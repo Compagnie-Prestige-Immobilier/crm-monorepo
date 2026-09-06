@@ -1,42 +1,70 @@
 import { readFile } from 'node:fs/promises';
 
-import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
+import {
+  expect,
+  request,
+  test,
+  type APIRequestContext,
+  type Locator,
+  type Page,
+} from '@playwright/test';
 
 import { adminApi } from './fixtures';
 
 /**
- * Lots d'export répartis : CHU-LOT-01, 03 à 09. CHU-LOT-02 vit dans
+ * Campagnes réparties : CHU-LOT-01, 03 à 09 pour l'administrateur, CHU-LOT-10 à
+ * CHU-LOT-21 pour le superviseur. CHU-LOT-02 vit dans
  * `chues-lots-export.roles.spec.ts`.
  *
- * AUCUN NETTOYAGE N'EST POSSIBLE POUR LES LOTS : l'API n'expose aucune
- * suppression, et le nom du lot est FABRIQUÉ par le web depuis la cible et
- * l'horodatage — aucun préfixe `E2E-CHUES-LOT ` ne peut y être posé. Chaque
- * exécution laisse donc un lot « Représentants, <date> » en base. Il ne porte
- * aucune donnée propre : il ne fait que référencer des représentants
- * existants. Les vingt représentants `E2E-CHUES-LOT Rep 01` à `20`, eux, sont
- * idempotents par téléphone et ne sont recréés qu'une fois.
+ * CHU-LOT-03 à CHU-LOT-09 laissent une campagne « Représentants non
+ * qualifiés, <date> » en base : leur formulaire ne corrige pas le nom proposé,
+ * qu'aucun préfixe ne peut donc porter. Elle ne détient aucune donnée propre,
+ * elle ne fait que référencer des représentants existants.
+ *
+ * Les campagnes de CHU-LOT-10 et suivants, elles, PORTENT le préfixe du fichier
+ * et le `beforeAll` retire celles de l'exécution précédente : EB-14 ouvre la
+ * saisie du nom, et la suppression existe pour l'administrateur.
+ *
+ * Les vingt représentants `E2E-CHUES-LOT Rep 01` à `20` sont idempotents par
+ * téléphone et ne sont recréés qu'une fois.
  */
 
 test.describe.configure({ mode: 'serial' });
 
 test.use({ storageState: 'e2e/.auth/admin.json' });
 
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+
+/** Le préfixe du fichier (`E2E.md` §5.5) : réserve de représentants ET campagnes. */
+const PREFIXE = 'E2E-CHUES-LOT ';
+
 /** Plage réservée à ce fichier (`E2E.md` §5.2). Le 21ᵉ sert à CHU-LOT-09. */
 const telephone = (rang: number) => `+2217810048${String(rang).padStart(2, '0')}`;
-const nomRepresentant = (rang: number) => `E2E-CHUES-LOT Rep ${String(rang).padStart(2, '0')}`;
+const nomRepresentant = (rang: number) => `${PREFIXE}Rep ${String(rang).padStart(2, '0')}`;
 
 const RESERVE = 20;
 const RANG_TARDIF = 21;
 
-/**
- * Trois comptes cochés, deux jours, trois fiches par jour : dix-huit places,
- * six cellules de trois. Un seul téléconseiller ne prouverait pas que le
- * tourniquet tourne, et un seul jour ne prouverait pas qu'il change de page.
- */
-const EQUIPE = ['Awa Fixture', 'Fatou Fixture', 'Superviseur Fixture'] as const;
+/** Le 22ᵉ numéro de la plage ne porte aucune fiche : il n'est QUE suggéré. */
+const TELEPHONE_SUGGERE = telephone(22);
+
 const FICHES_PAR_JOUR = 3;
 const JOURS = 2;
-const PLACES = EQUIPE.length * FICHES_PAR_JOUR * JOURS;
+
+/** Supervision et direction appellent en plus de leur travail : `capaciteParJour` côté API. */
+const capaciteReduite = (fichesParJour: number) => Math.max(1, Math.ceil(fichesParJour / 5));
+
+/**
+ * Trois comptes cochés et deux jours. Un seul téléconseiller ne prouverait pas
+ * que le tourniquet tourne, un seul jour ne prouverait pas qu'il change de
+ * page, et un compte de supervision est le seul qui prouve la capacité réduite.
+ */
+const EQUIPE = [
+  { nom: 'Awa Fixture', capacite: FICHES_PAR_JOUR },
+  { nom: 'Fatou Fixture', capacite: FICHES_PAR_JOUR },
+  { nom: 'Superviseur Fixture', capacite: capaciteReduite(FICHES_PAR_JOUR) },
+] as const;
+const PLACES = EQUIPE.reduce((total, membre) => total + membre.capacite, 0) * JOURS;
 
 interface Apercu {
   eligible: number;
@@ -64,6 +92,19 @@ interface Detail extends Lot {
 /** Le lot créé par CHU-LOT-05, relu par CHU-LOT-06 à CHU-LOT-09 (`serial`). */
 let lot: Lot | null = null;
 
+/**
+ * Le premier département du référentiel, seul lieu de la réserve. Les campagnes
+ * du superviseur s'y bornent : sans ce filtre, elles tireraient des fiches
+ * appartenant à d'autres specs, qu'un appel consigné modifierait.
+ */
+let departement: { id: string; name: string } | null = null;
+
+function leDepartement(): { id: string; name: string } {
+  expect(departement, 'Aucun département dans le référentiel').not.toBeNull();
+  if (departement === null) throw new Error('département absent');
+  return departement;
+}
+
 async function lire<T>(reponse: {
   ok: () => boolean;
   url: () => string;
@@ -83,7 +124,7 @@ async function lire<T>(reponse: {
  * accuserait l'écran.
  */
 async function exigerEquipe(api: APIRequestContext): Promise<void> {
-  for (const nom of EQUIPE) {
+  for (const { nom } of EQUIPE) {
     const page = await lire<{ items: { fullName: string; isActive: boolean }[] }>(
       await api.get('/api/v1/users', { params: { search: nom, pageSize: '50' } }),
     );
@@ -130,10 +171,11 @@ test.beforeAll(async () => {
   try {
     await exigerEquipe(api);
 
-    const departements = await lire<{ id: string }[]>(
+    const departements = await lire<{ id: string; name: string }[]>(
       await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
     );
-    const departementId = departements[0]?.id;
+    departement = departements[0] ?? null;
+    const departementId = departement?.id;
     expect(departementId, 'Aucun département dans le référentiel').toBeDefined();
     if (departementId === undefined) return;
 
@@ -153,15 +195,75 @@ test.beforeAll(async () => {
         `Le représentant ${nomRepresentant(RANG_TARDIF)} d’une exécution précédente n’a pas pu être retiré : ${await retire.text()}`,
       ).toBe(true);
     }
+
+    await retirerLesCampagnes(api);
+    await poserUnContactRecommande(api);
   } finally {
     await api.dispose();
   }
 });
 
+/**
+ * Les campagnes de l'exécution précédente. Le nettoyage se fait ICI et non dans
+ * un `afterAll` : celui-ci ne tourne pas après un échec dur, et le reliquat sert
+ * au diagnostic.
+ */
+async function retirerLesCampagnes(api: APIRequestContext): Promise<void> {
+  const liste = await lire<{ items: { id: string; name: string }[] }>(
+    await api.get('/api/v1/lots-export', { params: { search: PREFIXE, pageSize: '100' } }),
+  );
+  for (const ancienne of liste.items.filter((row) => row.name.startsWith(PREFIXE))) {
+    const retiree = await api.delete(`/api/v1/lots-export/${ancienne.id}`);
+    expect(
+      retiree.ok(),
+      `La campagne « ${ancienne.name} » n’a pas pu être retirée : ${await retiree.text()}`,
+    ).toBe(true);
+  }
+}
+
+/**
+ * EB-19 : le volume de démonstration n'offre AUCUN contact recommandé, et
+ * CHU-LOT-21 ne pourrait rien compter. Un numéro suggéré par le premier
+ * représentant de la réserve lui en donne un, hors de toute donnée partagée.
+ *
+ * Le numéro suggéré ne doit porter aucune fiche : la suggestion naîtrait
+ * résolue, et la cible ne retient que celles qui ne le sont pas.
+ */
+async function poserUnContactRecommande(api: APIRequestContext): Promise<void> {
+  const suggestions = await lire<{
+    items: { id: string; suggestedPhoneE164: string; resolvedRepresentantId: string | null }[];
+  }>(
+    await api.get('/api/v1/suggestions', {
+      params: { status: 'A_APPELER', pageSize: '100' },
+    }),
+  );
+  const deja = suggestions.items.find(
+    (row) => row.suggestedPhoneE164 === TELEPHONE_SUGGERE && row.resolvedRepresentantId === null,
+  );
+  if (deja !== undefined) return;
+
+  const source = await representantExistant(api, 1);
+  expect(source, `${nomRepresentant(1)} absent : la réserve n’a pas été posée`).toBeDefined();
+  if (source === undefined) return;
+
+  await lire(
+    await api.post('/api/v1/rep-campaigns/attempts', {
+      data: {
+        id: crypto.randomUUID(),
+        representantId: source.id,
+        outcome: 'REFUSED',
+        clientCreatedAt: new Date().toISOString(),
+        suggestedPhone: TELEPHONE_SUGGERE,
+        suggestedName: `${PREFIXE}contact recommandé`,
+      },
+    }),
+  );
+}
+
 async function ouvrirDialogue(page: Page): Promise<Locator> {
   await page.goto('/chues/campagnes');
-  await page.getByRole('button', { name: 'Nouveau lot' }).click();
-  const dialogue = page.getByRole('dialog', { name: 'Nouveau lot d’export' });
+  await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+  const dialogue = page.getByRole('dialog', { name: 'Nouvelle campagne' });
   await expect(dialogue).toBeVisible();
   return dialogue;
 }
@@ -172,7 +274,7 @@ function commande(dialogue: Locator, nom: string): Locator {
 }
 
 const boutonCreer = (dialogue: Locator): Locator =>
-  dialogue.getByRole('button', { name: 'Créer le lot', exact: true });
+  dialogue.getByRole('button', { name: 'Créer la campagne', exact: true });
 
 /**
  * Le champ nombre est visé par son libellé et non par `getByRole('spinbutton')` :
@@ -182,8 +284,8 @@ const boutonCreer = (dialogue: Locator): Locator =>
 async function reglerLaCible(dialogue: Locator): Promise<void> {
   await dialogue.getByRole('radio', { name: 'Représentants (CHUES)' }).check();
   await commande(dialogue, 'Tout décocher').click();
-  for (const nom of EQUIPE) await dialogue.getByRole('checkbox', { name: nom }).check();
-  await dialogue.getByLabel('Fiches par téléconseiller et par jour').fill(String(FICHES_PAR_JOUR));
+  for (const { nom } of EQUIPE) await dialogue.getByRole('checkbox', { name: nom }).check();
+  await dialogue.getByLabel('Fiches par jour, à défaut d’objectif').fill(String(FICHES_PAR_JOUR));
 }
 
 /**
@@ -265,9 +367,14 @@ async function telecharger(page: Page, nomDuBouton: string): Promise<Buffer> {
 test('CHU-LOT-01 · la route rend la liste des lots, et dit à quoi elle sert', async ({ page }) => {
   await page.goto('/chues/campagnes');
 
-  await expect(page.getByRole('heading', { name: 'Lots d’export', level: 1 })).toBeVisible();
-  await expect(page.getByText(/fige une sélection de fiches à une date donnée/)).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Nouveau lot' })).toBeVisible();
+  await expect(page).toHaveTitle('Campagnes · CPI GO');
+  await expect(page.getByRole('heading', { name: 'Campagnes', level: 1 })).toBeVisible();
+  await expect(
+    page.getByText(
+      'Une campagne répartit des fiches entre les téléconseillers et suit leur traitement.',
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Nouvelle campagne' })).toBeVisible();
 
   // L'ancien écran de campagne, dont la migration doit ne rien laisser.
   await expect(page.getByText('Distribuer les appels aux téléconseillers')).toHaveCount(0);
@@ -287,9 +394,9 @@ test('CHU-LOT-03 · le dialogue annonce la répartition avant de créer, et l’
 
   expect(
     apercu.eligible,
-    'moins de dix-huit représentants en base : le `beforeAll` n’a pas posé sa réserve',
+    'vivier trop court : le `beforeAll` n’a pas posé sa réserve',
   ).toBeGreaterThanOrEqual(PLACES);
-  expect(apercu.places, '3 téléconseillers × 3 fiches × 2 jours').toBe(PLACES);
+  expect(apercu.places, 'deux capacités pleines et une réduite, sur deux jours').toBe(PLACES);
   expect(apercu.retenues, 'le vivier dépasse les places : la répartition les remplit toutes').toBe(
     PLACES,
   );
@@ -322,7 +429,7 @@ test('CHU-LOT-04 · sans téléconseiller coché, la création est refusée et d
   await expect(boutonCreer(dialogue)).toBeEnabled();
 });
 
-test('CHU-LOT-05 · la création fige dix-huit fiches et le détail rend le tourniquet', async ({
+test('CHU-LOT-05 · la création fige les places de la répartition et le détail rend le tourniquet', async ({
   page,
 }) => {
   const dialogue = await ouvrirDialogue(page);
@@ -355,7 +462,7 @@ test('CHU-LOT-05 · la création fige dix-huit fiches et le détail rend le tour
     await expect(tableau.getByRole('columnheader', { name: `Jour ${String(jour)}` })).toBeVisible();
   }
 
-  for (const nom of EQUIPE) {
+  for (const { nom, capacite } of EQUIPE) {
     const ligne = tableau
       .getByRole('row')
       .filter({ has: page.getByRole('rowheader', { name: nom }) });
@@ -363,7 +470,7 @@ test('CHU-LOT-05 · la création fige dix-huit fiches et le détail rend le tour
       const cellule = ligne.getByRole('cell').filter({
         has: page.getByRole('button', { name: `Programme de ${nom}, jour ${String(jour)}` }),
       });
-      await expect(cellule, `${nom}, jour ${String(jour)}`).toContainText(String(FICHES_PAR_JOUR));
+      await expect(cellule, `${nom}, jour ${String(jour)}`).toContainText(String(capacite));
     }
   }
 });
@@ -373,7 +480,7 @@ test('CHU-LOT-06 · le programme d’un téléconseiller est un vrai PDF, nommé
 
   const [fichier] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('button', { name: `Programme de ${EQUIPE[0]}, jour 1` }).click(),
+    page.getByRole('button', { name: `Programme de ${EQUIPE[0].nom}, jour 1` }).click(),
   ]);
 
   expect(fichier.suggestedFilename()).toMatch(/^programme-.*jour-1\.pdf$/);
@@ -465,3 +572,485 @@ test('CHU-LOT-09 · le lot est figé : un représentant créé après lui n’y 
     await api.dispose();
   }
 });
+
+/**
+ * EB-14 à EB-19 : la campagne que règle un superviseur. CHU-LOT-10 à CHU-LOT-21.
+ *
+ * Le nom se SAISIT désormais et la suppression existe : ces campagnes portent le
+ * préfixe du fichier, et le `beforeAll` retire celles de l'exécution précédente.
+ * Elles visent le PREMIER département du référentiel, le seul où vive la réserve
+ * `E2E-CHUES-LOT Rep` : l'appel consigné par CHU-LOT-16 ne touche donc aucune
+ * fiche appartenant à une autre spec.
+ *
+ * Les onze parcours s'enchaînent sur une seule campagne, dans l'ordre où ils
+ * sont écrits : le fichier est en `serial`.
+ */
+
+const NOM_CREATION = `${PREFIXE}campagne du superviseur`;
+const NOM_RENOMME = `${PREFIXE}campagne renommée`;
+
+/** EB-17 : l'objectif explicite prime sur la capacité déduite du rôle. */
+const OBJECTIF_AWA = 4;
+const OBJECTIF_AWA_CORRIGE = 5;
+
+/**
+ * Un seul jour : la répartition tient dans une page de fiches, et chaque compte
+ * reçoit exactement sa capacité. Awa 4 par objectif, Fatou 3 par défaut,
+ * Superviseur Fixture 1 par capacité réduite.
+ */
+const JOURS_SUP = 1;
+const FICHES_AWA = OBJECTIF_AWA;
+const FICHES_FATOU = FICHES_PAR_JOUR;
+const FICHES_SUPERVISEUR = capaciteReduite(FICHES_PAR_JOUR);
+const FICHES_SUP = FICHES_AWA + FICHES_FATOU + FICHES_SUPERVISEUR;
+
+const [AWA, FATOU, SUPERVISEUR] = EQUIPE.map((membre) => membre.nom) as [string, string, string];
+
+interface Fiche {
+  position: number;
+  ficheId: string | null;
+  fullName: string;
+  teleconseillerName: string;
+  etat: 'NON_TRAITEE' | 'TRAITEE' | 'A_RAPPELER';
+}
+
+let campagne: Lot | null = null;
+let ficheTraitee: Fiche | null = null;
+
+function laCampagne(): Lot {
+  expect(
+    campagne,
+    'CHU-LOT-10 n’a pas créé de campagne : les suivants n’ont rien à ouvrir',
+  ).not.toBeNull();
+  if (campagne === null) throw new Error('campagne absente');
+  return campagne;
+}
+
+async function ouvrirLaCampagne(page: Page): Promise<Lot> {
+  const cree = laCampagne();
+  await page.goto(`/chues/campagnes/${cree.id}`);
+  await expect(page.getByRole('heading', { name: cree.name, level: 2 })).toBeVisible();
+  return cree;
+}
+
+const carteFiches = (page: Page): Locator =>
+  page.getByRole('table', { name: 'Fiches de la campagne' });
+
+const cartePerformance = (page: Page): Locator =>
+  page.getByRole('table', { name: 'Performance de la campagne' });
+
+function lignePerformance(page: Page, nom: string): Locator {
+  return cartePerformance(page)
+    .getByRole('row')
+    .filter({ has: page.getByRole('rowheader', { name: nom, exact: true }) });
+}
+
+/** Les listes déroulantes du panel sont des boutons ; leurs options vivent dans un portail. */
+async function choisir(page: Page, champ: string, option: string): Promise<void> {
+  await page.getByRole('combobox', { name: champ, exact: true }).click();
+  await page.getByRole('option', { name: option, exact: true }).click();
+}
+
+async function fichesDeLaCampagne(id: string): Promise<Fiche[]> {
+  const api = await adminApi();
+  try {
+    const page = await lire<{ items: Fiche[] }>(
+      await api.get(`/api/v1/lots-export/${id}/fiches`, { params: { pageSize: '100' } }),
+    );
+    return page.items;
+  } finally {
+    await api.dispose();
+  }
+}
+
+test.describe('campagne réglée par un superviseur', () => {
+  test.use({ storageState: 'e2e/.auth/superviseur.json' });
+
+  test('CHU-LOT-10 · le nom proposé suit les critères, et c’est le nom corrigé qui ouvre le détail', async ({
+    page,
+  }) => {
+    const departement = leDepartement();
+
+    await page.goto('/chues/campagnes');
+    await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+    const dialogue = page.getByRole('dialog', { name: 'Nouvelle campagne' });
+    await expect(dialogue).toBeVisible();
+
+    await dialogue.getByRole('radio', { name: 'Représentants (CHUES)' }).check();
+    await choisir(page, 'Département', departement.name);
+    await commande(dialogue, 'Tout décocher').click();
+    for (const { nom } of EQUIPE) await dialogue.getByRole('checkbox', { name: nom }).check();
+    await dialogue
+      .getByRole('spinbutton', { name: `Objectif quotidien de ${AWA}` })
+      .fill(String(OBJECTIF_AWA));
+
+    // EB-14 : le nom est PROPOSÉ d'après la cible et le lieu, puis daté. Sans
+    // cette lecture, rien ne distinguerait un champ pré-rempli d'un champ vide.
+    const champNom = dialogue.getByLabel('Nom de la campagne');
+    const propose = await champNom.inputValue();
+    const attendu = `Représentants non qualifiés, département de ${departement.name}, `;
+    expect(propose.slice(0, attendu.length), 'le nom proposé ne suit pas les critères').toBe(
+      attendu,
+    );
+    expect(propose.length, 'le nom proposé ne porte pas de date').toBeGreaterThan(attendu.length);
+
+    await champNom.fill(NOM_CREATION);
+
+    const attendreLApercu = page.waitForResponse((candidate) => {
+      if (!candidate.url().includes('/api/v1/lots-export/apercu')) return false;
+      if (candidate.request().method() !== 'POST') return false;
+      const corps = candidate.request().postDataJSON() as {
+        cible?: string;
+        distribution?: {
+          jours?: number;
+          fichesParJour?: number;
+          objectifs?: { fichesParJour: number }[];
+        };
+      } | null;
+      return (
+        corps?.cible === 'REPRESENTANTS' &&
+        corps.distribution?.jours === JOURS_SUP &&
+        corps.distribution.fichesParJour === FICHES_PAR_JOUR &&
+        corps.distribution.objectifs?.length === 1 &&
+        corps.distribution.objectifs[0]?.fichesParJour === OBJECTIF_AWA
+      );
+    });
+    await dialogue.getByLabel('Fiches par jour, à défaut d’objectif').fill(String(FICHES_PAR_JOUR));
+    await attendreLApercu;
+
+    const creation = page.waitForResponse(
+      (candidate) =>
+        candidate.url().endsWith('/api/v1/lots-export') && candidate.request().method() === 'POST',
+    );
+    await dialogue.getByRole('button', { name: 'Créer la campagne', exact: true }).click();
+
+    const reponse = await creation;
+    const corps = await reponse.text();
+    expect(reponse.status(), corps).toBe(201);
+    const cree = JSON.parse(corps) as Lot;
+    expect(cree.name, 'le nom corrigé n’est pas celui qui part au serveur').toBe(NOM_CREATION);
+    expect(
+      cree.itemCount,
+      'l’objectif saisi n’a pas compté dans les places : 4 + 3 + 1 sur un jour',
+    ).toBe(FICHES_SUP);
+    campagne = cree;
+
+    await page.waitForURL(`**/chues/campagnes/${cree.id}`);
+    await expect(page.getByRole('heading', { name: NOM_CREATION, level: 2 })).toBeVisible();
+  });
+
+  test('CHU-LOT-11 · un superviseur ne peut supprimer aucune campagne', async ({ page }) => {
+    const cree = await ouvrirLaCampagne(page);
+
+    await expect(
+      page.getByRole('button', { name: `Supprimer ${cree.name}` }),
+      'le détail ouvre la suppression à qui n’y a pas droit',
+    ).toHaveCount(0);
+
+    await page.goto('/chues/campagnes');
+    await page.getByLabel('Rechercher une campagne').fill(cree.name);
+    // La campagne est bien LÀ : sans cette ligne, l'absence de bouton ne dirait
+    // que l'absence de liste.
+    await expect(page.getByRole('link', { name: cree.name, exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /^Supprimer / }),
+      'la liste ouvre la suppression à qui n’y a pas droit',
+    ).toHaveCount(0);
+  });
+
+  test('CHU-LOT-12 · le renommage depuis le détail survit à un rechargement', async ({ page }) => {
+    const cree = await ouvrirLaCampagne(page);
+
+    await page.getByRole('button', { name: 'Renommer la campagne' }).click();
+    await page.getByLabel('Nom de la campagne').fill(NOM_RENOMME);
+
+    const renommage = page.waitForResponse(
+      (candidate) =>
+        candidate.url().endsWith(`/api/v1/lots-export/${cree.id}`) &&
+        candidate.request().method() === 'PATCH',
+    );
+    await page.getByRole('button', { name: 'Enregistrer le nom' }).click();
+    expect((await renommage).status()).toBe(200);
+
+    await expect(page.getByRole('heading', { name: NOM_RENOMME, level: 2 })).toBeVisible();
+
+    // Le rechargement relit le serveur : sans lui, l'écran ne montrerait que sa
+    // propre saisie.
+    await page.reload();
+    await expect(page.getByRole('heading', { name: NOM_RENOMME, level: 2 })).toBeVisible();
+    campagne = { ...cree, name: NOM_RENOMME };
+  });
+
+  test('CHU-LOT-13 · l’objectif saisi à la création se relit dans « Objectif par jour »', async ({
+    page,
+  }) => {
+    await ouvrirLaCampagne(page);
+
+    await expect(
+      cartePerformance(page).getByRole('columnheader', { name: 'Objectif par jour' }),
+    ).toBeVisible();
+    await expect(
+      lignePerformance(page, AWA).getByRole('spinbutton', {
+        name: `Objectif quotidien de ${AWA}`,
+      }),
+      'l’objectif saisi à la création ne se relit pas',
+    ).toHaveValue(String(OBJECTIF_AWA));
+    await expect(
+      lignePerformance(page, AWA),
+      'l’objectif n’a pas commandé la part d’Awa dans la répartition',
+    ).toContainText(`0 sur ${String(FICHES_AWA)}`);
+  });
+
+  test('CHU-LOT-14 · l’objectif se corrige depuis le détail et survit à un rechargement', async ({
+    page,
+  }) => {
+    const cree = await ouvrirLaCampagne(page);
+
+    const champ = lignePerformance(page, AWA).getByRole('spinbutton', {
+      name: `Objectif quotidien de ${AWA}`,
+    });
+    const reglage = page.waitForResponse(
+      (candidate) =>
+        candidate.url().endsWith(`/api/v1/lots-export/${cree.id}`) &&
+        candidate.request().method() === 'PATCH',
+    );
+    await champ.fill(String(OBJECTIF_AWA_CORRIGE));
+    // Le champ n'enregistre qu'en perdant le focus : le laisser rempli sans le
+    // quitter n'envoie rien.
+    await champ.blur();
+    expect((await reglage).status()).toBe(200);
+
+    await page.reload();
+    await expect(
+      lignePerformance(page, AWA).getByRole('spinbutton', {
+        name: `Objectif quotidien de ${AWA}`,
+      }),
+    ).toHaveValue(String(OBJECTIF_AWA_CORRIGE));
+  });
+
+  test('CHU-LOT-15 · le filtre par téléconseiller ne rend que les fiches de l’intéressé', async ({
+    page,
+  }) => {
+    await ouvrirLaCampagne(page);
+
+    const tableau = carteFiches(page);
+    await expect(tableau.getByRole('rowheader')).toHaveCount(FICHES_SUP);
+
+    await choisir(page, 'Téléconseiller', AWA);
+    await expect(
+      tableau.getByRole('rowheader'),
+      `${AWA} a ${String(FICHES_AWA)} fiches`,
+    ).toHaveCount(FICHES_AWA);
+    await expect(
+      tableau.getByRole('cell', { name: AWA, exact: true }),
+      'toutes les lignes rendues doivent être les siennes',
+    ).toHaveCount(FICHES_AWA);
+    await expect(tableau.getByRole('cell', { name: FATOU, exact: true })).toHaveCount(0);
+  });
+
+  test('CHU-LOT-16 · une fiche appelée passe à « Traitée », et le filtre par état la retrouve', async ({
+    page,
+  }) => {
+    const cree = laCampagne();
+    const fiches = await fichesDeLaCampagne(cree.id);
+    const cible = fiches.find(
+      (fiche) => fiche.teleconseillerName === AWA && fiche.etat === 'NON_TRAITEE',
+    );
+    expect(cible, `aucune fiche non traitée confiée à ${AWA}`).toBeDefined();
+    if (cible === undefined) return;
+    expect(
+      cible.fullName.startsWith(PREFIXE),
+      `la campagne a tiré « ${cible.fullName} », hors de la réserve de ce fichier`,
+    ).toBe(true);
+
+    // L'appel se consigne SOUS LE COMPTE D'AWA : la fiche est la sienne, et la
+    // performance ne compte que les appels de l'attributaire.
+    const awa = await request.newContext({
+      baseURL: WEB_URL,
+      storageState: 'e2e/.auth/commercial.json',
+    });
+    try {
+      await lire(
+        await awa.post('/api/v1/rep-campaigns/attempts', {
+          data: {
+            id: crypto.randomUUID(),
+            representantId: cible.ficheId,
+            outcome: 'REACHED',
+            clientCreatedAt: new Date().toISOString(),
+          },
+        }),
+      );
+    } finally {
+      await awa.dispose();
+    }
+    ficheTraitee = cible;
+
+    await ouvrirLaCampagne(page);
+    const tableau = carteFiches(page);
+
+    await choisir(page, 'État', 'Traitée');
+    await expect(tableau.getByRole('rowheader')).toHaveCount(1);
+    await expect(
+      tableau.getByRole('rowheader', { name: cible.fullName, exact: true }),
+    ).toBeVisible();
+
+    await choisir(page, 'État', 'Non traitée');
+    await expect(tableau.getByRole('rowheader')).toHaveCount(FICHES_SUP - 1);
+    await expect(
+      tableau.getByRole('rowheader', { name: cible.fullName, exact: true }),
+      'une fiche appelée reste comptée comme non traitée',
+    ).toHaveCount(0);
+  });
+
+  test('CHU-LOT-17 · une fiche traitée ne se coche pas', async ({ page }) => {
+    expect(ficheTraitee, 'CHU-LOT-16 n’a consigné aucun appel').not.toBeNull();
+    if (ficheTraitee === null) return;
+    await ouvrirLaCampagne(page);
+
+    const tableau = carteFiches(page);
+    await expect(
+      tableau.getByRole('checkbox', { name: `Attribuer la fiche de ${ficheTraitee.fullName}` }),
+      'une fiche appelée se déplacerait, et son travail passerait au compteur d’un autre',
+    ).toBeDisabled();
+
+    const encoreAFaire = (await fichesDeLaCampagne(laCampagne().id)).find(
+      (fiche) => fiche.etat === 'NON_TRAITEE',
+    );
+    expect(
+      encoreAFaire,
+      'plus une seule fiche non traitée : le refus ne prouverait rien',
+    ).toBeDefined();
+    if (encoreAFaire === undefined) return;
+    await expect(
+      tableau.getByRole('checkbox', { name: `Attribuer la fiche de ${encoreAFaire.fullName}` }),
+    ).toBeEnabled();
+  });
+
+  test('CHU-LOT-18 · les fiches cochées passent à un autre compte, et « Réaffectations » l’inscrit', async ({
+    page,
+  }) => {
+    await ouvrirLaCampagne(page);
+    const tableau = carteFiches(page);
+
+    await choisir(page, 'Téléconseiller', FATOU);
+    await expect(tableau.getByRole('rowheader')).toHaveCount(FICHES_FATOU);
+    const rendues = await tableau.getByRole('rowheader').allInnerTexts();
+
+    await tableau
+      .getByRole('checkbox', { name: 'Cocher toutes les fiches non traitées de la page' })
+      .check();
+    await choisir(page, 'Attribuer les fiches à', SUPERVISEUR);
+
+    const envoi = page.waitForResponse(
+      (candidate) =>
+        candidate.url().endsWith(`/api/v1/lots-export/${laCampagne().id}/reaffectation`) &&
+        candidate.request().method() === 'POST',
+    );
+    await page.getByRole('button', { name: 'Attribuer', exact: true }).click();
+    expect((await envoi).status()).toBe(200);
+
+    // Le filtre n'a pas bougé : ce qui reste sous le nom du cédant est ce qu'il
+    // n'a pas rendu.
+    await expect(page.getByText('Aucune fiche ne correspond à ces filtres.')).toBeVisible();
+
+    await choisir(page, 'Téléconseiller', SUPERVISEUR);
+    await expect(tableau.getByRole('rowheader')).toHaveCount(FICHES_SUPERVISEUR + FICHES_FATOU);
+    for (const nom of rendues) {
+      await expect(
+        tableau.getByRole('rowheader', { name: nom, exact: true }),
+        `« ${nom} » n’a pas changé de téléconseiller`,
+      ).toBeVisible();
+    }
+
+    await expect(page.getByRole('heading', { name: 'Réaffectations', level: 3 })).toBeVisible();
+    await expect(
+      page.getByText(`${String(FICHES_FATOU)} fiches de ${FATOU} vers ${SUPERVISEUR}`),
+      'le mouvement ne laisse aucune trace lisible',
+    ).toBeVisible();
+  });
+
+  test('CHU-LOT-19 · un téléconseiller retiré rend ses fiches au reste de l’équipe', async ({
+    page,
+  }) => {
+    await ouvrirLaCampagne(page);
+
+    const avant = FICHES_SUPERVISEUR + FICHES_FATOU;
+    await expect(lignePerformance(page, SUPERVISEUR)).toContainText(`0 sur ${String(avant)}`);
+    await expect(lignePerformance(page, AWA)).toContainText(`1 sur ${String(FICHES_AWA)}`);
+
+    await page.getByRole('button', { name: `Retirer ${SUPERVISEUR} de la campagne` }).click();
+    const dialogue = page.getByRole('dialog', { name: `Retirer ${SUPERVISEUR} ?` });
+    const retrait = page.waitForResponse(
+      (candidate) =>
+        candidate.url().endsWith(`/api/v1/lots-export/${laCampagne().id}/retrait`) &&
+        candidate.request().method() === 'POST',
+    );
+    await dialogue.getByRole('button', { name: 'Retirer', exact: true }).click();
+    expect((await retrait).status()).toBe(200);
+
+    await expect(
+      cartePerformance(page).getByRole('rowheader', { name: SUPERVISEUR, exact: true }),
+      'un compte sans fiche reste affiché comme s’il travaillait encore',
+    ).toHaveCount(0);
+
+    // Les quatre fiches rendues repartent selon les objectifs en vigueur :
+    // Awa 5, Fatou 3, donc deux et deux.
+    await expect(lignePerformance(page, AWA)).toContainText(`1 sur ${String(FICHES_AWA + 2)}`);
+    await expect(lignePerformance(page, FATOU)).toContainText('0 sur 2');
+  });
+
+  test('CHU-LOT-20 · la cible « Représentants injoignables » compte ce que le serveur compte', async ({
+    page,
+  }) => {
+    const apercu = await apercuDeLaCible(
+      page,
+      'Représentants injoignables',
+      'REPRESENTANTS_INJOIGNABLES',
+    );
+
+    expect(
+      apercu.eligible,
+      'aucun représentant injoignable en base : la cible ne peut rien prouver ici',
+    ).toBeGreaterThan(0);
+    expect(apercu.scopeLabel).toBe('Représentants injoignables');
+  });
+
+  test('CHU-LOT-21 · la cible « Contacts recommandés » compte ce que le serveur compte', async ({
+    page,
+  }) => {
+    const apercu = await apercuDeLaCible(page, 'Contacts recommandés', 'CONTACTS_RECOMMANDES');
+
+    expect(
+      apercu.eligible,
+      'aucun contact recommandé en attente : le `beforeAll` n’a pas posé le sien',
+    ).toBeGreaterThan(0);
+    expect(apercu.scopeLabel).toBe('Contacts recommandés');
+  });
+});
+
+/**
+ * Ouvre le dialogue sur une cible et rend l'aperçu LU SUR LE RÉSEAU, après
+ * avoir vérifié que l'écran affiche bien ce nombre-là. Un compte estimé côté
+ * navigateur divergerait du tirage réel sans que rien ne le dise.
+ */
+async function apercuDeLaCible(page: Page, titre: string, cible: string): Promise<Apercu> {
+  await page.goto('/chues/campagnes');
+  await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+  const dialogue = page.getByRole('dialog', { name: 'Nouvelle campagne' });
+  await expect(dialogue).toBeVisible();
+
+  const attendu = page.waitForResponse((candidate) => {
+    if (!candidate.url().includes('/api/v1/lots-export/apercu')) return false;
+    if (candidate.request().method() !== 'POST') return false;
+    return (candidate.request().postDataJSON() as { cible?: string } | null)?.cible === cible;
+  });
+  // Le libellé accessible du bouton radio porte AUSSI le texte d'aide de la
+  // cible : `exact` ne trouverait rien.
+  await dialogue.getByRole('radio', { name: titre }).check();
+  const apercu = await lire<Apercu>(await attendu);
+
+  const annonce = dialogue.getByRole('status');
+  await expect(annonce).toContainText(`${String(apercu.eligible)} fiche`);
+  await expect(annonce).toContainText('disponible');
+  return apercu;
+}
