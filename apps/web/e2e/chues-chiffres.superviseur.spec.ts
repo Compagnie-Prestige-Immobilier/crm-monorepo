@@ -387,5 +387,5 @@ test('CHU-TRV-06 · la navigation de l’encadrement ouvre sur les chiffres', as
    */
   const lotsExport = navigation.locator('a[href="/chues/campagnes"]');
   await expect(lotsExport).toHaveCount(1);
-  await expect(lotsExport).toHaveText('Lots d’export');
+  await expect(lotsExport).toHaveText('Campagnes');
 });
