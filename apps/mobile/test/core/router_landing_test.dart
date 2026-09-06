@@ -124,7 +124,10 @@ void main() {
           openedById: 'u-1',
           representantId: Value<String?>(representantId),
           prospectId: Value<String?>(prospectId),
-          openedAt: t0.subtract(const Duration(minutes: 2)),
+          openedAt: t0.subtract(const Duration(minutes: 3)),
+          // EB-09 : le chronomètre part de la première saisie, pas de
+          // l'ouverture.
+          firstInputAt: Value<DateTime?>(t0.subtract(const Duration(minutes: 2))),
         ),
       );
 
