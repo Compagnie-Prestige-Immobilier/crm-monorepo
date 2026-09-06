@@ -98,15 +98,19 @@ class AppelsCrm extends Notifier<String?> {
     return rapprocherEnAttente();
   }
 
-  /// Remplit les preuves encore sans entrée de journal. Relance si le journal
-  /// n'a rien : l'appel vient peut-être de se terminer.
+  /// Rapproche les preuves qu'aucune tentative n'a encore consommées : le
+  /// dernier appel du journal vers le numéro fait foi, même s'il en remplace
+  /// un déjà retenu. Relance si le journal n'a rien : l'appel vient peut-être
+  /// de se terminer.
   Future<void> rapprocherEnAttente() async {
     final AppDatabase db = ref.read(appDatabaseProvider);
     final Telephonie telephonie = ref.read(telephonieProvider);
     final DateTime maintenant = ref.read(clockProvider).now();
     final DateTime seuil = maintenant.subtract(kFenetrePreuve);
     final List<PreuvesAppelData> attente = await db
-        .preuvesEnAttente(seuilSecondes: seuil.millisecondsSinceEpoch ~/ 1000)
+        .preuvesARapprocher(
+          seuilSecondes: seuil.millisecondsSinceEpoch ~/ 1000,
+        )
         .get();
     if (attente.isEmpty) return;
 
@@ -122,9 +126,11 @@ class AppelsCrm extends Notifier<String?> {
         lanceA: preuve.lanceAt,
       );
       if (trouvee == null) {
-        manquant = true;
+        manquant = preuve.journalAt == null;
         continue;
       }
+      final DateTime? deja = preuve.journalAt;
+      if (deja != null && !trouvee.at.isAfter(deja)) continue;
       await (db.update(
         db.preuvesAppel,
       )..where((PreuvesAppel row) => row.id.equals(preuve.id))).write(
