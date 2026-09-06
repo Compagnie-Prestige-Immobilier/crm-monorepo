@@ -75,6 +75,308 @@ function rendezVous(valeur: unknown): string {
   return iso === null ? '' : ` · rendez-vous le ${formatDateTime(iso)}`;
 }
 
+function LotSummary({
+  id,
+  peutRegler,
+  name,
+  scopeLabel,
+  itemCount,
+  equipeCount,
+  jours,
+  createdAt,
+  createdByName,
+}: {
+  id: string;
+  peutRegler: boolean;
+  name: string;
+  scopeLabel: string;
+  itemCount: number;
+  equipeCount: number;
+  jours: number;
+  createdAt: string;
+  createdByName: string;
+}) {
+  return (
+    <div className="max-w-2xl">
+      {/* `h2` : la barre du panel porte déjà l'unique `h1` de la page. */}
+      {peutRegler ? (
+        <NomModifiable id={id} name={name} />
+      ) : (
+        <h2 className="font-display text-h2 font-[800]">{name}</h2>
+      )}
+      <p className="mt-1 text-[0.9375rem] text-muted-foreground">
+        {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
+        {itemCount > 1 ? 's' : ''} réparties entre{' '}
+        <span className="tabular-nums">{formatNumber(equipeCount)}</span> téléconseiller
+        {equipeCount > 1 ? 's' : ''} sur{' '}
+        <span className="tabular-nums">{formatNumber(jours)}</span> jour
+        {jours > 1 ? 's' : ''}, le {formatDate(createdAt)}, par {createdByName}.
+      </p>
+    </div>
+  );
+}
+
+function LotDownloads({
+  id,
+  name,
+  telechargement,
+}: {
+  id: string;
+  name: string;
+  telechargement: ReturnType<typeof useFileDownload>;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        type="button"
+        disabled={telechargement.pending}
+        onClick={() => {
+          void telechargement.download({
+            url: lotExportUrl(id, 'zip'),
+            fileName: lotExportFileName(name, 'zip'),
+            failureMessage: 'L’archive n’a pas pu être générée.',
+          });
+        }}
+      >
+        {telechargement.pending ? (
+          <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <FileArchiveIcon aria-hidden="true" />
+        )}
+        Tous les programmes (ZIP)
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        disabled={telechargement.pending}
+        onClick={() => {
+          void telechargement.download({
+            url: lotExportUrl(id, 'xlsx'),
+            fileName: lotExportFileName(name, 'xlsx'),
+            failureMessage: 'Le classeur n’a pas pu être généré.',
+          });
+        }}
+      >
+        <FileSpreadsheetIcon aria-hidden="true" />
+        Classeur Excel
+      </Button>
+    </div>
+  );
+}
+
+function ProgrammesCard({
+  repartition,
+  colonnes,
+  distribution,
+  id,
+  telechargement,
+}: {
+  repartition: LotExportDetail['repartition'];
+  colonnes: number[];
+  distribution: LotExportDetail['distribution'];
+  id: string;
+  telechargement: ReturnType<typeof useFileDownload>;
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+          Programmes d’appel
+        </h3>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
+          {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la
+          supervision et la direction.
+        </p>
+      </CardHeader>
+      <CardContent>
+        {repartition.length === 0 ? (
+          <p className="text-[0.875rem] text-muted-foreground">
+            Aucun téléconseiller n’a reçu de fiche.
+          </p>
+        ) : (
+          <Table aria-label="Programmes d’appel">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Téléconseiller</TableHead>
+                {colonnes.map((jour) => (
+                  <TableHead key={jour} scope="col" className="text-right">
+                    Jour {jour}
+                  </TableHead>
+                ))}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {repartition.map((ligne) => (
+                <TableRow key={ligne.teleconseillerId}>
+                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                    {ligne.teleconseillerName}
+                  </th>
+                  {colonnes.map((jour) => {
+                    const fiches = ligne.jours.find((entree) => entree.jour === jour)?.fiches ?? 0;
+                    return (
+                      <TableCell key={jour}>
+                        <span className="flex items-center justify-end gap-2">
+                          <span className="tabular-nums">{formatNumber(fiches)}</span>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="icon-sm"
+                            aria-label={`Programme de ${ligne.teleconseillerName}, jour ${String(jour)}`}
+                            disabled={fiches === 0 || telechargement.pending}
+                            onClick={() => {
+                              void telechargement.download({
+                                url: lotProgrammeUrl(id, ligne.teleconseillerId, jour),
+                                fileName: lotProgrammeFileName(ligne.teleconseillerName, jour),
+                                failureMessage: `Le programme du jour ${String(jour)} n’a pas pu être généré.`,
+                              });
+                            }}
+                          >
+                            <FileDownIcon aria-hidden="true" />
+                          </Button>
+                        </span>
+                      </TableCell>
+                    );
+                  })}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReaffectationsCard({
+  reaffectations,
+}: {
+  reaffectations: LotExportDetail['reaffectations'];
+}) {
+  if (reaffectations.length === 0) return null;
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+          Réaffectations
+        </h3>
+      </CardHeader>
+      <CardContent>
+        <ul className="divide-y divide-border">
+          {reaffectations.map((trace) => (
+            <li key={trace.id} className="py-2.5 text-[0.875rem]">
+              <span className="tabular-nums font-[600]">{formatNumber(trace.fiches)}</span> fiche
+              {trace.fiches > 1 ? 's' : ''} de {trace.fromName ?? 'personne'} vers {trace.toName}
+              <span className="block text-[0.8125rem] text-muted-foreground">
+                {formatDateTime(trace.createdAt)}, par {trace.performedByName}
+              </span>
+            </li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AppelsCard({
+  fichesAppelees,
+  itemCount,
+  callsSince,
+  parTeleconseiller,
+  recentAttempts,
+}: {
+  fichesAppelees: number;
+  itemCount: number;
+  callsSince: number;
+  parTeleconseiller: readonly (readonly [string, number])[];
+  recentAttempts: LotExportDetail['recentAttempts'];
+}) {
+  return (
+    <Card>
+      <CardHeader>
+        <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+          Appels passés sur ces fiches depuis la création
+        </h3>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5">
+        <p className="text-[0.9375rem]">
+          <span className="tabular-nums">{formatNumber(fichesAppelees)}</span> fiche
+          {fichesAppelees > 1 ? 's' : ''} appelée{fichesAppelees > 1 ? 's' : ''} sur{' '}
+          <span className="tabular-nums">{formatNumber(itemCount)}</span>,{' '}
+          <span className="tabular-nums">{formatNumber(callsSince)}</span> appel
+          {callsSince > 1 ? 's' : ''} consigné{callsSince > 1 ? 's' : ''}.
+        </p>
+
+        <ParTeleconseillerBlock parTeleconseiller={parTeleconseiller} />
+        <RecentAttemptsList recentAttempts={recentAttempts} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function ParTeleconseillerBlock({
+  parTeleconseiller,
+}: {
+  parTeleconseiller: readonly (readonly [string, number])[];
+}) {
+  if (parTeleconseiller.length === 0) return null;
+  return (
+    <div>
+      <h4 className="mb-2 text-[0.8125rem] font-[600] text-muted-foreground">Par téléconseiller</h4>
+      <ul className="flex flex-wrap gap-2">
+        {parTeleconseiller.map(([nom, nombre]) => (
+          <li key={nom}>
+            <Badge variant="outline">
+              {nom} : {formatNumber(nombre)}
+            </Badge>
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function RecentAttemptsList({
+  recentAttempts,
+}: {
+  recentAttempts: LotExportDetail['recentAttempts'];
+}) {
+  if (recentAttempts.length === 0) {
+    return (
+      <p className="text-[0.875rem] text-muted-foreground">
+        Aucun appel consigné depuis la création.
+      </p>
+    );
+  }
+  return (
+    <ul className="divide-y divide-border">
+      {recentAttempts.map((tentative) => (
+        <li key={tentative.id} className="flex flex-col gap-1 py-3">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}</Badge>
+            <span className="font-[600]">{tentative.shortCode}</span>
+            <span className="text-[0.8125rem] text-muted-foreground tabular-nums">
+              {formatPhone(tentative.phoneE164)}
+            </span>
+            {tentative.method === null ? null : (
+              <span className="text-[0.8125rem] text-muted-foreground">
+                {ENROLLMENT_METHOD_LABELS[tentative.method]}
+              </span>
+            )}
+          </div>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            {formatDateTime(tentative.createdAt)}, par {tentative.performedByName}
+            {rendezVous(tentative.rendezVousAt)}
+          </p>
+          {texte(tentative.comment) === null ? null : (
+            <p className="text-[0.875rem]">{texte(tentative.comment)}</p>
+          )}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export function LotExportDetailView({
   id,
   peutRegler,
@@ -137,223 +439,41 @@ export function LotExportDetailView({
       </Link>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="max-w-2xl">
-          {/* `h2` : la barre du panel porte déjà l'unique `h1` de la page. */}
-          {peutRegler ? (
-            <NomModifiable id={id} name={name} />
-          ) : (
-            <h2 className="font-display text-h2 font-[800]">{name}</h2>
-          )}
-          <p className="mt-1 text-[0.9375rem] text-muted-foreground">
-            {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
-            {itemCount > 1 ? 's' : ''} réparties entre{' '}
-            <span className="tabular-nums">{formatNumber(repartition.length)}</span> téléconseiller
-            {repartition.length > 1 ? 's' : ''} sur{' '}
-            <span className="tabular-nums">{formatNumber(distribution.jours)}</span> jour
-            {distribution.jours > 1 ? 's' : ''}, le {formatDate(createdAt)}, par {createdByName}.
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            type="button"
-            disabled={telechargement.pending}
-            onClick={() => {
-              void telechargement.download({
-                url: lotExportUrl(id, 'zip'),
-                fileName: lotExportFileName(name, 'zip'),
-                failureMessage: 'L’archive n’a pas pu être générée.',
-              });
-            }}
-          >
-            {telechargement.pending ? (
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-            ) : (
-              <FileArchiveIcon aria-hidden="true" />
-            )}
-            Tous les programmes (ZIP)
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={telechargement.pending}
-            onClick={() => {
-              void telechargement.download({
-                url: lotExportUrl(id, 'xlsx'),
-                fileName: lotExportFileName(name, 'xlsx'),
-                failureMessage: 'Le classeur n’a pas pu être généré.',
-              });
-            }}
-          >
-            <FileSpreadsheetIcon aria-hidden="true" />
-            Classeur Excel
-          </Button>
-        </div>
+        <LotSummary
+          id={id}
+          peutRegler={peutRegler}
+          name={name}
+          scopeLabel={scopeLabel}
+          itemCount={itemCount}
+          equipeCount={repartition.length}
+          jours={distribution.jours}
+          createdAt={createdAt}
+          createdByName={createdByName}
+        />
+        <LotDownloads id={id} name={name} telechargement={telechargement} />
       </div>
 
-      <Card>
-        <CardHeader>
-          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-            Programmes d’appel
-          </h3>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
-            {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la
-            supervision et la direction.
-          </p>
-        </CardHeader>
-        <CardContent>
-          {repartition.length === 0 ? (
-            <p className="text-[0.875rem] text-muted-foreground">
-              Aucun téléconseiller n’a reçu de fiche.
-            </p>
-          ) : (
-            <Table aria-label="Programmes d’appel">
-              <TableHeader>
-                <TableRow>
-                  <TableHead scope="col">Téléconseiller</TableHead>
-                  {colonnes.map((jour) => (
-                    <TableHead key={jour} scope="col" className="text-right">
-                      Jour {jour}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {repartition.map((ligne) => (
-                  <TableRow key={ligne.teleconseillerId}>
-                    <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
-                      {ligne.teleconseillerName}
-                    </th>
-                    {colonnes.map((jour) => {
-                      const fiches =
-                        ligne.jours.find((entree) => entree.jour === jour)?.fiches ?? 0;
-                      return (
-                        <TableCell key={jour}>
-                          <span className="flex items-center justify-end gap-2">
-                            <span className="tabular-nums">{formatNumber(fiches)}</span>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="icon-sm"
-                              aria-label={`Programme de ${ligne.teleconseillerName}, jour ${String(jour)}`}
-                              disabled={fiches === 0 || telechargement.pending}
-                              onClick={() => {
-                                void telechargement.download({
-                                  url: lotProgrammeUrl(id, ligne.teleconseillerId, jour),
-                                  fileName: lotProgrammeFileName(ligne.teleconseillerName, jour),
-                                  failureMessage: `Le programme du jour ${String(jour)} n’a pas pu être généré.`,
-                                });
-                              }}
-                            >
-                              <FileDownIcon aria-hidden="true" />
-                            </Button>
-                          </span>
-                        </TableCell>
-                      );
-                    })}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <ProgrammesCard
+        repartition={repartition}
+        colonnes={colonnes}
+        distribution={distribution}
+        id={id}
+        telechargement={telechargement}
+      />
 
       <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
 
       <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
 
-      {lot.data.reaffectations.length === 0 ? null : (
-        <Card>
-          <CardHeader>
-            <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-              Réaffectations
-            </h3>
-          </CardHeader>
-          <CardContent>
-            <ul className="divide-y divide-border">
-              {lot.data.reaffectations.map((trace) => (
-                <li key={trace.id} className="py-2.5 text-[0.875rem]">
-                  <span className="tabular-nums font-[600]">{formatNumber(trace.fiches)}</span>{' '}
-                  fiche{trace.fiches > 1 ? 's' : ''} de {trace.fromName ?? 'personne'} vers{' '}
-                  {trace.toName}
-                  <span className="block text-[0.8125rem] text-muted-foreground">
-                    {formatDateTime(trace.createdAt)}, par {trace.performedByName}
-                  </span>
-                </li>
-              ))}
-            </ul>
-          </CardContent>
-        </Card>
-      )}
+      <ReaffectationsCard reaffectations={lot.data.reaffectations} />
 
-      <Card>
-        <CardHeader>
-          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-            Appels passés sur ces fiches depuis la création
-          </h3>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-5">
-          <p className="text-[0.9375rem]">
-            <span className="tabular-nums">{formatNumber(fichesAppelees)}</span> fiche
-            {fichesAppelees > 1 ? 's' : ''} appelée{fichesAppelees > 1 ? 's' : ''} sur{' '}
-            <span className="tabular-nums">{formatNumber(itemCount)}</span>,{' '}
-            <span className="tabular-nums">{formatNumber(callsSince)}</span> appel
-            {callsSince > 1 ? 's' : ''} consigné{callsSince > 1 ? 's' : ''}.
-          </p>
-
-          {parTeleconseiller.length > 0 ? (
-            <div>
-              <h4 className="mb-2 text-[0.8125rem] font-[600] text-muted-foreground">
-                Par téléconseiller
-              </h4>
-              <ul className="flex flex-wrap gap-2">
-                {parTeleconseiller.map(([nom, nombre]) => (
-                  <li key={nom}>
-                    <Badge variant="outline">
-                      {nom} : {formatNumber(nombre)}
-                    </Badge>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-
-          {lot.data.recentAttempts.length === 0 ? (
-            <p className="text-[0.875rem] text-muted-foreground">
-              Aucun appel consigné depuis la création.
-            </p>
-          ) : (
-            <ul className="divide-y divide-border">
-              {lot.data.recentAttempts.map((tentative) => (
-                <li key={tentative.id} className="flex flex-col gap-1 py-3">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="secondary">
-                      {ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}
-                    </Badge>
-                    <span className="font-[600]">{tentative.shortCode}</span>
-                    <span className="text-[0.8125rem] text-muted-foreground tabular-nums">
-                      {formatPhone(tentative.phoneE164)}
-                    </span>
-                    {tentative.method === null ? null : (
-                      <span className="text-[0.8125rem] text-muted-foreground">
-                        {ENROLLMENT_METHOD_LABELS[tentative.method]}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-[0.8125rem] text-muted-foreground">
-                    {formatDateTime(tentative.createdAt)}, par {tentative.performedByName}
-                    {rendezVous(tentative.rendezVousAt)}
-                  </p>
-                  {texte(tentative.comment) === null ? null : (
-                    <p className="text-[0.875rem]">{texte(tentative.comment)}</p>
-                  )}
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <AppelsCard
+        fichesAppelees={fichesAppelees}
+        itemCount={itemCount}
+        callsSince={callsSince}
+        parTeleconseiller={parTeleconseiller}
+        recentAttempts={lot.data.recentAttempts}
+      />
     </div>
   );
 }

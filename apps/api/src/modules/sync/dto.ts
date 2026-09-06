@@ -721,38 +721,54 @@ class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
   }
 }
 
-export function dependencyKeyOf(operation: {
-  entity: SyncEntity;
+type DependencyOperation = {
   entityId: string;
   data?: { representantId?: string; prospectId?: string } | undefined;
-}): string {
-  if (operation.entity === SyncEntity.REPRESENTANT) return `representant:${operation.entityId}`;
+};
 
-  if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
-    return `representant:${operation.data?.representantId ?? operation.entityId}`;
-  }
+function representantCommentDependencyKey(operation: DependencyOperation): string {
+  return `representant:${operation.data?.representantId ?? operation.entityId}`;
+}
 
-  if (operation.entity === SyncEntity.CALL_ATTEMPT) {
-    return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
-  }
+function callAttemptDependencyKey(operation: DependencyOperation): string {
+  return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+}
 
-  // Une visite ne dépend de rien : chaque inscription est sa propre partition.
-  if (operation.entity === SyncEntity.VISITE) {
-    return `visite:${operation.entityId}`;
-  }
+/**
+ * Un appel détecté suit SA fiche, comme la tentative qui le consignera. Le
+ * laisser tomber dans le repli lui donnerait une partition par appel, et une
+ * session d'appels dépasserait seule la limite de groupes du lot.
+ */
+function appelDetecteDependencyKey(operation: DependencyOperation): string {
+  const fiche = operation.data?.representantId;
+  return fiche
+    ? `representant:${fiche}`
+    : `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+}
 
-  // Un appel détecté suit SA fiche, comme la tentative qui le consignera. Le
-  // laisser tomber dans le repli lui donnerait une partition par appel, et une
-  // session d'appels dépasserait seule la limite de groupes du lot.
-  if (operation.entity === SyncEntity.APPEL_DETECTE) {
-    const fiche = operation.data?.representantId;
-    return fiche
-      ? `representant:${fiche}`
-      : `prospect:${operation.data?.prospectId ?? operation.entityId}`;
-  }
-
+function representantOrEntityKey(operation: DependencyOperation): string {
   const parent = operation.data?.representantId;
   return parent ? `representant:${parent}` : `prospect:${operation.entityId}`;
+}
+
+export function dependencyKeyOf(
+  operation: DependencyOperation & { entity: SyncEntity },
+): string {
+  switch (operation.entity) {
+    case SyncEntity.REPRESENTANT:
+      return `representant:${operation.entityId}`;
+    case SyncEntity.REPRESENTANT_COMMENT:
+      return representantCommentDependencyKey(operation);
+    case SyncEntity.CALL_ATTEMPT:
+      return callAttemptDependencyKey(operation);
+    // Une visite ne dépend de rien : chaque inscription est sa propre partition.
+    case SyncEntity.VISITE:
+      return `visite:${operation.entityId}`;
+    case SyncEntity.APPEL_DETECTE:
+      return appelDetecteDependencyKey(operation);
+    default:
+      return representantOrEntityKey(operation);
+  }
 }
 
 export class SyncPushDto {

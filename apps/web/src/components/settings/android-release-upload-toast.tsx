@@ -8,7 +8,9 @@ import {
   useAndroidUploadProgress,
   useAndroidUploadSnapshot,
   useMarkMandatory,
+  type AndroidUploadProgress,
   type AndroidUploadSnapshot,
+  type AndroidUploadVariables,
 } from '@/components/settings/android-release-upload';
 import { Button } from '@/components/ui/button';
 import {
@@ -142,6 +144,25 @@ function PublishedDialog({
   );
 }
 
+function resolveUploadFileName(
+  progress: AndroidUploadProgress | null,
+  variables: AndroidUploadVariables | undefined,
+): string {
+  return progress?.fileName ?? variables?.file.name ?? 'Fichier';
+}
+
+function resolveUploadTotal(
+  progress: AndroidUploadProgress | null,
+  variables: AndroidUploadVariables | undefined,
+): number {
+  return progress?.total ?? variables?.file.size ?? 0;
+}
+
+function resolveUploadPercent(loaded: number, total: number): number {
+  if (total === 0) return 0;
+  return Math.min(100, Math.round((loaded / total) * 100));
+}
+
 /** La fenêtre se déduit du dernier envoi réussi, de sa fermeture et du plancher qu'on vient de poser. */
 function publishedRelease(
   snapshot: AndroidUploadSnapshot | undefined,
@@ -171,10 +192,10 @@ export function AndroidReleaseUploadToast() {
   useEffect(() => {
     if (snapshot === undefined || snapshot.status !== 'pending') return;
 
-    const fileName = progress?.fileName ?? snapshot.variables?.file.name ?? 'Fichier';
-    const total = progress?.total ?? snapshot.variables?.file.size ?? 0;
+    const fileName = resolveUploadFileName(progress, snapshot.variables);
+    const total = resolveUploadTotal(progress, snapshot.variables);
     const loaded = progress?.loaded ?? 0;
-    const percent = total === 0 ? 0 : Math.min(100, Math.round((loaded / total) * 100));
+    const percent = resolveUploadPercent(loaded, total);
     const controller = snapshot.variables?.controller;
 
     toast.custom(

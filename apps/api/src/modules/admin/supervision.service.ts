@@ -75,10 +75,10 @@ function toDateMap<K extends string>(
   field: string,
 ): Map<string, Date> {
   const map = new Map<string, Date>();
-  for (const row of rows) {
+  rows.forEach((row) => {
     const value = row._max[field];
     if (value instanceof Date) map.set(row[key], value);
-  }
+  });
   return map;
 }
 
@@ -91,6 +91,14 @@ function latest(a: Date | undefined, b: Date | undefined): Date | null {
 
 const optionalDate = (value: Date | null | undefined): Date | undefined => value ?? undefined;
 const isoOrNull = (value: Date | null | undefined): string | null => value?.toISOString() ?? null;
+
+function mapGetOr<T, F>(map: Map<string, T>, key: string, fallback: F): T | F {
+  return map.get(key) ?? fallback;
+}
+
+function orNull<T>(value: T | null | undefined): T | null {
+  return value ?? null;
+}
 
 interface CallMetricsRow {
   userId: string;
@@ -120,6 +128,15 @@ const AUCUN_APPEL: Omit<CallMetricsRow, 'userId'> = {
   medianUploadLagSeconds: null,
 };
 
+/** Un compte sans battement de cœur enregistré : aucune trace d'appareil. */
+const BEAT_VIDE = {
+  lastPushAt: null,
+  lastPullAt: null,
+  pendingOps: null,
+  appVersion: null,
+  journalAppelsAutorise: null,
+};
+
 interface ActivitySlotRow {
   userId: string;
   slot: Date;
@@ -135,29 +152,49 @@ interface SlotTotals {
   lastSeen: Date;
 }
 
+function activeSecondsOf(activity: SlotTotals | undefined): number {
+  return activity?.active ?? 0;
+}
+
+function inShiftsOf(activity: SlotTotals | undefined): number {
+  return activity?.inShifts ?? 0;
+}
+
+function lastPresenceOf(activity: SlotTotals | undefined): Date | null {
+  return activity?.lastSeen ?? null;
+}
+
+function firstSeenOf(activity: SlotTotals | undefined): Date | undefined {
+  return activity?.firstSeen;
+}
+
+function mergeSlot(totals: SlotTotals | undefined, slot: ActivitySlotRow, inShifts: number): SlotTotals {
+  if (totals === undefined) {
+    return {
+      active: slot.activeSeconds,
+      inShifts,
+      firstSeen: slot.firstSeenAt,
+      lastSeen: slot.lastSeenAt,
+    };
+  }
+  return {
+    active: totals.active + slot.activeSeconds,
+    inShifts: totals.inShifts + inShifts,
+    firstSeen: slot.firstSeenAt < totals.firstSeen ? slot.firstSeenAt : totals.firstSeen,
+    lastSeen: slot.lastSeenAt > totals.lastSeen ? slot.lastSeenAt : totals.lastSeen,
+  };
+}
+
 /** Les tranches horaires du jour, repliées en un total par compte. */
 function totalsBySlot(
   slots: readonly ActivitySlotRow[],
   shifts: readonly WorkShiftDto[],
 ): Map<string, SlotTotals> {
   const totalsOf = new Map<string, SlotTotals>();
-  for (const slot of slots) {
+  slots.forEach((slot) => {
     const inShifts = slotInShifts(slot.slot, shifts) ? slot.activeSeconds : 0;
-    const totals = totalsOf.get(slot.userId);
-    if (totals === undefined) {
-      totalsOf.set(slot.userId, {
-        active: slot.activeSeconds,
-        inShifts,
-        firstSeen: slot.firstSeenAt,
-        lastSeen: slot.lastSeenAt,
-      });
-      continue;
-    }
-    totals.active += slot.activeSeconds;
-    totals.inShifts += inShifts;
-    if (slot.firstSeenAt < totals.firstSeen) totals.firstSeen = slot.firstSeenAt;
-    if (slot.lastSeenAt > totals.lastSeen) totals.lastSeen = slot.lastSeenAt;
-  }
+    totalsOf.set(slot.userId, mergeSlot(totalsOf.get(slot.userId), slot, inShifts));
+  });
   return totalsOf;
 }
 
@@ -295,23 +332,19 @@ export class SupervisionService {
     const shiftSecondsElapsed = elapsedInShifts(shifts, now);
 
     const rows = users.map((user): SupervisedUserDto => {
-      const beat = beatOf.get(user.id) ?? {
-        lastPushAt: null,
-        lastPullAt: null,
-        pendingOps: null,
-        appVersion: null,
-        journalAppelsAutorise: null,
-      };
+      const beat = mapGetOr(beatOf, user.id, BEAT_VIDE);
       const pushedAt = latest(syncAt.get(user.id), optionalDate(beat.lastPushAt));
       const activity = activityOf.get(user.id);
-      const metrics = metricsOf.get(user.id) ?? AUCUN_APPEL;
+      const metrics = mapGetOr(metricsOf, user.id, AUCUN_APPEL);
+      const activeSecondsToday = activeSecondsOf(activity);
+      const activeSecondsInShifts = inShiftsOf(activity);
 
       const signals: ActivitySignals = {
         isActive: user.isActive,
         hasLiveSession: tokenAt.has(user.id),
         lastLoginAt: user.lastLoginAt,
-        lastTokenAt: tokenAt.get(user.id) ?? null,
-        lastPresenceAt: activity?.lastSeen ?? null,
+        lastTokenAt: mapGetOr(tokenAt, user.id, null),
+        lastPresenceAt: lastPresenceOf(activity),
         // Un pull ne laisse aucune autre trace : sans lui, un appareil ouvert
         // qui n'a rien à remonter passe pour absent pendant des heures.
         lastSyncAt: latest(optionalDate(pushedAt), optionalDate(beat.lastPullAt)),
@@ -320,7 +353,7 @@ export class SupervisionService {
         // de brancher sur le rôle : un compte peut changer de rôle, son
         // historique ne change pas.
         lastWriteAt: latest(
-          latest(prospectCallAt.get(user.id), representativeCallAt.get(user.id)) ?? undefined,
+          optionalDate(latest(prospectCallAt.get(user.id), representativeCallAt.get(user.id))),
           transitionAt.get(user.id),
         ),
       };
@@ -334,18 +367,18 @@ export class SupervisionService {
         isActive: user.isActive,
         presence: presenceOf(signals, now),
         hasLiveSession: signals.hasLiveSession,
-        sessionCount: sessionCounts.get(user.id) ?? 0,
+        sessionCount: mapGetOr(sessionCounts, user.id, 0),
         lastSeenAt: isoOrNull(lastSeenAt(signals)),
         lastLoginAt: isoOrNull(signals.lastLoginAt),
         lastSyncAt: isoOrNull(pushedAt),
         lastPullAt: isoOrNull(beat.lastPullAt),
         pendingOps: beat.pendingOps,
         appVersion: beat.appVersion,
-        journalAppelsAutorise: beat.journalAppelsAutorise ?? null,
+        journalAppelsAutorise: orNull(beat.journalAppelsAutorise),
         lastWriteAt: isoOrNull(signals.lastWriteAt),
-        activeSecondsToday: activity?.active ?? 0,
-        activeSecondsInShifts: activity?.inShifts ?? 0,
-        firstSeenToday: isoOrNull(activity?.firstSeen),
+        activeSecondsToday,
+        activeSecondsInShifts,
+        firstSeenToday: isoOrNull(firstSeenOf(activity)),
         callsToday: metrics.calls,
         medianGapSeconds: metrics.medianGapSeconds,
         medianUploadLagSeconds: metrics.medianUploadLagSeconds,
@@ -357,7 +390,7 @@ export class SupervisionService {
         deadSeconds: metrics.deadSeconds,
         deadGaps: metrics.deadGaps,
         score: performanceScore({
-          activeSecondsInShifts: activity?.inShifts ?? 0,
+          activeSecondsInShifts,
           shiftSecondsElapsed,
           calls: metrics.calls,
           reached: metrics.reachedToday,

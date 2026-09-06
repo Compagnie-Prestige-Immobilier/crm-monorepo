@@ -110,14 +110,12 @@ const fieldTime = (iso: string | null | undefined): number => {
  * et rappel obligatoires sur le MOTIF lui-même, qui peut durcir la règle de son
  * effet sans jamais l'assouplir.
  */
-export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): NormalizedAttempt {
-  const applied = reason ?? systemReasonFor(input.outcome);
-  const rule = outcomeEffectRule(applied.effect);
-
-  const method = input.method ?? null;
-  const rawComment = input.comment ?? null;
-  const comment = rawComment === null || rawComment.trim() === '' ? null : rawComment.trim();
-
+function assertAttemptRules(
+  rule: ReturnType<typeof outcomeEffectRule>,
+  applied: AttemptReason,
+  method: EnrollmentMethod | null,
+  comment: string | null,
+): void {
   if (rule.requiresMethod && method === null) {
     invalid(
       'PHASE2_METHOD_REQUIRED',
@@ -145,6 +143,17 @@ export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): Nor
       `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`,
     );
   }
+}
+
+export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): NormalizedAttempt {
+  const applied = reason ?? systemReasonFor(input.outcome);
+  const rule = outcomeEffectRule(applied.effect);
+
+  const method = input.method ?? null;
+  const rawComment = input.comment ?? null;
+  const comment = rawComment === null || rawComment.trim() === '' ? null : rawComment.trim();
+
+  assertAttemptRules(rule, applied, method, comment);
 
   return {
     outcome: input.outcome,

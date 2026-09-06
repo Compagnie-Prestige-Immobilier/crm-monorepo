@@ -150,6 +150,14 @@ export class OuverturesService {
       ? (body.draft as Prisma.InputJsonObject)
       : await this.brouillonPrecedent(user, body);
 
+    return this.creerOuverture(user, body, draft);
+  }
+
+  private async creerOuverture(
+    user: AuthenticatedUser,
+    body: OuvrirFicheDto,
+    draft: Prisma.InputJsonObject | null,
+  ): Promise<OuvertureFicheDto> {
     try {
       const cree = await this.prisma.ouvertureFiche.create({
         data: {

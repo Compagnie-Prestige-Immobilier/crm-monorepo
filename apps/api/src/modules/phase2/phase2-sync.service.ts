@@ -124,6 +124,56 @@ function dernierAppel(op: CallAttemptOpDto, userId: string, lastCallAt: Date | n
   return { lastCallOutcome: op.outcome, lastCallAt: at, lastCallById: userId };
 }
 
+function callAttemptRow(
+  op: CallAttemptOpDto,
+  performedById: string,
+  attempt: ReturnType<typeof normalizeAttempt>,
+  deviceCallAt: Date | null,
+) {
+  return {
+    id: op.id,
+    prospectId: op.prospectId,
+    performedById,
+    outcome: attempt.outcome,
+    reasonId: attempt.reasonId,
+    method: attempt.method,
+    comment: attempt.comment,
+    email: attempt.email,
+    fonctionnaire: attempt.fonctionnaire,
+    engagementEnCours: attempt.engagementEnCours,
+    dureeEtablissementMois: attempt.dureeEtablissementMois,
+    rendezVousAt: attempt.rendezVousAt,
+    deviceCallType: op.deviceCallType ?? null,
+    deviceCallDurationSeconds: op.deviceCallDurationSeconds ?? null,
+    deviceCallAt,
+    clientCreatedAt: new Date(op.clientCreatedAt),
+  };
+}
+
+// `Partial<T>` seul ne suffit pas : sous `exactOptionalPropertyTypes`, une
+// clé `profession?: string | undefined` reste distincte de `profession?:
+// string`, alors que les deux décrivent la même absence pour Prisma. Le
+// mapped type retire `undefined` du type de chaque valeur en plus de rendre
+// la clé optionnelle. Voir `defined` dans prospects.service.ts.
+function defined<T extends Record<string, unknown>>(
+  values: T,
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
+}
+
+const trimOrUndefined = (value: string | undefined): string | undefined => value?.trim();
+
+/** Un nom vidé n'est pas une correction : la colonne est obligatoire. */
+const nomCorrige = (value: string | undefined): string | undefined => {
+  const trimmed = trimOrUndefined(value);
+  return trimmed ? trimmed : undefined;
+};
+
+const normalizePhoneOrUndefined = (value: string | undefined): string | undefined =>
+  value === undefined ? undefined : normalizePhone(value);
+
 @Injectable()
 export class Phase2SyncService {
   async applyCallAttempt(
@@ -161,27 +211,9 @@ export class Phase2SyncService {
       dureeEtablissementMois: attempt.dureeEtablissementMois,
     });
 
+    const deviceCallAt = op.deviceCallAt ? new Date(op.deviceCallAt) : null;
     const inserted = await tx.callAttempt.createMany({
-      data: [
-        {
-          id: op.id,
-          prospectId: op.prospectId,
-          performedById: user.id,
-          outcome: attempt.outcome,
-          reasonId: attempt.reasonId,
-          method: attempt.method,
-          comment: attempt.comment,
-          email: attempt.email,
-          fonctionnaire: attempt.fonctionnaire,
-          engagementEnCours: attempt.engagementEnCours,
-          dureeEtablissementMois: attempt.dureeEtablissementMois,
-          rendezVousAt: attempt.rendezVousAt,
-          deviceCallType: op.deviceCallType ?? null,
-          deviceCallDurationSeconds: op.deviceCallDurationSeconds ?? null,
-          deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
-          clientCreatedAt: new Date(op.clientCreatedAt),
-        },
-      ],
+      data: [callAttemptRow(op, user.id, attempt, deviceCallAt)],
       skipDuplicates: true,
     });
 
@@ -194,7 +226,7 @@ export class Phase2SyncService {
       prospectId: op.prospectId,
       attemptId: op.id,
       clientCreatedAt: new Date(op.clientCreatedAt),
-      deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
+      deviceCallAt,
     });
 
     const corrige = await this.correctProspect(tx, user.id, op, prospect);
@@ -241,25 +273,21 @@ export class Phase2SyncService {
     op: CallAttemptOpDto,
     current: ProspectState,
   ): Promise<ProspectState> {
-    // Un nom vidé n'est pas une correction : la colonne est obligatoire, et
-    // l'écraser rendrait la fiche illisible dans toutes les listes.
-    const nom = op.nom?.trim() ?? '';
     const data = {
-      ...(nom === '' ? {} : { nom }),
-      ...(op.prenom === undefined ? {} : { prenom: op.prenom.trim() }),
-      ...(op.profession === undefined ? {} : { profession: op.profession.trim() }),
-      ...(op.etablissement === undefined ? {} : { etablissement: op.etablissement.trim() }),
-      ...(op.banqueId === undefined ? {} : { banqueId: op.banqueId }),
-      ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
-      ...(op.type === undefined ? {} : { type: op.type }),
-      ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
-      ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
-      ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
+      ...defined({
+        nom: nomCorrige(op.nom),
+        prenom: trimOrUndefined(op.prenom),
+        profession: trimOrUndefined(op.profession),
+        etablissement: trimOrUndefined(op.etablissement),
+        banqueId: op.banqueId,
+        syndicatId: op.syndicatId,
+        type: op.type,
+        incomeBandId: op.incomeBandId,
+        paymentMode: op.paymentMode,
+        dureeSystemeMois: op.dureeSystemeMois,
+      }),
       ...whatsappDuProspect(
-        {
-          ...(op.whatsappStatus === undefined ? {} : { statut: op.whatsappStatus }),
-          ...(op.whatsappE164 === undefined ? {} : { numero: normalizePhone(op.whatsappE164) }),
-        },
+        defined({ statut: op.whatsappStatus, numero: normalizePhoneOrUndefined(op.whatsappE164) }),
         current,
       ),
       ...champsLibresPatch(op.champsLibres, current.champsLibres),

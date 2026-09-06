@@ -99,18 +99,23 @@ export class RemindersService {
 
     let dispatched = 0;
     for (const row of due) {
-      try {
-        if ((await this.notifications.dispatch(row.id, now)).claimed) dispatched += 1;
-      } catch (error) {
-        this.logger.error(
-          `Expédition programmée ${row.id} en échec : ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      if (await this.dispatchDueOne(row.id, now)) dispatched += 1;
     }
 
     if (dispatched)
       this.logger.log(`${String(dispatched)} notification(s) programmée(s) expédiée(s).`);
     return dispatched;
+  }
+
+  private async dispatchDueOne(notificationId: string, now: Date): Promise<boolean> {
+    try {
+      return (await this.notifications.dispatch(notificationId, now)).claimed;
+    } catch (error) {
+      this.logger.error(
+        `Expédition programmée ${notificationId} en échec : ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 
   @Cron(REMINDERS_CRON, { name: 'cpi.notifications.reminders', timeZone: env.BUSINESS_TIME_ZONE })

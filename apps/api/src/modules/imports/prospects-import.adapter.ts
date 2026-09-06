@@ -20,6 +20,11 @@ import {
 } from './prospects-import-template.js';
 import { ProspectImportError, referentialAmbiguous, rowError } from './prospects-import.errors.js';
 
+/** Cellule brute, vide si absente, débarrassée de ses espaces de bord. */
+function cellValue(cells: Record<string, string>, key: string): string {
+  return (cells[key] ?? '').trim();
+}
+
 /** Import massif de prospects, dédoublonné par travail et téléphone normalisé. */
 export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, ProspectImportRun> {
   readonly kind = ImportKind.PROSPECTS;
@@ -84,7 +89,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
     rowNumber: number,
     refs: ProspectImportRun,
   ): ParsedRow<ProspectImportRow> {
-    const nom = (cells[PROSPECT_IMPORT_HEADERS.nom] ?? '').trim();
+    const nom = cellValue(cells, PROSPECT_IMPORT_HEADERS.nom);
     if (nom === '') {
       return {
         ok: false,
@@ -101,7 +106,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
     // représentants qui exige deux caractères : là-bas la colonne porte un nom
     // COMPLET, ici chaque moitié est contrôlée séparément et un prénom d'une
     // seule lettre est une orthographe légitime, pas une cellule bâclée.
-    const prenom = (cells[PROSPECT_IMPORT_HEADERS.prenom] ?? '').trim();
+    const prenom = cellValue(cells, PROSPECT_IMPORT_HEADERS.prenom);
     if (prenom === '') {
       return {
         ok: false,
@@ -114,7 +119,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
       };
     }
 
-    const rawPhone = (cells[PROSPECT_IMPORT_HEADERS.phone] ?? '').trim();
+    const rawPhone = cellValue(cells, PROSPECT_IMPORT_HEADERS.phone);
     // `tryNormalizePhone` du module commun, JAMAIS une expression régulière
     // écrite ici : c'est la clé de déduplication partagée avec le mobile et
     // avec l'index unique partiel. Une seconde implémentation, même
@@ -133,7 +138,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
       };
     }
 
-    const rawRepPhone = (cells[PROSPECT_IMPORT_HEADERS.representantPhone] ?? '').trim();
+    const rawRepPhone = cellValue(cells, PROSPECT_IMPORT_HEADERS.representantPhone);
     const representantPhoneE164 = tryNormalizePhone(rawRepPhone);
     if (!representantPhoneE164) {
       return {
@@ -178,7 +183,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
     // On refuse donc la ligne en nommant la colonne ET les valeurs admises :
     // corriger une cellule coûte quelques secondes, démêler un segment faux
     // coûte une reprise complète.
-    const rawBanque = (cells[PROSPECT_IMPORT_HEADERS.banque] ?? '').trim();
+    const rawBanque = cellValue(cells, PROSPECT_IMPORT_HEADERS.banque);
     const banqueId = refs.banques.get(referentialKey(rawBanque));
     if (banqueId === undefined) {
       return {
@@ -192,7 +197,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
       };
     }
 
-    const rawSyndicat = (cells[PROSPECT_IMPORT_HEADERS.syndicat] ?? '').trim();
+    const rawSyndicat = cellValue(cells, PROSPECT_IMPORT_HEADERS.syndicat);
     const syndicatId = refs.syndicats.get(referentialKey(rawSyndicat));
     if (syndicatId === undefined) {
       return {
@@ -206,7 +211,7 @@ export class ProspectsImportAdapter implements ImportAdapter<ProspectImportRow, 
       };
     }
 
-    const rawMethod = (cells[PROSPECT_IMPORT_HEADERS.enrollmentMethod] ?? '').trim();
+    const rawMethod = cellValue(cells, PROSPECT_IMPORT_HEADERS.enrollmentMethod);
     let enrollmentMethod: EnrollmentMethod | null = null;
     if (rawMethod !== '') {
       enrollmentMethod = parseEnrollmentMethod(rawMethod);

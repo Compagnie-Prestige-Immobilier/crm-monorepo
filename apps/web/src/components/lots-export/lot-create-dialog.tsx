@@ -440,9 +440,47 @@ function ChampsCritere({
   );
 }
 
+function EtatTeleconseillers({
+  chargement,
+  isError,
+  erreur,
+  vide,
+}: {
+  chargement: boolean;
+  isError: boolean;
+  erreur: unknown;
+  vide: boolean;
+}) {
+  if (chargement) {
+    return (
+      <div className="flex flex-col gap-2" aria-hidden="true">
+        {[0, 1, 2].map((index) => (
+          <Skeleton key={index} className="h-11 w-full" />
+        ))}
+      </div>
+    );
+  }
+  if (isError) {
+    return (
+      <output className="block rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
+        {apiErrorText(erreur, 'Les téléconseillers n’ont pas pu être lus.')}
+      </output>
+    );
+  }
+  if (vide) {
+    return (
+      <output className="block rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
+        Aucun compte téléconseiller actif. Créez-en un depuis l’écran Téléconseillers.
+      </output>
+    );
+  }
+  return null;
+}
+
 function ChampTeleconseillers({
   comptes,
   chargement,
+  isError,
   erreur,
   decoches,
   onChange,
@@ -450,8 +488,9 @@ function ChampTeleconseillers({
   onObjectif,
   defaut,
 }: {
-  comptes: readonly Teleconseiller[] | null;
+  comptes: readonly Teleconseiller[] | undefined;
   chargement: boolean;
+  isError: boolean;
   erreur: unknown;
   decoches: readonly string[];
   onChange: (decoches: readonly string[]) => void;
@@ -485,25 +524,12 @@ function ChampTeleconseillers({
         ) : null}
       </div>
 
-      {chargement ? (
-        <div className="flex flex-col gap-2" aria-hidden="true">
-          {[0, 1, 2].map((index) => (
-            <Skeleton key={index} className="h-11 w-full" />
-          ))}
-        </div>
-      ) : null}
-
-      {erreur === null || chargement ? null : (
-        <output className="block rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
-          {apiErrorText(erreur, 'Les téléconseillers n’ont pas pu être lus.')}
-        </output>
-      )}
-
-      {!chargement && erreur === null && liste.length === 0 ? (
-        <output className="block rounded-md bg-muted px-3 py-4 text-[0.8125rem]">
-          Aucun compte téléconseiller actif. Créez-en un depuis l’écran Téléconseillers.
-        </output>
-      ) : null}
+      <EtatTeleconseillers
+        chargement={chargement}
+        isError={isError}
+        erreur={erreur}
+        vide={liste.length === 0}
+      />
 
       {liste.length === 0 ? null : (
         <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-md border border-border p-1 scrollbar-thin">
@@ -644,6 +670,52 @@ function ChoixCible({
   );
 }
 
+function orEmpty<T>(data: readonly T[] | undefined): readonly T[] {
+  return data ?? [];
+}
+
+function buildDistribution(
+  equipe: readonly Teleconseiller[],
+  fichesParJour: number,
+  jours: number,
+  objectifs: { teleconseillerId: string; fichesParJour: number }[],
+) {
+  return {
+    teleconseillerIds: equipe.map((compte) => compte.id),
+    fichesParJour,
+    jours,
+    ...(objectifs.length > 0 ? { objectifs } : {}),
+  };
+}
+
+function eligibleDe(apercu: UseQueryResult<LotExportPreview>): number | null {
+  return apercu.isSuccess ? apercu.data.eligible : null;
+}
+
+function nomRetenu(nomSaisi: string | null, nomPropose: string): string {
+  return nomSaisi === null ? nomPropose.trim() : nomSaisi.trim();
+}
+
+function peutCreer(
+  equipeChoisie: boolean,
+  eligible: number | null,
+  nom: string,
+  pending: boolean,
+): boolean {
+  if (!equipeChoisie || eligible === null || eligible <= 0) return false;
+  if (nom.length < 3) return false;
+  return !pending;
+}
+
+function ErreurCreation({ isError, error }: { isError: boolean; error: unknown }) {
+  if (!isError) return null;
+  return (
+    <p role="alert" className="text-[0.875rem] text-destructive">
+      {apiErrorText(error, 'La campagne n’a pas pu être créée.')}
+    </p>
+  );
+}
+
 function FormulaireDeLot({
   projet,
   onCree,
@@ -677,16 +749,13 @@ function FormulaireDeLot({
     staleTime: 5 * 60_000,
   });
 
-  const equipe = (teleconseillers.data ?? []).filter((compte) => !decoches.includes(compte.id));
+  const equipe = orEmpty(teleconseillers.data).filter(
+    (compte) => !decoches.includes(compte.id),
+  );
   const fichesParJour = entierBorne(fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
   const jours = entierBorne(joursSaisi, JOURS_DEFAUT, 1, 10);
   const objectifs = objectifsRetenus(equipe, objectifsSaisis);
-  const distribution = {
-    teleconseillerIds: equipe.map((compte) => compte.id),
-    fichesParJour,
-    jours,
-    ...(objectifs.length > 0 ? { objectifs } : {}),
-  };
+  const distribution = buildDistribution(equipe, fichesParJour, jours, objectifs);
 
   const referentielsUtiles = surRepresentants(choix.cle);
   const departements = useQuery({
@@ -734,10 +803,10 @@ function FormulaireDeLot({
     enabled: critereStable && equipeChoisie,
   });
 
-  const eligible = apercu.isSuccess ? apercu.data.eligible : null;
+  const eligible = eligibleDe(apercu);
 
   const nomPropose = `${etiquette}, ${formatDateTime(maintenant)}`.slice(0, 120);
-  const nom = nomSaisi === null ? nomPropose.trim() : nomSaisi.trim();
+  const nom = nomRetenu(nomSaisi, nomPropose);
 
   const creation = useMutation({
     mutationFn: () => createLotExport({ ...corps, distribution, name: nom }),
@@ -749,8 +818,7 @@ function FormulaireDeLot({
     },
   });
 
-  const pretACreer =
-    equipeChoisie && eligible !== null && eligible > 0 && nom.length >= 3 && !creation.isPending;
+  const pretACreer = peutCreer(equipeChoisie, eligible, nom, creation.isPending);
 
   return (
     <>
@@ -767,14 +835,15 @@ function FormulaireDeLot({
       <ChampsCritere
         choix={choix}
         onChange={setChoix}
-        departements={departements.data ?? []}
-        iefs={iefs.data ?? []}
+        departements={orEmpty(departements.data)}
+        iefs={orEmpty(iefs.data)}
       />
 
       <ChampTeleconseillers
-        comptes={teleconseillers.data ?? null}
+        comptes={teleconseillers.data}
         chargement={teleconseillers.isPending}
-        erreur={teleconseillers.isError ? teleconseillers.error : null}
+        isError={teleconseillers.isError}
+        erreur={teleconseillers.error}
         decoches={decoches}
         onChange={setDecoches}
         objectifs={objectifsSaisis}
@@ -840,11 +909,7 @@ function FormulaireDeLot({
 
       <ApercuLot apercu={apercu} stable={critereStable} equipe={equipe.length} jours={jours} />
 
-      {creation.isError ? (
-        <p role="alert" className="text-[0.875rem] text-destructive">
-          {apiErrorText(creation.error, 'La campagne n’a pas pu être créée.')}
-        </p>
-      ) : null}
+      <ErreurCreation isError={creation.isError} error={creation.error} />
 
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onAnnule}>

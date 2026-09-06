@@ -399,6 +399,27 @@ function libresManquants(
   return manquants;
 }
 
+function texteErreur(
+  value: string,
+  requis: boolean,
+  obligatoire: string,
+  tropLong: string,
+): string | undefined {
+  const texteTrim = value.trim();
+  if (requis && texteTrim === '') return obligatoire;
+  if (texteTrim.length > NAME_MAX_LENGTH) return tropLong;
+  return undefined;
+}
+
+function emailErreur(value: string, requis: boolean): string | undefined {
+  const email = value.trim();
+  if (requis && email === '') return 'L’adresse électronique est obligatoire.';
+  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+    return 'Cette adresse électronique n’en est pas une.';
+  }
+  return undefined;
+}
+
 function identiteErreurs(
   draft: ConversionDraft,
   complet: boolean,
@@ -406,30 +427,32 @@ function identiteErreurs(
 ): ConversionErrors {
   const errors: ConversionErrors = {};
 
-  const nom = draft.nom.trim();
-  if (regles.requis('nom', true) && nom === '') errors.nom = 'Le nom est obligatoire.';
-  else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
+  const nomErr = texteErreur(
+    draft.nom,
+    regles.requis('nom', true),
+    'Le nom est obligatoire.',
+    'Nom trop long (120 caractères maximum).',
+  );
+  if (nomErr !== undefined) errors.nom = nomErr;
 
-  const prenom = draft.prenom.trim();
-  if (regles.requis('prenom', complet) && prenom === '') {
-    errors.prenom = 'Le prénom est obligatoire.';
-  } else if (prenom.length > NAME_MAX_LENGTH) {
-    errors.prenom = 'Prénom trop long (120 caractères maximum).';
-  }
+  const prenomErr = texteErreur(
+    draft.prenom,
+    regles.requis('prenom', complet),
+    'Le prénom est obligatoire.',
+    'Prénom trop long (120 caractères maximum).',
+  );
+  if (prenomErr !== undefined) errors.prenom = prenomErr;
 
-  const profession = draft.profession.trim();
-  if (regles.requis('profession', complet) && profession === '') {
-    errors.profession = 'La profession est obligatoire.';
-  } else if (profession.length > NAME_MAX_LENGTH) {
-    errors.profession = 'Profession trop longue (120 caractères maximum).';
-  }
+  const professionErr = texteErreur(
+    draft.profession,
+    regles.requis('profession', complet),
+    'La profession est obligatoire.',
+    'Profession trop longue (120 caractères maximum).',
+  );
+  if (professionErr !== undefined) errors.profession = professionErr;
 
-  const email = draft.email.trim();
-  if (regles.requis('email', false) && email === '') {
-    errors.email = 'L’adresse électronique est obligatoire.';
-  } else if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
-    errors.email = 'Cette adresse électronique n’en est pas une.';
-  }
+  const emailErr = emailErreur(draft.email, regles.requis('email', false));
+  if (emailErr !== undefined) errors.email = emailErr;
 
   return errors;
 }
@@ -469,6 +492,28 @@ function dossierObligatoires(
 
 const chiffres = (value: string): number => value.replace(/\D/gu, '').length;
 
+function dureeErreur(
+  value: string,
+  requis: boolean,
+  min: number,
+  max: number,
+  obligatoire: string,
+  invalide: string,
+): string | undefined {
+  const duree = value.trim();
+  if (requis && duree === '') return obligatoire;
+  if (duree === '') return undefined;
+  if (!/^\d+$/u.test(duree) || Number(duree) < min || Number(duree) > max) return invalide;
+  return undefined;
+}
+
+function whatsappDossierErreur(draft: ConversionDraft): string | undefined {
+  if (draft.memeWhatsapp !== false) return undefined;
+  if (draft.whatsapp.trim() === '') return undefined;
+  if (chiffres(draft.whatsapp) >= 9) return undefined;
+  return 'Le numéro WhatsApp est incomplet.';
+}
+
 function dossierErreurs(
   draft: ConversionDraft,
   complet: boolean,
@@ -476,30 +521,28 @@ function dossierErreurs(
 ): ConversionErrors {
   const errors: ConversionErrors = dossierObligatoires(draft, complet, regles);
 
-  const mois = draft.dureeEtablissementMois.trim();
-  if (regles.requis('dureeEtablissementMois', complet) && mois === '') {
-    errors.dureeEtablissementMois = 'La durée dans la fonction est obligatoire.';
-  } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
-    errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
-  }
+  const etablissementErr = dureeErreur(
+    draft.dureeEtablissementMois,
+    regles.requis('dureeEtablissementMois', complet),
+    0,
+    DUREE_ETABLISSEMENT_MAX_MOIS,
+    'La durée dans la fonction est obligatoire.',
+    `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
+  );
+  if (etablissementErr !== undefined) errors.dureeEtablissementMois = etablissementErr;
 
-  const systeme = draft.dureeSystemeMois.trim();
-  if (regles.requis('dureeSystemeMois', false) && systeme === '') {
-    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
-  } else if (
-    systeme !== '' &&
-    (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
-  ) {
-    errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
-  }
+  const systemeErr = dureeErreur(
+    draft.dureeSystemeMois,
+    regles.requis('dureeSystemeMois', false),
+    1,
+    DUREE_SYSTEME_MAX_MOIS,
+    'Choisissez la durée du système de paiement.',
+    `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`,
+  );
+  if (systemeErr !== undefined) errors.dureeSystemeMois = systemeErr;
 
-  if (
-    draft.memeWhatsapp === false &&
-    draft.whatsapp.trim() !== '' &&
-    chiffres(draft.whatsapp) < 9
-  ) {
-    errors.whatsapp = 'Le numéro WhatsApp est incomplet.';
-  }
+  const whatsappErr = whatsappDossierErreur(draft);
+  if (whatsappErr !== undefined) errors.whatsapp = whatsappErr;
 
   return errors;
 }
@@ -592,29 +635,41 @@ export interface AttemptDraft {
   readonly ouvertureId?: string;
 }
 
-/** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
-export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
-  const comment = draft.comment.trim();
-  const callbackAt = draft.callbackAt ?? null;
-
+function methodeAttemptErreur(draft: AttemptDraft): string | null {
   if (draft.outcome === 'METHOD_OBTAINED' && draft.method === null) {
     return 'Choisissez la méthode obtenue.';
   }
   if (draft.outcome !== 'METHOD_OBTAINED' && draft.method !== null) {
     return 'Une méthode ne s’enregistre que sur « Méthode obtenue ».';
   }
-  if (callbackAt !== null && draft.outcome !== 'CALLBACK') {
-    return 'Une échéance ne s’enregistre que sur « À rappeler ».';
-  }
-  if (callbackAt !== null && !(Date.parse(callbackAt) > now)) {
-    return 'Choisissez une échéance à venir.';
-  }
-  if (draft.outcome === 'OTHER' && comment === '') {
-    return 'L’issue « Autre » exige un commentaire.';
-  }
+  return null;
+}
+
+function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null {
+  const callbackAt = draft.callbackAt ?? null;
+  if (callbackAt === null) return null;
+  if (draft.outcome !== 'CALLBACK') return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  if (!(Date.parse(callbackAt) > now)) return 'Choisissez une échéance à venir.';
+  return null;
+}
+
+function commentAttemptErreur(draft: AttemptDraft): string | null {
+  const comment = draft.comment.trim();
+  if (draft.outcome === 'OTHER' && comment === '') return 'L’issue « Autre » exige un commentaire.';
   if (comment.length > COMMENT_MAX_LENGTH) {
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
+  return null;
+}
+
+/** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
+export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
+  const methodeErr = methodeAttemptErreur(draft);
+  if (methodeErr !== null) return methodeErr;
+  const callbackErr = callbackAttemptErreur(draft, now);
+  if (callbackErr !== null) return callbackErr;
+  const commentErr = commentAttemptErreur(draft);
+  if (commentErr !== null) return commentErr;
   if (draft.conversion !== undefined) {
     const problems = validateConversion(draft.conversion, now);
     return Object.values(problems).find((message) => typeof message === 'string') ?? null;
@@ -640,37 +695,58 @@ export function uuidV7(now: number = Date.now(), random: () => number = Math.ran
 type SyncPushBody = components['schemas']['SyncPushDto'];
 type SyncEntityData = components['schemas']['SyncEntityDataDto'];
 
+function identiteData(draft: ConversionDraft): SyncEntityData {
+  const nom = draft.nom.trim();
+  const prenom = draft.prenom.trim();
+  const email = draft.email.trim();
+  const profession = draft.profession.trim();
+  return {
+    ...(nom === '' ? {} : { nom }),
+    ...(prenom === '' ? {} : { prenom }),
+    ...(email === '' ? {} : { email }),
+    ...(profession === '' ? {} : { profession }),
+  };
+}
+
+function dossierChoixData(draft: ConversionDraft): SyncEntityData {
+  return {
+    ...(draft.type === null ? {} : { type: draft.type }),
+    ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
+    ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
+    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
+    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
+  };
+}
+
+function dossierDureesData(draft: ConversionDraft): SyncEntityData {
+  const mois = draft.dureeEtablissementMois.trim();
+  const systeme = draft.dureeSystemeMois.trim();
+  return {
+    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
+    ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
+    ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
+    ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+  };
+}
+
+function rendezVousData(draft: ConversionDraft): SyncEntityData {
+  if (draft.method !== 'APPOINTMENT') return {};
+  const rendezVousAt = dakarLocalToIso(draft.rendezVousAt.trim());
+  return rendezVousAt === null ? {} : { rendezVousAt };
+}
+
 /**
  * Un champ laissé vide n'est PAS envoyé : le serveur écrirait la chaîne vide
  * sur le prospect, et un formulaire dont la profession n'a pas été demandée
  * effacerait celle que le représentant avait relevée.
  */
 function conversionData(draft: ConversionDraft): SyncEntityData {
-  const nom = draft.nom.trim();
-  const prenom = draft.prenom.trim();
-  const email = draft.email.trim();
-  const profession = draft.profession.trim();
-  const mois = draft.dureeEtablissementMois.trim();
-  const systeme = draft.dureeSystemeMois.trim();
-  const rendezVousAt =
-    draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
-
   return {
-    ...(nom === '' ? {} : { nom }),
-    ...(prenom === '' ? {} : { prenom }),
-    ...(email === '' ? {} : { email }),
-    ...(profession === '' ? {} : { profession }),
-    ...(draft.type === null ? {} : { type: draft.type }),
-    ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
-    ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
-    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
-    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
-    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
-    ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
-    ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
-    ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+    ...identiteData(draft),
+    ...dossierChoixData(draft),
+    ...dossierDureesData(draft),
     ...whatsappData(draft),
-    ...(rendezVousAt === null ? {} : { rendezVousAt }),
+    ...rendezVousData(draft),
     ...siRenseignes(draft.champsLibres),
   };
 }

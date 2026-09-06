@@ -73,19 +73,27 @@ export function decodeCursor(raw: string | undefined): SyncCursor {
   const streams: Partial<Record<SyncStream, StreamPosition>> = {};
   const rawStreams = (candidate.streams ?? {}) as Record<string, unknown>;
   for (const stream of SYNC_STREAMS) {
-    const position = rawStreams[stream];
-    if (typeof position !== 'object' || position === null) continue;
-    const { t, id } = position as { t?: unknown; id?: unknown };
-    if (!isValidCursorMicros(t) || typeof id !== 'string' || !id) {
-      throw new BadRequestException({
-        code: 'SYNC_CURSOR_INVALID',
-        message: `Position de curseur illisible pour le flux ${stream}.`,
-      });
-    }
-    streams[stream] = { t, id };
+    const position = decodeStreamPosition(stream, rawStreams);
+    if (position) streams[stream] = position;
   }
 
   return { v: 1, streams };
+}
+
+function decodeStreamPosition(
+  stream: SyncStream,
+  rawStreams: Record<string, unknown>,
+): StreamPosition | undefined {
+  const position = rawStreams[stream];
+  if (typeof position !== 'object' || position === null) return undefined;
+  const { t, id } = position as { t?: unknown; id?: unknown };
+  if (!isValidCursorMicros(t) || typeof id !== 'string' || !id) {
+    throw new BadRequestException({
+      code: 'SYNC_CURSOR_INVALID',
+      message: `Position de curseur illisible pour le flux ${stream}.`,
+    });
+  }
+  return { t, id };
 }
 
 export const positionOf = (row: { updatedAt: Date; id: string }): StreamPosition => ({
