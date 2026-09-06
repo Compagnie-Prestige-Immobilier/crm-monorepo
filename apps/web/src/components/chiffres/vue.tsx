@@ -18,9 +18,14 @@ import {
   periodeAffichee,
   SelecteurPeriode,
 } from '@/components/accueil/tableau-de-bord/selecteur-periode';
-import { mesurerDonnees, type DonneesSource } from '@/components/accueil/tableau-de-bord/sources';
+import {
+  mesurerDonnees,
+  type DashboardMarque,
+  type DashboardSource,
+  type DonneesSource,
+} from '@/components/accueil/tableau-de-bord/sources';
 import { TiroirWidgets } from '@/components/accueil/tableau-de-bord/tiroir-widgets';
-import { chiffresFiltersAdapter } from '@/components/chiffres/filtres';
+import { chiffresFiltersAdapter, type ChiffresFilters } from '@/components/chiffres/filtres';
 import {
   catalogueDe,
   type Jeu,
@@ -65,6 +70,7 @@ import {
   serializeDisposition,
   type DashboardEcran,
   type DashboardWidget,
+  type Disposition,
 } from '@/lib/data/disposition';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
 import { formatNumber } from '@/lib/format';
@@ -169,6 +175,49 @@ function etatDesJeux(
   };
 }
 
+/** Le brouillon d'édition prime sur l'écran sauvegardé, sinon rien n'est composé. */
+function resolveWidgets(
+  brouillon: DashboardWidget[] | null,
+  disposition: Disposition | undefined,
+  catalogue: Record<string, SourceChiffre>,
+): DashboardWidget[] {
+  const source = brouillon ?? disposition?.widgets ?? [];
+  return source.filter((widget) => catalogue[widget.source] !== undefined);
+}
+
+function buildDonneesParSource(
+  catalogue: Record<string, SourceChiffre>,
+  jeux: Jeux,
+): Map<string, DonneesSource> {
+  const donnees = new Map<string, DonneesSource>();
+  for (const [cle, source] of Object.entries(catalogue)) {
+    const donnee = source.extraire(jeux);
+    if (donnee !== null) donnees.set(cle, donnee);
+  }
+  return donnees;
+}
+
+function buildDonneesParWidget(
+  widgets: readonly DashboardWidget[],
+  donneesParSource: Map<string, DonneesSource>,
+): Map<string, DonneesSource> {
+  const donnees = new Map<string, DonneesSource>();
+  for (const widget of widgets) {
+    const donnee = donneesParSource.get(widget.source);
+    if (donnee !== undefined) donnees.set(widget.id, donnee);
+  }
+  return donnees;
+}
+
+function equipeDe(jeux: Jeux): readonly { id: string; fullName: string }[] {
+  return jeux.activite?.teleconseillers ?? [];
+}
+
+function isDirty(brouillon: DashboardWidget[] | null, snapshot: string): boolean {
+  if (brouillon === null) return false;
+  return JSON.stringify(serializeDisposition(brouillon)) !== snapshot;
+}
+
 /**
  * EB-13 : la file de rappel s'atteint depuis le tableau de bord, avec son
  * compte du jour. Elle suit le téléconseiller regardé.
@@ -250,9 +299,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     },
   });
 
-  const widgets = (editing ? brouillon : (dispositionQuery.data?.widgets ?? [])).filter(
-    (widget) => catalogue[widget.source] !== undefined,
-  );
+  const widgets = resolveWidgets(brouillon, dispositionQuery.data, catalogue);
   const aCharger = jeuxACharger(catalogue, widgets, editing);
 
   const resultats = useQueries({
@@ -270,16 +317,8 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
   );
   const hasData = dispositionQuery.data !== undefined && toutCharge;
 
-  const donneesParSource = new Map<string, DonneesSource>();
-  for (const [cle, source] of Object.entries(catalogue)) {
-    const donnee = source.extraire(jeux);
-    if (donnee !== null) donneesParSource.set(cle, donnee);
-  }
-  const donneesParWidget = new Map<string, DonneesSource>();
-  for (const widget of widgets) {
-    const donnee = donneesParSource.get(widget.source);
-    if (donnee !== undefined) donneesParWidget.set(widget.id, donnee);
-  }
+  const donneesParSource = buildDonneesParSource(catalogue, jeux);
+  const donneesParWidget = buildDonneesParWidget(widgets, donneesParSource);
 
   const enterEdition = (): void => {
     if (dispositionQuery.data === undefined) return;
@@ -300,101 +339,62 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     }
   };
 
-  const dirty = editing && JSON.stringify(serializeDisposition(brouillon)) !== snapshot;
+  const dirty = isDirty(brouillon, snapshot);
   const placees = new Set(widgets.map((widget) => widget.source));
-  const equipe = jeux.activite?.teleconseillers ?? [];
+  const equipe = equipeDe(jeux);
+
+  function handleAddWidget(source: DashboardSource, marqueChoisie?: DashboardMarque): void {
+    const donneesSource = donneesParSource.get(source);
+    const forme = catalogue[source]?.forme;
+    const marque =
+      marqueChoisie ??
+      (donneesSource === undefined || forme === undefined
+        ? undefined
+        : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
+    avecTransition(() => {
+      setBrouillon((current) => [
+        ...(current ?? []),
+        { id: `${source}-${String(Date.now())}`, source, marque },
+      ]);
+    });
+  }
+
+  function handleSave(): void {
+    if (brouillon !== null) saveMutation.mutate(brouillon);
+  }
+
+  function handleSetDefault(): void {
+    if (brouillon !== null) setDefaultMutation.mutate(brouillon);
+  }
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
-            {periodeAffichee(filters)}
-          </p>
-          {equipe.length > 0 ? (
-            <Select
-              value={filters.teleconseiller ?? 'tous'}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ teleconseiller: value === 'tous' ? null : value });
-              }}
-            >
-              <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
-                {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
-                    déclencheur affichait l'identifiant du téléconseiller. */}
-                <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
-                {equipe.map((personne) => (
-                  <SelectItem key={personne.id} value={personne.id}>
-                    {personne.fullName}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <LiveIndicator
-            state={live.stateOf(enErreur)}
-            label={live.labelOf(enErreur)}
-            updatedAt={dataUpdatedAt === 0 ? null : dataUpdatedAt}
-            onTogglePause={live.togglePause}
-          />
-          {editing ? (
-            <TiroirWidgets
-              placees={placees}
-              donnees={donneesParSource}
-              catalogue={catalogue}
-              onAdd={(source, marqueChoisie) => {
-                const donneesSource = donneesParSource.get(source);
-                const forme = catalogue[source]?.forme;
-                const marque =
-                  marqueChoisie ??
-                  (donneesSource === undefined || forme === undefined
-                    ? undefined
-                    : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
-                avecTransition(() => {
-                  setBrouillon((current) => [
-                    ...(current ?? []),
-                    { id: `${source}-${String(Date.now())}`, source, marque },
-                  ]);
-                });
-              }}
-            />
-          ) : (
-            dispositionQuery.data?.source === 'utilisateur' && (
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={resetMutation.isPending}
-                onClick={() => {
-                  resetMutation.mutate();
-                }}
-              >
-                Revenir à l’écran par défaut
-              </Button>
-            )
-          )}
-          <BarreEdition
-            editing={editing}
-            dirty={dirty}
-            pending={saveMutation.isPending}
-            isAdmin={role === 'ADMIN'}
-            entryLabel="Composer l’écran"
-            onEnter={enterEdition}
-            onSave={() => {
-              if (brouillon !== null) saveMutation.mutate(brouillon);
-            }}
-            onCancel={cancelEdition}
-            onSetDefault={() => {
-              if (brouillon !== null) setDefaultMutation.mutate(brouillon);
-            }}
-          />
-        </div>
-      </div>
+      <ChiffresToolbar
+        filters={filters}
+        onFiltersChange={setFilters}
+        equipe={equipe}
+        projet={projet}
+        live={live}
+        enErreur={enErreur}
+        dataUpdatedAt={dataUpdatedAt}
+        editing={editing}
+        placees={placees}
+        donneesParSource={donneesParSource}
+        catalogue={catalogue}
+        onAddWidget={handleAddWidget}
+        dispositionSource={dispositionQuery.data?.source}
+        onReset={() => {
+          resetMutation.mutate();
+        }}
+        resetPending={resetMutation.isPending}
+        dirty={dirty}
+        savePending={saveMutation.isPending}
+        role={role}
+        onEnter={enterEdition}
+        onSave={handleSave}
+        onCancel={cancelEdition}
+        onSetDefault={handleSetDefault}
+      />
 
       {/* « Comparer à » n'agit que sur le registre des visites : ici il serait inerte. */}
       <SelecteurPeriode filters={filters} onChange={setFilters} comparaison={false} />
@@ -473,6 +473,121 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
           </div>
         );
       })()}
+    </div>
+  );
+}
+
+function ChiffresToolbar({
+  filters,
+  onFiltersChange,
+  equipe,
+  projet,
+  live,
+  enErreur,
+  dataUpdatedAt,
+  editing,
+  placees,
+  donneesParSource,
+  catalogue,
+  onAddWidget,
+  dispositionSource,
+  onReset,
+  resetPending,
+  dirty,
+  savePending,
+  role,
+  onEnter,
+  onSave,
+  onCancel,
+  onSetDefault,
+}: {
+  filters: ChiffresFilters;
+  onFiltersChange: (patch: Partial<ChiffresFilters>) => void;
+  equipe: readonly { id: string; fullName: string }[];
+  projet: Projet;
+  live: ReturnType<typeof useLive>;
+  enErreur: boolean;
+  dataUpdatedAt: number;
+  editing: boolean;
+  placees: Set<string>;
+  donneesParSource: Map<string, DonneesSource>;
+  catalogue: Record<string, SourceChiffre>;
+  onAddWidget: (source: DashboardSource, marque?: DashboardMarque) => void;
+  dispositionSource: Disposition['source'] | undefined;
+  onReset: () => void;
+  resetPending: boolean;
+  dirty: boolean;
+  savePending: boolean;
+  role: Role;
+  onEnter: () => void;
+  onSave: () => void;
+  onCancel: () => void;
+  onSetDefault: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
+          {periodeAffichee(filters)}
+        </p>
+        {equipe.length > 0 ? (
+          <Select
+            value={filters.teleconseiller ?? 'tous'}
+            onValueChange={(value) => {
+              if (value === null) return;
+              onFiltersChange({ teleconseiller: value === 'tous' ? null : value });
+            }}
+          >
+            <SelectTrigger size="sm" aria-label="Téléconseiller regardé" className="w-56">
+              {/* Sans cette fonction, Base UI rend la VALEUR de l'item : le
+                  déclencheur affichait l'identifiant du téléconseiller. */}
+              <SelectValue>{(valeur: string) => nomDeLEquipe(equipe, valeur)}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="tous">{TOUTE_L_EQUIPE}</SelectItem>
+              {equipe.map((personne) => (
+                <SelectItem key={personne.id} value={personne.id}>
+                  {personne.fullName}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        ) : null}
+        <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <LiveIndicator
+          state={live.stateOf(enErreur)}
+          label={live.labelOf(enErreur)}
+          updatedAt={dataUpdatedAt === 0 ? null : dataUpdatedAt}
+          onTogglePause={live.togglePause}
+        />
+        {editing ? (
+          <TiroirWidgets
+            placees={placees}
+            donnees={donneesParSource}
+            catalogue={catalogue}
+            onAdd={onAddWidget}
+          />
+        ) : (
+          dispositionSource === 'utilisateur' && (
+            <Button type="button" variant="ghost" disabled={resetPending} onClick={onReset}>
+              Revenir à l’écran par défaut
+            </Button>
+          )
+        )}
+        <BarreEdition
+          editing={editing}
+          dirty={dirty}
+          pending={savePending}
+          isAdmin={role === 'ADMIN'}
+          entryLabel="Composer l’écran"
+          onEnter={onEnter}
+          onSave={onSave}
+          onCancel={onCancel}
+          onSetDefault={onSetDefault}
+        />
+      </div>
     </div>
   );
 }
