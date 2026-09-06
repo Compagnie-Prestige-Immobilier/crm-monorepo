@@ -232,20 +232,54 @@ export function visiteCorrection(before: Visite, after: CreateVisiteInput): Upda
   const patch: UpdateVisiteInput = {};
   const poser = <K extends keyof UpdateVisiteInput>(
     key: K,
-    avant: UpdateVisiteInput[K],
-    apres: UpdateVisiteInput[K],
+    avant: () => UpdateVisiteInput[K],
+    apres: () => UpdateVisiteInput[K],
   ): void => {
-    if (avant !== apres) patch[key] = apres;
+    const valeurAvant = avant();
+    const valeurApres = apres();
+    if (valeurAvant !== valeurApres) patch[key] = valeurApres;
   };
 
-  poser('time', before.time, after.time ?? null);
-  poser('visitorName', before.visitorName, after.visitorName);
-  poser('phone', before.phone ?? '', after.phone ?? '');
-  poser('entrepriseId', before.entreprise.id, after.entrepriseId);
-  poser('objetId', before.objet.id, after.objetId);
-  poser('directionId', before.direction?.id ?? null, after.directionId ?? null);
-  poser('destinataireId', before.destinataire?.id ?? null, after.destinataireId ?? null);
-  poser('comment', before.comment ?? '', after.comment ?? '');
+  poser(
+    'time',
+    () => before.time,
+    () => after.time ?? null,
+  );
+  poser(
+    'visitorName',
+    () => before.visitorName,
+    () => after.visitorName,
+  );
+  poser(
+    'phone',
+    () => before.phone ?? '',
+    () => after.phone ?? '',
+  );
+  poser(
+    'entrepriseId',
+    () => before.entreprise.id,
+    () => after.entrepriseId,
+  );
+  poser(
+    'objetId',
+    () => before.objet.id,
+    () => after.objetId,
+  );
+  poser(
+    'directionId',
+    () => before.direction?.id ?? null,
+    () => after.directionId ?? null,
+  );
+  poser(
+    'destinataireId',
+    () => before.destinataire?.id ?? null,
+    () => after.destinataireId ?? null,
+  );
+  poser(
+    'comment',
+    () => before.comment ?? '',
+    () => after.comment ?? '',
+  );
 
   return patch;
 }
