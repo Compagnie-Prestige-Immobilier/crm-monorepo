@@ -187,8 +187,8 @@ void main() {
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
   }
 
-  /// Joignable, fiche exacte, question CHUES à oui : le chemin le plus long,
-  /// jusqu'à la dernière étape.
+  /// Joignable, fiche exacte, question CHUES à oui, statut Accepté posé par
+  /// la question : le chemin le plus long, jusqu'à la dernière étape.
   Future<void> accepteComplet(WidgetTester tester) async {
     await taper(tester, find.text('Joignable'));
     await etapeSuivante(tester);
@@ -196,6 +196,15 @@ void main() {
     await renseignements(tester);
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
+    await etapeSuivante(tester);
+  }
+
+  /// La personne raccroche : le script s'abrège et le statut vient tout de
+  /// suite. Depuis le résultat « Joignable », une étape plus loin.
+  Future<void> passerAuStatut(WidgetTester tester) async {
+    await etapeSuivante(tester);
+    await taper(tester, find.text('Il doit raccrocher, passer au statut'));
+    await pomper(tester);
   }
 
   testWidgets('la fiche se lit avant de composer le numéro', (
@@ -307,6 +316,12 @@ void main() {
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
 
+    // Le statut vient après le script, déjà coché par la question.
+    await etapeSuivante(tester);
+    expect(find.text('Statut de qualification'), findsWidgets);
+    expect(find.text('Il souhaite être représentant : Accepté est coché.'), findsOneWidget);
+    expect(continuer(tester).onPressed, isNotNull);
+
     await etapeSuivante(tester);
     expect(find.text('Pour finir'), findsOneWidget);
     expect(enregistrer(tester).onPressed, isNotNull);
@@ -323,6 +338,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
 
@@ -372,6 +388,11 @@ void main() {
     await renseignements(tester);
     await taper(tester, tuile(kQuestionCHUES, 'Non'));
     await etapeSuivante(tester);
+    expect(
+      find.text('Il ne souhaite pas être représentant : Refusé est coché.'),
+      findsOneWidget,
+    );
+    await etapeSuivante(tester);
 
     expect(
       find.text('Il propose quelqu\'un d\'autre ? (facultatif)'),
@@ -395,6 +416,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
 
@@ -443,7 +465,10 @@ void main() {
     expect(tuile('Statut de qualification', 'À rappeler'), findsNothing);
     expect(tuile('Statut de qualification', 'Faux numéro'), findsNothing);
 
+    // Qui a décroché se qualifie APRÈS le script : aucune tuile ici.
     await taper(tester, find.text('Joignable'));
+    expect(tuile('Statut de qualification', 'À rappeler'), findsNothing);
+    await passerAuStatut(tester);
     expect(tuile('Statut de qualification', 'À rappeler'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Faux numéro'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Hors cible'), findsOneWidget);
@@ -460,6 +485,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     expect(tuile('Statut de qualification', 'Accepté'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Refusé'), findsOneWidget);
 
@@ -475,6 +501,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'Refusé');
     await etapeSuivante(tester);
     await envoyer(tester);
@@ -494,8 +521,6 @@ void main() {
     await ouvrir(tester);
     await accepteComplet(tester);
     await etapePrecedente(tester);
-    await etapePrecedente(tester);
-    await etapePrecedente(tester);
     await statut(tester, 'Refusé');
     await etapeSuivante(tester);
     await envoyer(tester);
@@ -513,13 +538,14 @@ void main() {
   ) async {
     await ouvrir(tester);
 
-    await taper(tester, find.text('Joignable'));
-    expect(tuile('Statut de qualification', 'Autre'), findsOneWidget);
-    expect(tuile('Statut de qualification', 'Autre joint'), findsNothing);
-
     await taper(tester, find.text('Injoignable'));
     expect(tuile('Statut de qualification', 'Autre'), findsOneWidget);
     expect(tuile('Statut de qualification', 'Autre non joint'), findsNothing);
+
+    await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
+    expect(tuile('Statut de qualification', 'Autre'), findsOneWidget);
+    expect(tuile('Statut de qualification', 'Autre joint'), findsNothing);
 
     await demonter(tester);
   });
@@ -551,6 +577,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'Autre');
     await etapeSuivante(tester);
 
@@ -580,6 +607,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'À rappeler');
     expect(continuer(tester).onPressed, isNotNull);
 
@@ -609,6 +637,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'À rappeler');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
@@ -645,6 +674,47 @@ void main() {
 
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     expect(continuer(tester).onPressed, isNotNull);
+
+    await demonter(tester);
+  });
+
+  // EB-10 : la personne raccroche au milieu du script. Ce qui a été répondu
+  // part avec la tentative, ce qui ne l'a pas été ne retient rien, et la fiche
+  // relue à moitié ne se corrige pas.
+  testWidgets('le script abrégé garde ce qui a été répondu', (
+    WidgetTester tester,
+  ) async {
+    await ouvrir(tester);
+
+    await taper(tester, find.text('Joignable'));
+    await etapeSuivante(tester);
+    await ficheExacte(tester);
+    await taper(tester, tuile('Avez-vous été contacté ?', 'Oui'));
+    expect(continuer(tester).onPressed, isNull);
+
+    await taper(tester, find.text('Il doit raccrocher, passer au statut'));
+    await pomper(tester);
+    expect(find.text('Statut de qualification'), findsWidgets);
+    expect(continuer(tester).subtitle, 'Choisissez un statut');
+
+    await statut(tester, 'À rappeler');
+    await etapeSuivante(tester);
+    expect(find.text('A été contacté'), findsOneWidget);
+    expect(find.text('Connaît l\'UES'), findsNothing);
+
+    await taper(tester, find.text('Demain 9 h'));
+    await envoyer(tester);
+
+    expect(writes.outcome, 'CALLBACK');
+    expect(writes.relationStatus, isNull);
+    final OutboxData op = (await db.select(db.outbox).get()).singleWhere(
+      (OutboxData o) => o.entityType == 'rep_call_attempt',
+    );
+    final Map<String, Object?> payload =
+        jsonDecode(op.payload) as Map<String, Object?>;
+    expect(payload['contacte'], true);
+    expect(payload['connaitUES'], isNull);
+    expect(payload['numeroConfirme'], isNull);
 
     await demonter(tester);
   });
@@ -694,6 +764,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'À rappeler');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
@@ -740,6 +811,7 @@ void main() {
     await ouvrir(tester);
 
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'Hors cible');
     await etapeSuivante(tester);
     expect(enregistrer(tester).onPressed, isNotNull);
@@ -798,6 +870,7 @@ void main() {
     await taper(tester, tuile('Avez-vous été contacté ?', 'Non'));
     await taper(tester, tuile('Connaissez-vous l\'UES ?', 'Oui'));
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
+    await etapeSuivante(tester);
     await etapeSuivante(tester);
     await envoyer(tester);
 
@@ -867,6 +940,7 @@ void main() {
   ) async {
     await ouvrir(tester);
     await taper(tester, find.text('Joignable'));
+    await passerAuStatut(tester);
     await statut(tester, 'À rappeler');
     await etapeSuivante(tester);
     await taper(tester, find.text('Demain 9 h'));
@@ -933,6 +1007,7 @@ void main() {
     await renseignements(tester);
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
     await etapeSuivante(tester);
+    await etapeSuivante(tester);
     expect(find.text('Tout est exact'), findsOneWidget);
     await envoyer(tester);
 
@@ -973,6 +1048,7 @@ void main() {
     await etapeSuivante(tester);
     await renseignements(tester);
     await taper(tester, tuile(kQuestionCHUES, 'Oui'));
+    await etapeSuivante(tester);
     await etapeSuivante(tester);
 
     // Le récapitulatif nomme ce qui a changé, pas seulement combien.

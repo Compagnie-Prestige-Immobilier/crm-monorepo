@@ -42,7 +42,7 @@ enum _Resultat { joignable, injoignable }
 /// La fiche avant d'appeler, le résultat et son statut, la vérification de ce
 /// qui a été importé puis les renseignements si le statut les exige encore, et
 /// enfin le rappel, le commentaire et l'envoi.
-enum _Etape { fiche, resultat, verification, renseignements, fin }
+enum _Etape { fiche, resultat, verification, renseignements, statut, fin }
 
 /// La fiche importée, figée à l'ouverture. C'est l'écart avec elle qui fait
 /// une correction ; ce qui n'a pas bougé ne repart pas.
@@ -164,6 +164,10 @@ class _RepresentantQualificationScreenState
   bool saving = false;
   String? echec;
 
+  /// La personne a raccroché avant la fin du script : on saute au statut, et
+  /// ce qui a été répondu reste (EB-10).
+  bool scriptAbrege = false;
+
   /// Ce que le verrou vient de refuser. Bande et non toast : le refus doit
   /// rester lisible tant que le statut n'est pas posé.
   String? refus;
@@ -197,6 +201,7 @@ class _RepresentantQualificationScreenState
   @override
   Map<String, Object?> collectDraftValues() => <String, Object?>{
     'resultat': resultat?.name,
+    'scriptAbrege': scriptAbrege,
     'statutCode': statutChoisi?.code,
     'aEteContacte': aEteContacte,
     'connaitUES': connaitUES,
@@ -231,6 +236,7 @@ class _RepresentantQualificationScreenState
       resultat = _Resultat.values
           .where((_Resultat r) => r.name == valeurs['resultat'])
           .firstOrNull;
+      scriptAbrege = valeurs['scriptAbrege'] == true;
       statutChoisi = statutsDuReferentiel
           .where((StatutQualificationRow r) => r.code == valeurs['statutCode'])
           .firstOrNull;
@@ -260,6 +266,7 @@ class _RepresentantQualificationScreenState
     _Etape.resultat: 'Comment s\'est passé l\'appel ?',
     _Etape.verification: 'Vérifier la fiche',
     _Etape.renseignements: 'Ce qu\'il vous a dit',
+    _Etape.statut: 'Statut de qualification',
     _Etape.fin: 'Pour finir',
   };
 
@@ -435,13 +442,14 @@ class _RepresentantQualificationScreenState
   /// n'a de sens que sur un refus, dit par le statut ou par la question.
   bool get proposeQuelquUn =>
       resultat == _Resultat.joignable &&
-      (statutChoisi?.effect == 'REFUSED' ||
-          (renseignementsExiges && representantCHUES == false));
+      (statutRetenu?.effect == 'REFUSED' || representantCHUES == false);
 
-  /// Le script n'est posé qu'à qui a accepté de parler et de qui rien n'a
-  /// encore été tranché : un statut choisi à part dit déjà ce qu'il en est.
-  bool get renseignementsExiges =>
-      resultat == _Resultat.joignable && statutChoisi == null;
+  /// Le script se pose à qui a décroché ; le statut vient APRÈS lui.
+  bool get scriptPose => resultat == _Resultat.joignable;
+
+  /// Le script est exigé en entier, sauf quand la personne a raccroché avant
+  /// la fin : ce qui a été répondu part, le reste ne retient rien.
+  bool get renseignementsExiges => scriptPose && !scriptAbrege;
 
   /// Le statut que pose la réponse à la question, pris dans le référentiel par
   /// la relation qu'il engage : le code n'est pas un contrat du client.
@@ -470,9 +478,10 @@ class _RepresentantQualificationScreenState
   List<_Etape> get parcours => <_Etape>[
     _Etape.fiche,
     _Etape.resultat,
-    if (renseignementsExiges) ...<_Etape>[
+    if (scriptPose) ...<_Etape>[
       _Etape.verification,
       _Etape.renseignements,
+      _Etape.statut,
     ],
     _Etape.fin,
   ];
@@ -550,8 +559,16 @@ class _RepresentantQualificationScreenState
     _Etape.resultat => manqueResultat,
     _Etape.verification => manqueVerification,
     _Etape.renseignements => manqueRenseignements,
+    _Etape.statut => manqueStatut,
     _Etape.fin => manqueFin,
   };
+
+  /// Le référentiel pas encore descendu laisse passer, comme sur un appareil
+  /// qui ne le connaît pas : l'issue se tire alors de la question.
+  String? get manqueStatut =>
+      statutRetenu == null && statutsProposes.isNotEmpty
+      ? 'Choisissez un statut'
+      : null;
 
   /// Le statut demande une date : rappel promis, ou réessai d'un numéro qui
   /// n'a pas répondu.
@@ -586,14 +603,8 @@ class _RepresentantQualificationScreenState
 
   String? get manqueResultat {
     if (resultat == null) return 'Choisissez d\'abord le résultat';
-    // Sur la branche jointe le statut est facultatif : la question le pose.
-    // Le référentiel pas encore descendu laisse aussi passer, comme sur un
-    // appareil qui ne le connaît pas.
-    if (resultat == _Resultat.injoignable &&
-        statutChoisi == null &&
-        statutsProposes.isNotEmpty) {
-      return 'Choisissez un statut';
-    }
+    // Sur la branche jointe le statut vient après le script.
+    if (resultat == _Resultat.injoignable) return manqueStatut;
     return null;
   }
 
@@ -631,6 +642,7 @@ class _RepresentantQualificationScreenState
       (renseignementsExiges
           ? manqueVerification ?? manqueRenseignements
           : null) ??
+      (scriptPose ? manqueStatut : null) ??
       manqueEtape(_Etape.fin);
 
   static String? _ouiNon(bool? value) =>
@@ -656,7 +668,7 @@ class _RepresentantQualificationScreenState
         _Resultat.injoignable => 'Injoignable',
         null => null,
       }),
-      if (renseignementsExiges) ...<CpiRecapLine>[
+      if (renseignementsExiges)
         if (corrigees.isEmpty)
           const CpiRecapLine('Fiche vérifiée', 'Tout est exact')
         else ...<CpiRecapLine>[
@@ -664,9 +676,14 @@ class _RepresentantQualificationScreenState
           for (final (String libelle, String valeur) in corrigees)
             CpiRecapLine(libelle, valeur),
         ],
-        CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
-        CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
-        CpiRecapLine(kQuestionCHUES, _ouiNon(representantCHUES)),
+      // Un script abrégé garde ce qui a été répondu.
+      if (scriptPose) ...<CpiRecapLine>[
+        if (aEteContacte != null)
+          CpiRecapLine('A été contacté', _ouiNon(aEteContacte)),
+        if (connaitUES != null)
+          CpiRecapLine('Connaît l\'UES', _ouiNon(connaitUES)),
+        if (representantCHUES != null)
+          CpiRecapLine(kQuestionCHUES, _ouiNon(representantCHUES)),
       ],
       if (proposeQuelquUn && suggestionCommencee)
         CpiRecapLine(
@@ -717,7 +734,21 @@ class _RepresentantQualificationScreenState
     markDraftDirty();
     setState(() {
       enAvant = true;
+      // Le script parcouru jusqu'au bout n'est plus abrégé.
+      if (etape == _Etape.renseignements) scriptAbrege = false;
       etape = etapes[index + 1];
+    });
+    unawaited(remonterLeBrouillon(collectDraftValues()));
+  }
+
+  /// La personne raccroche avant la fin du script : droit au statut, sans
+  /// rien perdre de ce qui a été répondu.
+  void passerAuStatut() {
+    markDraftDirty();
+    setState(() {
+      enAvant = true;
+      scriptAbrege = true;
+      etape = _Etape.statut;
     });
     unawaited(remonterLeBrouillon(collectDraftValues()));
   }
@@ -1016,6 +1047,7 @@ class _RepresentantQualificationScreenState
                 _Etape.resultat => _corpsResultat(theme, representant),
                 _Etape.verification => _corpsVerification(theme),
                 _Etape.renseignements => _corpsRenseignements(theme),
+                _Etape.statut => _corpsStatut(theme),
                 _Etape.fin => _corpsFin(theme, representant),
               },
             ),
@@ -1031,21 +1063,31 @@ class _RepresentantQualificationScreenState
       icon: PhosphorIconsRegular.phoneCall,
       onPressed: suivant,
     ),
-    _Etape.resultat || _Etape.renseignements => CpiButton(
+    _Etape.resultat || _Etape.statut => CpiButton(
       'Continuer',
       icon: PhosphorIconsRegular.arrowRight,
       subtitle: manqueEtape(etape),
       onPressed: manqueEtape(etape) == null ? suivant : null,
     ),
+    _Etape.renseignements => _piedDuScript(
+      CpiButton(
+        'Continuer',
+        icon: PhosphorIconsRegular.arrowRight,
+        subtitle: manqueRenseignements,
+        onPressed: manqueRenseignements == null ? suivant : null,
+      ),
+    ),
     // Rien à corriger se valide d'un geste ; dès qu'un champ bouge, le bouton
     // redevient un simple passage à la suite.
-    _Etape.verification => CpiButton(
-      corrections.isEmpty ? 'Tout est exact' : 'Continuer',
-      icon: corrections.isEmpty
-          ? PhosphorIconsRegular.check
-          : PhosphorIconsRegular.arrowRight,
-      subtitle: manqueVerification,
-      onPressed: manqueVerification == null ? suivant : null,
+    _Etape.verification => _piedDuScript(
+      CpiButton(
+        corrections.isEmpty ? 'Tout est exact' : 'Continuer',
+        icon: corrections.isEmpty
+            ? PhosphorIconsRegular.check
+            : PhosphorIconsRegular.arrowRight,
+        subtitle: manqueVerification,
+        onPressed: manqueVerification == null ? suivant : null,
+      ),
     ),
     _Etape.fin => Builder(
       builder: (BuildContext context) => CpiButton(
@@ -1058,6 +1100,23 @@ class _RepresentantQualificationScreenState
       ),
     ),
   };
+
+  /// Sous le script, l'issue de secours : la personne doit raccrocher, le
+  /// statut se pose tout de suite et les réponses déjà prises restent.
+  Widget _piedDuScript(Widget principal) => Column(
+    mainAxisSize: MainAxisSize.min,
+    crossAxisAlignment: CrossAxisAlignment.stretch,
+    children: <Widget>[
+      principal,
+      const SizedBox(height: CpiSpacing.xs),
+      CpiButton(
+        'Il doit raccrocher, passer au statut',
+        variant: CpiButtonVariant.secondary,
+        icon: PhosphorIconsRegular.phoneX,
+        onPressed: passerAuStatut,
+      ),
+    ],
+  );
 
   static EdgeInsets get _marge =>
       const EdgeInsets.fromLTRB(CpiSpacing.md, 0, CpiSpacing.md, CpiSpacing.md);
@@ -1266,35 +1325,62 @@ class _RepresentantQualificationScreenState
           resultat = choix;
           statutChoisi = null;
           rappelAt = null;
+          scriptAbrege = false;
         }),
         options: const <(_Resultat, String)>[
           (_Resultat.joignable, 'Joignable'),
           (_Resultat.injoignable, 'Injoignable'),
         ],
       ),
-      // Rien à montrer tant que le référentiel n'est pas descendu.
-      if (statutsProposes.isNotEmpty) ...<Widget>[
+      // Qui n'a pas décroché se qualifie ici ; qui a décroché, après le script.
+      if (resultat == _Resultat.injoignable) ...<Widget>[
         const SizedBox(height: CpiSpacing.lg),
-        _ChoixUnique<StatutQualificationRow>(
-          label: 'Statut de qualification',
-          value: statutChoisi,
-          onChanged: (StatutQualificationRow statut) => setState(() {
-            statutChoisi = statut;
-            final bool? souhait = souhaitDuStatut(statut);
-            if (souhait != null) representantCHUES = souhait;
-            // Un numéro occupé se retente : le réessai arrive préréglé au
-            // délai du statut, l'appelant le déplace s'il veut.
-            final int? reessai = statut.retryAfterMinutes;
-            rappelAt = reessai == null
-                ? null
-                : DateTime.now().add(Duration(minutes: reessai));
-          }),
-          options: <(StatutQualificationRow, String)>[
-            for (final StatutQualificationRow s in statutsProposes)
-              (s, libelleStatut(s)),
-          ],
-        ),
+        ..._choixDuStatut(),
       ],
+    ],
+  );
+
+  /// Rien à montrer tant que le référentiel n'est pas descendu.
+  List<Widget> _choixDuStatut() => <Widget>[
+    if (statutsProposes.isNotEmpty)
+      _ChoixUnique<StatutQualificationRow>(
+        label: 'Statut de qualification',
+        // Sur la branche jointe, la réponse à la question a déjà coché
+        // Accepté ou Refusé ; la liste laisse en changer.
+        value: statutRetenu,
+        onChanged: (StatutQualificationRow statut) => setState(() {
+          statutChoisi = statut;
+          final bool? souhait = souhaitDuStatut(statut);
+          if (souhait != null) representantCHUES = souhait;
+          // Un numéro occupé se retente : le réessai arrive préréglé au
+          // délai du statut, l'appelant le déplace s'il veut.
+          final int? reessai = statut.retryAfterMinutes;
+          rappelAt = reessai == null
+              ? null
+              : DateTime.now().add(Duration(minutes: reessai));
+        }),
+        options: <(StatutQualificationRow, String)>[
+          for (final StatutQualificationRow s in statutsProposes)
+            (s, libelleStatut(s)),
+        ],
+      ),
+  ];
+
+  /// Étape 5 de la branche jointe : le statut, une fois le script posé.
+  Widget _corpsStatut(ThemeData theme) => ListView(
+    padding: _marge,
+    children: <Widget>[
+      if (representantCHUES != null && statutChoisi == null) ...<Widget>[
+        CpiStatusBand(
+          text: representantCHUES!
+              ? 'Il souhaite être représentant : Accepté est coché.'
+              : 'Il ne souhaite pas être représentant : Refusé est coché.',
+          tone: CpiTone.neutral,
+          padded: false,
+        ),
+        const SizedBox(height: CpiSpacing.md),
+      ],
+      ..._choixDuStatut(),
     ],
   );
 
