@@ -22,6 +22,7 @@ import {
   type VisiteStats,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { TiroirWidgets } from '@/components/accueil/tableau-de-bord/tiroir-widgets';
+import { BoutonExportExcel } from '@/components/dashboard/bouton-export-excel';
 import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -39,7 +40,9 @@ import {
   serializeDisposition,
   type DashboardWidget,
 } from '@/lib/data/visites-dashboard';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import type { ClasseurTableauDeBord, FeuilleTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
 import type { Role } from '@/lib/types';
@@ -102,6 +105,41 @@ function donneesDesWidgets(
     if (donnee !== undefined) donnees.set(widget.id, donnee);
   }
   return donnees;
+}
+
+/** Le classeur suit l'écran : ses feuilles sont les cartes posées, dans leur ordre. */
+function feuillesDesWidgets(
+  widgets: readonly DashboardWidget[],
+  catalogue: Catalogue,
+  donneesParWidget: Map<string, DonneesSource>,
+): FeuilleTableauDeBord[] {
+  const feuilles: FeuilleTableauDeBord[] = [];
+  for (const widget of widgets) {
+    const entree = catalogue[widget.source];
+    const donnee = donneesParWidget.get(widget.id);
+    if (entree === undefined || donnee === undefined) continue;
+    feuilles.push({ titre: entree.label, question: entree.question, donnees: donnee });
+  }
+  return feuilles;
+}
+
+function classeurDesVisites(
+  plage: { du: string; au: string },
+  periode: string,
+  feuilles: FeuilleTableauDeBord[],
+): ClasseurTableauDeBord {
+  return {
+    fichier: `cpi-visites-${plage.du}-${plage.au}`,
+    titre: 'Tableau de bord des visites',
+    sousTitre: periode,
+    reperes: [
+      { libelle: 'Registre', valeur: 'Visites reçues à l’accueil' },
+      { libelle: 'Période', valeur: `du ${formatDate(plage.du)} au ${formatDate(plage.au)}` },
+      { libelle: 'Feuilles de chiffres', valeur: String(feuilles.length) },
+      { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
+    ],
+    feuilles,
+  };
 }
 
 type Brouillon = DashboardWidget[] | null;
@@ -328,6 +366,16 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                 <FileSpreadsheetIcon aria-hidden="true" />
                 Exporter le détail
               </Button>
+              <BoutonExportExcel
+                preparer={() =>
+                  classeurDesVisites(
+                    plage,
+                    periodeAffichee(filters),
+                    feuillesDesWidgets(widgets, catalogue, donneesParWidget),
+                  )
+                }
+                disabled={!hasData || widgets.length === 0}
+              />
             </>
           )}
           <BarreEdition
