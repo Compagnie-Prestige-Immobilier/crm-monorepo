@@ -3,6 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 import { z } from 'zod';
 
 import { getApiClient } from '@/lib/api/browser';
+import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
 import { dakarLocalToIso } from '@/lib/format';
 import type {
   RepresentantScriptPatch,
@@ -196,6 +197,8 @@ export interface ConversionDraft {
   readonly incomeBandId: string;
   readonly paymentMode: PaymentMode | null;
   readonly dureeSystemeMois: string;
+  readonly memeWhatsapp: boolean | null;
+  readonly whatsapp: string;
   readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
 }
@@ -218,6 +221,8 @@ const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   incomeBandId: z.string(),
   paymentMode: z.enum(['COMPTANT', 'ECHELONNE']).nullable(),
   dureeSystemeMois: z.string(),
+  memeWhatsapp: z.boolean().nullable().catch(null),
+  whatsapp: z.string().catch(''),
   method: z.enum(ENROLLMENT_METHODS).nullable(),
   rendezVousAt: z.string(),
 });
@@ -313,6 +318,8 @@ export function conversionFrom(
     incomeBandId: prospect.incomeBandId ?? '',
     paymentMode: prospect.paymentMode,
     dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
+    memeWhatsapp: null,
+    whatsapp: '',
     method,
     rendezVousAt: '',
   };
@@ -378,24 +385,32 @@ function chuesObligatoires(draft: ConversionDraft): ConversionErrors {
   return errors;
 }
 
+const chiffres = (value: string): number => value.replace(/\D/gu, '').length;
+
 function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
   const errors: ConversionErrors = complet ? chuesObligatoires(draft) : {};
 
   const mois = draft.dureeEtablissementMois.trim();
   if (complet && mois === '') {
-    errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
+    errors.dureeEtablissementMois = 'La durée dans la fonction est obligatoire.';
   } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
   }
 
   const systeme = draft.dureeSystemeMois.trim();
-  if (complet && systeme === '') {
-    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
-  } else if (
+  if (
     systeme !== '' &&
     (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
   ) {
     errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
+  }
+
+  if (
+    draft.memeWhatsapp === false &&
+    draft.whatsapp.trim() !== '' &&
+    chiffres(draft.whatsapp) < 9
+  ) {
+    errors.whatsapp = 'Le numéro WhatsApp est incomplet.';
   }
 
   return errors;
@@ -410,14 +425,14 @@ function methodeErreurs(draft: ConversionDraft, now: number): ConversionErrors {
   if (draft.method === 'APPOINTMENT') {
     const iso = dakarLocalToIso(rendezVous);
     if (rendezVous === '') {
-      errors.rendezVousAt = 'La prise de rendez-vous exige la date du rendez-vous.';
+      errors.rendezVousAt = 'Le RDV CPI exige la date et l’heure du rendez-vous.';
     } else if (iso === null) {
       errors.rendezVousAt = 'La date du rendez-vous est illisible.';
     } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
       errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
     }
   } else if (rendezVous !== '') {
-    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».';
+    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « RDV CPI ».';
   }
 
   return errors;
@@ -432,11 +447,23 @@ export const CONVERSION_ERRORS: Readonly<
 > = {
   PHASE2_RENDEZ_VOUS_REQUIRED: {
     field: 'rendezVousAt',
-    message: 'La prise de rendez-vous exige la date du rendez-vous.',
+    message: 'Le RDV CPI exige la date et l’heure du rendez-vous.',
   },
   PHASE2_RENDEZ_VOUS_NOT_ALLOWED: {
     field: 'rendezVousAt',
-    message: 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».',
+    message: 'Une date de rendez-vous n’est admise que sur « RDV CPI ».',
+  },
+  PHASE2_METHOD_RETIREE: {
+    field: 'method',
+    message: 'Cette méthode n’existe plus. Choisissez « RDV CPI ».',
+  },
+  PHASE2_REVENU_REQUIRED: {
+    field: 'incomeBandId',
+    message: 'Choisissez la tranche de revenu.',
+  },
+  PHASE2_DUREE_FONCTION_REQUIRED: {
+    field: 'dureeEtablissementMois',
+    message: 'La durée dans la fonction est obligatoire.',
   },
   PHASE2_RENDEZ_VOUS_INVALID: {
     field: 'rendezVousAt',
@@ -548,7 +575,23 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
     ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
     ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
     ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+    ...whatsappData(draft),
     ...(rendezVousAt === null ? {} : { rendezVousAt }),
+  };
+}
+
+/**
+ * EB-23. Sur « oui » la colonne `whatsappE164` reste nulle : le serveur la
+ * recompose depuis le numéro appelé. Sur « non » sans numéro, il retient AUCUN.
+ */
+function whatsappData(draft: ConversionDraft): SyncEntityData {
+  if (draft.memeWhatsapp === null) return {};
+  if (draft.memeWhatsapp) return { whatsappStatus: 'MEME_NUMERO' };
+
+  const numero = draft.whatsapp.trim();
+  return {
+    whatsappStatus: 'AUTRE_NUMERO',
+    ...(numero === '' ? {} : { whatsappE164: numero }),
   };
 }
 
@@ -566,7 +609,7 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
 
   return {
     clientBatchId: input.batchId,
-    payloadVersion: 1,
+    payloadVersion: PANEL_PAYLOAD_VERSION,
     operations: [
       {
         opId: input.attemptId,

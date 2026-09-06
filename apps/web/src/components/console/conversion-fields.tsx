@@ -18,11 +18,13 @@ import {
   PROSPECT_TYPE_LABELS,
   PROSPECT_TYPES,
 } from '@/lib/data/grand-public';
+import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { fetchBanques, fetchIncomeBands, fetchSyndicats } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
   type EnrollmentMethod,
   type PaymentMode,
   type ProspectType,
@@ -31,20 +33,26 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-/** La prise de rendez-vous en tête : c'est l'issue que l'appel cherche. */
-const METHOD_ORDER: readonly EnrollmentMethod[] = [
-  'APPOINTMENT',
-  'VOICE_OR_ELECTRONIC_MESSAGING',
-  'PLATFORM',
-  'PHYSICAL',
-];
-
 const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
   { value: 'COMPTANT', label: 'Comptant' },
   { value: 'ECHELONNE', label: 'Échelonné' },
 ];
 
 const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
+
+const COORDONNEES: Partial<
+  Record<
+    EnrollmentMethod,
+    {
+      readonly libelle: string;
+      readonly cle: 'plateformeChuesUrl' | 'emailChues' | 'whatsappChuesE164';
+    }
+  >
+> = {
+  PLATFORM: { libelle: 'Lien de la plateforme CPI CHUES', cle: 'plateformeChuesUrl' },
+  VOICE_OR_ELECTRONIC_MESSAGING: { libelle: 'Adresse e-mail CHUES', cle: 'emailChues' },
+  WHATSAPP: { libelle: 'Numéro WhatsApp CHUES', cle: 'whatsappChuesE164' },
+};
 
 /**
  * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
@@ -129,6 +137,33 @@ export function ConversionFields({
         {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
       </Field>
 
+      <ChoixOuiNon
+        label="Ce numéro est-il un numéro WhatsApp ?"
+        name="console-whatsapp"
+        value={draft.memeWhatsapp}
+        nonDemande={false}
+        onChange={(memeWhatsapp) => {
+          onChange({ memeWhatsapp, ...(memeWhatsapp === false ? {} : { whatsapp: '' }) });
+        }}
+      />
+
+      {draft.memeWhatsapp === false ? (
+        <Field label="Numéro WhatsApp" error={errors.whatsapp}>
+          {(props) => (
+            <Input
+              {...props}
+              inputMode="tel"
+              autoComplete="off"
+              placeholder="77 123 45 67"
+              value={draft.whatsapp}
+              onChange={(event) => {
+                onChange({ whatsapp: event.target.value });
+              }}
+            />
+          )}
+        </Field>
+      ) : null}
+
       <Field label="E-mail" error={errors.email}>
         {(props) => (
           <Input
@@ -156,10 +191,9 @@ export function ConversionFields({
       </Field>
 
       <Field
-        label="Durée dans l’établissement (mois)"
+        label="Durée dans la fonction (mois)"
         required={complet}
         error={errors.dureeEtablissementMois}
-        description="Ancienneté au poste, pas la durée du système de paiement."
       >
         {(props) => (
           <Input
@@ -283,12 +317,8 @@ export function ConversionFields({
         </Field>
       )}
 
-      {complet || draft.paymentMode === 'ECHELONNE' ? (
-        <Field
-          label="Durée du système de paiement"
-          required={complet}
-          error={errors.dureeSystemeMois}
-        >
+      {draft.paymentMode === 'ECHELONNE' ? (
+        <Field label="Durée du système de paiement" error={errors.dureeSystemeMois}>
           {(props) => (
             <Liste
               id={props.id}
@@ -309,7 +339,7 @@ export function ConversionFields({
           Méthode d’enrôlement
         </legend>
         <div className="grid gap-2 sm:grid-cols-2">
-          {METHOD_ORDER.map((method) => (
+          {ENROLLMENT_METHOD_ORDER.map((method) => (
             <MethodChoice
               key={method}
               method={method}
@@ -332,9 +362,11 @@ export function ConversionFields({
         )}
       </fieldset>
 
+      <CoordonneeChues method={draft.method} />
+
       {draft.method === 'APPOINTMENT' ? (
         <Field
-          label="Date du rendez-vous"
+          label="Date et heure du rendez-vous"
           required
           error={errors.rendezVousAt}
           description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
@@ -353,6 +385,30 @@ export function ConversionFields({
         </Field>
       ) : null}
     </fieldset>
+  );
+}
+
+/** EB-24 : ce que le téléconseiller dicte au prospect, selon la méthode choisie. */
+function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
+  const parametres = useQuery({
+    queryKey: queryKeys.parametresChues,
+    queryFn: () => fetchParametresChues(),
+    staleTime: REFERENCE_STALE_TIME,
+  });
+
+  const attendue = method === null ? undefined : COORDONNEES[method];
+  if (attendue === undefined || parametres.data === undefined) return null;
+
+  const valeur = parametres.data[attendue.cle];
+  return (
+    <p className="rounded-md border border-border px-3 py-2 text-[0.875rem] sm:col-span-2">
+      <span className="text-muted-foreground">{attendue.libelle} : </span>
+      {valeur === '' ? (
+        'à renseigner dans les paramètres CHUES.'
+      ) : (
+        <span className="select-all font-[600]">{valeur}</span>
+      )}
+    </p>
   );
 }
 

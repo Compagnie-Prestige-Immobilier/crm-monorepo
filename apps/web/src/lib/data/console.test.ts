@@ -22,6 +22,7 @@ import {
   type Callback,
   type ConversionDraft,
 } from '@/lib/data/console';
+import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
 import { prospectFixture } from '@/test/prospect-fixture';
 
 const NOW = Date.parse('2026-08-16T12:00:00.000Z');
@@ -90,7 +91,7 @@ describe('buildAttemptBatch', () => {
     const batch = buildAttemptBatch(input);
 
     expect(batch.clientBatchId).toBe('b-1');
-    expect(batch.payloadVersion).toBe(1);
+    expect(batch.payloadVersion).toBe(PANEL_PAYLOAD_VERSION);
     expect(batch.operations).toHaveLength(1);
     expect(batch.operations[0]).toMatchObject({
       opId: 'a-1',
@@ -226,6 +227,8 @@ function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
     incomeBandId: 'i-1',
     paymentMode: 'ECHELONNE',
     dureeSystemeMois: '24',
+    memeWhatsapp: null,
+    whatsapp: '',
     method: 'PLATFORM',
     rendezVousAt: '',
     ...over,
@@ -298,7 +301,6 @@ describe('validateConversion', () => {
       [
         'banqueId',
         'dureeEtablissementMois',
-        'dureeSystemeMois',
         'engagementEnCours',
         'fonctionnaire',
         'incomeBandId',
@@ -361,7 +363,7 @@ describe('validateConversion', () => {
 
   it('refuse une date de rendez-vous sur toute autre méthode', () => {
     const draft = conversion({ method: 'PLATFORM', rendezVousAt: '2026-08-20T09:00' });
-    expect(validateConversion(draft, NOW).rendezVousAt).toMatch(/Prise de rendez-vous/);
+    expect(validateConversion(draft, NOW).rendezVousAt).toMatch(/RDV CPI/);
   });
 });
 

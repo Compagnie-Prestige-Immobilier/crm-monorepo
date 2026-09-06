@@ -1,6 +1,8 @@
 import { screen, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type * as AuthModule from '@/lib/data/auth';
+import type * as ParametresModule from '@/lib/data/parametres-chues';
 import type * as ProspectsModule from '@/lib/data/prospects';
 import type { Role } from '@/lib/types';
 import { prospectFixture } from '@/test/prospect-fixture';
@@ -10,6 +12,8 @@ const fetchProspect = vi.hoisted(() => vi.fn());
 const fetchCallAttempts = vi.hoisted(() => vi.fn());
 const fetchDeviceCalls = vi.hoisted(() => vi.fn());
 const fetchSegmentHistory = vi.hoisted(() => vi.fn());
+const fetchParametresChues = vi.hoisted(() => vi.fn());
+const fetchSessionUser = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/data/prospects', async () => {
   const actual = await vi.importActual<typeof ProspectsModule>('@/lib/data/prospects');
@@ -22,6 +26,16 @@ vi.mock('@/lib/data/prospects', async () => {
   };
 });
 
+vi.mock('@/lib/data/parametres-chues', async () => {
+  const actual = await vi.importActual<typeof ParametresModule>('@/lib/data/parametres-chues');
+  return { ...actual, fetchParametresChues: () => fetchParametresChues() as unknown };
+});
+
+vi.mock('@/lib/data/auth', async () => {
+  const actual = await vi.importActual<typeof AuthModule>('@/lib/data/auth');
+  return { ...actual, fetchSessionUser: () => fetchSessionUser() as unknown };
+});
+
 const { ProspectDetailView } = await import('@/components/prospects/prospect-detail-view');
 
 const ADMIN: Role = 'ADMIN';
@@ -30,7 +44,10 @@ beforeEach(() => {
   fetchProspect.mockResolvedValue(
     prospectFixture({
       id: 'p-1',
+      whatsappStatus: 'AUTRE_NUMERO',
       whatsappE164: '+221779876543',
+      whatsappNumber: '+221779876543',
+      etablissement: 'École Amadou Diop',
       profession: 'Enseignant',
       banqueName: 'CBAO',
       syndicatSigle: 'SAES',
@@ -42,6 +59,8 @@ beforeEach(() => {
   fetchCallAttempts.mockResolvedValue([]);
   fetchDeviceCalls.mockResolvedValue([]);
   fetchSegmentHistory.mockResolvedValue([]);
+  fetchParametresChues.mockResolvedValue({ messageWhatsapp: 'Bonjour {prenom}.' });
+  fetchSessionUser.mockResolvedValue({ fullName: 'Fatou Sow', phoneE164: '+221771112233' });
 });
 
 describe('ProspectDetailView', () => {
