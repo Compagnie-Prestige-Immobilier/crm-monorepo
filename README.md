@@ -106,9 +106,16 @@ active. Le serveur distingue le dernier signal, le temps actif observé, les
 appels, les saisies, les opérations locales en attente et le retard de
 synchronisation.
 
-Le tableau de bord interroge régulièrement l'API. « En direct » signifie que le
-panel vient de lire le serveur, pas qu'un téléphone hors ligne a déjà vidé son
-outbox.
+Les agrégats lourds (supervision, statistiques, dossiers bancaires,
+référentiels) sont servis depuis Redis pendant 30 à 60 secondes : le tableau de
+bord les relit toutes les 10 secondes sans recalcul en base. Sans `REDIS_URL`,
+l'API sert les mêmes routes directement depuis Postgres.
+
+Le panel tient une connexion SSE (`GET /api/v1/live`) : notifications,
+imports, exports de la base, référentiels et releases Android se rafraîchissent
+à l'événement, le sondage restant un filet de sécurité à la minute. « En
+direct » signifie que le panel vient de lire le serveur, pas qu'un téléphone
+hors ligne a déjà vidé son outbox.
 
 ## Prérequis
 
@@ -199,7 +206,13 @@ pnpm dx -- --mobile
 
 Cette commande démarre PostgreSQL, applique les migrations, exécute le seed,
 lance l'émulateur configuré, puis démarre l'API, le web et Flutter. Sans
-`--mobile`, `pnpm dx` démarre seulement l'API si nécessaire.
+`--mobile`, `pnpm dx` fait la même chose sans l'émulateur ni Flutter.
+
+Pour arrêter l'API, le web et PostgreSQL lancés en développement:
+
+```bash
+pnpm dx down
+```
 
 ## Application Android
 

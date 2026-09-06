@@ -13,6 +13,7 @@ import '../../features/auth/auth_state.dart';
 import '../../features/auth/presentation/login_screen.dart';
 import '../../features/contacts/presentation/mes_contacts_screen.dart';
 import '../../features/corrections/presentation/corrections_screen.dart';
+import '../../features/diagnostic/presentation/diagnostic_android_screen.dart';
 import '../../features/historique/presentation/historique_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/notifications/presentation/notifications_screen.dart';
@@ -38,13 +39,21 @@ import 'route_guard.dart';
 import 'route_memory.dart';
 import 'route_paths.dart';
 
-class _AuthRefreshNotifier extends ChangeNotifier {
-  _AuthRefreshNotifier(Ref ref) {
+class _RouterRefreshNotifier extends ChangeNotifier {
+  _RouterRefreshNotifier(Ref ref) {
     ref.listen<AuthState>(authControllerProvider, (
       AuthState? previous,
       AuthState next,
     ) {
       if (previous?.status != next.status) notifyListeners();
+    });
+    // La fiche tenue est lue en base, donc APRÈS la première trame : sans ce
+    // réveil, le démarrage resterait sur l'écran mémorisé.
+    ref.listen<AsyncValue<String?>>(routeFicheTenueProvider, (
+      AsyncValue<String?>? previous,
+      AsyncValue<String?> next,
+    ) {
+      if (previous?.value != next.value) notifyListeners();
     });
   }
 }
@@ -56,6 +65,21 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
   debugLabel: 'root',
 );
 
+/// EB-08 : la fiche tenue, quand la route demandée n'est pas la sienne. C'est
+/// elle que le démarrage rouvre, et elle qu'aucune autre route ne quitte.
+///
+/// Seul le CHEMIN compte : la fiche d'un prospect porte son numéro en
+/// paramètre, et le réécrire à chaque passage relancerait sa recherche. Un rôle
+/// qui n'a plus le droit de l'ouvrir n'y est pas renvoyé : le garde la
+/// rejetterait, et les deux règles se renverraient la balle sans fin.
+String? _ficheARouvrir(Ref ref, String demande, String? role) {
+  final String? fiche = ref.read(routeFicheTenueProvider).value;
+  if (fiche == null) return null;
+  final String chemin = Uri.parse(fiche).path;
+  if (chemin == demande || !RouteGuard.autorise(chemin, role)) return null;
+  return fiche;
+}
+
 GoRouterWidgetBuilder _chues(Widget Function(GoRouterState state) screen) {
   return (BuildContext context, GoRouterState state) =>
       ProjectScope(project: CpiProject.chues, child: screen(state));
@@ -63,7 +87,7 @@ GoRouterWidgetBuilder _chues(Widget Function(GoRouterState state) screen) {
 
 final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
   final RouteMemory memory = ref.watch(routeMemoryProvider);
-  final _AuthRefreshNotifier refresh = _AuthRefreshNotifier(ref);
+  final _RouterRefreshNotifier refresh = _RouterRefreshNotifier(ref);
   ref.onDispose(refresh.dispose);
 
   final AuthState depart = ref.read(authControllerProvider);
@@ -112,6 +136,9 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         }
         return next;
       }
+
+      final String? fiche = _ficheARouvrir(ref, state.uri.path, auth.role);
+      if (fiche != null) return fiche;
 
       // Un rôle qui n'ouvre qu'un projet n'a rien à choisir : le hub lui
       // demandait un geste de plus pour une seule porte. Le compte d'accueil
@@ -241,20 +268,20 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues((GoRouterState state) => const RappelsScreen()),
       ),
       GoRoute(
-        path: Routes.grandPublicMesContacts,
-        name: 'grandPublicMesContacts',
+        path: Routes.grandPublicCorrections,
+        name: 'grandPublicCorrections',
         parentNavigatorKey: rootNavigatorKey,
         builder: (BuildContext context, GoRouterState state) =>
             const ProjectScope(
               project: CpiProject.grandPublic,
-              child: MesContactsScreen(grandPublic: true),
+              child: CorrectionsScreen(),
             ),
       ),
       GoRoute(
-        path: Routes.mesContacts,
-        name: 'mesContacts',
+        path: Routes.corrections,
+        name: 'corrections',
         parentNavigatorKey: rootNavigatorKey,
-        builder: _chues((GoRouterState state) => const MesContactsScreen()),
+        builder: _chues((GoRouterState state) => const CorrectionsScreen()),
       ),
       GoRoute(
         path: '/grand-public/phase2',
@@ -301,10 +328,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.grandPublicCorrections,
-                name: 'grandPublicCorrections',
+                path: Routes.grandPublicMesContacts,
+                name: 'grandPublicMesContacts',
                 builder: (BuildContext context, GoRouterState state) =>
-                    const CorrectionsScreen(),
+                    const MesContactsScreen(grandPublic: true),
               ),
             ],
           ),
@@ -411,6 +438,14 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues((GoRouterState state) => const BatteryHelpScreen()),
       ),
       GoRoute(
+        path: Routes.diagnosticAndroid,
+        name: 'diagnosticAndroid',
+        parentNavigatorKey: rootNavigatorKey,
+        builder: _chues(
+          (GoRouterState state) => const DiagnosticAndroidScreen(),
+        ),
+      ),
+      GoRoute(
         path: Routes.about,
         name: 'about',
         parentNavigatorKey: rootNavigatorKey,
@@ -448,10 +483,10 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
           StatefulShellBranch(
             routes: <RouteBase>[
               GoRoute(
-                path: Routes.corrections,
-                name: 'corrections',
+                path: Routes.mesContacts,
+                name: 'mesContacts',
                 builder: (BuildContext context, GoRouterState state) =>
-                    const CorrectionsScreen(),
+                    const MesContactsScreen(),
               ),
             ],
           ),

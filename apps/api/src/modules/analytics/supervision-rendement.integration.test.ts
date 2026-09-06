@@ -118,16 +118,17 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
     [1, 2, 3, 4].map((rang) => fiche(tx, awa, rang)),
   );
 
-  const tentatives: [string, string, CallOutcome, string, number, number][] = [
-    [awa, ficheA as string, CallOutcome.METHOD_OBTAINED, LUNDI, 9, 0],
-    [awa, ficheB as string, CallOutcome.UNREACHABLE, LUNDI, 9, 20],
-    [awa, ficheB as string, CallOutcome.REFUSED, LUNDI, 9, 25],
-    [awa, ficheC as string, CallOutcome.REFUSED, LUNDI, 15, 30],
-    [bineta, ficheC as string, CallOutcome.REFUSED, LUNDI, 13, 50],
-    [bineta, ficheD as string, CallOutcome.REFUSED, MARDI, 9, 0],
+  // Dernière colonne : appel retrouvé dans le journal du téléphone Android.
+  const tentatives: [string, string, CallOutcome, string, number, number, boolean][] = [
+    [awa, ficheA as string, CallOutcome.METHOD_OBTAINED, LUNDI, 9, 0, true],
+    [awa, ficheB as string, CallOutcome.UNREACHABLE, LUNDI, 9, 20, true],
+    [awa, ficheB as string, CallOutcome.REFUSED, LUNDI, 9, 25, false],
+    [awa, ficheC as string, CallOutcome.REFUSED, LUNDI, 15, 30, false],
+    [bineta, ficheC as string, CallOutcome.REFUSED, LUNDI, 13, 50, false],
+    [bineta, ficheD as string, CallOutcome.REFUSED, MARDI, 9, 0, false],
   ];
 
-  for (const [performedById, prospectId, outcome, jour, h, min] of tentatives) {
+  for (const [performedById, prospectId, outcome, jour, h, min, confirme] of tentatives) {
     await tx.callAttempt.create({
       data: {
         id: uuidv7(),
@@ -135,6 +136,13 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
         performedById,
         outcome,
         ...(outcome === CallOutcome.METHOD_OBTAINED ? { method: EnrollmentMethod.PLATFORM } : {}),
+        ...(confirme
+          ? {
+              deviceCallType: 'sortant',
+              deviceCallDurationSeconds: 92,
+              deviceCallAt: a(jour, h, min),
+            }
+          : {}),
         clientCreatedAt: a(jour, h, min),
       },
     });
@@ -164,6 +172,9 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
         representantId: representant.id,
         performedById: daba,
         outcome,
+        ...(outcome === RepCallOutcome.REACHED
+          ? { deviceCallType: 'sortant', deviceCallDurationSeconds: 92, deviceCallAt: a(jour, 9) }
+          : {}),
         clientCreatedAt: a(jour, 9),
       },
     });
@@ -308,5 +319,21 @@ describe('quand rien ne peut être jugé', () => {
     expect(awa?.score.value).toBeGreaterThan(0);
     expect(awa?.score.reason).toBeNull();
     expect(awa?.score.parts).toHaveLength(6);
+  });
+});
+
+describe('appels confirmés par le journal du téléphone', () => {
+  it('ne compte que les tentatives horodatées par le téléphone', async () => {
+    const [prospects, representants] = await surLeJeu(async ({ service, awa, daba }) =>
+      Promise.all([
+        service.activite({ ...FENETRE, commercialId: awa }),
+        service.activite({ ...FENETRE, commercialId: daba }),
+      ]),
+    );
+
+    expect(prospects.totals.calls).toBe(4);
+    expect(prospects.totals.confirmedCalls).toBe(2);
+    expect(representants.totals.repCalls).toBe(2);
+    expect(representants.totals.repConfirmedCalls).toBe(1);
   });
 });

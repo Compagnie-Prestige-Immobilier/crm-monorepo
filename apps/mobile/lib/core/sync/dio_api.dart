@@ -58,7 +58,9 @@ class DioApi implements ApiPort {
   RepCampaignsApi get _repCampaigns => _client.getRepCampaignsApi();
   RepresentantsApi get _representants => _client.getRepresentantsApi();
   CallOutcomeReasonsApi get _reasons => _client.getCallOutcomeReasonsApi();
+  StatutsQualificationApi get _statuts => _client.getStatutsQualificationApi();
   VisitesApi get _visites => _client.getVisitesApi();
+  OuverturesApi get _ouvertures => _client.getOuverturesApi();
 
   @override
   Future<AuthTokens> login({
@@ -217,6 +219,38 @@ class DioApi implements ApiPort {
   }
 
   @override
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) async {
+    return _guard('ouvrirFiche', () async {
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvrirFiche(ouvrirFicheDto: corps, extra: TimeoutProfile.push.extra);
+      return _body('ouvrirFiche', response);
+    });
+  }
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() async {
+    return _guard('ouvertureCourante', () async {
+      final Response<OuvertureFicheDto> response = await _ouvertures
+          .ouvertureCourante(extra: TimeoutProfile.read.extra);
+      return response.data;
+    });
+  }
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required EnregistrerBrouillonDto corps,
+  }) async {
+    await _guard('brouillonOuverture', () async {
+      await _ouvertures.enregistrerBrouillonOuverture(
+        id: id,
+        enregistrerBrouillonDto: corps,
+        extra: TimeoutProfile.push.extra,
+      );
+    });
+  }
+
+  @override
   Future<void> uploadCallRecording({
     required String attemptId,
     required String path,
@@ -281,6 +315,20 @@ class DioApi implements ApiPort {
             extra: TimeoutProfile.read.extra,
           );
       return _body('callOutcomeReasons', response).items;
+    });
+  }
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async {
+    return _guard('statutsQualification', () async {
+      final Response<StatutQualificationListDto> response = await _statuts
+          .listStatutsQualification(
+            payloadVersion: payloadVersion,
+            extra: TimeoutProfile.read.extra,
+          );
+      return _body('statutsQualification', response).items;
     });
   }
 

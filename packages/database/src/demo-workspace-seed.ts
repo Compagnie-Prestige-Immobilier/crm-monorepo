@@ -8,7 +8,7 @@ function workspaceUrl(workspace: 'public' | 'demo'): string {
 }
 
 const demoDb = new PrismaClient({
-  adapter: new PrismaPg({ connectionString: workspaceUrl('demo'), max: 2 }),
+  adapter: new PrismaPg({ connectionString: workspaceUrl('demo'), max: 2 }, { schema: 'demo' }),
 });
 
 try {

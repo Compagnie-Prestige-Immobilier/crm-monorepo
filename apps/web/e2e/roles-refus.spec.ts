@@ -140,6 +140,12 @@ const ECRANS: readonly Ecran[] = [
     renvoyes: ['DIRECTION', 'SUPERVISEUR', 'ACCUEIL', 'BANQUE_FINANCE'],
   },
   {
+    route: '/admin/enrolement',
+    titre: 'Plateformes d’enrôlement · CPI GO',
+    familles: ['/api/v1/enrolement'],
+    autorises: ['ADMIN'],
+  },
+  {
     route: '/admin/parametres',
     titre: 'Paramètres · CPI GO',
     familles: ['/api/v1/admin/'],

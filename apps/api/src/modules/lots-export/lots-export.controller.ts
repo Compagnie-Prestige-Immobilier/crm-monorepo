@@ -6,6 +6,7 @@ import {
   HttpCode,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   Res,
@@ -32,12 +33,17 @@ import { WorkspaceContext } from '../../workspaces/workspace.js';
 import {
   CreateLotExportDto,
   LotExportDetailDto,
+  LotExportFichesDto,
+  LotExportFichesQueryDto,
   LotExportListDto,
   LotExportPreviewDto,
   LotExportProgrammeQueryDto,
   LotExportQueryDto,
   LotExportSummaryDto,
   MesAttributionsDto,
+  ReaffecterLotExportDto,
+  RetirerTeleconseillerDto,
+  UpdateLotExportDto,
 } from './dto.js';
 import { LotsExportService } from './lots-export.service.js';
 import { programmeFilename } from './programme-pdf.js';
@@ -54,7 +60,7 @@ export class LotsExportController {
     private readonly workspace: WorkspaceContext,
   ) {}
   @Post()
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({ operationId: 'createLotExport', summary: 'Crée une campagne de fiches.' })
   @ApiResponse({ status: 201, type: LotExportSummaryDto })
   create(
@@ -68,7 +74,7 @@ export class LotsExportController {
   // donc les mêmes critères imbriqués que la création, dans un corps.
   @Post('apercu')
   @HttpCode(200)
-  @Roles(Role.ADMIN)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
   @ApiOperation({ operationId: 'previewLotExport', summary: 'Compte les fiches d’une cible.' })
   @ApiResponse({ status: 200, type: LotExportPreviewDto })
   preview(@Body() body: CreateLotExportDto): Promise<LotExportPreviewDto> {
@@ -161,7 +167,7 @@ export class LotsExportController {
     operationId: 'mesAttributions',
     summary: 'Les fiches attribuées à l’appelant, tous lots confondus.',
     description:
-      'Sert au mobile à borner son tirage. `tout: true` pour ADMIN, SUPERVISEUR et DIRECTION : les deux listes sont alors vides et aucun filtre ne s’applique.',
+      'Sert au mobile à borner son tirage. `tout: true` pour ADMIN seulement : les deux listes sont alors vides et aucun filtre ne s’applique. Supervision et direction ne voient sur le téléphone que les fiches qu’une campagne leur a confiées.',
   })
   @ApiResponse({ status: 200, type: MesAttributionsDto })
   mesAttributions(@CurrentUser() user: AuthenticatedUser): Promise<MesAttributionsDto> {
@@ -178,6 +184,74 @@ export class LotsExportController {
   @ApiResponse({ status: 200, type: LotExportDetailDto })
   get(@Param('id', ParseUUIDPipe) id: string): Promise<LotExportDetailDto> {
     return this.lots.get(id);
+  }
+
+  @Patch(':id')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'updateLotExport',
+    summary: 'Renomme une campagne et règle les objectifs.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: LotExportSummaryDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'LOT_EXPORT_NOT_FOUND.' })
+  update(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: UpdateLotExportDto,
+  ): Promise<LotExportSummaryDto> {
+    return this.lots.update(id, body);
+  }
+
+  @Get(':id/fiches')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listLotExportFiches',
+    summary: 'Liste les fiches d’une campagne, avec leur état et le statut posé.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: LotExportFichesDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'LOT_EXPORT_NOT_FOUND.' })
+  fiches(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: LotExportFichesQueryDto,
+  ): Promise<LotExportFichesDto> {
+    return this.lots.fiches(id, query);
+  }
+
+  @Post(':id/reaffectation')
+  @HttpCode(200)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'reaffecterLotExport',
+    summary: 'Confie des fiches non traitées à un autre téléconseiller.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: LotExportDetailDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'LOT_EXPORT_NOT_FOUND.' })
+  reaffecter(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: ReaffecterLotExportDto,
+  ): Promise<LotExportDetailDto> {
+    return this.lots.reaffecter(user, id, body);
+  }
+
+  @Post(':id/retrait')
+  @HttpCode(200)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR)
+  @ApiOperation({
+    operationId: 'retirerTeleconseillerLotExport',
+    summary: 'Retire un téléconseiller et redistribue ses fiches non traitées.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: LotExportDetailDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'LOT_EXPORT_NOT_FOUND.' })
+  retirer(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() body: RetirerTeleconseillerDto,
+  ): Promise<LotExportDetailDto> {
+    return this.lots.retirer(user, id, body);
   }
 
   @Delete(':id')

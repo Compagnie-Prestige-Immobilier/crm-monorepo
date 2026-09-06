@@ -17,6 +17,7 @@ import {
   PROFESSIONS_SENEGAL,
   REGIONS_SENEGAL,
   Role,
+  STATUTS_QUALIFICATION,
   SYNDICATS_SENEGAL,
   VISITE_DESTINATAIRES,
   VISITE_DIRECTIONS,
@@ -277,6 +278,30 @@ async function seedCallOutcomes(): Promise<void> {
   console.info(`  issues d'appel : ${String(CALL_OUTCOME_REASONS.length)} motifs systeme`);
 }
 
+async function seedStatutsQualification(): Promise<void> {
+  for (const statut of STATUTS_QUALIFICATION) {
+    await prisma.statutQualification.upsert({
+      where: { code: statut.code },
+      create: { ...statut, isSystem: true },
+      update: {
+        label: statut.label,
+        effect: statut.effect,
+        minPayloadVersion: statut.minPayloadVersion,
+        requiresCallback: statut.requiresCallback,
+        requiresComment: statut.requiresComment,
+        retryAfterMinutes: statut.retryAfterMinutes,
+        priorite: statut.priorite,
+        relationStatus: statut.relationStatus,
+        sortOrder: statut.sortOrder,
+        isSystem: true,
+      },
+    });
+  }
+  console.info(
+    `  statuts de qualification : ${String(STATUTS_QUALIFICATION.length)} statuts systeme`,
+  );
+}
+
 async function seedVisiteReferentiels(): Promise<void> {
   for (const entreprise of VISITE_ENTREPRISES) {
     await prisma.visiteEntreprise.upsert({
@@ -404,6 +429,7 @@ async function main(): Promise<void> {
   await seedSituationGrandPublic();
   await seedBankWorkflow();
   await seedCallOutcomes();
+  await seedStatutsQualification();
   await seedVisiteReferentiels();
   await seedAdmin();
   await seedFixtureUsers();

@@ -26,6 +26,6 @@ import { readNotificationsEnv } from './notifications.env.js';
       },
     },
   ],
-  exports: [NotificationsService],
+  exports: [NotificationsService, RemindersService],
 })
 export class NotificationsModule {}

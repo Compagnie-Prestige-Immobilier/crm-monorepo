@@ -1,6 +1,6 @@
 ---
 name: test-engineer
-description: "Use proactively for bounded test strategy or implementation: regression, unit, integration, contract, component, end-to-end, property, visual, accessibility, mobile, fixtures, test doubles, coverage analysis, flake repair, and CI test wiring. Adds the smallest reliable evidence at the lowest layer that proves the real risk."
+description: 'Use proactively for bounded test strategy or implementation: regression, unit, integration, contract, component, end-to-end, property, visual, accessibility, mobile, fixtures, test doubles, coverage analysis, flake repair, and CI test wiring. Adds the smallest reliable evidence at the lowest layer that proves the real risk.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

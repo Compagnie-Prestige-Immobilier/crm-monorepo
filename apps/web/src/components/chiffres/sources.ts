@@ -10,12 +10,14 @@ import type {
   ChiffresBanques,
   ChiffresCampagne,
   ChiffresDelais,
+  ChiffresEnrolement,
   ChiffresEntonnoir,
   ChiffresMethodes,
   ChiffresRendement,
   ChiffresTotaux,
 } from '@/lib/data/chiffres';
-import { formatDecimal, formatNumber } from '@/lib/format';
+import type { ComptageOuvertures } from '@/lib/data/ouvertures';
+import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Role } from '@/lib/types';
 
@@ -23,7 +25,15 @@ export type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =
-  'activite' | 'entonnoir' | 'delais' | 'rendement' | 'methodes' | 'banques' | 'campagne';
+  | 'activite'
+  | 'entonnoir'
+  | 'delais'
+  | 'rendement'
+  | 'methodes'
+  | 'banques'
+  | 'campagne'
+  | 'ouvertures'
+  | 'enrolement';
 
 export interface Jeux {
   activite?: ChiffresActivite;
@@ -33,6 +43,8 @@ export interface Jeux {
   methodes?: ChiffresMethodes;
   banques?: ChiffresBanques;
   campagne?: ChiffresCampagne;
+  ouvertures?: ComptageOuvertures[];
+  enrolement?: ChiffresEnrolement;
 }
 
 export interface SourceChiffre {
@@ -44,6 +56,9 @@ export interface SourceChiffre {
   /** `null` tant que le jeu n'est pas arrivé : la carte montre son squelette. */
   extraire: (jeux: Jeux) => DonneesSource | null;
 }
+
+/** `formatXof` lit une suite de chiffres, pas un flottant de fin d'interpolation. */
+const francs = (montant: number): string => formatXof(String(Math.round(montant)));
 
 const taux = (valeur: number | null): string =>
   valeur === null ? 'Sans objet' : `${formatDecimal(valeur)} %`;
@@ -58,21 +73,22 @@ const scalaire = (libelle: string, valeur: number): DonneesSource => ({
 });
 
 /**
- * Un taux se range dans une tuile, pas dans une valeur brute : la jauge et la
- * tuile lisent `valeur`, `affichage` porte le pourcentage et `libelle` le
- * dénominateur qui le rend vrai. Sans dénominateur, la tuile dit « Sans objet »
- * et non « 0 % ».
+ * Un taux se range dans une tuile : la jauge lit `valeur` (le pourcentage), la
+ * tuile affiche en grand le nombre brut qui le fait, le taux et son
+ * dénominateur en dessous. Sans dénominateur, la tuile dit « Sans objet » et
+ * non « 0 % ».
  */
 const scalaireTaux = (
   valeur: number | null,
+  numerateur: number,
   libelle: string,
   sansDenominateur: string,
 ): DonneesSource => ({
   forme: 'scalaire',
   donnee: {
-    libelle: valeur === null ? sansDenominateur : libelle,
+    libelle: valeur === null ? sansDenominateur : `${taux(valeur)} · ${libelle}`,
     valeur: valeur ?? 0,
-    affichage: taux(valeur),
+    affichage: valeur === null ? taux(valeur) : { valeur: numerateur, format: formatNumber },
   },
 });
 
@@ -168,6 +184,30 @@ function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSourc
   };
 }
 
+/** EB-13 : le compte se lit par téléconseiller ET par jour, jamais cumulé. */
+function matriceOuvertures(lignes: readonly ComptageOuvertures[]): DonneesSource {
+  const jours = [...new Set(lignes.map((ligne) => ligne.jour))].sort();
+  const noms = new Map(lignes.map((ligne) => [ligne.openedById, ligne.openedByName]));
+  const comptes = new Map(
+    lignes.map((ligne) => [`${ligne.openedById}|${ligne.jour}`, ligne.ouvertures]),
+  );
+
+  return {
+    forme: 'matrice',
+    donnee: {
+      lignes: [...noms.values()],
+      colonnes: jours.map((jour) => formatShortDate(jour)),
+      cellules: [...noms.entries()].flatMap(([id, nom]) =>
+        jours.map((jour) => ({
+          ligne: nom,
+          colonne: formatShortDate(jour),
+          value: comptes.get(`${id}|${jour}`) ?? 0,
+        })),
+      ),
+    },
+  };
+}
+
 /** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
 const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   label: 'Par téléconseiller',
@@ -186,7 +226,7 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
  */
 export const SOURCES_CHIFFRES = {
   'taux-de-contact': {
-    label: 'Taux de contact des représentants',
+    label: 'Taux de joignabilité des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
@@ -197,12 +237,13 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repContactRate,
-            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            activite.totals.repReached,
+            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
   'a-rappeler': {
-    label: 'Taux de rendez-vous des représentants',
+    label: 'Taux de rappel des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
@@ -213,7 +254,8 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repCallbackRate,
-            `${formatNumber(activite.totals.repCallback)} rendez-vous sur ${formatNumber(activite.totals.repCalls)} appels aux représentants`,
+            activite.totals.repCallback,
+            `${formatNumber(activite.totals.repCallback)} rappels sur ${formatNumber(activite.totals.repCalls)} appels`,
             'Aucun appel à un représentant sur la période',
           ),
   },
@@ -228,9 +270,32 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.repQualificationRate,
+            activite.totals.repQualified,
             `${formatNumber(activite.totals.repQualified)} acceptent sur ${formatNumber(activite.totals.repQuestioned)} interrogés`,
             'Aucun représentant interrogé sur la période',
           ),
+  },
+  'repartition-statuts-qualification': {
+    label: 'Répartition des statuts de qualification',
+    forme: 'classement',
+    jeu: 'activite',
+    description:
+      'Nombre de représentants par statut de qualification, basé sur leur dernier appel dans la période.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) => {
+      if (activite === undefined || activite.repQualificationStatuses === null) return null;
+      return {
+        forme: 'classement',
+        donnee:
+          activite.repQualificationStatuses.total === 0
+            ? []
+            : activite.repQualificationStatuses.items.map((item) => ({
+                id: item.id,
+                label: item.label,
+                value: item.count,
+              })),
+      };
+    },
   },
   'taux-de-joignabilite': {
     label: 'Taux de joignabilité des prospects',
@@ -244,6 +309,7 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             activite.totals.reachRate,
+            joignables(activite.totals),
             `${formatNumber(joignables(activite.totals))} numéros exploitables sur ${formatNumber(activite.totals.calls)} appels aux prospects`,
             'Aucun appel à un prospect sur la période',
           ),
@@ -275,6 +341,15 @@ export const SOURCES_CHIFFRES = {
           ),
   },
   'par-teleconseiller': parTeleconseiller(false),
+  'fiches-ouvertes': {
+    label: 'Fiches ouvertes',
+    forme: 'matrice',
+    jeu: 'ouvertures',
+    description:
+      'Les fiches ouvertes depuis la liste, téléconseiller par téléconseiller et jour par jour. Prospects et représentants confondus. Une fiche rouverte compte à chaque fois.',
+    groupe: 'Équipe',
+    extraire: ({ ouvertures }) => (ouvertures === undefined ? null : matriceOuvertures(ouvertures)),
+  },
   'couverture-derniere-campagne': {
     label: 'Couverture de la dernière campagne',
     forme: 'composition',
@@ -333,13 +408,13 @@ export const SOURCES_CHIFFRES = {
             donnee: {
               libelle: `sur ${formatNumber(entonnoir.finance.dossiersEncaisses)} dossiers`,
               valeur: Number(entonnoir.finance.montantEncaisse),
-              affichage: formatXof(entonnoir.finance.montantEncaisse),
+              affichage: { valeur: Number(entonnoir.finance.montantEncaisse), format: francs },
             },
           },
   },
   'de-l-appel-a-l-encaissement': {
     label: 'De l’appel à l’encaissement',
-    forme: 'composition',
+    forme: 'classement',
     jeu: 'entonnoir',
     description: 'Voir combien de dossiers passent chaque étape, du premier appel au paiement.',
     groupe: 'Résultats',
@@ -347,17 +422,15 @@ export const SOURCES_CHIFFRES = {
       entonnoir === undefined
         ? null
         : {
-            forme: 'composition',
-            donnee: [
-              {
-                ligne: 'Étapes',
-                segments: entonnoir.etapes.map((etape) => ({
-                  id: etape.label,
-                  label: etape.label,
-                  value: etape.count,
-                })),
-              },
-            ],
+            forme: 'classement',
+            donnee:
+              (entonnoir.etapes[0]?.count ?? 0) === 0
+                ? []
+                : entonnoir.etapes.map((etape) => ({
+                    id: etape.label,
+                    label: etape.label,
+                    value: etape.count,
+                  })),
           },
   },
   'methodes-d-adhesion': {
@@ -417,11 +490,11 @@ export const SOURCES_CHIFFRES = {
         ? null
         : {
             forme: 'classement',
-            donnee: delais.legs.map((leg) => ({
-              id: leg.leg,
-              label: leg.label,
-              value: leg.medianDays ?? 0,
-            })),
+            donnee: delais.legs.flatMap((leg) =>
+              leg.medianDays === null
+                ? []
+                : [{ id: leg.leg, label: leg.label, value: leg.medianDays }],
+            ),
           },
   },
   'rendement-par-departement': {
@@ -442,6 +515,113 @@ export const SOURCES_CHIFFRES = {
             ),
           },
   },
+
+  // ─── Enrôlement, lu sur les plateformes ─────────────────────────────────
+  'enrolement-inscriptions': {
+    label: 'Inscriptions sur la plateforme',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description: 'Le nombre de personnes inscrites sur la plateforme d’enrôlement du projet.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaire('inscriptions lues sur la plateforme', enrolement.inscriptions),
+  },
+  'enrolement-taux-rapprochement': {
+    label: 'Inscriptions reconnues',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description:
+      'La part des inscriptions qu’on retrouve sur une fiche prospect, par le téléphone puis par l’e-mail. Le reste vient de personnes qui ne sont pas passées par nos appels.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaireTaux(
+            enrolement.tauxRapprochement,
+            enrolement.rapprochees,
+            `${formatNumber(enrolement.rapprochees)} inscriptions reconnues sur ${formatNumber(enrolement.inscriptions)}`,
+            'Aucune inscription sur la période',
+          ),
+  },
+  'enrolement-taux-conversion': {
+    label: 'Convertis puis inscrits',
+    forme: 'scalaire',
+    jeu: 'enrolement',
+    description:
+      'La part des prospects convertis, méthode d’enrôlement obtenue, qui vont jusqu’à s’inscrire sur la plateforme. C’est la mesure de la marche entre l’appel et l’enrôlement.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : scalaireTaux(
+            enrolement.tauxConversion,
+            enrolement.rapprochees,
+            `${formatNumber(enrolement.rapprochees)} prospects convertis retrouvés inscrits`,
+            'Aucun prospect converti sur la période',
+          ),
+  },
+  'enrolement-par-jour': {
+    label: 'Inscriptions par jour',
+    forme: 'serie-temporelle',
+    jeu: 'enrolement',
+    description: 'Voir si le rythme des inscriptions suit celui des appels.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'serie-temporelle',
+            donnee: enrolement.parJour.map((point) => ({
+              id: point.jour,
+              label: point.jour,
+              value: point.inscriptions,
+            })),
+          },
+  },
+  'enrolement-par-etape': {
+    label: 'Dossiers par étape',
+    forme: 'composition',
+    jeu: 'enrolement',
+    description: 'Repérer l’étape où les dossiers s’accumulent sur la plateforme.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'composition',
+            donnee: [
+              {
+                ligne: 'Étapes',
+                segments: enrolement.parEtape.map((etape) => ({
+                  id: etape.id,
+                  label: etape.label,
+                  value: etape.inscriptions,
+                })),
+              },
+            ],
+          },
+  },
+  'enrolement-par-teleconseiller': {
+    label: 'Inscriptions par téléconseiller',
+    forme: 'classement',
+    jeu: 'enrolement',
+    description:
+      'À qui revient chaque inscription reconnue : le téléconseiller qui a obtenu la méthode d’enrôlement, à défaut celui qui a saisi la fiche.',
+    groupe: 'Enrôlement',
+    extraire: ({ enrolement }) =>
+      enrolement === undefined
+        ? null
+        : {
+            forme: 'classement',
+            donnee: enrolement.parTeleconseiller.map((ligne) => ({
+              id: ligne.id,
+              label: ligne.label,
+              value: ligne.inscriptions,
+            })),
+          },
+  },
 } satisfies Partial<Record<ChiffreSource, SourceChiffre>>;
 
 /** Un représentant n'existe que dans CHUES : ces taux seraient vides ailleurs. */
@@ -449,6 +629,7 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'taux-de-contact',
   'a-rappeler',
   'taux-de-qualification',
+  'repartition-statuts-qualification',
 ];
 
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
@@ -464,6 +645,20 @@ const SOURCES_SUPERVISION: readonly string[] = [
   'hors-attribution-derniere-campagne',
 ];
 
+/**
+ * Ce que les plateformes d'enrôlement rendent ne sort pas de la cellule
+ * pilotage, qui tient le rôle ADMIN. L'API qui alimente ces cartes refuse tout
+ * autre rôle : ce filtre évite de proposer une carte qui répondrait 403.
+ */
+const SOURCES_ENROLEMENT: readonly string[] = [
+  'enrolement-inscriptions',
+  'enrolement-taux-rapprochement',
+  'enrolement-taux-conversion',
+  'enrolement-par-jour',
+  'enrolement-par-etape',
+  'enrolement-par-teleconseiller',
+];
+
 export function catalogueDe(input: {
   chues: boolean;
   voitLesMontants: boolean;
@@ -473,6 +668,7 @@ export function catalogueDe(input: {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
     if (input.role === 'SUPERVISEUR' && SOURCES_SUPERVISION.includes(cle)) return false;
+    if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });
   const catalogue = Object.fromEntries(entrees);

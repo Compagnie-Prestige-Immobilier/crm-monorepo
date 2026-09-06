@@ -40,6 +40,10 @@ export const queryKeys = {
   iefs: ['referentiels', 'iefs'] as const,
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
+  /** Ce que la SAISIE propose : actifs seulement. */
+  statutsQualification: ['referentiels', 'statutsQualification'] as const,
+  /** Ce que l'ADMINISTRATION montre : tout, désactivés compris. */
+  statutsQualificationAdmin: ['referentiels', 'statutsQualification', 'administration'] as const,
 
   // ─── Registre des visites ─────────────────────────────────────────────────
   visitesRoot: ['visites'] as const,
@@ -54,12 +58,16 @@ export const queryKeys = {
     ['visites', 'import', id, 'revue', page] as const,
 
   // ─── Phase 2 ──────────────────────────────────────────────────────────────
+  /** La fiche que l'appelant a en main : lue par la barre supérieure, écrite par les consoles. */
+  ouvertureCourante: ['ouvertures', 'courante'] as const,
   lotsExportRoot: ['lots-export'] as const,
   lotsExport: (filters: Record<string, unknown> = {}) => ['lots-export', filters] as const,
   lotsExportDetail: (id: string) => ['lots-export', 'detail', id] as const,
   lotsExportApercu: (critere: Record<string, unknown>) =>
     ['lots-export', 'apercu', critere] as const,
   lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
+  lotsExportFiches: (id: string, filtres: Record<string, unknown> = {}) =>
+    ['lots-export', 'detail', id, 'fiches', filtres] as const,
 
   // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,
@@ -126,4 +134,12 @@ export const queryKeys = {
     ['stats', 'vieillissement', filtersQueryKey(filters)] as const,
   statsAmbassadeurs: (filters: ProspectFilters) =>
     ['stats', 'ambassadeurs', filtersQueryKey(filters)] as const,
+
+  // ─── Plateformes d'enrôlement ─────────────────────────────────────────────
+  enrolementRoot: ['enrolement'] as const,
+  enrolementInscriptions: (projet: string, filtres: Record<string, unknown>) =>
+    ['enrolement', 'inscriptions', projet, filtres] as const,
+  enrolementIndicateurs: (projet: string, filtres: Record<string, unknown>) =>
+    ['enrolement', 'indicateurs', projet, filtres] as const,
+  enrolementReglages: (projet: string) => ['enrolement', 'reglages', projet] as const,
 };

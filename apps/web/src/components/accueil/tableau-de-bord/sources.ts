@@ -25,8 +25,8 @@ export type Forme =
 export interface ScalaireDatum {
   libelle: string;
   valeur: number;
-  /** Texte affiché à la place du nombre brut (un taux : « 50,0 % », « Sans objet »). */
-  affichage?: string;
+  /** Au lieu du nombre brut : un texte figé, ou le nombre à rouler et sa mise en forme. */
+  affichage?: string | { valeur: number; format: (valeur: number) => string };
   serie?: NamedCount[];
 }
 
@@ -455,6 +455,23 @@ export function mesurerDonnees(donnees: DonneesSource): {
     case 'equipe':
     default:
       return { nombreCategories: 0, nombrePoints: 0, partZero: 0 };
+  }
+}
+
+export function donneesVides(donnees: DonneesSource): boolean {
+  switch (donnees.forme) {
+    case 'classement':
+    case 'cyclique':
+    case 'serie-temporelle':
+      return donnees.donnee.length === 0;
+    case 'composition': {
+      const items = donnees.donnee.flatMap((ligne) => ligne.segments);
+      return items.every((item) => item.value === 0);
+    }
+    case 'matrice':
+      return donnees.donnee.cellules.every((cellule) => cellule.value === 0);
+    default:
+      return false;
   }
 }
 

@@ -219,6 +219,7 @@ const _$SyncEntityEnumMap = {
   SyncEntity.prospect: 'prospect',
   SyncEntity.callAttempt: 'call_attempt',
   SyncEntity.visite: 'visite',
+  SyncEntity.appelDetecte: 'appel_detecte',
   SyncEntity.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

@@ -1,6 +1,6 @@
 ---
 name: product-strategist
-description: "Read-only product direction: problem framing, PRDs, build-versus-buy/package evaluation, prioritization, positioning, roadmaps, metrics, experiments, rollout, and scope decisions. Produces decision-ready artifacts in its response; never implements or fabricates evidence."
+description: 'Read-only product direction: problem framing, PRDs, build-versus-buy/package evaluation, prioritization, positioning, roadmaps, metrics, experiments, rollout, and scope decisions. Produces decision-ready artifacts in its response; never implements or fabricates evidence.'
 tools: Read, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

@@ -10,6 +10,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/background/background_sync.dart';
 import '../../../core/feedback/feedback.dart';
+import '../../../core/network/api_environment.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../auth/auth_controller.dart';
 import '../../../core/providers/sync_coordinator.dart';
@@ -172,7 +173,7 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
             CpiRow(
               title: 'À corriger',
               trailing: _Valeur('$aCorriger', chevron: true),
-              onTap: () => context.go(correctionsDeLaCoque(context)),
+              onTap: () => ouvrirCorrections(context),
             ),
             CpiRow(
               leading: const Icon(
@@ -254,6 +255,11 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
               title: 'L\'app s\'arrête toute seule ?',
               onTap: () => context.pushOnce(Routes.batteryHelp),
             ),
+            if (_diagnosticVisible)
+              CpiRow(
+                title: 'Diagnostic Android',
+                onTap: () => context.pushOnce(Routes.diagnosticAndroid),
+              ),
             CpiRow(
               title: 'À propos',
               onTap: () => context.pushOnce(Routes.about),
@@ -278,6 +284,12 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
 
   /// Un chevron promettrait un écran de plus : ces lignes AGISSENT.
   static const Widget _sansChevron = SizedBox.shrink();
+
+  /// Écran d'essai de la téléphonie : sur un APK de recette ou contre l'API de
+  /// développement, jamais sur le téléphone d'un téléconseiller.
+  static bool get _diagnosticVisible =>
+      const bool.fromEnvironment('CPI_RAD') ||
+      ApiEnvironment.isDevelopmentServer;
 
   static const Map<ThemeMode, String> _themeLabels = <ThemeMode, String>{
     ThemeMode.system: 'Système',
@@ -377,6 +389,18 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     final AuthController auth = ref.read(authControllerProvider.notifier);
     final SyncCoordinator sync = ref.read(syncCoordinatorProvider.notifier);
 
+    final bool tenue = await _tientUneFiche();
+    if (!context.mounted) return;
+    if (tenue) {
+      cpiToast(
+        context,
+        'Qualifiez la fiche ouverte avant de vous déconnecter. Un superviseur '
+        'peut la libérer.',
+        persistent: true,
+      );
+      return;
+    }
+
     final bool? partir = await _demanderLeDepart(context, pending, sync);
     if (partir != true) return;
 
@@ -387,6 +411,14 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
       if (!mounted || !context.mounted) return;
       cpiToast(context, 'Déconnexion impossible. Réessayez.', persistent: true);
     }
+  }
+
+  /// EB-08 : une fiche ouverte se qualifie, elle ne s'abandonne pas. Lue en
+  /// base et non au serveur : hors ligne le verrou tient quand même.
+  Future<bool> _tientUneFiche() async {
+    final String? moi = ref.read(authControllerProvider).userId;
+    if (moi == null || moi.isEmpty) return false;
+    return await ref.read(ouvertureRepositoryProvider).courante(moi) != null;
   }
 
   /// Partir n'est jamais silencieux : avec des saisies en attente la feuille

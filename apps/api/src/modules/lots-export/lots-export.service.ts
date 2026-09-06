@@ -1,12 +1,22 @@
 import { Injectable, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
-import { LotExportCible, Prisma, Projet, Role } from '@crm/database';
+import {
+  CallOutcome,
+  LotExportCible,
+  Prisma,
+  Projet,
+  RepCallOutcome,
+  Role,
+  StatutQualificationEffect,
+  SuggestionStatus,
+} from '@crm/database';
+import { v7 as uuidv7 } from 'uuid';
 import ExcelJS from 'exceljs';
 import JSZip from 'jszip';
 import type { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
-import { readsEveryone } from '../../common/scope.js';
+import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
@@ -15,6 +25,7 @@ import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
 import { styleHeader } from '../export/import-template.workbook.js';
 import { toDakarCell } from '../export/dakar.js';
 import { lastAttemptsByProspect } from '../prospects/last-attempt.js';
+import { CALL_OUTCOME_LABELS } from '../prospects/phase2-labels.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { capaciteParJour, repartir, type MembreRepartition } from './repartition.js';
 import { programmeFilename, writeProgrammePdf, type ProgrammeData } from './programme-pdf.js';
@@ -22,13 +33,22 @@ import {
   CreateLotExportDto,
   LotExportAttemptDto,
   LotExportDetailDto,
+  LotExportFicheDto,
+  LotExportFicheEtat,
+  LotExportFichesDto,
+  LotExportFichesQueryDto,
   LotExportListDto,
+  LotExportObjectifDto,
   LotExportPerformanceDto,
   LotExportPreviewDto,
   LotExportQueryDto,
+  LotExportReaffectationDto,
   LotExportRepartitionDto,
   LotExportSummaryDto,
   MesAttributionsDto,
+  ReaffecterLotExportDto,
+  RetirerTeleconseillerDto,
+  UpdateLotExportDto,
 } from './dto.js';
 
 const ADMIN = { id: 'admin', role: Role.ADMIN } as const;
@@ -36,6 +56,15 @@ const CHUNK = 5_000;
 const DETAIL_PAGE = 500;
 const DATE_FORMAT = 'dd/mm/yyyy hh:mm';
 const TELECONSEILLER_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION];
+
+/** Trois cibles tirent des représentants ; seule `PROSPECTS` tire des prospects. */
+const CIBLES_REPRESENTANTS: readonly LotExportCible[] = [
+  LotExportCible.REPRESENTANTS,
+  LotExportCible.REPRESENTANTS_INJOIGNABLES,
+  LotExportCible.CONTACTS_RECOMMANDES,
+];
+
+const surRepresentants = (cible: LotExportCible): boolean => CIBLES_REPRESENTANTS.includes(cible);
 
 type LotExportRow = Prisma.LotExportGetPayload<{
   include: { createdBy: { select: { fullName: true } } };
@@ -51,6 +80,8 @@ interface Distribution {
   readonly teleconseillerIds: string[];
   readonly fichesParJour: number;
   readonly jours: number;
+  /** EB-17 : l'objectif propre à un téléconseiller. Absent, le rôle décide. */
+  readonly objectifs: Readonly<Record<string, number>>;
 }
 
 interface ItemRow {
@@ -65,6 +96,7 @@ interface ItemRow {
 interface PerformanceRow {
   id: string;
   name: string;
+  role: Role;
   assigned: number;
   treated: number;
   assignedCalls: number;
@@ -80,16 +112,13 @@ export class LotsExportService {
 
   async preview(body: CreateLotExportDto): Promise<LotExportPreviewDto> {
     const equipe = await this.equipe(body.distribution.teleconseillerIds);
-    const membres = capacites(equipe, body.distribution.fichesParJour);
+    const membres = capacites(
+      equipe,
+      body.distribution.fichesParJour,
+      objectifsDe(body.distribution.objectifs),
+    );
     const places = placesDe(membres, body.distribution.jours);
-    const eligible =
-      body.cible === LotExportCible.REPRESENTANTS
-        ? await this.prisma.representant.count({
-            where: this.representantWhere(body.representants),
-          })
-        : await this.prisma.prospect.count({
-            where: buildProspectWhere(ADMIN, body.prospects ?? {}),
-          });
+    const eligible = await this.compter(body);
     const retenues = Math.min(eligible, places);
     return {
       eligible,
@@ -101,8 +130,7 @@ export class LotsExportService {
   }
 
   async create(user: AuthenticatedUser, body: CreateLotExportDto): Promise<LotExportSummaryDto> {
-    const filters =
-      body.cible === LotExportCible.REPRESENTANTS ? body.representants : body.prospects;
+    const filters = surRepresentants(body.cible) ? body.representants : body.prospects;
     if (!filters)
       throw new UnprocessableEntityException({
         code: 'LOT_EXPORT_FILTRES_REQUIS',
@@ -110,25 +138,13 @@ export class LotsExportService {
       });
     const equipe = await this.equipe(body.distribution.teleconseillerIds);
     const { fichesParJour, jours } = body.distribution;
-    const membres = capacites(equipe, fichesParJour);
+    const objectifs = objectifsDe(body.distribution.objectifs);
+    const membres = capacites(equipe, fichesParJour, objectifs);
     const places = placesDe(membres, jours);
 
     const id = await this.prisma.$transaction(
       async (tx) => {
-        const fiches =
-          body.cible === LotExportCible.REPRESENTANTS
-            ? await tx.representant.findMany({
-                where: this.representantWhere(body.representants),
-                orderBy: { id: 'asc' },
-                take: places,
-                select: { id: true },
-              })
-            : await tx.prospect.findMany({
-                where: buildProspectWhere(user, body.prospects ?? {}),
-                orderBy: { id: 'asc' },
-                take: places,
-                select: { id: true },
-              });
+        const fiches = await this.tirer(tx, user, body, places);
         if (!fiches.length)
           throw new UnprocessableEntityException({
             code: 'LOT_EXPORT_CIBLE_VIDE',
@@ -143,7 +159,7 @@ export class LotsExportService {
             // Un représentant est CHUES par construction ; un lot de prospects
             // porte le projet exigé à la création.
             projet:
-              body.cible === LotExportCible.REPRESENTANTS
+              surRepresentants(body.cible)
                 ? Projet.CHUES
                 : (body.prospects?.projet ?? Projet.CHUES),
             // La répartition voyage avec les critères : elle n'a pas de colonne,
@@ -154,6 +170,7 @@ export class LotsExportService {
                 teleconseillerIds: equipe.map((membre) => membre.id),
                 fichesParJour,
                 jours,
+                objectifs,
               },
             } as Prisma.InputJsonValue,
             itemCount: affectations.length,
@@ -170,7 +187,7 @@ export class LotsExportService {
                 position: start + index,
                 assigneeId: affectation.assigneeId,
                 day: affectation.day,
-                ...(body.cible === LotExportCible.REPRESENTANTS
+                ...(surRepresentants(body.cible)
                   ? { representantId: fiche.id }
                   : { prospectId: fiche.id }),
               };
@@ -217,6 +234,169 @@ export class LotsExportService {
   }
 
   /**
+   * EB-14 et EB-17 : le nom se corrige, l'objectif de chacun se règle en cours
+   * de campagne.
+   *
+   * Ni l'un ni l'autre ne redistribue quoi que ce soit : les fiches sont déjà
+   * dans les mains, et un objectif est le dénominateur du taux de contact, pas
+   * un ordre de retirage.
+   */
+  async update(id: string, body: UpdateLotExportDto): Promise<LotExportSummaryDto> {
+    const lot = await this.lot(id);
+    const data: Prisma.LotExportUpdateInput = {};
+    if (body.name !== undefined) data.name = body.name.trim();
+    if (body.objectifs !== undefined)
+      data.filters = ecrireLaDistribution(lot.filters, (distribution) => ({
+        ...distribution,
+        objectifs: objectifsDe(body.objectifs),
+      }));
+    if (Object.keys(data).length > 0)
+      await this.prisma.lotExport.update({ where: { id }, data });
+    return this.summary(id);
+  }
+
+  /**
+   * EB-16 : des fiches NON TRAITÉES passent à un autre téléconseiller.
+   *
+   * Une fiche déjà appelée reste où elle est : la déplacer ferait porter le
+   * travail d'un téléconseiller au compteur d'un autre. Le destinataire entre
+   * dans l'équipe de la campagne s'il n'y était pas.
+   */
+  async reaffecter(
+    user: AuthenticatedUser,
+    id: string,
+    body: ReaffecterLotExportDto,
+  ): Promise<LotExportDetailDto> {
+    const lot = await this.lot(id);
+    await this.equipe([body.versTeleconseillerId]);
+    const traitees = await this.positionsTraitees(lot);
+
+    const deplacables = await this.prisma.lotExportItem.findMany({
+      where: {
+        lotId: id,
+        position: { in: body.positions.filter((position) => !traitees.has(position)) },
+        assigneeId: { not: body.versTeleconseillerId },
+      },
+      select: { position: true, assigneeId: true },
+    });
+    if (deplacables.length === 0)
+      throw new UnprocessableEntityException({
+        code: 'LOT_EXPORT_REAFFECTATION_VIDE',
+        message: 'Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.',
+      });
+
+    await this.deplacer(user, lot, deplacables, body.versTeleconseillerId);
+    return this.get(id);
+  }
+
+  /**
+   * EB-16 : le retiré rend ses fiches non traitées, redistribuées au reste de
+   * l'équipe selon les objectifs en vigueur.
+   */
+  async retirer(
+    user: AuthenticatedUser,
+    id: string,
+    body: RetirerTeleconseillerDto,
+  ): Promise<LotExportDetailDto> {
+    const lot = await this.lot(id);
+    const stored = readDistribution(lot.filters);
+    const restants = (stored?.teleconseillerIds ?? []).filter(
+      (membre) => membre !== body.teleconseillerId,
+    );
+    if (restants.length === 0)
+      throw new UnprocessableEntityException({
+        code: 'LOT_EXPORT_EQUIPE_VIDE',
+        message: 'Une campagne garde au moins un téléconseiller.',
+      });
+
+    const traitees = await this.positionsTraitees(lot);
+    const arendre = (
+      await this.prisma.lotExportItem.findMany({
+        where: { lotId: id, assigneeId: body.teleconseillerId },
+        select: { position: true },
+        orderBy: { position: 'asc' },
+      })
+    ).filter((item) => !traitees.has(item.position));
+
+    const equipe = await this.equipe(restants);
+    const membres = capacites(equipe, stored?.fichesParJour ?? 1, stored?.objectifs ?? {});
+    const reprises = repartir(arendre.length, membres, stored?.jours ?? 1);
+
+    await this.prisma.$transaction(async (tx) => {
+      const parRepreneur = new Map<string, number[]>();
+      arendre.forEach((item, index) => {
+        const vers = reprises[index]?.assigneeId;
+        if (vers === undefined) return;
+        parRepreneur.set(vers, [...(parRepreneur.get(vers) ?? []), item.position]);
+      });
+      for (const [vers, positions] of parRepreneur) {
+        await tx.lotExportItem.updateMany({
+          where: { lotId: id, position: { in: positions } },
+          data: { assigneeId: vers },
+        });
+        await tx.lotExportReaffectation.create({
+          data: {
+            lotId: id,
+            fromAssigneeId: body.teleconseillerId,
+            toAssigneeId: vers,
+            fiches: positions.length,
+            performedById: user.id,
+          },
+        });
+      }
+      await tx.lotExport.update({
+        where: { id },
+        data: {
+          filters: ecrireLaDistribution(lot.filters, (distribution) => ({
+            ...distribution,
+            teleconseillerIds: restants,
+          })),
+        },
+      });
+    });
+    return this.get(id);
+  }
+
+  private async deplacer(
+    user: AuthenticatedUser,
+    lot: { id: string; filters: Prisma.JsonValue },
+    items: readonly { position: number; assigneeId: string | null }[],
+    vers: string,
+  ): Promise<void> {
+    const parCedant = new Map<string | null, number[]>();
+    for (const item of items)
+      parCedant.set(item.assigneeId, [...(parCedant.get(item.assigneeId) ?? []), item.position]);
+
+    await this.prisma.$transaction(async (tx) => {
+      await tx.lotExportItem.updateMany({
+        where: { lotId: lot.id, position: { in: items.map((item) => item.position) } },
+        data: { assigneeId: vers },
+      });
+      for (const [cedant, positions] of parCedant)
+        await tx.lotExportReaffectation.create({
+          data: {
+            lotId: lot.id,
+            fromAssigneeId: cedant,
+            toAssigneeId: vers,
+            fiches: positions.length,
+            performedById: user.id,
+          },
+        });
+      await tx.lotExport.update({
+        where: { id: lot.id },
+        data: {
+          filters: ecrireLaDistribution(lot.filters, (distribution) => ({
+            ...distribution,
+            teleconseillerIds: distribution.teleconseillerIds.includes(vers)
+              ? distribution.teleconseillerIds
+              : [...distribution.teleconseillerIds, vers],
+          })),
+        },
+      });
+    });
+  }
+
+  /**
    * Supprime une campagne et sa répartition.
    *
    * Les fiches ne bougent pas : `LotExportItem` cascade sur le lot, mais ses
@@ -242,7 +422,7 @@ export class LotsExportService {
    * seul les fiches supprimées, sans qu'un `deletedAt` traîne côté item.
    */
   async mesAttributions(user: AuthenticatedUser): Promise<MesAttributionsDto> {
-    if (readsEveryone(user)) return { representantIds: [], prospectIds: [], tout: true };
+    if (isAdmin(user)) return { representantIds: [], prospectIds: [], tout: true };
 
     const [representants, prospects] = await Promise.all([
       this.prisma.lotExportItem.findMany({
@@ -320,8 +500,30 @@ export class LotsExportService {
       recentAttempts: await this.recentAttempts(row.id, row.cible, row.createdAt),
       distribution: { fichesParJour, jours },
       repartition,
-      performance: await this.performance(row.id, row.cible, row.createdAt),
+      performance: await this.performance(row.id, row.cible, row.createdAt, stored),
+      reaffectations: await this.reaffectations(row.id),
     });
+  }
+
+  private async reaffectations(id: string): Promise<LotExportReaffectationDto[]> {
+    const rows = await this.prisma.lotExportReaffectation.findMany({
+      where: { lotId: id },
+      include: {
+        fromAssignee: { select: { fullName: true } },
+        toAssignee: { select: { fullName: true } },
+        performedBy: { select: { fullName: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+      take: 100,
+    });
+    return rows.map((row) => ({
+      id: row.id,
+      fromName: row.fromAssignee?.fullName ?? null,
+      toName: row.toAssignee.fullName,
+      fiches: row.fiches,
+      performedByName: row.performedBy.fullName,
+      createdAt: row.createdAt.toISOString(),
+    }));
   }
 
   /** Le classeur du lot : la répartition d'abord, la fiche ensuite. */
@@ -353,7 +555,7 @@ export class LotsExportService {
     const demoEnabled = this.demo.current() === 'demo';
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
-    if (lot.cible === LotExportCible.REPRESENTANTS)
+    if (surRepresentants(lot.cible))
       await this.writeRepresentantsSheet(workbook, ordonnes, demoEnabled);
     else await this.writeProspectsSheet(workbook, ordonnes, demoEnabled);
     await workbook.commit();
@@ -432,7 +634,7 @@ export class LotsExportService {
       dayNumber: jour,
       dayCount,
       lotName: lot.name,
-      cibleLabel: lot.cible === LotExportCible.REPRESENTANTS ? label : `Prospects : ${label}`,
+      cibleLabel: surRepresentants(lot.cible) ? label : `Prospects : ${label}`,
       generatedAt: new Date(),
       rows: items.map((item, index) => ({
         position: index + 1,
@@ -612,7 +814,7 @@ export class LotsExportService {
     createdAt: Date,
   ): Promise<{ calls: number; fiches: number }> {
     const [row] =
-      cible === LotExportCible.REPRESENTANTS
+      surRepresentants(cible)
         ? await this.prisma.$queryRaw<
             { calls: number; fiches: number }[]
           >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches FROM "lot_export_items" i INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`
@@ -627,7 +829,7 @@ export class LotsExportService {
     cible: LotExportCible,
     createdAt: Date,
   ): Promise<LotExportAttemptDto[]> {
-    if (cible === LotExportCible.REPRESENTANTS) {
+    if (surRepresentants(cible)) {
       const rows = await this.prisma.repCallAttempt.findMany({
         where: {
           representant: { lotItems: { some: { lotId: id } } },
@@ -691,7 +893,7 @@ export class LotsExportService {
     createdAt: Date,
   ): Promise<Record<string, number>> {
     const rows =
-      cible === LotExportCible.REPRESENTANTS
+      surRepresentants(cible)
         ? await this.prisma.$queryRaw<
             { name: string; calls: number }[]
           >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "rep_call_attempts" a INNER JOIN "lot_export_items" i ON i."representantId" = a."representantId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`
@@ -705,13 +907,14 @@ export class LotsExportService {
     id: string,
     cible: LotExportCible,
     createdAt: Date,
+    distribution: Distribution | null,
   ): Promise<LotExportPerformanceDto[]> {
     const tentatives =
-      cible === LotExportCible.REPRESENTANTS
+      surRepresentants(cible)
         ? Prisma.sql`SELECT "representantId" AS "targetId", "performedById", "clientCreatedAt" FROM "rep_call_attempts"`
         : Prisma.sql`SELECT "prospectId" AS "targetId", "performedById", "clientCreatedAt" FROM "call_attempts"`;
     const target =
-      cible === LotExportCible.REPRESENTANTS
+      surRepresentants(cible)
         ? Prisma.sql`i."representantId"`
         : Prisma.sql`i."prospectId"`;
 
@@ -721,11 +924,12 @@ export class LotsExportService {
         SELECT
           i."assigneeId" AS id,
           u."fullName" AS name,
+          u."role" AS role,
           COUNT(*)::int AS assigned
         FROM "lot_export_items" i
         INNER JOIN "users" u ON u.id = i."assigneeId"
         WHERE i."lotId" = ${id} AND i."assigneeId" IS NOT NULL
-        GROUP BY i."assigneeId", u."fullName"
+        GROUP BY i."assigneeId", u."fullName", u."role"
       ),
       conformes AS (
         SELECT
@@ -760,6 +964,7 @@ export class LotsExportService {
       SELECT
         m.id,
         m.name,
+        m.role,
         m.assigned,
         COALESCE(c.treated, 0)::int AS treated,
         COALESCE(c."assignedCalls", 0)::int AS "assignedCalls",
@@ -773,6 +978,7 @@ export class LotsExportService {
     return rows.map((row) => ({
       teleconseillerId: row.id,
       teleconseillerName: row.name,
+      objectif: objectifDe(row, distribution),
       assigned: row.assigned,
       treated: row.treated,
       completionRate:
@@ -780,6 +986,235 @@ export class LotsExportService {
       assignedCalls: row.assignedCalls,
       outsideAssignmentCalls: row.outsideAssignmentCalls,
     }));
+  }
+
+  private async lot(id: string): Promise<{
+    id: string;
+    cible: LotExportCible;
+    filters: Prisma.JsonValue;
+    createdAt: Date;
+  }> {
+    const row = await this.prisma.lotExport.findUnique({
+      where: { id },
+      select: { id: true, cible: true, filters: true, createdAt: true },
+    });
+    if (!row)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_NOT_FOUND',
+        message: 'Campagne introuvable.',
+      });
+    return row;
+  }
+
+  /**
+   * Les positions déjà appelées depuis la création de la campagne.
+   *
+   * Sur la POSITION et non sur la fiche : la même personne peut figurer dans
+   * deux campagnes, et c'est cette ligne-ci qui est traitée ou non.
+   */
+  private async positionsTraitees(lot: {
+    id: string;
+    cible: LotExportCible;
+    createdAt: Date;
+  }): Promise<Set<number>> {
+    const rows = surRepresentants(lot.cible)
+      ? await this.prisma.$queryRaw<{ position: number }[]>`
+          SELECT DISTINCT i.position FROM "lot_export_items" i
+          INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId"
+          WHERE i."lotId" = ${lot.id} AND a."clientCreatedAt" >= ${lot.createdAt}`
+      : await this.prisma.$queryRaw<{ position: number }[]>`
+          SELECT DISTINCT i.position FROM "lot_export_items" i
+          INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId"
+          WHERE i."lotId" = ${lot.id} AND a."clientCreatedAt" >= ${lot.createdAt}`;
+    return new Set(rows.map((row) => row.position));
+  }
+
+  /**
+   * EB-18 : les fiches d'une campagne, avec leur état et le statut posé.
+   *
+   * Le superviseur voit toute la campagne ; le filtre par téléconseiller sert à
+   * la lire personne par personne.
+   */
+  async fiches(id: string, query: LotExportFichesQueryDto): Promise<LotExportFichesDto> {
+    const lot = await this.lot(id);
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const where: Prisma.LotExportItemWhereInput = {
+      lotId: id,
+      ...(query.teleconseillerId ? { assigneeId: query.teleconseillerId } : {}),
+    };
+
+    const traitees = await this.positionsTraitees(lot);
+    const rows = await this.prisma.lotExportItem.findMany({
+      where,
+      orderBy: { position: 'asc' },
+      select: {
+        position: true,
+        day: true,
+        assigneeId: true,
+        assignee: { select: { fullName: true } },
+        representant: {
+          select: {
+            id: true,
+            fullName: true,
+            phoneE164: true,
+            nextCallbackAt: true,
+            statutQualification: { select: { label: true } },
+          },
+        },
+        prospect: {
+          select: { id: true, nom: true, prenom: true, phoneE164: true, lastCallOutcome: true },
+        },
+      },
+    });
+
+    const items = rows.map((row) => ficheDe(row, traitees.has(row.position)));
+    const retenues =
+      query.etat === undefined ? items : items.filter((item) => item.etat === query.etat);
+    return {
+      items: retenues.slice((page - 1) * pageSize, page * pageSize),
+      meta: {
+        total: retenues.length,
+        page,
+        pageSize,
+        pageCount: Math.max(1, Math.ceil(retenues.length / pageSize)),
+      },
+    };
+  }
+
+  /** Le nombre de fiches que la cible offre, avant que la répartition ne la borne. */
+  private async compter(body: CreateLotExportDto): Promise<number> {
+    if (body.cible === LotExportCible.CONTACTS_RECOMMANDES) {
+      const groupes = await this.prisma.representantSuggestion.groupBy({
+        by: ['suggestedPhoneE164'],
+        where: this.suggestionWhere(body.representants),
+      });
+      return groupes.length;
+    }
+    if (surRepresentants(body.cible))
+      return this.prisma.representant.count({ where: this.cibleWhere(body) });
+    return this.prisma.prospect.count({ where: buildProspectWhere(ADMIN, body.prospects ?? {}) });
+  }
+
+  /** Les fiches retenues, dans l'ordre où la répartition les distribuera. */
+  private async tirer(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    body: CreateLotExportDto,
+    places: number,
+  ): Promise<{ id: string }[]> {
+    if (body.cible === LotExportCible.CONTACTS_RECOMMANDES)
+      return this.ouvrirLesContactsRecommandes(tx, user, body, places);
+    if (surRepresentants(body.cible))
+      return tx.representant.findMany({
+        where: this.cibleWhere(body),
+        orderBy: { id: 'asc' },
+        take: places,
+        select: { id: true },
+      });
+    return tx.prospect.findMany({
+      where: buildProspectWhere(user, body.prospects ?? {}),
+      orderBy: { id: 'asc' },
+      take: places,
+      select: { id: true },
+    });
+  }
+
+  /**
+   * EB-19 : un contact recommandé devient une fiche au LANCEMENT de la campagne.
+   *
+   * `RepresentantSuggestion` n'est pas appelable : elle n'a ni département ni
+   * qualification, et son numéro ne réserve rien. La fiche naît ici, rattachée
+   * au département de celui qui l'a nommée, et la suggestion pointe dessus.
+   *
+   * Le numéro porte un index unique partiel sur `Representant` : deux
+   * suggestions du même numéro, ou un numéro déjà connu, ne donnent qu'une
+   * fiche. Sans ce dédoublonnage la transaction entière échouerait.
+   */
+  private async ouvrirLesContactsRecommandes(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    body: CreateLotExportDto,
+    places: number,
+  ): Promise<{ id: string }[]> {
+    const suggestions = await tx.representantSuggestion.findMany({
+      where: this.suggestionWhere(body.representants),
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        suggestedName: true,
+        suggestedPhoneE164: true,
+        sourceRepresentant: { select: { departementId: true, iefId: true } },
+      },
+    });
+
+    const numeros = [...new Set(suggestions.map((piste) => piste.suggestedPhoneE164))];
+    const connus = new Set(
+      (
+        await tx.representant.findMany({
+          where: { phoneE164: { in: numeros }, deletedAt: null },
+          select: { phoneE164: true },
+        })
+      ).map((fiche) => fiche.phoneE164),
+    );
+
+    const maintenant = new Date();
+    const fiches: { id: string }[] = [];
+    for (const piste of suggestions) {
+      if (fiches.length >= places) break;
+      if (connus.has(piste.suggestedPhoneE164)) continue;
+      connus.add(piste.suggestedPhoneE164);
+      const id = uuidv7();
+      await tx.representant.create({
+        data: {
+          id,
+          fullName: piste.suggestedName?.trim() || 'Contact recommandé',
+          phoneE164: piste.suggestedPhoneE164,
+          departementId: piste.sourceRepresentant.departementId,
+          iefId: piste.sourceRepresentant.iefId,
+          createdById: user.id,
+          clientCreatedAt: maintenant,
+        },
+      });
+      await tx.representantSuggestion.update({
+        where: { id: piste.id },
+        data: { resolvedRepresentantId: id },
+      });
+      fiches.push({ id });
+    }
+    return fiches;
+  }
+
+  private suggestionWhere(
+    query?: RepresentantExportQueryDto,
+  ): Prisma.RepresentantSuggestionWhereInput {
+    const value = query ?? {};
+    return {
+      deletedAt: null,
+      status: SuggestionStatus.A_APPELER,
+      resolvedRepresentantId: null,
+      sourceRepresentant: {
+        deletedAt: null,
+        ...(value.departementId ? { departementId: value.departementId } : {}),
+        ...(value.iefId ? { iefId: value.iefId } : {}),
+      },
+    };
+  }
+
+  private cibleWhere(body: CreateLotExportDto): Prisma.RepresentantWhereInput {
+    const where = this.representantWhere(body.representants);
+    if (body.cible !== LotExportCible.REPRESENTANTS_INJOIGNABLES) return where;
+    // EB-19 : « hors Injoignable définitif » se lit sur le délai de reprise, et
+    // non sur un code écrit ici : l'administrateur peut créer d'autres statuts
+    // qui ne repassent jamais, et ils doivent sortir de la cible eux aussi.
+    return {
+      ...where,
+      lastCallOutcome: RepCallOutcome.UNREACHABLE,
+      statutQualification: {
+        effect: StatutQualificationEffect.UNREACHABLE,
+        retryAfterMinutes: { not: null },
+      },
+    };
   }
 
   private representantWhere(query?: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
@@ -800,15 +1235,40 @@ export class LotsExportService {
   }
 }
 
+/**
+ * A defaut d'objectif saisi, ce que la repartition a REELLEMENT applique.
+ *
+ * Rendre `fichesParJour` brut annoncait a la supervision un objectif de 50
+ * quand le tourniquet ne lui avait donne que 10 fiches : l'ecran contredisait
+ * la ligne d'a cote.
+ */
+function objectifDe(row: PerformanceRow, distribution: Distribution | null): number {
+  const explicite = distribution?.objectifs[row.id];
+  if (explicite !== undefined) return explicite;
+  if (!distribution) return 0;
+  return capaciteParJour(row.role, distribution.fichesParJour);
+}
+
 function placesDe(membres: readonly MembreRepartition[], jours: number): number {
   return membres.reduce((total, membre) => total + membre.fichesParJour, 0) * jours;
 }
 
-function capacites(equipe: readonly Teleconseiller[], fichesParJour: number) {
+function capacites(
+  equipe: readonly Teleconseiller[],
+  fichesParJour: number,
+  objectifs: Readonly<Record<string, number>> = {},
+): MembreRepartition[] {
   return equipe.map((membre) => ({
     assigneeId: membre.id,
-    fichesParJour: capaciteParJour(membre.role, fichesParJour),
+    fichesParJour: objectifs[membre.id] ?? capaciteParJour(membre.role, fichesParJour),
   }));
+}
+
+/** Le tableau reçu du client, réduit à ce que la distribution stockée porte. */
+function objectifsDe(saisis: readonly LotExportObjectifDto[] | undefined): Record<string, number> {
+  return Object.fromEntries(
+    (saisis ?? []).map((objectif) => [objectif.teleconseillerId, objectif.fichesParJour]),
+  );
 }
 
 const REPARTITION_COLUMNS = [
@@ -850,7 +1310,88 @@ function readDistribution(filters: Prisma.JsonValue): Distribution | null {
   const fichesParJour = typeof value.fichesParJour === 'number' ? value.fichesParJour : 0;
   const jours = typeof value.jours === 'number' ? value.jours : 0;
   if (!teleconseillerIds.length || fichesParJour < 1 || jours < 1) return null;
-  return { teleconseillerIds, fichesParJour, jours };
+  return { teleconseillerIds, fichesParJour, jours, objectifs: readObjectifs(value.objectifs) };
+}
+
+/**
+ * Réécrit la distribution SANS toucher aux critères qui l'entourent : ceux-ci
+ * disent quelles fiches ont été tirées, et les perdre effacerait l'étiquette de
+ * la campagne.
+ */
+function ecrireLaDistribution(
+  filters: Prisma.JsonValue,
+  changer: (distribution: Distribution) => Distribution,
+): Prisma.InputJsonValue {
+  const base =
+    typeof filters === 'object' && filters !== null && !Array.isArray(filters)
+      ? (filters as Record<string, unknown>)
+      : {};
+  const courante = readDistribution(filters) ?? {
+    teleconseillerIds: [],
+    fichesParJour: 1,
+    jours: 1,
+    objectifs: {},
+  };
+  return { ...base, distribution: { ...changer(courante) } } as Prisma.InputJsonValue;
+}
+
+interface FicheRow {
+  position: number;
+  day: number;
+  assigneeId: string | null;
+  assignee: { fullName: string } | null;
+  representant: {
+    id: string;
+    fullName: string;
+    phoneE164: string;
+    nextCallbackAt: Date | null;
+    statutQualification: { label: string } | null;
+  } | null;
+  prospect: {
+    id: string;
+    nom: string;
+    prenom: string | null;
+    phoneE164: string;
+    lastCallOutcome: CallOutcome | null;
+  } | null;
+}
+
+function ficheDe(row: FicheRow, traitee: boolean): LotExportFicheDto {
+  const fiche = row.representant;
+  const prospect = row.prospect;
+  return {
+    position: row.position,
+    jour: row.day,
+    ficheId: fiche?.id ?? prospect?.id ?? null,
+    fullName: fiche?.fullName ?? [prospect?.nom, prospect?.prenom].filter(Boolean).join(' '),
+    phoneE164: fiche?.phoneE164 ?? prospect?.phoneE164 ?? '',
+    teleconseillerId: row.assigneeId,
+    teleconseillerName: row.assignee?.fullName ?? 'Non attribuée',
+    etat: etatDe(traitee, fiche?.nextCallbackAt != null),
+    statutLabel: statutDe(row),
+  };
+}
+
+function etatDe(traitee: boolean, attendUnRappel: boolean): LotExportFicheEtat {
+  if (attendUnRappel) return LotExportFicheEtat.A_RAPPELER;
+  return traitee ? LotExportFicheEtat.TRAITEE : LotExportFicheEtat.NON_TRAITEE;
+}
+
+/** Un prospect ne porte pas de statut de qualification : son dernier appel en tient lieu. */
+function statutDe(row: FicheRow): string | null {
+  const label = row.representant?.statutQualification?.label;
+  if (label !== undefined) return label;
+  const outcome = row.prospect?.lastCallOutcome;
+  return outcome == null ? null : CALL_OUTCOME_LABELS[outcome];
+}
+
+function readObjectifs(raw: unknown): Record<string, number> {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).flatMap(([id, valeur]) =>
+      typeof valeur === 'number' && valeur >= 1 ? [[id, valeur] as [string, number]] : [],
+    ),
+  );
 }
 
 interface ScopeFilters {
@@ -862,6 +1403,8 @@ interface ScopeFilters {
 
 function scopeLabel(cible: LotExportCible, filters: unknown): string {
   const f = (filters ?? {}) as ScopeFilters;
+  if (cible === LotExportCible.REPRESENTANTS_INJOIGNABLES) return 'Représentants injoignables';
+  if (cible === LotExportCible.CONTACTS_RECOMMANDES) return 'Contacts recommandés';
   if (cible === LotExportCible.REPRESENTANTS) {
     if (!f.relationStatus) return 'Tous les représentants';
     return f.relationStatus === 'INCONNU'

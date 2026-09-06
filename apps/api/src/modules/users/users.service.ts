@@ -7,6 +7,8 @@ import {
 import { Prisma, Role } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { RedisService } from '../../redis/redis.service.js';
+import { freshUserKey } from '../../common/guards/fresh-session.guard.js';
 import { normalizePhone } from '../../common/phone.js';
 import { AuditAction, audit } from '../../common/audit.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -44,7 +46,10 @@ function toDto(user: UserRow): UserDto {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly redis: RedisService,
+  ) {}
 
   async list(query: UserListQueryDto): Promise<UserListDto> {
     const page = query.page ?? 1;
@@ -219,6 +224,7 @@ export class UsersService {
     // celle du renouvellement. Les deux sont nécessaires, et aucune ne remplace
     // l'autre : la première corrige l'AUTORITÉ, la seconde met fin à la SESSION.
     if (input.isActive === false || roleChanged) await this.revokeSessions(id);
+    await this.redis.bust(freshUserKey(id));
 
     return toDto(user);
   }
@@ -372,6 +378,7 @@ export class UsersService {
       });
     });
     await this.revokeSessions(id);
+    await this.redis.bust(freshUserKey(id));
     return { ok: true };
   }
 

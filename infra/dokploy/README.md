@@ -6,7 +6,7 @@ Un seul script, `deploy.py`, et des étapes à lancer dans l'ordre. Chacune est
 ```bash
 export DOKPLOY_KEY='votre-clé-api'
 
-python3 infra/dokploy/deploy.py provision   # Postgres + les deux applications
+python3 infra/dokploy/deploy.py provision   # Postgres + Redis + les deux applications
 python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
 python3 infra/dokploy/deploy.py deploy      # démarrage
 python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
@@ -62,7 +62,7 @@ python3 infra/dokploy/deploy.py redeploy   # applications seules
 python3 infra/dokploy/deploy.py deploy     # première mise en route, Postgres compris
 ```
 
-Le script configure aussi le volume Dokploy `cpi-go-apk-releases`, monté sur
+Le script configure aussi le volume Dokploy `cpi-go-releases`, monté sur
 `/repo/storage/releases`. Les APK publiés depuis **Paramètres → Release Android**
 survivent ainsi aux reconstructions et redéploiements de l'API. Même chose pour
 `cpi-go-db-dumps` sur `/repo/storage/db-dumps`, qui porte les exports à la
@@ -78,7 +78,8 @@ de Dokploy, et l'un des deux ne monterait pas.
 
 Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte
 Dokploy ces ports appartiennent à Traefik : les deux entreraient en collision et
-l'un ne démarrerait pas. La forme retenue est native, un service Postgres, deux
+l'un ne démarrerait pas. La forme retenue est native, un service Postgres, un
+service Redis (cache sans persistance, borné à 128 Mo par l'API), deux
 applications construites depuis leurs Dockerfile, et laisse à Traefik le
 domaine et le TLS, qui lui reviennent.
 

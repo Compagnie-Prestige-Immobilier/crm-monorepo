@@ -14,6 +14,7 @@ import {
 } from '@crm/database';
 
 import { attributionScope } from '../../common/scope.js';
+import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
 import {
@@ -147,6 +148,9 @@ export class Phase2SyncService {
           engagementEnCours: attempt.engagementEnCours,
           dureeEtablissementMois: attempt.dureeEtablissementMois,
           rendezVousAt: attempt.rendezVousAt,
+          deviceCallType: op.deviceCallType ?? null,
+          deviceCallDurationSeconds: op.deviceCallDurationSeconds ?? null,
+          deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
           clientCreatedAt: new Date(op.clientCreatedAt),
         },
       ],
@@ -156,6 +160,14 @@ export class Phase2SyncService {
     if (inserted.count === 0) {
       return this.duplicateResult(tx, op, op.id, projet);
     }
+
+    await rattacherDetections(tx, {
+      performedById: user.id,
+      prospectId: op.prospectId,
+      attemptId: op.id,
+      clientCreatedAt: new Date(op.clientCreatedAt),
+      deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
+    });
 
     const corrige = await this.correctProspect(tx, user.id, op, prospect);
     await this.scheduleCallback(tx, user.id, op, attempt);

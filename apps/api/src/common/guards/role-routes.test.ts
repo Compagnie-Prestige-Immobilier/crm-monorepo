@@ -16,17 +16,20 @@ import { CallbacksController } from '../../modules/callbacks/callbacks.controlle
 import { ClientRequestsController } from '../../modules/client-requests/client-requests.controller.js';
 import { DbDumpController } from '../../modules/db-dump/db-dump.controller.js';
 import { DemoController } from '../../modules/demo/demo.controller.js';
+import { EnrolementController } from '../../modules/enrolement/enrolement.controller.js';
 import { ExportController } from '../../modules/export/export.controller.js';
 import { HealthController } from '../../modules/health/health.controller.js';
 import { ImportsController } from '../../modules/imports/imports.controller.js';
 import { NotificationsController } from '../../modules/notifications/notifications.controller.js';
 import { NotificationTemplatesController } from '../../modules/notifications/templates.controller.js';
+import { OuverturesController } from '../../modules/ouvertures/ouvertures.controller.js';
 import { Phase2Controller } from '../../modules/phase2/phase2.controller.js';
 import { ProspectsController } from '../../modules/prospects/prospects.controller.js';
 import { ReferentielsController } from '../../modules/referentiels/referentiels.controller.js';
 import { RepCampaignsController } from '../../modules/rep-campaigns/rep-campaigns.controller.js';
 import { RepresentantsController } from '../../modules/representants/representants.controller.js';
 import { SuggestionsController } from '../../modules/suggestions/suggestions.controller.js';
+import { StatutsQualificationController } from '../../modules/referentiels/statuts-qualification.controller.js';
 import { SupervisionController } from '../../modules/analytics/supervision.controller.js';
 import { SyncController } from '../../modules/sync/sync.controller.js';
 import { CallOutcomeReasonsController } from '../../modules/referentiels/call-outcome-reasons.controller.js';
@@ -52,17 +55,20 @@ const CONTROLLERS: readonly Controller[] = [
   DashboardsController,
   DbDumpController,
   DemoController,
+  EnrolementController,
   ExportController,
   HealthController,
   ImportsController,
   NotificationsController,
   NotificationTemplatesController,
+  OuverturesController,
   Phase2Controller,
   ProspectsController,
   ReferentielsController,
   RepCampaignsController,
   RepresentantsController,
   SuggestionsController,
+  StatutsQualificationController,
   SupervisionController,
   SyncController,
   UsersController,
@@ -91,6 +97,13 @@ const TROIS_ETAPES: readonly string[] = [
   'ProspectsController.update',
 
   'RepCampaignsController.recordAttempt',
+
+  // Le verrou de traitement : ouvrir, garder le brouillon, relire la fiche en
+  // main. L'encadrement mene les trois etapes lui-meme, il ouvre donc aussi.
+  'OuverturesController.ouvrir',
+  'OuverturesController.courante',
+  'OuverturesController.enregistrerBrouillon',
+  'OuverturesController.comptage',
 
   // Le périmètre d'appel de l'appelant : le téléphone en a besoin pour borner
   // son tirage, quel que soit le rôle qui mène les trois étapes.
@@ -162,6 +175,7 @@ const ADMISES: readonly string[] = [
   'AuthController.changeMyPassword',
   'AuthController.me',
   'CallOutcomeReasonsController.list',
+  'StatutsQualificationController.list',
   'CallbacksController.list',
   'AuthController.switchWorkspace',
   'NotificationsController.mine',
@@ -170,6 +184,8 @@ const ADMISES: readonly string[] = [
   // Lecture seule: un superviseur ecoute une note audio, il n'en televerse pas.
   'Phase2Controller.downloadRecording',
 
+  'ProspectsController.callHistory',
+  'ProspectsController.deviceCalls',
   'ProspectsController.get',
   'ProspectsController.list',
 
@@ -189,17 +205,33 @@ const ADMISES: readonly string[] = [
 
   'LotsExportController.list',
   'LotsExportController.get',
+  'LotsExportController.fiches',
   'LotsExportController.xlsx',
   'LotsExportController.programme',
   'LotsExportController.programmesZip',
+  // EB-15 : le superviseur cree, previsualise et lance une campagne, et il en
+  // regle la repartition. La SUPPRESSION reste a l'administrateur seul : elle
+  // emporte le programme que le terrain a deja en main.
+  'LotsExportController.create',
+  'LotsExportController.preview',
+  'LotsExportController.update',
+  'LotsExportController.reaffecter',
+  'LotsExportController.retirer',
   'ExportController.representantsExport',
 
+  'RepresentantsController.callHistory',
+  'RepresentantsController.deviceCalls',
   'RepresentantsController.get',
   'RepresentantsController.list',
   'RepresentantsController.listComments',
   'RepresentantsController.relationHistory',
 
   'SuggestionsController.list',
+
+  // Liberer une fiche restee ouverte est un geste d'encadrement, jamais
+  // automatique : seuls le superviseur et l'administrateur l'atteignent.
+  'OuverturesController.ouvertes',
+  'OuverturesController.liberer',
 
   'SupervisionController.activite',
   'SupervisionController.creneaux',
@@ -223,6 +255,7 @@ const SOCLE: readonly string[] = [
   'AuthController.me',
   'AuthController.refresh',
   'CallOutcomeReasonsController.list',
+  'StatutsQualificationController.list',
   'AuthController.switchWorkspace',
   'HealthController.live',
   'HealthController.ready',
@@ -276,8 +309,27 @@ const ADMISES_ACCUEIL: readonly string[] = [
  * l'alimentent et exporte ce qu'elle lit. Elle n'ouvre aucun compte et ne purge
  * rien.
  */
+/**
+ * EB-15 et EB-16 : creer une campagne, la regler et deplacer les fiches d'un
+ * teleconseiller sont des gestes d'ENCADREMENT du travail d'autrui. La
+ * direction lit les campagnes, elle ne les conduit pas.
+ */
+const ENCADREMENT_DES_CAMPAGNES: readonly string[] = [
+  'LotsExportController.create',
+  'LotsExportController.preview',
+  'LotsExportController.update',
+  'LotsExportController.reaffecter',
+  'LotsExportController.retirer',
+];
+
 const ADMISES_DIRECTION: readonly string[] = [
-  ...ADMISES.filter((route) => route !== 'AnalyticsController.bankAging'),
+  ...ADMISES.filter(
+    (route) =>
+      route !== 'AnalyticsController.bankAging' &&
+      route !== 'OuverturesController.ouvertes' &&
+      route !== 'OuverturesController.liberer' &&
+      !ENCADREMENT_DES_CAMPAGNES.includes(route),
+  ),
   ...REGISTRE,
   'ExportController.prospects',
   'VisitesController.createReferentiel',
@@ -377,6 +429,12 @@ describe('ce qu’un SUPERVISEUR atteint, route par route', () => {
     expect(allows(CallbacksController, 'cancel')).toBe(false);
   });
 
+  it('ne lit RIEN des plateformes d’enrôlement, réservées à la cellule pilotage', () => {
+    for (const method of routesOf(EnrolementController)) {
+      expect(allows(EnrolementController, method), `enrolement.${method}`).toBe(false);
+    }
+  });
+
   it('n’administre aucun compte, alors qu’il en lit la liste', () => {
     expect(allows(UsersController, 'list')).toBe(true);
     for (const method of routesOf(UsersController).filter((name) => name !== 'list')) {
@@ -448,11 +506,14 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     expect(ouvertesDe(Role.DIRECTION)).toEqual([...ADMISES_DIRECTION].sort());
   });
 
-  it('lit tout ce que lit la supervision, hors dossiers bancaires', () => {
+  // Liberer une fiche restee ouverte est un geste d'ENCADREMENT sur le travail
+  // d'autrui, comme annuler un rappel : `manages()` le reserve au superviseur et
+  // a l'administrateur, et la direction n'y est pas.
+  it('lit tout ce que lit la supervision, hors dossiers bancaires et fiches a liberer', () => {
     const direction = new Set(ouvertesDe(Role.DIRECTION));
-    expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual([
-      'AnalyticsController.bankAging',
-    ]);
+    expect(ouvertesDe(Role.SUPERVISEUR).filter((route) => !direction.has(route))).toEqual(
+      ['AnalyticsController.bankAging', ...ENCADREMENT_DES_CAMPAGNES, 'OuverturesController.liberer', 'OuverturesController.ouvertes'].sort(),
+    );
   });
 
   it('reste hors du domaine bancaire', () => {
@@ -493,6 +554,14 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
     }
     for (const method of routesOf(ImportsController)) {
       expect(allowsAs(Role.DIRECTION, ImportsController, method), `imports.${method}`).toBe(false);
+    }
+  });
+
+  it('ne lit RIEN des plateformes d’enrôlement, réservées à la cellule pilotage', () => {
+    for (const method of routesOf(EnrolementController)) {
+      expect(allowsAs(Role.DIRECTION, EnrolementController, method), `enrolement.${method}`).toBe(
+        false,
+      );
     }
   });
 

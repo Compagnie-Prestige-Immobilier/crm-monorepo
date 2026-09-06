@@ -1,6 +1,6 @@
 ---
 name: security-auditor
-description: "Use proactively for a bounded read-only application/security review: trust boundaries, injection, authentication, authorization, tenant isolation, secrets, cryptography, dependencies, supply chain, web/API/mobile/cloud configuration, and OWASP risks. Reports only evidenced findings; does not edit, exploit external systems, or claim compliance."
+description: 'Use proactively for a bounded read-only application/security review: trust boundaries, injection, authentication, authorization, tenant isolation, secrets, cryptography, dependencies, supply chain, web/API/mobile/cloud configuration, and OWASP risks. Reports only evidenced findings; does not edit, exploit external systems, or claim compliance.'
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: opus
 effort: high

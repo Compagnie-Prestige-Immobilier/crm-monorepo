@@ -1,5 +1,6 @@
 import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
+import { z } from 'zod';
 
 import { getApiClient } from '@/lib/api/browser';
 import { dakarLocalToIso } from '@/lib/format';
@@ -9,6 +10,7 @@ import type {
   WhatsappStatus,
 } from '@/lib/data/representants';
 import type { RepresentantRelation } from '@/lib/representant-filters';
+import { ENROLLMENT_METHODS } from '@/lib/types';
 import type {
   CallOutcome,
   EnrollmentMethod,
@@ -201,6 +203,96 @@ export interface ConversionDraft {
 export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
 export type ConversionErrors = Partial<Record<ConversionField, string>>;
 
+const conversionSchema: z.ZodType<ConversionDraft> = z.object({
+  projet: z.enum(['CHUES', 'GRAND_PUBLIC']),
+  nom: z.string(),
+  prenom: z.string(),
+  email: z.string(),
+  profession: z.string(),
+  type: z.enum(['FONCTIONNAIRE', 'SECTEUR_PRIVE', 'INFORMEL', 'DIASPORA']).nullable(),
+  dureeEtablissementMois: z.string(),
+  fonctionnaire: z.boolean().nullable(),
+  syndicatId: z.string(),
+  banqueId: z.string(),
+  engagementEnCours: z.boolean().nullable(),
+  incomeBandId: z.string(),
+  paymentMode: z.enum(['COMPTANT', 'ECHELONNE']).nullable(),
+  dureeSystemeMois: z.string(),
+  method: z.enum(ENROLLMENT_METHODS).nullable(),
+  rendezVousAt: z.string(),
+});
+
+const brouillonSchema = z.object({
+  comment: z.string().catch(''),
+  conversion: conversionSchema.nullish().catch(null),
+});
+
+export interface BrouillonRepris {
+  readonly comment: string;
+  readonly conversion: ConversionDraft | null;
+}
+
+const RIEN: BrouillonRepris = { comment: '', conversion: null };
+
+/**
+ * EB-10 : ce que le rappel retrouve. Un brouillon d'une version antérieure ou
+ * abîmé rend un formulaire vide, jamais une erreur : perdre une saisie est
+ * fâcheux, ne plus pouvoir rouvrir la fiche l'est davantage.
+ */
+export function lireBrouillon(draft: unknown): BrouillonRepris {
+  const lu = brouillonSchema.safeParse(draft);
+  if (!lu.success) return RIEN;
+  return { comment: lu.data.comment, conversion: lu.data.conversion ?? null };
+}
+
+const texte = z.string().catch('');
+const oui = z.boolean().nullable().catch(null);
+
+/** Le script de qualification d'un représentant, réponse par réponse. */
+const brouillonRepSchema = z.object({
+  resultat: z.enum(['JOIGNABLE', 'INJOIGNABLE']).nullable().catch(null),
+  statutId: z.string().nullable().catch(null),
+  etablissementConfirme: oui,
+  nouvelEtablissement: texte,
+  contacte: oui,
+  connaitUES: oui,
+  syndicatId: z.string().nullable().catch(null),
+  ambassadeur: oui,
+  memeWhatsapp: oui,
+  whatsapp: texte,
+  rappelAt: z.string().nullable().catch(null),
+  sugPhone: texte,
+  sugName: texte,
+  sugNote: texte,
+  commentaire: texte,
+});
+
+export type BrouillonRep = z.infer<typeof brouillonRepSchema>;
+
+const RIEN_REP: BrouillonRep = {
+  resultat: null,
+  statutId: null,
+  etablissementConfirme: null,
+  nouvelEtablissement: '',
+  contacte: null,
+  connaitUES: null,
+  syndicatId: null,
+  ambassadeur: null,
+  memeWhatsapp: null,
+  whatsapp: '',
+  rappelAt: null,
+  sugPhone: '',
+  sugName: '',
+  sugNote: '',
+  commentaire: '',
+};
+
+/** Même règle que `lireBrouillon` : un brouillon abîmé rend un script vierge. */
+export function lireBrouillonRep(draft: unknown): BrouillonRep {
+  const lu = brouillonRepSchema.safeParse(draft);
+  return lu.success ? lu.data : RIEN_REP;
+}
+
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
 export function conversionFrom(
   prospect: ProspectRow,
@@ -376,6 +468,8 @@ export interface AttemptDraft {
   readonly comment: string;
   readonly callbackAt?: string | null;
   readonly conversion?: ConversionDraft;
+  /** L'ouverture que cette tentative referme, et dont elle arrête le chronomètre. */
+  readonly ouvertureId?: string;
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
@@ -488,6 +582,9 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           ...(comment === '' ? {} : { comment }),
           ...(callbackAt === null ? {} : { callbackAt }),
           ...(input.draft.conversion === undefined ? {} : conversionData(input.draft.conversion)),
+          ...(input.draft.ouvertureId === undefined
+            ? {}
+            : { ouvertureId: input.draft.ouvertureId }),
           clientCreatedAt: input.at,
         },
       },
@@ -549,10 +646,6 @@ export async function pushCallAttempt(
   );
 }
 
-export const repScriptKeys = {
-  root: ['console', 'representants'] as const,
-};
-
 /** Une relation tranchée n'a plus rien à donner au script : elle est en queue de file. */
 const REP_RELATION_RANK: Record<RepresentantRelation, number> = {
   INCONNU: 0,
@@ -593,6 +686,10 @@ export interface RepAnswer {
   readonly contacte?: boolean;
   readonly connaitUES?: boolean;
   readonly syndicat?: string;
+  /** Statut choisi au script. C'est lui qui commande `outcome`, jamais l'inverse. */
+  readonly statutQualificationId?: string;
+  /** L'ouverture que cette tentative ferme : c'est elle qui arrête le chronomètre. */
+  readonly ouvertureId?: string;
 }
 
 export function buildRepAttempt(

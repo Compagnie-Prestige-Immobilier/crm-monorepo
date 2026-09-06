@@ -2,9 +2,11 @@
 
 import { useQuery } from '@tanstack/react-query';
 import {
+  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   FileSpreadsheetIcon,
+  LayersIcon,
   LoaderIcon,
   PencilIcon,
   PlusIcon,
@@ -21,6 +23,14 @@ import { RepresentantFormDialog } from '@/components/representants/representant-
 import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
 import { useRepresentantFilters } from '@/components/representants/use-representant-filters';
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -84,6 +94,75 @@ function messageVide(
   };
 }
 
+/**
+ * L'export part des filtres de l'URL, pas de la page affichée : celui qui
+ * envoie le fichier doit pouvoir jurer qu'il contient ce qu'il avait sous les
+ * yeux.
+ */
+function MenuExport({
+  filters,
+  total,
+  activeFilterCount,
+}: {
+  filters: RepresentantFilters;
+  total: number;
+  activeFilterCount: number;
+}) {
+  const exporter = useFileDownload();
+  const filtres =
+    activeFilterCount === 0
+      ? 'Aucun filtre actif'
+      : `${String(activeFilterCount)} filtre${activeFilterCount > 1 ? 's' : ''} appliqué${activeFilterCount > 1 ? 's' : ''}`;
+
+  const telecharger = (mode: 'filtered' | 'all') => () => {
+    void exporter.download({
+      url: buildRepresentantsExportUrl(filters, mode),
+      fileName: representantsExportFileName(new Date(), mode),
+      failureMessage: 'L’export n’a pas pu être généré.',
+    });
+  };
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={<Button type="button" variant="outline" disabled={exporter.pending} />}
+      >
+        {exporter.pending ? (
+          <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <FileSpreadsheetIcon aria-hidden="true" />
+        )}
+        Exporter
+        <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-80">
+        <DropdownMenuLabel>Export Excel</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          className="items-start gap-3 py-2.5"
+          disabled={total === 0}
+          onClick={telecharger('filtered')}
+        >
+          <FileSpreadsheetIcon className="mt-0.5" aria-hidden="true" />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-[600]">Exporter la vue filtrée</span>
+            <span className="text-[0.75rem] text-muted-foreground">{filtres}</span>
+          </span>
+        </DropdownMenuItem>
+        <DropdownMenuItem className="items-start gap-3 py-2.5" onClick={telecharger('all')}>
+          <LayersIcon className="mt-0.5" aria-hidden="true" />
+          <span className="flex min-w-0 flex-col">
+            <span className="font-[600]">Exporter tous les représentants</span>
+            <span className="text-[0.75rem] text-muted-foreground">
+              Aucun filtre de la liste n’est appliqué.
+            </span>
+          </span>
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
 export function RepresentantsView({
   canAdminister,
   readOnly = false,
@@ -97,7 +176,6 @@ export function RepresentantsView({
   campaignScoped?: boolean;
 }) {
   const { filters, setFilters } = useRepresentantFilters();
-  const exporter = useFileDownload();
   const [editing, setEditing] = useState<{ representant: RepresentantRow | null } | null>(null);
 
   const { data, isPending, isFetching, isError, error, refetch } = useQuery({
@@ -158,29 +236,8 @@ export function RepresentantsView({
             </Link>
           ) : null}
 
-          {/* L'export part des filtres de l'URL, pas de la page affichée :
-              celui qui envoie le fichier doit pouvoir jurer qu'il contient ce
-              qu'il avait sous les yeux. */}
           {canExport ? (
-            <Button
-              type="button"
-              variant="outline"
-              disabled={exporter.pending || total === 0}
-              onClick={() => {
-                void exporter.download({
-                  url: buildRepresentantsExportUrl(filters),
-                  fileName: representantsExportFileName(),
-                  failureMessage: 'L’export n’a pas pu être généré.',
-                });
-              }}
-            >
-              {exporter.pending ? (
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <FileSpreadsheetIcon aria-hidden="true" />
-              )}
-              Exporter
-            </Button>
+            <MenuExport filters={filters} total={total} activeFilterCount={activeFilterCount} />
           ) : null}
         </div>
       </div>
@@ -270,7 +327,12 @@ export function RepresentantsView({
                             </Link>
                           </TableCell>
                           <TableCell>
-                            <RelationBadge status={representant.relationStatus} />
+                            <RelationBadge
+                              status={representant.relationStatus}
+                              label={representant.statutQualificationLabel}
+                              effect={representant.statutQualificationEffect}
+                              lastCallOutcome={representant.lastCallOutcome}
+                            />
                           </TableCell>
                           <TableCell className="tabular-nums">
                             {formatPhone(representant.phoneE164)}
@@ -412,7 +474,12 @@ function RepresentantCard({
             {formatPhone(representant.phoneE164)}
           </p>
           <div className="mt-1.5">
-            <RelationBadge status={representant.relationStatus} />
+            <RelationBadge
+              status={representant.relationStatus}
+              label={representant.statutQualificationLabel}
+              effect={representant.statutQualificationEffect}
+              lastCallOutcome={representant.lastCallOutcome}
+            />
           </div>
         </div>
         {/*

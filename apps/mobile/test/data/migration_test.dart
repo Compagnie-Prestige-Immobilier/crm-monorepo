@@ -1,5 +1,5 @@
 import 'package:cpi_go/data/local/database.dart';
-import 'package:drift/drift.dart' show GeneratedDatabase, QueryRow;
+import 'package:drift/drift.dart' show GeneratedDatabase, QueryRow, Value;
 import 'package:drift/native.dart';
 import 'package:drift_dev/api/migrations_native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -24,6 +24,16 @@ import 'generated_migrations/schema_v19.dart' as v19;
 import 'generated_migrations/schema_v20.dart' as v20;
 import 'generated_migrations/schema_v21.dart' as v21schema;
 import 'generated_migrations/schema_v22.dart' as v22schema;
+import 'generated_migrations/schema_v23.dart' as v23schema;
+import 'generated_migrations/schema_v24.dart' as v24schema;
+import 'generated_migrations/schema_v25.dart' as v25schema;
+import 'generated_migrations/schema_v26.dart' as v26schema;
+import 'generated_migrations/schema_v27.dart' as v27schema;
+import 'generated_migrations/schema_v28.dart' as v28schema;
+import 'generated_migrations/schema_v29.dart' as v29schema;
+import 'generated_migrations/schema_v30.dart' as v30schema;
+import 'generated_migrations/schema_v31.dart' as v31schema;
+import 'generated_migrations/schema_v32.dart' as v32schema;
 
 /// Test doré de migration.
 ///
@@ -1924,7 +1934,7 @@ void main() {
       await old.close();
 
       final AppDatabase db = AppDatabase(schema.newConnection());
-      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+      await verifier.migrateAndValidate(db, 21);
       await db.customStatement(
         'INSERT INTO income_bands '
         '(id, code, label, min_xof, max_xof, sort_order, local_updated_at) '
@@ -2388,6 +2398,511 @@ void main() {
         throwsA(anything),
       );
 
+      await db.close();
+    },
+  );
+
+  // Le vocabulaire de qualification arrive par une route dédiée : la table est
+  // neuve et se peuple au premier pull, sans marqueur de miroir à effacer.
+  test('v23 -> v24 ouvre les statuts sans toucher aux saisies en file', () async {
+    final schema = await verifier.schemaAt(23);
+    final v23schema.DatabaseAtV23 old = v23schema.DatabaseAtV23(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-v23',
+        'rep_call_attempt',
+        'att-23',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    // La cible est la version COURANTE : `createTable` engendre la forme
+    // courante de `statuts_qualification`, colonnes des paliers suivants
+    // comprises, et s'arrêter plus tôt comparerait cette forme à un golden
+    // qui ne les a pas.
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    // La table s'ÉCRIT : « elle existe » se vérifierait aussi sur des colonnes
+    // au mauvais type. Un effet que ce client ignore passe, comme pour les
+    // motifs : aucun CHECK ne cite le vocabulaire du serveur.
+    await db.customStatement(
+      'INSERT INTO statuts_qualification '
+      '(code, id, label, effect, requires_callback, position) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-1', 'À rappeler', 'EFFET_INCONNU', 1, 0],
+    );
+    final QueryRow statut = await db
+        .customSelect('SELECT id, requires_callback FROM statuts_qualification')
+        .getSingle();
+    expect(statut.read<String>('id'), 'sq-1');
+    expect(statut.read<bool>('requires_callback'), isTrue);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-v23',
+    );
+    await db.close();
+  });
+
+  test(
+    'v24 -> v25 donne aux fiches leur statut, et la vue son libellé',
+    () async {
+      final schema = await verifier.schemaAt(24);
+      final v24schema.DatabaseAtV24 old = v24schema.DatabaseAtV24(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO representants '
+        '(id, full_name, phone_e164, departement_id, created_by_id, '
+        ' relation_status, client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'rep-24',
+          'Fiche d’avant',
+          '+221771234567',
+          'dep-1',
+          'me',
+          'AMBASSADEUR',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+        'VALUES (?, ?, ?)',
+        <Object?>['all', 'eyJ1cGRhdGVkQXQiOiIyMDI2LTA4LTAxIn0=', _iso],
+      );
+      await old.customStatement(
+        'INSERT INTO sync_state (collection, last_pulled_at) VALUES (?, ?)',
+        <Object?>['@lock:auth.refresh', _iso],
+      );
+      await old.close();
+
+      // Jusqu'au bout : une vue recréée prend toujours sa forme courante, la
+      // valider à un palier intermédiaire échouerait sur ses colonnes neuves.
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 27);
+
+      // Le curseur de pull est effacé, et lui seul : les fiches déjà en base
+      // redescendent avec leur statut au prochain pull.
+      final List<QueryRow> cursors = await db
+          .customSelect('SELECT collection FROM sync_state')
+          .get();
+      expect(
+        cursors.map((QueryRow r) => r.read<String>('collection')),
+        <String>['@lock:auth.refresh'],
+      );
+
+      // La fiche d'avant garde sa relation et n'invente pas de statut : elle
+      // s'affichera sous « A accepté » tant qu'un appel ne l'aura pas qualifiée.
+      final QueryRow avant = await db
+          .customSelect(
+            'SELECT relation_status, statut_qualification_id, '
+            'statut_qualification_label FROM representant_sync_view',
+          )
+          .getSingle();
+      expect(avant.read<String>('relation_status'), 'AMBASSADEUR');
+      expect(avant.read<String?>('statut_qualification_id'), isNull);
+      expect(avant.read<String?>('statut_qualification_label'), isNull);
+
+      await db.customStatement(
+        'INSERT INTO statuts_qualification (code, id, label, effect) '
+        'VALUES (?, ?, ?, ?)',
+        <Object?>['TRES_INTERESSE', 'sq-1', 'Très intéressé', 'REACHED'],
+      );
+      await db.customStatement(
+        'UPDATE representants SET statut_qualification_id = ? WHERE id = ?',
+        <Object?>['sq-1', 'rep-24'],
+      );
+      final QueryRow apres = await db
+          .customSelect(
+            'SELECT statut_qualification_label FROM representant_sync_view',
+          )
+          .getSingle();
+      expect(
+        apres.read<String?>('statut_qualification_label'),
+        'Très intéressé',
+      );
+      await db.close();
+    },
+  );
+
+  test('v25 -> v26 compte les appels à zéro et rouvre le curseur', () async {
+    final schema = await verifier.schemaAt(25);
+    final v25schema.DatabaseAtV25 old = v25schema.DatabaseAtV25(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' relation_status, client_created_at, local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-25',
+        'Fiche d’avant',
+        '+221771234567',
+        'dep-1',
+        'me',
+        'INCONNU',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.customStatement(
+      'INSERT INTO sync_state (collection, cursor, last_pulled_at) '
+      'VALUES (?, ?, ?)',
+      <Object?>['all', 'eyJ1cGRhdGVkQXQiOiIyMDI2LTA4LTAxIn0=', _iso],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 27);
+
+    expect(await db.customSelect('SELECT 1 FROM sync_state').get(), isEmpty);
+    final QueryRow fiche = await db
+        .customSelect('SELECT call_attempt_count FROM representant_sync_view')
+        .getSingle();
+    expect(fiche.read<int>('call_attempt_count'), 0);
+    await db.close();
+  });
+
+  test('v26 -> v27 donne à la vue l\'effet du statut', () async {
+    final schema = await verifier.schemaAt(26);
+    final v26schema.DatabaseAtV26 old = v26schema.DatabaseAtV26(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-1', 'À rappeler', 'SCHEDULE_CALLBACK'],
+    );
+    await old.customStatement(
+      'INSERT INTO representants '
+      '(id, full_name, phone_e164, departement_id, created_by_id, '
+      ' relation_status, statut_qualification_id, client_created_at, '
+      ' local_updated_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'rep-26',
+        'Fiche d’avant',
+        '+221771234567',
+        'dep-1',
+        'me',
+        'INCONNU',
+        'sq-1',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 27);
+
+    final QueryRow fiche = await db
+        .customSelect(
+          'SELECT statut_qualification_effect FROM representant_sync_view',
+        )
+        .getSingle();
+    expect(
+      fiche.read<String?>('statut_qualification_effect'),
+      'SCHEDULE_CALLBACK',
+    );
+    await db.close();
+  });
+
+  test('v27 -> v28 donne aux statuts leur délai de réessai', () async {
+    final schema = await verifier.schemaAt(27);
+    final v27schema.DatabaseAtV27 old = v27schema.DatabaseAtV27(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['PAS_DE_REPONSE', 'sq-1', 'Pas de réponse', 'UNREACHABLE'],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 28);
+
+    final QueryRow statut = await db
+        .customSelect('SELECT retry_after_minutes FROM statuts_qualification')
+        .getSingle();
+    expect(statut.read<int?>('retry_after_minutes'), isNull);
+    await db.close();
+  });
+
+  // La table est NEUVE : ce qui se vérifie ici, c'est qu'un appareil déjà en
+  // service la reçoive sans perdre ce qu'il porte, et qu'elle accepte une
+  // preuve dès la migration passée.
+  //
+  // La cible est la version COURANTE et non 29 : `createTable` engendre
+  // toujours la forme courante de la table, colonnes des paliers suivants
+  // comprises, et s'arrêter à 29 comparerait cette forme au golden de 29.
+  test(
+    'v28 -> courant ajoute les preuves d\'appel sans toucher au reste',
+    () async {
+      final schema = await verifier.schemaAt(28);
+      final v28schema.DatabaseAtV28 old = v28schema.DatabaseAtV28(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO representants '
+        '(id, full_name, phone_e164, departement_id, created_by_id, '
+        ' relation_status, client_created_at, local_updated_at) '
+        'VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        <Object?>[
+          'rep-28',
+          'Fiche d’avant',
+          '+221771234567',
+          'dep-1',
+          'me',
+          'INCONNU',
+          _iso,
+          _iso,
+        ],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+      expect(await db.select(db.preuvesAppel).get(), isEmpty);
+      await db
+          .into(db.preuvesAppel)
+          .insert(
+            PreuvesAppelCompanion.insert(
+              id: 'preuve-1',
+              kind: 'representant',
+              entityId: 'rep-28',
+              phoneE164: '+221771234567',
+              lanceAt: DateTime.parse(_iso),
+              mode: 'call',
+            ),
+          );
+      expect(
+        await db
+            .dernierePreuvePour(kind: 'representant', entityId: 'rep-28')
+            .getSingle()
+            .then((PreuvesAppelData p) => p.journalAt),
+        isNull,
+      );
+      expect(
+        await db
+            .customSelect('SELECT id FROM representants')
+            .getSingle()
+            .then((QueryRow row) => row.read<String>('id')),
+        'rep-28',
+      );
+      await db.close();
+    },
+  );
+
+  // Une preuve déjà posée par la v29 doit survivre : c'est un appel du jour
+  // qu'aucune tentative n'a encore consommé.
+  test('v29 -> v30 ouvre les preuves aux appels détectés', () async {
+    final schema = await verifier.schemaAt(29);
+    final v29schema.DatabaseAtV29 old = v29schema.DatabaseAtV29(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO preuves_appel '
+      '(id, kind, entity_id, phone_e164, lance_at, mode) '
+      'VALUES (?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'preuve-29',
+        'representant',
+        'rep-29',
+        '+221771234567',
+        _iso,
+        'call',
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 30);
+
+    final PreuvesAppelData ancienne = await db
+        .select(db.preuvesAppel)
+        .getSingle();
+    expect(ancienne.id, 'preuve-29');
+    expect(ancienne.signaleAt, isNull);
+    expect(ancienne.ignoreAt, isNull);
+
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-30',
+            kind: 'prospect',
+            entityId: 'pros-30',
+            phoneE164: '+221780000002',
+            lanceAt: DateTime.parse(_iso),
+            mode: 'detecte',
+            journalAt: Value<DateTime>(DateTime.parse(_iso)),
+          ),
+        );
+    expect(
+      await db.appelsAConsigner().get().then(
+        (List<AppelsAConsignerResult> l) => l.single.id,
+      ),
+      'preuve-30',
+    );
+    await db.close();
+  });
+
+  // Le statut descendu avant la v31 n'exige aucun motif et ne pose aucune
+  // relation : les deux colonnes arrivent vides et le prochain pull les remplit.
+  test('v30 -> v31 laisse les statuts déjà descendus utilisables', () async {
+    final schema = await verifier.schemaAt(30);
+    final v30schema.DatabaseAtV30 old = v30schema.DatabaseAtV30(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO statuts_qualification (code, id, label, effect) '
+      'VALUES (?, ?, ?, ?)',
+      <Object?>['A_RAPPELER', 'sq-30', 'À rappeler', 'SCHEDULE_CALLBACK'],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, 31);
+
+    final StatutQualificationRow statut = await db
+        .select(db.statutsQualification)
+        .getSingle();
+    expect(statut.code, 'A_RAPPELER');
+    expect(statut.requiresComment, isFalse);
+    expect(statut.relationStatus, isNull);
+    await db.close();
+  });
+
+  // Le verrou d'ouverture de fiche n'est pas une règle d'écran : c'est l'index
+  // partiel qui refuse la seconde. Un palier qui créerait la table sans lui
+  // passerait le doré et laisserait deux fiches ouvertes sur le terrain.
+  test('v31 -> courant pose le verrou d\'ouverture de fiche', () async {
+    final schema = await verifier.schemaAt(31);
+    final v31schema.DatabaseAtV31 old = v31schema.DatabaseAtV31(
+      schema.newConnection(),
+    );
+    await old.customStatement(
+      'INSERT INTO outbox '
+      '(id, entity_type, entity_id, op, payload, next_attempt_at, created_at) '
+      'VALUES (?, ?, ?, ?, ?, ?, ?)',
+      <Object?>[
+        'op-v31',
+        'rep_call_attempt',
+        'att-31',
+        'create',
+        '{}',
+        _iso,
+        _iso,
+      ],
+    );
+    await old.close();
+
+    final AppDatabase db = AppDatabase(schema.newConnection());
+    await verifier.migrateAndValidate(db, GeneratedHelper.versions.last);
+
+    expect(
+      await db
+          .customSelect('SELECT id FROM outbox')
+          .getSingle()
+          .then((QueryRow row) => row.read<String>('id')),
+      'op-v31',
+    );
+
+    await db
+        .into(db.ouverturesFiche)
+        .insert(
+          OuverturesFicheCompanion.insert(
+            id: 'ouv-32',
+            openedById: 'user-32',
+            representantId: const Value<String?>('rep-32'),
+            openedAt: DateTime.parse(_iso),
+          ),
+        );
+    await expectLater(
+      db
+          .into(db.ouverturesFiche)
+          .insert(
+            OuverturesFicheCompanion.insert(
+              id: 'ouv-32-bis',
+              openedById: 'user-32',
+              prospectId: const Value<String?>('pros-32'),
+              openedAt: DateTime.parse(_iso),
+            ),
+          ),
+      throwsA(isA<SqliteException>()),
+    );
+
+    // Exactement une cible : une ligne qui en porte deux ne décrit aucune fiche.
+    await expectLater(
+      db.customStatement(
+        'INSERT INTO ouvertures_fiche '
+        '(id, opened_by_id, representant_id, prospect_id, opened_at) '
+        'VALUES (?, ?, ?, ?, ?)',
+        <Object?>['ouv-32-ter', 'user-33', 'rep-32', 'pros-32', _iso],
+      ),
+      throwsA(isA<SqliteException>()),
+    );
+    await db.close();
+  });
+
+  // La fiche ouverte avant la migration n'a pas de chronomètre : elle n'en a
+  // pas un à zéro, elle n'en a pas du tout. Un palier qui recopierait la table
+  // au lieu d'ajouter la colonne perdrait au passage le verrou partiel.
+  test(
+    'v32 -> v33 laisse la fiche ouverte sans départ de chronomètre',
+    () async {
+      final schema = await verifier.schemaAt(32);
+      final v32schema.DatabaseAtV32 old = v32schema.DatabaseAtV32(
+        schema.newConnection(),
+      );
+      await old.customStatement(
+        'INSERT INTO ouvertures_fiche '
+        '(id, opened_by_id, representant_id, opened_at) VALUES (?, ?, ?, ?)',
+        <Object?>['ouv-32', 'user-32', 'rep-32', _iso],
+      );
+      await old.close();
+
+      final AppDatabase db = AppDatabase(schema.newConnection());
+      await verifier.migrateAndValidate(db, 33);
+
+      final OuverturesFicheData reprise = await db
+          .ouvertureCourante(openedById: 'user-32')
+          .getSingle();
+      expect(reprise.openedAt, DateTime.parse(_iso));
+      expect(reprise.firstInputAt, isNull);
+
+      await expectLater(
+        db
+            .into(db.ouverturesFiche)
+            .insert(
+              OuverturesFicheCompanion.insert(
+                id: 'ouv-33',
+                openedById: 'user-32',
+                prospectId: const Value<String?>('pros-33'),
+                openedAt: DateTime.parse(_iso),
+              ),
+            ),
+        throwsA(isA<SqliteException>()),
+      );
       await db.close();
     },
   );

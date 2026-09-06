@@ -42,16 +42,16 @@ import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
+  REPRESENTANT_RELATION_CHOICES,
   REPRESENTANT_RELATION_LABELS,
-  REPRESENTANT_RELATIONS,
   type RepresentantRelation,
 } from '@/lib/representant-filters';
 import type { RepresentantRow } from '@/lib/types';
 
-const RELATION_ITEMS = REPRESENTANT_RELATIONS.map((relation) => ({
-  value: relation,
-  label: REPRESENTANT_RELATION_LABELS[relation],
-}));
+const relationItems = (current: RepresentantRelation) =>
+  [...new Set<RepresentantRelation>([...REPRESENTANT_RELATION_CHOICES, current])].map(
+    (relation) => ({ value: relation, label: REPRESENTANT_RELATION_LABELS[relation] }),
+  );
 
 const WHATSAPP_ITEMS = WHATSAPP_STATUSES.map((status) => ({
   value: status,
@@ -720,7 +720,7 @@ export function RepresentantFormDialog({
             <div className="flex flex-col gap-1.5">
               <Label htmlFor={relationId}>Relation</Label>
               <Select
-                items={RELATION_ITEMS}
+                items={relationItems(representant.relationStatus)}
                 value={relationStatus}
                 onValueChange={(value) => {
                   if (value === null) return;
@@ -731,7 +731,7 @@ export function RepresentantFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {RELATION_ITEMS.map((item) => (
+                  {relationItems(representant.relationStatus).map((item) => (
                     <SelectItem key={item.value} value={item.value}>
                       {item.label}
                     </SelectItem>

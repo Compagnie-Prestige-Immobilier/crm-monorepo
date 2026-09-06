@@ -18,7 +18,7 @@ import '../../../ui/widgets/error_state.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../rappels/presentation/rappels_screen.dart' show quandRappeler;
 import '../../representant/presentation/representant_detail_screen.dart'
-    show relationLabel;
+    show StatutTag, libelleIssueRepresentant, relationLabel;
 
 /// Les personnes que J'AI appelées, du plus récent au plus ancien.
 ///
@@ -47,7 +47,7 @@ class MesContactsScreen extends ConsumerWidget {
       child: CpiScaffold(
         title: 'Mes contacts',
         subtitle: 'Les personnes que vous avez appelées',
-        leading: CpiBackButton(fallback: retour),
+        leading: canPopHere(context) ? CpiBackButton(fallback: retour) : null,
         body: grandPublic
             ? prospects
             : FTabs(
@@ -61,7 +61,7 @@ class MesContactsScreen extends ConsumerWidget {
                       onRetry: () =>
                           ref.invalidate(mesContactsRepresentantsProvider),
                       route: Routes.representantDetailFor,
-                      libelleIssue: _issueRepresentant,
+                      libelleIssue: libelleIssueRepresentant,
                       libelleStatut: relationLabel,
                     ),
                   ),
@@ -75,17 +75,6 @@ class MesContactsScreen extends ConsumerWidget {
 /// Les six motifs système portent déjà les libellés du terrain.
 String _issueProspect(String code) =>
     SystemCallReasons.byCode[code]?.label ?? code;
-
-String _issueRepresentant(String code) => switch (code) {
-  'REACHED' => 'Joint',
-  'PROSPECTS_PROMISED' => 'Fiches promises',
-  'UNREACHABLE' => 'Injoignable',
-  'CALLBACK' => 'À rappeler',
-  'REFUSED' => 'Refus',
-  'WRONG_NUMBER' => 'Faux numéro',
-  'OTHER' => 'Autre',
-  _ => code,
-};
 
 class _Liste extends ConsumerWidget {
   const _Liste({
@@ -165,7 +154,7 @@ class _ContactTile extends StatelessWidget {
         ? 'Dernier appel : date inconnue'
         : 'Dernier appel : ${quandRappeler(context, at, maintenant)}';
     final String? issue = contact.issue;
-    final String statut = libelleStatut(contact.statut);
+    final String statut = contact.statutLabel ?? libelleStatut(contact.statut);
 
     void ouvrir() {
       HapticFeedback.selectionClick().ignore();
@@ -217,8 +206,17 @@ class _ContactTile extends StatelessWidget {
                       spacing: CpiSpacing.xs,
                       runSpacing: CpiSpacing.xxs,
                       children: <Widget>[
-                        if (issue != null) CpiTag(libelleIssue(issue)),
-                        CpiTag(statut),
+                        if (contact.representant)
+                          StatutTag(
+                            relationStatus: contact.statut,
+                            statutLabel: contact.statutLabel,
+                            statutEffect: contact.statutEffect,
+                            lastCallOutcome: issue,
+                          )
+                        else ...<Widget>[
+                          if (issue != null) CpiTag(libelleIssue(issue)),
+                          CpiTag(statut),
+                        ],
                       ],
                     ),
                   ],

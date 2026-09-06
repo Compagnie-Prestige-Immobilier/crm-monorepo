@@ -87,10 +87,15 @@ class CallbackPicker extends StatefulWidget {
     required this.onChanged,
     this.required = false,
     this.title,
+    this.initial,
   });
 
   final DateTime now;
   final ValueChanged<DateTime?> onChanged;
+
+  /// Un instant déjà choisi, ou proposé d'office : le réessai d'un numéro
+  /// occupé arrive préréglé, l'appelant le déplace s'il veut.
+  final DateTime? initial;
 
   /// Remplace « Quand rappeler ? » quand la question se pose autrement : sur un
   /// appel abouti, le rappel est une option et non le résultat de l'appel.
@@ -106,10 +111,14 @@ class CallbackPicker extends StatefulWidget {
 }
 
 class _CallbackPickerState extends State<CallbackPicker> {
-  DateTime? _selected;
+  late DateTime? _selected = widget.initial;
 
   /// Vrai quand l'instant vient de la feuille et non d'une puce toute faite.
-  bool _perso = false;
+  late bool _perso =
+      widget.initial != null &&
+      !callbackSlots(widget.now).any(
+        (CallbackSlot slot) => slot.at == widget.initial,
+      );
 
   void _pick(DateTime? at, {bool perso = false}) {
     unawaited(HapticFeedback.selectionClick());

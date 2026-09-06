@@ -11,6 +11,8 @@ import { createGzip } from 'node:zlib';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
+import { LiveService } from '../live/live.service.js';
 import { NotificationsService } from '../notifications/notifications.service.js';
 import { DbDumpController } from './db-dump.controller.js';
 import { DbDumpService } from './db-dump.service.js';
@@ -198,6 +200,7 @@ export async function createDumpApp(harness: {
       DbDumpService,
       { provide: NotificationsService, useValue: harness.notifications.asService() },
       { provide: DUMP_RUNNER, useValue: harness.runner },
+      { provide: LiveService, useValue: new LiveService(fakeWorkspace()) },
     ],
   }).compile();
 

@@ -1,5 +1,10 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
-import { RepCallOutcome, Role } from '@crm/database';
+import {
+  RepCallOutcome,
+  RepresentantRelation,
+  Role,
+  StatutQualificationEffect,
+} from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -23,13 +28,17 @@ const REP = '0198a000-0000-7000-8000-000000000001';
 interface Tx {
   repCallAttempt: { createMany: MockFn };
   representantSuggestion: { create: MockFn };
-  representant: { findFirst: MockFn; update: MockFn };
+  representant: { findFirst: MockFn; update: MockFn; updateMany: MockFn };
+  representantRelationChange: { create: MockFn };
+  deviceCallDetection: { updateMany: MockFn };
+  ouvertureFiche: { findUnique: MockFn; updateMany: MockFn };
 }
 
 let tx: Tx;
 let db: {
   repCallAttempt: { findUnique: MockFn };
   representant: { findFirst: MockFn };
+  statutQualification: { findUnique: MockFn };
   $transaction: MockFn;
 };
 let service: RepCampaignsService;
@@ -49,6 +58,13 @@ beforeEach(() => {
     representant: {
       findFirst: vi.fn().mockResolvedValue(null),
       update: vi.fn().mockResolvedValue({ id: REP }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
+    },
+    representantRelationChange: { create: vi.fn() },
+    deviceCallDetection: { updateMany: vi.fn().mockResolvedValue({ count: 0 }) },
+    ouvertureFiche: {
+      findUnique: vi.fn().mockResolvedValue({ openedAt: new Date('2026-08-10T09:50:00.000Z') }),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
   };
   db = {
@@ -63,6 +79,7 @@ beforeEach(() => {
         lastCallAt: null,
       }),
     },
+    statutQualification: { findUnique: vi.fn().mockResolvedValue(null) },
     $transaction: vi.fn((fn: (client: Tx) => unknown) => fn(tx)),
   };
   service = new RepCampaignsService(
@@ -144,6 +161,70 @@ describe('correction du numéro pendant la qualification', () => {
     const result = await service.recordAttempt(ALICE, body);
     expect(result.status).toBe(RepCallAttemptApplyStatus.DUPLICATE);
     expect(db.$transaction).not.toHaveBeenCalled();
+  });
+});
+
+describe('preuve d’appel lue dans le journal Android', () => {
+  const trace = (): Record<string, unknown> =>
+    (tx.repCallAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0]
+      .data[0] ?? {};
+
+  it('la tentative garde le type, la durée et l’heure du journal', async () => {
+    const body = baseBody();
+    body.deviceCallType = 'sortant';
+    body.deviceCallDurationSeconds = 92;
+    body.deviceCallAt = '2026-08-10T10:00:14.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(trace()).toMatchObject({
+      deviceCallType: 'sortant',
+      deviceCallDurationSeconds: 92,
+      deviceCallAt: new Date('2026-08-10T10:00:14.000Z'),
+    });
+  });
+
+  it('sans preuve, la tentative reste déclarative', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(trace()).toMatchObject({
+      deviceCallType: null,
+      deviceCallDurationSeconds: null,
+      deviceCallAt: null,
+    });
+  });
+
+  // Le téléphone remonte souvent l'appel avant que la fiche soit consignée :
+  // sans ce rattrapage, la supervision compterait l'appel comme non consigné.
+  it('la tentative réclame les appels déjà détectés sur la même fiche', async () => {
+    const body = baseBody();
+    body.deviceCallAt = '2026-08-10T09:59:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    const [args] = tx.deviceCallDetection.updateMany.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({
+      performedById: ALICE.id,
+      representantId: REP,
+      attemptId: null,
+    });
+    expect(args.data).toEqual({ attemptId: body.id });
+    expect(args.where.OR).toEqual([
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-10T08:00:00.000Z'),
+          lte: new Date('2026-08-10T10:00:00.000Z'),
+        },
+      },
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-10T09:57:00.000Z'),
+          lte: new Date('2026-08-10T10:01:00.000Z'),
+        },
+      },
+    ]);
   });
 });
 
@@ -246,5 +327,373 @@ describe('périmètre par campagne', () => {
       db.representant.findFirst.mock.calls[0] as [{ where: Record<string, unknown> }]
     )[0].where;
     expect(where).not.toHaveProperty('OR');
+  });
+});
+
+describe('le statut de qualification commande l’issue', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000001';
+
+  const statut = (over: Record<string, unknown> = {}) => ({
+    id: STATUT,
+    code: 'INTERESSE',
+    label: 'Intéressé',
+    effect: StatutQualificationEffect.REACHED,
+    requiresCallback: false,
+    isActive: true,
+    ...over,
+  });
+
+  it('accepte une tentative SANS statut : les versions déjà installées n’en émettent pas', async () => {
+    const resultat = await service.recordAttempt(ALICE, baseBody());
+
+    expect(resultat.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(db.statutQualification.findUnique).not.toHaveBeenCalled();
+  });
+
+  it('enregistre le statut sur la tentative ET sur la fiche', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut());
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(tx.repCallAttempt.createMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: [expect.objectContaining({ statutQualificationId: STATUT })],
+      }),
+    );
+    expect(tx.representant.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ statutQualificationId: STATUT }),
+      }),
+    );
+  });
+
+  it('refuse une issue qui contredit le statut, au lieu d’enregistrer la contradiction', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut());
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.outcome = RepCallOutcome.UNREACHABLE;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_OUTCOME_STATUT_MISMATCH' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  it('refuse un statut inconnu', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(null);
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_QUALIFICATION_UNKNOWN' },
+    });
+  });
+
+  it('refuse un statut retiré depuis la dernière synchronisation', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut({ isActive: false }));
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_QUALIFICATION_INACTIVE' },
+    });
+  });
+
+  it('exige la date quand le statut arme un rappel, par la règle qui existait déjà', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut({
+        code: 'A_RAPPELER',
+        label: 'À rappeler',
+        effect: StatutQualificationEffect.SCHEDULE_CALLBACK,
+        requiresCallback: true,
+      }),
+    );
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.outcome = RepCallOutcome.CALLBACK;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_CAMPAIGN_CALLBACK_AT_REQUIRED' },
+    });
+
+    body.callbackAt = '2026-09-10T09:00:00.000Z';
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
+  });
+
+  // EB-04 : la garde vit sur le STATUT, pas sur l'issue. Aucun effet ne dérive
+  // l'issue OTHER, donc `validatedComment` ne peut pas couvrir ce cas.
+  it('refuse « Autre » sans motif, et l’accepte dès qu’un motif est écrit', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut({ code: 'AUTRE_JOINT', label: 'Autre joint', requiresComment: true }),
+    );
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+    body.comment = '   ';
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_STATUT_MOTIF_REQUIRED' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+
+    body.comment = 'A rappelé pour dire qu’il réfléchit.';
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
+  });
+
+  it('n’exige aucun motif d’un statut qui n’en demande pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut({ requiresComment: false }));
+    const body = baseBody();
+    body.statutQualificationId = STATUT;
+
+    expect((await service.recordAttempt(ALICE, body)).status).toBe(
+      RepCallAttemptApplyStatus.APPLIED,
+    );
+  });
+});
+
+describe('la relation que le statut pose sur la fiche', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000002';
+
+  const statut = (relationStatus: RepresentantRelation | null) => ({
+    id: STATUT,
+    code: 'NON_INTERESSE',
+    label: 'Non intéressé',
+    effect: StatutQualificationEffect.REFUSED,
+    requiresCallback: false,
+    relationStatus,
+    isActive: true,
+  });
+
+  const bascule = (): Record<string, unknown> | undefined =>
+    (
+      tx.representant.updateMany.mock.calls[0] as [{ data: Record<string, unknown> }] | undefined
+    )?.[0].data;
+
+  const refus = (): CreateRepCallAttemptDto => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.REFUSED;
+    body.statutQualificationId = STATUT;
+    return body;
+  };
+
+  it('bascule la relation quand le client n’en envoie pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+
+    await service.recordAttempt(ALICE, refus());
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.REFUS });
+  });
+
+  // EB-02 : le statut DÉCOULE de la réponse au rattachement. « Oui » avec
+  // « Refusé » n'est pas un dernier mot, c'est une contradiction.
+  it('refuse une réponse au rattachement que le statut contredit', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.AMBASSADEUR;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REP_RELATION_STATUT_MISMATCH' },
+    });
+    expect(tx.repCallAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  it('accepte la même réponse répétée par le client et par le statut', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.REFUS;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.REFUS });
+  });
+
+  // Les sept autres statuts joints portent une relation nulle : la question n'a
+  // pas lieu d'être posée, et y répondre quand même reste admis.
+  it('laisse le dernier mot au client quand le statut ne tranche pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(null));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.AMBASSADEUR;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(bascule()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
+  });
+
+  it('ne pose rien quand le statut ne tranche pas', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(null));
+
+    await service.recordAttempt(ALICE, refus());
+
+    expect(tx.representant.updateMany).not.toHaveBeenCalled();
+  });
+
+  // Une transition refusee ne doit PAS faire echouer l'enregistrement : la
+  // tentative vient du terrain, souvent hors ligne, et l'erreur serait
+  // definitive. La relation posee est simplement laissee de cote.
+  it('enregistre la tentative même quand la relation posée serait un retour en arrière', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: null,
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.CONTACTE));
+
+    const resultat = await service.recordAttempt(ALICE, refus());
+
+    expect(resultat.status).toBe(RepCallAttemptApplyStatus.APPLIED);
+    expect(tx.representant.updateMany).not.toHaveBeenCalled();
+  });
+
+  it('refuse en revanche la relation ILLÉGALE que le client affirme', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: RepresentantRelation.AMBASSADEUR,
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: null,
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(RepresentantRelation.REFUS));
+    const body = refus();
+    body.relationStatus = RepresentantRelation.CONTACTE;
+
+    await expect(service.recordAttempt(ALICE, body)).rejects.toMatchObject({
+      response: { code: 'REPRESENTANT_RELATION_TRANSITION_REFUSED' },
+    });
+  });
+});
+
+describe('EB-06 : la fiche non jointe repasse d’elle-même en file', () => {
+  const STATUT = '0198c000-0000-7000-8000-000000000003';
+
+  const statut = (retryAfterMinutes: number | null, over: Record<string, unknown> = {}) => ({
+    id: STATUT,
+    code: 'PAS_DE_REPONSE',
+    label: 'Pas de réponse',
+    effect: StatutQualificationEffect.UNREACHABLE,
+    requiresCallback: false,
+    retryAfterMinutes,
+    relationStatus: null,
+    isActive: true,
+    ...over,
+  });
+
+  const fiche = (): Record<string, unknown> | undefined =>
+    (tx.representant.update.mock.calls[0] as [{ data: Record<string, unknown> }] | undefined)?.[0]
+      .data;
+
+  const nonJoint = (): CreateRepCallAttemptDto => {
+    const body = baseBody();
+    body.outcome = RepCallOutcome.UNREACHABLE;
+    body.statutQualificationId = STATUT;
+    return body;
+  };
+
+  it('arme l’échéance à partir du délai du statut, comptée depuis l’heure du terrain', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(statut(120));
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).toMatchObject({
+      nextCallbackAt: new Date('2026-08-10T12:00:00.000Z'),
+      nextCallbackOrigine: 'AUTOMATIQUE',
+    });
+  });
+
+  it('n’arme rien quand le délai est nul : « Injoignable définitif » ne revient jamais', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' }),
+    );
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).toMatchObject({ nextCallbackAt: null, nextCallbackOrigine: null });
+  });
+
+  it('garde la date convenue et la marque PROMIS, délai de réessai ou non', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, {
+        code: 'A_RAPPELER',
+        label: 'À rappeler',
+        effect: StatutQualificationEffect.SCHEDULE_CALLBACK,
+        requiresCallback: true,
+      }),
+    );
+    const body = nonJoint();
+    body.outcome = RepCallOutcome.CALLBACK;
+    body.callbackAt = '2026-08-12T09:00:00.000Z';
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(fiche()).toMatchObject({
+      nextCallbackAt: new Date('2026-08-12T09:00:00.000Z'),
+      nextCallbackOrigine: 'PROMIS',
+    });
+  });
+
+  it('efface l’échéance quand la fiche est enfin jointe', async () => {
+    db.statutQualification.findUnique.mockResolvedValue(
+      statut(null, {
+        code: 'ACCEPTE',
+        label: 'Accepté',
+        effect: StatutQualificationEffect.REACHED,
+      }),
+    );
+    const body = nonJoint();
+    body.outcome = RepCallOutcome.REACHED;
+
+    await service.recordAttempt(ALICE, body);
+
+    expect(fiche()).toMatchObject({ nextCallbackAt: null, nextCallbackOrigine: null });
+  });
+
+  it('n’écrase pas l’échéance quand une tentative plus ancienne remonte après coup', async () => {
+    db.representant.findFirst.mockResolvedValue({
+      id: REP,
+      relationStatus: 'INCONNU',
+      whatsappStatus: 'NON_DEMANDE',
+      whatsappE164: null,
+      phoneE164: '+221771234567',
+      lastCallAt: new Date('2026-08-11T10:00:00.000Z'),
+    });
+    db.statutQualification.findUnique.mockResolvedValue(statut(120));
+
+    await service.recordAttempt(ALICE, nonJoint());
+
+    expect(fiche()).not.toHaveProperty('nextCallbackAt');
+  });
+});
+
+describe('EB-09 : la qualification ferme l’ouverture qui la chronométrait', () => {
+  const OUVERTURE = '0198d000-0000-7000-8000-000000000001';
+
+  it('attache la tentative à l’ouverture, dans la MÊME transaction', async () => {
+    const body = baseBody();
+    body.ouvertureId = OUVERTURE;
+
+    await service.recordAttempt(ALICE, body);
+
+    const [args] = tx.ouvertureFiche.updateMany.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({ id: OUVERTURE, openedById: ALICE.id, closedAt: null });
+    expect(args.data).toEqual({
+      closedAt: new Date('2026-08-10T10:00:00.000Z'),
+      closingAttemptId: body.id,
+    });
+  });
+
+  it('ne touche à rien quand la tentative ne porte pas d’ouverture', async () => {
+    await service.recordAttempt(ALICE, baseBody());
+
+    expect(tx.ouvertureFiche.updateMany).not.toHaveBeenCalled();
   });
 });

@@ -40,6 +40,11 @@ export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
   AUCUN: 'Aucune',
 };
 
+export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
+  COMPTANT: 'Comptant',
+  ECHELONNE: 'Échelonné',
+};
+
 export type SessionUser = Schemas['AuthUserDto'];
 export type UserRow = Schemas['UserDto'];
 export type RepresentantRow = Schemas['RepresentantDto'];
@@ -102,6 +107,13 @@ export const readsOnly = (role: Role | undefined): boolean =>
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
   role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
+
+/**
+ * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
+ * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
+ */
+export const peutTenirUneFiche = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
 
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>

@@ -277,9 +277,11 @@ function PresenceRows({
           <ScoreBadge score={user.score} />
         </td>
         <td className="px-5 py-2 text-right tabular-nums">
-          {formatActiveDuration(user.activeSecondsToday)}
+          <AnimatedNumber value={user.activeSecondsToday} format={formatActiveDuration} />
         </td>
-        <td className="px-5 py-2 text-right tabular-nums">{user.callsToday}</td>
+        <td className="px-5 py-2 text-right tabular-nums">
+          <AnimatedNumber value={user.callsToday} />
+        </td>
         <td className="px-5 py-2 text-right tabular-nums">
           {user.pendingOps === null ? 'Inconnu' : user.pendingOps}
         </td>

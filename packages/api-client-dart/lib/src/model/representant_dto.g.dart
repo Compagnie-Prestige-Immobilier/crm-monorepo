@@ -39,6 +39,14 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto relationStatus(RepresentantRelation relationStatus);
 
+  RepresentantDto statutQualificationId(String? statutQualificationId);
+
+  RepresentantDto statutQualificationLabel(String? statutQualificationLabel);
+
+  RepresentantDto statutQualificationEffect(
+    StatutQualificationEffect? statutQualificationEffect,
+  );
+
   RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus);
 
   RepresentantDto whatsappE164(String? whatsappE164);
@@ -61,11 +69,15 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto lastCallAt(DateTime? lastCallAt);
 
+  RepresentantDto callAttemptCount(num callAttemptCount);
+
   RepresentantDto lastCallById(String? lastCallById);
 
   RepresentantDto lastCallByName(String? lastCallByName);
 
   RepresentantDto nextCallbackAt(DateTime? nextCallbackAt);
+
+  RepresentantDto nextCallbackOrigine(RappelOrigine? nextCallbackOrigine);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
@@ -90,6 +102,9 @@ abstract class _$RepresentantDtoCWProxy {
     DateTime updatedAt,
     num prospectCount,
     RepresentantRelation relationStatus,
+    String? statutQualificationId,
+    String? statutQualificationLabel,
+    StatutQualificationEffect? statutQualificationEffect,
     WhatsappStatus whatsappStatus,
     String? whatsappE164,
     String? whatsappNumber,
@@ -101,9 +116,11 @@ abstract class _$RepresentantDtoCWProxy {
     bool? contacte,
     RepCallOutcome? lastCallOutcome,
     DateTime? lastCallAt,
+    num callAttemptCount,
     String? lastCallById,
     String? lastCallByName,
     DateTime? nextCallbackAt,
+    RappelOrigine? nextCallbackOrigine,
   });
 }
 
@@ -169,6 +186,19 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(relationStatus: relationStatus);
 
   @override
+  RepresentantDto statutQualificationId(String? statutQualificationId) =>
+      this(statutQualificationId: statutQualificationId);
+
+  @override
+  RepresentantDto statutQualificationLabel(String? statutQualificationLabel) =>
+      this(statutQualificationLabel: statutQualificationLabel);
+
+  @override
+  RepresentantDto statutQualificationEffect(
+    StatutQualificationEffect? statutQualificationEffect,
+  ) => this(statutQualificationEffect: statutQualificationEffect);
+
+  @override
   RepresentantDto whatsappStatus(WhatsappStatus whatsappStatus) =>
       this(whatsappStatus: whatsappStatus);
 
@@ -209,6 +239,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       this(lastCallAt: lastCallAt);
 
   @override
+  RepresentantDto callAttemptCount(num callAttemptCount) =>
+      this(callAttemptCount: callAttemptCount);
+
+  @override
   RepresentantDto lastCallById(String? lastCallById) =>
       this(lastCallById: lastCallById);
 
@@ -219,6 +253,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
   @override
   RepresentantDto nextCallbackAt(DateTime? nextCallbackAt) =>
       this(nextCallbackAt: nextCallbackAt);
+
+  @override
+  RepresentantDto nextCallbackOrigine(RappelOrigine? nextCallbackOrigine) =>
+      this(nextCallbackOrigine: nextCallbackOrigine);
 
   @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `RepresentantDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -244,6 +282,9 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? updatedAt = const $CopyWithPlaceholder(),
     Object? prospectCount = const $CopyWithPlaceholder(),
     Object? relationStatus = const $CopyWithPlaceholder(),
+    Object? statutQualificationId = const $CopyWithPlaceholder(),
+    Object? statutQualificationLabel = const $CopyWithPlaceholder(),
+    Object? statutQualificationEffect = const $CopyWithPlaceholder(),
     Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? whatsappNumber = const $CopyWithPlaceholder(),
@@ -255,9 +296,11 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
     Object? contacte = const $CopyWithPlaceholder(),
     Object? lastCallOutcome = const $CopyWithPlaceholder(),
     Object? lastCallAt = const $CopyWithPlaceholder(),
+    Object? callAttemptCount = const $CopyWithPlaceholder(),
     Object? lastCallById = const $CopyWithPlaceholder(),
     Object? lastCallByName = const $CopyWithPlaceholder(),
     Object? nextCallbackAt = const $CopyWithPlaceholder(),
+    Object? nextCallbackOrigine = const $CopyWithPlaceholder(),
   }) {
     return RepresentantDto(
       id: id == const $CopyWithPlaceholder()
@@ -324,6 +367,21 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.relationStatus
           // ignore: cast_nullable_to_non_nullable
           : relationStatus as RepresentantRelation,
+      statutQualificationId:
+          statutQualificationId == const $CopyWithPlaceholder()
+          ? _value.statutQualificationId
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationId as String?,
+      statutQualificationLabel:
+          statutQualificationLabel == const $CopyWithPlaceholder()
+          ? _value.statutQualificationLabel
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationLabel as String?,
+      statutQualificationEffect:
+          statutQualificationEffect == const $CopyWithPlaceholder()
+          ? _value.statutQualificationEffect
+          // ignore: cast_nullable_to_non_nullable
+          : statutQualificationEffect as StatutQualificationEffect?,
       whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
           ? _value.whatsappStatus
           // ignore: cast_nullable_to_non_nullable
@@ -368,6 +426,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.lastCallAt
           // ignore: cast_nullable_to_non_nullable
           : lastCallAt as DateTime?,
+      callAttemptCount: callAttemptCount == const $CopyWithPlaceholder()
+          ? _value.callAttemptCount
+          // ignore: cast_nullable_to_non_nullable
+          : callAttemptCount as num,
       lastCallById: lastCallById == const $CopyWithPlaceholder()
           ? _value.lastCallById
           // ignore: cast_nullable_to_non_nullable
@@ -380,6 +442,10 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
           ? _value.nextCallbackAt
           // ignore: cast_nullable_to_non_nullable
           : nextCallbackAt as DateTime?,
+      nextCallbackOrigine: nextCallbackOrigine == const $CopyWithPlaceholder()
+          ? _value.nextCallbackOrigine
+          // ignore: cast_nullable_to_non_nullable
+          : nextCallbackOrigine as RappelOrigine?,
     );
   }
 }
@@ -416,6 +482,9 @@ RepresentantDto _$RepresentantDtoFromJson(
       'updatedAt',
       'prospectCount',
       'relationStatus',
+      'statutQualificationId',
+      'statutQualificationLabel',
+      'statutQualificationEffect',
       'whatsappStatus',
       'whatsappE164',
       'whatsappNumber',
@@ -427,9 +496,11 @@ RepresentantDto _$RepresentantDtoFromJson(
       'contacte',
       'lastCallOutcome',
       'lastCallAt',
+      'callAttemptCount',
       'lastCallById',
       'lastCallByName',
       'nextCallbackAt',
+      'nextCallbackOrigine',
     ],
   );
   final val = RepresentantDto(
@@ -457,6 +528,22 @@ RepresentantDto _$RepresentantDtoFromJson(
         _$RepresentantRelationEnumMap,
         v,
         unknownValue: RepresentantRelation.unknownDefaultOpenApi,
+      ),
+    ),
+    statutQualificationId: $checkedConvert(
+      'statutQualificationId',
+      (v) => v as String?,
+    ),
+    statutQualificationLabel: $checkedConvert(
+      'statutQualificationLabel',
+      (v) => v as String?,
+    ),
+    statutQualificationEffect: $checkedConvert(
+      'statutQualificationEffect',
+      (v) => $enumDecodeNullable(
+        _$StatutQualificationEffectEnumMap,
+        v,
+        unknownValue: StatutQualificationEffect.unknownDefaultOpenApi,
       ),
     ),
     whatsappStatus: $checkedConvert(
@@ -487,49 +574,65 @@ RepresentantDto _$RepresentantDtoFromJson(
       'lastCallAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    callAttemptCount: $checkedConvert('callAttemptCount', (v) => v as num),
     lastCallById: $checkedConvert('lastCallById', (v) => v as String?),
     lastCallByName: $checkedConvert('lastCallByName', (v) => v as String?),
     nextCallbackAt: $checkedConvert(
       'nextCallbackAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    nextCallbackOrigine: $checkedConvert(
+      'nextCallbackOrigine',
+      (v) => $enumDecodeNullable(
+        _$RappelOrigineEnumMap,
+        v,
+        unknownValue: RappelOrigine.unknownDefaultOpenApi,
+      ),
+    ),
   );
   return val;
 });
 
-Map<String, dynamic> _$RepresentantDtoToJson(RepresentantDto instance) =>
-    <String, dynamic>{
-      'id': instance.id,
-      'fullName': instance.fullName,
-      'phoneE164': instance.phoneE164,
-      'notes': instance.notes,
-      'rev': instance.rev,
-      'departementId': instance.departementId,
-      'departementName': instance.departementName,
-      'iefId': instance.iefId,
-      'iefName': instance.iefName,
-      'createdById': instance.createdById,
-      'createdByName': instance.createdByName,
-      'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
-      'createdAt': instance.createdAt.toIso8601String(),
-      'updatedAt': instance.updatedAt.toIso8601String(),
-      'prospectCount': instance.prospectCount,
-      'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
-      'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
-      'whatsappE164': instance.whatsappE164,
-      'whatsappNumber': instance.whatsappNumber,
-      'profession': instance.profession,
-      'prenom': instance.prenom,
-      'etablissement': instance.etablissement,
-      'syndicat': instance.syndicat,
-      'connaitUES': instance.connaitUES,
-      'contacte': instance.contacte,
-      'lastCallOutcome': _$RepCallOutcomeEnumMap[instance.lastCallOutcome],
-      'lastCallAt': instance.lastCallAt?.toIso8601String(),
-      'lastCallById': instance.lastCallById,
-      'lastCallByName': instance.lastCallByName,
-      'nextCallbackAt': instance.nextCallbackAt?.toIso8601String(),
-    };
+Map<String, dynamic> _$RepresentantDtoToJson(
+  RepresentantDto instance,
+) => <String, dynamic>{
+  'id': instance.id,
+  'fullName': instance.fullName,
+  'phoneE164': instance.phoneE164,
+  'notes': instance.notes,
+  'rev': instance.rev,
+  'departementId': instance.departementId,
+  'departementName': instance.departementName,
+  'iefId': instance.iefId,
+  'iefName': instance.iefName,
+  'createdById': instance.createdById,
+  'createdByName': instance.createdByName,
+  'clientCreatedAt': instance.clientCreatedAt.toIso8601String(),
+  'createdAt': instance.createdAt.toIso8601String(),
+  'updatedAt': instance.updatedAt.toIso8601String(),
+  'prospectCount': instance.prospectCount,
+  'relationStatus': _$RepresentantRelationEnumMap[instance.relationStatus]!,
+  'statutQualificationId': instance.statutQualificationId,
+  'statutQualificationLabel': instance.statutQualificationLabel,
+  'statutQualificationEffect':
+      _$StatutQualificationEffectEnumMap[instance.statutQualificationEffect],
+  'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
+  'whatsappE164': instance.whatsappE164,
+  'whatsappNumber': instance.whatsappNumber,
+  'profession': instance.profession,
+  'prenom': instance.prenom,
+  'etablissement': instance.etablissement,
+  'syndicat': instance.syndicat,
+  'connaitUES': instance.connaitUES,
+  'contacte': instance.contacte,
+  'lastCallOutcome': _$RepCallOutcomeEnumMap[instance.lastCallOutcome],
+  'lastCallAt': instance.lastCallAt?.toIso8601String(),
+  'callAttemptCount': instance.callAttemptCount,
+  'lastCallById': instance.lastCallById,
+  'lastCallByName': instance.lastCallByName,
+  'nextCallbackAt': instance.nextCallbackAt?.toIso8601String(),
+  'nextCallbackOrigine': _$RappelOrigineEnumMap[instance.nextCallbackOrigine],
+};
 
 const _$RepresentantRelationEnumMap = {
   RepresentantRelation.INCONNU: 'INCONNU',
@@ -537,6 +640,15 @@ const _$RepresentantRelationEnumMap = {
   RepresentantRelation.AMBASSADEUR: 'AMBASSADEUR',
   RepresentantRelation.REFUS: 'REFUS',
   RepresentantRelation.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$StatutQualificationEffectEnumMap = {
+  StatutQualificationEffect.REACHED: 'REACHED',
+  StatutQualificationEffect.REFUSED: 'REFUSED',
+  StatutQualificationEffect.SCHEDULE_CALLBACK: 'SCHEDULE_CALLBACK',
+  StatutQualificationEffect.UNREACHABLE: 'UNREACHABLE',
+  StatutQualificationEffect.WRONG_NUMBER: 'WRONG_NUMBER',
+  StatutQualificationEffect.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$WhatsappStatusEnumMap = {
@@ -556,4 +668,10 @@ const _$RepCallOutcomeEnumMap = {
   RepCallOutcome.WRONG_NUMBER: 'WRONG_NUMBER',
   RepCallOutcome.OTHER: 'OTHER',
   RepCallOutcome.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
+const _$RappelOrigineEnumMap = {
+  RappelOrigine.PROMIS: 'PROMIS',
+  RappelOrigine.AUTOMATIQUE: 'AUTOMATIQUE',
+  RappelOrigine.unknownDefaultOpenApi: 'unknown_default_open_api',
 };

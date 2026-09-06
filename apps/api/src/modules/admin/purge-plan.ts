@@ -3,7 +3,16 @@
 export const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
+  // Avant `commercialAccounts` : une détection pointe son téléconseiller en
+  // Restrict, et sa fiche en cascade.
+  'deviceCallDetections',
+  // Avant `commercialAccounts` : une ouverture pointe son teleconseiller et son
+  // liberateur en Restrict, et sa fiche en cascade.
+  'ouverturesFiche',
   'callAttempts',
+  // Avant `commercialAccounts` : une reaffectation pointe son beneficiaire et
+  // son auteur en Restrict, et sa campagne en cascade.
+  'lotExportReaffectations',
   'lotExportItems',
   'lotsExport',
   // Avant `commercialAccounts` : un rappel planifié pointe son téléconseiller
@@ -93,8 +102,14 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
   {
     key: 'tentatives',
     label: 'Tentatives d’appel',
-    hint: 'Historique des appels passés.',
-    steps: ['repSuggestions', 'repCallAttempts', 'callAttempts'],
+    hint: 'Appels consignés, appels seulement vus par le téléphone, et ouvertures de fiche.',
+    steps: [
+      'repSuggestions',
+      'repCallAttempts',
+      'callAttempts',
+      'deviceCallDetections',
+      'ouverturesFiche',
+    ],
     requires: [],
   },
   {
@@ -108,7 +123,7 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     key: 'lotsExport',
     label: 'Campagnes',
     hint: 'Campagnes de fiches réparties pour le terrain.',
-    steps: ['lotExportItems', 'lotsExport'],
+    steps: ['lotExportReaffectations', 'lotExportItems', 'lotsExport'],
     requires: [],
   },
   {

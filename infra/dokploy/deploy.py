@@ -83,11 +83,13 @@ API_DOMAIN = setting("API_DOMAIN", "go.cpi-chues.com")
 WEB_DOMAIN = setting("WEB_DOMAIN", "go-admin.cpi-chues.com")
 
 PG_NAME = "cpi-go-postgres"
+REDIS_NAME = "cpi-go-redis"
 API_NAME = "cpi-go-api"
 WEB_NAME = "cpi-go-web"
 SSH_KEY_NAME = "cpi-go-deploy"
 APK_RELEASE_MOUNT = "/repo/storage/releases"
-APK_RELEASE_VOLUME = "cpi-go-apk-releases"
+# Nom RÉEL du volume en production : il porte les APK publiés, on ne le renomme pas.
+APK_RELEASE_VOLUME = "cpi-go-releases"
 # Exports intégraux de la base, demandés depuis Paramètres. Même motif que les
 # APK, et il n'est pas facultatif : l'état du travail vit en base et nomme un
 # fichier. Sans volume, un redéploiement emporte le fichier et laisse l'écran
@@ -320,10 +322,17 @@ def load_secrets() -> dict[str, str]:
     existing = _read_kv(SECRETS_FILE)
     if existing.get("PG_PASSWORD"):
         info(f"secrets relus depuis {SECRETS_FILE.name}")
+        # Redis est arrivé après les premiers déploiements : un fichier plus
+        # ancien n'a pas ce secret, on le complète sans toucher aux autres.
+        if not existing.get("REDIS_PASSWORD"):
+            existing["REDIS_PASSWORD"] = _token(32)
+            _write_kv(SECRETS_FILE, existing, f"Complété le {time.strftime('%Y-%m-%dT%H:%M:%SZ')}")
+            ok("REDIS_PASSWORD engendré et ajouté")
         return existing
 
     values = {
         "PG_PASSWORD": _token(32),
+        "REDIS_PASSWORD": _token(32),
         "JWT_ACCESS": _token(48),
         "JWT_REFRESH": _token(48),
         "ADMIN_PASSWORD": _token(18),
@@ -427,6 +436,9 @@ def find_existing() -> dict[str, str]:
         for db in environment.get("postgres", []) or []:
             if db.get("name") == PG_NAME:
                 found["POSTGRES_ID"] = db.get("postgresId", "")
+        for cache in environment.get("redis", []) or []:
+            if cache.get("name") == REDIS_NAME:
+                found["REDIS_ID"] = cache.get("redisId", "")
     return found
 
 
@@ -459,6 +471,24 @@ def cmd_provision() -> None:
         )
         ids["POSTGRES_ID"] = (result or {}).get("postgresId", "")
         ok(f"créée, {ids['POSTGRES_ID']}")
+
+    step("Cache Redis")
+    if ids.get("REDIS_ID"):
+        ok(f"existe déjà, {ids['REDIS_ID']}")
+    else:
+        result = call(
+            "redis.create",
+            {
+                "environmentId": ENVIRONMENT_ID,
+                "name": REDIS_NAME,
+                "appName": REDIS_NAME,
+                "databasePassword": secrets_["REDIS_PASSWORD"],
+                "dockerImage": "redis:8-alpine",
+                "description": "Cache des agrégats CPI GO, sans persistance",
+            },
+        )
+        ids["REDIS_ID"] = (result or {}).get("redisId", "")
+        ok(f"créé, {ids['REDIS_ID']}")
 
     for key, name, description in (
         ("API_ID", API_NAME, "API NestJS, source du contrat OpenAPI"),
@@ -520,6 +550,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             "PORT=3001",
             "LOG_LEVEL=info",
             f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{names['postgres']}:5432/crm?schema=public",
+            f"REDIS_URL=redis://:{s['REDIS_PASSWORD']}@{names['redis']}:6379/0",
             f"JWT_ACCESS_SECRET={s['JWT_ACCESS']}",
             f"JWT_REFRESH_SECRET={s['JWT_REFRESH']}",
             "JWT_ACCESS_TTL=15m",
@@ -534,7 +565,10 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             # Swagger fermé : le contrat est publié par la CI, pas par le serveur.
             "API_DOCS_ENABLED=false",
             f"APK_RELEASE_DIR={APK_RELEASE_MOUNT}",
+            # Flotte NAT : une IP publique partagée par tout le parc.
+            "APK_DOWNLOAD_RATE_LIMIT=50000",
             f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
+            "DB_DUMP_ENABLED=true",
             "BUSINESS_TIME_ZONE=Africa/Dakar",
             "PHONE_DEFAULT_REGION=SN",
             "SYNC_MAX_BATCH_SIZE=200",
@@ -627,7 +661,7 @@ def service_app_names(ids: dict[str, str]) -> dict[str, str]:
     variables ». Le script signalait une réussite en ayant configuré à coup sûr
     une panne. Une résolution impossible doit interrompre.
     """
-    names = {"postgres": PG_NAME, "api": API_NAME, "web": WEB_NAME}
+    names = {"postgres": PG_NAME, "redis": REDIS_NAME, "api": API_NAME, "web": WEB_NAME}
     if ids.get("POSTGRES_ID"):
         db = call("postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET") or {}
         appname = db.get("appName")
@@ -636,6 +670,12 @@ def service_app_names(ids: dict[str, str]) -> dict[str, str]:
                 "nom de service Docker de Postgres illisible : DATABASE_URL serait fausse."
             )
         names["postgres"] = appname
+    if ids.get("REDIS_ID"):
+        cache = call("redis.one", {"redisId": ids["REDIS_ID"]}, method="GET") or {}
+        appname = cache.get("appName")
+        if not appname:
+            raise DokployError("nom de service Docker de Redis illisible : REDIS_URL serait fausse.")
+        names["redis"] = appname
     for key, slot in (("API_ID", "api"), ("WEB_ID", "web")):
         if ids.get(key):
             app = call("application.one", {"applicationId": ids[key]}, method="GET") or {}
@@ -785,6 +825,13 @@ def cmd_deploy() -> None:
     step("Démarrage de Postgres")
     call("postgres.deploy", {"postgresId": ids["POSTGRES_ID"]})
     ok("demandé")
+
+    step("Démarrage de Redis")
+    if ids.get("REDIS_ID"):
+        call("redis.deploy", {"redisId": ids["REDIS_ID"]})
+        ok("demandé")
+    else:
+        warn("absent : l'API démarre sans cache. Lancez `provision` pour le créer.")
     # Le déploiement est asynchrone : on laisse la base se lever avant
     # d'enchaîner, sinon la première migration tombe sur un port fermé.
     info("attente de 45 s avant de déployer l'API…")
@@ -1197,8 +1244,9 @@ def cmd_status() -> None:
     for environment in project.get("environments", []) or []:
         apps = environment.get("applications", []) or []
         dbs = environment.get("postgres", []) or []
+        caches = environment.get("redis", []) or []
         print(f"\n  environnement {environment.get('name', '?')}")
-        if not apps and not dbs:
+        if not apps and not dbs and not caches:
             info("  (vide)")
         # Le défaut '?' n'est pas de la coquetterie : `.get('name')` sans
         # défaut rend None, et `format(None, '24s')` lève une TypeError que
@@ -1210,6 +1258,11 @@ def cmd_status() -> None:
             print(
                 f"    postgres  {db.get('name') or '?':24s} "
                 f"{db.get('applicationStatus', '?')}"
+            )
+        for cache in caches:
+            print(
+                f"    redis     {cache.get('name') or '?':24s} "
+                f"{cache.get('applicationStatus', '?')}"
             )
         for app in apps:
             domains = ", ".join(d.get("host", "") for d in app.get("domains", []) or [])

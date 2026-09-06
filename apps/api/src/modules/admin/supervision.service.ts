@@ -3,7 +3,12 @@ import { Prisma, Role } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { performanceScore } from './performance-score.js';
-import { REP_ANSWERED_OUTCOMES, UNUSABLE_OUTCOMES } from '../analytics/pilotage.sql.js';
+import {
+  NOT_REACHED_OUTCOMES,
+  REP_ARBITRAGE,
+  REP_JOINT_OUTCOMES,
+  REP_STATUT_JOIN,
+} from '../analytics/pilotage.sql.js';
 import type { WorkShiftDto } from '../analytics/supervision.dto.js';
 import { DEFAULT_SHIFTS, WorkShiftsService } from '../analytics/work-shifts.service.js';
 import {
@@ -381,8 +386,8 @@ export class SupervisionService {
    *
    * Les issues comptées reprennent celles de l'écran d'activité
    * (`analytics/supervision.service.ts`) : un prospect est joint sur toute issue
-   * hors `UNUSABLE_OUTCOMES`, un représentant sur `REP_ANSWERED_OUTCOMES`, et un
-   * représentant n'est qualifié que sur sa DERNIÈRE réponse du jour.
+   * hors `NOT_REACHED_OUTCOMES`, un représentant sur `REP_JOINT_OUTCOMES`, et un
+   * représentant n'est qualifié que sur sa DERNIÈRE réponse tranchée du jour.
    */
   private callMetricsToday(
     dayStart: Date,
@@ -410,14 +415,14 @@ export class SupervisionService {
         SELECT
           "performedById" AS "userId", "clientCreatedAt", "createdAt",
           'prospect' AS famille, "prospectId" AS cible,
-          ("outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joint,
+          ("outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint,
           ("outcome" = 'METHOD_OBTAINED')::int          AS qualifie
         FROM "call_attempts" WHERE ${dayWindow}
         UNION ALL
         SELECT
           "performedById", "clientCreatedAt", "createdAt",
           'representant', "representantId",
-          ("outcome" IN ${REP_ANSWERED_OUTCOMES})::int, 0
+          ("outcome" IN ${REP_JOINT_OUTCOMES})::int, 0
         FROM "rep_call_attempts" WHERE ${dayWindow}
       ),
       situes AS (
@@ -446,10 +451,11 @@ export class SupervisionService {
       -- du jour qui vaut, et elle revient à qui l'a obtenue.
       derniere_reponse AS (
         SELECT DISTINCT ON (rca."representantId")
-          rca."performedById"              AS "userId",
-          (rca."outcome" = 'REACHED')::int AS qualifie
+          rca."performedById"                    AS "userId",
+          (${REP_ARBITRAGE} = 'AMBASSADEUR')::int AS qualifie
         FROM "rep_call_attempts" rca
-        WHERE rca."outcome" IN ${REP_ANSWERED_OUTCOMES}
+        ${REP_STATUT_JOIN}
+        WHERE ${REP_ARBITRAGE} IS NOT NULL
           AND rca."clientCreatedAt" >= ${dayStart} AND rca."clientCreatedAt" < ${dayEnd}
         ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
       ),

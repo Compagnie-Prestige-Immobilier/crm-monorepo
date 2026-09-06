@@ -28,7 +28,6 @@ import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/cpi_resume_banner.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../../ui/widgets/referentials_banner.dart';
-import 'representant_detail_screen.dart' show relationLabel;
 
 class RepresentantFormScreen extends ConsumerStatefulWidget {
   const RepresentantFormScreen({
@@ -80,10 +79,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
   String? _iefId;
   String _whatsappStatus = WhatsappStatus.nonDemande.code;
   String? _professionId;
-  String? _relationStatus;
-
-  /// Le statut au chargement : c'est l'écart avec lui qui vaut bascule.
-  String? _relationInitial;
   bool _saving = false;
   String? _error;
 
@@ -210,8 +205,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           );
           _setProfession(existing.profession ?? '');
           _notes.text = existing.notes ?? '';
-          _relationStatus = existing.relationStatus;
-          _relationInitial = existing.relationStatus;
         });
         await _labelDepartement(existing.departementId);
         if (existing.iefId != null) await _labelIef(existing.iefId!);
@@ -341,7 +334,8 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
           .read(apiPortProvider)
           .lookupRepresentantByPhone(e164);
       if (!mounted) return;
-      setState(() => _remoteMatch = remote.found ? remote : null);
+      final bool autre = remote.found && remote.representant?.id != _entityId;
+      setState(() => _remoteMatch = autre ? remote : null);
     } on ApiException {
       if (mounted) setState(() => _remoteMatch = null);
     }
@@ -453,11 +447,6 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               whatsappStatus: _whatsappStatus,
               whatsappE164: Phone.toE164(_whatsapp.text),
               profession: profession.isEmpty ? null : profession,
-              // Seulement si le geste a eu lieu : le serveur n'écrit une ligne
-              // d'histoire que sur une bascule réelle.
-              relationStatus: _relationStatus == _relationInitial
-                  ? null
-                  : _relationStatus,
               draftId: _draftId,
             );
       } else {
@@ -613,21 +602,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
     List<Departement> departements,
     List<Ief> iefs,
   ) => switch (_etape) {
-    0 => <Widget>[
-      // La relation ne se règle que sur une fiche qui existe, et elle a sa
-      // place auprès de la personne, pas de son lieu de travail.
-      if (!_creation && _relationStatus != null) ...<Widget>[
-        _ChampRelation(
-          status: _relationStatus!,
-          onChanged: (String choix) {
-            setState(() => _relationStatus = choix);
-            markDraftDirty();
-          },
-        ),
-        const SizedBox(height: CpiSpacing.md),
-      ],
-      ..._identite(),
-    ],
+    0 => _identite(),
     1 => _lieu(regions, departements, iefs),
     _ => _contact(),
   };
@@ -919,39 +894,6 @@ class _WhatsappPicker extends StatelessWidget {
         ),
       ],
     ],
-  );
-}
-
-/// Où en est la relation. Le commercial la règle depuis le terrain : c'est lui
-/// qui sait qu'un représentant vient d'accepter de présenter ses collègues, et
-/// il n'a pas le panneau web sous la main.
-class _ChampRelation extends StatelessWidget {
-  const _ChampRelation({required this.status, required this.onChanged});
-
-  final String status;
-  final ValueChanged<String> onChanged;
-
-  static const List<String> _choix = <String>[
-    'INCONNU',
-    'CONTACTE',
-    'AMBASSADEUR',
-    'REFUS',
-  ];
-
-  @override
-  Widget build(BuildContext context) => CpiChoiceGroup<String>(
-    label: 'Relation',
-    icon: PhosphorIconsRegular.handshake,
-    value: status,
-    options: <CpiChoice<String>>[
-      for (final String valeur in _choix)
-        CpiChoice<String>(value: valeur, label: relationLabel(valeur)),
-    ],
-    // Se corrige en touchant un autre choix : la relation a toujours un état,
-    // elle ne se vide pas.
-    onChanged: (String valeur) {
-      if (valeur != status) onChanged(valeur);
-    },
   );
 }
 

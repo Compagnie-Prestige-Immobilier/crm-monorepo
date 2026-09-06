@@ -28,6 +28,10 @@ class CreateRepCallAttemptDto {
 
     required this.outcome,
 
+    this.statutQualificationId,
+
+    this.ouvertureId,
+
     this.promisedProspects,
 
     this.comment,
@@ -63,6 +67,12 @@ class CreateRepCallAttemptDto {
     required this.clientCreatedAt,
 
     this.callbackAt,
+
+    this.deviceCallType,
+
+    this.deviceCallDurationSeconds,
+
+    this.deviceCallAt,
   });
 
   /// UUID v7 engendré par le client. Clé d’idempotence.
@@ -79,6 +89,18 @@ class CreateRepCallAttemptDto {
     unknownEnumValue: RepCallOutcome.unknownDefaultOpenApi,
   )
   final RepCallOutcome outcome;
+
+  /// Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.
+  @JsonKey(
+    name: r'statutQualificationId',
+    required: false,
+    includeIfNull: false,
+  )
+  final String? statutQualificationId;
+
+  /// Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.
+  @JsonKey(name: r'ouvertureId', required: false, includeIfNull: false)
+  final String? ouvertureId;
 
   /// Fiches promises. Admis uniquement pour l’issue PROSPECTS_PROMISED.
   // minimum: 0
@@ -168,6 +190,30 @@ class CreateRepCallAttemptDto {
   @JsonKey(name: r'callbackAt', required: false, includeIfNull: false)
   final DateTime? callbackAt;
 
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonKey(
+    name: r'deviceCallType',
+    required: false,
+    includeIfNull: false,
+    unknownEnumValue:
+        CreateRepCallAttemptDtoDeviceCallTypeEnum.unknownDefaultOpenApi,
+  )
+  final CreateRepCallAttemptDtoDeviceCallTypeEnum? deviceCallType;
+
+  /// Durée en secondes lue dans le journal d’appels Android.
+  // minimum: 0
+  // maximum: 86400
+  @JsonKey(
+    name: r'deviceCallDurationSeconds',
+    required: false,
+    includeIfNull: false,
+  )
+  final num? deviceCallDurationSeconds;
+
+  /// Heure de l’appel lue dans le journal d’appels Android.
+  @JsonKey(name: r'deviceCallAt', required: false, includeIfNull: false)
+  final DateTime? deviceCallAt;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is CreateRepCallAttemptDto &&
@@ -177,6 +223,8 @@ class CreateRepCallAttemptDto {
                 id,
                 representantId,
                 outcome,
+                statutQualificationId,
+                ouvertureId,
                 promisedProspects,
                 comment,
                 relationStatus,
@@ -195,11 +243,16 @@ class CreateRepCallAttemptDto {
                 syndicat,
                 clientCreatedAt,
                 callbackAt,
+                deviceCallType,
+                deviceCallDurationSeconds,
+                deviceCallAt,
               ],
               [
                 other.id,
                 other.representantId,
                 other.outcome,
+                other.statutQualificationId,
+                other.ouvertureId,
                 other.promisedProspects,
                 other.comment,
                 other.relationStatus,
@@ -218,6 +271,9 @@ class CreateRepCallAttemptDto {
                 other.syndicat,
                 other.clientCreatedAt,
                 other.callbackAt,
+                other.deviceCallType,
+                other.deviceCallDurationSeconds,
+                other.deviceCallAt,
               ],
             );
   }
@@ -229,6 +285,8 @@ class CreateRepCallAttemptDto {
         id,
         representantId,
         outcome,
+        statutQualificationId,
+        ouvertureId,
         promisedProspects,
         comment,
         relationStatus,
@@ -247,6 +305,9 @@ class CreateRepCallAttemptDto {
         syndicat,
         clientCreatedAt,
         callbackAt,
+        deviceCallType,
+        deviceCallDurationSeconds,
+        deviceCallAt,
       ]);
 
   factory CreateRepCallAttemptDto.fromJson(Map<String, dynamic> json) =>
@@ -258,4 +319,50 @@ class CreateRepCallAttemptDto {
   String toString() {
     return toJson().toString();
   }
+}
+
+/// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+enum CreateRepCallAttemptDtoDeviceCallTypeEnum {
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'sortant')
+  sortant(r'sortant'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'entrant')
+  entrant(r'entrant'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'manque')
+  manque(r'manque'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'rejete')
+  rejete(r'rejete'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'bloque')
+  bloque(r'bloque'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'messagerie')
+  messagerie(r'messagerie'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'externe')
+  externe(r'externe'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'inconnu')
+  inconnu(r'inconnu'),
+
+  /// Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.
+  @JsonValue(r'unknown_default_open_api')
+  unknownDefaultOpenApi(r'unknown_default_open_api');
+
+  const CreateRepCallAttemptDtoDeviceCallTypeEnum(this.value);
+
+  final String value;
+
+  @override
+  String toString() => value;
 }

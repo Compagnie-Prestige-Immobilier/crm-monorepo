@@ -31,6 +31,10 @@ abstract class _$SupervisionActivityDtoCWProxy {
     List<SupervisionHistogramBarDto> prospectsByRepresentant,
   );
 
+  SupervisionActivityDto repQualificationStatuses(
+    SupervisionRepStatutsDto? repQualificationStatuses,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -47,6 +51,7 @@ abstract class _$SupervisionActivityDtoCWProxy {
     List<SupervisionScoreDto> scores,
     List<SupervisionHistogramBarDto> prospectsByTeleconseiller,
     List<SupervisionHistogramBarDto> prospectsByRepresentant,
+    SupervisionRepStatutsDto? repQualificationStatuses,
   });
 }
 
@@ -95,6 +100,11 @@ class _$SupervisionActivityDtoCWProxyImpl
   ) => this(prospectsByRepresentant: prospectsByRepresentant);
 
   @override
+  SupervisionActivityDto repQualificationStatuses(
+    SupervisionRepStatutsDto? repQualificationStatuses,
+  ) => this(repQualificationStatuses: repQualificationStatuses);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SupervisionActivityDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -111,6 +121,7 @@ class _$SupervisionActivityDtoCWProxyImpl
     Object? scores = const $CopyWithPlaceholder(),
     Object? prospectsByTeleconseiller = const $CopyWithPlaceholder(),
     Object? prospectsByRepresentant = const $CopyWithPlaceholder(),
+    Object? repQualificationStatuses = const $CopyWithPlaceholder(),
   }) {
     return SupervisionActivityDto(
       from: from == const $CopyWithPlaceholder()
@@ -151,6 +162,11 @@ class _$SupervisionActivityDtoCWProxyImpl
           ? _value.prospectsByRepresentant
           // ignore: cast_nullable_to_non_nullable
           : prospectsByRepresentant as List<SupervisionHistogramBarDto>,
+      repQualificationStatuses:
+          repQualificationStatuses == const $CopyWithPlaceholder()
+          ? _value.repQualificationStatuses
+          // ignore: cast_nullable_to_non_nullable
+          : repQualificationStatuses as SupervisionRepStatutsDto?,
     );
   }
 }
@@ -181,6 +197,7 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
       'scores',
       'prospectsByTeleconseiller',
       'prospectsByRepresentant',
+      'repQualificationStatuses',
     ],
   );
   final val = SupervisionActivityDto(
@@ -247,6 +264,12 @@ SupervisionActivityDto _$SupervisionActivityDtoFromJson(
           )
           .toList(),
     ),
+    repQualificationStatuses: $checkedConvert(
+      'repQualificationStatuses',
+      (v) => v == null
+          ? null
+          : SupervisionRepStatutsDto.fromJson(v as Map<String, dynamic>),
+    ),
   );
   return val;
 });
@@ -267,6 +290,7 @@ Map<String, dynamic> _$SupervisionActivityDtoToJson(
   'prospectsByRepresentant': instance.prospectsByRepresentant
       .map((e) => e.toJson())
       .toList(),
+  'repQualificationStatuses': instance.repQualificationStatuses?.toJson(),
 };
 
 const _$SupervisionGranularityEnumMap = {

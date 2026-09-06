@@ -1,6 +1,11 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
-import { EmployeurType } from '@crm/database';
+import {
+  EmployeurType,
+  PrioriteTraitement,
+  RepresentantRelation,
+  StatutQualificationEffect,
+} from '@crm/database';
 import {
   IsBoolean,
   IsEnum,
@@ -587,6 +592,169 @@ export class UpdateCallOutcomeReasonDto {
 
 export class SetCallOutcomeReasonActiveDto {
   @ApiProperty({ type: Boolean })
+  @IsBoolean()
+  isActive!: boolean;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Statuts de qualification du représentant
+// ─────────────────────────────────────────────────────────────────────────────
+
+export class StatutQualificationDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ maxLength: 64 }) code!: string;
+  @ApiProperty({ maxLength: 120 }) label!: string;
+  @ApiProperty({ enum: StatutQualificationEffect, enumName: 'StatutQualificationEffect' })
+  effect!: StatutQualificationEffect;
+  @ApiProperty({ description: 'La date du rappel est exigée par ce statut.' })
+  requiresCallback!: boolean;
+  @ApiProperty({ description: 'Le motif est exigé par ce statut : « Autre » ne dit rien seul.' })
+  requiresComment!: boolean;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Délai, en minutes, du réessai que l’application propose d’elle-même. Nul : aucun réessai.',
+  })
+  retryAfterMinutes!: number | null;
+  @ApiProperty({
+    enum: PrioriteTraitement,
+    enumName: 'PrioriteTraitement',
+    description: 'Ordre de reprise : un « Très intéressé » se rappelle avant un « Non éligible ».',
+  })
+  priorite!: PrioriteTraitement;
+  @ApiProperty({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'La relation posée sur la fiche. Nulle quand le statut ne tranche rien.',
+  })
+  relationStatus!: RepresentantRelation | null;
+  @ApiProperty() isActive!: boolean;
+  @ApiProperty({ description: 'Le script s’appuie dessus : sa règle ne se reconfigure pas.' })
+  isSystem!: boolean;
+  @ApiProperty({ description: 'Version de charge utile minimale sachant émettre ce code.' })
+  minPayloadVersion!: number;
+  @ApiProperty({ format: 'date-time' }) updatedAt!: string;
+}
+
+export class StatutQualificationListDto {
+  @ApiProperty({ type: () => [StatutQualificationDto] }) items!: StatutQualificationDto[];
+}
+
+export class StatutQualificationFieldQueryDto {
+  @ApiProperty({
+    type: Number,
+    description:
+      'Version de charge utile de l’appelant. Un statut qu’il ne saurait pas émettre ne lui est jamais proposé : sa remontée finirait en échec définitif, hors ligne.',
+  })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  payloadVersion!: number;
+}
+
+export class CreateStatutQualificationDto {
+  @ApiProperty({
+    maxLength: 120,
+    description:
+      'Le code en est déduit, puis figé : majuscules, sans accents, espaces en tirets bas.',
+  })
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label!: string;
+
+  @ApiProperty({ enum: StatutQualificationEffect, enumName: 'StatutQualificationEffect' })
+  @IsEnum(StatutQualificationEffect)
+  effect!: StatutQualificationEffect;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional({ default: false })
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
+
+  @ApiPropertyOptional({ type: Number, nullable: true, minimum: 5, maximum: 10080 })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(10080)
+  retryAfterMinutes?: number | null;
+
+  @ApiPropertyOptional({
+    enum: PrioriteTraitement,
+    enumName: 'PrioriteTraitement',
+    default: PrioriteTraitement.NORMALE,
+  })
+  @IsOptional()
+  @IsEnum(PrioriteTraitement)
+  priorite?: PrioriteTraitement;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'Relation posée sur la fiche quand le client n’en envoie pas.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation | null;
+}
+
+export class UpdateStatutQualificationDto {
+  @ApiPropertyOptional({ maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  @MaxLength(120)
+  label?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresCallback?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  requiresComment?: boolean;
+
+  @ApiPropertyOptional({
+    type: Number,
+    nullable: true,
+    minimum: 5,
+    maximum: 10080,
+    description: 'Nul retire le réessai proposé.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(5)
+  @Max(10080)
+  retryAfterMinutes?: number | null;
+
+  @ApiPropertyOptional({ enum: PrioriteTraitement, enumName: 'PrioriteTraitement' })
+  @IsOptional()
+  @IsEnum(PrioriteTraitement)
+  priorite?: PrioriteTraitement;
+
+  @ApiPropertyOptional({
+    enum: RepresentantRelation,
+    enumName: 'RepresentantRelation',
+    nullable: true,
+    description: 'Nul retire la relation posée : le statut cesse alors de trancher.',
+  })
+  @IsOptional()
+  @IsEnum(RepresentantRelation)
+  relationStatus?: RepresentantRelation | null;
+}
+
+export class SetStatutQualificationActiveDto {
+  @ApiProperty()
   @IsBoolean()
   isActive!: boolean;
 }

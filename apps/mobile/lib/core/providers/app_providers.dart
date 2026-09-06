@@ -8,7 +8,8 @@ import 'package:drift/drift.dart'
         QueryRow,
         ResultSetImplementation,
         Variable;
-import 'package:flutter/material.dart' show DateUtils;
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/material.dart' show DateUtils, immutable;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,7 @@ import '../../ui/widgets/activity_chart.dart' show ActivityDay;
 import '../../data/local/database.dart';
 import '../../data/local/refresh_mutex_db.dart';
 import '../../data/repositories/draft_repository.dart';
+import '../../data/repositories/ouverture_repository.dart';
 import '../../data/repositories/reference_repository.dart';
 import '../../data/repositories/visites_repository.dart';
 import '../../data/repositories/write_repository.dart';
@@ -25,6 +27,7 @@ import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_state.dart';
 import '../network/dio_factory.dart';
 import '../router/route_memory.dart';
+import '../router/route_paths.dart';
 import '../sync/api_port.dart';
 import '../sync/clock.dart';
 import '../sync/dio_api.dart';
@@ -63,6 +66,9 @@ final Provider<({Dio dio, CrmApiClient client})> apiClientProvider =
     Provider<({Dio dio, CrmApiClient client})>((Ref ref) {
       return ApiClientFactory.build(
         tokens: ref.watch(tokenStoreProvider),
+        // La trace HTTP est le seul moyen de voir, depuis le téléphone, si une
+        // requête est partie. Jamais en release : elle nomme les routes.
+        verboseLogs: kDebugMode,
         mutex: DatabaseRefreshMutex(ref.watch(appDatabaseProvider)),
         onSessionExpired: () {
           ref.read(authControllerProvider.notifier).onSessionExpired();
@@ -124,6 +130,60 @@ final Provider<ReferenceRepository> referenceRepositoryProvider =
       return ReferenceRepository(ref.watch(appDatabaseProvider));
     });
 
+final Provider<OuvertureRepository> ouvertureRepositoryProvider =
+    Provider<OuvertureRepository>((Ref ref) {
+      return OuvertureRepository(
+        ref.watch(appDatabaseProvider),
+        ref.watch(apiPortProvider),
+        clock: ref.watch(clockProvider),
+      );
+    });
+
+/// La fiche que ce compte tient encore. C'est elle qui rouvre le formulaire
+/// après un plantage, verrou actif.
+final StreamProvider<OuverturesFicheData?> ouvertureCouranteProvider =
+    StreamProvider<OuverturesFicheData?>((Ref ref) {
+      final String moi = _moi(ref);
+      if (moi.isEmpty) return Stream<OuverturesFicheData?>.value(null);
+      return ref.watch(ouvertureRepositoryProvider).watchCourante(moi);
+    });
+
+/// EB-08 : la route de la fiche tenue. C'est elle que le routeur rouvre au
+/// démarrage, et la seule qu'il laisse ouverte tant qu'aucun statut n'est posé.
+///
+/// Nulle quand la fiche d'un prospect n'est pas descendue sur cet appareil :
+/// sans son numéro, l'écran d'appel n'a rien à rouvrir, et un renvoi en boucle
+/// vers une recherche vide vaudrait moins que de laisser l'application libre.
+final FutureProvider<String?> routeFicheTenueProvider = FutureProvider<String?>(
+  (Ref ref) async {
+    final OuverturesFicheData? tenue = await ref.watch(
+      ouvertureCouranteProvider.future,
+    );
+    if (tenue == null) return null;
+    final String? representantId = tenue.representantId;
+    if (representantId != null) {
+      return Routes.representantQualificationFor(representantId);
+    }
+    final String? prospectId = tenue.prospectId;
+    if (prospectId == null) return null;
+    final String? numero = await ref
+        .read(referenceRepositoryProvider)
+        .numeroDuProspect(prospectId);
+    if (numero == null) return null;
+    return Routes.phase2Pour(numero);
+  },
+);
+
+final historiqueRepresentantProvider =
+    StreamProvider.family<List<HistoriqueRepresentantResult>, String>((
+      Ref ref,
+      String representantId,
+    ) {
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchHistoriqueRepresentant(representantId);
+    });
+
 final NotifierProvider<AuthController, AuthState> authControllerProvider =
     NotifierProvider<AuthController, AuthState>(AuthController.new);
 
@@ -136,6 +196,14 @@ final StreamProvider<int> representantCountProvider = StreamProvider<int>((
   return ref
       .watch(referenceRepositoryProvider)
       .watchRepresentantCount(moi: _moi(ref));
+});
+
+final StreamProvider<int> representantsAppelesProvider = StreamProvider<int>((
+  Ref ref,
+) {
+  return ref
+      .watch(referenceRepositoryProvider)
+      .watchRepresentantsAppeles(moi: _moi(ref));
 });
 
 final StreamProvider<int> prospectCountProvider = StreamProvider<int>((
@@ -299,6 +367,13 @@ final StreamProvider<List<Employeur>> employeursProvider =
       return ref.watch(referenceRepositoryProvider).watchEmployeurs();
     });
 
+final StreamProvider<List<StatutQualificationRow>>
+statutsQualificationProvider = StreamProvider<List<StatutQualificationRow>>((
+  Ref ref,
+) {
+  return ref.watch(referenceRepositoryProvider).watchStatutsQualification();
+});
+
 final StreamProvider<List<PaysRow>> paysProvider =
     StreamProvider<List<PaysRow>>((Ref ref) {
       return ref.watch(referenceRepositoryProvider).watchPays();
@@ -313,6 +388,96 @@ class HistoriqueSearch extends Notifier<String> {
 
   void set(String value) => state = value;
 }
+
+/// « Jamais appelé » et « Jamais qualifié » : des valeurs qui n'existent dans
+/// aucune colonne, lues par les requêtes comme des tests de nullité.
+const String filtreJamais = 'JAMAIS';
+
+/// Les filtres de la liste des représentants. Une clé vide ne filtre pas.
+@immutable
+class FiltresRepresentants {
+  const FiltresRepresentants({
+    this.statutId = '',
+    this.relation = '',
+    this.dernierAppel = '',
+  });
+
+  final String statutId;
+  final String relation;
+  final String dernierAppel;
+
+  int get actifs =>
+      (statutId.isEmpty ? 0 : 1) +
+      (relation.isEmpty ? 0 : 1) +
+      (dernierAppel.isEmpty ? 0 : 1);
+
+  FiltresRepresentants copyWith({
+    String? statutId,
+    String? relation,
+    String? dernierAppel,
+  }) => FiltresRepresentants(
+    statutId: statutId ?? this.statutId,
+    relation: relation ?? this.relation,
+    dernierAppel: dernierAppel ?? this.dernierAppel,
+  );
+}
+
+class FiltresRepresentantsNotifier extends Notifier<FiltresRepresentants> {
+  @override
+  FiltresRepresentants build() => const FiltresRepresentants();
+
+  void set(FiltresRepresentants value) => state = value;
+}
+
+final NotifierProvider<FiltresRepresentantsNotifier, FiltresRepresentants>
+filtresRepresentantsProvider =
+    NotifierProvider<FiltresRepresentantsNotifier, FiltresRepresentants>(
+      FiltresRepresentantsNotifier.new,
+    );
+
+@immutable
+class FiltresProspects {
+  const FiltresProspects({this.statut = '', this.dernierAppel = ''});
+
+  final String statut;
+  final String dernierAppel;
+
+  int get actifs => (statut.isEmpty ? 0 : 1) + (dernierAppel.isEmpty ? 0 : 1);
+
+  FiltresProspects copyWith({String? statut, String? dernierAppel}) =>
+      FiltresProspects(
+        statut: statut ?? this.statut,
+        dernierAppel: dernierAppel ?? this.dernierAppel,
+      );
+}
+
+class FiltresProspectsNotifier extends Notifier<FiltresProspects> {
+  @override
+  FiltresProspects build() => const FiltresProspects();
+
+  void set(FiltresProspects value) => state = value;
+}
+
+final NotifierProvider<FiltresProspectsNotifier, FiltresProspects>
+filtresProspectsProvider =
+    NotifierProvider<FiltresProspectsNotifier, FiltresProspects>(
+      FiltresProspectsNotifier.new,
+    );
+
+/// Les prospects CHUES du périmètre, pour l'onglet « Prospects » des fiches.
+final StreamProvider<List<ProspectSyncViewData>> chuesProspectListProvider =
+    StreamProvider<List<ProspectSyncViewData>>((Ref ref) {
+      final FiltresProspects filtres = ref.watch(filtresProspectsProvider);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchAllProspects(
+            search: ref.watch(historiqueSearchProvider),
+            projet: 'CHUES',
+            moi: _moi(ref),
+            statut: filtres.statut,
+            dernierAppel: filtres.dernierAppel,
+          );
+    });
 
 /// L'identifiant du compte connecté, ou la chaîne vide : les requêtes qui
 /// bornent au périmètre d'appel s'en servent comme paramètre lié.
@@ -334,11 +499,17 @@ final StreamProvider<bool> perimetreBorneProvider = StreamProvider<bool>((
 
 final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
     StreamProvider<List<RepresentantSyncViewData>>((Ref ref) {
+      final FiltresRepresentants filtres = ref.watch(
+        filtresRepresentantsProvider,
+      );
       return ref
           .watch(referenceRepositoryProvider)
           .watchRepresentants(
             search: ref.watch(historiqueSearchProvider),
             moi: _moi(ref),
+            statutId: filtres.statutId,
+            relation: filtres.relation,
+            dernierAppel: filtres.dernierAppel,
           );
     });
 
@@ -585,6 +756,9 @@ typedef Contact = ({
   DateTime? at,
   String? issue,
   String statut,
+  String? statutLabel,
+  String? statutEffect,
+  bool representant,
 });
 
 /// Les représentants que J'AI appelés, du plus récent au plus ancien.
@@ -595,25 +769,28 @@ final StreamProvider<List<Contact>> mesContactsRepresentantsProvider =
         authControllerProvider.select((AuthState s) => s.userId),
       );
       if (moi == null) return Stream<List<Contact>>.value(const <Contact>[]);
-      return (db.select(db.representants)
+      return (db.select(db.representantSyncView)
             ..where(
-              (Representants t) =>
+              (RepresentantSyncView t) =>
                   t.lastCallById.equals(moi) & t.deletedAt.isNull(),
             )
-            ..orderBy(<OrderClauseGenerator<Representants>>[
-              (Representants t) => OrderingTerm.desc(t.lastCallAt),
+            ..orderBy(<OrderClauseGenerator<RepresentantSyncView>>[
+              (RepresentantSyncView t) => OrderingTerm.desc(t.lastCallAt),
             ]))
           .watch()
           .map(
-            (List<Representant> rows) => rows
+            (List<RepresentantSyncViewData> rows) => rows
                 .map(
-                  (Representant r) => (
+                  (RepresentantSyncViewData r) => (
                     id: r.id,
                     nom: r.fullName,
                     phoneE164: r.phoneE164,
                     at: r.lastCallAt,
                     issue: r.lastCallOutcome,
                     statut: r.relationStatus,
+                    statutLabel: r.statutQualificationLabel,
+                    statutEffect: r.statutQualificationEffect,
+                    representant: true,
                   ),
                 )
                 .toList(growable: false),
@@ -665,6 +842,9 @@ final mesContactsProspectsProvider = StreamProvider.family<List<Contact>, bool>(
                 at: r.read<DateTime?>('at'),
                 issue: r.read<String?>('issue'),
                 statut: r.read<String>('statut'),
+                statutLabel: null,
+                statutEffect: null,
+                representant: false,
               ),
             )
             .toList(growable: false),

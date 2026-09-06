@@ -36,11 +36,16 @@ export const readScope = (
  *
  * `Representant` et `Prospect` portent tous deux `createdById` et `lotItems` :
  * la même clause vaut pour les deux modèles.
+ *
+ * `malgreLeRole` borne aussi l'encadrement : sur l'écran d'appel, un
+ * superviseur ne compose que les numéros qui lui reviennent. Sa vue d'ensemble
+ * de l'annuaire et de la supervision passe par un appel sans cette option.
  */
 export const attributionScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
+  options: { malgreLeRole?: boolean } = {},
 ): Prisma.RepresentantWhereInput & Prisma.ProspectWhereInput =>
-  readsEveryone(user)
+  readsEveryone(user) && options.malgreLeRole !== true
     ? {}
     : { OR: [{ createdById: user.id }, { lotItems: { some: { assigneeId: user.id } } }] };
 
@@ -50,9 +55,10 @@ export const prospectReadScope = (
 ): Prisma.ProspectWhereInput => attributionScope(user);
 
 /**
- * Portée des prospects sur le TÉLÉPHONE. Volontairement plus étroite que
- * `prospectReadScope` : lire le travail de tous à l'écran est une chose, en
- * tirer le portefeuille national sur un appareil en est une autre.
+ * Portée des prospects sur le TÉLÉPHONE : aucune. Le tirage est GLOBAL et c'est
+ * l'appareil qui filtre, sans quoi une réattribution de campagne effacerait des
+ * fiches déjà ouvertes hors ligne. La portée d'écran, elle, reste
+ * `prospectReadScope`.
  */
 export const prospectSyncScope = (
   _user: Pick<AuthenticatedUser, 'id' | 'role'>,

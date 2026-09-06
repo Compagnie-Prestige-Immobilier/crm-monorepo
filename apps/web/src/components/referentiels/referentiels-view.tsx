@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 import { SearchField } from '@/components/filters/search-field';
 import { DeactivateReferentielDialog } from '@/components/referentiels/deactivate-dialog';
 import { OpenReferentialTab } from '@/components/referentiels/open-referential-tab';
+import { StatutsQualificationView } from '@/components/referentiels/statuts-qualification-view';
 import {
   BanqueFormDialog,
   DepartementFormDialog,
@@ -58,6 +59,7 @@ const TABS = [
   'employeurs',
   'incomeBands',
   'offers',
+  'statutsQualification',
 ] as const;
 
 type ReferentielTab = (typeof TABS)[number];
@@ -108,6 +110,7 @@ export function ReferentielsView() {
           <TabsTrigger value="employeurs">Employeurs</TabsTrigger>
           <TabsTrigger value="incomeBands">Revenus</TabsTrigger>
           <TabsTrigger value="offers">Offres</TabsTrigger>
+          <TabsTrigger value="statutsQualification">Statuts de qualification</TabsTrigger>
         </TabsList>
 
         <TabsContent value="banques">
@@ -145,6 +148,12 @@ export function ReferentielsView() {
         </TabsContent>
         <TabsContent value="offers">
           <OpenReferentialTab kind="offers" />
+        </TabsContent>
+        {/* Pas un `OpenReferentialTab` : ce référentiel porte un effet, une
+            ligne système et une activation par route séparée, dont l'onglet
+            générique ne sait rien. */}
+        <TabsContent value="statutsQualification">
+          <StatutsQualificationView />
         </TabsContent>
       </Tabs>
     </div>

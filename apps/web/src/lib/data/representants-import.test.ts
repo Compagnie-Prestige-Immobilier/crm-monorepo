@@ -88,12 +88,31 @@ describe('buildRepresentantsExportUrl', () => {
   it('vise le relais de Next, jamais le backend directement', () => {
     expect(buildRepresentantsExportUrl(EMPTY_REPRESENTANT_FILTERS)).toMatch(/^\/api\/v1\//u);
   });
+
+  it('permet aussi un export complet sans reprendre les filtres actifs', () => {
+    const url = buildRepresentantsExportUrl(
+      {
+        ...EMPTY_REPRESENTANT_FILTERS,
+        search: 'Diallo',
+        departementId: 'dep-1',
+        relationStatus: 'AMBASSADEUR',
+      },
+      'all',
+    );
+    expect(url).toBe('/api/v1/export/representants.xlsx');
+  });
 });
 
 describe('representantsExportFileName', () => {
   it('date le fichier, pour ne pas empiler dix homonymes dans Téléchargements', () => {
     expect(representantsExportFileName(new Date('2026-08-13T09:12:00.000Z'))).toBe(
       'cpi-representants-2026-08-13.xlsx',
+    );
+  });
+
+  it('nomme explicitement l’export complet', () => {
+    expect(representantsExportFileName(new Date('2026-08-13T09:12:00.000Z'), 'all')).toBe(
+      'cpi-representants-tous-2026-08-13.xlsx',
     );
   });
 });

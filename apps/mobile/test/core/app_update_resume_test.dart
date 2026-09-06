@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:cpi_go/core/providers/app_providers.dart';
@@ -537,13 +536,12 @@ class _Corrompu implements _Etape {
 }
 
 class _FakeInstaller implements UpdateInstaller {
-  _FakeInstaller({this.allowed = true, this.freeSpace = 1 << 40});
+  _FakeInstaller({this.freeSpace = 1 << 40});
 
-  final bool allowed;
   final int freeSpace;
 
   @override
-  Future<bool> canInstall() async => allowed;
+  Future<bool> canInstall() async => true;
 
   @override
   Future<int> freeSpaceBytes(String directory) async => freeSpace;

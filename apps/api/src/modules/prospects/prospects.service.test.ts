@@ -34,6 +34,8 @@ interface PrismaMock {
     update: ReturnType<typeof vi.fn>;
   };
   prospectConversion: { upsert: ReturnType<typeof vi.fn> };
+  callAttempt: { findMany: ReturnType<typeof vi.fn> };
+  ouvertureFiche: { findMany: ReturnType<typeof vi.fn> };
   $transaction: ReturnType<typeof vi.fn>;
   $queryRaw: ReturnType<typeof vi.fn>;
 }
@@ -57,6 +59,8 @@ function makePrisma(): PrismaMock {
       update: vi.fn(),
     },
     prospectConversion: { upsert: vi.fn() },
+    callAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+    ouvertureFiche: { findMany: vi.fn().mockResolvedValue([]) },
     $transaction: vi.fn(),
     $queryRaw: vi.fn().mockResolvedValue([]),
   };
@@ -423,7 +427,13 @@ describe('surface de phase 2 dans la liste', () => {
       }),
     ]);
     prisma.$queryRaw.mockResolvedValue([
-      { prospectId: 'p-1', outcome: 'METHOD_OBTAINED', comment: 'Accepte la plateforme', at: DATE },
+      {
+        prospectId: 'p-1',
+        outcome: 'METHOD_OBTAINED',
+        comment: 'Accepte la plateforme',
+        at: DATE,
+        count: 4n,
+      },
     ]);
 
     const [item] = (await service(prisma).list(admin, {})).items;
@@ -437,6 +447,7 @@ describe('surface de phase 2 dans la liste', () => {
       lastOutcome: 'METHOD_OBTAINED',
       lastComment: 'Accepte la plateforme',
       lastAttemptAt: DATE.toISOString(),
+      callAttemptCount: 4,
       ownedByCommercialId: alice.id,
     });
   });
@@ -653,6 +664,72 @@ describe('lecture du SUPERVISEUR', () => {
 
     await expect(service(prisma).get(superviseur, 'p-1')).resolves.toMatchObject({ id: 'p-1' });
     expect(firstArg(prisma.prospect.findFirst).where).not.toHaveProperty('OR');
+  });
+
+  it('relit les appels d’une fiche, avec leur auteur et leur motif', async () => {
+    const DATE = new Date('2026-08-05T10:00:00.000Z');
+    prisma.prospect.findFirst.mockResolvedValue(prospectRow({ createdById: bob.id }));
+    prisma.callAttempt.findMany.mockResolvedValue([
+      {
+        id: 'att-1',
+        outcome: 'METHOD_OBTAINED',
+        reason: { label: 'Méthode obtenue' },
+        method: 'PLATFORM',
+        comment: null,
+        email: 'a@b.sn',
+        fonctionnaire: true,
+        engagementEnCours: null,
+        dureeEtablissementMois: 24,
+        rendezVousAt: null,
+        performedById: bob.id,
+        performedBy: { fullName: 'Bob Sarr' },
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: new Date('2026-08-05T10:00:14.000Z'),
+        clientCreatedAt: DATE,
+      },
+    ]);
+
+    prisma.ouvertureFiche.findMany.mockResolvedValue([
+      {
+        closingAttemptId: 'att-1',
+        firstInputAt: new Date('2026-08-05T10:00:00.000Z'),
+        closedAt: new Date('2026-08-05T10:03:20.000Z'),
+      },
+    ]);
+
+    const result = await service(prisma).callHistory(superviseur, 'p-1');
+
+    expect(result.items).toEqual([
+      {
+        id: 'att-1',
+        outcome: 'METHOD_OBTAINED',
+        reasonLabel: 'Méthode obtenue',
+        method: 'PLATFORM',
+        comment: null,
+        email: 'a@b.sn',
+        fonctionnaire: true,
+        engagementEnCours: null,
+        dureeEtablissementMois: 24,
+        rendezVousAt: null,
+        performedById: bob.id,
+        performedByName: 'Bob Sarr',
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-08-05T10:00:14.000Z',
+        clientCreatedAt: DATE.toISOString(),
+        dureeTraitementSecondes: 200,
+      },
+    ]);
+  });
+
+  it('ne relit pas les appels d’une fiche absente', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(null);
+
+    await expect(service(prisma).callHistory(superviseur, 'p-1')).rejects.toBeInstanceOf(
+      NotFoundException,
+    );
+    expect(prisma.callAttempt.findMany).not.toHaveBeenCalled();
   });
 
   it('n’écrit rien : modification, suppression et réaffectation lui sont refusées', async () => {

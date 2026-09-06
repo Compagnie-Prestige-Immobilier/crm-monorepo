@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ChiffresView } from '@/components/chiffres/vue';
 import { catalogueDe } from '@/components/chiffres/sources';
+import type * as ConsoleModule from '@/lib/data/console';
 import type * as DispositionModule from '@/lib/data/disposition';
 import type { Role } from '@/lib/types';
 import { renderWithQuery } from '@/test/render-query';
@@ -13,6 +14,8 @@ const SUPERVISEUR: Role = 'SUPERVISEUR';
 
 const activiteMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 const dispositionMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
+const comptageMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
+const callbacksMock = vi.hoisted(() => vi.fn<() => Promise<unknown>>());
 
 // Seuls les jeux des cartes POSÉES doivent partir : les autres rejettent, et
 // une requête de trop ferait rougir le test au lieu de passer inaperçue.
@@ -24,7 +27,15 @@ vi.mock('@/lib/data/chiffres', () => ({
   fetchChiffresMethodes: vi.fn<() => Promise<never>>(),
   fetchChiffresBanques: vi.fn<() => Promise<never>>(),
   fetchChiffresCampagne: vi.fn<() => Promise<never>>(),
+  fetchChiffresEnrolement: vi.fn<() => Promise<never>>(),
 }));
+
+vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock }));
+
+vi.mock('@/lib/data/console', async (importOriginal) => {
+  const actual = await importOriginal<typeof ConsoleModule>();
+  return { ...actual, fetchCallbacks: callbacksMock };
+});
 
 vi.mock('@/lib/data/disposition', async () => {
   const actual = await vi.importActual<typeof DispositionModule>('@/lib/data/disposition');
@@ -49,6 +60,7 @@ const totaux = {
   prospectsCreated: 26,
   representantsContacted: 9,
   repCalls: 30,
+  repWrongNumber: 0,
   repReached: 21,
   repCallback: 6,
   repUnreachable: 3,
@@ -87,6 +99,7 @@ const activite = {
   ],
   prospectsByTeleconseiller: [],
   prospectsByRepresentant: [],
+  repQualificationStatuses: null,
 };
 
 const disposition = (sources: string[]) => ({
@@ -109,6 +122,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
       performance: [
         {
           teleconseillerId: 'awa',
+          objectif: 50,
           teleconseillerName: 'Awa Fixture',
           assigned: 25,
           treated: 15,
@@ -134,6 +148,86 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(catalogue['hors-attribution-derniere-campagne']?.extraire({ campagne })).toEqual({
       forme: 'classement',
       donnee: [{ id: 'awa', label: 'Awa Fixture', value: 4 }],
+    });
+  });
+
+  // EB-13 : le compte se lit par téléconseiller ET par jour. Cumulé sur la
+  // période, il ne dirait plus qui a ouvert quoi, ni quand.
+  it('croise les fiches ouvertes par téléconseiller et par jour', () => {
+    const catalogue = catalogueDe({ chues: true, voitLesMontants: false, role: SUPERVISEUR });
+
+    expect(
+      catalogue['fiches-ouvertes']?.extraire({
+        ouvertures: [
+          {
+            openedById: 'u-1',
+            openedByName: 'Awa Sy',
+            jour: '2026-08-27',
+            ouvertures: 12,
+            dureeMoyenneSecondes: 240,
+          },
+          {
+            openedById: 'u-2',
+            openedByName: 'Moussa Ba',
+            jour: '2026-08-26',
+            ouvertures: 5,
+            dureeMoyenneSecondes: null,
+          },
+        ],
+      }),
+    ).toEqual({
+      forme: 'matrice',
+      donnee: {
+        lignes: ['Awa Sy', 'Moussa Ba'],
+        colonnes: ['26 août', '27 août'],
+        cellules: [
+          { ligne: 'Awa Sy', colonne: '26 août', value: 0 },
+          { ligne: 'Awa Sy', colonne: '27 août', value: 12 },
+          { ligne: 'Moussa Ba', colonne: '26 août', value: 5 },
+          { ligne: 'Moussa Ba', colonne: '27 août', value: 0 },
+        ],
+      },
+    });
+  });
+
+  it('ne demande le comptage des ouvertures que si sa carte est posée', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['fiches-ouvertes']));
+    activiteMock.mockRejectedValue(new Error('jeu non demandé'));
+    comptageMock.mockResolvedValue([
+      {
+        openedById: 'u-1',
+        openedByName: 'Awa Sy',
+        jour: '2026-08-27',
+        ouvertures: 12,
+        dureeMoyenneSecondes: 240,
+      },
+    ]);
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect(await screen.findByText('Awa Sy')).toBeTruthy();
+    expect(screen.getByText('12')).toBeTruthy();
+    expect(activiteMock).not.toHaveBeenCalled();
+  });
+
+  // EB-13 : la rubrique « À rappeler » s'atteint AUSSI depuis le tableau de
+  // bord, avec son compteur.
+  it('mène à la file de rappel, avec le compte du jour', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['prospects-notes']));
+    activiteMock.mockResolvedValue(activite);
+    callbacksMock.mockResolvedValue({
+      items: [{ id: 'c-1' }, { id: 'c-2' }],
+      serverTime: '2026-08-28T09:00:00.000Z',
+    });
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    const lien = await screen.findByRole('link', { name: /À rappeler/u });
+    expect(lien.getAttribute('href')).toBe('/chues/rappels');
+    await waitFor(() => {
+      expect(lien.textContent).toContain('2 aujourd’hui');
     });
   });
 
@@ -292,7 +386,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     await waitFor(() => {
       expect(screen.getAllByText('Prospects saisis').length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText('Taux de contact des représentants')).toBeNull();
+    expect(screen.queryByText('Taux de joignabilité des représentants')).toBeNull();
   });
 
   // Deux familles d'appels sur le même écran : le titre de la tuile, et non son
@@ -308,10 +402,22 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     expect(
-      (await screen.findAllByText('Taux de contact des représentants')).length,
+      (await screen.findAllByText('Taux de joignabilité des représentants')).length,
     ).toBeGreaterThan(0);
     expect(screen.getAllByText('Taux de joignabilité des prospects').length).toBeGreaterThan(0);
     expect(screen.getByText('Sans objet')).toBeTruthy();
     expect(screen.getByText('Aucun appel à un prospect sur la période')).toBeTruthy();
+  });
+
+  it('une tuile de taux met le nombre en grand et le pourcentage en dessous', async () => {
+    setUrl('/chues/statistiques');
+    dispositionMock.mockResolvedValue(disposition(['taux-de-contact']));
+    activiteMock.mockResolvedValue(activite);
+
+    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
+
+    expect((await screen.findAllByText('21')).length).toBeGreaterThan(0);
+    expect(screen.getByText('70,0 % · 21 joints sur 30 appels')).toBeTruthy();
+    expect(screen.queryByText('70,0 %')).toBeNull();
   });
 });

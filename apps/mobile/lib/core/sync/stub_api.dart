@@ -107,6 +107,24 @@ class StubApi implements ApiPort {
   }
 
   @override
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
+  Future<OuvertureFicheDto?> ouvertureCourante() async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required EnregistrerBrouillonDto corps,
+  }) async {
+    throw const ApiException('api_not_configured', kind: FailureKind.retryable);
+  }
+
+  @override
   Future<void> uploadCallRecording({
     required String attemptId,
     required String path,
@@ -131,6 +149,11 @@ class StubApi implements ApiPort {
   Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
     required int payloadVersion,
   }) async => const <CallOutcomeReasonDto>[];
+
+  @override
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
+    required int payloadVersion,
+  }) async => const <StatutQualificationDto>[];
 
   /// Même raison que [pullVisiteReferentiels] : un refus, jamais des listes
   /// vides.

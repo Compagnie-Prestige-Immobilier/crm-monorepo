@@ -29,5 +29,17 @@ services:
       timeout: 5s
       retries: 10
 
+  # Port 6381, même raison que 5434 : un Redis local ou celui d'un autre projet
+  # tient souvent 6379/6380.
+  redis:
+    image: redis:8-alpine
+    container_name: crm-redis-dev
+    ports: ['6381:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
 volumes:
   crm-postgres18-data:

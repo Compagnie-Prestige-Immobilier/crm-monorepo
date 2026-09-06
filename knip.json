@@ -11,6 +11,12 @@
     "packages/api-client": {
       "ignoreDependencies": ["openapi-typescript", "prettier"]
     },
+    "packages/api-client-chues": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
+    "packages/api-client-grand-public": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
     "packages/api-client-dart": {
       "ignoreDependencies": ["@openapitools/openapi-generator-cli"]
     }

@@ -1,6 +1,6 @@
 ---
 name: frontend-engineer
-description: "Use proactively for bounded implementation or debugging in an existing web app: routes, components, forms, state/data flow, packages, browser behavior, SSR, and hydration in React, Next.js, Vue, Svelte, or the detected framework. Use after product/API behavior and visual direction are known. Not for design-only, backend-only, accessibility-audit-only, or dedicated performance work."
+description: 'Use proactively for bounded implementation or debugging in an existing web app: routes, components, forms, state/data flow, packages, browser behavior, SSR, and hydration in React, Next.js, Vue, Svelte, or the detected framework. Use after product/API behavior and visual direction are known. Not for design-only, backend-only, accessibility-audit-only, or dedicated performance work.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

@@ -9,6 +9,7 @@ import { DatabaseDumpSection } from '@/components/settings/database-dump-section
 import { PurgeCard } from '@/components/settings/purge-card';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchDemoStatus } from '@/lib/data/demo';
+import { demoWorkspaceEnabled } from '@/lib/demo-workspace';
 import { getQueryClient } from '@/lib/query-client';
 import { queryKeys } from '@/lib/query-keys';
 import { guardRoles } from '@/lib/session';
@@ -22,14 +23,17 @@ export default async function ParametresPage() {
     return <PermissionDenied role={guard.user.role} what="Les paramètres de la plateforme" />;
   }
 
+  const demoEnabled = demoWorkspaceEnabled();
   const queryClient = getQueryClient();
-  try {
-    await queryClient.prefetchQuery({
-      queryKey: queryKeys.demoStatus,
-      queryFn: () => fetchDemoStatus(getServerApiClient()),
-    });
-  } catch (error) {
-    unstable_rethrow(error);
+  if (demoEnabled) {
+    try {
+      await queryClient.prefetchQuery({
+        queryKey: queryKeys.demoStatus,
+        queryFn: () => fetchDemoStatus(getServerApiClient()),
+      });
+    } catch (error) {
+      unstable_rethrow(error);
+    }
   }
 
   return (
@@ -38,9 +42,11 @@ export default async function ParametresPage() {
         Ces actions portent sur les données de tous les utilisateurs.
       </p>
 
-      <HydrationBoundary state={dehydrate(queryClient)}>
-        <DemoModeCard />
-      </HydrationBoundary>
+      {demoEnabled ? (
+        <HydrationBoundary state={dehydrate(queryClient)}>
+          <DemoModeCard />
+        </HydrationBoundary>
+      ) : null}
 
       <AndroidReleaseCard />
 

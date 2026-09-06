@@ -357,9 +357,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                         className="size-4 align-middle"
                         aria-label="Sélectionner tous les comptes affichés"
                         disabled={selectables.length === 0}
-                        checked={
-                          selectables.length > 0 && selection.length === selectables.length
-                        }
+                        checked={selectables.length > 0 && selection.length === selectables.length}
                         onChange={(event) => {
                           setSelectedIds(
                             event.target.checked ? selectables.map((row) => row.id) : [],

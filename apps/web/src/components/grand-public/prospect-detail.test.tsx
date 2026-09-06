@@ -120,6 +120,8 @@ describe('les autres absences', () => {
     expect(within(ligne('Situation')).getByText('Question non posée')).toBeTruthy();
     expect(within(ligne('Profession')).getByText('Non renseignée')).toBeTruthy();
     expect(within(ligne('Canal de provenance')).getByText('Non renseigné')).toBeTruthy();
+    expect(within(ligne('Revenu mensuel')).getByText('Non renseigné')).toBeTruthy();
+    expect(within(ligne('Paiement')).getByText('Non renseigné')).toBeTruthy();
     expect(within(ligne('Durée du système')).getByText('Non renseignée')).toBeTruthy();
     expect(within(ligne('Banque de domiciliation')).getByText('Non renseignée')).toBeTruthy();
     expect(within(ligne('Dernier appel')).getByText('Jamais appelé')).toBeTruthy();
@@ -133,6 +135,8 @@ describe('les autres absences', () => {
           type: 'DIASPORA',
           profession: 'Chauffeur',
           canalProvenanceLabel: 'TikTok',
+          incomeBandLabel: '150 000 à 300 000',
+          paymentMode: 'ECHELONNE',
           dureeSystemeMois: 36,
         })}
       />,
@@ -141,6 +145,8 @@ describe('les autres absences', () => {
     expect(within(ligne('Situation')).getByText('Diaspora')).toBeTruthy();
     expect(within(ligne('Profession')).getByText('Chauffeur')).toBeTruthy();
     expect(within(ligne('Canal de provenance')).getByText('TikTok')).toBeTruthy();
+    expect(within(ligne('Revenu mensuel')).getByText('150 000 à 300 000')).toBeTruthy();
+    expect(within(ligne('Paiement')).getByText('Échelonné')).toBeTruthy();
     expect(within(ligne('Durée du système')).getByText('3 ans (36 mois)')).toBeTruthy();
   });
 

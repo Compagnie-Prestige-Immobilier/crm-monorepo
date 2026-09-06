@@ -8,6 +8,7 @@ import type * as RepresentantsData from '@/lib/data/representants';
 import type { Paginated, RepresentantRow } from '@/lib/types';
 import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
+import { routerMock } from '@/test/router-mock';
 
 const fetchRepresentantsAppeles = vi.fn();
 const fetchProspectsAppeles = vi.fn();
@@ -51,6 +52,10 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
     updatedAt: '2026-01-01T00:00:00.000Z',
     prospectCount: 0,
     relationStatus: 'AMBASSADEUR',
+    statutQualificationId: null,
+    statutQualificationLabel: null,
+    statutQualificationEffect: null,
+    callAttemptCount: 0,
     whatsappStatus: 'NON_DEMANDE',
     whatsappE164: null,
     whatsappNumber: null,
@@ -65,6 +70,7 @@ function rep(over: Partial<RepresentantRow> & { id: string }): RepresentantRow {
     lastCallById: 'u-1',
     lastCallByName: 'Fatou Sow',
     nextCallbackAt: null,
+    nextCallbackOrigine: null,
     ...over,
   };
 }
@@ -118,7 +124,7 @@ describe('MesContactsView', () => {
     expect(within(ligne).getByText('+221 77 000 00 09')).toBeTruthy();
     expect(within(ligne).getAllByText('Méthode obtenue')).toHaveLength(2);
     expect(within(ligne).getByRole('link', { name: 'Awa Diouf' }).getAttribute('href')).toBe(
-      '/chues/prospects?search=%2B221770000009',
+      '/chues/prospects/p-1#appels',
     );
     expect(fetchProspectsAppeles).toHaveBeenCalledWith('u-1', 'CHUES');
   });
@@ -130,10 +136,11 @@ describe('MesContactsView', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Représentants' }));
 
     const ligne = (await screen.findByText('Aminata Ndiaye')).closest('tr') as HTMLElement;
-    expect(within(ligne).getByText('Prospects promis')).toBeTruthy();
-    expect(within(ligne).getByText('A accepté')).toBeTruthy();
+    // L'issue en colonne, et la pastille qui la reprend faute de statut.
+    expect(within(ligne).getAllByText('Prospects promis')).toHaveLength(2);
+    expect(within(ligne).queryByText('A accepté')).toBeNull();
     expect(within(ligne).getByRole('link', { name: 'Aminata Ndiaye' }).getAttribute('href')).toBe(
-      '/chues/representants/r-1',
+      '/chues/representants/r-1#appels',
     );
     expect(fetchRepresentantsAppeles).toHaveBeenCalledWith('u-1');
   });
@@ -171,13 +178,38 @@ describe('MesContactsView', () => {
   it('ne propose aucun onglet en Grand Public et mène à la fiche du prospect', async () => {
     await renderView({ projet: 'GRAND_PUBLIC' });
 
-    expect(await screen.findByRole('link', { name: 'Awa Diouf' })).toHaveProperty(
-      'pathname',
-      '/grand-public/p-1',
-    );
+    const lien = await screen.findByRole('link', { name: 'Awa Diouf' });
+    expect(lien).toHaveProperty('pathname', '/grand-public/p-1');
+    // La fiche Grand Public n'a pas de section d'appels : pas d'ancre morte.
+    expect(lien.getAttribute('href')).toBe('/grand-public/p-1');
     expect(screen.queryByRole('group', { name: 'Type de contact' })).toBeNull();
     expect(fetchProspectsAppeles).toHaveBeenCalledWith('u-1', 'GRAND_PUBLIC');
     expect(fetchRepresentantsAppeles).not.toHaveBeenCalled();
+  });
+
+  it('ouvre la fiche depuis n’importe quelle cellule de la ligne, sur les appels', async () => {
+    await renderView();
+    await screen.findByText('Awa Diouf');
+    await userEvent.click(screen.getByRole('button', { name: 'Représentants' }));
+
+    const ligne = (await screen.findByText('Aminata Ndiaye')).closest('tr') as HTMLElement;
+    await userEvent.click(within(ligne).getByText('+221 77 123 45 67'));
+
+    expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-1#appels');
+  });
+
+  it('laisse sélectionner un numéro à la souris sans quitter la liste', async () => {
+    await renderView();
+
+    const cellule = await screen.findByText('+221 77 000 00 09');
+    await userEvent.pointer([
+      { target: cellule, offset: 0, keys: '[MouseLeft>]' },
+      { target: cellule, offset: 10 },
+      { keys: '[/MouseLeft]' },
+    ]);
+
+    expect(window.getSelection()?.toString()).toBe('+221 77 00');
+    expect(routerMock.push).not.toHaveBeenCalled();
   });
 
   it('avoue que la liste est coupée quand le serveur en a davantage', async () => {

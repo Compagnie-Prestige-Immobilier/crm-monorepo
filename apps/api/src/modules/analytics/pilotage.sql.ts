@@ -9,18 +9,45 @@ export const BANK_CASE = Prisma.sql`bc`;
 export const TRANSITION = Prisma.sql`tr`;
 export const RELATION_CHANGE = Prisma.sql`rc`;
 
-/** Clés de `CallOutcome` comptant pour un numéro inexploitable. */
-export const UNUSABLE_OUTCOMES = Prisma.sql`('UNREACHABLE', 'WRONG_NUMBER')`;
+/**
+ * Clés de `CallOutcome` qui ne comptent PAS comme un contact. Un faux numéro
+ * n'en est plus : la fiche est traitée, elle sort du numérateur des
+ * injoignables. Miroir de `countsAsReached`, tenu par
+ * `referentiels/call-outcome-rules.test.ts`.
+ */
+export const NOT_REACHED_OUTCOMES = Prisma.sql`('UNREACHABLE')`;
 
 /**
  * Les seules issues de `RepCallOutcome` que le terrain sait encore saisir.
- * `PROSPECTS_PROMISED`, `WRONG_NUMBER` et `OTHER` sont de l'héritage : ni
+ * `PROSPECTS_PROMISED` et `OTHER` sont de l'héritage : ni
  * numérateur ni dénominateur, sinon les taux dépendraient de l'âge des données.
  */
-export const REP_LIVE_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', 'UNREACHABLE')`;
+export const REP_LIVE_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', 'UNREACHABLE', 'WRONG_NUMBER')`;
 
-/** Joignable côté représentant : il a répondu, qu'il dise oui ou non. */
-export const REP_ANSWERED_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED')`;
+/**
+ * La famille jointe côté représentant, telle que `brancheDe` la dérive de
+ * l'effet du statut. Un faux numéro y entre : quelqu'un a décroché.
+ */
+export const REP_JOINT_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', 'WRONG_NUMBER')`;
+
+/** À placer après `FROM "rep_call_attempts" rca` pour lire `REP_ARBITRAGE`. */
+export const REP_STATUT_JOIN = Prisma.sql`LEFT JOIN "statuts_qualification" sq ON sq."id" = rca."statutQualificationId"`;
+
+/**
+ * Ce que la tentative tranche de l'adhésion, ou NULL quand elle ne tranche
+ * rien. La relation posée par le statut fait foi : seul « Accepté » pose
+ * AMBASSADEUR, seul « Refusé » pose REFUS. « Décédé », « Hors cible » ou
+ * « Autre joint » sont joints et fermés sans être un arbitrage : hors
+ * numérateur ET hors dénominateur, comme l'héritage ci-dessus. Une tentative
+ * d'avant le référentiel ne porte aucun statut : son issue reste le seul
+ * signal, sinon le taux d'acceptation changerait avec l'âge des données.
+ */
+export const REP_ARBITRAGE = Prisma.sql`CASE
+    WHEN sq."relationStatus" IN ('AMBASSADEUR', 'REFUS') THEN sq."relationStatus"::text
+    WHEN rca."statutQualificationId" IS NOT NULL THEN NULL
+    WHEN rca."outcome" = 'REACHED' THEN 'AMBASSADEUR'
+    WHEN rca."outcome" = 'REFUSED' THEN 'REFUS'
+  END`;
 
 /**
  * Sous-requêtes et non jointures : un prospect porte plusieurs dossiers, une

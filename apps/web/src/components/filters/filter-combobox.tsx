@@ -97,7 +97,12 @@ export function FilterCombobox({
             bouton déclencheur : un champ étroit ouvrait un menu tout aussi
             étroit, tronquant les libellés longs du référentiel.
           */}
-          <PopoverContent className="w-max min-w-(--anchor-width) max-w-[min(28rem,90vw)] p-0">
+          {/*
+            `overflow-hidden` reprend la main sur le popover : c'est la LISTE
+            qui défile, pas la boîte, sinon le champ de recherche s'en irait
+            vers le haut au premier coup de molette.
+          */}
+          <PopoverContent className="w-max min-w-(--anchor-width) max-w-[min(28rem,90vw)] overflow-hidden p-0">
             {/*
               `shouldFilter={false}` : cmdk filtre par défaut avec son propre
               score, qui ignore les accents autant qu'il ignore le français.

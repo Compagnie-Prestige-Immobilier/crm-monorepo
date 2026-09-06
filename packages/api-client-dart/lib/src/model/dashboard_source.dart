@@ -50,6 +50,8 @@ enum DashboardSource {
   aRappeler(r'a-rappeler'),
   @JsonValue(r'taux-de-qualification')
   tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'repartition-statuts-qualification')
+  repartitionStatutsQualification(r'repartition-statuts-qualification'),
   @JsonValue(r'taux-de-joignabilite')
   tauxDeJoignabilite(r'taux-de-joignabilite'),
   @JsonValue(r'prospects-notes')
@@ -58,6 +60,8 @@ enum DashboardSource {
   adhesions(r'adhesions'),
   @JsonValue(r'reste-a-appeler')
   resteAAppeler(r'reste-a-appeler'),
+  @JsonValue(r'fiches-ouvertes')
+  fichesOuvertes(r'fiches-ouvertes'),
   @JsonValue(r'par-teleconseiller')
   parTeleconseiller(r'par-teleconseiller'),
   @JsonValue(r'couverture-derniere-campagne')
@@ -76,6 +80,18 @@ enum DashboardSource {
   delaisMedians(r'delais-medians'),
   @JsonValue(r'rendement-par-departement')
   rendementParDepartement(r'rendement-par-departement'),
+  @JsonValue(r'enrolement-inscriptions')
+  enrolementInscriptions(r'enrolement-inscriptions'),
+  @JsonValue(r'enrolement-taux-rapprochement')
+  enrolementTauxRapprochement(r'enrolement-taux-rapprochement'),
+  @JsonValue(r'enrolement-taux-conversion')
+  enrolementTauxConversion(r'enrolement-taux-conversion'),
+  @JsonValue(r'enrolement-par-jour')
+  enrolementParJour(r'enrolement-par-jour'),
+  @JsonValue(r'enrolement-par-etape')
+  enrolementParEtape(r'enrolement-par-etape'),
+  @JsonValue(r'enrolement-par-teleconseiller')
+  enrolementParTeleconseiller(r'enrolement-par-teleconseiller'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

@@ -31,12 +31,13 @@ import {
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { navigationRetenue } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 export function NotificationBell({ href }: { href: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const live = useLive();
+  const live = useLive({ topic: 'notifications' });
 
   const [open, setOpen] = useState(false);
   const [swinging, setSwinging] = useState(false);
@@ -93,6 +94,7 @@ export function NotificationBell({ href }: { href: string }) {
     const target = webRouteFor(item.route);
     if (target === null) return;
     setOpen(false);
+    if (navigationRetenue()) return;
     router.push(target);
   }
 

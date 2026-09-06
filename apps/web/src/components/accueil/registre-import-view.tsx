@@ -113,7 +113,7 @@ function peutAppliquer(
 
 export function RegistreImportView() {
   const queryClient = useQueryClient();
-  const live = useLive();
+  const live = useLive({ topic: 'imports' });
   const template = useFileDownload();
   const inputId = useId();
   const duId = useId();

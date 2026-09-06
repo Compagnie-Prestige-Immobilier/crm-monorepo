@@ -13,6 +13,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { DEVICE_CALL_LABELS, type DeviceCallType } from '../../common/device-call.js';
 import { SupervisionActivityService } from '../analytics/supervision.service.js';
 import { dakarDayEnd } from '../callbacks/callbacks.service.js';
 import { isOpenApiGeneration } from '../../env.js';
@@ -40,9 +41,18 @@ export const ReminderKey = {
   BANK_CASES_STALE: 'bank-cases-stale',
   DUE_CALLBACKS: 'due-callbacks',
   DAILY_REPORT: 'daily-report',
+  UNLOGGED_CALL: 'appel-non-consigne',
 } as const;
 
 export type ReminderKeyValue = (typeof ReminderKey)[keyof typeof ReminderKey];
+
+export const UNLOGGED_CALL_BUCKET_MS = 30 * 60 * 1000;
+
+/** La tranche de 30 minutes qui regroupe les alertes d'appels non consignés. */
+export const trancheDe = (now: Date): string =>
+  new Date(Math.floor(now.getTime() / UNLOGGED_CALL_BUCKET_MS) * UNLOGGED_CALL_BUCKET_MS)
+    .toISOString()
+    .slice(0, 16);
 
 export const periodFor = (date: Date, timeZone: string): string =>
   new Intl.DateTimeFormat('en-CA', {
@@ -304,6 +314,100 @@ export class RemindersService {
       route: '/dossiers',
       category: NotificationCategory.RAPPEL,
     });
+  }
+
+  /**
+   * Le téléphone a vu un appel que personne n'a consigné : l'encadrement doit
+   * l'apprendre le jour même, pas au relevé du mois.
+   *
+   * REGROUPÉ PAR TRANCHE DE 30 MINUTES. Une session d'appels non consignés en
+   * produit une dizaine ; une alerte par appel noierait la boîte et ferait
+   * cesser la lecture. La tranche sert de `period`, et l'index unique
+   * `(reminderKey, period)` rend le regroupement atomique entre deux poussées
+   * simultanées du même téléphone.
+   */
+  async alerterAppelsNonConsignes(
+    performedById: string,
+    detectionIds: readonly string[],
+    now: Date = new Date(),
+  ): Promise<number> {
+    if (!detectionIds.length) return 0;
+
+    const detection = await this.prisma.deviceCallDetection.findFirst({
+      where: { id: { in: [...detectionIds] }, performedById, attemptId: null },
+      orderBy: { deviceCallAt: 'desc' },
+      select: {
+        deviceCallType: true,
+        deviceCallAt: true,
+        performedBy: { select: { fullName: true } },
+        representant: { select: { fullName: true } },
+        prospect: { select: { nom: true, prenom: true } },
+      },
+    });
+    if (!detection) return 0;
+
+    const destinataires = await this.prisma.user.findMany({
+      where: {
+        role: { in: [Role.SUPERVISEUR, Role.DIRECTION] },
+        isActive: true,
+        deletedAt: null,
+      },
+      select: { id: true },
+    });
+    if (!destinataires.length) return 0;
+
+    const fiche =
+      detection.representant?.fullName ??
+      [detection.prospect?.prenom, detection.prospect?.nom].filter(Boolean).join(' ').trim();
+    const type =
+      DEVICE_CALL_LABELS[detection.deviceCallType as DeviceCallType] ?? detection.deviceCallType;
+    const heure = new Intl.DateTimeFormat('fr-FR', {
+      timeZone: this.config.BUSINESS_TIME_ZONE,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).format(detection.deviceCallAt);
+
+    const id = uuidv7();
+    const reminderKey = `${ReminderKey.UNLOGGED_CALL}:${performedById}`;
+    const period = trancheDe(now);
+
+    await this.prisma.notification.createMany({
+      data: [
+        {
+          id,
+          title: 'Appel non consigné',
+          body: `${detection.performedBy.fullName} : appel ${type} avec ${fiche || 'une fiche'} à ${heure}, non consigné.`,
+          category: NotificationCategory.ANNONCE,
+          route: '/supervision?volet=activite',
+          audience: NotificationAudience.USERS,
+          audienceUserIds: destinataires.map((row) => row.id),
+          status: NotificationStatus.SENDING,
+          reminderKey,
+          period,
+        },
+      ],
+      skipDuplicates: true,
+    });
+
+    const present = await this.prisma.notification.findFirst({
+      where: { reminderKey, period },
+      select: { id: true },
+    });
+    if (present?.id !== id) return 0;
+
+    await this.prisma.notificationDelivery.createMany({
+      data: destinataires.map((row) => ({
+        notificationId: id,
+        userId: row.id,
+        status: NotificationDeliveryStatus.PENDING,
+        reminderKey: ReminderKey.UNLOGGED_CALL,
+        period,
+      })),
+      skipDuplicates: true,
+    });
+    await this.notifications.dispatchMany([id], now);
+    return 1;
   }
 
   private async roleAudience(

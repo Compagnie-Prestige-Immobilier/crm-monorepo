@@ -72,6 +72,8 @@ jobs:
       SEED_ADMIN_EMAIL: admin@cpi.sn
       SEED_ADMIN_USERNAME: admin
       SEED_ADMIN_PASSWORD: ci-admin-password-2026
+      REDIS_URL: redis://localhost:6379
+      DEMO_WORKSPACE_ENABLED: 'true'
     services:
       postgres:
         image: postgres:18.4
@@ -83,6 +85,15 @@ jobs:
           - 5432:5432
         options: >-
           --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
@@ -110,7 +121,7 @@ jobs:
       # fois : même suite de tests, même résultat, ~4 minutes de moins.
       - name: Publier la couverture pour Sonar
         if: vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod'
-        uses: actions/upload-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: lcov-coverage
           path: |
@@ -225,7 +236,7 @@ jobs:
       # `path: apps`, et non `.` : `upload-artifact` retire le préfixe commun
       # `apps/` des deux fichiers avant de les stocker, `download-artifact` ne
       # le restitue donc qu'en le précisant ici.
-      - uses: actions/download-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           name: lcov-coverage
           path: apps
@@ -434,6 +445,8 @@ jobs:
             apps/api/openapi.json
             packages/api-client/src/generated
             packages/api-client-dart/lib
+            packages/api-client-chues/src/generated
+            packages/api-client-grand-public/src/generated
           )
           # Un chemin généré absent n'est pas « pas de dérive » : c'est une
           # génération qui n'a rien produit. `git add` échouerait de toute

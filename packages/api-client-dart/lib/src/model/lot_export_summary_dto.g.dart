@@ -241,6 +241,8 @@ Map<String, dynamic> _$LotExportSummaryDtoToJson(
 const _$LotExportCibleEnumMap = {
   LotExportCible.REPRESENTANTS: 'REPRESENTANTS',
   LotExportCible.PROSPECTS: 'PROSPECTS',
+  LotExportCible.REPRESENTANTS_INJOIGNABLES: 'REPRESENTANTS_INJOIGNABLES',
+  LotExportCible.CONTACTS_RECOMMANDES: 'CONTACTS_RECOMMANDES',
   LotExportCible.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

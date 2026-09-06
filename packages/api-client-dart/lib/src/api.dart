@@ -16,16 +16,19 @@ import 'package:crm_api_client/src/api/bank_cases_api.dart';
 import 'package:crm_api_client/src/api/call_outcome_reasons_api.dart';
 import 'package:crm_api_client/src/api/client_requests_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
+import 'package:crm_api_client/src/api/enrolement_api.dart';
 import 'package:crm_api_client/src/api/export_api.dart';
 import 'package:crm_api_client/src/api/imports_api.dart';
 import 'package:crm_api_client/src/api/lots_export_api.dart';
 import 'package:crm_api_client/src/api/notification_templates_api.dart';
 import 'package:crm_api_client/src/api/notifications_api.dart';
+import 'package:crm_api_client/src/api/ouvertures_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
 import 'package:crm_api_client/src/api/prospects_api.dart';
 import 'package:crm_api_client/src/api/referentiels_api.dart';
 import 'package:crm_api_client/src/api/rep_campaigns_api.dart';
 import 'package:crm_api_client/src/api/representants_api.dart';
+import 'package:crm_api_client/src/api/statuts_qualification_api.dart';
 import 'package:crm_api_client/src/api/suggestions_api.dart';
 import 'package:crm_api_client/src/api/supervision_api.dart';
 import 'package:crm_api_client/src/api/sync_api.dart';
@@ -210,6 +213,12 @@ class CrmApiClient {
     return DemoApi(dio);
   }
 
+  /// Get EnrolementApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  EnrolementApi getEnrolementApi() {
+    return EnrolementApi(dio);
+  }
+
   /// Get ExportApi instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   ExportApi getExportApi() {
@@ -240,6 +249,12 @@ class CrmApiClient {
     return NotificationsApi(dio);
   }
 
+  /// Get OuverturesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  OuverturesApi getOuverturesApi() {
+    return OuverturesApi(dio);
+  }
+
   /// Get Phase2Api instance, base route and serializer can be overridden by a given but be careful,
   /// by doing that all interceptors will not be executed
   Phase2Api getPhase2Api() {
@@ -268,6 +283,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   RepresentantsApi getRepresentantsApi() {
     return RepresentantsApi(dio);
+  }
+
+  /// Get StatutsQualificationApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  StatutsQualificationApi getStatutsQualificationApi() {
+    return StatutsQualificationApi(dio);
   }
 
   /// Get SuggestionsApi instance, base route and serializer can be overridden by a given but be careful,

@@ -48,14 +48,22 @@ describe('mes-attributions', () => {
     ]);
   });
 
-  it('l’encadrement reçoit `tout` et deux listes vides : le mobile ne filtre pas', async () => {
-    for (const role of [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION]) {
+  it('l’admin reçoit `tout` et deux listes vides : le mobile ne filtre pas', async () => {
+    await expect(service.mesAttributions({ ...ALICE, role: Role.ADMIN })).resolves.toEqual({
+      representantIds: [],
+      prospectIds: [],
+      tout: true,
+    });
+    expect(findMany).not.toHaveBeenCalled();
+  });
+
+  it('supervision et direction sont bornées à leurs campagnes comme un téléconseiller', async () => {
+    for (const role of [Role.SUPERVISEUR, Role.DIRECTION]) {
       await expect(service.mesAttributions({ ...ALICE, role })).resolves.toEqual({
-        representantIds: [],
-        prospectIds: [],
-        tout: true,
+        representantIds: ['rep-1', 'rep-2'],
+        prospectIds: ['p-1'],
+        tout: false,
       });
     }
-    expect(findMany).not.toHaveBeenCalled();
   });
 });

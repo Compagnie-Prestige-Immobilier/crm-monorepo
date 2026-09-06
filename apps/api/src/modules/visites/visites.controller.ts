@@ -15,6 +15,7 @@ import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import {
   CurrentUser,
   type AuthenticatedUser,
@@ -173,6 +174,7 @@ export class VisitesController {
 
   @Roles(...VISITE_REGISTRE_ROLES)
   @Get('statistiques')
+  @Cached(60)
   @ApiOperation({
     operationId: 'getVisiteStats',
     summary: 'Le registre compté sur une période.',
