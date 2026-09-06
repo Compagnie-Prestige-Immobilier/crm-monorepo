@@ -75,11 +75,10 @@ class UpdateRepresentantDto {
   @JsonKey(name: r'phone', required: false, includeIfNull: false)
   final String? phone;
 
-  /// FACULTATIF : une fiche naît normalement en tournée, où le département se déduit du secteur. La saisie manuelle ne le connaît pas toujours.
   @JsonKey(name: r'departementId', required: false, includeIfNull: false)
   final String? departementId;
 
-  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement.
+  /// IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
   @JsonKey(name: r'iefId', required: false, includeIfNull: false)
   final String? iefId;
 

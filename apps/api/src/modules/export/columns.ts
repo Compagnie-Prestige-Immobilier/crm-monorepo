@@ -85,7 +85,7 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   {
     header: 'Département',
     key: 'departement',
-    value: (row) => row.representant?.departement?.name ?? '',
+    value: (row) => row.representant?.departement.name ?? '',
   },
   { header: 'Commercial', key: 'commercial', value: (row) => row.createdBy.fullName },
   { header: 'Date de saisie', key: 'saisie', isDate: true, value: (row) => row.clientCreatedAt },

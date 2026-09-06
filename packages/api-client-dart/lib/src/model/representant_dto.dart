@@ -112,11 +112,11 @@ class RepresentantDto {
   @JsonKey(name: r'rev', required: true, includeIfNull: false)
   final num rev;
 
-  @JsonKey(name: r'departementId', required: true, includeIfNull: true)
-  final String? departementId;
+  @JsonKey(name: r'departementId', required: true, includeIfNull: false)
+  final String departementId;
 
-  @JsonKey(name: r'departementName', required: true, includeIfNull: true)
-  final String? departementName;
+  @JsonKey(name: r'departementName', required: true, includeIfNull: false)
+  final String departementName;
 
   @JsonKey(name: r'iefId', required: true, includeIfNull: true)
   final String? iefId;

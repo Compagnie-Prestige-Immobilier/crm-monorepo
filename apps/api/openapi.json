@@ -23399,12 +23399,10 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid",
-            "nullable": true
+            "format": "uuid"
           },
           "departementName": {
-            "type": "string",
-            "nullable": true
+            "type": "string"
           },
           "iefId": {
             "type": "string",
@@ -23816,13 +23814,12 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid",
-            "description": "FACULTATIF : une fiche naît normalement en tournée, où le département se déduit du secteur. La saisie manuelle ne le connaît pas toujours."
+            "format": "uuid"
           },
           "iefId": {
             "type": "string",
             "format": "uuid",
-            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement."
+            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse."
           },
           "notes": {
             "type": "string",
@@ -23834,7 +23831,7 @@
             "description": "Horodatage de la saisie sur le terrain. Défaut : maintenant. Distinct de createdAt, qui est l’arrivée en base."
           }
         },
-        "required": ["fullName", "phone"]
+        "required": ["fullName", "phone", "departementId"]
       },
       "UpdateRepresentantDto": {
         "type": "object",
@@ -23866,13 +23863,12 @@
           },
           "departementId": {
             "type": "string",
-            "format": "uuid",
-            "description": "FACULTATIF : une fiche naît normalement en tournée, où le département se déduit du secteur. La saisie manuelle ne le connaît pas toujours."
+            "format": "uuid"
           },
           "iefId": {
             "type": "string",
             "format": "uuid",
-            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement."
+            "description": "IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse."
           },
           "notes": {
             "type": "string",

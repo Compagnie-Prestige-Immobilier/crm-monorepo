@@ -244,7 +244,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     representantName: representant.fullName,
     representantPhoneE164: representant.phoneE164,
     departementId: representant.departementId,
-    departementName: representant.departement?.name ?? null,
+    departementName: representant.departement.name,
     ownedByCommercialId: row.createdBy.id,
     ownedByCommercialName: row.createdBy.fullName,
     type: row.type,

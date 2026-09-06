@@ -17,9 +17,9 @@ abstract class _$RepresentantDtoCWProxy {
 
   RepresentantDto rev(num rev);
 
-  RepresentantDto departementId(String? departementId);
+  RepresentantDto departementId(String departementId);
 
-  RepresentantDto departementName(String? departementName);
+  RepresentantDto departementName(String departementName);
 
   RepresentantDto iefId(String? iefId);
 
@@ -91,8 +91,8 @@ abstract class _$RepresentantDtoCWProxy {
     String phoneE164,
     String? notes,
     num rev,
-    String? departementId,
-    String? departementName,
+    String departementId,
+    String departementName,
     String? iefId,
     String? iefName,
     String createdById,
@@ -146,11 +146,11 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
   RepresentantDto rev(num rev) => this(rev: rev);
 
   @override
-  RepresentantDto departementId(String? departementId) =>
+  RepresentantDto departementId(String departementId) =>
       this(departementId: departementId);
 
   @override
-  RepresentantDto departementName(String? departementName) =>
+  RepresentantDto departementName(String departementName) =>
       this(departementName: departementName);
 
   @override
@@ -326,11 +326,11 @@ class _$RepresentantDtoCWProxyImpl implements _$RepresentantDtoCWProxy {
       departementId: departementId == const $CopyWithPlaceholder()
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
-          : departementId as String?,
+          : departementId as String,
       departementName: departementName == const $CopyWithPlaceholder()
           ? _value.departementName
           // ignore: cast_nullable_to_non_nullable
-          : departementName as String?,
+          : departementName as String,
       iefId: iefId == const $CopyWithPlaceholder()
           ? _value.iefId
           // ignore: cast_nullable_to_non_nullable
@@ -509,8 +509,8 @@ RepresentantDto _$RepresentantDtoFromJson(
     phoneE164: $checkedConvert('phoneE164', (v) => v as String),
     notes: $checkedConvert('notes', (v) => v as String?),
     rev: $checkedConvert('rev', (v) => v as num),
-    departementId: $checkedConvert('departementId', (v) => v as String?),
-    departementName: $checkedConvert('departementName', (v) => v as String?),
+    departementId: $checkedConvert('departementId', (v) => v as String),
+    departementName: $checkedConvert('departementName', (v) => v as String),
     iefId: $checkedConvert('iefId', (v) => v as String?),
     iefName: $checkedConvert('iefName', (v) => v as String?),
     createdById: $checkedConvert('createdById', (v) => v as String),
