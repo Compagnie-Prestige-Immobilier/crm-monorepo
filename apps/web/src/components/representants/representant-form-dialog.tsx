@@ -160,6 +160,7 @@ function AideNumero({
 }
 
 interface ChampsQualificationProps {
+  visible: boolean;
   ids: { prenomId: string; etablissementId: string; connaitUESId: string; contacteId: string };
   prenom: string;
   onPrenom: (value: string) => void;
@@ -176,6 +177,8 @@ interface ChampsQualificationProps {
 
 /** Ce que l'appel a appris de la personne, hors campagne en cours. */
 function ChampsQualification(props: ChampsQualificationProps) {
+  if (!props.visible) return null;
+
   return (
     <>
       <div className="grid gap-3 sm:grid-cols-2">
@@ -285,6 +288,203 @@ function referentielsDe(
   };
 }
 
+function regionOptionsDe(reference: Referentiels) {
+  return (reference?.regions ?? []).map((region) => ({ value: region.id, label: region.name }));
+}
+
+function iefOptionsDe(reference: Referentiels, departementId: string | null) {
+  return (reference?.iefs ?? [])
+    .filter((ief) => (departementId === null ? true : ief.departementId === departementId))
+    .map((ief) => ({ value: ief.id, label: ief.name, hint: ief.departementName }));
+}
+
+function ariaDescribedByDe(
+  phoneId: string,
+  conflict: { label: string; owner: string | null } | null,
+): string {
+  return conflict === null ? `${phoneId}-aide` : `${phoneId}-conflit`;
+}
+
+function ChampRelation({
+  visible,
+  relationId,
+  reasonId,
+  representant,
+  relationStatus,
+  onRelationStatus,
+  switchingToRefus,
+  relationReason,
+  onRelationReason,
+}: {
+  visible: boolean;
+  relationId: string;
+  reasonId: string;
+  representant: RepresentantRow | null;
+  relationStatus: RepresentantRelation;
+  onRelationStatus: (value: RepresentantRelation) => void;
+  switchingToRefus: boolean;
+  relationReason: string;
+  onRelationReason: (value: string) => void;
+}) {
+  if (!visible || representant === null) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={relationId}>Relation</Label>
+      <Select
+        items={relationItems(representant.relationStatus)}
+        value={relationStatus}
+        onValueChange={(value) => {
+          if (value === null) return;
+          onRelationStatus(value);
+        }}
+      >
+        <SelectTrigger id={relationId} className="w-full">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {relationItems(representant.relationStatus).map((item) => (
+            <SelectItem key={item.value} value={item.value}>
+              {item.label}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+      <p className="text-[0.75rem] text-muted-foreground">
+        Chaque changement est daté et signé dans l’histoire de la fiche.
+      </p>
+
+      <ChampMotifRefus
+        visible={switchingToRefus}
+        reasonId={reasonId}
+        value={relationReason}
+        onChange={onRelationReason}
+      />
+    </div>
+  );
+}
+
+function ChampWhatsapp({
+  visible,
+  whatsappId,
+  whatsappNumberId,
+  whatsappStatus,
+  onWhatsappStatus,
+  whatsappNumber,
+  onWhatsappNumber,
+}: {
+  visible: boolean;
+  whatsappId: string;
+  whatsappNumberId: string;
+  whatsappStatus: WhatsappStatus;
+  onWhatsappStatus: (value: WhatsappStatus) => void;
+  whatsappNumber: string;
+  onWhatsappNumber: (value: string) => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={whatsappId}>WhatsApp</Label>
+        <Select
+          items={WHATSAPP_ITEMS}
+          value={whatsappStatus}
+          onValueChange={(value) => {
+            if (value === null) return;
+            onWhatsappStatus(value);
+          }}
+        >
+          <SelectTrigger id={whatsappId} className="w-full">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {WHATSAPP_ITEMS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <p className="text-[0.75rem] text-muted-foreground">
+          « Non demandé » dit que la question n’a pas été posée, « pas de WhatsApp » qu’elle l’a
+          été.
+        </p>
+      </div>
+
+      {whatsappStatus === 'AUTRE_NUMERO' ? (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor={whatsappNumberId}>Numéro WhatsApp</Label>
+          <Input
+            id={whatsappNumberId}
+            value={whatsappNumber}
+            maxLength={40}
+            inputMode="tel"
+            autoComplete="off"
+            placeholder="77 123 45 67"
+            onChange={(event) => {
+              onWhatsappNumber(event.target.value);
+            }}
+          />
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function ChampProfession({
+  visible,
+  professionId,
+  profession,
+  onProfession,
+}: {
+  visible: boolean;
+  professionId: string;
+  profession: string;
+  onProfession: (value: string) => void;
+}) {
+  if (!visible) return null;
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={professionId}>Profession</Label>
+      <Input
+        id={professionId}
+        value={profession}
+        maxLength={120}
+        autoComplete="off"
+        list={`${professionId}-frequentes`}
+        onChange={(event) => {
+          onProfession(event.target.value);
+        }}
+      />
+      <datalist id={`${professionId}-frequentes`}>
+        {PROFESSIONS.map((item) => (
+          <option key={item} value={item} />
+        ))}
+      </datalist>
+    </div>
+  );
+}
+
+function BoutonEnregistrer({ isPending, isEdit }: { isPending: boolean; isEdit: boolean }) {
+  if (isPending) {
+    return (
+      <>
+        <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        Enregistrement…
+      </>
+    );
+  }
+
+  return (
+    <>
+      <CheckIcon aria-hidden="true" />
+      {isEdit ? 'Enregistrer' : 'Créer la fiche'}
+    </>
+  );
+}
+
 function ficheEnvoyable(etat: {
   fullName: string;
   phone: string;
@@ -354,6 +554,40 @@ function patchDuScript(
   return patch;
 }
 
+// Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans rien
+// écrire, et l'écran laisserait croire à une bascule historisée.
+function patchRelation(
+  patch: UpdateRepresentantPatch,
+  representant: RepresentantRow,
+  saisie: SaisieFiche,
+): void {
+  if (saisie.relationStatus !== representant.relationStatus) {
+    patch.relationStatus = saisie.relationStatus;
+  }
+  const reason = saisie.relationReason.trim();
+  if (saisie.switchingToRefus && reason !== '') patch.relationReason = reason;
+}
+
+function assignTexteSiChange(
+  patch: UpdateRepresentantPatch,
+  key: 'prenom' | 'etablissement' | 'syndicat',
+  value: string,
+  previous: string,
+): void {
+  if (value !== previous) patch[key] = value;
+}
+
+// Le contrat n'admet que `boolean` : « Indéterminé » ne peut pas remettre la
+// valeur à null, il laisse donc la fiche telle quelle.
+function assignTriSiChange(
+  patch: UpdateRepresentantPatch,
+  key: 'connaitUES' | 'contacte',
+  value: boolean | null,
+  previous: boolean | null,
+): void {
+  if (value !== null && value !== previous) patch[key] = value;
+}
+
 /** Ne repart que ce qui a CHANGÉ : le serveur refuse une bascule sans écart. */
 function patchDeFiche(
   representant: RepresentantRow,
@@ -367,63 +601,63 @@ function patchDeFiche(
     notes: saisie.notes.trim(),
   };
   if (saisie.iefId !== null) patch.iefId = saisie.iefId;
-  // Un statut inchangé n'est PAS renvoyé : le serveur le refuserait sans rien
-  // écrire, et l'écran laisserait croire à une bascule historisée.
-  if (saisie.relationStatus !== representant.relationStatus) {
-    patch.relationStatus = saisie.relationStatus;
-  }
-  const reason = saisie.relationReason.trim();
-  if (saisie.switchingToRefus && reason !== '') patch.relationReason = reason;
-
+  patchRelation(patch, representant, saisie);
   Object.assign(patch, patchDuScript(saisie, savedScript));
-  if (saisie.prenom.trim() !== (representant.prenom ?? '')) patch.prenom = saisie.prenom.trim();
-  if (saisie.etablissement.trim() !== (representant.etablissement ?? '')) {
-    patch.etablissement = saisie.etablissement.trim();
-  }
-  if (saisie.syndicat.trim() !== (representant.syndicat ?? '')) {
-    patch.syndicat = saisie.syndicat.trim();
-  }
-  // Le contrat n'admet que `boolean` : « Indéterminé » ne peut pas remettre la
-  // valeur à null, il laisse donc la fiche telle quelle.
-  if (saisie.connaitUES !== null && saisie.connaitUES !== representant.connaitUES) {
-    patch.connaitUES = saisie.connaitUES;
-  }
-  if (saisie.contacte !== null && saisie.contacte !== representant.contacte) {
-    patch.contacte = saisie.contacte;
-  }
+  assignTexteSiChange(patch, 'prenom', saisie.prenom.trim(), representant.prenom ?? '');
+  assignTexteSiChange(
+    patch,
+    'etablissement',
+    saisie.etablissement.trim(),
+    representant.etablissement ?? '',
+  );
+  assignTexteSiChange(patch, 'syndicat', saisie.syndicat.trim(), representant.syndicat ?? '');
+  assignTriSiChange(patch, 'connaitUES', saisie.connaitUES, representant.connaitUES);
+  assignTriSiChange(patch, 'contacte', saisie.contacte, representant.contacte);
   return patch;
 }
 
-function champsDeFiche(representant: RepresentantRow | null, prefill: RepresentantPrefill | null) {
-  if (representant === null) {
-    return {
-      fullName: prefill?.fullName ?? '',
-      prenom: '',
-      etablissement: '',
-      syndicat: '',
-      connaitUES: null as boolean | null,
-      contacte: null as boolean | null,
-      phone: prefill?.phone ?? '',
-      departementId: null as string | null,
-      iefId: null as string | null,
-      notes: prefill?.notes ?? '',
-      relationStatus: 'INCONNU' as RepresentantRelation,
-    };
-  }
+function texteOuRepli(value: string | null | undefined, repli: string): string {
+  return value ?? repli;
+}
 
+function champsDeFicheVierge(prefill: RepresentantPrefill | null) {
+  return {
+    fullName: texteOuRepli(prefill?.fullName, ''),
+    prenom: '',
+    etablissement: '',
+    syndicat: '',
+    connaitUES: null as boolean | null,
+    contacte: null as boolean | null,
+    phone: texteOuRepli(prefill?.phone, ''),
+    departementId: null as string | null,
+    iefId: null as string | null,
+    notes: texteOuRepli(prefill?.notes, ''),
+    relationStatus: 'INCONNU' as RepresentantRelation,
+  };
+}
+
+function champsDeFicheExistante(
+  representant: RepresentantRow,
+  prefill: RepresentantPrefill | null,
+) {
   return {
     fullName: representant.fullName,
-    prenom: representant.prenom ?? '',
-    etablissement: representant.etablissement ?? '',
-    syndicat: representant.syndicat ?? '',
+    prenom: texteOuRepli(representant.prenom, ''),
+    etablissement: texteOuRepli(representant.etablissement, ''),
+    syndicat: texteOuRepli(representant.syndicat, ''),
     connaitUES: representant.connaitUES ?? null,
     contacte: representant.contacte ?? null,
     phone: formatPhone(representant.phoneE164),
     departementId: representant.departementId as string | null,
     iefId: representant.iefId ?? null,
-    notes: representant.notes ?? prefill?.notes ?? '',
+    notes: texteOuRepli(representant.notes, texteOuRepli(prefill?.notes, '')),
     relationStatus: representant.relationStatus as RepresentantRelation,
   };
+}
+
+function champsDeFiche(representant: RepresentantRow | null, prefill: RepresentantPrefill | null) {
+  if (representant === null) return champsDeFicheVierge(prefill);
+  return champsDeFicheExistante(representant, prefill);
 }
 
 function valeursDeFiche(
@@ -500,6 +734,7 @@ export function RepresentantFormDialog({
   const isEdit = representant !== null;
   const switchingToRefus =
     representant !== null && relationStatus === 'REFUS' && representant.relationStatus !== 'REFUS';
+  const showEditFields = isEdit && !pendantAppel;
 
   useEffect(() => {
     if (!open) return;
@@ -651,7 +886,7 @@ export function RepresentantFormDialog({
               autoComplete="off"
               placeholder="77 123 45 67"
               aria-invalid={conflict !== null}
-              aria-describedby={conflict === null ? `${phoneId}-aide` : `${phoneId}-conflit`}
+              aria-describedby={ariaDescribedByDe(phoneId, conflict)}
               onChange={(event) => {
                 setPhone(event.target.value);
                 setConflict(null);
@@ -669,10 +904,7 @@ export function RepresentantFormDialog({
               label="Région"
               placeholder="Toutes les régions"
               value={regionId}
-              options={(reference?.regions ?? []).map((region) => ({
-                value: region.id,
-                label: region.name,
-              }))}
+              options={regionOptionsDe(reference)}
               onChange={(value) => {
                 setRegionDraft(value);
                 setDepartementId(null);
@@ -699,15 +931,7 @@ export function RepresentantFormDialog({
               label="IEF"
               placeholder="Aucune"
               value={iefId}
-              options={(reference?.iefs ?? [])
-                .filter((ief) =>
-                  departementId === null ? true : ief.departementId === departementId,
-                )
-                .map((ief) => ({
-                  value: ief.id,
-                  label: ief.name,
-                  hint: ief.departementName,
-                }))}
+              options={iefOptionsDe(reference, departementId)}
               onChange={setIefId}
             />
           </div>
@@ -716,128 +940,52 @@ export function RepresentantFormDialog({
             portent pas, et l’exiger les invaliderait rétroactivement.
           </p>
 
-          {isEdit && !pendantAppel ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={relationId}>Relation</Label>
-              <Select
-                items={relationItems(representant.relationStatus)}
-                value={relationStatus}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setRelationStatus(value);
-                }}
-              >
-                <SelectTrigger id={relationId} className="w-full">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {relationItems(representant.relationStatus).map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[0.75rem] text-muted-foreground">
-                Chaque changement est daté et signé dans l’histoire de la fiche.
-              </p>
+          <ChampRelation
+            visible={showEditFields}
+            relationId={relationId}
+            reasonId={reasonId}
+            representant={representant}
+            relationStatus={relationStatus}
+            onRelationStatus={setRelationStatus}
+            switchingToRefus={switchingToRefus}
+            relationReason={relationReason}
+            onRelationReason={setRelationReason}
+          />
 
-              <ChampMotifRefus
-                visible={switchingToRefus}
-                reasonId={reasonId}
-                value={relationReason}
-                onChange={setRelationReason}
-              />
-            </div>
-          ) : null}
+          <ChampWhatsapp
+            visible={showEditFields}
+            whatsappId={whatsappId}
+            whatsappNumberId={whatsappNumberId}
+            whatsappStatus={whatsappStatus}
+            onWhatsappStatus={setWhatsappStatus}
+            whatsappNumber={whatsappNumber}
+            onWhatsappNumber={setWhatsappNumber}
+          />
 
-          {isEdit && !pendantAppel ? (
-            <>
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={whatsappId}>WhatsApp</Label>
-                <Select
-                  items={WHATSAPP_ITEMS}
-                  value={whatsappStatus}
-                  onValueChange={(value) => {
-                    if (value === null) return;
-                    setWhatsappStatus(value);
-                  }}
-                >
-                  <SelectTrigger id={whatsappId} className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {WHATSAPP_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-[0.75rem] text-muted-foreground">
-                  « Non demandé » dit que la question n’a pas été posée, « pas de WhatsApp » qu’elle
-                  l’a été.
-                </p>
-              </div>
+          <ChampProfession
+            visible={isEdit}
+            professionId={professionId}
+            profession={profession}
+            onProfession={setProfession}
+          />
 
-              {whatsappStatus === 'AUTRE_NUMERO' ? (
-                <div className="flex flex-col gap-1.5">
-                  <Label htmlFor={whatsappNumberId}>Numéro WhatsApp</Label>
-                  <Input
-                    id={whatsappNumberId}
-                    value={whatsappNumber}
-                    maxLength={40}
-                    inputMode="tel"
-                    autoComplete="off"
-                    placeholder="77 123 45 67"
-                    onChange={(event) => {
-                      setWhatsappNumber(event.target.value);
-                    }}
-                  />
-                </div>
-              ) : null}
-            </>
-          ) : null}
-
-          {isEdit ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={professionId}>Profession</Label>
-              <Input
-                id={professionId}
-                value={profession}
-                maxLength={120}
-                autoComplete="off"
-                list={`${professionId}-frequentes`}
-                onChange={(event) => {
-                  setProfession(event.target.value);
-                }}
-              />
-              <datalist id={`${professionId}-frequentes`}>
-                {PROFESSIONS.map((item) => (
-                  <option key={item} value={item} />
-                ))}
-              </datalist>
-            </div>
-          ) : null}
-
-          {isEdit && !pendantAppel ? (
-            <ChampsQualification
-              ids={{ prenomId, etablissementId, connaitUESId, contacteId }}
-              prenom={prenom}
-              onPrenom={setPrenom}
-              etablissement={etablissement}
-              onEtablissement={setEtablissement}
-              syndicatId={syndicatId}
-              syndicatOptions={syndicatOptions}
-              onSyndicat={(value) => {
-                setSyndicat(reference?.syndicats.find((item) => item.id === value)?.name ?? '');
-              }}
-              connaitUES={connaitUES}
-              onConnaitUES={setConnaitUES}
-              contacte={contacte}
-              onContacte={setContacte}
-            />
-          ) : null}
+          <ChampsQualification
+            visible={showEditFields}
+            ids={{ prenomId, etablissementId, connaitUESId, contacteId }}
+            prenom={prenom}
+            onPrenom={setPrenom}
+            etablissement={etablissement}
+            onEtablissement={setEtablissement}
+            syndicatId={syndicatId}
+            syndicatOptions={syndicatOptions}
+            onSyndicat={(value) => {
+              setSyndicat(reference?.syndicats.find((item) => item.id === value)?.name ?? '');
+            }}
+            connaitUES={connaitUES}
+            onConnaitUES={setConnaitUES}
+            contacte={contacte}
+            onContacte={setContacte}
+          />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={notesId}>Notes</Label>
@@ -871,17 +1019,7 @@ export function RepresentantFormDialog({
               save.mutate();
             }}
           >
-            {save.isPending ? (
-              <>
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                Enregistrement…
-              </>
-            ) : (
-              <>
-                <CheckIcon aria-hidden="true" />
-                {isEdit ? 'Enregistrer' : 'Créer la fiche'}
-              </>
-            )}
+            <BoutonEnregistrer isPending={save.isPending} isEdit={isEdit} />
           </Button>
         </DialogFooter>
       </DialogContent>
