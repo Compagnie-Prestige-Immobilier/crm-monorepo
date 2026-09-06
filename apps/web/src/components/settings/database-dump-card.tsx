@@ -241,9 +241,9 @@ function ConfirmExportDialog({
             <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
             <span>
               <span className="font-[600]">Aucun e-mail, aucun lien.</span> L’avis de fin arrive
-              dans la cloche du panel, et nulle part ailleurs&nbsp;: rien ne part par messagerie.
-              Le téléchargement se fait sur cet écran, dans votre session, et l’archive est
-              détruite aussitôt après.
+              dans la cloche du panel, et nulle part ailleurs&nbsp;: rien ne part par messagerie. Le
+              téléchargement se fait sur cet écran, dans votre session, et l’archive est détruite
+              aussitôt après.
             </span>
           </p>
 

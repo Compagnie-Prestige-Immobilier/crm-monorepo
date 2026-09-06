@@ -269,9 +269,7 @@ export function ClientRequestsView({ role }: { role: Role }) {
 
 function RequestNote({ note }: { note: string | null }) {
   if (note === null || note === '') return null;
-  return (
-    <p className="max-w-prose rounded-md bg-muted px-3 py-2 text-[0.8125rem]">{note}</p>
-  );
+  return <p className="max-w-prose rounded-md bg-muted px-3 py-2 text-[0.8125rem]">{note}</p>;
 }
 
 function RequestRejectionNote({ request }: { request: ClientRequest }) {

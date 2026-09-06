@@ -144,8 +144,7 @@ function ApproveDialogFields({
         champ, et reste donc un simple paragraphe.
       */}
       <p className="text-[0.75rem] text-muted-foreground">
-        La banque demandeuse devient la provenance de la fiche, que l’équipe CHUES qualifie
-        ensuite.
+        La banque demandeuse devient la provenance de la fiche, que l’équipe CHUES qualifie ensuite.
       </p>
     </div>
   );
