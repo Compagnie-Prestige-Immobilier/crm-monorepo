@@ -318,7 +318,8 @@ model User {
   clientRequestsReviewed ClientCreationRequest[] @relation("ClientCreationRequestReviewedBy")
 
   // Démonstration
-  appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
+  appSettingsUpdated AppSetting[]       @relation("AppSettingUpdatedBy")
+  appSettingsChanged AppSettingChange[] @relation("AppSettingChangedBy")
 
   androidReleasesPublished AndroidRelease[] @relation("AndroidReleasePublishedBy")
 
@@ -1063,12 +1064,12 @@ model AgentHeartbeat {
   userId String @id
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  lastPullAt DateTime?
-  lastPushAt DateTime?
+  lastPullAt            DateTime?
+  lastPushAt            DateTime?
   /// NULLABLE et sans valeur par défaut : un appareil qui ne l'annonce pas
   /// laisse « inconnu », et non « zéro en attente », qui serait un fait faux.
-  pendingOps Int?
-  appVersion String?
+  pendingOps            Int?
+  appVersion            String?
   /// EB-37 : lecture du journal d'appels accordée. Nul tant que l'appareil ne
   /// l'annonce pas ; faux, la DMC de ce compte ne se mesure pas.
   journalAppelsAutorise Boolean?
@@ -1583,6 +1584,29 @@ model BankCaseTransition {
 }
 
 /// Réglages de la plateforme, en clé/valeur.
+/// EB-29 : ce qu'une valeur de reglage valait AVANT, et ce qu'elle vaut apres.
+///
+/// `AppSetting` ecrase : elle porte son dernier auteur et sa derniere date,
+/// jamais l'ancienne valeur. Sans cette table, personne ne peut dire qui a
+/// change le message envoye aux prospects, ni ce qu'il disait la veille.
+///
+/// Append-only. Aucune mise a jour, aucune suppression hors purge.
+model AppSettingChange {
+  id  String @id @default(uuid(7))
+  key String
+
+  /// Nul a la premiere ecriture : le reglage n'existait pas encore.
+  oldValue String?
+  newValue String
+
+  changedById String
+  changedBy   User     @relation("AppSettingChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  changedAt   DateTime @default(now())
+
+  @@index([key, changedAt])
+  @@map("app_setting_changes")
+}
+
 model AppSetting {
   key         String   @id
   value       String
