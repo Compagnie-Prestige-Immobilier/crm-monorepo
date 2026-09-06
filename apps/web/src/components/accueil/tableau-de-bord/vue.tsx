@@ -42,7 +42,7 @@ import {
 } from '@/lib/data/visites-dashboard';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
-import type { ClasseurTableauDeBord, FeuilleTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
+import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
 import type { Role } from '@/lib/types';
@@ -107,26 +107,51 @@ function donneesDesWidgets(
   return donnees;
 }
 
-/** Le classeur suit l'écran : ses feuilles sont les cartes posées, dans leur ordre. */
-function feuillesDesWidgets(
+/** L'onglet du classeur où chaque source se range : ce qui se lit ensemble reste ensemble. */
+const GROUPES_EXPORT: Record<string, string> = {
+  'par-entreprise': 'Qui vient, et pourquoi',
+  'par-objet': 'Qui vient, et pourquoi',
+  'par-entreprise-objet': 'Qui vient, et pourquoi',
+  'visiteurs-recurrents': 'Qui vient, et pourquoi',
+  'par-direction': 'Qui reçoit',
+  'par-destinataire': 'Qui reçoit',
+  'par-destinataire-direction': 'Qui reçoit',
+  'par-jour': 'Dans le temps',
+  'par-mois': 'Dans le temps',
+  'par-heure': 'Dans le temps',
+  'par-jour-semaine': 'Dans le temps',
+  'par-heure-jour-semaine': 'Dans le temps',
+  'par-objet-mois': 'Dans le temps',
+  'par-agent': 'Travail de l’accueil',
+  'qualite-de-saisie': 'Travail de l’accueil',
+  'avec-telephone': 'Travail de l’accueil',
+};
+
+/** Le classeur suit l'écran : ses blocs sont les cartes posées, dans leur ordre. */
+function blocsDesWidgets(
   widgets: readonly DashboardWidget[],
   catalogue: Catalogue,
   donneesParWidget: Map<string, DonneesSource>,
-): FeuilleTableauDeBord[] {
-  const feuilles: FeuilleTableauDeBord[] = [];
+): BlocTableauDeBord[] {
+  const blocs: BlocTableauDeBord[] = [];
   for (const widget of widgets) {
     const entree = catalogue[widget.source];
     const donnee = donneesParWidget.get(widget.id);
     if (entree === undefined || donnee === undefined) continue;
-    feuilles.push({ titre: entree.label, question: entree.question, donnees: donnee });
+    blocs.push({
+      titre: entree.label,
+      question: entree.question,
+      groupe: GROUPES_EXPORT[widget.source],
+      donnees: donnee,
+    });
   }
-  return feuilles;
+  return blocs;
 }
 
 function classeurDesVisites(
   plage: { du: string; au: string },
   periode: string,
-  feuilles: FeuilleTableauDeBord[],
+  blocs: BlocTableauDeBord[],
 ): ClasseurTableauDeBord {
   return {
     fichier: `cpi-visites-${plage.du}-${plage.au}`,
@@ -135,10 +160,10 @@ function classeurDesVisites(
     reperes: [
       { libelle: 'Registre', valeur: 'Visites reçues à l’accueil' },
       { libelle: 'Période', valeur: `du ${formatDate(plage.du)} au ${formatDate(plage.au)}` },
-      { libelle: 'Feuilles de chiffres', valeur: String(feuilles.length) },
+      { libelle: 'Chiffres repris', valeur: String(blocs.length) },
       { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
     ],
-    feuilles,
+    blocs,
   };
 }
 
@@ -371,7 +396,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                   classeurDesVisites(
                     plage,
                     periodeAffichee(filters),
-                    feuillesDesWidgets(widgets, catalogue, donneesParWidget),
+                    blocsDesWidgets(widgets, catalogue, donneesParWidget),
                   )
                 }
                 disabled={!hasData || widgets.length === 0}
