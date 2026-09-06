@@ -122,11 +122,13 @@ enum CpiProject {
       // déployé et hors réseau.
       CpiProject.chues =>
         parsed == Role.COMMERCIAL ||
+            parsed == Role.CHARGE_CLIENTELE ||
             parsed == Role.BANQUE_FINANCE ||
             parsed == Role.unknownDefaultOpenApi ||
             _encadrement.contains(parsed),
       CpiProject.grandPublic =>
         parsed == Role.COMMERCIAL ||
+            parsed == Role.CHARGE_CLIENTELE ||
             parsed == Role.BANQUE_FINANCE ||
             _encadrement.contains(parsed),
     };

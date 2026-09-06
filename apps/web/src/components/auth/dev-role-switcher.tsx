@@ -21,6 +21,7 @@ const DEV_ROLES = [
   'SUPERVISEUR',
   'DIRECTION',
   'ACCUEIL',
+  'CHARGE_CLIENTELE',
 ] as const satisfies readonly Role[];
 
 function roleFromPayload(payload: unknown, fallback: Role): Role {

@@ -6111,6 +6111,82 @@
         "tags": ["prospects"]
       }
     },
+    "/api/v1/prospects/{id}/revue": {
+      "post": {
+        "description": "La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.",
+        "operationId": "marquerProspectRevue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PROSPECT_NOT_FOUND · fiche absente ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marque une demande convertie « revue » avant sa transmission à l’enrôlement.",
+        "tags": ["prospects"]
+      }
+    },
     "/api/v1/prospects/merge": {
       "post": {
         "operationId": "mergeProspects",
@@ -21079,7 +21155,15 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION", "ACCUEIL"]
+        "enum": [
+          "ADMIN",
+          "COMMERCIAL",
+          "BANQUE_FINANCE",
+          "SUPERVISEUR",
+          "DIRECTION",
+          "ACCUEIL",
+          "CHARGE_CLIENTELE"
+        ]
       },
       "AuthUserDto": {
         "type": "object",
@@ -24151,6 +24235,21 @@
             "format": "date-time",
             "nullable": true
           },
+          "revueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue."
+          },
+          "revueById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "revueByName": {
+            "type": "string",
+            "nullable": true
+          },
           "lastOutcome": {
             "nullable": true,
             "description": "Résultat de la dernière tentative d’appel enregistrée.",
@@ -24272,6 +24371,9 @@
           "enrollmentCapturedById",
           "enrollmentCapturedByName",
           "enrollmentCapturedAt",
+          "revueAt",
+          "revueById",
+          "revueByName",
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
@@ -30982,6 +31084,7 @@
         "type": "string",
         "enum": [
           "teleconseillers",
+          "chargesClientele",
           "finances",
           "supervision",
           "directionAccueil",

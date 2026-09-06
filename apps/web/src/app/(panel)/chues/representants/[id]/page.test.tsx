@@ -53,6 +53,12 @@ describe('garde de la fiche représentant', () => {
 
     await RepresentantPage({ params }).catch(() => undefined);
 
-    expect(guardRoles).toHaveBeenCalledWith(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+    expect(guardRoles).toHaveBeenCalledWith([
+      'ADMIN',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'SUPERVISEUR',
+      'DIRECTION',
+    ]);
   });
 });

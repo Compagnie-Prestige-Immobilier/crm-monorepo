@@ -18,7 +18,13 @@ export default async function GrandPublicProspectPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL']);
+  const guard = await guardRoles([
+    'ADMIN',
+    'DIRECTION',
+    'SUPERVISEUR',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+  ]);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La fiche d’un prospect" />;

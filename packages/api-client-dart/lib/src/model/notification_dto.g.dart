@@ -364,6 +364,7 @@ const _$RoleEnumMap = {
   Role.SUPERVISEUR: 'SUPERVISEUR',
   Role.DIRECTION: 'DIRECTION',
   Role.ACCUEIL: 'ACCUEIL',
+  Role.CHARGE_CLIENTELE: 'CHARGE_CLIENTELE',
   Role.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
