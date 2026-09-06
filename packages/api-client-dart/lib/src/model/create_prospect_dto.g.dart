@@ -29,6 +29,8 @@ abstract class _$CreateProspectDtoCWProxy {
 
   CreateProspectDto professionId(String? professionId);
 
+  CreateProspectDto etablissement(String? etablissement);
+
   CreateProspectDto incomeBandId(String? incomeBandId);
 
   CreateProspectDto employeurId(String? employeurId);
@@ -81,6 +83,7 @@ abstract class _$CreateProspectDtoCWProxy {
     ProspectType? type,
     String? profession,
     String? professionId,
+    String? etablissement,
     String? incomeBandId,
     String? employeurId,
     String? employeur,
@@ -143,6 +146,10 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
   @override
   CreateProspectDto professionId(String? professionId) =>
       this(professionId: professionId);
+
+  @override
+  CreateProspectDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
 
   @override
   CreateProspectDto incomeBandId(String? incomeBandId) =>
@@ -228,6 +235,7 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
     Object? type = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
     Object? professionId = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
     Object? incomeBandId = const $CopyWithPlaceholder(),
     Object? employeurId = const $CopyWithPlaceholder(),
     Object? employeur = const $CopyWithPlaceholder(),
@@ -291,6 +299,10 @@ class _$CreateProspectDtoCWProxyImpl implements _$CreateProspectDtoCWProxy {
           ? _value.professionId
           // ignore: cast_nullable_to_non_nullable
           : professionId as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
       incomeBandId: incomeBandId == const $CopyWithPlaceholder()
           ? _value.incomeBandId
           // ignore: cast_nullable_to_non_nullable
@@ -404,6 +416,7 @@ CreateProspectDto _$CreateProspectDtoFromJson(
     ),
     profession: $checkedConvert('profession', (v) => v as String?),
     professionId: $checkedConvert('professionId', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
     incomeBandId: $checkedConvert('incomeBandId', (v) => v as String?),
     employeurId: $checkedConvert('employeurId', (v) => v as String?),
     employeur: $checkedConvert('employeur', (v) => v as String?),
@@ -473,6 +486,7 @@ Map<String, dynamic> _$CreateProspectDtoToJson(
   if (_$ProspectTypeEnumMap[instance.type] case final value?) 'type': value,
   if (instance.profession case final value?) 'profession': value,
   if (instance.professionId case final value?) 'professionId': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
   if (instance.incomeBandId case final value?) 'incomeBandId': value,
   if (instance.employeurId case final value?) 'employeurId': value,
   if (instance.employeur case final value?) 'employeur': value,

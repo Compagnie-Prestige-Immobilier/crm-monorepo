@@ -12,6 +12,7 @@ const FIXTURE_IDENTIFIERS: Record<Exclude<Role, 'ADMIN'>, string> = {
   SUPERVISEUR: 'fixture.superviseur@cpi.sn',
   DIRECTION: 'fixture.direction@cpi.sn',
   ACCUEIL: 'fixture.accueil@cpi.sn',
+  CHARGE_CLIENTELE: 'fixture.clientele@cpi.sn',
 };
 
 function accountForRole(role: Role): { identifier: string; password: string } {

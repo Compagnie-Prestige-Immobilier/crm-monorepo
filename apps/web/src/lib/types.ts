@@ -92,6 +92,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   SUPERVISEUR: 'Supervision',
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
+  CHARGE_CLIENTELE: 'Chargé de clientèle',
 };
 
 /**
@@ -106,18 +107,30 @@ export const readsOnly = (role: Role | undefined): boolean =>
  * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
  * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
  */
 export const peutTenirUneFiche = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
 
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
+
+/** Qui marque une demande convertie « revue ». Miroir de `POST /prospects/{id}/revue`. */
+export const peutRevoirUneDemande = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'CHARGE_CLIENTELE' || role === 'SUPERVISEUR';
 
 export const RETIRED_SUFFIX = '(retiré)';
 
@@ -202,13 +215,23 @@ export const ENROLLMENT_METHODS = [
   'PHYSICAL',
   'VOICE_OR_ELECTRONIC_MESSAGING',
   'APPOINTMENT',
+  'WHATSAPP',
+] as const satisfies readonly EnrollmentMethod[];
+
+/** Ce que l'écran propose. `PHYSICAL` en sort : EB-24 l'a versé dans « RDV CPI ». */
+export const ENROLLMENT_METHOD_ORDER = [
+  'APPOINTMENT',
+  'PLATFORM',
+  'VOICE_OR_ELECTRONIC_MESSAGING',
+  'WHATSAPP',
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
-  PLATFORM: 'Plateforme',
-  PHYSICAL: 'Physique',
-  VOICE_OR_ELECTRONIC_MESSAGING: 'Vocal ou messagerie électronique',
-  APPOINTMENT: 'Prise de rendez-vous',
+  APPOINTMENT: 'RDV CPI',
+  PHYSICAL: 'RDV CPI',
+  PLATFORM: 'Plateforme en ligne',
+  VOICE_OR_ELECTRONIC_MESSAGING: 'Mail',
+  WHATSAPP: 'WhatsApp',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {

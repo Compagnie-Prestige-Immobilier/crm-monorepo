@@ -21,12 +21,17 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
 import { LotExportFicheEtat, type CreateLotExportDto } from './dto.js';
+import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
 import { LotsExportService } from './lots-export.service.js';
 
 const prisma = new PrismaClient({
   adapter: new PrismaPg({ connectionString: process.env.DATABASE_URL }),
 });
-const service = new LotsExportService(prisma as unknown as PrismaService, new WorkspaceContext());
+const service = new LotsExportService(
+  prisma as unknown as PrismaService,
+  new WorkspaceContext(),
+  new ChampsConversionService(prisma as unknown as PrismaService),
+);
 
 const TAG = 'ITLE';
 

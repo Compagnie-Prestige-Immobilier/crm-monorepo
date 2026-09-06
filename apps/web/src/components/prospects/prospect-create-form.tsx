@@ -76,6 +76,7 @@ export function ProspectCreateForm({
   const [nom, setNom] = useState('');
   const [phone, setPhone] = useState('');
   const [callingCode, setCallingCode] = useState('221');
+  const [etablissement, setEtablissement] = useState('');
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const [syndicatId, setSyndicatId] = useState<string | null>(null);
   const [repId, setRepId] = useState<string | null>(representantId);
@@ -120,8 +121,9 @@ export function ProspectCreateForm({
         return;
       }
 
-      // La rafale : seule l'identité repart de zéro. La banque et le syndicat
-      // sont les mêmes pour toute une tournée chez le même représentant.
+      // La rafale : seule l'identité repart de zéro. L'établissement, la banque
+      // et le syndicat sont les mêmes pour toute une tournée chez le même
+      // représentant.
       setPrenom('');
       setNom('');
       setPhone('');
@@ -158,6 +160,7 @@ export function ProspectCreateForm({
         prenom: prenom.trim(),
         nom: nom.trim(),
         phone: e164,
+        ...(etablissement.trim() === '' ? {} : { etablissement: etablissement.trim() }),
         ...(repId === null ? {} : { representantId: repId }),
         ...(banqueId === null ? {} : { banqueId }),
         ...(syndicatId === null ? {} : { syndicatId }),
@@ -284,6 +287,20 @@ export function ProspectCreateForm({
           </CardContent>
         </Card>
       ) : null}
+
+      <Field label="Établissement">
+        {(props) => (
+          <Input
+            {...props}
+            value={etablissement}
+            maxLength={160}
+            autoComplete="off"
+            onChange={(event) => {
+              setEtablissement(event.target.value);
+            }}
+          />
+        )}
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">

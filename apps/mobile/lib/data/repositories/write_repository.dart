@@ -534,6 +534,7 @@ class WriteRepository {
     String? paysResidenceId,
     String? villeResidence,
     String? whatsappE164,
+    String? etablissement,
     String? relaisNom,
     String? relaisPhoneE164,
     String? id,
@@ -585,6 +586,9 @@ class WriteRepository {
               villeResidence ?? existing.villeResidence,
             ),
             whatsappE164: Value<String?>(whatsappE164 ?? existing.whatsappE164),
+            etablissement: Value<String?>(
+              etablissement ?? existing.etablissement,
+            ),
             relaisNom: Value<String?>(relaisNom ?? existing.relaisNom),
             relaisPhoneE164: Value<String?>(
               relaisPhoneE164 ?? existing.relaisPhoneE164,
@@ -620,6 +624,7 @@ class WriteRepository {
               paysResidenceId: paysResidenceId,
               villeResidence: villeResidence,
               whatsappE164: whatsappE164,
+              etablissement: etablissement,
               relaisNom: relaisNom,
               relaisPhoneE164: relaisPhoneE164,
             ),
@@ -657,6 +662,7 @@ class WriteRepository {
               paysResidenceId: Value<String?>(paysResidenceId),
               villeResidence: Value<String?>(villeResidence),
               whatsappE164: Value<String?>(whatsappE164),
+              etablissement: Value<String?>(etablissement),
               relaisNom: Value<String?>(relaisNom),
               relaisPhoneE164: Value<String?>(relaisPhoneE164),
               createdById: createdById,
@@ -699,6 +705,7 @@ class WriteRepository {
             paysResidenceId: paysResidenceId,
             villeResidence: villeResidence,
             whatsappE164: whatsappE164,
+            etablissement: etablissement,
             relaisNom: relaisNom,
             relaisPhoneE164: relaisPhoneE164,
           ),
@@ -725,6 +732,7 @@ class WriteRepository {
     required String? paysResidenceId,
     required String? villeResidence,
     required String? whatsappE164,
+    required String? etablissement,
     required String? relaisNom,
     required String? relaisPhoneE164,
   }) {
@@ -740,6 +748,7 @@ class WriteRepository {
       'paysResidenceId': ?paysResidenceId,
       'villeResidence': ?villeResidence,
       'whatsappE164': ?whatsappE164,
+      'etablissement': ?etablissement,
       'relaisNom': ?relaisNom,
       'relaisPhoneE164': ?relaisPhoneE164,
     };
@@ -879,6 +888,8 @@ class WriteRepository {
     String? syndicatId,
     String? incomeBandId,
     int? dureeSystemeMois,
+    String? whatsappStatus,
+    String? whatsappE164,
     String? email,
     bool? fonctionnaire,
     bool? engagementEnCours,
@@ -994,6 +1005,8 @@ class WriteRepository {
           'syndicatId': ?syndicatId,
           'incomeBandId': ?incomeBandId,
           'dureeSystemeMois': ?dureeSystemeMois,
+          'whatsappStatus': ?whatsappStatus,
+          'whatsappE164': ?whatsappE164,
           'email': ?normalizedEmail,
           // Le `?` n'omet que le NUL : `false` est une réponse et part, là où
           // son absence se lirait « question non posée ».

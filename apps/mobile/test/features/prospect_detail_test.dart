@@ -295,7 +295,7 @@ void main() {
     expect(find.text('Dernier appel'), findsOneWidget);
     expect(find.text('Méthode obtenue'), findsOneWidget);
     expect(find.text('Méthode d\'enrôlement'), findsOneWidget);
-    expect(find.text('Plateforme'), findsOneWidget);
+    expect(find.text('Plateforme en ligne'), findsOneWidget);
 
     await unmount(tester);
   });

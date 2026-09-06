@@ -210,6 +210,8 @@ enum LotExportAttemptDtoMethodEnum {
   VOICE_OR_ELECTRONIC_MESSAGING(r'VOICE_OR_ELECTRONIC_MESSAGING'),
   @JsonValue(r'APPOINTMENT')
   APPOINTMENT(r'APPOINTMENT'),
+  @JsonValue(r'WHATSAPP')
+  WHATSAPP(r'WHATSAPP'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

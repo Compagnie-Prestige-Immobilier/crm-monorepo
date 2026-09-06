@@ -30,6 +30,7 @@ import {
 import { dakarWallClock } from '../../common/date-bounds.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
+import { whatsappDuProspect, type WhatsappPatchProspect } from '../prospects/whatsapp.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
@@ -341,7 +342,7 @@ export class SyncService {
       .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
 
     // Le rôle est figé une fois pour éviter deux autorités dans un même lot.
-    const author = await this.readAuthority(user);
+    const author = await this.readAuthority(user, body.payloadVersion);
 
     const results: SyncOperationResultDto[] = [];
     for (const operations of ordered) {
@@ -379,13 +380,17 @@ export class SyncService {
     );
   }
 
-  private async readAuthority(user: AuthenticatedUser): Promise<BatchAuthority> {
+  private async readAuthority(
+    user: AuthenticatedUser,
+    payloadVersion: number,
+  ): Promise<BatchAuthority> {
     const author = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { role: true },
     });
     return {
       user: author?.role ? { ...user, role: author.role } : user,
+      payloadVersion,
     };
   }
 
@@ -394,7 +399,7 @@ export class SyncService {
     batchKey: string,
     operations: SyncOperationDto[],
   ): Promise<SyncOperationResultDto[]> {
-    const { user } = author;
+    const { user, payloadVersion } = author;
     return this.prisma.$transaction(
       async (tx) => {
         const results: SyncOperationResultDto[] = [];
@@ -424,7 +429,7 @@ export class SyncService {
               error: 'Le représentant de rattachement n’a pas pu être enregistré.',
             };
           } else {
-            outcome = await this.applyOperation(tx, user, operation);
+            outcome = await this.applyOperation(tx, user, operation, payloadVersion);
             if (
               operation.entity === SyncEntity.REPRESENTANT &&
               outcome.status !== SyncOpStatus.APPLIED
@@ -454,6 +459,7 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    payloadVersion: number,
   ): Promise<OperationOutcome> {
     try {
       if (operation.entity === SyncEntity.REPRESENTANT) {
@@ -465,7 +471,7 @@ export class SyncService {
       if (operation.entity === SyncEntity.CALL_ATTEMPT) {
         // La tentative hérite de SON PROSPECT, que `phase2-sync` lit déjà :
         // rien à transmettre ici.
-        return await this.applyCallAttempt(tx, user, operation);
+        return await this.applyCallAttempt(tx, user, operation, payloadVersion);
       }
       if (operation.entity === SyncEntity.VISITE) {
         return await this.applyVisite(tx, user, operation);
@@ -828,6 +834,7 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    payloadVersion: number,
   ): Promise<OperationOutcome> {
     const data = operation.data;
     if (!data?.prospectId || !data.outcome || !data.clientCreatedAt) {
@@ -839,37 +846,46 @@ export class SyncService {
     }
 
     try {
-      const result = await this.phase2Sync.applyCallAttempt(tx, user, {
-        id: operation.entityId,
-        prospectId: data.prospectId,
-        outcome: data.outcome,
-        ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
-        ...(data.method === undefined ? {} : { method: data.method }),
-        ...(data.comment === undefined ? {} : { comment: data.comment }),
-        ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
-        // Renseignements de conversion (phase 3). Les cinq premiers vont sur la
-        // tentative, les cinq suivants sur le prospect : voir `CallAttemptOpDto`.
-        ...definedValues({
-          email: data.email,
-          fonctionnaire: data.fonctionnaire,
-          engagementEnCours: data.engagementEnCours,
-          dureeEtablissementMois: data.dureeEtablissementMois,
-          rendezVousAt: data.rendezVousAt,
-          nom: data.nom,
-          prenom: data.prenom,
-          profession: data.profession,
-          banqueId: data.banqueId,
-          syndicatId: data.syndicatId,
-          type: data.type,
-          incomeBandId: data.incomeBandId,
-          paymentMode: data.paymentMode,
-          dureeSystemeMois: data.dureeSystemeMois,
-          deviceCallType: data.deviceCallType,
-          deviceCallDurationSeconds: data.deviceCallDurationSeconds,
-          deviceCallAt: data.deviceCallAt,
-        }),
-        clientCreatedAt: data.clientCreatedAt,
-      });
+      const result = await this.phase2Sync.applyCallAttempt(
+        tx,
+        user,
+        {
+          id: operation.entityId,
+          prospectId: data.prospectId,
+          outcome: data.outcome,
+          ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
+          ...(data.method === undefined ? {} : { method: data.method }),
+          ...(data.comment === undefined ? {} : { comment: data.comment }),
+          ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
+          // Renseignements de conversion (phase 3). Les uns vont sur la tentative,
+          // les autres sur le prospect : voir `CallAttemptOpDto`.
+          ...definedValues({
+            email: data.email,
+            fonctionnaire: data.fonctionnaire,
+            engagementEnCours: data.engagementEnCours,
+            dureeEtablissementMois: data.dureeEtablissementMois,
+            rendezVousAt: data.rendezVousAt,
+            nom: data.nom,
+            prenom: data.prenom,
+            profession: data.profession,
+            etablissement: data.etablissement,
+            banqueId: data.banqueId,
+            syndicatId: data.syndicatId,
+            type: data.type,
+            incomeBandId: data.incomeBandId,
+            paymentMode: data.paymentMode,
+            dureeSystemeMois: data.dureeSystemeMois,
+            champsLibres: data.champsLibres,
+            whatsappStatus: data.whatsappStatus,
+            whatsappE164: data.whatsappE164,
+            deviceCallType: data.deviceCallType,
+            deviceCallDurationSeconds: data.deviceCallDurationSeconds,
+            deviceCallAt: data.deviceCallAt,
+          }),
+          clientCreatedAt: data.clientCreatedAt,
+        },
+        payloadVersion,
+      );
 
       if (data.ouvertureId) {
         await fermerOuverture(tx, {
@@ -1046,6 +1062,10 @@ export class SyncService {
 
     const data = operation.data || {};
     const phoneE164 = requirePhone(data);
+    // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
+    // supprime le `null` avant l'envoi, donc un effacement arrivait ici
+    // identique au silence d'une application ancienne.
+    const videe = new Set(operation.clearedFields ?? []);
 
     if (!existing || existing.deletedAt) {
       requireText(data.nom, 'nom');
@@ -1079,7 +1099,9 @@ export class SyncService {
             canalProvenanceId: data.canalProvenanceId,
             statut: data.statut,
           }),
+          ...clearableValue('etablissement', data.etablissement, videe, null),
           ...situationGrandPublic(data),
+          ...whatsappProspect(data, phoneE164, WHATSAPP_NEUF, videe),
           clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
         },
         update: {
@@ -1097,7 +1119,9 @@ export class SyncService {
             canalProvenanceId: data.canalProvenanceId,
             statut: data.statut,
           }),
+          ...clearableValue('etablissement', data.etablissement, videe, null),
           ...situationGrandPublic(data),
+          ...whatsappProspect(data, phoneE164, existing ?? WHATSAPP_NEUF, videe),
           deletedAt: null,
           rev: { increment: 1 },
         },
@@ -1114,10 +1138,6 @@ export class SyncService {
       await assertRepresentantUsable(tx, data.representantId);
     }
 
-    // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
-    // supprime le `null` avant l'envoi, donc un effacement arrivait ici
-    // identique au silence d'une application ancienne.
-    const videe = new Set(operation.clearedFields ?? []);
     const lien = (champ: 'banqueId' | 'syndicatId' | 'representantId'): object =>
       clearableValue(champ, data[champ], videe, null);
 
@@ -1140,7 +1160,9 @@ export class SyncService {
           canalProvenanceId: data.canalProvenanceId,
           statut: data.statut,
         }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
         ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, existing, videe),
         rev: { increment: 1 },
       },
     });
@@ -1659,11 +1681,32 @@ function situationGrandPublic(data: SyncEntityDataDto): Record<string, unknown> 
     modeEpargne: data.modeEpargne,
     paysResidenceId: data.paysResidenceId,
     villeResidence: data.villeResidence,
-    whatsappE164: optionalPhone(data.whatsappE164),
     relaisNom: data.relaisNom,
     relaisPhoneE164: optionalPhone(data.relaisPhoneE164),
   });
 }
+
+/**
+ * `whatsappE164` a quitte `situationGrandPublic` : sous le CHECK d'EB-23 le
+ * numero ne s'ecrit plus seul, le statut le gouverne.
+ */
+function whatsappProspect(
+  data: SyncEntityDataDto,
+  phoneE164: string,
+  courant: { whatsappStatus: WhatsappStatus; whatsappE164: string | null },
+  videe: ReadonlySet<string>,
+): WhatsappPatchProspect {
+  const numero = videe.has('whatsappE164') ? null : optionalPhone(data.whatsappE164);
+  return whatsappDuProspect(
+    {
+      ...(data.whatsappStatus === undefined ? {} : { statut: data.whatsappStatus }),
+      ...(numero === undefined ? {} : { numero }),
+    },
+    { ...courant, phoneE164 },
+  );
+}
+
+const WHATSAPP_NEUF = { whatsappStatus: WhatsappStatus.NON_DEMANDE, whatsappE164: null };
 
 /** Un appel détecté vise UNE fiche : représentant ou prospect, jamais les deux. */
 type AppelDetecte = {
@@ -1738,6 +1781,8 @@ const clientDate = (clientCreatedAt: string | undefined, fallback: string): Date
  */
 interface BatchAuthority {
   readonly user: AuthenticatedUser;
+  /** Ce que le lot annonce savoir emettre. Decide des regles opposables. */
+  readonly payloadVersion: number;
 }
 
 /**

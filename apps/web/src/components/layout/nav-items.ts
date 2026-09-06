@@ -11,6 +11,7 @@ import {
   HouseIcon,
   LayoutDashboardIcon,
   LibraryIcon,
+  ListChecksIcon,
   ListIcon,
   ListOrderedIcon,
   MegaphoneIcon,
@@ -19,6 +20,7 @@ import {
   PlugZapIcon,
   PlusCircleIcon,
   SettingsIcon,
+  SlidersHorizontalIcon,
   UploadIcon,
   UserPlusIcon,
   UsersIcon,
@@ -42,7 +44,8 @@ export const INBOX_PATH = '/notifications';
 
 /**
  * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le
- * téléconseiller en est absent : les siennes visent l'application mobile.
+ * téléconseiller et le chargé de clientèle en sont absents : les leurs visent
+ * l'application mobile.
  */
 export const INBOX_ROLES: readonly Role[] = [
   'ADMIN',
@@ -88,14 +91,28 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Projet CHUES',
     path: '/chues',
     description: 'Enrôlement des enseignants syndiqués',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
+    roles: [
+      'ADMIN',
+      'DIRECTION',
+      'SUPERVISEUR',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'BANQUE_FINANCE',
+    ],
   },
   {
     id: 'grand-public',
     label: 'Projet Grand Public',
     path: '/grand-public',
     description: 'Prospection, appels et conversion hors CHUES',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
+    roles: [
+      'ADMIN',
+      'DIRECTION',
+      'SUPERVISEUR',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'BANQUE_FINANCE',
+    ],
   },
   {
     id: 'admin',
@@ -135,11 +152,11 @@ export interface NavSection {
 }
 
 /**
- * Les trois rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils
- * lisent les mêmes intitulés dans le même ordre : une seule suite d'entrées les
- * sert tous les trois, et on n'explique qu'un seul parcours au téléphone.
+ * Les rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils lisent les
+ * mêmes intitulés dans le même ordre : une seule suite d'entrées les sert tous,
+ * et on n'explique qu'un seul parcours au téléphone.
  */
-const TERRAIN: readonly Role[] = ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'];
+const TERRAIN: readonly Role[] = ['COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION'];
 
 /** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
 const ENCADREMENT: readonly Role[] = ['SUPERVISEUR', 'DIRECTION'];
@@ -216,7 +233,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/chues',
@@ -303,6 +320,16 @@ const SECTIONS: readonly NavSection[] = [
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
+        secondary: true,
+      },
+      {
+        href: '/chues/parametres-chues',
+        label: 'Paramètres CHUES',
+        icon: SlidersHorizontalIcon,
+        description: 'Liens, contacts et messages envoyés',
+        // Pas `ENCADREMENT` : l'administrateur règle TOUT, la supervision et la
+        // direction seulement les deux textes envoyés aux prospects.
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
         secondary: true,
       },
 
@@ -518,28 +545,28 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Grand Public',
         icon: UsersIcon,
         description: 'Créer, retrouver et suivre les prospects',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
         description: 'Chercher un prospect et consigner l’appel',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/mes-contacts',
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },
       {
@@ -547,7 +574,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Noter un prospect',
         icon: PlusCircleIcon,
         description: 'Saisie d’un prospect',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },
 
@@ -748,6 +775,16 @@ const SECTIONS: readonly NavSection[] = [
         icon: SettingsIcon,
         description: 'Démonstration et suppression',
         roles: ['ADMIN'],
+      },
+      {
+        // Sous « Plus » : on règle le formulaire une fois, on ne le rouvre pas
+        // chaque jour, et la barre tient à six entrées.
+        href: '/admin/champs-conversion',
+        label: 'Champs de la conversion',
+        icon: ListChecksIcon,
+        description: 'Ordre, visibilité et champs ajoutés',
+        roles: ['ADMIN'],
+        secondary: true,
       },
     ],
   },

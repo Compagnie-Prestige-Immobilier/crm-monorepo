@@ -14,6 +14,7 @@ import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/type_contrat.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -98,13 +99,21 @@ class ProspectDto {
 
     required this.villeResidence,
 
+    required this.etablissement,
+
+    required this.whatsappStatus,
+
     required this.whatsappE164,
+
+    required this.whatsappNumber,
 
     required this.relaisNom,
 
     required this.relaisPhoneE164,
 
     required this.journeys,
+
+    required this.champsLibres,
 
     required this.dureeSystemeMois,
 
@@ -123,6 +132,12 @@ class ProspectDto {
     required this.enrollmentCapturedByName,
 
     required this.enrollmentCapturedAt,
+
+    required this.revueAt,
+
+    required this.revueById,
+
+    required this.revueByName,
 
     required this.lastOutcome,
 
@@ -289,8 +304,24 @@ class ProspectDto {
   @JsonKey(name: r'villeResidence', required: true, includeIfNull: true)
   final String? villeResidence;
 
+  @JsonKey(name: r'etablissement', required: true, includeIfNull: true)
+  final String? etablissement;
+
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus whatsappStatus;
+
+  /// Renseigné avec le seul statut AUTRE_NUMERO.
   @JsonKey(name: r'whatsappE164', required: true, includeIfNull: true)
   final String? whatsappE164;
+
+  /// Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon.
+  @JsonKey(name: r'whatsappNumber', required: true, includeIfNull: true)
+  final String? whatsappNumber;
 
   @JsonKey(name: r'relaisNom', required: true, includeIfNull: true)
   final String? relaisNom;
@@ -300,6 +331,10 @@ class ProspectDto {
 
   @JsonKey(name: r'journeys', required: true, includeIfNull: false)
   final List<ProspectJourneyDto> journeys;
+
+  /// Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}.
+  @JsonKey(name: r'champsLibres', required: true, includeIfNull: false)
+  final Map<String, String> champsLibres;
 
   /// Durée du système de paiement retenue, en MOIS.
   @JsonKey(name: r'dureeSystemeMois', required: true, includeIfNull: true)
@@ -351,6 +386,16 @@ class ProspectDto {
 
   @JsonKey(name: r'enrollmentCapturedAt', required: true, includeIfNull: true)
   final DateTime? enrollmentCapturedAt;
+
+  /// Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.
+  @JsonKey(name: r'revueAt', required: true, includeIfNull: true)
+  final DateTime? revueAt;
+
+  @JsonKey(name: r'revueById', required: true, includeIfNull: true)
+  final String? revueById;
+
+  @JsonKey(name: r'revueByName', required: true, includeIfNull: true)
+  final String? revueByName;
 
   /// Résultat de la dernière tentative d’appel enregistrée.
   @JsonKey(
@@ -449,10 +494,14 @@ class ProspectDto {
                 paysResidenceId,
                 paysResidenceLabel,
                 villeResidence,
+                etablissement,
+                whatsappStatus,
                 whatsappE164,
+                whatsappNumber,
                 relaisNom,
                 relaisPhoneE164,
                 journeys,
+                champsLibres,
                 dureeSystemeMois,
                 canalProvenanceId,
                 canalProvenanceLabel,
@@ -462,6 +511,9 @@ class ProspectDto {
                 enrollmentCapturedById,
                 enrollmentCapturedByName,
                 enrollmentCapturedAt,
+                revueAt,
+                revueById,
+                revueByName,
                 lastOutcome,
                 lastComment,
                 lastAttemptAt,
@@ -512,10 +564,14 @@ class ProspectDto {
                 other.paysResidenceId,
                 other.paysResidenceLabel,
                 other.villeResidence,
+                other.etablissement,
+                other.whatsappStatus,
                 other.whatsappE164,
+                other.whatsappNumber,
                 other.relaisNom,
                 other.relaisPhoneE164,
                 other.journeys,
+                other.champsLibres,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
                 other.canalProvenanceLabel,
@@ -525,6 +581,9 @@ class ProspectDto {
                 other.enrollmentCapturedById,
                 other.enrollmentCapturedByName,
                 other.enrollmentCapturedAt,
+                other.revueAt,
+                other.revueById,
+                other.revueByName,
                 other.lastOutcome,
                 other.lastComment,
                 other.lastAttemptAt,
@@ -581,10 +640,14 @@ class ProspectDto {
         paysResidenceId,
         paysResidenceLabel,
         villeResidence,
+        etablissement,
+        whatsappStatus,
         whatsappE164,
+        whatsappNumber,
         relaisNom,
         relaisPhoneE164,
         journeys,
+        champsLibres,
         dureeSystemeMois,
         canalProvenanceId,
         canalProvenanceLabel,
@@ -594,6 +657,9 @@ class ProspectDto {
         enrollmentCapturedById,
         enrollmentCapturedByName,
         enrollmentCapturedAt,
+        revueAt,
+        revueById,
+        revueByName,
         lastOutcome,
         lastComment,
         lastAttemptAt,

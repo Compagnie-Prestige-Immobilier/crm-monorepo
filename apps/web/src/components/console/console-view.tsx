@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
+import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { useShortcuts } from '@/components/console/use-shortcuts';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -40,6 +42,7 @@ import {
   ouvrirFiche,
   type OuvertureFiche,
 } from '@/lib/data/ouvertures';
+import { useChampsConversion } from '@/lib/data/champs-conversion';
 import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
@@ -488,6 +491,8 @@ function Consignation({
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const formulaire = useChampsConversion(projet);
+
   const nomComplet = nomDe(prospect);
   const closed = prospect.phase2Status !== 'PENDING' || refusee;
   const [now] = useState(() => Date.now());
@@ -568,11 +573,16 @@ function Consignation({
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
-    const problems = validateConversion(conversion);
+    const problems = validateConversion(
+      conversion,
+      Date.now(),
+      formulaire.champs,
+      formulaire.libres,
+    );
     setConversionErrors(problems);
     if (Object.keys(problems).length > 0 || conversion.method === null) return;
     record('METHOD_OBTAINED', conversion.method, null, conversion);
-  }, [conversion, record]);
+  }, [conversion, formulaire, record]);
 
   const startOther = useCallback(() => {
     if (closed) return;
@@ -723,6 +733,7 @@ function Consignation({
             Copier
             <Kbd>C</Kbd>
           </Button>
+          {etape === 'dossier' ? null : <BoutonWhatsApp prospect={prospect} />}
         </div>
 
         <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
@@ -744,11 +755,15 @@ function Consignation({
               Joignable · son dossier, et la manière dont il adhère
             </p>
 
+            <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+
             <ConversionFields
               draft={conversion}
               errors={conversionErrors}
               phoneE164={prospect.phoneE164}
               disabled={send.isPending}
+              reglages={formulaire.champs}
+              libres={formulaire.libres}
               onChange={(patch) => {
                 setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
               }}

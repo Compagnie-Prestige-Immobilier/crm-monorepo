@@ -173,7 +173,7 @@ const ISSUES_PROSPECT: readonly IssueProspect[] = [
   { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.PLATFORM },
   { outcome: CallOutcome.UNREACHABLE },
   { outcome: CallOutcome.CALLBACK },
-  { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.PHYSICAL },
+  { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.WHATSAPP },
   { outcome: CallOutcome.REFUSED },
   { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.APPOINTMENT },
   { outcome: CallOutcome.WRONG_NUMBER },

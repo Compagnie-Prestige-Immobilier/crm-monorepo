@@ -103,6 +103,7 @@ Map<String, dynamic> _$PurgeDeletionDtoToJson(PurgeDeletionDto instance) =>
 
 const _$PurgeDomainKeyEnumMap = {
   PurgeDomainKey.teleconseillers: 'teleconseillers',
+  PurgeDomainKey.chargesClientele: 'chargesClientele',
   PurgeDomainKey.finances: 'finances',
   PurgeDomainKey.supervision: 'supervision',
   PurgeDomainKey.directionAccueil: 'directionAccueil',

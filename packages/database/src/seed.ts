@@ -75,6 +75,12 @@ const FIXTURE_USERS = [
     fullName: 'Accueil Fixture',
     role: Role.ACCUEIL,
   },
+  {
+    email: 'fixture.clientele@cpi.sn',
+    username: 'fixture.clientele',
+    fullName: 'Clientèle Fixture',
+    role: Role.CHARGE_CLIENTELE,
+  },
 ] as const;
 
 async function seedGeography(): Promise<void> {

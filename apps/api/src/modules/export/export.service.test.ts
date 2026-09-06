@@ -370,7 +370,7 @@ describe('colonnes', () => {
     expect(cell('Nom')).toBe('Un');
     expect(cell('Segment')).toBe('BDD1');
     expect(cell('Statut phase 3 (conversion)')).toBe('Méthode obtenue');
-    expect(cell('Méthode d’enrôlement')).toBe('Plateforme');
+    expect(cell('Méthode d’enrôlement')).toBe('Plateforme en ligne');
     expect(cell('Méthode obtenue par')).toBe('Omar Ba');
     expect(cell('Dernier résultat')).toBe('Méthode obtenue');
     expect(cell('Dernier commentaire')).toBe('Accepte la plateforme');
@@ -442,5 +442,41 @@ describe('coût des requêtes', () => {
     await exports.writeProspects(admin, {}, stream, ExportMode.CONSOLIDATED);
 
     expect(queries()).toBe(5);
+  });
+});
+
+// EB-23 : sur MEME_NUMERO la colonne dédiée reste NULLE, et l'export doit
+// pourtant écrire un numéro joignable, sinon la fiche paraît sans WhatsApp.
+describe('colonne WhatsApp recomposée', () => {
+  const colonne = PROSPECT_COLUMNS.find((column) => column.header === 'WhatsApp');
+  const cellule = (row: Record<string, unknown>): unknown =>
+    colonne?.value(row as never, undefined);
+
+  it('rend le téléphone principal sur MEME_NUMERO', () => {
+    expect(
+      cellule({
+        phoneE164: '+221771234567',
+        whatsappStatus: 'MEME_NUMERO',
+        whatsappE164: null,
+      }),
+    ).toBe('+221771234567');
+  });
+
+  it('rend le second numéro sur AUTRE_NUMERO, et rien sans réponse', () => {
+    expect(
+      cellule({
+        phoneE164: '+221771234567',
+        whatsappStatus: 'AUTRE_NUMERO',
+        whatsappE164: '+33612345678',
+      }),
+    ).toBe('+33612345678');
+
+    expect(
+      cellule({
+        phoneE164: '+221771234567',
+        whatsappStatus: 'NON_DEMANDE',
+        whatsappE164: null,
+      }),
+    ).toBe('');
   });
 });

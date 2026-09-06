@@ -137,6 +137,9 @@ export interface ProspectRow {
   phoneE164: string;
   rev: number;
   statut: string;
+  /** Colonne NOT NULL en base, `CHUES` par défaut : la laisser vide ici mentirait. */
+  projet?: string;
+  incomeBandId?: string | null;
   phase2Status?: string;
   enrollmentMethod?: string | null;
   enrollmentCapturedById?: string | null;
@@ -153,7 +156,9 @@ export interface ProspectRow {
   modeEpargne?: string | null;
   paysResidenceId?: string | null;
   villeResidence?: string | null;
+  whatsappStatus?: string;
   whatsappE164?: string | null;
+  etablissement?: string | null;
   relaisNom?: string | null;
   relaisPhoneE164?: string | null;
   createdById: string;

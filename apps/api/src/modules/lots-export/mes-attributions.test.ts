@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { WorkspaceContext } from '../../workspaces/workspace.js';
+import type { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
 import { LotsExportService } from './lots-export.service.js';
 
 const ALICE: AuthenticatedUser = {
@@ -28,6 +29,7 @@ beforeEach(() => {
   service = new LotsExportService(
     { lotExportItem: { findMany } } as unknown as PrismaService,
     {} as unknown as WorkspaceContext,
+    {} as unknown as ChampsConversionService,
   );
 });
 

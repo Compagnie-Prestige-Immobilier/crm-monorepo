@@ -63,6 +63,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
   final TextEditingController _paysResidence = TextEditingController();
   final TextEditingController _villeResidence = TextEditingController();
   final TextEditingController _whatsapp = TextEditingController();
+  final TextEditingController _etablissement = TextEditingController();
   final TextEditingController _relaisNom = TextEditingController();
   final TextEditingController _relaisPhone = TextEditingController();
 
@@ -86,6 +87,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     _paysResidence,
     _villeResidence,
     _whatsapp,
+    _etablissement,
     _relaisNom,
     _relaisPhone,
   ];
@@ -205,6 +207,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     'indicatif': _indicatif,
     'villeResidence': _villeResidence.text,
     'whatsapp': _whatsapp.text,
+    'etablissement': _etablissement.text,
     'relaisNom': _relaisNom.text,
     'relaisPhone': _relaisPhone.text,
   };
@@ -297,6 +300,8 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       _villeResidence.text =
           (snapshot.values['villeResidence'] as String?) ?? '';
       _whatsapp.text = (snapshot.values['whatsapp'] as String?) ?? '';
+      _etablissement.text =
+          (snapshot.values['etablissement'] as String?) ?? '';
       _relaisNom.text = (snapshot.values['relaisNom'] as String?) ?? '';
       _relaisPhone.text = (snapshot.values['relaisPhone'] as String?) ?? '';
       _pendingRestore = null;
@@ -403,7 +408,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     },
     _ when _grandPublic =>
       _avecBanque ? 'Sa banque, sa provenance' : 'Comment l’a-t-il connu ?',
-    _ => 'Sa banque, son syndicat',
+    _ => 'Son établissement, sa banque',
   };
 
   /// Ce qui retient l'étape, nommé sous « Continuer ». Tout ce qui est
@@ -428,6 +433,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
       _paysResidence,
       _villeResidence,
       _whatsapp,
+      _etablissement,
       _relaisNom,
       _relaisPhone,
     ]) {
@@ -538,6 +544,7 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
         whatsappE164: _diaspora
             ? WorldPhone.toE164(_whatsapp.text, callingCode: _indicatif)
             : null,
+        etablissement: _grandPublic ? null : _etablissement.text.trim(),
         relaisNom: _diaspora ? _relaisNom.text.trim() : null,
         relaisPhoneE164: _diaspora ? Phone.toE164(_relaisPhone.text) : null,
         createdById: userId,
@@ -1128,6 +1135,8 @@ class _ProspectEntryScreenState extends ConsumerState<ProspectEntryScreen>
     List<Syndicat> syndicats,
     List<CanauxProvenanceData> canaux,
   ) => _espaces(<Widget>[
+    if (!_grandPublic)
+      _champTexte(_etablissement, 'Établissement', 'Ex. Lycée Blaise Diagne'),
     if (_avecBanque) _champBanque(banques),
     if (_avecSyndicat) _champSyndicat(syndicats),
     if (_grandPublic) ...<Widget>[

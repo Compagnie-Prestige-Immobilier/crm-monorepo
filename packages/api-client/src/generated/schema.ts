@@ -1141,6 +1141,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/prospects/{id}/revue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Marque une demande convertie « revue » avant sa transmission à l’enrôlement.
+     * @description La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.
+     */
+    post: operations['marquerProspectRevue'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/prospects/merge': {
     parameters: {
       query?: never;
@@ -2889,6 +2909,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/champs-conversion/{projet}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Champs du formulaire de conversion, dans l’ordre d’affichage.
+     * @description Lu par le formulaire du téléconseiller comme par le formulaire public : un champ masqué n’est ni rendu ni exigé. Les champs imposés reviennent toujours visibles, quel que soit le réglage enregistré.
+     */
+    get: operations['getChampsConversion'];
+    /**
+     * Enregistre visibilité, caractère obligatoire, ordre et champs ajoutés.
+     * @description La liste entière est remplacée. Masquer un champ imposé est refusé en 400.
+     */
+    put: operations['updateChampsConversion'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/app-updates/android/current': {
     parameters: {
       query?: never;
@@ -3268,6 +3312,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/parametres-chues': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les réglages CHUES, valeurs d’usine comprises. */
+    get: operations['getParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Règle les paramètres CHUES.
+     * @description La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.
+     */
+    patch: operations['updateParametresChues'];
+    trace?: never;
+  };
+  '/api/v1/parametres-chues/journal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Qui a changé quoi, et ce que la valeur disait avant. */
+    get: operations['getJournalParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/enrolement/{projet}/inscriptions': {
     parameters: {
       query?: never;
@@ -3376,7 +3458,14 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR' | 'DIRECTION' | 'ACCUEIL';
+    Role:
+      | 'ADMIN'
+      | 'COMMERCIAL'
+      | 'BANQUE_FINANCE'
+      | 'SUPERVISEUR'
+      | 'DIRECTION'
+      | 'ACCUEIL'
+      | 'CHARGE_CLIENTELE';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -4392,7 +4481,8 @@ export interface components {
     /** @enum {string} */
     Phase2Status: 'PENDING' | 'METHOD_OBTAINED' | 'REFUSED' | 'WRONG_NUMBER';
     /** @enum {string} */
-    EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT';
+    EnrollmentMethod:
+      'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | 'WHATSAPP';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
@@ -4469,10 +4559,19 @@ export interface components {
       paysResidenceId: string | null;
       paysResidenceLabel: string | null;
       villeResidence: string | null;
+      etablissement: string | null;
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
       whatsappE164: string | null;
+      /** @description Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon. */
+      whatsappNumber: string | null;
       relaisNom: string | null;
       relaisPhoneE164: string | null;
       journeys: components['schemas']['ProspectJourneyDto'][];
+      /** @description Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}. */
+      champsLibres: {
+        [key: string]: string;
+      };
       /** @description Durée du système de paiement retenue, en MOIS. */
       dureeSystemeMois: number | null;
       /** Format: uuid */
@@ -4492,6 +4591,14 @@ export interface components {
       enrollmentCapturedByName: string | null;
       /** Format: date-time */
       enrollmentCapturedAt: string | null;
+      /**
+       * Format: date-time
+       * @description Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.
+       */
+      revueAt: string | null;
+      /** Format: uuid */
+      revueById: string | null;
+      revueByName: string | null;
       /** @description Résultat de la dernière tentative d’appel enregistrée. */
       lastOutcome: components['schemas']['CallOutcome'] | null;
       /** @description Commentaire de cette tentative. */
@@ -4582,6 +4689,8 @@ export interface components {
        * @description Profession choisie dans le référentiel.
        */
       professionId?: string;
+      /** @description Établissement où le prospect exerce. */
+      etablissement?: string;
       /**
        * Format: uuid
        * @description Tranche de revenu mensuel déclaré.
@@ -4720,6 +4829,7 @@ export interface components {
       /** Format: uuid */
       paysResidenceId?: string | null;
       villeResidence?: string | null;
+      etablissement?: string | null;
       whatsappE164?: string | null;
       relaisNom?: string | null;
       relaisPhoneE164?: string | null;
@@ -5027,6 +5137,10 @@ export interface components {
        * @description Visite : destinataire visé.
        */
       destinataireId?: string;
+      /** @description Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ. */
+      champsLibres?: {
+        [key: string]: string;
+      };
     };
     SyncOperationDto: {
       /**
@@ -6962,6 +7076,7 @@ export interface components {
     /** @enum {string} */
     PurgeDomainKey:
       | 'teleconseillers'
+      | 'chargesClientele'
       | 'finances'
       | 'supervision'
       | 'directionAccueil'
@@ -7113,6 +7228,55 @@ export interface components {
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
+    ReglageChampDto: {
+      /** @description Clé du champ dans le catalogue de la conversion. */
+      champ: string;
+      libelle: string;
+      visible: boolean;
+      obligatoire: boolean;
+      /** @description Champ exigé par les indicateurs et le closing : il ne peut pas être masqué. */
+      impose: boolean;
+    };
+    ChampLibreDto: {
+      /** Format: uuid */
+      id: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      /** @description Valeurs proposées, pour le type LISTE seulement. */
+      options: string[];
+      obligatoire: boolean;
+    };
+    ReglagesConversionDto: {
+      projet: components['schemas']['Projet'];
+      /** @description Dans l’ordre d’affichage. Un champ masqué n’est ni rendu ni exigé. */
+      champs: components['schemas']['ReglageChampDto'][];
+      libres: components['schemas']['ChampLibreDto'][];
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    ReglageChampInputDto: {
+      champ: string;
+      visible: boolean;
+      obligatoire: boolean;
+    };
+    ChampLibreInputDto: {
+      /**
+       * Format: uuid
+       * @description Absent : le champ vient d’être ajouté.
+       */
+      id?: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      options?: string[];
+      obligatoire: boolean;
+    };
+    UpdateReglagesConversionDto: {
+      /** @description La liste ENTIÈRE, dans l’ordre d’affichage voulu. */
+      champs: components['schemas']['ReglageChampInputDto'][];
+      libres: components['schemas']['ChampLibreInputDto'][];
+    };
     AppUpdateDto: {
       available: boolean;
       /** @description Le poste est sous le plancher obligatoire. */
@@ -7482,7 +7646,13 @@ export interface components {
         | 'WRONG_NUMBER'
         | 'OTHER';
       /** @enum {string|null} */
-      method: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | null;
+      method:
+        | 'PLATFORM'
+        | 'PHYSICAL'
+        | 'VOICE_OR_ELECTRONIC_MESSAGING'
+        | 'APPOINTMENT'
+        | 'WHATSAPP'
+        | null;
       comment: string | null;
       performedByName: string;
       createdAt: string;
@@ -7578,6 +7748,44 @@ export interface components {
     RetirerTeleconseillerDto: {
       /** Format: uuid */
       teleconseillerId: string;
+    };
+    ParametresChuesDto: {
+      plateformeChuesUrl: string;
+      plateformeGrandPublicUrl: string;
+      emailChues: string;
+      whatsappChuesE164: string;
+      messageWhatsapp: string;
+      accuseReceptionObjet: string;
+      accuseReceptionCorps: string;
+      destinatairesEnrolement: string[];
+      destinatairesBpe: string[];
+      destinatairesSupervision: string[];
+      destinatairesDirection: string[];
+    };
+    UpdateParametresChuesDto: {
+      plateformeChuesUrl?: string;
+      plateformeGrandPublicUrl?: string;
+      emailChues?: string;
+      whatsappChuesE164?: string;
+      messageWhatsapp?: string;
+      accuseReceptionObjet?: string;
+      accuseReceptionCorps?: string;
+      destinatairesEnrolement?: string[];
+      destinatairesBpe?: string[];
+      destinatairesSupervision?: string[];
+      destinatairesDirection?: string[];
+    };
+    ParametreChangementDto: {
+      /** Format: uuid */
+      id: string;
+      cle: string;
+      ancienne: string | null;
+      nouvelle: string;
+      parNom: string;
+      le: string;
+    };
+    JournalParametresDto: {
+      items: components['schemas']['ParametreChangementDto'][];
     };
     InscriptionPlateformeDto: {
       /** Format: uuid */
@@ -11957,6 +12165,63 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  marquerProspectRevue: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
         headers: {
           [name: string]: unknown;
         };
@@ -18441,6 +18706,106 @@ export interface operations {
       };
     };
   };
+  getChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateReglagesConversionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   getAndroidUpdate: {
     parameters: {
       query: {
@@ -19775,6 +20140,150 @@ export interface operations {
       };
       /** @description LOT_EXPORT_NOT_FOUND. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateParametresChuesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PARAMETRE_RESERVE_ADMIN. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getJournalParametresChues: {
+    parameters: {
+      query?: {
+        limite?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JournalParametresDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
         headers: {
           [name: string]: unknown;
         };

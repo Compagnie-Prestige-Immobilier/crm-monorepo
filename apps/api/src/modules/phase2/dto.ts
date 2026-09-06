@@ -7,6 +7,7 @@ import {
   IsISO8601,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -27,6 +28,7 @@ import {
   Phase2Status,
   Projet,
   ProspectType,
+  WhatsappStatus,
 } from '@crm/database';
 
 import {
@@ -241,8 +243,9 @@ export class CallAttemptOpDto {
     minimum: 0,
     maximum: DUREE_ETABLISSEMENT_MAX_MOIS,
     description:
-      'Ancienneté dans l’établissement, en MOIS. Distincte de `dureeSystemeMois` du prospect, ' +
-      'qui est la durée du système de paiement.',
+      'Durée dans la fonction, en MOIS. Distincte de `dureeSystemeMois` du prospect, qui est ' +
+      'la durée du système de paiement. Obligatoire sur une conversion CHUES à partir de la ' +
+      'version de charge utile 8.',
   })
   @IsOptional()
   @Type(() => Number)
@@ -255,7 +258,7 @@ export class CallAttemptOpDto {
     type: String,
     format: 'date-time',
     description:
-      'Date du rendez-vous pris. Obligatoire si et seulement si method vaut APPOINTMENT, et ' +
+      'Date et heure du RDV CPI. Obligatoire si et seulement si method vaut APPOINTMENT, et ' +
       'postérieure à clientCreatedAt. Refusée sur toute autre méthode.',
   })
   @IsOptional()
@@ -281,6 +284,33 @@ export class CallAttemptOpDto {
   @MaxLength(120)
   profession?: string;
 
+  @ApiPropertyOptional({ maxLength: 160, description: 'Corrige l’établissement DU PROSPECT.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string;
+
+  @ApiPropertyOptional({
+    enum: WhatsappStatus,
+    enumName: 'WhatsappStatus',
+    description:
+      'Réponse à « ce numéro est-il un numéro WhatsApp ? ». MEME_NUMERO garde le numéro appelé ' +
+      'sans le recopier ; AUTRE_NUMERO exige `whatsappE164` et retombe sur AUCUN sans lui.',
+  })
+  @IsOptional()
+  @IsEnum(WhatsappStatus)
+  whatsappStatus?: WhatsappStatus;
+
+  @ApiPropertyOptional({
+    maxLength: 40,
+    description: 'Numéro WhatsApp DU PROSPECT, quand il diffère du numéro appelé.',
+  })
+  @IsOptional()
+  @IsString()
+  @MinLength(6)
+  @MaxLength(40)
+  whatsappE164?: string;
+
   @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la banque DU PROSPECT.' })
   @IsOptional()
   @IsUUID()
@@ -300,7 +330,12 @@ export class CallAttemptOpDto {
   @IsEnum(ProspectType)
   type?: ProspectType;
 
-  @ApiPropertyOptional({ format: 'uuid', description: 'Corrige la tranche de revenu DU PROSPECT.' })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Corrige la tranche de revenu mensuel DU PROSPECT. Obligatoire sur une conversion CHUES ' +
+      'à partir de la version de charge utile 8, si la fiche n’en porte pas déjà une.',
+  })
   @IsOptional()
   @IsUUID()
   incomeBandId?: string;
@@ -326,6 +361,18 @@ export class CallAttemptOpDto {
   @Min(1)
   @Max(300)
   dureeSystemeMois?: number;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Réponses aux champs que l’administrateur a ajoutés au formulaire, par identifiant ' +
+      'de champ. Écrites SUR LE PROSPECT, fusionnées : une clé absente laisse la réponse ' +
+      'en place. Elles n’alimentent aucun indicateur.',
+  })
+  @IsOptional()
+  @IsObject()
+  champsLibres?: Record<string, string>;
 }
 
 export class ProspectPhase2StateDto {

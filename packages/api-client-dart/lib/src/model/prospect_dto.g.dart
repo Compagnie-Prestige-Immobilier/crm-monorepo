@@ -75,13 +75,21 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto villeResidence(String? villeResidence);
 
+  ProspectDto etablissement(String? etablissement);
+
+  ProspectDto whatsappStatus(WhatsappStatus whatsappStatus);
+
   ProspectDto whatsappE164(String? whatsappE164);
+
+  ProspectDto whatsappNumber(String? whatsappNumber);
 
   ProspectDto relaisNom(String? relaisNom);
 
   ProspectDto relaisPhoneE164(String? relaisPhoneE164);
 
   ProspectDto journeys(List<ProspectJourneyDto> journeys);
+
+  ProspectDto champsLibres(Map<String, String> champsLibres);
 
   ProspectDto dureeSystemeMois(num? dureeSystemeMois);
 
@@ -100,6 +108,12 @@ abstract class _$ProspectDtoCWProxy {
   ProspectDto enrollmentCapturedByName(String? enrollmentCapturedByName);
 
   ProspectDto enrollmentCapturedAt(DateTime? enrollmentCapturedAt);
+
+  ProspectDto revueAt(DateTime? revueAt);
+
+  ProspectDto revueById(String? revueById);
+
+  ProspectDto revueByName(String? revueByName);
 
   ProspectDto lastOutcome(CallOutcome? lastOutcome);
 
@@ -170,10 +184,14 @@ abstract class _$ProspectDtoCWProxy {
     String? paysResidenceId,
     String? paysResidenceLabel,
     String? villeResidence,
+    String? etablissement,
+    WhatsappStatus whatsappStatus,
     String? whatsappE164,
+    String? whatsappNumber,
     String? relaisNom,
     String? relaisPhoneE164,
     List<ProspectJourneyDto> journeys,
+    Map<String, String> champsLibres,
     num? dureeSystemeMois,
     String? canalProvenanceId,
     String? canalProvenanceLabel,
@@ -183,6 +201,9 @@ abstract class _$ProspectDtoCWProxy {
     String? enrollmentCapturedById,
     String? enrollmentCapturedByName,
     DateTime? enrollmentCapturedAt,
+    DateTime? revueAt,
+    String? revueById,
+    String? revueByName,
     CallOutcome? lastOutcome,
     String? lastComment,
     DateTime? lastAttemptAt,
@@ -330,8 +351,20 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(villeResidence: villeResidence);
 
   @override
+  ProspectDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  ProspectDto whatsappStatus(WhatsappStatus whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
   ProspectDto whatsappE164(String? whatsappE164) =>
       this(whatsappE164: whatsappE164);
+
+  @override
+  ProspectDto whatsappNumber(String? whatsappNumber) =>
+      this(whatsappNumber: whatsappNumber);
 
   @override
   ProspectDto relaisNom(String? relaisNom) => this(relaisNom: relaisNom);
@@ -343,6 +376,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
   @override
   ProspectDto journeys(List<ProspectJourneyDto> journeys) =>
       this(journeys: journeys);
+
+  @override
+  ProspectDto champsLibres(Map<String, String> champsLibres) =>
+      this(champsLibres: champsLibres);
 
   @override
   ProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
@@ -378,6 +415,16 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
   @override
   ProspectDto enrollmentCapturedAt(DateTime? enrollmentCapturedAt) =>
       this(enrollmentCapturedAt: enrollmentCapturedAt);
+
+  @override
+  ProspectDto revueAt(DateTime? revueAt) => this(revueAt: revueAt);
+
+  @override
+  ProspectDto revueById(String? revueById) => this(revueById: revueById);
+
+  @override
+  ProspectDto revueByName(String? revueByName) =>
+      this(revueByName: revueByName);
 
   @override
   ProspectDto lastOutcome(CallOutcome? lastOutcome) =>
@@ -472,10 +519,14 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? paysResidenceId = const $CopyWithPlaceholder(),
     Object? paysResidenceLabel = const $CopyWithPlaceholder(),
     Object? villeResidence = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? whatsappNumber = const $CopyWithPlaceholder(),
     Object? relaisNom = const $CopyWithPlaceholder(),
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? journeys = const $CopyWithPlaceholder(),
+    Object? champsLibres = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? canalProvenanceLabel = const $CopyWithPlaceholder(),
@@ -485,6 +536,9 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? enrollmentCapturedById = const $CopyWithPlaceholder(),
     Object? enrollmentCapturedByName = const $CopyWithPlaceholder(),
     Object? enrollmentCapturedAt = const $CopyWithPlaceholder(),
+    Object? revueAt = const $CopyWithPlaceholder(),
+    Object? revueById = const $CopyWithPlaceholder(),
+    Object? revueByName = const $CopyWithPlaceholder(),
     Object? lastOutcome = const $CopyWithPlaceholder(),
     Object? lastComment = const $CopyWithPlaceholder(),
     Object? lastAttemptAt = const $CopyWithPlaceholder(),
@@ -639,10 +693,22 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.villeResidence
           // ignore: cast_nullable_to_non_nullable
           : villeResidence as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus,
       whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
           ? _value.whatsappE164
           // ignore: cast_nullable_to_non_nullable
           : whatsappE164 as String?,
+      whatsappNumber: whatsappNumber == const $CopyWithPlaceholder()
+          ? _value.whatsappNumber
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappNumber as String?,
       relaisNom: relaisNom == const $CopyWithPlaceholder()
           ? _value.relaisNom
           // ignore: cast_nullable_to_non_nullable
@@ -655,6 +721,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.journeys
           // ignore: cast_nullable_to_non_nullable
           : journeys as List<ProspectJourneyDto>,
+      champsLibres: champsLibres == const $CopyWithPlaceholder()
+          ? _value.champsLibres
+          // ignore: cast_nullable_to_non_nullable
+          : champsLibres as Map<String, String>,
       dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
           ? _value.dureeSystemeMois
           // ignore: cast_nullable_to_non_nullable
@@ -693,6 +763,18 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.enrollmentCapturedAt
           // ignore: cast_nullable_to_non_nullable
           : enrollmentCapturedAt as DateTime?,
+      revueAt: revueAt == const $CopyWithPlaceholder()
+          ? _value.revueAt
+          // ignore: cast_nullable_to_non_nullable
+          : revueAt as DateTime?,
+      revueById: revueById == const $CopyWithPlaceholder()
+          ? _value.revueById
+          // ignore: cast_nullable_to_non_nullable
+          : revueById as String?,
+      revueByName: revueByName == const $CopyWithPlaceholder()
+          ? _value.revueByName
+          // ignore: cast_nullable_to_non_nullable
+          : revueByName as String?,
       lastOutcome: lastOutcome == const $CopyWithPlaceholder()
           ? _value.lastOutcome
           // ignore: cast_nullable_to_non_nullable
@@ -803,10 +885,14 @@ ProspectDto _$ProspectDtoFromJson(
       'paysResidenceId',
       'paysResidenceLabel',
       'villeResidence',
+      'etablissement',
+      'whatsappStatus',
       'whatsappE164',
+      'whatsappNumber',
       'relaisNom',
       'relaisPhoneE164',
       'journeys',
+      'champsLibres',
       'dureeSystemeMois',
       'canalProvenanceId',
       'canalProvenanceLabel',
@@ -816,6 +902,9 @@ ProspectDto _$ProspectDtoFromJson(
       'enrollmentCapturedById',
       'enrollmentCapturedByName',
       'enrollmentCapturedAt',
+      'revueAt',
+      'revueById',
+      'revueByName',
       'lastOutcome',
       'lastComment',
       'lastAttemptAt',
@@ -924,7 +1013,17 @@ ProspectDto _$ProspectDtoFromJson(
       (v) => v as String?,
     ),
     villeResidence: $checkedConvert('villeResidence', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecode(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    whatsappNumber: $checkedConvert('whatsappNumber', (v) => v as String?),
     relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
     relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
     journeys: $checkedConvert(
@@ -932,6 +1031,10 @@ ProspectDto _$ProspectDtoFromJson(
       (v) => (v as List<dynamic>)
           .map((e) => ProspectJourneyDto.fromJson(e as Map<String, dynamic>))
           .toList(),
+    ),
+    champsLibres: $checkedConvert(
+      'champsLibres',
+      (v) => Map<String, String>.from(v as Map),
     ),
     dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
     canalProvenanceId: $checkedConvert(
@@ -978,6 +1081,12 @@ ProspectDto _$ProspectDtoFromJson(
       'enrollmentCapturedAt',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    revueAt: $checkedConvert(
+      'revueAt',
+      (v) => v == null ? null : DateTime.parse(v as String),
+    ),
+    revueById: $checkedConvert('revueById', (v) => v as String?),
+    revueByName: $checkedConvert('revueByName', (v) => v as String?),
     lastOutcome: $checkedConvert(
       'lastOutcome',
       (v) => $enumDecodeNullable(
@@ -1058,10 +1167,14 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'paysResidenceId': instance.paysResidenceId,
       'paysResidenceLabel': instance.paysResidenceLabel,
       'villeResidence': instance.villeResidence,
+      'etablissement': instance.etablissement,
+      'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
       'whatsappE164': instance.whatsappE164,
+      'whatsappNumber': instance.whatsappNumber,
       'relaisNom': instance.relaisNom,
       'relaisPhoneE164': instance.relaisPhoneE164,
       'journeys': instance.journeys.map((e) => e.toJson()).toList(),
+      'champsLibres': instance.champsLibres,
       'dureeSystemeMois': instance.dureeSystemeMois,
       'canalProvenanceId': instance.canalProvenanceId,
       'canalProvenanceLabel': instance.canalProvenanceLabel,
@@ -1071,6 +1184,9 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'enrollmentCapturedById': instance.enrollmentCapturedById,
       'enrollmentCapturedByName': instance.enrollmentCapturedByName,
       'enrollmentCapturedAt': instance.enrollmentCapturedAt?.toIso8601String(),
+      'revueAt': instance.revueAt?.toIso8601String(),
+      'revueById': instance.revueById,
+      'revueByName': instance.revueByName,
       'lastOutcome': _$CallOutcomeEnumMap[instance.lastOutcome],
       'lastComment': instance.lastComment,
       'lastAttemptAt': instance.lastAttemptAt?.toIso8601String(),
@@ -1130,6 +1246,14 @@ const _$ModeEpargneEnumMap = {
   ModeEpargne.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
 const _$BddSegmentEnumMap = {
   BddSegment.BDD1: 'BDD1',
   BddSegment.BDD2: 'BDD2',
@@ -1152,6 +1276,7 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
+  EnrollmentMethod.WHATSAPP: 'WHATSAPP',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

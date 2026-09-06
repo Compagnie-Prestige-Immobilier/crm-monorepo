@@ -14,7 +14,7 @@ class AppDatabase extends _$AppDatabase {
   }
 
   @override
-  int get schemaVersion => 33;
+  int get schemaVersion => 34;
 
   /// Les colonnes ajoutées à `call_attempts` par la v19. Déclarées ici parce
   /// que TROIS paliers recopient cette table : chacun engendre sa forme
@@ -387,6 +387,21 @@ class AppDatabase extends _$AppDatabase {
       // forme courante, la colonne y est déjà.
       if (from >= 32 && from < 33 && to >= 33) {
         await m.addColumn(ouverturesFiche, ouverturesFiche.firstInputAt);
+      }
+      if (from < 34 && to >= 34) {
+        // Même garde qu'au palier v23 : avant la v13, `prospects` est recréée
+        // dans sa forme courante, colonnes comprises.
+        if (from >= 13) {
+          await m.addColumn(prospects, prospects.whatsappStatus);
+          await m.addColumn(prospects, prospects.etablissement);
+        }
+        // `SELECT p.*` est figé à la création de la vue.
+        await m.recreateAllViews();
+        // Comme au palier v25 : une fiche déjà en base ne redescend plus, et
+        // ses deux colonnes neuves resteraient vides à vie.
+        await customStatement(
+          'DELETE FROM sync_state WHERE collection = \'all\'',
+        );
       }
     },
     beforeOpen: (OpeningDetails details) async {

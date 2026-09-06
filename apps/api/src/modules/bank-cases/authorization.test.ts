@@ -173,64 +173,64 @@ const MATRICE_NOUVEAUX: {
   {
     controller: RepCampaignsController,
     method: 'recordAttempt',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
 
   {
     controller: RepresentantsController,
     method: 'list',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'lookup',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'get',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'create',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'update',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'remove',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   { controller: RepresentantsController, method: 'import', roles: [Role.ADMIN] },
   {
     controller: RepresentantsController,
     method: 'relationHistory',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'callHistory',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'deviceCalls',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'listComments',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   {
     controller: RepresentantsController,
     method: 'addComment',
-    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION],
   },
   { controller: RepresentantsController, method: 'removeComment', roles: [Role.ADMIN] },
 ];
@@ -318,8 +318,8 @@ describe('matrice d’autorisation des modules récents', () => {
       // domaine bancaire, qui ne regarde pas la direction commerciale.
       const attendus =
         method === 'bankAging'
-          ? [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR]
-          : [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION];
+          ? [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR]
+          : [Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.DIRECTION];
       expect(admitted(AnalyticsController, method).sort(), method).toEqual([...attendus].sort());
       expect(allows(AnalyticsController, method, Role.BANQUE_FINANCE)).toBe(false);
       expect(allows(AnalyticsController, method, Role.ACCUEIL)).toBe(false);
@@ -328,6 +328,7 @@ describe('matrice d’autorisation des modules récents', () => {
     expect(Reflect.getMetadata(ROLES_KEY, AnalyticsController)).toEqual([
       Role.ADMIN,
       Role.COMMERCIAL,
+      Role.CHARGE_CLIENTELE,
       Role.SUPERVISEUR,
       Role.DIRECTION,
     ]);
