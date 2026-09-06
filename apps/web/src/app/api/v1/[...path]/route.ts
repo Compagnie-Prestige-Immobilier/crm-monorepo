@@ -67,37 +67,37 @@ function toClientResponse(upstream: Response): Response {
   return new Response(upstream.body, { status: upstream.status, headers });
 }
 
-async function handle(
+type ForwardAttempt =
+  | { kind: 'success'; response: Response }
+  | { kind: 'network-error'; response: Response }
+  | { kind: 'retry' };
+
+async function tryForward(
   request: Request,
   method: Method,
-  context: { params: Promise<{ path: string[] }> },
-): Promise<Response> {
-  const { path } = await context.params;
-
+  path: string[],
+  accessToken: string,
+  body: ArrayBuffer | null,
+): Promise<ForwardAttempt> {
+  let upstream: Response;
   try {
-    serverApiOrigin();
-  } catch (error) {
-    if (error instanceof ApiConfigurationError) {
-      return NextResponse.json(configErrorBody(error), { status: 500 });
-    }
-    throw error;
+    upstream = await forward(request, method, path, accessToken, body);
+  } catch {
+    return {
+      kind: 'network-error',
+      response: NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 }),
+    };
   }
+  if (upstream.status === 401) return { kind: 'retry' };
+  return { kind: 'success', response: toClientResponse(upstream) };
+}
 
-  const accessToken = await getAccessToken();
-  const body = method === 'GET' || method === 'DELETE' ? null : await request.arrayBuffer();
-
-  // Le cookie d'accès expire avant celui de rafraîchissement : son absence
-  // vaut un 401 amont et passe par la même rotation.
-  if (accessToken !== null && accessToken !== '') {
-    let upstream: Response;
-    try {
-      upstream = await forward(request, method, path, accessToken, body);
-    } catch {
-      return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
-    }
-    if (upstream.status !== 401) return toClientResponse(upstream);
-  }
-
+async function renewAndForward(
+  request: Request,
+  method: Method,
+  path: string[],
+  body: ArrayBuffer | null,
+): Promise<Response> {
   const refreshToken = await getRefreshToken();
   const rotation =
     refreshToken === null || refreshToken === ''
@@ -125,6 +125,35 @@ async function handle(
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
   }
+}
+
+async function handle(
+  request: Request,
+  method: Method,
+  context: { params: Promise<{ path: string[] }> },
+): Promise<Response> {
+  const { path } = await context.params;
+
+  try {
+    serverApiOrigin();
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) {
+      return NextResponse.json(configErrorBody(error), { status: 500 });
+    }
+    throw error;
+  }
+
+  const accessToken = await getAccessToken();
+  const body = method === 'GET' || method === 'DELETE' ? null : await request.arrayBuffer();
+
+  // Le cookie d'accès expire avant celui de rafraîchissement : son absence
+  // vaut un 401 amont et passe par la même rotation.
+  if (accessToken !== null && accessToken !== '') {
+    const attempt = await tryForward(request, method, path, accessToken, body);
+    if (attempt.kind !== 'retry') return attempt.response;
+  }
+
+  return renewAndForward(request, method, path, body);
 }
 
 export const GET = (request: Request, context: { params: Promise<{ path: string[] }> }) =>
