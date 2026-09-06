@@ -158,7 +158,7 @@ function PetitsMultiples({
           </li>
         ))}
       </ul>
-      <div className="grid auto-rows-[12rem] grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+      <div className="grid auto-rows-[13rem] grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
         {lignes.map((ligne) => {
           const id = ligne.id;
           return (
@@ -177,7 +177,7 @@ function PetitsMultiples({
                 />
               </div>
               <figcaption className="text-center">
-                <span className="block truncate text-[0.8125rem] font-[600]">{ligne.ligne}</span>
+                <span className="line-clamp-2 text-[0.8125rem] font-[600]">{ligne.ligne}</span>
                 {ligne.detail === undefined ? null : (
                   <span className="block truncate text-[0.75rem] text-muted-foreground">
                     {ligne.detail}
