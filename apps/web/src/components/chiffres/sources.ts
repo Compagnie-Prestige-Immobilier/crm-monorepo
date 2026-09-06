@@ -423,33 +423,21 @@ export const SOURCES_CHIFFRES = {
   },
   'taux-d-exploitation': {
     label: 'Taux d’exploitation',
-    forme: 'classement',
+    forme: 'composition',
     jeu: 'campagnes',
     description:
-      'Fiches traitées, une part par campagne de la période. Une part ouvre sa campagne.',
+      'Un camembert par campagne : fiches traitées ÷ fiches de la campagne. Le camembert ouvre sa campagne.',
     groupe: 'Campagnes',
     lien: (id) => `/chues/campagnes/${id}`,
     extraire: ({ campagnes }) =>
       campagnes === undefined
         ? null
         : {
-            forme: 'classement',
-            donnee: campagnes.items.map((c) => ({ id: c.id, label: c.name, value: c.traitees })),
-          },
-  },
-  'exploitation-par-campagne': {
-    label: 'Exploitation par campagne',
-    forme: 'composition',
-    jeu: 'campagnes',
-    description: 'Par campagne : fiches traitées et fiches restantes.',
-    groupe: 'Campagnes',
-    extraire: ({ campagnes }) =>
-      campagnes === undefined
-        ? null
-        : {
             forme: 'composition',
             donnee: campagnes.items.map((campagne) => ({
+              id: campagne.id,
               ligne: campagne.name,
+              detail: `${formatNumber(campagne.traitees)} traitées sur ${formatNumber(campagne.prevues)} · ${taux(part(campagne.traitees, campagne.prevues))}`,
               segments: [
                 { id: 'traitees', label: 'Traitées', value: campagne.traitees },
                 {
@@ -912,7 +900,6 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'statuts-par-famille',
   'joignabilite-par-creneau',
   'taux-d-exploitation',
-  'exploitation-par-campagne',
   'representants-par-departement',
   'representants-par-ief',
   'representants-jamais-appeles',

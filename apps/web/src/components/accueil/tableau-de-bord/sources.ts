@@ -33,6 +33,9 @@ export interface ScalaireDatum {
 export interface CompositionLigne {
   ligne: string;
   segments: NamedCount[];
+  /** Ce que le clic sur cette ligne ouvre, et ce que sa légende ajoute sous le nom. */
+  id?: string;
+  detail?: string;
 }
 
 export interface MatriceCellule {

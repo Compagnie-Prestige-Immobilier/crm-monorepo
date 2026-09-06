@@ -7213,7 +7213,6 @@ export interface components {
       | 'statuts-par-famille'
       | 'joignabilite-par-creneau'
       | 'taux-d-exploitation'
-      | 'exploitation-par-campagne'
       | 'representants-par-departement'
       | 'representants-par-ief'
       | 'representants-jamais-appeles'

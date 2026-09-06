@@ -51,8 +51,9 @@ function hauteurDe(
   marque: DashboardMarque | undefined,
   taille: DashboardTaille,
   vide: boolean,
-): 'compacte' | 'normale' | 'haute' {
+): 'compacte' | 'normale' | 'haute' | 'libre' {
   if (vide) return 'compacte';
+  if (forme === 'composition' && (marque === 'camembert' || marque === 'anneau')) return 'libre';
   if (taille === 'pleine' || forme === 'equipe') return 'haute';
   if (marque === 'tuile') return 'compacte';
   return 'normale';

@@ -40,7 +40,7 @@ export interface ItemsChartProps {
  * surfaces d'or par opacité — jamais le texte, `docs/design.md §2.3`.
  * `serie` retombe sur la palette CPI habituelle.
  */
-function paletteFill(
+export function paletteFill(
   theme: ChartTheme,
   palette: DispositionPresentation['palette'],
   index: number,

@@ -39,7 +39,6 @@ const SOURCES_EN_RESERVE = [
   'Joints et non joints',
   'Statuts par famille',
   'Joignabilité par créneau',
-  'Exploitation par campagne',
   'Représentants par département',
   'Représentants par IEF',
   'Représentants jamais appelés',
