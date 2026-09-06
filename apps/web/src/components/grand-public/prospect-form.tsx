@@ -269,28 +269,245 @@ type Envoi =
 const montre = (type: ProspectType | null, champ: Champ): boolean =>
   type !== null && CHAMPS[type].includes(champ);
 
-/** Ne garde que ce que la nouvelle situation demande. */
+/** Le champ qui commande chaque colonne de la situation : deux colonnes peuvent dépendre du même. */
+const CHAMP_PAR_CLE: Record<keyof Situation, Champ> = {
+  employeurId: 'employeur',
+  employeur: 'employeur',
+  typeContrat: 'contrat',
+  ancienneteMois: 'anciennete',
+  lieuActivite: 'lieu',
+  modeEpargne: 'epargne',
+  paysResidenceId: 'pays',
+  villeResidence: 'pays',
+  whatsapp: 'whatsapp',
+  relaisNom: 'relais',
+  relaisPhone: 'relais',
+  banqueId: 'banque',
+  syndicatId: 'syndicat',
+};
+
+/** Ne garde que ce que la nouvelle situation demande, vide le reste vers `SITUATION_VIDE`. */
 function pourSituation(type: ProspectType | null, actuel: Situation): Situation {
-  const garde = (champ: Champ): boolean => montre(type, champ);
-  return {
-    employeurId: garde('employeur') ? actuel.employeurId : null,
-    employeur: garde('employeur') ? actuel.employeur : '',
-    typeContrat: garde('contrat') ? actuel.typeContrat : null,
-    ancienneteMois: garde('anciennete') ? actuel.ancienneteMois : '',
-    lieuActivite: garde('lieu') ? actuel.lieuActivite : '',
-    modeEpargne: garde('epargne') ? actuel.modeEpargne : null,
-    paysResidenceId: garde('pays') ? actuel.paysResidenceId : null,
-    villeResidence: garde('pays') ? actuel.villeResidence : '',
-    whatsapp: garde('whatsapp') ? actuel.whatsapp : '',
-    relaisNom: garde('relais') ? actuel.relaisNom : '',
-    relaisPhone: garde('relais') ? actuel.relaisPhone : '',
-    banqueId: garde('banque') ? actuel.banqueId : null,
-    syndicatId: garde('syndicat') ? actuel.syndicatId : null,
-  };
+  const result: Record<string, unknown> = { ...actuel };
+  for (const [cle, champ] of Object.entries(CHAMP_PAR_CLE)) {
+    if (!montre(type, champ)) result[cle] = SITUATION_VIDE[cle as keyof Situation];
+  }
+  return result as unknown as Situation;
 }
 
 const actives = <T extends { isActive: boolean }>(items: readonly T[] | undefined): T[] =>
   (items ?? []).filter((item) => item.isActive);
+
+function searchHrefPourConflit(phone: string, callingCode: string): string {
+  return `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
+}
+
+function paysDisponibles(reference: ReferenceData | undefined) {
+  return callingCountriesFrom(reference?.pays ?? []);
+}
+
+function estEnseignante(reference: ReferenceData | undefined, professionId: string | null): boolean {
+  return (
+    reference?.professions.find((profession) => profession.id === professionId)?.isTeaching ===
+    true
+  );
+}
+
+function countriesPourTelephone(
+  type: ProspectType | null,
+  paysCountries: readonly { code: string; label: string }[],
+) {
+  return type === 'DIASPORA' ? paysCountries : undefined;
+}
+
+function orEmptyString<T extends string>(value: T | null): string {
+  return value ?? '';
+}
+
+function dureeSelectValue(dureeMois: number | null): string {
+  return dureeMois === null ? '' : String(dureeMois);
+}
+
+function libelleProfession(type: ProspectType | null): string {
+  return type === 'INFORMEL' ? 'Activité' : 'Profession';
+}
+
+function IntroHeader({ embedded }: { embedded: boolean }) {
+  if (embedded) return null;
+  return (
+    <div>
+      <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
+        Nouveau prospect Grand Public
+      </h1>
+      <p className="text-body text-muted-foreground">
+        Le nom, le prénom et le téléphone suffisent. Le reste se complète plus tard.
+      </p>
+    </div>
+  );
+}
+
+function PhoneConflictCard({
+  conflict,
+  searchHref,
+}: {
+  conflict: ProspectPhoneConflict | null;
+  searchHref: string;
+}) {
+  if (conflict === null) return null;
+  return (
+    <Card className="border-destructive/40">
+      <CardContent className="flex items-start gap-3">
+        <AlertTriangleIcon
+          className="mt-0.5 size-5 shrink-0 text-destructive"
+          aria-hidden="true"
+        />
+        <div role="alert" className="flex min-w-0 flex-col gap-1">
+          <p className="font-[600]">
+            Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
+          </p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Saisi par le téléconseiller {conflict.ownedByCommercialName} le{' '}
+            {formatDateTime(conflict.createdAt)}.
+          </p>
+          <Link
+            href={searchHref}
+            className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Chercher cette fiche dans le Grand Public
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfessionField({
+  type,
+  professionId,
+  reference,
+  onChange,
+}: {
+  type: ProspectType | null;
+  professionId: string | null;
+  reference: ReferenceData | undefined;
+  onChange: (professionId: string | null, isTeaching: boolean) => void;
+}) {
+  return (
+    <FilterCombobox
+      label={libelleProfession(type)}
+      placeholder="Rechercher une profession"
+      value={professionId}
+      options={actives(reference?.professions).map((profession) => ({
+        value: profession.id,
+        label: profession.label,
+      }))}
+      onChange={(value) => {
+        const profession = reference?.professions.find((item) => item.id === value);
+        onChange(value, profession?.isTeaching === true);
+      }}
+    />
+  );
+}
+
+function MontantsFields({
+  incomeBandId,
+  onIncomeBandChange,
+  paymentMode,
+  onPaymentModeChange,
+  dureeMois,
+  onDureeChange,
+  canalId,
+  onCanalChange,
+  reference,
+  canaux,
+}: {
+  incomeBandId: string | null;
+  onIncomeBandChange: (value: string | null) => void;
+  paymentMode: PaymentMode | null;
+  onPaymentModeChange: (mode: PaymentMode | null) => void;
+  dureeMois: number | null;
+  onDureeChange: (value: number | null) => void;
+  canalId: string | null;
+  onCanalChange: (value: string | null) => void;
+  reference: ReferenceData | undefined;
+  canaux: readonly { id: string; label: string; isActive: boolean }[] | undefined;
+}) {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FilterCombobox
+        label="Revenu mensuel"
+        placeholder="Choisir une tranche"
+        value={incomeBandId}
+        options={actives(reference?.incomeBands).map((band) => ({
+          value: band.id,
+          label: band.label,
+        }))}
+        onChange={onIncomeBandChange}
+      />
+      <div className="flex min-w-0 flex-col gap-1.5">
+        <Label htmlFor="gp-paiement">Paiement</Label>
+        <Select
+          value={orEmptyString(paymentMode)}
+          onValueChange={(value) => {
+            const mode = value === '' || value === null ? null : (value as PaymentMode);
+            onPaymentModeChange(mode);
+          }}
+        >
+          <SelectTrigger id="gp-paiement">
+            <SelectValue placeholder="Choisir un mode" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="COMPTANT">Comptant</SelectItem>
+            <SelectItem value="ECHELONNE">Échelonné</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <DureeField paymentMode={paymentMode} dureeMois={dureeMois} onDureeChange={onDureeChange} />
+
+      <FilterCombobox
+        label="Canal de provenance"
+        placeholder="Choisir un canal"
+        value={canalId}
+        options={actives(canaux).map((canal) => ({ value: canal.id, label: canal.label }))}
+        onChange={onCanalChange}
+      />
+    </div>
+  );
+}
+
+function DureeField({
+  paymentMode,
+  dureeMois,
+  onDureeChange,
+}: {
+  paymentMode: PaymentMode | null;
+  dureeMois: number | null;
+  onDureeChange: (value: number | null) => void;
+}) {
+  if (paymentMode !== 'ECHELONNE') return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor="gp-duree">Durée de remboursement</Label>
+      <Select
+        value={dureeSelectValue(dureeMois)}
+        onValueChange={(value) => {
+          onDureeChange(value === null || value === '' ? null : Number(value));
+        }}
+      >
+        <SelectTrigger id="gp-duree">
+          <SelectValue placeholder="Choisir une durée" />
+        </SelectTrigger>
+        <SelectContent>
+          {DUREES_MOIS.map((mois) => (
+            <SelectItem key={mois} value={String(mois)}>
+              {formatDureeMois(mois)}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
 
 export function GrandPublicProspectForm({
   embedded = false,
@@ -440,11 +657,9 @@ export function GrandPublicProspectForm({
     save.mutate({ mode: 'creation', input: pourCreation(valeurs), andNext });
   }
 
-  const searchHref = `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
-  const paysCountries = callingCountriesFrom(reference.data?.pays ?? []);
-  const enseignante =
-    reference.data?.professions.find((profession) => profession.id === professionId)?.isTeaching ===
-    true;
+  const searchHref = searchHrefPourConflit(phone, callingCode);
+  const paysCountries = paysDisponibles(reference.data);
+  const enseignante = estEnseignante(reference.data, professionId);
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
@@ -460,16 +675,7 @@ export function GrandPublicProspectForm({
         submit(true);
       }}
     >
-      {embedded ? null : (
-        <div>
-          <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
-            Nouveau prospect Grand Public
-          </h1>
-          <p className="text-body text-muted-foreground">
-            Le nom, le prénom et le téléphone suffisent. Le reste se complète plus tard.
-          </p>
-        </div>
-      )}
+      <IntroHeader embedded={embedded} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom}>
@@ -508,7 +714,7 @@ export function GrandPublicProspectForm({
         value={phone}
         callingCode={callingCode}
         error={errors.phone}
-        countries={type === 'DIASPORA' ? paysCountries : undefined}
+        countries={countriesPourTelephone(type, paysCountries)}
         onCallingCodeChange={setCallingCode}
         onChange={(value) => {
           setPhone(value);
@@ -516,31 +722,7 @@ export function GrandPublicProspectForm({
         }}
       />
 
-      {conflict !== null ? (
-        <Card className="border-destructive/40">
-          <CardContent className="flex items-start gap-3">
-            <AlertTriangleIcon
-              className="mt-0.5 size-5 shrink-0 text-destructive"
-              aria-hidden="true"
-            />
-            <div role="alert" className="flex min-w-0 flex-col gap-1">
-              <p className="font-[600]">
-                Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
-              </p>
-              <p className="text-[0.8125rem] text-muted-foreground">
-                Saisi par le téléconseiller {conflict.ownedByCommercialName} le{' '}
-                {formatDateTime(conflict.createdAt)}.
-              </p>
-              <Link
-                href={searchHref}
-                className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Chercher cette fiche dans le Grand Public
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <PhoneConflictCard conflict={conflict} searchHref={searchHref} />
 
       <fieldset className="flex flex-col gap-2">
         <legend className="mb-2 text-[0.875rem] font-[600] text-foreground">Situation</legend>
@@ -574,20 +756,13 @@ export function GrandPublicProspectForm({
         </div>
       </fieldset>
 
-      <FilterCombobox
-        label={type === 'INFORMEL' ? 'Activité' : 'Profession'}
-        placeholder="Rechercher une profession"
-        value={professionId}
-        options={actives(reference.data?.professions).map((profession) => ({
-          value: profession.id,
-          label: profession.label,
-        }))}
-        onChange={(value) => {
+      <ProfessionField
+        type={type}
+        professionId={professionId}
+        reference={reference.data}
+        onChange={(value, isTeaching) => {
           setProfessionId(value);
-          const profession = reference.data?.professions.find((item) => item.id === value);
-          if (profession?.isTeaching !== true) {
-            setSituation((previous) => ({ ...previous, syndicatId: null }));
-          }
+          if (!isTeaching) setSituation((previous) => ({ ...previous, syndicatId: null }));
         }}
       />
 
@@ -608,67 +783,21 @@ export function GrandPublicProspectForm({
         }}
       />
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <FilterCombobox
-          label="Revenu mensuel"
-          placeholder="Choisir une tranche"
-          value={incomeBandId}
-          options={actives(reference.data?.incomeBands).map((band) => ({
-            value: band.id,
-            label: band.label,
-          }))}
-          onChange={setIncomeBandId}
-        />
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="gp-paiement">Paiement</Label>
-          <Select
-            value={paymentMode ?? ''}
-            onValueChange={(value) => {
-              const mode = value === '' || value === null ? null : (value as PaymentMode);
-              setPaymentMode(mode);
-              if (mode !== 'ECHELONNE') setDureeMois(null);
-            }}
-          >
-            <SelectTrigger id="gp-paiement">
-              <SelectValue placeholder="Choisir un mode" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="COMPTANT">Comptant</SelectItem>
-              <SelectItem value="ECHELONNE">Échelonné</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        {paymentMode === 'ECHELONNE' ? (
-          <div className="flex min-w-0 flex-col gap-1.5">
-            <Label htmlFor="gp-duree">Durée de remboursement</Label>
-            <Select
-              value={dureeMois === null ? '' : String(dureeMois)}
-              onValueChange={(value) => {
-                setDureeMois(value === null || value === '' ? null : Number(value));
-              }}
-            >
-              <SelectTrigger id="gp-duree">
-                <SelectValue placeholder="Choisir une durée" />
-              </SelectTrigger>
-              <SelectContent>
-                {DUREES_MOIS.map((mois) => (
-                  <SelectItem key={mois} value={String(mois)}>
-                    {formatDureeMois(mois)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        ) : null}
-
-        <FilterCombobox
-          label="Canal de provenance"
-          placeholder="Choisir un canal"
-          value={canalId}
-          options={actives(canaux.data).map((canal) => ({ value: canal.id, label: canal.label }))}
-          onChange={setCanalId}
-        />
-      </div>
+      <MontantsFields
+        incomeBandId={incomeBandId}
+        onIncomeBandChange={setIncomeBandId}
+        paymentMode={paymentMode}
+        onPaymentModeChange={(mode) => {
+          setPaymentMode(mode);
+          if (mode !== 'ECHELONNE') setDureeMois(null);
+        }}
+        dureeMois={dureeMois}
+        onDureeChange={setDureeMois}
+        canalId={canalId}
+        onCanalChange={setCanalId}
+        reference={reference.data}
+        canaux={canaux.data}
+      />
 
       <PiedDeFormulaire
         modification={initial !== undefined}
@@ -740,6 +869,254 @@ function anciennete(saisie: string): number | null {
   return valeur;
 }
 
+interface ChampSituationProps {
+  type: ProspectType | null;
+  valeurs: Situation;
+  reference: ReferenceData | undefined;
+  onPatch: (patch: Partial<Situation>) => void;
+}
+
+function ContratField({ type, valeurs, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'contrat')) return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor="gp-contrat">Type de contrat</Label>
+      <Select
+        value={orEmptyString(valeurs.typeContrat)}
+        onValueChange={(value) => {
+          onPatch({ typeContrat: value === '' || value === null ? null : (value as TypeContrat) });
+        }}
+      >
+        <SelectTrigger id="gp-contrat">
+          <SelectValue placeholder="Choisir un contrat" />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(TYPE_CONTRAT_LABELS).map(([valeur, libelle]) => (
+            <SelectItem key={valeur} value={valeur}>
+              {libelle}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function BanqueField({ type, valeurs, reference, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'banque')) return null;
+  return (
+    <FilterCombobox
+      label={type === 'DIASPORA' ? 'Banque au Sénégal' : 'Banque de domiciliation'}
+      placeholder="Choisir une banque"
+      value={valeurs.banqueId}
+      options={actives(reference?.banques).map((banque) => ({
+        value: banque.id,
+        label: banque.name,
+        hint: banque.shortName,
+      }))}
+      onChange={(banqueId) => {
+        onPatch({ banqueId });
+      }}
+    />
+  );
+}
+
+function SyndicatField({
+  type,
+  enseignante,
+  valeurs,
+  reference,
+  onPatch,
+}: ChampSituationProps & { enseignante: boolean }) {
+  if (!montre(type, 'syndicat') || !enseignante) return null;
+  return (
+    <FilterCombobox
+      label="Syndicat"
+      placeholder="Choisir un syndicat"
+      value={valeurs.syndicatId}
+      options={actives(reference?.syndicats).map((syndicat) => ({
+        value: syndicat.id,
+        label: syndicat.name,
+        hint: syndicat.sigle,
+      }))}
+      onChange={(syndicatId) => {
+        onPatch({ syndicatId });
+      }}
+    />
+  );
+}
+
+function AncienneteField({ type, valeurs, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'anciennete')) return null;
+  return (
+    <Field label="Ancienneté (mois)" description="Chez l’employeur actuel.">
+      {(props) => (
+        <Input
+          {...props}
+          type="number"
+          min="0"
+          max="840"
+          inputMode="numeric"
+          value={valeurs.ancienneteMois}
+          onChange={(event) => {
+            onPatch({ ancienneteMois: event.target.value });
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
+function LieuField({ type, valeurs, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'lieu')) return null;
+  return (
+    <Field label="Lieu d’activité">
+      {(props) => (
+        <Input
+          {...props}
+          value={valeurs.lieuActivite}
+          maxLength={160}
+          onChange={(event) => {
+            onPatch({ lieuActivite: event.target.value });
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
+function EpargneField({ type, valeurs, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'epargne')) return null;
+  return (
+    <div className="flex min-w-0 flex-col gap-1.5">
+      <Label htmlFor="gp-epargne">Mode d’épargne</Label>
+      <Select
+        value={orEmptyString(valeurs.modeEpargne)}
+        onValueChange={(value) => {
+          onPatch({ modeEpargne: value === '' || value === null ? null : (value as ModeEpargne) });
+        }}
+      >
+        <SelectTrigger id="gp-epargne">
+          <SelectValue placeholder="Choisir un mode" />
+        </SelectTrigger>
+        <SelectContent>
+          {Object.entries(MODE_EPARGNE_LABELS).map(([valeur, libelle]) => (
+            <SelectItem key={valeur} value={valeur}>
+              {libelle}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
+function PaysField({
+  type,
+  valeurs,
+  reference,
+  onIndicatifResidence,
+  onPatch,
+}: ChampSituationProps & { onIndicatifResidence: (indicatif: string) => void }) {
+  if (!montre(type, 'pays')) return null;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <FilterCombobox
+        label="Pays de résidence"
+        placeholder="Choisir un pays"
+        value={valeurs.paysResidenceId}
+        options={actives(reference?.pays).map((pays) => ({
+          value: pays.id,
+          label: pays.label,
+          hint: `+${pays.indicatif}`,
+        }))}
+        onChange={(paysResidenceId) => {
+          onPatch({ paysResidenceId });
+          const choisi = reference?.pays.find((pays) => pays.id === paysResidenceId);
+          if (choisi !== undefined) onIndicatifResidence(choisi.indicatif);
+        }}
+      />
+      <Field label="Ville de résidence">
+        {(props) => (
+          <Input
+            {...props}
+            value={valeurs.villeResidence}
+            maxLength={120}
+            onChange={(event) => {
+              onPatch({ villeResidence: event.target.value });
+            }}
+          />
+        )}
+      </Field>
+    </div>
+  );
+}
+
+function WhatsappField({
+  type,
+  valeurs,
+  paysCountries,
+  whatsappCode,
+  onWhatsappCode,
+  onPatch,
+}: ChampSituationProps & {
+  paysCountries: readonly { code: string; label: string }[];
+  whatsappCode: string;
+  onWhatsappCode: (value: string) => void;
+}) {
+  if (!montre(type, 'whatsapp')) return null;
+  return (
+    <InternationalPhoneField
+      label="WhatsApp"
+      countryLabel="Pays WhatsApp"
+      description="Laissez vide s’il est identique au téléphone."
+      required={false}
+      placeholder="6 12 34 56 78"
+      countries={paysCountries}
+      value={valeurs.whatsapp}
+      callingCode={whatsappCode}
+      onCallingCodeChange={onWhatsappCode}
+      onChange={(whatsapp) => {
+        onPatch({ whatsapp });
+      }}
+    />
+  );
+}
+
+function RelaisField({ type, valeurs, onPatch }: ChampSituationProps) {
+  if (!montre(type, 'relais')) return null;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <Field label="Personne relais au Sénégal">
+        {(props) => (
+          <Input
+            {...props}
+            value={valeurs.relaisNom}
+            maxLength={160}
+            onChange={(event) => {
+              onPatch({ relaisNom: event.target.value });
+            }}
+          />
+        )}
+      </Field>
+      <Field label="Téléphone du relais">
+        {(props) => (
+          <Input
+            {...props}
+            value={valeurs.relaisPhone}
+            maxLength={40}
+            inputMode="tel"
+            placeholder="77 123 45 67"
+            onChange={(event) => {
+              onPatch({ relaisPhone: event.target.value });
+            }}
+          />
+        )}
+      </Field>
+    </div>
+  );
+}
+
 function ChampsSituation({
   type,
   valeurs,
@@ -765,204 +1142,36 @@ function ChampsSituation({
 
   return (
     <div className="flex flex-col gap-4">
-      {montre(type, 'employeur') ? (
-        <ChampEmployeur type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
-      ) : null}
-
-      {montre(type, 'contrat') ? (
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="gp-contrat">Type de contrat</Label>
-          <Select
-            value={valeurs.typeContrat ?? ''}
-            onValueChange={(value) => {
-              onPatch({
-                typeContrat: value === '' || value === null ? null : (value as TypeContrat),
-              });
-            }}
-          >
-            <SelectTrigger id="gp-contrat">
-              <SelectValue placeholder="Choisir un contrat" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(TYPE_CONTRAT_LABELS).map(([valeur, libelle]) => (
-                <SelectItem key={valeur} value={valeur}>
-                  {libelle}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {montre(type, 'banque') ? (
-        <FilterCombobox
-          label={type === 'DIASPORA' ? 'Banque au Sénégal' : 'Banque de domiciliation'}
-          placeholder="Choisir une banque"
-          value={valeurs.banqueId}
-          options={actives(reference?.banques).map((banque) => ({
-            value: banque.id,
-            label: banque.name,
-            hint: banque.shortName,
-          }))}
-          onChange={(banqueId) => {
-            onPatch({ banqueId });
-          }}
-        />
-      ) : null}
-
-      {montre(type, 'syndicat') && enseignante ? (
-        <FilterCombobox
-          label="Syndicat"
-          placeholder="Choisir un syndicat"
-          value={valeurs.syndicatId}
-          options={actives(reference?.syndicats).map((syndicat) => ({
-            value: syndicat.id,
-            label: syndicat.name,
-            hint: syndicat.sigle,
-          }))}
-          onChange={(syndicatId) => {
-            onPatch({ syndicatId });
-          }}
-        />
-      ) : null}
-
-      {montre(type, 'anciennete') ? (
-        <Field label="Ancienneté (mois)" description="Chez l’employeur actuel.">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              min="0"
-              max="840"
-              inputMode="numeric"
-              value={valeurs.ancienneteMois}
-              onChange={(event) => {
-                onPatch({ ancienneteMois: event.target.value });
-              }}
-            />
-          )}
-        </Field>
-      ) : null}
-
-      {montre(type, 'lieu') ? (
-        <Field label="Lieu d’activité">
-          {(props) => (
-            <Input
-              {...props}
-              value={valeurs.lieuActivite}
-              maxLength={160}
-              onChange={(event) => {
-                onPatch({ lieuActivite: event.target.value });
-              }}
-            />
-          )}
-        </Field>
-      ) : null}
-
-      {montre(type, 'epargne') ? (
-        <div className="flex min-w-0 flex-col gap-1.5">
-          <Label htmlFor="gp-epargne">Mode d’épargne</Label>
-          <Select
-            value={valeurs.modeEpargne ?? ''}
-            onValueChange={(value) => {
-              onPatch({
-                modeEpargne: value === '' || value === null ? null : (value as ModeEpargne),
-              });
-            }}
-          >
-            <SelectTrigger id="gp-epargne">
-              <SelectValue placeholder="Choisir un mode" />
-            </SelectTrigger>
-            <SelectContent>
-              {Object.entries(MODE_EPARGNE_LABELS).map(([valeur, libelle]) => (
-                <SelectItem key={valeur} value={valeur}>
-                  {libelle}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      ) : null}
-
-      {montre(type, 'pays') ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <FilterCombobox
-            label="Pays de résidence"
-            placeholder="Choisir un pays"
-            value={valeurs.paysResidenceId}
-            options={actives(reference?.pays).map((pays) => ({
-              value: pays.id,
-              label: pays.label,
-              hint: `+${pays.indicatif}`,
-            }))}
-            onChange={(paysResidenceId) => {
-              onPatch({ paysResidenceId });
-              const choisi = reference?.pays.find((pays) => pays.id === paysResidenceId);
-              if (choisi !== undefined) onIndicatifResidence(choisi.indicatif);
-            }}
-          />
-          <Field label="Ville de résidence">
-            {(props) => (
-              <Input
-                {...props}
-                value={valeurs.villeResidence}
-                maxLength={120}
-                onChange={(event) => {
-                  onPatch({ villeResidence: event.target.value });
-                }}
-              />
-            )}
-          </Field>
-        </div>
-      ) : null}
-
-      {montre(type, 'whatsapp') ? (
-        <InternationalPhoneField
-          label="WhatsApp"
-          countryLabel="Pays WhatsApp"
-          description="Laissez vide s’il est identique au téléphone."
-          required={false}
-          placeholder="6 12 34 56 78"
-          countries={paysCountries}
-          value={valeurs.whatsapp}
-          callingCode={whatsappCode}
-          onCallingCodeChange={onWhatsappCode}
-          onChange={(whatsapp) => {
-            onPatch({ whatsapp });
-          }}
-        />
-      ) : null}
-
-      {montre(type, 'relais') ? (
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Personne relais au Sénégal">
-            {(props) => (
-              <Input
-                {...props}
-                value={valeurs.relaisNom}
-                maxLength={160}
-                onChange={(event) => {
-                  onPatch({ relaisNom: event.target.value });
-                }}
-              />
-            )}
-          </Field>
-          <Field label="Téléphone du relais">
-            {(props) => (
-              <Input
-                {...props}
-                value={valeurs.relaisPhone}
-                maxLength={40}
-                inputMode="tel"
-                placeholder="77 123 45 67"
-                onChange={(event) => {
-                  onPatch({ relaisPhone: event.target.value });
-                }}
-              />
-            )}
-          </Field>
-        </div>
-      ) : null}
+      <ChampEmployeur type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <ContratField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <BanqueField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <SyndicatField
+        type={type}
+        enseignante={enseignante}
+        valeurs={valeurs}
+        reference={reference}
+        onPatch={onPatch}
+      />
+      <AncienneteField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <LieuField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <EpargneField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <PaysField
+        type={type}
+        valeurs={valeurs}
+        reference={reference}
+        onIndicatifResidence={onIndicatifResidence}
+        onPatch={onPatch}
+      />
+      <WhatsappField
+        type={type}
+        valeurs={valeurs}
+        reference={reference}
+        paysCountries={paysCountries}
+        whatsappCode={whatsappCode}
+        onWhatsappCode={onWhatsappCode}
+        onPatch={onPatch}
+      />
+      <RelaisField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
     </div>
   );
 }
