@@ -230,7 +230,9 @@ function matriceOuvertures(lignes: readonly ComptageOuvertures[]): DonneesSource
 function matriceCreneaux(creneaux: ChiffresCreneaux): DonneesSource {
   const lignes = creneaux.activites.map((activite) => activityLines(activite));
   const noms = [...new Set(lignes.flat().map((ligne) => ligne.name))].sort();
-  const colonnes = creneaux.creneaux.map((creneau) => `${creneau.label} ${creneau.start}–${creneau.end}`);
+  const colonnes = creneaux.creneaux.map(
+    (creneau) => `${creneau.label} ${creneau.start}–${creneau.end}`,
+  );
   return {
     forme: 'matrice',
     donnee: {
@@ -266,7 +268,9 @@ function dureeMoyenneSurLaFiche(lignes: readonly ComptageOuvertures[]): number |
 
 const partsStock = (parts: ChiffresRepresentants['parDepartement']): DonneesSource => ({
   forme: 'classement',
-  donnee: parts.filter((p) => p.count > 0).map((p) => ({ id: p.id, label: p.label, value: p.count })),
+  donnee: parts
+    .filter((p) => p.count > 0)
+    .map((p) => ({ id: p.id, label: p.label, value: p.count })),
 });
 
 /** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
@@ -435,8 +439,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Taux d’exploitation',
     forme: 'classement',
     jeu: 'campagnes',
-    description:
-      'Les fiches traitées de chaque campagne de la période, une part par campagne.',
+    description: 'Les fiches traitées de chaque campagne de la période, une part par campagne.',
     groupe: 'Campagnes',
     extraire: ({ campagnes }) =>
       campagnes === undefined
@@ -474,7 +477,8 @@ export const SOURCES_CHIFFRES = {
     label: 'Représentants par département',
     forme: 'classement',
     jeu: 'representants',
-    description: 'Le stock des représentants, département par département. La période ne le borne pas.',
+    description:
+      'Le stock des représentants, département par département. La période ne le borne pas.',
     groupe: 'Représentants',
     extraire: ({ representants }) =>
       representants === undefined ? null : partsStock(representants.parDepartement),
@@ -941,16 +945,6 @@ const SOURCES_CHUES_SEULEMENT: readonly string[] = [
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
 const SOURCES_MONTANTS: readonly string[] = ['encaisse', 'de-l-appel-a-l-encaissement'];
 
-/** Le pilotage d'équipe parle d'appels, pas de recette ni de portefeuille. */
-const SOURCES_SUPERVISION: readonly string[] = [
-  'par-banque',
-  'encaisse',
-  'de-l-appel-a-l-encaissement',
-  'rendement-par-departement',
-  'couverture-derniere-campagne',
-  'hors-attribution-derniere-campagne',
-];
-
 /**
  * Ce que les plateformes d'enrôlement rendent ne sort pas de la cellule
  * pilotage, qui tient le rôle ADMIN. L'API qui alimente ces cartes refuse tout
@@ -973,7 +967,6 @@ export function catalogueDe(input: {
   const entrees = Object.entries(SOURCES_CHIFFRES).filter(([cle]) => {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
-    if (input.role === 'SUPERVISEUR' && SOURCES_SUPERVISION.includes(cle)) return false;
     if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });
