@@ -3,10 +3,10 @@
   "ignoreDependencies": ["pino-pretty"],
   "workspaces": {
     "apps/api": {
-      "entry": ["src/main.ts", "src/openapi.ts", "src/**/*.test.ts"]
+      "entry": ["src/main.ts", "src/openapi.ts", "src/**/*.integration.test.ts"]
     },
     "apps/web": {
-      "entry": ["e2e/**/*.ts", "src/test/server-only-stub.ts"]
+      "entry": ["e2e/**/*.ts"]
     },
     "packages/api-client": {
       "ignoreDependencies": ["openapi-typescript", "prettier"]

@@ -54,10 +54,10 @@ env:
 
 jobs:
   # ---------------------------------------------------------------------------
-  # Qualité TypeScript : format, lint, types, tests, build.
+  # Qualité TypeScript : format, lint, types, intégration, build.
   # ---------------------------------------------------------------------------
   node:
-    name: node — format, lint, types, tests, build
+    name: node — format, lint, types, intégration, build
     runs-on: ubuntu-latest
     timeout-minutes: 30
     env:
@@ -114,20 +114,17 @@ jobs:
       - run: pnpm lint
       - run: pnpm dead-code
       - run: pnpm typecheck
-      - run: pnpm test:coverage
 
-      # Le job `sonar` a besoin de ces deux fichiers et de rien d'autre. Les
-      # partager évite d'y relancer `pnpm test:coverage` en entier une seconde
-      # fois : même suite de tests, même résultat, ~4 minutes de moins.
-      - name: Publier la couverture pour Sonar
-        if: vars.SONAR_ENABLED == 'true' && github.ref != 'refs/heads/prod'
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
-        with:
-          name: lcov-coverage
-          path: |
-            apps/api/coverage/lcov.info
-            apps/web/coverage/lcov.info
-          retention-days: 1
+      # Les tests unitaires sont interdits dans ce dépôt (voir CLAUDE.md).
+      # Seuls restent les tests d'intégration Postgres, Playwright et Maestro.
+      - name: Aucun test unitaire
+        run: |
+          unitaires=$(git ls-files 'apps/*/src/**/*.test.ts' 'apps/*/src/**/*.test.tsx' 'packages/**/*.test.ts' 'apps/mobile/test/**' | grep -v '\.integration\.test\.ts$' || true)
+          if [ -n "$unitaires" ]; then
+            echo "::error::Tests unitaires interdits :"
+            echo "$unitaires"
+            exit 1
+          fi
 
       - name: Migrations
         run: pnpm db:deploy
@@ -231,19 +228,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      # Couverture produite par le job `node`, pas rejouée ici : voir le
-      # commentaire sur l'étape d'upload dans ce même fichier.
-      # `path: apps`, et non `.` : `upload-artifact` retire le préfixe commun
-      # `apps/` des deux fichiers avant de les stocker, `download-artifact` ne
-      # le restitue donc qu'en le précisant ici.
-      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
-        with:
-          name: lcov-coverage
-          path: apps
-      - name: Rendre les chemins LCOV lisibles par Sonar
-        run: |
-          sed -i 's#^SF:src/#SF:apps/api/src/#' apps/api/coverage/lcov.info
-          sed -i 's#^SF:src/#SF:apps/web/src/#' apps/web/coverage/lcov.info
       - name: SonarQube Cloud scan and gate
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7
         env:
@@ -528,7 +512,7 @@ jobs:
   # C'est précisément ce que le commit du code généré achète.
   # ---------------------------------------------------------------------------
   mobile:
-    name: flutter — analyze + test
+    name: flutter — analyze
     runs-on: ubuntu-latest
     timeout-minutes: 15
     # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
@@ -581,10 +565,9 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           flutter analyze
           # Rien ne gardait la mise en forme d'apps/mobile, et elle avait dérivé
-          # sur 87 fichiers. `lib/` et `test/` seulement : le code engendré
-          # n'est pas écrit à la main et son formateur n'est pas celui-ci.
-          dart format --output=none --set-exit-if-changed lib/ test/
-          flutter test
+          # sur 87 fichiers. `lib/` seulement : le code engendré n'est pas
+          # écrit à la main et son formateur n'est pas celui-ci.
+          dart format --output=none --set-exit-if-changed lib/
 
   # ---------------------------------------------------------------------------
   # Déploiement, et il n'a lieu QUE si tout le reste est vert.
