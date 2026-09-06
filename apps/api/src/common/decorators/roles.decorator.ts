@@ -16,6 +16,13 @@ export const ANY_AUTHENTICATED = [
 ] as const;
 
 /**
+ * Qui règle ce qui encadre le travail des autres : listes de référence,
+ * paramètres partagés. La supervision et la direction en répondent au même
+ * titre que l'administrateur.
+ */
+export const ENCADREMENT = [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] as const;
+
+/**
  * Qui MÈNE les trois étapes : qualifier un représentant, ajouter un prospect,
  * le convertir. La supervision et la direction les mènent elles-mêmes, comme un
  * téléconseiller ; la portée de leurs écritures reste celle de leurs propres

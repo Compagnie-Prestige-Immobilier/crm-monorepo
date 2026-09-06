@@ -119,7 +119,9 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Admin',
     path: '/admin',
     description: 'Comptes, listes de référence, imports et paramètres',
-    roles: ['ADMIN'],
+    // La supervision et la direction n'y voient que les listes de référence :
+    // chaque entrée porte ses propres rôles.
+    roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
   },
 ];
 
@@ -750,7 +752,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Listes de référence',
         icon: LibraryIcon,
         description: 'Départements, banques, syndicats',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         // Après les listes de référence : un classeur ne peut nommer que des
