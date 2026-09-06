@@ -14,7 +14,7 @@ import {
 import { plainToInstance } from 'class-transformer';
 import { validate } from 'class-validator';
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { MultipartFile } from '@fastify/multipart';
+import type { Multipart, MultipartFile } from '@fastify/multipart';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -72,10 +72,58 @@ async function saveApk(part: MultipartFile, path: string, hash: Hash): Promise<n
   return size;
 }
 
+interface UploadCollector {
+  file: MultipartFile | null;
+  fileSize: number;
+  readonly fields: Record<string, string>;
+}
+
+/**
+ * `collector` est un objet mutable et non des `let` réaffectés : si `saveApk`
+ * jette au milieu d'un envoi, `collector.file` doit rester posé pour que le
+ * `catch` de `upload` sache distinguer un envoi tronqué d'une autre erreur.
+ */
+async function collectPart(
+  part: Multipart,
+  temporaryPath: string,
+  hash: Hash,
+  collector: UploadCollector,
+): Promise<void> {
+  if (part.type === 'file') {
+    assertApk(part);
+    collector.file = part;
+    collector.fileSize = await saveApk(part, temporaryPath, hash);
+    return;
+  }
+  if (typeof part.value === 'string') collector.fields[part.fieldname] = part.value;
+}
+
 function assertApk(part: MultipartFile): void {
   if (!part.filename.toLowerCase().endsWith('.apk')) {
     throw new BadRequestException('Un fichier APK est requis.');
   }
+}
+
+function unavailableUpdateDto(
+  release: ReleaseRow | null,
+  versionCode: number,
+  minVersionCode: number | null,
+  forceUpdate: boolean,
+): AppUpdateDto {
+  return {
+    available: false,
+    forceUpdate,
+    versionName: release?.versionName ?? '',
+    versionCode: release?.versionCode ?? versionCode,
+    fileName: '',
+    fileSize: 0,
+    sha256: '',
+    signerSha256: '',
+    downloadUrl: '',
+    publishedAt: release?.publishedAt.toISOString() ?? '',
+    minVersionCode,
+    notes: null,
+  };
 }
 
 const unknownRelease = (versionCode: number): NotFoundException =>
@@ -98,20 +146,7 @@ export class AppUpdatesService {
     const forceUpdate = minVersionCode !== null && versionCode < minVersionCode;
 
     if (release === null || release.versionCode <= versionCode) {
-      return {
-        available: false,
-        forceUpdate,
-        versionName: release?.versionName ?? '',
-        versionCode: release?.versionCode ?? versionCode,
-        fileName: '',
-        fileSize: 0,
-        sha256: '',
-        signerSha256: '',
-        downloadUrl: '',
-        publishedAt: release?.publishedAt.toISOString() ?? '',
-        minVersionCode,
-        notes: null,
-      };
+      return unavailableUpdateDto(release, versionCode, minVersionCode, forceUpdate);
     }
 
     return {
@@ -143,9 +178,7 @@ export class AppUpdatesService {
     const draft = randomUUID();
     const temporaryPath = join(this.directory, `.${draft}.apk.part`);
     const hash = createHash('sha256');
-    let fileSize = 0;
-    let file: MultipartFile | null = null;
-    const fields: Record<string, string> = {};
+    const collector: UploadCollector = { file: null, fileSize: 0, fields: {} };
 
     let identity: ApkIdentity;
     let signerSha256: string;
@@ -153,18 +186,12 @@ export class AppUpdatesService {
     let input: AppUpdateUploadDto;
     try {
       for await (const part of request.parts()) {
-        if (part.type === 'file') {
-          assertApk(part);
-          file = part;
-          fileSize = await saveApk(part, temporaryPath, hash);
-          continue;
-        }
-        if (typeof part.value === 'string') fields[part.fieldname] = part.value;
+        await collectPart(part, temporaryPath, hash, collector);
       }
 
-      if (file === null) throw new BadRequestException('Un fichier APK est requis.');
+      if (collector.file === null) throw new BadRequestException('Un fichier APK est requis.');
 
-      input = await this.validateFields(fields);
+      input = await this.validateFields(collector.fields);
       identity = await readApkIdentity(temporaryPath);
       const published = await this.releases();
       assertPublishable(identity, published[0]?.versionCode ?? null);
@@ -176,7 +203,9 @@ export class AppUpdatesService {
       await rename(temporaryPath, join(this.directory, fileName));
     } catch (error) {
       await rm(temporaryPath, { force: true });
-      if (file?.file.truncated === true) throw new BadRequestException('APK trop volumineux.');
+      if (collector.file?.file.truncated === true) {
+        throw new BadRequestException('APK trop volumineux.');
+      }
       throw error;
     }
 
@@ -185,7 +214,7 @@ export class AppUpdatesService {
         versionCode: identity.versionCode,
         versionName: identity.versionName,
         fileName,
-        fileSize,
+        fileSize: collector.fileSize,
         sha256: hash.digest('hex'),
         signerSha256,
         publishedById: actor.id,
