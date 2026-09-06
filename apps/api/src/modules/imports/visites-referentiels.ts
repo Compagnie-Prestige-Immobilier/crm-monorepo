@@ -45,6 +45,20 @@ export interface VisiteReferentiels {
   readonly owners: ReadonlyMap<string, string>;
 }
 
+function indexRow(
+  map: Map<string, Entry>,
+  owners: Map<string, string>,
+  owner: string,
+  row: { id: string; code: string; label: string },
+): void {
+  const entry = { id: row.id, label: row.label };
+  for (const key of [normalizeKey(row.label), normalizeKey(row.code)]) {
+    if (key === '') continue;
+    map.set(key, entry);
+    if (!owners.has(key)) owners.set(key, owner);
+  }
+}
+
 export async function loadVisiteReferentiels(
   tx: PrismaTransactionClient,
 ): Promise<VisiteReferentiels> {
@@ -64,14 +78,7 @@ export async function loadVisiteReferentiels(
     owner: string,
   ): ReadonlyMap<string, Entry> => {
     const map = new Map<string, Entry>();
-    for (const row of rows) {
-      const entry = { id: row.id, label: row.label };
-      for (const key of [normalizeKey(row.label), normalizeKey(row.code)]) {
-        if (key === '') continue;
-        map.set(key, entry);
-        if (!owners.has(key)) owners.set(key, owner);
-      }
-    }
+    for (const row of rows) indexRow(map, owners, owner, row);
     return map;
   };
 
