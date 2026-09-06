@@ -2,8 +2,10 @@
 
 The repository has two levels of verification:
 
-- `ci.yml`: required PR checks (format, lint, types, unit/coverage,
-  PostgreSQL integration, build, contract generation, mobile analysis/tests).
+- `ci.yml`: required PR checks (format, lint, types, PostgreSQL integration,
+  build, contract generation, mobile analysis). Unit tests are forbidden: the
+  `node` job fails on any `*.test.ts`, `*.test.tsx` or `apps/mobile/test`
+  file.
 - `security.yml`: scheduled and PR security checks (Gitleaks, Semgrep,
   OSV-Scanner and Trivy).
 - `quality-extended.yml`: scheduled/manual performance checks (Lighthouse and
@@ -26,7 +28,7 @@ The scan waits for the Sonar quality gate. Recommended gate conditions:
 
 - no new blocker or critical issues;
 - no new security hotspots left unreviewed;
-- new-code coverage at least 80%;
+- no coverage condition (no unit tests, no coverage report);
 - new-code duplication below 3%;
 - reliability and security ratings at least A.
 
@@ -36,10 +38,9 @@ Sonar subscription; the rest of the quality stack remains free/open source.
 
 ## UX acceptance bar
 
-Playwright covers real browser journeys and download bytes. Flutter tests cover
-offline sync, semantics, reduced motion, touch target sizing and haptic timing.
-The extended workflow adds Lighthouse accessibility/performance budgets, k6 API
-latency budgets and a Maestro Android smoke journey.
+Playwright covers real browser journeys and download bytes. The extended
+workflow adds Lighthouse accessibility/performance budgets, k6 API latency
+budgets and a Maestro Android smoke journey.
 
 Every important mutation must have a visible pending state, a success/error
 state, retry behavior and an offline-safe outcome. Haptics happen after a local
