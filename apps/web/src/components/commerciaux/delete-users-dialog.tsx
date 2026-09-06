@@ -15,6 +15,27 @@ import {
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
 
+function dialogTitre(users: UserRow[], unique: UserRow | null): string {
+  if (unique !== null) return `Supprimer le compte de ${unique.fullName} ?`;
+  if (users.length > 1) return `Supprimer ${formatNumber(users.length)} comptes ?`;
+  return '';
+}
+
+function rattachementLabel(prospects: number, unique: UserRow | null): string {
+  return `${prospects === 1 ? 'prospect est rattaché' : 'prospects sont rattachés'} ${
+    unique === null ? 'à ces comptes' : 'à ce compte'
+  }.`;
+}
+
+function avertissementLabel(reprisRequise: boolean, choisi: UserRow | null): string {
+  if (!reprisRequise) {
+    return 'Aucune fiche n’est rattachée. L’historique déjà écrit reste en place, mais le compte ne peut plus être réactivé.';
+  }
+  return `Prospects, représentants et appels à passer sont transférés ${
+    choisi === null ? 'au repreneur' : `à ${choisi.fullName}`
+  } avant la suppression. Un compte supprimé ne peut plus être réactivé.`;
+}
+
 export function DeleteUsersDialog({
   users,
   repreneurs,
@@ -53,19 +74,9 @@ export function DeleteUsersDialog({
 
   const unique = users.length === 1 ? (users[0] ?? null) : null;
 
-  let titre = '';
-  if (unique !== null) titre = `Supprimer le compte de ${unique.fullName} ?`;
-  else if (users.length > 1) titre = `Supprimer ${formatNumber(users.length)} comptes ?`;
-
-  const rattachement = `${prospects === 1 ? 'prospect est rattaché' : 'prospects sont rattachés'} ${
-    unique === null ? 'à ces comptes' : 'à ce compte'
-  }.`;
-
-  const avertissement = reprisRequise
-    ? `Prospects, représentants et appels à passer sont transférés ${
-        choisi === null ? 'au repreneur' : `à ${choisi.fullName}`
-      } avant la suppression. Un compte supprimé ne peut plus être réactivé.`
-    : 'Aucune fiche n’est rattachée. L’historique déjà écrit reste en place, mais le compte ne peut plus être réactivé.';
+  const titre = dialogTitre(users, unique);
+  const rattachement = rattachementLabel(prospects, unique);
+  const avertissement = avertissementLabel(reprisRequise, choisi);
 
   return (
     <ConfirmDialog
