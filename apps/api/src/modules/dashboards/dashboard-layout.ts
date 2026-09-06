@@ -167,23 +167,31 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'enrolement-par-teleconseiller': CLASSEMENT,
 };
 
+function palettePresentation(value: unknown): DispositionPresentation['palette'] {
+  if (typeof value !== 'string' || !PALETTES.has(value)) return undefined;
+  return value as 'neutre' | 'serie' | 'categorielle';
+}
+
+function triPresentation(value: unknown): DispositionPresentation['tri'] {
+  if (typeof value !== 'string' || !TRIS.has(value)) return undefined;
+  return value as 'valeur-desc' | 'valeur-asc' | 'alphabetique';
+}
+
+function autresApresPresentation(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) return undefined;
+  return value;
+}
+
 function toPresentation(raw: Record<string, unknown>): DispositionPresentation | undefined {
   const presentation: DispositionPresentation = {};
-  if (typeof raw.palette === 'string' && PALETTES.has(raw.palette)) {
-    presentation.palette = raw.palette as 'neutre' | 'serie' | 'categorielle';
-  }
+  const palette = palettePresentation(raw.palette);
+  if (palette !== undefined) presentation.palette = palette;
   if (typeof raw.valeurs === 'boolean') presentation.valeurs = raw.valeurs;
   if (typeof raw.legende === 'boolean') presentation.legende = raw.legende;
-  if (typeof raw.tri === 'string' && TRIS.has(raw.tri)) {
-    presentation.tri = raw.tri as 'valeur-desc' | 'valeur-asc' | 'alphabetique';
-  }
-  if (
-    typeof raw.autresApres === 'number' &&
-    Number.isInteger(raw.autresApres) &&
-    raw.autresApres >= 1
-  ) {
-    presentation.autresApres = raw.autresApres;
-  }
+  const tri = triPresentation(raw.tri);
+  if (tri !== undefined) presentation.tri = tri;
+  const autresApres = autresApresPresentation(raw.autresApres);
+  if (autresApres !== undefined) presentation.autresApres = autresApres;
   return Object.keys(presentation).length === 0 ? undefined : presentation;
 }
 
@@ -199,6 +207,21 @@ function toWidget(raw: Record<string, unknown>): DispositionWidget | null {
   return widget;
 }
 
+function resolvePreset(record: Record<string, unknown>): DashboardPreset {
+  if (typeof record.preset === 'string' && PRESET_SET.has(record.preset)) {
+    return record.preset as DashboardPreset;
+  }
+  return 'essentiel';
+}
+
+function widgetDepuisBrut(raw: unknown, version: unknown): DispositionWidget | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const widget = toWidget(raw as Record<string, unknown>);
+  if (widget === null) return null;
+  if (version === 1) widget.source = RENOMMAGES_V1[widget.source] ?? widget.source;
+  return widget;
+}
+
 /** Rend `null` sur une version inconnue ou une forme qui ne tient pas : le repli prend le relais. */
 function parseLayout(value: unknown): DispositionLayout | null {
   if (typeof value !== 'object' || value === null) return null;
@@ -206,21 +229,33 @@ function parseLayout(value: unknown): DispositionLayout | null {
   if (record.version !== LAYOUT_VERSION && record.version !== 1) return null;
   if (!Array.isArray(record.widgets)) return null;
 
-  const preset =
-    typeof record.preset === 'string' && PRESET_SET.has(record.preset)
-      ? (record.preset as DashboardPreset)
-      : 'essentiel';
-
+  const preset = resolvePreset(record);
   const widgets: DispositionWidget[] = [];
   for (const raw of record.widgets as unknown[]) {
-    if (typeof raw !== 'object' || raw === null) continue;
-    const widget = toWidget(raw as Record<string, unknown>);
-    if (widget === null) continue;
-    if (record.version === 1) widget.source = RENOMMAGES_V1[widget.source] ?? widget.source;
-    widgets.push(widget);
+    const widget = widgetDepuisBrut(raw, record.version);
+    if (widget !== null) widgets.push(widget);
   }
 
   return { version: LAYOUT_VERSION, preset, widgets };
+}
+
+function marqueRetenue(
+  rules: ReglesDeMarque,
+  marque: DashboardMarque | undefined,
+): DashboardMarque {
+  if (marque === undefined) return rules.defaut;
+  if (!MARQUE_SET.has(marque)) return rules.defaut;
+  if (!rules.compatibles.includes(marque)) return rules.defaut;
+  return marque;
+}
+
+function widgetNettoye(widget: DispositionWidget, marque: DashboardMarque): DispositionWidget {
+  return {
+    source: widget.source,
+    marque,
+    ...(widget.taille === undefined ? {} : { taille: widget.taille }),
+    ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
+  };
 }
 
 /**
@@ -243,19 +278,8 @@ export function sanitize(
     seen.add(widget.source);
 
     const rules = SOURCE_MARQUES[widget.source];
-    const marque =
-      widget.marque !== undefined &&
-      MARQUE_SET.has(widget.marque) &&
-      rules.compatibles.includes(widget.marque)
-        ? widget.marque
-        : rules.defaut;
-
-    cleaned.push({
-      source: widget.source,
-      marque,
-      ...(widget.taille === undefined ? {} : { taille: widget.taille }),
-      ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
-    });
+    const marque = marqueRetenue(rules, widget.marque);
+    cleaned.push(widgetNettoye(widget, marque));
 
     if (cleaned.length >= MAX_WIDGETS) break;
   }
