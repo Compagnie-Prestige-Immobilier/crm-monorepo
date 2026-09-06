@@ -727,17 +727,25 @@ class _RepresentantQualificationScreenState
     popOrHome(context);
   }
 
+  /// Le focus se lâche AVANT de retirer l'étape de l'arbre : un champ à
+  /// complétion démonté avec le focus ferme ensuite une liste déjà disparue
+  /// (`OverlayPortalController.hide`, `_zOrderIndex != null`).
+  void _allerA(_Etape cible, {required bool avant}) {
+    FocusManager.instance.primaryFocus?.unfocus();
+    setState(() {
+      enAvant = avant;
+      etape = cible;
+    });
+  }
+
   void suivant() {
     final List<_Etape> etapes = parcours;
     final int index = etapes.indexOf(etape);
     if (index + 1 >= etapes.length) return;
     markDraftDirty();
-    setState(() {
-      enAvant = true;
-      // Le script parcouru jusqu'au bout n'est plus abrégé.
-      if (etape == _Etape.renseignements) scriptAbrege = false;
-      etape = etapes[index + 1];
-    });
+    // Le script parcouru jusqu'au bout n'est plus abrégé.
+    if (etape == _Etape.renseignements) scriptAbrege = false;
+    _allerA(etapes[index + 1], avant: true);
     unawaited(remonterLeBrouillon(collectDraftValues()));
   }
 
@@ -745,11 +753,8 @@ class _RepresentantQualificationScreenState
   /// rien perdre de ce qui a été répondu.
   void passerAuStatut() {
     markDraftDirty();
-    setState(() {
-      enAvant = true;
-      scriptAbrege = true;
-      etape = _Etape.statut;
-    });
+    scriptAbrege = true;
+    _allerA(_Etape.statut, avant: true);
     unawaited(remonterLeBrouillon(collectDraftValues()));
   }
 
@@ -760,10 +765,7 @@ class _RepresentantQualificationScreenState
       quitter();
       return;
     }
-    setState(() {
-      enAvant = false;
-      etape = etapes[index - 1];
-    });
+    _allerA(etapes[index - 1], avant: false);
   }
 
   bool whatsappCorrige(_Fiche avant) =>
