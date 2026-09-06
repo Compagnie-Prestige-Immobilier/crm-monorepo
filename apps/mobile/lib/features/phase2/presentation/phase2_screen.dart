@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:crm_api_client/crm_api_client.dart'
+    show ChampLibreDto, ChampLibreDtoTypeEnum, Projet;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -38,6 +40,7 @@ import '../../representant/presentation/representant_form_screen.dart'
     show kProfessionsFrequentes;
 import '../../shell/projects.dart';
 import '../phase2_controller.dart';
+import '../regles_conversion.dart';
 import 'callback_picker.dart';
 import 'call_audio_recorder.dart';
 
@@ -442,6 +445,17 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
         ref.watch(syndicatsProvider).value ?? const [];
     final List<IncomeBand> tranches =
         ref.watch(incomeBandsProvider).value ?? const [];
+    // EB-27 : posé sur le formulaire avant qu'il ne dise ce qui lui manque, la
+    // barre de pied lisant le reproche dans le même passage.
+    _form.regles =
+        ref
+            .watch(
+              reglesConversionProvider(
+                _form.grandPublic ? Projet.GRAND_PUBLIC : Projet.CHUES,
+              ),
+            )
+            .value ??
+        ReglesConversion.aucune;
     final int etape = _etape;
 
     final Widget screen = CpiScaffold(
@@ -665,6 +679,17 @@ class Phase2FormFields {
   /// conversion CHUES ne demande plus.
   bool grandPublic = false;
 
+  /// EB-27 : ce que l'administration a masqué, exigé, ordonné et ajouté.
+  ReglesConversion regles = ReglesConversion.aucune;
+
+  /// Les réponses aux champs ajoutés, par identifiant de champ. Les champs
+  /// texte ont en plus leur contrôleur, créé à leur première apparition.
+  final Map<String, String> champsLibres = <String, String>{};
+  final Map<String, TextEditingController> _libresTexte =
+      <String, TextEditingController>{};
+
+  VoidCallback? _surSaisie;
+
   /// Redessine l'étape à chaque frappe des champs qui peuvent la retenir.
   ///
   /// Sur l'écouteur du contrôleur et non sur `onChanged` du champ : ForUI
@@ -672,12 +697,49 @@ class Phase2FormFields {
   /// le bouton étaient en retard d'une frappe : la dernière lettre, celle qui
   /// invalide l'adresse, laissait « Continuer » allumé.
   void watch(VoidCallback onChanged) {
+    _surSaisie = onChanged;
     nom.addListener(onChanged);
     prenom.addListener(onChanged);
     email.addListener(onChanged);
     profession.addListener(onChanged);
     duree.addListener(onChanged);
     whatsapp.addListener(onChanged);
+  }
+
+  /// Le contrôleur d'un champ texte ajouté par l'administration. Créé à la
+  /// demande : la liste des champs n'est connue qu'une fois les réglages lus.
+  TextEditingController libreTexte(String id) =>
+      _libresTexte.putIfAbsent(id, () {
+        final TextEditingController controleur = TextEditingController(
+          text: champsLibres[id] ?? '',
+        );
+        final VoidCallback? ecouteur = _surSaisie;
+        if (ecouteur != null) controleur.addListener(ecouteur);
+        return controleur;
+      });
+
+  /// Les réponses telles qu'elles partent : les champs texte lisent leur
+  /// contrôleur, les listes leur valeur choisie, et le vide ne part pas.
+  Map<String, String> get reponsesLibres {
+    final Map<String, String> reponses = <String, String>{...champsLibres};
+    for (final MapEntry<String, TextEditingController> entree
+        in _libresTexte.entries) {
+      reponses[entree.key] = entree.value.text.trim();
+    }
+    reponses.removeWhere((String _, String valeur) => valeur.isEmpty);
+    return reponses;
+  }
+
+  /// Le premier champ ajouté qui reste sans réponse alors qu'il est exigé.
+  String? get manqueLibre {
+    final Map<String, String> reponses = reponsesLibres;
+    for (final ChampLibreDto champ in regles.libres) {
+      if (!champ.obligatoire) continue;
+      if ((reponses[champ.id] ?? '').isEmpty) {
+        return 'Renseignez « ${champ.libelle} »';
+      }
+    }
+    return null;
   }
 
   String? get erreurEmail {
@@ -719,32 +781,64 @@ class Phase2FormFields {
   String? get whatsappE164 =>
       whatsappMemeNumero == Tri.non ? Phone.toE164(whatsapp.text) : null;
 
-  /// Ce qui manque à l'identité. L'e-mail reste FACULTATIF : il n'est reproché
-  /// que mal écrit.
+  bool _exige(String champ, {required bool defaut}) =>
+      regles.requis(champ, defaut: defaut);
+
+  /// Ce qui manque à l'identité. L'e-mail reste FACULTATIF sauf réglage
+  /// contraire : il n'est sinon reproché que mal écrit.
   String? get manqueQui {
-    if (nom.text.trim().isEmpty) return 'Indiquez le nom';
-    if (prenom.text.trim().isEmpty) return 'Indiquez le prénom';
+    if (_exige('nom', defaut: true) && nom.text.trim().isEmpty) {
+      return 'Indiquez le nom';
+    }
+    if (_exige('prenom', defaut: true) && prenom.text.trim().isEmpty) {
+      return 'Indiquez le prénom';
+    }
+    if (_exige('email', defaut: false) && email.text.trim().isEmpty) {
+      return 'Indiquez l\'e-mail';
+    }
     if (erreurEmail != null) return 'Vérifiez l\'e-mail';
     return erreurWhatsapp == null ? null : 'Vérifiez le numéro WhatsApp';
   }
 
   String? get manqueTravail {
-    if (profession.text.trim().isEmpty) return 'Indiquez la profession';
-    if (duree.text.trim().isEmpty) return 'Indiquez la durée dans la fonction';
+    if (_exige('profession', defaut: true) && profession.text.trim().isEmpty) {
+      return 'Indiquez la profession';
+    }
+    if (_exige('dureeEtablissementMois', defaut: true) &&
+        duree.text.trim().isEmpty) {
+      return 'Indiquez la durée dans la fonction';
+    }
     if (erreurDuree != null) return 'Vérifiez la durée en mois';
-    return fonctionnaire.value == null ? 'Répondez à « Fonctionnaire »' : null;
+    return _exige('fonctionnaire', defaut: true) && fonctionnaire.value == null
+        ? 'Répondez à « Fonctionnaire »'
+        : null;
   }
 
   String? get manqueBanque {
-    if (syndicatId == null) return 'Choisissez le syndicat';
-    if (banqueId == null) return 'Choisissez la banque';
-    if (engagementEnCours.value == null) {
+    if (_exige('syndicatId', defaut: true) && syndicatId == null) {
+      return 'Choisissez le syndicat';
+    }
+    if (_exige('banqueId', defaut: true) && banqueId == null) {
+      return 'Choisissez la banque';
+    }
+    if (_exige('engagementEnCours', defaut: true) &&
+        engagementEnCours.value == null) {
       return 'Répondez à « Engagement en cours »';
     }
-    if (incomeBandId == null) return 'Choisissez le revenu mensuel';
-    if (!grandPublic) return null;
-    return dureeSystemeMois == null ? 'Choisissez la durée du système' : null;
+    if (_exige('incomeBandId', defaut: true) && incomeBandId == null) {
+      return 'Choisissez le revenu mensuel';
+    }
+    if (_exige('dureeSystemeMois', defaut: grandPublic) &&
+        dureeSystemeMois == null) {
+      return 'Choisissez la durée du système';
+    }
+    return manqueLibre;
   }
+
+  /// La durée du système de paiement ne concerne que le Grand Public, sauf si
+  /// l'administration la rend visible ailleurs.
+  bool get montreDureeSysteme =>
+      regles.visible('dureeSystemeMois', defaut: grandPublic);
 
   /// Le premier champ qui manque au dossier. Une adhésion l'exige entier ; un
   /// appel qui n'a pas abouti, non.
@@ -783,9 +877,10 @@ class Phase2FormFields {
     banqueId: banqueId,
     engagementEnCours: engagementEnCours.value,
     incomeBandId: incomeBandId,
-    dureeSystemeMois: grandPublic ? dureeSystemeMois : null,
+    dureeSystemeMois: montreDureeSysteme ? dureeSystemeMois : null,
     whatsappStatus: whatsappStatus,
     whatsappE164: whatsappE164,
+    champsLibres: reponsesLibres,
   );
 
   /// Reprend ce que la fiche locale sait déjà, sans jamais écraser une saisie.
@@ -847,6 +942,7 @@ class Phase2FormFields {
     'whatsappMemeNumero': whatsappMemeNumero.name,
     'fonctionnaire': fonctionnaire.name,
     'engagementEnCours': engagementEnCours.name,
+    'champsLibres': reponsesLibres,
   };
 
   void applyDraft(Map<String, Object?> valeurs) {
@@ -873,6 +969,25 @@ class Phase2FormFields {
     whatsappMemeNumero = _tri(valeurs['whatsappMemeNumero']);
     fonctionnaire = _tri(valeurs['fonctionnaire']);
     engagementEnCours = _tri(valeurs['engagementEnCours']);
+
+    champsLibres
+      ..clear()
+      ..addAll(_reponses(valeurs['champsLibres']));
+    // Les contrôleurs déjà nés portent encore le brouillon précédent : les
+    // laisser tels quels rouvrirait la réponse d'une autre personne.
+    for (final MapEntry<String, TextEditingController> entree
+        in _libresTexte.entries) {
+      entree.value.text = champsLibres[entree.key] ?? '';
+    }
+  }
+
+  static Map<String, String> _reponses(Object? brut) {
+    if (brut is! Map) return const <String, String>{};
+    return <String, String>{
+      for (final MapEntry<Object?, Object?> entree in brut.entries)
+        if (entree.key is String && entree.value is String)
+          entree.key! as String: entree.value! as String,
+    };
   }
 
   static Tri _tri(Object? brut) =>
@@ -882,6 +997,10 @@ class Phase2FormFields {
     for (final TextEditingController c in _controllers) {
       c.clear();
     }
+    for (final TextEditingController c in _libresTexte.values) {
+      c.clear();
+    }
+    champsLibres.clear();
     banqueId = null;
     syndicatId = null;
     incomeBandId = null;
@@ -893,6 +1012,9 @@ class Phase2FormFields {
 
   void dispose() {
     for (final TextEditingController c in _controllers) {
+      c.dispose();
+    }
+    for (final TextEditingController c in _libresTexte.values) {
       c.dispose();
     }
     for (final FocusNode f in _focusNodes) {
@@ -1039,6 +1161,10 @@ class _EtapeQui extends StatelessWidget {
 
 /// Étapes 2 à 4 : ce que l'appel a appris de la personne, trois à cinq questions
 /// à la fois. Une adhésion les exige toutes, sauf l'e-mail.
+///
+/// EB-27 : l'administration masque, exige et ordonne ces champs depuis le
+/// panel. Le découpage en trois étapes, lui, reste celui du script d'appel :
+/// l'ordre réglé se lit À L'INTÉRIEUR de l'étape qui porte la question.
 class _EtapeRenseignements extends StatelessWidget {
   const _EtapeRenseignements({
     required this.etape,
@@ -1057,18 +1183,36 @@ class _EtapeRenseignements extends StatelessWidget {
   final VoidCallback onChanged;
 
   @override
-  Widget build(BuildContext context) => Column(
-    crossAxisAlignment: CrossAxisAlignment.stretch,
-    spacing: CpiSpacing.md,
-    children: switch (etape) {
+  Widget build(BuildContext context) {
+    final Map<String, Widget> noeuds = switch (etape) {
       2 => _qui(),
       3 => _travail(),
       _ => _banqueEtSyndicat(),
-    },
-  );
+    };
 
-  List<Widget> _qui() => <Widget>[
-    CpiField(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: CpiSpacing.md,
+      children: <Widget>[
+        for (final String champ in fields.regles.ordonner(
+          noeuds.keys.toList(growable: false),
+        ))
+          if (fields.regles.visible(champ, defaut: _visibleParDefaut(champ)))
+            ?noeuds[champ],
+        // Les champs ajoutés viennent après les questions du script, comme au
+        // panel, sur la dernière étape de renseignements.
+        if (etape == 4)
+          for (final ChampLibreDto champ in fields.regles.libres)
+            _ChampAjoute(champ: champ, fields: fields, onChanged: onChanged),
+      ],
+    );
+  }
+
+  bool _visibleParDefaut(String champ) =>
+      champ == 'dureeSystemeMois' ? fields.montreDureeSysteme : true;
+
+  Map<String, Widget> _qui() => <String, Widget>{
+    'nom': CpiField(
       label: 'Nom',
       controller: fields.nom,
       focusNode: fields.nomFocus,
@@ -1077,7 +1221,7 @@ class _EtapeRenseignements extends StatelessWidget {
       textInputAction: TextInputAction.next,
       maxLength: kProfessionMaxLength,
     ),
-    CpiField(
+    'prenom': CpiField(
       label: 'Prénom',
       controller: fields.prenom,
       focusNode: fields.prenomFocus,
@@ -1088,29 +1232,38 @@ class _EtapeRenseignements extends StatelessWidget {
     ),
     // Le numéro vient de l'annuaire et ne se corrige pas depuis un appel :
     // le serveur refuse de l'écrire ici. Il est là pour être relu.
-    CpiField(
+    'phoneE164': CpiField(
       label: 'Téléphone',
       controller: fields.telephone,
       readOnly: true,
       description: 'Numéro de l\'annuaire',
     ),
-    _ChoixTri(
-      label: 'Ce numéro est sur WhatsApp',
-      value: fields.whatsappMemeNumero,
-      onChanged: (Tri choix) {
-        fields.whatsappMemeNumero = choix;
-        if (choix != Tri.non) fields.whatsapp.clear();
-        onChanged();
-      },
+    // Pas un champ du catalogue champs-conversion : toujours posée, jamais
+    // masquée ni réordonnée par l'administration (`ReglesConversion.visible`
+    // retombe sur `_visibleParDefaut`, `true` par défaut).
+    'whatsappMemeNumero': Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: CpiSpacing.md,
+      children: <Widget>[
+        _ChoixTri(
+          label: 'Ce numéro est sur WhatsApp',
+          value: fields.whatsappMemeNumero,
+          onChanged: (Tri choix) {
+            fields.whatsappMemeNumero = choix;
+            if (choix != Tri.non) fields.whatsapp.clear();
+            onChanged();
+          },
+        ),
+        if (fields.whatsappMemeNumero == Tri.non)
+          PhoneField(
+            controller: fields.whatsapp,
+            focusNode: fields.whatsappFocus,
+            label: 'Numéro WhatsApp',
+            helper: 'Laissez vide s\'il n\'a pas WhatsApp.',
+          ),
+      ],
     ),
-    if (fields.whatsappMemeNumero == Tri.non)
-      PhoneField(
-        controller: fields.whatsapp,
-        focusNode: fields.whatsappFocus,
-        label: 'Numéro WhatsApp',
-        helper: 'Laissez vide s\'il n\'a pas WhatsApp.',
-      ),
-    CpiField(
+    'email': CpiField(
       label: 'E-mail',
       controller: fields.email,
       focusNode: fields.emailFocus,
@@ -1120,10 +1273,10 @@ class _EtapeRenseignements extends StatelessWidget {
       maxLength: kCallAttemptEmailMaxLength,
       error: fields.erreurEmail,
     ),
-  ];
+  };
 
-  List<Widget> _travail() => <Widget>[
-    LocalTypeahead(
+  Map<String, Widget> _travail() => <String, Widget>{
+    'profession': LocalTypeahead(
       controller: fields.profession,
       focusNode: fields.professionFocus,
       label: 'Profession',
@@ -1135,7 +1288,7 @@ class _EtapeRenseignements extends StatelessWidget {
           .toList(growable: false),
       onSelected: (TypeaheadOption _) {},
     ),
-    CpiField(
+    'dureeEtablissementMois': CpiField(
       label: 'Durée dans la fonction',
       controller: fields.duree,
       focusNode: fields.dureeFocus,
@@ -1149,7 +1302,7 @@ class _EtapeRenseignements extends StatelessWidget {
       suffix: const Text('mois'),
       error: fields.erreurDuree,
     ),
-    _ChoixTri(
+    'fonctionnaire': _ChoixTri(
       label: 'Fonctionnaire',
       value: fields.fonctionnaire,
       onChanged: (Tri choix) {
@@ -1157,10 +1310,10 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-  ];
+  };
 
-  List<Widget> _banqueEtSyndicat() => <Widget>[
-    LocalTypeahead(
+  Map<String, Widget> _banqueEtSyndicat() => <String, Widget>{
+    'syndicatId': LocalTypeahead(
       controller: fields.syndicat,
       focusNode: fields.syndicatFocus,
       label: 'Syndicat',
@@ -1189,7 +1342,7 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-    LocalTypeahead(
+    'banqueId': LocalTypeahead(
       controller: fields.banque,
       focusNode: fields.banqueFocus,
       label: 'Banque',
@@ -1218,7 +1371,7 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-    _ChoixTri(
+    'engagementEnCours': _ChoixTri(
       label: 'Engagement en cours à la banque',
       value: fields.engagementEnCours,
       onChanged: (Tri choix) {
@@ -1226,7 +1379,7 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-    LocalTypeahead(
+    'incomeBandId': LocalTypeahead(
       controller: fields.revenu,
       focusNode: fields.revenuFocus,
       label: 'Revenu mensuel',
@@ -1255,23 +1408,69 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-    if (fields.grandPublic)
-      CpiChoiceGroup<int>(
-        label: 'Durée du système de paiement',
-        value: fields.dureeSystemeMois,
-        options: <CpiChoice<int>>[
-          for (final int mois in kDureesSystemeMois)
-            CpiChoice<int>(value: mois, label: formatDureeMois(mois)),
-        ],
-        onChanged: (int mois) {
-          if (mois == fields.dureeSystemeMois) return;
-          unawaited(HapticFeedback.selectionClick());
-          fields.dureeSystemeMois = mois;
-          onChanged();
-        },
-      ),
-  ];
+    'dureeSystemeMois': CpiChoiceGroup<int>(
+      label: 'Durée du système de paiement',
+      value: fields.dureeSystemeMois,
+      options: <CpiChoice<int>>[
+        for (final int mois in kDureesSystemeMois)
+          CpiChoice<int>(value: mois, label: formatDureeMois(mois)),
+      ],
+      onChanged: (int mois) {
+        if (mois == fields.dureeSystemeMois) return;
+        unawaited(HapticFeedback.selectionClick());
+        fields.dureeSystemeMois = mois;
+        onChanged();
+      },
+    ),
+  };
 }
+
+/// Un champ que l'administration a ajouté au formulaire de conversion : une
+/// saisie libre, ou un choix parmi les valeurs qu'elle a écrites.
+class _ChampAjoute extends StatelessWidget {
+  const _ChampAjoute({
+    required this.champ,
+    required this.fields,
+    required this.onChanged,
+  });
+
+  final ChampLibreDto champ;
+  final Phase2FormFields fields;
+  final VoidCallback onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    final String libelle = champ.obligatoire
+        ? champ.libelle
+        : '${champ.libelle} (facultatif)';
+
+    if (champ.type == ChampLibreDtoTypeEnum.TEXTE) {
+      return CpiField(
+        label: libelle,
+        controller: fields.libreTexte(champ.id),
+        maxLength: kReponseChampLibreMaxLength,
+      );
+    }
+
+    return CpiChoiceGroup<String>(
+      label: libelle,
+      value: fields.champsLibres[champ.id],
+      options: <CpiChoice<String>>[
+        for (final String valeur in ReglesConversion.valeursProposees(champ))
+          CpiChoice<String>(value: valeur, label: valeur),
+      ],
+      onChanged: (String valeur) {
+        if (valeur == fields.champsLibres[champ.id]) return;
+        unawaited(HapticFeedback.selectionClick());
+        fields.champsLibres[champ.id] = valeur;
+        onChanged();
+      },
+    );
+  }
+}
+
+/// Le serveur tronque au-delà (`REPONSE_MAX_LENGTH`, catalogue.ts).
+const int kReponseChampLibreMaxLength = 500;
 
 /// Une question à deux réponses : oui ou non.
 class _ChoixTri extends StatelessWidget {

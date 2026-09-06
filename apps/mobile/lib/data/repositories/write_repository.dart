@@ -895,6 +895,7 @@ class WriteRepository {
     bool? engagementEnCours,
     int? dureeEtablissementMois,
     DateTime? rendezVousAt,
+    Map<String, String>? champsLibres,
   }) async {
     final CallReason? reason = await resolveCallReason(
       _db,
@@ -1014,6 +1015,11 @@ class WriteRepository {
           'engagementEnCours': ?engagementEnCours,
           'dureeEtablissementMois': ?dureeEtablissementMois,
           'rendezVousAt': ?rendezVousAt?.toUtc().toIso8601String(),
+          // Vide, la clé ne part pas : le serveur fusionne ce qu'il reçoit sur
+          // ce que la fiche porte déjà, et un objet vide n'effacerait rien mais
+          // ferait voyager du bruit à chaque appel consigné.
+          if (champsLibres != null && champsLibres.isNotEmpty)
+            'champsLibres': champsLibres,
           'clientCreatedAt': now.toUtc().toIso8601String(),
           '_recordingPath': ?recordingPath,
           'deviceCallType': ?preuve?.journalType,
