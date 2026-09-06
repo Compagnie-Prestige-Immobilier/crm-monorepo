@@ -160,19 +160,20 @@ export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): 
 }
 
 export function countActiveFilters(filters: ProspectFilters): number {
-  let count = 0;
-  if (filters.search.trim() !== '') count += 1;
-  if (filters.commercialId !== null) count += 1;
-  if (filters.representantId !== null) count += 1;
-  if (filters.departementId !== null) count += 1;
-  if (filters.banqueId !== null) count += 1;
-  if (filters.syndicatId !== null) count += 1;
-  if (filters.statut !== null) count += 1;
-  if (filters.segment !== null) count += 1;
-  if (filters.phase2Status !== null) count += 1;
-  if (filters.enrollmentMethod !== null) count += 1;
-  if (filters.enrollmentCapturedById !== null) count += 1;
-  if (filters.revue !== null) count += 1;
-  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
-  return count;
+  const filtresActifs = [
+    filters.search.trim() !== '',
+    filters.commercialId !== null,
+    filters.representantId !== null,
+    filters.departementId !== null,
+    filters.banqueId !== null,
+    filters.syndicatId !== null,
+    filters.statut !== null,
+    filters.segment !== null,
+    filters.phase2Status !== null,
+    filters.enrollmentMethod !== null,
+    filters.enrollmentCapturedById !== null,
+    filters.revue !== null,
+    filters.dateFrom !== null || filters.dateTo !== null,
+  ];
+  return filtresActifs.filter(Boolean).length;
 }
