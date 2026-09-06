@@ -130,6 +130,27 @@ export const prospectSchema = z.object({
 });
 export type ProspectFormInput = z.infer<typeof prospectSchema>;
 
+/**
+ * Le formulaire public : les champs de la conversion qu'un visiteur peut
+ * remplir seul. Ni banque ni syndicat : ils se choisissent dans un référentiel
+ * que la page publique n'a pas le droit d'afficher.
+ */
+export const demandePubliqueSchema = z.object({
+  prenom: z.string().trim().min(1, 'Le prénom est obligatoire.').max(120, 'Prénom trop long.'),
+  nom: z.string().trim().min(1, 'Le nom est obligatoire.').max(120, 'Nom trop long.'),
+  phone: z.string().trim().min(6, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
+  email: z.union([
+    z.literal(''),
+    z.email('Adresse e-mail invalide.').max(254, 'Adresse trop longue.'),
+  ]),
+  profession: z.string().trim().max(120, 'Profession trop longue.'),
+  employeur: z.string().trim().max(160, 'Employeur trop long.'),
+  message: z.string().trim().max(500, 'Message trop long (500 caractères maximum).'),
+  site: z.string().max(200),
+});
+
+export type DemandePubliqueInput = z.infer<typeof demandePubliqueSchema>;
+
 export const representantSchema = z.object({
   fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
   phone: z.string().trim().min(1, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
