@@ -457,7 +457,7 @@ export class SyncService {
     batchKey: string,
     operations: SyncOperationDto[],
   ): Promise<SyncOperationResultDto[]> {
-    const { user, payloadVersion } = author;
+    const { user } = author;
     return this.prisma.$transaction(
       async (tx) => {
         const results: SyncOperationResultDto[] = [];
@@ -1658,6 +1658,75 @@ const missingResult = (operation: SyncOperationDto): SyncOperationResultDto => (
  * ou le résultat mémorisé si elle avait déjà été appliquée, auquel cas on
  * réémet ce résultat sans refaire l'écriture.
  */
+type StoredSyncOperation = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['syncOperation']['findUnique']>>
+>;
+
+/**
+ * Le statut réémis vient du verdict MÉMORISÉ, jamais d'une constante. La
+ * ligne `sync_operations` est écrite `APPLIED` à la réservation puis corrigée
+ * par `finalizeOperation` : c'est `result` qui porte la vérité. Réémettre un
+ * `DUPLICATE` fixe ferait passer un refus pour une réussite, et le téléphone
+ * effacerait la saisie en la croyant partie.
+ *
+ * Le repli n'est PAS `DUPLICATE`. Une base migrée avant que l'API ne soit
+ * reconstruite peut porter une valeur que cette version ne connaît pas, et la
+ * table rendrait alors `undefined`. Dans le doute on refuse : `INVALID` fait
+ * remonter la ligne dans « À corriger », là où un humain la voit. Un statut
+ * inconnu ne doit jamais pouvoir se lire comme une réussite.
+ */
+function replayedStatus(stored: StoredSyncOperation | null): {
+  status: SyncOpStatus;
+  unknownResult: boolean;
+} {
+  const memorisedStatus = stored ? storedStatusOf(stored.result) : SyncOpStatus.DUPLICATE;
+  return {
+    status: memorisedStatus ?? SyncOpStatus.INVALID,
+    unknownResult: memorisedStatus === undefined,
+  };
+}
+
+function replayedEntityId(
+  memorised: SyncOperationResultDto | null | undefined,
+  stored: StoredSyncOperation | null,
+  operation: SyncOperationDto,
+): string {
+  return memorised?.entityId ?? stored?.entityId ?? operation.entityId;
+}
+
+function replayedError(
+  unknownResult: boolean,
+  memorised: SyncOperationResultDto | null | undefined,
+): Pick<SyncOperationResultDto, 'errorCode' | 'error'> {
+  if (unknownResult) {
+    return {
+      errorCode: 'UNKNOWN_STORED_RESULT',
+      error:
+        'Verdict enregistré inconnu de cette version du serveur. Opération à revoir manuellement.',
+    };
+  }
+  return {
+    errorCode: memorised?.errorCode ?? null,
+    error: memorised?.error ?? null,
+  };
+}
+
+function replayedOperationResult(
+  operation: SyncOperationDto,
+  stored: StoredSyncOperation | null,
+): SyncOperationResultDto {
+  const memorised = stored?.resultJson as SyncOperationResultDto | null | undefined;
+  const { status, unknownResult } = replayedStatus(stored);
+  return {
+    opId: operation.opId,
+    status,
+    entityId: replayedEntityId(memorised, stored, operation),
+    rev: memorised?.rev ?? null,
+    serverUpdatedAt: memorised?.serverUpdatedAt ?? null,
+    ...replayedError(unknownResult, memorised),
+  };
+}
+
 async function claimOperation(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -1673,34 +1742,7 @@ async function claimOperation(
   if (inserted === 1) return undefined;
 
   const stored = await tx.syncOperation.findUnique({ where: { opId: operation.opId } });
-  const memorised = stored?.resultJson as SyncOperationResultDto | null | undefined;
-
-  // Le statut réémis vient du verdict MÉMORISÉ, jamais d'une constante. La
-  // ligne `sync_operations` est écrite `APPLIED` à la réservation puis corrigée
-  // par `finalizeOperation` : c'est `result` qui porte la vérité. Réémettre un
-  // `DUPLICATE` fixe ferait passer un refus pour une réussite, et le téléphone
-  // effacerait la saisie en la croyant partie.
-  //
-  // Le repli n'est PAS `DUPLICATE`. Une base migrée avant que l'API ne soit
-  // reconstruite peut porter une valeur que cette version ne connaît pas, et la
-  // table rendrait alors `undefined`. Dans le doute on refuse : `INVALID` fait
-  // remonter la ligne dans « À corriger », là où un humain la voit. Un statut
-  // inconnu ne doit jamais pouvoir se lire comme une réussite.
-  const memorisedStatus = stored ? storedStatusOf(stored.result) : SyncOpStatus.DUPLICATE;
-  const unknownResult = memorisedStatus === undefined;
-  const status = memorisedStatus ?? SyncOpStatus.INVALID;
-
-  return {
-    opId: operation.opId,
-    status,
-    entityId: memorised?.entityId ?? stored?.entityId ?? operation.entityId,
-    rev: memorised?.rev ?? null,
-    serverUpdatedAt: memorised?.serverUpdatedAt ?? null,
-    errorCode: unknownResult ? 'UNKNOWN_STORED_RESULT' : (memorised?.errorCode ?? null),
-    error: unknownResult
-      ? 'Verdict enregistré inconnu de cette version du serveur. Opération à revoir manuellement.'
-      : (memorised?.error ?? null),
-  };
+  return replayedOperationResult(operation, stored);
 }
 
 async function finalizeOperation(
