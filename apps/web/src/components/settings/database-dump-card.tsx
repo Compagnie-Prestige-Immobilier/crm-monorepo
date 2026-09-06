@@ -46,6 +46,74 @@ import { queryKeys } from '@/lib/query-keys';
  * lecture. Sans annonce, un lecteur d'écran ne saurait pas que l'export est
  * devenu téléchargeable.
  */
+function ExportStatusLine({
+  data,
+  running,
+}: {
+  data: Awaited<ReturnType<typeof fetchDatabaseDump>>;
+  running: boolean;
+}) {
+  if (running) {
+    return (
+      <p className="flex items-start gap-2 text-[0.875rem]">
+        <LoaderIcon className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
+        <span>
+          <span className="font-[600]">Export en cours.</span> L’opération dure plusieurs minutes.
+          Vous pouvez quitter le panel&nbsp;: la cloche des notifications vous préviendra dès que
+          l’archive sera prête.
+        </span>
+      </p>
+    );
+  }
+  return <p className="text-[0.875rem] text-muted-foreground">{dumpStatusLabel(data)}</p>;
+}
+
+function ExportMetaLine({ data }: { data: Awaited<ReturnType<typeof fetchDatabaseDump>> }) {
+  if (data.status !== 'ready') return null;
+  return (
+    <p className="text-[0.8125rem] text-muted-foreground">
+      {formatDumpSize(data.fileSize)}
+      {data.finishedAt === null ? null : (
+        <>
+          {' · produit le '}
+          <time dateTime={data.finishedAt}>{formatDateTime(data.finishedAt)}</time>
+        </>
+      )}
+      {data.expiresAt === null ? null : (
+        <>
+          {' · détruit le '}
+          <time dateTime={data.expiresAt}>{formatDateTime(data.expiresAt)}</time>
+        </>
+      )}
+    </p>
+  );
+}
+
+function ExportShaLine({ data }: { data: Awaited<ReturnType<typeof fetchDatabaseDump>> }) {
+  if (data.status !== 'ready' || data.sha256 === null) return null;
+  return <p className="break-all text-[0.75rem] text-muted-foreground">sha256 {data.sha256}</p>;
+}
+
+function ExportFailureLine({ data }: { data: Awaited<ReturnType<typeof fetchDatabaseDump>> }) {
+  if (data.status !== 'failed' || data.failureReason === null) return null;
+  return (
+    <p className="flex items-start gap-2 rounded-md border border-destructive/30 px-3 py-2.5 text-[0.8125rem] text-destructive">
+      <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>{data.failureReason}</span>
+    </p>
+  );
+}
+
+function ExportNoticeLine({ notice }: { notice: string | null }) {
+  if (notice === null) return null;
+  return (
+    <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning">
+      <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      <span>{notice}</span>
+    </p>
+  );
+}
+
 function EtatExport({
   data,
   running,
@@ -57,55 +125,169 @@ function EtatExport({
 }) {
   return (
     <div role="status" className="flex flex-col gap-2">
-      {running ? (
-        <p className="flex items-start gap-2 text-[0.875rem]">
-          <LoaderIcon className="mt-0.5 size-4 shrink-0 animate-spin" aria-hidden="true" />
-          <span>
-            <span className="font-[600]">Export en cours.</span> L’opération dure plusieurs minutes.
-            Vous pouvez quitter le panel&nbsp;: la cloche des notifications vous préviendra dès que
-            l’archive sera prête.
-          </span>
-        </p>
-      ) : (
-        <p className="text-[0.875rem] text-muted-foreground">{dumpStatusLabel(data)}</p>
-      )}
+      <ExportStatusLine data={data} running={running} />
+      <ExportMetaLine data={data} />
+      <ExportShaLine data={data} />
+      <ExportFailureLine data={data} />
+      <ExportNoticeLine notice={notice} />
+    </div>
+  );
+}
 
-      {data.status === 'ready' ? (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {formatDumpSize(data.fileSize)}
-          {data.finishedAt === null ? null : (
-            <>
-              {' · produit le '}
-              <time dateTime={data.finishedAt}>{formatDateTime(data.finishedAt)}</time>
-            </>
+function DumpActions({
+  data,
+  running,
+  downloadPending,
+  requestPending,
+  onDownload,
+  onRequestExport,
+}: {
+  data: Awaited<ReturnType<typeof fetchDatabaseDump>>;
+  running: boolean;
+  downloadPending: boolean;
+  requestPending: boolean;
+  onDownload: () => void;
+  onRequestExport: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-3">
+      {data.downloadable ? (
+        <Button type="button" disabled={downloadPending} onClick={onDownload}>
+          {downloadPending ? (
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <DownloadIcon aria-hidden="true" />
           )}
-          {data.expiresAt === null ? null : (
-            <>
-              {' · détruit le '}
-              <time dateTime={data.expiresAt}>{formatDateTime(data.expiresAt)}</time>
-            </>
-          )}
-        </p>
+          Télécharger l’archive
+        </Button>
       ) : null}
 
-      {data.status === 'ready' && data.sha256 !== null ? (
-        <p className="break-all text-[0.75rem] text-muted-foreground">sha256 {data.sha256}</p>
-      ) : null}
-
-      {data.status === 'failed' && data.failureReason !== null ? (
-        <p className="flex items-start gap-2 rounded-md border border-destructive/30 px-3 py-2.5 text-[0.8125rem] text-destructive">
-          <TriangleAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{data.failureReason}</span>
-        </p>
-      ) : null}
-
-      {notice === null ? null : (
-        <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.8125rem] text-warning">
-          <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          <span>{notice}</span>
-        </p>
+      <Button
+        type="button"
+        variant={data.downloadable ? 'ghost' : 'secondary'}
+        disabled={running || requestPending}
+        onClick={onRequestExport}
+      >
+        {running ? (
+          <>
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            Export en cours…
+          </>
+        ) : (
+          <>
+            <DatabaseIcon aria-hidden="true" />
+            Demander un export
+          </>
+        )}
+      </Button>
+      {running ? null : (
+        <p className="text-[0.75rem] text-muted-foreground">Confirmation requise.</p>
       )}
     </div>
+  );
+}
+
+function ConfirmExportDialog({
+  open,
+  onOpenChange,
+  confirmId,
+  confirmed,
+  onConfirmedChange,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  confirmId: string;
+  confirmed: boolean;
+  onConfirmedChange: (checked: boolean) => void;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Créer une copie complète de la base ?</DialogTitle>
+          <DialogDescription>
+            Le fichier produit contient l’intégralité des données de la plateforme.
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col gap-4">
+          <ul className="flex list-disc flex-col gap-1 rounded-md border border-border p-3 pl-7 text-[0.875rem]">
+            <li>Toutes les fiches prospects, avec les noms et les numéros de téléphone.</li>
+            <li>Tous les dossiers bancaires, avec les montants en francs CFA.</li>
+            <li>Tous les comptes utilisateurs, avec les empreintes de leurs mots de passe.</li>
+            <li>Toutes les campagnes, les demandes clients et l’historique des actions.</li>
+            <li>L’espace démo possède sa propre base et ne peut pas produire cette archive.</li>
+          </ul>
+
+          <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
+            <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              <span className="font-[600]">
+                Ce fichier vaut la base elle-même. Il concerne des personnes réelles.
+              </span>{' '}
+              Une fois sur votre poste, il n’est plus protégé par vos droits d’accès. Ne le
+              transférez pas par messagerie, ne le déposez pas sur un stockage personnel, et
+              effacez-le dès qu’il a servi.
+            </span>
+          </p>
+
+          <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
+            <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+            <span>
+              <span className="font-[600]">Aucun e-mail, aucun lien.</span> L’avis de fin arrive
+              dans la cloche du panel, et nulle part ailleurs&nbsp;: rien ne part par messagerie.
+              Le téléchargement se fait sur cet écran, dans votre session, et l’archive est
+              détruite aussitôt après.
+            </span>
+          </p>
+
+          <label
+            htmlFor={confirmId}
+            className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-[0.875rem] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
+          >
+            <input
+              id={confirmId}
+              type="checkbox"
+              checked={confirmed}
+              disabled={pending}
+              className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
+              onChange={(event) => {
+                onConfirmedChange(event.target.checked);
+              }}
+            />
+            <span>
+              Je comprends que ce fichier contient toutes les données de la plateforme, et j’en
+              assume la garde.
+            </span>
+          </label>
+        </div>
+
+        <DialogFooter>
+          <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
+            Annuler
+          </Button>
+          <Button type="button" disabled={!confirmed || pending} onClick={onConfirm}>
+            {pending ? (
+              <>
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                Lancement…
+              </>
+            ) : (
+              <>
+                <DatabaseIcon aria-hidden="true" />
+                Lancer l’export
+              </>
+            )}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -156,6 +338,24 @@ export function DatabaseDumpCard() {
   const running = isDumpRunning(data);
   const notice = dumpNoticeWarning(data);
 
+  const handleDownload = () => {
+    void download
+      .download({
+        url: DATABASE_DUMP_DOWNLOAD_URL,
+        fileName: databaseDumpFileName(),
+        failureMessage: 'Le téléchargement de l’export a échoué.',
+      })
+      .then(() => {
+        void queryClient.invalidateQueries({ queryKey: queryKeys.databaseDump });
+      });
+  };
+
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open && request.isPending) return;
+    setConfirming(open);
+    if (!open) setConfirmed(false);
+  };
+
   return (
     <>
       <Card className="animate-rise">
@@ -173,57 +373,17 @@ export function DatabaseDumpCard() {
         <CardContent className="flex flex-col gap-5">
           <EtatExport data={data} running={running} notice={notice} />
 
-          <div className="flex flex-wrap items-center gap-3">
-            {data.downloadable ? (
-              <Button
-                type="button"
-                disabled={download.pending}
-                onClick={() => {
-                  void download
-                    .download({
-                      url: DATABASE_DUMP_DOWNLOAD_URL,
-                      fileName: databaseDumpFileName(),
-                      failureMessage: 'Le téléchargement de l’export a échoué.',
-                    })
-                    .then(() => {
-                      void queryClient.invalidateQueries({ queryKey: queryKeys.databaseDump });
-                    });
-                }}
-              >
-                {download.pending ? (
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <DownloadIcon aria-hidden="true" />
-                )}
-                Télécharger l’archive
-              </Button>
-            ) : null}
-
-            <Button
-              type="button"
-              variant={data.downloadable ? 'ghost' : 'secondary'}
-              disabled={running || request.isPending}
-              onClick={() => {
-                setConfirmed(false);
-                setConfirming(true);
-              }}
-            >
-              {running ? (
-                <>
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                  Export en cours…
-                </>
-              ) : (
-                <>
-                  <DatabaseIcon aria-hidden="true" />
-                  Demander un export
-                </>
-              )}
-            </Button>
-            {running ? null : (
-              <p className="text-[0.75rem] text-muted-foreground">Confirmation requise.</p>
-            )}
-          </div>
+          <DumpActions
+            data={data}
+            running={running}
+            downloadPending={download.pending}
+            requestPending={request.isPending}
+            onDownload={handleDownload}
+            onRequestExport={() => {
+              setConfirmed(false);
+              setConfirming(true);
+            }}
+          />
 
           <p className="flex items-start gap-2 text-[0.75rem] text-muted-foreground">
             <InfoIcon className="mt-0.5 size-3.5 shrink-0" aria-hidden="true" />
@@ -236,114 +396,16 @@ export function DatabaseDumpCard() {
         </CardContent>
       </Card>
 
-      <Dialog
+      <ConfirmExportDialog
         open={confirming}
-        onOpenChange={(open) => {
-          if (!open && request.isPending) return;
-          setConfirming(open);
-          if (!open) setConfirmed(false);
-        }}
-      >
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Créer une copie complète de la base ?</DialogTitle>
-            <DialogDescription>
-              Le fichier produit contient l’intégralité des données de la plateforme.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="flex flex-col gap-4">
-            {/*
-              L'ÉNUMÉRATION, et elle est le cœur de cet écran.
-
-              « Un export de la base » ne veut rien dire à qui décide. La liste
-              nomme ce que le fichier contiendra vraiment, y compris ce que
-              personne ne pense à y trouver : les empreintes de mots de passe.
-            */}
-            <ul className="flex list-disc flex-col gap-1 rounded-md border border-border p-3 pl-7 text-[0.875rem]">
-              <li>Toutes les fiches prospects, avec les noms et les numéros de téléphone.</li>
-              <li>Tous les dossiers bancaires, avec les montants en francs CFA.</li>
-              <li>Tous les comptes utilisateurs, avec les empreintes de leurs mots de passe.</li>
-              <li>Toutes les campagnes, les demandes clients et l’historique des actions.</li>
-              <li>L’espace démo possède sa propre base et ne peut pas produire cette archive.</li>
-            </ul>
-
-            <p className="flex items-start gap-2 rounded-md border border-accent-border/40 bg-accent-surface px-3 py-2.5 text-[0.875rem] text-warning">
-              <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">
-                  Ce fichier vaut la base elle-même. Il concerne des personnes réelles.
-                </span>{' '}
-                Une fois sur votre poste, il n’est plus protégé par vos droits d’accès. Ne le
-                transférez pas par messagerie, ne le déposez pas sur un stockage personnel, et
-                effacez-le dès qu’il a servi.
-              </span>
-            </p>
-
-            <p className="flex items-start gap-2 rounded-md border border-success/30 bg-success-surface px-3 py-2.5 text-[0.875rem] text-success">
-              <MailIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              <span>
-                <span className="font-[600]">Aucun e-mail, aucun lien.</span> L’avis de fin arrive
-                dans la cloche du panel, et nulle part ailleurs&nbsp;: rien ne part par messagerie.
-                Le téléchargement se fait sur cet écran, dans votre session, et l’archive est
-                détruite aussitôt après.
-              </span>
-            </p>
-
-            <label
-              htmlFor={confirmId}
-              className="flex min-h-11 cursor-pointer items-start gap-3 rounded-md border border-border p-3 text-[0.875rem] focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring"
-            >
-              <input
-                id={confirmId}
-                type="checkbox"
-                checked={confirmed}
-                disabled={request.isPending}
-                className="mt-0.5 size-4 shrink-0 accent-[var(--primary)]"
-                onChange={(event) => {
-                  setConfirmed(event.target.checked);
-                }}
-              />
-              <span>
-                Je comprends que ce fichier contient toutes les données de la plateforme, et j’en
-                assume la garde.
-              </span>
-            </label>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="ghost"
-              disabled={request.isPending}
-              onClick={() => {
-                setConfirming(false);
-              }}
-            >
-              Annuler
-            </Button>
-            <Button
-              type="button"
-              disabled={!confirmed || request.isPending}
-              onClick={() => {
-                request.mutate();
-              }}
-            >
-              {request.isPending ? (
-                <>
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                  Lancement…
-                </>
-              ) : (
-                <>
-                  <DatabaseIcon aria-hidden="true" />
-                  Lancer l’export
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+        onOpenChange={handleDialogOpenChange}
+        confirmId={confirmId}
+        confirmed={confirmed}
+        onConfirmedChange={setConfirmed}
+        pending={request.isPending}
+        onCancel={() => setConfirming(false)}
+        onConfirm={() => request.mutate()}
+      />
     </>
   );
 }
