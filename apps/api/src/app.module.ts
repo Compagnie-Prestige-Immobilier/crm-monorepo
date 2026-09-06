@@ -38,6 +38,7 @@ import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
 import { VisitesModule } from './modules/visites/visites.module.js';
 import { DashboardsModule } from './modules/dashboards/dashboards.module.js';
 import { LotsExportModule } from './modules/lots-export/lots-export.module.js';
+import { ParametresChuesModule } from './modules/parametres-chues/parametres-chues.module.js';
 import { LiveModule } from './modules/live/live.module.js';
 
 const env = readEnv();
@@ -126,6 +127,7 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     VisitesModule,
     DashboardsModule,
     LotsExportModule,
+    ParametresChuesModule,
     EnrolementModule,
   ],
   providers: [

@@ -108,6 +108,7 @@ import 'package:crm_api_client/src/model/income_band_dto.dart';
 import 'package:crm_api_client/src/model/inscription_plateforme_detail_dto.dart';
 import 'package:crm_api_client/src/model/inscription_plateforme_dto.dart';
 import 'package:crm_api_client/src/model/inscriptions_page_dto.dart';
+import 'package:crm_api_client/src/model/journal_parametres_dto.dart';
 import 'package:crm_api_client/src/model/login_dto.dart';
 import 'package:crm_api_client/src/model/logout_response_dto.dart';
 import 'package:crm_api_client/src/model/lot_export_attempt_dto.dart';
@@ -145,6 +146,8 @@ import 'package:crm_api_client/src/model/ouverture_fiche_dto.dart';
 import 'package:crm_api_client/src/model/ouverture_fiche_list_dto.dart';
 import 'package:crm_api_client/src/model/ouvrir_fiche_dto.dart';
 import 'package:crm_api_client/src/model/page_meta_dto.dart';
+import 'package:crm_api_client/src/model/parametre_changement_dto.dart';
+import 'package:crm_api_client/src/model/parametres_chues_dto.dart';
 import 'package:crm_api_client/src/model/pays_dto.dart';
 import 'package:crm_api_client/src/model/performance_score.dart';
 import 'package:crm_api_client/src/model/phase2_status_count_dto.dart';
@@ -262,6 +265,7 @@ import 'package:crm_api_client/src/model/update_income_band_dto.dart';
 import 'package:crm_api_client/src/model/update_lot_export_dto.dart';
 import 'package:crm_api_client/src/model/update_notification_template_dto.dart';
 import 'package:crm_api_client/src/model/update_offer_dto.dart';
+import 'package:crm_api_client/src/model/update_parametres_chues_dto.dart';
 import 'package:crm_api_client/src/model/update_profession_dto.dart';
 import 'package:crm_api_client/src/model/update_prospect_dto.dart';
 import 'package:crm_api_client/src/model/update_representant_dto.dart';
@@ -673,6 +677,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'InscriptionsPageDto':
       return InscriptionsPageDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
+    case 'JournalParametresDto':
+      return JournalParametresDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'LoginDto':
       return LoginDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'LogoutResponseDto':
@@ -791,6 +798,12 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'PageMetaDto':
       return PageMetaDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'ParametreChangementDto':
+      return ParametreChangementDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'ParametresChuesDto':
+      return ParametresChuesDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'PaymentMode':
     case 'PaysDto':
       return PaysDto.fromJson(value as Map<String, dynamic>) as ReturnType;
@@ -1182,6 +1195,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'UpdateOfferDto':
       return UpdateOfferDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'UpdateParametresChuesDto':
+      return UpdateParametresChuesDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'UpdateProfessionDto':
       return UpdateProfessionDto.fromJson(value as Map<String, dynamic>)

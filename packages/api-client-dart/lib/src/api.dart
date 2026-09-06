@@ -23,6 +23,7 @@ import 'package:crm_api_client/src/api/lots_export_api.dart';
 import 'package:crm_api_client/src/api/notification_templates_api.dart';
 import 'package:crm_api_client/src/api/notifications_api.dart';
 import 'package:crm_api_client/src/api/ouvertures_api.dart';
+import 'package:crm_api_client/src/api/parametres_chues_api.dart';
 import 'package:crm_api_client/src/api/phase2_api.dart';
 import 'package:crm_api_client/src/api/prospects_api.dart';
 import 'package:crm_api_client/src/api/referentiels_api.dart';
@@ -253,6 +254,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   OuverturesApi getOuverturesApi() {
     return OuverturesApi(dio);
+  }
+
+  /// Get ParametresChuesApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ParametresChuesApi getParametresChuesApi() {
+    return ParametresChuesApi(dio);
   }
 
   /// Get Phase2Api instance, base route and serializer can be overridden by a given but be careful,
