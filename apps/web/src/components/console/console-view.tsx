@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
+import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -732,7 +733,7 @@ function Consignation({
             Copier
             <Kbd>C</Kbd>
           </Button>
-          <BoutonWhatsApp prospect={prospect} />
+          {etape === 'dossier' ? null : <BoutonWhatsApp prospect={prospect} />}
         </div>
 
         <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
@@ -753,6 +754,8 @@ function Consignation({
             <p className="text-[0.8125rem] font-[600] text-muted-foreground">
               Joignable · son dossier, et la manière dont il adhère
             </p>
+
+            <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
 
             <ConversionFields
               draft={conversion}
