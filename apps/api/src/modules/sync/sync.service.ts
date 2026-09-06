@@ -208,6 +208,13 @@ const mineOrAssignedRepresentant = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): Prisma.RepresentantWhereInput => (ANNUAIRE_ROLES.includes(user.role) ? {} : {});
 
+type RepresentantRow = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['representant']['findUnique']>>
+>;
+type ProspectRow = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['prospect']['findUnique']>>
+>;
+
 @Injectable()
 export class SyncService {
   private readonly logger = new Logger(SyncService.name);
@@ -658,74 +665,98 @@ export class SyncService {
     await this.assertRepresentantWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
-      if (!existing || existing.deletedAt) {
-        // Supprimer ce qui n'existe plus est le résultat voulu.
-        return existingOutcome(operation.entityId, existing);
-      }
-      assertRev(operation, existing.rev);
-      const now = new Date();
-      await tx.prospect.updateMany({
-        where: { representantId: existing.id, deletedAt: null },
-        data: { deletedAt: now, rev: { increment: 1 } },
-      });
-      const row = await tx.representant.update({
-        where: { id: existing.id },
-        data: { deletedAt: now, rev: { increment: 1 } },
-      });
-      return applied(row.id, row.rev, row.updatedAt);
+      return this.deleteRepresentant(tx, operation, existing);
     }
+    if (!existing || existing.deletedAt) {
+      return this.createRepresentant(tx, user, operation);
+    }
+    return this.updateRepresentant(tx, user, operation, existing);
+  }
 
+  private async deleteRepresentant(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: RepresentantRow | null,
+  ): Promise<OperationOutcome> {
+    if (!existing || existing.deletedAt) {
+      // Supprimer ce qui n'existe plus est le résultat voulu.
+      return existingOutcome(operation.entityId, existing);
+    }
+    assertRev(operation, existing.rev);
+    const now = new Date();
+    await tx.prospect.updateMany({
+      where: { representantId: existing.id, deletedAt: null },
+      data: { deletedAt: now, rev: { increment: 1 } },
+    });
+    const row = await tx.representant.update({
+      where: { id: existing.id },
+      data: { deletedAt: now, rev: { increment: 1 } },
+    });
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async createRepresentant(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+  ): Promise<OperationOutcome> {
     const data = operation.data || {};
     const phoneE164 = requirePhone(data);
+    requireText(data.fullName, 'fullName');
+    requireUuid(data.departementId, 'departementId');
+    await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
 
-    if (!existing || existing.deletedAt) {
-      requireText(data.fullName, 'fullName');
-      requireUuid(data.departementId, 'departementId');
-      await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
+    // `upsert` et non `create` : la ligne peut exister en supprimé logique
+    // (le commercial a effacé la fiche puis la ressaisit). Un `create` se
+    // heurterait à la clé primaire.
+    const row = await tx.representant.upsert({
+      where: { id: operation.entityId },
+      create: {
+        id: operation.entityId,
+        fullName: data.fullName.trim(),
+        phoneE164,
+        ...definedValues({ notes: data.notes || undefined }),
+        ...definedValues({
+          prenom: data.prenom || undefined,
+          etablissement: data.etablissement || undefined,
+          syndicat: data.syndicat || undefined,
+          connaitUES: data.connaitUES,
+          contacte: data.contacte,
+        }),
+        // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
+        // meme regle que le panneau, donc le CHECK ne peut pas etre viole
+        // par le chemin hors ligne.
+        ...resolveWhatsappPatch(data, {
+          whatsappStatus: WhatsappStatus.NON_DEMANDE,
+          whatsappE164: null,
+        }),
+        departementId: data.departementId,
+        ...definedValues({ iefId: data.iefId || undefined }),
+        createdById: user.id,
+        clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+      },
+      update: {
+        fullName: data.fullName.trim(),
+        phoneE164,
+        notes: valueOrNull(data.notes),
+        departementId: data.departementId,
+        ...definedValues({ iefId: data.iefId || undefined }),
+        deletedAt: null,
+        rev: { increment: 1 },
+      },
+    });
+    // Inscrite au registre pour que la purge sache la reprendre : sans cela
+    return applied(row.id, row.rev, row.updatedAt);
+  }
 
-      // `upsert` et non `create` : la ligne peut exister en supprimé logique
-      // (le commercial a effacé la fiche puis la ressaisit). Un `create` se
-      // heurterait à la clé primaire.
-      const row = await tx.representant.upsert({
-        where: { id: operation.entityId },
-        create: {
-          id: operation.entityId,
-          fullName: data.fullName.trim(),
-          phoneE164,
-          ...definedValues({ notes: data.notes || undefined }),
-          ...definedValues({
-            prenom: data.prenom || undefined,
-            etablissement: data.etablissement || undefined,
-            syndicat: data.syndicat || undefined,
-            connaitUES: data.connaitUES,
-            contacte: data.contacte,
-          }),
-          // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
-          // meme regle que le panneau, donc le CHECK ne peut pas etre viole
-          // par le chemin hors ligne.
-          ...resolveWhatsappPatch(data, {
-            whatsappStatus: WhatsappStatus.NON_DEMANDE,
-            whatsappE164: null,
-          }),
-          departementId: data.departementId,
-          ...definedValues({ iefId: data.iefId || undefined }),
-          createdById: user.id,
-          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-        },
-        update: {
-          fullName: data.fullName.trim(),
-          phoneE164,
-          notes: valueOrNull(data.notes),
-          departementId: data.departementId,
-          ...definedValues({ iefId: data.iefId || undefined }),
-          deletedAt: null,
-          rev: { increment: 1 },
-        },
-      });
-      // Inscrite au registre pour que la purge sache la reprendre : sans cela
-      return applied(row.id, row.rev, row.updatedAt);
-    }
-
+  private async updateRepresentant(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+    existing: RepresentantRow,
+  ): Promise<OperationOutcome> {
+    const data = operation.data || {};
+    const phoneE164 = requirePhone(data);
     assertRev(operation, existing.rev);
     if (phoneE164 !== existing.phoneE164) {
       await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
