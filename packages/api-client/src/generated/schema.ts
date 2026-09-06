@@ -3444,6 +3444,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/formulaire-public/{jeton}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reçoit une demande envoyée depuis le formulaire public.
+     * @description Le jeton est le compte qui a partagé le lien : il devient auteur de la fiche et reçoit l’avis.
+     */
+    post: operations['envoyerDemandePublique'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -4617,6 +4637,11 @@ export interface components {
       origin: string | null;
       /** @description Détail conservé à la création (nom de la banque demandeuse, par exemple). */
       originLabel: string | null;
+      /**
+       * Format: date-time
+       * @description Date de la demande publique qui attend une relecture.
+       */
+      aRevoirAt: string | null;
       /** Format: date-time */
       clientCreatedAt: string;
       /** Format: date-time */
@@ -7377,7 +7402,6 @@ export interface components {
       | 'statuts-par-famille'
       | 'joignabilite-par-creneau'
       | 'taux-d-exploitation'
-      | 'exploitation-par-campagne'
       | 'representants-par-departement'
       | 'representants-par-ief'
       | 'representants-jamais-appeles'
@@ -7554,7 +7578,7 @@ export interface components {
        * @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
        * @enum {string}
        */
-      origin?: 'BANQUE';
+      origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
       /**
        * Format: date-time
        * @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -7926,6 +7950,19 @@ export interface components {
     };
     SuppressionDto: {
       supprimees: number;
+    };
+    DemandePubliqueDto: {
+      nom: string;
+      prenom: string;
+      /** @description Saisie libre, normalisé en E.164 par le serveur. */
+      phone: string;
+      /** @description Sans adresse, la confirmation à l’écran vaut accusé de réception. */
+      email?: string;
+      profession?: string;
+      employeur?: string;
+      message?: string;
+      /** @description Laisser vide. */
+      site?: string;
     };
   };
   responses: never;
@@ -11686,7 +11723,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -14858,7 +14895,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -14940,7 +14977,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15022,7 +15059,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15105,7 +15142,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15188,7 +15225,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15270,7 +15307,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15352,7 +15389,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15434,7 +15471,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15516,7 +15553,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15598,7 +15635,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15680,7 +15717,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15763,7 +15800,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15845,7 +15882,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -15927,7 +15964,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -16009,7 +16046,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -16091,7 +16128,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -16176,7 +16213,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -16258,7 +16295,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -16399,7 +16436,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -18380,7 +18417,7 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
@@ -20776,6 +20813,58 @@ export interface operations {
       };
       /** @description Ressource introuvable, ou supprimée. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  envoyerDemandePublique: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        jeton: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DemandePubliqueDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
         headers: {
           [name: string]: unknown;
         };

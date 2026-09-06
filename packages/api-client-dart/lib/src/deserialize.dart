@@ -76,6 +76,7 @@ import 'package:crm_api_client/src/model/data_quality_row_dto.dart';
 import 'package:crm_api_client/src/model/database_dump_job_dto.dart';
 import 'package:crm_api_client/src/model/delai_median_dto.dart';
 import 'package:crm_api_client/src/model/delay_leg_dto.dart';
+import 'package:crm_api_client/src/model/demande_publique_dto.dart';
 import 'package:crm_api_client/src/model/demo_workspace_counts_dto.dart';
 import 'package:crm_api_client/src/model/demo_workspace_status_dto.dart';
 import 'package:crm_api_client/src/model/departement_dto.dart';
@@ -582,6 +583,9 @@ ReturnType deserialize<ReturnType, BaseType>(
     case 'DelayLeg':
     case 'DelayLegDto':
       return DelayLegDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'DemandePubliqueDto':
+      return DemandePubliqueDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'DemoWorkspaceCountsDto':
       return DemoWorkspaceCountsDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;

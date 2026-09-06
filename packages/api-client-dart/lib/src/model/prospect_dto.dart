@@ -159,6 +159,8 @@ class ProspectDto {
 
     required this.originLabel,
 
+    required this.aRevoirAt,
+
     required this.clientCreatedAt,
 
     required this.createdAt,
@@ -442,6 +444,10 @@ class ProspectDto {
   @JsonKey(name: r'originLabel', required: true, includeIfNull: true)
   final String? originLabel;
 
+  /// Date de la demande publique qui attend une relecture.
+  @JsonKey(name: r'aRevoirAt', required: true, includeIfNull: true)
+  final DateTime? aRevoirAt;
+
   @JsonKey(name: r'clientCreatedAt', required: true, includeIfNull: false)
   final DateTime clientCreatedAt;
 
@@ -524,6 +530,7 @@ class ProspectDto {
                 lastCallByName,
                 origin,
                 originLabel,
+                aRevoirAt,
                 clientCreatedAt,
                 createdAt,
                 updatedAt,
@@ -594,6 +601,7 @@ class ProspectDto {
                 other.lastCallByName,
                 other.origin,
                 other.originLabel,
+                other.aRevoirAt,
                 other.clientCreatedAt,
                 other.createdAt,
                 other.updatedAt,
@@ -670,6 +678,7 @@ class ProspectDto {
         lastCallByName,
         origin,
         originLabel,
+        aRevoirAt,
         clientCreatedAt,
         createdAt,
         updatedAt,

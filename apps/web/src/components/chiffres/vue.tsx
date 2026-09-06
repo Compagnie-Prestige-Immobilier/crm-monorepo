@@ -70,6 +70,7 @@ import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
 import { formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
+import { avecTransition } from '@/lib/transition-de-vue';
 import type { Role } from '@/lib/types';
 
 /** Une requête par jeu, et seulement pour les jeux qu'une carte posée réclame. */
@@ -355,10 +356,12 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
                   (donneesSource === undefined || forme === undefined
                     ? undefined
                     : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
-                setBrouillon((current) => [
-                  ...(current ?? []),
-                  { id: `${source}-${String(Date.now())}`, source, marque, taille: 'demi' },
-                ]);
+                avecTransition(() => {
+                  setBrouillon((current) => [
+                    ...(current ?? []),
+                    { id: `${source}-${String(Date.now())}`, source, marque },
+                  ]);
+                });
               }}
             />
           ) : (
@@ -438,10 +441,14 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
                 setBrouillon((current) => deplacer(current, fromId, toId));
               }}
               onRemove={(id) => {
-                setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                avecTransition(() => {
+                  setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                });
               }}
               onMove={(id, direction) => {
-                setBrouillon((current) => decaler(current, id, direction));
+                avecTransition(() => {
+                  setBrouillon((current) => decaler(current, id, direction));
+                });
               }}
               onChangeMarque={(id, marque) => {
                 setBrouillon(
@@ -449,9 +456,12 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
                 );
               }}
               onChangeTaille={(id, taille) => {
-                setBrouillon(
-                  (current) => current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
-                );
+                avecTransition(() => {
+                  setBrouillon(
+                    (current) =>
+                      current?.map((w) => (w.id === id ? { ...w, taille } : w)) ?? current,
+                  );
+                });
               }}
               onChangePresentation={(id, presentation) => {
                 setBrouillon(
@@ -501,7 +511,7 @@ function decaler(
 
 export function ChiffresSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
       {[0, 1, 2, 3].map((index) => (
         <Card key={`tuile-${String(index)}`}>
           <CardContent>

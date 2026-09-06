@@ -5406,7 +5406,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10084,7 +10084,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10329,7 +10329,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10574,7 +10574,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10827,7 +10827,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11083,7 +11083,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11328,7 +11328,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11573,7 +11573,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11819,7 +11819,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12065,7 +12065,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12311,7 +12311,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12556,7 +12556,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12813,7 +12813,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13059,7 +13059,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13305,7 +13305,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13550,7 +13550,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13796,7 +13796,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14065,7 +14065,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14311,7 +14311,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14683,7 +14683,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -17888,7 +17888,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -21440,6 +21440,77 @@
         "summary": "Tire la plateforme maintenant, sans attendre l’échéance.",
         "tags": ["enrolement"]
       }
+    },
+    "/api/v1/formulaire-public/{jeton}": {
+      "post": {
+        "description": "Le jeton est le compte qui a partagé le lien : il devient auteur de la fiche et reçoit l’avis.",
+        "operationId": "envoyerDemandePublique",
+        "parameters": [
+          {
+            "name": "jeton",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandePubliqueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reçoit une demande envoyée depuis le formulaire public.",
+        "tags": ["formulaire-public"]
+      }
     }
   },
   "info": {
@@ -24653,6 +24724,12 @@
             "nullable": true,
             "description": "Détail conservé à la création (nom de la banque demandeuse, par exemple)."
           },
+          "aRevoirAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Date de la demande publique qui attend une relecture."
+          },
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time"
@@ -24736,6 +24813,7 @@
           "lastCallByName",
           "origin",
           "originLabel",
+          "aRevoirAt",
           "clientCreatedAt",
           "createdAt",
           "updatedAt",
@@ -32229,7 +32307,6 @@
           "statuts-par-famille",
           "joignabilite-par-creneau",
           "taux-d-exploitation",
-          "exploitation-par-campagne",
           "representants-par-departement",
           "representants-par-ief",
           "representants-jamais-appeles",
@@ -32558,7 +32635,7 @@
           },
           "origin": {
             "type": "string",
-            "enum": ["BANQUE"],
+            "enum": ["BANQUE", "FORMULAIRE_PUBLIC"],
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses."
           },
           "dateFrom": {
@@ -33829,6 +33906,47 @@
           }
         },
         "required": ["supprimees"]
+      },
+      "DemandePubliqueDto": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "prenom": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Saisie libre, normalisé en E.164 par le serveur."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 254,
+            "description": "Sans adresse, la confirmation à l’écran vaut accusé de réception."
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "site": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Laisser vide."
+          }
+        },
+        "required": ["nom", "prenom", "phone"]
       }
     }
   }

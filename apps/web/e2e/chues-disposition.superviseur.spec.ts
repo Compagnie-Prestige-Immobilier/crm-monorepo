@@ -27,6 +27,7 @@ const CARTES_USINE = [
   'Taux de joignabilité des représentants',
   'Taux d’acceptation',
   'Taux de qualification',
+  'Taux d’exploitation',
   'Répartition des statuts de qualification',
   'Par téléconseiller',
   'Fiches ouvertes',
@@ -38,8 +39,6 @@ const SOURCES_EN_RESERVE = [
   'Joints et non joints',
   'Statuts par famille',
   'Joignabilité par créneau',
-  'Taux d’exploitation',
-  'Exploitation par campagne',
   'Représentants par département',
   'Représentants par IEF',
   'Représentants jamais appelés',
@@ -332,20 +331,20 @@ test('CHU-DSP-11 · la disposition est propre à chaque compte', async ({
 test('CHU-DSP-12 · la disposition est propre à chaque écran', async ({ page }) => {
   await avecDisposition(page, () => page.goto('/chues/statistiques'));
   await ouvrirComposition(page);
-  await page.getByRole('button', { name: 'Retirer Taux de qualification' }).click();
+  await page.getByRole('button', { name: 'Retirer Par téléconseiller' }).click();
   await enregistrer(page);
-  await expect(carte(page, 'Taux de qualification')).toHaveCount(0);
+  await expect(carte(page, 'Par téléconseiller')).toHaveCount(0);
 
   await page.goto('/grand-public/statistiques');
   for (const titre of [
     'Taux de joignabilité des prospects',
+    'Taux de qualification',
     'Prospects saisis',
     'Méthodes obtenues',
     'Par téléconseiller',
   ]) {
     await expect(carte(page, titre), `« ${titre} » d’usine sur l’écran Grand Public`).toBeVisible();
   }
-  await expect(carte(page, 'Taux de qualification')).toHaveCount(0);
 });
 
 test('CHU-DSP-08 · « Revenir à l’écran par défaut » efface la disposition personnelle', async ({

@@ -107,9 +107,10 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
   });
 
   // Un écran de pilotage se lit d'un coup d'œil : le repli ne doit pas ouvrir
-  // sur un mur de cartes que personne ne trie ensuite.
+  // sur un mur de cartes que personne ne trie ensuite. Relevé de 14 à 16 : la
+  // fusion EB-32/pilotage a ajouté taux-de-rappel et deux durées moyennes.
   it.each(DASHBOARD_ECRANS)('la disposition d’usine de %s reste courte', (ecran) => {
-    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(12);
+    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(16);
   });
 
   it('n’ouvre les montants qu’à qui les regarde', () => {
@@ -135,6 +136,24 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     }
   });
 
+  // EB-34 : les deux diagrammes circulaires des campagnes se lisent dès
+  // l'ouverture, sur la ligne qui suit les quatre taux.
+  it('ouvre CHUES sur quatre taux puis deux camemberts, pour tous les rôles', () => {
+    for (const voitLesMontants of [false, true]) {
+      const widgets = dispositionUsine('chues', voitLesMontants).widgets;
+      expect(widgets.slice(0, 6).map((widget) => widget.marque)).toEqual([
+        'tuile',
+        'tuile',
+        'tuile',
+        'tuile',
+        'camembert',
+        'camembert',
+      ]);
+      expect(widgets[4]?.source).toBe('taux-d-exploitation');
+      expect(widgets[5]?.source).toBe('repartition-statuts-qualification');
+    }
+  });
+
   // EB-13 : le compte des fiches ouvertes se lit SUR le tableau de bord. Posé
   // seulement dans le tiroir, il resterait à découvrir.
   it.each(['chues', 'grand-public'] as const)(
@@ -152,16 +171,10 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     },
   );
 
-  it('met la répartition des statuts de qualification en graphique large dès l’usine', () => {
-    const widget = dispositionUsine('chues').widgets.find(
-      (item) => item.source === 'repartition-statuts-qualification',
-    );
-
-    expect(widget).toMatchObject({
-      source: 'repartition-statuts-qualification',
-      marque: 'barres-horizontales',
-      taille: 'pleine',
-      presentation: { valeurs: true },
-    });
+  it('garde le camembert et les barres empilées sur le taux d’exploitation (EB-34)', () => {
+    for (const marque of ['camembert', 'barres-empilees'] as const) {
+      const [widget] = sanitize('chues', [{ source: 'taux-d-exploitation', marque }]);
+      expect(widget?.marque).toBe(marque);
+    }
   });
 });

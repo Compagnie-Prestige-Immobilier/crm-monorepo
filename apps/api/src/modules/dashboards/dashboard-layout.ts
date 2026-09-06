@@ -132,11 +132,7 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'joints-non-joints': { defaut: 'barres-verticales', compatibles: CATEGORIE_MARQUES },
   'statuts-par-famille': { defaut: 'barres-empilees', compatibles: COMPOSITION_MARQUES },
   'joignabilite-par-creneau': MATRICE,
-  'taux-d-exploitation': { defaut: 'camembert', compatibles: CATEGORIE_MARQUES },
-  'exploitation-par-campagne': {
-    defaut: 'barres-100',
-    compatibles: ['barres-100', 'barres-empilees', 'tableau'],
-  },
+  'taux-d-exploitation': { defaut: 'camembert', compatibles: COMPOSITION_MARQUES },
   'representants-par-departement': CLASSEMENT,
   'representants-par-ief': CLASSEMENT,
   'representants-jamais-appeles': CHIFFRE,
@@ -286,9 +282,8 @@ export function resolveLayout(
 }
 
 /**
- * Ce qu'un compte voit à sa première ouverture : une ligne de taux, le tableau
- * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
- * retirable comme le reste.
+ * Ce qu'un compte voit à sa première ouverture, en lignes pleines sur la
+ * grille de quatre colonnes : quatre tuiles, deux graphiques, puis les tableaux.
  */
 type WidgetUsine = DashboardSource | DispositionWidget;
 
@@ -307,11 +302,8 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
     'taux-de-joignabilite-representants',
     'taux-d-acceptation',
     'taux-de-qualification',
-    {
-      source: 'repartition-statuts-qualification',
-      taille: 'pleine',
-      presentation: { valeurs: true },
-    },
+    { source: 'taux-d-exploitation', marque: 'camembert', taille: 'pleine' },
+    { source: 'repartition-statuts-qualification', marque: 'camembert', taille: 'pleine' },
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
     'couverture-derniere-campagne',
@@ -320,6 +312,7 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   ],
   'grand-public': [
     'taux-de-joignabilite',
+    'taux-de-qualification',
     'prospects-notes',
     'adhesions',
     'par-teleconseiller',
@@ -330,11 +323,26 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   ],
 };
 
-/** Les montants, ajoutés en fin d'écran pour l'administrateur et la direction. */
-const USINE_MONTANTS: Record<DashboardEcran, readonly DashboardSource[]> = {
+/**
+ * Ce que la direction voit EN PLUS. EB-32 a déplacé campagne/rendement dans
+ * `USINE` (visibles aussi en supervision) ; ce bloc ne garde que le reste.
+ */
+const USINE_DIRECTION: Record<DashboardEcran, readonly WidgetUsine[]> = {
   visites: [],
-  chues: ['encaisse', 'de-l-appel-a-l-encaissement'],
-  'grand-public': ['encaisse', 'de-l-appel-a-l-encaissement'],
+  chues: [
+    'encaisse',
+    'taux-de-rappel',
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
+    'de-l-appel-a-l-encaissement',
+  ],
+  'grand-public': [
+    { source: 'encaisse', taille: 'demi' },
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
+    'de-l-appel-a-l-encaissement',
+    'methodes-d-adhesion',
+  ],
 };
 
 function widgetUsine(item: WidgetUsine): DispositionWidget {
@@ -345,7 +353,7 @@ export function dispositionUsine(
   ecran: DashboardEcran,
   voitLesMontants = false,
 ): DispositionLayout {
-  const sources = voitLesMontants ? [...USINE[ecran], ...USINE_MONTANTS[ecran]] : USINE[ecran];
+  const sources = voitLesMontants ? [...USINE[ecran], ...USINE_DIRECTION[ecran]] : USINE[ecran];
   return {
     version: LAYOUT_VERSION,
     preset: 'essentiel',

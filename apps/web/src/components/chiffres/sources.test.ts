@@ -69,8 +69,11 @@ const ouverture = (
 describe('les cartes du lot 2', () => {
   it('lit le taux de qualification sur les fiches ouvertes, « Sans objet » sans ouverture', () => {
     const carte = chues['taux-de-qualification'];
-    expect(carte?.extraire({ ouvertures: [ouverture('Awa', 10, 8, 60), ouverture('Ba', 10, 7, 60)] }))
-      .toMatchObject({ donnee: { valeur: 75, libelle: '75,0 % · 15 qualifiées sur 20 fiches ouvertes' } });
+    expect(
+      carte?.extraire({ ouvertures: [ouverture('Awa', 10, 8, 60), ouverture('Ba', 10, 7, 60)] }),
+    ).toMatchObject({
+      donnee: { valeur: 75, affichage: '75,0 %', libelle: '15 qualifiées sur 20 fiches ouvertes' },
+    });
     expect(carte?.extraire({ ouvertures: [] })).toMatchObject({
       donnee: { affichage: 'Sans objet' },
     });
@@ -117,7 +120,7 @@ describe('les cartes du lot 2', () => {
     });
   });
 
-  it('fait une part par campagne pour le taux d’exploitation', () => {
+  it('fait un camembert par campagne pour le taux d’exploitation', () => {
     const campagne = (id: string, name: string, prevues: number, traitees: number) => ({
       id,
       name,
@@ -136,17 +139,31 @@ describe('les cartes du lot 2', () => {
     };
 
     expect(chues['taux-d-exploitation']?.extraire({ campagnes })).toEqual({
-      forme: 'classement',
+      forme: 'composition',
       donnee: [
-        { id: 'a', label: 'Dakar', value: 30 },
-        { id: 'b', label: 'Thiès', value: 5 },
+        {
+          id: 'a',
+          ligne: 'Dakar',
+          detail: '30 traitées sur 50 · 60,0 %',
+          segments: [
+            { id: 'traitees', label: 'Traitées', value: 30 },
+            { id: 'restantes', label: 'Restantes', value: 20 },
+          ],
+        },
+        {
+          id: 'b',
+          ligne: 'Thiès',
+          detail: '5 traitées sur 20 · 25,0 %',
+          segments: [
+            { id: 'traitees', label: 'Traitées', value: 5 },
+            { id: 'restantes', label: 'Restantes', value: 15 },
+          ],
+        },
       ],
     });
-    expect(chues['exploitation-par-campagne']?.extraire({ campagnes })).toMatchObject({
-      donnee: [{ ligne: 'Dakar', segments: [{ value: 30 }, { value: 20 }] }, { ligne: 'Thiès' }],
-    });
+    expect(chues['taux-d-exploitation']?.lien?.('a')).toBe('/chues/campagnes/a');
     expect(chues['taux-de-contact']?.extraire({ campagnes })).toMatchObject({
-      donnee: { valeur: 50, libelle: '50,0 % · 35 appelées sur 70 fiches prévues' },
+      donnee: { valeur: 50, affichage: '50,0 %', libelle: '35 appelées sur 70 fiches prévues' },
     });
   });
 });

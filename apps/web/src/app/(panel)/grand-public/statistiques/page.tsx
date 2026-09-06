@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 
 import { ChiffresView } from '@/components/chiffres/vue';
 import { PermissionDenied } from '@/components/permission-denied';
+import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Tableau de bord Grand Public' };
@@ -14,5 +15,10 @@ export default async function ChiffresGrandPublicPage() {
     return <PermissionDenied role={guard.user.role} what="Les chiffres du projet Grand Public" />;
   }
 
-  return <ChiffresView ecran="grand-public" role={guard.user.role} />;
+  return (
+    <div className="flex flex-col gap-6">
+      <OngletsPilotage coque="grand-public" />
+      <ChiffresView ecran="grand-public" role={guard.user.role} />
+    </div>
+  );
 }

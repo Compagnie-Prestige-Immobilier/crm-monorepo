@@ -62,8 +62,6 @@ enum DashboardSource {
   joignabiliteParCreneau(r'joignabilite-par-creneau'),
   @JsonValue(r'taux-d-exploitation')
   tauxDExploitation(r'taux-d-exploitation'),
-  @JsonValue(r'exploitation-par-campagne')
-  exploitationParCampagne(r'exploitation-par-campagne'),
   @JsonValue(r'representants-par-departement')
   representantsParDepartement(r'representants-par-departement'),
   @JsonValue(r'representants-par-ief')
