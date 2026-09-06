@@ -87,13 +87,18 @@ enum Phase2Status {
   WRONG_NUMBER
 }
 
+/// Les CODES sont immuables : l'historique des tentatives les designe. Seuls
+/// leurs libelles suivent EB-24, dans `phase2-labels.ts`. `PHYSICAL` n'est plus
+/// proposable, mais ses lignes gardent leur valeur : les convertir en
+/// `APPOINTMENT` leur inventerait une date de rendez-vous qui n'a jamais existe.
 enum EnrollmentMethod {
   PLATFORM
   PHYSICAL
   VOICE_OR_ELECTRONIC_MESSAGING
-  /// Prise de rendez-vous. Seule methode qui exige une date : `rendezVousAt`
-  /// sur la tentative, contrainte CHECK comprise.
+  /// RDV CPI. Seule methode qui exige une date : `rendezVousAt` sur la
+  /// tentative, contrainte CHECK comprise.
   APPOINTMENT
+  WHATSAPP
 }
 
 // BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés
@@ -752,6 +757,10 @@ model Prospect {
   /// Hors CHUES seulement. Voir `ProspectType`.
   type ProspectType?
 
+  /// L'etablissement ou il exerce, tel qu'il le declare. Meme champ que sur
+  /// `Representant`, et facultatif pour la meme raison.
+  etablissement String?
+
   /// Le metier declare, en clair. Pas un referentiel : la variete du secteur
   /// informel n'en supporterait pas un, et une liste fermee ferait saisir
   /// « autre » partout.
@@ -786,9 +795,15 @@ model Prospect {
   paysResidenceId String?
   paysResidence   Pays?   @relation(fields: [paysResidenceId], references: [id], onDelete: Restrict)
   villeResidence  String?
-  whatsappE164    String?
   relaisNom       String?
   relaisPhoneE164 String?
+
+  // Meme invariant que sur `Representant`, pose en CHECK dans la migration :
+  // `whatsappE164` est renseigne SI ET SEULEMENT SI `whatsappStatus` vaut
+  // AUTRE_NUMERO. Sur MEME_NUMERO la colonne reste NULLE, recopier `phoneE164`
+  // creerait une seconde verite qui divergerait a la premiere correction.
+  whatsappStatus WhatsappStatus @default(NON_DEMANDE)
+  whatsappE164   String?
 
   paymentMode PaymentMode?
 

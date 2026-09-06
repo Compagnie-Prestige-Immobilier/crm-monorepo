@@ -14,6 +14,7 @@ import 'package:crm_api_client/src/model/prospect_journey_dto.dart';
 import 'package:crm_api_client/src/model/prospect_statut.dart';
 import 'package:crm_api_client/src/model/type_contrat.dart';
 import 'package:crm_api_client/src/model/enrollment_method.dart';
+import 'package:crm_api_client/src/model/whatsapp_status.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -98,7 +99,13 @@ class ProspectDto {
 
     required this.villeResidence,
 
+    required this.etablissement,
+
+    required this.whatsappStatus,
+
     required this.whatsappE164,
+
+    required this.whatsappNumber,
 
     required this.relaisNom,
 
@@ -289,8 +296,24 @@ class ProspectDto {
   @JsonKey(name: r'villeResidence', required: true, includeIfNull: true)
   final String? villeResidence;
 
+  @JsonKey(name: r'etablissement', required: true, includeIfNull: true)
+  final String? etablissement;
+
+  @JsonKey(
+    name: r'whatsappStatus',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: WhatsappStatus.unknownDefaultOpenApi,
+  )
+  final WhatsappStatus whatsappStatus;
+
+  /// Renseigné avec le seul statut AUTRE_NUMERO.
   @JsonKey(name: r'whatsappE164', required: true, includeIfNull: true)
   final String? whatsappE164;
+
+  /// Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon.
+  @JsonKey(name: r'whatsappNumber', required: true, includeIfNull: true)
+  final String? whatsappNumber;
 
   @JsonKey(name: r'relaisNom', required: true, includeIfNull: true)
   final String? relaisNom;
@@ -449,7 +472,10 @@ class ProspectDto {
                 paysResidenceId,
                 paysResidenceLabel,
                 villeResidence,
+                etablissement,
+                whatsappStatus,
                 whatsappE164,
+                whatsappNumber,
                 relaisNom,
                 relaisPhoneE164,
                 journeys,
@@ -512,7 +538,10 @@ class ProspectDto {
                 other.paysResidenceId,
                 other.paysResidenceLabel,
                 other.villeResidence,
+                other.etablissement,
+                other.whatsappStatus,
                 other.whatsappE164,
+                other.whatsappNumber,
                 other.relaisNom,
                 other.relaisPhoneE164,
                 other.journeys,
@@ -581,7 +610,10 @@ class ProspectDto {
         paysResidenceId,
         paysResidenceLabel,
         villeResidence,
+        etablissement,
+        whatsappStatus,
         whatsappE164,
+        whatsappNumber,
         relaisNom,
         relaisPhoneE164,
         journeys,

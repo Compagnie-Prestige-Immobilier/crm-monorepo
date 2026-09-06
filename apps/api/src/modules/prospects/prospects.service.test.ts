@@ -1,5 +1,5 @@
 import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
-import { GrandPublicConsent, Role } from '@crm/database';
+import { GrandPublicConsent, Role, WhatsappStatus } from '@crm/database';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PrismaService } from '../../prisma/prisma.service.js';
@@ -626,10 +626,43 @@ describe('effacement d’un champ de situation', () => {
     expect(data).not.toHaveProperty('syndicatId');
   });
 
+  // La colonne dédiée reste nulle sur MEME_NUMERO : la fiche doit tout de même
+  // rendre un numéro joignable, sinon l'écran conclut « pas de WhatsApp ».
+  it('la fiche renvoie le numéro WhatsApp recomposé', async () => {
+    prisma.prospect.update.mockResolvedValue(
+      prospectRow({ whatsappStatus: WhatsappStatus.MEME_NUMERO, whatsappE164: null }),
+    );
+
+    const dto = await service(prisma).update(alice, 'p-1', { prenom: 'Awa' });
+
+    expect(dto.whatsappE164).toBeNull();
+    expect(dto.whatsappNumber).toBe('+221771234567');
+  });
+
+  it('l’établissement se corrige et se vide', async () => {
+    await service(prisma).update(alice, 'p-1', { etablissement: ' CEM Kaolack ' });
+    expect(firstArg(prisma.prospect.update).data?.etablissement).toBe('CEM Kaolack');
+
+    await service(prisma).update(alice, 'p-1', { etablissement: null });
+    expect(prisma.prospect.update.mock.calls[1]?.[0]?.data?.etablissement).toBeNull();
+  });
+
   it('un numéro renseigné est toujours normalisé', async () => {
+    await service(prisma).update(alice, 'p-1', { whatsappE164: '77 555 44 33' });
+
+    const data = firstArg(prisma.prospect.update).data ?? {};
+    expect(data.whatsappE164).toBe('+221775554433');
+    expect(data.whatsappStatus).toBe(WhatsappStatus.AUTRE_NUMERO);
+  });
+
+  // EB-23 : la colonne reste NULLE quand le WhatsApp est le numéro appelé. Une
+  // copie de `phoneE164` désignerait un autre abonné à la première correction.
+  it('le numéro du prospect lui-même se range en MEME_NUMERO, colonne vide', async () => {
     await service(prisma).update(alice, 'p-1', { whatsappE164: '77 123 45 67' });
 
-    expect(firstArg(prisma.prospect.update).data?.whatsappE164).toBe('+221771234567');
+    const data = firstArg(prisma.prospect.update).data ?? {};
+    expect(data.whatsappE164).toBeNull();
+    expect(data.whatsappStatus).toBe(WhatsappStatus.MEME_NUMERO);
   });
 });
 
@@ -776,6 +809,21 @@ describe('le panneau sait saisir une fiche Grand Public', () => {
     expect(data.profession).toBe('Couturière');
     expect(data.dureeSystemeMois).toBe(24);
     expect(data.canalProvenanceId).toBe('canal-tiktok');
+  });
+
+  // EB-20 : le champ existait sur la fiche représentant seule.
+  it('l’établissement saisi à la création est enregistré sur la fiche', async () => {
+    prisma.prospect.findFirst.mockResolvedValue(null);
+    prisma.prospect.create.mockResolvedValue(prospectRow({}));
+
+    await service(prisma).create(alice, {
+      nom: 'Diop',
+      prenom: 'Awa',
+      phone: '771234567',
+      etablissement: '  Lycée Blaise Diagne ',
+    });
+
+    expect(firstArg(prisma.prospect.create).data?.etablissement).toBe('Lycée Blaise Diagne');
   });
 
   it('sans représentant, l’annuaire n’est pas interrogé du tout', async () => {

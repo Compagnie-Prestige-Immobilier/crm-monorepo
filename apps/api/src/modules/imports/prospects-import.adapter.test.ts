@@ -177,11 +177,12 @@ describe('méthode d’enrôlement', () => {
     expect(accepted(adapter.parseRow(cells(), 3, run)).enrollmentMethod).toBeNull();
   });
 
-  it('accepte les trois jetons admis', async () => {
+  it('accepte les quatre jetons admis', async () => {
     for (const token of [
+      EnrollmentMethod.APPOINTMENT,
       EnrollmentMethod.PLATFORM,
-      EnrollmentMethod.PHYSICAL,
       EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
+      EnrollmentMethod.WHATSAPP,
     ]) {
       const parser = new ProspectsImportAdapter();
       const runParser = await parser.prepare(fakeImportContext(store));
@@ -195,24 +196,32 @@ describe('méthode d’enrôlement', () => {
 
     expect(error.code).toBe(ProspectImportError.ENROLLMENT_METHOD_UNKNOWN);
     expect(error.column).toBe(H.enrollmentMethod);
-    expect(error.message).toContain('Plateforme');
-    expect(error.message).toContain('Vocal ou messagerie électronique');
+    expect(error.message).toContain('Plateforme en ligne');
+    expect(error.message).toContain('RDV CPI');
+  });
+
+  // EB-24 retire « Physique » : un classeur ancien qui le porte encore est
+  // refusé ligne à ligne, pas rangé en silence sous une autre méthode.
+  it('refuse la méthode retirée « Physique »', () => {
+    const error = refusal(adapter.parseRow(cells({ [H.enrollmentMethod]: 'Physique' }), 3, run));
+
+    expect(error.code).toBe(ProspectImportError.ENROLLMENT_METHOD_UNKNOWN);
   });
 
   it('accepte le LIBELLÉ français, celui du modèle et celui de l’export', () => {
     const row = accepted(
-      adapter.parseRow(cells({ [H.enrollmentMethod]: 'Vocal ou messagerie électronique' }), 3, run),
+      adapter.parseRow(cells({ [H.enrollmentMethod]: 'Plateforme en ligne' }), 3, run),
     );
 
-    expect(row.enrollmentMethod).toBe(EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING);
+    expect(row.enrollmentMethod).toBe(EnrollmentMethod.PLATFORM);
   });
 
   it('tolère la casse et les accents sur le libellé', () => {
     const row = accepted(
-      adapter.parseRow(cells({ [H.enrollmentMethod]: 'vocal ou messagerie electronique' }), 3, run),
+      adapter.parseRow(cells({ [H.enrollmentMethod]: 'plateforme en ligne' }), 3, run),
     );
 
-    expect(row.enrollmentMethod).toBe(EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING);
+    expect(row.enrollmentMethod).toBe(EnrollmentMethod.PLATFORM);
   });
 
   // Le modèle propose le libellé, l'export l'écrit : les deux doivent tomber
@@ -229,14 +238,14 @@ describe('méthode d’enrôlement', () => {
 describe('modèle de la colonne « Méthode d’enrôlement »', () => {
   it('propose les libellés français, jamais les jetons techniques', () => {
     expect(ENROLLMENT_METHOD_TOKENS).toEqual([
-      'Plateforme',
-      'Physique',
-      'Vocal ou messagerie électronique',
-      'Prise de rendez-vous',
+      'RDV CPI',
+      'Plateforme en ligne',
+      'Mail',
+      'WhatsApp',
     ]);
 
     const colonne = PROSPECTS_IMPORT_COLUMNS.find((column) => column.header === H.enrollmentMethod);
-    expect(colonne?.sample).toBe('Plateforme');
+    expect(colonne?.sample).toBe('Plateforme en ligne');
     expect(colonne?.help).not.toContain('VOICE_OR_ELECTRONIC_MESSAGING');
   });
 });
@@ -354,14 +363,14 @@ describe('écriture d’une tranche', () => {
   it('satisfait le CHECK de phase 2 quand la méthode est fournie', async () => {
     const ctx = fakeImportContext(store);
     const row = accepted(
-      adapter.parseRow(cells({ [H.enrollmentMethod]: EnrollmentMethod.PHYSICAL }), 3, run),
+      adapter.parseRow(cells({ [H.enrollmentMethod]: EnrollmentMethod.WHATSAPP }), 3, run),
     );
 
     await adapter.writeChunk([row], ctx, run);
 
     expect(store.prospects[0]).toMatchObject({
       phase2Status: Phase2Status.METHOD_OBTAINED,
-      enrollmentMethod: EnrollmentMethod.PHYSICAL,
+      enrollmentMethod: EnrollmentMethod.WHATSAPP,
       enrollmentCapturedById: 'user-admin',
     });
     expect(store.prospects[0]?.enrollmentCapturedAt).toBeInstanceOf(Date);

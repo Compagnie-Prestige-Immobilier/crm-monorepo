@@ -4430,7 +4430,8 @@ export interface components {
     /** @enum {string} */
     Phase2Status: 'PENDING' | 'METHOD_OBTAINED' | 'REFUSED' | 'WRONG_NUMBER';
     /** @enum {string} */
-    EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT';
+    EnrollmentMethod:
+      'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | 'WHATSAPP';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
@@ -4507,7 +4508,12 @@ export interface components {
       paysResidenceId: string | null;
       paysResidenceLabel: string | null;
       villeResidence: string | null;
+      etablissement: string | null;
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
       whatsappE164: string | null;
+      /** @description Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon. */
+      whatsappNumber: string | null;
       relaisNom: string | null;
       relaisPhoneE164: string | null;
       journeys: components['schemas']['ProspectJourneyDto'][];
@@ -4620,6 +4626,8 @@ export interface components {
        * @description Profession choisie dans le référentiel.
        */
       professionId?: string;
+      /** @description Établissement où le prospect exerce. */
+      etablissement?: string;
       /**
        * Format: uuid
        * @description Tranche de revenu mensuel déclaré.
@@ -4758,6 +4766,7 @@ export interface components {
       /** Format: uuid */
       paysResidenceId?: string | null;
       villeResidence?: string | null;
+      etablissement?: string | null;
       whatsappE164?: string | null;
       relaisNom?: string | null;
       relaisPhoneE164?: string | null;
@@ -7520,7 +7529,13 @@ export interface components {
         | 'WRONG_NUMBER'
         | 'OTHER';
       /** @enum {string|null} */
-      method: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | null;
+      method:
+        | 'PLATFORM'
+        | 'PHYSICAL'
+        | 'VOICE_OR_ELECTRONIC_MESSAGING'
+        | 'APPOINTMENT'
+        | 'WHATSAPP'
+        | null;
       comment: string | null;
       performedByName: string;
       createdAt: string;

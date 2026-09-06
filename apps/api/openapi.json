@@ -24028,7 +24028,7 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"]
+        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT", "WHATSAPP"]
       },
       "ProspectSortField": {
         "type": "string",
@@ -24264,9 +24264,26 @@
             "type": "string",
             "nullable": true
           },
-          "whatsappE164": {
+          "etablissement": {
             "type": "string",
             "nullable": true
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Renseigné avec le seul statut AUTRE_NUMERO."
+          },
+          "whatsappNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon."
           },
           "relaisNom": {
             "type": "string",
@@ -24445,7 +24462,10 @@
           "paysResidenceId",
           "paysResidenceLabel",
           "villeResidence",
+          "etablissement",
+          "whatsappStatus",
           "whatsappE164",
+          "whatsappNumber",
           "relaisNom",
           "relaisPhoneE164",
           "journeys",
@@ -24662,6 +24682,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Profession choisie dans le référentiel."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où le prospect exerce."
           },
           "incomeBandId": {
             "type": "string",
@@ -24985,6 +25010,11 @@
           "villeResidence": {
             "type": "string",
             "maxLength": 120,
+            "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
             "nullable": true
           },
           "whatsappE164": {
@@ -32384,7 +32414,13 @@
           },
           "method": {
             "type": "string",
-            "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"],
+            "enum": [
+              "PLATFORM",
+              "PHYSICAL",
+              "VOICE_OR_ELECTRONIC_MESSAGING",
+              "APPOINTMENT",
+              "WHATSAPP"
+            ],
             "nullable": true
           },
           "comment": {
