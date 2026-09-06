@@ -34,6 +34,7 @@ export const PURGE_STEP_ORDER = [
   'syncBatches',
   'auditLogs',
   'commercialAccounts',
+  'chargeClienteleAccounts',
   'financeAccounts',
   'supervisionAccounts',
   'directionAccounts',
@@ -62,6 +63,7 @@ export type PurgeStepKey = (typeof PURGE_STEP_ORDER)[number];
 
 export const PURGE_DOMAIN_KEYS = [
   'teleconseillers',
+  'chargesClientele',
   'finances',
   'supervision',
   'directionAccueil',
@@ -180,6 +182,13 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     label: 'Comptes téléconseillers',
     hint: 'Comptes et tout ce qu’ils ont saisi.',
     steps: ['commercialAccounts'],
+    requires: ['dossiers', 'tentatives', 'fileAppels', 'lotsExport', 'prospects', 'representants'],
+  },
+  {
+    key: 'chargesClientele',
+    label: 'Comptes chargés de clientèle',
+    hint: 'Comptes du closing et tout ce qu’ils ont saisi.',
+    steps: ['chargeClienteleAccounts'],
     requires: ['dossiers', 'tentatives', 'fileAppels', 'lotsExport', 'prospects', 'representants'],
   },
   {

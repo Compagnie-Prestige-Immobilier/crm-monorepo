@@ -20,7 +20,8 @@ import '../../../core/utils/relative_time.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
-import '../../../core/utils/whatsapp.dart' show kProfessionMaxLength;
+import '../../../core/utils/whatsapp.dart'
+    show WhatsappStatus, kProfessionMaxLength;
 import '../../../data/local/database.dart';
 import '../../../data/repositories/draft_repository.dart';
 import '../../../data/repositories/ouverture_repository.dart';
@@ -30,11 +31,13 @@ import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_choice_group.dart';
 import '../../../ui/widgets/cpi_forui.dart';
 import '../../../ui/widgets/cpi_kit.dart';
+import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/cpi_steps.dart';
 import '../../../ui/widgets/local_typeahead.dart';
 import '../../../ui/widgets/phone_field.dart';
 import '../../representant/presentation/representant_form_screen.dart'
     show kProfessionsFrequentes;
+import '../../shell/projects.dart';
 import '../phase2_controller.dart';
 import 'callback_picker.dart';
 import 'call_audio_recorder.dart';
@@ -138,6 +141,13 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
       _saisie();
       if (mounted) setState(() {});
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _form.grandPublic =
+        ProjectScope.maybeOf(context) == CpiProject.grandPublic;
   }
 
   /// Une lettre tapée ou une case cochée : le brouillon est sale, et c'est de
@@ -587,7 +597,7 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
   Future<void> _openRendezVousSheet(List<CallReason> reasons) async {
     final DateTime? at = await showCpiSheet<DateTime>(
       context,
-      title: 'Prise de rendez-vous',
+      title: 'RDV CPI',
       builder: (BuildContext context) =>
           RendezVousSheet(now: ref.read(clockProvider).now()),
     );
@@ -630,6 +640,7 @@ class Phase2FormFields {
   final TextEditingController banque = TextEditingController();
   final TextEditingController syndicat = TextEditingController();
   final TextEditingController revenu = TextEditingController();
+  final TextEditingController whatsapp = TextEditingController();
 
   final FocusNode nomFocus = FocusNode();
   final FocusNode prenomFocus = FocusNode();
@@ -639,6 +650,7 @@ class Phase2FormFields {
   final FocusNode banqueFocus = FocusNode();
   final FocusNode syndicatFocus = FocusNode();
   final FocusNode revenuFocus = FocusNode();
+  final FocusNode whatsappFocus = FocusNode();
 
   String? banqueId;
   String? syndicatId;
@@ -646,6 +658,14 @@ class Phase2FormFields {
   int? dureeSystemeMois;
   Tri fonctionnaire = Tri.nonDemande;
   Tri engagementEnCours = Tri.nonDemande;
+
+  /// EB-23 : « ce numéro est-il un numéro WhatsApp ? ». Non ouvre un second
+  /// numéro, facultatif.
+  Tri whatsappMemeNumero = Tri.nonDemande;
+
+  /// EB-22 : le Grand Public garde la durée du système de paiement, que la
+  /// conversion CHUES ne demande plus.
+  bool grandPublic = false;
 
   /// Redessine l'étape à chaque frappe des champs qui peuvent la retenir.
   ///
@@ -659,6 +679,7 @@ class Phase2FormFields {
     email.addListener(onChanged);
     profession.addListener(onChanged);
     duree.addListener(onChanged);
+    whatsapp.addListener(onChanged);
   }
 
   String? get erreurEmail {
@@ -678,17 +699,41 @@ class Phase2FormFields {
         : 'De 0 à $kDureeEtablissementMaxMois mois';
   }
 
+  /// Le second numéro reste FACULTATIF : vide, la réponse « non » vaut « pas de
+  /// WhatsApp ». Écrit à moitié, elle ne vaut rien et se reproche.
+  String? get erreurWhatsapp {
+    if (whatsappMemeNumero != Tri.non) return null;
+    if (whatsapp.text.trim().isEmpty) return null;
+    return Phone.parse(whatsapp.text) is PhoneValid
+        ? null
+        : 'Numéro incomplet';
+  }
+
+  /// Le couple EB-23 tel qu'il part. `null` quand la question n'a pas été
+  /// posée : le serveur laisse alors la fiche telle quelle.
+  String? get whatsappStatus => switch (whatsappMemeNumero) {
+    Tri.oui => WhatsappStatus.memeNumero.code,
+    Tri.non => whatsappE164 == null
+        ? WhatsappStatus.aucun.code
+        : WhatsappStatus.autreNumero.code,
+    Tri.nonDemande => null,
+  };
+
+  String? get whatsappE164 =>
+      whatsappMemeNumero == Tri.non ? Phone.toE164(whatsapp.text) : null;
+
   /// Ce qui manque à l'identité. L'e-mail reste FACULTATIF : il n'est reproché
   /// que mal écrit.
   String? get manqueQui {
     if (nom.text.trim().isEmpty) return 'Indiquez le nom';
     if (prenom.text.trim().isEmpty) return 'Indiquez le prénom';
-    return erreurEmail == null ? null : 'Vérifiez l\'e-mail';
+    if (erreurEmail != null) return 'Vérifiez l\'e-mail';
+    return erreurWhatsapp == null ? null : 'Vérifiez le numéro WhatsApp';
   }
 
   String? get manqueTravail {
     if (profession.text.trim().isEmpty) return 'Indiquez la profession';
-    if (duree.text.trim().isEmpty) return 'Indiquez l\'ancienneté';
+    if (duree.text.trim().isEmpty) return 'Indiquez la durée dans la fonction';
     if (erreurDuree != null) return 'Vérifiez la durée en mois';
     return fonctionnaire.value == null ? 'Répondez à « Fonctionnaire »' : null;
   }
@@ -700,6 +745,7 @@ class Phase2FormFields {
       return 'Répondez à « Engagement en cours »';
     }
     if (incomeBandId == null) return 'Choisissez le revenu mensuel';
+    if (!grandPublic) return null;
     return dureeSystemeMois == null ? 'Choisissez la durée du système' : null;
   }
 
@@ -722,10 +768,11 @@ class Phase2FormFields {
     CpiRecapLine('Téléphone', telephone.text),
     CpiRecapLine('Profession', profession.text),
     CpiRecapLine('Revenu mensuel', revenu.text),
-    CpiRecapLine(
-      'Durée du système',
-      dureeSystemeMois == null ? null : formatDureeMois(dureeSystemeMois!),
-    ),
+    if (grandPublic)
+      CpiRecapLine(
+        'Durée du système',
+        dureeSystemeMois == null ? null : formatDureeMois(dureeSystemeMois!),
+      ),
   ];
 
   Phase2Renseignements read() => Phase2Renseignements(
@@ -739,7 +786,9 @@ class Phase2FormFields {
     banqueId: banqueId,
     engagementEnCours: engagementEnCours.value,
     incomeBandId: incomeBandId,
-    dureeSystemeMois: dureeSystemeMois,
+    dureeSystemeMois: grandPublic ? dureeSystemeMois : null,
+    whatsappStatus: whatsappStatus,
+    whatsappE164: whatsappE164,
   );
 
   /// Reprend ce que la fiche locale sait déjà, sans jamais écraser une saisie.
@@ -797,6 +846,8 @@ class Phase2FormFields {
     'revenu': revenu.text,
     'incomeBandId': incomeBandId,
     'dureeSystemeMois': dureeSystemeMois,
+    'whatsapp': whatsapp.text,
+    'whatsappMemeNumero': whatsappMemeNumero.name,
     'fonctionnaire': fonctionnaire.name,
     'engagementEnCours': engagementEnCours.name,
   };
@@ -821,6 +872,8 @@ class Phase2FormFields {
     dureeSystemeMois = valeurs['dureeSystemeMois'] is num
         ? (valeurs['dureeSystemeMois']! as num).toInt()
         : null;
+    whatsapp.text = texte('whatsapp');
+    whatsappMemeNumero = _tri(valeurs['whatsappMemeNumero']);
     fonctionnaire = _tri(valeurs['fonctionnaire']);
     engagementEnCours = _tri(valeurs['engagementEnCours']);
   }
@@ -836,6 +889,7 @@ class Phase2FormFields {
     syndicatId = null;
     incomeBandId = null;
     dureeSystemeMois = null;
+    whatsappMemeNumero = Tri.nonDemande;
     fonctionnaire = Tri.nonDemande;
     engagementEnCours = Tri.nonDemande;
   }
@@ -859,6 +913,7 @@ class Phase2FormFields {
     banque,
     syndicat,
     revenu,
+    whatsapp,
   ];
 
   List<FocusNode> get _focusNodes => <FocusNode>[
@@ -870,6 +925,7 @@ class Phase2FormFields {
     banqueFocus,
     syndicatFocus,
     revenuFocus,
+    whatsappFocus,
   ];
 
   static void _fill(TextEditingController controller, String? value) {
@@ -1041,6 +1097,25 @@ class _EtapeRenseignements extends StatelessWidget {
       readOnly: true,
       description: 'Numéro de l\'annuaire',
     ),
+    _ChoixTri(
+      label: 'Ce numéro est-il un numéro WhatsApp ?',
+      value: fields.whatsappMemeNumero,
+      onChanged: (Tri choix) {
+        fields.whatsappMemeNumero = choix;
+        if (choix != Tri.non) fields.whatsapp.clear();
+        onChanged();
+      },
+    ),
+    CpiReveal(
+      visible: fields.whatsappMemeNumero == Tri.non,
+      child: PhoneField(
+        controller: fields.whatsapp,
+        focusNode: fields.whatsappFocus,
+        label: 'Numéro WhatsApp',
+        helper: 'S\'il en a un.',
+        onChanged: (String _) => onChanged(),
+      ),
+    ),
     CpiField(
       label: 'E-mail',
       controller: fields.email,
@@ -1067,7 +1142,7 @@ class _EtapeRenseignements extends StatelessWidget {
       onSelected: (TypeaheadOption _) {},
     ),
     CpiField(
-      label: 'Ancienneté',
+      label: 'Durée dans la fonction',
       controller: fields.duree,
       focusNode: fields.dureeFocus,
       hint: 'Ex. 36',
@@ -1078,7 +1153,6 @@ class _EtapeRenseignements extends StatelessWidget {
         LengthLimitingTextInputFormatter(3),
       ],
       suffix: const Text('mois'),
-      description: 'Dans l\'établissement, en mois',
       error: fields.erreurDuree,
     ),
     _ChoixTri(
@@ -1187,20 +1261,21 @@ class _EtapeRenseignements extends StatelessWidget {
         onChanged();
       },
     ),
-    CpiChoiceGroup<int>(
-      label: 'Durée du système de paiement',
-      value: fields.dureeSystemeMois,
-      options: <CpiChoice<int>>[
-        for (final int mois in kDureesSystemeMois)
-          CpiChoice<int>(value: mois, label: formatDureeMois(mois)),
-      ],
-      onChanged: (int mois) {
-        if (mois == fields.dureeSystemeMois) return;
-        unawaited(HapticFeedback.selectionClick());
-        fields.dureeSystemeMois = mois;
-        onChanged();
-      },
-    ),
+    if (fields.grandPublic)
+      CpiChoiceGroup<int>(
+        label: 'Durée du système de paiement',
+        value: fields.dureeSystemeMois,
+        options: <CpiChoice<int>>[
+          for (final int mois in kDureesSystemeMois)
+            CpiChoice<int>(value: mois, label: formatDureeMois(mois)),
+        ],
+        onChanged: (int mois) {
+          if (mois == fields.dureeSystemeMois) return;
+          unawaited(HapticFeedback.selectionClick());
+          fields.dureeSystemeMois = mois;
+          onChanged();
+        },
+      ),
   ];
 }
 
@@ -1839,7 +1914,7 @@ class _Capture extends StatelessWidget {
         const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
           method: EnrollmentMethods.appointment,
-          title: 'Prise de rendez-vous',
+          title: 'RDV CPI',
           subtitle: 'Choisir la date et l\'heure',
           icon: PhosphorIconsRegular.calendarPlus,
           enabled: enabled,
@@ -1848,27 +1923,27 @@ class _Capture extends StatelessWidget {
         const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
           method: EnrollmentMethods.platform,
-          title: 'Plateforme',
-          subtitle: 'En ligne',
+          title: 'Plateforme en ligne',
+          subtitle: 'Il remplit le formulaire CPI CHUES',
           icon: PhosphorIconsRegular.deviceMobile,
           enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
-          method: EnrollmentMethods.physical,
-          title: 'Physique',
-          subtitle: 'Dossier signé sur place',
-          icon: PhosphorIconsRegular.handshake,
+          method: EnrollmentMethods.voiceOrElectronicMessaging,
+          title: 'Mail',
+          subtitle: 'Il envoie ses informations par e-mail',
+          icon: PhosphorIconsRegular.envelopeSimple,
           enabled: enabled,
           onTap: onMethod,
         ),
         const SizedBox(height: CpiSpacing.sm),
         _MethodCard(
-          method: EnrollmentMethods.voiceOrElectronicMessaging,
-          title: 'Par appel ou message',
-          subtitle: 'Au téléphone ou par SMS',
-          icon: PhosphorIconsRegular.chatCircleText,
+          method: EnrollmentMethods.whatsapp,
+          title: 'WhatsApp',
+          subtitle: 'Il écrit au numéro CPI CHUES',
+          icon: PhosphorIconsRegular.whatsappLogo,
           enabled: enabled,
           onTap: onMethod,
         ),
@@ -2042,7 +2117,7 @@ class _Confirmed extends StatelessWidget {
   }
 }
 
-/// Le contenu de la feuille « Prise de rendez-vous » : un jour au calendrier,
+/// Le contenu de la feuille « RDV CPI » : un jour au calendrier,
 /// une heure à la roue, et rien d'autre.
 ///
 /// Le serveur EXIGE la date sur cette méthode et la refuse sur les autres :

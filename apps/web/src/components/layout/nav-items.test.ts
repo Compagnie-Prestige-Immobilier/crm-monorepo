@@ -163,6 +163,7 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
   // Les deux redirections ne portent aucun garde : elles renvoient vers
   // « Chiffres », qui refuse lui-même qui n'y a pas droit.
   COMMERCIAL: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
+  CHARGE_CLIENTELE: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
   BANQUE_FINANCE: [
     '/chues',
     '/chues/tableau-de-bord',
@@ -984,7 +985,7 @@ describe('boîte de réception, hors coque', () => {
     // La cloche s'affichait à l'ACCUEIL, dont le garde de l'écran ne voulait
     // pas : la pastille menait à un refus de permission.
     expect([...INBOX_ROLES].sort()).toEqual(
-      PANEL_ROLES.filter((role) => role !== 'COMMERCIAL')
+      PANEL_ROLES.filter((role) => role !== 'COMMERCIAL' && role !== 'CHARGE_CLIENTELE')
         .slice()
         .sort(),
     );

@@ -26,6 +26,7 @@ export default async function ProjetChuesPage() {
   const guard = await guardRoles([
     'ADMIN',
     'COMMERCIAL',
+    'CHARGE_CLIENTELE',
     'SUPERVISEUR',
     'DIRECTION',
     'BANQUE_FINANCE',

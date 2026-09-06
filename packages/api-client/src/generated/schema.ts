@@ -1141,6 +1141,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/prospects/{id}/revue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Marque une demande convertie « revue » avant sa transmission à l’enrôlement.
+     * @description La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.
+     */
+    post: operations['marquerProspectRevue'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/prospects/merge': {
     parameters: {
       query?: never;
@@ -3414,7 +3434,14 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR' | 'DIRECTION' | 'ACCUEIL';
+    Role:
+      | 'ADMIN'
+      | 'COMMERCIAL'
+      | 'BANQUE_FINANCE'
+      | 'SUPERVISEUR'
+      | 'DIRECTION'
+      | 'ACCUEIL'
+      | 'CHARGE_CLIENTELE';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -4536,6 +4563,14 @@ export interface components {
       enrollmentCapturedByName: string | null;
       /** Format: date-time */
       enrollmentCapturedAt: string | null;
+      /**
+       * Format: date-time
+       * @description Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.
+       */
+      revueAt: string | null;
+      /** Format: uuid */
+      revueById: string | null;
+      revueByName: string | null;
       /** @description Résultat de la dernière tentative d’appel enregistrée. */
       lastOutcome: components['schemas']['CallOutcome'] | null;
       /** @description Commentaire de cette tentative. */
@@ -7009,6 +7044,7 @@ export interface components {
     /** @enum {string} */
     PurgeDomainKey:
       | 'teleconseillers'
+      | 'chargesClientele'
       | 'finances'
       | 'supervision'
       | 'directionAccueil'
@@ -12048,6 +12084,63 @@ export interface operations {
       };
       /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
       403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  marquerProspectRevue: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
         headers: {
           [name: string]: unknown;
         };

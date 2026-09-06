@@ -191,6 +191,10 @@ const ADMISES: readonly string[] = [
   'ProspectsController.get',
   'ProspectsController.list',
 
+  // EB-31 : la revue d'une demande convertie, avant sa transmission a
+  // l'enrolement. Le chargé de clientèle la marque, la supervision aussi.
+  'ProspectsController.marquerRevue',
+
   'ReferentielsController.bundle',
   'ReferentielsController.listBanques',
   'ReferentielsController.listCanauxProvenance',
@@ -336,6 +340,7 @@ const ADMISES_DIRECTION: readonly string[] = [
       route !== 'AnalyticsController.bankAging' &&
       route !== 'OuverturesController.ouvertes' &&
       route !== 'OuverturesController.liberer' &&
+      route !== 'ProspectsController.marquerRevue' &&
       !ENCADREMENT_DES_CAMPAGNES.includes(route),
   ),
   ...REGISTRE,
@@ -509,6 +514,14 @@ describe('ce qu’un compte d’ACCUEIL atteint, route par route', () => {
   });
 });
 
+describe('ce qu’un CHARGÉ DE CLIENTÈLE atteint, route par route', () => {
+  it('tout ce qu’atteint un téléconseiller, plus la revue des demandes converties', () => {
+    expect(ouvertesDe(Role.CHARGE_CLIENTELE)).toEqual(
+      [...ouvertesDe(Role.COMMERCIAL), 'ProspectsController.marquerRevue'].sort(),
+    );
+  });
+});
+
 describe('ce qu’une DIRECTION atteint, route par route', () => {
   it('exactement l’inventaire, ni plus ni moins', () => {
     expect(ouvertesDe(Role.DIRECTION)).toEqual([...ADMISES_DIRECTION].sort());
@@ -525,6 +538,7 @@ describe('ce qu’une DIRECTION atteint, route par route', () => {
         ...ENCADREMENT_DES_CAMPAGNES,
         'OuverturesController.liberer',
         'OuverturesController.ouvertes',
+        'ProspectsController.marquerRevue',
       ].sort(),
     );
   });

@@ -40,7 +40,7 @@ export class ExportController {
   // ADMIN, COMMERCIAL, DIRECTION : la feuille Synthèse porte les agrégats d'`AnalyticsController`,
   // moins le SUPERVISEUR, écarté ici à dessein — voir `representantsExport` plus bas.
   @Get('prospects.xlsx')
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.DIRECTION)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportProspectsXlsx',
@@ -193,7 +193,7 @@ export class ExportController {
 
   // Le SUPERVISEUR peut exporter l'annuaire qu'il consulte pour travailler hors ligne.
   @Get('representants.xlsx')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportRepresentantsXlsx',

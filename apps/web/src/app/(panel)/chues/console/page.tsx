@@ -9,7 +9,13 @@ export const metadata: Metadata = { title: 'Convertir un prospect' };
 
 /** Étape 3 du projet CHUES : obtenir l'adhésion, prospect par prospect. */
 export default async function ConsolePage() {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+  const guard = await guardRoles([
+    'ADMIN',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'SUPERVISEUR',
+    'DIRECTION',
+  ]);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return (

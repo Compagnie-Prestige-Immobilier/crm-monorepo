@@ -56,7 +56,7 @@ import {
 
 @ApiTags('representants')
 @ApiBearerAuth()
-@Roles(Role.COMMERCIAL, Role.ADMIN)
+@Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN)
 @ApiErrors({ 400: true, 401: true, 403: true })
 @Controller({ path: 'representants', version: '1' })
 export class RepresentantsController {
@@ -66,7 +66,7 @@ export class RepresentantsController {
   ) {}
 
   @Get()
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentants',
     summary: 'Liste paginée de l’annuaire, borné aux campagnes de l’appelant.',
@@ -132,7 +132,7 @@ export class RepresentantsController {
   }
 
   @Get(':id')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({ operationId: 'getRepresentant', summary: 'Détail d’un représentant.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: RepresentantDto })
@@ -182,7 +182,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/relation-history')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantRelationChanges',
     summary:
@@ -202,7 +202,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/call-attempts')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantCallAttempts',
     summary: 'Les appels consignés sur une fiche, du plus récent au plus ancien.',
@@ -215,7 +215,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/device-calls')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantDeviceCalls',
     summary: 'Les appels que le journal du téléphone a relevés sur une fiche.',
@@ -231,7 +231,7 @@ export class RepresentantsController {
   }
 
   @Get(':id/comments')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listRepresentantComments',
     summary: 'Fil de commentaires d’une fiche, du plus récent au plus ancien.',

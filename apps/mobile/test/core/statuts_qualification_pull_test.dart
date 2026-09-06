@@ -74,8 +74,8 @@ void main() {
   test('la version déclarée est celle que le serveur compare', () async {
     await engine.pullStatutsQualification();
 
-    expect(api.statutCalls, <int>[7]);
-    expect(SyncEngine.payloadVersion, 7);
+    expect(api.statutCalls, <int>[8]);
+    expect(SyncEngine.payloadVersion, 8);
   });
 
   test('un statut retiré du serveur quitte le miroir', () async {

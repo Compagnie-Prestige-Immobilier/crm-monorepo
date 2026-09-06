@@ -50,6 +50,7 @@ export const PROSPECT_INCLUDE = {
   syndicat: { select: { sigle: true } },
   createdBy: { select: { id: true, fullName: true } },
   enrollmentCapturedBy: { select: { id: true, fullName: true } },
+  revueBy: { select: { fullName: true } },
   lastCallBy: { select: { fullName: true } },
   canalProvenance: { select: { label: true } },
   professionRef: { select: { label: true, isTeaching: true } },
@@ -286,6 +287,9 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     enrollmentCapturedById: row.enrollmentCapturedById,
     enrollmentCapturedByName: enrollmentAuthor.fullName,
     enrollmentCapturedAt: isoOrNull(row.enrollmentCapturedAt),
+    revueAt: isoOrNull(row.revueAt),
+    revueById: row.revueById,
+    revueByName: row.revueBy?.fullName ?? null,
     origin: row.origin,
     originLabel: row.originLabel,
     aRevoirAt: isoOrNull(row.aRevoirAt),
@@ -695,6 +699,33 @@ export class ProspectsService {
         data: { statut: 'CONVERTI', rev: { increment: 1 } },
       }),
     ]);
+    return this.get(user, id);
+  }
+
+  /**
+   * La revue du closing, avant transmission à l'enrôlement.
+   *
+   * `updateMany` sous condition plutôt que `update` : deux revues simultanées
+   * écriraient sinon deux auteurs, et c'est le PREMIER qui a relu la demande.
+   */
+  async marquerRevue(user: AuthenticatedUser, id: string): Promise<ProspectDto> {
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id, deletedAt: null },
+      select: { statut: true },
+    });
+    if (!prospect) {
+      throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
+    }
+    if (prospect.statut !== 'CONVERTI') {
+      throw new BadRequestException({
+        code: 'PROSPECT_REVUE_REQUIRES_CONVERSION',
+        message: 'Seule une demande convertie se revoit.',
+      });
+    }
+    await this.prisma.prospect.updateMany({
+      where: { id, revueAt: null },
+      data: { revueAt: new Date(), revueById: user.id },
+    });
     return this.get(user, id);
   }
 

@@ -9,7 +9,13 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Rappels' };
 
 export default async function RappelsPage() {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+  const guard = await guardRoles([
+    'ADMIN',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'SUPERVISEUR',
+    'DIRECTION',
+  ]);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Les rappels promis" />;

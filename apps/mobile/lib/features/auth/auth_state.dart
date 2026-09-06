@@ -49,6 +49,7 @@ class AuthState {
       Role.SUPERVISEUR => 'Supervision',
       Role.DIRECTION => 'Direction',
       Role.ACCUEIL => 'Accueil',
+      Role.CHARGE_CLIENTELE => 'Chargé de clientèle',
       Role.unknownDefaultOpenApi => raw,
     };
   }

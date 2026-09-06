@@ -438,6 +438,8 @@ abstract final class EnrollmentMethods {
   /// `rendezVousAt`, et la refuse sur toutes les autres.
   static const String appointment = 'APPOINTMENT';
 
+  static const String whatsapp = 'WHATSAPP';
+
   static final List<String> all = EnrollmentMethod.values
       .where(
         (EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi,
