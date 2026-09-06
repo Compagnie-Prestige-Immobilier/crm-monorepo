@@ -1,6 +1,6 @@
 {
   "extends": "./tsconfig.json",
-  // `fake-prisma.ts` est un utilitaire de test : il vit à côté du service qu'il
-  // double, mais n'a rien à faire dans l'artefact de production.
+  // `fake-workspace.ts` sert aux tests d'intégration : il vit à côté du code
+  // qu'il double, mais n'a rien à faire dans l'artefact de production.
   "exclude": ["src/**/*.test.ts", "src/**/fake-*.ts", "src/openapi.ts", "dist", "node_modules"]
 }

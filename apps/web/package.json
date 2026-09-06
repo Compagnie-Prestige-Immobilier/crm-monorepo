@@ -9,9 +9,7 @@
     "start": "next start --port 3000",
     "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
     "typecheck": "tsc -p tsconfig.json --noEmit && tsc -p tsconfig.e2e.json --noEmit",
-    "test:e2e": "playwright test",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage"
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",
@@ -45,17 +43,11 @@
     "@crm/typescript-config": "workspace:*",
     "@playwright/test": "catalog:",
     "@tailwindcss/postcss": "catalog:",
-    "@testing-library/dom": "catalog:",
-    "@testing-library/react": "catalog:",
-    "@testing-library/user-event": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
-    "@vitest/coverage-v8": "catalog:",
-    "jsdom": "catalog:",
     "tailwindcss": "catalog:",
     "tw-animate-css": "catalog:",
-    "typescript": "catalog:",
-    "vitest": "catalog:"
+    "typescript": "catalog:"
   }
 }

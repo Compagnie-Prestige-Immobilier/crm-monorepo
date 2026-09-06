@@ -20,9 +20,9 @@ Campagne du 30 août 2026, sur le commit `e8baacd` avec l'arbre de travail modif
 5. **UI-03 / UI-07** : l'accueil Grand Public affiche « 0 appel du jour » en dur ; les étapes CHUES comptent tout au lieu du reste à faire.
 6. **FOR-04 / FOR-05 / FOR-02 / FOR-01** : le client accepte ce que le serveur refuse (téléphone collé avec indicatif, e-mail à domaine d'une lettre, ancienneté hors bornes, nom de plus de 120 caractères).
 
-## Tests de preuve
+## Scripts de preuve
 
-`apps/mobile/test/qa/` : `qa_form_prospect_test.dart`, `qa_form_phase2_test.dart` (verts, ils constatent l'état actuel) et `qa_sync_preuves.dart` (affirme le comportement attendu : 8 tests sur 11 échouent tant que SYN-01 à SYN-07 sont ouverts ; hors de la découverte de `flutter test` à dessein, se lance par `fvm flutter test test/qa/qa_sync_preuves.dart`). Scripts HTTP : `syn01.sh`, `syn02.sh` (mot de passe des comptes de recette lu dans `SEED_FIXTURE_PASSWORD`).
+Scripts HTTP : `syn01.sh`, `syn02.sh` (mot de passe des comptes de recette lu dans `SEED_FIXTURE_PASSWORD`). Les tests Dart de preuve ont été retirés avec la suite unitaire mobile.
 
 ## Classement
 
