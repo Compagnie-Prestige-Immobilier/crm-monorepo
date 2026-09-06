@@ -185,16 +185,151 @@ function errorsCaption(report: ImportJobReport): string {
   )}. Corrigez celles-ci et redéposez le fichier : les suivantes apparaîtront.`;
 }
 
+function UploadCard({
+  kind,
+  onKindChange,
+  inputRef,
+  pending,
+  templatePending,
+  onDownloadTemplate,
+  onFile,
+}: {
+  kind: UploadableImportKind;
+  onKindChange: (next: UploadableImportKind) => void;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  pending: boolean;
+  templatePending: boolean;
+  onDownloadTemplate: (template: NonNullable<(typeof IMPORT_TEMPLATES)[UploadableImportKind]>) => void;
+  onFile: (candidate: File | null) => void;
+}) {
+  const inputId = useId();
+  const selectId = useId();
+  const [dragging, setDragging] = useState(false);
+  const selectedTemplate = IMPORT_TEMPLATES[kind];
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-[1.0625rem]">Déposer un classeur</CardTitle>
+        <CardDescription>
+          Le fichier est d’abord simulé. Rien n’est écrit tant que vous n’avez pas confirmé
+          l’application.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex min-w-56 flex-col gap-1.5">
+            <Label htmlFor={selectId}>Entité à importer</Label>
+            <Select
+              items={KIND_OPTIONS}
+              value={kind}
+              onValueChange={(next) => {
+                // Base UI rend `value | null` : un `null` remet à vide, et
+                // l'écran n'a pas d'état « aucune entité ».
+                if (next !== null) onKindChange(next);
+              }}
+            >
+              <SelectTrigger id={selectId}>
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {KIND_OPTIONS.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {selectedTemplate === undefined ? null : (
+            <Button
+              type="button"
+              variant="outline"
+              disabled={templatePending}
+              onClick={() => {
+                onDownloadTemplate(selectedTemplate);
+              }}
+            >
+              {templatePending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <DownloadIcon aria-hidden="true" />
+              )}
+              Télécharger le modèle
+            </Button>
+          )}
+        </div>
+
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {IMPORT_HINTS[kind]} {formatNumber(IMPORT_MAX_ROWS[kind])} lignes au maximum.
+        </p>
+
+        {/* Le champ de fichier double la zone de dépôt : le glisser-déposer
+            n'est pas atteignable au clavier. */}
+        {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
+        <label
+          htmlFor={inputId}
+          onDragOver={(event) => {
+            event.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => {
+            setDragging(false);
+          }}
+          onDrop={(event) => {
+            event.preventDefault();
+            setDragging(false);
+            onFile(event.dataTransfer.files.item(0));
+          }}
+          className={cn(
+            'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
+            'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
+            'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+            dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
+          )}
+        >
+          <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
+          <span className="text-[0.9375rem] font-[600]">
+            Glissez le classeur ici, ou choisissez un fichier
+          </span>
+          <span className="text-[0.8125rem] text-muted-foreground">
+            Format .xlsx, 25 Mo au maximum.
+          </span>
+          <input
+            id={inputId}
+            ref={inputRef}
+            type="file"
+            accept={ACCEPTED}
+            className="sr-only"
+            disabled={pending}
+            onChange={(event) => {
+              onFile(event.target.files?.item(0) ?? null);
+              // Vidé pour que redéposer le même fichier corrigé émette bien un
+              // nouvel évènement `change`.
+              event.target.value = '';
+            }}
+          />
+        </label>
+
+        {pending ? (
+          <p role="status" className="flex items-center gap-2 text-[0.875rem]">
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            Envoi du classeur…
+          </p>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
 export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: UploadableImportKind }) {
   const queryClient = useQueryClient();
   const live = useLive({ topic: 'imports' });
-  const inputId = useId();
-  const selectId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const template = useFileDownload();
 
   const [kind, setKind] = useState<UploadableImportKind>(initialKind);
-  const [dragging, setDragging] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
 
@@ -265,126 +400,23 @@ export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: Uploa
     deposit.mutate({ kind, file: candidate });
   }
 
-  const selectedTemplate = IMPORT_TEMPLATES[kind];
-
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-[1.0625rem]">Déposer un classeur</CardTitle>
-          <CardDescription>
-            Le fichier est d’abord simulé. Rien n’est écrit tant que vous n’avez pas confirmé
-            l’application.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="flex min-w-56 flex-col gap-1.5">
-              <Label htmlFor={selectId}>Entité à importer</Label>
-              <Select
-                items={KIND_OPTIONS}
-                value={kind}
-                onValueChange={(next) => {
-                  // Base UI rend `value | null` : un `null` remet à vide, et
-                  // l'écran n'a pas d'état « aucune entité ».
-                  if (next !== null) setKind(next);
-                }}
-              >
-                <SelectTrigger id={selectId}>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {KIND_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {selectedTemplate === undefined ? null : (
-              <Button
-                type="button"
-                variant="outline"
-                disabled={template.pending}
-                onClick={() => {
-                  void template.download({
-                    url: selectedTemplate.url,
-                    fileName: selectedTemplate.fileName,
-                    failureMessage: 'Le modèle n’a pas pu être généré.',
-                  });
-                }}
-              >
-                {template.pending ? (
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <DownloadIcon aria-hidden="true" />
-                )}
-                Télécharger le modèle
-              </Button>
-            )}
-          </div>
-
-          <p className="text-[0.8125rem] text-muted-foreground">
-            {IMPORT_HINTS[kind]} {formatNumber(IMPORT_MAX_ROWS[kind])} lignes au maximum.
-          </p>
-
-          {/* Le champ de fichier double la zone de dépôt : le glisser-déposer
-              n'est pas atteignable au clavier. */}
-          {/* oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- input de fichier associé */}
-          <label
-            htmlFor={inputId}
-            onDragOver={(event) => {
-              event.preventDefault();
-              setDragging(true);
-            }}
-            onDragLeave={() => {
-              setDragging(false);
-            }}
-            onDrop={(event) => {
-              event.preventDefault();
-              setDragging(false);
-              accept(event.dataTransfer.files.item(0));
-            }}
-            className={cn(
-              'flex cursor-pointer flex-col items-center gap-2 rounded-lg border-2 border-dashed p-8 text-center',
-              'transition-colors duration-(--dur-1) ease-(--ease-out-cpi)',
-              'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-              dragging ? 'border-primary bg-secondary' : 'border-border hover:bg-secondary/50',
-            )}
-          >
-            <UploadIcon className="size-7 text-muted-foreground" aria-hidden="true" />
-            <span className="text-[0.9375rem] font-[600]">
-              Glissez le classeur ici, ou choisissez un fichier
-            </span>
-            <span className="text-[0.8125rem] text-muted-foreground">
-              Format .xlsx, 25 Mo au maximum.
-            </span>
-            <input
-              id={inputId}
-              ref={inputRef}
-              type="file"
-              accept={ACCEPTED}
-              className="sr-only"
-              disabled={deposit.isPending}
-              onChange={(event) => {
-                accept(event.target.files?.item(0) ?? null);
-                // Vidé pour que redéposer le même fichier corrigé émette bien un
-                // nouvel évènement `change`.
-                event.target.value = '';
-              }}
-            />
-          </label>
-
-          {deposit.isPending ? (
-            <p role="status" className="flex items-center gap-2 text-[0.875rem]">
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              Envoi du classeur…
-            </p>
-          ) : null}
-        </CardContent>
-      </Card>
+      <UploadCard
+        kind={kind}
+        onKindChange={setKind}
+        inputRef={inputRef}
+        pending={deposit.isPending}
+        templatePending={template.pending}
+        onDownloadTemplate={(selected) => {
+          void template.download({
+            url: selected.url,
+            fileName: selected.fileName,
+            failureMessage: 'Le modèle n’a pas pu être généré.',
+          });
+        }}
+        onFile={accept}
+      />
 
       {jobQuery.isError && job === undefined ? (
         <QueryErrorInline
@@ -455,7 +487,6 @@ function JobPanel({
   onReset: () => void;
 }) {
   const running = isRunning(job);
-  const applied = job.status === 'succeeded' && job.mode === 'APPLY';
 
   return (
     <div className="flex flex-col gap-6">
@@ -472,85 +503,125 @@ function JobPanel({
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          {/* `role="status"` : l'avancement change sans geste de l'utilisateur. */}
-          <p role="status" className="flex items-center gap-2 text-[0.9375rem] tabular-nums">
-            {running ? (
-              <>
-                <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
-                {progressLabel(job)}
-              </>
-            ) : (
-              <TerminalState job={job} />
-            )}
-          </p>
-
-          {running ? (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              Vous pouvez quitter cet écran : le travail court sur le serveur et se retrouve dans
-              l’historique.
-            </p>
-          ) : null}
-
+          <JobProgress job={job} running={running} />
           <Figures job={job} />
         </CardContent>
       </Card>
 
-      {applied ? (
-        <div
-          role="status"
-          className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
-        >
-          <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
-          <div className="min-w-0 text-[0.875rem]">
-            <p className="font-[600]">
-              {formatNumber(totalWriteRows(job))} {nounFor(job)} {createdPast(job)}.
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              Corrigez les lignes refusées dans le classeur et redéposez-le :{' '}
-              {job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE'
-                ? 'les visites déjà au registre seront de nouveau ignorées'
-                : `les ${IMPORT_NOUNS[job.kind].plusieurs} déjà en base seront de nouveau ignorés`}
-              , sans doublon.
-            </p>
-          </div>
-        </div>
-      ) : null}
+      <AppliedBanner job={job} />
+      <ErrorsCard job={job} />
+      <JobActions job={job} applying={applying} running={running} onApply={onApply} onReset={onReset} />
+    </div>
+  );
+}
 
-      {job.report !== null && job.report.errors.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
-              <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
-              Lignes refusées
-            </CardTitle>
-            <CardDescription>
-              {errorsCaption(job.report)} Le numéro est celui de la ligne dans le classeur, en-tête
-              compris.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-24">Ligne</TableHead>
-                  <TableHead className="w-56">Colonne</TableHead>
-                  <TableHead>Motif</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {job.report.errors.map((error, index) => (
-                  <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
-                    <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
-                    <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>
-                    <TableCell>{error.message}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : null}
+function JobProgress({ job, running }: { job: ImportJob; running: boolean }) {
+  return (
+    <>
+      {/* `role="status"` : l'avancement change sans geste de l'utilisateur. */}
+      <p role="status" className="flex items-center gap-2 text-[0.9375rem] tabular-nums">
+        {running ? (
+          <>
+            <LoaderIcon className="size-4 shrink-0 animate-spin" aria-hidden="true" />
+            {progressLabel(job)}
+          </>
+        ) : (
+          <TerminalState job={job} />
+        )}
+      </p>
 
+      {running ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Vous pouvez quitter cet écran : le travail court sur le serveur et se retrouve dans
+          l’historique.
+        </p>
+      ) : null}
+    </>
+  );
+}
+
+function AppliedBanner({ job }: { job: ImportJob }) {
+  if (job.status !== 'succeeded' || job.mode !== 'APPLY') return null;
+  const registre = job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE';
+
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
+    >
+      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+      <div className="min-w-0 text-[0.875rem]">
+        <p className="font-[600]">
+          {formatNumber(totalWriteRows(job))} {nounFor(job)} {createdPast(job)}.
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Corrigez les lignes refusées dans le classeur et redéposez-le :{' '}
+          {registre
+            ? 'les visites déjà au registre seront de nouveau ignorées'
+            : `les ${IMPORT_NOUNS[job.kind].plusieurs} déjà en base seront de nouveau ignorés`}
+          , sans doublon.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ErrorsCard({ job }: { job: ImportJob }) {
+  if (job.report === null || job.report.errors.length === 0) return null;
+  const report = job.report;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
+          <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
+          Lignes refusées
+        </CardTitle>
+        <CardDescription>
+          {errorsCaption(report)} Le numéro est celui de la ligne dans le classeur, en-tête compris.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead className="w-24">Ligne</TableHead>
+              <TableHead className="w-56">Colonne</TableHead>
+              <TableHead>Motif</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {report.errors.map((error, index) => (
+              <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
+                <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
+                <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>
+                <TableCell>{error.message}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function JobActions({
+  job,
+  applying,
+  running,
+  onApply,
+  onReset,
+}: {
+  job: ImportJob;
+  applying: boolean;
+  running: boolean;
+  onApply: () => void;
+  onReset: () => void;
+}) {
+  const showEmptyHint = job.status === 'succeeded' && job.mode === 'DRY_RUN' && job.createdRows === 0;
+
+  return (
+    <>
       <div className="flex flex-wrap items-center gap-3">
         {canApply(job) ? (
           <Button type="button" disabled={applying} onClick={onApply}>
@@ -565,12 +636,12 @@ function JobPanel({
         )}
       </div>
 
-      {job.status === 'succeeded' && job.mode === 'DRY_RUN' && job.createdRows === 0 ? (
+      {showEmptyHint ? (
         <p className="text-[0.875rem] text-muted-foreground">
           Aucune ligne à créer : tout le fichier est soit déjà en base, soit refusé.
         </p>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -868,51 +939,69 @@ function ApplyDialog({
     <Dialog open={job !== null} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-lg">
         {job === null ? null : (
-          <>
-            <DialogHeader>
-              <DialogTitle>{applyLabel(job)} ?</DialogTitle>
-              <DialogDescription>
-                {job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE'
-                  ? 'Cette action écrit les visites en base et ne s’annule pas.'
-                  : 'Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde son numéro dans l’index d’unicité.'}
-              </DialogDescription>
-            </DialogHeader>
-
-            <div className="flex flex-col gap-3">
-              <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
-                <span className="font-display text-[1.5rem] font-[800] tabular-nums">
-                  {formatNumber(totalWriteRows(job))}
-                </span>{' '}
-                {nounFor(job)} {createdVerb(job)} à partir de « {job.fileName} ».
-              </p>
-
-              <p className="text-[0.8125rem] text-muted-foreground">
-                {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''}{' '}
-                {job.skippedRows > 1 ? 'seront ignorées' : 'sera ignorée'} car déjà en base, et{' '}
-                {formatNumber(job.errorRows)} refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux
-                ne sera écrite.
-              </p>
-            </div>
-
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={pending}
-                onClick={() => {
-                  onOpenChange(false);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button type="button" disabled={pending} onClick={onConfirm}>
-                {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
-                {applyLabel(job)}
-              </Button>
-            </DialogFooter>
-          </>
+          <ApplyDialogBody
+            job={job}
+            pending={pending}
+            onCancel={() => {
+              onOpenChange(false);
+            }}
+            onConfirm={onConfirm}
+          />
         )}
       </DialogContent>
     </Dialog>
+  );
+}
+
+function ApplyDialogBody({
+  job,
+  pending,
+  onCancel,
+  onConfirm,
+}: {
+  job: ImportJob;
+  pending: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  const registre = job.kind === 'VISITES' || job.kind === 'VISITES_REGISTRE';
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>{applyLabel(job)} ?</DialogTitle>
+        <DialogDescription>
+          {registre
+            ? 'Cette action écrit les visites en base et ne s’annule pas.'
+            : 'Cette action écrit en base et ne s’annule pas : une fiche supprimée ensuite garde son numéro dans l’index d’unicité.'}
+        </DialogDescription>
+      </DialogHeader>
+
+      <div className="flex flex-col gap-3">
+        <p className="rounded-md border border-border bg-secondary px-3 py-2.5 text-[0.875rem]">
+          <span className="font-display text-[1.5rem] font-[800] tabular-nums">
+            {formatNumber(totalWriteRows(job))}
+          </span>{' '}
+          {nounFor(job)} {createdVerb(job)} à partir de « {job.fileName} ».
+        </p>
+
+        <p className="text-[0.8125rem] text-muted-foreground">
+          {formatNumber(job.skippedRows)} ligne{job.skippedRows > 1 ? 's' : ''}{' '}
+          {job.skippedRows > 1 ? 'seront ignorées' : 'sera ignorée'} car déjà en base, et{' '}
+          {formatNumber(job.errorRows)} refusée{job.errorRows > 1 ? 's' : ''}. Aucune des deux ne
+          sera écrite.
+        </p>
+      </div>
+
+      <DialogFooter>
+        <Button type="button" variant="ghost" disabled={pending} onClick={onCancel}>
+          Annuler
+        </Button>
+        <Button type="button" disabled={pending} onClick={onConfirm}>
+          {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
+          {applyLabel(job)}
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
