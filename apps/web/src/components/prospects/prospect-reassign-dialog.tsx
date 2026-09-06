@@ -22,6 +22,22 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import type { ProspectRow } from '@/lib/types';
 
+function isReassignUnchanged(
+  prospect: ProspectRow | null,
+  representantId: string | null,
+  commercialId: string | null,
+) {
+  if (prospect === null) return false;
+  const sameRepresentant = representantId === null || representantId === prospect.representantId;
+  const sameCommercial = commercialId === null || commercialId === prospect.ownedByCommercialId;
+  return sameRepresentant && sameCommercial;
+}
+
+function reassignSummary(prospect: ProspectRow | null) {
+  if (prospect === null) return null;
+  return `${prospect.prenom} ${prospect.nom}, ${formatPhone(prospect.phoneE164)}`;
+}
+
 export function ProspectReassignDialog({
   prospect,
   onOpenChange,
@@ -71,10 +87,7 @@ export function ProspectReassignDialog({
     },
   });
 
-  const unchanged =
-    prospect !== null &&
-    (representantId === null || representantId === prospect.representantId) &&
-    (commercialId === null || commercialId === prospect.ownedByCommercialId);
+  const unchanged = isReassignUnchanged(prospect, representantId, commercialId);
 
   return (
     <Dialog
@@ -86,11 +99,7 @@ export function ProspectReassignDialog({
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>Réaffecter le prospect</DialogTitle>
-          <DialogDescription>
-            {prospect === null
-              ? null
-              : `${prospect.prenom} ${prospect.nom}, ${formatPhone(prospect.phoneE164)}`}
-          </DialogDescription>
+          <DialogDescription>{reassignSummary(prospect)}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
