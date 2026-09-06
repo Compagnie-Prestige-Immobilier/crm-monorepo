@@ -7,6 +7,7 @@ import {
   IsISO8601,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -326,6 +327,18 @@ export class CallAttemptOpDto {
   @Min(1)
   @Max(300)
   dureeSystemeMois?: number;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Réponses aux champs que l’administrateur a ajoutés au formulaire, par identifiant ' +
+      'de champ. Écrites SUR LE PROSPECT, fusionnées : une clé absente laisse la réponse ' +
+      'en place. Elles n’alimentent aucun indicateur.',
+  })
+  @IsOptional()
+  @IsObject()
+  champsLibres?: Record<string, string>;
 }
 
 export class ProspectPhase2StateDto {

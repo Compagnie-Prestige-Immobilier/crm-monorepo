@@ -14,6 +14,7 @@ import 'package:crm_api_client/src/api/auth_api.dart';
 import 'package:crm_api_client/src/api/bank_case_stages_api.dart';
 import 'package:crm_api_client/src/api/bank_cases_api.dart';
 import 'package:crm_api_client/src/api/call_outcome_reasons_api.dart';
+import 'package:crm_api_client/src/api/champs_conversion_api.dart';
 import 'package:crm_api_client/src/api/client_requests_api.dart';
 import 'package:crm_api_client/src/api/demo_api.dart';
 import 'package:crm_api_client/src/api/enrolement_api.dart';
@@ -199,6 +200,12 @@ class CrmApiClient {
   /// by doing that all interceptors will not be executed
   CallOutcomeReasonsApi getCallOutcomeReasonsApi() {
     return CallOutcomeReasonsApi(dio);
+  }
+
+  /// Get ChampsConversionApi instance, base route and serializer can be overridden by a given but be careful,
+  /// by doing that all interceptors will not be executed
+  ChampsConversionApi getChampsConversionApi() {
+    return ChampsConversionApi(dio);
   }
 
   /// Get ClientRequestsApi instance, base route and serializer can be overridden by a given but be careful,

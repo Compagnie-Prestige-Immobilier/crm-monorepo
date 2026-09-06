@@ -864,6 +864,7 @@ export class SyncService {
           incomeBandId: data.incomeBandId,
           paymentMode: data.paymentMode,
           dureeSystemeMois: data.dureeSystemeMois,
+          champsLibres: data.champsLibres,
           deviceCallType: data.deviceCallType,
           deviceCallDurationSeconds: data.deviceCallDurationSeconds,
           deviceCallAt: data.deviceCallAt,

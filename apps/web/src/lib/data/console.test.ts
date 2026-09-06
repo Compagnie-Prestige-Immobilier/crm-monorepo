@@ -228,6 +228,7 @@ function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
     dureeSystemeMois: '24',
     method: 'PLATFORM',
     rendezVousAt: '',
+    champsLibres: {},
     ...over,
   };
 }

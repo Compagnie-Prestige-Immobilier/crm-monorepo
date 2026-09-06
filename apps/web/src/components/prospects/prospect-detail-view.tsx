@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { DetailBackLink } from '@/components/detail-back-link';
+import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -145,6 +146,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
           </dl>
         </CardContent>
       </Card>
+
+      <ChampsAjoutes prospect={prospect} />
 
       {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
       <Card id="appels">

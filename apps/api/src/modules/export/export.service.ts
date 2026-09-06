@@ -12,8 +12,9 @@ import type { ProspectFilterDto } from '../../common/dto/prospect-filter.dto.js'
 import { lastAttemptsByProspect } from '../prospects/last-attempt.js';
 import type { LastAttempt } from '../prospects/last-attempt.js';
 import { AnalyticsService } from '../analytics/analytics.service.js';
-import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from './columns.js';
-import type { ExportRow } from './columns.js';
+import type { ChampLibre } from '../champs-conversion/catalogue.js';
+import { EXPORT_INCLUDE, cellValue, prospectColumns } from './columns.js';
+import type { ColumnSpec, ExportRow } from './columns.js';
 import { CONSOLIDATED_SHEET, ExportMode } from './dto.js';
 import { markWorkbook, writeDemoWarningRow } from './demo-marking.js';
 import { WorkspaceContext } from '../../workspaces/workspace.js';
@@ -201,6 +202,7 @@ export class ExportService {
     filter: ProspectFilterDto,
     stream: Writable,
     mode: ExportMode = ExportMode.FILTERED,
+    libres: readonly ChampLibre[] = [],
   ): Promise<void> {
     // Lu UNE fois pour tout le classeur : une bascule en cours d'export marquerait
     // une feuille et pas l'autre.
@@ -208,11 +210,12 @@ export class ExportService {
 
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
     markWorkbook(workbook, demoEnabled);
+    const columns = prospectColumns(libres);
 
     if (mode === ExportMode.CONSOLIDATED) {
-      await this.writeConsolidated(user, filter, workbook, demoEnabled);
+      await this.writeConsolidated(user, filter, workbook, demoEnabled, columns);
     } else {
-      await this.writeFiltered(user, filter, workbook, demoEnabled);
+      await this.writeFiltered(user, filter, workbook, demoEnabled, columns);
     }
 
     await workbook.commit();
@@ -222,6 +225,7 @@ export class ExportService {
     user: AuthenticatedUser,
     ids: readonly string[],
     stream: Writable,
+    libres: readonly ChampLibre[] = [],
   ): Promise<void> {
     const demoEnabled = this.demo.current() === 'demo';
     const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream, useStyles: true });
@@ -231,6 +235,7 @@ export class ExportService {
       'Prospects',
       { id: { in: [...ids] }, deletedAt: null },
       demoEnabled,
+      prospectColumns(libres),
     );
     await workbook.commit();
   }
@@ -240,6 +245,7 @@ export class ExportService {
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     demoEnabled: boolean,
+    columns: readonly ColumnSpec[],
   ): Promise<void> {
     const where = buildProspectWhere(user, filter);
     const { rows: total, representants } = await this.writeProspectSheet(
@@ -247,6 +253,7 @@ export class ExportService {
       'Prospects',
       where,
       demoEnabled,
+      columns,
     );
 
     const repSheet = workbook.addWorksheet('Représentants', {
@@ -360,12 +367,14 @@ export class ExportService {
     filter: ProspectFilterDto,
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     demoEnabled: boolean,
+    columns: readonly ColumnSpec[],
   ): Promise<void> {
     await this.writeProspectSheet(
       workbook,
       CONSOLIDATED_SHEET,
       buildProspectWhere(user, filterForSegment(filter, undefined)),
       demoEnabled,
+      columns,
     );
 
     for (const segment of ALL_SEGMENTS) {
@@ -374,6 +383,7 @@ export class ExportService {
         segment,
         buildProspectWhere(user, filterForSegment(filter, segment)),
         demoEnabled,
+        columns,
       );
     }
   }
@@ -383,15 +393,16 @@ export class ExportService {
     name: string,
     where: Prisma.ProspectWhereInput,
     demoEnabled: boolean,
+    columns: readonly ColumnSpec[],
   ): Promise<SheetResult> {
     // Page lue AVANT de creer la feuille : les largeurs tiennent dans l'en-tete du XML et
     // ne sont plus ajustables une fois des lignes emises.
     let page = await this.page(where, undefined);
     let attempts = await this.attempts(page);
-    const widths = computeWidths(page, attempts);
+    const widths = computeWidths(columns, page, attempts);
 
     const sheet = workbook.addWorksheet(name, { views: [{ state: 'frozen', ySplit: 1 }] });
-    sheet.columns = PROSPECT_COLUMNS.map((column, index) => ({
+    sheet.columns = columns.map((column, index) => ({
       header: column.header,
       key: column.key,
       width: widths[index] ?? 16,
@@ -400,9 +411,9 @@ export class ExportService {
     styleHeader(sheet);
     sheet.autoFilter = {
       from: { row: 1, column: 1 },
-      to: { row: 1, column: PROSPECT_COLUMNS.length },
+      to: { row: 1, column: columns.length },
     };
-    writeDemoWarningRow(sheet, demoEnabled, PROSPECT_COLUMNS.length);
+    writeDemoWarningRow(sheet, demoEnabled, columns.length);
 
     const representants = new Map<string, RepresentantTally>();
     let rows = 0;
@@ -411,7 +422,7 @@ export class ExportService {
       for (const row of page) {
         const last = attempts.get(row.id);
         sheet
-          .addRow(Object.fromEntries(PROSPECT_COLUMNS.map((c) => [c.key, cellValue(c, row, last)])))
+          .addRow(Object.fromEntries(columns.map((c) => [c.key, cellValue(c, row, last)])))
           .commit();
         rows += 1;
 
@@ -489,8 +500,12 @@ function styleHeader(sheet: ExcelJS.Worksheet): void {
   header.commit();
 }
 
-function computeWidths(sample: readonly ExportRow[], attempts: Map<string, LastAttempt>): number[] {
-  return PROSPECT_COLUMNS.map((column) => {
+function computeWidths(
+  columns: readonly ColumnSpec[],
+  sample: readonly ExportRow[],
+  attempts: Map<string, LastAttempt>,
+): number[] {
+  return columns.map((column) => {
     let longest = column.header.length;
     for (const row of sample) {
       const value = column.value(row, attempts.get(row.id));

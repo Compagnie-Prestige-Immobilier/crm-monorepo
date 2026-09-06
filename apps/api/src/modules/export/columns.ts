@@ -12,6 +12,7 @@ import {
   TYPE_CONTRAT_LABELS,
 } from '../prospects/phase2-labels.js';
 import type { LastAttempt } from '../prospects/last-attempt.js';
+import { normaliserReponses, type ChampLibre } from '../champs-conversion/catalogue.js';
 import { toDakarCell } from './dakar.js';
 
 export const EXPORT_INCLUDE = {
@@ -199,4 +200,25 @@ export function cellValue(
 ): CellValue {
   const value = column.value(row, last);
   return value instanceof Date ? toDakarCell(value) : value;
+}
+
+/**
+ * Les champs que l'administrateur a ajoutes au formulaire, en queue de
+ * classeur : intercales, ils decaleraient des colonnes que les feuilles de
+ * calcul du client referencent par position.
+ */
+export function prospectColumns(libres: readonly ChampLibre[]): readonly ColumnSpec[] {
+  if (libres.length === 0) return PROSPECT_COLUMNS;
+  return [
+    ...PROSPECT_COLUMNS,
+    ...libres.map((libre) => ({
+      header: libre.libelle,
+      key: `libre:${libre.id}`,
+      value: (row: ExportRow): CellValue => reponse(row.champsLibres, libre),
+    })),
+  ];
+}
+
+function reponse(brut: unknown, libre: ChampLibre): CellValue {
+  return (normaliserReponses(brut) ?? {})[libre.id] ?? '';
 }
