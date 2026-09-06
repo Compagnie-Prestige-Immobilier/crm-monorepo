@@ -49,42 +49,45 @@ export const PILLS: readonly { preset: PeriodePreset; label: string }[] = [
 const iso = (date: Date): string => format(date, 'yyyy-MM-dd');
 const dateUtc = (jour: string): Date => new Date(`${jour}T00:00:00Z`);
 
+const CALCULS_PRESET: Record<PeriodePreset, (reference: Date) => Plage> = {
+  aujourdhui: (reference) => {
+    const jour = iso(reference);
+    return { du: jour, au: jour };
+  },
+  hier: (reference) => {
+    const jour = iso(subDays(reference, 1));
+    return { du: jour, au: jour };
+  },
+  'avant-hier': (reference) => {
+    const jour = iso(subDays(reference, 2));
+    return { du: jour, au: jour };
+  },
+  'cette-semaine': (reference) => ({
+    du: iso(startOfWeek(reference, { weekStartsOn: 1 })),
+    au: iso(endOfWeek(reference, { weekStartsOn: 1 })),
+  }),
+  'ce-mois': (reference) => ({ du: iso(startOfMonth(reference)), au: iso(endOfMonth(reference)) }),
+  'mois-dernier': (reference) => {
+    const mois = subMonths(reference, 1);
+    return { du: iso(startOfMonth(mois)), au: iso(endOfMonth(mois)) };
+  },
+  'trois-mois': (reference) => ({
+    du: iso(startOfMonth(subMonths(reference, 2))),
+    au: iso(endOfMonth(reference)),
+  }),
+  'douze-mois': (reference) => ({
+    du: iso(startOfMonth(subMonths(reference, 11))),
+    au: iso(endOfMonth(reference)),
+  }),
+  'cette-annee': (reference) => ({ du: iso(startOfYear(reference)), au: iso(endOfYear(reference)) }),
+  'annee-derniere': (reference) => {
+    const annee = subYears(reference, 1);
+    return { du: iso(startOfYear(annee)), au: iso(endOfYear(annee)) };
+  },
+};
+
 export function plageDuPreset(preset: PeriodePreset, reference: Date): Plage {
-  switch (preset) {
-    case 'aujourdhui': {
-      const jour = iso(reference);
-      return { du: jour, au: jour };
-    }
-    case 'hier': {
-      const jour = iso(subDays(reference, 1));
-      return { du: jour, au: jour };
-    }
-    case 'avant-hier': {
-      const jour = iso(subDays(reference, 2));
-      return { du: jour, au: jour };
-    }
-    case 'cette-semaine':
-      return {
-        du: iso(startOfWeek(reference, { weekStartsOn: 1 })),
-        au: iso(endOfWeek(reference, { weekStartsOn: 1 })),
-      };
-    case 'ce-mois':
-      return { du: iso(startOfMonth(reference)), au: iso(endOfMonth(reference)) };
-    case 'mois-dernier': {
-      const mois = subMonths(reference, 1);
-      return { du: iso(startOfMonth(mois)), au: iso(endOfMonth(mois)) };
-    }
-    case 'trois-mois':
-      return { du: iso(startOfMonth(subMonths(reference, 2))), au: iso(endOfMonth(reference)) };
-    case 'douze-mois':
-      return { du: iso(startOfMonth(subMonths(reference, 11))), au: iso(endOfMonth(reference)) };
-    case 'cette-annee':
-      return { du: iso(startOfYear(reference)), au: iso(endOfYear(reference)) };
-    case 'annee-derniere': {
-      const annee = subYears(reference, 1);
-      return { du: iso(startOfYear(annee)), au: iso(endOfYear(annee)) };
-    }
-  }
+  return CALCULS_PRESET[preset](reference);
 }
 
 export function joursDansPlage(plage: Plage): number {
