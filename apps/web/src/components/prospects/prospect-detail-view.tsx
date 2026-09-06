@@ -58,6 +58,58 @@ function ouiNon(value: boolean | null): string {
   return value ? 'Oui' : 'Non';
 }
 
+function orNoValue(value: string | null): string {
+  return value ?? NO_VALUE;
+}
+
+function ProspectInfoGrid({ prospect }: { prospect: ProspectRow }) {
+  return (
+    <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
+      <Ligne label="WhatsApp">
+        {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
+      </Ligne>
+      <Ligne label="Profession">{orNoValue(prospect.profession)}</Ligne>
+      <Ligne label="Établissement">{orNoValue(prospect.etablissement)}</Ligne>
+      <Ligne label="Banque">{orNoValue(prospect.banqueName)}</Ligne>
+      <Ligne label="Syndicat">{orNoValue(prospect.syndicatSigle)}</Ligne>
+      <Ligne label="Représentant">{orNoValue(prospect.representantName)}</Ligne>
+      <Ligne label="Segment">
+        {prospect.segment === null ? NO_VALUE : SEGMENT_LABELS[prospect.segment]}
+      </Ligne>
+      <Ligne label="Méthode d’enrôlement">
+        {prospect.enrollmentMethod === null
+          ? NO_VALUE
+          : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+      </Ligne>
+      <Ligne label="Téléconseiller">{prospect.ownedByCommercialName}</Ligne>
+      <Ligne label="Saisi le">{formatDate(prospect.clientCreatedAt)}</Ligne>
+      <Ligne label="Dernier appel">
+        {prospect.lastCallOutcome === null
+          ? 'Jamais appelé'
+          : CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
+      </Ligne>
+      <Ligne label="Appelé le">
+        {prospect.lastCallAt === null ? NO_VALUE : formatDateTime(prospect.lastCallAt)}
+      </Ligne>
+      <Ligne label="Tentatives">{formatNumber(prospect.callAttemptCount)}</Ligne>
+    </dl>
+  );
+}
+
+function SegmentHistoryCard({ role, prospectId }: { role: Role; prospectId: string }) {
+  if (role !== 'ADMIN' && role !== 'COMMERCIAL') return null;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Segment</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <ProspectSegmentHistory prospectId={prospectId} />
+      </CardContent>
+    </Card>
+  );
+}
+
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et chaque appel passé dessus. */
 export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
   const fiche = useQuery({
@@ -124,35 +176,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
           </div>
         </CardHeader>
         <CardContent>
-          <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
-            <Ligne label="WhatsApp">
-              {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
-            </Ligne>
-            <Ligne label="Profession">{prospect.profession ?? NO_VALUE}</Ligne>
-            <Ligne label="Établissement">{prospect.etablissement ?? NO_VALUE}</Ligne>
-            <Ligne label="Banque">{prospect.banqueName ?? NO_VALUE}</Ligne>
-            <Ligne label="Syndicat">{prospect.syndicatSigle ?? NO_VALUE}</Ligne>
-            <Ligne label="Représentant">{prospect.representantName ?? NO_VALUE}</Ligne>
-            <Ligne label="Segment">
-              {prospect.segment === null ? NO_VALUE : SEGMENT_LABELS[prospect.segment]}
-            </Ligne>
-            <Ligne label="Méthode d’enrôlement">
-              {prospect.enrollmentMethod === null
-                ? NO_VALUE
-                : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
-            </Ligne>
-            <Ligne label="Téléconseiller">{prospect.ownedByCommercialName}</Ligne>
-            <Ligne label="Saisi le">{formatDate(prospect.clientCreatedAt)}</Ligne>
-            <Ligne label="Dernier appel">
-              {prospect.lastCallOutcome === null
-                ? 'Jamais appelé'
-                : CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
-            </Ligne>
-            <Ligne label="Appelé le">
-              {prospect.lastCallAt === null ? NO_VALUE : formatDateTime(prospect.lastCallAt)}
-            </Ligne>
-            <Ligne label="Tentatives">{formatNumber(prospect.callAttemptCount)}</Ligne>
-          </dl>
+          <ProspectInfoGrid prospect={prospect} />
         </CardContent>
       </Card>
 
@@ -179,16 +203,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         </CardContent>
       </Card>
 
-      {role === 'ADMIN' || role === 'COMMERCIAL' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Segment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ProspectSegmentHistory prospectId={prospectId} />
-          </CardContent>
-        </Card>
-      ) : null}
+      <SegmentHistoryCard role={role} prospectId={prospectId} />
     </div>
   );
 }
@@ -301,49 +316,70 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
   return (
     <ol aria-label="Appels" className="flex flex-col divide-y divide-border">
       {items.map((appel) => (
-        <li key={appel.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              {appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome]}
-            </Badge>
-            {appel.method === null ? null : (
-              <span className="text-[0.8125rem]">{ENROLLMENT_METHOD_LABELS[appel.method]}</span>
-            )}
-          </div>
-          <p className="text-[0.75rem] text-muted-foreground">
-            <time dateTime={appel.clientCreatedAt} className="tabular-nums">
-              {formatDateTime(appel.clientCreatedAt)}
-            </time>{' '}
-            · {appel.performedByName}
-          </p>
-          <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
-          {appel.dureeTraitementSecondes === null ? null : (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              Traitement : {formatDuration(appel.dureeTraitementSecondes)}
-            </p>
-          )}
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Fonctionnaire : {ouiNon(appel.fonctionnaire)} · Engagement en cours :{' '}
-            {ouiNon(appel.engagementEnCours)}
-            {appel.dureeEtablissementMois === null
-              ? ''
-              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans la fonction`}
-            {appel.email === null || appel.email === '' ? '' : ` · ${appel.email}`}
-          </p>
-          {appel.rendezVousAt === null ? null : (
-            <p className="text-[0.8125rem]">Rendez-vous le {formatDateTime(appel.rendezVousAt)}</p>
-          )}
-          {appel.comment === null || appel.comment === '' ? null : (
-            <p className="max-w-prose text-[0.875rem]">
-              {/* L'issue « Autre » exige le commentaire : c'est un motif. */}
-              <span className="text-muted-foreground">
-                {appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire'} :{' '}
-              </span>
-              {appel.comment}
-            </p>
-          )}
-        </li>
+        <AppelItem key={appel.id} appel={appel} />
       ))}
     </ol>
+  );
+}
+
+function methodeAppel(appel: Appel): ReactNode {
+  if (appel.method === null) return null;
+  return <span className="text-[0.8125rem]">{ENROLLMENT_METHOD_LABELS[appel.method]}</span>;
+}
+
+function dureeTraitementLigne(appel: Appel): ReactNode {
+  if (appel.dureeTraitementSecondes === null) return null;
+  return (
+    <p className="text-[0.8125rem] text-muted-foreground">
+      Traitement : {formatDuration(appel.dureeTraitementSecondes)}
+    </p>
+  );
+}
+
+function detailsAppelTexte(appel: Appel): string {
+  const dureeEtablissement =
+    appel.dureeEtablissementMois === null
+      ? ''
+      : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans la fonction`;
+  const email = appel.email === null || appel.email === '' ? '' : ` · ${appel.email}`;
+  return `Fonctionnaire : ${ouiNon(appel.fonctionnaire)} · Engagement en cours : ${ouiNon(appel.engagementEnCours)}${dureeEtablissement}${email}`;
+}
+
+function rendezVousLigne(appel: Appel): ReactNode {
+  if (appel.rendezVousAt === null) return null;
+  return <p className="text-[0.8125rem]">Rendez-vous le {formatDateTime(appel.rendezVousAt)}</p>;
+}
+
+function commentaireLigne(appel: Appel): ReactNode {
+  if (appel.comment === null || appel.comment === '') return null;
+  const label = appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire';
+  return (
+    <p className="max-w-prose text-[0.875rem]">
+      {/* L'issue « Autre » exige le commentaire : c'est un motif. */}
+      <span className="text-muted-foreground">{label} : </span>
+      {appel.comment}
+    </p>
+  );
+}
+
+function AppelItem({ appel }: { appel: Appel }) {
+  return (
+    <li className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline">{appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome]}</Badge>
+        {methodeAppel(appel)}
+      </div>
+      <p className="text-[0.75rem] text-muted-foreground">
+        <time dateTime={appel.clientCreatedAt} className="tabular-nums">
+          {formatDateTime(appel.clientCreatedAt)}
+        </time>{' '}
+        · {appel.performedByName}
+      </p>
+      <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
+      {dureeTraitementLigne(appel)}
+      <p className="text-[0.8125rem] text-muted-foreground">{detailsAppelTexte(appel)}</p>
+      {rendezVousLigne(appel)}
+      {commentaireLigne(appel)}
+    </li>
   );
 }
