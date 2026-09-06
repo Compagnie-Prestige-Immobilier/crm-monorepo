@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:cpi_go/core/sync/outbox_status.dart';
+import 'package:cpi_go/core/sync/sync_engine.dart';
 import 'package:cpi_go/data/local/database.dart';
 import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
@@ -363,6 +364,7 @@ Future<int> queueOp(
           nextAttemptAt: nextAttemptAt ?? t0,
           leaseUntil: Value<DateTime?>(leaseUntil),
           claimToken: Value<String?>(claimToken),
+          payloadVersion: const Value<int>(SyncEngine.payloadVersion),
           createdAt: t0,
         ),
       );
