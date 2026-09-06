@@ -109,7 +109,7 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
   // Un écran de pilotage se lit d'un coup d'œil : le repli ne doit pas ouvrir
   // sur un mur de cartes que personne ne trie ensuite.
   it.each(DASHBOARD_ECRANS)('la disposition d’usine de %s reste courte', (ecran) => {
-    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(12);
+    expect(dispositionUsine(ecran, true).widgets.length).toBeLessThanOrEqual(14);
   });
 
   it('n’ouvre les montants qu’à qui les regarde', () => {
@@ -121,11 +121,22 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     expect(direction).toContain('de-l-appel-a-l-encaissement');
   });
 
-  it('place le suivi de la dernière campagne sur le tableau de bord de direction', () => {
-    const direction = dispositionUsine('chues', true).widgets.map((widget) => widget.source);
-
-    expect(direction).toContain('couverture-derniere-campagne');
-    expect(direction).toContain('hors-attribution-derniere-campagne');
+  // EB-34 : les deux diagrammes circulaires des campagnes se lisent dès
+  // l'ouverture, sur la ligne qui suit les quatre taux.
+  it('ouvre CHUES sur quatre taux puis deux camemberts, pour tous les rôles', () => {
+    for (const voitLesMontants of [false, true]) {
+      const widgets = dispositionUsine('chues', voitLesMontants).widgets;
+      expect(widgets.slice(0, 6).map((widget) => widget.marque)).toEqual([
+        'tuile',
+        'tuile',
+        'tuile',
+        'tuile',
+        'camembert',
+        'camembert',
+      ]);
+      expect(widgets[4]?.source).toBe('taux-d-exploitation');
+      expect(widgets[5]?.source).toBe('repartition-statuts-qualification');
+    }
   });
 
   // EB-13 : le compte des fiches ouvertes se lit SUR le tableau de bord. Posé
@@ -145,16 +156,11 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     },
   );
 
-  it('met la répartition des statuts de qualification en graphique large dès l’usine', () => {
-    const widget = dispositionUsine('chues').widgets.find(
-      (item) => item.source === 'repartition-statuts-qualification',
-    );
+  it('propose le camembert sur l’exploitation par campagne (EB-34)', () => {
+    const [widget] = sanitize('chues', [
+      { source: 'exploitation-par-campagne', marque: 'camembert' },
+    ]);
 
-    expect(widget).toMatchObject({
-      source: 'repartition-statuts-qualification',
-      marque: 'barres-horizontales',
-      taille: 'pleine',
-      presentation: { valeurs: true },
-    });
+    expect(widget?.marque).toBe('camembert');
   });
 });

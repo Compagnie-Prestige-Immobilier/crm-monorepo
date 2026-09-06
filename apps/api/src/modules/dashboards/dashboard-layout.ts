@@ -133,10 +133,7 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'statuts-par-famille': { defaut: 'barres-empilees', compatibles: COMPOSITION_MARQUES },
   'joignabilite-par-creneau': MATRICE,
   'taux-d-exploitation': { defaut: 'camembert', compatibles: CATEGORIE_MARQUES },
-  'exploitation-par-campagne': {
-    defaut: 'barres-100',
-    compatibles: ['barres-100', 'barres-empilees', 'tableau'],
-  },
+  'exploitation-par-campagne': { defaut: 'camembert', compatibles: COMPOSITION_MARQUES },
   'representants-par-departement': CLASSEMENT,
   'representants-par-ief': CLASSEMENT,
   'representants-jamais-appeles': CHIFFRE,
@@ -286,9 +283,8 @@ export function resolveLayout(
 }
 
 /**
- * Ce qu'un compte voit à sa première ouverture : une ligne de taux, le tableau
- * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
- * retirable comme le reste.
+ * Ce qu'un compte voit à sa première ouverture, en lignes pleines sur la
+ * grille de quatre colonnes : quatre tuiles, deux graphiques, puis les tableaux.
  */
 type WidgetUsine = DashboardSource | DispositionWidget;
 
@@ -307,16 +303,14 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
     'taux-de-joignabilite-representants',
     'taux-d-acceptation',
     'taux-de-qualification',
-    {
-      source: 'repartition-statuts-qualification',
-      taille: 'pleine',
-      presentation: { valeurs: true },
-    },
+    { source: 'taux-d-exploitation', marque: 'camembert' },
+    { source: 'repartition-statuts-qualification', marque: 'camembert' },
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
   ],
   'grand-public': [
     'taux-de-joignabilite',
+    'taux-de-qualification',
     'prospects-notes',
     'adhesions',
     'par-teleconseiller',
@@ -324,20 +318,21 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   ],
 };
 
-/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
-const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
+/** Ce que la direction voit EN PLUS, après les tableaux : une ligne de tuiles, une ligne de résultat. */
+const USINE_DIRECTION: Record<DashboardEcran, readonly WidgetUsine[]> = {
   visites: [],
   chues: [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
     'encaisse',
+    'taux-de-rappel',
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
     'de-l-appel-a-l-encaissement',
     'rendement-par-departement',
   ],
   'grand-public': [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
-    'encaisse',
+    { source: 'encaisse', taille: 'demi' },
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
     'de-l-appel-a-l-encaissement',
     'methodes-d-adhesion',
   ],

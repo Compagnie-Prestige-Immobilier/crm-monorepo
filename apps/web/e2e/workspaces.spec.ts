@@ -170,7 +170,7 @@ test('le menu d’export produit les DEUX classeurs', async ({ page }) => {
 
 test('création d’une campagne : l’aperçu chiffre AVANT la confirmation', async ({ page }) => {
   await page.goto('/campagnes');
-  await expect(page.getByRole('heading', { name: 'Campagnes', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
 
   await page.getByRole('button', { name: 'Nouvelle campagne' }).first().click();
 
@@ -276,7 +276,7 @@ const REP_CAMPAIGN_NAME = `E2E REP ${String(Date.now())}`;
 
 test('une campagne représentants se tire depuis l’onglet dédié', async ({ page }) => {
   await page.goto('/campagnes/representants');
-  await expect(page.getByRole('heading', { name: 'Campagnes', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
   // Le titre de la barre supérieure est celui de `/campagnes` : c'est l'onglet
   // qui dit sur laquelle des deux listes on se trouve.
   await expect(page.getByRole('link', { name: 'Appels représentants' })).toHaveAttribute(

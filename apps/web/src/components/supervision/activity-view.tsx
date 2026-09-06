@@ -320,12 +320,6 @@ export function ActivityView({ projet }: { projet: Projet }) {
         })}
       </div>
 
-      <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
-
-      <FichesOuvertes range={range} />
-
-      <ScoreSection scores={data.scores} />
-
       <Card>
         <CardContent className="p-0">
           <Table>
@@ -389,6 +383,12 @@ export function ActivityView({ projet }: { projet: Projet }) {
       <p className="text-[0.8125rem] text-muted-foreground">
         Chaque colonne porte sur la date de l’acte, dans la période choisie.
       </p>
+
+      <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
+
+      <FichesOuvertes range={range} />
+
+      <ScoreSection scores={data.scores} />
 
       {buckets.length > 0 ? (
         <Card>
