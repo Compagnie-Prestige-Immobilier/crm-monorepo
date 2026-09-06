@@ -43,6 +43,22 @@ const MOVED_PATHS: Readonly<Record<string, string>> = {
 
 export type SearchParams = Record<string, string | string[] | undefined>;
 
+function appendSearchValue(query: URLSearchParams, key: string, value: string | string[]): void {
+  if (!Array.isArray(value)) {
+    query.set(key, value);
+    return;
+  }
+  for (const item of value) query.append(key, item);
+}
+
+function buildQueryString(search: SearchParams): string {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(search)) {
+    if (value !== undefined) appendSearchValue(query, key, value);
+  }
+  return query.size === 0 ? '' : `?${query.toString()}`;
+}
+
 /**
  * Destination d'une ancienne adresse, ou `null` si la racine n'a jamais
  * existé. Le reste du chemin et la requête suivent : un lien de notification
@@ -59,12 +75,5 @@ export function movedTarget(
   const base = exact ?? MOVED_ROUTES[root];
   if (base === undefined) return null;
 
-  const query = new URLSearchParams();
-  for (const [key, value] of Object.entries(search)) {
-    if (Array.isArray(value)) for (const item of value) query.append(key, item);
-    else if (value !== undefined) query.set(key, value);
-  }
-
-  const suffix = query.size === 0 ? '' : `?${query.toString()}`;
-  return `${base}${exact === undefined ? tail : ''}${suffix}`;
+  return `${base}${exact === undefined ? tail : ''}${buildQueryString(search)}`;
 }
