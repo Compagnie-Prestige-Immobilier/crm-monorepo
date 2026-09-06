@@ -24520,7 +24520,16 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT", "WHATSAPP"]
+        "enum": [
+          "PLATFORM",
+          "PHYSICAL",
+          "VOICE_OR_ELECTRONIC_MESSAGING",
+          "APPOINTMENT",
+          "WHATSAPP",
+          "RDV_CPI",
+          "PLATEFORME_EN_LIGNE",
+          "MAIL"
+        ]
       },
       "ProspectSortField": {
         "type": "string",
@@ -33100,7 +33109,10 @@
               "PHYSICAL",
               "VOICE_OR_ELECTRONIC_MESSAGING",
               "APPOINTMENT",
-              "WHATSAPP"
+              "WHATSAPP",
+              "RDV_CPI",
+              "PLATEFORME_EN_LIGNE",
+              "MAIL"
             ],
             "nullable": true
           },

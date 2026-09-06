@@ -102,6 +102,9 @@ enum EnrollmentMethod {
   /// tentative, contrainte CHECK comprise.
   APPOINTMENT
   WHATSAPP
+  RDV_CPI
+  PLATEFORME_EN_LIGNE
+  MAIL
 }
 
 // BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés

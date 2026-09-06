@@ -1,5 +1,5 @@
 import { spawn, spawnSync } from 'node:child_process';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, rmSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
 import fkill from 'fkill';
@@ -125,6 +125,10 @@ function startApiDev() {
   startApiAndWeb();
 }
 
+function clearWebBuildCache() {
+  rmSync(resolve(root, 'apps/web/.next'), { recursive: true, force: true });
+}
+
 function isListening(port) {
   const result = spawnSync('lsof', ['-nP', `-iTCP:${String(port)}`, '-sTCP:LISTEN'], {
     encoding: 'utf8',
@@ -177,6 +181,7 @@ function startMobile() {
 if (downMode) {
   await stopEnvironment();
 } else {
+  clearWebBuildCache();
   if (mobileMode) startMobile();
   else startApiDev();
 

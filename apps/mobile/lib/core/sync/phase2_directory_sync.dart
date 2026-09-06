@@ -440,6 +440,22 @@ abstract final class EnrollmentMethods {
 
   static const String whatsapp = 'WHATSAPP';
 
+  static Map<String, dynamic> normalizeLegacyMethod(
+    Map<String, dynamic> payload,
+  ) {
+    final Object? raw = payload['method'];
+    if (raw is! String) return payload;
+    final String? normalized = switch (raw) {
+      'MAIL' => voiceOrElectronicMessaging,
+      'PLATEFORME_EN_LIGNE' => platform,
+      'RDV_CPI' => appointment,
+      _ => null,
+    };
+    return normalized == null || normalized == raw
+        ? payload
+        : <String, dynamic>{...payload, 'method': normalized};
+  }
+
   static final List<String> all = EnrollmentMethod.values
       .where(
         (EnrollmentMethod m) => m != EnrollmentMethod.unknownDefaultOpenApi,

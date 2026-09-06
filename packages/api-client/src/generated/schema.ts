@@ -4502,7 +4502,14 @@ export interface components {
     Phase2Status: 'PENDING' | 'METHOD_OBTAINED' | 'REFUSED' | 'WRONG_NUMBER';
     /** @enum {string} */
     EnrollmentMethod:
-      'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | 'WHATSAPP';
+      | 'PLATFORM'
+      | 'PHYSICAL'
+      | 'VOICE_OR_ELECTRONIC_MESSAGING'
+      | 'APPOINTMENT'
+      | 'WHATSAPP'
+      | 'RDV_CPI'
+      | 'PLATEFORME_EN_LIGNE'
+      | 'MAIL';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
@@ -7678,6 +7685,9 @@ export interface components {
         | 'VOICE_OR_ELECTRONIC_MESSAGING'
         | 'APPOINTMENT'
         | 'WHATSAPP'
+        | 'RDV_CPI'
+        | 'PLATEFORME_EN_LIGNE'
+        | 'MAIL'
         | null;
       comment: string | null;
       performedByName: string;

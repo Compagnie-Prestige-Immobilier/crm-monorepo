@@ -66,7 +66,7 @@ export async function createApiApp(): Promise<NestFastifyApplication> {
   const adapter = createApiAdapter(env);
   await adapter.getInstance().register(websocket, { options: { maxPayload: 64 } });
   const app = await NestFactory.create<NestFastifyApplication>(AppModule, adapter, {
-    bufferLogs: true,
+    logger: false,
   });
 
   app.useLogger(app.get(Logger));

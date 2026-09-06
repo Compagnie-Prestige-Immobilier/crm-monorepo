@@ -65,9 +65,15 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
                     options: { colorize: true, translateTime: 'SYS:standard' },
                   },
                   {
-                    target: 'pino/file',
+                    target: 'pino-roll',
                     level: env.LOG_LEVEL,
-                    options: { destination: apiLogPath, mkdir: true },
+                    options: {
+                      file: apiLogPath,
+                      frequency: 'daily',
+                      size: '10m',
+                      limit: { count: 7, removeOtherLogFiles: true },
+                      mkdir: true,
+                    },
                   },
                 ],
               },
