@@ -54,7 +54,11 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         {title}
       </h1>
 
-      <DevRoleSwitcher currentRole={user.role} enabled={process.env.NODE_ENV === 'development'} />
+      <DevRoleSwitcher
+        currentRole={user.role}
+        enabled={process.env.NODE_ENV === 'development'}
+        className="hidden md:block"
+      />
 
       <Link
         href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
