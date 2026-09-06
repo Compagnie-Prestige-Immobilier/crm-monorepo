@@ -83,6 +83,8 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto journeys(List<ProspectJourneyDto> journeys);
 
+  ProspectDto champsLibres(Map<String, String> champsLibres);
+
   ProspectDto dureeSystemeMois(num? dureeSystemeMois);
 
   ProspectDto canalProvenanceId(String? canalProvenanceId);
@@ -174,6 +176,7 @@ abstract class _$ProspectDtoCWProxy {
     String? relaisNom,
     String? relaisPhoneE164,
     List<ProspectJourneyDto> journeys,
+    Map<String, String> champsLibres,
     num? dureeSystemeMois,
     String? canalProvenanceId,
     String? canalProvenanceLabel,
@@ -345,6 +348,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(journeys: journeys);
 
   @override
+  ProspectDto champsLibres(Map<String, String> champsLibres) =>
+      this(champsLibres: champsLibres);
+
+  @override
   ProspectDto dureeSystemeMois(num? dureeSystemeMois) =>
       this(dureeSystemeMois: dureeSystemeMois);
 
@@ -476,6 +483,7 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? relaisNom = const $CopyWithPlaceholder(),
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? journeys = const $CopyWithPlaceholder(),
+    Object? champsLibres = const $CopyWithPlaceholder(),
     Object? dureeSystemeMois = const $CopyWithPlaceholder(),
     Object? canalProvenanceId = const $CopyWithPlaceholder(),
     Object? canalProvenanceLabel = const $CopyWithPlaceholder(),
@@ -655,6 +663,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.journeys
           // ignore: cast_nullable_to_non_nullable
           : journeys as List<ProspectJourneyDto>,
+      champsLibres: champsLibres == const $CopyWithPlaceholder()
+          ? _value.champsLibres
+          // ignore: cast_nullable_to_non_nullable
+          : champsLibres as Map<String, String>,
       dureeSystemeMois: dureeSystemeMois == const $CopyWithPlaceholder()
           ? _value.dureeSystemeMois
           // ignore: cast_nullable_to_non_nullable
@@ -807,6 +819,7 @@ ProspectDto _$ProspectDtoFromJson(
       'relaisNom',
       'relaisPhoneE164',
       'journeys',
+      'champsLibres',
       'dureeSystemeMois',
       'canalProvenanceId',
       'canalProvenanceLabel',
@@ -932,6 +945,10 @@ ProspectDto _$ProspectDtoFromJson(
       (v) => (v as List<dynamic>)
           .map((e) => ProspectJourneyDto.fromJson(e as Map<String, dynamic>))
           .toList(),
+    ),
+    champsLibres: $checkedConvert(
+      'champsLibres',
+      (v) => Map<String, String>.from(v as Map),
     ),
     dureeSystemeMois: $checkedConvert('dureeSystemeMois', (v) => v as num?),
     canalProvenanceId: $checkedConvert(
@@ -1062,6 +1079,7 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'relaisNom': instance.relaisNom,
       'relaisPhoneE164': instance.relaisPhoneE164,
       'journeys': instance.journeys.map((e) => e.toJson()).toList(),
+      'champsLibres': instance.champsLibres,
       'dureeSystemeMois': instance.dureeSystemeMois,
       'canalProvenanceId': instance.canalProvenanceId,
       'canalProvenanceLabel': instance.canalProvenanceLabel,

@@ -40,6 +40,7 @@ import {
   ouvrirFiche,
   type OuvertureFiche,
 } from '@/lib/data/ouvertures';
+import { useChampsConversion } from '@/lib/data/champs-conversion';
 import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
@@ -488,6 +489,8 @@ function Consignation({
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const formulaire = useChampsConversion(projet);
+
   const nomComplet = nomDe(prospect);
   const closed = prospect.phase2Status !== 'PENDING' || refusee;
   const [now] = useState(() => Date.now());
@@ -568,11 +571,16 @@ function Consignation({
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
-    const problems = validateConversion(conversion);
+    const problems = validateConversion(
+      conversion,
+      Date.now(),
+      formulaire.champs,
+      formulaire.libres,
+    );
     setConversionErrors(problems);
     if (Object.keys(problems).length > 0 || conversion.method === null) return;
     record('METHOD_OBTAINED', conversion.method, null, conversion);
-  }, [conversion, record]);
+  }, [conversion, formulaire, record]);
 
   const startOther = useCallback(() => {
     if (closed) return;
@@ -749,6 +757,8 @@ function Consignation({
               errors={conversionErrors}
               phoneE164={prospect.phoneE164}
               disabled={send.isPending}
+              reglages={formulaire.champs}
+              libres={formulaire.libres}
               onChange={(patch) => {
                 setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
               }}

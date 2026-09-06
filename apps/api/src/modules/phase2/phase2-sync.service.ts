@@ -16,6 +16,7 @@ import {
 import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { normaliserReponses } from '../champs-conversion/catalogue.js';
 import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
 import {
   CallAttemptApplyStatus,
@@ -32,6 +33,7 @@ interface ProspectState {
   rev: number;
   updatedAt: Date;
   lastCallAt: Date | null;
+  champsLibres: Prisma.JsonValue;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -49,6 +51,7 @@ const PROSPECT_STATE_SELECT = {
   rev: true,
   updatedAt: true,
   lastCallAt: true,
+  champsLibres: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -226,6 +229,7 @@ export class Phase2SyncService {
       ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
       ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
       ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
+      ...champsLibresPatch(op.champsLibres, current.champsLibres),
     };
     const dernier = dernierAppel(op, userId, current.lastCallAt);
     if (Object.keys(data).length === 0 && Object.keys(dernier).length === 0) return current;
@@ -420,4 +424,20 @@ export class Phase2SyncService {
       select: JOURNEY_STATE_SELECT,
     });
   }
+}
+
+/**
+ * Les réponses aux champs ajoutés par l'administrateur, fusionnées : le
+ * formulaire d'un projet ne connaît pas les champs de l'autre, et remplacer
+ * l'objet entier effacerait les réponses du parcours voisin.
+ */
+function champsLibresPatch(
+  envoyees: Record<string, string> | undefined,
+  courantes: Prisma.JsonValue,
+): { champsLibres?: Prisma.InputJsonValue } {
+  if (envoyees === undefined) return {};
+  const reponses = normaliserReponses(envoyees);
+  if (reponses === null || Object.keys(reponses).length === 0) return {};
+  const deja = normaliserReponses(courantes) ?? {};
+  return { champsLibres: { ...deja, ...reponses } };
 }

@@ -97,6 +97,8 @@ export const queryKeys = {
   demoBanner: ['demo-status', 'banner'] as const,
 
   // ─── Administration ───────────────────────────────────────────────────────
+  champsConversionRoot: ['champs-conversion'] as const,
+  champsConversion: (projet: Projet) => ['champs-conversion', projet] as const,
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
 

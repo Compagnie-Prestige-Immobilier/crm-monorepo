@@ -14,6 +14,7 @@ const NES_APRES = new Set([
   '/chues/appels-representants',
   '/chues/mes-contacts',
   '/admin/enrolement',
+  '/admin/champs-conversion',
 ]);
 
 describe('anciennes adresses, d’avant le découpage en coques', () => {
