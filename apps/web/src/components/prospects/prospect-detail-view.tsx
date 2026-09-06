@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
 
 import { DetailBackLink } from '@/components/detail-back-link';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -111,15 +112,17 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
               <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
+              <BoutonWhatsApp prospect={prospect} />
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
             <Ligne label="WhatsApp">
-              {prospect.whatsappE164 === null ? NO_VALUE : formatPhone(prospect.whatsappE164)}
+              {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
             </Ligne>
             <Ligne label="Profession">{prospect.profession ?? NO_VALUE}</Ligne>
+            <Ligne label="Établissement">{prospect.etablissement ?? NO_VALUE}</Ligne>
             <Ligne label="Banque">{prospect.banqueName ?? NO_VALUE}</Ligne>
             <Ligne label="Syndicat">{prospect.syndicatSigle ?? NO_VALUE}</Ligne>
             <Ligne label="Représentant">{prospect.representantName ?? NO_VALUE}</Ligne>
@@ -269,7 +272,7 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
             {ouiNon(appel.engagementEnCours)}
             {appel.dureeEtablissementMois === null
               ? ''
-              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans l’établissement`}
+              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans la fonction`}
             {appel.email === null || appel.email === '' ? '' : ` · ${appel.email}`}
           </p>
           {appel.rendezVousAt === null ? null : (

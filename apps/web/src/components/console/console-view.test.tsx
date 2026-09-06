@@ -308,8 +308,8 @@ describe('ConsoleView : fiche', () => {
     for (const label of ['Joignable', 'À rappeler', 'Injoignable', 'Mauvais numéro', 'Autre']) {
       expect(fiche.getByRole('button', { name: new RegExp(label) })).toBeTruthy();
     }
-    expect(fiche.queryByRole('button', { name: /Plateforme/ })).toBeNull();
-    expect(fiche.queryByRole('button', { name: /Prise de rendez-vous/ })).toBeNull();
+    expect(fiche.queryByRole('button', { name: /Plateforme en ligne/ })).toBeNull();
+    expect(fiche.queryByRole('button', { name: /RDV CPI/ })).toBeNull();
   });
 
   it('revient à la liste après enregistrement, sans sauter sur quelqu’un', async () => {
@@ -502,7 +502,7 @@ describe('ConsoleView : joignable, le dossier', () => {
 
   /** Ce que l'appel apprend et que la fiche ne porte pas encore. */
   const completerDossier = async (): Promise<void> => {
-    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/), '36');
+    await userEvent.type(await screen.findByLabelText(/Durée dans la fonction/), '36');
     await userEvent.click(
       within(screen.getByRole('group', { name: 'Fonctionnaire' })).getByRole('radio', {
         name: 'Oui',
@@ -513,7 +513,7 @@ describe('ConsoleView : joignable, le dossier', () => {
         name: 'Non',
       }),
     );
-    await choisirMethode('Plateforme');
+    await choisirMethode('Plateforme en ligne');
   };
 
   const GRAND_PUBLIC = prospect({
@@ -550,22 +550,23 @@ describe('ConsoleView : joignable, le dossier', () => {
       /^Téléphone/,
       /^E-mail/,
       /^Profession/,
-      /Durée dans l’établissement/,
+      /Durée dans la fonction/,
     ]) {
       expect(screen.getByLabelText(label)).toBeTruthy();
     }
     for (const groupe of ['Fonctionnaire', 'Engagement en cours à la banque']) {
       expect(screen.getByRole('group', { name: groupe })).toBeTruthy();
     }
-    for (const liste of [/Syndicat/, /Banque/, /Revenu mensuel/, /Durée du système de paiement/]) {
+    for (const liste of [/Syndicat/, /Banque/, /Revenu mensuel/]) {
       expect(screen.getByRole('combobox', { name: liste })).toBeTruthy();
     }
-    expect(screen.getByRole('radio', { name: 'Prise de rendez-vous' })).toBeTruthy();
+    expect(screen.getByRole('radio', { name: 'RDV CPI' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Il refuse' })).toBeTruthy();
     expect(screen.getByLabelText(/Commentaire/)).toBeTruthy();
 
     expect(screen.queryByRole('group', { name: 'Situation' })).toBeNull();
     expect(screen.queryByRole('combobox', { name: /^Paiement/ })).toBeNull();
+    expect(screen.queryByRole('combobox', { name: /Durée du système de paiement/ })).toBeNull();
     expect(screen.queryByRole('radio', { name: 'Non demandé' })).toBeNull();
   });
 
@@ -612,11 +613,8 @@ describe('ConsoleView : joignable, le dossier', () => {
         'Moins de 150 000 F',
       );
     });
-    expect(
-      screen.getByRole('combobox', { name: /Durée du système de paiement/ }).textContent,
-    ).toContain('2 ans (24 mois)');
     for (const radio of screen.getAllByRole('radio', {
-      name: /Plateforme|Physique|rendez-vous|Vocal/,
+      name: /RDV CPI|Plateforme en ligne|Mail|WhatsApp/,
     })) {
       expect(radio).toHaveProperty('checked', false);
     }
@@ -700,7 +698,7 @@ describe('ConsoleView : joignable, le dossier', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await choisirMethode('Plateforme');
+    await choisirMethode('Plateforme en ligne');
     await submit();
 
     await waitFor(() => {
@@ -715,7 +713,7 @@ describe('ConsoleView : joignable, le dossier', () => {
 
     await userEvent.keyboard('1');
     await userEvent.click(await screen.findByRole('checkbox', { name: 'Diaspora' }));
-    await choisirMethode('Plateforme');
+    await choisirMethode('Plateforme en ligne');
     await submit();
 
     await waitFor(() => {
@@ -733,10 +731,10 @@ describe('ConsoleView : joignable, le dossier', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await choisirMethode('Prise de rendez-vous');
+    await choisirMethode('RDV CPI');
     await submit();
 
-    expect(await screen.findByText(/exige la date du rendez-vous/)).toBeTruthy();
+    expect(await screen.findByText(/exige la date et l’heure du rendez-vous/)).toBeTruthy();
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
 
@@ -744,8 +742,11 @@ describe('ConsoleView : joignable, le dossier', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await choisirMethode('Prise de rendez-vous');
-    await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
+    await choisirMethode('RDV CPI');
+    await userEvent.type(
+      await screen.findByLabelText(/Date et heure du rendez-vous/),
+      '2027-03-04T11:30',
+    );
     await submit();
 
     await waitFor(() => {
@@ -759,9 +760,12 @@ describe('ConsoleView : joignable, le dossier', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await choisirMethode('Prise de rendez-vous');
-    await userEvent.type(await screen.findByLabelText(/Date du rendez-vous/), '2027-03-04T11:30');
-    await choisirMethode('Plateforme');
+    await choisirMethode('RDV CPI');
+    await userEvent.type(
+      await screen.findByLabelText(/Date et heure du rendez-vous/),
+      '2027-03-04T11:30',
+    );
+    await choisirMethode('Plateforme en ligne');
     await submit();
 
     await waitFor(() => {
@@ -788,12 +792,12 @@ describe('ConsoleView : joignable, le dossier', () => {
     await renderConsole([GRAND_PUBLIC]);
 
     await userEvent.keyboard('1');
-    await choisirMethode('Plateforme');
+    await choisirMethode('Plateforme en ligne');
     await submit();
 
     const message = await screen.findByText(/mois entiers, de 0 à 600/);
     expect(
-      screen.getByLabelText(/Durée dans l’établissement/).getAttribute('aria-describedby'),
+      screen.getByLabelText(/Durée dans la fonction/).getAttribute('aria-describedby'),
     ).toContain(message.id);
   });
 
@@ -1113,7 +1117,7 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await renderConsole([RENSEIGNE]);
 
     await userEvent.keyboard('1');
-    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+    await userEvent.type(await screen.findByLabelText(/Durée dans la fonction/u), '36');
     await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle après 17 h');
     // Les deux boutons voisins n'ont pas le même effet : l'écran doit le dire.
     expect(screen.getByText(/« Annuler » l’efface/u)).toBeTruthy();
@@ -1210,7 +1214,7 @@ describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
     await renderConsole([NEUVE]);
 
     expect(await screen.findByLabelText(/^Profession/u)).toHaveProperty('value', 'Instituteur');
-    expect(screen.getByLabelText(/^Durée dans l’établissement/u)).toHaveProperty('value', '36');
+    expect(screen.getByLabelText(/^Durée dans la fonction/u)).toHaveProperty('value', '36');
     expect(screen.getByRole('combobox', { name: /Banque/u }).textContent).toContain('CBAO');
     expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il rappelle après 17 h');
   });
@@ -1350,7 +1354,7 @@ describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
     await renderConsole([NEUVE]);
 
     await userEvent.keyboard('1');
-    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+    await userEvent.type(await screen.findByLabelText(/Durée dans la fonction/u), '36');
 
     masquerLOnglet();
 

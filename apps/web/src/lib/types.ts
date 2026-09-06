@@ -202,13 +202,23 @@ export const ENROLLMENT_METHODS = [
   'PHYSICAL',
   'VOICE_OR_ELECTRONIC_MESSAGING',
   'APPOINTMENT',
+  'WHATSAPP',
+] as const satisfies readonly EnrollmentMethod[];
+
+/** Ce que l'écran propose. `PHYSICAL` en sort : EB-24 l'a versé dans « RDV CPI ». */
+export const ENROLLMENT_METHOD_ORDER = [
+  'APPOINTMENT',
+  'PLATFORM',
+  'VOICE_OR_ELECTRONIC_MESSAGING',
+  'WHATSAPP',
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
-  PLATFORM: 'Plateforme',
-  PHYSICAL: 'Physique',
-  VOICE_OR_ELECTRONIC_MESSAGING: 'Vocal ou messagerie électronique',
-  APPOINTMENT: 'Prise de rendez-vous',
+  APPOINTMENT: 'RDV CPI',
+  PHYSICAL: 'RDV CPI',
+  PLATFORM: 'Plateforme en ligne',
+  VOICE_OR_ELECTRONIC_MESSAGING: 'Mail',
+  WHATSAPP: 'WhatsApp',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {

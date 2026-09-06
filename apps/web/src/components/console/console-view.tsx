@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
 import { useShortcuts } from '@/components/console/use-shortcuts';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -723,6 +724,7 @@ function Consignation({
             Copier
             <Kbd>C</Kbd>
           </Button>
+          <BoutonWhatsApp prospect={prospect} />
         </div>
 
         <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
