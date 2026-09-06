@@ -11,6 +11,7 @@ class AuthState {
     this.fullName,
     this.role,
     this.email,
+    this.phoneE164,
     this.errorMessage,
     this.isSubmitting = false,
   });
@@ -28,6 +29,9 @@ class AuthState {
   final String? role;
 
   final String? email;
+
+  /// EB-26 : le message WhatsApp envoyé au prospect s'y termine.
+  final String? phoneE164;
 
   final String? errorMessage;
   final bool isSubmitting;
@@ -60,6 +64,7 @@ class AuthState {
     String? fullName,
     String? role,
     String? email,
+    String? phoneE164,
     String? errorMessage,
     bool clearError = false,
     bool? isSubmitting,
@@ -70,6 +75,7 @@ class AuthState {
       fullName: fullName ?? this.fullName,
       role: role ?? this.role,
       email: email ?? this.email,
+      phoneE164: phoneE164 ?? this.phoneE164,
       errorMessage: clearError ? null : (errorMessage ?? this.errorMessage),
       isSubmitting: isSubmitting ?? this.isSubmitting,
     );
@@ -84,6 +90,7 @@ class AuthState {
           other.fullName == fullName &&
           other.role == role &&
           other.email == email &&
+          other.phoneE164 == phoneE164 &&
           other.errorMessage == errorMessage &&
           other.isSubmitting == isSubmitting;
 
@@ -94,6 +101,7 @@ class AuthState {
     fullName,
     role,
     email,
+    phoneE164,
     errorMessage,
     isSubmitting,
   );

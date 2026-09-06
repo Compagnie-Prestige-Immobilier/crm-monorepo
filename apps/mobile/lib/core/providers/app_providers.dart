@@ -86,6 +86,23 @@ final Provider<ApiPort> apiPortProvider = Provider<ApiPort>((Ref ref) {
   );
 });
 
+/// EB-26 : le gabarit du message WhatsApp et les autres réglages CHUES. Nul
+/// hors ligne ou en cas d'échec — ces valeurs n'affichent qu'une aide, jamais
+/// un blocage du parcours.
+final FutureProvider<ParametresChuesDto?> parametresChuesProvider =
+    FutureProvider<ParametresChuesDto?>((Ref ref) async {
+      try {
+        final Response<ParametresChuesDto> reponse = await ref
+            .watch(apiClientProvider)
+            .client
+            .getParametresChuesApi()
+            .getParametresChues();
+        return reponse.data;
+      } on DioException {
+        return null;
+      }
+    });
+
 final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((
   Ref ref,
 ) {
