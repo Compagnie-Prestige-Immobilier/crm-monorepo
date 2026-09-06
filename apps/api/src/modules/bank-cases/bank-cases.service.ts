@@ -53,6 +53,38 @@ const DEFAULT_SEARCH_PAGE_SIZE = 20;
 /** Sentinelle interne : la transaction n'a rien mis à jour, la révision a bougé. */
 const REV_MISMATCH = Symbol('rev-mismatch');
 
+// « Fall Moussa » et « Moussa Fall » désignent la même personne. La
+// permutation se fait sur le TERME : inverser les COLONNES demanderait une
+// seconde expression, que l'index ne couvre pas, et ramènerait le balayage
+// séquentiel que cet index existe pour éviter.
+function prospectSearchForms(term: string): string[] {
+  const jetons = sansAccents(term.toLowerCase()).split(/\s+/u).filter(Boolean);
+  const [premier, second] = jetons;
+  return jetons.length === 2 && premier !== undefined && second !== undefined
+    ? [`%${premier} ${second}%`, `%${second} ${premier}%`]
+    : [`%${sansAccents(term.toLowerCase())}%`];
+}
+
+// Téléphone cherché sous sa forme NORMALISÉE : les quatre écritures d'un même
+// abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
+function prospectPhoneCondition(term: string): Prisma.Sql {
+  const digits = term.replace(/\D/gu, '');
+  const normalized = tryNormalizePhone(term);
+  if (normalized !== undefined) return Prisma.sql`OR p."phoneE164" = ${normalized}`;
+  if (digits.length >= 4) return Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`;
+  return Prisma.sql``;
+}
+
+// Le PARCOURS, pas le projet d'entrée : voir `bankCaseConditions`.
+function prospectProjetCondition(projet: Projet | undefined): Prisma.Sql {
+  return projet === undefined
+    ? Prisma.sql`TRUE`
+    : Prisma.sql`EXISTS (
+        SELECT 1 FROM "prospect_journeys" pj
+        WHERE pj."prospectId" = p."id" AND pj."projet" = ${projet}::"Projet"
+      )`;
+}
+
 @Injectable()
 export class BankCasesService {
   constructor(private readonly prisma: PrismaService) {}
@@ -198,29 +230,20 @@ export class BankCasesService {
     const existing = await this.loadCase(id);
     if (isTerminalStage(existing.currentStage)) throw terminalCase(existing.currentStage.label);
 
+    const referenceUpdate = await this.resolveReferenceUpdate(existing, input);
+    const processingBankId = await this.resolveProcessingBankId(input);
+
     // `Unchecked` : la variante vérifiée n'expose pas les clés étrangères
     // (`updatedById`, `processingBankId`) qu'on écrit ici.
     const data: Prisma.BankCaseUncheckedUpdateManyInput = {
       updatedById: user.id,
       rev: { increment: 1 },
     };
-
-    let referenceKey: string | undefined;
-    if (input.reference !== undefined) {
-      referenceKey = normalizeReferenceKey(input.reference);
-      if (referenceKey !== existing.referenceKey) await this.assertReferenceFree(referenceKey);
-      data.reference = normalizeReferenceDisplay(input.reference);
-      data.referenceKey = referenceKey;
+    if (referenceUpdate !== undefined) {
+      data.reference = referenceUpdate.reference;
+      data.referenceKey = referenceUpdate.referenceKey;
     }
-
-    if (input.processingBankId !== undefined) {
-      const bank = await this.prisma.banque.findUnique({
-        where: { id: input.processingBankId },
-        select: { id: true },
-      });
-      if (!bank) throw bankNotFound(input.processingBankId);
-      data.processingBankId = input.processingBankId;
-    }
+    if (processingBankId !== undefined) data.processingBankId = processingBankId;
 
     try {
       const updated = await this.prisma.bankCase.updateMany({
@@ -229,13 +252,33 @@ export class BankCasesService {
       });
       if (updated.count === 0) throw revConflict(toBankCaseDto(await this.loadCase(id)));
     } catch (error) {
-      if (referenceKey !== undefined && isUniqueViolation(error)) {
-        throw await this.referenceConflictError(referenceKey);
+      if (referenceUpdate !== undefined && isUniqueViolation(error)) {
+        throw await this.referenceConflictError(referenceUpdate.referenceKey);
       }
       throw error;
     }
 
     return toBankCaseDto(await this.loadCase(id));
+  }
+
+  private async resolveReferenceUpdate(
+    existing: BankCaseRow,
+    input: UpdateBankCaseDto,
+  ): Promise<{ reference: string; referenceKey: string } | undefined> {
+    if (input.reference === undefined) return undefined;
+    const referenceKey = normalizeReferenceKey(input.reference);
+    if (referenceKey !== existing.referenceKey) await this.assertReferenceFree(referenceKey);
+    return { reference: normalizeReferenceDisplay(input.reference), referenceKey };
+  }
+
+  private async resolveProcessingBankId(input: UpdateBankCaseDto): Promise<string | undefined> {
+    if (input.processingBankId === undefined) return undefined;
+    const bank = await this.prisma.banque.findUnique({
+      where: { id: input.processingBankId },
+      select: { id: true },
+    });
+    if (!bank) throw bankNotFound(input.processingBankId);
+    return input.processingBankId;
   }
 
   /** Avancée normale, réservée aux étapes atteignables depuis l'étape courante. */
@@ -338,38 +381,11 @@ export class BankCasesService {
     const pageSize = query.pageSize ?? DEFAULT_SEARCH_PAGE_SIZE;
     const term = query.search.trim();
 
-    // « Fall Moussa » et « Moussa Fall » désignent la même personne. La
-    // permutation se fait sur le TERME : inverser les COLONNES demanderait une
-    // seconde expression, que l'index ne couvre pas, et ramènerait le balayage
-    // séquentiel que cet index existe pour éviter.
     // Désaccentué ici et non en SQL : `LIKE ANY (SELECT immutable_unaccent(m)
     // FROM unnest(...))` fait perdre l'index au planificateur, vérifié à l'EXPLAIN.
-    const jetons = sansAccents(term.toLowerCase()).split(/\s+/u).filter(Boolean);
-    const [premier, second] = jetons;
-    const formesRecherchees =
-      jetons.length === 2 && premier !== undefined && second !== undefined
-        ? [`%${premier} ${second}%`, `%${second} ${premier}%`]
-        : [`%${sansAccents(term.toLowerCase())}%`];
-
-    // Téléphone cherché sous sa forme NORMALISÉE : les quatre écritures d'un même
-    // abonné doivent répondre. Une saisie partielle retombe sur les chiffres bruts.
-    const digits = term.replace(/\D/gu, '');
-    const normalized = tryNormalizePhone(term);
-    let phone = Prisma.sql``;
-    if (normalized !== undefined) {
-      phone = Prisma.sql`OR p."phoneE164" = ${normalized}`;
-    } else if (digits.length >= 4) {
-      phone = Prisma.sql`OR p."phoneE164" LIKE ${`%${digits}`}`;
-    }
-
-    // Le PARCOURS, pas le projet d'entrée : voir `bankCaseConditions`.
-    const projet =
-      query.projet === undefined
-        ? Prisma.sql`TRUE`
-        : Prisma.sql`EXISTS (
-            SELECT 1 FROM "prospect_journeys" pj
-            WHERE pj."prospectId" = p."id" AND pj."projet" = ${query.projet}::"Projet"
-          )`;
+    const formesRecherchees = prospectSearchForms(term);
+    const phone = prospectPhoneCondition(term);
+    const projet = prospectProjetCondition(query.projet);
     const where = Prisma.sql`
       p."deletedAt" IS NULL
       AND ${projet}
