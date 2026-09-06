@@ -16,6 +16,7 @@ import { ParametresChuesService } from '../parametres-chues/parametres-chues.ser
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { DemandePubliqueDto } from './dto.js';
+import { verifierTurnstile } from './turnstile.js';
 
 const TITRE_MAX = 120;
 const CORPS_MAX = 500;
@@ -70,10 +71,12 @@ export class FormulairePublicService {
     @Inject(BREVO_TRANSPORT) private readonly email: BrevoTransport,
   ) {}
 
-  async recevoir(jeton: string, demande: DemandePubliqueDto): Promise<OkDto> {
+  async recevoir(jeton: string, demande: DemandePubliqueDto, ip?: string): Promise<OkDto> {
     // Le piège est rempli : la réponse est celle d'un envoi accepté, et rien
     // n'est écrit. Un refus explicite apprendrait au robot à contourner.
     if (demande.site !== undefined && demande.site.trim() !== '') return { ok: true };
+
+    await verifierTurnstile(demande.turnstileToken, ip);
 
     const agent = await this.prisma.user.findFirst({
       where: { id: jeton, isActive: true, deletedAt: null },

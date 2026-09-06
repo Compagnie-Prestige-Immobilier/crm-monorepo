@@ -1,4 +1,4 @@
-import { Body, Controller, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Ip, Param, ParseUUIDPipe, Post } from '@nestjs/common';
 import { ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { seconds, Throttle } from '@nestjs/throttler';
 
@@ -9,7 +9,7 @@ import { DemandePubliqueDto } from './dto.js';
 import { FormulairePublicService } from './formulaire-public.service.js';
 
 @ApiTags('formulaire-public')
-@ApiErrors({ 400: true, 404: true, 429: true })
+@ApiErrors({ 400: true, 404: true, 429: true, 503: true })
 @Controller({ path: 'formulaire-public', version: '1' })
 export class FormulairePublicController {
   constructor(private readonly demandes: FormulairePublicService) {}
@@ -29,10 +29,15 @@ export class FormulairePublicController {
   })
   @ApiParam({ name: 'jeton', format: 'uuid' })
   @ApiResponse({ status: 201, type: OkDto })
+  /**
+   * `ip` sert la vérification Cloudflare et vaut celle du visiteur seulement
+   * derrière `API_TRUST_PROXY_HEADERS=true`, comme le compteur du throttler.
+   */
   envoyer(
     @Param('jeton', ParseUUIDPipe) jeton: string,
     @Body() demande: DemandePubliqueDto,
+    @Ip() ip: string,
   ): Promise<OkDto> {
-    return this.demandes.recevoir(jeton, demande);
+    return this.demandes.recevoir(jeton, demande, ip);
   }
 }

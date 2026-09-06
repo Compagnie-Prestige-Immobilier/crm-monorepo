@@ -20,6 +20,9 @@ export default async function DemandePubliquePage({
   params: Promise<{ jeton: string }>;
 }) {
   const { jeton } = await params;
+  // Clé publique du widget anti-robot. Absente, la page rend le formulaire sans
+  // widget et l'API refuse l'envoi, sauf TURNSTILE_ALLOW_DEGRADED.
+  const cleSite = process.env.TURNSTILE_SITE_KEY ?? '';
 
   return (
     <main id="contenu-principal" className="flex min-h-dvh justify-center bg-background px-6 py-12">
@@ -43,7 +46,7 @@ export default async function DemandePubliquePage({
         </div>
 
         <div className="mt-8">
-          <FormulaireDemande jeton={jeton} />
+          <FormulaireDemande jeton={jeton} cleSite={cleSite} />
         </div>
 
         <p className="mt-10 text-caption text-muted-foreground">

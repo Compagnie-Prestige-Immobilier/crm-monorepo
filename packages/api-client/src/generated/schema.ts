@@ -7963,6 +7963,8 @@ export interface components {
       message?: string;
       /** @description Laisser vide. */
       site?: string;
+      /** @description Jeton rendu par le widget Cloudflare Turnstile de la page. */
+      turnstileToken?: string;
     };
   };
   responses: never;
@@ -20865,6 +20867,15 @@ export interface operations {
       };
       /** @description Trop de requêtes : réessayez plus tard. */
       429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Service momentanément indisponible. */
+      503: {
         headers: {
           [name: string]: unknown;
         };
