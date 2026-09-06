@@ -490,6 +490,59 @@ export function BankStagesView() {
   );
 }
 
+function resolveDialogKey(mode: 'create' | 'edit', stage: BankCaseStage | null): string | null {
+  if (stage !== null) return stage.id;
+  return mode === 'create' ? 'nouveau' : null;
+}
+
+function shouldReinitialize(open: boolean, key: string | null, initialised: string | null): boolean {
+  return open && key !== null && initialised !== key;
+}
+
+function saveStagePayload(
+  mode: 'create' | 'edit',
+  stage: BankCaseStage | null,
+  code: string,
+  label: string,
+  color: string,
+) {
+  if (mode === 'create') {
+    return createBankStage({ code: code.trim().toUpperCase(), label: label.trim(), color });
+  }
+  return updateBankStage(stage?.id ?? '', { label: label.trim(), color });
+}
+
+function saveStageSuccessMessage(mode: 'create' | 'edit', label: string): string {
+  return mode === 'create' ? `Étape « ${label} » créée.` : `Étape renommée en « ${label} ».`;
+}
+
+function stageFormTitle(mode: 'create' | 'edit', stageLabel: string): string {
+  return mode === 'create' ? 'Nouvelle étape du flux' : `Renommer « ${stageLabel} »`;
+}
+
+function stageFormDescription(mode: 'create' | 'edit'): string {
+  return mode === 'create'
+    ? 'Ajoutée à la fin du flux ouvert, déplaçable ensuite.'
+    : 'Le code reste inchangé.';
+}
+
+function StageCodeSection({
+  mode,
+  codeId,
+  code,
+  valide,
+  onChange,
+}: {
+  mode: 'create' | 'edit';
+  codeId: string;
+  code: string;
+  valide: boolean;
+  onChange: (code: string) => void;
+}) {
+  if (mode !== 'create') return null;
+  return <ChampCode codeId={codeId} code={code} valide={valide} onChange={onChange} />;
+}
+
 function codeAcceptable(mode: 'create' | 'edit', code: string): boolean {
   return mode === 'edit' || /^[A-Z][A-Z0-9_]{1,39}$/u.test(code.trim().toUpperCase());
 }
@@ -560,26 +613,20 @@ function StageFormDialog({
   const [color, setColor] = useState('info');
   const [initialised, setInitialised] = useState<string | null>(null);
 
-  const key = stage?.id ?? (mode === 'create' ? 'nouveau' : null);
-  if (open && key !== null && initialised !== key) {
+  const stageLabel = stage?.label ?? '';
+  const key = resolveDialogKey(mode, stage);
+  if (shouldReinitialize(open, key, initialised)) {
     setInitialised(key);
     setCode('');
-    setLabel(stage?.label ?? '');
+    setLabel(stageLabel);
     setColor(stage?.color ?? 'info');
   }
 
   const save = useMutation({
-    mutationFn: () =>
-      mode === 'create'
-        ? createBankStage({ code: code.trim().toUpperCase(), label: label.trim(), color })
-        : updateBankStage(stage?.id ?? '', { label: label.trim(), color }),
+    mutationFn: () => saveStagePayload(mode, stage, code, label, color),
     onSuccess: (result) => {
       onDone();
-      toast.success(
-        mode === 'create'
-          ? `Étape « ${result.label} » créée.`
-          : `Étape renommée en « ${result.label} ».`,
-      );
+      toast.success(saveStageSuccessMessage(mode, result.label));
       onOpenChange(false);
     },
     onError: (error) => {
@@ -590,31 +637,22 @@ function StageFormDialog({
   const codeValid = codeAcceptable(mode, code);
   const labelValid = libelleAcceptable(label);
 
+  function handleOpenChange(next: boolean): void {
+    if (!next && save.isPending) return;
+    if (!next) setInitialised(null);
+    onOpenChange(next);
+  }
+
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next && save.isPending) return;
-        if (!next) setInitialised(null);
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {mode === 'create' ? 'Nouvelle étape du flux' : `Renommer « ${stage?.label ?? ''} »`}
-          </DialogTitle>
-          <DialogDescription>
-            {mode === 'create'
-              ? 'Ajoutée à la fin du flux ouvert, déplaçable ensuite.'
-              : 'Le code reste inchangé.'}
-          </DialogDescription>
+          <DialogTitle>{stageFormTitle(mode, stageLabel)}</DialogTitle>
+          <DialogDescription>{stageFormDescription(mode)}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          {mode === 'create' ? (
-            <ChampCode codeId={codeId} code={code} valide={codeValid} onChange={setCode} />
-          ) : null}
+          <StageCodeSection mode={mode} codeId={codeId} code={code} valide={codeValid} onChange={setCode} />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={labelId}>
