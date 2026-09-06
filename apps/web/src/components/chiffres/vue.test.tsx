@@ -288,9 +288,7 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
     await user.click(await screen.findByRole('button', { name: 'À propos de Prospects saisis' }));
-    expect(
-      await screen.findByText('Le nombre de nouvelles fiches saisies pendant la période.'),
-    ).toBeTruthy();
+    expect(await screen.findByText('Fiches prospect saisies sur la période.')).toBeTruthy();
   });
 
   // Les taux par téléconseiller se relisent sur les sommes des lignes ; la
@@ -437,15 +435,14 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(screen.getByText('Aucun appel à un prospect sur la période')).toBeTruthy();
   });
 
-  it('une tuile de taux met le nombre en grand et le pourcentage en dessous', async () => {
+  it('une tuile de taux met le pourcentage en grand et le compte en dessous', async () => {
     setUrl('/chues/statistiques');
     dispositionMock.mockResolvedValue(disposition(['taux-de-joignabilite-representants']));
     activiteMock.mockResolvedValue(activite);
 
     renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
 
-    expect((await screen.findAllByText('14')).length).toBeGreaterThan(0);
-    expect(screen.getByText('70,0 % · 14 joints sur 20 fiches')).toBeTruthy();
-    expect(screen.queryByText('70,0 %')).toBeNull();
+    expect((await screen.findAllByText('70,0 %')).length).toBeGreaterThan(0);
+    expect(screen.getByText('14 joints sur 20 fiches')).toBeTruthy();
   });
 });

@@ -116,6 +116,10 @@ const ATTEINT_AUTREMENT: Readonly<Record<string, string>> = {
   '/chues/console': 'troisième geste · chues/hub-view.tsx',
   '/chues/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
   '/grand-public/tableau-de-bord': 'redirige vers « Chiffres », qui l’a absorbé',
+  '/chues/supervision': 'onglets Activité et Présence · pilotage/onglets.tsx',
+  '/chues/campagnes': 'onglet Campagnes · pilotage/onglets.tsx',
+  '/grand-public/supervision': 'onglet Activité · pilotage/onglets.tsx',
+  '/grand-public/campagnes': 'onglet Campagnes · pilotage/onglets.tsx',
   '/chues/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
   '/grand-public/dossiers/nouveau': 'bouton · bank/bank-cases-view.tsx',
   '/chues/representants/import': 'bouton · representants/representants-view.tsx',
@@ -133,13 +137,17 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/admin/referentiels/issues-appel',
     '/admin/referentiels/statuts-qualification',
     '/chues/appels-representants',
+    '/chues/campagnes',
     '/chues/console',
     '/chues/dossiers/nouveau',
     '/chues/prospects/nouveau',
     '/chues/representants/import',
+    '/chues/supervision',
     '/chues/tableau-de-bord',
     '/compte',
+    '/grand-public/campagnes',
     '/grand-public/dossiers/nouveau',
+    '/grand-public/supervision',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
@@ -148,15 +156,23 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
     '/accueil/listes',
     '/accueil/tableau-de-bord',
     '/chues',
+    '/chues/campagnes',
+    '/chues/supervision',
     '/chues/tableau-de-bord',
     '/compte',
+    '/grand-public/campagnes',
+    '/grand-public/supervision',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
   SUPERVISEUR: [
     '/chues',
+    '/chues/campagnes',
+    '/chues/supervision',
     '/chues/tableau-de-bord',
     '/compte',
+    '/grand-public/campagnes',
+    '/grand-public/supervision',
     '/grand-public/tableau-de-bord',
     '/notifications',
   ],
@@ -280,7 +296,6 @@ describe('navigation d’un ADMIN', () => {
       '/chues',
       '/chues/statistiques',
       '/chues/prospects',
-      '/chues/campagnes',
       '/chues/parametres-chues',
       '/chues/dossiers',
       '/chues/dossiers/etapes',
@@ -291,7 +306,6 @@ describe('navigation d’un ADMIN', () => {
       '/chues/representants',
       '/chues/suggestions',
       '/admin/commerciaux',
-      '/chues/supervision',
       '/admin/referentiels',
       '/admin/imports',
       '/admin/parametres',
@@ -367,19 +381,17 @@ describe('navigation d’un ADMIN', () => {
     for (const section of sections) expect(section.items.length).toBeGreaterThan(0);
   });
 
-  it('ouvre sur le tableau de bord, garde cinq entrées en pleine barre et replie le reste', () => {
+  it('ouvre sur le tableau de bord, garde quatre entrées en pleine barre et replie le reste', () => {
     const items = navItems('ADMIN', 'chues');
     expect(items.filter((item) => item.secondary !== true).map((item) => item.href)).toEqual([
       '/chues/statistiques',
       '/chues/prospects',
       '/chues/representants',
-      '/chues/campagnes',
       '/chues/dossiers',
     ]);
     expect(items.filter((item) => item.secondary === true).map((item) => item.href)).toEqual([
       '/chues/parametres-chues',
       '/chues',
-      '/chues/supervision',
       '/chues/rappels',
       '/chues/mes-contacts',
       '/chues/suggestions',
@@ -730,7 +742,9 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
   it('nomme l’écran des comptes par ce qu’il contient VRAIMENT', () => {
     expect(navTitle('ADMIN', '/admin/commerciaux')).toBe('Utilisateurs');
     expect(navTitle('ADMIN', '/admin/commerciaux')).not.toContain('Commerciaux');
-    expect(navTitle('ADMIN', '/chues/supervision')).toBe('Équipes');
+    // Activité, Présence et Campagnes sont des onglets du tableau de bord : même titre.
+    expect(navTitle('ADMIN', '/chues/supervision')).toBe('Tableau de bord');
+    expect(navTitle('ADMIN', '/chues/campagnes')).toBe('Tableau de bord');
     expect(navTitle('ADMIN', '/chues/statistiques')).toBe('Tableau de bord');
   });
 
@@ -767,20 +781,18 @@ describe('titre et surbrillance par PRÉFIXE LE PLUS LONG', () => {
 });
 
 describe('navigation d’un SUPERVISEUR', () => {
-  it('ouvre sur le tableau de bord, puis ses propres appels, puis le suivi de son équipe', () => {
+  it('ouvre sur le tableau de bord, puis ses propres appels', () => {
     expect(hrefs('SUPERVISEUR', 'chues')).toEqual([
       '/chues/statistiques',
       '/chues/appels-representants',
       '/chues/prospects/nouveau',
       '/chues/console',
       '/chues/rappels',
-      '/chues/supervision',
       // Sous « Plus ».
       '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/representants',
       '/chues/prospects',
-      '/chues/campagnes',
       '/chues/parametres-chues',
     ]);
     expect(navItems('SUPERVISEUR', 'chues').map((item) => item.label)).toEqual([
@@ -789,23 +801,26 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Ajouter un prospect',
       'Convertir un prospect',
       'Rappels promis',
-      'Mon équipe',
       'Mes contacts',
       'Contacts recommandés',
       'Représentants',
       'Prospects',
-      'Campagnes',
       'Paramètres CHUES',
     ]);
   });
 
-  it('garde le tableau de bord et le suivi de l’équipe en pleine barre, replie les lots', () => {
-    const replies = navItems('SUPERVISEUR', 'chues')
-      .filter((item) => item.secondary === true)
-      .map((item) => item.href);
-    expect(replies).toContain('/chues/campagnes');
-    expect(replies).not.toContain('/chues/statistiques');
-    expect(replies).not.toContain('/chues/supervision');
+  // Le suivi de l'équipe et les campagnes sont des onglets du tableau de bord :
+  // la barre surligne cette entrée quand on y est.
+  it('surligne « Tableau de bord » sur l’activité, la présence et les campagnes', () => {
+    const tableauDeBord = navItems('SUPERVISEUR', 'chues').find(
+      (item) => item.href === '/chues/statistiques',
+    );
+    expect(tableauDeBord).toBeDefined();
+    if (tableauDeBord === undefined) return;
+    for (const pathname of ['/chues/supervision', '/chues/campagnes', '/chues/campagnes/lot-1']) {
+      expect(isNavItemActive('SUPERVISEUR', pathname, tableauDeBord), pathname).toBe(true);
+      expect(navTitle('SUPERVISEUR', pathname)).toBe('Tableau de bord');
+    }
   });
 
   it('masque toujours l’administration, la banque et le registre des visites', () => {
@@ -901,7 +916,7 @@ describe('les trois étapes, lues à l’identique par les trois rôles qui les 
   });
 
   it('ne réserve le suivi de l’équipe qu’à ceux qui encadrent', () => {
-    expect(parRole((role) => hrefs(role, 'chues').includes('/chues/supervision'))).toEqual({
+    expect(parRole((role) => navTitle(role, '/chues/supervision') === 'Tableau de bord')).toEqual({
       COMMERCIAL: false,
       SUPERVISEUR: true,
       DIRECTION: true,
@@ -937,13 +952,11 @@ describe('navigation de la DIRECTION', () => {
       '/chues/prospects/nouveau',
       '/chues/console',
       '/chues/rappels',
-      '/chues/supervision',
       // Sous « Plus ».
       '/chues/mes-contacts',
       '/chues/suggestions',
       '/chues/representants',
       '/chues/prospects',
-      '/chues/campagnes',
       '/chues/parametres-chues',
     ]);
   });
@@ -952,11 +965,9 @@ describe('navigation de la DIRECTION', () => {
     expect(hrefs('DIRECTION', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
       '/grand-public/mes-contacts',
-      '/grand-public/campagnes',
     ]);
   });
 
@@ -1018,35 +1029,31 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
     expect(hrefs('SUPERVISEUR', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/supervision',
       // Sous « Plus ».
       '/grand-public/rappels',
       '/grand-public/mes-contacts',
-      '/grand-public/campagnes',
     ]);
     expect(
       navItems('SUPERVISEUR', 'grand-public')
         .filter((item) => item.secondary === true)
         .map((item) => item.href),
-    ).toEqual(['/grand-public/rappels', '/grand-public/mes-contacts', '/grand-public/campagnes']);
+    ).toEqual(['/grand-public/rappels', '/grand-public/mes-contacts']);
   });
 
   it('suit l’équipe et les campagnes du Grand Public sans passer par CHUES', () => {
-    expect(navTitle('SUPERVISEUR', '/grand-public/supervision')).toBe('Mon équipe');
-    expect(navTitle('ADMIN', '/grand-public/campagnes')).toBe('Campagnes');
-    expect(hrefs('COMMERCIAL', 'grand-public')).not.toContain('/grand-public/supervision');
+    expect(navTitle('SUPERVISEUR', '/grand-public/supervision')).toBe('Tableau de bord');
+    expect(navTitle('ADMIN', '/grand-public/campagnes')).toBe('Tableau de bord');
+    expect(navTitle('COMMERCIAL', '/grand-public/supervision')).not.toBe('Tableau de bord');
   });
 
   it('donne à l’ADMIN les deux écrans de saisie du Grand Public, sous « Plus »', () => {
     expect(hrefs('ADMIN', 'grand-public')).toEqual([
       '/grand-public/statistiques',
       '/grand-public',
-      '/grand-public/supervision',
       '/grand-public/dossiers',
       // Sous « Plus ».
       '/grand-public/rappels',
       '/grand-public/mes-contacts',
-      '/grand-public/campagnes',
       '/grand-public/console',
       '/grand-public/nouveau',
       '/grand-public/banque',
@@ -1059,12 +1066,7 @@ describe('navigation du pilotage sur le Grand Public et le registre', () => {
       navItems('ADMIN', 'grand-public')
         .filter((item) => item.secondary !== true)
         .map((item) => item.href),
-    ).toEqual([
-      '/grand-public/statistiques',
-      '/grand-public',
-      '/grand-public/supervision',
-      '/grand-public/dossiers',
-    ]);
+    ).toEqual(['/grand-public/statistiques', '/grand-public', '/grand-public/dossiers']);
   });
 
   it('n’ouvre à l’ADMIN qu’une entrée dans le registre : les trois autres sont des onglets', () => {

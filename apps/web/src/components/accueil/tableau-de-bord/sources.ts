@@ -33,6 +33,9 @@ export interface ScalaireDatum {
 export interface CompositionLigne {
   ligne: string;
   segments: NamedCount[];
+  /** Ce que le clic sur cette ligne ouvre, et ce que sa légende ajoute sous le nom. */
+  id?: string;
+  detail?: string;
 }
 
 export interface MatriceCellule {
@@ -89,6 +92,8 @@ export interface CatalogueEntree {
   question?: string;
   description?: string;
   groupe?: string;
+  /** L'écran qu'ouvre une part du graphique, à partir de son identifiant. */
+  lien?: (id: string) => string;
 }
 
 export type Catalogue = Readonly<Record<string, CatalogueEntree>>;
@@ -475,13 +480,14 @@ export function donneesVides(donnees: DonneesSource): boolean {
   }
 }
 
+/** Une tuile prend une colonne, un graphique deux, un tableau ou une carte pleine quatre. */
 export function spanClass(
   marque: DashboardMarque | undefined,
   taille: DashboardTaille | undefined,
 ): string {
-  if (marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge') return '';
-  if (marque === 'tableau') return 'sm:col-span-2 xl:col-span-4';
-  if (taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  if (marque === 'tableau' || taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  const tuile = marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge';
+  if (tuile && taille === undefined) return '';
   return 'sm:col-span-2 xl:col-span-2';
 }
 

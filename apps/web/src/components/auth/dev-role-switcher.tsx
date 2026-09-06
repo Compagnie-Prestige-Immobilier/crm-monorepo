@@ -77,7 +77,12 @@ export function DevRoleSwitcher({
   if (!enabled) return null;
 
   return (
-    <div className={cn('rounded-md border border-accent-border/50 bg-accent-surface/50 p-3', className)}>
+    <div
+      className={cn(
+        'rounded-md border border-accent-border/50 bg-accent-surface/50 p-3',
+        className,
+      )}
+    >
       <div className="mb-2 flex items-center gap-2 text-[0.75rem] font-[600] text-warning">
         <ShieldCheckIcon className="size-4" aria-hidden="true" />
         Accès développeur

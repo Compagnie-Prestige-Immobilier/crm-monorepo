@@ -114,7 +114,9 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
     'Référentiel des départements',
   );
-  const departementId = departements[0]?.id;
+  // Le DERNIER département : le premier est la réserve où chues-lots-export
+  // tire ses campagnes, et ces fiches n'ont rien à y faire.
+  const departementId = departements.at(-1)?.id;
   expect(departementId, 'Aucun département dans le référentiel').toBeDefined();
 
   const parCle = new Map<string, string>();
@@ -127,6 +129,7 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     );
     const deja = existants.items.find((item) => item.phoneE164 === fiche.phone);
     if (deja !== undefined) {
+      await api.patch(`/api/v1/representants/${deja.id}`, { data: { departementId } });
       parCle.set(fiche.cle, deja.id);
       continue;
     }
@@ -211,9 +214,9 @@ test('CHU-CHF-13 la joignabilité vaut exactement 75 % sur 3 fiches jointes pour
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('3');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('75,0 %');
   await expect(
-    carte(page, JOIGNABILITE).getByText('75,0 % · 3 joints sur 4 fiches', { exact: true }),
+    carte(page, JOIGNABILITE).getByText('3 joints sur 4 fiches', { exact: true }),
   ).toHaveCount(1);
 });
 
@@ -235,11 +238,9 @@ test('CHU-CHF-15 le taux d’acceptation vaut exactement 33,3 % sur 1 accepté p
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Taux d’acceptation')).toHaveText('1');
+  await expect(chiffreDe(page, 'Taux d’acceptation')).toHaveText('33,3 %');
   await expect(
-    carte(page, 'Taux d’acceptation').getByText('33,3 % · 1 acceptent sur 3 joints', {
-      exact: true,
-    }),
+    carte(page, 'Taux d’acceptation').getByText('1 acceptent sur 3 joints', { exact: true }),
   ).toHaveCount(1);
 });
 
@@ -275,7 +276,7 @@ test('CHU-CHF-17 une journée sans aucun appel ne se lit pas « 0 % »', async (
 
 test('CHU-CHF-18 le filtre par téléconseiller borne réellement les chiffres', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
-  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('3');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('75,0 %');
 
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, awaId));
   await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('Sans objet');

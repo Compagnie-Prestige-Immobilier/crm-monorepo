@@ -41,6 +41,7 @@ import {
 } from '@/lib/data/visites-dashboard';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
+import { avecTransition } from '@/lib/transition-de-vue';
 import type { Role } from '@/lib/types';
 
 function exportCsv(stats: VisiteStats, plage: { du: string; au: string }): void {
@@ -263,10 +264,9 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                     ? undefined
                     : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
                 const id = `${source}-${String(Date.now())}`;
-                setBrouillon((current) => [
-                  ...(current ?? []),
-                  { id, source, marque, taille: 'demi' },
-                ]);
+                avecTransition(() => {
+                  setBrouillon((current) => [...(current ?? []), { id, source, marque }]);
+                });
                 dernierAjoutRef.current = id;
               }}
             />
@@ -357,16 +357,22 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                   setBrouillon((current) => reordonner(current, fromId, toId));
                 }}
                 onRemove={(id) => {
-                  setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                  avecTransition(() => {
+                    setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                  });
                 }}
                 onMove={(id, direction) => {
-                  setBrouillon((current) => decaler(current, id, direction));
+                  avecTransition(() => {
+                    setBrouillon((current) => decaler(current, id, direction));
+                  });
                 }}
                 onChangeMarque={(id, marque) => {
                   setBrouillon((current) => modifier(current, id, { marque }));
                 }}
                 onChangeTaille={(id, taille) => {
-                  setBrouillon((current) => modifier(current, id, { taille }));
+                  avecTransition(() => {
+                    setBrouillon((current) => modifier(current, id, { taille }));
+                  });
                 }}
                 onChangePresentation={(id, presentation) => {
                   setBrouillon((current) => modifier(current, id, { presentation }));
@@ -382,7 +388,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
 
 export function DashboardVisitesSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
       {[0, 1, 2].map((index) => (
         <Card key={`tuile-${String(index)}`}>
           <CardContent>

@@ -724,6 +724,11 @@ html.dark:has([data-coque='chues']) {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* Barres de défilement discrètes, teintées prune. */

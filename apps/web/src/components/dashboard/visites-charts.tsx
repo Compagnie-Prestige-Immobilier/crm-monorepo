@@ -40,7 +40,7 @@ export interface ItemsChartProps {
  * surfaces d'or par opacité — jamais le texte, `docs/design.md §2.3`.
  * `serie` retombe sur la palette CPI habituelle.
  */
-function paletteFill(
+export function paletteFill(
   theme: ChartTheme,
   palette: DispositionPresentation['palette'],
   index: number,
@@ -407,11 +407,12 @@ function partageOptions(
   reducedMotion: boolean,
   legende: boolean,
   position: 'right' | 'top',
+  onSelect?: (index: number) => void,
 ): ChartOptions<'doughnut'> {
   const total = (items: readonly NamedCount[]) =>
     items.reduce((somme, item) => somme + item.value, 0);
   return {
-    ...baseOptions(theme, reducedMotion),
+    ...baseOptions(theme, reducedMotion, onSelect),
     plugins: {
       ...baseOptions(theme, reducedMotion).plugins,
       legend: {
@@ -443,16 +444,21 @@ function partageOptions(
 export function AnneauChart({
   items,
   presentation,
+  onSelect,
 }: {
   items: readonly NamedCount[];
   presentation?: DispositionPresentation | undefined;
+  onSelect?: ((index: number) => void) | undefined;
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
   const legende = presentation?.legende ?? true;
   return (
     <Doughnut
-      options={{ ...partageOptions(theme, reducedMotion, legende, 'right'), cutout: '62%' }}
+      options={{
+        ...partageOptions(theme, reducedMotion, legende, 'right', onSelect),
+        cutout: '62%',
+      }}
       data={{
         labels: items.map((item) => item.label),
         datasets: [
@@ -475,16 +481,21 @@ export function AnneauChart({
 export function CamembertChart({
   items,
   presentation,
+  onSelect,
 }: {
   items: readonly NamedCount[];
   presentation?: DispositionPresentation | undefined;
+  onSelect?: ((index: number) => void) | undefined;
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
   const legende = presentation?.legende ?? true;
   return (
     <Doughnut
-      options={{ ...partageOptions(theme, reducedMotion, legende, 'right'), cutout: '0%' }}
+      options={{
+        ...partageOptions(theme, reducedMotion, legende, 'right', onSelect),
+        cutout: '0%',
+      }}
       data={{
         labels: items.map((item) => item.label),
         datasets: [

@@ -80,7 +80,9 @@ describe('contrat des réponses d’erreur', () => {
 
     for (const route of manquantes) {
       expect(
-        route.includes('/auth/') || route.includes('/app-updates/'),
+        route.includes('/auth/') ||
+          route.includes('/app-updates/') ||
+          route.includes('/formulaire-public/'),
         `${route} n’annonce ni 401 ni 403 alors qu’elle est authentifiée`,
       ).toBe(true);
     }

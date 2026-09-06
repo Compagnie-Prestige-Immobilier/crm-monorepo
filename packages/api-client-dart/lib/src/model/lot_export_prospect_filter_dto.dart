@@ -282,6 +282,10 @@ enum LotExportProspectFilterDtoOriginEnum {
   BANQUE(r'BANQUE'),
 
   /// Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
+  @JsonValue(r'FORMULAIRE_PUBLIC')
+  FORMULAIRE_PUBLIC(r'FORMULAIRE_PUBLIC'),
+
+  /// Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 
