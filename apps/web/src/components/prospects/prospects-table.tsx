@@ -43,23 +43,49 @@ import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { PROSPECT_SORT_FIELDS, type ProspectRow, type ProspectSortField } from '@/lib/types';
+import {
+  PROSPECT_SORT_FIELDS,
+  type Paginated,
+  type ProspectFilters,
+  type ProspectRow,
+  type ProspectSortField,
+} from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function isSortField(id: string): id is ProspectSortField {
   return (PROSPECT_SORT_FIELDS as readonly string[]).includes(id);
 }
 
+function tableSourceData(data: Paginated<ProspectRow> | undefined): {
+  items: ProspectRow[];
+  pageCount: number;
+} {
+  if (data === undefined) return { items: [], pageCount: 0 };
+  return { items: data.items, pageCount: data.pageCount };
+}
+
+function rangeLabel(first: number, last: number, total: number): string {
+  if (total === 0) return 'Aucun résultat';
+  return `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`;
+}
+
+function deleteSummary(deleting: ProspectRow | null): string | null {
+  if (deleting === null) return null;
+  return `${deleting.prenom} ${deleting.nom}, ${formatPhone(deleting.phoneE164)}. La fiche est retirée des listes et des exports, le numéro redevient disponible.`;
+}
+
 export function ProspectsTable({
   canAdminister,
-  readOnly = false,
-  campaignScoped = false,
+  readOnly: readOnlyProp,
+  campaignScoped: campaignScopedProp,
 }: {
   canAdminister: boolean;
   readOnly?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {
+  const readOnly = Boolean(readOnlyProp);
+  const campaignScoped = Boolean(campaignScopedProp);
   const { filters, setFilters } = useProspectFilters();
   const queryClient = useQueryClient();
 
@@ -101,15 +127,17 @@ export function ProspectsTable({
     [canAdminister, filters.projet, readOnly],
   );
 
+  const source = tableSourceData(data);
+
   // oxlint-disable-next-line react/incompatible-library -- faux positif TanStack Table
   const table = useReactTable({
-    data: data?.items ?? [],
+    data: source.items,
     columns,
     getCoreRowModel: getCoreRowModel(),
     manualPagination: true,
     manualSorting: true,
     manualFiltering: true,
-    pageCount: data?.pageCount ?? 0,
+    pageCount: source.pageCount,
     state: {
       sorting: [{ id: filters.sortBy, desc: filters.sortDir === 'desc' }],
     },
@@ -175,19 +203,7 @@ export function ProspectsTable({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.length === 0 ? (
-              <TableRow className="hover:bg-transparent">
-                <TableCell colSpan={columns.length} className="py-16">
-                  <div className="flex flex-col items-center gap-2 text-center">
-                    <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-                    <p className="font-[600]">Aucun prospect ne correspond à ces filtres.</p>
-                    <p className="text-[0.8125rem] text-muted-foreground">
-                      {campaignScoped
-                        ? 'Vos campagnes n’en contiennent aucun.'
-                        : 'Élargissez la période ou retirez un critère.'}
-                    </p>
-                  </div>
-                </TableCell>
-              </TableRow>
+              <ProspectsTableEmptyRow campaignScoped={campaignScoped} colSpan={columns.length} />
             ) : (
               table.getRowModel().rows.map((row) => (
                 <TableRow key={row.id}>
@@ -222,64 +238,150 @@ export function ProspectsTable({
         */}
         <p className="text-[0.8125rem] text-muted-foreground" role="status">
           <span className="sr-only">Prospects affichés&nbsp;: </span>
-          {total === 0
-            ? 'Aucun résultat'
-            : `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`}
+          {rangeLabel(first, last, total)}
         </p>
 
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
-            <span className="hidden sm:inline">Lignes</span>
-            <Select
-              value={String(filters.pageSize)}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ pageSize: Number(value), page: 1 });
-              }}
-            >
-              <SelectTrigger size="sm" className="w-20">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page précédente"
-              disabled={page <= 1}
-              onClick={() => {
-                setFilters({ page: page - 1 });
-              }}
-            >
-              <ChevronLeftIcon className="size-4" aria-hidden="true" />
-            </Button>
-            <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-              {page} / {pageCount}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page suivante"
-              disabled={page >= pageCount}
-              onClick={() => {
-                setFilters({ page: page + 1 });
-              }}
-            >
-              <ChevronRightIcon className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
+        <ProspectsTablePagination
+          pageSize={filters.pageSize}
+          page={page}
+          pageCount={pageCount}
+          setFilters={setFilters}
+        />
       </div>
 
+      <ProspectsTableDialogs
+        editing={editing}
+        setEditing={setEditing}
+        merging={merging}
+        setMerging={setMerging}
+        reassigning={reassigning}
+        setReassigning={setReassigning}
+        deleting={deleting}
+        setDeleting={setDeleting}
+        onDelete={(target) => {
+          remove.mutate(target);
+        }}
+        deletePending={remove.isPending}
+      />
+    </div>
+  );
+}
+
+function ProspectsTableEmptyRow({
+  campaignScoped,
+  colSpan,
+}: {
+  campaignScoped: boolean;
+  colSpan: number;
+}) {
+  return (
+    <TableRow className="hover:bg-transparent">
+      <TableCell colSpan={colSpan} className="py-16">
+        <div className="flex flex-col items-center gap-2 text-center">
+          <InboxIcon className="size-8 text-muted-foreground" aria-hidden="true" />
+          <p className="font-[600]">Aucun prospect ne correspond à ces filtres.</p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            {campaignScoped
+              ? 'Vos campagnes n’en contiennent aucun.'
+              : 'Élargissez la période ou retirez un critère.'}
+          </p>
+        </div>
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function ProspectsTablePagination({
+  pageSize,
+  page,
+  pageCount,
+  setFilters,
+}: {
+  pageSize: number;
+  page: number;
+  pageCount: number;
+  setFilters: (patch: Partial<ProspectFilters>) => void;
+}) {
+  return (
+    <div className="flex items-center gap-3">
+      <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
+        <span className="hidden sm:inline">Lignes</span>
+        <Select
+          value={String(pageSize)}
+          onValueChange={(value) => {
+            if (value === null) return;
+            setFilters({ pageSize: Number(value), page: 1 });
+          }}
+        >
+          <SelectTrigger size="sm" className="w-20">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <SelectItem key={size} value={String(size)}>
+                {size}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </label>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page précédente"
+          disabled={page <= 1}
+          onClick={() => {
+            setFilters({ page: page - 1 });
+          }}
+        >
+          <ChevronLeftIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+          {page} / {pageCount}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page suivante"
+          disabled={page >= pageCount}
+          onClick={() => {
+            setFilters({ page: page + 1 });
+          }}
+        >
+          <ChevronRightIcon className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function ProspectsTableDialogs({
+  editing,
+  setEditing,
+  merging,
+  setMerging,
+  reassigning,
+  setReassigning,
+  deleting,
+  setDeleting,
+  onDelete,
+  deletePending,
+}: {
+  editing: ProspectRow | null;
+  setEditing: (value: ProspectRow | null) => void;
+  merging: ProspectRow | null;
+  setMerging: (value: ProspectRow | null) => void;
+  reassigning: ProspectRow | null;
+  setReassigning: (value: ProspectRow | null) => void;
+  deleting: ProspectRow | null;
+  setDeleting: (value: ProspectRow | null) => void;
+  onDelete: (target: ProspectRow) => void;
+  deletePending: boolean;
+}) {
+  return (
+    <>
       <ProspectEditDialog
         prospect={editing}
         onOpenChange={(open) => {
@@ -308,11 +410,7 @@ export function ProspectsTable({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>Supprimer ce prospect ?</DialogTitle>
-            <DialogDescription>
-              {deleting === null
-                ? null
-                : `${deleting.prenom} ${deleting.nom}, ${formatPhone(deleting.phoneE164)}. La fiche est retirée des listes et des exports, le numéro redevient disponible.`}
-            </DialogDescription>
+            <DialogDescription>{deleteSummary(deleting)}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
             <Button
@@ -327,9 +425,9 @@ export function ProspectsTable({
             <Button
               type="button"
               variant="destructive"
-              disabled={remove.isPending}
+              disabled={deletePending}
               onClick={() => {
-                if (deleting !== null) remove.mutate(deleting);
+                if (deleting !== null) onDelete(deleting);
               }}
             >
               Supprimer
@@ -337,7 +435,7 @@ export function ProspectsTable({
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </>
   );
 }
 
