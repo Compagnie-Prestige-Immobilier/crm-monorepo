@@ -329,17 +329,7 @@ export class SyncService {
     user: AuthenticatedUser,
     body: SyncPushDto,
   ): Promise<SyncOperationResultDto[]> {
-    const groups = new Map<string, SyncOperationDto[]>();
-    for (const operation of body.operations) {
-      const key = dependencyKeyOf(operation);
-      const bucket = groups.get(key);
-      if (bucket) bucket.push(operation);
-      else groups.set(key, [operation]);
-    }
-
-    const ordered = [...groups.values()]
-      .map((operations) => [...operations].sort((left, right) => left.seq - right.seq))
-      .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
+    const ordered = groupOperationsByDependency(body.operations);
 
     // Le rôle est figé une fois pour éviter deux autorités dans un même lot.
     const author = await this.readAuthority(user, body.payloadVersion);
@@ -349,26 +339,7 @@ export class SyncService {
       try {
         results.push(...(await this.runGroup(author, body.clientBatchId, operations)));
       } catch (error) {
-        // La transaction du groupe a été annulée : AUCUNE de ses opérations
-        // n'a été écrite. On le dit franchement et on passe au groupe suivant,
-        // qui est indépendant.
-        this.logger.error(
-          `Groupe de synchronisation annulé (${String(operations.length)} opérations) : ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        for (const operation of operations) {
-          results.push(
-            toResultDto(operation, {
-              status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
-              entityId: operation.entityId,
-              rev: null,
-              serverUpdatedAt: null,
-              errorCode: 'GROUP_TRANSACTION_FAILED',
-              error: 'La transaction du groupe a échoué ; aucune de ses écritures n’a été retenue.',
-            }),
-          );
-        }
+        results.push(...this.groupFailureResults(operations, error));
       }
     }
 
@@ -377,6 +348,31 @@ export class SyncService {
     const bySeq = new Map(results.map((result) => [result.opId, result]));
     return body.operations.map(
       (operation) => bySeq.get(operation.opId) ?? missingResult(operation),
+    );
+  }
+
+  /**
+   * La transaction du groupe a été annulée : AUCUNE de ses opérations n'a été
+   * écrite. On le dit franchement et on passe au groupe suivant, indépendant.
+   */
+  private groupFailureResults(
+    operations: SyncOperationDto[],
+    error: unknown,
+  ): SyncOperationResultDto[] {
+    this.logger.error(
+      `Groupe de synchronisation annulé (${String(operations.length)} opérations) : ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return operations.map((operation) =>
+      toResultDto(operation, {
+        status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
+        entityId: operation.entityId,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: 'GROUP_TRANSACTION_FAILED',
+        error: 'La transaction du groupe a échoué ; aucune de ses écritures n’a été retenue.',
+      }),
     );
   }
 
@@ -418,31 +414,23 @@ export class SyncService {
             continue;
           }
 
-          let outcome: OperationOutcome;
-          if (parentUnavailable && operation.entity === SyncEntity.PROSPECT) {
-            outcome = {
-              status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
-              entityId: operation.entityId,
-              rev: null,
-              serverUpdatedAt: null,
-              errorCode: 'PARENT_REPRESENTANT_FAILED',
-              error: 'Le représentant de rattachement n’a pas pu être enregistré.',
-            };
-          } else {
-            outcome = await this.applyOperation(tx, user, operation, payloadVersion);
-            if (
-              operation.entity === SyncEntity.REPRESENTANT &&
-              outcome.status !== SyncOpStatus.APPLIED
-            ) {
-              // Un « déjà présent », même sous un autre créateur, n'est pas une
-              // indisponibilité : seule l'absence effective de la ligne de
-              // l'annuaire condamne ses prospects.
-              const exists = await tx.representant.findFirst({
-                where: { id: operation.entityId, deletedAt: null },
-                select: { id: true },
-              });
-              parentUnavailable = !exists;
-            }
+          const outcome = await this.applyGroupOperation(
+            tx,
+            author,
+            operation,
+            parentUnavailable,
+          );
+          if (
+            operation.entity === SyncEntity.REPRESENTANT &&
+            outcome.status !== SyncOpStatus.APPLIED
+          ) {
+            // Un « déjà présent », même sous un autre créateur, n'est pas une
+            // indisponibilité : seule l'absence effective de la ligne de
+            // l'annuaire condamne ses prospects.
+            parentUnavailable = !(await tx.representant.findFirst({
+              where: { id: operation.entityId, deletedAt: null },
+              select: { id: true },
+            }));
           }
 
           await finalizeOperation(tx, operation.opId, outcome);
@@ -453,6 +441,25 @@ export class SyncService {
       },
       { timeout: GROUP_TRANSACTION_TIMEOUT_MS, isolationLevel: 'ReadCommitted' },
     );
+  }
+
+  private async applyGroupOperation(
+    tx: Prisma.TransactionClient,
+    author: BatchAuthority,
+    operation: SyncOperationDto,
+    parentUnavailable: boolean,
+  ): Promise<OperationOutcome> {
+    if (parentUnavailable && operation.entity === SyncEntity.PROSPECT) {
+      return {
+        status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
+        entityId: operation.entityId,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: 'PARENT_REPRESENTANT_FAILED',
+        error: 'Le représentant de rattachement n’a pas pu être enregistré.',
+      };
+    }
+    return this.applyOperation(tx, author.user, operation, author.payloadVersion);
   }
 
   private async applyOperation(
@@ -1544,6 +1551,19 @@ const toResultDto = (
   operation: SyncOperationDto,
   outcome: OperationOutcome,
 ): SyncOperationResultDto => ({ opId: operation.opId, ...outcome });
+
+function groupOperationsByDependency(operations: SyncOperationDto[]): SyncOperationDto[][] {
+  const groups = new Map<string, SyncOperationDto[]>();
+  for (const operation of operations) {
+    const key = dependencyKeyOf(operation);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(operation);
+    else groups.set(key, [operation]);
+  }
+  return [...groups.values()]
+    .map((group) => [...group].sort((left, right) => left.seq - right.seq))
+    .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
+}
 
 const missingResult = (operation: SyncOperationDto): SyncOperationResultDto => ({
   opId: operation.opId,
