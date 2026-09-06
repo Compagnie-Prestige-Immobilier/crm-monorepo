@@ -25,69 +25,77 @@ export const closedAtLateral = (caseAlias: Prisma.Sql): Prisma.Sql => Prisma.sql
   ) cl ON TRUE
 `;
 
-export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
-  const conditions: Prisma.Sql[] = [Prisma.sql`c."deletedAt" IS NULL`];
-
-  if (filter.stageId) conditions.push(Prisma.sql`c."currentStageId" = ${filter.stageId}`);
-  if (filter.stageType) {
-    conditions.push(Prisma.sql`s."type" = ${filter.stageType}::"BankStageType"`);
-  }
-  if (filter.banqueId) conditions.push(Prisma.sql`c."processingBankId" = ${filter.banqueId}`);
-  // Le PARCOURS, pas le projet d'entrée : un même numéro suit CHUES et Grand
-  // Public à la fois, et `prospects."projet"` ne dit que par où il est arrivé.
-  // Sous-requête plutôt qu'une jointure : `BANK_CASE_FROM` sert aussi aux
-  // agrégats, et y ajouter une table changerait leurs comptages.
-  if (filter.projet) {
-    conditions.push(
-      Prisma.sql`EXISTS (
+// Le PARCOURS, pas le projet d'entrée : un même numéro suit CHUES et Grand
+// Public à la fois, et `prospects."projet"` ne dit que par où il est arrivé.
+// Sous-requête plutôt qu'une jointure : `BANK_CASE_FROM` sert aussi aux
+// agrégats, et y ajouter une table changerait leurs comptages.
+const projetCondition = (filter: BankCaseFilterDto): Prisma.Sql | undefined =>
+  filter.projet
+    ? Prisma.sql`EXISTS (
         SELECT 1 FROM "prospect_journeys" pj
         WHERE pj."prospectId" = c."prospectId" AND pj."projet" = ${filter.projet}::"Projet"
-      )`,
-    );
-  }
-  if (filter.rejectionReasonId) {
-    conditions.push(Prisma.sql`c."rejectionReasonId" = ${filter.rejectionReasonId}`);
-  }
-  if (filter.agentId) {
-    // Créateur OU dernier intervenant : reprendre le dossier d'un collègue compte.
-    conditions.push(
-      Prisma.sql`(c."createdById" = ${filter.agentId} OR c."updatedById" = ${filter.agentId})`,
-    );
-  }
-  if (filter.dateFrom)
-    conditions.push(Prisma.sql`c."createdAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
-  if (filter.dateTo)
-    conditions.push(Prisma.sql`c."createdAt" <= ${inclusiveDateTo(filter.dateTo)}`);
+      )`
+    : undefined;
 
-  // Un filtre de montant ne retient jamais un dossier ouvert : son montant est
-  // NULL, et NULL n'est ni supérieur ni inférieur à une borne.
-  if (filter.amountMin !== undefined) {
-    conditions.push(Prisma.sql`c."amountXof" >= ${filter.amountMin}::numeric`);
-  }
-  if (filter.amountMax !== undefined) {
-    conditions.push(Prisma.sql`c."amountXof" <= ${filter.amountMax}::numeric`);
-  }
+// Créateur OU dernier intervenant : reprendre le dossier d'un collègue compte.
+const agentCondition = (filter: BankCaseFilterDto): Prisma.Sql | undefined =>
+  filter.agentId
+    ? Prisma.sql`(c."createdById" = ${filter.agentId} OR c."updatedById" = ${filter.agentId})`
+    : undefined;
 
+// QUATRE CHIFFRES AU MOINS : « DOS-3 » ne laisse que « 3 », et un seuil plus
+// bas ferait joindre tous les téléphones contenant ce chiffre.
+function searchCondition(filter: BankCaseFilterDto): Prisma.Sql | undefined {
   const search = filter.search?.trim();
-  if (search) {
-    const like = `%${search}%`;
-    const referenceLike = `%${normalizeReferenceKey(search)}%`;
-    // QUATRE CHIFFRES AU MOINS : « DOS-3 » ne laisse que « 3 », et un seuil plus
-    // bas ferait joindre tous les téléphones contenant ce chiffre.
-    const digits = search.replace(/\D/gu, '');
-    const normalized = tryNormalizePhone(search);
-    const phoneLike = `%${normalized ?? digits}%`;
-    const phoneCondition =
-      normalized !== undefined || digits.length >= 4
-        ? Prisma.sql`OR c."customerPhoneE164" LIKE ${phoneLike}`
-        : Prisma.sql``;
+  if (!search) return undefined;
 
-    conditions.push(Prisma.sql`(
-      c."referenceKey" LIKE ${referenceLike}
-      OR unaccent(lower(c."customerName")) LIKE unaccent(lower(${like}))
-      ${phoneCondition}
-    )`);
-  }
+  const like = `%${search}%`;
+  const referenceLike = `%${normalizeReferenceKey(search)}%`;
+  const digits = search.replace(/\D/gu, '');
+  const normalized = tryNormalizePhone(search);
+  const phoneLike = `%${normalized ?? digits}%`;
+  const phoneCondition =
+    normalized !== undefined || digits.length >= 4
+      ? Prisma.sql`OR c."customerPhoneE164" LIKE ${phoneLike}`
+      : Prisma.sql``;
+
+  return Prisma.sql`(
+    c."referenceKey" LIKE ${referenceLike}
+    OR unaccent(lower(c."customerName")) LIKE unaccent(lower(${like}))
+    ${phoneCondition}
+  )`;
+}
+
+function optionalConditions(filter: BankCaseFilterDto): (Prisma.Sql | undefined)[] {
+  return [
+    filter.stageId ? Prisma.sql`c."currentStageId" = ${filter.stageId}` : undefined,
+    filter.stageType ? Prisma.sql`s."type" = ${filter.stageType}::"BankStageType"` : undefined,
+    filter.banqueId ? Prisma.sql`c."processingBankId" = ${filter.banqueId}` : undefined,
+    projetCondition(filter),
+    filter.rejectionReasonId
+      ? Prisma.sql`c."rejectionReasonId" = ${filter.rejectionReasonId}`
+      : undefined,
+    agentCondition(filter),
+    filter.dateFrom
+      ? Prisma.sql`c."createdAt" >= ${inclusiveDateFrom(filter.dateFrom)}`
+      : undefined,
+    filter.dateTo ? Prisma.sql`c."createdAt" <= ${inclusiveDateTo(filter.dateTo)}` : undefined,
+    // Un filtre de montant ne retient jamais un dossier ouvert : son montant
+    // est NULL, et NULL n'est ni supérieur ni inférieur à une borne.
+    filter.amountMin !== undefined
+      ? Prisma.sql`c."amountXof" >= ${filter.amountMin}::numeric`
+      : undefined,
+    filter.amountMax !== undefined
+      ? Prisma.sql`c."amountXof" <= ${filter.amountMax}::numeric`
+      : undefined,
+    searchCondition(filter),
+  ];
+}
+
+export function bankCaseConditions(filter: BankCaseFilterDto): Prisma.Sql {
+  const conditions = [Prisma.sql`c."deletedAt" IS NULL`, ...optionalConditions(filter)].filter(
+    (condition): condition is Prisma.Sql => Boolean(condition),
+  );
 
   return Prisma.join(conditions, ' AND ');
 }
