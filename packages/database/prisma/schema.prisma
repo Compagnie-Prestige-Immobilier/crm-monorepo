@@ -811,6 +811,11 @@ model Prospect {
 
   paymentMode PaymentMode?
 
+  /// Reponses aux champs libres que l'administrateur ajoute au formulaire de
+  /// conversion. Objet plat `identifiant du champ` -> valeur, les definitions
+  /// vivant dans `AppSetting` sous `conversion.champs.<projet>`.
+  champsLibres Json?
+
   /// Duree du systeme de paiement retenue, en mois.
   ///
   /// Un entier et non un libelle : c'est un nombre de mois, et le stocker en

@@ -1097,25 +1097,6 @@ class _EtapeRenseignements extends StatelessWidget {
       readOnly: true,
       description: 'Numéro de l\'annuaire',
     ),
-    _ChoixTri(
-      label: 'Ce numéro est-il un numéro WhatsApp ?',
-      value: fields.whatsappMemeNumero,
-      onChanged: (Tri choix) {
-        fields.whatsappMemeNumero = choix;
-        if (choix != Tri.non) fields.whatsapp.clear();
-        onChanged();
-      },
-    ),
-    CpiReveal(
-      visible: fields.whatsappMemeNumero == Tri.non,
-      child: PhoneField(
-        controller: fields.whatsapp,
-        focusNode: fields.whatsappFocus,
-        label: 'Numéro WhatsApp',
-        helper: 'S\'il en a un.',
-        onChanged: (String _) => onChanged(),
-      ),
-    ),
     CpiField(
       label: 'E-mail',
       controller: fields.email,

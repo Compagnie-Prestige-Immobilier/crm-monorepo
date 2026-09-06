@@ -17,6 +17,7 @@ const NES_APRES = new Set([
   // EB-29. Pas « parametres » tout court : le dernier segment sert de racine
   // héritée, et celle-là mène déjà à l'écran technique de l'administration.
   '/chues/parametres-chues',
+  '/admin/champs-conversion',
 ]);
 
 describe('anciennes adresses, d’avant le découpage en coques', () => {

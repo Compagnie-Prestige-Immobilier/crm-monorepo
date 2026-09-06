@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 
 import { DetailBackLink } from '@/components/detail-back-link';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -154,6 +155,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
           </dl>
         </CardContent>
       </Card>
+
+      <ChampsAjoutes prospect={prospect} />
 
       {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
       <Card id="appels">

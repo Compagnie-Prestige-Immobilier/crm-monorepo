@@ -1,5 +1,6 @@
 'use client';
 
+import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Field } from '@/components/forms/field';
@@ -11,7 +12,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { ConversionDraft, ConversionErrors } from '@/lib/data/console';
+import {
+  reglesChamps,
+  type ChampReglable,
+  type ConversionDraft,
+  type ConversionErrors,
+} from '@/lib/data/console';
+import { valeursProposees, type ChampLibre, type ReglageChamp } from '@/lib/data/champs-conversion';
 import {
   DUREES_MOIS,
   formatDureeMois,
@@ -55,24 +62,28 @@ const COORDONNEES: Partial<
 };
 
 /**
- * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
- * l'adhésion exige le dossier complet. Le Grand Public garde ces deux champs,
- * facultatifs, et « non demandé » pour les questions qu'on n'a pas posées.
+ * L'ordre, la visibilité et le caractère obligatoire viennent de
+ * `reglages` : sans réglage chargé, le formulaire reste celui du projet.
  */
 export function ConversionFields({
   draft,
   errors,
   phoneE164,
   disabled,
+  reglages,
+  libres,
   onChange,
 }: {
   draft: ConversionDraft;
   errors: ConversionErrors;
   phoneE164: string;
   disabled: boolean;
+  reglages: readonly ReglageChamp[];
+  libres: readonly ChampLibre[];
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
+  const regles = reglesChamps(reglages);
 
   const banques = useQuery({
     queryKey: queryKeys.banques,
@@ -103,13 +114,9 @@ export function ConversionFields({
     label: withRetired(tranche.label, tranche.isActive),
   }));
 
-  return (
-    <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
-      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Phase 3 · Conversion
-      </legend>
-
-      <Field label="Nom" required error={errors.nom}>
+  const noeuds: Readonly<Record<ChampReglable, ReactNode>> = {
+    nom: (
+      <Field label="Nom" required={regles.requis('nom', true)} error={errors.nom}>
         {(props) => (
           <Input
             {...props}
@@ -120,8 +127,9 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Prénom" required={complet} error={errors.prenom}>
+    ),
+    prenom: (
+      <Field label="Prénom" required={regles.requis('prenom', complet)} error={errors.prenom}>
         {(props) => (
           <Input
             {...props}
@@ -132,11 +140,13 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    phoneE164: (
       <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
         {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
       </Field>
-
+    ),
+    whatsappStatus: (
       <ChoixOuiNon
         label="Ce numéro est-il un numéro WhatsApp ?"
         name="console-whatsapp"
@@ -146,8 +156,9 @@ export function ConversionFields({
           onChange({ memeWhatsapp, ...(memeWhatsapp === false ? {} : { whatsapp: '' }) });
         }}
       />
-
-      {draft.memeWhatsapp === false ? (
+    ),
+    whatsappE164:
+      draft.memeWhatsapp === false ? (
         <Field label="Numéro WhatsApp" error={errors.whatsapp}>
           {(props) => (
             <Input
@@ -162,9 +173,9 @@ export function ConversionFields({
             />
           )}
         </Field>
-      ) : null}
-
-      <Field label="E-mail" error={errors.email}>
+      ) : null,
+    email: (
+      <Field label="E-mail" required={regles.requis('email', false)} error={errors.email}>
         {(props) => (
           <Input
             {...props}
@@ -177,8 +188,13 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Profession" required={complet} error={errors.profession}>
+    ),
+    profession: (
+      <Field
+        label="Profession"
+        required={regles.requis('profession', complet)}
+        error={errors.profession}
+      >
         {(props) => (
           <Input
             {...props}
@@ -189,10 +205,11 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    dureeEtablissementMois: (
       <Field
         label="Durée dans la fonction (mois)"
-        required={complet}
+        required={regles.requis('dureeEtablissementMois', complet)}
         error={errors.dureeEtablissementMois}
       >
         {(props) => (
@@ -210,37 +227,47 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    fonctionnaire: (
       <ChoixOuiNon
         label="Fonctionnaire"
         name="console-fonctionnaire"
         value={draft.fonctionnaire}
-        nonDemande={!complet}
+        nonDemande={!regles.requis('fonctionnaire', complet)}
         error={errors.fonctionnaire}
         onChange={(fonctionnaire) => {
           onChange({ fonctionnaire });
         }}
       />
-
-      {complet ? null : (
-        <fieldset className="flex min-w-0 flex-col gap-2">
-          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
-          <div className="flex flex-wrap gap-2">
-            {PROSPECT_TYPES.map((option) => (
-              <ChoixSituation
-                key={option}
-                option={option}
-                checked={draft.type === option}
-                onSelect={() => {
-                  onChange({ type: draft.type === option ? null : option });
-                }}
-              />
-            ))}
-          </div>
-        </fieldset>
-      )}
-
-      <Field label="Syndicat" required={complet} error={errors.syndicatId}>
+    ),
+    type: (
+      <fieldset className="flex min-w-0 flex-col gap-2">
+        <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
+        <div className="flex flex-wrap gap-2">
+          {PROSPECT_TYPES.map((option) => (
+            <ChoixSituation
+              key={option}
+              option={option}
+              checked={draft.type === option}
+              onSelect={() => {
+                onChange({ type: draft.type === option ? null : option });
+              }}
+            />
+          ))}
+        </div>
+        {errors.type === undefined ? null : (
+          <p role="alert" className="text-[0.75rem] text-destructive">
+            {errors.type}
+          </p>
+        )}
+      </fieldset>
+    ),
+    syndicatId: (
+      <Field
+        label="Syndicat"
+        required={regles.requis('syndicatId', complet)}
+        error={errors.syndicatId}
+      >
         {(props) => (
           <Liste
             id={props.id}
@@ -254,8 +281,9 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Banque" required={complet} error={errors.banqueId}>
+    ),
+    banqueId: (
+      <Field label="Banque" required={regles.requis('banqueId', complet)} error={errors.banqueId}>
         {(props) => (
           <Liste
             id={props.id}
@@ -269,19 +297,25 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    engagementEnCours: (
       <ChoixOuiNon
         label="Engagement en cours à la banque"
         name="console-engagement"
         value={draft.engagementEnCours}
-        nonDemande={!complet}
+        nonDemande={!regles.requis('engagementEnCours', complet)}
         error={errors.engagementEnCours}
         onChange={(engagementEnCours) => {
           onChange({ engagementEnCours });
         }}
       />
-
-      <Field label="Revenu mensuel" required={complet} error={errors.incomeBandId}>
+    ),
+    incomeBandId: (
+      <Field
+        label="Revenu mensuel"
+        required={regles.requis('incomeBandId', complet)}
+        error={errors.incomeBandId}
+      >
         {(props) => (
           <Liste
             id={props.id}
@@ -295,30 +329,38 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      {complet ? null : (
-        <Field label="Paiement">
-          {(props) => (
-            <Liste
-              id={props.id}
-              describedBy={props['aria-describedby']}
-              items={PAIEMENTS}
-              value={draft.paymentMode ?? ''}
-              placeholder="Choisir un mode"
-              onChange={(value) => {
-                const paymentMode = value as PaymentMode;
-                onChange({
-                  paymentMode,
-                  ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
-                });
-              }}
-            />
-          )}
-        </Field>
-      )}
-
-      {draft.paymentMode === 'ECHELONNE' ? (
-        <Field label="Durée du système de paiement" error={errors.dureeSystemeMois}>
+    ),
+    paymentMode: (
+      <Field
+        label="Paiement"
+        required={regles.requis('paymentMode', false)}
+        error={errors.paymentMode}
+      >
+        {(props) => (
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
+            items={PAIEMENTS}
+            value={draft.paymentMode ?? ''}
+            placeholder="Choisir un mode"
+            onChange={(value) => {
+              const paymentMode = value as PaymentMode;
+              onChange({
+                paymentMode,
+                ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
+              });
+            }}
+          />
+        )}
+      </Field>
+    ),
+    dureeSystemeMois:
+      draft.paymentMode === 'ECHELONNE' ? (
+        <Field
+          label="Durée du système de paiement"
+          required={regles.requis('dureeSystemeMois', false)}
+          error={errors.dureeSystemeMois}
+        >
           {(props) => (
             <Liste
               id={props.id}
@@ -332,39 +374,41 @@ export function ConversionFields({
             />
           )}
         </Field>
-      ) : null}
-
-      <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-        <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-          Méthode d’enrôlement
-        </legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {ENROLLMENT_METHOD_ORDER.map((method) => (
-            <MethodChoice
-              key={method}
-              method={method}
-              checked={draft.method === method}
-              onSelect={() => {
-                // Changer de méthode efface la date : le serveur refuse un
-                // rendez-vous sur toute autre méthode que la prise de rendez-vous.
-                onChange({
-                  method,
-                  ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
-                });
-              }}
-            />
-          ))}
-        </div>
-        {errors.method === undefined ? null : (
-          <p role="alert" className="text-[0.75rem] text-destructive">
-            {errors.method}
-          </p>
-        )}
-      </fieldset>
-
-      <CoordonneeChues method={draft.method} />
-
-      {draft.method === 'APPOINTMENT' ? (
+      ) : null,
+    method: (
+      <>
+        <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
+          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
+            Méthode d’enrôlement
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ENROLLMENT_METHOD_ORDER.map((method) => (
+              <MethodChoice
+                key={method}
+                method={method}
+                checked={draft.method === method}
+                onSelect={() => {
+                  // Changer de méthode efface la date : le serveur refuse un
+                  // rendez-vous sur toute autre méthode que la prise de rendez-vous.
+                  onChange({
+                    method,
+                    ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
+                  });
+                }}
+              />
+            ))}
+          </div>
+          {errors.method === undefined ? null : (
+            <p role="alert" className="text-[0.75rem] text-destructive">
+              {errors.method}
+            </p>
+          )}
+        </fieldset>
+        <CoordonneeChues method={draft.method} />
+      </>
+    ),
+    rendezVousAt:
+      draft.method === 'APPOINTMENT' ? (
         <Field
           label="Date et heure du rendez-vous"
           required
@@ -383,7 +427,34 @@ export function ConversionFields({
             />
           )}
         </Field>
-      ) : null}
+      ) : null,
+  };
+
+  const ordre = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
+
+  return (
+    <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
+      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        Phase 3 · Conversion
+      </legend>
+
+      {ordre.map((champ) =>
+        regles.visible(champ as ChampReglable, visibleParDefaut(champ, complet)) ? (
+          <Fragment key={champ}>{noeuds[champ as ChampReglable]}</Fragment>
+        ) : null,
+      )}
+
+      {libres.map((champ) => (
+        <ChampAjoute
+          key={champ.id}
+          champ={champ}
+          value={draft.champsLibres[champ.id] ?? ''}
+          error={errors.libres?.[champ.id]}
+          onChange={(valeur) => {
+            onChange({ champsLibres: { ...draft.champsLibres, [champ.id]: valeur } });
+          }}
+        />
+      ))}
     </fieldset>
   );
 }
@@ -409,6 +480,58 @@ function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
         <span className="select-all font-[600]">{valeur}</span>
       )}
     </p>
+  );
+}
+
+/** Situation et mode de paiement n'existent pas sur CHUES : le prospect y est enseignant. */
+function visibleParDefaut(champ: string, complet: boolean): boolean {
+  if (champ === 'type' || champ === 'paymentMode' || champ === 'dureeSystemeMois') {
+    return !complet;
+  }
+  return true;
+}
+
+function ChampAjoute({
+  champ,
+  value,
+  error,
+  onChange,
+}: {
+  champ: ChampLibre;
+  value: string;
+  error: string | undefined;
+  onChange: (valeur: string) => void;
+}) {
+  if (champ.type === 'TEXTE') {
+    return (
+      <Field label={champ.libelle} required={champ.obligatoire} error={error}>
+        {(props) => (
+          <Input
+            {...props}
+            value={value}
+            onChange={(event) => {
+              onChange(event.target.value);
+            }}
+          />
+        )}
+      </Field>
+    );
+  }
+
+  const items = valeursProposees(champ).map((option) => ({ value: option, label: option }));
+  return (
+    <Field label={champ.libelle} required={champ.obligatoire} error={error}>
+      {(props) => (
+        <Liste
+          id={props.id}
+          describedBy={props['aria-describedby']}
+          items={items}
+          value={value}
+          placeholder="Choisir une valeur"
+          onChange={onChange}
+        />
+      )}
+    </Field>
   );
 }
 

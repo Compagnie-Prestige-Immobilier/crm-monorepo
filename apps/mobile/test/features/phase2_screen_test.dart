@@ -508,6 +508,13 @@ void main() {
     expect(api.premieresSaisies[ouvertureId], saisie.toUtc());
 
     await tester.pump();
+    // ignore: avoid_print
+    print('OFFSET: ' +
+        tester
+            .widget<Scrollable>(find.byType(Scrollable).first)
+            .controller!
+            .offset
+            .toString());
     expect(find.text('00:00'), findsOneWidget);
   });
 

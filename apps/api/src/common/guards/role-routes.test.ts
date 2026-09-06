@@ -13,6 +13,7 @@ import { BankCaseStagesController } from '../../modules/bank-cases/bank-case-sta
 import { BankCasesController } from '../../modules/bank-cases/bank-cases.controller.js';
 import { BankCasesExportController } from '../../modules/bank-cases/bank-cases-export.controller.js';
 import { CallbacksController } from '../../modules/callbacks/callbacks.controller.js';
+import { ChampsConversionController } from '../../modules/champs-conversion/champs-conversion.controller.js';
 import { ClientRequestsController } from '../../modules/client-requests/client-requests.controller.js';
 import { DbDumpController } from '../../modules/db-dump/db-dump.controller.js';
 import { DemoController } from '../../modules/demo/demo.controller.js';
@@ -52,6 +53,7 @@ const CONTROLLERS: readonly Controller[] = [
   BankCasesExportController,
   CallbacksController,
   CallOutcomeReasonsController,
+  ChampsConversionController,
   ClientRequestsController,
   DashboardsController,
   DbDumpController,
@@ -177,6 +179,7 @@ const ADMISES: readonly string[] = [
   'AuthController.changeMyPassword',
   'AuthController.me',
   'CallOutcomeReasonsController.list',
+  'ChampsConversionController.reglages',
   'StatutsQualificationController.list',
   'CallbacksController.list',
   'AuthController.switchWorkspace',
@@ -267,6 +270,7 @@ const SOCLE: readonly string[] = [
   'AuthController.me',
   'AuthController.refresh',
   'CallOutcomeReasonsController.list',
+  'ChampsConversionController.reglages',
   'StatutsQualificationController.list',
   'AuthController.switchWorkspace',
   'HealthController.live',

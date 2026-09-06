@@ -20,7 +20,9 @@ import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
-import { EXPORT_INCLUDE, PROSPECT_COLUMNS, cellValue } from '../export/columns.js';
+import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
+import { EXPORT_INCLUDE, cellValue, prospectColumns } from '../export/columns.js';
+import type { ColumnSpec } from '../export/columns.js';
 import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
 import { styleHeader } from '../export/import-template.workbook.js';
 import { toDakarCell } from '../export/dakar.js';
@@ -108,6 +110,7 @@ export class LotsExportService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly demo: WorkspaceContext,
+    private readonly champs: ChampsConversionService,
   ) {}
 
   async preview(body: CreateLotExportDto): Promise<LotExportPreviewDto> {
@@ -158,10 +161,9 @@ export class LotsExportService {
             cible: body.cible,
             // Un représentant est CHUES par construction ; un lot de prospects
             // porte le projet exigé à la création.
-            projet:
-              surRepresentants(body.cible)
-                ? Projet.CHUES
-                : (body.prospects?.projet ?? Projet.CHUES),
+            projet: surRepresentants(body.cible)
+              ? Projet.CHUES
+              : (body.prospects?.projet ?? Projet.CHUES),
             // La répartition voyage avec les critères : elle n'a pas de colonne,
             // et un téléconseiller à zéro fiche ne laisse aucune ligne derrière lui.
             filters: {
@@ -250,8 +252,7 @@ export class LotsExportService {
         ...distribution,
         objectifs: objectifsDe(body.objectifs),
       }));
-    if (Object.keys(data).length > 0)
-      await this.prisma.lotExport.update({ where: { id }, data });
+    if (Object.keys(data).length > 0) await this.prisma.lotExport.update({ where: { id }, data });
     return this.summary(id);
   }
 
@@ -282,7 +283,8 @@ export class LotsExportService {
     if (deplacables.length === 0)
       throw new UnprocessableEntityException({
         code: 'LOT_EXPORT_REAFFECTATION_VIDE',
-        message: 'Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.',
+        message:
+          'Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.',
       });
 
     await this.deplacer(user, lot, deplacables, body.versTeleconseillerId);
@@ -530,7 +532,7 @@ export class LotsExportService {
   async writeXlsx(id: string, stream: Writable): Promise<void> {
     const lot = await this.prisma.lotExport.findUnique({
       where: { id },
-      select: { cible: true, filters: true },
+      select: { cible: true, filters: true, projet: true },
     });
     if (!lot)
       throw new NotFoundException({
@@ -557,7 +559,10 @@ export class LotsExportService {
     markWorkbook(workbook, demoEnabled);
     if (surRepresentants(lot.cible))
       await this.writeRepresentantsSheet(workbook, ordonnes, demoEnabled);
-    else await this.writeProspectsSheet(workbook, ordonnes, demoEnabled);
+    else {
+      const libres = await this.champs.champsLibres(lot.projet);
+      await this.writeProspectsSheet(workbook, ordonnes, demoEnabled, prospectColumns(libres));
+    }
     await workbook.commit();
   }
 
@@ -659,11 +664,12 @@ export class LotsExportService {
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     items: readonly ItemRow[],
     demoEnabled: boolean,
+    colonnes: readonly ColumnSpec[],
   ): Promise<void> {
     const sheet = workbook.addWorksheet('Répartition', { views: [{ state: 'frozen', ySplit: 1 }] });
     sheet.columns = [
       ...REPARTITION_COLUMNS,
-      ...PROSPECT_COLUMNS.map((column) => ({
+      ...colonnes.map((column) => ({
         header: column.header,
         key: column.key,
         width: 22,
@@ -690,10 +696,7 @@ export class LotsExportService {
             teleconseiller: item.assignee?.fullName ?? '',
             jour: item.day,
             ...Object.fromEntries(
-              PROSPECT_COLUMNS.map((column) => [
-                column.key,
-                cellValue(column, row, attempts.get(row.id)),
-              ]),
+              colonnes.map((column) => [column.key, cellValue(column, row, attempts.get(row.id))]),
             ),
           })
           .commit();
@@ -813,14 +816,13 @@ export class LotsExportService {
     cible: LotExportCible,
     createdAt: Date,
   ): Promise<{ calls: number; fiches: number }> {
-    const [row] =
-      surRepresentants(cible)
-        ? await this.prisma.$queryRaw<
-            { calls: number; fiches: number }[]
-          >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches FROM "lot_export_items" i INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`
-        : await this.prisma.$queryRaw<
-            { calls: number; fiches: number }[]
-          >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches FROM "lot_export_items" i INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`;
+    const [row] = surRepresentants(cible)
+      ? await this.prisma.$queryRaw<
+          { calls: number; fiches: number }[]
+        >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches FROM "lot_export_items" i INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`
+      : await this.prisma.$queryRaw<
+          { calls: number; fiches: number }[]
+        >`SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches FROM "lot_export_items" i INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt}`;
     return row ?? { calls: 0, fiches: 0 };
   }
 
@@ -892,14 +894,13 @@ export class LotsExportService {
     cible: LotExportCible,
     createdAt: Date,
   ): Promise<Record<string, number>> {
-    const rows =
-      surRepresentants(cible)
-        ? await this.prisma.$queryRaw<
-            { name: string; calls: number }[]
-          >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "rep_call_attempts" a INNER JOIN "lot_export_items" i ON i."representantId" = a."representantId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`
-        : await this.prisma.$queryRaw<
-            { name: string; calls: number }[]
-          >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "call_attempts" a INNER JOIN "lot_export_items" i ON i."prospectId" = a."prospectId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`;
+    const rows = surRepresentants(cible)
+      ? await this.prisma.$queryRaw<
+          { name: string; calls: number }[]
+        >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "rep_call_attempts" a INNER JOIN "lot_export_items" i ON i."representantId" = a."representantId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`
+      : await this.prisma.$queryRaw<
+          { name: string; calls: number }[]
+        >`SELECT u."fullName" AS name, COUNT(*)::int AS calls FROM "call_attempts" a INNER JOIN "lot_export_items" i ON i."prospectId" = a."prospectId" INNER JOIN "users" u ON u."id" = a."performedById" WHERE i."lotId" = ${id} AND a."clientCreatedAt" >= ${createdAt} GROUP BY u."id", u."fullName"`;
     return Object.fromEntries(rows.map((row) => [row.name, row.calls]));
   }
 
@@ -909,14 +910,12 @@ export class LotsExportService {
     createdAt: Date,
     distribution: Distribution | null,
   ): Promise<LotExportPerformanceDto[]> {
-    const tentatives =
-      surRepresentants(cible)
-        ? Prisma.sql`SELECT "representantId" AS "targetId", "performedById", "clientCreatedAt" FROM "rep_call_attempts"`
-        : Prisma.sql`SELECT "prospectId" AS "targetId", "performedById", "clientCreatedAt" FROM "call_attempts"`;
-    const target =
-      surRepresentants(cible)
-        ? Prisma.sql`i."representantId"`
-        : Prisma.sql`i."prospectId"`;
+    const tentatives = surRepresentants(cible)
+      ? Prisma.sql`SELECT "representantId" AS "targetId", "performedById", "clientCreatedAt" FROM "rep_call_attempts"`
+      : Prisma.sql`SELECT "prospectId" AS "targetId", "performedById", "clientCreatedAt" FROM "call_attempts"`;
+    const target = surRepresentants(cible)
+      ? Prisma.sql`i."representantId"`
+      : Prisma.sql`i."prospectId"`;
 
     const rows = await this.prisma.$queryRaw<PerformanceRow[]>`
       WITH tentatives AS (${tentatives}),
