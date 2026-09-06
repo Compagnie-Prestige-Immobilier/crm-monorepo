@@ -33,6 +33,14 @@ export function prospectConditions(
   return Prisma.join(conditions, ' AND ');
 }
 
+/** Les deux valeurs bornent aux demandes converties : rien d'autre ne se revoit. */
+function revueConditions(revue: boolean): Prisma.Sql[] {
+  return [
+    Prisma.sql`p."statut" = 'CONVERTI'::"ProspectStatut"`,
+    revue ? Prisma.sql`p."revueAt" IS NOT NULL` : Prisma.sql`p."revueAt" IS NULL`,
+  ];
+}
+
 /**
  * Portée des prospects en SQL. Les agrégats sont écrits en SQL brut, une clause
  * Prisma ne s'y réemploie pas ; c'est la même règle, elle doit bouger en même temps.
@@ -78,6 +86,7 @@ function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
   if (filter.statut && !filter.projet) {
     conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
   }
+  if (filter.revue !== undefined) conditions.push(...revueConditions(filter.revue));
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
   if (filter.appelePar) {
     conditions.push(Prisma.sql`EXISTS (

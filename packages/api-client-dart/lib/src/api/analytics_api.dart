@@ -64,6 +64,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -94,6 +95,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -136,6 +138,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -204,6 +207,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -234,6 +238,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -276,6 +281,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -344,6 +350,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -374,6 +381,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -416,6 +424,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -484,6 +493,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -514,6 +524,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -556,6 +567,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -624,6 +636,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -654,6 +667,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -696,6 +710,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -764,6 +779,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -794,6 +810,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -836,6 +853,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -904,6 +922,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -934,6 +953,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -976,6 +996,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1044,6 +1065,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1074,6 +1096,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1116,6 +1139,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1184,6 +1208,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1214,6 +1239,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1256,6 +1282,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1324,6 +1351,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1354,6 +1382,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1396,6 +1425,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1464,6 +1494,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1494,6 +1525,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1536,6 +1568,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1604,6 +1637,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1634,6 +1668,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1676,6 +1711,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1744,6 +1780,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1774,6 +1811,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1816,6 +1854,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -1884,6 +1923,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -1914,6 +1954,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -1956,6 +1997,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
@@ -2024,6 +2066,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [granularity]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -2055,6 +2098,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     TimeGranularity? granularity,
     CancelToken? cancelToken,
@@ -2098,6 +2142,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (granularity != null) r'granularity': granularity,
     };
@@ -2167,6 +2212,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [limit]
   /// * [dormantDays] - Ancienneté, en jours, au delà de laquelle un représentant sans nouvel apport est déclaré dormant. Le seuil est un paramètre parce qu’il dépend du rythme de la zone : trois mois de silence n’ont pas le même sens partout.
@@ -2200,6 +2246,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     num? limit = 10,
     num? dormantDays = 90,
@@ -2244,6 +2291,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (limit != null) r'limit': limit,
       if (dormantDays != null) r'dormantDays': dormantDays,
@@ -2413,6 +2461,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [limit]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -2444,6 +2493,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     num? limit = 10,
     CancelToken? cancelToken,
@@ -2487,6 +2537,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (limit != null) r'limit': limit,
     };
@@ -2556,6 +2607,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [limit]
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
@@ -2587,6 +2639,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     num? limit = 10,
     CancelToken? cancelToken,
@@ -2630,6 +2683,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (limit != null) r'limit': limit,
     };
@@ -2699,6 +2753,7 @@ class AnalyticsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
@@ -2729,6 +2784,7 @@ class AnalyticsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
@@ -2771,6 +2827,7 @@ class AnalyticsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
     };
 
