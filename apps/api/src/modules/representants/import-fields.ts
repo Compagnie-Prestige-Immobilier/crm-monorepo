@@ -275,22 +275,34 @@ const AN_MOIS_JOUR = /^(\d{4})-(\d{2})-(\d{2})/;
  * coïncident, et une conversion de fuseau ferait glisser la date d'un jour sur
  * une machine de développement européenne.
  */
+function extractDateParts(texte: string): readonly [number, number, number] | null {
+  const jma = JOUR_MOIS_AN.exec(texte);
+  if (jma) return [Number(jma[3]), Number(jma[2]), Number(jma[1])];
+  const amj = AN_MOIS_JOUR.exec(texte);
+  if (amj) return [Number(amj[1]), Number(amj[2]), Number(amj[3])];
+  return null;
+}
+
+/**
+ * Attrape le 31 février, que `Date.UTC` accepte en le reportant au 3 mars
+ * sans rien dire.
+ */
+function estMemeDateCalendaire(date: Date, annee: number, mois: number, jour: number): boolean {
+  return (
+    date.getUTCFullYear() === annee && date.getUTCMonth() === mois - 1 && date.getUTCDate() === jour
+  );
+}
+
 function parseDateAppel(raw: string, maintenant = new Date()): Date | null {
   const texte = raw.trim();
   if (texte === '') return null;
 
-  const jma = JOUR_MOIS_AN.exec(texte);
-  const amj = AN_MOIS_JOUR.exec(texte);
-  if (!jma && !amj) return null;
-  const [annee, mois, jour] = jma
-    ? [Number(jma[3]), Number(jma[2]), Number(jma[1])]
-    : [Number(amj?.[1]), Number(amj?.[2]), Number(amj?.[3])];
+  const parts = extractDateParts(texte);
+  if (!parts) return null;
+  const [annee, mois, jour] = parts;
 
   const date = new Date(Date.UTC(annee, mois - 1, jour));
-  // Le contrôle de recomposition attrape le 31 février, que `Date.UTC` accepte
-  // en le reportant au 3 mars sans rien dire.
-  if (date.getUTCFullYear() !== annee || date.getUTCMonth() !== mois - 1) return null;
-  if (date.getUTCDate() !== jour) return null;
+  if (!estMemeDateCalendaire(date, annee, mois, jour)) return null;
   if (date.getTime() > maintenant.getTime()) return null;
   return date;
 }
