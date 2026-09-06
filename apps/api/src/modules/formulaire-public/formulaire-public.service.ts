@@ -123,13 +123,7 @@ export class FormulairePublicService {
         data: {
           origin: PROSPECT_ORIGIN_FORMULAIRE_PUBLIC,
           aRevoirAt: now,
-          ...(existant.prenom === '' ? { prenom: demande.prenom.trim() } : {}),
-          ...(existant.profession === null && demande.profession !== undefined
-            ? { profession: demande.profession.trim() }
-            : {}),
-          ...(existant.employeur === null && demande.employeur !== undefined
-            ? { employeur: demande.employeur.trim() }
-            : {}),
+          ...this.champsAManques(existant, demande),
         },
       });
       return existant.id;
@@ -152,6 +146,21 @@ export class FormulairePublicService {
       select: { id: true },
     });
     return cree.id;
+  }
+
+  private champsAManques(
+    existant: { prenom: string; profession: string | null; employeur: string | null },
+    demande: DemandePubliqueDto,
+  ): Record<string, string> {
+    return {
+      ...(existant.prenom === '' ? { prenom: demande.prenom.trim() } : {}),
+      ...(existant.profession === null && demande.profession !== undefined
+        ? { profession: demande.profession.trim() }
+        : {}),
+      ...(existant.employeur === null && demande.employeur !== undefined
+        ? { employeur: demande.employeur.trim() }
+        : {}),
+    };
   }
 
   /**
