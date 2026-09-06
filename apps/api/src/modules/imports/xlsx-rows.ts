@@ -40,21 +40,24 @@ export class UnreadableWorkbookError extends Error {
   }
 }
 
+function objectCellText(value: Extract<ExcelJS.CellValue, object>): string {
+  if ('text' in value && typeof value.text === 'string') return value.text.trim();
+  if ('result' in value) return cellText(value.result);
+  if ('richText' in value && Array.isArray(value.richText)) {
+    return value.richText
+      .map((part) => part.text)
+      .join('')
+      .trim();
+  }
+  return '';
+}
+
 function cellText(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object') {
-    if ('text' in value && typeof value.text === 'string') return value.text.trim();
-    if ('result' in value) return cellText(value.result);
-    if ('richText' in value && Array.isArray(value.richText)) {
-      return value.richText
-        .map((part) => part.text)
-        .join('')
-        .trim();
-    }
-  }
+  if (typeof value === 'object') return objectCellText(value);
   return '';
 }
 
