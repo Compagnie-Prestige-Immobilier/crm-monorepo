@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useId, useRef, useState } from 'react';
+import { useId, useRef, useState, type RefObject } from 'react';
 import { toast } from 'sonner';
 
 import { ClientRequestDialog } from '@/components/bank/client-request-dialog';
@@ -107,6 +107,188 @@ function ResultatsRecherche({
   );
 }
 
+function ClientSearchField({
+  searchId,
+  term,
+  setTerm,
+  selected,
+  onClear,
+  debounced,
+  results,
+  onSelectProspect,
+  onRequest,
+}: {
+  searchId: string;
+  term: string;
+  setTerm: (value: string) => void;
+  selected: BankProspectSearchItem | null;
+  onClear: () => void;
+  debounced: string;
+  results: UseQueryResult<BankProspectSearchItem[]>;
+  onSelectProspect: (prospect: BankProspectSearchItem) => void;
+  onRequest: () => void;
+}) {
+  return (
+    <section className="flex flex-col gap-2">
+      <Label htmlFor={searchId} className="text-[1rem]">
+        Rechercher un client
+        <span className="text-destructive" aria-label="obligatoire">
+          *
+        </span>
+      </Label>
+      <p id={`${searchId}-aide`} className="text-[0.8125rem] text-muted-foreground">
+        Par nom ou par téléphone. Méthode d’enrôlement obtenue requise.
+      </p>
+      <div className="relative">
+        <SearchIcon
+          className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          id={searchId}
+          type="search"
+          className="h-14 pl-12 text-[1.125rem]"
+          autoComplete="off"
+          // oxlint-disable-next-line jsx-a11y/no-autofocus -- recherche première du formulaire
+          autoFocus
+          value={selected === null ? term : selected.fullName}
+          aria-describedby={`${searchId}-aide`}
+          placeholder="Aminata Diallo, ou 77 123 45 67"
+          readOnly={selected !== null}
+          onChange={(event) => {
+            setTerm(event.target.value);
+          }}
+        />
+        {selected !== null ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="absolute top-1/2 right-2 -translate-y-1/2"
+            aria-label="Changer de client"
+            onClick={onClear}
+          >
+            <XIcon className="size-4" aria-hidden="true" />
+          </Button>
+        ) : null}
+      </div>
+
+      {selected === null && debounced.length >= 2 ? (
+        <div role="status" className="rounded-md border border-border bg-card">
+          <ResultatsRecherche results={results} onSelect={onSelectProspect} onRequest={onRequest} />
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SelectedClientSummary({ selected }: { selected: BankProspectSearchItem | null }) {
+  if (selected === null) return null;
+  return (
+    <Card className="animate-rise border-primary/30">
+      <CardContent className="flex items-start gap-3">
+        <CheckIcon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+        <div className="min-w-0">
+          <p className="truncate font-[600]">{selected.fullName}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
+            {formatPhone(selected.phoneE164)}
+          </p>
+          <p className="mt-1 text-[0.75rem] text-muted-foreground">
+            Nom et téléphone sont copiés sur le dossier.
+          </p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ReferenceFeedback({
+  referenceId,
+  duplicate,
+  checking,
+  base,
+}: {
+  referenceId: string;
+  duplicate: { id: string; reference: string } | null;
+  checking: boolean;
+  base: string;
+}) {
+  if (duplicate === null) {
+    return (
+      <p id={`${referenceId}-aide`} className="text-[0.75rem] text-muted-foreground">
+        Deux caractères au minimum. Référence unique.
+        {checking ? ' Vérification en cours…' : ''}
+      </p>
+    );
+  }
+
+  return (
+    <p
+      id={`${referenceId}-doublon`}
+      role="alert"
+      className="flex flex-wrap items-center gap-1.5 text-[0.75rem] text-destructive"
+    >
+      <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
+      La référence « {duplicate.reference} » existe déjà.
+      <Link
+        href={`${base}/dossiers/${duplicate.id}`}
+        className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Ouvrir ce dossier
+      </Link>
+    </p>
+  );
+}
+
+function ReferenceField({
+  referenceId,
+  referenceRef,
+  value,
+  duplicate,
+  checking,
+  base,
+  onChange,
+  onBlur,
+}: {
+  referenceId: string;
+  referenceRef: RefObject<HTMLInputElement | null>;
+  value: string;
+  duplicate: { id: string; reference: string } | null;
+  checking: boolean;
+  base: string;
+  onChange: (value: string) => void;
+  onBlur: (value: string) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={referenceId}>
+        Référence bancaire
+        <span className="text-destructive" aria-label="obligatoire">
+          *
+        </span>
+      </Label>
+      <Input
+        id={referenceId}
+        ref={referenceRef}
+        value={value}
+        maxLength={64}
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="CPI-2026-00412"
+        aria-invalid={duplicate !== null}
+        aria-describedby={duplicate !== null ? `${referenceId}-doublon` : `${referenceId}-aide`}
+        onChange={(event) => {
+          onChange(event.target.value);
+        }}
+        onBlur={(event) => {
+          onBlur(event.target.value.trim());
+        }}
+      />
+      <ReferenceFeedback referenceId={referenceId} duplicate={duplicate} checking={checking} base={base} />
+    </div>
+  );
+}
+
 export function BankCaseForm({ projet }: { projet: Projet }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -139,6 +321,7 @@ export function BankCaseForm({ projet }: { projet: Projet }) {
     queryFn: () => fetchBanques(),
     staleTime: 5 * 60_000,
   });
+  const bankList = banques.data ?? [];
 
   const checkReference = useMutation({
     mutationFn: (value: string) =>
@@ -219,84 +402,26 @@ export function BankCaseForm({ projet }: { projet: Projet }) {
       }}
     >
       {/* ─── 1. Le client ───────────────────────────────────────────────── */}
-      <section className="flex flex-col gap-2">
-        <Label htmlFor={searchId} className="text-[1rem]">
-          Rechercher un client
-          <span className="text-destructive" aria-label="obligatoire">
-            *
-          </span>
-        </Label>
-        <p id={`${searchId}-aide`} className="text-[0.8125rem] text-muted-foreground">
-          Par nom ou par téléphone. Méthode d’enrôlement obtenue requise.
-        </p>
-        <div className="relative">
-          <SearchIcon
-            className="pointer-events-none absolute top-1/2 left-4 size-5 -translate-y-1/2 text-muted-foreground"
-            aria-hidden="true"
-          />
-          <Input
-            id={searchId}
-            type="search"
-            className="h-14 pl-12 text-[1.125rem]"
-            autoComplete="off"
-            // oxlint-disable-next-line jsx-a11y/no-autofocus -- recherche première du formulaire
-            autoFocus
-            value={selected === null ? term : selected.fullName}
-            aria-describedby={`${searchId}-aide`}
-            placeholder="Aminata Diallo, ou 77 123 45 67"
-            readOnly={selected !== null}
-            onChange={(event) => {
-              setTerm(event.target.value);
-            }}
-          />
-          {selected !== null ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="absolute top-1/2 right-2 -translate-y-1/2"
-              aria-label="Changer de client"
-              onClick={() => {
-                setSelected(null);
-                setTerm('');
-                setDuplicate(null);
-              }}
-            >
-              <XIcon className="size-4" aria-hidden="true" />
-            </Button>
-          ) : null}
-        </div>
-
-        {selected === null && debounced.length >= 2 ? (
-          <div role="status" className="rounded-md border border-border bg-card">
-            <ResultatsRecherche
-              results={results}
-              onSelect={selectProspect}
-              onRequest={() => {
-                setRequesting(true);
-              }}
-            />
-          </div>
-        ) : null}
-      </section>
+      <ClientSearchField
+        searchId={searchId}
+        term={term}
+        setTerm={setTerm}
+        selected={selected}
+        onClear={() => {
+          setSelected(null);
+          setTerm('');
+          setDuplicate(null);
+        }}
+        debounced={debounced}
+        results={results}
+        onSelectProspect={selectProspect}
+        onRequest={() => {
+          setRequesting(true);
+        }}
+      />
 
       {/* ─── 2. Résumé compact ──────────────────────────────────────────── */}
-      {selected !== null ? (
-        <Card className="animate-rise border-primary/30">
-          <CardContent className="flex items-start gap-3">
-            <CheckIcon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
-            <div className="min-w-0">
-              <p className="truncate font-[600]">{selected.fullName}</p>
-              <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
-                {formatPhone(selected.phoneE164)}
-              </p>
-              <p className="mt-1 text-[0.75rem] text-muted-foreground">
-                Nom et téléphone sont copiés sur le dossier.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <SelectedClientSummary selected={selected} />
 
       {/* ─── 3. Référence et banque ─────────────────────────────────────── */}
       {/* Pas d'`opacity-50` sur le bloc entier tant qu'aucun client n'est
@@ -307,61 +432,28 @@ export function BankCaseForm({ projet }: { projet: Projet }) {
           `disabled` sur le `fieldset` suffit : chaque champ prend la peau
           désactivée (`muted`), qui reste lisible et dit déjà « pas encore ». */}
       <fieldset disabled={selected === null} className="flex flex-col gap-5">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={referenceId}>
-            Référence bancaire
-            <span className="text-destructive" aria-label="obligatoire">
-              *
-            </span>
-          </Label>
-          <Input
-            id={referenceId}
-            ref={referenceRef}
-            value={reference}
-            maxLength={64}
-            autoComplete="off"
-            spellCheck={false}
-            placeholder="CPI-2026-00412"
-            aria-invalid={duplicate !== null}
-            aria-describedby={duplicate !== null ? `${referenceId}-doublon` : `${referenceId}-aide`}
-            onChange={(event) => {
-              setReference(event.target.value);
-              setDuplicate(null);
-            }}
-            onBlur={(event) => {
-              const value = event.target.value.trim();
-              if (value.length >= 2) checkReference.mutate(value);
-            }}
-          />
-          {duplicate === null ? (
-            <p id={`${referenceId}-aide`} className="text-[0.75rem] text-muted-foreground">
-              Deux caractères au minimum. Référence unique.
-              {checkReference.isPending ? ' Vérification en cours…' : ''}
-            </p>
-          ) : (
-            <p
-              id={`${referenceId}-doublon`}
-              role="alert"
-              className="flex flex-wrap items-center gap-1.5 text-[0.75rem] text-destructive"
-            >
-              <AlertTriangleIcon className="size-3.5 shrink-0" aria-hidden="true" />
-              La référence « {duplicate.reference} » existe déjà.
-              <Link
-                href={`${base}/dossiers/${duplicate.id}`}
-                className="rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Ouvrir ce dossier
-              </Link>
-            </p>
-          )}
-        </div>
+        <ReferenceField
+          referenceId={referenceId}
+          referenceRef={referenceRef}
+          value={reference}
+          duplicate={duplicate}
+          checking={checkReference.isPending}
+          base={base}
+          onChange={(value) => {
+            setReference(value);
+            setDuplicate(null);
+          }}
+          onBlur={(value) => {
+            if (value.length >= 2) checkReference.mutate(value);
+          }}
+        />
 
         <div className="flex flex-col gap-1.5">
           <Label htmlFor={bankId}>Banque de traitement</Label>
           {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie, pas
               le texte de l'item — ici, l'identifiant de la banque. */}
           <Select
-            items={(banques.data ?? []).map((banque) => ({
+            items={bankList.map((banque) => ({
               value: banque.id,
               label: `${withRetired(banque.shortName, banque.isActive)}, ${banque.name}`,
             }))}
@@ -375,7 +467,7 @@ export function BankCaseForm({ projet }: { projet: Projet }) {
               <SelectValue placeholder="Choisir une banque" />
             </SelectTrigger>
             <SelectContent>
-              {(banques.data ?? []).map((banque) => (
+              {bankList.map((banque) => (
                 <SelectItem key={banque.id} value={banque.id}>
                   {withRetired(banque.shortName, banque.isActive)}, {banque.name}
                 </SelectItem>
