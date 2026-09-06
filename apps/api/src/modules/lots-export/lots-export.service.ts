@@ -68,6 +68,26 @@ const CIBLES_REPRESENTANTS: readonly LotExportCible[] = [
 
 const surRepresentants = (cible: LotExportCible): boolean => CIBLES_REPRESENTANTS.includes(cible);
 
+function lotExportCreatedAtRange(query: LotExportQueryDto): Prisma.LotExportWhereInput {
+  if (!query.dateFrom && !query.dateTo) return {};
+  return {
+    createdAt: {
+      ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
+      ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
+    },
+  };
+}
+
+function lotExportListWhere(query: LotExportQueryDto): Prisma.LotExportWhereInput {
+  return {
+    ...(query.search ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}),
+    ...(query.cible ? { cible: query.cible } : {}),
+    ...(query.projet ? { projet: query.projet } : {}),
+    ...(query.createdById ? { createdById: query.createdById } : {}),
+    ...lotExportCreatedAtRange(query),
+  };
+}
+
 type LotExportRow = Prisma.LotExportGetPayload<{
   include: { createdBy: { select: { fullName: true } } };
 }>;
@@ -205,20 +225,7 @@ export class LotsExportService {
   async list(query: LotExportQueryDto): Promise<LotExportListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-    const where: Prisma.LotExportWhereInput = {
-      ...(query.search ? { name: { contains: query.search.trim(), mode: 'insensitive' } } : {}),
-      ...(query.cible ? { cible: query.cible } : {}),
-      ...(query.projet ? { projet: query.projet } : {}),
-      ...(query.createdById ? { createdById: query.createdById } : {}),
-      ...(query.dateFrom || query.dateTo
-        ? {
-            createdAt: {
-              ...(query.dateFrom ? { gte: new Date(query.dateFrom) } : {}),
-              ...(query.dateTo ? { lte: new Date(query.dateTo) } : {}),
-            },
-          }
-        : {}),
-    };
+    const where = lotExportListWhere(query);
     const [total, rows] = await Promise.all([
       this.prisma.lotExport.count({ where }),
       this.prisma.lotExport.findMany({
@@ -634,6 +641,17 @@ export class LotsExportService {
       )._max.day ??
       1;
     const label = scopeLabel(lot.cible, lot.filters);
+
+    function fullNameDe(item: (typeof items)[number]): string {
+      return (
+        item.representant?.fullName ??
+        [item.prospect?.nom, item.prospect?.prenom].filter(Boolean).join(' ')
+      );
+    }
+    function phoneE164De(item: (typeof items)[number]): string {
+      return item.representant?.phoneE164 ?? item.prospect?.phoneE164 ?? '';
+    }
+
     return {
       teleconseillerName: items[0]?.assignee?.fullName ?? 'Téléconseiller',
       dayNumber: jour,
@@ -643,11 +661,9 @@ export class LotsExportService {
       generatedAt: new Date(),
       rows: items.map((item, index) => ({
         position: index + 1,
-        fullName:
-          item.representant?.fullName ??
-          [item.prospect?.nom, item.prospect?.prenom].filter(Boolean).join(' '),
+        fullName: fullNameDe(item),
         etablissement: item.representant?.etablissement ?? '',
-        phoneE164: item.representant?.phoneE164 ?? item.prospect?.phoneE164 ?? '',
+        phoneE164: phoneE164De(item),
       })),
     };
   }
@@ -688,9 +704,10 @@ export class LotsExportService {
       });
       const attempts = await lastAttemptsByProspect(this.prisma, ids);
       const byId = new Map(rows.map((row) => [row.id, row]));
-      for (const item of page) {
+
+      function writeRow(item: ItemRow): void {
         const row = item.prospectId ? byId.get(item.prospectId) : undefined;
-        if (!row) continue;
+        if (!row) return;
         sheet
           .addRow({
             teleconseiller: item.assignee?.fullName ?? '',
@@ -701,6 +718,7 @@ export class LotsExportService {
           })
           .commit();
       }
+      for (const item of page) writeRow(item);
     }
     sheet.commit();
   }
@@ -736,9 +754,10 @@ export class LotsExportService {
         },
       });
       const byId = new Map(rows.map((row) => [row.id, row]));
-      for (const item of page) {
+
+      function writeRow(item: ItemRow): void {
         const row = item.representantId ? byId.get(item.representantId) : undefined;
-        if (!row) continue;
+        if (!row) return;
         sheet
           .addRow({
             teleconseiller: item.assignee?.fullName ?? '',
@@ -753,6 +772,7 @@ export class LotsExportService {
           })
           .commit();
       }
+      for (const item of page) writeRow(item);
     }
     sheet.commit();
   }
@@ -1298,11 +1318,16 @@ function trierParTeleconseiller(
   );
 }
 
-function readDistribution(filters: Prisma.JsonValue): Distribution | null {
+function distributionValueOf(filters: Prisma.JsonValue): Record<string, unknown> | null {
   if (typeof filters !== 'object' || filters === null || Array.isArray(filters)) return null;
   const raw = (filters as Record<string, unknown>).distribution;
   if (typeof raw !== 'object' || raw === null) return null;
-  const value = raw as Record<string, unknown>;
+  return raw as Record<string, unknown>;
+}
+
+function readDistribution(filters: Prisma.JsonValue): Distribution | null {
+  const value = distributionValueOf(filters);
+  if (!value) return null;
   const teleconseillerIds = Array.isArray(value.teleconseillerIds)
     ? value.teleconseillerIds.filter((id): id is string => typeof id === 'string')
     : [];
@@ -1355,15 +1380,30 @@ interface FicheRow {
   } | null;
 }
 
+type FicheRepresentant = FicheRow['representant'];
+type FicheProspect = FicheRow['prospect'];
+
+function ficheIdDe(fiche: FicheRepresentant, prospect: FicheProspect): string | null {
+  return fiche?.id ?? prospect?.id ?? null;
+}
+
+function ficheNomDe(fiche: FicheRepresentant, prospect: FicheProspect): string {
+  return fiche?.fullName ?? [prospect?.nom, prospect?.prenom].filter(Boolean).join(' ');
+}
+
+function fichePhoneDe(fiche: FicheRepresentant, prospect: FicheProspect): string {
+  return fiche?.phoneE164 ?? prospect?.phoneE164 ?? '';
+}
+
 function ficheDe(row: FicheRow, traitee: boolean): LotExportFicheDto {
   const fiche = row.representant;
   const prospect = row.prospect;
   return {
     position: row.position,
     jour: row.day,
-    ficheId: fiche?.id ?? prospect?.id ?? null,
-    fullName: fiche?.fullName ?? [prospect?.nom, prospect?.prenom].filter(Boolean).join(' '),
-    phoneE164: fiche?.phoneE164 ?? prospect?.phoneE164 ?? '',
+    ficheId: ficheIdDe(fiche, prospect),
+    fullName: ficheNomDe(fiche, prospect),
+    phoneE164: fichePhoneDe(fiche, prospect),
     teleconseillerId: row.assigneeId,
     teleconseillerName: row.assignee?.fullName ?? 'Non attribuée',
     etat: etatDe(traitee, fiche?.nextCallbackAt != null),
@@ -1400,17 +1440,23 @@ interface ScopeFilters {
   projet?: string;
 }
 
+function representantScopeLabel(f: ScopeFilters): string {
+  if (!f.relationStatus) return 'Tous les représentants';
+  return f.relationStatus === 'INCONNU'
+    ? 'Représentants non qualifiés'
+    : `Représentants ${f.relationStatus.toLowerCase()}`;
+}
+
+function prospectScopeLabel(f: ScopeFilters): string {
+  if (f.segment) return `${f.projet ?? 'Tous projets'}, segment ${f.segment}`;
+  if (f.type) return `${f.projet ?? 'Grand Public'}, ${f.type.toLowerCase().replace('_', ' ')}`;
+  return f.projet ?? 'Tous projets';
+}
+
 function scopeLabel(cible: LotExportCible, filters: unknown): string {
   const f = (filters ?? {}) as ScopeFilters;
   if (cible === LotExportCible.REPRESENTANTS_INJOIGNABLES) return 'Représentants injoignables';
   if (cible === LotExportCible.CONTACTS_RECOMMANDES) return 'Contacts recommandés';
-  if (cible === LotExportCible.REPRESENTANTS) {
-    if (!f.relationStatus) return 'Tous les représentants';
-    return f.relationStatus === 'INCONNU'
-      ? 'Représentants non qualifiés'
-      : `Représentants ${f.relationStatus.toLowerCase()}`;
-  }
-  if (f.segment) return `${f.projet ?? 'Tous projets'}, segment ${f.segment}`;
-  if (f.type) return `${f.projet ?? 'Grand Public'}, ${f.type.toLowerCase().replace('_', ' ')}`;
-  return f.projet ?? 'Tous projets';
+  if (cible === LotExportCible.REPRESENTANTS) return representantScopeLabel(f);
+  return prospectScopeLabel(f);
 }
