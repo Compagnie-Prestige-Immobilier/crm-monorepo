@@ -38,6 +38,21 @@ import {
 } from '@/lib/types';
 import { ROLES } from '@/lib/user-filters';
 
+function userFormDefaults(user: UserRow | undefined) {
+  return {
+    email: user?.email ?? '',
+    username: user?.username ?? '',
+    fullName: user?.fullName ?? '',
+    phone: user?.phoneE164 ?? '',
+    password: '',
+    ...(user ? { role: user.role } : {}),
+  };
+}
+
+function errorMessage(error?: { message?: string }): string | undefined {
+  return error?.message;
+}
+
 const ROLE_HINTS: Record<Role, string> = {
   ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
   COMMERCIAL: 'Saisit les prospects depuis l’application mobile.',
@@ -75,14 +90,7 @@ export function UserFormDialog({
 
   useEffect(() => {
     if (!open) return;
-    reset({
-      email: user?.email ?? '',
-      username: user?.username ?? '',
-      fullName: user?.fullName ?? '',
-      phone: user?.phoneE164 ?? '',
-      password: '',
-      ...(user ? { role: user.role } : {}),
-    });
+    reset(userFormDefaults(user));
   }, [open, user, reset]);
 
   const mutation = useMutation({
@@ -155,11 +163,11 @@ export function UserFormDialog({
             })(event);
           }}
         >
-          <Field label="Nom complet" required error={formState.errors.fullName?.message}>
+          <Field label="Nom complet" required error={errorMessage(formState.errors.fullName)}>
             {(props) => <Input {...props} autoComplete="name" {...register('fullName')} />}
           </Field>
 
-          <Field label="Adresse e-mail" required error={formState.errors.email?.message}>
+          <Field label="Adresse e-mail" required error={errorMessage(formState.errors.email)}>
             {(props) => (
               <Input {...props} type="email" autoComplete="email" {...register('email')} />
             )}
@@ -169,7 +177,7 @@ export function UserFormDialog({
             label="Identifiant"
             required
             description="Utilisé pour la connexion, avec l’e-mail."
-            error={formState.errors.username?.message}
+            error={errorMessage(formState.errors.username)}
           >
             {(props) => (
               <Input
@@ -184,7 +192,7 @@ export function UserFormDialog({
           <Field
             label="Téléphone"
             description="Format libre."
-            error={formState.errors.phone?.message}
+            error={errorMessage(formState.errors.phone)}
           >
             {(props) => (
               <Input {...props} type="tel" placeholder="77 123 45 67" {...register('phone')} />
@@ -202,7 +210,7 @@ export function UserFormDialog({
             description={
               role === undefined ? 'Décide de ce que le compte pourra consulter.' : ROLE_HINTS[role]
             }
-            error={formState.errors.role?.message}
+            error={errorMessage(formState.errors.role)}
           >
             {(props) => (
               <Select
@@ -235,7 +243,7 @@ export function UserFormDialog({
               label="Mot de passe"
               required
               description="12 caractères minimum."
-              error={formState.errors.password?.message}
+              error={errorMessage(formState.errors.password)}
             >
               {(props) => (
                 <Input
