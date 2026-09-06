@@ -43,6 +43,8 @@ export function FormulaireDemande({ jeton, cleSite }: { jeton: string; cleSite: 
     defaultValues: VIDE,
   });
 
+  const msg = (champ: keyof DemandePubliqueInput): string | undefined => errors[champ]?.message;
+
   /**
    * Le widget pose lui-même un champ caché dans le formulaire : il est lu ici
    * plutôt que recopié dans un état, qui serait une seconde source de vérité.
@@ -112,38 +114,34 @@ export function FormulaireDemande({ jeton, cleSite }: { jeton: string; cleSite: 
       ) : null}
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Prénom" required error={errors.prenom?.message}>
+        <Field label="Prénom" required error={msg('prenom')}>
           {(props) => <Input {...props} autoComplete="given-name" {...register('prenom')} />}
         </Field>
-        <Field label="Nom" required error={errors.nom?.message}>
+        <Field label="Nom" required error={msg('nom')}>
           {(props) => <Input {...props} autoComplete="family-name" {...register('nom')} />}
         </Field>
       </div>
 
-      <Field label="Téléphone" required error={errors.phone?.message}>
+      <Field label="Téléphone" required error={msg('phone')}>
         {(props) => (
           <Input {...props} type="tel" inputMode="tel" autoComplete="tel" {...register('phone')} />
         )}
       </Field>
 
-      <Field
-        label="E-mail"
-        error={errors.email?.message}
-        description="Pour recevoir un accusé de réception."
-      >
+      <Field label="E-mail" error={msg('email')} description="Pour recevoir un accusé de réception.">
         {(props) => <Input {...props} type="email" autoComplete="email" {...register('email')} />}
       </Field>
 
       <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Profession" error={errors.profession?.message}>
+        <Field label="Profession" error={msg('profession')}>
           {(props) => <Input {...props} {...register('profession')} />}
         </Field>
-        <Field label="Employeur" error={errors.employeur?.message}>
+        <Field label="Employeur" error={msg('employeur')}>
           {(props) => <Input {...props} {...register('employeur')} />}
         </Field>
       </div>
 
-      <Field label="Votre message" error={errors.message?.message}>
+      <Field label="Votre message" error={msg('message')}>
         {(props) => <Textarea {...props} rows={4} {...register('message')} />}
       </Field>
 
