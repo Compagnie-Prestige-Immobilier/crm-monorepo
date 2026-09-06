@@ -21630,6 +21630,66 @@
         "tags": ["enrolement"]
       }
     },
+    "/api/v1/formulaire-public/formulaire": {
+      "get": {
+        "operationId": "lireFormulairePublic",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormulairePublicDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Champs à rendre et listes à proposer sur le formulaire public.",
+        "tags": ["formulaire-public"]
+      }
+    },
     "/api/v1/formulaire-public/{jeton}": {
       "post": {
         "description": "Le jeton est le compte qui a partagé le lien : il devient auteur de la fiche et reçoit l’avis.",
@@ -34122,6 +34182,57 @@
         },
         "required": ["supprimees"]
       },
+      "OptionPubliqueDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "libelle": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "libelle"]
+      },
+      "FormulairePublicDto": {
+        "type": "object",
+        "properties": {
+          "champs": {
+            "description": "Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampDto"
+            }
+          },
+          "libres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreDto"
+            }
+          },
+          "banques": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "syndicats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "revenus": {
+            "description": "Tranches de revenu mensuel.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          }
+        },
+        "required": ["champs", "libres", "banques", "syndicats", "revenus"]
+      },
       "DemandePubliqueDto": {
         "type": "object",
         "properties": {
@@ -34140,16 +34251,87 @@
           },
           "email": {
             "type": "string",
-            "maxLength": 254,
-            "description": "Sans adresse, la confirmation à l’écran vaut accusé de réception."
+            "maxLength": 160,
+            "description": "Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu."
           },
           "profession": {
             "type": "string",
             "maxLength": 120
           },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où le visiteur exerce."
+          },
           "employeur": {
             "type": "string",
-            "maxLength": 160
+            "maxLength": 160,
+            "description": "Conservé pour les pages déjà en ligne. `etablissement` le remplace.",
+            "deprecated": true
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "fonctionnaire": {
+            "type": "boolean"
+          },
+          "engagementEnCours": {
+            "type": "boolean"
+          },
+          "syndicatId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "banqueId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "paymentMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 300
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Exigé quand le statut vaut AUTRE_NUMERO."
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Réponses aux champs ajoutés par l’administrateur, par identifiant de champ."
           },
           "message": {
             "type": "string",

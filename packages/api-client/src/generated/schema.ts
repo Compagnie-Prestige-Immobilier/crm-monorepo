@@ -3444,6 +3444,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/formulaire-public/formulaire': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Champs à rendre et listes à proposer sur le formulaire public. */
+    get: operations['lireFormulairePublic'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/formulaire-public/{jeton}': {
     parameters: {
       query?: never;
@@ -7963,15 +7980,63 @@ export interface components {
     SuppressionDto: {
       supprimees: number;
     };
+    OptionPubliqueDto: {
+      /** Format: uuid */
+      id: string;
+      libelle: string;
+    };
+    FormulairePublicDto: {
+      /** @description Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller. */
+      champs: components['schemas']['ReglageChampDto'][];
+      libres: components['schemas']['ChampLibreDto'][];
+      banques: components['schemas']['OptionPubliqueDto'][];
+      syndicats: components['schemas']['OptionPubliqueDto'][];
+      /** @description Tranches de revenu mensuel. */
+      revenus: components['schemas']['OptionPubliqueDto'][];
+    };
     DemandePubliqueDto: {
       nom: string;
       prenom: string;
       /** @description Saisie libre, normalisé en E.164 par le serveur. */
       phone: string;
-      /** @description Sans adresse, la confirmation à l’écran vaut accusé de réception. */
+      /** @description Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu. */
       email?: string;
       profession?: string;
+      /** @description Établissement où le visiteur exerce. */
+      etablissement?: string;
+      /**
+       * @deprecated
+       * @description Conservé pour les pages déjà en ligne. `etablissement` le remplace.
+       */
       employeur?: string;
+      dureeEtablissementMois?: number;
+      fonctionnaire?: boolean;
+      engagementEnCours?: boolean;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      syndicatId?: string;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      banqueId?: string;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      incomeBandId?: string;
+      type?: components['schemas']['ProspectType'];
+      paymentMode?: components['schemas']['PaymentMode'];
+      dureeSystemeMois?: number;
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Exigé quand le statut vaut AUTRE_NUMERO. */
+      whatsappE164?: string;
+      /** @description Réponses aux champs ajoutés par l’administrateur, par identifiant de champ. */
+      champsLibres?: {
+        [key: string]: string;
+      };
       message?: string;
       /** @description Laisser vide. */
       site?: string;
@@ -20869,6 +20934,61 @@ export interface operations {
       };
       /** @description Ressource introuvable, ou supprimée. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  lireFormulairePublic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FormulairePublicDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Service momentanément indisponible. */
+      503: {
         headers: {
           [name: string]: unknown;
         };
