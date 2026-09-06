@@ -11,6 +11,26 @@ import type { AnalyticsFinanceDto, AnalyticsFunnelDto, FunnelStageDto } from './
 /** Date d'encaissement ou de rejet lue dans l'HISTORIQUE : `updatedAt` bouge à chaque écriture et fausserait délai et montant 30 jours. */
 const CLOSED_AT = closedAtLateral(BANK_CASE);
 
+interface FinanceRow {
+  dossiers: number;
+  ouverts: number;
+  encaisses: number;
+  rejetes: number;
+  montant: string | null;
+  montant30: string | null;
+  delai: number | null;
+}
+
+const FINANCE_VIDE: FinanceRow = {
+  dossiers: 0,
+  ouverts: 0,
+  encaisses: 0,
+  rejetes: 0,
+  montant: null,
+  montant30: null,
+  delai: null,
+};
+
 @Injectable()
 export class FunnelService {
   constructor(private readonly prisma: PrismaService) {}
@@ -70,17 +90,7 @@ export class FunnelService {
   }
 
   private async finance(where: Prisma.Sql): Promise<AnalyticsFinanceDto> {
-    const rows = await this.prisma.$queryRaw<
-      {
-        dossiers: number;
-        ouverts: number;
-        encaisses: number;
-        rejetes: number;
-        montant: string | null;
-        montant30: string | null;
-        delai: number | null;
-      }[]
-    >`
+    const rows = await this.prisma.$queryRaw<FinanceRow[]>`
       WITH portee AS (
         SELECT bc."id", bc."amountXof", bc."createdAt", cl."closedAt", st."type"
         ${PROSPECT_FROM}
@@ -108,24 +118,22 @@ export class FunnelService {
       FROM portee
     `;
 
-    const row = rows[0];
-    const dossiers = row?.dossiers ?? 0;
-    const encaisses = row?.encaisses ?? 0;
-    const rejetes = row?.rejetes ?? 0;
-    const montant = row?.montant ?? '0';
+    const row = rows[0] ?? FINANCE_VIDE;
+    const { dossiers, encaisses, rejetes } = row;
+    const montant = row.montant ?? '0';
     const clos = encaisses + rejetes;
 
     return {
       montantEncaisse: montant,
       montantEnCours: '0',
       encaissementMoyen: encaisses === 0 ? '0' : (BigInt(montant) / BigInt(encaisses)).toString(),
-      montantEncaisse30Jours: row?.montant30 ?? '0',
+      montantEncaisse30Jours: row.montant30 ?? '0',
       dossiers,
-      dossiersOuverts: row?.ouverts ?? 0,
+      dossiersOuverts: row.ouverts,
       dossiersEncaisses: encaisses,
       dossiersRejetes: rejetes,
       tauxRejet: clos === 0 ? 0 : Math.round((rejetes / clos) * 1000) / 10,
-      delaiMoyenJours: row?.delai == null ? null : Math.round(row.delai * 10) / 10,
+      delaiMoyenJours: row.delai == null ? null : Math.round(row.delai * 10) / 10,
     };
   }
 }
