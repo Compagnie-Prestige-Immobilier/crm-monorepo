@@ -4067,8 +4067,8 @@ export interface components {
       /** @description Révision serveur, incrémentée à chaque écriture. */
       rev: number;
       /** Format: uuid */
-      departementId: string;
-      departementName: string;
+      departementId: string | null;
+      departementName: string | null;
       /** Format: uuid */
       iefId: string | null;
       iefName: string | null;
@@ -4196,11 +4196,14 @@ export interface components {
        * @example 77 123 45 67
        */
       phone: string;
-      /** Format: uuid */
-      departementId: string;
       /**
        * Format: uuid
-       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
+       * @description FACULTATIF : une fiche naît normalement en tournée, où le département se déduit du secteur. La saisie manuelle ne le connaît pas toujours.
+       */
+      departementId?: string;
+      /**
+       * Format: uuid
+       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement.
        */
       iefId?: string;
       notes?: string;
@@ -4226,11 +4229,14 @@ export interface components {
        * @example 77 123 45 67
        */
       phone?: string;
-      /** Format: uuid */
+      /**
+       * Format: uuid
+       * @description FACULTATIF : une fiche naît normalement en tournée, où le département se déduit du secteur. La saisie manuelle ne le connaît pas toujours.
+       */
       departementId?: string;
       /**
        * Format: uuid
-       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, jamais l’inverse.
+       * @description IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait rétroactivement.
        */
       iefId?: string;
       notes?: string;

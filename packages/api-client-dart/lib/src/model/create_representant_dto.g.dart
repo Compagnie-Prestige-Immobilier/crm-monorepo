@@ -17,7 +17,7 @@ abstract class _$CreateRepresentantDtoCWProxy {
 
   CreateRepresentantDto phone(String phone);
 
-  CreateRepresentantDto departementId(String departementId);
+  CreateRepresentantDto departementId(String? departementId);
 
   CreateRepresentantDto iefId(String? iefId);
 
@@ -37,7 +37,7 @@ abstract class _$CreateRepresentantDtoCWProxy {
     String? prenom,
     String? etablissement,
     String phone,
-    String departementId,
+    String? departementId,
     String? iefId,
     String? notes,
     DateTime? clientCreatedAt,
@@ -68,7 +68,7 @@ class _$CreateRepresentantDtoCWProxyImpl
   CreateRepresentantDto phone(String phone) => this(phone: phone);
 
   @override
-  CreateRepresentantDto departementId(String departementId) =>
+  CreateRepresentantDto departementId(String? departementId) =>
       this(departementId: departementId);
 
   @override
@@ -123,7 +123,7 @@ class _$CreateRepresentantDtoCWProxyImpl
       departementId: departementId == const $CopyWithPlaceholder()
           ? _value.departementId
           // ignore: cast_nullable_to_non_nullable
-          : departementId as String,
+          : departementId as String?,
       iefId: iefId == const $CopyWithPlaceholder()
           ? _value.iefId
           // ignore: cast_nullable_to_non_nullable
@@ -154,14 +154,14 @@ extension $CreateRepresentantDtoCopyWith on CreateRepresentantDto {
 CreateRepresentantDto _$CreateRepresentantDtoFromJson(
   Map<String, dynamic> json,
 ) => $checkedCreate('CreateRepresentantDto', json, ($checkedConvert) {
-  $checkKeys(json, requiredKeys: const ['fullName', 'phone', 'departementId']);
+  $checkKeys(json, requiredKeys: const ['fullName', 'phone']);
   final val = CreateRepresentantDto(
     id: $checkedConvert('id', (v) => v as String?),
     fullName: $checkedConvert('fullName', (v) => v as String),
     prenom: $checkedConvert('prenom', (v) => v as String?),
     etablissement: $checkedConvert('etablissement', (v) => v as String?),
     phone: $checkedConvert('phone', (v) => v as String),
-    departementId: $checkedConvert('departementId', (v) => v as String),
+    departementId: $checkedConvert('departementId', (v) => v as String?),
     iefId: $checkedConvert('iefId', (v) => v as String?),
     notes: $checkedConvert('notes', (v) => v as String?),
     clientCreatedAt: $checkedConvert(
@@ -180,7 +180,7 @@ Map<String, dynamic> _$CreateRepresentantDtoToJson(
   if (instance.prenom case final value?) 'prenom': value,
   if (instance.etablissement case final value?) 'etablissement': value,
   'phone': instance.phone,
-  'departementId': instance.departementId,
+  if (instance.departementId case final value?) 'departementId': value,
   if (instance.iefId case final value?) 'iefId': value,
   if (instance.notes case final value?) 'notes': value,
   if (instance.clientCreatedAt?.toIso8601String() case final value?)
