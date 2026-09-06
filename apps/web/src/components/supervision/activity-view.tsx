@@ -23,6 +23,7 @@ import {
 import { Fragment, useState } from 'react';
 
 import { DatePicker } from '@/components/filters/date-picker';
+import { AnimatedNumber } from '@/components/live/animated-number';
 import { QueryErrorState } from '@/components/query-error-state';
 import {
   Fact,
@@ -77,11 +78,13 @@ import {
   type ActivitySortKey,
   type PeriodPreset,
   type SortDirection,
+  type SupervisionActivity,
   type SupervisionGranularity,
   type SupervisionScore,
   type UpdateWorkShifts,
   type WorkShifts,
 } from '@/lib/data/admin';
+import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
@@ -297,7 +300,7 @@ export function ActivityView({ projet }: { projet: Projet }) {
     <div className="flex flex-col gap-6">
       <p className="text-[0.9375rem] text-muted-foreground">
         Ce volet mesure les appels et les saisies. La connexion à l’application est suivie dans
-        Comptes.
+        Comptes. « Confirmés » compte les appels retrouvés dans le journal du téléphone Android.
       </p>
       {toolbar}
 
@@ -310,7 +313,8 @@ export function ActivityView({ projet }: { projet: Projet }) {
               key={tuile.key}
               index={index}
               label={colonne.label}
-              value={valeurAffichee(colonne, totals[tuile.key])}
+              value={totals[tuile.key]}
+              format={(valeur) => valeurAffichee(colonne, valeur)}
               icon={tuile.icon}
             />
           );
@@ -318,6 +322,8 @@ export function ActivityView({ projet }: { projet: Projet }) {
       </div>
 
       <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
+
+      <FichesOuvertes range={range} />
 
       <ScoreSection scores={data.scores} />
 
@@ -421,6 +427,61 @@ export function ActivityView({ projet }: { projet: Projet }) {
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * Section à part, et non une colonne du tableau d'activité : une ouverture ne
+ * suit pas la famille d'appel, et son compte se lit par jour, pas par période.
+ */
+function FichesOuvertes({ range }: { range: ActivityRange }) {
+  const comptage = useQuery({
+    queryKey: ['ouvertures', 'comptage', range.from, range.to] as const,
+    queryFn: () => fetchComptageOuvertures({ from: range.from, to: range.to }),
+  });
+
+  if (comptage.isPending) return <Skeleton className="h-40 w-full" />;
+  if (comptage.isError) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+            Fiches ouvertes, par téléconseiller et par jour
+          </caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Téléconseiller</TableHead>
+              <TableHead>Jour</TableHead>
+              <TableHead className="text-right">Fiches ouvertes</TableHead>
+              <TableHead className="text-right">Traitement moyen</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {comptage.data.map((ligne) => (
+              <TableRow key={`${ligne.openedById}-${ligne.jour}`}>
+                <TableCell className="font-[600]">{ligne.openedByName}</TableCell>
+                <TableCell>{formatShortDate(ligne.jour)}</TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatNumber(ligne.ouvertures)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatDuration(ligne.dureeMoyenneSecondes)}
+                </TableCell>
+              </TableRow>
+            ))}
+            {comptage.data.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center">
+                  Aucune fiche ouverte sur la période. Élargissez les dates.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -576,11 +637,12 @@ function ShiftComparison({
 
   if (shiftsQuery.isPending || shifts.length === 0) return null;
 
-  const callsOf = (counts: ActivityCounts): number =>
+  type ApiCounts = SupervisionActivity['totals'];
+  const callsOf = (counts: ApiCounts): number =>
     famille === 'representants' ? counts.repCalls : counts.calls;
-  const successOf = (counts: ActivityCounts): number =>
+  const successOf = (counts: ApiCounts): number =>
     famille === 'representants' ? counts.repReached : counts.methodObtained;
-  const rateOf = (counts: ActivityCounts): number | null =>
+  const rateOf = (counts: ApiCounts): number | null =>
     famille === 'representants' ? counts.repContactRate : counts.reachRate;
 
   return (
@@ -740,8 +802,16 @@ function rangeDays(range: ActivityRange): number {
   return Math.max(1, Math.floor((to - from) / 86_400_000) + 1);
 }
 
+function dureeAffichee(secondes: number): string {
+  const minutes = Math.floor(secondes / 60);
+  const reste = Math.round(secondes % 60);
+  if (minutes === 0) return `${formatNumber(reste)} s`;
+  return `${formatNumber(minutes)} min ${String(reste).padStart(2, '0')}`;
+}
+
 function valeurAffichee(colonne: ActivityColumn, valeur: number | null, decimal = false): string {
   if (colonne.taux === true) return formatRateOrNone(valeur);
+  if (colonne.duree === true) return valeur === null ? 'Sans objet' : dureeAffichee(valeur);
   const nombre = valeur ?? 0;
   return decimal ? formatDecimal(nombre) : formatNumber(nombre);
 }
@@ -750,19 +820,23 @@ function Cellule({
   colonne,
   valeur,
   decimal = false,
+  anime = false,
 }: {
   colonne: ActivityColumn;
   valeur: number | null;
   decimal?: boolean;
+  anime?: boolean;
 }) {
   return (
-    <TableCell
-      className={cn(
-        'text-right',
-        colonne.taux === true && valeur === null && 'text-muted-foreground',
+    <TableCell className={cn('text-right', valeur === null && 'text-muted-foreground')}>
+      {anime && valeur !== null ? (
+        <AnimatedNumber
+          value={valeur}
+          format={(nombre) => valeurAffichee(colonne, nombre, decimal)}
+        />
+      ) : (
+        valeurAffichee(colonne, valeur, decimal)
       )}
-    >
-      {valeurAffichee(colonne, valeur, decimal)}
     </TableCell>
   );
 }
@@ -807,6 +881,7 @@ function TotalsRow({
           colonne={colonne}
           valeur={values[colonne.key]}
           decimal={decimal}
+          anime
         />
       ))}
     </TableRow>
@@ -846,11 +921,13 @@ function SortButton({
 function Tile({
   label,
   value,
+  format,
   icon: Icon,
   index,
 }: {
   label: string;
-  value: string;
+  value: number | null;
+  format: (valeur: number | null) => string;
   icon: LucideIcon;
   index: number;
 }) {
@@ -862,7 +939,7 @@ function Tile({
             {label}
           </p>
           <p className="mt-1 font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
-            {value}
+            {value === null ? format(null) : <AnimatedNumber value={value} format={format} />}
           </p>
         </div>
         <span

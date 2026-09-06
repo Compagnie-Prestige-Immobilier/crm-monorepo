@@ -2,9 +2,11 @@ import { spawn, spawnSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import process from 'node:process';
+import fkill from 'fkill';
 
 const root = resolve(import.meta.dirname, '../..');
 const mobile = resolve(root, 'apps/mobile');
+const downMode = process.argv[2] === 'down';
 const mobileMode = process.argv.includes('--mobile');
 
 if (existsSync(resolve(root, '.env'))) {
@@ -39,26 +41,88 @@ function stopApps() {
     if (child.pid === undefined) continue;
     try {
       if (process.platform === 'win32') child.kill();
-      else process.kill(-child.pid, 'SIGTERM');
+      else process.kill(-child.pid, 'SIGINT');
     } catch {}
   }
   children.clear();
 }
 
+function listeningProcessGroups() {
+  if (process.platform === 'win32') return [];
+  const listeners = spawnSync('lsof', ['-nP', '-t', '-iTCP:3000', '-iTCP:3001', '-sTCP:LISTEN'], {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'ignore'],
+  })
+    .stdout.trim()
+    .split('\n')
+    .filter(Boolean)
+    .join(',');
+  if (!listeners) return [];
+  const groups = spawnSync('ps', ['-o', 'pgid=', '-p', listeners], { encoding: 'utf8' }).stdout;
+  return new Set(groups.trim().split(/\s+/).filter(Boolean).map(Number));
+}
+
+function stopProcessGroup(group) {
+  try {
+    process.kill(-group, 'SIGTERM');
+  } catch (error) {
+    if (error.code !== 'ESRCH') throw error;
+  }
+}
+
+async function stopEnvironment() {
+  console.log('[dx] arrêt de l’API, du web et de Postgres…');
+  for (const group of listeningProcessGroups()) stopProcessGroup(group);
+  await fkill([':3000', ':3001'], { forceAfterTimeout: 2_000, silent: true });
+  const result = spawnSync('docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'stop'], {
+    cwd: root,
+    env: process.env,
+    stdio: 'inherit',
+  });
+  if (result.status !== 0) process.exit(result.status ?? 1);
+  console.log('[dx] environnement arrêté.');
+}
+
+function startApiAndWeb() {
+  if (isListening(3001)) console.log('[dx] API déjà active : http://localhost:3001');
+  else run('pnpm', ['--filter', '@crm/api', 'dev']);
+  if (isListening(3000)) console.log('[dx] web déjà actif : http://localhost:3000');
+  else run('pnpm', ['--filter', '@crm/web', 'dev']);
+}
+
 function startApps() {
   console.log('[dx] API : http://localhost:3001 · web : http://localhost:3000');
-  if (!isListening(3001)) run('pnpm', ['--filter', '@crm/api', 'dev']);
-  if (!isListening(3000)) run('pnpm', ['--filter', '@crm/web', 'dev']);
+  startApiAndWeb();
   flutterProcess = run('flutter', ['run', '-d', 'emulator-5554'], mobile, { interactive: true });
 }
 
+function runRequired(command, args, cwd = root) {
+  const result = spawnSync(command, args, { cwd, env: process.env, stdio: 'inherit' });
+  if (result.status !== 0) process.exit(result.status ?? 1);
+}
+
+function prepareDatabase() {
+  console.log('[dx] Postgres, migrations et seed…');
+  runRequired('docker', [
+    'compose',
+    '-f',
+    'infra/docker/docker-compose.yml',
+    'up',
+    '--wait',
+    '--wait-timeout',
+    '45',
+    'postgres',
+  ]);
+  runRequired('pnpm', ['db:deploy']);
+  runRequired('pnpm', ['db:seed']);
+  runRequired('pnpm', ['db:seed:dev-chues']);
+  runRequired('pnpm', ['db:seed:demo']);
+}
+
 function startApiDev() {
-  if (isListening(3001)) {
-    console.log('[dx] API déjà active : http://localhost:3001 · logs/api.log');
-    return;
-  }
-  console.log('[dx] démarrage de l’API : http://localhost:3001 · logs/api.log');
-  run('pnpm', ['--filter', '@crm/api', 'dev']);
+  prepareDatabase();
+  console.log('[dx] API : http://localhost:3001 · web : http://localhost:3000');
+  startApiAndWeb();
 }
 
 function isListening(port) {
@@ -90,15 +154,7 @@ function waitForAndroid() {
 }
 
 function startMobile() {
-  console.log('[dx] démarrage de Postgres, migrations et seed…');
-  for (const [command, args] of [
-    ['docker', ['compose', '-f', 'infra/docker/docker-compose.yml', 'up', '-d']],
-    ['pnpm', ['db:deploy']],
-    ['pnpm', ['db:seed']],
-  ]) {
-    const result = spawnSync(command, args, { cwd: root, env: process.env, stdio: 'inherit' });
-    if (result.status !== 0) process.exit(result.status ?? 1);
-  }
+  prepareDatabase();
 
   const devices = spawnSync('adb', ['devices'], {
     encoding: 'utf8',
@@ -118,22 +174,26 @@ function startMobile() {
   }
 }
 
-if (mobileMode) startMobile();
-else startApiDev();
+if (downMode) {
+  await stopEnvironment();
+} else {
+  if (mobileMode) startMobile();
+  else startApiDev();
 
-process.stdin.setRawMode?.(true);
-process.stdin.resume();
-process.stdin.on('data', (data) => {
-  const key = data.toString();
-  if (key === '\u0003') {
-    shutdown();
-    return;
-  }
-  if (key.toLowerCase() === 'r' && flutterProcess?.stdin.writable) {
-    console.log('[dx] hot restart Flutter…');
-    flutterProcess.stdin.write('R');
-  }
-});
+  process.stdin.setRawMode?.(true);
+  process.stdin.resume();
+  process.stdin.on('data', (data) => {
+    const key = data.toString();
+    if (key === '\u0003') {
+      shutdown();
+      return;
+    }
+    if (key.toLowerCase() === 'r' && flutterProcess?.stdin.writable) {
+      console.log('[dx] hot restart Flutter…');
+      flutterProcess.stdin.write('R');
+    }
+  });
+}
 
 function shutdown() {
   if (stopping) return;

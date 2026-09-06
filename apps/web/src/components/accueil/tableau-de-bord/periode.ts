@@ -1,9 +1,11 @@
 import {
   differenceInCalendarDays,
   endOfMonth,
+  endOfWeek,
   endOfYear,
   format,
   startOfMonth,
+  startOfWeek,
   startOfYear,
   subDays,
   subMonths,
@@ -11,7 +13,16 @@ import {
 } from 'date-fns';
 
 export type PeriodePreset =
-  'ce-mois' | 'mois-dernier' | 'trois-mois' | 'douze-mois' | 'cette-annee' | 'annee-derniere';
+  | 'aujourdhui'
+  | 'hier'
+  | 'avant-hier'
+  | 'cette-semaine'
+  | 'ce-mois'
+  | 'mois-dernier'
+  | 'trois-mois'
+  | 'douze-mois'
+  | 'cette-annee'
+  | 'annee-derniere';
 
 export type Comparaison = 'aucune' | 'precedente' | 'annee-precedente';
 
@@ -23,6 +34,10 @@ export interface Plage {
 export const PLAGE_MAX_JOURS = 400;
 
 export const PILLS: readonly { preset: PeriodePreset; label: string }[] = [
+  { preset: 'aujourdhui', label: 'Aujourd’hui' },
+  { preset: 'hier', label: 'Hier' },
+  { preset: 'avant-hier', label: 'Avant-hier' },
+  { preset: 'cette-semaine', label: 'Cette semaine' },
   { preset: 'ce-mois', label: 'Ce mois-ci' },
   { preset: 'mois-dernier', label: 'Mois dernier' },
   { preset: 'trois-mois', label: '3 derniers mois' },
@@ -36,6 +51,23 @@ const dateUtc = (jour: string): Date => new Date(`${jour}T00:00:00Z`);
 
 export function plageDuPreset(preset: PeriodePreset, reference: Date): Plage {
   switch (preset) {
+    case 'aujourdhui': {
+      const jour = iso(reference);
+      return { du: jour, au: jour };
+    }
+    case 'hier': {
+      const jour = iso(subDays(reference, 1));
+      return { du: jour, au: jour };
+    }
+    case 'avant-hier': {
+      const jour = iso(subDays(reference, 2));
+      return { du: jour, au: jour };
+    }
+    case 'cette-semaine':
+      return {
+        du: iso(startOfWeek(reference, { weekStartsOn: 1 })),
+        au: iso(endOfWeek(reference, { weekStartsOn: 1 })),
+      };
     case 'ce-mois':
       return { du: iso(startOfMonth(reference)), au: iso(endOfMonth(reference)) };
     case 'mois-dernier': {

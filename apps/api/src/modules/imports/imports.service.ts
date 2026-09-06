@@ -14,6 +14,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { LiveService } from '../live/live.service.js';
 import {
   IMPORT_FILE_STORE,
   ImportFileTooLargeError,
@@ -67,6 +68,7 @@ export class ImportsService {
     private readonly prisma: PrismaService,
     private readonly runner: ImportRunnerService,
     @Inject(IMPORT_FILE_STORE) private readonly files: ImportFileStore,
+    private readonly live: LiveService,
   ) {}
 
   /**
@@ -134,6 +136,7 @@ export class ImportsService {
           expiresAt: new Date(now.getTime() + this.config.IMPORTS_TTL_HOURS * 3_600_000),
         },
       });
+      this.live.emit('imports');
 
       // Non attendu, EXPRÈS : la route rend 201 immédiatement. `void` et un
       // `catch`, parce qu'une promesse rejetée sans gestionnaire ferait tomber

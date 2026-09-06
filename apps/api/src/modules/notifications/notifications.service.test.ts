@@ -36,6 +36,9 @@ import {
   type BrevoTransport,
 } from './brevo.transport.js';
 import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
+import { LiveService } from '../live/live.service.js';
+
+const live = (): LiveService => new LiveService(fakeWorkspace());
 
 const admin: AuthenticatedUser = {
   id: 'usr-admin',
@@ -81,7 +84,7 @@ const baseBody = {
 beforeEach(() => {
   db = new FakePrisma();
   brevo = new FakeBrevoTransport();
-  service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+  service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 });
 
 describe('résolution du public', () => {
@@ -139,6 +142,7 @@ describe('résolution du public', () => {
       empty.asService(),
       fakeWorkspace(),
       new FakeBrevoTransport(),
+      live(),
     );
 
     const error = await refusal(() => isolated.create(admin, baseBody));
@@ -184,7 +188,7 @@ describe('éventail', () => {
         : { email, ok: true },
     );
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -208,7 +212,7 @@ describe('éventail', () => {
         : { email, ok: true },
     );
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -232,7 +236,7 @@ describe('éventail', () => {
         : { email, ok: true },
     );
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -251,7 +255,7 @@ describe('éventail', () => {
         : { email, ok: true },
     );
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -269,7 +273,7 @@ describe('éventail', () => {
       refuse ? { email, ok: false, errorCode: 'HTTP_503', kind: 'transient' } : { email, ok: true },
     );
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -290,6 +294,7 @@ describe('éventail', () => {
       db.asService(),
       fakeWorkspace(),
       new BrokenBrevoTransport(),
+      live(),
     );
 
     const created = await broken.create(admin, {
@@ -309,6 +314,7 @@ describe('éventail', () => {
       db.asService(),
       fakeWorkspace(),
       new ThrowingBrevoTransport(),
+      live(),
     );
 
     const created = await throwing.create(admin, {
@@ -374,7 +380,7 @@ describe('éventail', () => {
       kind: 'transient',
     }));
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -398,7 +404,7 @@ describe('éventail', () => {
       kind: 'permanent',
     }));
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -421,7 +427,7 @@ describe('éventail', () => {
       kind: 'transient',
     }));
     brevo.configured = true;
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -487,7 +493,7 @@ describe('écriture des acceptations au fil de l’eau', () => {
       db.addUser({ id: `usr-${suffix}`, role: Role.COMMERCIAL, email: `${suffix}@cpi.sn` });
     }
     dying = new DyingBrevoTransport();
-    service = new NotificationsService(db.asService(), fakeWorkspace(), dying);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), dying, live());
   });
 
   it('LA REPRISE NE RENVOIE QUE CE QUI N’A PAS ÉTÉ ACCEPTÉ', async () => {
@@ -547,7 +553,12 @@ describe('absence de clé Brevo', () => {
   });
 
   it('ne referme pas sur SENT tant qu’une livraison porte le marqueur de réessai', async () => {
-    service = new NotificationsService(db.asService(), fakeWorkspace(), new BrokenBrevoTransport());
+    service = new NotificationsService(
+      db.asService(),
+      fakeWorkspace(),
+      new BrokenBrevoTransport(),
+      live(),
+    );
 
     const created = await service.create(admin, {
       ...baseBody,
@@ -557,7 +568,7 @@ describe('absence de clé Brevo', () => {
     expect(db.deliveries[0]?.error).toBe(DELIVERY_RETRY_ERROR);
     expect(created.status).toBe(NotificationStatus.SENDING);
 
-    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo);
+    service = new NotificationsService(db.asService(), fakeWorkspace(), brevo, live());
     await service.dispatch(created.id, apresLeBail());
 
     const detail = await service.get(created.id);
@@ -637,7 +648,7 @@ describe('boîte de réception', () => {
       kind: 'permanent',
     }));
     failing.configured = true;
-    const isolated = new NotificationsService(db.asService(), fakeWorkspace(), failing);
+    const isolated = new NotificationsService(db.asService(), fakeWorkspace(), failing, live());
 
     const created = await isolated.create(admin, {
       ...baseBody,
@@ -661,7 +672,7 @@ describe('boîte de réception', () => {
       refuse ? { email, ok: false, errorCode: 'HTTP_503', kind: 'transient' } : { email, ok: true },
     );
     flaky.configured = true;
-    const isolated = new NotificationsService(db.asService(), fakeWorkspace(), flaky);
+    const isolated = new NotificationsService(db.asService(), fakeWorkspace(), flaky, live());
 
     const created = await isolated.create(admin, {
       ...baseBody,
@@ -1073,7 +1084,7 @@ describe('appels HTTP Brevo', () => {
 describe('workspace démo', () => {
   it('n’appelle jamais Brevo', async () => {
     db.addUser({ id: 'usr-demo', role: Role.COMMERCIAL, email: 'demo@cpi.sn' });
-    const demo = new NotificationsService(db.asService(), fakeWorkspace(true), brevo);
+    const demo = new NotificationsService(db.asService(), fakeWorkspace(true), brevo, live());
 
     await demo.create(admin, {
       ...baseBody,
@@ -1141,6 +1152,7 @@ describe('bail perdu en cours d’expédition', () => {
             db.asService(),
             fakeWorkspace(),
             new BrokenBrevoTransport(),
+            live(),
           ).dispatch(created.id, apres);
           dansLaReprise = false;
         }
@@ -1150,7 +1162,7 @@ describe('bail perdu en cours d’expédition', () => {
       }
     })();
 
-    const premier = new NotificationsService(db.asService(), fakeWorkspace(), lent);
+    const premier = new NotificationsService(db.asService(), fakeWorkspace(), lent, live());
     await premier.dispatch(created.id);
 
     expect(vaguesDuPremier).toBe(2);
@@ -1190,7 +1202,7 @@ describe('bail perdu en cours d’expédition', () => {
       async send(): Promise<BrevoDispatchResult> {
         const apres = new Date(Date.now() + 10 * SENDING_LEASE_MS);
         tardif.clock = () => apres;
-        await new NotificationsService(tardif.asService(), fakeWorkspace(), bon).dispatch(
+        await new NotificationsService(tardif.asService(), fakeWorkspace(), bon, live()).dispatch(
           created.id,
           apres,
         );
@@ -1198,7 +1210,9 @@ describe('bail perdu en cours d’expédition', () => {
       }
     })();
 
-    await new NotificationsService(tardif.asService(), fakeWorkspace(), casse).dispatch(created.id);
+    await new NotificationsService(tardif.asService(), fakeWorkspace(), casse, live()).dispatch(
+      created.id,
+    );
 
     const row = tardif.notifications.find((candidate) => candidate.id === created.id);
     expect(row?.status).toBe(NotificationStatus.SENT);

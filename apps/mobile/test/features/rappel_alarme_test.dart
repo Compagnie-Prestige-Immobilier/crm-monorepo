@@ -317,7 +317,29 @@ void main() {
         isTrue,
       );
       expect(ligne.notifiedAt, isNull);
-      expect(alarmes.posees.single.id, 'rap-1');
+      // La dernière posée, et non la seule : le démarrage réarme déjà les
+      // rappels en base.
+      expect(alarmes.posees.last.id, 'rap-1');
+      expect(
+        alarmes.posees.last.at.isAtSameMomentAs(t0.add(kRepCallbackReport)),
+        isTrue,
+      );
+
+      await demonter(tester);
+    });
+
+    testWidgets('un rappel déjà notifié ne se réarme pas au démarrage', (
+      WidgetTester tester,
+    ) async {
+      await promettre(
+        id: 'rap-1',
+        at: t0.add(const Duration(hours: 3)),
+        notifieA: t0,
+      );
+
+      await monter(tester, const RepCallbackDueListener(child: SizedBox()));
+
+      expect(alarmes.posees, isEmpty);
 
       await demonter(tester);
     });
@@ -344,6 +366,121 @@ void main() {
 
       await demonter(tester);
     });
+  });
+
+  // Un redémarrage vide la file d'alarmes d'Android, et le récepteur du greffon
+  // ne rejoue que ce qu'il a lui-même posé : un rappel promis alors que la
+  // permission d'alarme exacte manquait ne sonnerait jamais.
+  group('après redémarrage', () {
+    const MethodChannel canal = MethodChannel(
+      'dexterous.com/flutter/local_notifications',
+    );
+    late List<MethodCall> appels;
+
+    setUp(() {
+      appels = <MethodCall>[];
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      AndroidFlutterLocalNotificationsPlugin.registerWith();
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(canal, (MethodCall call) async {
+            appels.add(call);
+            return switch (call.method) {
+              'canScheduleExactNotifications' || 'initialize' => true,
+              _ => null,
+            };
+          });
+    });
+
+    tearDown(() {
+      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .setMockMethodCallHandler(canal, null);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    /// Le greffon compare à l'horloge RÉELLE avant d'armer : un instant fixe du
+    /// passé y serait refusé.
+    final DateTime maintenant = DateTime.now().toUtc();
+
+    Future<void> demarrer(WidgetTester tester) async {
+      final SharedPreferences prefs = await SharedPreferences.getInstance();
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: <Override>[
+            appDatabaseProvider.overrideWithValue(db),
+            apiPortProvider.overrideWithValue(api),
+            clockProvider.overrideWithValue(FakeClock(maintenant)),
+            sharedPreferencesProvider.overrideWithValue(prefs),
+            feedbackProvider.overrideWithValue(_RetoursMuets()),
+            syncCoordinatorProvider.overrideWith(_Idle.new),
+            authControllerProvider.overrideWith(_Connecte.new),
+          ],
+          child: const MaterialApp(
+            home: Scaffold(body: RepCallbackDueListener(child: SizedBox())),
+          ),
+        ),
+      );
+      await battre(tester);
+    }
+
+    List<Object?> armees() => appels
+        .where((MethodCall c) => c.method == 'zonedSchedule')
+        .map((MethodCall c) => (c.arguments as Map<Object?, Object?>)['id'])
+        .toList(growable: false);
+
+    /// Le drapeau de plateforme se rend AVANT la fin du corps du test : le banc
+    /// vérifie ses invariants avant de dérouler les `tearDown`.
+    Future<void> terminer(WidgetTester tester) async {
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump(const Duration(milliseconds: 1));
+      debugDefaultTargetPlatformOverride = null;
+    }
+
+    testWidgets('les rappels en base réarment leurs deux alarmes', (
+      WidgetTester tester,
+    ) async {
+      await promettre(
+        id: 'rap-1',
+        at: maintenant.add(const Duration(hours: 3)),
+      );
+      await promettre(
+        id: 'rap-2',
+        at: maintenant.add(const Duration(hours: 5)),
+      );
+
+      await demarrer(tester);
+
+      final (int pre1, int heure1) =
+          RepCallbackNotifications.notificationIdsFor('rap-1');
+      final (int pre2, int heure2) =
+          RepCallbackNotifications.notificationIdsFor('rap-2');
+      expect(armees(), <int>[pre1, heure1, pre2, heure2]);
+
+      await terminer(tester);
+    });
+
+    // Le greffon REFUSE une alarme dans le passé : sans ce filtre, un rappel en
+    // retard levait au démarrage et les suivants n'étaient jamais armés.
+    testWidgets(
+      'un rappel en retard n\'arme rien et n\'empêche pas les autres',
+      (WidgetTester tester) async {
+        await promettre(
+          id: 'rap-0',
+          at: maintenant.subtract(const Duration(hours: 1)),
+        );
+        await promettre(
+          id: 'rap-1',
+          at: maintenant.add(const Duration(hours: 3)),
+        );
+
+        await demarrer(tester);
+
+        final (int pre1, int heure1) =
+            RepCallbackNotifications.notificationIdsFor('rap-1');
+        expect(armees(), <int>[pre1, heure1]);
+
+        await terminer(tester);
+      },
+    );
   });
 }
 

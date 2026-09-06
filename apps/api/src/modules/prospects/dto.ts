@@ -520,6 +520,9 @@ export class ProspectDto {
   @ApiProperty({ type: String, format: 'date-time', nullable: true })
   lastAttemptAt!: string | null;
 
+  @ApiProperty({ type: Number, description: 'Nombre de tentatives d’appel consignées.' })
+  callAttemptCount!: number;
+
   /**
    * Le dernier appel PORTÉ PAR LA FICHE, et non recalculé sur les tentatives :
    * c'est lui qui descend au téléphone et qui filtre « mes contacts ».
@@ -601,6 +604,43 @@ export class ConfirmGrandPublicConversionDto {
   @Min(1)
   @Max(300)
   durationMonths?: number;
+}
+
+/** Une tentative d'appel, avec ce que l'appel a appris ce jour-là. */
+export class ProspectCallAttemptDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ enum: CallOutcome, enumName: 'CallOutcome' }) outcome!: CallOutcome;
+  @ApiProperty({ type: String, nullable: true, description: 'Libellé du motif choisi.' })
+  reasonLabel!: string | null;
+  @ApiProperty({ enum: EnrollmentMethod, enumName: 'EnrollmentMethod', nullable: true })
+  method!: EnrollmentMethod | null;
+  @ApiProperty({ type: String, nullable: true }) comment!: string | null;
+  @ApiProperty({ type: String, nullable: true }) email!: string | null;
+  @ApiProperty({ type: Boolean, nullable: true }) fonctionnaire!: boolean | null;
+  @ApiProperty({ type: Boolean, nullable: true }) engagementEnCours!: boolean | null;
+  @ApiProperty({ type: Number, nullable: true }) dureeEtablissementMois!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) rendezVousAt!: string | null;
+  @ApiProperty({ type: String, nullable: true }) deviceCallType!: string | null;
+  @ApiProperty({ type: Number, nullable: true }) deviceCallDurationSeconds!: number | null;
+  @ApiProperty({ type: String, format: 'date-time', nullable: true }) deviceCallAt!: string | null;
+  @ApiProperty({ format: 'uuid' }) performedById!: string;
+  @ApiProperty() performedByName!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
+  @ApiProperty({
+    type: Number,
+    nullable: true,
+    description:
+      'Temps de traitement de la fiche pour cet appel, en secondes : de la première saisie à la qualification. Nul quand l’appel a été consigné hors du parcours de fiche ouverte, ou sans aucune saisie. Distinct de `deviceCallDurationSeconds`, qui est la durée de communication.',
+  })
+  dureeTraitementSecondes!: number | null;
+}
+
+export class ProspectCallAttemptListDto {
+  @ApiProperty({
+    type: () => [ProspectCallAttemptDto],
+    description: 'Du plus récent au plus ancien.',
+  })
+  items!: ProspectCallAttemptDto[];
 }
 
 export class ProspectListDto {

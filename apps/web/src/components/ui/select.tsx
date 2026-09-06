@@ -20,8 +20,16 @@ type SelectValueProps = Omit<SelectPrimitive.Value.Props, 'className'> & {
   className?: string | undefined;
 };
 
-function SelectValue(props: SelectValueProps) {
-  return <SelectPrimitive.Value data-slot="select-value" {...props} />;
+// `min-w-0` autant que `truncate` : sans lui un élément flex refuse de passer
+// sous la largeur de son texte, et un libellé long débordait du champ.
+function SelectValue({ className, ...props }: SelectValueProps) {
+  return (
+    <SelectPrimitive.Value
+      data-slot="select-value"
+      className={cn('block min-w-0 flex-1 truncate text-left', className)}
+      {...props}
+    />
+  );
 }
 
 type SelectTriggerProps = Omit<SelectPrimitive.Trigger.Props, 'className'> & {
@@ -35,7 +43,7 @@ function SelectTrigger({ className, size = 'default', children, ...props }: Sele
       data-slot="select-trigger"
       data-size={size}
       className={cn(
-        'flex w-full items-center justify-between gap-2 rounded-md border border-input-border bg-input-background px-3 py-2',
+        'flex w-full min-w-0 items-center justify-between gap-2 rounded-md border border-input-border bg-input-background px-3 py-2',
         'text-[0.875rem] text-foreground whitespace-nowrap transition-colors',
         'data-[size=default]:h-11 data-[size=sm]:h-9',
         'data-placeholder:text-muted-foreground',

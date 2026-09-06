@@ -45,9 +45,9 @@ test.describe('session commercial', () => {
 
     await page.waitForURL((url) => url.pathname === '/chues');
     expect(new URL(page.url()).pathname).toBe('/chues');
-    await expect(page.getByText('Trois étapes, dans l’ordre.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Nouveau lot' })).toHaveCount(0);
-    expect(charges, 'un téléconseiller ne doit lire aucun lot d’export').toEqual([]);
+    await expect(page.getByText('Trois étapes, dans l’ordre, puis ce qui revient.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Nouvelle campagne' })).toHaveCount(0);
+    expect(charges, 'un téléconseiller ne doit lire aucune campagne').toEqual([]);
   });
 });
 
@@ -65,7 +65,7 @@ test.describe('session banque', () => {
     await page.waitForURL((url) => url.pathname === '/chues/banque');
     expect(new URL(page.url()).pathname).toBe('/chues/banque');
     await expect(page).toHaveTitle(/Tableau de bord bancaire/);
-    await expect(page.getByRole('button', { name: 'Nouveau lot' })).toHaveCount(0);
-    expect(charges, 'un agent bancaire ne doit lire aucun lot d’export').toEqual([]);
+    await expect(page.getByRole('button', { name: 'Nouvelle campagne' })).toHaveCount(0);
+    expect(charges, 'un agent bancaire ne doit lire aucune campagne').toEqual([]);
   });
 });

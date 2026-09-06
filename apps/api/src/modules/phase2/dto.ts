@@ -5,6 +5,7 @@ import {
   IsEmail,
   IsBoolean,
   IsISO8601,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -14,6 +15,11 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
+import {
+  DEVICE_CALL_MAX_DURATION_SECONDS,
+  DEVICE_CALL_TYPES,
+  type DeviceCallType,
+} from '../../common/device-call.js';
 import {
   CallOutcome,
   EnrollmentMethod,
@@ -160,6 +166,34 @@ export class CallAttemptOpDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  @ApiPropertyOptional({
+    enum: DEVICE_CALL_TYPES,
+    description: 'Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.',
+  })
+  @IsOptional()
+  @IsIn(DEVICE_CALL_TYPES)
+  deviceCallType?: DeviceCallType;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: DEVICE_CALL_MAX_DURATION_SECONDS,
+    description: 'Durée en secondes lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(DEVICE_CALL_MAX_DURATION_SECONDS)
+  deviceCallDurationSeconds?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description: 'Heure de l’appel lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  deviceCallAt?: string;
 
   // ── Renseignements de conversion (phase 3) ────────────────────────────────
   //

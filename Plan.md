@@ -48,15 +48,15 @@ Cette décision n'est pas rediscutable. Ce qui reste à trancher est en §1.
 
 Monorepo pnpm 11.15.1, Node >= 24.18.0, Turborepo.
 
-| Élément | Emplacement | Pile |
-| --- | --- | --- |
-| API | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api` | NestJS 11 sur Fastify, Prisma 7, PostgreSQL |
-| Web | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web` | Next.js 16 App Router, React 19, Tailwind v4, Base UI, TanStack Query et Table, react-hook-form + zod, vitest, Playwright, oxlint |
-| Mobile | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile` | Flutter 3.41.7 (FVM), Riverpod 3, go_router 17, drift 2.33, ForUI 0.21, icônes Phosphor, Android seul |
-| Schéma | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/database/prisma/schema.prisma` | Prisma |
-| Contrat | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/openapi.json` | engendré |
-| Client TS | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/api-client` | engendré |
-| Client Dart | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/api-client-dart` | engendré |
+| Élément     | Emplacement                                                                                | Pile                                                                                                                              |
+| ----------- | ------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------- |
+| API         | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api`                               | NestJS 11 sur Fastify, Prisma 7, PostgreSQL                                                                                       |
+| Web         | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web`                               | Next.js 16 App Router, React 19, Tailwind v4, Base UI, TanStack Query et Table, react-hook-form + zod, vitest, Playwright, oxlint |
+| Mobile      | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile`                            | Flutter 3.41.7 (FVM), Riverpod 3, go_router 17, drift 2.33, ForUI 0.21, icônes Phosphor, Android seul                             |
+| Schéma      | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/database/prisma/schema.prisma` | Prisma                                                                                                                            |
+| Contrat     | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/openapi.json`                  | engendré                                                                                                                          |
+| Client TS   | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/api-client`                    | engendré                                                                                                                          |
+| Client Dart | `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/api-client-dart`               | engendré                                                                                                                          |
 
 Les deux clients ne se modifient **jamais** à la main : ils sortent de
 `pnpm codegen`.
@@ -204,11 +204,11 @@ titre du Grand Public sur une fiche entrée en CHUES ferait avancer le parcours
 CHUES, et le parcours Grand Public d'une fiche à deux parcours deviendrait
 inatteignable par téléphone.
 
-| Option | Coût |
-| --- | --- |
-| 1. Le client déclare le projet dans la tentative (`CallAttemptOpDto.projet?: Projet`, repli sur `prospect.projet`) | Un champ de plus au contrat de poussée (`apps/api/src/modules/phase2/dto.ts:392`, `apps/api/src/modules/sync/dto.ts:103`), une valeur de plus à émettre côté web et mobile |
-| 2. Le projet reste celui de la fiche | Les fiches à deux parcours ne progressent plus que sur leur parcours d'entrée. Volume mesurable : `SELECT COUNT(*) FROM (SELECT "prospectId" FROM prospect_journeys GROUP BY 1 HAVING COUNT(*) > 1) t;` |
-| 3. Le serveur choisit le parcours encore `PENDING`, et lève un `409` s'il y en a deux | Une règle implicite de plus, et un conflit que l'écran doit savoir expliquer |
+| Option                                                                                                             | Coût                                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Le client déclare le projet dans la tentative (`CallAttemptOpDto.projet?: Projet`, repli sur `prospect.projet`) | Un champ de plus au contrat de poussée (`apps/api/src/modules/phase2/dto.ts:392`, `apps/api/src/modules/sync/dto.ts:103`), une valeur de plus à émettre côté web et mobile                              |
+| 2. Le projet reste celui de la fiche                                                                               | Les fiches à deux parcours ne progressent plus que sur leur parcours d'entrée. Volume mesurable : `SELECT COUNT(*) FROM (SELECT "prospectId" FROM prospect_journeys GROUP BY 1 HAVING COUNT(*) > 1) t;` |
+| 3. Le serveur choisit le parcours encore `PENDING`, et lève un `409` s'il y en a deux                              | Une règle implicite de plus, et un conflit que l'écran doit savoir expliquer                                                                                                                            |
 
 **Décision prise : option 1.** Le client déclare le projet dans la tentative :
 le web le connaît par le chemin (`/chues/…` ou `/grand-public/…`), le mobile par
@@ -233,11 +233,11 @@ et la garde d'écriture à `:807`. Sans elles, il ne reste que
 `createdById = moi` : sur un appareil neuf, le téléconseiller n'aurait presque
 rien à chercher.
 
-| Option | Effet |
-| --- | --- |
-| 1. Le pull descend **tous** les prospects, comme il descend déjà tout l'annuaire des représentants (`sync.service.ts:195`) | Cohérent, marche hors ligne. Risque : volume (le commentaire `schema.prisma:944` évoque 120 000 fiches) et surface de données personnelles sur un téléphone perdu |
-| 2. Le pull reste borné aux fiches de l'appelant, la recherche libre passe par une route **en ligne** paginée, sur le modèle de `GET /v1/phase2/directory` (`apps/api/src/modules/phase2/phase2.controller.ts:120`) | La recherche de prospect ne marche plus hors ligne |
-| 3. Une borne géographique (département, IEF) | À définir entièrement ; ni le web ni le mobile n'ont ce filtre aujourd'hui |
+| Option                                                                                                                                                                                                             | Effet                                                                                                                                                             |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Le pull descend **tous** les prospects, comme il descend déjà tout l'annuaire des représentants (`sync.service.ts:195`)                                                                                         | Cohérent, marche hors ligne. Risque : volume (le commentaire `schema.prisma:944` évoque 120 000 fiches) et surface de données personnelles sur un téléphone perdu |
+| 2. Le pull reste borné aux fiches de l'appelant, la recherche libre passe par une route **en ligne** paginée, sur le modèle de `GET /v1/phase2/directory` (`apps/api/src/modules/phase2/phase2.controller.ts:120`) | La recherche de prospect ne marche plus hors ligne                                                                                                                |
+| 3. Une borne géographique (département, IEF)                                                                                                                                                                       | À définir entièrement ; ni le web ni le mobile n'ont ce filtre aujourd'hui                                                                                        |
 
 Chiffre à obtenir avant de trancher, sur la base réelle :
 `SELECT COUNT(*) FROM prospects WHERE "deletedAt" IS NULL;`
@@ -287,10 +287,10 @@ et `assignedToId` (`:155`). Le web n'utilise que le premier
 (`/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web/src/lib/filters.ts:80`, `:110`),
 sous le libellé « Campagne d'appels ». `assignedToId` n'est utilisé nulle part.
 
-| Option | Coût |
-| --- | --- |
-| 1. Les deux filtres disparaissent du contrat | Le web perd le chip, la barre de filtres et le champ `ReferenceData.campagnes` (`apps/web/src/lib/types.ts:348`). Personne ne peut plus lister « les prospects du lot X » |
-| 2. `campaignId` devient `lotId` et pointe `lot_export_items` | Un `WHERE` de plus, un `LEFT JOIN` sur une table qui peut peser des millions de lignes (voir D12), et un filtre que seul l'encadrement sait lire |
+| Option                                                       | Coût                                                                                                                                                                      |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Les deux filtres disparaissent du contrat                 | Le web perd le chip, la barre de filtres et le champ `ReferenceData.campagnes` (`apps/web/src/lib/types.ts:348`). Personne ne peut plus lister « les prospects du lot X » |
+| 2. `campaignId` devient `lotId` et pointe `lot_export_items` | Un `WHERE` de plus, un `LEFT JOIN` sur une table qui peut peser des millions de lignes (voir D12), et un filtre que seul l'encadrement sait lire                          |
 
 **Décision prise : `campaignId` disparaît ; `assignedToId` est remplacé par
 `appelePar` (identifiant de téléconseiller).** Le filtre « Appelé par » borne
@@ -298,7 +298,7 @@ la liste aux fiches sur lesquelles ce téléconseiller a consigné au moins une
 tentative (`call_attempts.performedById` pour les prospects,
 `rep_call_attempts.performedById` pour les représentants, même filtre sur
 `GET /v1/representants`). C'est ce qui remplace « assigné à » : on ne sait plus
-qui *devait* appeler, on sait qui *a* appelé. Le chip « Campagne d'appels » et
+qui _devait_ appeler, on sait qui _a_ appelé. Le chip « Campagne d'appels » et
 `ReferenceData.campagnes` partent ; le chip « Appelé par » prend leur place, avec
 la liste des téléconseillers déjà servie à l'écran « Mon équipe ».
 
@@ -395,40 +395,40 @@ supposaient sont signalés par **écart** dans la dernière colonne.
 
 Préfixe `/api/v1` partout.
 
-| Route | Avant | Après | Note |
-| --- | --- | --- | --- |
-| `GET /phase2/campaigns` | `listCallCampaigns`, ADMIN COMMERCIAL SUPERVISEUR DIRECTION | supprimée | |
-| `POST /phase2/campaigns` | `createCallCampaign`, ADMIN | supprimée | remplacée par `POST /lots-export` |
-| `GET /phase2/campaigns/{id}` | `getCallCampaign` | supprimée | |
-| `POST /phase2/campaigns/{id}/close|pause|resume` | ADMIN | supprimées | un lot n'a pas d'état |
-| `GET /phase2/campaigns/{id}/commerciaux/{userId}/programme.pdf` | `downloadCallProgrammePdf` | supprimée | programme nominatif |
-| `GET /phase2/directory` | `pullPhase2Directory`, PARCOURS_ROLES | **inchangée** | annuaire hors ligne, ne touche aucune tâche |
-| `POST /phase2/call-attempts/{id}/recording` | PARCOURS_ROLES | **inchangée** | |
-| `GET /phase2/call-attempts/{id}/recording` | ADMIN SUPERVISEUR DIRECTION COMMERCIAL | **inchangée** | |
-| `GET /phase2/callbacks` | `listScheduledCallbacks` | **transformée** | `CallbackDto` perd `campaignId` et `taskId` |
-| `POST /phase2/callbacks/{id}/cancel` | `cancelScheduledCallback` | **transformée** | même retrait |
-| `GET /rep-campaigns/preview` | `previewRepCampaign`, ADMIN | remplacée par `GET /lots-export/apercu` | perd `perCommercial` et `perDay` |
-| **`POST /rep-campaigns/attempts`** | `recordRepCallAttempt`, PARCOURS_ROLES | **conservée, chemin inchangé** | **seul chemin qui consigne un appel à un représentant, sur le web comme sur le mobile. Ne jamais la supprimer.** La réponse perd `taskId` et `taskClosed`. Renommage éventuel : D6 |
-| `GET /rep-campaigns` | `listRepCampaigns` | supprimée | |
-| `POST /rep-campaigns` | `createRepCampaign` | supprimée | |
-| `GET /rep-campaigns/{id}` | `getRepCampaign` | supprimée | |
-| `POST /rep-campaigns/{id}/close` | `closeRepCampaign` | supprimée | |
-| `GET /rep-campaigns/{id}/commerciaux/{userId}/programme.pdf` | `downloadRepProgrammePdf` | supprimée | |
-| `GET /rep-campaigns/{id}/programmes.zip` | `downloadRepProgrammesZip` | supprimée | |
-| `GET /analytics/campaign-pilotage` | `getCampaignPilotage` | supprimée | tout son contenu compte des tâches ; `attempts`, `reachRate` et `methodsObtained` sont déjà rendus par `GET /supervision/activite` |
-| `GET /analytics/delays` | `getAnalyticsDelays` | **inchangée** | ne lit ni tâche ni campagne |
-| `GET /supervision/activite` | `getSupervisionActivite` | **transformée** | voir §2.3 |
-| `GET /admin/supervision` | `getSupervision` | **inchangée** | présence calculée sur `refreshToken`, `syncBatch`, `callAttempt`, `bankCaseTransition`, `agentHeartbeat` |
-| `GET|POST /admin/purge` | | **transformées** | nouveau catalogue d'étapes |
-| `GET /export/representants.xlsx` | COMMERCIAL ADMIN DIRECTION | **transformée** | accepte `relationStatus`, `whatsappStatus`, `hasWhatsapp` ; **ouverte au SUPERVISEUR** |
-| `GET /export/prospects.xlsx` | | **inchangée** | |
-| `POST /lots-export` | absente | `createLotExport`, **ADMIN**, `201` | |
-| `GET /lots-export/apercu` | absente | `previewLotExport`, ADMIN | |
-| `GET /lots-export` | absente | `listLotsExport`, ADMIN SUPERVISEUR DIRECTION | |
-| `GET /lots-export/{id}` | absente | `getLotExport`, ADMIN SUPERVISEUR DIRECTION, `404 LOT_EXPORT_NOT_FOUND` | |
-| `GET /lots-export/{id}/export.xlsx` | absente | `downloadLotExportXlsx`, ADMIN SUPERVISEUR DIRECTION | **écart** : le web attendait `GET /lots/{id}/fiches.xlsx` |
-| `GET /lots-export/{id}/fiches/{itemId}.pdf` | absente | `downloadLotExportFichePdf`, **obligatoire**, cibles `REPRESENTANTS` et `PROSPECTS` | une fiche imprimable (A4), réutilise `writeRepProgrammePdf` de `programme-pdf.ts:360` déplacé dans le module lots et généralisé aux prospects |
-| `GET /lots-export/{id}/fiches.zip` | absente | `downloadLotExportFichesZip`, **obligatoire**, cibles `REPRESENTANTS` et `PROSPECTS` | tous les PDF du lot, un fichier par fiche, en flux (`JSZip` déjà en place) |
+| Route                                                           | Avant                                                       | Après                                                                                | Note                                                                                                                                                                               |
+| --------------------------------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /phase2/campaigns`                                         | `listCallCampaigns`, ADMIN COMMERCIAL SUPERVISEUR DIRECTION | supprimée                                                                            |                                                                                                                                                                                    |
+| `POST /phase2/campaigns`                                        | `createCallCampaign`, ADMIN                                 | supprimée                                                                            | remplacée par `POST /lots-export`                                                                                                                                                  |
+| `GET /phase2/campaigns/{id}`                                    | `getCallCampaign`                                           | supprimée                                                                            |                                                                                                                                                                                    |
+| `POST /phase2/campaigns/{id}/close                              | pause                                                       | resume`                                                                              | ADMIN                                                                                                                                                                              | supprimées                 | un lot n'a pas d'état |
+| `GET /phase2/campaigns/{id}/commerciaux/{userId}/programme.pdf` | `downloadCallProgrammePdf`                                  | supprimée                                                                            | programme nominatif                                                                                                                                                                |
+| `GET /phase2/directory`                                         | `pullPhase2Directory`, PARCOURS_ROLES                       | **inchangée**                                                                        | annuaire hors ligne, ne touche aucune tâche                                                                                                                                        |
+| `POST /phase2/call-attempts/{id}/recording`                     | PARCOURS_ROLES                                              | **inchangée**                                                                        |                                                                                                                                                                                    |
+| `GET /phase2/call-attempts/{id}/recording`                      | ADMIN SUPERVISEUR DIRECTION COMMERCIAL                      | **inchangée**                                                                        |                                                                                                                                                                                    |
+| `GET /phase2/callbacks`                                         | `listScheduledCallbacks`                                    | **transformée**                                                                      | `CallbackDto` perd `campaignId` et `taskId`                                                                                                                                        |
+| `POST /phase2/callbacks/{id}/cancel`                            | `cancelScheduledCallback`                                   | **transformée**                                                                      | même retrait                                                                                                                                                                       |
+| `GET /rep-campaigns/preview`                                    | `previewRepCampaign`, ADMIN                                 | remplacée par `GET /lots-export/apercu`                                              | perd `perCommercial` et `perDay`                                                                                                                                                   |
+| **`POST /rep-campaigns/attempts`**                              | `recordRepCallAttempt`, PARCOURS_ROLES                      | **conservée, chemin inchangé**                                                       | **seul chemin qui consigne un appel à un représentant, sur le web comme sur le mobile. Ne jamais la supprimer.** La réponse perd `taskId` et `taskClosed`. Renommage éventuel : D6 |
+| `GET /rep-campaigns`                                            | `listRepCampaigns`                                          | supprimée                                                                            |                                                                                                                                                                                    |
+| `POST /rep-campaigns`                                           | `createRepCampaign`                                         | supprimée                                                                            |                                                                                                                                                                                    |
+| `GET /rep-campaigns/{id}`                                       | `getRepCampaign`                                            | supprimée                                                                            |                                                                                                                                                                                    |
+| `POST /rep-campaigns/{id}/close`                                | `closeRepCampaign`                                          | supprimée                                                                            |                                                                                                                                                                                    |
+| `GET /rep-campaigns/{id}/commerciaux/{userId}/programme.pdf`    | `downloadRepProgrammePdf`                                   | supprimée                                                                            |                                                                                                                                                                                    |
+| `GET /rep-campaigns/{id}/programmes.zip`                        | `downloadRepProgrammesZip`                                  | supprimée                                                                            |                                                                                                                                                                                    |
+| `GET /analytics/campaign-pilotage`                              | `getCampaignPilotage`                                       | supprimée                                                                            | tout son contenu compte des tâches ; `attempts`, `reachRate` et `methodsObtained` sont déjà rendus par `GET /supervision/activite`                                                 |
+| `GET /analytics/delays`                                         | `getAnalyticsDelays`                                        | **inchangée**                                                                        | ne lit ni tâche ni campagne                                                                                                                                                        |
+| `GET /supervision/activite`                                     | `getSupervisionActivite`                                    | **transformée**                                                                      | voir §2.3                                                                                                                                                                          |
+| `GET /admin/supervision`                                        | `getSupervision`                                            | **inchangée**                                                                        | présence calculée sur `refreshToken`, `syncBatch`, `callAttempt`, `bankCaseTransition`, `agentHeartbeat`                                                                           |
+| `GET                                                            | POST /admin/purge`                                          |                                                                                      | **transformées**                                                                                                                                                                   | nouveau catalogue d'étapes |
+| `GET /export/representants.xlsx`                                | COMMERCIAL ADMIN DIRECTION                                  | **transformée**                                                                      | accepte `relationStatus`, `whatsappStatus`, `hasWhatsapp` ; **ouverte au SUPERVISEUR**                                                                                             |
+| `GET /export/prospects.xlsx`                                    |                                                             | **inchangée**                                                                        |                                                                                                                                                                                    |
+| `POST /lots-export`                                             | absente                                                     | `createLotExport`, **ADMIN**, `201`                                                  |                                                                                                                                                                                    |
+| `GET /lots-export/apercu`                                       | absente                                                     | `previewLotExport`, ADMIN                                                            |                                                                                                                                                                                    |
+| `GET /lots-export`                                              | absente                                                     | `listLotsExport`, ADMIN SUPERVISEUR DIRECTION                                        |                                                                                                                                                                                    |
+| `GET /lots-export/{id}`                                         | absente                                                     | `getLotExport`, ADMIN SUPERVISEUR DIRECTION, `404 LOT_EXPORT_NOT_FOUND`              |                                                                                                                                                                                    |
+| `GET /lots-export/{id}/export.xlsx`                             | absente                                                     | `downloadLotExportXlsx`, ADMIN SUPERVISEUR DIRECTION                                 | **écart** : le web attendait `GET /lots/{id}/fiches.xlsx`                                                                                                                          |
+| `GET /lots-export/{id}/fiches/{itemId}.pdf`                     | absente                                                     | `downloadLotExportFichePdf`, **obligatoire**, cibles `REPRESENTANTS` et `PROSPECTS`  | une fiche imprimable (A4), réutilise `writeRepProgrammePdf` de `programme-pdf.ts:360` déplacé dans le module lots et généralisé aux prospects                                      |
+| `GET /lots-export/{id}/fiches.zip`                              | absente                                                     | `downloadLotExportFichesZip`, **obligatoire**, cibles `REPRESENTANTS` et `PROSPECTS` | tous les PDF du lot, un fichier par fiche, en flux (`JSZip` déjà en place)                                                                                                         |
 
 **Écart de nommage tranché** : le web supposait une ressource `/api/v1/lots`
 avec `LotSummaryDto { fiches, appels, dernierAppelAt }`. Le nom retenu est
@@ -452,29 +452,29 @@ liste des représentants avec le filtre « A accepté » actif renvoie donc
 
 ### 2.2 DTO
 
-| DTO | Champs retirés | Champs ajoutés |
-| --- | --- | --- |
-| `CallbackDto` | `campaignId`, `taskId` | |
-| `RepCallAttemptResultDto` | `taskId`, `taskClosed` | |
-| `CallAttemptResultDto` | `taskId`, `taskStatus` | (n'apparaît pas dans `openapi.json`, aucun impact contractuel) |
-| `SupervisionQueryDto` | `campaignId` | |
-| `SupervisionActivityCountsDto` | `tasksClosed` | |
-| `SupervisionTeleconseillerDto` | `openTasks` | |
-| `ProspectFilterDto` | `campaignId`, `assignedToId` (D4) | |
-| `SyncChangesDto` | `callCampaigns`, `callTasks`, `repCallCampaigns`, `repCallTasks` | |
-| `RepresentantExportQueryDto` | | `relationStatus`, `whatsappStatus`, `hasWhatsapp` |
-| Supprimés en entier | `CreateCampaignDto`, `CampaignProgressDto`, `CampaignCommercialDto`, `CampaignAttemptDto`, `CampaignSummaryDto`, `CampaignDetailDto`, `CampaignListDto`, `CampaignQueryDto`, `ProgrammeQueryDto`, `CreateRepCampaignDto`, `RepCampaignProgressDto`, `RepCampaignCommercialDto`, `RepCampaignAttemptDto`, `RepCampaignSummaryDto`, `RepCampaignDetailDto`, `RepCampaignListDto`, `RepCampaignQueryDto`, `RepCampaignPreviewQueryDto`, `RepCampaignPreviewDto`, `RepProgrammeQueryDto`, `CampaignClosedDayDto`, `CampaignPilotageDto`, `SyncCallCampaignDto`, `SyncCallTaskDto`, `SyncRepCallCampaignDto`, `SyncRepCallTaskDto` | |
-| Enums retirés du contrat | `CampaignScope`, `CampaignStatus`, `CallTaskStatus` | `LotExportCible` |
+| DTO                            | Champs retirés                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                | Champs ajoutés                                                 |
+| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `CallbackDto`                  | `campaignId`, `taskId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                |
+| `RepCallAttemptResultDto`      | `taskId`, `taskClosed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |                                                                |
+| `CallAttemptResultDto`         | `taskId`, `taskStatus`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        | (n'apparaît pas dans `openapi.json`, aucun impact contractuel) |
+| `SupervisionQueryDto`          | `campaignId`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |                                                                |
+| `SupervisionActivityCountsDto` | `tasksClosed`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                |
+| `SupervisionTeleconseillerDto` | `openTasks`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |                                                                |
+| `ProspectFilterDto`            | `campaignId`, `assignedToId` (D4)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |                                                                |
+| `SyncChangesDto`               | `callCampaigns`, `callTasks`, `repCallCampaigns`, `repCallTasks`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |                                                                |
+| `RepresentantExportQueryDto`   |                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               | `relationStatus`, `whatsappStatus`, `hasWhatsapp`              |
+| Supprimés en entier            | `CreateCampaignDto`, `CampaignProgressDto`, `CampaignCommercialDto`, `CampaignAttemptDto`, `CampaignSummaryDto`, `CampaignDetailDto`, `CampaignListDto`, `CampaignQueryDto`, `ProgrammeQueryDto`, `CreateRepCampaignDto`, `RepCampaignProgressDto`, `RepCampaignCommercialDto`, `RepCampaignAttemptDto`, `RepCampaignSummaryDto`, `RepCampaignDetailDto`, `RepCampaignListDto`, `RepCampaignQueryDto`, `RepCampaignPreviewQueryDto`, `RepCampaignPreviewDto`, `RepProgrammeQueryDto`, `CampaignClosedDayDto`, `CampaignPilotageDto`, `SyncCallCampaignDto`, `SyncCallTaskDto`, `SyncRepCallCampaignDto`, `SyncRepCallTaskDto` |                                                                |
+| Enums retirés du contrat       | `CampaignScope`, `CampaignStatus`, `CallTaskStatus`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           | `LotExportCible`                                               |
 
 DTO du nouveau module, dans
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/lots-export/dto.ts` :
 
 ```ts
 export class CreateLotExportDto {
-  name: string;                                // 3..120
-  cible: LotExportCible;                       // REPRESENTANTS | PROSPECTS
-  representants?: RepresentantExportQueryDto;  // requis si cible = REPRESENTANTS
-  prospects?: ProspectFilterDto;               // requis si cible = PROSPECTS
+  name: string; // 3..120
+  cible: LotExportCible; // REPRESENTANTS | PROSPECTS
+  representants?: RepresentantExportQueryDto; // requis si cible = REPRESENTANTS
+  prospects?: ProspectFilterDto; // requis si cible = PROSPECTS
 }
 
 export class LotExportSummaryDto {
@@ -482,13 +482,13 @@ export class LotExportSummaryDto {
   name: string;
   cible: LotExportCible;
   projet: Projet | null;
-  scopeLabel: string;      // libellé lisible de la cible
+  scopeLabel: string; // libellé lisible de la cible
   itemCount: number;
   createdById: string;
   createdByName: string;
   createdAt: string;
-  callsSince: number;      // appels consignés sur les fiches du lot depuis createdAt
-  fichesAppelees: number;  // fiches distinctes du lot ayant reçu au moins un appel
+  callsSince: number; // appels consignés sur les fiches du lot depuis createdAt
+  fichesAppelees: number; // fiches distinctes du lot ayant reçu au moins un appel
 }
 ```
 
@@ -600,14 +600,14 @@ Deux nuances :
 
 ### 2.5 Portée cible
 
-| Objet | Lecture | Écriture |
-| --- | --- | --- |
-| Représentants (annuaire) | Tous rôles terrain : tout | Propriétaire, ou encadrement (`assertManageable`) |
-| Prospects (web) | Tous rôles terrain : tout (D2) | Propriétaire, ou encadrement |
-| Prospects (mobile, pull) | D2 | Propriétaire |
-| Tentatives d'appel | Selon la fiche | Ajout seul, `performedById` = l'appelant, sur n'importe quelle fiche vivante |
-| Rappels | Le sien, ou tout pour supervision et direction (`apps/api/src/modules/callbacks/callbacks.service.ts:66`) | Celui qui l'a promis, ou ADMIN (`:103`) |
-| Lots d'export | ADMIN, SUPERVISEUR, DIRECTION | ADMIN |
+| Objet                    | Lecture                                                                                                   | Écriture                                                                     |
+| ------------------------ | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Représentants (annuaire) | Tous rôles terrain : tout                                                                                 | Propriétaire, ou encadrement (`assertManageable`)                            |
+| Prospects (web)          | Tous rôles terrain : tout (D2)                                                                            | Propriétaire, ou encadrement                                                 |
+| Prospects (mobile, pull) | D2                                                                                                        | Propriétaire                                                                 |
+| Tentatives d'appel       | Selon la fiche                                                                                            | Ajout seul, `performedById` = l'appelant, sur n'importe quelle fiche vivante |
+| Rappels                  | Le sien, ou tout pour supervision et direction (`apps/api/src/modules/callbacks/callbacks.service.ts:66`) | Celui qui l'a promis, ou ADMIN (`:103`)                                      |
+| Lots d'export            | ADMIN, SUPERVISEUR, DIRECTION                                                                             | ADMIN                                                                        |
 
 L'écriture ne change pas : `assertOwnership`
 (`/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/common/scope.ts:96`)
@@ -911,36 +911,36 @@ Précautions d'exécution :
 
 L'ordre interne est celui du risque croissant. B0 d'abord, toujours.
 
-| Étape | Fichiers | Ce qu'on écrit | Vérification | Rouge attendu |
-| --- | --- | --- | --- | --- |
-| **B0. Relire l'arbre** | tous | rien | `git status`, relecture | l'arbre a bougé depuis la rédaction (§0.5) |
-| **B1. Copie de la navigation** | `apps/web/src/components/layout/nav-items.ts` (274-281, 313-319, 534-540, 493, 560) et son test | libellé « Lots d'export », descriptions de §4.2.6 | `pnpm --filter @crm/web test src/components/layout/nav-items.test.ts` | le test neuf exige `label === "Lots d'export"` et une description sans « distribuer » ni « appels aux » |
-| **B2. Écran d'ouverture CHUES** | `components/chues/hub-view.tsx`, `hub-filters.ts`, `app/(panel)/chues/page.tsx` | renommer `A_APPELER` en `NON_QUALIFIES`, supprimer `prioritaire` et la pastille, changer deux légendes | `pnpm --filter @crm/web test src/components/chues/hub-view.test.tsx` | « pas encore qualifiés » attendu, `queryByText('À faire maintenant')` nul |
-| **B3. Étape 1 perd sa liste confiée** | `components/console/rep-script.tsx`, nouveau `components/console/rep-annuaire.ts`, `lib/data/console.ts`, `app/(panel)/chues/appels-representants/page.tsx` | sortir `annuaireFilters` du module client, supprimer la requête de file, précharger l'annuaire | `pnpm --filter @crm/web test src/components/console/rep-script.test.tsx` | « ouvre sur l'annuaire, sans liste confiée » : première requête `fetchRepresentants({search: ''})`, aucun appel à `fetchRepScriptQueue` |
-| **B4. Étape 3 devient un écran de recherche** | `components/console/console-view.tsx`, `lib/data/console.ts`, les deux pages `console/page.tsx` | **en deux temps** : B4a les données, B4b l'écran (§4.2.3) | `pnpm --filter @crm/web test src/components/console src/lib/data/console.test.ts` puis `typecheck` | les six tests d'ordre de file disparaissent, trois tests d'ouverture par recherche rougissent d'abord |
-| **B5. Supervision et Chiffres** | `lib/data/admin.ts`, `components/supervision/activity-view.tsx`, `components/chiffres/sources.ts` | retirer `tasksClosed`, `openTasks`, la carte et la colonne « Reste à appeler » | `pnpm --filter @crm/web test src/lib/data/admin.test.ts src/components/supervision/activity-view.test.tsx src/components/chiffres` | en-têtes sans « Tâches closes » ni « Reste à faire ». **Voir C1** |
-| **B6. Rappels** | `components/rappels/rappels-view.tsx` | dériver la racine du lien du `pathname`, changer deux textes et un libellé | `pnpm --filter @crm/web test src/components/rappels/rappels-view.test.tsx` | sur `/grand-public/rappels`, le lien vise `/grand-public/console?fiche=…` |
-| **B7. Créer l'écran des lots** | nouveau dossier `components/lots/`, `lib/lot-filters.ts`, `lib/data/lots.ts`, `lib/query-keys.ts` | §4.2.4 | `pnpm --filter @crm/web test src/components/lots` | `lots-view.test.tsx` et `lot-create-dialog.test.tsx` écrits d'abord |
-| **B8. Supprimer l'ancien monde** | §4.2.2 et §4.2.5 | suppressions et nettoyages | `typecheck && lint` puis `pnpm dead-code` | knip signale les exports sans appelant |
-| **B9. Consigner depuis les listes** | `components/prospects/columns.tsx`, `components/representants/representant-detail-view.tsx` | un lien « Consigner un appel » par ligne | `pnpm --filter @crm/web test src/components/prospects/columns.test.tsx` | le test du lien vers `/chues/console?fiche=<id>` |
-| **B10. Frontières et bout en bout** | §5.2 | tests | `typecheck`, `lint`, `test`, `build`, puis `test:e2e` | voir §5.2 |
+| Étape                                         | Fichiers                                                                                                                                                    | Ce qu'on écrit                                                                                         | Vérification                                                                                                                       | Rouge attendu                                                                                                                           |
+| --------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **B0. Relire l'arbre**                        | tous                                                                                                                                                        | rien                                                                                                   | `git status`, relecture                                                                                                            | l'arbre a bougé depuis la rédaction (§0.5)                                                                                              |
+| **B1. Copie de la navigation**                | `apps/web/src/components/layout/nav-items.ts` (274-281, 313-319, 534-540, 493, 560) et son test                                                             | libellé « Lots d'export », descriptions de §4.2.6                                                      | `pnpm --filter @crm/web test src/components/layout/nav-items.test.ts`                                                              | le test neuf exige `label === "Lots d'export"` et une description sans « distribuer » ni « appels aux »                                 |
+| **B2. Écran d'ouverture CHUES**               | `components/chues/hub-view.tsx`, `hub-filters.ts`, `app/(panel)/chues/page.tsx`                                                                             | renommer `A_APPELER` en `NON_QUALIFIES`, supprimer `prioritaire` et la pastille, changer deux légendes | `pnpm --filter @crm/web test src/components/chues/hub-view.test.tsx`                                                               | « pas encore qualifiés » attendu, `queryByText('À faire maintenant')` nul                                                               |
+| **B3. Étape 1 perd sa liste confiée**         | `components/console/rep-script.tsx`, nouveau `components/console/rep-annuaire.ts`, `lib/data/console.ts`, `app/(panel)/chues/appels-representants/page.tsx` | sortir `annuaireFilters` du module client, supprimer la requête de file, précharger l'annuaire         | `pnpm --filter @crm/web test src/components/console/rep-script.test.tsx`                                                           | « ouvre sur l'annuaire, sans liste confiée » : première requête `fetchRepresentants({search: ''})`, aucun appel à `fetchRepScriptQueue` |
+| **B4. Étape 3 devient un écran de recherche** | `components/console/console-view.tsx`, `lib/data/console.ts`, les deux pages `console/page.tsx`                                                             | **en deux temps** : B4a les données, B4b l'écran (§4.2.3)                                              | `pnpm --filter @crm/web test src/components/console src/lib/data/console.test.ts` puis `typecheck`                                 | les six tests d'ordre de file disparaissent, trois tests d'ouverture par recherche rougissent d'abord                                   |
+| **B5. Supervision et Chiffres**               | `lib/data/admin.ts`, `components/supervision/activity-view.tsx`, `components/chiffres/sources.ts`                                                           | retirer `tasksClosed`, `openTasks`, la carte et la colonne « Reste à appeler »                         | `pnpm --filter @crm/web test src/lib/data/admin.test.ts src/components/supervision/activity-view.test.tsx src/components/chiffres` | en-têtes sans « Tâches closes » ni « Reste à faire ». **Voir C1**                                                                       |
+| **B6. Rappels**                               | `components/rappels/rappels-view.tsx`                                                                                                                       | dériver la racine du lien du `pathname`, changer deux textes et un libellé                             | `pnpm --filter @crm/web test src/components/rappels/rappels-view.test.tsx`                                                         | sur `/grand-public/rappels`, le lien vise `/grand-public/console?fiche=…`                                                               |
+| **B7. Créer l'écran des lots**                | nouveau dossier `components/lots/`, `lib/lot-filters.ts`, `lib/data/lots.ts`, `lib/query-keys.ts`                                                           | §4.2.4                                                                                                 | `pnpm --filter @crm/web test src/components/lots`                                                                                  | `lots-view.test.tsx` et `lot-create-dialog.test.tsx` écrits d'abord                                                                     |
+| **B8. Supprimer l'ancien monde**              | §4.2.2 et §4.2.5                                                                                                                                            | suppressions et nettoyages                                                                             | `typecheck && lint` puis `pnpm dead-code`                                                                                          | knip signale les exports sans appelant                                                                                                  |
+| **B9. Consigner depuis les listes**           | `components/prospects/columns.tsx`, `components/representants/representant-detail-view.tsx`                                                                 | un lien « Consigner un appel » par ligne                                                               | `pnpm --filter @crm/web test src/components/prospects/columns.test.tsx`                                                            | le test du lien vers `/chues/console?fiche=<id>`                                                                                        |
+| **B10. Frontières et bout en bout**           | §5.2                                                                                                                                                        | tests                                                                                                  | `typecheck`, `lint`, `test`, `build`, puis `test:e2e`                                                                              | voir §5.2                                                                                                                               |
 
 ### 3.3 Lot C, mobile
 
 Toutes les commandes depuis
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile`.
 
-| Étape | Ce qu'on fait | Vérification | Rouge attendu |
-| --- | --- | --- | --- |
-| **C0. Point de départ vert** | `flutter pub get`, `build_runner`, `analyze`, `test` | `No issues found.` et tout vert | si ce n'est pas le cas **avant** toute modification, s'arrêter et le signaler |
-| **C1. Retirer écrans, routes et providers de campagne** | supprimer `lib/features/campagnes/` en entier ; déplacer trois constantes dans `route_paths.dart` ; nettoyer `app_router.dart` et `route_memory.dart` ; corriger `prospect_detail_screen.dart` (§4.3.3) | `flutter analyze` | `Target of URI doesn't exist`, `Undefined name 'CampagnesRoutes'` dans les deux accueils, `Undefined name 'ProspectPickerScreen'` dans le routeur |
-| **C2. Réécrire les deux accueils** | `home_screen.dart`, `grand_public_screen.dart`, `hub_screen.dart:159`, `grand_public_fiches_screen.dart:200`, `projects.dart:89`, `phase2_screen.dart:37` (§4.3.3 et §4.3.6) | `flutter analyze` | rouge résiduel limité à `ProspectPickerScreen` et `prospectPickerListProvider` |
-| **C3. Le sélecteur de prospects** | deux providers dans `app_providers.dart`, un `onTap` optionnel sur `ProspectTile`, l'écran neuf, la `GoRoute` (§4.3.4) | `flutter analyze` puis `dart format --output=none --set-exit-if-changed lib/` | avant d'écrire l'écran, l'erreur porte bien sur `ProspectPickerScreen` |
-| **C4. Base locale et migration** | `schema.drift` perd 803 à 899, `database.dart` passe en v20 (§4.3.1) | `build_runner`, `analyze`, `flutter test test/data/migration_test.dart` | « le golden couvre toutes les versions déclarées » (`test/data/migration_test.dart:63`) rougit avec `schemaVersion a bougé sans nouveau dump` |
-| **C4bis. Dumps** | `dart run drift_dev schema dump lib/data/local/database.dart drift_schemas/` puis `dart run drift_dev schema generate drift_schemas/ test/data/generated_migrations/` | relire le diff : **aucun** `schema_v1..v19.dart` ne doit changer | s'il en change un, drift et drift_dev ne sont pas ensemble dans `>=2.33.0 <2.34.0` (`pubspec.yaml:31`, `:109`) |
-| **C5. Moteur de sync et dépôt d'écriture** | `sync_engine.dart` perd 1975 à 2057 ; `write_repository.dart` perd 919-931 puis 891-896 (§4.3.2) | `flutter analyze`, `flutter test test/core/sync_engine_test.dart test/data/write_repository_test.dart` | le test de file de campagne et l'assertion `repCallTasks … 'DONE'` échouent, plus les compilations citant `db.callTasks` |
-| **C6. Les tests** | §5.3 | `flutter analyze`, `dart format`, `flutter test` | tout vert ; sur chaque test neuf, casser le code couvert et vérifier le rouge |
-| **C7. Le contrat** (après le lot A) | `pnpm codegen` à la racine, puis retirer les arguments morts des sept fichiers qui construisent un `SyncChangesDto`, et porter `sync_engine.dart:59` à 5 | la séquence complète de §0.3, plus `pnpm codegen:check` | `git diff --stat packages/api-client-dart/lib` doit montrer la disparition des quatre DTO de flux et de `call_task_status.dart` |
+| Étape                                                   | Ce qu'on fait                                                                                                                                                                                           | Vérification                                                                                           | Rouge attendu                                                                                                                                     |
+| ------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **C0. Point de départ vert**                            | `flutter pub get`, `build_runner`, `analyze`, `test`                                                                                                                                                    | `No issues found.` et tout vert                                                                        | si ce n'est pas le cas **avant** toute modification, s'arrêter et le signaler                                                                     |
+| **C1. Retirer écrans, routes et providers de campagne** | supprimer `lib/features/campagnes/` en entier ; déplacer trois constantes dans `route_paths.dart` ; nettoyer `app_router.dart` et `route_memory.dart` ; corriger `prospect_detail_screen.dart` (§4.3.3) | `flutter analyze`                                                                                      | `Target of URI doesn't exist`, `Undefined name 'CampagnesRoutes'` dans les deux accueils, `Undefined name 'ProspectPickerScreen'` dans le routeur |
+| **C2. Réécrire les deux accueils**                      | `home_screen.dart`, `grand_public_screen.dart`, `hub_screen.dart:159`, `grand_public_fiches_screen.dart:200`, `projects.dart:89`, `phase2_screen.dart:37` (§4.3.3 et §4.3.6)                            | `flutter analyze`                                                                                      | rouge résiduel limité à `ProspectPickerScreen` et `prospectPickerListProvider`                                                                    |
+| **C3. Le sélecteur de prospects**                       | deux providers dans `app_providers.dart`, un `onTap` optionnel sur `ProspectTile`, l'écran neuf, la `GoRoute` (§4.3.4)                                                                                  | `flutter analyze` puis `dart format --output=none --set-exit-if-changed lib/`                          | avant d'écrire l'écran, l'erreur porte bien sur `ProspectPickerScreen`                                                                            |
+| **C4. Base locale et migration**                        | `schema.drift` perd 803 à 899, `database.dart` passe en v20 (§4.3.1)                                                                                                                                    | `build_runner`, `analyze`, `flutter test test/data/migration_test.dart`                                | « le golden couvre toutes les versions déclarées » (`test/data/migration_test.dart:63`) rougit avec `schemaVersion a bougé sans nouveau dump`     |
+| **C4bis. Dumps**                                        | `dart run drift_dev schema dump lib/data/local/database.dart drift_schemas/` puis `dart run drift_dev schema generate drift_schemas/ test/data/generated_migrations/`                                   | relire le diff : **aucun** `schema_v1..v19.dart` ne doit changer                                       | s'il en change un, drift et drift_dev ne sont pas ensemble dans `>=2.33.0 <2.34.0` (`pubspec.yaml:31`, `:109`)                                    |
+| **C5. Moteur de sync et dépôt d'écriture**              | `sync_engine.dart` perd 1975 à 2057 ; `write_repository.dart` perd 919-931 puis 891-896 (§4.3.2)                                                                                                        | `flutter analyze`, `flutter test test/core/sync_engine_test.dart test/data/write_repository_test.dart` | le test de file de campagne et l'assertion `repCallTasks … 'DONE'` échouent, plus les compilations citant `db.callTasks`                          |
+| **C6. Les tests**                                       | §5.3                                                                                                                                                                                                    | `flutter analyze`, `dart format`, `flutter test`                                                       | tout vert ; sur chaque test neuf, casser le code couvert et vérifier le rouge                                                                     |
+| **C7. Le contrat** (après le lot A)                     | `pnpm codegen` à la racine, puis retirer les arguments morts des sept fichiers qui construisent un `SyncChangesDto`, et porter `sync_engine.dart:59` à 5                                                | la séquence complète de §0.3, plus `pnpm codegen:check`                                                | `git diff --stat packages/api-client-dart/lib` doit montrer la disparition des quatre DTO de flux et de `call_task_status.dart`                   |
 
 ### 3.4 Déploiement
 
@@ -953,11 +953,11 @@ Trois envois, dans cet ordre.
    - l'API retire les quatre flux et porte `MIN_PULL_PAYLOAD_VERSION` à 5 ;
    - l'APK porte `payloadVersion` à 5 et la base locale v20 ;
    - le web bascule sur les lots.
-   Un web en retard sur l'API rend des `404` bruts à l'utilisateur ; un APK en
-   retard reçoit un `426` honnête et continue de pousser ses saisies. **Publier
-   aussi la nouvelle version dans le service de mises à jour**
-   (`apps/api/src/modules/app-updates/`), sans quoi le `426` ne produit qu'une
-   bande d'état et le parc ne se met pas à jour.
+     Un web en retard sur l'API rend des `404` bruts à l'utilisateur ; un APK en
+     retard reçoit un `426` honnête et continue de pousser ses saisies. **Publier
+     aussi la nouvelle version dans le service de mises à jour**
+     (`apps/api/src/modules/app-updates/`), sans quoi le `426` ne produit qu'une
+     bande d'état et le parc ne se met pas à jour.
 3. **Envoi 3, contraction.** Migration `retrait_des_listes_d_appel` (A8), une
    fois qu'aucune instance d'API ne lit plus les colonnes retirées.
 
@@ -988,27 +988,27 @@ Fichier :
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/database/prisma/schema.prisma`
 (2315 lignes).
 
-| Ligne | Enum | Verdict |
-| --- | --- | --- |
-| `:153` | `CampaignScope` (BDD1..BDD4, GP1..GP4, ALL) | **SUPPRIMER.** Le périmètre d'un lot se dit avec les filtres partagés (§2.2). Consommateurs : `apps/api/src/modules/phase2/campaigns.service.ts:54`, `:70`, `:292`, `apps/api/src/modules/phase2/dto.ts:51`, `packages/database/src/segment.ts:82`, `:89`, `:116` |
-| `:165` | `CampaignStatus` | **SUPPRIMER.** Un lot d'export n'a pas d'état : il est produit une fois |
-| `:172` | `CallTaskStatus` | **SUPPRIMER** |
-| `:178` | `CallOutcome` | **GARDER.** Décrit l'issue d'un appel, pas une tâche |
-| `:195` | `RepCallOutcome` | **GARDER** |
-| `:1139` | `ScheduledCallbackStatus` | **GARDER** |
-| `:1516` | `NotificationCategory` | **GARDER.** Sa valeur `CAMPAGNE` perd son seul usage, mais vider un enum PostgreSQL exposé au contrat ne vaut pas une migration |
+| Ligne   | Enum                                        | Verdict                                                                                                                                                                                                                                                           |
+| ------- | ------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `:153`  | `CampaignScope` (BDD1..BDD4, GP1..GP4, ALL) | **SUPPRIMER.** Le périmètre d'un lot se dit avec les filtres partagés (§2.2). Consommateurs : `apps/api/src/modules/phase2/campaigns.service.ts:54`, `:70`, `:292`, `apps/api/src/modules/phase2/dto.ts:51`, `packages/database/src/segment.ts:82`, `:89`, `:116` |
+| `:165`  | `CampaignStatus`                            | **SUPPRIMER.** Un lot d'export n'a pas d'état : il est produit une fois                                                                                                                                                                                           |
+| `:172`  | `CallTaskStatus`                            | **SUPPRIMER**                                                                                                                                                                                                                                                     |
+| `:178`  | `CallOutcome`                               | **GARDER.** Décrit l'issue d'un appel, pas une tâche                                                                                                                                                                                                              |
+| `:195`  | `RepCallOutcome`                            | **GARDER**                                                                                                                                                                                                                                                        |
+| `:1139` | `ScheduledCallbackStatus`                   | **GARDER**                                                                                                                                                                                                                                                        |
+| `:1516` | `NotificationCategory`                      | **GARDER.** Sa valeur `CAMPAGNE` perd son seul usage, mais vider un enum PostgreSQL exposé au contrat ne vaut pas une migration                                                                                                                                   |
 
-| Ligne | Modèle | Verdict | Détail |
-| --- | --- | --- | --- |
-| `:928` | `CallCampaign` / `call_campaigns` | **SUPPRIMER** | Porte `scope`, `seed`, `status`, `spreadDays`, `audienceFilters`, et les relations `commerciaux`, `tasks`, `attempts`, `callbacks` |
-| `:966` | `CallCampaignCommercial` | **SUPPRIMER** | Table de tourniquet |
-| `:987` | `CallTask` / `call_tasks` | **SUPPRIMER** | `assignedToId:994`, `position:999`, `dayIndex:1006`, `status:1008`, `isActive:1009`, index `:1018` à `:1027` |
-| `:1037` | `CallAttempt` | **GARDER en le vidant** | Retirer `taskId:1042`, `task:1043`, `campaignId:1044`, `campaign:1045` et `@@index([campaignId]):1085`. Tout le reste reste : issue, méthode, motif, renseignements de conversion, `performedById`, `clientCreatedAt`. C'est le journal des appels, seule source des chiffres après le chantier |
-| `:1103` | `ScheduledCallback` | **GARDER en le vidant** | Retirer `taskId:1107`, `task:1108`, `campaignId:1109`, `campaign:1110`. **Garder** `assignedToId:1114` (celui qui a promis le rappel, le commentaire `:1112` le dit déjà) et `sourceAttemptId:1123` (clé d'idempotence). Garder les trois index `:1132`, `:1133`, `:1135` |
-| `:1159` | `RepCallCampaign` | **SUPPRIMER** | `departementId:1170`, `iefId:1172`, `onlyWithoutProspects:1177`, `relationStatuses:1181` décrivent une cible : elle se reporte dans le lot |
-| `:1198` | `RepCallCampaignCommercial` | **SUPPRIMER** | |
-| `:1218` | `RepCallTask` | **SUPPRIMER** | |
-| `:1251` | `RepCallAttempt` | **GARDER en le vidant** | Retirer `taskId:1256`, `task:1257`, `campaignId:1258`, `campaign:1259`, `@@index([campaignId]):1280`. Garder `outcome`, `promisedProspects`, `callbackAt`, `suggestion` |
+| Ligne   | Modèle                            | Verdict                 | Détail                                                                                                                                                                                                                                                                                          |
+| ------- | --------------------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `:928`  | `CallCampaign` / `call_campaigns` | **SUPPRIMER**           | Porte `scope`, `seed`, `status`, `spreadDays`, `audienceFilters`, et les relations `commerciaux`, `tasks`, `attempts`, `callbacks`                                                                                                                                                              |
+| `:966`  | `CallCampaignCommercial`          | **SUPPRIMER**           | Table de tourniquet                                                                                                                                                                                                                                                                             |
+| `:987`  | `CallTask` / `call_tasks`         | **SUPPRIMER**           | `assignedToId:994`, `position:999`, `dayIndex:1006`, `status:1008`, `isActive:1009`, index `:1018` à `:1027`                                                                                                                                                                                    |
+| `:1037` | `CallAttempt`                     | **GARDER en le vidant** | Retirer `taskId:1042`, `task:1043`, `campaignId:1044`, `campaign:1045` et `@@index([campaignId]):1085`. Tout le reste reste : issue, méthode, motif, renseignements de conversion, `performedById`, `clientCreatedAt`. C'est le journal des appels, seule source des chiffres après le chantier |
+| `:1103` | `ScheduledCallback`               | **GARDER en le vidant** | Retirer `taskId:1107`, `task:1108`, `campaignId:1109`, `campaign:1110`. **Garder** `assignedToId:1114` (celui qui a promis le rappel, le commentaire `:1112` le dit déjà) et `sourceAttemptId:1123` (clé d'idempotence). Garder les trois index `:1132`, `:1133`, `:1135`                       |
+| `:1159` | `RepCallCampaign`                 | **SUPPRIMER**           | `departementId:1170`, `iefId:1172`, `onlyWithoutProspects:1177`, `relationStatuses:1181` décrivent une cible : elle se reporte dans le lot                                                                                                                                                      |
+| `:1198` | `RepCallCampaignCommercial`       | **SUPPRIMER**           |                                                                                                                                                                                                                                                                                                 |
+| `:1218` | `RepCallTask`                     | **SUPPRIMER**           |                                                                                                                                                                                                                                                                                                 |
+| `:1251` | `RepCallAttempt`                  | **GARDER en le vidant** | Retirer `taskId:1256`, `task:1257`, `campaignId:1258`, `campaign:1259`, `@@index([campaignId]):1280`. Garder `outcome`, `promisedProspects`, `callbackAt`, `suggestion`                                                                                                                         |
 
 Champs de relation à retirer sur les modèles conservés : `User.campaignsCreated:255`,
 `User.campaignMemberships:256`, `User.callTasksAssigned:257`,
@@ -1024,66 +1024,66 @@ Champs de relation à retirer sur les modèles conservés : `User.campaignsCreat
 Fichier :
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/database/src/segment.ts`
 
-| Ligne | Élément | Verdict |
-| --- | --- | --- |
-| `:82` | `GP_TYPES` | **SUPPRIMER** (dépend de `CampaignScope`) |
-| `:89` | `scopeWhere(scope, projet)` | **SUPPRIMER** |
-| `:116` | `eligibleForCampaignWhere(scope, projet)` | **SUPPRIMER.** Sa ligne `:124`, `callTasks: { none: { isActive: true } }`, est le cœur de l'éligibilité par assignation |
-| ailleurs | `segmentWhere`, `segmentAxes`, `ALL_SEGMENTS`, `CHUES_SIGLE`, `CBAO_SHORT_NAME` | **GARDER** : statistiques, listes, exports |
+| Ligne    | Élément                                                                         | Verdict                                                                                                                 |
+| -------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| `:82`    | `GP_TYPES`                                                                      | **SUPPRIMER** (dépend de `CampaignScope`)                                                                               |
+| `:89`    | `scopeWhere(scope, projet)`                                                     | **SUPPRIMER**                                                                                                           |
+| `:116`   | `eligibleForCampaignWhere(scope, projet)`                                       | **SUPPRIMER.** Sa ligne `:124`, `callTasks: { none: { isActive: true } }`, est le cœur de l'éligibilité par assignation |
+| ailleurs | `segmentWhere`, `segmentAxes`, `ALL_SEGMENTS`, `CHUES_SIGLE`, `CBAO_SHORT_NAME` | **GARDER** : statistiques, listes, exports                                                                              |
 
 #### 4.1.2 Modules de campagne
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/phase2/`
 
-| Fichier | Verdict |
-| --- | --- |
-| `campaigns.service.ts` (27,6 Ko, tirage à `:113`) | **SUPPRIMER** |
-| `campaigns.service.test.ts` (16,9 Ko) | **SUPPRIMER** |
-| `distribution.ts`, `distribution.test.ts` | **SUPPRIMER** |
+| Fichier                                                    | Verdict                                                                                                                                                                                                                                                                                                                           |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `campaigns.service.ts` (27,6 Ko, tirage à `:113`)          | **SUPPRIMER**                                                                                                                                                                                                                                                                                                                     |
+| `campaigns.service.test.ts` (16,9 Ko)                      | **SUPPRIMER**                                                                                                                                                                                                                                                                                                                     |
+| `distribution.ts`, `distribution.test.ts`                  | **SUPPRIMER**                                                                                                                                                                                                                                                                                                                     |
 | `programme-pdf.ts`, `programme-pdf.test.ts`, `pdf-text.ts` | **DÉPLACER** dans le module lots (`fiche-pdf.ts`) : garder `writeRepProgrammeData` / `writeRepProgrammePdf` (`programme-pdf.ts:360`) comme base de la fiche imprimable, retirer tout ce qui parle d'assignation, de jour et de position, généraliser aux prospects. Les routes `fiches/{itemId}.pdf` et `fiches.zip` en dépendent |
-| `phase2.controller.ts` | **RÉDUIRE** aux trois routes conservées (`:66`, `:96`, `:120`) |
-| `phase2.module.ts` | perd `Phase2CampaignsService` (`:6`, `:15`, `:20`) |
-| `dto.ts` | perd `CreateCampaignDto:38`, `CampaignProgressDto:109`, `CampaignCommercialDto:123`, `CampaignAttemptDto:137` (sa forme est reprise par `LotExportAttemptDto`), `CampaignSummaryDto:189`, `CampaignDetailDto:217`, `CampaignListDto:253`, `CampaignQueryDto:258`, `ProgrammeQueryDto:323`, plus `:596` et `:604` |
-| `directory.service.ts`, `directory-cursor.test.ts` | **GARDER** : l'annuaire hors ligne ne mentionne ni tâche ni campagne |
+| `phase2.controller.ts`                                     | **RÉDUIRE** aux trois routes conservées (`:66`, `:96`, `:120`)                                                                                                                                                                                                                                                                    |
+| `phase2.module.ts`                                         | perd `Phase2CampaignsService` (`:6`, `:15`, `:20`)                                                                                                                                                                                                                                                                                |
+| `dto.ts`                                                   | perd `CreateCampaignDto:38`, `CampaignProgressDto:109`, `CampaignCommercialDto:123`, `CampaignAttemptDto:137` (sa forme est reprise par `LotExportAttemptDto`), `CampaignSummaryDto:189`, `CampaignDetailDto:217`, `CampaignListDto:253`, `CampaignQueryDto:258`, `ProgrammeQueryDto:323`, plus `:596` et `:604`                  |
+| `directory.service.ts`, `directory-cursor.test.ts`         | **GARDER** : l'annuaire hors ligne ne mentionne ni tâche ni campagne                                                                                                                                                                                                                                                              |
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/rep-campaigns/`
 
-| Fichier | Verdict |
-| --- | --- |
+| Fichier                              | Verdict                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `rep-campaigns.service.ts` (28,8 Ko) | **RÉDUIRE** à `recordAttempt` (`:600`), `resolveSuggested`, `validatedComment`, `resolveWhatsappPatch`. Les 550 premières lignes (tirage, tourniquet, répartition, détail, programme, ZIP) disparaissent. Retirer la recherche de tâche active (`:641`), les écritures `taskId` et `campaignId` (`:655`, `:656`) et la clôture (`:708`) |
-| `rep-campaigns.controller.ts` | ne garde que `recordAttempt` (`:83`) |
-| `dto.ts` | perd les onze DTO listés en §2.2, plus `taskId:499` et `taskClosed:505` |
+| `rep-campaigns.controller.ts`        | ne garde que `recordAttempt` (`:83`)                                                                                                                                                                                                                                                                                                    |
+| `dto.ts`                             | perd les onze DTO listés en §2.2, plus `taskId:499` et `taskClosed:505`                                                                                                                                                                                                                                                                 |
 
 Retraits en cascade :
 
-| Fichier:ligne | Ce qu'on retire |
-| --- | --- |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/users/users.service.ts:312` à `:321` | Les deux `updateMany` de réassignation de tâches dans la reprise de portefeuille, et le commentaire `:312` |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/prospects/prospects.service.ts:103` à `:106` | La clôture de tâche dans `closeProspectWork` ; **garder** l'annulation du rappel (`:107`) |
-| `.../prospects.service.ts:663` | `tx.callTask.updateMany` dans la fusion de fiches |
+| Fichier:ligne                                                                                                        | Ce qu'on retire                                                                                            |
+| -------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/users/users.service.ts:312` à `:321`         | Les deux `updateMany` de réassignation de tâches dans la reprise de portefeuille, et le commentaire `:312` |
+| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/prospects/prospects.service.ts:103` à `:106` | La clôture de tâche dans `closeProspectWork` ; **garder** l'annulation du rappel (`:107`)                  |
+| `.../prospects.service.ts:663`                                                                                       | `tx.callTask.updateMany` dans la fusion de fiches                                                          |
 
 #### 4.1.3 Synchronisation
 
 Fichiers sous
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/sync/`.
 
-| Ligne | Élément | Verdict |
-| --- | --- | --- |
-| `cursor.ts:22` à `:25` | Les quatre flux de `SYNC_STREAMS` | **SUPPRIMER** |
-| `sync.service.ts:1140` | `callCampaign.findMany`, borné par `tasks: { some: { assignedToId } }` (`:1143`) | **SUPPRIMER** |
-| `sync.service.ts:1155` | `callTask.findMany`, borné par `assignedToId` (`:1158`) | **SUPPRIMER** |
-| `sync.service.ts:1166` | `repCallCampaign.findMany`, borné par `commerciaux: { some: { userId } }` (`:1169`) | **SUPPRIMER** |
-| `sync.service.ts:1177` | `repCallTask.findMany` (`:1180`) | **SUPPRIMER** |
-| `sync.service.ts:1282` à `:1317` | Les quatre tableaux de la réponse | **SUPPRIMER** |
-| `sync.service.ts:1212` à `:1229` | `deletions` (représentants et prospects) | **GARDER** |
-| `dto.ts:674`, `:686`, `:707`, `:709`, `:778` à `:782` | Les quatre DTO et les quatre champs | **SUPPRIMER** |
-| `sync.service.ts:186` | `assignedTo(userId)` | **SUPPRIMER** |
-| `sync.service.ts:202` à `:213` | `mineOrAssignedRepresentant` | **SIMPLIFIER** (voir A4) |
-| `sync.service.ts:803` à `:818` | Garde d'autorisation de la tentative (`:807`) | **TRANSFORMER** vers la nouvelle portée |
-| `sync.service.ts:1006` à `:1022` | `assertProspectWritable`, repli sur `callTask.findFirst` (`:1012`) | **TRANSFORMER** |
-| `sync.service.ts:720` à `:740` | `assertRepresentantWritable`, repli sur `callTask.findFirst` (`:726`) | **TRANSFORMER** |
-| `sync.controller.ts:29` | `MIN_PULL_PAYLOAD_VERSION = 4` | **4 vers 5** |
-| `phase2-sync.service.ts:104` à `:119`, `:128`, `:139`, `:140`, `:246`, `:247`, `:295` à `:298` | Lecture de tâche, projet par campagne, écritures, clôture | **TRANSFORMER** ou **SUPPRIMER** (A4, D1) |
+| Ligne                                                                                          | Élément                                                                             | Verdict                                   |
+| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- | ----------------------------------------- |
+| `cursor.ts:22` à `:25`                                                                         | Les quatre flux de `SYNC_STREAMS`                                                   | **SUPPRIMER**                             |
+| `sync.service.ts:1140`                                                                         | `callCampaign.findMany`, borné par `tasks: { some: { assignedToId } }` (`:1143`)    | **SUPPRIMER**                             |
+| `sync.service.ts:1155`                                                                         | `callTask.findMany`, borné par `assignedToId` (`:1158`)                             | **SUPPRIMER**                             |
+| `sync.service.ts:1166`                                                                         | `repCallCampaign.findMany`, borné par `commerciaux: { some: { userId } }` (`:1169`) | **SUPPRIMER**                             |
+| `sync.service.ts:1177`                                                                         | `repCallTask.findMany` (`:1180`)                                                    | **SUPPRIMER**                             |
+| `sync.service.ts:1282` à `:1317`                                                               | Les quatre tableaux de la réponse                                                   | **SUPPRIMER**                             |
+| `sync.service.ts:1212` à `:1229`                                                               | `deletions` (représentants et prospects)                                            | **GARDER**                                |
+| `dto.ts:674`, `:686`, `:707`, `:709`, `:778` à `:782`                                          | Les quatre DTO et les quatre champs                                                 | **SUPPRIMER**                             |
+| `sync.service.ts:186`                                                                          | `assignedTo(userId)`                                                                | **SUPPRIMER**                             |
+| `sync.service.ts:202` à `:213`                                                                 | `mineOrAssignedRepresentant`                                                        | **SIMPLIFIER** (voir A4)                  |
+| `sync.service.ts:803` à `:818`                                                                 | Garde d'autorisation de la tentative (`:807`)                                       | **TRANSFORMER** vers la nouvelle portée   |
+| `sync.service.ts:1006` à `:1022`                                                               | `assertProspectWritable`, repli sur `callTask.findFirst` (`:1012`)                  | **TRANSFORMER**                           |
+| `sync.service.ts:720` à `:740`                                                                 | `assertRepresentantWritable`, repli sur `callTask.findFirst` (`:726`)               | **TRANSFORMER**                           |
+| `sync.controller.ts:29`                                                                        | `MIN_PULL_PAYLOAD_VERSION = 4`                                                      | **4 vers 5**                              |
+| `phase2-sync.service.ts:104` à `:119`, `:128`, `:139`, `:140`, `:246`, `:247`, `:295` à `:298` | Lecture de tâche, projet par campagne, écritures, clôture                           | **TRANSFORMER** ou **SUPPRIMER** (A4, D1) |
 
 Les rappels ne descendent pas par le pull : ils sont servis en ligne par
 `GET /v1/phase2/callbacks`. Ce plan ne change pas ce choix.
@@ -1092,30 +1092,30 @@ Les rappels ne descendent pas par le pull : ils sont servis en ligne par
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/common/scope.ts`
 
-| Ligne | Fonction | Règle actuelle |
-| --- | --- | --- |
-| `:38` | `mineOrAssignedProspect(userId)` | `createdById = userId` OU `callTasks.some(assignedToId = userId, isActive)` |
-| `:46` | `prospectReadScope(user)` | Supervision et direction : tout. Autres : `mineOrAssignedProspect` |
-| `:55` | `prospectSyncScope(user)` | Admin : tout. Autres : `mineOrAssignedProspect` |
-| `:20`, `:25`, `:80` | `ownerScope`, `readScope`, `manageScope` | `createdById` seul, aucune tâche. **Inchangés** |
+| Ligne               | Fonction                                 | Règle actuelle                                                              |
+| ------------------- | ---------------------------------------- | --------------------------------------------------------------------------- |
+| `:38`               | `mineOrAssignedProspect(userId)`         | `createdById = userId` OU `callTasks.some(assignedToId = userId, isActive)` |
+| `:46`               | `prospectReadScope(user)`                | Supervision et direction : tout. Autres : `mineOrAssignedProspect`          |
+| `:55`               | `prospectSyncScope(user)`                | Admin : tout. Autres : `mineOrAssignedProspect`                             |
+| `:20`, `:25`, `:80` | `ownerScope`, `readScope`, `manageScope` | `createdById` seul, aucune tâche. **Inchangés**                             |
 
 Tous les endroits où `call_tasks` ou `assignedToId` entre dans un `WHERE`, à
 traiter en A3, A4, A5, A6 et A7 :
 
-| Fichier:ligne | Contexte |
-| --- | --- |
-| `apps/api/src/common/scope.ts:41` | `mineOrAssignedProspect` |
-| `apps/api/src/common/prospect-where.ts:21` | Injection de `prospectReadScope` dans le `AND` |
-| `apps/api/src/common/prospect-where.ts:78` à `:87` | Filtres publics `campaignId` et `assignedToId` |
-| `apps/api/src/modules/analytics/analytics.sql.ts:17`, `:44` à `:49` | `porteeProspect` : `EXISTS (SELECT 1 FROM "call_tasks" ...)` |
-| `apps/api/src/modules/analytics/analytics.sql.ts:107` à `:120` | `campaignCondition` |
-| `apps/api/src/modules/analytics/pilotage.service.ts:52`, `:89` | `INNER JOIN "call_tasks"` |
-| `apps/api/src/modules/analytics/supervision.service.ts:107`, `:170`, `:301` | `taskScope`, `FROM "call_tasks"`, `LEFT JOIN "call_tasks"` |
-| `apps/api/src/modules/sync/sync.service.ts:187`, `:210`, `:211`, `:726`, `:807`, `:1013`, `:1143`, `:1158`, `:1180` | Portées et gardes de synchronisation |
-| `packages/database/src/segment.ts:124` | `callTasks: { none: { isActive: true } }` |
-| `apps/api/src/modules/notifications/reminders.service.ts:175` à `:181` | `groupBy assignedToId` sur les tâches ouvertes |
-| `apps/api/src/modules/users/users.service.ts:314` à `:321` | Reprise de portefeuille |
-| `apps/api/src/modules/prospects/prospects.service.ts:103`, `:663` | Fermeture et fusion de fiches |
+| Fichier:ligne                                                                                                       | Contexte                                                     |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| `apps/api/src/common/scope.ts:41`                                                                                   | `mineOrAssignedProspect`                                     |
+| `apps/api/src/common/prospect-where.ts:21`                                                                          | Injection de `prospectReadScope` dans le `AND`               |
+| `apps/api/src/common/prospect-where.ts:78` à `:87`                                                                  | Filtres publics `campaignId` et `assignedToId`               |
+| `apps/api/src/modules/analytics/analytics.sql.ts:17`, `:44` à `:49`                                                 | `porteeProspect` : `EXISTS (SELECT 1 FROM "call_tasks" ...)` |
+| `apps/api/src/modules/analytics/analytics.sql.ts:107` à `:120`                                                      | `campaignCondition`                                          |
+| `apps/api/src/modules/analytics/pilotage.service.ts:52`, `:89`                                                      | `INNER JOIN "call_tasks"`                                    |
+| `apps/api/src/modules/analytics/supervision.service.ts:107`, `:170`, `:301`                                         | `taskScope`, `FROM "call_tasks"`, `LEFT JOIN "call_tasks"`   |
+| `apps/api/src/modules/sync/sync.service.ts:187`, `:210`, `:211`, `:726`, `:807`, `:1013`, `:1143`, `:1158`, `:1180` | Portées et gardes de synchronisation                         |
+| `packages/database/src/segment.ts:124`                                                                              | `callTasks: { none: { isActive: true } }`                    |
+| `apps/api/src/modules/notifications/reminders.service.ts:175` à `:181`                                              | `groupBy assignedToId` sur les tâches ouvertes               |
+| `apps/api/src/modules/users/users.service.ts:314` à `:321`                                                          | Reprise de portefeuille                                      |
+| `apps/api/src/modules/prospects/prospects.service.ts:103`, `:663`                                                   | Fermeture et fusion de fiches                                |
 
 #### 4.1.5 Statistiques et supervision
 
@@ -1131,16 +1131,16 @@ méthodes obtenues sont déjà rendus par `GET /supervision/activite`
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/analytics/supervision.service.ts`
 
-| Ligne | Élément | Verdict |
-| --- | --- | --- |
-| `:103` à `:107` | `campaign(column)` et `taskScope` | **SUPPRIMER** |
-| `:106` | `attemptScope` sur `ca."campaignId"` | **SUPPRIMER**, remplacer par `TRUE` (`ALL_ROWS`) |
-| `:112` à `:115` | `repScope` bâti sur `rca."campaignId"` | **TRANSFORMER** : ne garder que la borne projet (`Projet.GRAND_PUBLIC` vers `FALSE`) |
-| `:166` à `:173` | Quatrième branche du `UNION ALL`, qui compte les tâches closes | **SUPPRIMER** |
-| `:145`, `:169`, `:228`, `:270` | Colonne `tache`, agrégat `taches` | **SUPPRIMER** |
-| `:294` à `:306` | `roster` avec `LEFT JOIN "call_tasks"` et `COUNT(ct."id") AS ouvertes` | **TRANSFORMER** : la liste des téléconseillers reste (elle sert à repérer les agents muets, `reminders.service.ts:265`), le compte de tâches tombe. La requête devient `SELECT id, fullName, isActive FROM users WHERE <teleconseiller>` |
-| `:357` | `openTasks: row.ouvertes` | **SUPPRIMER** |
-| `:377` | `tasksClosed: base.taches` | **SUPPRIMER** |
+| Ligne                          | Élément                                                                | Verdict                                                                                                                                                                                                                                  |
+| ------------------------------ | ---------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `:103` à `:107`                | `campaign(column)` et `taskScope`                                      | **SUPPRIMER**                                                                                                                                                                                                                            |
+| `:106`                         | `attemptScope` sur `ca."campaignId"`                                   | **SUPPRIMER**, remplacer par `TRUE` (`ALL_ROWS`)                                                                                                                                                                                         |
+| `:112` à `:115`                | `repScope` bâti sur `rca."campaignId"`                                 | **TRANSFORMER** : ne garder que la borne projet (`Projet.GRAND_PUBLIC` vers `FALSE`)                                                                                                                                                     |
+| `:166` à `:173`                | Quatrième branche du `UNION ALL`, qui compte les tâches closes         | **SUPPRIMER**                                                                                                                                                                                                                            |
+| `:145`, `:169`, `:228`, `:270` | Colonne `tache`, agrégat `taches`                                      | **SUPPRIMER**                                                                                                                                                                                                                            |
+| `:294` à `:306`                | `roster` avec `LEFT JOIN "call_tasks"` et `COUNT(ct."id") AS ouvertes` | **TRANSFORMER** : la liste des téléconseillers reste (elle sert à repérer les agents muets, `reminders.service.ts:265`), le compte de tâches tombe. La requête devient `SELECT id, fullName, isActive FROM users WHERE <teleconseiller>` |
+| `:357`                         | `openTasks: row.ouvertes`                                              | **SUPPRIMER**                                                                                                                                                                                                                            |
+| `:377`                         | `tasksClosed: base.taches`                                             | **SUPPRIMER**                                                                                                                                                                                                                            |
 
 `.../analytics/supervision.dto.ts` : retirer `SupervisionQueryDto.campaignId`
 (`:58` à `:66`), `SupervisionActivityCountsDto.tasksClosed` (`:101`),
@@ -1156,16 +1156,16 @@ Autres services d'analytics : `quality.service.ts`, `funnel.service.ts`,
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/notifications/reminders.service.ts`
 
-| Ligne | Élément | Verdict |
-| --- | --- | --- |
-| `:41`, `:42` | Clés `OPEN_CALL_TASKS`, `OPEN_REP_CALL_TASKS` | **SUPPRIMER** |
-| `:59` à `:65` | Interface `OpenTaskDelegate` | **SUPPRIMER** |
-| `:128`, `:129` | Appels dans `runAll` ; `runs` (`:134`) passe de cinq à trois | **SUPPRIMER** |
-| `:141` à `:161` | `remindOpenCallTasks`, `remindOpenRepCallTasks` | **SUPPRIMER** |
-| `:163` à `:198` | `remindOpenTasks` | **SUPPRIMER** |
-| `:196` | `category: NotificationCategory.CAMPAGNE` | disparaît avec son seul usage ; l'enum reste (§4.1.1) |
-| `:205` à `:225` | `remindDueCallbacks` | **GARDER** : groupe sur `scheduledCallback.assignedToId`, sans tâche |
-| `:239` à `:280` | `sendDailyReport` | **TRANSFORMER** : il lit `activity.teleconseillers` (`:265`), qui reste, mais ne doit plus lire de compteur de tâches |
+| Ligne           | Élément                                                      | Verdict                                                                                                               |
+| --------------- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------- |
+| `:41`, `:42`    | Clés `OPEN_CALL_TASKS`, `OPEN_REP_CALL_TASKS`                | **SUPPRIMER**                                                                                                         |
+| `:59` à `:65`   | Interface `OpenTaskDelegate`                                 | **SUPPRIMER**                                                                                                         |
+| `:128`, `:129`  | Appels dans `runAll` ; `runs` (`:134`) passe de cinq à trois | **SUPPRIMER**                                                                                                         |
+| `:141` à `:161` | `remindOpenCallTasks`, `remindOpenRepCallTasks`              | **SUPPRIMER**                                                                                                         |
+| `:163` à `:198` | `remindOpenTasks`                                            | **SUPPRIMER**                                                                                                         |
+| `:196`          | `category: NotificationCategory.CAMPAGNE`                    | disparaît avec son seul usage ; l'enum reste (§4.1.1)                                                                 |
+| `:205` à `:225` | `remindDueCallbacks`                                         | **GARDER** : groupe sur `scheduledCallback.assignedToId`, sans tâche                                                  |
+| `:239` à `:280` | `sendDailyReport`                                            | **TRANSFORMER** : il lit `activity.teleconseillers` (`:265`), qui reste, mais ne doit plus lire de compteur de tâches |
 
 Variables d'environnement mortes : `NOTIFICATIONS_OPEN_TASKS_ENABLED` et
 `NOTIFICATIONS_OPEN_TASKS_MIN` (lues à `:172` et `:185`), à retirer de
@@ -1185,23 +1185,23 @@ recopiés dans `toDto` (`:49`, `:50`). Ces quatre lignes tombent, avec
 
 Réutilisable tel quel, à ne pas réécrire :
 
-| Fichier | Ligne | Élément |
-| --- | --- | --- |
-| `apps/api/src/modules/export/export.controller.ts` | `:42` | `GET /export/prospects.xlsx`, filtres `ProspectFilterDto` étendu (`export/dto.ts:13`), modes `filtered` et `consolidated` |
-| `apps/api/src/modules/export/export.controller.ts` | `:197` | `GET /export/representants.xlsx` |
-| `apps/api/src/modules/export/representants-export.service.ts` | `:52` | `EXPORT_COLUMNS` : nom, téléphone, département, IEF, commercial, prospects, notes, dates |
-| `apps/api/src/modules/export/representants-export.service.ts` | `:112` | Écriture en flux, pagination keyset par `id asc` |
-| `apps/api/src/modules/phase2/programme-pdf.ts` | `:360` | `RepProgrammeData`, `writeRepProgrammePdf`, A4, 25 lignes par page |
+| Fichier                                                       | Ligne  | Élément                                                                                                                   |
+| ------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/modules/export/export.controller.ts`            | `:42`  | `GET /export/prospects.xlsx`, filtres `ProspectFilterDto` étendu (`export/dto.ts:13`), modes `filtered` et `consolidated` |
+| `apps/api/src/modules/export/export.controller.ts`            | `:197` | `GET /export/representants.xlsx`                                                                                          |
+| `apps/api/src/modules/export/representants-export.service.ts` | `:52`  | `EXPORT_COLUMNS` : nom, téléphone, département, IEF, commercial, prospects, notes, dates                                  |
+| `apps/api/src/modules/export/representants-export.service.ts` | `:112` | Écriture en flux, pagination keyset par `id asc`                                                                          |
+| `apps/api/src/modules/phase2/programme-pdf.ts`                | `:360` | `RepProgrammeData`, `writeRepProgrammePdf`, A4, 25 lignes par page                                                        |
 
 Catalogue de purge :
 
-| Fichier:ligne | Verdict |
-| --- | --- |
-| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/admin/purge-plan.ts:10` | Étape `callTasks` : **SUPPRIMER** |
-| `.../purge-plan.ts:17` | Étape `repCallTasks` : **SUPPRIMER** |
-| `.../purge-plan.ts:108` | `steps: ['scheduledCallbacks', 'callTasks']` : **TRANSFORMER** |
-| `.../purge-plan.ts:125` | Bloc citant `repCallTasks` : **TRANSFORMER** |
-| `.../purge-steps.ts:52` à `:90` | Six étapes (`callTasks`, `callCampaignCommerciaux`, `callCampaigns`, `repCallTasks`, `repCallCampaignCommerciaux`, `repCallCampaigns`) : **SUPPRIMER les six**, **ajouter** `lotExportItems` et `lotsExport` |
+| Fichier:ligne                                                                                   | Verdict                                                                                                                                                                                                      |
+| ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/api/src/modules/admin/purge-plan.ts:10` | Étape `callTasks` : **SUPPRIMER**                                                                                                                                                                            |
+| `.../purge-plan.ts:17`                                                                          | Étape `repCallTasks` : **SUPPRIMER**                                                                                                                                                                         |
+| `.../purge-plan.ts:108`                                                                         | `steps: ['scheduledCallbacks', 'callTasks']` : **TRANSFORMER**                                                                                                                                               |
+| `.../purge-plan.ts:125`                                                                         | Bloc citant `repCallTasks` : **TRANSFORMER**                                                                                                                                                                 |
+| `.../purge-steps.ts:52` à `:90`                                                                 | Six étapes (`callTasks`, `callCampaignCommerciaux`, `callCampaigns`, `repCallTasks`, `repCallCampaignCommerciaux`, `repCallCampaigns`) : **SUPPRIMER les six**, **ajouter** `lotExportItems` et `lotsExport` |
 
 Espace de démonstration :
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/packages/database/src/demo-workspace-factory.ts:121`
@@ -1293,14 +1293,14 @@ Un lot ne porte aucun invariant métier.
 
 #### 4.1.9 Sort des lignes existantes
 
-| Table | Volume attendu | Que faire |
-| --- | --- | --- |
-| `call_tasks` | Une ligne par prospect distribué, jusqu'à ~120 000 par campagne (`schema.prisma:944`) | **Supprimer.** Une tâche n'est pas un fait métier, c'est une intention d'appel. Le fait est la tentative, conservée dans `call_attempts` |
-| `call_campaigns`, `call_campaign_commerciaux` | Quelques dizaines de lignes | **Supprimer** |
-| `rep_call_tasks`, `rep_call_campaigns`, `rep_call_campaign_commerciaux` | Idem | **Supprimer** |
-| `call_attempts.taskId` et `.campaignId` | Sur les tentatives issues d'une campagne | **Perdues volontairement** (D7). Le lien « quel appel appartient à quelle opération » est repris pour l'avenir par `lots_export` et la date ; pour le passé, il n'est pas reconstruit |
-| `rep_call_attempts.taskId` et `.campaignId` | Idem | Idem |
-| `scheduled_callbacks.taskId` et `.campaignId` | Renseignées quand le rappel venait d'une campagne | **Perdues.** `assignedToId` et `sourceAttemptId` suffisent à la file et à son idempotence |
+| Table                                                                   | Volume attendu                                                                        | Que faire                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `call_tasks`                                                            | Une ligne par prospect distribué, jusqu'à ~120 000 par campagne (`schema.prisma:944`) | **Supprimer.** Une tâche n'est pas un fait métier, c'est une intention d'appel. Le fait est la tentative, conservée dans `call_attempts`                                              |
+| `call_campaigns`, `call_campaign_commerciaux`                           | Quelques dizaines de lignes                                                           | **Supprimer**                                                                                                                                                                         |
+| `rep_call_tasks`, `rep_call_campaigns`, `rep_call_campaign_commerciaux` | Idem                                                                                  | **Supprimer**                                                                                                                                                                         |
+| `call_attempts.taskId` et `.campaignId`                                 | Sur les tentatives issues d'une campagne                                              | **Perdues volontairement** (D7). Le lien « quel appel appartient à quelle opération » est repris pour l'avenir par `lots_export` et la date ; pour le passé, il n'est pas reconstruit |
+| `rep_call_attempts.taskId` et `.campaignId`                             | Idem                                                                                  | Idem                                                                                                                                                                                  |
+| `scheduled_callbacks.taskId` et `.campaignId`                           | Renseignées quand le rappel venait d'une campagne                                     | **Perdues.** `assignedToId` et `sourceAttemptId` suffisent à la file et à son idempotence                                                                                             |
 
 **Aucune reprise de données pour les lots** : un lot décrit un téléchargement, et
 aucun téléchargement passé n'a été enregistré. La table démarre vide.
@@ -1321,76 +1321,76 @@ qualifier un représentant (`/chues/appels-representants`), ajouter un prospect
 Racine :
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web/src/app/(panel)/`
 
-| Fichier | Verdict | Détail |
-| --- | --- | --- |
-| `chues/page.tsx` | **TRANSFORMER** | Précharge quatre compteurs (`:41` à `:58`), dont deux décrivent une file |
-| `chues/layout.tsx` | GARDER | Monte le sélecteur des trois étapes (`:21`) |
-| `chues/appels-representants/page.tsx` | **TRANSFORMER** | Précharge `fetchRepScriptQueue` (`:8`, `:24` à `:26`), la liste confiée |
-| `chues/appels-representants/loading.tsx` | GARDER | |
-| `chues/appels-representants/page.test.tsx` | **TRANSFORMER** | Vérifie le préchargement de la file |
-| `chues/console/page.tsx` | **TRANSFORMER** | Précharge la file (`:23` à `:26`) ; le refus dit « La file d'appel des prospects » (`:19`) |
-| `chues/console/loading.tsx` | GARDER | |
-| `chues/rappels/page.tsx` | **TRANSFORMER** | Copie « La file des rappels » (`:14`) |
-| `chues/supervision/page.tsx` | GARDER | |
-| `chues/suggestions/page.tsx` | GARDER | Les numéros recommandés par les représentants ne sont pas une file assignée |
-| `chues/prospects/page.tsx` | **TRANSFORMER** | Ajouter un geste par ligne vers la consignation (B9) |
-| `chues/prospects/nouveau/page.tsx`, `chues/representants/page.tsx`, `chues/representants/[id]/page.tsx` | GARDER | |
-| `chues/statistiques/page.tsx` | GARDER | Déjà refondu par le chantier Chiffres (rend `ChiffresView`) |
-| `chues/tableau-de-bord/page.tsx` | GARDER | Redirection permanente vers `/chues/statistiques` |
-| `chues/campagnes/page.tsx` | **REMPLACER** | Devient la liste des lots. Garde ADMIN, SUPERVISEUR, DIRECTION (`:21`) |
-| `chues/campagnes/[id]/page.tsx` | **REMPLACER** | Devient le détail d'un lot |
-| `chues/campagnes/representants/page.tsx` et `[id]/page.tsx` | **SUPPRIMER** | Fusionnées dans la liste unique |
-| `chues/campagnes/access.test.tsx` | **TRANSFORMER** | Importe quatre pages (`:13` à `:17`), n'en garder que deux |
-| `chues/banque/**`, `chues/dossiers/**`, `chues/demandes-clients/**` | GARDER | Hors périmètre |
-| `grand-public/page.tsx`, `[id]/page.tsx`, `nouveau/page.tsx` | GARDER | |
-| `grand-public/console/page.tsx` | **TRANSFORMER** | Même refonte ; refus « La file d'appel Grand Public » (`:23`) |
-| `grand-public/rappels/page.tsx` | GARDER | Réexporte la page CHUES (`:1`) |
-| `grand-public/statistiques/page.tsx`, `tableau-de-bord/page.tsx` | GARDER | |
-| `grand-public/campagnes/page.tsx` | **REMPLACER** | Liste des lots Grand Public |
-| `grand-public/campagnes/[id]/page.tsx` | **REMPLACER** | Réexporte la page CHUES (`:3`) ; garder ce montage |
+| Fichier                                                                                                 | Verdict         | Détail                                                                                     |
+| ------------------------------------------------------------------------------------------------------- | --------------- | ------------------------------------------------------------------------------------------ |
+| `chues/page.tsx`                                                                                        | **TRANSFORMER** | Précharge quatre compteurs (`:41` à `:58`), dont deux décrivent une file                   |
+| `chues/layout.tsx`                                                                                      | GARDER          | Monte le sélecteur des trois étapes (`:21`)                                                |
+| `chues/appels-representants/page.tsx`                                                                   | **TRANSFORMER** | Précharge `fetchRepScriptQueue` (`:8`, `:24` à `:26`), la liste confiée                    |
+| `chues/appels-representants/loading.tsx`                                                                | GARDER          |                                                                                            |
+| `chues/appels-representants/page.test.tsx`                                                              | **TRANSFORMER** | Vérifie le préchargement de la file                                                        |
+| `chues/console/page.tsx`                                                                                | **TRANSFORMER** | Précharge la file (`:23` à `:26`) ; le refus dit « La file d'appel des prospects » (`:19`) |
+| `chues/console/loading.tsx`                                                                             | GARDER          |                                                                                            |
+| `chues/rappels/page.tsx`                                                                                | **TRANSFORMER** | Copie « La file des rappels » (`:14`)                                                      |
+| `chues/supervision/page.tsx`                                                                            | GARDER          |                                                                                            |
+| `chues/suggestions/page.tsx`                                                                            | GARDER          | Les numéros recommandés par les représentants ne sont pas une file assignée                |
+| `chues/prospects/page.tsx`                                                                              | **TRANSFORMER** | Ajouter un geste par ligne vers la consignation (B9)                                       |
+| `chues/prospects/nouveau/page.tsx`, `chues/representants/page.tsx`, `chues/representants/[id]/page.tsx` | GARDER          |                                                                                            |
+| `chues/statistiques/page.tsx`                                                                           | GARDER          | Déjà refondu par le chantier Chiffres (rend `ChiffresView`)                                |
+| `chues/tableau-de-bord/page.tsx`                                                                        | GARDER          | Redirection permanente vers `/chues/statistiques`                                          |
+| `chues/campagnes/page.tsx`                                                                              | **REMPLACER**   | Devient la liste des lots. Garde ADMIN, SUPERVISEUR, DIRECTION (`:21`)                     |
+| `chues/campagnes/[id]/page.tsx`                                                                         | **REMPLACER**   | Devient le détail d'un lot                                                                 |
+| `chues/campagnes/representants/page.tsx` et `[id]/page.tsx`                                             | **SUPPRIMER**   | Fusionnées dans la liste unique                                                            |
+| `chues/campagnes/access.test.tsx`                                                                       | **TRANSFORMER** | Importe quatre pages (`:13` à `:17`), n'en garder que deux                                 |
+| `chues/banque/**`, `chues/dossiers/**`, `chues/demandes-clients/**`                                     | GARDER          | Hors périmètre                                                                             |
+| `grand-public/page.tsx`, `[id]/page.tsx`, `nouveau/page.tsx`                                            | GARDER          |                                                                                            |
+| `grand-public/console/page.tsx`                                                                         | **TRANSFORMER** | Même refonte ; refus « La file d'appel Grand Public » (`:23`)                              |
+| `grand-public/rappels/page.tsx`                                                                         | GARDER          | Réexporte la page CHUES (`:1`)                                                             |
+| `grand-public/statistiques/page.tsx`, `tableau-de-bord/page.tsx`                                        | GARDER          |                                                                                            |
+| `grand-public/campagnes/page.tsx`                                                                       | **REMPLACER**   | Liste des lots Grand Public                                                                |
+| `grand-public/campagnes/[id]/page.tsx`                                                                  | **REMPLACER**   | Réexporte la page CHUES (`:3`) ; garder ce montage                                         |
 
 #### 4.2.2 Composants de campagne
 
 Racine :
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web/src/components/phase2/`
 
-| Fichier | Verdict | Ce qui le condamne, ce qu'on récupère |
-| --- | --- | --- |
-| `campaigns-view.tsx` | **REMPLACER** | « Distribuer les appels aux téléconseillers. Tirage définitif. » (`:56`), `CampaignProgressBar` (`:131`), compteur de téléconseillers (`:134`), date de clôture (`:140`). **Récupérer** la pagination (`:156` à `:188`) |
-| `campaign-detail-view.tsx` | **REMPLACER** | Clôture (`:84`, `:158`, `:298`), pause et reprise (`:101`, `:147`), « Répartition par téléconseiller » (`:212`), `CommercialCard` avec programme PDF (`:392` à `:489`), « Tâche d'un autre téléconseiller » (`:282`). **Récupérer** « Tentatives récentes » (`:231` à `:296`), `AttemptRenseignements` (`:358` à `:390`) et le bouton de téléchargement (`:403` à `:416`) |
-| `campaign-create-dialog.tsx` | **REMPLACER** | Sélection nominative de téléconseillers (`:209` à `:268`), aperçu du tourniquet (`:345` à `:464`), « Le tirage est définitif » (`:175`), « Lancer la campagne » (`:334`) |
-| `rep-campaign-create-dialog.tsx` | **REMPLACER** | Équipe (`:310` à `:364`), aperçu (`:486` à `:542`). **Récupérer** la cascade Région, Département, IEF (`:223` à `:269`), le choix de qualification (`:48` à `:64`, `:271` à `:276`) et l'interrupteur « seulement les représentants dormants » (`:281` à `:306`) : ce sont exactement les critères de cible d'un lot |
-| `rep-campaign-detail-view.tsx` | **SUPPRIMER** | Jumeau du détail campagne |
-| `campaign-target-field.tsx` | **REMPLACER** | À déplacer vers `components/lots/cible.tsx`. `RadioCardGroup` (`:17` à `:68`) et le champ (`:70` à `:105`) sont réutilisables ; la légende `:99` change, et chaque carte produit désormais `{ projet, segment }` ou `{ projet, type }` (§2.2) |
-| `campaign-progress-bar.tsx` | **SUPPRIMER** | Ne mesure que l'avancement de tâches |
-| `campaigns-tabs.tsx` | **SUPPRIMER** | Deux onglets prospects et représentants ; une seule liste les remplace |
-| `campaigns-filters-bar.tsx` | **REMPLACER** | Devient `lots-filters-bar.tsx`, sans le filtre de statut |
-| `rep-campaigns-filters-bar.tsx`, `rep-campaigns-view.tsx` | **SUPPRIMER** | |
-| `spread-days-field.tsx` | **SUPPRIMER** | L'étalement n'existe que pour distribuer des tâches |
-| `use-campaign-filters.ts` | **REMPLACER** | Devient `use-lot-filters.ts` |
-| `use-rep-campaign-filters.ts` | **SUPPRIMER** | |
-| `call-recording-player.tsx` et son test | **GARDER**, déplacer sous `components/lots/` | Seul lecteur des notes vocales enregistrées depuis le mobile, utile dans la liste des appels d'un lot |
+| Fichier                                                   | Verdict                                      | Ce qui le condamne, ce qu'on récupère                                                                                                                                                                                                                                                                                                                                     |
+| --------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `campaigns-view.tsx`                                      | **REMPLACER**                                | « Distribuer les appels aux téléconseillers. Tirage définitif. » (`:56`), `CampaignProgressBar` (`:131`), compteur de téléconseillers (`:134`), date de clôture (`:140`). **Récupérer** la pagination (`:156` à `:188`)                                                                                                                                                   |
+| `campaign-detail-view.tsx`                                | **REMPLACER**                                | Clôture (`:84`, `:158`, `:298`), pause et reprise (`:101`, `:147`), « Répartition par téléconseiller » (`:212`), `CommercialCard` avec programme PDF (`:392` à `:489`), « Tâche d'un autre téléconseiller » (`:282`). **Récupérer** « Tentatives récentes » (`:231` à `:296`), `AttemptRenseignements` (`:358` à `:390`) et le bouton de téléchargement (`:403` à `:416`) |
+| `campaign-create-dialog.tsx`                              | **REMPLACER**                                | Sélection nominative de téléconseillers (`:209` à `:268`), aperçu du tourniquet (`:345` à `:464`), « Le tirage est définitif » (`:175`), « Lancer la campagne » (`:334`)                                                                                                                                                                                                  |
+| `rep-campaign-create-dialog.tsx`                          | **REMPLACER**                                | Équipe (`:310` à `:364`), aperçu (`:486` à `:542`). **Récupérer** la cascade Région, Département, IEF (`:223` à `:269`), le choix de qualification (`:48` à `:64`, `:271` à `:276`) et l'interrupteur « seulement les représentants dormants » (`:281` à `:306`) : ce sont exactement les critères de cible d'un lot                                                      |
+| `rep-campaign-detail-view.tsx`                            | **SUPPRIMER**                                | Jumeau du détail campagne                                                                                                                                                                                                                                                                                                                                                 |
+| `campaign-target-field.tsx`                               | **REMPLACER**                                | À déplacer vers `components/lots/cible.tsx`. `RadioCardGroup` (`:17` à `:68`) et le champ (`:70` à `:105`) sont réutilisables ; la légende `:99` change, et chaque carte produit désormais `{ projet, segment }` ou `{ projet, type }` (§2.2)                                                                                                                             |
+| `campaign-progress-bar.tsx`                               | **SUPPRIMER**                                | Ne mesure que l'avancement de tâches                                                                                                                                                                                                                                                                                                                                      |
+| `campaigns-tabs.tsx`                                      | **SUPPRIMER**                                | Deux onglets prospects et représentants ; une seule liste les remplace                                                                                                                                                                                                                                                                                                    |
+| `campaigns-filters-bar.tsx`                               | **REMPLACER**                                | Devient `lots-filters-bar.tsx`, sans le filtre de statut                                                                                                                                                                                                                                                                                                                  |
+| `rep-campaigns-filters-bar.tsx`, `rep-campaigns-view.tsx` | **SUPPRIMER**                                |                                                                                                                                                                                                                                                                                                                                                                           |
+| `spread-days-field.tsx`                                   | **SUPPRIMER**                                | L'étalement n'existe que pour distribuer des tâches                                                                                                                                                                                                                                                                                                                       |
+| `use-campaign-filters.ts`                                 | **REMPLACER**                                | Devient `use-lot-filters.ts`                                                                                                                                                                                                                                                                                                                                              |
+| `use-rep-campaign-filters.ts`                             | **SUPPRIMER**                                |                                                                                                                                                                                                                                                                                                                                                                           |
+| `call-recording-player.tsx` et son test                   | **GARDER**, déplacer sous `components/lots/` | Seul lecteur des notes vocales enregistrées depuis le mobile, utile dans la liste des appels d'un lot                                                                                                                                                                                                                                                                     |
 
 #### 4.2.3 Console et script représentant
 
-| Emplacement | Verdict | Ce qui le condamne |
-| --- | --- | --- |
-| `apps/web/src/components/console/console-view.tsx:120` | SUPPRIMER | État `campaignId` |
-| `…:135`, `:169`, `:752` à `:762`, `:870` à `:933` | SUPPRIMER | `rawOrder` et `SortExplainer` : l'explication de l'ordre d'une file |
-| `…:140` à `:151` | TRANSFORMER | `fetchConsoleCampaigns` et `fetchConsoleQueue(campaignId, …)` |
-| `…:130` à `:133`, `:186` à `:219`, `:272` à `:293`, `:344` à `:348` | TRANSFORMER | `done`, `enchaine`, `nextAfter`, `move`, `skip` : l'enchaînement automatique |
-| `…:433` | TRANSFORMER | « La file d'appel n'a pas pu être chargée. » |
-| `…:441` à `:497` | TRANSFORMER | État vide « Aucun prospect à appeler … dans cette campagne » |
-| `…:729` à `:799` | SUPPRIMER | Tiroir « Suivants à appeler », son sélecteur de campagne (`:738`) et sa note (`:791`) |
-| `…:84` à `:102` | TRANSFORMER | Carte clavier : retirer « ↑ ↓ Parcourir la file » et « Espace Ouvrir la fiche sélectionnée » |
-| `…:822` à `:861` | SUPPRIMER | Palette `Ctrl/Cmd K` (D10) |
-| `…:504` à `:549`, `:559` à `:626`, `:561` à `:571`, `:628` à `:683`, `:551` à `:558` | GARDER | Fiche, dernier appel, issues au clavier, `ConversionFields`, choix d'échéance, garde de fiche close |
-| `apps/web/src/components/console/rep-script.tsx:100` à `:104` | SUPPRIMER | Requête `repScriptKeys.queue` / `fetchRepScriptQueue` |
-| `…/rep-script.tsx:113` à `:117` | TRANSFORMER | `file`, `liste`, `listeEstFile` : la liste confiée passe devant l'annuaire |
-| `…/rep-script.tsx:128` à `:140`, `:167` à `:171` | TRANSFORMER | Squelette, erreur et phrase de la file |
-| `…/rep-script.tsx:75` à `:81` | TRANSFORMER | `annuaireFilters` doit sortir de ce module `'use client'` pour que la page serveur précharge la même clé (§0.4) |
-| `…/rep-script.tsx:142` à `:155`, `:220` à `:247`, `:249` à `:682` | GARDER | Recherche, fiche, deux étapes de questions, échéance de rappel, envoi unique : c'est déjà l'état cible |
-| `apps/web/src/components/console/console-ui.tsx`, `use-shortcuts.ts`, `conversion-fields.tsx` | GARDER | |
+| Emplacement                                                                                   | Verdict     | Ce qui le condamne                                                                                              |
+| --------------------------------------------------------------------------------------------- | ----------- | --------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/console/console-view.tsx:120`                                        | SUPPRIMER   | État `campaignId`                                                                                               |
+| `…:135`, `:169`, `:752` à `:762`, `:870` à `:933`                                             | SUPPRIMER   | `rawOrder` et `SortExplainer` : l'explication de l'ordre d'une file                                             |
+| `…:140` à `:151`                                                                              | TRANSFORMER | `fetchConsoleCampaigns` et `fetchConsoleQueue(campaignId, …)`                                                   |
+| `…:130` à `:133`, `:186` à `:219`, `:272` à `:293`, `:344` à `:348`                           | TRANSFORMER | `done`, `enchaine`, `nextAfter`, `move`, `skip` : l'enchaînement automatique                                    |
+| `…:433`                                                                                       | TRANSFORMER | « La file d'appel n'a pas pu être chargée. »                                                                    |
+| `…:441` à `:497`                                                                              | TRANSFORMER | État vide « Aucun prospect à appeler … dans cette campagne »                                                    |
+| `…:729` à `:799`                                                                              | SUPPRIMER   | Tiroir « Suivants à appeler », son sélecteur de campagne (`:738`) et sa note (`:791`)                           |
+| `…:84` à `:102`                                                                               | TRANSFORMER | Carte clavier : retirer « ↑ ↓ Parcourir la file » et « Espace Ouvrir la fiche sélectionnée »                    |
+| `…:822` à `:861`                                                                              | SUPPRIMER   | Palette `Ctrl/Cmd K` (D10)                                                                                      |
+| `…:504` à `:549`, `:559` à `:626`, `:561` à `:571`, `:628` à `:683`, `:551` à `:558`          | GARDER      | Fiche, dernier appel, issues au clavier, `ConversionFields`, choix d'échéance, garde de fiche close             |
+| `apps/web/src/components/console/rep-script.tsx:100` à `:104`                                 | SUPPRIMER   | Requête `repScriptKeys.queue` / `fetchRepScriptQueue`                                                           |
+| `…/rep-script.tsx:113` à `:117`                                                               | TRANSFORMER | `file`, `liste`, `listeEstFile` : la liste confiée passe devant l'annuaire                                      |
+| `…/rep-script.tsx:128` à `:140`, `:167` à `:171`                                              | TRANSFORMER | Squelette, erreur et phrase de la file                                                                          |
+| `…/rep-script.tsx:75` à `:81`                                                                 | TRANSFORMER | `annuaireFilters` doit sortir de ce module `'use client'` pour que la page serveur précharge la même clé (§0.4) |
+| `…/rep-script.tsx:142` à `:155`, `:220` à `:247`, `:249` à `:682`                             | GARDER      | Recherche, fiche, deux étapes de questions, échéance de rappel, envoi unique : c'est déjà l'état cible          |
+| `apps/web/src/components/console/console-ui.tsx`, `use-shortcuts.ts`, `conversion-fields.tsx` | GARDER      |                                                                                                                 |
 
 **État cible de l'étape 1** (`/chues/appels-representants`) : l'écran ouvre sur
 le champ de recherche et l'annuaire, sans liste confiée. Sans saisie, les vingt
@@ -1426,29 +1426,29 @@ calqué sur l'étape 1 pour que les deux écrans s'expliquent avec les mêmes mo
 
 #### 4.2.4 Écran d'ouverture, lots, supervision, chiffres
 
-| Emplacement | Verdict | Détail |
-| --- | --- | --- |
-| `apps/web/src/components/chues/hub-filters.ts:7` à `:12` | TRANSFORMER | `A_APPELER` décrit une file. Le filtre reste valable (`relationStatus: 'INCONNU'`), le nom devient `NON_QUALIFIES` |
-| `…/hub-filters.ts:14` à `:20` | GARDER | `SANS_PROSPECT` est une observation sur la base |
-| `apps/web/src/components/chues/hub-view.tsx:48` à `:57` | SUPPRIMER | Calcul `prioritaire` |
-| `…/hub-view.tsx:82`, `:97`, `:103`, `:118`, `:124`, `:148`, `:162`, `:168`, `:177` à `:181`, `:229` à `:239` | SUPPRIMER | Propagation de `prioritaire`, pastille « À faire maintenant », variante de bouton |
-| `…/hub-view.tsx:90`, `:132` | TRANSFORMER | Deux légendes (§4.2.6) |
-| `…/hub-view.tsx:133` à `:141`, `:190` à `:219` | GARDER | Compte des rappels dus, et le squelette qui empêche d'afficher un zéro provisoire |
-| `apps/web/src/components/chues/etapes.tsx:14` à `:18` | GARDER | Les trois étapes ne bougent pas |
-| `apps/web/src/components/supervision/activity-view.tsx:68`, `:69`, `:385`, `:386`, `:415`, `:416`, `:309` à `:312` | SUPPRIMER | Colonnes « Tâches closes » et « Reste à faire », leurs cellules, la note qui les expliquait. Onze colonnes passent à neuf |
-| `apps/web/src/components/supervision/supervision-view.tsx` | GARDER | Présence et sessions |
-| `apps/web/src/lib/data/admin.ts:197`, `:207`, `:233`, `:243`, `:255`, `:265`, `:279`, `:299`, `:315`, `:328`, `:349`, `:457`, `:475`, `:489` | SUPPRIMER | `openTasks` et `tasksClosed` dans `ActivityLine`, `ActivityTotals`, les moyennes et l'export CSV |
-| `apps/web/src/components/chiffres/sources.ts:58` à `:64`, `:160`, `:189` | TRANSFORMER | Colonne « Reste à appeler » de la table `par-teleconseiller` |
-| `…/chiffres/sources.ts:140` à `:153` | SUPPRIMER | Carte `reste-a-appeler` (D3) |
-| `apps/web/src/components/stats/campaigns-panel.tsx` | SUPPRIMER | « Pilotage de campagne » (`:69`), tuile « Reste à faire » (`:136`), « Fiches clôturées par jour » (`:152`). Déjà orpheline depuis la refonte Chiffres |
-| Anciens panneaux banque et entonnoir | SUPPRIMÉ | Knip a confirmé qu'ils n'avaient plus aucun appelant après la refonte Chiffres |
-| `apps/web/src/lib/stat-explanations.ts:27` à `:33`, `:95` à `:106` | SUPPRIMER | Clés `campaignContactRate`, `campaignReachRate`, `campaignAttemptsPerMethod`, `campaignRemaining`, `campaignClosedPerDay`, `campaignClosedPerCommercial` |
-| `apps/web/src/lib/data/advanced-stats.ts:25` | SUPPRIMER | `fetchCampaignPilotage`, plus `closedPerDayTotals`, `closedPerCommercial`, `estimatedEndLabel` s'ils n'ont plus d'appelant |
+| Emplacement                                                                                                                                  | Verdict     | Détail                                                                                                                                                   |
+| -------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/components/chues/hub-filters.ts:7` à `:12`                                                                                     | TRANSFORMER | `A_APPELER` décrit une file. Le filtre reste valable (`relationStatus: 'INCONNU'`), le nom devient `NON_QUALIFIES`                                       |
+| `…/hub-filters.ts:14` à `:20`                                                                                                                | GARDER      | `SANS_PROSPECT` est une observation sur la base                                                                                                          |
+| `apps/web/src/components/chues/hub-view.tsx:48` à `:57`                                                                                      | SUPPRIMER   | Calcul `prioritaire`                                                                                                                                     |
+| `…/hub-view.tsx:82`, `:97`, `:103`, `:118`, `:124`, `:148`, `:162`, `:168`, `:177` à `:181`, `:229` à `:239`                                 | SUPPRIMER   | Propagation de `prioritaire`, pastille « À faire maintenant », variante de bouton                                                                        |
+| `…/hub-view.tsx:90`, `:132`                                                                                                                  | TRANSFORMER | Deux légendes (§4.2.6)                                                                                                                                   |
+| `…/hub-view.tsx:133` à `:141`, `:190` à `:219`                                                                                               | GARDER      | Compte des rappels dus, et le squelette qui empêche d'afficher un zéro provisoire                                                                        |
+| `apps/web/src/components/chues/etapes.tsx:14` à `:18`                                                                                        | GARDER      | Les trois étapes ne bougent pas                                                                                                                          |
+| `apps/web/src/components/supervision/activity-view.tsx:68`, `:69`, `:385`, `:386`, `:415`, `:416`, `:309` à `:312`                           | SUPPRIMER   | Colonnes « Tâches closes » et « Reste à faire », leurs cellules, la note qui les expliquait. Onze colonnes passent à neuf                                |
+| `apps/web/src/components/supervision/supervision-view.tsx`                                                                                   | GARDER      | Présence et sessions                                                                                                                                     |
+| `apps/web/src/lib/data/admin.ts:197`, `:207`, `:233`, `:243`, `:255`, `:265`, `:279`, `:299`, `:315`, `:328`, `:349`, `:457`, `:475`, `:489` | SUPPRIMER   | `openTasks` et `tasksClosed` dans `ActivityLine`, `ActivityTotals`, les moyennes et l'export CSV                                                         |
+| `apps/web/src/components/chiffres/sources.ts:58` à `:64`, `:160`, `:189`                                                                     | TRANSFORMER | Colonne « Reste à appeler » de la table `par-teleconseiller`                                                                                             |
+| `…/chiffres/sources.ts:140` à `:153`                                                                                                         | SUPPRIMER   | Carte `reste-a-appeler` (D3)                                                                                                                             |
+| `apps/web/src/components/stats/campaigns-panel.tsx`                                                                                          | SUPPRIMER   | « Pilotage de campagne » (`:69`), tuile « Reste à faire » (`:136`), « Fiches clôturées par jour » (`:152`). Déjà orpheline depuis la refonte Chiffres    |
+| Anciens panneaux banque et entonnoir                                                                                                         | SUPPRIMÉ    | Knip a confirmé qu'ils n'avaient plus aucun appelant après la refonte Chiffres                                                                           |
+| `apps/web/src/lib/stat-explanations.ts:27` à `:33`, `:95` à `:106`                                                                           | SUPPRIMER   | Clés `campaignContactRate`, `campaignReachRate`, `campaignAttemptsPerMethod`, `campaignRemaining`, `campaignClosedPerDay`, `campaignClosedPerCommercial` |
+| `apps/web/src/lib/data/advanced-stats.ts:25`                                                                                                 | SUPPRIMER   | `fetchCampaignPilotage`, plus `closedPerDayTotals`, `closedPerCommercial`, `estimatedEndLabel` s'ils n'ont plus d'appelant                               |
 
 **État cible de l'écran des lots**, `/chues/campagnes` et
 `/grand-public/campagnes` (D5 pour l'URL).
 
-*Liste* (ADMIN, SUPERVISEUR, DIRECTION) : une phrase en tête, un bouton
+_Liste_ (ADMIN, SUPERVISEUR, DIRECTION) : une phrase en tête, un bouton
 « Nouveau lot » pour qui peut créer, une barre de filtres (recherche par nom,
 cible, auteur, période), et une ligne par lot : nom en lien, cible en clair
 (« Représentants qualifiés, département de Thiès », « CHUES, segment BDD2 »),
@@ -1457,7 +1457,7 @@ nombre de fiches, date, auteur, et **appels passés sur ces fiches depuis**
 de téléconseillers, ni date de clôture. Pagination reprise de
 `campaigns-view.tsx:156`.
 
-*Création* (ADMIN seulement, comme aujourd'hui via `canManage`) : un dialogue en
+_Création_ (ADMIN seulement, comme aujourd'hui via `canManage`) : un dialogue en
 une seule étape, sans aperçu de tourniquet.
 
 1. « Que veut-on exporter ? » : `RadioCardGroup` repris de
@@ -1471,7 +1471,7 @@ une seule étape, sans aperçu de tourniquet.
    par `GET /api/v1/lots-export/apercu`, jamais estimé localement.
 5. « Créer le lot », puis le téléchargement du classeur dans la foulée.
 
-*Détail* : en-tête (nom, cible en clair, date, auteur, nombre de fiches) ; un
+_Détail_ : en-tête (nom, cible en clair, date, auteur, nombre de fiches) ; un
 bouton « Télécharger les fiches » qui réutilise
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web/src/components/exports/download-button.tsx`
 (`useFileDownload`), comme le font déjà `campaign-detail-view.tsx:403` et
@@ -1480,7 +1480,7 @@ une section « Appels passés sur ces fiches » reprise de
 `campaign-detail-view.tsx:231` à `:296`, avec `AttemptRenseignements` et
 `CallRecordingPlayer` ; aucun bouton de clôture, de pause ni de reprise.
 
-*Consigner depuis les listes* (B9). Sans cela, une fiche trouvée dans une liste
+_Consigner depuis les listes_ (B9). Sans cela, une fiche trouvée dans une liste
 ne mène à aucune consignation :
 
 - `/chues/prospects` : une colonne d'action avec un lien « Consigner un appel »
@@ -1491,7 +1491,7 @@ ne mène à aucune consignation :
   `/chues/appels-representants?rep=<id>`, et l'étape 1 lit ce paramètre pour
   ouvrir directement la fiche.
 
-*Rappels* (`/chues/rappels`, `/grand-public/rappels`) : écran conservé, trois
+_Rappels_ (`/chues/rappels`, `/grand-public/rappels`) : écran conservé, trois
 corrections. Le lien de chaque ligne pointe en dur sur `/chues/console`
 (`rappels-view.tsx:170`) alors que l'écran sert aussi le Grand Public : le
 dériver du `pathname`, comme le fait déjà `projet` (`:64`). La copie ne parle
@@ -1501,33 +1501,33 @@ rappel, pas à qui on l'a assigné.
 
 #### 4.2.5 Données, clés de cache, filtres
 
-| Emplacement | Verdict | Détail |
-| --- | --- | --- |
-| `apps/web/src/lib/data/phase2.ts:16` à `:54` | REMPLACER | `toCampaignQuery`, `fetchCampaigns` vers les équivalents « lots » |
-| `…/phase2.ts:79` à `:111` | SUPPRIMER | `createCampaign` (remplacé par `createLot`), `closeCampaign`, `pauseCampaign`, `resumeCampaign` |
-| `…/phase2.ts:113` à `:165`, `:198` à `:210` | SUPPRIMER | `CampaignPreview`, `spreadIntoDays`, `roundRobinSplit`, `buildCampaignPreview`, `fetchCampaignPreview` |
-| `…/phase2.ts:189` à `:196` | SUPPRIMER | `countOpenTasks` |
-| `…/phase2.ts:212` à `:234` | SUPPRIMER | `programmePdfUrl`, `programmePdfFileName` |
-| `…/phase2.ts:63` à `:77`, `:167` à `:187`, `:217` à `:225` | GARDER | `fetchCallRecording`, `countPendingProspects`, `slugForFileName` |
-| `apps/web/src/lib/data/rep-campaigns.ts` | SUPPRIMER le fichier | Sauf `RepQualification` (`:73`) et `REP_QUALIFICATION_STATUSES` (`:76` à `:81`), à déplacer dans `lib/data/lots.ts`. `buildRepAttempt` (`:761`) et `pushRepCallAttempt` (`:774`) vivent déjà dans `lib/data/console.ts` |
-| `apps/web/src/lib/data/console.ts:23` à `:27` | TRANSFORMER | `consoleKeys.queue(campaignId)` et `consoleKeys.campaigns` |
-| `…/console.ts:43` à `:67` | TRANSFORMER | `fetchConsoleQueue` (paramètre `campaignId`, tri figé, `pageSize: 200`) devient `fetchProspectsAChercher(search, projet)`, paginée |
-| `…/console.ts:69` à `:84` | SUPPRIMER | `fetchConsoleCampaigns` et son indice « X ouvertes » |
-| `…/console.ts:232` à `:342` | SUPPRIMER | `QueueBucket`, `QUEUE_BUCKET_LABELS`, `BUCKET_RANK`, `bucketOf`, `orderKey`, `sortQueue`, `buildQueue`, `undatedCallbacks` |
-| `…/console.ts:344` à `:348`, `:357` à `:382` | SUPPRIMER | `nextAfter`, `queueLabel` |
-| `…/console.ts:692` à `:712` | SUPPRIMER | `REP_QUEUE_SIZE`, `repScriptKeys.queue`, `RepScriptPage`, `fetchRepScriptQueue`. **Garder** `repScriptKeys.root`, utilisé pour l'invalidation (`rep-script.tsx:151`) |
-| `…/console.ts:29` à `:34`, `:86` à `:143`, `:145` à `:230`, `:384` à `:690`, `:714` à `:779` | GARDER | Rappels, créneaux, validation d'appel, conversion, envoi par `sync/push`, appel représentant |
-| `apps/web/src/lib/query-keys.ts:56` à `:88` | REMPLACER | Bloc « Phase 2 » vers `lotsRoot`, `lots(filters)`, `lot(id)`, `lotApercu(criteres)` |
-| `apps/web/src/lib/campaign-filters.ts` (93 lignes) | REMPLACER | Devient `lot-filters.ts` sans `status` (`:12`, `:18`, `:41`, `:58`, `:88`) |
-| `apps/web/src/lib/rep-campaign-filters.ts` et son test | SUPPRIMER | |
-| `apps/web/src/lib/filters.ts:41`, `:80`, `:110`, `:133`, `:189` | SUPPRIMER | `campaignId` disparaît du contrat (D4). **Écart tranché** : le plan web voulait le garder en le renommant « lot d'export » |
-| `apps/web/src/components/filters/filters-bar.tsx:287`, `:288` et `apps/web/src/components/filters/advanced-chips.ts:29` | SUPPRIMER | Le filtre et son chip disparaissent avec `campaignId` |
-| `apps/web/src/lib/types.ts:125` à `:133` | TRANSFORMER | `CampaignSummary`, `CampaignDetail`, `CampaignCommercial`, `CampaignProgress`, `CreateCampaignInput` suivent le contrat. `CampaignAttempt` (`:131`) survit sous le nom du lot |
-| `…/types.ts:126`, `:149` à `:159`, `:232` à `:237`, `:244` | SUPPRIMER | `CampaignStatus`, `CAMPAIGN_SCOPES`, `CAMPAIGN_STATUS_LABELS`, l'entrée correspondante de `FilterListCoverage` (§2.2) |
-| `…/types.ts:348` | SUPPRIMER | `ReferenceData.campagnes`, avec sa source `apps/web/src/lib/data/reference.ts:43` à `:49` et `:72` à `:76`, qui appelait `GET /api/v1/phase2/campaigns` |
-| `apps/web/src/app/moved-routes.ts:29`, `:30` | TRANSFORMER | `phase2` vers `/chues/campagnes` (garder) ; `rep-campaigns` vers `/chues/campagnes` (la sous-route disparaît) |
-| `apps/web/src/app/moved-routes.ts:40` à `:42` | GARDER | `/phase2/callbacks` vers `/chues/rappels` |
-| `apps/web/src/lib/data/inbox.ts:85` à `:124` | GARDER | La liste blanche doit continuer d'accepter `/campagnes`, `/chues/campagnes`, `/phase2` et `/rep-campaigns` : des notifications déjà en base portent ces adresses, et `moved-routes.ts` les rattrape |
+| Emplacement                                                                                                             | Verdict              | Détail                                                                                                                                                                                                                  |
+| ----------------------------------------------------------------------------------------------------------------------- | -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/web/src/lib/data/phase2.ts:16` à `:54`                                                                            | REMPLACER            | `toCampaignQuery`, `fetchCampaigns` vers les équivalents « lots »                                                                                                                                                       |
+| `…/phase2.ts:79` à `:111`                                                                                               | SUPPRIMER            | `createCampaign` (remplacé par `createLot`), `closeCampaign`, `pauseCampaign`, `resumeCampaign`                                                                                                                         |
+| `…/phase2.ts:113` à `:165`, `:198` à `:210`                                                                             | SUPPRIMER            | `CampaignPreview`, `spreadIntoDays`, `roundRobinSplit`, `buildCampaignPreview`, `fetchCampaignPreview`                                                                                                                  |
+| `…/phase2.ts:189` à `:196`                                                                                              | SUPPRIMER            | `countOpenTasks`                                                                                                                                                                                                        |
+| `…/phase2.ts:212` à `:234`                                                                                              | SUPPRIMER            | `programmePdfUrl`, `programmePdfFileName`                                                                                                                                                                               |
+| `…/phase2.ts:63` à `:77`, `:167` à `:187`, `:217` à `:225`                                                              | GARDER               | `fetchCallRecording`, `countPendingProspects`, `slugForFileName`                                                                                                                                                        |
+| `apps/web/src/lib/data/rep-campaigns.ts`                                                                                | SUPPRIMER le fichier | Sauf `RepQualification` (`:73`) et `REP_QUALIFICATION_STATUSES` (`:76` à `:81`), à déplacer dans `lib/data/lots.ts`. `buildRepAttempt` (`:761`) et `pushRepCallAttempt` (`:774`) vivent déjà dans `lib/data/console.ts` |
+| `apps/web/src/lib/data/console.ts:23` à `:27`                                                                           | TRANSFORMER          | `consoleKeys.queue(campaignId)` et `consoleKeys.campaigns`                                                                                                                                                              |
+| `…/console.ts:43` à `:67`                                                                                               | TRANSFORMER          | `fetchConsoleQueue` (paramètre `campaignId`, tri figé, `pageSize: 200`) devient `fetchProspectsAChercher(search, projet)`, paginée                                                                                      |
+| `…/console.ts:69` à `:84`                                                                                               | SUPPRIMER            | `fetchConsoleCampaigns` et son indice « X ouvertes »                                                                                                                                                                    |
+| `…/console.ts:232` à `:342`                                                                                             | SUPPRIMER            | `QueueBucket`, `QUEUE_BUCKET_LABELS`, `BUCKET_RANK`, `bucketOf`, `orderKey`, `sortQueue`, `buildQueue`, `undatedCallbacks`                                                                                              |
+| `…/console.ts:344` à `:348`, `:357` à `:382`                                                                            | SUPPRIMER            | `nextAfter`, `queueLabel`                                                                                                                                                                                               |
+| `…/console.ts:692` à `:712`                                                                                             | SUPPRIMER            | `REP_QUEUE_SIZE`, `repScriptKeys.queue`, `RepScriptPage`, `fetchRepScriptQueue`. **Garder** `repScriptKeys.root`, utilisé pour l'invalidation (`rep-script.tsx:151`)                                                    |
+| `…/console.ts:29` à `:34`, `:86` à `:143`, `:145` à `:230`, `:384` à `:690`, `:714` à `:779`                            | GARDER               | Rappels, créneaux, validation d'appel, conversion, envoi par `sync/push`, appel représentant                                                                                                                            |
+| `apps/web/src/lib/query-keys.ts:56` à `:88`                                                                             | REMPLACER            | Bloc « Phase 2 » vers `lotsRoot`, `lots(filters)`, `lot(id)`, `lotApercu(criteres)`                                                                                                                                     |
+| `apps/web/src/lib/campaign-filters.ts` (93 lignes)                                                                      | REMPLACER            | Devient `lot-filters.ts` sans `status` (`:12`, `:18`, `:41`, `:58`, `:88`)                                                                                                                                              |
+| `apps/web/src/lib/rep-campaign-filters.ts` et son test                                                                  | SUPPRIMER            |                                                                                                                                                                                                                         |
+| `apps/web/src/lib/filters.ts:41`, `:80`, `:110`, `:133`, `:189`                                                         | SUPPRIMER            | `campaignId` disparaît du contrat (D4). **Écart tranché** : le plan web voulait le garder en le renommant « lot d'export »                                                                                              |
+| `apps/web/src/components/filters/filters-bar.tsx:287`, `:288` et `apps/web/src/components/filters/advanced-chips.ts:29` | SUPPRIMER            | Le filtre et son chip disparaissent avec `campaignId`                                                                                                                                                                   |
+| `apps/web/src/lib/types.ts:125` à `:133`                                                                                | TRANSFORMER          | `CampaignSummary`, `CampaignDetail`, `CampaignCommercial`, `CampaignProgress`, `CreateCampaignInput` suivent le contrat. `CampaignAttempt` (`:131`) survit sous le nom du lot                                           |
+| `…/types.ts:126`, `:149` à `:159`, `:232` à `:237`, `:244`                                                              | SUPPRIMER            | `CampaignStatus`, `CAMPAIGN_SCOPES`, `CAMPAIGN_STATUS_LABELS`, l'entrée correspondante de `FilterListCoverage` (§2.2)                                                                                                   |
+| `…/types.ts:348`                                                                                                        | SUPPRIMER            | `ReferenceData.campagnes`, avec sa source `apps/web/src/lib/data/reference.ts:43` à `:49` et `:72` à `:76`, qui appelait `GET /api/v1/phase2/campaigns`                                                                 |
+| `apps/web/src/app/moved-routes.ts:29`, `:30`                                                                            | TRANSFORMER          | `phase2` vers `/chues/campagnes` (garder) ; `rep-campaigns` vers `/chues/campagnes` (la sous-route disparaît)                                                                                                           |
+| `apps/web/src/app/moved-routes.ts:40` à `:42`                                                                           | GARDER               | `/phase2/callbacks` vers `/chues/rappels`                                                                                                                                                                               |
+| `apps/web/src/lib/data/inbox.ts:85` à `:124`                                                                            | GARDER               | La liste blanche doit continuer d'accepter `/campagnes`, `/chues/campagnes`, `/phase2` et `/rep-campaigns` : des notifications déjà en base portent ces adresses, et `moved-routes.ts` les rattrape                     |
 
 Fichiers à créer sous
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/web/src/components/lots/` :
@@ -1546,13 +1546,13 @@ Fichier :
 (719 lignes à la rédaction, réécrit en parallèle par le chantier Chiffres :
 **relire les numéros avant d'éditer**).
 
-| Ligne | Contenu | Verdict |
-| --- | --- | --- |
-| `:274` à `:281` | « Campagnes », `/chues/campagnes`, rôles ENCADREMENT, repliée | Label « Lots d'export » |
-| `:313` à `:319` | Même entrée pour ADMIN, en pleine barre | Même libellé |
-| `:534` à `:540` | « Campagnes » `/grand-public/campagnes` | Même libellé |
-| `:490` à `:493`, `:557` à `:560` | `/grand-public/console`, « File d'appels et qualification » | Nouvelle description |
-| `:226` à `:231`, `:404` à `:411`, `:212` à `:217`, `:396` à `:403`, `:234` à `:238`, `:344` à `:349` | Console CHUES, appels représentants, rappels | GARDER |
+| Ligne                                                                                                | Contenu                                                       | Verdict                 |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | ----------------------- |
+| `:274` à `:281`                                                                                      | « Campagnes », `/chues/campagnes`, rôles ENCADREMENT, repliée | Label « Lots d'export » |
+| `:313` à `:319`                                                                                      | Même entrée pour ADMIN, en pleine barre                       | Même libellé            |
+| `:534` à `:540`                                                                                      | « Campagnes » `/grand-public/campagnes`                       | Même libellé            |
+| `:490` à `:493`, `:557` à `:560`                                                                     | `/grand-public/console`, « File d'appels et qualification »   | Nouvelle description    |
+| `:226` à `:231`, `:404` à `:411`, `:212` à `:217`, `:396` à `:403`, `:234` à `:238`, `:344` à `:349` | Console CHUES, appels représentants, rappels                  | GARDER                  |
 
 Aucune entrée `/chues/campagnes/representants` n'existe dans la barre : la route
 est atteinte par l'onglet, ce que déclarent `nav-items.test.ts:107`
@@ -1560,35 +1560,35 @@ est atteinte par l'onglet, ce que déclarent `nav-items.test.ts:107`
 
 Copie à remplacer :
 
-| Où | Aujourd'hui | Demain |
-| --- | --- | --- |
-| `nav-items.ts:278`, `:317`, `:538` | « Distribuer les appels aux téléconseillers » | « Fiches téléchargées et appels qui ont suivi » |
-| `nav-items.ts:493`, `:560` | « File d'appels et qualification » | « Chercher un prospect et consigner l'appel » |
-| `campaigns-view.tsx:56` | « Distribuer les appels aux téléconseillers. Tirage définitif. » | « Choisir une cible, télécharger les fiches, suivre les appels qui ont suivi. » |
-| `campaigns-view.tsx:40` | « Utilisez "Nouvelle campagne", en haut, pour répartir les prospects en attente. » | « Utilisez "Nouveau lot", en haut, pour choisir une cible et télécharger ses fiches. » |
-| `campaign-create-dialog.tsx:171`, `:175`, `:176` | « Nouvelle campagne d'appels » / « Le tirage est définitif. » / « Les prospects tirés sont retirés des campagnes suivantes. » | « Nouveau lot d'export » / « Choisissez qui vous exportez. » |
-| `campaign-create-dialog.tsx:334`, `:218` | « Lancer la campagne » / « L'ordre de sélection fixe l'ordre du tourniquet. » | « Créer le lot » / (supprimé) |
-| `campaign-target-field.tsx:99` | « Qui appelle-t-on ? » | « Que veut-on exporter ? » |
-| `campaign-detail-view.tsx:216` | « Répartition par téléconseiller » | (supprimé) |
-| `campaign-detail-view.tsx:234` | « Tentatives récentes » | « Appels passés sur ces fiches » |
-| `console-view.tsx:433` | « La file d'appel n'a pas pu être chargée. » | « Les prospects n'ont pas pu être lus. » |
-| `console-view.tsx:461`, `:462` | « Aucun prospect à appeler pour l'instant / dans cette campagne. » | « Cherchez le prospect que vous venez d'appeler. » |
-| `console-view.tsx:455`, `:456` | « Retirez le filtre de campagne, ou ouvrez-la depuis les prospects. » | « Ouvrez-la depuis la liste des prospects. » |
-| `console-view.tsx:734` | « Suivants à appeler » | (supprimé) |
-| `console-view.tsx:95`, `:96` | « Parcourir la file » / « Ouvrir la fiche sélectionnée » | (supprimés de la carte clavier) |
-| `rep-script.tsx:169` | « Votre liste d'appel. Choisissez qui vous venez d'appeler. » | « Choisissez qui vous venez d'appeler. » (variante déjà présente `:170`) |
-| `rep-script.tsx:135` | « La file des représentants n'a pas pu être chargée. » | « L'annuaire n'a pas pu être lu. » (déjà présent `:176`) |
-| `rappels-view.tsx:53` à `:58` | « Une échéance se promet depuis la console d'appel : touche 5, puis le chiffre de l'heure. » | « Une échéance se promet en consignant un appel. » |
-| `rappels-view.tsx:174` | « Ouvrir dans la console » | « Ouvrir la fiche » |
-| `chues/console/page.tsx:19` | « La file d'appel des prospects » | « La consignation des appels aux prospects » |
-| `grand-public/console/page.tsx:23` | « La file d'appel Grand Public » | « La consignation des appels Grand Public » |
-| `chues/rappels/page.tsx:14` | « La file des rappels » | « Les rappels promis » |
-| `activity-view.tsx:68`, `:69` | « Tâches closes » / « Reste à faire » | (colonnes supprimées) |
-| `chiffres/sources.ts:63`, `:141` | « Reste à appeler » | (carte et colonne supprimées) |
-| `hub-view.tsx:90` | « pas encore appelés » | « pas encore qualifiés » |
-| `hub-view.tsx:132` | « en attente d'appel » | « pas encore convertis » |
-| `hub-view.tsx:179` | « À faire maintenant » | (pastille supprimée) |
-| `representants/representant-detail-view.tsx:251` | « Le statut se pose depuis la console d'appel » | « Le statut se pose en consignant un appel » |
+| Où                                               | Aujourd'hui                                                                                                                   | Demain                                                                                 |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| `nav-items.ts:278`, `:317`, `:538`               | « Distribuer les appels aux téléconseillers »                                                                                 | « Fiches téléchargées et appels qui ont suivi »                                        |
+| `nav-items.ts:493`, `:560`                       | « File d'appels et qualification »                                                                                            | « Chercher un prospect et consigner l'appel »                                          |
+| `campaigns-view.tsx:56`                          | « Distribuer les appels aux téléconseillers. Tirage définitif. »                                                              | « Choisir une cible, télécharger les fiches, suivre les appels qui ont suivi. »        |
+| `campaigns-view.tsx:40`                          | « Utilisez "Nouvelle campagne", en haut, pour répartir les prospects en attente. »                                            | « Utilisez "Nouveau lot", en haut, pour choisir une cible et télécharger ses fiches. » |
+| `campaign-create-dialog.tsx:171`, `:175`, `:176` | « Nouvelle campagne d'appels » / « Le tirage est définitif. » / « Les prospects tirés sont retirés des campagnes suivantes. » | « Nouveau lot d'export » / « Choisissez qui vous exportez. »                           |
+| `campaign-create-dialog.tsx:334`, `:218`         | « Lancer la campagne » / « L'ordre de sélection fixe l'ordre du tourniquet. »                                                 | « Créer le lot » / (supprimé)                                                          |
+| `campaign-target-field.tsx:99`                   | « Qui appelle-t-on ? »                                                                                                        | « Que veut-on exporter ? »                                                             |
+| `campaign-detail-view.tsx:216`                   | « Répartition par téléconseiller »                                                                                            | (supprimé)                                                                             |
+| `campaign-detail-view.tsx:234`                   | « Tentatives récentes »                                                                                                       | « Appels passés sur ces fiches »                                                       |
+| `console-view.tsx:433`                           | « La file d'appel n'a pas pu être chargée. »                                                                                  | « Les prospects n'ont pas pu être lus. »                                               |
+| `console-view.tsx:461`, `:462`                   | « Aucun prospect à appeler pour l'instant / dans cette campagne. »                                                            | « Cherchez le prospect que vous venez d'appeler. »                                     |
+| `console-view.tsx:455`, `:456`                   | « Retirez le filtre de campagne, ou ouvrez-la depuis les prospects. »                                                         | « Ouvrez-la depuis la liste des prospects. »                                           |
+| `console-view.tsx:734`                           | « Suivants à appeler »                                                                                                        | (supprimé)                                                                             |
+| `console-view.tsx:95`, `:96`                     | « Parcourir la file » / « Ouvrir la fiche sélectionnée »                                                                      | (supprimés de la carte clavier)                                                        |
+| `rep-script.tsx:169`                             | « Votre liste d'appel. Choisissez qui vous venez d'appeler. »                                                                 | « Choisissez qui vous venez d'appeler. » (variante déjà présente `:170`)               |
+| `rep-script.tsx:135`                             | « La file des représentants n'a pas pu être chargée. »                                                                        | « L'annuaire n'a pas pu être lu. » (déjà présent `:176`)                               |
+| `rappels-view.tsx:53` à `:58`                    | « Une échéance se promet depuis la console d'appel : touche 5, puis le chiffre de l'heure. »                                  | « Une échéance se promet en consignant un appel. »                                     |
+| `rappels-view.tsx:174`                           | « Ouvrir dans la console »                                                                                                    | « Ouvrir la fiche »                                                                    |
+| `chues/console/page.tsx:19`                      | « La file d'appel des prospects »                                                                                             | « La consignation des appels aux prospects »                                           |
+| `grand-public/console/page.tsx:23`               | « La file d'appel Grand Public »                                                                                              | « La consignation des appels Grand Public »                                            |
+| `chues/rappels/page.tsx:14`                      | « La file des rappels »                                                                                                       | « Les rappels promis »                                                                 |
+| `activity-view.tsx:68`, `:69`                    | « Tâches closes » / « Reste à faire »                                                                                         | (colonnes supprimées)                                                                  |
+| `chiffres/sources.ts:63`, `:141`                 | « Reste à appeler »                                                                                                           | (carte et colonne supprimées)                                                          |
+| `hub-view.tsx:90`                                | « pas encore appelés »                                                                                                        | « pas encore qualifiés »                                                               |
+| `hub-view.tsx:132`                               | « en attente d'appel »                                                                                                        | « pas encore convertis »                                                               |
+| `hub-view.tsx:179`                               | « À faire maintenant »                                                                                                        | (pastille supprimée)                                                                   |
+| `representants/representant-detail-view.tsx:251` | « Le statut se pose depuis la console d'appel »                                                                               | « Le statut se pose en consignant un appel »                                           |
 
 ### 4.3 Mobile
 
@@ -1616,25 +1616,25 @@ refusés. Rien d'autre.
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/data/local/schema.drift`
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 803-808 | Bandeau « Campagnes d'appels » | SUPPRIMER |
-| 810-818 | `CREATE TABLE call_campaigns` | SUPPRIMER |
-| 820-834 | `CREATE TABLE call_tasks` | SUPPRIMER |
-| 836-841 | `call_tasks_campaign_idx`, `call_tasks_prospect_idx` et son commentaire | SUPPRIMER |
-| 843-851 | Requête nommée `campaignQueue` | SUPPRIMER |
-| 853-860 | Requête nommée `campaignsWithOpenWork` | SUPPRIMER |
-| 862-869 | `CREATE TABLE rep_call_campaigns` | SUPPRIMER |
-| 871-879 | `CREATE TABLE rep_call_tasks` | SUPPRIMER |
-| 881-882 | Les deux index de `rep_call_tasks` | SUPPRIMER |
-| 884-891 | Requête nommée `repCampaignQueue` | SUPPRIMER |
-| 893-899 | Requête nommée `repCampaignsWithOpenWork` | SUPPRIMER |
-| 901-917 | `rep_callback_reminders` et son index | **GARDER** : les rappels restent |
-| 919-922 | `pendingRepCallbackReminders` | **GARDER** |
-| 924-926 | Commentaire des visites qui cite `call_campaigns/call_tasks` | **RÉÉCRIRE** (§4.3.6) |
-| 492-547 | `CREATE TABLE call_attempts` | **GARDER intégralement** |
-| 437-470 | `CREATE TABLE phase2_directory` | **GARDER** |
-| 774-795 | `countMyAttempts`, `countMyMethods`, `attemptsForProspect` | **GARDER** |
+| Ligne(s) | Objet                                                                   | Verdict                          |
+| -------- | ----------------------------------------------------------------------- | -------------------------------- |
+| 803-808  | Bandeau « Campagnes d'appels »                                          | SUPPRIMER                        |
+| 810-818  | `CREATE TABLE call_campaigns`                                           | SUPPRIMER                        |
+| 820-834  | `CREATE TABLE call_tasks`                                               | SUPPRIMER                        |
+| 836-841  | `call_tasks_campaign_idx`, `call_tasks_prospect_idx` et son commentaire | SUPPRIMER                        |
+| 843-851  | Requête nommée `campaignQueue`                                          | SUPPRIMER                        |
+| 853-860  | Requête nommée `campaignsWithOpenWork`                                  | SUPPRIMER                        |
+| 862-869  | `CREATE TABLE rep_call_campaigns`                                       | SUPPRIMER                        |
+| 871-879  | `CREATE TABLE rep_call_tasks`                                           | SUPPRIMER                        |
+| 881-882  | Les deux index de `rep_call_tasks`                                      | SUPPRIMER                        |
+| 884-891  | Requête nommée `repCampaignQueue`                                       | SUPPRIMER                        |
+| 893-899  | Requête nommée `repCampaignsWithOpenWork`                               | SUPPRIMER                        |
+| 901-917  | `rep_callback_reminders` et son index                                   | **GARDER** : les rappels restent |
+| 919-922  | `pendingRepCallbackReminders`                                           | **GARDER**                       |
+| 924-926  | Commentaire des visites qui cite `call_campaigns/call_tasks`            | **RÉÉCRIRE** (§4.3.6)            |
+| 492-547  | `CREATE TABLE call_attempts`                                            | **GARDER intégralement**         |
+| 437-470  | `CREATE TABLE phase2_directory`                                         | **GARDER**                       |
+| 774-795  | `countMyAttempts`, `countMyMethods`, `attemptsForProspect`              | **GARDER**                       |
 
 En pratique, l'étape C4 supprime les lignes **803 à 899 incluses**. La ligne
 suivante conservée doit être le commentaire de `rep_callback_reminders`
@@ -1647,14 +1647,14 @@ le contrat de poussée est inchangé.
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/data/local/database.dart`
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 17 | `int get schemaVersion => 19;` | **20** |
-| 170-177 | Palier v12 : `createTable(callCampaigns)`, `createTable(callTasks)`, deux `createIndex` | SUPPRIMER |
-| 215-220 | Palier v17 : `createTable(repCallCampaigns)`, `createTable(repCallTasks)`, deux `createIndex` | SUPPRIMER |
-| 221-224 | Palier v18 (`rep_callback_reminders`) | **GARDER** |
-| 225-237 | Palier v19 (colonnes de renseignements sur `call_attempts`) | **GARDER** |
-| après 237 | Palier v20 | **AJOUTER** |
+| Ligne(s)  | Objet                                                                                         | Verdict     |
+| --------- | --------------------------------------------------------------------------------------------- | ----------- |
+| 17        | `int get schemaVersion => 19;`                                                                | **20**      |
+| 170-177   | Palier v12 : `createTable(callCampaigns)`, `createTable(callTasks)`, deux `createIndex`       | SUPPRIMER   |
+| 215-220   | Palier v17 : `createTable(repCallCampaigns)`, `createTable(repCallTasks)`, deux `createIndex` | SUPPRIMER   |
+| 221-224   | Palier v18 (`rep_callback_reminders`)                                                         | **GARDER**  |
+| 225-237   | Palier v19 (colonnes de renseignements sur `call_attempts`)                                   | **GARDER**  |
+| après 237 | Palier v20                                                                                    | **AJOUTER** |
 
 ```dart
       if (from < 20 && to >= 20) {
@@ -1693,11 +1693,11 @@ régénérer `schema.dart` (ses lignes 7 à 24 gagnent
 
 Migration des installations existantes :
 
-| Version installée | Chemin | Résultat |
-| --- | --- | --- |
-| v11 ou moins | Les paliers 12 et 17 n'existent plus, le palier 20 fait `DROP TABLE IF EXISTS` sur des tables absentes | base à jour, saisies intactes |
-| v12 à v16 | `call_campaigns` et `call_tasks` existent, le palier 20 les supprime | base à jour, saisies intactes |
-| v17 à v19 | Les quatre tables existent, le palier 20 les supprime | base à jour, saisies intactes |
+| Version installée | Chemin                                                                                                 | Résultat                      |
+| ----------------- | ------------------------------------------------------------------------------------------------------ | ----------------------------- |
+| v11 ou moins      | Les paliers 12 et 17 n'existent plus, le palier 20 fait `DROP TABLE IF EXISTS` sur des tables absentes | base à jour, saisies intactes |
+| v12 à v16         | `call_campaigns` et `call_tasks` existent, le palier 20 les supprime                                   | base à jour, saisies intactes |
+| v17 à v19         | Les quatre tables existent, le palier 20 les supprime                                                  | base à jour, saisies intactes |
 
 Survivent dans tous les cas : `outbox` (les envois en attente), `call_attempts`,
 `rep_callback_reminders` (donc les alarmes déjà armées), `representants`,
@@ -1720,17 +1720,17 @@ survit.
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/core/sync/sync_engine.dart`
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 59 | `static const int payloadVersion = 4;` | **5** (§2.4) |
-| 1975-1992 | Boucle `callCampaigns` (et sa doc `:1975` à `:1977`) | SUPPRIMER |
-| 1993-2019 | Boucle `callTasks`, avec la suppression sur `!t.isActive` | SUPPRIMER |
-| 2020-2034 | Boucle `repCallCampaigns` | SUPPRIMER |
-| 2035-2057 | Boucle `repCallTasks` | SUPPRIMER |
-| 2059-2088 | Boucle `visites` | **GARDER** |
-| 2090-2107 | Boucle `page.deletions` | **GARDER** |
-| 24 | `const String repCallAttemptEntity = 'rep_call_attempt';` | **GARDER** |
-| 150-155 | Aiguillage de `drain()` vers `_sendRepCallAttempts` | **GARDER** |
+| Ligne(s)  | Objet                                                     | Verdict      |
+| --------- | --------------------------------------------------------- | ------------ |
+| 59        | `static const int payloadVersion = 4;`                    | **5** (§2.4) |
+| 1975-1992 | Boucle `callCampaigns` (et sa doc `:1975` à `:1977`)      | SUPPRIMER    |
+| 1993-2019 | Boucle `callTasks`, avec la suppression sur `!t.isActive` | SUPPRIMER    |
+| 2020-2034 | Boucle `repCallCampaigns`                                 | SUPPRIMER    |
+| 2035-2057 | Boucle `repCallTasks`                                     | SUPPRIMER    |
+| 2059-2088 | Boucle `visites`                                          | **GARDER**   |
+| 2090-2107 | Boucle `page.deletions`                                   | **GARDER**   |
+| 24        | `const String repCallAttemptEntity = 'rep_call_attempt';` | **GARDER**   |
+| 150-155   | Aiguillage de `drain()` vers `_sendRepCallAttempts`       | **GARDER**   |
 
 C4 supprime les lignes **1975 à 2057 incluses**. La ligne suivante conservée est
 le commentaire « Le registre : aucune revision… ».
@@ -1741,12 +1741,12 @@ le commentaire « Le registre : aucune revision… ».
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/core/sync/dio_api.dart`
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 58 | `RepCampaignsApi get _repCampaigns => _client.getRepCampaignsApi();` | **GARDER** |
-| 171-183 | `recordRepCallAttempt`, poste une qualification représentant | **GARDER** |
-| 203-226 | `GET /v1/phase2/directory` | **GARDER** |
-| 239-251, 257-283 | Motifs d'issue et référentiels | **GARDER** |
+| Ligne(s)         | Objet                                                                | Verdict    |
+| ---------------- | -------------------------------------------------------------------- | ---------- |
+| 58               | `RepCampaignsApi get _repCampaigns => _client.getRepCampaignsApi();` | **GARDER** |
+| 171-183          | `recordRepCallAttempt`, poste une qualification représentant         | **GARDER** |
+| 203-226          | `GET /v1/phase2/directory`                                           | **GARDER** |
+| 239-251, 257-283 | Motifs d'issue et référentiels                                       | **GARDER** |
 
 `RepCampaignsApi` est le nom d'une étiquette OpenAPI, pas une campagne au sens
 mobile : c'est par là que part la qualification d'un représentant, geste n° 1.
@@ -1755,14 +1755,14 @@ la régénération.
 
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/data/repositories/write_repository.dart`
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 891-896 | `const Set<String> terminal = {'REACHED', 'PROSPECTS_PROMISED', 'REFUSED', 'WRONG_NUMBER'};` | SUPPRIMER (devient inutilisé) |
-| 919-931 | `if (terminal.contains(outcome)) { update repCallTasks … status DONE }` | SUPPRIMER |
-| 932-945 | Insertion dans `rep_callback_reminders` | **GARDER** |
-| 946-966 | `_enqueue` de la qualification | **GARDER** |
-| 741-858 | `recordCallAttempt` (conversion) | **GARDER**, aucune référence à une tâche |
-| 977-996, 1004-1019 | `honourRepCallbacks`, `snoozeRepCallback` | **GARDER** |
+| Ligne(s)           | Objet                                                                                        | Verdict                                  |
+| ------------------ | -------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| 891-896            | `const Set<String> terminal = {'REACHED', 'PROSPECTS_PROMISED', 'REFUSED', 'WRONG_NUMBER'};` | SUPPRIMER (devient inutilisé)            |
+| 919-931            | `if (terminal.contains(outcome)) { update repCallTasks … status DONE }`                      | SUPPRIMER                                |
+| 932-945            | Insertion dans `rep_callback_reminders`                                                      | **GARDER**                               |
+| 946-966            | `_enqueue` de la qualification                                                               | **GARDER**                               |
+| 741-858            | `recordCallAttempt` (conversion)                                                             | **GARDER**, aucune référence à une tâche |
+| 977-996, 1004-1019 | `honourRepCallbacks`, `snoozeRepCallback`                                                    | **GARDER**                               |
 
 Retirer le bloc `:919` à `:931` **avant** la déclaration `:891` à `:896`, puis
 vérifier par `grep -n "terminal" lib/data/repositories/write_repository.dart`
@@ -1770,45 +1770,45 @@ qu'aucune référence ne subsiste.
 
 #### 4.3.3 Écrans et routes
 
-| Fichier | Verdict | Remplacement |
-| --- | --- | --- |
-| `lib/features/campagnes/campagnes.dart` (175 l.) | **SUPPRIMER le fichier** | Les constantes encore utiles (`grandPublicConsole` l. 12-14, `appelPour` et `appelGrandPublicPour` l. 33-42) migrent dans `route_paths.dart` |
-| `lib/features/campagnes/presentation/campagnes_screen.dart` (369 l.) | **SUPPRIMER** | Aucun |
-| `lib/features/campagnes/presentation/campagne_file_screen.dart` (432 l.) | **SUPPRIMER** | Aucun |
-| `lib/features/campagnes/` | **SUPPRIMER le dossier** | |
-| `lib/features/phase2/presentation/phase2_screen.dart` (2073 l.) | **GARDER**, une retouche de commentaire (l. 37-39) | |
-| `lib/features/phase2/phase2_controller.dart`, `presentation/callback_picker.dart`, `presentation/call_audio_recorder.dart` | **GARDER** | |
-| `lib/features/representant/presentation/representant_picker_screen.dart` (216 l.) | **GARDER tel quel** | C'est déjà l'annuaire cherchable, avec le mode `pourQualifier` (l. 24-26, 185-189) |
-| `lib/features/representant/presentation/representant_qualification_screen.dart` (631 l.) | **GARDER**, ne pas toucher (autre chantier) | |
-| `lib/features/representant/presentation/representant_detail_screen.dart`, `representant_form_screen.dart` | **GARDER** | |
-| `lib/features/prospect/presentation/prospect_entry_screen.dart` (964 l.) | **GARDER** | Geste n° 2 |
-| `lib/features/prospect/presentation/prospect_detail_screen.dart` | **RÉÉCRIRE** l. 26 (import) et l. 130 | `Routes.grandPublicConsole` |
-| `lib/features/prospect/presentation/prospect_picker_screen.dart` | **CRÉER** | Geste n° 3, §4.3.4 |
-| `lib/features/home/presentation/home_screen.dart` (423 l.) | **RÉÉCRIRE** l. 12, 56-105, 107-157 | Trois cartes de gestes, sans compteur de file |
-| `lib/features/shell/grand_public_screen.dart` (276 l.) | **RÉÉCRIRE** l. 12, 28-60, 90-97 ; supprimer `_GrandeCarte` l. 134-208 | Trois cartes `_Carte` |
-| `lib/features/shell/hub_screen.dart` (275 l.) | **GARDER**, sauf le libellé l. 159 | Ne connaît pas les campagnes |
-| `lib/features/shell/app_shell.dart` (289 l.) | **GARDER** | Le badge « À corriger » (l. 106-113) lit `needsAttentionCountProvider`, jamais une tâche |
-| `lib/features/shell/grand_public_fiches_screen.dart` (203 l.) | **RÉÉCRIRE** l. 200-201 (copie périmée) ; **réutiliser** `ProspectTile` (l. 113-185) | |
-| `lib/features/shell/projects.dart` | **RÉÉCRIRE** le commentaire l. 89 | |
-| `lib/features/historique/presentation/historique_screen.dart` (258 l.) | **GARDER** | Voir §6 |
-| `lib/features/corrections/presentation/corrections_screen.dart` (545 l.) | **GARDER** | Aucune référence à une campagne |
-| `lib/features/rappels/**`, `lib/features/notifications/**`, `lib/core/notifications/**` | **GARDER**, ne pas toucher | Autre chantier ; §4.3.5 |
-| `lib/features/accueil/**` | **GARDER** | Le projet Accueil ignore les campagnes |
+| Fichier                                                                                                                    | Verdict                                                                              | Remplacement                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/features/campagnes/campagnes.dart` (175 l.)                                                                           | **SUPPRIMER le fichier**                                                             | Les constantes encore utiles (`grandPublicConsole` l. 12-14, `appelPour` et `appelGrandPublicPour` l. 33-42) migrent dans `route_paths.dart` |
+| `lib/features/campagnes/presentation/campagnes_screen.dart` (369 l.)                                                       | **SUPPRIMER**                                                                        | Aucun                                                                                                                                        |
+| `lib/features/campagnes/presentation/campagne_file_screen.dart` (432 l.)                                                   | **SUPPRIMER**                                                                        | Aucun                                                                                                                                        |
+| `lib/features/campagnes/`                                                                                                  | **SUPPRIMER le dossier**                                                             |                                                                                                                                              |
+| `lib/features/phase2/presentation/phase2_screen.dart` (2073 l.)                                                            | **GARDER**, une retouche de commentaire (l. 37-39)                                   |                                                                                                                                              |
+| `lib/features/phase2/phase2_controller.dart`, `presentation/callback_picker.dart`, `presentation/call_audio_recorder.dart` | **GARDER**                                                                           |                                                                                                                                              |
+| `lib/features/representant/presentation/representant_picker_screen.dart` (216 l.)                                          | **GARDER tel quel**                                                                  | C'est déjà l'annuaire cherchable, avec le mode `pourQualifier` (l. 24-26, 185-189)                                                           |
+| `lib/features/representant/presentation/representant_qualification_screen.dart` (631 l.)                                   | **GARDER**, ne pas toucher (autre chantier)                                          |                                                                                                                                              |
+| `lib/features/representant/presentation/representant_detail_screen.dart`, `representant_form_screen.dart`                  | **GARDER**                                                                           |                                                                                                                                              |
+| `lib/features/prospect/presentation/prospect_entry_screen.dart` (964 l.)                                                   | **GARDER**                                                                           | Geste n° 2                                                                                                                                   |
+| `lib/features/prospect/presentation/prospect_detail_screen.dart`                                                           | **RÉÉCRIRE** l. 26 (import) et l. 130                                                | `Routes.grandPublicConsole`                                                                                                                  |
+| `lib/features/prospect/presentation/prospect_picker_screen.dart`                                                           | **CRÉER**                                                                            | Geste n° 3, §4.3.4                                                                                                                           |
+| `lib/features/home/presentation/home_screen.dart` (423 l.)                                                                 | **RÉÉCRIRE** l. 12, 56-105, 107-157                                                  | Trois cartes de gestes, sans compteur de file                                                                                                |
+| `lib/features/shell/grand_public_screen.dart` (276 l.)                                                                     | **RÉÉCRIRE** l. 12, 28-60, 90-97 ; supprimer `_GrandeCarte` l. 134-208               | Trois cartes `_Carte`                                                                                                                        |
+| `lib/features/shell/hub_screen.dart` (275 l.)                                                                              | **GARDER**, sauf le libellé l. 159                                                   | Ne connaît pas les campagnes                                                                                                                 |
+| `lib/features/shell/app_shell.dart` (289 l.)                                                                               | **GARDER**                                                                           | Le badge « À corriger » (l. 106-113) lit `needsAttentionCountProvider`, jamais une tâche                                                     |
+| `lib/features/shell/grand_public_fiches_screen.dart` (203 l.)                                                              | **RÉÉCRIRE** l. 200-201 (copie périmée) ; **réutiliser** `ProspectTile` (l. 113-185) |                                                                                                                                              |
+| `lib/features/shell/projects.dart`                                                                                         | **RÉÉCRIRE** le commentaire l. 89                                                    |                                                                                                                                              |
+| `lib/features/historique/presentation/historique_screen.dart` (258 l.)                                                     | **GARDER**                                                                           | Voir §6                                                                                                                                      |
+| `lib/features/corrections/presentation/corrections_screen.dart` (545 l.)                                                   | **GARDER**                                                                           | Aucune référence à une campagne                                                                                                              |
+| `lib/features/rappels/**`, `lib/features/notifications/**`, `lib/core/notifications/**`                                    | **GARDER**, ne pas toucher                                                           | Autre chantier ; §4.3.5                                                                                                                      |
+| `lib/features/accueil/**`                                                                                                  | **GARDER**                                                                           | Le projet Accueil ignore les campagnes                                                                                                       |
 
 Routeur,
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/core/router/app_router.dart` :
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 19-21 | Trois `import` de `features/campagnes/` | SUPPRIMER |
-| 226-235 | `GoRoute` `/grand-public/campagnes` | SUPPRIMER |
-| 236-247 | `GoRoute` `/grand-public/campagnes/:id` | SUPPRIMER |
-| 264-274 | `GoRoute` `/grand-public/console` | **GARDER**, `CampagnesRoutes.grandPublicConsole` (l. 265) devient `Routes.grandPublicConsole` |
-| 406-417 | `GoRoute` `/campagnes` | SUPPRIMER |
-| 418-428 | `GoRoute` `/campagnes/representants/:id` | SUPPRIMER |
-| 429-438 | `GoRoute` `/campagnes/:id` | SUPPRIMER |
-| autour de 375 | Nouvelle `GoRoute` `/prospects` | **AJOUTER**, enveloppée dans `_chues(...)` comme ses voisines |
-| 329-340, 376-386, 389-395 | `/representants` avec `?but=qualifier`, `/prospects/nouveau`, `/prospects/:id` | **GARDER** |
+| Ligne(s)                  | Objet                                                                          | Verdict                                                                                       |
+| ------------------------- | ------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| 19-21                     | Trois `import` de `features/campagnes/`                                        | SUPPRIMER                                                                                     |
+| 226-235                   | `GoRoute` `/grand-public/campagnes`                                            | SUPPRIMER                                                                                     |
+| 236-247                   | `GoRoute` `/grand-public/campagnes/:id`                                        | SUPPRIMER                                                                                     |
+| 264-274                   | `GoRoute` `/grand-public/console`                                              | **GARDER**, `CampagnesRoutes.grandPublicConsole` (l. 265) devient `Routes.grandPublicConsole` |
+| 406-417                   | `GoRoute` `/campagnes`                                                         | SUPPRIMER                                                                                     |
+| 418-428                   | `GoRoute` `/campagnes/representants/:id`                                       | SUPPRIMER                                                                                     |
+| 429-438                   | `GoRoute` `/campagnes/:id`                                                     | SUPPRIMER                                                                                     |
+| autour de 375             | Nouvelle `GoRoute` `/prospects`                                                | **AJOUTER**, enveloppée dans `_chues(...)` comme ses voisines                                 |
+| 329-340, 376-386, 389-395 | `/representants` avec `?but=qualifier`, `/prospects/nouveau`, `/prospects/:id` | **GARDER**                                                                                    |
 
 `go_router` essaie les routes dans l'ordre de déclaration. `/prospects` (exact)
 ne peut pas être avalé par `/prospects/:id`, mais l'ordre du fichier veut que
@@ -1818,12 +1818,12 @@ et `:387`) : poser la nouvelle route **avant** `Routes.newProspect`.
 Chemins,
 `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo/apps/mobile/lib/core/router/route_paths.dart` :
 
-| Ligne(s) | Objet | Verdict |
-| --- | --- | --- |
-| 40 | `static const String prospects = '/prospects';` | **GARDER** : la constante existe mais aucune `GoRoute` ne la sert aujourd'hui ; elle n'est citée que par `route_memory.dart:28` |
-| 46 | `phase2 = '/phase2'` | **GARDER** |
-| 63-72 | `butParam`, `butQualifier`, `representantsPourQualifier()` | **GARDER** |
-| après 32 | `grandPublicConsole = '/grand-public/console'` | **AJOUTER**, valeur reprise de `campagnes.dart:14` |
+| Ligne(s)  | Objet                                                                     | Verdict                                                                                                                                                                 |
+| --------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 40        | `static const String prospects = '/prospects';`                           | **GARDER** : la constante existe mais aucune `GoRoute` ne la sert aujourd'hui ; elle n'est citée que par `route_memory.dart:28`                                         |
+| 46        | `phase2 = '/phase2'`                                                      | **GARDER**                                                                                                                                                              |
+| 63-72     | `butParam`, `butQualifier`, `representantsPourQualifier()`                | **GARDER**                                                                                                                                                              |
+| après 32  | `grandPublicConsole = '/grand-public/console'`                            | **AJOUTER**, valeur reprise de `campagnes.dart:14`                                                                                                                      |
 | après 111 | `appelPour(String phoneE164)` et `appelGrandPublicPour(String phoneE164)` | **AJOUTER**, repris de `campagnes.dart:33-42` : `Uri(path: phase2, queryParameters: {prefillPhoneParam: phoneE164}).toString()` et son pendant sur `grandPublicConsole` |
 
 Mémoire de route, `lib/core/router/route_memory.dart` : supprimer l'import l. 6
@@ -1840,29 +1840,29 @@ sont conservées.
 
 #### 4.3.4 Providers et écrans cibles
 
-| Emplacement | Objet | Verdict |
-| --- | --- | --- |
-| `campagnes.dart:45-53`, `:57-58` | `repCampagnesProvider`, `grandPublicCampagnesProvider`, `chuesCampagnesProvider` | SUPPRIMER avec le fichier |
-| `campagnes.dart:63-94` | `_campagnesDuProjet` (SQL `call_campaigns` JOIN `call_tasks`) | SUPPRIMER |
-| `campagnes.dart:98-174` | `campagneProvider`, `repCampagneProvider`, `fileDeCampagneProvider`, `repFileDeCampagneProvider`, `grandPublicFileDeCampagneProvider` | SUPPRIMER |
-| `app_providers.dart` (615 l.) | **aucun** provider de campagne ou de tâche | **GARDER intégralement** |
-| `app_providers.dart:132-136`, `:138-142`, `:144-149` | `representantCountProvider`, `prospectCountProvider`, `grandPublicProspectCountProvider` | **GARDER**, réemployés ci-dessous |
-| `app_providers.dart:223-235` | `needsAttentionCountProvider`, `needsAttentionProvider` | **GARDER** |
-| `app_providers.dart:275-283`, `:292-302` | `historiqueSearchProvider`, `grandPublicProspectListProvider` | **GARDER** |
-| `app_providers.dart:304-326` | `representantPickerSearchProvider`, `representantPickerListProvider` | **GARDER** : la brique du geste n° 1, et le patron du geste n° 3 |
-| `app_providers.dart:408-453`, `:459-485` | `grandPublicRappelsProvider`, `representantRappelsProvider` | **GARDER** |
-| `app_providers.dart:516-544` | `phase2DirectoryCountProvider`, `phase2ProgressProvider`, `phase2PendingCountProvider` | **GARDER** : progression **personnelle**, jamais une campagne |
-| `home_screen.dart:29-45` | `representantsSansProspectProvider` | **GARDER** : compte les représentants AMBASSADEUR sans prospect, ne dépend d'aucune tâche |
-| `lib/core/providers/sync_coordinator.dart` | | **GARDER** |
+| Emplacement                                          | Objet                                                                                                                                 | Verdict                                                                                   |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| `campagnes.dart:45-53`, `:57-58`                     | `repCampagnesProvider`, `grandPublicCampagnesProvider`, `chuesCampagnesProvider`                                                      | SUPPRIMER avec le fichier                                                                 |
+| `campagnes.dart:63-94`                               | `_campagnesDuProjet` (SQL `call_campaigns` JOIN `call_tasks`)                                                                         | SUPPRIMER                                                                                 |
+| `campagnes.dart:98-174`                              | `campagneProvider`, `repCampagneProvider`, `fileDeCampagneProvider`, `repFileDeCampagneProvider`, `grandPublicFileDeCampagneProvider` | SUPPRIMER                                                                                 |
+| `app_providers.dart` (615 l.)                        | **aucun** provider de campagne ou de tâche                                                                                            | **GARDER intégralement**                                                                  |
+| `app_providers.dart:132-136`, `:138-142`, `:144-149` | `representantCountProvider`, `prospectCountProvider`, `grandPublicProspectCountProvider`                                              | **GARDER**, réemployés ci-dessous                                                         |
+| `app_providers.dart:223-235`                         | `needsAttentionCountProvider`, `needsAttentionProvider`                                                                               | **GARDER**                                                                                |
+| `app_providers.dart:275-283`, `:292-302`             | `historiqueSearchProvider`, `grandPublicProspectListProvider`                                                                         | **GARDER**                                                                                |
+| `app_providers.dart:304-326`                         | `representantPickerSearchProvider`, `representantPickerListProvider`                                                                  | **GARDER** : la brique du geste n° 1, et le patron du geste n° 3                          |
+| `app_providers.dart:408-453`, `:459-485`             | `grandPublicRappelsProvider`, `representantRappelsProvider`                                                                           | **GARDER**                                                                                |
+| `app_providers.dart:516-544`                         | `phase2DirectoryCountProvider`, `phase2ProgressProvider`, `phase2PendingCountProvider`                                                | **GARDER** : progression **personnelle**, jamais une campagne                             |
+| `home_screen.dart:29-45`                             | `representantsSansProspectProvider`                                                                                                   | **GARDER** : compte les représentants AMBASSADEUR sans prospect, ne dépend d'aucune tâche |
+| `lib/core/providers/sync_coordinator.dart`           |                                                                                                                                       | **GARDER**                                                                                |
 
 **Accueil CHUES** (`HomeScreen`, `/chues`) : trois cartes de gestes, plus les
 raccourcis et le graphique d'activité. Aucun compteur de file.
 
-| Rang | Titre | Phrase | Chiffre | Destination |
-| --- | --- | --- | --- | --- |
-| 1 | `Consigner un appel représentant` | `Cherchez la personne, appelez, notez sa réponse.` | `representantCountProvider`, libellé `dans l'annuaire` | `Routes.representantsPourQualifier()` |
-| 2 | `Ajouter un prospect` | `Notez les collègues que vos représentants vous donnent.` | `representantsSansProspectProvider`, libellé `représentant(s) sans prospect` | `Routes.representants` |
-| 3 | `Consigner un appel de conversion` | `Cherchez le prospect, appelez, notez ce qu'il a dit.` | `prospectCountProvider`, libellé `fiche(s)` | `Routes.prospects` |
+| Rang | Titre                              | Phrase                                                    | Chiffre                                                                      | Destination                           |
+| ---- | ---------------------------------- | --------------------------------------------------------- | ---------------------------------------------------------------------------- | ------------------------------------- |
+| 1    | `Consigner un appel représentant`  | `Cherchez la personne, appelez, notez sa réponse.`        | `representantCountProvider`, libellé `dans l'annuaire`                       | `Routes.representantsPourQualifier()` |
+| 2    | `Ajouter un prospect`              | `Notez les collègues que vos représentants vous donnent.` | `representantsSansProspectProvider`, libellé `représentant(s) sans prospect` | `Routes.representants`                |
+| 3    | `Consigner un appel de conversion` | `Cherchez le prospect, appelez, notez ce qu'il a dit.`    | `prospectCountProvider`, libellé `fiche(s)`                                  | `Routes.prospects`                    |
 
 `_EtapeCard` (`home_screen.dart:204-300`) se réemploie **tel quel** : il prend
 déjà un `AsyncValue<int>` et affiche `…`, `–` ou le nombre. Le paramètre `rang`
@@ -1877,11 +1877,11 @@ et « Annonces ». Le calcul `chiffresIllisibles` (l. 67-68) se réduit à
 forme (l. 211-276, réemployée). Supprimer la fonction `appeler` (l. 45-60) et la
 classe `_GrandeCarte` (l. 134-208), devenue inutilisée.
 
-| Titre | Détail | Chiffre | Destination |
-| --- | --- | --- | --- |
-| `Consigner un appel` | `Après l'appel, notez ce qui a été dit.` | aucun (`nombre: null`) | `Routes.grandPublicConsole` |
-| `Prospects` | `Retrouver une fiche` | `grandPublicProspectCountProvider` | `Routes.grandPublicFiches` |
-| `Rappels` | `Aucun rappel prévu` ou `Prochain <date> à <heure>` | `grandPublicRappelsProvider.length` | `Routes.grandPublicRappels` |
+| Titre                | Détail                                              | Chiffre                             | Destination                 |
+| -------------------- | --------------------------------------------------- | ----------------------------------- | --------------------------- |
+| `Consigner un appel` | `Après l'appel, notez ce qui a été dit.`            | aucun (`nombre: null`)              | `Routes.grandPublicConsole` |
+| `Prospects`          | `Retrouver une fiche`                               | `grandPublicProspectCountProvider`  | `Routes.grandPublicFiches`  |
+| `Rappels`            | `Aucun rappel prévu` ou `Prochain <date> à <heure>` | `grandPublicRappelsProvider.length` | `Routes.grandPublicRappels` |
 
 **Hub** (`hub_screen.dart`) : strictement identique, trois tuiles de projet
 filtrées par rôle, un en-tête de marque, un bouton de déconnexion, aucun
@@ -1968,28 +1968,28 @@ Ce que le mobile importe et qui doit rester : `CreateRepCallAttemptDto`
 
 Copie affichée :
 
-| Emplacement | Texte actuel | Remplacement |
-| --- | --- | --- |
-| `home_screen.dart:124` | Titre `Qualifier les représentants` | `Consigner un appel représentant` |
-| `home_screen.dart:126` | `Appelez chaque représentant et notez sa réponse.` | `Cherchez la personne, appelez, notez sa réponse.` |
-| `home_screen.dart:128-129` | `représentant(s) à appeler` | Retirer le compteur ; sous-titre `N dans l'annuaire` |
-| `home_screen.dart:135`, `:137-139` | `Notez les collègues…`, `représentant(s) sans prospect` | Inchangés |
-| `home_screen.dart:144` | Titre `Convertir les prospects` | `Consigner un appel de conversion` |
-| `home_screen.dart:145` | `Appelez les prospects pour obtenir leur adhésion.` | `Cherchez le prospect, appelez, notez ce qu'il a dit.` |
-| `home_screen.dart:147-148` | `prospect(s) à appeler` | Retirer le compteur ; sous-titre `N fiches` |
-| `home_screen.dart:113` | `Les chiffres n'ont pas pu être lus.` | Inchangé |
-| `home_screen.dart:315` | `Après l'appel, notez ce qui a été dit.` (ligne de `_Raccourcis`) | Retirer la ligne, doublon de la carte 3 |
-| `home_screen.dart:394` | `Que voulez-vous faire ?` | Inchangé, mais la feuille reçoit une troisième entrée |
-| `grand_public_screen.dart:21-22` (doc) | `appeler la file du jour, tenir les rappels promis` | `consigner les appels, tenir les rappels promis` |
-| `grand_public_screen.dart:93` | `Appels du jour` | `Consigner un appel` |
-| `grand_public_screen.dart:95`, `:197` | `Rien à appeler aujourd'hui.`, `À appeler` | Supprimés avec `_GrandeCarte` |
-| `grand_public_screen.dart:111`, `:112` | `Aucun rappel prévu`, `Prochain …` | **Garder** : « prochain rappel » vise une promesse tenue, pas une file assignée |
-| `grand_public_fiches_screen.dart:200-201` | `… Touchez « Recevoir les listes » dans Réglages.` | `… Touchez « Envoyer maintenant » dans Réglages.` : le contrôle réel s'appelle ainsi (`reglages_screen.dart:170`) |
-| `hub_screen.dart:159` | `Prospects et appels du jour` | `Prospects et appels` |
-| `phase2_screen.dart:37-39` (doc) | `quand on vient d'une file de campagne` | `quand on arrive depuis une fiche déjà ouverte` |
-| `projects.dart:89` (doc) | `(représentants, prospects, campagnes, phase 2)` | `(représentants, prospects, appels)` |
-| `schema.drift:924-926` (doc) | `Le tirage descend le registre comme call_campaigns/call_tasks` | `Le serveur est seul à écrire cette table : un pull rejoué recopie la même ligne, updated_at seul arbitre.` |
-| `sync_engine.dart:1975-1977` (doc), `schema.drift:803-808` (doc), `campagne_file_screen.dart:24-26`, `:107`, `:156`, `campagnes_screen.dart:84`, `:88`, `:188` | Textes de file et de campagne | Supprimés avec leur code |
+| Emplacement                                                                                                                                                    | Texte actuel                                                      | Remplacement                                                                                                      |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `home_screen.dart:124`                                                                                                                                         | Titre `Qualifier les représentants`                               | `Consigner un appel représentant`                                                                                 |
+| `home_screen.dart:126`                                                                                                                                         | `Appelez chaque représentant et notez sa réponse.`                | `Cherchez la personne, appelez, notez sa réponse.`                                                                |
+| `home_screen.dart:128-129`                                                                                                                                     | `représentant(s) à appeler`                                       | Retirer le compteur ; sous-titre `N dans l'annuaire`                                                              |
+| `home_screen.dart:135`, `:137-139`                                                                                                                             | `Notez les collègues…`, `représentant(s) sans prospect`           | Inchangés                                                                                                         |
+| `home_screen.dart:144`                                                                                                                                         | Titre `Convertir les prospects`                                   | `Consigner un appel de conversion`                                                                                |
+| `home_screen.dart:145`                                                                                                                                         | `Appelez les prospects pour obtenir leur adhésion.`               | `Cherchez le prospect, appelez, notez ce qu'il a dit.`                                                            |
+| `home_screen.dart:147-148`                                                                                                                                     | `prospect(s) à appeler`                                           | Retirer le compteur ; sous-titre `N fiches`                                                                       |
+| `home_screen.dart:113`                                                                                                                                         | `Les chiffres n'ont pas pu être lus.`                             | Inchangé                                                                                                          |
+| `home_screen.dart:315`                                                                                                                                         | `Après l'appel, notez ce qui a été dit.` (ligne de `_Raccourcis`) | Retirer la ligne, doublon de la carte 3                                                                           |
+| `home_screen.dart:394`                                                                                                                                         | `Que voulez-vous faire ?`                                         | Inchangé, mais la feuille reçoit une troisième entrée                                                             |
+| `grand_public_screen.dart:21-22` (doc)                                                                                                                         | `appeler la file du jour, tenir les rappels promis`               | `consigner les appels, tenir les rappels promis`                                                                  |
+| `grand_public_screen.dart:93`                                                                                                                                  | `Appels du jour`                                                  | `Consigner un appel`                                                                                              |
+| `grand_public_screen.dart:95`, `:197`                                                                                                                          | `Rien à appeler aujourd'hui.`, `À appeler`                        | Supprimés avec `_GrandeCarte`                                                                                     |
+| `grand_public_screen.dart:111`, `:112`                                                                                                                         | `Aucun rappel prévu`, `Prochain …`                                | **Garder** : « prochain rappel » vise une promesse tenue, pas une file assignée                                   |
+| `grand_public_fiches_screen.dart:200-201`                                                                                                                      | `… Touchez « Recevoir les listes » dans Réglages.`                | `… Touchez « Envoyer maintenant » dans Réglages.` : le contrôle réel s'appelle ainsi (`reglages_screen.dart:170`) |
+| `hub_screen.dart:159`                                                                                                                                          | `Prospects et appels du jour`                                     | `Prospects et appels`                                                                                             |
+| `phase2_screen.dart:37-39` (doc)                                                                                                                               | `quand on vient d'une file de campagne`                           | `quand on arrive depuis une fiche déjà ouverte`                                                                   |
+| `projects.dart:89` (doc)                                                                                                                                       | `(représentants, prospects, campagnes, phase 2)`                  | `(représentants, prospects, appels)`                                                                              |
+| `schema.drift:924-926` (doc)                                                                                                                                   | `Le tirage descend le registre comme call_campaigns/call_tasks`   | `Le serveur est seul à écrire cette table : un pull rejoué recopie la même ligne, updated_at seul arbitre.`       |
+| `sync_engine.dart:1975-1977` (doc), `schema.drift:803-808` (doc), `campagne_file_screen.dart:24-26`, `:107`, `:156`, `campagnes_screen.dart:84`, `:88`, `:188` | Textes de file et de campagne                                     | Supprimés avec leur code                                                                                          |
 
 Mots à **ne plus jamais** écrire dans une chaîne affichée par le mobile :
 « campagne », « file », « tâche », « à appeler », « programme », « tirage ».
@@ -2005,36 +2005,36 @@ Mots à **ne plus jamais** écrire dans une chaîne affichée par le mobile :
 (ce dernier seulement si l'option PDF du lot n'est pas retenue). Ils disparaissent
 avec leur code.
 
-| Fichier | Verdict |
-| --- | --- |
-| `apps/api/src/modules/analytics/authorization.sweep.test.ts` | **RETOURNER, jamais supprimer.** Il exige aujourd'hui (`:114`, assertion `:122` à `:127`) que **chaque** trace SQL d'une route d'analytics contienne l'identifiant du téléconseiller appelant. Avec la nouvelle portée, l'assertion s'inverse exactement : **plus aucune route ne doit borner sur l'appelant**. Le cas `:142` (« un SUPERVISEUR n'est borné sur personne ») devient la règle générale. Un balayage qui ne vérifie plus rien est pire que pas de balayage |
-| `apps/api/src/modules/phase2/phase2-sync.service.test.ts` | ADAPTER : retirer les cas de clôture de tâche ; garder idempotence, conflit `PHASE2_ALREADY_COMPLETED`, rappel promis, correction de fiche |
-| `apps/api/src/modules/phase2/directory-cursor.test.ts` | GARDER |
-| `apps/api/src/modules/rep-campaigns/rep-campaigns.service.test.ts` (45,9 Ko) et `rep-campaigns.integration.test.ts` | ADAPTER : ne garder que `recordAttempt` (idempotence, commentaire obligatoire, `callbackAt`, suggestion de numéro, bascule de relation, WhatsApp) |
-| `apps/api/src/modules/sync/sync.service.test.ts`, `sync.integration.test.ts`, `fake-prisma.ts`, `cursor.test.ts`, `dto.test.ts` | ADAPTER : retirer les quatre flux, les délégués `callTask`, `callCampaign`, `repCallTask`, `repCallCampaign` du faux Prisma (`fake-prisma.ts:43`, `:44`) et les positions de curseur |
-| `apps/api/src/modules/prospects/portee-lecture.integration.test.ts` | **RÉÉCRIRE** : il prouve aujourd'hui qu'une fiche confiée par tâche est lisible (`:80` à `:94`, `:132`). Il doit prouver la nouvelle règle |
-| `apps/api/src/modules/prospects/phase2-surface.integration.test.ts` | ADAPTER : retirer les quatre blocs de campagne (`:134`, `:171`, `:367`, `:392`, `:415`) |
-| `apps/api/src/modules/prospects/filter-consistency.test.ts` et `apps/api/src/common/prospect-where.test.ts` | ADAPTER : retirer `campaignId` (`:47`), `assignedToId` (`:48`) et les attentes SQL `:105`, `:113` |
-| `apps/api/src/modules/analytics/pilotage.service.test.ts` | ADAPTER : ne garder que `delays` |
-| `apps/api/src/modules/analytics/supervision.service.test.ts` | ADAPTER : retirer `tasksClosed`, `openTasks`, `campaignId` |
-| `apps/api/src/modules/analytics/lot-j.integration.test.ts:35` et `lot-j-chiffres.integration.test.ts` | ADAPTER : retirer les assertions sur `campaignPilotage` |
-| `apps/api/src/modules/notifications/reminders.service.test.ts` (31,4 Ko) et `fake-prisma.ts` | ADAPTER : retirer les cas de rappel de tâches ouvertes et les délégués correspondants ; garder rappels dus et dossiers bancaires |
-| `apps/api/src/modules/users/users.service.test.ts` | ADAPTER : la reprise de portefeuille ne réassigne plus de tâche |
-| `apps/api/src/modules/admin/purge-plan.test.ts`, `purge.service.test.ts`, `purge.integration.test.ts` | ADAPTER : nouveau catalogue d'étapes |
-| `apps/api/src/common/guards/role-routes.test.ts` | ADAPTER : retirer `Phase2Controller.getCampaign` (`:161`), `.listCampaigns` (`:162`), `.downloadProgramme` (`:163`), `RepCampaignsController.get` (`:182`), `.list` (`:183`), `.downloadProgramme` (`:184`), `.downloadProgrammes` (`:185`), `AnalyticsController.campaignPilotage` (`:131`) ; ajouter les routes de lot. **Inventaire exhaustif : il rougit tant qu'il n'est pas exact** |
-| `apps/api/src/modules/export/openapi-contract.test.ts:60` | ADAPTER : ajouter les trois filtres de relation et les routes de lot |
-| `packages/database/src/segment.test.ts` | ADAPTER : retirer les cas de `scopeWhere` et `eligibleForCampaignWhere` |
+| Fichier                                                                                                                         | Verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `apps/api/src/modules/analytics/authorization.sweep.test.ts`                                                                    | **RETOURNER, jamais supprimer.** Il exige aujourd'hui (`:114`, assertion `:122` à `:127`) que **chaque** trace SQL d'une route d'analytics contienne l'identifiant du téléconseiller appelant. Avec la nouvelle portée, l'assertion s'inverse exactement : **plus aucune route ne doit borner sur l'appelant**. Le cas `:142` (« un SUPERVISEUR n'est borné sur personne ») devient la règle générale. Un balayage qui ne vérifie plus rien est pire que pas de balayage |
+| `apps/api/src/modules/phase2/phase2-sync.service.test.ts`                                                                       | ADAPTER : retirer les cas de clôture de tâche ; garder idempotence, conflit `PHASE2_ALREADY_COMPLETED`, rappel promis, correction de fiche                                                                                                                                                                                                                                                                                                                               |
+| `apps/api/src/modules/phase2/directory-cursor.test.ts`                                                                          | GARDER                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| `apps/api/src/modules/rep-campaigns/rep-campaigns.service.test.ts` (45,9 Ko) et `rep-campaigns.integration.test.ts`             | ADAPTER : ne garder que `recordAttempt` (idempotence, commentaire obligatoire, `callbackAt`, suggestion de numéro, bascule de relation, WhatsApp)                                                                                                                                                                                                                                                                                                                        |
+| `apps/api/src/modules/sync/sync.service.test.ts`, `sync.integration.test.ts`, `fake-prisma.ts`, `cursor.test.ts`, `dto.test.ts` | ADAPTER : retirer les quatre flux, les délégués `callTask`, `callCampaign`, `repCallTask`, `repCallCampaign` du faux Prisma (`fake-prisma.ts:43`, `:44`) et les positions de curseur                                                                                                                                                                                                                                                                                     |
+| `apps/api/src/modules/prospects/portee-lecture.integration.test.ts`                                                             | **RÉÉCRIRE** : il prouve aujourd'hui qu'une fiche confiée par tâche est lisible (`:80` à `:94`, `:132`). Il doit prouver la nouvelle règle                                                                                                                                                                                                                                                                                                                               |
+| `apps/api/src/modules/prospects/phase2-surface.integration.test.ts`                                                             | ADAPTER : retirer les quatre blocs de campagne (`:134`, `:171`, `:367`, `:392`, `:415`)                                                                                                                                                                                                                                                                                                                                                                                  |
+| `apps/api/src/modules/prospects/filter-consistency.test.ts` et `apps/api/src/common/prospect-where.test.ts`                     | ADAPTER : retirer `campaignId` (`:47`), `assignedToId` (`:48`) et les attentes SQL `:105`, `:113`                                                                                                                                                                                                                                                                                                                                                                        |
+| `apps/api/src/modules/analytics/pilotage.service.test.ts`                                                                       | ADAPTER : ne garder que `delays`                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| `apps/api/src/modules/analytics/supervision.service.test.ts`                                                                    | ADAPTER : retirer `tasksClosed`, `openTasks`, `campaignId`                                                                                                                                                                                                                                                                                                                                                                                                               |
+| `apps/api/src/modules/analytics/lot-j.integration.test.ts:35` et `lot-j-chiffres.integration.test.ts`                           | ADAPTER : retirer les assertions sur `campaignPilotage`                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| `apps/api/src/modules/notifications/reminders.service.test.ts` (31,4 Ko) et `fake-prisma.ts`                                    | ADAPTER : retirer les cas de rappel de tâches ouvertes et les délégués correspondants ; garder rappels dus et dossiers bancaires                                                                                                                                                                                                                                                                                                                                         |
+| `apps/api/src/modules/users/users.service.test.ts`                                                                              | ADAPTER : la reprise de portefeuille ne réassigne plus de tâche                                                                                                                                                                                                                                                                                                                                                                                                          |
+| `apps/api/src/modules/admin/purge-plan.test.ts`, `purge.service.test.ts`, `purge.integration.test.ts`                           | ADAPTER : nouveau catalogue d'étapes                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `apps/api/src/common/guards/role-routes.test.ts`                                                                                | ADAPTER : retirer `Phase2Controller.getCampaign` (`:161`), `.listCampaigns` (`:162`), `.downloadProgramme` (`:163`), `RepCampaignsController.get` (`:182`), `.list` (`:183`), `.downloadProgramme` (`:184`), `.downloadProgrammes` (`:185`), `AnalyticsController.campaignPilotage` (`:131`) ; ajouter les routes de lot. **Inventaire exhaustif : il rougit tant qu'il n'est pas exact**                                                                                |
+| `apps/api/src/modules/export/openapi-contract.test.ts:60`                                                                       | ADAPTER : ajouter les trois filtres de relation et les routes de lot                                                                                                                                                                                                                                                                                                                                                                                                     |
+| `packages/database/src/segment.test.ts`                                                                                         | ADAPTER : retirer les cas de `scopeWhere` et `eligibleForCampaignWhere`                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 À **écrire** :
 
-| Fichier | Ce qu'il doit prouver |
-| --- | --- |
-| `apps/api/src/modules/lots-export/lots-export.service.test.ts` | La création fige la liste : deux fiches ajoutées après coup n'entrent pas dans le lot. `itemCount` égale le nombre de lignes écrites. Une cible vide rend `422 LOT_EXPORT_CIBLE_VIDE`. Un lot `REPRESENTANTS` ne peut pas porter d'item `prospectId` |
-| `apps/api/src/modules/lots-export/lots-export.integration.test.ts` | Sur une vraie base : `callsSince` ne compte que les appels postérieurs à `createdAt` et portant sur une fiche du lot. Un appel hors lot ne compte pas. Un appel antérieur à la création ne compte pas |
-| `apps/api/src/modules/sync/sync.controller.test.ts` (compléter) | Un client annonçant `X-CPI-Payload-Version: 4` reçoit `426 APP_UPDATE_REQUIRED` ; `5` passe ; la poussée reste ouverte à 4 |
-| `apps/api/src/modules/prospects/portee-lecture.integration.test.ts` (réécrit) | Un COMMERCIAL lit une fiche créée par un autre ; il ne peut **pas** la modifier (`403 NOT_OWNER`) ; il **peut** y consigner une tentative d'appel |
-| `apps/api/src/modules/export/openapi-contract.test.ts` (complété) | `GET /lots-export/{id}/export.xlsx` déclare le classeur en binaire. `GET /export/representants.xlsx` annonce `relationStatus`, `whatsappStatus`, `hasWhatsapp`, et accepte le SUPERVISEUR |
-| `apps/api/src/common/guards/role-routes.test.ts` (complété) | Un COMMERCIAL n'atteint aucune route de lot. Un SUPERVISEUR lit les lots sans en créer |
+| Fichier                                                                       | Ce qu'il doit prouver                                                                                                                                                                                                                                |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `apps/api/src/modules/lots-export/lots-export.service.test.ts`                | La création fige la liste : deux fiches ajoutées après coup n'entrent pas dans le lot. `itemCount` égale le nombre de lignes écrites. Une cible vide rend `422 LOT_EXPORT_CIBLE_VIDE`. Un lot `REPRESENTANTS` ne peut pas porter d'item `prospectId` |
+| `apps/api/src/modules/lots-export/lots-export.integration.test.ts`            | Sur une vraie base : `callsSince` ne compte que les appels postérieurs à `createdAt` et portant sur une fiche du lot. Un appel hors lot ne compte pas. Un appel antérieur à la création ne compte pas                                                |
+| `apps/api/src/modules/sync/sync.controller.test.ts` (compléter)               | Un client annonçant `X-CPI-Payload-Version: 4` reçoit `426 APP_UPDATE_REQUIRED` ; `5` passe ; la poussée reste ouverte à 4                                                                                                                           |
+| `apps/api/src/modules/prospects/portee-lecture.integration.test.ts` (réécrit) | Un COMMERCIAL lit une fiche créée par un autre ; il ne peut **pas** la modifier (`403 NOT_OWNER`) ; il **peut** y consigner une tentative d'appel                                                                                                    |
+| `apps/api/src/modules/export/openapi-contract.test.ts` (complété)             | `GET /lots-export/{id}/export.xlsx` déclare le classeur en binaire. `GET /export/representants.xlsx` annonce `relationStatus`, `whatsappStatus`, `hasWhatsapp`, et accepte le SUPERVISEUR                                                            |
+| `apps/api/src/common/guards/role-routes.test.ts` (complété)                   | Un COMMERCIAL n'atteint aucune route de lot. Un SUPERVISEUR lit les lots sans en créer                                                                                                                                                               |
 
 ### 5.2 Web
 
@@ -2148,12 +2148,12 @@ les tâches ouvertes dans l'ordre » (l. 524-572), le groupe `compteurs` qui sui
 
 À **adapter** :
 
-| Fichier | Détail |
-| --- | --- |
-| `test/data/write_repository_test.dart` | Renommer le test l. 709 en `'qualifier un représentant met à jour la fiche'`, supprimer l'insertion de campagne et de tâche (l. 712-731) et l'assertion l. 746 ; **garder** les assertions sur la fiche (l. 741-745), sur `op.entityType` (l. 747-748), sur la charge utile (l. 749) et tout le bloc `repCallbackReminders` (l. 771, 811, 828) |
-| `test/data/migration_test.dart` | Garder l'import `schema_v11.dart` (l. 18), réutilisé par le nouveau test v11 vers courant ; ajouter `import 'generated_migrations/schema_v19.dart' as v19;`. Le test « le golden couvre toutes les versions déclarées » (l. 63-73) **reste** : il rougit tant que le dump v20 n'existe pas, c'est voulu |
-| `test/features/home_test.dart` (424 l.) | **RÉÉCRIRE** : supprimer l'import l. 10, l'aide `seedFileRepresentants` (l. 43-69), les trois `GoRoute` factices `/campagnes*` (l. 89-110) et les cinq tests l. 154, 221, 239, 264, 331. **Garder** l'aide `mount` (l. 71-152), la `GoRoute` `/representants` (l. 111-115) et les tests l. 317, 344, 365, 387 |
-| `test/features/text_scale_overflow_test.dart` (1028 l.) | Supprimer les imports l. 13-14, la fixture l. 187-211 (`insertCampagne('campFiche')`, `insertProspect('proCampagne')`, `insertTache('tacheCampagne')`) et les entrées « Campagnes » et « File de campagne » du balayage (l. 502-506) ; **ajouter** après l. 435 l'entrée `'Choisir un prospect': ProspectPickerScreen.new,`. **Garder** la fixture `repCallbackReminders` (l. 174-185) |
+| Fichier                                                    | Détail                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `test/data/write_repository_test.dart`                     | Renommer le test l. 709 en `'qualifier un représentant met à jour la fiche'`, supprimer l'insertion de campagne et de tâche (l. 712-731) et l'assertion l. 746 ; **garder** les assertions sur la fiche (l. 741-745), sur `op.entityType` (l. 747-748), sur la charge utile (l. 749) et tout le bloc `repCallbackReminders` (l. 771, 811, 828)                                                                                                                                       |
+| `test/data/migration_test.dart`                            | Garder l'import `schema_v11.dart` (l. 18), réutilisé par le nouveau test v11 vers courant ; ajouter `import 'generated_migrations/schema_v19.dart' as v19;`. Le test « le golden couvre toutes les versions déclarées » (l. 63-73) **reste** : il rougit tant que le dump v20 n'existe pas, c'est voulu                                                                                                                                                                              |
+| `test/features/home_test.dart` (424 l.)                    | **RÉÉCRIRE** : supprimer l'import l. 10, l'aide `seedFileRepresentants` (l. 43-69), les trois `GoRoute` factices `/campagnes*` (l. 89-110) et les cinq tests l. 154, 221, 239, 264, 331. **Garder** l'aide `mount` (l. 71-152), la `GoRoute` `/representants` (l. 111-115) et les tests l. 317, 344, 365, 387                                                                                                                                                                        |
+| `test/features/text_scale_overflow_test.dart` (1028 l.)    | Supprimer les imports l. 13-14, la fixture l. 187-211 (`insertCampagne('campFiche')`, `insertProspect('proCampagne')`, `insertTache('tacheCampagne')`) et les entrées « Campagnes » et « File de campagne » du balayage (l. 502-506) ; **ajouter** après l. 435 l'entrée `'Choisir un prospect': ProspectPickerScreen.new,`. **Garder** la fixture `repCallbackReminders` (l. 174-185)                                                                                               |
 | Les sept fichiers qui **construisent** un `SyncChangesDto` | Retrait d'arguments, **après** `pnpm codegen` : `lib/core/sync/stub_api.dart` (l. 64-67), `test/support/fake_api.dart` (l. 486-489), `test/core/sync_engine_test.dart` (l. 1782-1785, 1825-1828, 1882-1885, 1924-1927, 1961-1964), `test/core/sync_generations_test.dart` (l. 514-517), `test/core/sync_ownership_test.dart` (l. 891-894, 1498-1501, 1522-1525), `test/core/sync_reconciliation_test.dart` (l. 974-977), `test/core/sync_visite_referentiels_test.dart` (l. 229-232) |
 
 À **écrire** :
@@ -2246,18 +2246,18 @@ overflowed`. Tout écran neuf doit y entrer.
 
 ### 7.1 Risques
 
-| # | Risque | Parade |
-| --- | --- | --- |
-| R1 | **Un APK déjà installé cesse silencieusement de recevoir des fiches** si les quatre clés partent sans que `MIN_PULL_PAYLOAD_VERSION` bouge (chaîne complète en §2.4) | Les deux changements dans le **même** déploiement, plus la publication de la version dans le service de mises à jour |
-| R2 | **Un web en retard sur l'API** rend des `404` bruts à l'utilisateur, sans message | API et web dans le même envoi (§3.4) |
-| R3 | **L'arbre de travail bouge.** Trois chantiers écrivent en parallèle | Relire chaque fichier avant de l'éditer, ne jamais `Write` par-dessus un fichier modifié, ne jamais `git stash` ni `git checkout` (§0.5) |
-| R4 | **Volume de `lot_export_items`** : jusqu'à 14 millions de lignes par an sans purge | Les deux étapes de purge sont exposées ; la rétention est D12 |
-| R5 | **Après le retrait de `campaign-pilotage`, plus aucun écran ne dit « il reste tant de fiches à traiter ».** C'est voulu, mais un tableau de bord qui s'appuyait sur `remaining` ou `estimatedEndDate` rendra un écran **vide** et non une erreur : le cas le plus difficile à repérer | Les deux points d'entrée repérés sont `apps/web/src/components/stats/campaigns-panel.tsx` et `apps/web/src/lib/data/advanced-stats.ts` (§4.2.4) |
-| R6 | **L'ampleur de B4** : `console-view.tsx` fait 944 lignes, dont environ la moitié disparaît. C'est l'étape la plus risquée | La mener seule, tests d'abord, sans y mêler d'autre changement |
-| R7 | **Ouvrir l'export des représentants au SUPERVISEUR** contredit un choix documenté dans le code (`export.controller.ts:194`) | Réécrire le commentaire dans le même geste (§2.1) |
-| R8 | **La migration mobile n'aura été prouvée qu'en mémoire** par `migrateAndValidate`. Elle n'est qu'un `DROP TABLE`, donc rapide, mais aucun émulateur ne prouve le comportement sur une base de production chargée de 500 000 lignes d'annuaire, ni les alarmes exactes sur ROM Transsion ou Xiaomi | Un essai sur un appareil réel portant une base de production avant diffusion |
-| R9 | **Perte définitive du lien appel vers campagne passée** (D7) | Décision du propriétaire |
-| R10 | **Aucune vérification n'a été exécutée à la rédaction de ce document.** Ni typecheck, ni lint, ni test, ni build | Toutes les commandes de §0.3 et §3 restent à exécuter |
+| #   | Risque                                                                                                                                                                                                                                                                                            | Parade                                                                                                                                          |
+| --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| R1  | **Un APK déjà installé cesse silencieusement de recevoir des fiches** si les quatre clés partent sans que `MIN_PULL_PAYLOAD_VERSION` bouge (chaîne complète en §2.4)                                                                                                                              | Les deux changements dans le **même** déploiement, plus la publication de la version dans le service de mises à jour                            |
+| R2  | **Un web en retard sur l'API** rend des `404` bruts à l'utilisateur, sans message                                                                                                                                                                                                                 | API et web dans le même envoi (§3.4)                                                                                                            |
+| R3  | **L'arbre de travail bouge.** Trois chantiers écrivent en parallèle                                                                                                                                                                                                                               | Relire chaque fichier avant de l'éditer, ne jamais `Write` par-dessus un fichier modifié, ne jamais `git stash` ni `git checkout` (§0.5)        |
+| R4  | **Volume de `lot_export_items`** : jusqu'à 14 millions de lignes par an sans purge                                                                                                                                                                                                                | Les deux étapes de purge sont exposées ; la rétention est D12                                                                                   |
+| R5  | **Après le retrait de `campaign-pilotage`, plus aucun écran ne dit « il reste tant de fiches à traiter ».** C'est voulu, mais un tableau de bord qui s'appuyait sur `remaining` ou `estimatedEndDate` rendra un écran **vide** et non une erreur : le cas le plus difficile à repérer             | Les deux points d'entrée repérés sont `apps/web/src/components/stats/campaigns-panel.tsx` et `apps/web/src/lib/data/advanced-stats.ts` (§4.2.4) |
+| R6  | **L'ampleur de B4** : `console-view.tsx` fait 944 lignes, dont environ la moitié disparaît. C'est l'étape la plus risquée                                                                                                                                                                         | La mener seule, tests d'abord, sans y mêler d'autre changement                                                                                  |
+| R7  | **Ouvrir l'export des représentants au SUPERVISEUR** contredit un choix documenté dans le code (`export.controller.ts:194`)                                                                                                                                                                       | Réécrire le commentaire dans le même geste (§2.1)                                                                                               |
+| R8  | **La migration mobile n'aura été prouvée qu'en mémoire** par `migrateAndValidate`. Elle n'est qu'un `DROP TABLE`, donc rapide, mais aucun émulateur ne prouve le comportement sur une base de production chargée de 500 000 lignes d'annuaire, ni les alarmes exactes sur ROM Transsion ou Xiaomi | Un essai sur un appareil réel portant une base de production avant diffusion                                                                    |
+| R9  | **Perte définitive du lien appel vers campagne passée** (D7)                                                                                                                                                                                                                                      | Décision du propriétaire                                                                                                                        |
+| R10 | **Aucune vérification n'a été exécutée à la rédaction de ce document.** Ni typecheck, ni lint, ni test, ni build                                                                                                                                                                                  | Toutes les commandes de §0.3 et §3 restent à exécuter                                                                                           |
 
 ### 7.2 Critères d'acceptation
 
@@ -2327,5 +2327,3 @@ Le chantier est terminé quand tout ce qui suit est vrai.
 
 Ce document consolide les audits API, web et mobile réalisés le 28 août 2026.
 Les écarts entre domaines sont tranchés en §2.
-
-

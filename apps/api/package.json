@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "tsc -p tsconfig.gen.json --watch --preserveWatchOutput & node --watch --enable-source-maps dist/main.js",
+    "dev": "tsc -p tsconfig.gen.json && (tsc -p tsconfig.gen.json --watch --preserveWatchOutput & node --watch --watch-preserve-output --enable-source-maps dist/main.js)",
     "build": "tsc -p tsconfig.build.json",
     "start": "node dist/main.js",
     "lint": "oxlint --config .oxlintrc.json --report-unused-disable-directives src",
@@ -15,6 +15,8 @@
     "openapi:generate": "tsc -p tsconfig.gen.json && node dist/openapi.js && prettier openapi.json --write"
   },
   "dependencies": {
+    "@crm/api-client-chues": "workspace:*",
+    "@crm/api-client-grand-public": "workspace:*",
     "@crm/database": "workspace:*",
     "@devicefarmer/adbkit-apkreader": "catalog:",
     "@fastify/cors": "catalog:",
@@ -36,6 +38,7 @@
     "class-validator": "catalog:",
     "exceljs": "catalog:",
     "fastify": "catalog:",
+    "ioredis": "catalog:",
     "jszip": "catalog:",
     "libphonenumber-js": "catalog:",
     "nestjs-pino": "catalog:",

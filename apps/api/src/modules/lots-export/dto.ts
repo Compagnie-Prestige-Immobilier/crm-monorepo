@@ -27,6 +27,17 @@ import {
 import { ProspectFilterDto, PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
 import { RepresentantExportQueryDto } from '../representants/dto.js';
 
+/** L'objectif quotidien d'UN teleconseiller, qui prime sur la capacite du role. */
+export class LotExportObjectifDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() teleconseillerId!: string;
+  @ApiProperty({ type: Number, minimum: 1, maximum: 500 })
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(500)
+  fichesParJour!: number;
+}
+
 /** La base tire des `uuid(7)` : contraindre la version 4 refuserait tout compte. */
 export class LotExportDistributionInputDto {
   @ApiProperty({ type: [String], format: 'uuid', minItems: 1, maxItems: 50 })
@@ -49,6 +60,16 @@ export class LotExportDistributionInputDto {
   @Min(1)
   @Max(10)
   jours: number = 1;
+  /**
+   * EB-17 : l'objectif de chacun. Ce qui n'y figure pas retombe sur
+   * `fichesParJour` pondéré par le rôle.
+   */
+  @ApiPropertyOptional({ type: () => [LotExportObjectifDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LotExportObjectifDto)
+  objectifs?: LotExportObjectifDto[];
 }
 
 /**
@@ -87,6 +108,39 @@ export class CreateLotExportDto {
   @ValidateNested()
   @Type(() => LotExportDistributionInputDto)
   distribution!: LotExportDistributionInputDto;
+}
+
+/** EB-14 et EB-17 : le nom et les objectifs se règlent en cours de campagne. */
+export class UpdateLotExportDto {
+  @ApiPropertyOptional({ maxLength: 120 })
+  @IsOptional()
+  @IsString()
+  @MinLength(3)
+  @MaxLength(120)
+  name?: string;
+  @ApiPropertyOptional({ type: () => [LotExportObjectifDto] })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => LotExportObjectifDto)
+  objectifs?: LotExportObjectifDto[];
+}
+
+/** EB-16 : les fiches désignées passent à un autre téléconseiller. */
+export class ReaffecterLotExportDto {
+  @ApiProperty({ type: [Number], minItems: 1, maxItems: 1000 })
+  @IsArray()
+  @ArrayMinSize(1)
+  @ArrayMaxSize(1000)
+  @Type(() => Number)
+  @IsInt({ each: true })
+  positions!: number[];
+  @ApiProperty({ format: 'uuid' }) @IsUUID() versTeleconseillerId!: string;
+}
+
+/** EB-16 : le retiré rend ses fiches non traitées, redistribuées au reste de l'équipe. */
+export class RetirerTeleconseillerDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() teleconseillerId!: string;
 }
 
 export class LotExportProgrammeQueryDto {
@@ -130,6 +184,68 @@ export class LotExportQueryDto {
   @Min(1)
   @Max(200)
   pageSize?: number;
+}
+
+/**
+ * EB-18 : où en est une fiche de la campagne.
+ *
+ * `A_RAPPELER` prime sur `TRAITEE` : une fiche appelée qui attend un rappel
+ * n'est pas finie, et c'est ce qui reste à faire qui intéresse le superviseur.
+ */
+export enum LotExportFicheEtat {
+  NON_TRAITEE = 'NON_TRAITEE',
+  TRAITEE = 'TRAITEE',
+  A_RAPPELER = 'A_RAPPELER',
+}
+
+export class LotExportFichesQueryDto {
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() teleconseillerId?: string;
+  @ApiPropertyOptional({ enum: LotExportFicheEtat, enumName: 'LotExportFicheEtat' })
+  @IsOptional()
+  @IsEnum(LotExportFicheEtat)
+  etat?: LotExportFicheEtat;
+  @ApiPropertyOptional({ minimum: 1, default: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  page?: number;
+  @ApiPropertyOptional({ minimum: 1, maximum: 200, default: 50 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(200)
+  pageSize?: number;
+}
+
+export class LotExportFicheDto {
+  @ApiProperty() position!: number;
+  @ApiProperty() jour!: number;
+  @ApiProperty({ format: 'uuid', nullable: true, type: String }) ficheId!: string | null;
+  @ApiProperty() fullName!: string;
+  @ApiProperty() phoneE164!: string;
+  @ApiProperty({ format: 'uuid', nullable: true, type: String })
+  teleconseillerId!: string | null;
+  @ApiProperty() teleconseillerName!: string;
+  @ApiProperty({ enum: LotExportFicheEtat, enumName: 'LotExportFicheEtat' })
+  etat!: LotExportFicheEtat;
+  @ApiProperty({ type: String, nullable: true }) statutLabel!: string | null;
+}
+
+export class LotExportFichesDto {
+  @ApiProperty({ type: () => [LotExportFicheDto] }) items!: LotExportFicheDto[];
+  @ApiProperty({ type: () => PageMetaDto }) meta!: PageMetaDto;
+}
+
+/** EB-16 : qui a déplacé combien de fiches, de qui vers qui. */
+export class LotExportReaffectationDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ type: String, nullable: true }) fromName!: string | null;
+  @ApiProperty() toName!: string;
+  @ApiProperty() fiches!: number;
+  @ApiProperty() performedByName!: string;
+  @ApiProperty() createdAt!: string;
 }
 
 export class LotExportAttemptDto {
@@ -183,6 +299,8 @@ export class LotExportRepartitionDto {
 export class LotExportPerformanceDto {
   @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
   @ApiProperty() teleconseillerName!: string;
+  /** EB-17 : les fiches à traiter par jour, dénominateur du taux de contact. */
+  @ApiProperty() objectif!: number;
   @ApiProperty() assigned!: number;
   @ApiProperty() treated!: number;
   @ApiProperty() completionRate!: number;
@@ -196,6 +314,8 @@ export class LotExportDetailDto extends LotExportSummaryDto {
   @ApiProperty({ type: () => [LotExportRepartitionDto] }) repartition!: LotExportRepartitionDto[];
   @ApiProperty({ type: () => [LotExportPerformanceDto] })
   performance!: LotExportPerformanceDto[];
+  @ApiProperty({ type: () => [LotExportReaffectationDto] })
+  reaffectations!: LotExportReaffectationDto[];
 }
 /** Le périmètre d'appel de l'appelant, tous lots et tous jours confondus. */
 export class MesAttributionsDto {

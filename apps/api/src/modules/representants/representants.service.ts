@@ -4,12 +4,20 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { ChangeSource, Prisma, RepCallOutcome, WhatsappStatus } from '@crm/database';
+import {
+  ChangeSource,
+  Prisma,
+  RepCallOutcome,
+  RepresentantRelation,
+  WhatsappStatus,
+} from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { normalizePhone } from '../../common/phone.js';
 import { assertOwnership, attributionScope, isAdmin } from '../../common/scope.js';
+import { listerDetections, type DeviceCallDetectionListDto } from '../../common/device-call.js';
+import { dureesDeTraitement } from '../ouvertures/ouvertures.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
 import { RepresentantSortField, RepresentantSuivi } from './dto.js';
@@ -26,6 +34,7 @@ import type {
   RepresentantLookupDto,
   RepresentantQueryDto,
   UpdateRepresentantDto,
+  RepresentantCallAttemptListDto,
   RepresentantRelationChangeListDto,
 } from './dto.js';
 import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
@@ -37,7 +46,8 @@ export const REPRESENTANT_INCLUDE = {
   ief: { select: { name: true } },
   createdBy: { select: { id: true, fullName: true } },
   lastCallBy: { select: { fullName: true } },
-  _count: { select: { prospects: { where: { deletedAt: null } } } },
+  statutQualification: { select: { label: true, effect: true } },
+  _count: { select: { prospects: { where: { deletedAt: null } }, repCallAttempts: true } },
 } satisfies Prisma.RepresentantInclude;
 
 const INCLUDE = REPRESENTANT_INCLUDE;
@@ -70,6 +80,11 @@ function orderByFor(query: RepresentantQueryDto): Prisma.RepresentantOrderByWith
     case RepresentantSortField.NEXT_CALLBACK_AT:
       // Le rappel le plus proche d'abord, sauf tri explicite.
       return [{ nextCallbackAt: query.sortOrder ?? 'asc' }, { id: 'desc' }];
+    case RepresentantSortField.PRIORITE:
+      // `asc` suit l'ordre de declaration de l'enumeration, HAUTE d'abord, et
+      // PostgreSQL classe les NULL en dernier dans ce sens : une fiche jamais
+      // qualifiee ne double pas celles qu'on a jointes.
+      return [{ statutQualification: { priorite: query.sortOrder ?? 'asc' } }, { id: 'desc' }];
     case RepresentantSortField.CLIENT_CREATED_AT:
     default:
       return [{ clientCreatedAt: direction }, { id: 'desc' }];
@@ -81,14 +96,25 @@ const TRI_DU_SUIVI: Record<RepresentantSuivi, RepresentantSortField> = {
   [RepresentantSuivi.INJOIGNABLE]: RepresentantSortField.LAST_CALL_AT,
 };
 
-export function suiviWhere(query: RepresentantExportQueryDto): Prisma.RepresentantWhereInput {
+export function suiviWhere(
+  query: Pick<RepresentantExportQueryDto, 'lastCallById' | 'suivi' | 'statutQualificationId'>,
+): Prisma.RepresentantWhereInput {
   return {
     ...(query.lastCallById ? { lastCallById: query.lastCallById } : {}),
     ...(query.suivi === RepresentantSuivi.A_RAPPELER ? { nextCallbackAt: { not: null } } : {}),
     ...(query.suivi === RepresentantSuivi.INJOIGNABLE
       ? { lastCallOutcome: RepCallOutcome.UNREACHABLE }
       : {}),
+    ...(query.statutQualificationId ? { statutQualificationId: query.statutQualificationId } : {}),
   };
+}
+
+/** Un seul état reste une égalité : l'index s'en sert, et la clause se lit. */
+function relationWhere(relations: RepresentantRelation[] = []): Prisma.RepresentantWhereInput {
+  const [relation, ...autres] = relations;
+  if (relation === undefined) return {};
+  if (autres.length === 0) return { relationStatus: relation };
+  return { relationStatus: { in: [relation, ...autres] } };
 }
 
 type RepresentantRow = Prisma.RepresentantGetPayload<{ include: typeof REPRESENTANT_INCLUDE }>;
@@ -111,6 +137,9 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     updatedAt: row.updatedAt.toISOString(),
     prospectCount: row._count.prospects,
     relationStatus: row.relationStatus,
+    statutQualificationId: row.statutQualificationId,
+    statutQualificationLabel: row.statutQualification?.label ?? null,
+    statutQualificationEffect: row.statutQualification?.effect ?? null,
     whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
     whatsappNumber: whatsappNumberOf(row),
@@ -122,9 +151,11 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     contacte: row.contacte,
     lastCallOutcome: row.lastCallOutcome,
     lastCallAt: row.lastCallAt?.toISOString() ?? null,
+    callAttemptCount: row._count.repCallAttempts,
     lastCallById: row.lastCallById,
     lastCallByName: row.lastCallBy?.fullName ?? null,
     nextCallbackAt: row.nextCallbackAt?.toISOString() ?? null,
+    nextCallbackOrigine: row.nextCallbackOrigine,
   };
 }
 
@@ -184,15 +215,18 @@ export class RepresentantsService {
 
     // Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
     // cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
-    const where: Prisma.RepresentantWhereInput = { deletedAt: null, ...suiviWhere(query) };
-    const portee = attributionScope(user);
+    const where: Prisma.RepresentantWhereInput = {
+      deletedAt: null,
+      ...suiviWhere(query),
+      ...relationWhere(query.relationStatus),
+    };
+    const portee = attributionScope(user, { malgreLeRole: query.mesFiches === true });
     if (portee.OR) where.AND = [portee];
     if (query.commercialId) {
       where.createdById = query.commercialId;
     }
     if (query.departementId) where.departementId = query.departementId;
     if (query.iefId) where.iefId = query.iefId;
-    if (query.relationStatus) where.relationStatus = query.relationStatus;
     if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
       where.whatsappStatus = { in: allowedWhatsappStatuses(query) };
     }
@@ -399,6 +433,74 @@ export class RepresentantsService {
     });
 
     return { items: rows.map(toRelationChangeDto) };
+  }
+
+  /** Les appels que le journal du téléphone a relevés sur cette fiche. */
+  async deviceCalls(id: string): Promise<DeviceCallDetectionListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+    return listerDetections(this.prisma, { representantId: id });
+  }
+
+  /** Même lecture globale que `relationHistory` : un appel suit sa fiche. */
+  async callHistory(id: string): Promise<RepresentantCallAttemptListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+
+    const rows = await this.prisma.repCallAttempt.findMany({
+      where: { representantId: id },
+      include: {
+        performedBy: { select: { fullName: true } },
+        statutQualification: { select: { label: true, requiresComment: true } },
+        suggestion: { select: { suggestedName: true, suggestedPhoneE164: true, note: true } },
+      },
+      orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+    });
+    const durees = await dureesDeTraitement(this.prisma, { representantId: id });
+
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        outcome: row.outcome,
+        statutQualificationId: row.statutQualificationId,
+        statutQualificationLabel: row.statutQualification?.label ?? null,
+        statutQualificationRequiresComment: row.statutQualification?.requiresComment ?? false,
+        comment: row.comment,
+        callbackAt: row.callbackAt?.toISOString() ?? null,
+        promisedProspects: row.promisedProspects,
+        etablissementConfirme: row.etablissementConfirme,
+        numeroConfirme: row.numeroConfirme,
+        contacte: row.contacte,
+        connaitUES: row.connaitUES,
+        syndicat: row.syndicat,
+        suggestedName: row.suggestion?.suggestedName ?? null,
+        suggestedPhoneE164: row.suggestion?.suggestedPhoneE164 ?? null,
+        suggestedNote: row.suggestion?.note ?? null,
+        deviceCallType: row.deviceCallType,
+        deviceCallDurationSeconds: row.deviceCallDurationSeconds,
+        deviceCallAt: row.deviceCallAt?.toISOString() ?? null,
+        performedById: row.performedById,
+        performedByName: row.performedBy.fullName,
+        clientCreatedAt: row.clientCreatedAt.toISOString(),
+        dureeTraitementSecondes: durees.get(row.id) ?? null,
+      })),
+    };
   }
 
   async listComments(

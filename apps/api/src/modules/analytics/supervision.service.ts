@@ -5,9 +5,11 @@ import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import { performanceScore } from '../admin/performance-score.js';
 import {
-  UNUSABLE_OUTCOMES,
-  REP_ANSWERED_OUTCOMES,
+  NOT_REACHED_OUTCOMES,
+  REP_ARBITRAGE,
+  REP_JOINT_OUTCOMES,
   REP_LIVE_OUTCOMES,
+  REP_STATUT_JOIN,
   ALL_ROWS,
   rate,
 } from './pilotage.sql.js';
@@ -18,6 +20,8 @@ import type {
   SupervisionHistogramBarDto,
   SupervisionActivityRowDto,
   SupervisionQueryDto,
+  SupervisionRepStatutDto,
+  SupervisionRepStatutsDto,
   SupervisionScoreDto,
   SupervisionTeleconseillerDto,
   WorkShiftDto,
@@ -87,6 +91,7 @@ interface ActivityRow {
   id: string;
   nom: string;
   appels: number;
+  confirmes: number;
   injoignables: number;
   faux: number;
   refus: number;
@@ -102,6 +107,7 @@ type TotalRow = Omit<ActivityRow, 'jour' | 'id' | 'nom'>;
 
 const TOTAL_VIDE: TotalRow = {
   appels: 0,
+  confirmes: 0,
   injoignables: 0,
   faux: 0,
   refus: 0,
@@ -119,6 +125,8 @@ interface RepRow {
   jour: string;
   id: string;
   appels: number;
+  confirmes: number;
+  faux: number;
   joints: number;
   rappels: number;
   injoignables: number;
@@ -129,12 +137,61 @@ interface RepRow {
 
 const REP_VIDE: Omit<RepRow, 'jour' | 'id'> = {
   appels: 0,
+  confirmes: 0,
+  faux: 0,
   joints: 0,
   rappels: 0,
   injoignables: 0,
   autres: 0,
   interroges: 0,
   qualifies: 0,
+};
+
+/**
+ * Ce que les tentatives seules ne disent pas : les appels vus par le téléphone,
+ * la durée passée en ligne, et le sort des rappels promis. Lu à part de `faits`
+ * parce que chaque source a sa propre date d'acte.
+ */
+interface ExtraRow {
+  jour: string;
+  id: string;
+  detectes: number;
+  nonConsignes: number;
+  repDetectes: number;
+  repNonConsignes: number;
+  duree: number;
+  durees: number;
+  repDuree: number;
+  repDurees: number;
+  entrants: number;
+  manques: number;
+  rappelsHonores: number;
+  rappelsRetard: number;
+  rappelsAVenir: number;
+  repRappelsHonores: number;
+  repRappelsRetard: number;
+  repRappelsAVenir: number;
+}
+
+type ExtraTotal = Omit<ExtraRow, 'jour' | 'id'>;
+
+const EXTRA_VIDE: ExtraTotal = {
+  detectes: 0,
+  nonConsignes: 0,
+  repDetectes: 0,
+  repNonConsignes: 0,
+  duree: 0,
+  durees: 0,
+  repDuree: 0,
+  repDurees: 0,
+  entrants: 0,
+  manques: 0,
+  rappelsHonores: 0,
+  rappelsRetard: 0,
+  rappelsAVenir: 0,
+  repRappelsHonores: 0,
+  repRappelsRetard: 0,
+  repRappelsAVenir: 0,
 };
 
 interface RosterRow {
@@ -209,13 +266,14 @@ export class SupervisionActivityService {
             ca."performedById"                              AS "userId",
             date_trunc(${unit}, ca."clientCreatedAt")       AS bucket,
             1                                               AS appel,
+            (ca."deviceCallAt" IS NOT NULL)::int            AS confirme,
             (ca."outcome" = 'UNREACHABLE')::int             AS injoignable,
             (ca."outcome" = 'WRONG_NUMBER')::int            AS faux,
             (ca."outcome" = 'REFUSED')::int                 AS refus,
             (ca."outcome" = 'OTHER')::int                   AS autre,
             (ca."outcome" = 'METHOD_OBTAINED')::int         AS methode,
             (ca."outcome" = 'CALLBACK')::int                AS rappel,
-            (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joignable,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joignable,
             0                                               AS prospect,
             NULL::text                                      AS representant
           FROM "call_attempts" ca
@@ -225,7 +283,7 @@ export class SupervisionActivityService {
           UNION ALL
           SELECT
             p."createdById", date_trunc(${unit}, p."clientCreatedAt"),
-            0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
           FROM "prospects" p
           WHERE p."deletedAt" IS NULL AND ${projetScope(Prisma.sql`p."id"`)}
             AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
@@ -233,24 +291,121 @@ export class SupervisionActivityService {
           UNION ALL
           SELECT
             rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
-            0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
           FROM "rep_call_attempts" rca
           WHERE ${repScope}
             AND ${repWindow}
 
+          -- Une ligne d'agent sans aucune tentative : c'est le cas même que la
+          -- supervision cherche, un téléphone qui appelle et rien de consigné.
+          UNION ALL
+          SELECT
+            d."performedById", date_trunc(${unit}, d."deviceCallAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL::text
+          FROM "device_call_detections" d
+          WHERE ${withinWindow(Prisma.sql`d."deviceCallAt"`, query)}
+            AND CASE
+              WHEN d."representantId" IS NOT NULL THEN ${repScope}
+              ELSE ${projetScope(Prisma.sql`d."prospectId"`)}
+            END
     `;
 
     const repTentatives = Prisma.sql`
           SELECT
             rca."performedById"                             AS "userId",
             date_trunc(${unit}, rca."clientCreatedAt")      AS bucket,
-            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int     AS appel,
-            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int AS joint,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int AS appel,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL)::int AS confirme,
+            (rca."outcome" = 'WRONG_NUMBER')::int             AS faux,
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int     AS joint,
             (rca."outcome" = 'CALLBACK')::int                AS rappel,
             (rca."outcome" = 'UNREACHABLE')::int             AS injoignable,
             (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES})::int AS autre
           FROM "rep_call_attempts" rca
           WHERE ${repScope} AND ${repWindow}
+    `;
+
+    const extras = Prisma.sql`
+          SELECT
+            d."performedById"                                   AS "userId",
+            date_trunc(${unit}, d."deviceCallAt")               AS bucket,
+            (d."prospectId" IS NOT NULL)::int                   AS detecte,
+            (d."prospectId" IS NOT NULL AND d."attemptId" IS NULL)::int      AS "nonConsigne",
+            (d."representantId" IS NOT NULL)::int               AS "repDetecte",
+            (d."representantId" IS NOT NULL AND d."attemptId" IS NULL)::int  AS "repNonConsigne",
+            0 AS duree, 0 AS durees, 0 AS "repDuree", 0 AS "repDurees",
+            (d."attemptId" IS NULL AND d."deviceCallType" = 'entrant')::int  AS entrant,
+            (d."attemptId" IS NULL AND d."deviceCallType" = 'manque')::int   AS manque,
+            0 AS "rappelHonore", 0 AS "rappelRetard", 0 AS "rappelAVenir",
+            0 AS "repRappelHonore", 0 AS "repRappelRetard", 0 AS "repRappelAVenir"
+          FROM "device_call_detections" d
+          WHERE ${withinWindow(Prisma.sql`d."deviceCallAt"`, query)}
+            AND CASE
+              WHEN d."representantId" IS NOT NULL THEN ${repScope}
+              ELSE ${projetScope(Prisma.sql`d."prospectId"`)}
+            END
+
+          UNION ALL
+          SELECT
+            ca."performedById", date_trunc(${unit}, ca."clientCreatedAt"),
+            0, 0, 0, 0,
+            CASE WHEN ca."deviceCallAt" IS NOT NULL
+              THEN COALESCE(ca."deviceCallDurationSeconds", 0) ELSE 0 END,
+            (ca."deviceCallAt" IS NOT NULL)::int, 0, 0,
+            (ca."deviceCallType" = 'entrant')::int,
+            (ca."deviceCallType" = 'manque')::int,
+            0, 0, 0, 0, 0, 0
+          FROM "call_attempts" ca
+          WHERE (ca."deviceCallType" IS NOT NULL OR ca."deviceCallAt" IS NOT NULL)
+            AND ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
+            0, 0, 0, 0, 0, 0,
+            CASE WHEN rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL
+              THEN COALESCE(rca."deviceCallDurationSeconds", 0) ELSE 0 END,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL)::int,
+            (rca."deviceCallType" = 'entrant')::int,
+            (rca."deviceCallType" = 'manque')::int,
+            0, 0, 0, 0, 0, 0
+          FROM "rep_call_attempts" rca
+          WHERE (rca."deviceCallType" IS NOT NULL OR rca."deviceCallAt" IS NOT NULL)
+            AND ${repScope} AND ${repWindow}
+
+          UNION ALL
+          SELECT
+            sc."assignedToId", date_trunc(${unit}, sc."scheduledAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            (sc."status" = 'DONE')::int,
+            (sc."status" = 'PENDING' AND sc."scheduledAt" <= now())::int,
+            (sc."status" = 'PENDING' AND sc."scheduledAt" > now())::int,
+            0, 0, 0
+          FROM "scheduled_callbacks" sc
+          WHERE ${withinWindow(Prisma.sql`sc."scheduledAt"`, query)}
+            AND ${projetScope(Prisma.sql`sc."prospectId"`)}
+
+          UNION ALL
+          SELECT
+            h."performedById", date_trunc(${unit}, h."callbackAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+            h.honore::int,
+            (NOT h.honore AND h."callbackAt" <= now())::int,
+            (NOT h.honore AND h."callbackAt" > now())::int
+          FROM (
+            SELECT
+              rca."performedById", rca."callbackAt",
+              EXISTS (
+                SELECT 1 FROM "rep_call_attempts" x
+                WHERE x."representantId" = rca."representantId"
+                  AND x."clientCreatedAt" > rca."callbackAt"
+              ) AS honore
+            FROM "rep_call_attempts" rca
+            WHERE rca."callbackAt" IS NOT NULL AND ${repScope}
+              AND ${withinWindow(Prisma.sql`rca."callbackAt"`, query)}
+          ) h
     `;
 
     // Un représentant ne se qualifie qu'une fois : c'est sa DERNIÈRE réponse de
@@ -261,9 +416,10 @@ export class SupervisionActivityService {
           SELECT DISTINCT ON (rca."representantId")
             rca."performedById"                        AS "userId",
             date_trunc(${unit}, rca."clientCreatedAt") AS bucket,
-            (rca."outcome" = 'REACHED')::int           AS qualifie
+            (${REP_ARBITRAGE} = 'AMBASSADEUR')::int    AS qualifie
           FROM "rep_call_attempts" rca
-          WHERE rca."outcome" IN ${REP_ANSWERED_OUTCOMES} AND ${repScope} AND ${repWindow}
+          ${REP_STATUT_JOIN}
+          WHERE ${REP_ARBITRAGE} IS NOT NULL AND ${repScope} AND ${repWindow}
           ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
     `;
 
@@ -286,7 +442,7 @@ export class SupervisionActivityService {
             ca."clientCreatedAt"                            AS quand,
             'prospect'                                      AS famille,
             ca."prospectId"::text                           AS cible,
-            (ca."outcome" NOT IN ${UNUSABLE_OUTCOMES})::int AS joint,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint,
             (ca."outcome" = 'METHOD_OBTAINED')::int         AS qualifie
           FROM "call_attempts" ca
           WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
@@ -296,7 +452,7 @@ export class SupervisionActivityService {
           SELECT
             rca."performedById", rca."clientCreatedAt", 'representant',
             rca."representantId"::text,
-            (rca."outcome" IN ${REP_ANSWERED_OUTCOMES})::int, 0
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int, 0
           FROM "rep_call_attempts" rca
           WHERE ${repScope} AND ${repWindow}
     `;
@@ -336,6 +492,7 @@ export class SupervisionActivityService {
     const [
       rows,
       repRows,
+      extraRows,
       [totalRow],
       [repTotalRow],
       roster,
@@ -350,6 +507,7 @@ export class SupervisionActivityService {
           u."id"                               AS id,
           u."fullName"                         AS nom,
           SUM(f.appel)::int                    AS appels,
+          SUM(f.confirme)::int                 AS confirmes,
           SUM(f.injoignable)::int              AS injoignables,
           SUM(f.faux)::int                     AS faux,
           SUM(f.refus)::int                    AS refus,
@@ -377,6 +535,8 @@ export class SupervisionActivityService {
           to_char(t.bucket, 'YYYY-MM-DD')     AS jour,
           t."userId"                          AS id,
           SUM(t.appel)::int                   AS appels,
+          SUM(t.confirme)::int                AS confirmes,
+          SUM(t.faux)::int                    AS faux,
           SUM(t.joint)::int                   AS joints,
           SUM(t.rappel)::int                  AS rappels,
           SUM(t.injoignable)::int             AS injoignables,
@@ -387,10 +547,37 @@ export class SupervisionActivityService {
         LEFT JOIN interroges i ON i."userId" = t."userId" AND i.bucket = t.bucket
         GROUP BY 1, 2
       `,
+      this.prisma.$queryRaw<ExtraRow[]>`
+        WITH extras AS (${extras})
+        SELECT
+          to_char(e.bucket, 'YYYY-MM-DD')   AS jour,
+          u."id"                            AS id,
+          SUM(e.detecte)::int               AS detectes,
+          SUM(e."nonConsigne")::int         AS "nonConsignes",
+          SUM(e."repDetecte")::int          AS "repDetectes",
+          SUM(e."repNonConsigne")::int      AS "repNonConsignes",
+          SUM(e.duree)::int                 AS duree,
+          SUM(e.durees)::int                AS durees,
+          SUM(e."repDuree")::int            AS "repDuree",
+          SUM(e."repDurees")::int           AS "repDurees",
+          SUM(e.entrant)::int               AS entrants,
+          SUM(e.manque)::int                AS manques,
+          SUM(e."rappelHonore")::int        AS "rappelsHonores",
+          SUM(e."rappelRetard")::int        AS "rappelsRetard",
+          SUM(e."rappelAVenir")::int        AS "rappelsAVenir",
+          SUM(e."repRappelHonore")::int     AS "repRappelsHonores",
+          SUM(e."repRappelRetard")::int     AS "repRappelsRetard",
+          SUM(e."repRappelAVenir")::int     AS "repRappelsAVenir"
+        FROM extras e
+        INNER JOIN "users" u ON u."id" = e."userId"
+        WHERE ${teleconseiller}
+        GROUP BY 1, 2
+      `,
       this.prisma.$queryRaw<TotalRow[]>`
         WITH faits AS (${faits})
         SELECT
           COALESCE(SUM(f.appel), 0)::int       AS appels,
+          COALESCE(SUM(f.confirme), 0)::int    AS confirmes,
           COALESCE(SUM(f.injoignable), 0)::int AS injoignables,
           COALESCE(SUM(f.faux), 0)::int        AS faux,
           COALESCE(SUM(f.refus), 0)::int       AS refus,
@@ -408,6 +595,8 @@ export class SupervisionActivityService {
         reponses AS (${repReponses})
         SELECT
           COALESCE(SUM(t.appel), 0)::int       AS appels,
+          COALESCE(SUM(t.confirme), 0)::int    AS confirmes,
+          COALESCE(SUM(t.faux), 0)::int        AS faux,
           COALESCE(SUM(t.joint), 0)::int       AS joints,
           COALESCE(SUM(t.rappel), 0)::int      AS rappels,
           COALESCE(SUM(t.injoignable), 0)::int AS injoignables,
@@ -534,15 +723,71 @@ export class SupervisionActivityService {
     ]);
 
     const repParLigne = new Map(repRows.map((row) => [`${row.jour}|${row.id}`, row]));
+    const extraParLigne = new Map(extraRows.map((row) => [`${row.jour}|${row.id}`, row]));
+    // Toutes ces colonnes sont additives : le total de l'équipe est la somme
+    // des lignes, déjà bornées aux comptes du plateau par la requête.
+    const extraTotal = extraRows.reduce<ExtraTotal>(
+      (total, row) => {
+        for (const cle of Object.keys(EXTRA_VIDE) as (keyof ExtraTotal)[]) {
+          total[cle] += row[cle];
+        }
+        return total;
+      },
+      { ...EXTRA_VIDE },
+    );
+
+    // Répartition des représentants par statut de qualification : le dernier
+    // appel portant un statut dans la fenêtre détermine le comptage. Les statuts
+    // actifs apparaissent même à zéro ; les statuts désactivés n'apparaissent
+    // que s'ils sont réellement présents.
+    const estGrandPublic = query.projet === Projet.GRAND_PUBLIC;
+    let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
+    if (!estGrandPublic) {
+      const repStatuts = await this.prisma.$queryRaw<
+        { id: string; code: string; label: string; isActive: boolean; count: number }[]
+      >`
+        WITH last_calls AS (
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById" AS "userId",
+            rca."statutQualificationId" AS "sid"
+          FROM "rep_call_attempts" rca
+          WHERE rca."statutQualificationId" IS NOT NULL
+            AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+        ),
+        counts AS (
+          SELECT "sid", COUNT(*)::int AS count
+          FROM last_calls
+          WHERE ${membreEquipe(Prisma.sql`"userId"`)}
+          GROUP BY "sid"
+        )
+        SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
+        FROM "statuts_qualification" sq
+        LEFT JOIN counts c ON c."sid" = sq.id
+        WHERE sq."isActive" = TRUE OR c.count > 0
+        ORDER BY sq."sortOrder" ASC, sq."label" ASC
+      `;
+      repQualificationStatuses = {
+        total: repStatuts.reduce((sum, row) => sum + row.count, 0),
+        items: repStatuts.map((row): SupervisionRepStatutDto => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          isActive: row.isActive,
+          count: row.count,
+        })),
+      };
+    }
 
     return {
       from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
       to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
       granularity,
-      totals: chiffres(totalRow ?? TOTAL_VIDE, repTotalRow ?? REP_VIDE),
+      totals: chiffres(totalRow ?? TOTAL_VIDE, repTotalRow ?? REP_VIDE, extraTotal),
       items: rows.map((row): SupervisionActivityRowDto => {
         const rep = repParLigne.get(`${row.jour}|${row.id}`) ?? REP_VIDE;
-        return Object.assign(chiffres(row, rep), {
+        const extra = extraParLigne.get(`${row.jour}|${row.id}`) ?? EXTRA_VIDE;
+        return Object.assign(chiffres(row, rep, extra), {
           bucket: row.jour,
           teleconseillerId: row.id,
           teleconseillerName: row.nom,
@@ -556,6 +801,7 @@ export class SupervisionActivityService {
       scores: rendement === null ? [] : notes(roster, rendement[0], rendement[1], creneaux),
       prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
       prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
+      repQualificationStatuses,
     };
   }
 }
@@ -612,9 +858,20 @@ function notes(
   });
 }
 
-function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDto {
+const moyenne = (total: number, nombre: number): number | null =>
+  nombre === 0 ? null : Math.round(total / nombre);
+
+function chiffres(
+  base: TotalRow,
+  rep: RepTotalRow,
+  extra: ExtraTotal,
+): SupervisionActivityCountsDto {
   return {
     calls: base.appels,
+    confirmedCalls: base.confirmes,
+    detectedCalls: extra.detectes,
+    unloggedCalls: extra.nonConsignes,
+    avgCallSeconds: moyenne(extra.duree, extra.durees),
     unreachable: base.injoignables,
     wrongNumber: base.faux,
     refused: base.refus,
@@ -625,6 +882,11 @@ function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDt
     prospectsCreated: base.prospects,
     representantsContacted: base.representants,
     repCalls: rep.appels,
+    repConfirmedCalls: rep.confirmes,
+    repDetectedCalls: extra.repDetectes,
+    repUnloggedCalls: extra.repNonConsignes,
+    repAvgCallSeconds: moyenne(extra.repDuree, extra.repDurees),
+    repWrongNumber: rep.faux,
     repReached: rep.joints,
     repCallback: rep.rappels,
     repUnreachable: rep.injoignables,
@@ -634,6 +896,14 @@ function chiffres(base: TotalRow, rep: RepTotalRow): SupervisionActivityCountsDt
     repQuestioned: rep.interroges,
     repQualified: rep.qualifies,
     repQualificationRate: rate(rep.qualifies, rep.interroges),
+    inboundCalls: extra.entrants,
+    missedCalls: extra.manques,
+    callbacksHonored: extra.rappelsHonores,
+    callbacksLate: extra.rappelsRetard,
+    callbacksUpcoming: extra.rappelsAVenir,
+    repCallbacksHonored: extra.repRappelsHonores,
+    repCallbacksLate: extra.repRappelsRetard,
+    repCallbacksUpcoming: extra.repRappelsAVenir,
   };
 }
 

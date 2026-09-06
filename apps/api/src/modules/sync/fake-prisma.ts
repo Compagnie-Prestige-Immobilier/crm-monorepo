@@ -1,3 +1,5 @@
+import type { RemindersService } from '../notifications/reminders.service.js';
+
 interface BatchRow {
   key: string;
   userId: string;
@@ -55,6 +57,31 @@ export interface CallAttemptRow {
   engagementEnCours: boolean | null;
   dureeEtablissementMois: number | null;
   rendezVousAt: Date | null;
+  deviceCallType: string | null;
+  deviceCallDurationSeconds: number | null;
+  deviceCallAt: Date | null;
+  clientCreatedAt: Date;
+}
+
+export interface DeviceCallDetectionRow {
+  id: string;
+  performedById: string;
+  representantId: string | null;
+  prospectId: string | null;
+  deviceCallType: string;
+  deviceCallDurationSeconds: number;
+  deviceCallAt: Date;
+  detectedAt: Date;
+  attemptId: string | null;
+  createdAt: Date;
+}
+
+export interface RepCallAttemptRow {
+  id: string;
+  representantId: string;
+  performedById: string;
+  outcome: string;
+  deviceCallAt: Date | null;
   clientCreatedAt: Date;
 }
 
@@ -154,8 +181,24 @@ function matchesFilter(row: Row, key: string, expected: unknown): boolean {
   if (expected === null) return actual === null || actual === undefined;
   if (typeof expected !== 'object') return actual === expected;
 
-  const filter = expected as { not?: unknown; in?: unknown[] };
+  const filter = expected as {
+    not?: unknown;
+    in?: unknown[];
+    gte?: Date;
+    lte?: Date;
+    some?: Row;
+  };
+  // `lotItems: { some: ... }` de la portée d'attribution. Une ligne qui ne
+  // déclare pas la relation la laisse passer : la doublure ne la modélise pas,
+  // et prétendre le contraire changerait le verdict de tests écrits avant elle.
+  // Une ligne qui la déclare, même vide, est examinée pour de bon.
+  if (filter.some !== undefined) {
+    if (!Array.isArray(actual)) return true;
+    return actual.some((item) => matches(item as Row, filter.some));
+  }
   if ('not' in filter && actual === filter.not) return false;
+  if (filter.gte !== undefined && !(actual instanceof Date && actual >= filter.gte)) return false;
+  if (filter.lte !== undefined && !(actual instanceof Date && actual <= filter.lte)) return false;
   return filter.in === undefined || filter.in.includes(actual);
 }
 
@@ -170,6 +213,9 @@ export class FakePrisma {
   prospectJourneys = new Map<string, Row>();
   relationChanges: Row[] = [];
   callAttempts = new Map<string, CallAttemptRow>();
+  repCallAttempts = new Map<string, RepCallAttemptRow>();
+  deviceCallDetections = new Map<string, DeviceCallDetectionRow>();
+  ouverturesFiche = new Map<string, Row>();
   representantComments = new Map<string, RepresentantCommentRow>();
   callOutcomeReasons = new Map<string, CallOutcomeReasonRow>();
   visites = new Map<string, VisiteRow>();
@@ -273,6 +319,7 @@ export class FakePrisma {
       representants: new Map([...this.representants].map(([k, v]) => [k, clone(v)])),
       prospects: new Map([...this.prospects].map(([k, v]) => [k, clone(v)])),
       callAttempts: new Map([...this.callAttempts].map(([k, v]) => [k, clone(v)])),
+      deviceCallDetections: new Map([...this.deviceCallDetections].map(([k, v]) => [k, clone(v)])),
       representantComments: new Map([...this.representantComments].map(([k, v]) => [k, clone(v)])),
       visites: new Map([...this.visites].map(([k, v]) => [k, clone(v)])),
     };
@@ -283,6 +330,7 @@ export class FakePrisma {
       this.representants = snapshot.representants;
       this.prospects = snapshot.prospects;
       this.callAttempts = snapshot.callAttempts;
+      this.deviceCallDetections = snapshot.deviceCallDetections;
       this.representantComments = snapshot.representantComments;
       this.visites = snapshot.visites;
       this.rollbackCount += 1;
@@ -410,11 +458,49 @@ export class FakePrisma {
       const row = this.callAttempts.get(args.where.id);
       return Promise.resolve(row ? { ...row, task: null } : null);
     },
+    findFirst: (args: { where?: Row }) =>
+      Promise.resolve(
+        [...this.callAttempts.values()]
+          .sort((a, b) => a.clientCreatedAt.getTime() - b.clientCreatedAt.getTime())
+          .find((row) => matches(row as unknown as Row, args.where)) ?? null,
+      ),
     createMany: (args: { data: CallAttemptRow[] }) => {
       let count = 0;
       for (const row of args.data) {
         if (this.callAttempts.has(row.id)) continue;
         this.callAttempts.set(row.id, clone(row));
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+  };
+
+  repCallAttempt = {
+    findFirst: (args: { where?: Row }) =>
+      Promise.resolve(
+        [...this.repCallAttempts.values()]
+          .sort((a, b) => a.clientCreatedAt.getTime() - b.clientCreatedAt.getTime())
+          .find((row) => matches(row as unknown as Row, args.where)) ?? null,
+      ),
+  };
+
+  deviceCallDetection = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.deviceCallDetections.get(args.where.id) ?? null),
+    createMany: (args: { data: DeviceCallDetectionRow[] }) => {
+      let count = 0;
+      for (const row of args.data) {
+        if (this.deviceCallDetections.has(row.id)) continue;
+        this.deviceCallDetections.set(row.id, clone(row));
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
+    updateMany: (args: { where?: Row; data: { attemptId: string } }) => {
+      let count = 0;
+      for (const row of this.deviceCallDetections.values()) {
+        if (!matches(row as unknown as Row, args.where)) continue;
+        row.attemptId = args.data.attemptId;
         count += 1;
       }
       return Promise.resolve({ count });
@@ -438,6 +524,20 @@ export class FakePrisma {
   scheduledCallback = {
     updateMany: () => Promise.resolve({ count: 0 }),
     createMany: () => Promise.resolve({ count: 1 }),
+  };
+
+  ouvertureFiche = {
+    findUnique: (args: { where: { id: string } }) =>
+      Promise.resolve(this.ouverturesFiche.get(args.where.id) ?? null),
+    updateMany: (args: { where?: Row; data: Row }) => {
+      let count = 0;
+      for (const row of this.ouverturesFiche.values()) {
+        if (!matches(row, args.where)) continue;
+        Object.assign(row, args.data);
+        count += 1;
+      }
+      return Promise.resolve({ count });
+    },
   };
 
   prospect = {
@@ -601,6 +701,10 @@ export class FakePrisma {
     },
   };
 }
+
+/** L'alerte d'encadrement part APRÈS le lot : la poussée se teste sans elle. */
+export const fakeReminders = (): RemindersService =>
+  ({ alerterAppelsNonConsignes: () => Promise.resolve(0) }) as unknown as RemindersService;
 
 function applyUpdate(row: Row, data: Row): void {
   for (const [key, value] of Object.entries(data)) {

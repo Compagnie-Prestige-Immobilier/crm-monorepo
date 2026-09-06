@@ -22,6 +22,7 @@ interface MockTx {
   prospect: Record<'findFirst' | 'updateMany' | 'update', MockFn>;
   prospectJourney: Record<'upsert' | 'updateMany', MockFn>;
   scheduledCallback: Record<'updateMany' | 'createMany', MockFn>;
+  deviceCallDetection: Record<'updateMany', MockFn>;
 }
 
 /** Le référentiel tel qu'il sort du semis : les six motifs système, actifs. */
@@ -82,6 +83,9 @@ const prepare = (): void => {
       updateMany: vi.fn().mockResolvedValue({ count: 0 }),
       createMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
+    deviceCallDetection: {
+      updateMany: vi.fn().mockResolvedValue({ count: 0 }),
+    },
   };
 };
 
@@ -114,6 +118,60 @@ describe('nature de la tentative écrite', () => {
 
     expect(writtenRow()).toMatchObject({ prospectId: 'p-1', performedById: 'com-1' });
     expect(writtenRow()).not.toHaveProperty('isDemo');
+  });
+
+  it('la preuve lue dans le journal Android est écrite telle quelle', async () => {
+    await apply({
+      deviceCallType: 'sortant',
+      deviceCallDurationSeconds: 92,
+      deviceCallAt: '2026-08-01T10:00:14.000Z',
+    });
+
+    expect(writtenRow()).toMatchObject({
+      deviceCallType: 'sortant',
+      deviceCallDurationSeconds: 92,
+      deviceCallAt: new Date('2026-08-01T10:00:14.000Z'),
+    });
+  });
+
+  it('sans preuve, la tentative reste déclarative', async () => {
+    await apply();
+
+    expect(writtenRow()).toMatchObject({
+      deviceCallType: null,
+      deviceCallDurationSeconds: null,
+      deviceCallAt: null,
+    });
+  });
+
+  // Le téléphone remonte souvent l'appel avant que la fiche soit consignée :
+  // sans ce rattrapage, la supervision compterait l'appel comme non consigné.
+  it('la tentative réclame les appels déjà détectés sur la même fiche', async () => {
+    await apply({ deviceCallAt: '2026-08-01T09:59:00.000Z' });
+
+    const [args] = tx.deviceCallDetection.updateMany.mock.calls[0] as [
+      { where: Record<string, unknown>; data: Record<string, unknown> },
+    ];
+    expect(args.where).toMatchObject({
+      performedById: 'com-1',
+      prospectId: 'p-1',
+      attemptId: null,
+    });
+    expect(args.data).toEqual({ attemptId: 'att-1' });
+    expect(args.where.OR).toEqual([
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-01T08:00:00.000Z'),
+          lte: new Date('2026-08-01T10:00:00.000Z'),
+        },
+      },
+      {
+        deviceCallAt: {
+          gte: new Date('2026-08-01T09:57:00.000Z'),
+          lte: new Date('2026-08-01T10:01:00.000Z'),
+        },
+      },
+    ]);
   });
 });
 

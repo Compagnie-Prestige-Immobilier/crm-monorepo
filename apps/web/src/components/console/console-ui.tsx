@@ -1,7 +1,9 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
+
+import { formatChrono, secondesEcoulees } from '@/lib/data/ouvertures';
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
@@ -23,5 +25,29 @@ export function copyPhone(phoneE164: string): void {
     () => {
       toast.error('Copie refusée par le navigateur.');
     },
+  );
+}
+
+/**
+ * Le temps de traitement : de la première saisie au statut, la lecture de la
+ * fiche exclue. Rien saisi, rien à montrer : l'appelant ne le monte pas.
+ */
+export function Chrono({ firstInputAt }: { firstInputAt: string }) {
+  const [secondes, setSecondes] = useState(() => secondesEcoulees(firstInputAt, Date.now()));
+
+  useEffect(() => {
+    const battement = setInterval(() => {
+      setSecondes(secondesEcoulees(firstInputAt, Date.now()));
+    }, 1000);
+    return () => {
+      clearInterval(battement);
+    };
+  }, [firstInputAt]);
+
+  return (
+    <p className="text-[0.8125rem] text-muted-foreground">
+      En saisie depuis{' '}
+      <span className="font-[600] tabular-nums text-foreground">{formatChrono(secondes)}</span>
+    </p>
   );
 }

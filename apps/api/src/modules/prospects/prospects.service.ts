@@ -22,6 +22,8 @@ import { AuditAction, audit } from '../../common/audit.js';
 import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
 import { assertOwnership, isAdmin, ownerScope, prospectReadScope } from '../../common/scope.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
+import { listerDetections, type DeviceCallDetectionListDto } from '../../common/device-call.js';
+import { dureesDeTraitement } from '../ouvertures/ouvertures.service.js';
 import { ProspectSortField, SortOrder } from '../../common/dto/prospect-filter.dto.js';
 import type { ProspectQueryDto } from '../../common/dto/prospect-filter.dto.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
@@ -30,6 +32,7 @@ import type {
   CreateProspectDto,
   ConfirmGrandPublicConversionDto,
   MergeProspectsDto,
+  ProspectCallAttemptListDto,
   ProspectDto,
   ProspectListDto,
   ReassignProspectsDto,
@@ -216,7 +219,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
   const incomeBand = row.incomeBand ?? { label: null };
   const provenance = row.canalProvenance ?? { label: null };
   const enrollmentAuthor = row.enrollmentCapturedBy ?? { fullName: null };
-  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null };
+  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null, count: 0 };
 
   return {
     id: row.id,
@@ -280,6 +283,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     lastOutcome: attempt.outcome,
     lastComment: attempt.comment,
     lastAttemptAt: isoOrNull(attempt.at),
+    callAttemptCount: attempt.count,
     lastCallOutcome: row.lastCallOutcome,
     lastCallAt: isoOrNull(row.lastCallAt),
     lastCallById: row.lastCallById,
@@ -355,6 +359,47 @@ export class ProspectsService {
     }
     const attempts = await lastAttemptsByProspect(this.prisma, [row.id]);
     return toProspectDto(row, attempts.get(row.id));
+  }
+
+  /** Même portée que `get` : qui peut lire la fiche peut relire ses appels. */
+  /** Les appels que le journal du téléphone a relevés sur cette fiche. */
+  async deviceCalls(user: AuthenticatedUser, id: string): Promise<DeviceCallDetectionListDto> {
+    await this.get(user, id);
+    return listerDetections(this.prisma, { prospectId: id });
+  }
+
+  async callHistory(user: AuthenticatedUser, id: string): Promise<ProspectCallAttemptListDto> {
+    await this.get(user, id);
+    const rows = await this.prisma.callAttempt.findMany({
+      where: { prospectId: id },
+      include: {
+        performedBy: { select: { fullName: true } },
+        reason: { select: { label: true } },
+      },
+      orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
+    });
+    const durees = await dureesDeTraitement(this.prisma, { prospectId: id });
+    return {
+      items: rows.map((row) => ({
+        id: row.id,
+        outcome: row.outcome,
+        reasonLabel: row.reason?.label ?? null,
+        method: row.method,
+        comment: row.comment,
+        email: row.email,
+        fonctionnaire: row.fonctionnaire,
+        engagementEnCours: row.engagementEnCours,
+        dureeEtablissementMois: row.dureeEtablissementMois,
+        rendezVousAt: isoOrNull(row.rendezVousAt),
+        deviceCallType: row.deviceCallType,
+        deviceCallDurationSeconds: row.deviceCallDurationSeconds,
+        deviceCallAt: isoOrNull(row.deviceCallAt),
+        performedById: row.performedById,
+        performedByName: row.performedBy.fullName,
+        clientCreatedAt: row.clientCreatedAt.toISOString(),
+        dureeTraitementSecondes: durees.get(row.id) ?? null,
+      })),
+    };
   }
 
   async create(user: AuthenticatedUser, input: CreateProspectDto): Promise<ProspectDto> {

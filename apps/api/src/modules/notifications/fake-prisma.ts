@@ -100,6 +100,17 @@ export interface BankCaseRow {
   deletedAt: Date | null;
 }
 
+export interface DetectionRow {
+  id: string;
+  performedById: string;
+  attemptId: string | null;
+  deviceCallType: string;
+  deviceCallAt: Date;
+  performedBy: { fullName: string };
+  representant: { fullName: string } | null;
+  prospect: { nom: string; prenom: string } | null;
+}
+
 export const ADMIN: UserRow = {
   id: 'usr-admin',
   fullName: 'Administrateur CPI',
@@ -273,6 +284,7 @@ export class FakePrisma {
   readonly repCallTasks: CallTaskRow[] = [];
   readonly bankCases: BankCaseRow[] = [];
   readonly scheduledCallbacks: ScheduledCallbackRow[] = [];
+  readonly deviceCallDetections: DetectionRow[] = [];
 
   addUser(row: Partial<UserRow> & { id: string }): UserRow {
     const user: UserRow = {
@@ -694,6 +706,17 @@ export class FakePrisma {
     };
   }
 
+  get deviceCallDetection() {
+    return {
+      findFirst: (args: { where?: Record<string, unknown> }) =>
+        Promise.resolve(
+          this.deviceCallDetections.find((row) =>
+            matches(row as unknown as Record<string, unknown>, args.where, this),
+          ) ?? null,
+        ),
+    };
+  }
+
   private decorate(row: NotificationRow | undefined): unknown {
     if (!row) return null;
     const createdBy = this.users.find((user) => user.id === row.createdById);
@@ -714,6 +737,7 @@ const DELEGATES = new Set([
   'repCallTask',
   'scheduledCallback',
   'bankCase',
+  'deviceCallDetection',
 ]);
 
 /** La même doublure, avec la trace de chaque aller-retour qu'on lui demande. */
@@ -744,6 +768,10 @@ const LIGNE_VIDE = {
   teleconseillerId: '',
   teleconseillerName: '',
   calls: 0,
+  confirmedCalls: 0,
+  detectedCalls: 0,
+  unloggedCalls: 0,
+  avgCallSeconds: null,
   unreachable: 0,
   wrongNumber: 0,
   refused: 0,
@@ -754,6 +782,11 @@ const LIGNE_VIDE = {
   prospectsCreated: 0,
   representantsContacted: 0,
   repCalls: 0,
+  repConfirmedCalls: 0,
+  repDetectedCalls: 0,
+  repUnloggedCalls: 0,
+  repAvgCallSeconds: null,
+  repWrongNumber: 0,
   repReached: 0,
   repCallback: 0,
   repUnreachable: 0,
@@ -763,6 +796,14 @@ const LIGNE_VIDE = {
   repQuestioned: 0,
   repQualified: 0,
   repQualificationRate: null,
+  inboundCalls: 0,
+  missedCalls: 0,
+  callbacksHonored: 0,
+  callbacksLate: 0,
+  callbacksUpcoming: 0,
+  repCallbacksHonored: 0,
+  repCallbacksLate: 0,
+  repCallbacksUpcoming: 0,
 } satisfies SupervisionActivityRowDto;
 
 /** Le module analytics rendu par son service réel ; ici on ne fournit que sa réponse. */
@@ -800,6 +841,7 @@ export class FakeActivity {
       scores: [],
       prospectsByTeleconseiller: this.prospectsByTeleconseiller,
       prospectsByRepresentant: this.prospectsByRepresentant,
+      repQualificationStatuses: null,
     });
   }
 

@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import { IMPORT_COLUMNS } from '../representants/import-template.js';
 import type { ChunkOutcome, ImportAdapter, ParsedRow } from './import-adapter.js';
+import { fakeWorkspace } from '../../workspaces/fake-workspace.js';
+import { LiveService } from '../live/live.service.js';
 import { ImportRunnerService } from './import-runner.service.js';
 import { DEPARTEMENT_DAKAR, fakeJob, FakeImportPrisma } from './fake-import-prisma.js';
 import { ImportsService } from './imports.service.js';
@@ -89,6 +91,7 @@ const runnerOn = (
     prisma as unknown as PrismaService,
     adapters as unknown as readonly ImportAdapter<unknown>[],
     reader,
+    new LiveService(fakeWorkspace()),
   );
 
 const NOW = new Date('2026-08-16T10:00:00.000Z');
@@ -209,6 +212,7 @@ describe('moteur d’import', () => {
           run: () => Promise.resolve({ result: 'busy' as const }),
         } as unknown as ImportRunnerService,
         { save: () => Promise.reject(new Error('inutile')), remove: () => Promise.resolve() },
+        new LiveService(fakeWorkspace()),
       );
       await service.apply('job-1', NOW);
       expect(prisma.jobs[0]?.processedRows).toBe(2);

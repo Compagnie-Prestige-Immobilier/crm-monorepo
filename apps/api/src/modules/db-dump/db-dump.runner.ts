@@ -13,7 +13,14 @@ export interface DumpRunner {
 
 export const DUMP_RUNNER = Symbol('DUMP_RUNNER');
 
-const PG_DUMP_ARGUMENTS = ['--format=plain', '--no-owner', '--no-privileges'] as const;
+// `--schema=public` : le schéma `demo` porte des centaines de milliers de
+// lignes engendrées, sans valeur de sauvegarde et qui doubleraient l'export.
+const PG_DUMP_ARGUMENTS = [
+  '--format=plain',
+  '--no-owner',
+  '--no-privileges',
+  '--schema=public',
+] as const;
 
 const PG_DUMP_BINARY = 'pg_dump';
 

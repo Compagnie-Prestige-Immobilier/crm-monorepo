@@ -23,6 +23,25 @@ import 'token_store.dart';
 
 const String repCallAttemptEntity = 'rep_call_attempt';
 
+/// L'ouverture d'une fiche. Route REST dédiée et non `SyncEntity` : le verrou
+/// se joue sur un index unique, et une violation d'unicité dans la transaction
+/// de groupe annulerait les autres opérations du même représentant.
+const String ouvertureEntity = 'ouverture';
+
+/// Les entités poussées par une route dédiée. Un lot n'en mêle jamais deux :
+/// chacune a son propre envoi, et le lot de synchronisation n'en veut aucune.
+const Set<String> routesDediees = <String>{
+  repCallAttemptEntity,
+  ouvertureEntity,
+};
+
+String? _routeDedieeDe(OutboxData row) =>
+    routesDediees.contains(row.entityType) ? row.entityType : null;
+
+/// Un appel du journal du téléphone rapproché d'une fiche, que personne n'a
+/// consigné. Poussé par la route de synchronisation ordinaire.
+const String appelDetecteEntity = 'appel_detecte';
+
 class SyncEngine {
   SyncEngine({
     required AppDatabase database,
@@ -56,7 +75,14 @@ class SyncEngine {
   /// v3 : les commentaires d'une fiche remontent depuis la file hors ligne.
   /// v4 : les liens banque, syndicat et représentant d'un prospect peuvent
   /// être nuls ; le tirage exige ce numéro en en-tête et refuse en dessous.
-  static const int payloadVersion = 5;
+  /// v6 : la tentative auprès d'un représentant porte `statutQualificationId`.
+  /// v7 : le motif exigé par un statut (`requiresComment`) est lu et imposé
+  /// avant l'envoi. Les APK d'avant ne le lisent pas : servis, les deux statuts
+  /// « Autre » repartiraient sans motif, le serveur refuserait, et un refus
+  /// hors ligne est définitif.
+  /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
+  /// chaque statut ; en dessous, aucun statut ne descend.
+  static const int payloadVersion = 7;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -149,6 +175,13 @@ class SyncEngine {
 
         if (batch.first.entityType == repCallAttemptEntity) {
           final _SendReport report = await _sendRepCallAttempts(batch);
+          acknowledged += report.acknowledged;
+          if (!report.keepGoing) break;
+          continue;
+        }
+
+        if (batch.first.entityType == ouvertureEntity) {
+          final _SendReport report = await _sendOuvertures(batch);
           acknowledged += report.acknowledged;
           if (!report.keepGoing) break;
           continue;
@@ -319,8 +352,7 @@ class SyncEngine {
         if (row.status != OutboxStatus.pending) break;
         if (row.nextAttemptAt.isAfter(at)) break;
         if (batch.isNotEmpty &&
-            (row.entityType == repCallAttemptEntity) !=
-                (batch.first.entityType == repCallAttemptEntity)) {
+            _routeDedieeDe(row) != _routeDedieeDe(batch.first)) {
           return batch;
         }
 
@@ -359,9 +391,15 @@ class SyncEngine {
       return 'prospect:${prospectId is String ? prospectId : row.entityId}';
     }
     final Object? parent = data?['representantId'];
-    return parent is String && parent.isNotEmpty
-        ? 'representant:$parent'
-        : 'prospect:${row.entityId}';
+    if (parent is String && parent.isNotEmpty) return 'representant:$parent';
+    // Un appel détecté est identifié par sa PREUVE : sans le prospect qu'il
+    // vise, il partirait dans une partition à lui et pourrait doubler la
+    // tentative du même prospect.
+    final Object? prospect = data?['prospectId'];
+    if (row.entityType == appelDetecteEntity && prospect is String) {
+      return 'prospect:$prospect';
+    }
+    return 'prospect:${row.entityId}';
   }
 
   static Object? _tryDecode(String payload) {
@@ -425,11 +463,21 @@ class SyncEngine {
     return first;
   }
 
+  /// Ces entités ne portent NI `rev` NI `server_updated_at` en local : la
+  /// réponse du serveur n'a aucune ligne à estampiller, et l'estampiller quand
+  /// même toucherait une table qui ne les connaît pas.
+  static const Set<String> _sansRevLocale = <String>{
+    callAttemptEntity,
+    repCallAttemptEntity,
+    appelDetecteEntity,
+  };
+
   static SyncEntity _entityOf(String entityType) => switch (entityType) {
     'representant' => SyncEntity.representant,
     'representant_comment' => SyncEntity.representantComment,
     'prospect' => SyncEntity.prospect,
     callAttemptEntity => SyncEntity.callAttempt,
+    appelDetecteEntity => SyncEntity.appelDetecte,
     'visite' => SyncEntity.visite,
     _ => throw FormatException('entité inconnue', entityType),
   };
@@ -652,6 +700,86 @@ class SyncEngine {
     return _SendReport(acknowledged: acknowledged, keepGoing: true);
   }
 
+  /// Une ouverture par requête, comme les tentatives : le lot de
+  /// synchronisation ne sait pas porter une route dédiée, et un refus du verrou
+  /// n'a pas à annuler l'ouverture suivante.
+  Future<_SendReport> _sendOuvertures(List<OutboxData> rows) async {
+    int acknowledged = 0;
+    for (int index = 0; index < rows.length; index++) {
+      final OutboxData row = rows[index];
+      try {
+        final Object? decoded = jsonDecode(row.payload);
+        if (decoded is! Map<String, dynamic>) {
+          throw const FormatException('payload non objet');
+        }
+        if (row.op == 'update') {
+          await _remonterLaPremiereSaisie(row.entityId, decoded);
+        } else {
+          final Object? brut = decoded['openedAt'];
+          final DateTime? openedAt = brut is String
+              ? DateTime.tryParse(brut)
+              : null;
+          if (openedAt == null) {
+            throw const FormatException('openedAt illisible');
+          }
+          await _api.ouvrirFiche(
+            OuvrirFicheDto(
+              id: row.entityId,
+              openedAt: openedAt,
+              representantId: decoded['representantId'] as String?,
+              prospectId: decoded['prospectId'] as String?,
+            ),
+          );
+        }
+        await _markDone(
+          row,
+          SyncOperationResultDto(
+            opId: row.id,
+            status: SyncOpStatus.applied,
+            entityId: row.entityId,
+            rev: null,
+            serverUpdatedAt: null,
+            errorCode: null,
+            error: null,
+          ),
+        );
+        acknowledged++;
+      } on FormatException catch (error) {
+        await _markFailed(
+          row,
+          ClientErrorCodes.payloadSchemaMismatch,
+          error.message,
+        );
+      } on ApiException catch (error) {
+        await _handleBatchFailure(rows.sublist(index), error);
+        return _SendReport(acknowledged: acknowledged, keepGoing: false);
+      }
+    }
+    return _SendReport(acknowledged: acknowledged, keepGoing: true);
+  }
+
+  /// L'heure du TERRAIN de la première saisie, remontée après coup. Sans elle,
+  /// une fiche traitée hors ligne arriverait sans départ de chronomètre et la
+  /// DMT ne compterait que les appels passés en ligne.
+  Future<void> _remonterLaPremiereSaisie(
+    String id,
+    Map<String, dynamic> payload,
+  ) async {
+    final Object? brut = payload['firstInputAt'];
+    final DateTime? at = brut is String ? DateTime.tryParse(brut) : null;
+    if (at == null) throw const FormatException('firstInputAt illisible');
+    final Object? draft = payload['draft'];
+    await _api.enregistrerBrouillonOuverture(
+      id: id,
+      corps: EnregistrerBrouillonDto(
+        draft: draft is Map<String, dynamic>
+            ? Map<String, Object>.from(draft)
+            : const <String, Object>{},
+        firstInputAt: at,
+      ),
+    );
+  }
+
   static const Set<String> _conflictCodes = <String>{
     ServerErrorCodes.revConflict,
     ServerErrorCodes.representantPhoneConflict,
@@ -824,9 +952,7 @@ class SyncEngine {
     required int? rev,
   }) async {
     if (rev == null) return;
-    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
-      return;
-    }
+    if (_sansRevLocale.contains(entityType)) return;
     await (_db.update(_db.outbox)..where(
           (Outbox o) =>
               o.entityType.equals(entityType) &
@@ -847,9 +973,7 @@ class SyncEngine {
   }) async {
     final bool clearDeletion = op != 'delete';
     if (rev == null && serverUpdatedAt == null && !clearDeletion) return;
-    if (entityType == callAttemptEntity || entityType == repCallAttemptEntity) {
-      return;
-    }
+    if (_sansRevLocale.contains(entityType)) return;
     if (entityType == 'representant') {
       await (_db.update(
         _db.representants,
@@ -1272,6 +1396,7 @@ class SyncEngine {
     _pulling = true;
     try {
       await pullCallOutcomeReasons();
+      await pullStatutsQualification();
       int applied = 0;
       String? cursor = await readCursor();
       bool listesBougees = false;
@@ -1373,6 +1498,53 @@ class SyncEngine {
                 sortOrder: Value<int>(r.sortOrder.toInt()),
                 color: Value<String?>(r.color),
                 minPayloadVersion: Value<int>(r.minPayloadVersion.toInt()),
+              ),
+            );
+      }
+    });
+    return items.length;
+  }
+
+  /// Le vocabulaire de qualification d'un représentant, REMPLACÉ en entier.
+  ///
+  /// Même route dédiée que les motifs d'appel, hors curseur keyset : un
+  /// téléphone déjà en service se peuple à la première synchronisation. Le
+  /// remplacement est franc, contrairement aux motifs : le champ est FACULTATIF
+  /// dans le contrat, et une tentative en file qui citerait un statut retiré
+  /// part sans lui plutôt qu'en échec définitif.
+  ///
+  /// L'ordre d'affichage se décide au serveur : le rang servi est recopié dans
+  /// `position`, faute de quoi la liste se réordonnerait toute seule.
+  Future<int> pullStatutsQualification() async {
+    final List<StatutQualificationDto> items;
+    try {
+      items = await _api.pullStatutsQualification(
+        payloadVersion: payloadVersion,
+      );
+    } on ApiException {
+      return 0;
+    }
+    if (items.isEmpty) return 0;
+    await _db.transaction(() async {
+      await _db.delete(_db.statutsQualification).go();
+      for (int rang = 0; rang < items.length; rang++) {
+        final StatutQualificationDto statut = items[rang];
+        await _db
+            .into(_db.statutsQualification)
+            .insertOnConflictUpdate(
+              StatutsQualificationCompanion.insert(
+                code: statut.code,
+                id: statut.id,
+                label: statut.label,
+                effect: statut.effect.value,
+                requiresCallback: Value<bool>(statut.requiresCallback),
+                retryAfterMinutes: Value<int?>(
+                  statut.retryAfterMinutes?.toInt(),
+                ),
+                relationStatus: Value<String?>(statut.relationStatus?.value),
+                isActive: Value<bool>(statut.isActive),
+                position: Value<int>(rang),
+                minPayloadVersion: Value<int>(statut.minPayloadVersion.toInt()),
               ),
             );
       }
@@ -2041,6 +2213,7 @@ class SyncEngine {
                 departementId: r.departementId,
                 iefId: Value<String?>(r.iefId),
                 relationStatus: Value<String>(r.relationStatus.value),
+                statutQualificationId: Value<String?>(r.statutQualificationId),
                 whatsappStatus: Value<String>(r.whatsappStatus.value),
                 whatsappE164: Value<String?>(r.whatsappE164),
                 profession: Value<String?>(r.profession),
@@ -2052,6 +2225,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(r.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(r.lastCallAt),
                 lastCallById: Value<String?>(r.lastCallById),
+                callAttemptCount: Value<int>(r.callAttemptCount.toInt()),
                 nextCallbackAt: Value<DateTime?>(r.nextCallbackAt),
                 createdById: r.createdById,
                 clientCreatedAt: r.clientCreatedAt,
@@ -2074,6 +2248,9 @@ class SyncEngine {
                   iefId: const CustomExpression<String>('excluded.ief_id'),
                   relationStatus: const CustomExpression<String>(
                     'excluded.relation_status',
+                  ),
+                  statutQualificationId: const CustomExpression<String>(
+                    'excluded.statut_qualification_id',
                   ),
                   whatsappStatus: const CustomExpression<String>(
                     'excluded.whatsapp_status',
@@ -2102,6 +2279,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   nextCallbackAt: const CustomExpression<DateTime>(
                     'excluded.next_callback_at',
                   ),
@@ -2113,9 +2293,18 @@ class SyncEngine {
                     'excluded.local_updated_at',
                   ),
                 ),
-                where: (Representants old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                // Un `rev` égal ne revient que sur une page rejouée ou après
+                // un curseur remis à zéro : la relire est sans effet, sauf
+                // pour les colonnes apparues depuis. Une saisie en file, elle,
+                // garde la main jusqu'à sa remontée.
+                where: (Representants old) => const CustomExpression<bool>(
+                  'excluded.rev > representants.rev OR ('
+                  'excluded.rev = representants.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = representants.id '
+                  'OR o.dependency_key = representants.id)))',
+                ),
               ),
             );
         count++;
@@ -2154,6 +2343,7 @@ class SyncEngine {
                 lastCallOutcome: Value<String?>(p.lastCallOutcome?.value),
                 lastCallAt: Value<DateTime?>(p.lastCallAt),
                 lastCallById: Value<String?>(p.lastCallById),
+                callAttemptCount: Value<int>(p.callAttemptCount.toInt()),
                 createdById: p.ownedByCommercialId,
                 statut: Value<String>(p.statut.value),
                 clientCreatedAt: p.clientCreatedAt,
@@ -2237,6 +2427,9 @@ class SyncEngine {
                   lastCallById: const CustomExpression<String>(
                     'excluded.last_call_by_id',
                   ),
+                  callAttemptCount: const CustomExpression<int>(
+                    'excluded.call_attempt_count',
+                  ),
                   statut: const CustomExpression<String>('excluded.statut'),
                   rev: const CustomExpression<int>('excluded.rev'),
                   serverUpdatedAt: const CustomExpression<DateTime>(
@@ -2249,9 +2442,15 @@ class SyncEngine {
                     'excluded.deleted_at',
                   ),
                 ),
-                where: (Prospects old) => const CustomExpression<int>(
-                  'excluded.rev',
-                ).isBiggerThan(old.rev),
+                where: (Prospects old) => const CustomExpression<bool>(
+                  'excluded.rev > prospects.rev OR ('
+                  'excluded.rev = prospects.rev AND NOT EXISTS ('
+                  'SELECT 1 FROM outbox o WHERE o.status IN '
+                  "('pending', 'syncing', 'conflict', 'failed') "
+                  'AND (o.entity_id = prospects.id '
+                  'OR o.dependency_key = prospects.id '
+                  "OR o.dependency_key = 'phase2:' || prospects.id)))",
+                ),
               ),
             );
         // Les parcours, sans arbitrage : un parcours s'ouvre et ne se ferme

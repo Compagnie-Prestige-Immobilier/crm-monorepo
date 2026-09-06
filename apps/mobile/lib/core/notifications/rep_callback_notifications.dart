@@ -4,6 +4,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:timezone/timezone.dart' as tz;
 
+import '../../data/local/database.dart';
 import '../providers/app_providers.dart';
 import '../sync/clock.dart';
 import '../utils/phone.dart';
@@ -144,6 +145,29 @@ class RepCallbackNotifications {
       androidScheduleMode: mode,
       payload: payload,
     );
+  }
+
+  /// Réarme toutes les alarmes encore dues. Idempotent : `schedule` annule
+  /// d'abord, et les identifiants système sont dérivés du rappel.
+  ///
+  /// Après un redémarrage, ou quand la permission d'alarme exacte n'a été
+  /// accordée qu'APRÈS la promesse, c'est le seul geste qui remet les alarmes
+  /// en place.
+  /// Un rappel dont l'heure est PASSÉE n'est pas réarmé : le greffon refuse une
+  /// alarme dans le passé, et le retard se rattrape à l'écran
+  /// ([RepCallbackDueListener]).
+  Future<void> reprogrammerTout(List<RepCallbackReminder> rappels) async {
+    final DateTime maintenant = _clock.now();
+    for (final RepCallbackReminder rappel in rappels) {
+      if (!rappel.scheduledAt.isAfter(maintenant)) continue;
+      await schedule(
+        id: rappel.id,
+        representantId: rappel.representantId,
+        fullName: rappel.fullName,
+        phoneE164: rappel.phoneE164,
+        at: rappel.scheduledAt,
+      );
+    }
   }
 
   Future<void> cancel(String id) async {

@@ -1,6 +1,6 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ActivityView } from '@/components/supervision/activity-view';
 import type * as CsvModule from '@/lib/csv';
@@ -17,8 +17,15 @@ vi.mock('@/lib/csv', async () => {
   return { ...actual, downloadCsv: downloadMock };
 });
 
+vi.mock('@/lib/data/ouvertures', () => ({ fetchComptageOuvertures: comptageMock }));
+
 const fetchMock = vi.hoisted(() => vi.fn());
 const downloadMock = vi.hoisted(() => vi.fn());
+const comptageMock = vi.hoisted(() => vi.fn());
+
+beforeEach(() => {
+  comptageMock.mockResolvedValue([]);
+});
 
 const ALICE = '11111111-1111-1111-1111-111111111111';
 const BINETA = '22222222-2222-2222-2222-222222222222';
@@ -34,6 +41,10 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         teleconseillerId: ALICE,
         teleconseillerName: 'Alice Diop',
         calls: 4,
+        confirmedCalls: 3,
+        detectedCalls: 5,
+        unloggedCalls: 2,
+        avgCallSeconds: 95,
         unreachable: 1,
         wrongNumber: 1,
         refused: 1,
@@ -44,6 +55,10 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         prospectsCreated: 2,
         representantsContacted: 2,
         repCalls: 10,
+        repConfirmedCalls: 7,
+        repDetectedCalls: 9,
+        repUnloggedCalls: 2,
+        repAvgCallSeconds: 140,
         repReached: 6,
         repCallback: 2,
         repUnreachable: 2,
@@ -53,6 +68,14 @@ function payload(overrides: Partial<AdminModule.SupervisionActivity> = {}) {
         repQuestioned: 5,
         repQualified: 4,
         repQualificationRate: 80,
+        inboundCalls: 1,
+        missedCalls: 2,
+        callbacksHonored: 1,
+        callbacksLate: 1,
+        callbacksUpcoming: 2,
+        repCallbacksHonored: 3,
+        repCallbacksLate: 1,
+        repCallbacksUpcoming: 0,
       },
     ],
     teleconseillers: [
@@ -124,8 +147,8 @@ describe('tableau d’activité des téléconseillers', () => {
           {
             ...payload().items[0],
             calls: 3,
-            unreachable: 2,
-            wrongNumber: 1,
+            unreachable: 3,
+            wrongNumber: 0,
             reachRate: 0,
           } as AdminModule.ActivityRow,
         ],
@@ -137,8 +160,8 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[5]?.textContent).toBe('0 %');
-    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[5]?.textContent).toBe('Sans objet');
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')[14]?.textContent).toBe('0 %');
+    expect(within(rowOf('Bineta Fall')).getAllByRole('cell')[14]?.textContent).toBe('Sans objet');
   });
 
   it('compte les appels aux représentants en CHUES, ceux aux prospects en Grand Public', async () => {
@@ -150,8 +173,8 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(chues[0]?.textContent).toBe('10');
-    expect(chues[4]?.textContent).toBe('60 %');
-    expect(chues[5]?.textContent).toBe('80 %');
+    expect(chues[12]?.textContent).toBe('60 %');
+    expect(chues[13]?.textContent).toBe('80 %');
     expect(screen.queryByRole('button', { name: /Faux numéros/u })).toBeNull();
     unmount();
 
@@ -161,8 +184,11 @@ describe('tableau d’activité des téléconseillers', () => {
     });
     const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
     expect(gp[0]?.textContent).toBe('4');
-    // Un faux numéro compte parmi les injoignables.
-    expect(gp[2]?.textContent).toBe('2');
+    // Un faux numéro est une fiche traitée : sa colonne est à part, et il ne
+    // sort plus la joignabilité comme le faisait un numéro qui n'a pas décroché.
+    expect(gp[7]?.textContent).toBe('1');
+    expect(gp[8]?.textContent).toBe('1');
+    expect(gp[14]?.textContent).toBe('75 %');
     expect(screen.queryByRole('button', { name: 'Appels prospects' })).toBeNull();
   });
 
@@ -173,12 +199,12 @@ describe('tableau d’activité des téléconseillers', () => {
     await waitFor(() => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
 
     await userEvent.click(screen.getByRole('button', { name: 'Appels prospects' }));
 
     const cells = within(rowOf('Alice Diop')).getAllByRole('cell');
-    expect(cells).toHaveLength(7);
+    expect(cells).toHaveLength(16);
     expect(cells[0]?.textContent).toBe('4');
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
 
@@ -186,6 +212,27 @@ describe('tableau d’activité des téléconseillers', () => {
     const csv = downloadMock.mock.calls.at(-1)?.[0] as string;
     expect(csv).toContain('Appels prospects');
     expect(downloadMock.mock.calls.at(-1)?.[1]).toContain('chues-prospects');
+  });
+
+  it('montre les appels confirmés par le journal du téléphone, et leur part', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    const { unmount } = renderWithQuery(<ActivityView projet="CHUES" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const chues = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(chues[1]?.textContent).toBe('7');
+    expect(chues[4]?.textContent).toBe('70 %');
+    unmount();
+
+    renderWithQuery(<ActivityView projet="GRAND_PUBLIC" />);
+    await waitFor(() => {
+      expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
+    });
+    const gp = within(rowOf('Alice Diop')).getAllByRole('cell');
+    expect(gp[1]?.textContent).toBe('3');
+    expect(gp[4]?.textContent).toBe('75 %');
   });
 
   it('affiche le total d’équipe et la moyenne par téléconseiller', async () => {
@@ -262,8 +309,8 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.queryByRole('button', { name: /Représentants contactés/u })).toBeNull();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(7);
-    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(7);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
+    expect(within(rowOf('Total équipe')).getAllByRole('cell')).toHaveLength(16);
   });
 
   it('la garde en CHUES, et nomme le projet dans le CSV', async () => {
@@ -275,7 +322,7 @@ describe('tableau d’activité des téléconseillers', () => {
       expect(screen.getByRole('rowheader', { name: /Alice Diop/u })).toBeTruthy();
     });
     expect(screen.getByRole('button', { name: /Représentants contactés/u })).toBeTruthy();
-    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(8);
+    expect(within(rowOf('Alice Diop')).getAllByRole('cell')).toHaveLength(16);
 
     await userEvent.click(screen.getByRole('button', { name: 'Exporter en CSV' }));
 
@@ -393,5 +440,54 @@ describe('rendement sur la période', () => {
     await render([]);
 
     expect(screen.getByText(/un dimanche ou un congé ne fait pas baisser la note/u)).toBeTruthy();
+  });
+});
+
+describe('fiches ouvertes, par téléconseiller et par jour', () => {
+  const table = (): HTMLElement =>
+    screen.getByRole('table', { name: /Fiches ouvertes, par téléconseiller et par jour/u });
+
+  it('compte les ouvertures du jour et la durée moyenne de traitement', async () => {
+    fetchMock.mockResolvedValue(payload());
+    comptageMock.mockResolvedValue([
+      {
+        openedById: ALICE,
+        openedByName: 'Alice Diop',
+        jour: '2026-08-17',
+        ouvertures: 12,
+        dureeMoyenneSecondes: 180,
+      },
+      {
+        openedById: BINETA,
+        openedByName: 'Bineta Fall',
+        jour: '2026-08-17',
+        ouvertures: 3,
+        dureeMoyenneSecondes: null,
+      },
+    ]);
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(table()).toBeTruthy();
+    });
+    const lignes = within(table()).getAllByRole('row').slice(1);
+    expect(lignes[0]?.textContent).toContain('Alice Diop');
+    expect(lignes[0]?.textContent).toContain('12');
+    expect(lignes[0]?.textContent).toContain('3 min');
+    expect(lignes[1]?.textContent).toContain('Bineta Fall');
+    expect(lignes[1]?.textContent).toContain('Sans objet');
+  });
+
+  it('dit quoi faire quand aucune fiche n’a été ouverte sur la période', async () => {
+    fetchMock.mockResolvedValue(payload());
+
+    renderWithQuery(<ActivityView projet="CHUES" />);
+
+    await waitFor(() => {
+      expect(
+        within(table()).getByText('Aucune fiche ouverte sur la période. Élargissez les dates.'),
+      ).toBeTruthy();
+    });
   });
 });

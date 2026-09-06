@@ -168,10 +168,13 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.tauxDeContact: 'taux-de-contact',
   DashboardSource.aRappeler: 'a-rappeler',
   DashboardSource.tauxDeQualification: 'taux-de-qualification',
+  DashboardSource.repartitionStatutsQualification:
+      'repartition-statuts-qualification',
   DashboardSource.tauxDeJoignabilite: 'taux-de-joignabilite',
   DashboardSource.prospectsNotes: 'prospects-notes',
   DashboardSource.adhesions: 'adhesions',
   DashboardSource.resteAAppeler: 'reste-a-appeler',
+  DashboardSource.fichesOuvertes: 'fiches-ouvertes',
   DashboardSource.parTeleconseiller: 'par-teleconseiller',
   DashboardSource.couvertureDerniereCampagne: 'couverture-derniere-campagne',
   DashboardSource.horsAttributionDerniereCampagne:
@@ -182,6 +185,12 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.parBanque: 'par-banque',
   DashboardSource.delaisMedians: 'delais-medians',
   DashboardSource.rendementParDepartement: 'rendement-par-departement',
+  DashboardSource.enrolementInscriptions: 'enrolement-inscriptions',
+  DashboardSource.enrolementTauxRapprochement: 'enrolement-taux-rapprochement',
+  DashboardSource.enrolementTauxConversion: 'enrolement-taux-conversion',
+  DashboardSource.enrolementParJour: 'enrolement-par-jour',
+  DashboardSource.enrolementParEtape: 'enrolement-par-etape',
+  DashboardSource.enrolementParTeleconseiller: 'enrolement-par-teleconseiller',
   DashboardSource.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

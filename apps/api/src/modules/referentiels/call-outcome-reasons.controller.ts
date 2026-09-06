@@ -5,6 +5,7 @@ import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
 import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 import { CallOutcomeReasonsService } from './call-outcome-reasons.service.js';
 import {
   CallOutcomeReasonDto,
@@ -18,6 +19,7 @@ import {
 @ApiTags('call-outcome-reasons')
 @ApiBearerAuth()
 @ApiErrors({ 400: true, 401: true, 403: true })
+@Cached(60, 'referentiels')
 @Controller({ path: 'call-outcome-reasons', version: '1' })
 export class CallOutcomeReasonsController {
   constructor(private readonly reasons: CallOutcomeReasonsService) {}

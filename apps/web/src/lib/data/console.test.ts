@@ -11,6 +11,7 @@ import {
   conversionFrom,
   fetchCallbacks,
   formatCallbackAt,
+  lireBrouillon,
   formatDelay,
   pushCallAttempt,
   sortCallbacks,
@@ -361,6 +362,38 @@ describe('validateConversion', () => {
   it('refuse une date de rendez-vous sur toute autre méthode', () => {
     const draft = conversion({ method: 'PLATFORM', rendezVousAt: '2026-08-20T09:00' });
     expect(validateConversion(draft, NOW).rendezVousAt).toMatch(/Prise de rendez-vous/);
+  });
+});
+
+describe('lireBrouillon', () => {
+  it('rend le commentaire ET le dossier deja saisi', () => {
+    const garde = { comment: 'il est en réunion', conversion: conversion({ banqueId: 'b-7' }) };
+
+    const repris = lireBrouillon(garde);
+
+    expect(repris.comment).toBe('il est en réunion');
+    expect(repris.conversion).toEqual(conversion({ banqueId: 'b-7' }));
+  });
+
+  it('rend un formulaire vide plutôt qu’une erreur sur un brouillon abîmé', () => {
+    for (const abime of [null, undefined, 'texte', 42, [], { comment: 12 }]) {
+      expect(lireBrouillon(abime)).toEqual({ comment: '', conversion: null });
+    }
+  });
+
+  it('garde le commentaire quand le dossier vient d’une version antérieure', () => {
+    const ancien = {
+      comment: 'à rappeler lundi',
+      conversion: { nom: 'Diallo', banque: 'CBAO' },
+    };
+
+    expect(lireBrouillon(ancien)).toEqual({ comment: 'à rappeler lundi', conversion: null });
+  });
+
+  it('refuse une valeur que le formulaire ne saurait pas afficher', () => {
+    const inconnu = { comment: '', conversion: conversion({ method: 'TELEPATHIE' as never }) };
+
+    expect(lireBrouillon(inconnu).conversion).toBeNull();
   });
 });
 

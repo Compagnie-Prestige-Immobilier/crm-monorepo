@@ -190,7 +190,7 @@ void main() {
     expect(find.text('Ousmane Fall'), findsOneWidget);
     expect(find.text('Aminata Ba'), findsNothing);
     expect(find.text('Joint'), findsOneWidget);
-    expect(find.text('Ambassadeur'), findsOneWidget);
+    expect(find.text('A accepté'), findsNothing);
 
     await tester.tap(find.text('Ousmane Fall'));
     await settle(tester);

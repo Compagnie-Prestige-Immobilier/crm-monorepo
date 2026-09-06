@@ -7,6 +7,7 @@ import '../../core/sync/clock.dart';
 import '../../core/sync/outbox_status.dart';
 import '../../core/sync/phase2_directory_sync.dart';
 import '../../core/sync/sync_engine.dart';
+import '../../core/telephonie/preuve_appel.dart';
 import '../../core/utils/ids.dart';
 import '../../core/utils/phone.dart';
 import '../../core/utils/whatsapp.dart';
@@ -357,12 +358,16 @@ class WriteRepository {
     String whatsappStatus = 'NON_DEMANDE',
     String? whatsappE164,
     String? profession,
+    // Nul : inchangé. Vide : effacé. Le serveur lit la même distinction, et
+    // sans elle un prénom retiré sur le terrain revenait au pull suivant.
+    String? prenom,
     String? relationStatus,
     String? relationReason,
     String? draftId,
   }) async {
     final DateTime now = _clock.now();
     final String? whatsapp = _whatsappE164For(whatsappStatus, whatsappE164);
+    final String? prenomSaisi = prenom?.trim();
     await _db.transaction(() async {
       final Representant current = await (_db.select(
         _db.representants,
@@ -379,6 +384,9 @@ class WriteRepository {
           whatsappStatus: Value<String>(whatsappStatus),
           whatsappE164: Value<String?>(whatsapp),
           profession: Value<String?>(profession),
+          prenom: prenomSaisi == null
+              ? const Value<String?>.absent()
+              : Value<String?>(prenomSaisi.isEmpty ? null : prenomSaisi),
           relationStatus: relationStatus == null
               ? const Value<String>.absent()
               : Value<String>(relationStatus),
@@ -401,6 +409,7 @@ class WriteRepository {
           'whatsappStatus': whatsappStatus,
           'whatsappE164': whatsapp,
           'profession': profession,
+          'prenom': ?prenomSaisi,
           // Absent tant que rien n'a bougé : le serveur ne rejoue une bascule
           // que sur une demande explicite, un renvoi systematique remplirait la
           // chronologie de la relation de lignes sans geste derriere.
@@ -856,6 +865,7 @@ class WriteRepository {
     required String prospectId,
     required String outcome,
     required String createdById,
+    String? ouvertureId,
     String? reasonCode,
     String? method,
     String? comment,
@@ -937,6 +947,31 @@ class WriteRepository {
           lastCallById: Value<String?>(createdById),
         ),
       );
+      await _db.customStatement(
+        'UPDATE prospects SET call_attempt_count = call_attempt_count + 1 '
+        'WHERE id = ?',
+        <Object>[prospectId],
+      );
+      final PreuvesAppelData? preuve = await _consommerPreuve(
+        kind: 'prospect',
+        entityId: prospectId,
+        attemptId: entityId,
+        now: now,
+      );
+      // Le verrou se lève ici et pas dans l'écran : une qualification
+      // enregistrée par un autre chemin doit rendre la fiche elle aussi.
+      if (ouvertureId != null) {
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(ouvertureId) & o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(
+                closedAt: Value<DateTime?>(now),
+                closingAttemptId: Value<String?>(entityId),
+              ),
+            );
+      }
       await _enqueue(
         dependencyKey: 'phase2:$prospectId',
         entityType: callAttemptEntity,
@@ -944,6 +979,9 @@ class WriteRepository {
         op: 'create',
         payload: <String, Object?>{
           'prospectId': prospectId,
+          // Ferme l'ouverture côté serveur, et c'est ce qui arrête le
+          // chronomètre. Une ouverture inconnue y est ignorée en silence.
+          'ouvertureId': ?ouvertureId,
           'outcome': reason.outcome,
           'reasonCode': reason.code,
           'method': ?method,
@@ -965,6 +1003,9 @@ class WriteRepository {
           'rendezVousAt': ?rendezVousAt?.toUtc().toIso8601String(),
           'clientCreatedAt': now.toUtc().toIso8601String(),
           '_recordingPath': ?recordingPath,
+          'deviceCallType': ?preuve?.journalType,
+          'deviceCallDurationSeconds': ?preuve?.journalDureeS,
+          'deviceCallAt': ?preuve?.journalAt?.toUtc().toIso8601String(),
         },
         now: now,
       );
@@ -1009,6 +1050,9 @@ class WriteRepository {
     String? syndicat,
     bool? numeroConfirme,
     String? numeroSaisi,
+    String? statutQualificationId,
+    String? ouvertureId,
+    String? createdByName,
     String? id,
   }) async {
     final String entityId = id ?? Ids.newId();
@@ -1072,6 +1116,9 @@ class WriteRepository {
           contacte: contacte == null
               ? const Value<bool?>.absent()
               : Value<bool?>(contacte),
+          statutQualificationId: statutQualificationId == null
+              ? const Value<String?>.absent()
+              : Value<String?>(statutQualificationId),
           // Le résumé du dernier appel vient du serveur au pull. L'écrire AUSSI
           // ici est ce qui fait apparaître la fiche dans « Mes contacts » et
           // « Injoignables » hors ligne, sans attendre la remontée.
@@ -1081,6 +1128,11 @@ class WriteRepository {
           nextCallbackAt: Value<DateTime?>(callbackAt),
           localUpdatedAt: Value<DateTime>(now),
         ),
+      );
+      await _db.customStatement(
+        'UPDATE representants SET call_attempt_count = call_attempt_count + 1 '
+        'WHERE id = ?',
+        <Object>[representantId],
       );
       if (callbackAt != null) {
         await _db
@@ -1093,6 +1145,48 @@ class WriteRepository {
                 phoneE164: representant?.phoneE164 ?? '',
                 scheduledAt: callbackAt,
                 createdAt: now,
+              ),
+            );
+      }
+      final PreuvesAppelData? preuve = await _consommerPreuve(
+        kind: 'representant',
+        entityId: representantId,
+        attemptId: entityId,
+        now: now,
+      );
+      // L'historique de la fiche, relu HORS LIGNE à l'ouverture suivante :
+      // aucune route ne le redescend, il n'existe que s'il est écrit ici.
+      await _db
+          .into(_db.repCallAttempts)
+          .insert(
+            RepCallAttemptsCompanion.insert(
+              id: entityId,
+              representantId: representantId,
+              createdById: Value<String?>(createdById),
+              createdByName: Value<String?>(createdByName),
+              outcome: outcome,
+              statutQualificationId: Value<String?>(statutQualificationId),
+              relationStatus: Value<String?>(relationStatus),
+              comment: Value<String?>(normalizedComment),
+              contacte: Value<bool?>(contacte),
+              connaitUes: Value<bool?>(connaitUES),
+              syndicat: Value<String?>(normalizedSyndicat),
+              etablissement: Value<String?>(nouvelEtablissement),
+              callbackAt: Value<DateTime?>(callbackAt),
+              clientCreatedAt: now,
+            ),
+          );
+      // Le verrou se lève ici et pas dans l'écran : une qualification
+      // enregistrée par un autre chemin doit rendre la fiche elle aussi.
+      if (ouvertureId != null) {
+        await (_db.update(_db.ouverturesFiche)..where(
+              (OuverturesFiche o) =>
+                  o.id.equals(ouvertureId) & o.closedAt.isNull(),
+            ))
+            .write(
+              OuverturesFicheCompanion(
+                closedAt: Value<DateTime?>(now),
+                closingAttemptId: Value<String?>(entityId),
               ),
             );
       }
@@ -1123,12 +1217,96 @@ class WriteRepository {
           'syndicat': ?normalizedSyndicat,
           'numeroConfirme': ?numeroConfirme,
           'phone': ?nouveauNumero,
+          'statutQualificationId': ?statutQualificationId,
+          // Ferme l'ouverture côté serveur, et c'est ce qui arrête le
+          // chronomètre. Une ouverture inconnue y est ignorée en silence.
+          'ouvertureId': ?ouvertureId,
           'clientCreatedAt': now.toUtc().toIso8601String(),
+          'deviceCallType': ?preuve?.journalType,
+          'deviceCallDurationSeconds': ?preuve?.journalDureeS,
+          'deviceCallAt': ?preuve?.journalAt?.toUtc().toIso8601String(),
         },
         now: now,
       );
     });
     return entityId;
+  }
+
+  /// Un appel retrouvé dans le journal du téléphone : la preuve reste locale
+  /// tant qu'il n'est pas consigné, et l'opération part au serveur pour que le
+  /// superviseur voie l'appel non consigné. Rend l'identifiant de la preuve.
+  Future<String> enregistrerAppelDetecte({
+    required String kind,
+    required String entityId,
+    required String phoneE164,
+    required String journalType,
+    required int dureeSecondes,
+    required DateTime journalAt,
+  }) async {
+    final DateTime now = _clock.now();
+    final String preuveId = Ids.newId();
+    await _db.transaction(() async {
+      await _db
+          .into(_db.preuvesAppel)
+          .insert(
+            PreuvesAppelCompanion.insert(
+              id: preuveId,
+              kind: kind,
+              entityId: entityId,
+              phoneE164: phoneE164,
+              // L'appel n'a pas été lancé d'ici : son heure de départ est celle
+              // que le journal a inscrite.
+              lanceAt: journalAt,
+              mode: 'detecte',
+              journalType: Value<String?>(journalType),
+              journalDureeS: Value<int?>(dureeSecondes),
+              journalAt: Value<DateTime?>(journalAt),
+              rapprocheAt: Value<DateTime?>(now),
+            ),
+          );
+      await _enqueue(
+        dependencyKey: kind == 'representant' ? entityId : 'phase2:$entityId',
+        entityType: appelDetecteEntity,
+        entityId: preuveId,
+        op: 'create',
+        payload: <String, Object?>{
+          if (kind == 'representant')
+            'representantId': entityId
+          else
+            'prospectId': entityId,
+          'deviceCallType': journalType,
+          'deviceCallDurationSeconds': dureeSecondes,
+          'deviceCallAt': journalAt.toUtc().toIso8601String(),
+          'detectedAt': now.toUtc().toIso8601String(),
+        },
+        now: now,
+      );
+    });
+    return preuveId;
+  }
+
+  /// La preuve du dernier appel LANCÉ depuis la fiche, ou RETROUVÉ dans le
+  /// journal, marquée comme consommée par cette tentative. Nulle quand le
+  /// numéro a été composé ailleurs, ou quand le journal n'a rien confirmé.
+  Future<PreuvesAppelData?> _consommerPreuve({
+    required String kind,
+    required String entityId,
+    required String attemptId,
+    required DateTime now,
+  }) async {
+    final PreuvesAppelData? preuve = await _db
+        .preuveAConsommer(
+          kind: kind,
+          entityId: entityId,
+          seuilSecondes:
+              now.subtract(kFenetrePreuve).millisecondsSinceEpoch ~/ 1000,
+        )
+        .getSingleOrNull();
+    if (preuve == null) return null;
+    await (_db.update(_db.preuvesAppel)
+          ..where((PreuvesAppel row) => row.id.equals(preuve.id)))
+        .write(PreuvesAppelCompanion(attemptId: Value<String?>(attemptId)));
+    return preuve;
   }
 
   /// Efface les rappels promis à ce représentant : l'appel qui vient d'être

@@ -57,6 +57,8 @@ abstract final class Routes {
   static const String reglages = '/reglages';
   static const String batteryHelp = '/reglages/autorisations';
 
+  static const String diagnosticAndroid = '/reglages/diagnostic-android';
+
   static const String about = '/reglages/a-propos';
 
   static const String nextParam = 'next';
@@ -83,6 +85,13 @@ abstract final class Routes {
 
   static String representantQualificationFor(String id) =>
       '/representants/${Uri.encodeComponent(id)}/qualifier';
+
+  /// La fiche d'un prospect se rouvre par son numéro : l'écran le cherche dans
+  /// l'annuaire et retrouve l'ouverture en cours.
+  static String phase2Pour(String phoneE164) => Uri(
+    path: phase2,
+    queryParameters: <String, String>{prefillPhoneParam: phoneE164},
+  ).toString();
 
   static String newProspectFor(String representantId, {String? draftId}) {
     final Map<String, String> q = <String, String>{repParam: representantId};

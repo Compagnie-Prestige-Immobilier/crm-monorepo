@@ -8,7 +8,7 @@ import { VisitesService } from '../visites/visites.service.js';
 import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
-import { FakePrisma, type ProspectRow } from './fake-prisma.js';
+import { FakePrisma, fakeReminders, type ProspectRow } from './fake-prisma.js';
 import { SyncEntity, SyncOp, SyncOpStatus } from './dto.js';
 import type { SyncOperationDto, SyncPushDto } from './dto.js';
 
@@ -80,6 +80,7 @@ beforeEach(() => {
     new SyncBatchStore(prisma),
     new Phase2SyncService(),
     new VisitesService(prisma),
+    fakeReminders(),
   );
 });
 
@@ -347,5 +348,74 @@ describe('à qui appartient la fiche appelée', () => {
 
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
     expect(db.callAttempts.size).toBe(1);
+  });
+});
+
+describe('preuve d’appel remontée par le téléphone', () => {
+  it('le lot conserve le type, la durée et l’heure du journal Android', async () => {
+    const result = await sync.push(
+      alice,
+      push([
+        attempt(PROSPECT_A, {
+          deviceCallType: 'sortant',
+          deviceCallDurationSeconds: 92,
+          deviceCallAt: '2026-08-10T10:04:08.000Z',
+        }),
+      ]),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+
+    const ligne = [...db.callAttempts.values()][0];
+    expect(ligne?.deviceCallType).toBe('sortant');
+    expect(ligne?.deviceCallDurationSeconds).toBe(92);
+    expect(ligne?.deviceCallAt?.toISOString()).toBe('2026-08-10T10:04:08.000Z');
+  });
+
+  it('un lot sans preuve laisse les trois colonnes vides', async () => {
+    await sync.push(alice, push([attempt(PROSPECT_A)]));
+
+    const ligne = [...db.callAttempts.values()][0];
+    expect(ligne?.deviceCallType).toBeNull();
+    expect(ligne?.deviceCallDurationSeconds).toBeNull();
+    expect(ligne?.deviceCallAt).toBeNull();
+  });
+});
+
+describe('la tentative d’un prospect ferme l’ouverture qui la chronométrait', () => {
+  const OUVERTURE = '0198d000-0000-7000-8000-000000000001';
+
+  const seedOuverture = (openedById: string): void => {
+    db.ouverturesFiche.set(OUVERTURE, {
+      id: OUVERTURE,
+      openedById,
+      prospectId: PROSPECT_A,
+      openedAt: new Date('2026-08-10T10:00:00.000Z'),
+      closedAt: null,
+      closingAttemptId: null,
+    });
+  };
+
+  it('attache la tentative et lève le verrou dans la transaction du groupe', async () => {
+    seedOuverture(alice.id);
+    const operation = attempt(PROSPECT_A, { ouvertureId: OUVERTURE });
+
+    const result = await sync.push(alice, push([operation]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.ouverturesFiche.get(OUVERTURE)).toMatchObject({
+      closedAt: new Date('2026-08-10T10:05:00.000Z'),
+      closingAttemptId: operation.entityId,
+    });
+  });
+
+  // Un verrou tenu par quelqu'un d'autre ne condamne pas une saisie du terrain.
+  it('enregistre la tentative même quand l’ouverture appartient à un autre', async () => {
+    seedOuverture('com-omar');
+
+    const result = await sync.push(alice, push([attempt(PROSPECT_A, { ouvertureId: OUVERTURE })]));
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.ouverturesFiche.get(OUVERTURE)?.closedAt).toBeNull();
   });
 });

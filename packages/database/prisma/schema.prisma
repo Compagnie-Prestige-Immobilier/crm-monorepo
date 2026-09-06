@@ -174,6 +174,12 @@ enum PaymentMode {
 enum LotExportCible {
   REPRESENTANTS
   PROSPECTS
+  /// Dernier statut non joint, hors Injoignable definitif : la fiche n'a jamais
+  /// ete jointe et merite une nouvelle salve.
+  REPRESENTANTS_INJOIGNABLES
+  /// Les numeros donnes par un representant qui decline. Le lancement cree une
+  /// fiche representant pour chacun : `RepresentantSuggestion` n'en est pas une.
+  CONTACTS_RECOMMANDES
 }
 
 enum CallOutcome {
@@ -193,6 +199,39 @@ enum CallOutcome {
 // issues sans objet pour un prospect (« a promis une liste »), et les
 // statistiques de phase 2 compteraient alors des appels qui ne la concernent
 // pas.
+// Effet machine d'un statut de qualification de representant. Il dit a la fois
+// l'issue a enregistrer et, par consequence, la branche du script ou le statut
+// se propose : UNREACHABLE et WRONG_NUMBER appartiennent a l'appel qui n'a pas
+// abouti, les trois autres a celui qui a abouti.
+//
+// Pas de colonne « joignable » a cote : elle serait une seconde verite, qui
+// divergerait de l'effet a la premiere correction.
+// Ordre de reprise d'une fiche qualifiee. Une enumeration et non un entier :
+// un rang chiffre ne dit rien de ce qu'il classe, et c'est exactement ce qui a
+// fait retirer `sortOrder` de l'interface. L'ordre de DECLARATION est celui du
+// tri croissant en base.
+enum PrioriteTraitement {
+  HAUTE
+  NORMALE
+  BASSE
+}
+
+enum StatutQualificationEffect {
+  REACHED
+  REFUSED
+  SCHEDULE_CALLBACK
+  UNREACHABLE
+  WRONG_NUMBER
+}
+
+// D'ou vient l'echeance d'un rappel. Sans elle, la file mele la date convenue
+// avec le representant et le simple delai de reessai : deplacer la premiere est
+// une parole trahie, deplacer la seconde ne coute rien.
+enum RappelOrigine {
+  PROMIS
+  AUTOMATIQUE
+}
+
 enum RepCallOutcome {
   REACHED
   PROSPECTS_PROMISED
@@ -264,6 +303,7 @@ model User {
   conversionsConfirmed ProspectConversion[] @relation("ProspectConversionConfirmedBy")
 
   repCallAttempts         RepCallAttempt[]         @relation("RepCallAttemptPerformedBy")
+  deviceCallDetections    DeviceCallDetection[]    @relation("DeviceCallDetectionPerformedBy")
   representantsLastCalled Representant[]           @relation("RepresentantLastCallBy")
   prospectsLastCalled     Prospect[]               @relation("ProspectLastCallBy")
   repSuggestions          RepresentantSuggestion[] @relation("RepresentantSuggestionSuggestedBy")
@@ -291,17 +331,24 @@ model User {
   importJobs     ImportJob[]     @relation("ImportJobRequestedBy")
   segmentChanges SegmentChange[] @relation("SegmentChangeChangedBy")
 
+  fichesOuvertes OuvertureFiche[] @relation("OuvertureFicheOpenedBy")
+  fichesLiberees OuvertureFiche[] @relation("OuvertureFicheReleasedBy")
+
   scheduledCallbacks       ScheduledCallback[]          @relation("ScheduledCallbackAssignedTo")
   representantRelationsSet RepresentantRelationChange[] @relation("RepresentantRelationChangeChangedBy")
   representantComments     RepresentantComment[]        @relation("RepresentantCommentAuthor")
 
-  heartbeat AgentHeartbeat?
+  heartbeat     AgentHeartbeat?
   activitySlots AgentActivitySlot[]
 
   visitesEnregistrees Visite[]          @relation("VisiteCreatedBy")
   dashboardLayouts    DashboardLayout[] @relation("DashboardLayoutUser")
   lotsExport          LotExport[]       @relation("LotExportCreatedBy")
   lotExportItems      LotExportItem[]   @relation("LotExportItemAssignee")
+
+  reaffectationsRecues LotExportReaffectation[] @relation("LotExportReaffectationTo")
+  reaffectationsCedees LotExportReaffectation[] @relation("LotExportReaffectationFrom")
+  reaffectationsFaites LotExportReaffectation[] @relation("LotExportReaffectationBy")
 
   @@index([role, isActive])
   @@index([deletedAt])
@@ -498,6 +545,12 @@ model Representant {
   /// écran de qualification, pas la décision.
   contacte   Boolean?
 
+  /// Degre d'interet recueilli au dernier appel. NULLABLE et sans defaut : les
+  /// fiches deja en base n'ont jamais eu la question, et un defaut leur
+  /// inventerait une reponse.
+  statutQualificationId String?
+  statutQualification   StatutQualification? @relation(fields: [statutQualificationId], references: [id], onDelete: Restrict)
+
   /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `RepCallAttempt`
   /// pour que les listes « injoignables » et « à rappeler » se filtrent sur la
   /// fiche, et descendent au téléphone avec elle. `nextCallbackAt` est le
@@ -508,17 +561,25 @@ model Representant {
   lastCallBy      User?           @relation("RepresentantLastCallBy", fields: [lastCallById], references: [id], onDelete: Restrict)
   nextCallbackAt  DateTime?
 
+  /// Qui a fixe l'echeance : le representant lui-meme, ou le delai de reessai
+  /// de son statut. Un rappel promis se tient a l'heure dite ; un rappel
+  /// automatique se deplace sans rien trahir. Nulle en meme temps que
+  /// `nextCallbackAt`, contrainte CHECK.
+  nextCallbackOrigine RappelOrigine?
+
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  prospects           Prospect[]
-  repCallAttempts     RepCallAttempt[]
-  relationChanges     RepresentantRelationChange[]
-  comments            RepresentantComment[]
-  suggestionsGiven    RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
-  suggestionsResolved RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
-  lotItems            LotExportItem[]
+  prospects            Prospect[]
+  repCallAttempts      RepCallAttempt[]
+  deviceCallDetections DeviceCallDetection[]
+  relationChanges      RepresentantRelationChange[]
+  comments             RepresentantComment[]
+  suggestionsGiven     RepresentantSuggestion[]     @relation("RepresentantSuggestionSource")
+  suggestionsResolved  RepresentantSuggestion[]     @relation("RepresentantSuggestionResolved")
+  lotItems             LotExportItem[]
+  ouvertures           OuvertureFiche[]
 
   @@index([phoneE164])
   @@index([createdById])
@@ -535,6 +596,10 @@ model Representant {
   @@index([lastCallById, lastCallOutcome])
   @@index([nextCallbackAt])
   @@index([whatsappStatus])
+  // Filtre de l'annuaire, et axe de tirage d'un lot d'appels : le tirage borne
+  // par IEF avant de trier, d'ou le composite.
+  @@index([statutQualificationId])
+  @@index([statutQualificationId, iefId])
   @@map("representants")
 }
 
@@ -793,14 +858,19 @@ model Prospect {
   updatedAt DateTime  @updatedAt
   deletedAt DateTime?
 
-  callAttempts       CallAttempt[]
-  scheduledCallbacks ScheduledCallback[]
-  lotItems           LotExportItem[]
-  bankCases          BankCase[]
-  clientRequests     ClientCreationRequest[]
+  callAttempts         CallAttempt[]
+  deviceCallDetections DeviceCallDetection[]
+  scheduledCallbacks   ScheduledCallback[]
+  lotItems             LotExportItem[]
+  bankCases            BankCase[]
+  clientRequests       ClientCreationRequest[]
 
   segmentChanges SegmentChange[]
   journeys       ProspectJourney[]
+  ouvertures     OuvertureFiche[]
+
+  /// Le rapprochement vit du cote de l'inscription : rien n'est ecrit ici.
+  inscriptionsPlateforme InscriptionPlateforme[]
 
   @@index([phoneE164])
   @@index([representantId])
@@ -1010,12 +1080,12 @@ model AgentHeartbeat {
 /// Dakar tronquée, stockée en UTC, les deux ne différant jamais.
 model AgentActivitySlot {
   userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   slot   DateTime
 
-  firstSeenAt  DateTime
-  lastSeenAt   DateTime
-  activeSeconds Int @default(0)
+  firstSeenAt   DateTime
+  lastSeenAt    DateTime
+  activeSeconds Int      @default(0)
 
   @@id([userId, slot])
   @@index([slot])
@@ -1078,6 +1148,12 @@ model CallAttempt {
   /// Date du rendez-vous pris. Obligatoire si et seulement si la méthode vaut
   /// APPOINTMENT. Contrainte CHECK.
   rendezVousAt           DateTime?
+
+  /// Preuve lue dans le journal d'appels Android pour l'appel lancé depuis la
+  /// fiche. Nulle si la permission manque ou si l'appel n'a pas été retrouvé.
+  deviceCallType            String?
+  deviceCallDurationSeconds Int?
+  deviceCallAt              DateTime?
 
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
@@ -1165,6 +1241,17 @@ model RepCallAttempt {
   connaitUES            Boolean?
   syndicat              String?
 
+  /// Le statut dit pendant CET appel. La fiche garde l'etat courant ; cette
+  /// colonne garde la trace. Nullable : les versions deja installees ne
+  /// l'emettent pas.
+  statutQualificationId String?
+  statutQualification   StatutQualification? @relation(fields: [statutQualificationId], references: [id], onDelete: Restrict)
+
+  /// Preuve lue dans le journal d'appels Android. Voir `CallAttempt`.
+  deviceCallType            String?
+  deviceCallDurationSeconds Int?
+  deviceCallAt              DateTime?
+
   clientCreatedAt DateTime
   createdAt       DateTime @default(now())
 
@@ -1174,6 +1261,107 @@ model RepCallAttempt {
   @@index([performedById, createdAt])
   @@index([performedById, clientCreatedAt])
   @@map("rep_call_attempts")
+}
+
+/// Un appel retrouvé dans le journal Android d'un téléconseiller avec un
+/// numéro de fiche, sans avoir été lancé depuis l'app. `attemptId` pointe la
+/// tentative (prospect ou représentant) qui l'a consigné ensuite, sans clé
+/// étrangère : deux tables cibles.
+model DeviceCallDetection {
+  id             String        @id
+  performedById  String
+  performedBy    User          @relation("DeviceCallDetectionPerformedBy", fields: [performedById], references: [id], onDelete: Restrict)
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  deviceCallType            String
+  deviceCallDurationSeconds Int
+  deviceCallAt              DateTime
+  detectedAt                DateTime
+  attemptId                 String?
+  createdAt                 DateTime @default(now())
+
+  @@index([performedById, deviceCallAt])
+  @@index([representantId, deviceCallAt])
+  @@index([prospectId, deviceCallAt])
+  @@map("device_call_detections")
+}
+
+/// Une fiche ouverte apres confirmation, et ce que cette ouverture engage.
+///
+/// Quatre besoins tenaient dans la meme ligne, aucun ne survit sans les autres :
+/// le comptage des fiches ouvertes, le chronometre qui alimente la DMT, le
+/// verrou qui interdit de partir sans qualifier, et le brouillon a restituer.
+/// Les separer aurait demande de recoller quatre tables sur le meme evenement.
+///
+/// Une table pour les deux cibles, sur le patron de `DeviceCallDetection` et de
+/// `LotExportItem` : deux colonnes nullables, exactement une renseignee, la
+/// contrainte CHECK tient l'exclusivite. Deux tables jumelles obligeraient a
+/// dupliquer le verrou, le chronometre et leurs index.
+///
+/// Rien n'est jamais supprime ici : chaque ouverture confirmee compte, meme
+/// repetee le meme jour sur la meme fiche.
+model OuvertureFiche {
+  // UUID v7 engendre par le client : l'ouverture existe hors ligne avant
+  // d'atteindre le serveur, et sert de cle d'idempotence a sa remontee.
+  id String @id
+
+  openedById String
+  openedBy   User   @relation("OuvertureFicheOpenedBy", fields: [openedById], references: [id], onDelete: Restrict)
+
+  representantId String?
+  representant   Representant? @relation(fields: [representantId], references: [id], onDelete: Cascade)
+  prospectId     String?
+  prospect       Prospect?     @relation(fields: [prospectId], references: [id], onDelete: Cascade)
+
+  /// Horloge du terrain, comme `clientCreatedAt` ailleurs : c'est elle qui
+  /// date la journee de travail.
+  openedAt     DateTime
+  /// Horloge du terrain de la PREMIERE saisie, celle qui demarre le
+  /// chronometre : le temps de lecture de la fiche n'est pas du traitement.
+  /// Posee une seule fois, jamais reecrite, sans quoi la borne reculerait a
+  /// chaque frappe. Nulle tant que rien n'a ete saisi.
+  firstInputAt DateTime?
+  /// Nul tant que la fiche est verrouillee. La DMT est la difference avec
+  /// `firstInputAt`, jamais une colonne : une duree stockee se desaccorde de
+  /// ses deux bornes des la premiere correction.
+  closedAt     DateTime?
+
+  /// La tentative qui a leve le verrou. Sans cle etrangere : deux tables
+  /// cibles, comme `DeviceCallDetection.attemptId`.
+  closingAttemptId String?
+
+  /// Les reponses deja saisies, restituees au rappel et apres un plantage.
+  /// Forme libre : le formulaire d'un prospect et celui d'un representant ne
+  /// portent pas les memes champs, et un brouillon incomplet ne se range pas
+  /// dans les colonnes typees de la tentative.
+  draft Json?
+
+  /// Liberation par un superviseur ou un administrateur. Jamais automatique :
+  /// une fiche qu'une machine libere est une fiche qu'on croit traitee.
+  releasedById String?
+  releasedBy   User?     @relation("OuvertureFicheReleasedBy", fields: [releasedById], references: [id], onDelete: Restrict)
+  releasedAt   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  /// Fiches ouvertes par teleconseiller et par journee de travail.
+  @@index([openedById, openedAt])
+  /// La meme lecture toutes files confondues, pour le tableau de bord.
+  @@index([openedAt])
+  /// Le brouillon a restituer et l'historique des ouvertures d'une fiche.
+  @@index([representantId, openedAt])
+  @@index([prospectId, openedAt])
+  // Index du curseur de synchronisation : une liberation faite en supervision
+  // redescend au telephone par le pull, en `orderBy: [updatedAt, id]`.
+  @@index([updatedAt, id])
+  // Le verrou est UNIQUE par teleconseiller, en index PARTIEL
+  // (`WHERE "closedAt" IS NULL`) pose dans la migration : Prisma ne sait pas
+  // exprimer la clause `WHERE`. Voir `ouvertures_fiche_verrou_unique`.
+  @@map("ouvertures_fiche")
 }
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -2015,6 +2203,70 @@ model CallOutcomeReason {
 /// immuable puisque les visites déjà enregistrées le désignent, désactivation
 /// plutôt que suppression, `isSystem` pour ce que l'administration ne peut pas
 /// retirer des listes.
+/// Degre d'interet recueilli en qualifiant un representant, administrable.
+///
+/// Le script ne captait que la joignabilite : on ne distinguait pas celui qui
+/// refuse de celui qui redemande a etre rappele. Un referentiel et non une
+/// enumeration, parce que le vocabulaire commercial bouge et qu'une valeur
+/// figee dans le schema coute une migration, trois deploiements et une version
+/// d'APK sur le terrain.
+///
+/// Jamais supprime, seulement desactive : les fiches des annees passees
+/// continuent de le designer.
+model StatutQualification {
+  id String @id @default(uuid(7))
+
+  /// Immuable : l'historique le reference. Voir `CallOutcomeReason.code`.
+  code   String                    @unique
+  label  String                    @unique
+  effect StatutQualificationEffect
+
+  /// La date du rappel est exigee par CETTE ligne, jamais par le code.
+  requiresCallback Boolean @default(false)
+
+  /// Le motif est exige par CETTE ligne. Meme nom et meme role que sur
+  /// `CallOutcomeReason` : « Autre » ne dit rien tant qu'on ne l'a pas ecrit.
+  requiresComment Boolean @default(false)
+
+  /// Un numero occupe se retente : l'app propose d'elle-meme un reessai apres
+  /// ce delai, modifiable au moment de l'appel. Nul : pas de reessai propose.
+  retryAfterMinutes Int?
+
+  /// Dans quel ordre le plateau reprend les fiches : un « Tres interesse »
+  /// joint se rappelle avant un « Non eligible ». Se modifie, y compris sur une
+  /// ligne systeme : c'est un arbitrage du metier, pas une regle du script.
+  ///
+  /// L'ordre d'ASC suit l'ordre de declaration des valeurs : HAUTE d'abord.
+  priorite PrioriteTraitement @default(NORMALE)
+
+  /// La relation que ce statut POSE sur la fiche. Nulle quand le statut ne
+  /// tranche rien : un numero occupe ne dit rien de l'interet, et « a rappeler »
+  /// dit qu'on n'a pas encore tranche. Ce que le client envoie garde le dernier
+  /// mot ; cette colonne comble son silence.
+  relationStatus RepresentantRelation?
+
+  /// Le script s'appuie dessus : une ligne systeme se desactive, ne se supprime
+  /// pas, et ses regles ne se modifient pas.
+  isSystem  Boolean @default(false)
+  isActive  Boolean @default(true)
+  sortOrder Int     @default(100)
+
+  /// Version de charge utile minimale sachant emettre ce code. Comparee a la
+  /// version declaree par l'appelant SUR LA ROUTE DEDIEE : un telephone ne
+  /// recoit jamais un code qu'il ne sait pas renvoyer, qui finirait en erreur
+  /// definitive hors ligne, sans possibilite de correction.
+  minPayloadVersion Int @default(6)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  representants Representant[]
+  attempts      RepCallAttempt[]
+
+  @@index([isActive, sortOrder])
+  @@map("statuts_qualification")
+}
+
 model VisiteEntreprise {
   id    String @id @default(uuid(7))
   /// Immuable : le registre le référence. Voir `BankCaseStage.code`.
@@ -2201,7 +2453,8 @@ model LotExport {
   createdBy   User     @relation("LotExportCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt   DateTime @default(now())
 
-  items LotExportItem[]
+  items          LotExportItem[]
+  reaffectations LotExportReaffectation[]
 
   @@index([cible, createdAt])
   @@index([createdById, createdAt])
@@ -2231,6 +2484,33 @@ model LotExportItem {
   @@index([prospectId])
   @@index([lotId, assigneeId, day])
   @@map("lot_export_items")
+}
+
+/// Qui a deplace combien de fiches, de qui vers qui, et quand.
+///
+/// La repartition d'origine vit dans `LotExport.filters`, ecrasee a chaque
+/// reglage : sans cette table, un superviseur ne pourrait plus dire pourquoi un
+/// teleconseiller a rendu moins de fiches qu'il n'en avait recu.
+model LotExportReaffectation {
+  id    String    @id @default(uuid(7))
+  lotId String
+  lot   LotExport @relation(fields: [lotId], references: [id], onDelete: Cascade)
+
+  /// Nul quand les fiches n'etaient attribuees a personne.
+  fromAssigneeId String?
+  fromAssignee   User?   @relation("LotExportReaffectationFrom", fields: [fromAssigneeId], references: [id], onDelete: SetNull)
+  toAssigneeId   String
+  toAssignee     User    @relation("LotExportReaffectationTo", fields: [toAssigneeId], references: [id], onDelete: Restrict)
+
+  fiches Int
+
+  performedById String
+  performedBy   User   @relation("LotExportReaffectationBy", fields: [performedById], references: [id], onDelete: Restrict)
+
+  createdAt DateTime @default(now())
+
+  @@index([lotId, createdAt])
+  @@map("lot_export_reaffectations")
 }
 
 enum VisiteImportChangeKind {
@@ -2278,4 +2558,64 @@ model VisiteImportChange {
   @@unique([importJobId, sheet, rowNumber])
   @@index([importJobId, kind])
   @@map("visite_import_changes")
+}
+
+/// Une inscription lue sur la plateforme d'enrolement du projet.
+///
+/// La table est un MIROIR : rien n'y remonte vers le CRM, et le rapprochement
+/// avec un prospect vit ici, pas sur la fiche. La cellule pilotage lit ces
+/// lignes, personne d'autre.
+///
+/// `projet` + `identifiantDistant` est la cle d'idempotence du tirage : la
+/// plateforme est relue en entier a chaque passage, et une ligne deja vue est
+/// mise a jour au lieu d'etre redeposee.
+model InscriptionPlateforme {
+  id String @id @default(uuid(7))
+
+  projet             Projet
+  /// L'identifiant de la ligne CHEZ la plateforme, tel quel.
+  identifiantDistant String
+
+  nom       String
+  prenom    String
+  /// Normalise par `normalizePhone`, ou nul si la plateforme n'en donne pas
+  /// d'exploitable. Un numero vide ne rapproche RIEN.
+  phoneE164 String?
+  email     String?
+
+  /// Le statut rendu par la plateforme, tel quel. Deux plateformes, deux
+  /// vocabulaires : les figer dans une enumeration obligerait une migration a
+  /// chaque libelle ajoute en face.
+  statutDistant String
+  /// Grand Public : `dossier_etape`, 0 a 5. Nulle en CHUES, qui n'a pas d'etape
+  /// numerotee.
+  etapeDistante Int?
+
+  inscriteLe DateTime?
+  soumiseLe  DateTime?
+  decideeLe  DateTime?
+
+  /// La ligne n'est plus rendue par la plateforme. Marquee, jamais supprimee :
+  /// le lien vers le prospect et la charge utile restent lisibles.
+  disparueLe DateTime?
+
+  /// Le prospect du MEME projet reconnu au telephone puis a l'e-mail. Nul tant
+  /// qu'aucun ne correspond, et le lien ne s'ecrit que d'ici.
+  prospectId String?
+  prospect   Prospect? @relation(fields: [prospectId], references: [id], onDelete: SetNull)
+
+  /// La reponse brute de la plateforme, pour relire une ligne sans la retirer.
+  chargeUtile Json
+
+  premierTirageAt DateTime @default(now())
+  dernierTirageAt DateTime
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([projet, identifiantDistant])
+  @@index([projet, statutDistant])
+  @@index([projet, inscriteLe])
+  @@index([prospectId])
+  @@map("inscriptions_plateforme")
 }

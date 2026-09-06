@@ -248,26 +248,51 @@ export async function fetchSupervisionActivite(
 
 const COUNT_KEYS = [
   'repCalls',
+  'repConfirmedCalls',
+  'repDetectedCalls',
+  'repUnloggedCalls',
   'repReached',
   'repCallback',
   'repUnreachable',
+  'repCallbacksHonored',
+  'repCallbacksLate',
+  'repCallbacksUpcoming',
   'repQuestioned',
   'repQualified',
   'representantsContacted',
   'calls',
+  'confirmedCalls',
+  'detectedCalls',
+  'unloggedCalls',
   'methodObtained',
   'unreachable',
+  'wrongNumber',
   'refused',
   'callback',
+  'callbacksHonored',
+  'callbacksLate',
+  'callbacksUpcoming',
   'prospectsCreated',
 ] as const;
 
 type ActivityCountKey = (typeof COUNT_KEYS)[number];
-type ActivityRateKey = 'repContactRate' | 'repQualificationRate' | 'reachRate';
+type ActivityRateKey =
+  | 'repContactRate'
+  | 'repQualificationRate'
+  | 'reachRate'
+  | 'confirmRate'
+  | 'repConfirmRate'
+  | 'avgCallSeconds'
+  | 'repAvgCallSeconds';
 export type ActivityKey = ActivityCountKey | ActivityRateKey;
 
+/**
+ * `callSeconds` ne vient pas de l'API : c'est le numérateur reconstitué de la
+ * durée moyenne. Sans lui, agréger plusieurs lignes reviendrait à moyenner des
+ * moyennes, ce qui donne le mauvais chiffre dès que les volumes diffèrent.
+ */
 export type ActivityCounts = Record<ActivityCountKey, number> &
-  Record<ActivityRateKey, number | null>;
+  Record<ActivityRateKey, number | null> & { callSeconds: number; repCallSeconds: number };
 export type ActivityLine = ActivityCounts & {
   id: string;
   name: string;
@@ -281,6 +306,8 @@ export interface ActivityColumn {
   key: ActivityKey;
   label: string;
   taux?: boolean;
+  /** Une durée en secondes, affichée en minutes et secondes. */
+  duree?: boolean;
 }
 
 /**
@@ -298,9 +325,18 @@ export const FAMILLE_LABELS: Record<ActivityFamille, string> = {
 export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   representants: [
     { key: 'repCalls', label: 'Appels' },
+    { key: 'repConfirmedCalls', label: 'Confirmés' },
+    { key: 'repDetectedCalls', label: 'Détectés' },
+    { key: 'repUnloggedCalls', label: 'Non consignés' },
+    { key: 'repConfirmRate', label: 'Confirmation', taux: true },
+    { key: 'repAvgCallSeconds', label: 'Durée moy.', duree: true },
+    // « Joints » est la famille : le rendez-vous en est un détail, pas un voisin.
     { key: 'repReached', label: 'Joints' },
-    { key: 'repCallback', label: 'Rendez-vous' },
+    { key: 'repCallback', label: 'dont rendez-vous' },
     { key: 'repUnreachable', label: 'Injoignables' },
+    { key: 'repCallbacksHonored', label: 'Rappels tenus' },
+    { key: 'repCallbacksLate', label: 'Rappels en retard' },
+    { key: 'repCallbacksUpcoming', label: 'Rappels à venir' },
     { key: 'repContactRate', label: 'Taux de contact', taux: true },
     { key: 'repQualificationRate', label: 'Qualification', taux: true },
     { key: 'representantsContacted', label: 'Représentants contactés' },
@@ -308,10 +344,19 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   ],
   prospects: [
     { key: 'calls', label: 'Appels' },
+    { key: 'confirmedCalls', label: 'Confirmés' },
+    { key: 'detectedCalls', label: 'Détectés' },
+    { key: 'unloggedCalls', label: 'Non consignés' },
+    { key: 'confirmRate', label: 'Confirmation', taux: true },
+    { key: 'avgCallSeconds', label: 'Durée moy.', duree: true },
     { key: 'methodObtained', label: 'Méthodes' },
     { key: 'unreachable', label: 'Injoignables' },
+    { key: 'wrongNumber', label: 'Faux numéros' },
     { key: 'refused', label: 'Refus' },
     { key: 'callback', label: 'À rappeler' },
+    { key: 'callbacksHonored', label: 'Rappels tenus' },
+    { key: 'callbacksLate', label: 'Rappels en retard' },
+    { key: 'callbacksUpcoming', label: 'Rappels à venir' },
     { key: 'reachRate', label: 'Joignabilité', taux: true },
     { key: 'prospectsCreated', label: 'Prospects saisis' },
   ],
@@ -331,21 +376,41 @@ function compteursVides(): ActivityCounts {
     ActivityCountKey,
     number
   >;
-  return { ...zeros, repContactRate: null, repQualificationRate: null, reachRate: null };
+  return {
+    ...zeros,
+    repContactRate: null,
+    repQualificationRate: null,
+    reachRate: null,
+    confirmRate: null,
+    repConfirmRate: null,
+    avgCallSeconds: null,
+    repAvgCallSeconds: null,
+    callSeconds: 0,
+    repCallSeconds: 0,
+  };
 }
 
-// Un faux numéro est un appel perdu comme un NRP : une seule colonne.
 // Distincts DANS une période, `representantsContacted` et `repQuestioned`
 // recomptent un représentant rappelé une autre période.
 function cumuler(into: ActivityCounts, row: ActivityRow): void {
   for (const key of COUNT_KEYS) into[key] += row[key];
-  into.unreachable += row.wrongNumber;
+  into.callSeconds += (row.avgCallSeconds ?? 0) * row.confirmedCalls;
+  into.repCallSeconds += (row.repAvgCallSeconds ?? 0) * row.repConfirmedCalls;
+}
+
+function moyenne(total: number, nombre: number): number | null {
+  if (nombre === 0) return null;
+  return Math.round(total / nombre);
 }
 
 function calculerTaux<T extends ActivityCounts>(counts: T): T {
   counts.reachRate = rate(counts.calls - counts.unreachable, counts.calls);
   counts.repContactRate = rate(counts.repReached, counts.repCalls);
   counts.repQualificationRate = rate(counts.repQualified, counts.repQuestioned);
+  counts.confirmRate = rate(counts.confirmedCalls, counts.calls);
+  counts.repConfirmRate = rate(counts.repConfirmedCalls, counts.repCalls);
+  counts.avgCallSeconds = moyenne(counts.callSeconds, counts.confirmedCalls);
+  counts.repAvgCallSeconds = moyenne(counts.repCallSeconds, counts.repConfirmedCalls);
   return counts;
 }
 
@@ -373,7 +438,11 @@ export function activityLines(data: SupervisionActivity): ActivityLine[] {
 
 export function activityTotals(lines: readonly ActivityLine[]): ActivityTotals {
   const totals: ActivityTotals = { ...compteursVides(), people: lines.length };
-  for (const line of lines) for (const key of COUNT_KEYS) totals[key] += line[key];
+  for (const line of lines) {
+    for (const key of COUNT_KEYS) totals[key] += line[key];
+    totals.callSeconds += line.callSeconds;
+    totals.repCallSeconds += line.repCallSeconds;
+  }
   return calculerTaux(totals);
 }
 

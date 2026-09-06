@@ -4,6 +4,7 @@ import {
   IsBoolean,
   IsEnum,
   IsISO8601,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
@@ -14,6 +15,12 @@ import {
   MinLength,
 } from 'class-validator';
 import { RepCallOutcome, RepresentantRelation, WhatsappStatus } from '@crm/database';
+
+import {
+  DEVICE_CALL_MAX_DURATION_SECONDS,
+  DEVICE_CALL_TYPES,
+  type DeviceCallType,
+} from '../../common/device-call.js';
 
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { PROFESSION_MAX_LENGTH, RepresentantLookupDto } from '../representants/dto.js';
@@ -33,6 +40,24 @@ export class CreateRepCallAttemptDto {
   @ApiProperty({ enum: RepCallOutcome, enumName: 'RepCallOutcome' })
   @IsEnum(RepCallOutcome)
   outcome!: RepCallOutcome;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Statut de qualification recueilli. FACULTATIF : les versions déjà installées ne l’émettent pas, et un refus mettrait leur saisie en échec définitif. Quand il est présent, c’est lui qui commande l’issue enregistrée.',
+  })
+  @IsOptional()
+  @IsUUID()
+  statutQualificationId?: string;
+
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description:
+      'Ouverture de fiche que cette qualification ferme. Le chronomètre se lit entre son `openedAt` et cette fermeture. Une ouverture inconnue, déjà fermée ou ouverte par un autre est ignorée : la tentative vient du terrain et ne se perd pas pour un verrou.',
+  })
+  @IsOptional()
+  @IsUUID()
+  ouvertureId?: string;
 
   @ApiPropertyOptional({
     type: Number,
@@ -217,6 +242,34 @@ export class CreateRepCallAttemptDto {
   @IsOptional()
   @IsISO8601()
   callbackAt?: string;
+
+  @ApiPropertyOptional({
+    enum: DEVICE_CALL_TYPES,
+    description: 'Type lu dans le journal d’appels Android pour l’appel lancé depuis la fiche.',
+  })
+  @IsOptional()
+  @IsIn(DEVICE_CALL_TYPES)
+  deviceCallType?: DeviceCallType;
+
+  @ApiPropertyOptional({
+    minimum: 0,
+    maximum: DEVICE_CALL_MAX_DURATION_SECONDS,
+    description: 'Durée en secondes lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  @Max(DEVICE_CALL_MAX_DURATION_SECONDS)
+  deviceCallDurationSeconds?: number;
+
+  @ApiPropertyOptional({
+    type: String,
+    format: 'date-time',
+    description: 'Heure de l’appel lue dans le journal d’appels Android.',
+  })
+  @IsOptional()
+  @IsISO8601()
+  deviceCallAt?: string;
 }
 
 export enum RepCallAttemptApplyStatus {

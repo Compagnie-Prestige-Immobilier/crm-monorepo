@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { RepresentantsFiltersBar } from '@/components/representants/representants-filters-bar';
+import { parseRepresentantFilters } from '@/lib/representant-filters';
 import type * as ReferenceModule from '@/lib/data/reference';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock, setUrl } from '@/test/router-mock';
@@ -141,5 +142,29 @@ describe('RepresentantsFiltersBar, état de la relation', () => {
     await choose('Relation', 'Tous');
 
     expect(routerMock.push).toHaveBeenCalledWith('/representants', { scroll: false });
+  });
+});
+
+async function openAdvanced(): Promise<void> {
+  await userEvent.setup().click(await screen.findByRole('button', { name: /Filtres avancés/u }));
+}
+
+describe('RepresentantsFiltersBar, tri par priorité de traitement', () => {
+  it('porte le choix dans l’URL', async () => {
+    setUrl('/representants');
+    renderWithQuery(<RepresentantsFiltersBar />);
+
+    await openAdvanced();
+    await choose('Trier par', 'Priorité de traitement');
+
+    expect(routerMock.push).toHaveBeenCalledWith('/representants?sortBy=priorite', {
+      scroll: false,
+    });
+  });
+
+  it('relit le choix depuis l’URL', () => {
+    expect(parseRepresentantFilters(new URLSearchParams('sortBy=priorite')).sortBy).toBe(
+      'priorite',
+    );
   });
 });

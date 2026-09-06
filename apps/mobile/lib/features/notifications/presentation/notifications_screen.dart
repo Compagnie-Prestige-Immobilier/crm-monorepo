@@ -12,6 +12,7 @@ import '../../../core/push/push_message.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/router/back_navigation.dart';
+import '../../../core/router/route_paths.dart';
 import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../data/local/database.dart';
@@ -22,6 +23,26 @@ import '../../../ui/widgets/cpi_action_bar.dart';
 import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
+
+/// Le serveur nomme des écrans du PANNEAU dans ses rappels. Ceux qui ont un
+/// pendant ici y mènent ; les autres ne sont pas un lien, plutôt qu'une
+/// « Page introuvable ».
+String? destinationMobile(BuildContext context, String? route) {
+  if (!PushMessage.isSafeRoute(route)) return null;
+  final String cible = switch (Uri.parse(route!).path) {
+    '/phase2/callbacks' => Routes.rappels,
+    _ => route,
+  };
+  final GoRouter? router = GoRouter.maybeOf(context);
+  if (router == null) return cible;
+  try {
+    return router.configuration.findMatch(Uri.parse(cible)).isError
+        ? null
+        : cible;
+  } on Object {
+    return null;
+  }
+}
 
 class NotificationsScreen extends ConsumerStatefulWidget {
   const NotificationsScreen({super.key});
@@ -246,8 +267,8 @@ class _NotificationTileState extends ConsumerState<_NotificationTile> {
       _opening = false;
       return;
     }
-    final String? route = widget.data.route;
-    if (PushMessage.isSafeRoute(route)) await context.push<Object?>(route!);
+    final String? cible = destinationMobile(context, widget.data.route);
+    if (cible != null) await context.push<Object?>(cible);
     _opening = false;
   }
 
@@ -257,7 +278,7 @@ class _NotificationTileState extends ConsumerState<_NotificationTile> {
     final ThemeData theme = Theme.of(context);
     final CpiColors cpi = context.cpi;
     final bool isUnread = data.readAt == null;
-    final bool hasRoute = PushMessage.isSafeRoute(data.route);
+    final bool hasRoute = destinationMobile(context, data.route) != null;
 
     return FTile(
       title: Text(data.title),

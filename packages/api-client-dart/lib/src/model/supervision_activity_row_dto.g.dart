@@ -9,6 +9,14 @@ part of 'supervision_activity_row_dto.dart';
 abstract class _$SupervisionActivityRowDtoCWProxy {
   SupervisionActivityRowDto calls(num calls);
 
+  SupervisionActivityRowDto confirmedCalls(num confirmedCalls);
+
+  SupervisionActivityRowDto detectedCalls(num detectedCalls);
+
+  SupervisionActivityRowDto unloggedCalls(num unloggedCalls);
+
+  SupervisionActivityRowDto avgCallSeconds(num? avgCallSeconds);
+
   SupervisionActivityRowDto unreachable(num unreachable);
 
   SupervisionActivityRowDto wrongNumber(num wrongNumber);
@@ -29,6 +37,16 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto repCalls(num repCalls);
 
+  SupervisionActivityRowDto repConfirmedCalls(num repConfirmedCalls);
+
+  SupervisionActivityRowDto repDetectedCalls(num repDetectedCalls);
+
+  SupervisionActivityRowDto repUnloggedCalls(num repUnloggedCalls);
+
+  SupervisionActivityRowDto repAvgCallSeconds(num? repAvgCallSeconds);
+
+  SupervisionActivityRowDto repWrongNumber(num repWrongNumber);
+
   SupervisionActivityRowDto repReached(num repReached);
 
   SupervisionActivityRowDto repCallback(num repCallback);
@@ -47,6 +65,22 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
 
   SupervisionActivityRowDto repQualificationRate(num? repQualificationRate);
 
+  SupervisionActivityRowDto inboundCalls(num inboundCalls);
+
+  SupervisionActivityRowDto missedCalls(num missedCalls);
+
+  SupervisionActivityRowDto callbacksHonored(num callbacksHonored);
+
+  SupervisionActivityRowDto callbacksLate(num callbacksLate);
+
+  SupervisionActivityRowDto callbacksUpcoming(num callbacksUpcoming);
+
+  SupervisionActivityRowDto repCallbacksHonored(num repCallbacksHonored);
+
+  SupervisionActivityRowDto repCallbacksLate(num repCallbacksLate);
+
+  SupervisionActivityRowDto repCallbacksUpcoming(num repCallbacksUpcoming);
+
   SupervisionActivityRowDto bucket(String bucket);
 
   SupervisionActivityRowDto teleconseillerId(String teleconseillerId);
@@ -61,6 +95,10 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
   /// ````
   SupervisionActivityRowDto call({
     num calls,
+    num confirmedCalls,
+    num detectedCalls,
+    num unloggedCalls,
+    num? avgCallSeconds,
     num unreachable,
     num wrongNumber,
     num refused,
@@ -71,6 +109,11 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num prospectsCreated,
     num representantsContacted,
     num repCalls,
+    num repConfirmedCalls,
+    num repDetectedCalls,
+    num repUnloggedCalls,
+    num? repAvgCallSeconds,
+    num repWrongNumber,
     num repReached,
     num repCallback,
     num repUnreachable,
@@ -80,6 +123,14 @@ abstract class _$SupervisionActivityRowDtoCWProxy {
     num repQuestioned,
     num repQualified,
     num? repQualificationRate,
+    num inboundCalls,
+    num missedCalls,
+    num callbacksHonored,
+    num callbacksLate,
+    num callbacksUpcoming,
+    num repCallbacksHonored,
+    num repCallbacksLate,
+    num repCallbacksUpcoming,
     String bucket,
     String teleconseillerId,
     String teleconseillerName,
@@ -95,6 +146,22 @@ class _$SupervisionActivityRowDtoCWProxyImpl
 
   @override
   SupervisionActivityRowDto calls(num calls) => this(calls: calls);
+
+  @override
+  SupervisionActivityRowDto confirmedCalls(num confirmedCalls) =>
+      this(confirmedCalls: confirmedCalls);
+
+  @override
+  SupervisionActivityRowDto detectedCalls(num detectedCalls) =>
+      this(detectedCalls: detectedCalls);
+
+  @override
+  SupervisionActivityRowDto unloggedCalls(num unloggedCalls) =>
+      this(unloggedCalls: unloggedCalls);
+
+  @override
+  SupervisionActivityRowDto avgCallSeconds(num? avgCallSeconds) =>
+      this(avgCallSeconds: avgCallSeconds);
 
   @override
   SupervisionActivityRowDto unreachable(num unreachable) =>
@@ -134,6 +201,26 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   SupervisionActivityRowDto repCalls(num repCalls) => this(repCalls: repCalls);
 
   @override
+  SupervisionActivityRowDto repConfirmedCalls(num repConfirmedCalls) =>
+      this(repConfirmedCalls: repConfirmedCalls);
+
+  @override
+  SupervisionActivityRowDto repDetectedCalls(num repDetectedCalls) =>
+      this(repDetectedCalls: repDetectedCalls);
+
+  @override
+  SupervisionActivityRowDto repUnloggedCalls(num repUnloggedCalls) =>
+      this(repUnloggedCalls: repUnloggedCalls);
+
+  @override
+  SupervisionActivityRowDto repAvgCallSeconds(num? repAvgCallSeconds) =>
+      this(repAvgCallSeconds: repAvgCallSeconds);
+
+  @override
+  SupervisionActivityRowDto repWrongNumber(num repWrongNumber) =>
+      this(repWrongNumber: repWrongNumber);
+
+  @override
   SupervisionActivityRowDto repReached(num repReached) =>
       this(repReached: repReached);
 
@@ -169,6 +256,38 @@ class _$SupervisionActivityRowDtoCWProxyImpl
       this(repQualificationRate: repQualificationRate);
 
   @override
+  SupervisionActivityRowDto inboundCalls(num inboundCalls) =>
+      this(inboundCalls: inboundCalls);
+
+  @override
+  SupervisionActivityRowDto missedCalls(num missedCalls) =>
+      this(missedCalls: missedCalls);
+
+  @override
+  SupervisionActivityRowDto callbacksHonored(num callbacksHonored) =>
+      this(callbacksHonored: callbacksHonored);
+
+  @override
+  SupervisionActivityRowDto callbacksLate(num callbacksLate) =>
+      this(callbacksLate: callbacksLate);
+
+  @override
+  SupervisionActivityRowDto callbacksUpcoming(num callbacksUpcoming) =>
+      this(callbacksUpcoming: callbacksUpcoming);
+
+  @override
+  SupervisionActivityRowDto repCallbacksHonored(num repCallbacksHonored) =>
+      this(repCallbacksHonored: repCallbacksHonored);
+
+  @override
+  SupervisionActivityRowDto repCallbacksLate(num repCallbacksLate) =>
+      this(repCallbacksLate: repCallbacksLate);
+
+  @override
+  SupervisionActivityRowDto repCallbacksUpcoming(num repCallbacksUpcoming) =>
+      this(repCallbacksUpcoming: repCallbacksUpcoming);
+
+  @override
   SupervisionActivityRowDto bucket(String bucket) => this(bucket: bucket);
 
   @override
@@ -188,6 +307,10 @@ class _$SupervisionActivityRowDtoCWProxyImpl
   /// ````
   SupervisionActivityRowDto call({
     Object? calls = const $CopyWithPlaceholder(),
+    Object? confirmedCalls = const $CopyWithPlaceholder(),
+    Object? detectedCalls = const $CopyWithPlaceholder(),
+    Object? unloggedCalls = const $CopyWithPlaceholder(),
+    Object? avgCallSeconds = const $CopyWithPlaceholder(),
     Object? unreachable = const $CopyWithPlaceholder(),
     Object? wrongNumber = const $CopyWithPlaceholder(),
     Object? refused = const $CopyWithPlaceholder(),
@@ -198,6 +321,11 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? prospectsCreated = const $CopyWithPlaceholder(),
     Object? representantsContacted = const $CopyWithPlaceholder(),
     Object? repCalls = const $CopyWithPlaceholder(),
+    Object? repConfirmedCalls = const $CopyWithPlaceholder(),
+    Object? repDetectedCalls = const $CopyWithPlaceholder(),
+    Object? repUnloggedCalls = const $CopyWithPlaceholder(),
+    Object? repAvgCallSeconds = const $CopyWithPlaceholder(),
+    Object? repWrongNumber = const $CopyWithPlaceholder(),
     Object? repReached = const $CopyWithPlaceholder(),
     Object? repCallback = const $CopyWithPlaceholder(),
     Object? repUnreachable = const $CopyWithPlaceholder(),
@@ -207,6 +335,14 @@ class _$SupervisionActivityRowDtoCWProxyImpl
     Object? repQuestioned = const $CopyWithPlaceholder(),
     Object? repQualified = const $CopyWithPlaceholder(),
     Object? repQualificationRate = const $CopyWithPlaceholder(),
+    Object? inboundCalls = const $CopyWithPlaceholder(),
+    Object? missedCalls = const $CopyWithPlaceholder(),
+    Object? callbacksHonored = const $CopyWithPlaceholder(),
+    Object? callbacksLate = const $CopyWithPlaceholder(),
+    Object? callbacksUpcoming = const $CopyWithPlaceholder(),
+    Object? repCallbacksHonored = const $CopyWithPlaceholder(),
+    Object? repCallbacksLate = const $CopyWithPlaceholder(),
+    Object? repCallbacksUpcoming = const $CopyWithPlaceholder(),
     Object? bucket = const $CopyWithPlaceholder(),
     Object? teleconseillerId = const $CopyWithPlaceholder(),
     Object? teleconseillerName = const $CopyWithPlaceholder(),
@@ -216,6 +352,22 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.calls
           // ignore: cast_nullable_to_non_nullable
           : calls as num,
+      confirmedCalls: confirmedCalls == const $CopyWithPlaceholder()
+          ? _value.confirmedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : confirmedCalls as num,
+      detectedCalls: detectedCalls == const $CopyWithPlaceholder()
+          ? _value.detectedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : detectedCalls as num,
+      unloggedCalls: unloggedCalls == const $CopyWithPlaceholder()
+          ? _value.unloggedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : unloggedCalls as num,
+      avgCallSeconds: avgCallSeconds == const $CopyWithPlaceholder()
+          ? _value.avgCallSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : avgCallSeconds as num?,
       unreachable: unreachable == const $CopyWithPlaceholder()
           ? _value.unreachable
           // ignore: cast_nullable_to_non_nullable
@@ -257,6 +409,26 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.repCalls
           // ignore: cast_nullable_to_non_nullable
           : repCalls as num,
+      repConfirmedCalls: repConfirmedCalls == const $CopyWithPlaceholder()
+          ? _value.repConfirmedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : repConfirmedCalls as num,
+      repDetectedCalls: repDetectedCalls == const $CopyWithPlaceholder()
+          ? _value.repDetectedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : repDetectedCalls as num,
+      repUnloggedCalls: repUnloggedCalls == const $CopyWithPlaceholder()
+          ? _value.repUnloggedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : repUnloggedCalls as num,
+      repAvgCallSeconds: repAvgCallSeconds == const $CopyWithPlaceholder()
+          ? _value.repAvgCallSeconds
+          // ignore: cast_nullable_to_non_nullable
+          : repAvgCallSeconds as num?,
+      repWrongNumber: repWrongNumber == const $CopyWithPlaceholder()
+          ? _value.repWrongNumber
+          // ignore: cast_nullable_to_non_nullable
+          : repWrongNumber as num,
       repReached: repReached == const $CopyWithPlaceholder()
           ? _value.repReached
           // ignore: cast_nullable_to_non_nullable
@@ -293,6 +465,38 @@ class _$SupervisionActivityRowDtoCWProxyImpl
           ? _value.repQualificationRate
           // ignore: cast_nullable_to_non_nullable
           : repQualificationRate as num?,
+      inboundCalls: inboundCalls == const $CopyWithPlaceholder()
+          ? _value.inboundCalls
+          // ignore: cast_nullable_to_non_nullable
+          : inboundCalls as num,
+      missedCalls: missedCalls == const $CopyWithPlaceholder()
+          ? _value.missedCalls
+          // ignore: cast_nullable_to_non_nullable
+          : missedCalls as num,
+      callbacksHonored: callbacksHonored == const $CopyWithPlaceholder()
+          ? _value.callbacksHonored
+          // ignore: cast_nullable_to_non_nullable
+          : callbacksHonored as num,
+      callbacksLate: callbacksLate == const $CopyWithPlaceholder()
+          ? _value.callbacksLate
+          // ignore: cast_nullable_to_non_nullable
+          : callbacksLate as num,
+      callbacksUpcoming: callbacksUpcoming == const $CopyWithPlaceholder()
+          ? _value.callbacksUpcoming
+          // ignore: cast_nullable_to_non_nullable
+          : callbacksUpcoming as num,
+      repCallbacksHonored: repCallbacksHonored == const $CopyWithPlaceholder()
+          ? _value.repCallbacksHonored
+          // ignore: cast_nullable_to_non_nullable
+          : repCallbacksHonored as num,
+      repCallbacksLate: repCallbacksLate == const $CopyWithPlaceholder()
+          ? _value.repCallbacksLate
+          // ignore: cast_nullable_to_non_nullable
+          : repCallbacksLate as num,
+      repCallbacksUpcoming: repCallbacksUpcoming == const $CopyWithPlaceholder()
+          ? _value.repCallbacksUpcoming
+          // ignore: cast_nullable_to_non_nullable
+          : repCallbacksUpcoming as num,
       bucket: bucket == const $CopyWithPlaceholder()
           ? _value.bucket
           // ignore: cast_nullable_to_non_nullable
@@ -327,6 +531,10 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
     json,
     requiredKeys: const [
       'calls',
+      'confirmedCalls',
+      'detectedCalls',
+      'unloggedCalls',
+      'avgCallSeconds',
       'unreachable',
       'wrongNumber',
       'refused',
@@ -337,6 +545,11 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'prospectsCreated',
       'representantsContacted',
       'repCalls',
+      'repConfirmedCalls',
+      'repDetectedCalls',
+      'repUnloggedCalls',
+      'repAvgCallSeconds',
+      'repWrongNumber',
       'repReached',
       'repCallback',
       'repUnreachable',
@@ -346,6 +559,14 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       'repQuestioned',
       'repQualified',
       'repQualificationRate',
+      'inboundCalls',
+      'missedCalls',
+      'callbacksHonored',
+      'callbacksLate',
+      'callbacksUpcoming',
+      'repCallbacksHonored',
+      'repCallbacksLate',
+      'repCallbacksUpcoming',
       'bucket',
       'teleconseillerId',
       'teleconseillerName',
@@ -353,6 +574,10 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
   );
   final val = SupervisionActivityRowDto(
     calls: $checkedConvert('calls', (v) => v as num),
+    confirmedCalls: $checkedConvert('confirmedCalls', (v) => v as num),
+    detectedCalls: $checkedConvert('detectedCalls', (v) => v as num),
+    unloggedCalls: $checkedConvert('unloggedCalls', (v) => v as num),
+    avgCallSeconds: $checkedConvert('avgCallSeconds', (v) => v as num?),
     unreachable: $checkedConvert('unreachable', (v) => v as num),
     wrongNumber: $checkedConvert('wrongNumber', (v) => v as num),
     refused: $checkedConvert('refused', (v) => v as num),
@@ -366,6 +591,11 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
       (v) => v as num,
     ),
     repCalls: $checkedConvert('repCalls', (v) => v as num),
+    repConfirmedCalls: $checkedConvert('repConfirmedCalls', (v) => v as num),
+    repDetectedCalls: $checkedConvert('repDetectedCalls', (v) => v as num),
+    repUnloggedCalls: $checkedConvert('repUnloggedCalls', (v) => v as num),
+    repAvgCallSeconds: $checkedConvert('repAvgCallSeconds', (v) => v as num?),
+    repWrongNumber: $checkedConvert('repWrongNumber', (v) => v as num),
     repReached: $checkedConvert('repReached', (v) => v as num),
     repCallback: $checkedConvert('repCallback', (v) => v as num),
     repUnreachable: $checkedConvert('repUnreachable', (v) => v as num),
@@ -377,6 +607,20 @@ SupervisionActivityRowDto _$SupervisionActivityRowDtoFromJson(
     repQualificationRate: $checkedConvert(
       'repQualificationRate',
       (v) => v as num?,
+    ),
+    inboundCalls: $checkedConvert('inboundCalls', (v) => v as num),
+    missedCalls: $checkedConvert('missedCalls', (v) => v as num),
+    callbacksHonored: $checkedConvert('callbacksHonored', (v) => v as num),
+    callbacksLate: $checkedConvert('callbacksLate', (v) => v as num),
+    callbacksUpcoming: $checkedConvert('callbacksUpcoming', (v) => v as num),
+    repCallbacksHonored: $checkedConvert(
+      'repCallbacksHonored',
+      (v) => v as num,
+    ),
+    repCallbacksLate: $checkedConvert('repCallbacksLate', (v) => v as num),
+    repCallbacksUpcoming: $checkedConvert(
+      'repCallbacksUpcoming',
+      (v) => v as num,
     ),
     bucket: $checkedConvert('bucket', (v) => v as String),
     teleconseillerId: $checkedConvert('teleconseillerId', (v) => v as String),
@@ -392,6 +636,10 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   SupervisionActivityRowDto instance,
 ) => <String, dynamic>{
   'calls': instance.calls,
+  'confirmedCalls': instance.confirmedCalls,
+  'detectedCalls': instance.detectedCalls,
+  'unloggedCalls': instance.unloggedCalls,
+  'avgCallSeconds': instance.avgCallSeconds,
   'unreachable': instance.unreachable,
   'wrongNumber': instance.wrongNumber,
   'refused': instance.refused,
@@ -402,6 +650,11 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'prospectsCreated': instance.prospectsCreated,
   'representantsContacted': instance.representantsContacted,
   'repCalls': instance.repCalls,
+  'repConfirmedCalls': instance.repConfirmedCalls,
+  'repDetectedCalls': instance.repDetectedCalls,
+  'repUnloggedCalls': instance.repUnloggedCalls,
+  'repAvgCallSeconds': instance.repAvgCallSeconds,
+  'repWrongNumber': instance.repWrongNumber,
   'repReached': instance.repReached,
   'repCallback': instance.repCallback,
   'repUnreachable': instance.repUnreachable,
@@ -411,6 +664,14 @@ Map<String, dynamic> _$SupervisionActivityRowDtoToJson(
   'repQuestioned': instance.repQuestioned,
   'repQualified': instance.repQualified,
   'repQualificationRate': instance.repQualificationRate,
+  'inboundCalls': instance.inboundCalls,
+  'missedCalls': instance.missedCalls,
+  'callbacksHonored': instance.callbacksHonored,
+  'callbacksLate': instance.callbacksLate,
+  'callbacksUpcoming': instance.callbacksUpcoming,
+  'repCallbacksHonored': instance.repCallbacksHonored,
+  'repCallbacksLate': instance.repCallbacksLate,
+  'repCallbacksUpcoming': instance.repCallbacksUpcoming,
   'bucket': instance.bucket,
   'teleconseillerId': instance.teleconseillerId,
   'teleconseillerName': instance.teleconseillerName,

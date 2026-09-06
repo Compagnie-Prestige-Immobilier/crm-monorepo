@@ -14,12 +14,14 @@ import 'package:cpi_go/features/auth/auth_state.dart';
 import 'package:cpi_go/features/representant/presentation/representant_detail_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_form_screen.dart';
 import 'package:cpi_go/features/representant/presentation/representant_picker_screen.dart';
+import 'package:drift/drift.dart' show Value;
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../support/db_fixture.dart';
@@ -213,7 +215,103 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('Ambassadeur'), findsOneWidget);
+    // Sans statut ni appel, la pastille dit « Jamais appelé » ; la relation
+    // acceptée se voit à l'étoile.
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
+
+    await teardownTree(tester);
+  });
+
+  // Appeler est le geste principal de la fiche : saisir des prospects vient
+  // après l'appel, jamais à sa place.
+  testWidgets('la fiche appelle, et porte la preuve de l\'appel lancé', (
+    WidgetTester tester,
+  ) async {
+    await insertRepresentant(db, id: 'rep-1', phone: '+221770000001');
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'representant',
+            entityId: 'rep-1',
+            phoneE164: '+221770000001',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Appeler'), findsOneWidget);
+    expect(find.text('Ajouter des prospects'), findsOneWidget);
+    expect(
+      find.text('+221 77 000 00 01\nSortant · 1 min 32 · 14:02'),
+      findsOneWidget,
+    );
+
+    await teardownTree(tester);
+  });
+
+  testWidgets('la fiche montre le statut de qualification, étoile comprise', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.statutsQualification)
+        .insert(
+          StatutsQualificationCompanion.insert(
+            code: 'TRES_INTERESSE',
+            id: 'sq-1',
+            label: 'Très intéressé',
+            effect: 'REACHED',
+          ),
+        );
+    await insertRepresentant(
+      db,
+      id: 'rep-1',
+      phone: '+221770000001',
+      relationStatus: 'AMBASSADEUR',
+      statutQualificationId: 'sq-1',
+    );
+
+    final ProviderContainer container = await makeContainer(tester);
+    await tester.pumpWidget(
+      UncontrolledProviderScope(
+        container: container,
+        child: MaterialApp(
+          theme: AppTheme.light,
+          locale: const Locale('fr'),
+          localizationsDelegates: GlobalMaterialLocalizations.delegates,
+          supportedLocales: const <Locale>[Locale('fr')],
+          home: const RepresentantDetailScreen(representantId: 'rep-1'),
+        ),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 400));
+
+    expect(find.text('Très intéressé'), findsOneWidget);
+    expect(find.text('A accepté'), findsNothing);
+    expect(find.byIcon(PhosphorIconsFill.star), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -246,7 +344,10 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 400));
 
-    expect(find.text('PARRAIN'), findsOneWidget);
+    // Une relation que ce client ignore ne casse rien : la pastille parle de
+    // l'appel, pas de la relation.
+    expect(find.text('Jamais appelé'), findsOneWidget);
+    expect(find.text('+221 77 000 00 01'), findsOneWidget);
 
     await teardownTree(tester);
   });
@@ -338,6 +439,35 @@ void main() {
 
       await teardownTree(tester);
     });
+
+    testWidgets(
+      'les réponses du script de qualification se lisent sur la fiche',
+      (WidgetTester tester) async {
+        await insertRepresentant(
+          db,
+          id: 'rep-1',
+          phone: '+221770000001',
+          prenom: 'Awa',
+          etablissement: 'École Test',
+          syndicat: 'Syndicat Test',
+          connaitUES: true,
+          contacte: false,
+        );
+        await mountFiche(tester);
+
+        expect(find.text('Prénom'), findsOneWidget);
+        expect(find.text('Awa'), findsOneWidget);
+        expect(find.text('Établissement'), findsOneWidget);
+        expect(find.text('École Test'), findsOneWidget);
+        expect(find.text('Syndicat'), findsOneWidget);
+        expect(find.text('Connaît l’UES'), findsOneWidget);
+        expect(find.text('Déjà contacté'), findsOneWidget);
+        expect(find.text('Oui'), findsOneWidget);
+        expect(find.text('Non'), findsOneWidget);
+
+        await teardownTree(tester);
+      },
+    );
 
     testWidgets('un état inconnu de ce client s\'affiche quand même', (
       WidgetTester tester,

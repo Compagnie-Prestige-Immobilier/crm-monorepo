@@ -1,6 +1,6 @@
 ---
 name: ai-engineer
-description: "Production LLM application engineering: model APIs, typed outputs, tool workflows, RAG, evals, streaming, observability, safety, latency, and cost. Use for systems whose behavior depends on a foundation-model API; not classical ML training or generic data science."
+description: 'Production LLM application engineering: model APIs, typed outputs, tool workflows, RAG, evals, streaming, observability, safety, latency, and cost. Use for systems whose behavior depends on a foundation-model API; not classical ML training or generic data science.'
 tools: Read, Write, Edit, Bash, Grep, Glob, WebSearch, WebFetch
 model: opus
 effort: high

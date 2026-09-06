@@ -4,24 +4,34 @@ import { useQuery } from '@tanstack/react-query';
 
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
+import { AppelsRepresentant } from '@/components/representants/appels-representant';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantComments } from '@/components/representants/representant-comments';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { EMPTY_FILTERS } from '@/lib/filters';
-import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import {
+  formatDate,
+  formatDateTime,
+  formatDetectedCall,
+  formatNumber,
+  formatPhone,
+} from '@/lib/format';
 import { fetchProspects } from '@/lib/data/prospects';
 import {
   fetchRepresentant,
+  fetchRepresentantCallAttempts,
+  fetchRepresentantDeviceCalls,
   fetchRepresentantRelationHistory,
   scriptOf,
   whatsappLabel,
+  type DeviceCallDetection,
   type RepresentantRelationChange,
 } from '@/lib/data/representants';
 import { queryKeys } from '@/lib/query-keys';
 import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
-import { PROSPECT_STATUT_LABELS } from '@/lib/types';
+import { PROSPECT_STATUT_LABELS, REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 
 const NO_VALUE = '–';
 
@@ -51,6 +61,16 @@ export function RepresentantDetailView({
   const history = useQuery({
     queryKey: [...queryKeys.representant(representantId), 'relation-history'],
     queryFn: () => fetchRepresentantRelationHistory(representantId),
+  });
+
+  const appels = useQuery({
+    queryKey: [...queryKeys.representant(representantId), 'call-attempts'],
+    queryFn: () => fetchRepresentantCallAttempts(representantId),
+  });
+
+  const releves = useQuery({
+    queryKey: [...queryKeys.representant(representantId), 'device-calls'],
+    queryFn: () => fetchRepresentantDeviceCalls(representantId),
   });
 
   const prospectFilters = { ...EMPTY_FILTERS, representantId };
@@ -108,7 +128,12 @@ export function RepresentantDetailView({
               </p>
             </div>
             <div className="flex flex-col items-end gap-2">
-              <RelationBadge status={representant.relationStatus} />
+              <RelationBadge
+                status={representant.relationStatus}
+                label={representant.statutQualificationLabel}
+                effect={representant.statutQualificationEffect}
+                lastCallOutcome={representant.lastCallOutcome}
+              />
               <p className="text-right">
                 <span className="block font-display text-[1.5rem] font-[800] leading-none tabular-nums">
                   {formatNumber(representant.prospectCount)}
@@ -166,6 +191,22 @@ export function RepresentantDetailView({
               <dt className="text-muted-foreground">Connaît l’UES</dt>
               <dd className="truncate font-[600]">{ouiNonNsp(representant.connaitUES)}</dd>
             </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Dernier appel</dt>
+              <dd className="truncate font-[600]">
+                {representant.lastCallOutcome == null
+                  ? 'Jamais appelé'
+                  : REP_CALL_OUTCOME_LABELS[representant.lastCallOutcome]}
+              </dd>
+            </div>
+            <div className="min-w-0">
+              <dt className="text-muted-foreground">Appelé le</dt>
+              <dd className="truncate font-[600]">
+                {representant.lastCallAt == null
+                  ? NO_VALUE
+                  : formatDateTime(representant.lastCallAt)}
+              </dd>
+            </div>
           </dl>
 
           {/* La note EST un champ de la fiche : elle reste dans la fiche, sous
@@ -190,6 +231,27 @@ export function RepresentantDetailView({
             canAdminister={canAdminister}
             readOnly={readOnly}
           />
+        </CardContent>
+      </Card>
+
+      {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
+      <Card id="appels">
+        <CardHeader>
+          <CardTitle>Appels</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {appels.isPending ? <Skeleton className="h-24 w-full" /> : null}
+          {appels.isError ? (
+            <QueryErrorState
+              error={appels.error}
+              onRetry={() => {
+                void appels.refetch();
+              }}
+              fallback="Les appels n’ont pas pu être chargés."
+            />
+          ) : null}
+          {appels.isSuccess ? <AppelsRepresentant items={appels.data} /> : null}
+          {releves.isSuccess ? <RelevesTelephone items={releves.data} /> : null}
         </CardContent>
       </Card>
 
@@ -269,6 +331,55 @@ export function RepresentantDetailView({
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** Ce que le journal du téléphone a relevé, consigné en tentative ou non. */
+function RelevesTelephone({ items }: { items: readonly DeviceCallDetection[] }) {
+  if (items.length === 0) return null;
+
+  const nonConsignes = items.filter((releve) => releve.attemptId === null);
+  const consignes = items.filter((releve) => releve.attemptId !== null);
+
+  return (
+    <section className="mt-4 border-t border-border pt-4">
+      <p className="text-[0.75rem] text-muted-foreground">Relevés par le téléphone</p>
+      {nonConsignes.length === 0 ? null : (
+        <ul
+          aria-label="Relevés par le téléphone"
+          className="mt-2 flex flex-col divide-y divide-border"
+        >
+          {nonConsignes.map((releve) => (
+            <ReleveTelephone key={releve.id} releve={releve} />
+          ))}
+        </ul>
+      )}
+      {consignes.length === 0 ? null : (
+        <details className="mt-2">
+          <summary className="w-fit cursor-pointer rounded-md py-1 text-[0.8125rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+            {formatNumber(consignes.length)} appel{consignes.length === 1 ? '' : 's'} consigné
+            {consignes.length === 1 ? '' : 's'}
+          </summary>
+          <ul className="mt-1 flex flex-col divide-y divide-border">
+            {consignes.map((releve) => (
+              <ReleveTelephone key={releve.id} releve={releve} />
+            ))}
+          </ul>
+        </details>
+      )}
+    </section>
+  );
+}
+
+function ReleveTelephone({ releve }: { releve: DeviceCallDetection }) {
+  return (
+    <li className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
+      <Badge variant={releve.attemptId === null ? 'warning' : 'success'}>
+        {releve.attemptId === null ? 'Non consigné' : 'Consigné'}
+      </Badge>
+      <span className="text-[0.8125rem] tabular-nums">{formatDetectedCall(releve)}</span>
+      <span className="text-[0.75rem] text-muted-foreground">{releve.performedByName}</span>
+    </li>
   );
 }
 

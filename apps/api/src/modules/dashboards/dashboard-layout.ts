@@ -76,7 +76,6 @@ const CLASSEMENT: ReglesDeMarque = {
   defaut: 'barres-horizontales',
   compatibles: CATEGORIE_MARQUES,
 };
-const COMPOSITION: ReglesDeMarque = { defaut: 'barres-100', compatibles: COMPOSITION_MARQUES };
 const MATRICE: ReglesDeMarque = { defaut: 'carte-de-chaleur', compatibles: MATRICE_MARQUES };
 
 /** La marque par défaut de chaque source, et les marques compatibles avec sa forme de données. */
@@ -116,10 +115,12 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'taux-de-contact': TAUX,
   'a-rappeler': TAUX,
   'taux-de-qualification': TAUX,
+  'repartition-statuts-qualification': CLASSEMENT,
   'taux-de-joignabilite': TAUX,
   'prospects-notes': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
+  'fiches-ouvertes': MATRICE,
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
   'couverture-derniere-campagne': {
     defaut: 'barres-100',
@@ -127,11 +128,18 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   },
   'hors-attribution-derniere-campagne': CLASSEMENT,
   encaisse: CHIFFRE,
-  'de-l-appel-a-l-encaissement': COMPOSITION,
+  'de-l-appel-a-l-encaissement': CLASSEMENT,
   'methodes-d-adhesion': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'par-banque': { defaut: 'anneau', compatibles: COMPOSITION_MARQUES },
   'delais-medians': CLASSEMENT,
   'rendement-par-departement': CLASSEMENT,
+
+  'enrolement-inscriptions': CHIFFRE,
+  'enrolement-taux-rapprochement': TAUX,
+  'enrolement-taux-conversion': TAUX,
+  'enrolement-par-jour': { defaut: 'courbe', compatibles: SERIE_TEMPORELLE_MARQUES },
+  'enrolement-par-etape': { defaut: 'camembert', compatibles: COMPOSITION_MARQUES },
+  'enrolement-par-teleconseiller': CLASSEMENT,
 };
 
 function toPresentation(raw: Record<string, unknown>): DispositionPresentation | undefined {
@@ -251,7 +259,9 @@ export function resolveLayout(
  * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
  * retirable comme le reste.
  */
-const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
+type WidgetUsine = DashboardSource | DispositionWidget;
+
+const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   visites: [
     'total-visites',
     'moyenne-journaliere',
@@ -266,9 +276,21 @@ const USINE: Record<DashboardEcran, readonly DashboardSource[]> = {
     'a-rappeler',
     'taux-de-qualification',
     'adhesions',
+    {
+      source: 'repartition-statuts-qualification',
+      taille: 'pleine',
+      presentation: { valeurs: true },
+    },
     'par-teleconseiller',
+    { source: 'fiches-ouvertes', taille: 'pleine' },
   ],
-  'grand-public': ['taux-de-joignabilite', 'prospects-notes', 'adhesions', 'par-teleconseiller'],
+  'grand-public': [
+    'taux-de-joignabilite',
+    'prospects-notes',
+    'adhesions',
+    'par-teleconseiller',
+    { source: 'fiches-ouvertes', taille: 'pleine' },
+  ],
 };
 
 /** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
@@ -290,6 +312,10 @@ const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
   ],
 };
 
+function widgetUsine(item: WidgetUsine): DispositionWidget {
+  return typeof item === 'string' ? { source: item } : item;
+}
+
 export function dispositionUsine(
   ecran: DashboardEcran,
   voitLesMontants = false,
@@ -298,9 +324,6 @@ export function dispositionUsine(
   return {
     version: 1,
     preset: 'essentiel',
-    widgets: sanitize(
-      ecran,
-      sources.map((source) => ({ source })),
-    ),
+    widgets: sanitize(ecran, sources.map(widgetUsine)),
   };
 }

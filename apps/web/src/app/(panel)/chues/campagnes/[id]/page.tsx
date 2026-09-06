@@ -27,7 +27,10 @@ export default async function LotExportDetailPage({ params }: { params: Promise<
   }
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <LotExportDetailView id={id} />
+      <LotExportDetailView
+        id={id}
+        peutRegler={guard.user.role === 'ADMIN' || guard.user.role === 'SUPERVISEUR'}
+      />
     </HydrationBoundary>
   );
 }

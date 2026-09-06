@@ -12,6 +12,8 @@ import '../../../core/providers/sync_coordinator.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
 import '../../../core/router/single_push.dart';
+import '../../../core/telephonie/appels_crm.dart';
+import '../../../core/theme/cpi_colors.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
 import '../../../core/utils/relative_time.dart';
@@ -25,6 +27,7 @@ import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
+import '../../telephonie/appels_a_consigner.dart';
 import '../../../ui/async_value_x.dart';
 
 class RepresentantDetailScreen extends ConsumerWidget {
@@ -65,12 +68,100 @@ class RepresentantDetailScreen extends ConsumerWidget {
 /// mobile pour la relation. Une valeur ajoutée côté serveur s'affiche telle
 /// quelle plutôt que de disparaître.
 String relationLabel(String status) => switch (status) {
-  'INCONNU' => 'Inconnue',
+  'INCONNU' => 'Pas encore contacté',
   'CONTACTE' => 'Contacté',
-  'AMBASSADEUR' => 'Ambassadeur',
+  'AMBASSADEUR' => 'A accepté',
   'REFUS' => 'Refus',
   _ => status,
 };
+
+String libelleIssueRepresentant(String code) => switch (code) {
+  'REACHED' => 'Joint',
+  'PROSPECTS_PROMISED' => 'Fiches promises',
+  'UNREACHABLE' => 'Injoignable',
+  'CALLBACK' => 'À rappeler',
+  'REFUSED' => 'Refus',
+  'WRONG_NUMBER' => 'Faux numéro',
+  'OTHER' => 'Autre',
+  _ => code,
+};
+
+/// Même pastille que le web : le statut de qualification est le libellé,
+/// la relation ne décide que de la couleur et de l'étoile. Une fiche jamais
+/// qualifiée retombe sur le libellé de la relation.
+/// Le ton d'un effet de statut ou d'une issue d'appel : joint en vert, à
+/// rappeler en orange, refus en rouge, le reste neutre.
+CpiTone toneDeLEffet(String? effet) => switch (effet) {
+  'REACHED' || 'PROSPECTS_PROMISED' => CpiTone.success,
+  'SCHEDULE_CALLBACK' || 'CALLBACK' => CpiTone.warning,
+  'REFUSED' => CpiTone.danger,
+  _ => CpiTone.neutral,
+};
+
+/// La pastille dit où en est l'appel : le statut de qualification, sinon
+/// l'issue du dernier appel, sinon « Jamais appelé ». La relation ne parle
+/// pas, elle se voit : étoile pour qui a accepté, interdit pour qui a refusé.
+class StatutTag extends StatelessWidget {
+  const StatutTag({
+    required this.relationStatus,
+    required this.statutLabel,
+    this.statutEffect,
+    this.lastCallOutcome,
+    super.key,
+  });
+
+  final String relationStatus;
+  final String? statutLabel;
+  final String? statutEffect;
+  final String? lastCallOutcome;
+
+  @override
+  Widget build(BuildContext context) {
+    final String? issue = lastCallOutcome;
+    final String libelle =
+        statutLabel ??
+        (issue == null ? 'Jamais appelé' : libelleIssueRepresentant(issue));
+    final CpiTone tone = toneDeLEffet(
+      statutLabel == null ? issue : statutEffect,
+    );
+    final bool etoile = relationStatus == 'AMBASSADEUR';
+    final bool refus = relationStatus == 'REFUS';
+    return Semantics(
+      label:
+          'Statut : $libelle'
+          '${etoile ? ', a accepté' : ''}${refus ? ', a refusé' : ''}',
+      child: ExcludeSemantics(
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            if (etoile) ...<Widget>[
+              Icon(
+                PhosphorIconsFill.star,
+                size: CpiIconSize.xs,
+                color: context.cpi.success,
+              ),
+              const SizedBox(width: CpiSpacing.xxs),
+            ],
+            if (refus) ...<Widget>[
+              Icon(
+                PhosphorIconsFill.prohibit,
+                size: CpiIconSize.xs,
+                color: Theme.of(context).colorScheme.error,
+              ),
+              const SizedBox(width: CpiSpacing.xxs),
+            ],
+            CpiTag(libelle, tone: tone),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+String ouiNonNsp(bool? value) {
+  if (value == null) return 'Indéterminé';
+  return value ? 'Oui' : 'Non';
+}
 
 class _PiedDeFiche extends ConsumerWidget {
   const _PiedDeFiche({required this.data});
@@ -84,7 +175,23 @@ class _PiedDeFiche extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         CpiButton(
+          'Appeler',
+          icon: PhosphorIconsRegular.phone,
+          onPressed: () => unawaited(
+            ref
+                .read(appelsCrmProvider.notifier)
+                .lancer(
+                  context,
+                  kind: 'representant',
+                  id: data.id,
+                  e164: data.phoneE164,
+                ),
+          ),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        CpiButton(
           'Ajouter des prospects',
+          variant: CpiButtonVariant.secondary,
           icon: PhosphorIconsRegular.userPlus,
           onPressed: () => context.pushOnce(Routes.newProspectFor(data.id)),
         ),
@@ -201,6 +308,9 @@ class _Fiche extends ConsumerWidget {
 
     final String notes = (data.notes ?? '').trim();
     final String profession = (data.profession ?? '').trim();
+    final PreuvesAppelData? preuve = ref
+        .watch(dernierePreuveProvider((kind: 'representant', id: data.id)))
+        .value;
     final WhatsappStatus? whatsapp = WhatsappStatus.parse(data.whatsappStatus);
     final String? whatsappAutre = whatsapp == WhatsappStatus.autreNumero
         ? data.whatsappE164
@@ -220,11 +330,11 @@ class _Fiche extends ConsumerWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           children: <Widget>[
             if (status.aSignaler != null) SyncStatusChip(status: status),
-            Semantics(
-              label: 'Relation : ${relationLabel(data.relationStatus)}',
-              child: ExcludeSemantics(
-                child: CpiTag(relationLabel(data.relationStatus)),
-              ),
+            StatutTag(
+              relationStatus: data.relationStatus,
+              statutLabel: data.statutQualificationLabel,
+              statutEffect: data.statutQualificationEffect,
+              lastCallOutcome: data.lastCallOutcome,
             ),
           ],
         ),
@@ -234,8 +344,16 @@ class _Fiche extends ConsumerWidget {
             context,
             icon: PhosphorIconsRegular.phone,
             label: 'Téléphone',
-            value: Phone.format(data.phoneE164),
+            value: preuve == null
+                ? Phone.format(data.phoneE164)
+                : '${Phone.format(data.phoneE164)}\n${preuve.libelle}',
             copied: data.phoneE164,
+          ),
+          ?ligneAppelNonConsigne(
+            context,
+            ref,
+            kind: 'representant',
+            entityId: data.id,
           ),
           if (departement != null)
             _info(
@@ -269,6 +387,34 @@ class _Fiche extends ConsumerWidget {
               label: 'Profession',
               value: profession,
             ),
+          if ((data.prenom ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.identificationCard,
+              label: 'Prénom',
+              value: data.prenom!.trim(),
+            ),
+          if ((data.etablissement ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.buildings,
+              label: 'Établissement',
+              value: data.etablissement!.trim(),
+            ),
+          if ((data.syndicat ?? '').trim().isNotEmpty)
+            _info(
+              icon: PhosphorIconsRegular.usersThree,
+              label: 'Syndicat',
+              value: data.syndicat!.trim(),
+            ),
+          _info(
+            icon: PhosphorIconsRegular.info,
+            label: 'Connaît l’UES',
+            value: ouiNonNsp(data.connaitUes),
+          ),
+          _info(
+            icon: PhosphorIconsRegular.phoneCall,
+            label: 'Déjà contacté',
+            value: ouiNonNsp(data.contacte),
+          ),
           if (ief != null)
             _info(
               icon: PhosphorIconsRegular.buildings,

@@ -1,21 +1,30 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeftIcon,
+  CheckIcon,
   FileArchiveIcon,
   FileDownIcon,
   FileSpreadsheetIcon,
   LoaderIcon,
+  PencilIcon,
+  UserMinusIcon,
+  XIcon,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { LotExportFiches } from '@/components/lots-export/lot-export-fiches';
 import {
   Table,
   TableBody,
@@ -31,7 +40,11 @@ import {
   lotExportUrl,
   lotProgrammeFileName,
   lotProgrammeUrl,
+  retirerTeleconseiller,
+  updateLotExport,
+  type LotExportDetail,
 } from '@/lib/data/lots-export';
+import { apiErrorText } from '@/lib/mutation-feedback';
 import { formatDate, formatDateTime, formatNumber, formatPhone, formatRate } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
@@ -62,7 +75,14 @@ function rendezVous(valeur: unknown): string {
   return iso === null ? '' : ` · rendez-vous le ${formatDateTime(iso)}`;
 }
 
-export function LotExportDetailView({ id }: { id: string }) {
+export function LotExportDetailView({
+  id,
+  peutRegler,
+}: {
+  id: string;
+  /** EB-15 et EB-16 : la direction consulte, elle ne règle rien. */
+  peutRegler: boolean;
+}) {
   const telechargement = useFileDownload();
   const lot = useQuery({
     queryKey: queryKeys.lotsExportDetail(id),
@@ -119,7 +139,11 @@ export function LotExportDetailView({ id }: { id: string }) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="max-w-2xl">
           {/* `h2` : la barre du panel porte déjà l'unique `h1` de la page. */}
-          <h2 className="font-display text-h2 font-[800]">{name}</h2>
+          {peutRegler ? (
+            <NomModifiable id={id} name={name} />
+          ) : (
+            <h2 className="font-display text-h2 font-[800]">{name}</h2>
+          )}
           <p className="mt-1 text-[0.9375rem] text-muted-foreground">
             {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
             {itemCount > 1 ? 's' : ''} réparties entre{' '}
@@ -172,8 +196,9 @@ export function LotExportDetailView({ id }: { id: string }) {
             Programmes d’appel
           </h3>
           <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Capacité principale : {formatNumber(distribution.fichesParJour)} fiches par jour. Les
-            comptes supervision et direction en reçoivent 20 %.
+            Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
+            {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la
+            supervision et la direction.
           </p>
         </CardHeader>
         <CardContent>
@@ -234,65 +259,33 @@ export function LotExportDetailView({ id }: { id: string }) {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-            Performance de la campagne
-          </h3>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
-            hors attribution vise une fiche confiée à un collègue dans cette campagne.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Table aria-label="Performance de la campagne">
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">Téléconseiller</TableHead>
-                <TableHead scope="col" className="text-right">
-                  Traitées
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Couverture
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Appels attribués
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Hors attribution
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lot.data.performance.map((ligne) => (
-                <TableRow key={ligne.teleconseillerId}>
-                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
-                    {ligne.teleconseillerName}
-                  </th>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRate(ligne.completionRate)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ligne.assignedCalls)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {ligne.outsideAssignmentCalls === 0 ? (
-                      '0'
-                    ) : (
-                      <Badge variant="outline" className="border-warning/40 text-warning">
-                        {formatNumber(ligne.outsideAssignmentCalls)}
-                      </Badge>
-                    )}
-                  </TableCell>
-                </TableRow>
+      <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
+
+      <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
+
+      {lot.data.reaffectations.length === 0 ? null : (
+        <Card>
+          <CardHeader>
+            <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+              Réaffectations
+            </h3>
+          </CardHeader>
+          <CardContent>
+            <ul className="divide-y divide-border">
+              {lot.data.reaffectations.map((trace) => (
+                <li key={trace.id} className="py-2.5 text-[0.875rem]">
+                  <span className="tabular-nums font-[600]">{formatNumber(trace.fiches)}</span>{' '}
+                  fiche{trace.fiches > 1 ? 's' : ''} de {trace.fromName ?? 'personne'} vers{' '}
+                  {trace.toName}
+                  <span className="block text-[0.8125rem] text-muted-foreground">
+                    {formatDateTime(trace.createdAt)}, par {trace.performedByName}
+                  </span>
+                </li>
               ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            </ul>
+          </CardContent>
+        </Card>
+      )}
 
       <Card>
         <CardHeader>
@@ -362,5 +355,291 @@ export function LotExportDetailView({ id }: { id: string }) {
         </CardContent>
       </Card>
     </div>
+  );
+}
+
+/** EB-14 : le nom se corrige sur place, sans quitter la campagne. */
+function NomModifiable({ id, name }: { id: string; name: string }) {
+  const queryClient = useQueryClient();
+  const [saisie, setSaisie] = useState<string | null>(null);
+
+  const renommage = useMutation({
+    mutationFn: (nouveau: string) => updateLotExport(id, { name: nouveau }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
+      setSaisie(null);
+    },
+    onError: (erreur) => {
+      toast.error(apiErrorText(erreur, 'Le nom n’a pas pu être changé.'));
+    },
+  });
+
+  if (saisie === null)
+    return (
+      <div className="flex items-center gap-2">
+        <h2 className="font-display text-h2 font-[800]">{name}</h2>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Renommer la campagne"
+          onClick={() => {
+            setSaisie(name);
+          }}
+        >
+          <PencilIcon className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    );
+
+  const valide = saisie.trim().length >= 3;
+  return (
+    <div className="flex items-center gap-2">
+      <Input
+        maxLength={120}
+        aria-label="Nom de la campagne"
+        value={saisie}
+        onChange={(event) => {
+          setSaisie(event.target.value);
+        }}
+      />
+      <Button
+        type="button"
+        size="icon"
+        aria-label="Enregistrer le nom"
+        disabled={!valide || renommage.isPending}
+        onClick={() => {
+          renommage.mutate(saisie.trim());
+        }}
+      >
+        {renommage.isPending ? (
+          <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <CheckIcon className="size-4" aria-hidden="true" />
+        )}
+      </Button>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        aria-label="Abandonner le renommage"
+        onClick={() => {
+          setSaisie(null);
+        }}
+      >
+        <XIcon className="size-4" aria-hidden="true" />
+      </Button>
+    </div>
+  );
+}
+
+/**
+ * EB-17 : l'objectif quotidien d'un téléconseiller.
+ *
+ * L'API remplace la table entière des objectifs : le PATCH renvoie donc TOUS
+ * ceux de la campagne, sans quoi régler l'un effacerait les autres.
+ */
+function ChampObjectif({
+  id,
+  lot,
+  ligne,
+}: {
+  id: string;
+  lot: LotExportDetail;
+  ligne: LotExportDetail['performance'][number];
+}) {
+  const queryClient = useQueryClient();
+  const [saisie, setSaisie] = useState(String(ligne.objectif));
+
+  const reglage = useMutation({
+    mutationFn: (valeur: number) =>
+      updateLotExport(id, {
+        objectifs: lot.performance.map((autre) => ({
+          teleconseillerId: autre.teleconseillerId,
+          fichesParJour:
+            autre.teleconseillerId === ligne.teleconseillerId ? valeur : autre.objectif,
+        })),
+      }),
+    onSuccess: (_summary, valeur) => {
+      setSaisie(String(valeur));
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
+      toast.success('Objectif enregistré.');
+    },
+    onError: (erreur) => {
+      setSaisie(String(ligne.objectif));
+      toast.error(apiErrorText(erreur, 'L’objectif n’a pas pu être enregistré.'));
+    },
+  });
+
+  return (
+    <Input
+      type="number"
+      min={1}
+      max={500}
+      step={1}
+      className="ml-auto h-9 w-20 text-right tabular-nums"
+      aria-label={`Objectif quotidien de ${ligne.teleconseillerName}`}
+      value={saisie}
+      disabled={reglage.isPending}
+      onChange={(event) => {
+        setSaisie(event.target.value);
+      }}
+      onBlur={() => {
+        const valeur = Number.parseInt(saisie, 10);
+        if (!Number.isFinite(valeur) || valeur < 1 || valeur === ligne.objectif) {
+          setSaisie(String(ligne.objectif));
+          return;
+        }
+        reglage.mutate(Math.min(500, valeur));
+      }}
+    />
+  );
+}
+
+/** EB-16 : le retiré rend ses fiches non traitées au reste de l'équipe. */
+function BoutonRetrait({
+  id,
+  ligne,
+  seul,
+}: {
+  id: string;
+  ligne: LotExportDetail['performance'][number];
+  seul: boolean;
+}) {
+  const queryClient = useQueryClient();
+  const [ouvert, setOuvert] = useState(false);
+
+  const retrait = useMutation({
+    mutationFn: () => retirerTeleconseiller(id, ligne.teleconseillerId),
+    onSuccess: (detail) => {
+      queryClient.setQueryData(queryKeys.lotsExportDetail(id), detail);
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
+      setOuvert(false);
+      toast.success(`${ligne.teleconseillerName} a été retiré de la campagne.`);
+    },
+    onError: (erreur) => {
+      toast.error(apiErrorText(erreur, 'Le retrait a échoué.'));
+    },
+  });
+
+  return (
+    <>
+      <Button
+        type="button"
+        variant="ghost"
+        size="icon"
+        disabled={seul}
+        aria-label={`Retirer ${ligne.teleconseillerName} de la campagne`}
+        onClick={() => {
+          setOuvert(true);
+        }}
+      >
+        <UserMinusIcon className="size-4" aria-hidden="true" />
+      </Button>
+      <ConfirmDialog
+        open={ouvert}
+        onOpenChange={setOuvert}
+        title={`Retirer ${ligne.teleconseillerName} ?`}
+        description="Ses fiches non traitées repartent au reste de l’équipe. Les fiches qu’il a déjà appelées lui restent."
+        confirmLabel="Retirer"
+        pending={retrait.isPending}
+        onConfirm={() => {
+          retrait.mutate();
+        }}
+      />
+    </>
+  );
+}
+
+function CartePerformance({
+  id,
+  lot,
+  peutRegler,
+}: {
+  id: string;
+  lot: LotExportDetail;
+  peutRegler: boolean;
+}) {
+  return (
+      <Card>
+        <CardHeader>
+          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+            Performance de la campagne
+          </h3>
+          <p className="mt-1 text-[0.875rem] text-muted-foreground">
+            Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
+            hors attribution vise une fiche confiée à un collègue dans cette campagne.
+          </p>
+        </CardHeader>
+        <CardContent>
+          <Table aria-label="Performance de la campagne">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">Téléconseiller</TableHead>
+                <TableHead scope="col" className="text-right">
+                  Objectif par jour
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Traitées
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Couverture
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Appels attribués
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Hors attribution
+                </TableHead>
+                {peutRegler ? (
+                  <TableHead scope="col" className="text-right">
+                    <span className="sr-only">Retirer de la campagne</span>
+                  </TableHead>
+                ) : null}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {lot.performance.map((ligne) => (
+                <TableRow key={ligne.teleconseillerId}>
+                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                    {ligne.teleconseillerName}
+                  </th>
+                  <TableCell className="text-right tabular-nums">
+                    {peutRegler ? (
+                      <ChampObjectif id={id} lot={lot} ligne={ligne} />
+                    ) : (
+                      formatNumber(ligne.objectif)
+                    )}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatRate(ligne.completionRate)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ligne.assignedCalls)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {ligne.outsideAssignmentCalls === 0 ? (
+                      '0'
+                    ) : (
+                      <Badge variant="outline" className="border-warning/40 text-warning">
+                        {formatNumber(ligne.outsideAssignmentCalls)}
+                      </Badge>
+                    )}
+                  </TableCell>
+                  {peutRegler ? (
+                    <TableCell className="text-right">
+                      <BoutonRetrait id={id} ligne={ligne} seul={lot.performance.length < 2} />
+                    </TableCell>
+                  ) : null}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </CardContent>
+      </Card>
   );
 }

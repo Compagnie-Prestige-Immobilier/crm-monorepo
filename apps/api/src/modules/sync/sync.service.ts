@@ -21,7 +21,12 @@ import {
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { readEnv } from '../../env.js';
 import { normalizePhone } from '../../common/phone.js';
-import { isAdmin, prospectSyncScope } from '../../common/scope.js';
+import { attributionScope, isAdmin, prospectSyncScope } from '../../common/scope.js';
+import {
+  DEVICE_CALL_TYPES,
+  fenetreTentative,
+  type DeviceCallType,
+} from '../../common/device-call.js';
 import { dakarWallClock } from '../../common/date-bounds.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
@@ -29,8 +34,10 @@ import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/repres
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
 import { CallAttemptApplyStatus } from '../phase2/dto.js';
+import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
+import { RemindersService } from '../notifications/reminders.service.js';
 import type { VisiteReferentielKind } from '../visites/dto.js';
 import { SyncBatchStore } from './batch-store.js';
 import { requestHash } from './request-hash.js';
@@ -209,6 +216,7 @@ export class SyncService {
     private readonly batches: SyncBatchStore,
     private readonly phase2Sync: Phase2SyncService,
     private readonly visites: VisitesService,
+    private readonly reminders: RemindersService,
   ) {}
 
   // PUSH
@@ -269,7 +277,38 @@ export class SyncService {
     };
 
     await this.batches.complete(user.id, body.clientBatchId, 200, response);
+    await this.alerterAppelsDetectes(user, body, results);
     return { body: response, replayed: false };
+  }
+
+  /**
+   * HORS TRANSACTION, et après le marqueur d'idempotence : une alerte est un
+   * effet de bord d'encadrement, elle ne doit ni retenir le verrou du lot ni
+   * faire échouer une poussée dont les écritures sont déjà validées.
+   */
+  private async alerterAppelsDetectes(
+    user: AuthenticatedUser,
+    body: SyncPushDto,
+    results: readonly SyncOperationResultDto[],
+  ): Promise<void> {
+    const poses = new Set(
+      body.operations
+        .filter((operation) => operation.entity === SyncEntity.APPEL_DETECTE)
+        .map((operation) => operation.opId),
+    );
+    if (!poses.size) return;
+
+    const detectees = results
+      .filter((result) => poses.has(result.opId) && result.status === SyncOpStatus.APPLIED)
+      .map((result) => result.entityId)
+      .filter((id): id is string => id !== null);
+    if (!detectees.length) return;
+
+    try {
+      await this.reminders.alerterAppelsNonConsignes(user.id, detectees);
+    } catch (error) {
+      this.logger.warn(`alerte d’appels non consignés impossible: ${String(error)}`);
+    }
   }
 
   /**
@@ -430,6 +469,9 @@ export class SyncService {
       }
       if (operation.entity === SyncEntity.VISITE) {
         return await this.applyVisite(tx, user, operation);
+      }
+      if (operation.entity === SyncEntity.APPEL_DETECTE) {
+        return await this.applyAppelDetecte(tx, user, operation);
       }
       return await this.applyProspect(tx, user, operation);
     } catch (error) {
@@ -822,9 +864,21 @@ export class SyncService {
           incomeBandId: data.incomeBandId,
           paymentMode: data.paymentMode,
           dureeSystemeMois: data.dureeSystemeMois,
+          deviceCallType: data.deviceCallType,
+          deviceCallDurationSeconds: data.deviceCallDurationSeconds,
+          deviceCallAt: data.deviceCallAt,
         }),
         clientCreatedAt: data.clientCreatedAt,
       });
+
+      if (data.ouvertureId) {
+        await fermerOuverture(tx, {
+          ouvertureId: data.ouvertureId,
+          openedById: user.id,
+          attemptId: operation.entityId,
+          at: new Date(data.clientCreatedAt),
+        });
+      }
 
       return {
         // Un rejeu n'est pas un échec : la tentative était déjà enregistrée,
@@ -866,6 +920,105 @@ export class SyncService {
       }
       throw error;
     }
+  }
+
+  // ─── Appel détecté ────────────────────────────────────────────────────────
+
+  /**
+   * Un appel que le journal du téléphone a vu, avant même que le téléconseiller
+   * le consigne. La détection ne juge rien : elle se pose, et cherche la
+   * tentative qui la couvre déjà. Sans tentative, la supervision la comptera
+   * comme non consignée.
+   */
+  private async applyAppelDetecte(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+  ): Promise<OperationOutcome> {
+    if (operation.op !== SyncOp.CREATE) {
+      throw new OperationError(
+        SyncOpStatus.INVALID,
+        'OP_NOT_SUPPORTED',
+        'Un appel détecté ne peut être ni modifié ni supprimé.',
+      );
+    }
+
+    const appel = lireAppelDetecte(operation.data ?? {});
+
+    const existing = await tx.deviceCallDetection.findUnique({
+      where: { id: operation.entityId },
+      select: { id: true, createdAt: true },
+    });
+    if (existing) {
+      return {
+        status: SyncOpStatus.DUPLICATE,
+        entityId: existing.id,
+        rev: null,
+        serverUpdatedAt: existing.createdAt.toISOString(),
+        errorCode: null,
+        error: null,
+      };
+    }
+
+    const attemptId = await this.tentativeCouvrante(tx, user, appel);
+
+    const createdAt = new Date();
+    await tx.deviceCallDetection.createMany({
+      data: [
+        {
+          id: operation.entityId,
+          performedById: user.id,
+          representantId: appel.representantId ?? null,
+          prospectId: appel.prospectId ?? null,
+          deviceCallType: appel.deviceCallType,
+          deviceCallDurationSeconds: appel.deviceCallDurationSeconds,
+          deviceCallAt: appel.deviceCallAt,
+          detectedAt: appel.detectedAt,
+          attemptId,
+          createdAt,
+        },
+      ],
+      skipDuplicates: true,
+    });
+    return applied(operation.entityId, null, createdAt);
+  }
+
+  /** La fiche doit être en main, et la tentative qui couvre déjà cet appel se lit avec elle. */
+  private async tentativeCouvrante(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    appel: AppelDetecte,
+  ): Promise<string | null> {
+    const portee = attributionScope(user);
+    const OR = fenetreTentative(appel.deviceCallAt);
+
+    if (appel.representantId !== undefined) {
+      const representantId = appel.representantId;
+      const fiche = await tx.representant.findFirst({
+        where: { id: representantId, deletedAt: null, ...portee },
+        select: { id: true },
+      });
+      if (!fiche) throw appelDetecteHorsPerimetre();
+      const tentative = await tx.repCallAttempt.findFirst({
+        where: { performedById: user.id, representantId, OR },
+        orderBy: { clientCreatedAt: 'asc' },
+        select: { id: true },
+      });
+      return tentative?.id ?? null;
+    }
+
+    const prospectId = appel.prospectId;
+    const fiche = await tx.prospect.findFirst({
+      where: { id: prospectId, deletedAt: null, ...portee },
+      select: { id: true },
+    });
+    if (!fiche) throw appelDetecteHorsPerimetre();
+    const tentative = await tx.callAttempt.findFirst({
+      where: { performedById: user.id, prospectId, OR },
+      orderBy: { clientCreatedAt: 'asc' },
+      select: { id: true },
+    });
+    return tentative?.id ?? null;
   }
 
   // ─── Prospect ─────────────────────────────────────────────────────────────
@@ -1511,6 +1664,54 @@ function situationGrandPublic(data: SyncEntityDataDto): Record<string, unknown> 
     relaisPhoneE164: optionalPhone(data.relaisPhoneE164),
   });
 }
+
+/** Un appel détecté vise UNE fiche : représentant ou prospect, jamais les deux. */
+type AppelDetecte = {
+  deviceCallType: DeviceCallType;
+  deviceCallDurationSeconds: number;
+  deviceCallAt: Date;
+  detectedAt: Date;
+} & (
+  | { representantId: string; prospectId?: undefined }
+  | { representantId?: undefined; prospectId: string }
+);
+
+function lireAppelDetecte(data: SyncEntityDataDto): AppelDetecte {
+  const { representantId, prospectId } = data;
+  if ((representantId === undefined) === (prospectId === undefined)) {
+    throw appelDetecteInvalide(
+      'Un appel détecté vise un représentant OU un prospect, jamais les deux.',
+    );
+  }
+  if (!data.deviceCallType || !DEVICE_CALL_TYPES.includes(data.deviceCallType)) {
+    throw appelDetecteInvalide('Type d’appel inconnu.');
+  }
+  if (data.deviceCallDurationSeconds === undefined || !data.deviceCallAt || !data.detectedAt) {
+    throw appelDetecteInvalide(
+      'Un appel détecté exige deviceCallDurationSeconds, deviceCallAt et detectedAt.',
+    );
+  }
+
+  const commun = {
+    deviceCallType: data.deviceCallType,
+    deviceCallDurationSeconds: data.deviceCallDurationSeconds,
+    deviceCallAt: new Date(data.deviceCallAt),
+    detectedAt: new Date(data.detectedAt),
+  };
+  return representantId === undefined
+    ? { ...commun, prospectId: prospectId as string }
+    : { ...commun, representantId };
+}
+
+const appelDetecteInvalide = (message: string): OperationError =>
+  new OperationError(SyncOpStatus.INVALID, 'APPEL_DETECTE_INVALIDE', message);
+
+const appelDetecteHorsPerimetre = (): OperationError =>
+  new OperationError(
+    SyncOpStatus.INVALID,
+    'APPEL_DETECTE_HORS_PERIMETRE',
+    'Cette fiche n’est pas dans votre périmètre.',
+  );
 
 function requireText(value: string | undefined, field: string): asserts value is string {
   if (!value?.trim()) {

@@ -16,6 +16,7 @@ import {
   MegaphoneIcon,
   PhoneCallIcon,
   PhoneForwardedIcon,
+  PlugZapIcon,
   PlusCircleIcon,
   SettingsIcon,
   UploadIcon,
@@ -729,6 +730,16 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Envoyer une notification',
         icon: BellIcon,
         description: 'Annonces et rappels envoyés',
+        roles: ['ADMIN'],
+      },
+      {
+        // Le suivi de l'enrôlement, tenu par la cellule pilotage et
+        // performance. Elle est le seul usage du rôle ADMIN, et rien de ce que
+        // rendent les plateformes n'est lisible ailleurs dans l'application.
+        href: '/admin/enrolement',
+        label: 'Plateformes d’enrôlement',
+        icon: PlugZapIcon,
+        description: 'Inscriptions CHUES et Grand Public',
         roles: ['ADMIN'],
       },
       {

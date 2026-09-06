@@ -1,6 +1,6 @@
 ---
 name: code-reviewer-pro
-description: "Use proactively for a bounded read-only review of a diff, commit, PR, or named files. Finds evidenced correctness, security, data-safety, concurrency, compatibility, performance, dependency, rollout, and missing-regression defects. Reports findings by severity with path:line; never edits or pads with style opinions."
+description: 'Use proactively for a bounded read-only review of a diff, commit, PR, or named files. Finds evidenced correctness, security, data-safety, concurrency, compatibility, performance, dependency, rollout, and missing-regression defects. Reports findings by severity with path:line; never edits or pads with style opinions.'
 tools: Read, Grep, Glob, Bash, WebSearch, WebFetch
 model: opus
 effort: high

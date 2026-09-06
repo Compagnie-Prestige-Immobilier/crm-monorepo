@@ -3,6 +3,7 @@ import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagg
 import { Role } from '@crm/database';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
+import { Cached } from '../../redis/cache.interceptor.js';
 
 import {
   CurrentUser,
@@ -43,6 +44,7 @@ import { SegmentConversionListDto, SegmentConversionsQueryDto } from './segment-
 @ApiBearerAuth()
 @Roles(Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION)
 @ApiErrors({ 400: true, 401: true, 403: true })
+@Cached(60)
 @Controller({ path: 'analytics', version: '1' })
 export class AnalyticsController {
   constructor(

@@ -283,7 +283,10 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         ref.read(appUpdateControllerProvider.notifier).recheckAfterSync();
         unawaited(_connectPresence());
       }
-      if (pull && outcome.isOk) await _pullDirectory();
+      if (pull && outcome.isOk) {
+        await _pullDirectory();
+        await _reconcilierOuverture();
+      }
       return outcome;
     } on Object catch (e) {
       if (ref.mounted) {
@@ -385,6 +388,25 @@ class SyncCoordinator extends Notifier<SyncUiState> {
     } on Object catch (e, stack) {
       developer.log(
         'Annuaire de phase 2 non rafraîchi',
+        name: 'cpi.sync',
+        error: e,
+        stackTrace: stack,
+      );
+    }
+  }
+
+  /// EB-08 : seul l'encadrement libère une fiche restée ouverte, et il le fait
+  /// depuis le web. Rien ne pousse cette décision jusqu'ici : le cycle de
+  /// synchronisation est le seul moment où l'appareil peut l'apprendre, et il
+  /// couvre le démarrage comme le retour au premier plan, qui le déclenchent.
+  Future<void> _reconcilierOuverture() async {
+    try {
+      final String? moi = await ref.read(tokenStoreProvider).readUserId();
+      if (moi == null || moi.isEmpty || !ref.mounted) return;
+      await ref.read(ouvertureRepositoryProvider).reconcilier(moi);
+    } on Object catch (e, stack) {
+      developer.log(
+        'Ouverture courante non réconciliée',
         name: 'cpi.sync',
         error: e,
         stackTrace: stack,

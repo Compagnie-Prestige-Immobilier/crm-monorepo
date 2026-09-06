@@ -61,6 +61,19 @@ describe('attributionScope', () => {
   it('le tirage mobile reste GLOBAL : c’est le téléphone qui filtre', () => {
     expect(prospectSyncScope(alice)).toEqual({});
   });
+
+  it('borne l’encadrement quand l’appelant le demande', () => {
+    expect(attributionScope(superviseur, { malgreLeRole: true })).toEqual({
+      OR: [{ createdById: 'sup-1' }, { lotItems: { some: { assigneeId: 'sup-1' } } }],
+    });
+    expect(attributionScope(admin, { malgreLeRole: true })).toEqual({
+      OR: [{ createdById: 'admin-1' }, { lotItems: { some: { assigneeId: 'admin-1' } } }],
+    });
+  });
+
+  it('ne change rien pour un COMMERCIAL, déjà borné', () => {
+    expect(attributionScope(alice, { malgreLeRole: true })).toEqual(attributionScope(alice));
+  });
 });
 
 describe('assertOwnership', () => {

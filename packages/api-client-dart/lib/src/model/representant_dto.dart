@@ -4,8 +4,10 @@
 
 // ignore_for_file: unused_element
 import 'package:crm_api_client/src/model/rep_call_outcome.dart';
+import 'package:crm_api_client/src/model/rappel_origine.dart';
 import 'package:crm_api_client/src/model/representant_relation.dart';
 import 'package:crm_api_client/src/model/whatsapp_status.dart';
+import 'package:crm_api_client/src/model/statut_qualification_effect.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -54,6 +56,12 @@ class RepresentantDto {
 
     required this.relationStatus,
 
+    required this.statutQualificationId,
+
+    required this.statutQualificationLabel,
+
+    required this.statutQualificationEffect,
+
     required this.whatsappStatus,
 
     required this.whatsappE164,
@@ -76,11 +84,15 @@ class RepresentantDto {
 
     required this.lastCallAt,
 
+    required this.callAttemptCount,
+
     required this.lastCallById,
 
     required this.lastCallByName,
 
     required this.nextCallbackAt,
+
+    required this.nextCallbackOrigine,
   });
 
   @JsonKey(name: r'id', required: true, includeIfNull: false)
@@ -138,6 +150,26 @@ class RepresentantDto {
   )
   final RepresentantRelation relationStatus;
 
+  @JsonKey(name: r'statutQualificationId', required: true, includeIfNull: true)
+  final String? statutQualificationId;
+
+  /// Libellé du statut de qualification, affiché à la place de `relationStatus`. Nul sur une fiche jamais qualifiée.
+  @JsonKey(
+    name: r'statutQualificationLabel',
+    required: true,
+    includeIfNull: true,
+  )
+  final String? statutQualificationLabel;
+
+  /// Effet du statut : c’est lui qui colore la pastille.
+  @JsonKey(
+    name: r'statutQualificationEffect',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: StatutQualificationEffect.unknownDefaultOpenApi,
+  )
+  final StatutQualificationEffect? statutQualificationEffect;
+
   @JsonKey(
     name: r'whatsappStatus',
     required: true,
@@ -184,15 +216,28 @@ class RepresentantDto {
   @JsonKey(name: r'lastCallAt', required: true, includeIfNull: true)
   final DateTime? lastCallAt;
 
+  /// Nombre d’appels consignés sur cette fiche.
+  @JsonKey(name: r'callAttemptCount', required: true, includeIfNull: false)
+  final num callAttemptCount;
+
   @JsonKey(name: r'lastCallById', required: true, includeIfNull: true)
   final String? lastCallById;
 
   @JsonKey(name: r'lastCallByName', required: true, includeIfNull: true)
   final String? lastCallByName;
 
-  /// Rappel promis par le dernier appel, tant qu’aucun appel ne l’a honoré.
+  /// Rappel dû, tant qu’aucun appel ne l’a honoré.
   @JsonKey(name: r'nextCallbackAt', required: true, includeIfNull: true)
   final DateTime? nextCallbackAt;
+
+  /// PROMIS : la date convenue avec la personne. AUTOMATIQUE : le délai de réessai du dernier statut non joint. Nul en même temps que `nextCallbackAt`.
+  @JsonKey(
+    name: r'nextCallbackOrigine',
+    required: true,
+    includeIfNull: true,
+    unknownEnumValue: RappelOrigine.unknownDefaultOpenApi,
+  )
+  final RappelOrigine? nextCallbackOrigine;
 
   bool operator ==(Object other) {
     return identical(this, other) ||
@@ -216,6 +261,9 @@ class RepresentantDto {
                 updatedAt,
                 prospectCount,
                 relationStatus,
+                statutQualificationId,
+                statutQualificationLabel,
+                statutQualificationEffect,
                 whatsappStatus,
                 whatsappE164,
                 whatsappNumber,
@@ -227,9 +275,11 @@ class RepresentantDto {
                 contacte,
                 lastCallOutcome,
                 lastCallAt,
+                callAttemptCount,
                 lastCallById,
                 lastCallByName,
                 nextCallbackAt,
+                nextCallbackOrigine,
               ],
               [
                 other.id,
@@ -248,6 +298,9 @@ class RepresentantDto {
                 other.updatedAt,
                 other.prospectCount,
                 other.relationStatus,
+                other.statutQualificationId,
+                other.statutQualificationLabel,
+                other.statutQualificationEffect,
                 other.whatsappStatus,
                 other.whatsappE164,
                 other.whatsappNumber,
@@ -259,9 +312,11 @@ class RepresentantDto {
                 other.contacte,
                 other.lastCallOutcome,
                 other.lastCallAt,
+                other.callAttemptCount,
                 other.lastCallById,
                 other.lastCallByName,
                 other.nextCallbackAt,
+                other.nextCallbackOrigine,
               ],
             );
   }
@@ -286,6 +341,9 @@ class RepresentantDto {
         updatedAt,
         prospectCount,
         relationStatus,
+        statutQualificationId,
+        statutQualificationLabel,
+        statutQualificationEffect,
         whatsappStatus,
         whatsappE164,
         whatsappNumber,
@@ -297,9 +355,11 @@ class RepresentantDto {
         contacte,
         lastCallOutcome,
         lastCallAt,
+        callAttemptCount,
         lastCallById,
         lastCallByName,
         nextCallbackAt,
+        nextCallbackOrigine,
       ]);
 
   factory RepresentantDto.fromJson(Map<String, dynamic> json) =>

@@ -139,6 +139,10 @@ class RepresentantLookup {
   final String? ownedByCommercialName;
 }
 
+/// Le verrou : ce compte tient déjà une fiche. La route ne dit pas laquelle,
+/// c'est `GET /v1/ouvertures/courante` qui la nomme.
+const String ouvertureFicheDejaOuverteCode = 'OUVERTURE_FICHE_DEJA_OUVERTE';
+
 enum FailureKind {
   retryable,
 
@@ -229,9 +233,29 @@ abstract interface class ApiPort {
     required List<SyncOperationDto> operations,
   });
 
+  /// `ouvertureId` ferme l'ouverture qui a lancé cette qualification, et c'est
+  /// ce qui arrête le chronomètre. Une ouverture inconnue, déjà fermée ou tenue
+  /// par un autre est ignorée EN SILENCE : aucune erreur ne peut en venir.
   Future<RepCallAttemptResultDto> recordRepCallAttempt(
     CreateRepCallAttemptDto attempt,
   );
+
+  /// `POST /v1/ouvertures`. Exactement une des deux cibles.
+  ///
+  /// Le rejeu du même identifiant par le même compte rend la ligne existante,
+  /// sans compter de seconde ouverture : c'est ce qui rend la file rejouable.
+  /// Lève un [ApiException] de code [ouvertureFicheDejaOuverteCode] quand ce
+  /// compte tient déjà une autre fiche.
+  Future<OuvertureFicheDto> ouvrirFiche(OuvrirFicheDto corps);
+
+  /// `GET /v1/ouvertures/courante`. Null : ce compte ne tient aucune fiche.
+  Future<OuvertureFicheDto?> ouvertureCourante();
+
+  /// `PUT /v1/ouvertures/:id/brouillon`. Remplace le brouillon EN ENTIER.
+  Future<void> enregistrerBrouillonOuverture({
+    required String id,
+    required EnregistrerBrouillonDto corps,
+  });
 
   Future<void> uploadCallRecording({
     required String attemptId,
@@ -243,6 +267,13 @@ abstract interface class ApiPort {
   /// Le référentiel entier, filtré par le serveur sur `minPayloadVersion` : sans
   /// pagination ni curseur, il tient en quelques dizaines de lignes.
   Future<List<CallOutcomeReasonDto>> pullCallOutcomeReasons({
+    required int payloadVersion,
+  });
+
+  /// Le vocabulaire de qualification d'un représentant, ENTIER et dans l'ordre
+  /// servi. Même route dédiée que les motifs, et même filtrage sur
+  /// [payloadVersion].
+  Future<List<StatutQualificationDto>> pullStatutsQualification({
     required int payloadVersion,
   });
 

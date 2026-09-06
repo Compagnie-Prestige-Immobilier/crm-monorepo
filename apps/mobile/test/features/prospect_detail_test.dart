@@ -52,6 +52,9 @@ void main() {
             projet: const Value<String>('GRAND_PUBLIC'),
             type: const Value<String?>('FONCTIONNAIRE'),
             profession: const Value<String?>('Institutrice'),
+            canalProvenanceId: const Value<String?>('cn-1'),
+            incomeBandId: const Value<String?>('rev-1'),
+            dureeSystemeMois: const Value<int?>(36),
             createdById: 'u-1',
             clientCreatedAt: t0,
             localUpdatedAt: t0,
@@ -166,12 +169,17 @@ void main() {
     expect(find.text('Fonctionnaire'), findsOneWidget);
     expect(find.text('Profession'), findsOneWidget);
     expect(find.text('Institutrice'), findsOneWidget);
+    expect(find.text('Tranche de revenus'), findsOneWidget);
+    expect(find.text('Revenu Test'), findsOneWidget);
+    expect(find.text('Durée de remboursement'), findsOneWidget);
+    expect(find.text('36 mois'), findsOneWidget);
+    expect(find.text('Canal de provenance'), findsOneWidget);
+    expect(find.text('Parrainage'), findsOneWidget);
     for (final String vide in <String>[
       'Ancienneté',
       'Type de contrat',
       'Pays de résidence',
       'WhatsApp',
-      'Tranche de revenus',
     ]) {
       expect(find.text(vide), findsNothing, reason: '« $vide » est vide');
     }
@@ -211,6 +219,58 @@ void main() {
     expect(find.text('Consigner l\'appel'), findsOneWidget);
     // La base vient du bureau : rien ne s'efface depuis le téléphone.
     expect(find.text('Supprimer ce prospect'), findsNothing);
+
+    await unmount(tester);
+  });
+
+  // Ce que le TÉLÉPHONE a fait de l'appel, sous le numéro : sans cette ligne,
+  // la fiche laisse croire qu'un appel lancé a forcément abouti.
+  testWidgets('la fiche montre ce que le journal du téléphone a confirmé', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'prospect',
+            entityId: 'gp-1',
+            phoneE164: '+221771234567',
+            lanceAt: t0,
+            mode: 'call',
+            journalType: const Value<String?>('sortant'),
+            journalDureeS: const Value<int?>(92),
+            journalAt: Value<DateTime?>(DateTime(2026, 8, 12, 14, 2)),
+            rapprocheAt: Value<DateTime?>(t0),
+          ),
+        );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Sortant · 1 min 32 · 14:02'), findsOneWidget);
+
+    await unmount(tester);
+  });
+
+  testWidgets('un appel lancé sans confirmation du téléphone le dit', (
+    WidgetTester tester,
+  ) async {
+    await db
+        .into(db.preuvesAppel)
+        .insert(
+          PreuvesAppelCompanion.insert(
+            id: 'preuve-1',
+            kind: 'prospect',
+            entityId: 'gp-1',
+            phoneE164: '+221771234567',
+            lanceAt: t0,
+            mode: 'dial',
+          ),
+        );
+
+    await open(tester, 'gp-1');
+
+    expect(find.text('Non confirmé par le téléphone'), findsOneWidget);
 
     await unmount(tester);
   });

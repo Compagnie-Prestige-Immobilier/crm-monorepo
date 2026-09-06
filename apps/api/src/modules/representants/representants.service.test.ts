@@ -11,6 +11,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { ROLES_KEY } from '../../common/decorators/roles.decorator.js';
+import { SortOrder } from '../../common/dto/prospect-filter.dto.js';
+import { RepresentantSortField } from './dto.js';
 import { RepresentantsController } from './representants.controller.js';
 import { RepresentantsService } from './representants.service.js';
 
@@ -22,6 +24,8 @@ interface MockDb {
     MockFn
   >;
   representantRelationChange: Record<'create' | 'findMany', MockFn>;
+  repCallAttempt: Record<'findMany', MockFn>;
+  ouvertureFiche: Record<'findMany', MockFn>;
   representantComment: Record<
     'findMany' | 'findUniqueOrThrow' | 'count' | 'createMany' | 'updateMany',
     MockFn
@@ -63,6 +67,8 @@ const foreignRow = (): Record<string, unknown> => ({
   createdAt: date,
   updatedAt: date,
   relationStatus: RepresentantRelation.INCONNU,
+  statutQualificationId: null,
+  statutQualification: null,
   whatsappStatus: WhatsappStatus.NON_DEMANDE,
   whatsappE164: null,
   profession: null,
@@ -71,7 +77,7 @@ const foreignRow = (): Record<string, unknown> => ({
   syndicat: null,
   connaitUES: null,
   contacte: null,
-  _count: { prospects: 42 },
+  _count: { prospects: 42, repCallAttempts: 3 },
 });
 
 let db: MockDb;
@@ -89,6 +95,8 @@ beforeEach(() => {
       updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     representantRelationChange: { create: vi.fn(), findMany: vi.fn().mockResolvedValue([]) },
+    repCallAttempt: { findMany: vi.fn().mockResolvedValue([]) },
+    ouvertureFiche: { findMany: vi.fn().mockResolvedValue([]) },
     representantComment: {
       findMany: vi.fn().mockResolvedValue([]),
       findUniqueOrThrow: vi.fn(),
@@ -217,9 +225,33 @@ describe('filtre par état de relation', () => {
     (db.representant.findMany.mock.calls[0] as [{ where: Record<string, unknown> }])[0].where;
 
   it('ne retient que les fiches dans l’état demandé', async () => {
-    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list(ADMIN, { relationStatus: [RepresentantRelation.AMBASSADEUR] });
 
     expect(whereOf().relationStatus).toBe(RepresentantRelation.AMBASSADEUR);
+  });
+
+  it('retient tous les états demandés quand il y en a plusieurs', async () => {
+    await service.list(ADMIN, {
+      relationStatus: [
+        RepresentantRelation.CONTACTE,
+        RepresentantRelation.AMBASSADEUR,
+        RepresentantRelation.REFUS,
+      ],
+    });
+
+    expect(whereOf().relationStatus).toEqual({
+      in: [
+        RepresentantRelation.CONTACTE,
+        RepresentantRelation.AMBASSADEUR,
+        RepresentantRelation.REFUS,
+      ],
+    });
+  });
+
+  it('ne filtre sur rien quand la liste est vide', async () => {
+    await service.list(ADMIN, { relationStatus: [] });
+
+    expect(whereOf()).not.toHaveProperty('relationStatus');
   });
 
   it('ne filtre sur rien quand l’état n’est pas demandé', async () => {
@@ -240,7 +272,7 @@ describe('filtre par état de relation', () => {
   });
 
   it('n’ajoute aucun cloisonnement pour l’encadrement', async () => {
-    await service.list(ADMIN, { relationStatus: RepresentantRelation.AMBASSADEUR });
+    await service.list(ADMIN, { relationStatus: [RepresentantRelation.AMBASSADEUR] });
 
     expect(whereOf()).toMatchObject({ relationStatus: RepresentantRelation.AMBASSADEUR });
     expect(whereOf()).not.toHaveProperty('AND');
@@ -271,10 +303,37 @@ describe('périmètre par campagne', () => {
   it('le SUPERVISEUR n’est borné par rien', async () => {
     await service.list(
       { ...COMMERCIAL, id: 'sup-1', role: Role.SUPERVISEUR },
-      { relationStatus: RepresentantRelation.AMBASSADEUR },
+      { relationStatus: [RepresentantRelation.AMBASSADEUR] },
     );
 
     expect(whereOf()).not.toHaveProperty('AND');
+  });
+
+  it('`mesFiches` borne le SUPERVISEUR à ce qu’il doit appeler', async () => {
+    const superviseur = { ...COMMERCIAL, id: 'sup-1', role: Role.SUPERVISEUR };
+    await service.list(superviseur, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      { OR: [{ createdById: 'sup-1' }, { lotItems: { some: { assigneeId: 'sup-1' } } }] },
+    ]);
+  });
+
+  it('`mesFiches` borne aussi l’ADMIN, sans quoi le drapeau ne voudrait rien dire', async () => {
+    await service.list(ADMIN, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      { OR: [{ createdById: ADMIN.id }, { lotItems: { some: { assigneeId: ADMIN.id } } }] },
+    ]);
+  });
+
+  it('`mesFiches` ne change rien pour un COMMERCIAL, déjà borné', async () => {
+    await service.list(COMMERCIAL, { mesFiches: true });
+
+    expect(whereOf().AND).toEqual([
+      {
+        OR: [{ createdById: COMMERCIAL.id }, { lotItems: { some: { assigneeId: COMMERCIAL.id } } }],
+      },
+    ]);
   });
 
   it('un détail hors périmètre est INTROUVABLE, pas refusé', async () => {
@@ -505,6 +564,86 @@ describe('historique de relation', () => {
     db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
 
     await expect(service.relationHistory('rep-9')).resolves.toEqual({ items: [] });
+  });
+});
+
+describe('historique des appels', () => {
+  it('rend 404 sur une fiche absente, sans lire les appels', async () => {
+    db.representant.findFirst.mockResolvedValue(null);
+
+    await expect(service.callHistory('rep-9')).rejects.toBeInstanceOf(NotFoundException);
+    expect(db.repCallAttempt.findMany).not.toHaveBeenCalled();
+  });
+
+  it('rend chaque appel avec son auteur, son statut et la personne proposée', async () => {
+    db.representant.findFirst.mockResolvedValue({ id: 'rep-9', createdById: COMMERCIAL.id });
+    db.repCallAttempt.findMany.mockResolvedValue([
+      {
+        id: 'att-1',
+        outcome: 'REFUSED',
+        statutQualificationId: 'sq-1',
+        statutQualification: { label: 'Autre joint', requiresComment: true },
+        comment: 'Rappeler après les examens',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: true,
+        numeroConfirme: null,
+        contacte: false,
+        connaitUES: true,
+        syndicat: 'SAEMSS',
+        suggestion: {
+          suggestedName: 'Fatou Sarr',
+          suggestedPhoneE164: '+221771234567',
+          note: null,
+        },
+        performedById: COMMERCIAL.id,
+        performedBy: { fullName: COMMERCIAL.fullName },
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: new Date('2026-08-05T10:00:14.000Z'),
+        clientCreatedAt: date,
+      },
+    ]);
+
+    db.ouvertureFiche.findMany.mockResolvedValue([
+      {
+        closingAttemptId: 'att-1',
+        firstInputAt: new Date('2026-08-05T10:00:00.000Z'),
+        closedAt: new Date('2026-08-05T10:07:00.000Z'),
+      },
+    ]);
+
+    const result = await service.callHistory('rep-9');
+
+    expect(result.items).toEqual([
+      {
+        id: 'att-1',
+        outcome: 'REFUSED',
+        statutQualificationId: 'sq-1',
+        statutQualificationLabel: 'Autre joint',
+        statutQualificationRequiresComment: true,
+        comment: 'Rappeler après les examens',
+        callbackAt: null,
+        promisedProspects: null,
+        etablissementConfirme: true,
+        numeroConfirme: null,
+        contacte: false,
+        connaitUES: true,
+        syndicat: 'SAEMSS',
+        suggestedName: 'Fatou Sarr',
+        suggestedPhoneE164: '+221771234567',
+        suggestedNote: null,
+        performedById: COMMERCIAL.id,
+        performedByName: COMMERCIAL.fullName,
+        deviceCallType: 'sortant',
+        deviceCallDurationSeconds: 92,
+        deviceCallAt: '2026-08-05T10:00:14.000Z',
+        clientCreatedAt: date.toISOString(),
+        dureeTraitementSecondes: 420,
+      },
+    ]);
+    const args = db.repCallAttempt.findMany.mock.calls[0]?.[0] as { orderBy: unknown[] };
+    expect(args.orderBy).toEqual([{ clientCreatedAt: 'desc' }, { id: 'desc' }]);
   });
 });
 
@@ -866,5 +1005,28 @@ describe('WhatsApp et profession sur la fiche', () => {
     await service.list(ADMIN, {});
 
     expect(whereOf()).not.toHaveProperty('whatsappStatus');
+  });
+});
+
+describe('tri par priorité de traitement', () => {
+  const orderByOf = (): unknown =>
+    (db.representant.findMany.mock.calls[0] as [{ orderBy: unknown }])[0].orderBy;
+
+  it('remonte les priorités hautes, et les fiches jamais qualifiées en dernier', async () => {
+    await service.list(ADMIN, { sortBy: RepresentantSortField.PRIORITE });
+
+    // `asc` sur l'énumération suit son ordre de déclaration, HAUTE d'abord, et
+    // PostgreSQL classe les NULL en dernier dans ce sens : une fiche sans
+    // statut ne double pas celles qu'on a qualifiées.
+    expect(orderByOf()).toEqual([{ statutQualification: { priorite: 'asc' } }, { id: 'desc' }]);
+  });
+
+  it('accepte l’ordre inverse quand il est demandé', async () => {
+    await service.list(ADMIN, {
+      sortBy: RepresentantSortField.PRIORITE,
+      sortOrder: SortOrder.DESC,
+    });
+
+    expect(orderByOf()).toEqual([{ statutQualification: { priorite: 'desc' } }, { id: 'desc' }]);
   });
 });

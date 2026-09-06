@@ -62,6 +62,51 @@ export function formatShortDate(iso: string): string {
   return format(parseISO(iso), 'dd MMM', { locale: fr });
 }
 
+const DEVICE_CALL_LABELS: Record<string, string> = {
+  sortant: 'Sortant',
+  entrant: 'Entrant',
+  manque: 'Manqué',
+  rejete: 'Rejeté',
+  bloque: 'Bloqué',
+  messagerie: 'Messagerie',
+  externe: 'Externe',
+  inconnu: 'Inconnu',
+};
+
+function formatCallDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const reste = seconds % 60;
+  if (minutes === 0) return `${formatNumber(reste)} s`;
+  return `${formatNumber(minutes)} min ${String(reste).padStart(2, '0')}`;
+}
+
+/** Une ligne du journal d'appels : nature, durée, heure. */
+export function formatDetectedCall(call: {
+  deviceCallType?: string | null;
+  deviceCallDurationSeconds?: number | null;
+  deviceCallAt: string;
+}): string {
+  const duree = call.deviceCallDurationSeconds ?? null;
+  const parts = [DEVICE_CALL_LABELS[call.deviceCallType ?? ''] ?? 'Inconnu'];
+  if (duree !== null) parts.push(formatCallDuration(duree));
+  parts.push(format(parseISO(call.deviceCallAt), 'HH:mm', { locale: fr }));
+  return parts.join(' · ');
+}
+
+/**
+ * Ce que le journal d'appels du téléphone Android dit d'une tentative. Sans
+ * `deviceCallAt`, l'appel n'est que déclaré : aucune trace ne l'atteste.
+ */
+export function formatDeviceCall(attempt: {
+  deviceCallType?: string | null;
+  deviceCallDurationSeconds?: number | null;
+  deviceCallAt?: string | null;
+}): string {
+  const at = attempt.deviceCallAt ?? null;
+  if (at === null) return 'Téléphone : non confirmé';
+  return `Téléphone : ${formatDetectedCall({ ...attempt, deviceCallAt: at })}`;
+}
+
 export function formatPhone(e164: string): string {
   return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
 }

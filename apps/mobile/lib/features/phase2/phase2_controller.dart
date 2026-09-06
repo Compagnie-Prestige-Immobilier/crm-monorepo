@@ -265,6 +265,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     String? recordingPath,
     Phase2Renseignements? renseignements,
     DateTime? rendezVousAt,
+    String? ouvertureId,
   }) async {
     final Phase2DirectoryData? entry = state.entry;
     if (entry == null) return false;
@@ -280,6 +281,7 @@ class Phase2Controller extends Notifier<Phase2State> {
     try {
       await _writes.recordCallAttempt(
         prospectId: entry.prospectId,
+        ouvertureId: ouvertureId,
         outcome: reason.outcome,
         reasonCode: reason.code,
         method: method,

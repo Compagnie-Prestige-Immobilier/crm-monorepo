@@ -18,6 +18,7 @@ import '../../../ui/widgets/cpi_pressable.dart';
 import '../../../ui/widgets/search_field.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
+import 'representant_detail_screen.dart' show StatutTag;
 
 class RepresentantPickerScreen extends ConsumerStatefulWidget {
   const RepresentantPickerScreen({super.key, this.pourQualifier = false});
@@ -193,7 +194,14 @@ class _RepresentantRow extends StatelessWidget {
               ),
         title: data.fullName,
         subtitle: subtitle,
-        trailing: signal == null ? null : CpiTag(signal, tone: status.tone),
+        trailing: signal == null
+            ? StatutTag(
+                relationStatus: data.relationStatus,
+                statutLabel: data.statutQualificationLabel,
+                statutEffect: data.statutQualificationEffect,
+                lastCallOutcome: data.lastCallOutcome,
+              )
+            : CpiTag(signal, tone: status.tone),
         onTap: () => context.pushOnce(
           pourQualifier
               ? Routes.representantQualificationFor(data.id)
@@ -216,14 +224,7 @@ class _Empty extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (query.isEmpty) {
-      return const CpiEmptyState(
-        icon: PhosphorIconsDuotone.magnifyingGlass,
-        title: 'Cherchez un représentant',
-        message: 'Tapez son nom ou son numéro.',
-      );
-    }
-    if (borne) {
+    if (query.isEmpty || borne) {
       return const CpiEmptyState(
         icon: PhosphorIconsDuotone.usersThree,
         title: 'Aucune fiche dans vos campagnes.',

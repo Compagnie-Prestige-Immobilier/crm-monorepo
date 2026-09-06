@@ -182,6 +182,19 @@ class ReferenceRepository {
         );
   }
 
+  /// Les statuts proposés à la qualification d'un représentant. Sans repli :
+  /// le champ est facultatif dans le contrat, et une liste vide laisse la
+  /// saisie possible plutôt que d'inventer un vocabulaire.
+  Stream<List<StatutQualificationRow>> watchStatutsQualification() {
+    return (_db.select(_db.statutsQualification)
+          ..where((StatutsQualification t) => t.isActive.equals(true))
+          ..orderBy(<OrderClauseGenerator<StatutsQualification>>[
+            (StatutsQualification t) => OrderingTerm.asc(t.position),
+            (StatutsQualification t) => OrderingTerm.asc(t.label),
+          ]))
+        .watch();
+  }
+
   Future<Representant?> findRepresentantByPhone(String phoneE164) {
     return (_db.select(_db.representants)
           ..where(
@@ -208,17 +221,18 @@ class ReferenceRepository {
     )..where((Departements t) => t.id.equals(id))).getSingleOrNull();
   }
 
+  /// [statutId], [relation] et [dernierAppel] vides ne filtrent pas ; la
+  /// valeur `JAMAIS` cible les fiches sans statut ou jamais appelées.
   Stream<List<RepresentantSyncViewData>> watchRepresentants({
     String? search,
     String? moi,
+    String statutId = '',
+    String relation = '',
+    String dernierAppel = '',
   }) {
     final String terme = (search ?? '').trim();
-    // Annuaire de milliers de fiches : tout dérouler laisse croire à un total
-    // faux (« il n'y en a que 500 »). L'écran reste vide tant qu'on n'a pas
-    // cherché ; un résultat n'apparaît que pour une recherche explicite.
-    if (terme.isEmpty) {
-      return Stream<List<RepresentantSyncViewData>>.value(const []);
-    }
+    // ponytail: pas de LIMIT, le périmètre borne déjà la liste ; paginer si un
+    // compte se retrouve avec plus de quelques milliers de fiches.
     final String pattern = '%${terme.toLowerCase()}%';
     // Un numéro se tape avec des espaces (« 77 152 11 62 ») et se range en
     // E.164 : sans cette seconde forme, aucune recherche par téléphone ne sort.
@@ -230,12 +244,20 @@ class ReferenceRepository {
           'WHERE deleted_at IS NULL '
           '  AND (lower(full_name) LIKE ?2 OR phone_e164 LIKE ?2 '
           '       OR (?3 <> \'\' AND phone_e164 LIKE ?3)) '
+          '  AND (?4 = \'\' OR (?4 = \'JAMAIS\' AND statut_qualification_id IS NULL) '
+          '       OR statut_qualification_id = ?4) '
+          '  AND (?5 = \'\' OR relation_status = ?5) '
+          '  AND (?6 = \'\' OR (?6 = \'JAMAIS\' AND last_call_at IS NULL) '
+          '       OR last_call_outcome = ?6) '
           '  ${_perimetre('representant')}'
           'ORDER BY client_created_at DESC',
           variables: <Variable<Object>>[
             Variable<String>(moi ?? ''),
             Variable<String>(pattern),
             Variable<String>(parNumero),
+            Variable<String>(statutId),
+            Variable<String>(relation),
+            Variable<String>(dernierAppel),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
@@ -303,10 +325,20 @@ class ReferenceRepository {
         .watch();
   }
 
+  /// L'historique des qualifications d'une fiche, du plus récent au plus
+  /// ancien. Lecture seule : une entrée passée ne se modifie jamais.
+  Stream<List<HistoriqueRepresentantResult>> watchHistoriqueRepresentant(
+    String representantId,
+  ) {
+    return _db.historiqueRepresentant(representantId: representantId).watch();
+  }
+
   Stream<List<ProspectSyncViewData>> watchAllProspects({
     String? search,
     String? projet,
     String? moi,
+    String statut = '',
+    String dernierAppel = '',
   }) {
     final String pattern = '%${(search ?? '').trim().toLowerCase()}%';
     final String project = projet ?? '';
@@ -319,12 +351,17 @@ class ReferenceRepository {
           '        WHERE j.prospect_id = v.id AND j.projet = ?2)) '
           '  AND (?3 = \'%%\' OR lower(nom) LIKE ?3 OR lower(prenom) LIKE ?3 '
           '       OR phone_e164 LIKE ?3) '
+          '  AND (?4 = \'\' OR statut = ?4) '
+          '  AND (?5 = \'\' OR (?5 = \'JAMAIS\' AND last_call_at IS NULL) '
+          '       OR last_call_outcome = ?5) '
           '  ${_perimetre('prospect', alias: 'v')}'
           'ORDER BY client_created_at DESC LIMIT 500',
           variables: <Variable<Object>>[
             Variable<String>(moi ?? ''),
             Variable<String>(project),
             Variable<String>(pattern),
+            Variable<String>(statut),
+            Variable<String>(dernierAppel),
           ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.prospects,
@@ -367,6 +404,22 @@ class ReferenceRepository {
         .customSelect(
           'SELECT COUNT(*) AS c FROM representants '
           'WHERE deleted_at IS NULL ${_perimetre('representant')}',
+          variables: <Variable<Object>>[Variable<String>(moi ?? '')],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.representants,
+            _db.attributions,
+          },
+        )
+        .map((QueryRow row) => row.read<int>('c'))
+        .watchSingle();
+  }
+
+  Stream<int> watchRepresentantsAppeles({String? moi}) {
+    return _db
+        .customSelect(
+          'SELECT COUNT(*) AS c FROM representants '
+          'WHERE deleted_at IS NULL AND last_call_at IS NOT NULL '
+          '${_perimetre('representant')}',
           variables: <Variable<Object>>[Variable<String>(moi ?? '')],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
@@ -428,6 +481,17 @@ class ReferenceRepository {
     return (_db.select(
       _db.prospects,
     )..where((Prospects t) => t.id.equals(id))).getSingleOrNull();
+  }
+
+  /// Le numéro d'une fiche de prospect, cherché comme l'écran d'appel la
+  /// cherche : l'annuaire d'abord, la fiche locale ensuite.
+  Future<String?> numeroDuProspect(String prospectId) async {
+    final Phase2DirectoryData? annuaire =
+        await (_db.select(_db.phase2Directory)
+              ..where((Phase2Directory t) => t.prospectId.equals(prospectId)))
+            .getSingleOrNull();
+    if (annuaire != null) return annuaire.phoneE164;
+    return (await prospectById(prospectId))?.phoneE164;
   }
 
   Future<DateTime?> lastPulledAt() async {

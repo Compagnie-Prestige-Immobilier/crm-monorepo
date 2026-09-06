@@ -103,19 +103,26 @@ class AppShell extends ConsumerWidget {
             shell.goBranch(index, initialLocation: index == shell.currentIndex),
         items: <CpiNavItem>[
           ..._propres,
+          if (project == CpiProject.accueil)
+            CpiNavItem(
+              label: 'À corriger',
+              icon: PhosphorIconsRegular.warningCircle,
+              activeIcon: PhosphorIconsFill.warningCircle,
+              badge: needsAttention,
+              badgeSemanticsLabel: _aCorriger(needsAttention),
+            )
+          else
+            const CpiNavItem(
+              label: 'Contacts',
+              icon: PhosphorIconsRegular.addressBook,
+              activeIcon: PhosphorIconsFill.addressBook,
+            ),
           CpiNavItem(
-            label: 'À corriger',
-            icon: PhosphorIconsRegular.warningCircle,
-            activeIcon: PhosphorIconsFill.warningCircle,
-            badge: needsAttention,
-            badgeSemanticsLabel:
-                '$needsAttention saisie${needsAttention > 1 ? 's' : ''} '
-                'à corriger',
-          ),
-          const CpiNavItem(
             label: 'Réglages',
             icon: PhosphorIconsRegular.gear,
             activeIcon: PhosphorIconsFill.gear,
+            badge: project == CpiProject.accueil ? 0 : needsAttention,
+            badgeSemanticsLabel: _aCorriger(needsAttention),
           ),
         ],
       ),
@@ -149,11 +156,23 @@ CpiProject projetDeLaCoque(BuildContext context) {
   return CpiProject.duChemin(config.uri.path) ?? CpiProject.chues;
 }
 
-/// L'onglet « À corriger » de la coque où l'on se trouve : chaque projet a le
-/// sien, et sauter dans celui d'un autre changerait de projet au milieu d'un
-/// geste.
+String _aCorriger(int n) => '$n saisie${n > 1 ? 's' : ''} à corriger';
+
+/// « À corriger » de la coque où l'on se trouve : chaque projet a le sien, et
+/// sauter dans celui d'un autre changerait de projet au milieu d'un geste.
 String correctionsDeLaCoque(BuildContext context) =>
     projetDeLaCoque(context).corrections;
+
+/// Onglet dans la coque d'accueil, écran poussé par-dessus ailleurs : l'onglet
+/// du CHUES et du Grand Public est pris par « Contacts ».
+void ouvrirCorrections(BuildContext context) {
+  final String cible = correctionsDeLaCoque(context);
+  if (projetDeLaCoque(context) == CpiProject.accueil) {
+    context.go(cible);
+    return;
+  }
+  context.push(cible).ignore();
+}
 
 /// L'onglet « Réglages » de la coque où l'on se trouve. Sert de repli aux pages
 /// d'aide poussées par-dessus : sans lui, un retour non dépilable déposait dans
@@ -269,7 +288,7 @@ class _PendingBannerState extends ConsumerState<PendingBanner> {
             'Aucun envoi ne les débloquera.',
         tone: CpiTone.danger,
         action: 'Corriger',
-        onAction: () => context.go(correctionsDeLaCoque(context)),
+        onAction: () => ouvrirCorrections(context),
       );
     } else if (_showSuccess) {
       band = (

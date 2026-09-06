@@ -64,11 +64,12 @@ async function expectNoErrorState(page: Page): Promise<void> {
 }
 
 test('l’espace démo se réinitialise et reste isolé', async ({ page }) => {
+  test.setTimeout(300_000);
   await page.goto('/parametres');
   await expect(page.getByRole('heading', { name: 'Paramètres', level: 1 })).toBeVisible();
 
   await page.getByRole('button', { name: 'Réinitialiser l’espace démo' }).click();
-  await expect(page.getByText('Espace démo réinitialisé.')).toBeVisible({ timeout: 90_000 });
+  await expect(page.getByText('Espace démo réinitialisé.')).toBeVisible({ timeout: 240_000 });
 
   await page.getByRole('button', { name: /^Compte de / }).click();
   await page.getByRole('menuitem', { name: 'Ouvrir l’espace démo' }).click();

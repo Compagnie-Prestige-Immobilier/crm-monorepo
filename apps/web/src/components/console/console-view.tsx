@@ -7,11 +7,12 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
-import { copyPhone, Kbd } from '@/components/console/console-ui';
+import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
@@ -23,6 +24,7 @@ import {
   conversionErrorFor,
   conversionFrom,
   formatCallbackAt,
+  lireBrouillon,
   newAttemptInput,
   pushCallAttempt,
   validateAttempt,
@@ -32,6 +34,12 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
+import {
+  enregistrerBrouillon,
+  fetchOuvertureCourante,
+  ouvrirFiche,
+  type OuvertureFiche,
+} from '@/lib/data/ouvertures';
 import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
@@ -45,15 +53,20 @@ import {
   type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
+import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
+/** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
+const RAPPEL_KEY = '2';
+
 /** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
 const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
   { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
-  { key: '2', label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
+  { key: RAPPEL_KEY, label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
   { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
   { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
   { key: '5', label: 'Autre', outcome: 'OTHER' },
@@ -68,7 +81,7 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1 … 6', 'Échéance proposée, après 2'],
   ['0', 'Saisir une autre échéance, après 2'],
   ['Entrée', 'Valider'],
-  ['Échap', 'Annuler la saisie, ou revenir à la liste'],
+  ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
   ['N', 'Ajouter un prospect sur ce représentant'],
   ['R', 'Fiche du représentant'],
@@ -99,7 +112,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
-  const [choisi, setChoisi] = useState<ProspectRow | null>(null);
+  const [ouverte, setOuverte] = useState<Ouverte | null>(null);
+  const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
   const [confirme, setConfirme] = useState<string | null>(null);
@@ -112,30 +126,77 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     retry: false,
   });
 
-  const courante = choisi ?? (demandee === null ? null : (parLien.data ?? null));
+  const venuDesRappels = demandee === null ? null : (parLien.data ?? null);
+  const aConfirmer =
+    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
+  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
+  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
+  const consultee =
+    ouverte ??
+    (venuDesRappels !== null && !aQualifier(venuDesRappels)
+      ? { prospect: venuDesRappels, ouverture: null }
+      : null);
 
   const annuaire = useQuery({
     queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
     queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
-    enabled: courante === null,
+    enabled: consultee === null && aConfirmer === null,
     placeholderData: (previous) => previous,
   });
 
   const revenir = useCallback(() => {
-    setChoisi(null);
+    setOuverte(null);
+    setVise(null);
     setDemandee(null);
   }, []);
 
-  if (courante !== null) {
+  const reprendre = useCallback((prise: Ouverte) => {
+    setVise(null);
+    setDemandee(null);
+    setOuverte(prise);
+  }, []);
+
+  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
+  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
+  // est toujours tenue.
+  const repriseFaite = useRef(false);
+  useEffect(() => {
+    if (repriseFaite.current) return;
+    repriseFaite.current = true;
+    void reprendreOuverte(reprendre);
+  }, [reprendre]);
+
+  const ouvrir = useMutation({
+    mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
+      prospect: row,
+      ouverture: await ouvrirFiche({ prospectId: row.id }),
+    }),
+    onSuccess: (prise) => {
+      setConfirme(null);
+      setVise(null);
+      setDemandee(null);
+      setOuverte(prise);
+      queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
+    },
+    onError: (error) => {
+      void reprendreOuverte(reprendre, error);
+    },
+  });
+
+  if (consultee !== null) {
     return (
       <Consignation
-        key={courante.id}
-        prospect={courante}
+        key={consultee.prospect.id}
+        prospect={consultee.prospect}
+        ouverture={consultee.ouverture}
         projet={projet}
         onAbandon={revenir}
         onEnregistre={(nom) => {
           setConfirme(nom);
           revenir();
+          // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
+          // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
+          queryClient.setQueryData(queryKeys.ouvertureCourante, null);
           void queryClient.invalidateQueries({ queryKey: ['prospects'] });
           void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
         }}
@@ -176,11 +237,77 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         projet={projet}
         onChoisir={(row) => {
           setConfirme(null);
-          setChoisi(row);
+          if (aQualifier(row)) setVise(row);
+          else setOuverte({ prospect: row, ouverture: null });
+        }}
+      />
+
+      <ConfirmDialog
+        open={aConfirmer !== null}
+        onOpenChange={(next) => {
+          if (next) return;
+          setVise(null);
+          setDemandee(null);
+        }}
+        title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
+        description="Vous ne pourrez pas la quitter sans la qualifier."
+        confirmLabel="Ouvrir"
+        confirmVariant="default"
+        pending={ouvrir.isPending}
+        onConfirm={() => {
+          if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
         }}
       />
     </div>
   );
+}
+
+/** La fiche et l'ouverture qui la verrouille. Nulle quand la fiche est close. */
+interface Ouverte {
+  prospect: ProspectRow;
+  ouverture: OuvertureFiche | null;
+}
+
+const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
+
+/** Ce que `lireBrouillon` sait relire, et rien d'autre. */
+const brouillonDe = (
+  comment: string,
+  conversion: ConversionDraft | null,
+): Record<string, unknown> => ({
+  comment,
+  ...(conversion === null ? {} : { conversion }),
+});
+
+const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
+
+/**
+ * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
+ * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
+ * est tenue, que le serveur ne nomme pas.
+ */
+async function reprendreOuverte(
+  reprendre: (prise: Ouverte) => void,
+  refus: unknown = null,
+): Promise<void> {
+  const courante = await fetchOuvertureCourante().catch(() => null);
+  if (courante === null) {
+    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
+    return;
+  }
+  if (courante.prospectId === null) {
+    toast.error(
+      `Vous avez ${courante.ficheNom} en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.`,
+    );
+    return;
+  }
+  const prospect = await fetchProspect(courante.prospectId).catch(() => null);
+  if (prospect === null) {
+    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
+    return;
+  }
+  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
+  reprendre({ prospect, ouverture: courante });
 }
 
 function ListeAnnuaire({
@@ -299,6 +426,12 @@ function ListeSkeleton() {
   );
 }
 
+function rattachements(prospect: ProspectRow, projet: Projet): string {
+  const parts = [prospect.banqueName, prospect.syndicatSigle, prospect.departementName];
+  if (projet === 'CHUES') parts.push(`Représentant ${prospect.representantName ?? 'aucun'}`);
+  return parts.filter((part) => part !== null && part !== '').join(' · ');
+}
+
 function resumeDernierAppel(prospect: ProspectRow): string {
   const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
   if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
@@ -308,16 +441,35 @@ function resumeDernierAppel(prospect: ProspectRow): string {
 }
 
 /**
+ * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
+ * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
+ */
+type Etape = 'issues' | 'dossier' | 'echeance' | null;
+
+function etapeCourante(
+  closed: boolean,
+  conversion: ConversionDraft | null,
+  slots: readonly CallbackSlot[] | null,
+): Etape {
+  if (closed) return null;
+  if (slots !== null) return 'echeance';
+  if (conversion !== null) return 'dossier';
+  return 'issues';
+}
+
+/**
  * La consignation d'un appel, en deux temps : d'abord si la personne était
  * joignable, puis, si oui, son dossier et la manière dont elle adhère.
  */
 function Consignation({
   prospect,
+  ouverture,
   projet,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
+  ouverture: OuvertureFiche | null;
   projet: Projet;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
@@ -326,21 +478,41 @@ function Consignation({
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const callbackRef = useRef<HTMLInputElement>(null);
 
-  const [comment, setComment] = useState('');
+  const [repris] = useState(() => lireBrouillon(ouverture?.draft));
+  const [comment, setComment] = useState(repris.comment);
   const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
-  const [conversion, setConversion] = useState<ConversionDraft | null>(null);
+  const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
-  const nomComplet = `${prospect.nom} ${prospect.prenom}`;
+  const nomComplet = nomDe(prospect);
   const closed = prospect.phase2Status !== 'PENDING' || refusee;
   const [now] = useState(() => Date.now());
+  const verrouille = ouverture !== null && !closed;
+
+  const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
   const send = useMutation({
-    mutationFn: (draft: AttemptDraft) => pushCallAttempt(newAttemptInput(prospect.id, draft)),
+    mutationFn: async (draft: AttemptDraft) => {
+      // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
+      // ferait refuser toute écriture postérieure. Le dossier passe par lui et
+      // non par la tentative : incomplet, le serveur la refuserait en 400.
+      if (draft.outcome === 'CALLBACK' && ouverture !== null) {
+        // La borne vient d'ici et non de l'horloge du serveur : la base exige
+        // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.
+        await enregistrerBrouillon(
+          ouverture.id,
+          brouillonDe(draft.comment, conversion),
+          departChrono ?? new Date().toISOString(),
+        ).catch(() => {
+          toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
+        });
+      }
+      return pushCallAttempt(newAttemptInput(prospect.id, draft));
+    },
     onSuccess: () => {
       onEnregistre(nomComplet);
     },
@@ -374,6 +546,7 @@ function Consignation({
         comment,
         callbackAt,
         ...(renseignements === undefined ? {} : { conversion: renseignements }),
+        ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
       };
       const problem = validateAttempt(draft);
       if (problem !== null) {
@@ -382,7 +555,7 @@ function Consignation({
       }
       send.mutate(draft);
     },
-    [closed, send, comment],
+    [closed, send, comment, ouverture],
   );
 
   const ouvrirDossier = useCallback(() => {
@@ -424,11 +597,9 @@ function Consignation({
     [ouvrirDossier, startCallback, startOther, record],
   );
 
+  // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
+  // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
-    if (conversion !== null) {
-      submitConversion();
-      return;
-    }
     if (slots !== null) {
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
@@ -438,24 +609,43 @@ function Consignation({
       record('CALLBACK', null, iso);
       return;
     }
+    if (conversion !== null) {
+      submitConversion();
+      return;
+    }
     if (draftOutcome !== null) record(draftOutcome, null);
   }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
 
+  const etape = etapeCourante(closed, conversion, slots);
   const saisieEnCours =
     conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
 
+  const retenu = useCallback(() => {
+    toast.error('Consignez l’appel avant de quitter cette fiche.');
+  }, []);
+
+  useVerrouNavigation(verrouille, retenu);
+
   const annuler = useCallback(() => {
+    // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
+    // perdrait ce qu'EB-10 demande justement de garder.
+    if (slots !== null) {
+      setSlots(null);
+      return;
+    }
     if (!saisieEnCours) {
-      onAbandon();
+      // EB-08 : la fiche ouverte ne se quitte pas sans issue. Seul l'envoi la
+      // referme, et le chronomètre s'arrête avec elle.
+      if (verrouille) retenu();
+      else onAbandon();
       return;
     }
     setDraftOutcome(null);
     setComment('');
-    setSlots(null);
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [saisieEnCours, onAbandon]);
+  }, [slots, saisieEnCours, verrouille, retenu, onAbandon]);
 
   const issueShortcuts: Record<string, () => void> = Object.fromEntries(
     ISSUES.map((issue) => [
@@ -479,8 +669,8 @@ function Consignation({
   };
 
   let digitShortcuts = issueShortcuts;
-  if (slots !== null) digitShortcuts = slotShortcuts;
-  if (conversion !== null) digitShortcuts = {};
+  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: startCallback };
+  if (etape === 'echeance') digitShortcuts = slotShortcuts;
 
   useShortcuts({
     ...digitShortcuts,
@@ -490,10 +680,12 @@ function Consignation({
       copyPhone(prospect.phoneE164);
     },
     n: () => {
+      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
     r: () => {
+      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
     },
@@ -504,10 +696,14 @@ function Consignation({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-        <ArrowLeftIcon aria-hidden="true" />
-        Revenir à la liste
-      </Button>
+      {verrouille ? null : (
+        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Revenir à la liste
+        </Button>
+      )}
+
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
@@ -529,12 +725,7 @@ function Consignation({
           </Button>
         </div>
 
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {[prospect.banqueName, prospect.syndicatSigle, prospect.departementName]
-            .filter((part) => part !== null && part !== '')
-            .join(' · ')}
-          {projet === 'CHUES' ? ` · Représentant ${prospect.representantName ?? 'aucun'}` : ''}
-        </p>
+        <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
         <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
 
         {closed ? (
@@ -547,7 +738,7 @@ function Consignation({
           </div>
         ) : null}
 
-        {closed || conversion === null ? null : (
+        {etape !== 'dossier' || conversion === null ? null : (
           <>
             <p className="text-[0.8125rem] font-[600] text-muted-foreground">
               Joignable · son dossier, et la manière dont il adhère
@@ -562,15 +753,61 @@ function Consignation({
                 setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
               }}
             />
+          </>
+        )}
 
-            <Commentaire
-              value={comment}
-              obligatoire={false}
-              inputRef={commentRef}
-              onChange={setComment}
-              onValidate={validate}
-            />
+        {etape !== 'issues' ? null : (
+          <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
+            <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+              Comment s’est passé l’appel ?
+            </legend>
+            <div className="flex flex-wrap gap-2">
+              {ISSUES.map((issue) => (
+                <Button
+                  key={issue.key}
+                  variant={
+                    issue.outcome === 'OTHER' && draftOutcome === 'OTHER' ? 'default' : 'outline'
+                  }
+                  onClick={() => {
+                    choisir(issue.outcome);
+                  }}
+                >
+                  <Kbd>{issue.key}</Kbd>
+                  {issue.label}
+                </Button>
+              ))}
+            </div>
+          </fieldset>
+        )}
 
+        {etape !== 'echeance' || slots === null ? null : (
+          <PanneauEcheance
+            slots={slots}
+            now={now}
+            freeCallback={freeCallback}
+            surDossier={conversion !== null}
+            disabled={send.isPending}
+            inputRef={callbackRef}
+            onChoisir={(at) => {
+              record('CALLBACK', null, at);
+            }}
+            onFreeCallback={setFreeCallback}
+            onValidate={validate}
+          />
+        )}
+
+        {etape === null ? null : (
+          <Commentaire
+            value={comment}
+            obligatoire={draftOutcome === 'OTHER'}
+            inputRef={commentRef}
+            onChange={setComment}
+            onValidate={validate}
+          />
+        )}
+
+        {etape !== 'dossier' ? null : (
+          <>
             <div className="flex flex-wrap gap-2">
               <Button onClick={submitConversion} disabled={send.isPending}>
                 Enregistrer l’adhésion
@@ -585,6 +822,10 @@ function Consignation({
               >
                 Il refuse
               </Button>
+              <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
+                À rappeler
+                <Kbd>{RAPPEL_KEY}</Kbd>
+              </Button>
               <Button
                 variant="ghost"
                 disabled={send.isPending}
@@ -597,101 +838,9 @@ function Consignation({
                 <Kbd>Échap</Kbd>
               </Button>
             </div>
-          </>
-        )}
-
-        {closed || conversion !== null ? null : (
-          <>
-            {slots !== null ? null : (
-              <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                  Comment s’est passé l’appel ?
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {ISSUES.map((issue) => (
-                    <Button
-                      key={issue.key}
-                      variant={
-                        issue.outcome === 'OTHER' && draftOutcome === 'OTHER'
-                          ? 'default'
-                          : 'outline'
-                      }
-                      onClick={() => {
-                        choisir(issue.outcome);
-                      }}
-                    >
-                      <Kbd>{issue.key}</Kbd>
-                      {issue.label}
-                    </Button>
-                  ))}
-                </div>
-              </fieldset>
-            )}
-
-            {slots === null ? null : (
-              <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
-                <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                  Quand rappeler
-                </legend>
-                <div className="flex flex-wrap gap-2">
-                  {slots.map((slot) => (
-                    <Button
-                      key={slot.key}
-                      variant="outline"
-                      className="h-auto flex-col items-start gap-0.5 py-2"
-                      onClick={() => {
-                        record('CALLBACK', null, slot.at);
-                      }}
-                    >
-                      <span className="flex items-center gap-2">
-                        <Kbd>{slot.key}</Kbd>
-                        {slot.label}
-                      </span>
-                      <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
-                        {formatCallbackAt(slot.at, now)}
-                      </span>
-                    </Button>
-                  ))}
-                </div>
-
-                <div className="flex flex-col gap-1.5">
-                  <label
-                    htmlFor="console-callback-at"
-                    className="flex items-center gap-2 text-[0.875rem] font-[600]"
-                  >
-                    <Kbd>0</Kbd>
-                    Autre échéance
-                  </label>
-                  <Input
-                    id="console-callback-at"
-                    ref={callbackRef}
-                    type="datetime-local"
-                    className="max-w-64"
-                    value={freeCallback}
-                    onChange={(event) => {
-                      setFreeCallback(event.target.value);
-                    }}
-                    onKeyDown={(event) => {
-                      if (event.key !== 'Enter') return;
-                      event.preventDefault();
-                      validate();
-                    }}
-                  />
-                  <p className="text-[0.75rem] text-muted-foreground">
-                    Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste. Échap revient aux
-                    issues.
-                  </p>
-                </div>
-              </fieldset>
-            )}
-
-            <Commentaire
-              value={comment}
-              obligatoire={draftOutcome === 'OTHER'}
-              inputRef={commentRef}
-              onChange={setComment}
-              onValidate={validate}
-            />
+            <p className="text-[0.8125rem] text-muted-foreground">
+              « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
+            </p>
           </>
         )}
       </section>
@@ -707,7 +856,7 @@ function Consignation({
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
           {KEYBOARD_MAP.filter(
-            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
+            ([keys]) => (projet === 'CHUES' && !verrouille) || (keys !== 'N' && keys !== 'R'),
           ).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">
@@ -719,6 +868,91 @@ function Consignation({
         </dl>
       </details>
     </div>
+  );
+}
+
+/** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
+function PanneauEcheance({
+  slots,
+  now,
+  freeCallback,
+  surDossier,
+  disabled,
+  inputRef,
+  onChoisir,
+  onFreeCallback,
+  onValidate,
+}: {
+  slots: readonly CallbackSlot[];
+  now: number;
+  freeCallback: string;
+  surDossier: boolean;
+  disabled: boolean;
+  inputRef: React.RefObject<HTMLInputElement | null>;
+  onChoisir: (at: string) => void;
+  onFreeCallback: (value: string) => void;
+  onValidate: () => void;
+}) {
+  return (
+    <fieldset className="flex flex-col gap-3" disabled={disabled}>
+      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        Quand rappeler
+      </legend>
+      {surDossier ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Vous retrouverez le dossier déjà rempli au prochain appel.
+        </p>
+      ) : null}
+      <div className="flex flex-wrap gap-2">
+        {slots.map((slot) => (
+          <Button
+            key={slot.key}
+            variant="outline"
+            className="h-auto flex-col items-start gap-0.5 py-2"
+            onClick={() => {
+              onChoisir(slot.at);
+            }}
+          >
+            <span className="flex items-center gap-2">
+              <Kbd>{slot.key}</Kbd>
+              {slot.label}
+            </span>
+            <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
+              {formatCallbackAt(slot.at, now)}
+            </span>
+          </Button>
+        ))}
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="console-callback-at"
+          className="flex items-center gap-2 text-[0.875rem] font-[600]"
+        >
+          <Kbd>0</Kbd>
+          Autre échéance
+        </label>
+        <Input
+          id="console-callback-at"
+          ref={inputRef}
+          type="datetime-local"
+          className="max-w-64"
+          value={freeCallback}
+          onChange={(event) => {
+            onFreeCallback(event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key !== 'Enter') return;
+            event.preventDefault();
+            onValidate();
+          }}
+        />
+        <p className="text-[0.75rem] text-muted-foreground">
+          Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste.{' '}
+          {surDossier ? 'Échap revient au dossier.' : 'Échap revient aux issues.'}
+        </p>
+      </div>
+    </fieldset>
   );
 }
 

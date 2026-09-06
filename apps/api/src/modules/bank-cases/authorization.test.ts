@@ -214,6 +214,16 @@ const MATRICE_NOUVEAUX: {
   },
   {
     controller: RepresentantsController,
+    method: 'callHistory',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+  },
+  {
+    controller: RepresentantsController,
+    method: 'deviceCalls',
+    roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
+  },
+  {
+    controller: RepresentantsController,
     method: 'listComments',
     roles: [Role.ADMIN, Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION],
   },

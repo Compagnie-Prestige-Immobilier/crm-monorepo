@@ -56,12 +56,21 @@ class _RepCallbackDueListenerState
   void _ensureNotificationsInitialized() {
     if (_notificationsReady) return;
     _notificationsReady = true;
-    unawaited(
-      ref
-          .read(repCallbackNotificationsProvider)
-          .initialize(onAction: _surAlarme),
-    );
+    unawaited(_armerLesAlarmes());
     unawaited(ref.read(feedbackProvider).preparer());
+  }
+
+  /// Un redémarrage vide la file d'alarmes d'Android, et le récepteur du
+  /// greffon ne rejoue que ce qu'il a lui-même posé. Les rappels encore dus se
+  /// réarment donc à chaque démarrage authentifié.
+  Future<void> _armerLesAlarmes() async {
+    final RepCallbackNotifications alarmes = ref.read(
+      repCallbackNotificationsProvider,
+    );
+    await alarmes.initialize(onAction: _surAlarme);
+    await alarmes.reprogrammerTout(
+      await ref.read(appDatabaseProvider).pendingRepCallbackReminders().get(),
+    );
   }
 
   void _surAlarme(RepCallbackTap tap) {

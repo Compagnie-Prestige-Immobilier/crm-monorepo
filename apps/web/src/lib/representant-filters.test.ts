@@ -60,3 +60,44 @@ describe('filtre par état de la relation', () => {
     expect(new Set(Object.values(REPRESENTANT_RELATION_LABELS)).size).toBe(4);
   });
 });
+
+describe('filtre par statut de qualification', () => {
+  const statutId = '0197f0a1-2b3c-7d4e-8f90-a1b2c3d4e5f6';
+
+  it('se lit dans l’URL', () => {
+    const filters = parseRepresentantFilters(
+      new URLSearchParams(`statutQualificationId=${statutId}`),
+    );
+
+    expect(filters.statutQualificationId).toBe(statutId);
+  });
+
+  it('revient dans l’URL, et disparaît quand il est vide', () => {
+    const retenu = serializeRepresentantFilters({
+      ...EMPTY_REPRESENTANT_FILTERS,
+      statutQualificationId: statutId,
+    });
+    expect(retenu.get('statutQualificationId')).toBe(statutId);
+
+    expect(
+      serializeRepresentantFilters(EMPTY_REPRESENTANT_FILTERS).has('statutQualificationId'),
+    ).toBe(false);
+  });
+
+  it('compte comme un critère actif', () => {
+    expect(
+      countActiveRepresentantFilters({
+        ...EMPTY_REPRESENTANT_FILTERS,
+        statutQualificationId: statutId,
+      }),
+    ).toBe(1);
+  });
+
+  it('part vers l’API, et seulement s’il est posé', () => {
+    expect(
+      toRepresentantQuery({ ...EMPTY_REPRESENTANT_FILTERS, statutQualificationId: statutId })
+        .statutQualificationId,
+    ).toBe(statutId);
+    expect(toRepresentantQuery(EMPTY_REPRESENTANT_FILTERS).statutQualificationId).toBeUndefined();
+  });
+});

@@ -3,7 +3,9 @@ import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as InboxModule from '@/lib/data/inbox';
+import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { renderWithQuery } from '@/test/render-query';
+import { routerMock } from '@/test/router-mock';
 
 const markNotificationRead = vi.fn((id: string) => Promise.resolve(id));
 const fetchInbox = vi.fn();
@@ -43,6 +45,7 @@ const rowButton = async (): Promise<HTMLElement> => {
 describe('NotificationBell', () => {
   beforeEach(() => {
     markNotificationRead.mockClear();
+    routerMock.push.mockClear();
     fetchInbox.mockReturnValue(
       Promise.resolve({
         items: [
@@ -99,6 +102,32 @@ describe('NotificationBell', () => {
     await waitFor(() => {
       expect(markNotificationRead).toHaveBeenCalledWith('notif-1');
     });
+  });
+
+  it('mène à l’écran visé par la notification', async () => {
+    renderWithQuery(<NotificationBell href="/notifications" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
+    await userEvent.click(await rowButton());
+
+    expect(routerMock.push).toHaveBeenCalledWith('/chues/demandes-clients');
+  });
+
+  // EB-08 : la cloche reste visible au-dessus d'une fiche verrouillée ; sa
+  // navigation part du code, aucun écouteur de clic ne la voit.
+  it('ne quitte pas une fiche tenue par le verrou', async () => {
+    const retenu = vi.fn();
+    function SousVerrou() {
+      useVerrouNavigation(true, retenu);
+      return <NotificationBell href="/notifications" />;
+    }
+    renderWithQuery(<SousVerrou />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /Notifications/ }));
+    await userEvent.click(await rowButton());
+
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(retenu).toHaveBeenCalledTimes(1);
   });
 
   it('ne remarque pas une ligne déjà lue', async () => {

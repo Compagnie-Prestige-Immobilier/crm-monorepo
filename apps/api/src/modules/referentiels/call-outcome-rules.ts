@@ -144,7 +144,7 @@ export const SYSTEM_OUTCOME_REASONS: readonly SystemOutcomeReason[] = [
     effect: CallOutcomeEffect.CLOSE_WRONG_NUMBER,
     requiresComment: false,
     requiresCallback: false,
-    countsAsReached: false,
+    countsAsReached: true,
     color: 'danger',
     sortOrder: 50,
   },

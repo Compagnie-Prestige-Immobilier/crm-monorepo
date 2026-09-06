@@ -1,13 +1,17 @@
 import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import Link from 'next/link';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ConsoleView } from '@/components/console/console-view';
 import { AttemptRefused, type AttemptInput, type ConversionDraft } from '@/lib/data/console';
 import type * as ConsoleData from '@/lib/data/console';
+import type * as OuverturesData from '@/lib/data/ouvertures';
 import type * as ProspectsData from '@/lib/data/prospects';
 import type * as ReferenceData from '@/lib/data/reference';
+import { queryKeys } from '@/lib/query-keys';
 import type { CallOutcome, ProspectFilters, ProspectRow } from '@/lib/types';
+import { masquerLOnglet } from '@/test/masquer-onglet';
 import { prospectFixture } from '@/test/prospect-fixture';
 import { renderWithQuery } from '@/test/render-query';
 import { routerMock, setUrl } from '@/test/router-mock';
@@ -18,7 +22,11 @@ const pushCallAttempt = vi.fn();
 const fetchBanques = vi.fn();
 const fetchSyndicats = vi.fn();
 const fetchIncomeBands = vi.fn();
+const ouvrirFiche = vi.fn();
+const fetchOuvertureCourante = vi.fn();
+const enregistrerBrouillon = vi.fn();
 const toastError = vi.fn();
+const toastInfo = vi.fn();
 
 const BANQUES = [
   { id: 'b-1', name: 'CBAO Sénégal', shortName: 'CBAO', isActive: true, sortOrder: 1 },
@@ -76,10 +84,23 @@ vi.mock('@/lib/data/console', async (importOriginal) => {
   };
 });
 
+vi.mock('@/lib/data/ouvertures', async (importOriginal) => {
+  const actual = await importOriginal<typeof OuverturesData>();
+  return {
+    ...actual,
+    ouvrirFiche: (...args: unknown[]) => ouvrirFiche(...args) as unknown,
+    fetchOuvertureCourante: () => fetchOuvertureCourante() as unknown,
+    enregistrerBrouillon: (...args: unknown[]) => enregistrerBrouillon(...args) as unknown,
+  };
+});
+
 vi.mock('sonner', () => ({
   toast: {
     error: (message: string) => {
       toastError(message);
+    },
+    info: (message: string) => {
+      toastInfo(message);
     },
     success: vi.fn(),
   },
@@ -119,17 +140,43 @@ async function renderListe(
   return view;
 }
 
-/** Ouvre la première fiche servie, comme la téléconseillère le ferait. */
+/** Désigne une fiche dans la liste, sans confirmer son ouverture. */
+async function viser(row: ProspectRow): Promise<void> {
+  await userEvent.click(
+    await screen.findByRole('button', { name: new RegExp(`${row.nom} ${row.prenom}`) }),
+  );
+}
+
+/** Ouvre la première fiche servie, confirmation comprise (EB-07). */
 async function renderConsole(items: readonly ProspectRow[] = [NEUVE, RAPPEL]) {
   const view = await renderListe(items);
   const premiere = items[0];
   if (premiere === undefined) throw new Error('renderConsole exige une fiche');
-  await userEvent.click(
-    await screen.findByRole('button', { name: new RegExp(`${premiere.nom} ${premiere.prenom}`) }),
-  );
+  await viser(premiere);
+  if (premiere.phase2Status === 'PENDING') {
+    await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
+  }
   await screen.findByRole('heading', { level: 2 });
   return view;
 }
+
+const ouverture = (over: Partial<OuverturesData.OuvertureFiche> = {}) => ({
+  id: 'ouv-1',
+  openedById: 'u-1',
+  openedByName: 'Fatou Sow',
+  representantId: null,
+  prospectId: 'p-1',
+  ficheNom: 'Neuve Fiche',
+  openedAt: new Date().toISOString(),
+  firstInputAt: null,
+  closedAt: null,
+  dureeSecondes: null,
+  closingAttemptId: null,
+  draft: null,
+  releasedByName: null,
+  releasedAt: null,
+  ...over,
+});
 
 function slotAt(now: Date, plusDays: number, hour: number): string {
   const at = new Date(now);
@@ -160,7 +207,16 @@ beforeEach(() => {
   fetchSyndicats.mockResolvedValue(SYNDICATS);
   fetchIncomeBands.mockReset();
   fetchIncomeBands.mockResolvedValue(TRANCHES);
+  ouvrirFiche.mockReset();
+  ouvrirFiche.mockImplementation((input: { prospectId: string }) =>
+    Promise.resolve(ouverture({ prospectId: input.prospectId })),
+  );
+  fetchOuvertureCourante.mockReset();
+  fetchOuvertureCourante.mockResolvedValue(null);
+  enregistrerBrouillon.mockReset();
+  enregistrerBrouillon.mockResolvedValue(ouverture());
   toastError.mockClear();
+  toastInfo.mockClear();
   routerMock.push.mockClear();
 });
 
@@ -268,12 +324,10 @@ describe('ConsoleView : fiche', () => {
     expect(screen.getByLabelText('Quel prospect avez-vous appelé ?')).toBeTruthy();
   });
 
-  it('« Revenir à la liste » abandonne la fiche sans rien consigner', async () => {
+  it('ne propose plus de revenir à la liste tant que rien n’est consigné', async () => {
     await renderConsole();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Revenir à la liste' }));
-
-    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Revenir à la liste' })).toBeNull();
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
 
@@ -282,6 +336,8 @@ describe('ConsoleView : fiche', () => {
     fetchProspect.mockResolvedValue(RAPPEL);
     serve([NEUVE]);
     renderWithQuery(<ConsoleView projet="CHUES" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Ouvrir' }));
 
     expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Rappel Fiche');
     expect(fetchProspect).toHaveBeenCalledWith('p-2');
@@ -820,7 +876,7 @@ describe('ConsoleView : Autre et commentaire', () => {
     expect(screen.getByLabelText(/Commentaire/)).toHaveProperty('value', '3');
   });
 
-  it('Échap vide la saisie en cours, puis seulement revient à la liste', async () => {
+  it('Échap vide la saisie en cours, mais ne rend pas la fiche ouverte', async () => {
     await renderConsole();
 
     await userEvent.keyboard('5');
@@ -832,7 +888,10 @@ describe('ConsoleView : Autre et commentaire', () => {
 
     await userEvent.keyboard('{Escape}');
 
-    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+    expect(screen.getByRole('heading', { level: 2 })).toBeTruthy();
+    expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+      'Consignez l’appel avant de quitter cette fiche.',
+    );
     expect(pushCallAttempt).not.toHaveBeenCalled();
   });
 });
@@ -878,6 +937,13 @@ describe('ConsoleView : fiche déjà close', () => {
 });
 
 describe('ConsoleView : raccourcis annexes', () => {
+  const CONSULTEE = prospect({
+    id: 'p-7',
+    nom: 'Consultee',
+    prenom: 'Fiche',
+    phase2Status: 'REFUSED',
+  });
+
   it('copie le numéro sur C, sans le faire retaper', async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
@@ -889,7 +955,7 @@ describe('ConsoleView : raccourcis annexes', () => {
   });
 
   it('ouvre la création de prospect sur le représentant courant', async () => {
-    await renderConsole();
+    await renderConsole([CONSULTEE]);
 
     await userEvent.keyboard('n');
 
@@ -897,11 +963,23 @@ describe('ConsoleView : raccourcis annexes', () => {
   });
 
   it('ouvre la fiche du représentant', async () => {
-    await renderConsole();
+    await renderConsole([CONSULTEE]);
 
     await userEvent.keyboard('r');
 
     expect(routerMock.push).toHaveBeenCalledWith('/chues/representants/r-9');
+  });
+
+  // EB-08 : le verrou ne tient que s'il tient AUSSI les navigations lancées par
+  // le code, qu'aucun écouteur de clic ni de popstate ne voit passer.
+  it('retient N et R tant que la fiche ouverte n’a pas d’issue', async () => {
+    await renderConsole();
+
+    await userEvent.keyboard('n');
+    await userEvent.keyboard('r');
+
+    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(toastError).toHaveBeenLastCalledWith('Consignez l’appel avant de quitter cette fiche.');
   });
 
   it('garde la carte clavier repliée, dépliable sur ?, sans ↑ ↓ ni Espace', async () => {
@@ -915,7 +993,400 @@ describe('ConsoleView : raccourcis annexes', () => {
 
     expect(carte()?.open).toBe(true);
     expect(screen.getByText('Copier le numéro')).toBeTruthy();
+    // Sous verrou, N et R ne mènent plus nulle part : les annoncer serait mentir.
+    expect(screen.queryByText('Fiche du représentant')).toBeNull();
     expect(screen.queryByText('↑ ↓')).toBeNull();
     expect(screen.queryByText('Espace')).toBeNull();
+  });
+});
+
+/** EB-07 à EB-10 : on confirme, on est tenu, le temps se voit, rien ne se perd. */
+describe('ConsoleView : l’ouverture confirmée d’une fiche', () => {
+  it('demande confirmation en nommant la fiche, et n’ouvre rien avant', async () => {
+    await renderListe([NEUVE]);
+    await viser(NEUVE);
+
+    const boite = await screen.findByRole('dialog');
+    expect(boite.textContent).toContain('Ouvrir la fiche de Neuve Fiche ?');
+    expect(boite.textContent).toContain('Vous ne pourrez pas la quitter sans la qualifier.');
+    expect(screen.getByRole('button', { name: 'Ouvrir' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Annuler' })).toBeTruthy();
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+  });
+
+  it('renonce sans rien enregistrer', async () => {
+    await renderListe([NEUVE]);
+    await viser(NEUVE);
+    await userEvent.click(await screen.findByRole('button', { name: 'Annuler' }));
+
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+    expect(screen.getByLabelText('Quel prospect avez-vous appelé ?')).toBeTruthy();
+  });
+
+  it('enregistre l’ouverture sans démarrer le chronomètre', async () => {
+    await renderConsole([NEUVE]);
+
+    expect(ouvrirFiche.mock.calls[0]?.[0]).toMatchObject({ prospectId: 'p-1' });
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
+  });
+
+  // Le temps de lecture de la fiche et de son historique n'est pas du traitement.
+  it('démarre le chronomètre à la première lettre, pas à l’ouverture', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'i');
+
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toMatch(/\d\d:\d\d/u);
+  });
+
+  it('ferme l’ouverture avec la tentative : c’est ce qui arrête le chronomètre', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.keyboard('3');
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(lastDraft()).toMatchObject({ ouvertureId: 'ouv-1' });
+  });
+
+  // Next.js n'expose aucune API de blocage : le clic sur un lien est l'une des
+  // trois seules prises, avec la fermeture de l'onglet et le retour arrière.
+  it('retient un clic vers un autre écran tant que rien n’est consigné', async () => {
+    await renderConsole([NEUVE]);
+    renderWithQuery(
+      <Link href="/chues/rappels" data-testid="ailleurs">
+        Rappels
+      </Link>,
+    );
+
+    await userEvent.click(screen.getByTestId('ailleurs'));
+
+    expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+      'Consignez l’appel avant de quitter cette fiche.',
+    );
+  });
+
+  // Le serveur refuse la seconde ouverture sans dire laquelle est tenue : sans
+  // ce rattrapage, le téléconseiller reste devant un refus qu'il ne peut pas lever.
+  it('rouvre la fiche déjà en main quand le verrou du serveur refuse', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ id: 'ouv-9', prospectId: 'p-2', ficheNom: 'Rappel Fiche' }),
+    );
+    fetchProspect.mockResolvedValue(RAPPEL);
+
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Rappel Fiche');
+    expect(toastInfo.mock.calls.at(-1)?.[0]).toContain('Rappel Fiche');
+  });
+
+  // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture.
+  it('conserve les réponses saisies quand la personne demande à être rappelée', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.keyboard('2');
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il est en réunion');
+    await userEvent.click(screen.getByRole('button', { name: /Demain 9 h/u }));
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(enregistrerBrouillon).toHaveBeenCalledWith(
+      'ouv-1',
+      { comment: 'il est en réunion' },
+      expect.stringMatching(/^\d{4}-/u) as unknown,
+    );
+  });
+
+  // Le scénario littéral d'EB-10 : occupé EN COURS DE SAISIE du dossier.
+  it('pose « À rappeler » depuis le dossier ouvert, et garde ce qui y est saisi', async () => {
+    const RENSEIGNE = prospect({
+      id: 'p-1',
+      nom: 'Neuve',
+      prenom: 'Fiche',
+      profession: 'Instituteur',
+    });
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle après 17 h');
+    // Les deux boutons voisins n'ont pas le même effet : l'écran doit le dire.
+    expect(screen.getByText(/« Annuler » l’efface/u)).toBeTruthy();
+    await userEvent.click(screen.getByRole('button', { name: /À rappeler/u }));
+    await userEvent.click(await screen.findByRole('button', { name: /Demain 9 h/u }));
+
+    await waitFor(() => {
+      expect(pushCallAttempt).toHaveBeenCalledTimes(1);
+    });
+    expect(enregistrerBrouillon).toHaveBeenCalledWith(
+      'ouv-1',
+      {
+        comment: 'il rappelle après 17 h',
+        conversion: expect.objectContaining({
+          profession: 'Instituteur',
+          dureeEtablissementMois: '36',
+        }) as unknown,
+      },
+      expect.stringMatching(/^\d{4}-/u) as unknown,
+    );
+    // Le dossier incomplet ne voyage PAS dans la tentative : le serveur la refuserait.
+    expect(lastDraft().outcome).toBe('CALLBACK');
+    expect(lastDraft().conversion).toBeUndefined();
+  });
+
+  it('ouvre l’échéance au chiffre depuis le dossier, et Échap l’y ramène intact', async () => {
+    const RENSEIGNE = prospect({
+      id: 'p-1',
+      nom: 'Neuve',
+      prenom: 'Fiche',
+      profession: 'Instituteur',
+    });
+    await renderConsole([RENSEIGNE]);
+
+    await userEvent.keyboard('1');
+    await screen.findByText('Phase 3 · Conversion');
+    await userEvent.keyboard('2');
+    expect(await screen.findByText('Demain 9 h')).toBeTruthy();
+    expect(screen.getByText(/retrouverez le dossier déjà rempli/u)).toBeTruthy();
+
+    await userEvent.keyboard('{Escape}');
+
+    expect(await screen.findByLabelText(/^Profession/u)).toHaveProperty('value', 'Instituteur');
+    expect(screen.queryByText('Demain 9 h')).toBeNull();
+    expect(pushCallAttempt).not.toHaveBeenCalled();
+  });
+
+  it('rouvre le formulaire sur ce que le brouillon avait gardé', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ ficheNom: 'Neuve Fiche', draft: { comment: 'il est en réunion' } }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il est en réunion');
+  });
+
+  it('rouvre le dossier tel qu’il avait été rempli, et pas seulement le commentaire', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        ficheNom: 'Neuve Fiche',
+        draft: {
+          comment: 'il rappelle après 17 h',
+          conversion: {
+            projet: 'CHUES',
+            nom: 'Neuve',
+            prenom: 'Fiche',
+            email: '',
+            profession: 'Instituteur',
+            type: 'FONCTIONNAIRE',
+            dureeEtablissementMois: '36',
+            fonctionnaire: true,
+            syndicatId: 's-1',
+            banqueId: 'b-1',
+            engagementEnCours: false,
+            incomeBandId: 'i-1',
+            paymentMode: null,
+            dureeSystemeMois: '24',
+            method: null,
+            rendezVousAt: '',
+          },
+        },
+      }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderConsole([NEUVE]);
+
+    expect(await screen.findByLabelText(/^Profession/u)).toHaveProperty('value', 'Instituteur');
+    expect(screen.getByLabelText(/^Durée dans l’établissement/u)).toHaveProperty('value', '36');
+    expect(screen.getByRole('combobox', { name: /Banque/u }).textContent).toContain('CBAO');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il rappelle après 17 h');
+  });
+
+  it('rouvre un formulaire vide plutôt que de casser sur un brouillon abîmé', async () => {
+    ouvrirFiche.mockRejectedValue(new Error('OUVERTURE_FICHE_DEJA_OUVERTE'));
+    // Rien de tenu au montage : c'est le refus du serveur qu'on éprouve ici.
+    fetchOuvertureCourante.mockResolvedValueOnce(null);
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ ficheNom: 'Neuve Fiche', draft: { comment: 7, conversion: 'ancienne forme' } }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderConsole([NEUVE]);
+
+    expect(screen.getByRole('heading', { level: 2 }).textContent).toBe('Neuve Fiche');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', '');
+    expect(screen.queryByLabelText(/^Profession/u)).toBeNull();
+  });
+
+  // EB-07 : la consultation d'une fiche close ne compte pas, et l'ouvrir sous
+  // verrou y enfermerait quelqu'un qui ne peut plus rien y consigner.
+  it('n’ouvre ni ne verrouille une fiche déjà close', async () => {
+    const close = prospect({ id: 'p-8', nom: 'Close', prenom: 'Fiche', phase2Status: 'REFUSED' });
+    await renderConsole([close]);
+
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+    expect(screen.queryByText(/En saisie depuis/u)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Revenir à la liste' })).toBeTruthy();
+  });
+});
+
+// EB-08 : le verrou vit sur le serveur, l'écran non. Ctrl+R, une URL retapée ou
+// un plantage laissaient le téléconseiller devant l'annuaire, fiche tenue.
+describe('ConsoleView : la fiche tenue au rechargement', () => {
+  it('rouvre au montage la fiche que le serveur tient encore, brouillon compris', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        id: 'ouv-7',
+        prospectId: 'p-1',
+        firstInputAt: new Date().toISOString(),
+        draft: { comment: 'il est en réunion' },
+      }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE, RAPPEL]);
+
+    expect((await screen.findByRole('heading', { level: 2 })).textContent).toBe('Neuve Fiche');
+    expect(screen.getByLabelText(/Commentaire/u)).toHaveProperty('value', 'il est en réunion');
+    expect(screen.getByText(/En saisie depuis/u)).toBeTruthy();
+    // Rouvrir n'est pas ouvrir : la fiche est déjà comptée, EB-07.
+    expect(ouvrirFiche).not.toHaveBeenCalled();
+  });
+
+  it('remet le chronomètre à l’heure de la première saisie, pas à celle de l’ouverture', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({
+        openedAt: new Date(Date.now() - 600_000).toISOString(),
+        firstInputAt: new Date(Date.now() - 125_000).toISOString(),
+      }),
+    );
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE]);
+
+    expect((await screen.findByText(/En saisie depuis/u)).textContent).toContain('02:0');
+  });
+
+  it('reverrouille la navigation sur la fiche rouverte', async () => {
+    fetchOuvertureCourante.mockResolvedValue(ouverture());
+    fetchProspect.mockResolvedValue(NEUVE);
+
+    await renderListe([NEUVE]);
+    await screen.findByRole('heading', { level: 2 });
+    renderWithQuery(
+      <Link href="/chues/rappels" data-testid="ailleurs">
+        Rappels
+      </Link>,
+    );
+
+    await userEvent.click(screen.getByTestId('ailleurs'));
+
+    expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+      'Consignez l’appel avant de quitter cette fiche.',
+    );
+  });
+
+  // La fiche tenue est sur l'autre console : l'ignorer laisserait chercher.
+  it('dit où est la fiche quand elle est tenue sur un représentant', async () => {
+    fetchOuvertureCourante.mockResolvedValue(
+      ouverture({ prospectId: null, representantId: 'r-2', ficheNom: 'Ousmane Fall' }),
+    );
+
+    await renderListe([NEUVE]);
+
+    await waitFor(() => {
+      expect(toastError.mock.calls.at(-1)?.[0]).toBe(
+        'Vous avez Ousmane Fall en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.',
+      );
+    });
+    expect(screen.queryByRole('heading', { level: 2 })).toBeNull();
+  });
+
+  it('laisse l’annuaire tranquille quand rien n’est tenu', async () => {
+    await renderListe([NEUVE]);
+
+    expect(await screen.findByRole('button', { name: /Neuve Fiche/ })).toBeTruthy();
+    expect(toastError).not.toHaveBeenCalled();
+    expect(toastInfo).not.toHaveBeenCalled();
+  });
+});
+
+// Une coupure de courant, un processus tué, un onglet fermé par le système : le
+// verrou tient sur le serveur, mais rien n'avait encore emporté la saisie.
+describe('ConsoleView : la saisie survit à une fermeture brutale', () => {
+  it('enregistre le brouillon quand l’onglet passe en arrière-plan', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.type(screen.getByLabelText(/Commentaire/u), 'il rappelle ce soir');
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledWith(
+        'ouv-1',
+        { comment: 'il rappelle ce soir' },
+        expect.stringMatching(/^\d{4}-/u) as unknown,
+      );
+    });
+    // Dix-neuf frappes, une écriture : c'est l'anti-rafale qui les a réunies.
+    expect(enregistrerBrouillon).toHaveBeenCalledTimes(1);
+  });
+
+  it('emporte aussi le dossier ouvert, pas seulement le commentaire', async () => {
+    await renderConsole([NEUVE]);
+
+    await userEvent.keyboard('1');
+    await userEvent.type(await screen.findByLabelText(/Durée dans l’établissement/u), '36');
+
+    masquerLOnglet();
+
+    await waitFor(() => {
+      expect(enregistrerBrouillon).toHaveBeenCalledWith(
+        'ouv-1',
+        {
+          comment: '',
+          conversion: expect.objectContaining({ dureeEtablissementMois: '36' }) as unknown,
+        },
+        expect.stringMatching(/^\d{4}-/u) as unknown,
+      );
+    });
+  });
+
+  it('n’écrit rien tant que la saisie n’a pas bougé', async () => {
+    await renderConsole([NEUVE]);
+
+    masquerLOnglet();
+
+    expect(enregistrerBrouillon).not.toHaveBeenCalled();
+  });
+});
+
+// EB-08 : la barre supérieure refuse la déconnexion sur ce cache. Périmé dans
+// un sens il laisse partir sous verrou, dans l'autre il enferme sans fiche.
+describe('ConsoleView : ce que la barre supérieure lit du verrou', () => {
+  it('y publie la fiche ouverte, puis sa fermeture', async () => {
+    const { client } = await renderConsole([NEUVE]);
+
+    expect(client.getQueryData(queryKeys.ouvertureCourante)).toMatchObject({ id: 'ouv-1' });
+
+    await userEvent.keyboard('3');
+
+    await waitFor(() => {
+      expect(client.getQueryData(queryKeys.ouvertureCourante)).toBeNull();
+    });
   });
 });

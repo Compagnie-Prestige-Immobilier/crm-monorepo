@@ -10,6 +10,10 @@ enum LotExportCible {
   REPRESENTANTS(r'REPRESENTANTS'),
   @JsonValue(r'PROSPECTS')
   PROSPECTS(r'PROSPECTS'),
+  @JsonValue(r'REPRESENTANTS_INJOIGNABLES')
+  REPRESENTANTS_INJOIGNABLES(r'REPRESENTANTS_INJOIGNABLES'),
+  @JsonValue(r'CONTACTS_RECOMMANDES')
+  CONTACTS_RECOMMANDES(r'CONTACTS_RECOMMANDES'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

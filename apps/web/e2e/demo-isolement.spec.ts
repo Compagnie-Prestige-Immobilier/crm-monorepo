@@ -197,6 +197,9 @@ async function basculer(surLaPage: Page, cible: 'demo' | 'public'): Promise<void
     (reponse) =>
       new URL(reponse.url()).pathname === '/api/auth/workspace' &&
       reponse.request().method() === 'POST',
+    // La bascule qui amorce le schéma démo tient une minute : le défaut de
+    // trente secondes couperait avant la réponse.
+    { timeout: 240_000 },
   );
   await surLaPage.getByRole('menuitem', { name: libelle, exact: true }).click();
   const reponse = await bascule;
@@ -332,12 +335,14 @@ async function reinitialiserLaDemo(): Promise<void> {
   await page.goto('/admin/parametres');
   await expect(page).toHaveTitle('Paramètres · CPI GO');
   await page.getByRole('button', { name: 'Réinitialiser l’espace démo' }).click();
-  // Borne large et assumée : la fabrique vide le schéma, recopie dix-sept
-  // tables et refait le jeu. `workspaces.spec.ts` lui accorde la même.
-  await expect(page.getByText('Espace démo réinitialisé.')).toBeVisible({ timeout: 90_000 });
+  // Borne large et assumée : la fabrique vide le schéma, recopie vingt tables
+  // et engendre neuf cent mille lignes. Cinquante secondes en local.
+  await expect(page.getByText('Espace démo réinitialisé.')).toBeVisible({ timeout: 240_000 });
 }
 
 test('DEMO-01 · la bascule vers la démo pose le bandeau et retourne l’entrée du menu', async () => {
+  // La première bascule d'un schéma vide ou périmé engendre le jeu complet.
+  test.setTimeout(300_000);
   await page.goto('/admin/parametres');
   await expect(page).toHaveTitle('Paramètres · CPI GO');
   await expect(
@@ -371,7 +376,7 @@ test('DEMO-02 · le retour au public retire le bandeau ET rend la session publiq
 test('DEMO-03 · la réinitialisation rend au jeu de démonstration ses effectifs exacts', async () => {
   // La réinitialisation vide un schéma et recopie dix-sept tables : le délai du
   // test est porté à sa mesure, faute de quoi il expirerait avant la réponse.
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   // Le menu de compte est celui de la coque : la page y est ramenée avant la
   // bascule, pour que ce scénario reste jouable seul.
@@ -381,13 +386,15 @@ test('DEMO-03 · la réinitialisation rend au jeu de démonstration ses effectif
 
   await reinitialiserLaDemo();
 
-  await expect(compteurDemo('représentants')).toHaveText('8');
-  await expect(compteurDemo('prospects')).toHaveText('16');
-  await expect(compteurDemo('dossiers bancaires')).toHaveText('3');
+  // `DEMO_EFFECTIFS` (packages/database/src/demo-volume.ts) : le volume
+  // engendré, moins les lignes marquées supprimées, plus l'échantillon nommé.
+  await expect(compteurDemo('représentants')).toHaveText(/^14\s?908$/u);
+  await expect(compteurDemo('prospects')).toHaveText(/^49\s?816$/u);
+  await expect(compteurDemo('dossiers bancaires')).toHaveText(/^11\s?953$/u);
   await expect(
     compteurDemo('comptes'),
-    'la fabrique recopie `public.users` : le compteur suit les comptes actifs publics',
-  ).toHaveText(String(actifs));
+    'la fabrique recopie `public.users` et y ajoute 57 comptes de plateau actifs',
+  ).toHaveText(String(actifs + 57));
 });
 
 test('DEMO-04 · les deux projets ne se mélangent pas dans le jeu de démonstration', async () => {
@@ -488,7 +495,7 @@ test('DEMO-06 · ce qui est écrit en public ne se voit nulle part en démo', as
 });
 
 test('DEMO-07 · la réinitialisation de la démo n’atteint pas le schéma public', async () => {
-  test.setTimeout(180_000);
+  test.setTimeout(300_000);
 
   await basculer(page, 'public');
 
