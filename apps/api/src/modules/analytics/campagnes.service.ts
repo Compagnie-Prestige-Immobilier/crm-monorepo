@@ -11,6 +11,39 @@ import type {
   SupervisionQueryDto,
 } from './supervision.dto.js';
 
+interface CampagneScope {
+  projet: Prisma.Sql;
+  assignee: Prisma.Sql;
+  dansLaFenetre: Prisma.Sql;
+  viseLaFiche: Prisma.Sql;
+}
+
+function campagneScope(query: SupervisionQueryDto): CampagneScope {
+  const from = query.actFrom ? inclusiveDateFrom(query.actFrom) : null;
+  const to = query.actTo ? inclusiveDateTo(query.actTo) : null;
+  const projet = query.projet ? Prisma.sql`l."projet" = ${query.projet}::"Projet"` : ALL_ROWS;
+  const assignee = query.commercialId
+    ? Prisma.sql`i."assigneeId" = ${query.commercialId}`
+    : ALL_ROWS;
+  // Jour 1 du programme = la journée de création du lot.
+  const jourProgramme = Prisma.sql`(date_trunc('day', l."createdAt") + (i."day" - 1) * interval '1 day')`;
+  const dansLaFenetre = Prisma.join(
+    [
+      from ? Prisma.sql`${jourProgramme} >= ${from}` : ALL_ROWS,
+      to ? Prisma.sql`${jourProgramme} <= ${to}` : ALL_ROWS,
+    ],
+    ' AND ',
+  );
+  const avantLaFin = to ? Prisma.sql`t."clientCreatedAt" <= ${to}` : ALL_ROWS;
+  const viseLaFiche = Prisma.sql`
+    t."clientCreatedAt" >= l."createdAt" AND ${avantLaFin}
+    AND CASE WHEN i."representantId" IS NOT NULL
+             THEN t."representantId" = i."representantId"
+             ELSE t."prospectId" = i."prospectId" END
+  `;
+  return { projet, assignee, dansLaFenetre, viseLaFiche };
+}
+
 interface LigneRow {
   lotId: string;
   name: string;
@@ -36,28 +69,7 @@ export class CampagnesService {
   constructor(private readonly prisma: PrismaService) {}
 
   async campagnes(query: SupervisionQueryDto): Promise<SupervisionCampagnesDto> {
-    const from = query.actFrom ? inclusiveDateFrom(query.actFrom) : null;
-    const to = query.actTo ? inclusiveDateTo(query.actTo) : null;
-    const projet = query.projet ? Prisma.sql`l."projet" = ${query.projet}::"Projet"` : ALL_ROWS;
-    const assignee = query.commercialId
-      ? Prisma.sql`i."assigneeId" = ${query.commercialId}`
-      : ALL_ROWS;
-    // Jour 1 du programme = la journée de création du lot.
-    const jourProgramme = Prisma.sql`(date_trunc('day', l."createdAt") + (i."day" - 1) * interval '1 day')`;
-    const dansLaFenetre = Prisma.join(
-      [
-        from ? Prisma.sql`${jourProgramme} >= ${from}` : ALL_ROWS,
-        to ? Prisma.sql`${jourProgramme} <= ${to}` : ALL_ROWS,
-      ],
-      ' AND ',
-    );
-    const avantLaFin = to ? Prisma.sql`t."clientCreatedAt" <= ${to}` : ALL_ROWS;
-    const viseLaFiche = Prisma.sql`
-      t."clientCreatedAt" >= l."createdAt" AND ${avantLaFin}
-      AND CASE WHEN i."representantId" IS NOT NULL
-               THEN t."representantId" = i."representantId"
-               ELSE t."prospectId" = i."prospectId" END
-    `;
+    const { projet, assignee, dansLaFenetre, viseLaFiche } = campagneScope(query);
 
     const rows = await this.prisma.$queryRaw<LigneRow[]>`
       WITH tentatives AS (
