@@ -267,6 +267,134 @@ export function ClientRequestsView({ role }: { role: Role }) {
   );
 }
 
+function RequestNote({ note }: { note: string | null }) {
+  if (note === null || note === '') return null;
+  return (
+    <p className="max-w-prose rounded-md bg-muted px-3 py-2 text-[0.8125rem]">{note}</p>
+  );
+}
+
+function RequestRejectionNote({ request }: { request: ClientRequest }) {
+  if (request.status !== 'REJECTED' || request.rejectionNote === null) return null;
+  return (
+    <p className="max-w-prose text-[0.8125rem] text-destructive">
+      Refusée : {request.rejectionNote}
+    </p>
+  );
+}
+
+function RequestReviewedLine({ request }: { request: ClientRequest }) {
+  if (request.status === 'PENDING') return null;
+  return (
+    <p className="text-[0.75rem] text-muted-foreground">
+      Arbitrée par {request.reviewedByName ?? 'un administrateur'}
+      {request.reviewedAt === null ? (
+        ''
+      ) : (
+        <>
+          {' le '}
+          <time dateTime={request.reviewedAt}>{formatDateTime(request.reviewedAt)}</time>
+        </>
+      )}
+    </p>
+  );
+}
+
+function RequestReviewActions({
+  isPending,
+  canReview,
+  onReview,
+}: {
+  isPending: boolean;
+  canReview: boolean;
+  onReview: (action: 'approve' | 'reject') => void;
+}) {
+  if (!isPending) return null;
+
+  // L'agent bancaire n'arbitre pas : on le dit plutôt que de laisser
+  // une carte muette qui se lit comme un écran à moitié chargé.
+  if (!canReview) {
+    return (
+      <p className="text-[0.8125rem] text-muted-foreground">
+        En attente d’arbitrage par l’administration.
+      </p>
+    );
+  }
+
+  return (
+    <>
+      <Button
+        type="button"
+        onClick={() => {
+          onReview('approve');
+        }}
+      >
+        Approuver et créer le prospect
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        onClick={() => {
+          onReview('reject');
+        }}
+      >
+        Refuser
+      </Button>
+    </>
+  );
+}
+
+/*
+  `/chues/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
+  bancaire l'enverrait droit sur un refus de droits. Il retrouve son
+  client par la recherche du formulaire d'ouverture de dossier.
+
+  Pourquoi le lien passe par la RECHERCHE et non par l'identifiant.
+
+  `request.createdProspectId` est connu, et l'ignorer paraît être un
+  raccourci paresseux. Ce n'en est pas un : le panel n'a pas d'écran de
+  détail de prospect. Il n'existe ni route `/chues/prospects/[id]`, ni critère
+  par identifiant dans `ProspectFilters` : la fiche s'ouvre dans un
+  dialogue, depuis la ligne du tableau. Un lien par identifiant n'aurait
+  donc aucune destination.
+
+  La recherche par téléphone, elle, aboutit bien : l'API normalise le
+  terme avant de comparer (`tryNormalizePhone` dans
+  `common/prospect-where.ts`), si bien qu'une forme E.164 retrouve la
+  fiche stockée à l'identique. Le `+` survit à l'aller-retour d'URL
+  grâce à `encodeURIComponent` : sans lui, `URLSearchParams` le lirait
+  comme une espace et la recherche partirait sur un numéro amputé.
+  C'est ce dernier point qu'éprouve `lib/filters.test.ts`.
+*/
+function RequestProspectLink({
+  request,
+  canReview,
+}: {
+  request: ClientRequest;
+  canReview: boolean;
+}) {
+  if (request.createdProspectId === null) return null;
+
+  // Un LIEN habillé en bouton : la primitive `Button` de Base UI
+  // poserait `role="button"` sur le `<a>`.
+  if (canReview) {
+    return (
+      <Link
+        href={`/chues/prospects?search=${encodeURIComponent(request.phoneE164)}`}
+        className={buttonVariants({ variant: 'outline' })}
+      >
+        Voir le prospect créé
+      </Link>
+    );
+  }
+
+  return (
+    <Link href="/chues/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
+      Ouvrir un dossier pour ce client
+    </Link>
+  );
+}
+
 function RequestCard({
   request,
   canReview,
@@ -307,103 +435,13 @@ function RequestCard({
           </span>
         </p>
 
-        {request.note !== null && request.note !== '' ? (
-          <p className="max-w-prose rounded-md bg-muted px-3 py-2 text-[0.8125rem]">
-            {request.note}
-          </p>
-        ) : null}
-
-        {request.status === 'REJECTED' && request.rejectionNote !== null ? (
-          <p className="max-w-prose text-[0.8125rem] text-destructive">
-            Refusée : {request.rejectionNote}
-          </p>
-        ) : null}
-
-        {request.status !== 'PENDING' ? (
-          <p className="text-[0.75rem] text-muted-foreground">
-            Arbitrée par {request.reviewedByName ?? 'un administrateur'}
-            {request.reviewedAt === null ? (
-              ''
-            ) : (
-              <>
-                {' le '}
-                <time dateTime={request.reviewedAt}>{formatDateTime(request.reviewedAt)}</time>
-              </>
-            )}
-          </p>
-        ) : null}
+        <RequestNote note={request.note} />
+        <RequestRejectionNote request={request} />
+        <RequestReviewedLine request={request} />
 
         <div className="flex flex-wrap items-center gap-2">
-          {isPending && canReview ? (
-            <>
-              <Button
-                type="button"
-                onClick={() => {
-                  onReview('approve');
-                }}
-              >
-                Approuver et créer le prospect
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => {
-                  onReview('reject');
-                }}
-              >
-                Refuser
-              </Button>
-            </>
-          ) : null}
-
-          {/* L'agent bancaire n'arbitre pas : on le dit plutôt que de laisser
-              une carte muette qui se lit comme un écran à moitié chargé. */}
-          {isPending && !canReview ? (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              En attente d’arbitrage par l’administration.
-            </p>
-          ) : null}
-
-          {/*
-            `/chues/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
-            bancaire l'enverrait droit sur un refus de droits. Il retrouve son
-            client par la recherche du formulaire d'ouverture de dossier.
-
-            ═════════════════════════════════════════════════════════════════
-            Pourquoi le lien passe par la RECHERCHE et non par l'identifiant.
-            ═════════════════════════════════════════════════════════════════
-
-            `request.createdProspectId` est connu, et l'ignorer paraît être un
-            raccourci paresseux. Ce n'en est pas un : le panel n'a pas d'écran de
-            détail de prospect. Il n'existe ni route `/chues/prospects/[id]`, ni critère
-            par identifiant dans `ProspectFilters` : la fiche s'ouvre dans un
-            dialogue, depuis la ligne du tableau. Un lien par identifiant n'aurait
-            donc aucune destination.
-
-            La recherche par téléphone, elle, aboutit bien : l'API normalise le
-            terme avant de comparer (`tryNormalizePhone` dans
-            `common/prospect-where.ts`), si bien qu'une forme E.164 retrouve la
-            fiche stockée à l'identique. Le `+` survit à l'aller-retour d'URL
-            grâce à `encodeURIComponent` : sans lui, `URLSearchParams` le lirait
-            comme une espace et la recherche partirait sur un numéro amputé.
-            C'est ce dernier point qu'éprouve `lib/filters.test.ts`.
-          */}
-          {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
-              poserait `role="button"` sur le `<a>`. */}
-          {request.createdProspectId !== null && canReview ? (
-            <Link
-              href={`/chues/prospects?search=${encodeURIComponent(request.phoneE164)}`}
-              className={buttonVariants({ variant: 'outline' })}
-            >
-              Voir le prospect créé
-            </Link>
-          ) : null}
-
-          {request.createdProspectId !== null && !canReview ? (
-            <Link href="/chues/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
-              Ouvrir un dossier pour ce client
-            </Link>
-          ) : null}
+          <RequestReviewActions isPending={isPending} canReview={canReview} onReview={onReview} />
+          <RequestProspectLink request={request} canReview={canReview} />
         </div>
       </CardContent>
     </Card>
