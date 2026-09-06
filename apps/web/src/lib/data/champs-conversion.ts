@@ -18,7 +18,7 @@ export const TYPE_CHAMP_LIBRE_LABELS: Readonly<Record<TypeChampLibre, string>> =
   OUI_NON: 'Oui / non',
 };
 
-export const OUI_NON: readonly string[] = ['Oui', 'Non'];
+const OUI_NON: readonly string[] = ['Oui', 'Non'];
 
 export async function fetchChampsConversion(
   projet: Projet,

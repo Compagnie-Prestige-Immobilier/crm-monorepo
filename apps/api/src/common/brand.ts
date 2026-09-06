@@ -25,7 +25,3 @@ function readLogo(): Buffer | null {
     return null;
   }
 }
-
-export function resetCpiLogoCache(): void {
-  logoCache = null;
-}

@@ -91,7 +91,7 @@ export const estChampConversion = (valeur: string): valeur is ChampConversion =>
 
 export const estChampImpose = (champ: ChampConversion): boolean => IMPOSES.has(champ);
 
-export interface ReglageChamp {
+interface ReglageChamp {
   readonly champ: ChampConversion;
   readonly libelle: string;
   readonly visible: boolean;
@@ -111,7 +111,7 @@ export interface ChampLibre {
 }
 
 export const CHAMPS_LIBRES_MAX = 20;
-export const REPONSE_MAX_LENGTH = 500;
+const REPONSE_MAX_LENGTH = 500;
 
 export type ReponsesChampsLibres = Record<string, string>;
 

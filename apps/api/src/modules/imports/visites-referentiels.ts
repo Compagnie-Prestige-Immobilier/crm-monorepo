@@ -162,7 +162,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 const HOUR_MINUTE = /^(\d{1,2})\s*[h:]\s*(\d{2})\s*h?$/i;
 const HOUR_ALONE = /^(\d{1,2})\s*h?$/i;
 
-export const pad2 = (value: number): string => String(value).padStart(2, '0');
+const pad2 = (value: number): string => String(value).padStart(2, '0');
 
 /** Le classeur porte des dates numériques : styles ignorés, le flux rend le rang brut. */
 export function readSheetDate(raw: string): string | null {

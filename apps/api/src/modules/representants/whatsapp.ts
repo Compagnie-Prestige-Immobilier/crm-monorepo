@@ -3,18 +3,18 @@ import { WhatsappStatus } from '@crm/database';
 
 import { normalizePhone } from '../../common/phone.js';
 
-export const WhatsappError = {
+const WhatsappError = {
   NUMBER_NOT_ALLOWED: 'WHATSAPP_NUMBER_NOT_ALLOWED',
   NUMBER_REQUIRED: 'WHATSAPP_NUMBER_REQUIRED',
 } as const;
 
-export const whatsappNumberNotAllowed = (): BadRequestException =>
+const whatsappNumberNotAllowed = (): BadRequestException =>
   new BadRequestException({
     code: WhatsappError.NUMBER_NOT_ALLOWED,
     message: 'Un numéro WhatsApp distinct n’a de sens qu’avec le statut AUTRE_NUMERO.',
   });
 
-export const whatsappNumberRequired = (): BadRequestException =>
+const whatsappNumberRequired = (): BadRequestException =>
   new BadRequestException({
     code: WhatsappError.NUMBER_REQUIRED,
     message: 'Le statut AUTRE_NUMERO exige le numéro WhatsApp.',

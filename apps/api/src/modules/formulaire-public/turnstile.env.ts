@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const turnstileEnvSchema = z.object({
+const turnstileEnvSchema = z.object({
   /** Lu par le panel, qui peint le widget. L'API n'en a pas l'usage. */
   TURNSTILE_SITE_KEY: z.string().optional(),
 

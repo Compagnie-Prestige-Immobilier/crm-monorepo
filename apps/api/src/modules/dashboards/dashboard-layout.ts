@@ -200,7 +200,7 @@ function toWidget(raw: Record<string, unknown>): DispositionWidget | null {
 }
 
 /** Rend `null` sur une version inconnue ou une forme qui ne tient pas : le repli prend le relais. */
-export function parseLayout(value: unknown): DispositionLayout | null {
+function parseLayout(value: unknown): DispositionLayout | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
   if (record.version !== LAYOUT_VERSION && record.version !== 1) return null;

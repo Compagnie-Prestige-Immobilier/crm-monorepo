@@ -31,13 +31,13 @@ export const DEVICE_CALL_LABELS: Record<DeviceCallType, string> = {
 };
 
 /** Écart toléré entre l'heure du journal d'appels et celle de la tentative. */
-export const DETECTION_MATCH_MS = 120_000;
+const DETECTION_MATCH_MS = 120_000;
 
 /**
  * Délai laissé au téléconseiller pour consigner un appel qu'il vient de passer.
  * Au-delà, la détection reste orpheline et alimente l'alerte de supervision.
  */
-export const DETECTION_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
+const DETECTION_LOOKAHEAD_MS = 2 * 60 * 60 * 1000;
 
 interface Borne {
   gte: Date;

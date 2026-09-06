@@ -48,8 +48,8 @@ import { SHEET_CELL } from './xlsx-rows.js';
  * pour l'écran de revue et `writeChunk` ci-dessous pour les deux passes.
  */
 
-export const VISITES_REGISTRE_MAX_ROWS = 20_000;
-export const VISITES_REGISTRE_MAX_DIFFERENCES = 5_000;
+const VISITES_REGISTRE_MAX_ROWS = 20_000;
+const VISITES_REGISTRE_MAX_DIFFERENCES = 5_000;
 
 const H = VISITES_REGISTRE_HEADERS;
 
@@ -57,7 +57,7 @@ const DATE_FR = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
 /** Une date retapée à la française se lit ; un mois > 12 ne se devine pas. */
-export function readRegistreDate(raw: string): string | null {
+function readRegistreDate(raw: string): string | null {
   const iso = readSheetDate(raw);
   if (iso !== null) return iso;
 
@@ -75,7 +75,7 @@ export function readRegistreDate(raw: string): string | null {
  * d'Excel : `0,604166…` pour 14:30. Essayée EN PREMIER, avant de déléguer au
  * lecteur du classeur historique.
  */
-export function readRegistreTime(raw: string): string | null {
+function readRegistreTime(raw: string): string | null {
   const trimmed = raw.trim();
   const fraction = Number(trimmed);
   if (Number.isFinite(fraction) && fraction >= 0 && fraction < 1 && /[.,]/.test(trimmed)) {

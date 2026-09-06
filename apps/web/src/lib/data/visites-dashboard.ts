@@ -10,9 +10,7 @@ export {
   saveDefaultDisposition,
   saveDisposition,
   serializeDisposition,
-  serializeWidget,
   type DashboardWidget,
-  type Disposition,
 } from '@/lib/data/disposition';
 
 export async function fetchVisiteDashboardStats(

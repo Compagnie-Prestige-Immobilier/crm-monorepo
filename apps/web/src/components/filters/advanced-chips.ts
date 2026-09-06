@@ -15,7 +15,7 @@ export interface AdvancedChip {
   value: string;
 }
 
-export const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
+const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   representantId: 'Représentant',
   departementId: 'Département',
   banqueId: 'Banque',

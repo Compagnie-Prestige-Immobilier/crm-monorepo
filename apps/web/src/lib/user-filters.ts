@@ -1,7 +1,7 @@
 import { readPositiveInt, readString, type RawSearchParams } from '@/lib/search-params';
 import { type Role } from '@/lib/types';
 
-export const USER_PAGE_SIZE = 25;
+const USER_PAGE_SIZE = 25;
 
 export const ROLES: readonly Role[] = [
   'ADMIN',
@@ -71,12 +71,4 @@ export function serializeUserFilters(filters: UserFilters): URLSearchParams {
 
 export function userFiltersQueryKey(filters: UserFilters): string {
   return serializeUserFilters(filters).toString();
-}
-
-export function countActiveUserFilters(filters: UserFilters): number {
-  let count = 0;
-  if (filters.search.trim() !== '') count += 1;
-  if (filters.role !== EMPTY_USER_FILTERS.role) count += 1;
-  if (filters.isActive !== null) count += 1;
-  return count;
 }

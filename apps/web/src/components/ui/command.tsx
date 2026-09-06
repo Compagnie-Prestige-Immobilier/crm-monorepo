@@ -4,13 +4,6 @@ import { Command as CommandPrimitive } from 'cmdk';
 import { SearchIcon } from 'lucide-react';
 import type * as React from 'react';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 function Command({ className, ...props }: React.ComponentProps<typeof CommandPrimitive>) {
@@ -23,29 +16,6 @@ function Command({ className, ...props }: React.ComponentProps<typeof CommandPri
       )}
       {...props}
     />
-  );
-}
-
-function CommandDialog({
-  title = 'Recherche',
-  description = 'Cherchez puis sélectionnez une entrée.',
-  children,
-  ...props
-}: Omit<React.ComponentProps<typeof Dialog>, 'children'> & {
-  children?: React.ReactNode;
-  title?: string | undefined;
-  description?: string | undefined;
-}) {
-  return (
-    <Dialog {...props}>
-      <DialogHeader className="sr-only">
-        <DialogTitle>{title}</DialogTitle>
-        <DialogDescription>{description}</DialogDescription>
-      </DialogHeader>
-      <DialogContent className="overflow-hidden p-0">
-        <Command>{children}</Command>
-      </DialogContent>
-    </Dialog>
   );
 }
 
@@ -115,19 +85,6 @@ function CommandGroup({
   );
 }
 
-function CommandSeparator({
-  className,
-  ...props
-}: React.ComponentProps<typeof CommandPrimitive.Separator>) {
-  return (
-    <CommandPrimitive.Separator
-      data-slot="command-separator"
-      className={cn('-mx-1 h-px bg-border', className)}
-      {...props}
-    />
-  );
-}
-
 function CommandItem({ className, ...props }: React.ComponentProps<typeof CommandPrimitive.Item>) {
   return (
     <CommandPrimitive.Item
@@ -146,13 +103,4 @@ function CommandItem({ className, ...props }: React.ComponentProps<typeof Comman
   );
 }
 
-export {
-  Command,
-  CommandDialog,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-};
+export { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList };

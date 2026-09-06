@@ -90,7 +90,7 @@ export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'
 export const exigeMotif = (statut: StatutQualification): boolean => statut.requiresComment;
 
 /** Les deux statuts que la question du script pose seule : ils ne se choisissent plus. */
-export const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
+const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
 
 export const statutDuSouhait = (
   statuts: readonly StatutQualification[],

@@ -134,8 +134,6 @@ export const peutRevoirUneDemande = (role: Role | undefined): boolean =>
 
 export const RETIRED_SUFFIX = '(retiré)';
 
-export type PageMeta = Schemas['PageMetaDto'];
-
 export interface Paginated<T> {
   items: T[];
   total: number;
@@ -290,8 +288,7 @@ type FilterListCoverage = {
   BANK_CASE_SORT_FIELDS: MissingFrom<BankCaseSortField, (typeof BANK_CASE_SORT_FIELDS)[number]>;
 };
 
-export const FILTER_LISTS_ARE_EXHAUSTIVE: Record<keyof FilterListCoverage, never> =
-  {} as FilterListCoverage;
+void ({} as FilterListCoverage satisfies Record<keyof FilterListCoverage, never>);
 
 export type BankStageType = Schemas['BankStageType'];
 export type BankCaseStage = Schemas['BankCaseStageDto'];
@@ -341,30 +338,11 @@ export const BANK_STAGE_TYPE_LABELS: Record<BankStageType, string> = {
 };
 
 export type DemoStatus = Schemas['DemoWorkspaceStatusDto'];
-export type DemoCounts = Schemas['DemoWorkspaceCountsDto'];
-
-export type DashboardKpis = Schemas['AnalyticsTotalsDto'];
-
-export interface TimeSeriePoint {
-  date: string;
-  count: number;
-  cumulative: number;
-}
 
 export interface NamedCount {
   id: string;
   label: string;
   value: number;
-}
-
-export interface DashboardStats {
-  kpis: DashboardKpis;
-  prospectsOverTime: TimeSeriePoint[];
-  topCommerciaux: NamedCount[];
-  parDepartement: NamedCount[];
-  parBanque: NamedCount[];
-  parSyndicat: NamedCount[];
-  topRepresentants: NamedCount[];
 }
 
 export interface FilterOption {

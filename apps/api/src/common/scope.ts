@@ -15,16 +15,11 @@ export const readsEveryone = (user: Pick<AuthenticatedUser, 'role'>): boolean =>
  *
  * Élargir cette fonction à un rôle de lecture tirerait le portefeuille national
  * sur son téléphone et ouvrirait la validation des poussées entre
- * téléconseillers. La lecture large passe par `readScope`.
+ * téléconseillers. La lecture large passe par `attributionScope`.
  */
 export const ownerScope = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): { createdById?: string } => (isAdmin(user) ? {} : { createdById: user.id });
-
-/** Portée de LECTURE des écrans : supervision et direction voient le travail de tous. */
-export const readScope = (
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): { createdById?: string } => (readsEveryone(user) ? {} : { createdById: user.id });
 
 /**
  * CE QU'UN TÉLÉCONSEILLER A EN MAIN : ses propres fiches, ou celles qu'une
@@ -86,53 +81,12 @@ export function readableOwnerId(
   return '__aucun__';
 }
 
-/**
- * Qui ENCADRE : peut agir sur le travail d'un autre depuis le PANNEAU.
- *
- * Distinct d'`ownerScope`, qui reste la portée du téléphone. Le superviseur
- * corrige, réattribue et débloque ce que ses commerciaux ont saisi ; il ne
- * synchronise pas, donc il ne tire aucun portefeuille sur un appareil.
- * La DIRECTION mène les trois étapes sur SES propres fiches, sans corriger
- * celles des autres : elle n'est pas ici.
- */
-export const manages = (user: Pick<AuthenticatedUser, 'role'>): boolean =>
-  isAdmin(user) || user.role === Role.SUPERVISEUR;
-
-/** Portée d'écriture des écrans d'encadrement. Ne JAMAIS l'utiliser dans `sync`. */
-export const manageScope = (
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-): { createdById?: string } => (manages(user) ? {} : { createdById: user.id });
-
-/** Pendant d'`assertOwnership` pour un geste d'encadrement. */
-export function assertManageable(
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-  row: { createdById: string },
-  message = 'Cette fiche appartient à un autre commercial.',
-): void {
-  if (manages(user)) return;
-  if (row.createdById !== user.id) {
-    throw new ForbiddenException({ code: 'NOT_OWNER', message });
-  }
-}
-
 export function assertOwnership(
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
   row: { createdById: string },
   message = 'Cette fiche appartient à un autre commercial.',
 ): void {
   if (isAdmin(user)) return;
-  if (row.createdById !== user.id) {
-    throw new ForbiddenException({ code: 'NOT_OWNER', message });
-  }
-}
-
-/** Pendant d'`assertOwnership` sur un chemin qui ne modifie rien. */
-export function assertReadable(
-  user: Pick<AuthenticatedUser, 'id' | 'role'>,
-  row: { createdById: string },
-  message = 'Cette fiche appartient à un autre téléconseiller.',
-): void {
-  if (readsEveryone(user)) return;
   if (row.createdById !== user.id) {
     throw new ForbiddenException({ code: 'NOT_OWNER', message });
   }

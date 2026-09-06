@@ -24,7 +24,7 @@ const COMPATIBLES: Record<Forme, DashboardMarque[]> = {
   equipe: ['tableau'],
 };
 
-export function marquesCompatibles(forme: Forme): DashboardMarque[] {
+function marquesCompatibles(forme: Forme): DashboardMarque[] {
   return COMPATIBLES[forme];
 }
 

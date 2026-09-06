@@ -26,7 +26,7 @@ export interface OutcomeEffectRule {
   readonly acceptsCallbackAt: boolean;
 }
 
-export const OUTCOME_EFFECT_RULES: Readonly<Record<CallOutcomeEffect, OutcomeEffectRule>> = {
+const OUTCOME_EFFECT_RULES: Readonly<Record<CallOutcomeEffect, OutcomeEffectRule>> = {
   [CallOutcomeEffect.CLOSE_METHOD]: {
     closes: true,
     phase2Status: Phase2Status.METHOD_OBTAINED,
@@ -70,12 +70,6 @@ export function outcomeEffectRule(effect: string): OutcomeEffectRule {
   return rule;
 }
 
-/**
- * Version de charge utile la plus ancienne encore déployée sur le parc. Un motif
- * créé depuis le panneau porte la SUIVANTE : aucun téléphone en place ne peut
- * l'émettre, et le lot mobile qui les fera apparaître passera en version 2.
- */
-export const LEGACY_PAYLOAD_VERSION = 1;
 export const NEW_REASON_PAYLOAD_VERSION = 2;
 
 export interface SystemOutcomeReason {

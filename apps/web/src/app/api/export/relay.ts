@@ -18,7 +18,7 @@ import { DEMO_MODE_HEADER, isDemoExport, withDemoSuffix } from '@/lib/demo-marki
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/types';
 
-export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 export interface XlsxRelayOptions {
   upstreamPath: string;

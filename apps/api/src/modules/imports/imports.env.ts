@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const importsEnvSchema = z.object({
+const importsEnvSchema = z.object({
   IMPORTS_DIR: z.string().min(1).default('./storage/imports'),
 
   IMPORTS_MAX_BYTES: z.coerce

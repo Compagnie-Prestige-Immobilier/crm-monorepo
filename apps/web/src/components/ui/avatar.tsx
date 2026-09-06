@@ -18,20 +18,6 @@ function Avatar({ className, ...props }: AvatarProps) {
   );
 }
 
-type AvatarImageProps = Omit<AvatarPrimitive.Image.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function AvatarImage({ className, ...props }: AvatarImageProps) {
-  return (
-    <AvatarPrimitive.Image
-      data-slot="avatar-image"
-      className={cn('aspect-square size-full object-cover', className)}
-      {...props}
-    />
-  );
-}
-
 type AvatarFallbackProps = Omit<AvatarPrimitive.Fallback.Props, 'className'> & {
   className?: string | undefined;
 };
@@ -50,4 +36,4 @@ function AvatarFallback({ className, ...props }: AvatarFallbackProps) {
   );
 }
 
-export { Avatar, AvatarFallback, AvatarImage };
+export { Avatar, AvatarFallback };

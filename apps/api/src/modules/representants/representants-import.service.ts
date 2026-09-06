@@ -23,10 +23,10 @@ export { normalizeKey };
 /** Import Excel avec simulation préalable et dédoublonnage du téléphone normalisé. */
 
 /** Au-delà, utiliser un outil de reprise plutôt qu'un import. */
-export const IMPORT_MAX_ROWS = 5_000;
+const IMPORT_MAX_ROWS = 5_000;
 
 /** Refuse les classeurs trop volumineux avant leur lecture. */
-export const IMPORT_MAX_BYTES = 10 * 1_024 * 1_024;
+const IMPORT_MAX_BYTES = 10 * 1_024 * 1_024;
 
 /** Bornes de la transaction d'écriture massive. */
 const IMPORT_TRANSACTION_TIMEOUT_MS = 60_000;
@@ -55,7 +55,7 @@ const MAX_PREVIEW_ROWS = 50;
  * et l'onglet Instructions dit désormais la même chose. Le test
  * `l'exemple du modèle n'est jamais importé` tient les trois ensemble.
  */
-export const FIRST_DATA_ROW = 3;
+const FIRST_DATA_ROW = 3;
 
 interface ParsedRow {
   readonly line: number;

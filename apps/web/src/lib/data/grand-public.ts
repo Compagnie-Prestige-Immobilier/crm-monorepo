@@ -21,9 +21,9 @@ import {
 
 export type CanalProvenance = components['schemas']['CanalProvenanceDto'];
 export type ProspectType = components['schemas']['ProspectType'];
-export type Projet = components['schemas']['Projet'];
+type Projet = components['schemas']['Projet'];
 
-export const GRAND_PUBLIC: Projet = 'GRAND_PUBLIC';
+const GRAND_PUBLIC: Projet = 'GRAND_PUBLIC';
 
 export const PROSPECT_TYPES = [
   'FONCTIONNAIRE',
@@ -108,7 +108,7 @@ export function serializeGrandPublicFilters(filters: GrandPublicFilters): URLSea
   return params;
 }
 
-export function grandPublicFiltersKey(filters: GrandPublicFilters): string {
+function grandPublicFiltersKey(filters: GrandPublicFilters): string {
   return serializeGrandPublicFilters(filters).toString();
 }
 
@@ -127,7 +127,7 @@ export function countGrandPublicFilters(filters: GrandPublicFilters): number {
  * les fiches CHUES. Les bornes de date passent par `toFilterQuery`, seul endroit
  * qui sait que la journée métier se ferme à 23:59:59.999 heure de Dakar.
  */
-export function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
+function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
   const base = toFilterQuery({
     ...EMPTY_FILTERS,
     search: filters.search,

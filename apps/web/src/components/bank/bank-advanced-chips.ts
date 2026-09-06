@@ -9,7 +9,7 @@ import type { FilterOption } from '@/lib/types';
 
 export type BankAdvancedChip = AdvancedChipItem<BankAdvancedFilterKey>;
 
-export const BANK_ADVANCED_FILTER_LABELS: Record<BankAdvancedFilterKey, string> = {
+const BANK_ADVANCED_FILTER_LABELS: Record<BankAdvancedFilterKey, string> = {
   banqueId: 'Banque de traitement',
   agentId: 'Agent',
   rejectionReasonId: 'Motif de rejet',

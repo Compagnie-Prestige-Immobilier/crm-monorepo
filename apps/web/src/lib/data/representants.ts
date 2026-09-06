@@ -245,13 +245,6 @@ export async function updateRepresentant(
   );
 }
 
-export async function deleteRepresentant(
-  id: string,
-  client: ApiClient = getApiClient(),
-): Promise<void> {
-  unwrap(await client.DELETE('/api/v1/representants/{id}', { params: { path: { id } } }));
-}
-
 export type RepresentantComment = components['schemas']['RepresentantCommentDto'];
 
 export interface NewRepresentantComment {

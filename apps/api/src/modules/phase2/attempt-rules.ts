@@ -5,26 +5,8 @@ import { SYSTEM_OUTCOME_REASONS, outcomeEffectRule } from '../referentiels/call-
 
 export const COMMENT_MAX_LENGTH = 2_000;
 
-export const TERMINAL_OUTCOMES = [
-  CallOutcome.METHOD_OBTAINED,
-  CallOutcome.REFUSED,
-  CallOutcome.WRONG_NUMBER,
-] as const;
-
-export type TerminalOutcome = (typeof TERMINAL_OUTCOMES)[number];
-
-export function isTerminalOutcome(outcome: CallOutcome): outcome is TerminalOutcome {
-  return (TERMINAL_OUTCOMES as readonly CallOutcome[]).includes(outcome);
-}
-
-export const PHASE2_STATUS_FOR_OUTCOME: Readonly<Record<TerminalOutcome, Phase2Status>> = {
-  [CallOutcome.METHOD_OBTAINED]: Phase2Status.METHOD_OBTAINED,
-  [CallOutcome.REFUSED]: Phase2Status.REFUSED,
-  [CallOutcome.WRONG_NUMBER]: Phase2Status.WRONG_NUMBER,
-};
-
 /** Même valeur que `IMPORT_CLOCK_SKEW_TOLERANCE_MS` : une seule dérive admise dans le dépôt. */
-export const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
+const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
 
 export const EMAIL_MAX_LENGTH = 160;
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
@@ -35,7 +17,7 @@ export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
  * duree dans la fonction : lui opposer un 400 perdrait la saisie, l'ecran
  * « A corriger » ne proposant qu'un renvoi a l'identique.
  */
-export const CONVERSION_CHUES_PAYLOAD_VERSION = 8;
+const CONVERSION_CHUES_PAYLOAD_VERSION = 8;
 
 /**
  * Volontairement grossier : le serveur n'a pas à trancher la RFC 5322, il refuse

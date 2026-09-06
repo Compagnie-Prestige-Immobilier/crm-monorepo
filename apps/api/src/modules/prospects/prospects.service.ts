@@ -123,10 +123,7 @@ const saisieWhatsapp = (input: UpdateProspectDto): WhatsappSaisi =>
 const isoOrNull = (value: Date | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toISOString();
 
-export async function closeProspectWork(
-  tx: Prisma.TransactionClient,
-  prospectId: string,
-): Promise<void> {
+async function closeProspectWork(tx: Prisma.TransactionClient, prospectId: string): Promise<void> {
   await tx.scheduledCallback.updateMany({
     where: { prospectId, status: ScheduledCallbackStatus.PENDING },
     data: { status: ScheduledCallbackStatus.CANCELLED },
@@ -249,11 +246,11 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     ownedByCommercialName: row.createdBy.fullName,
     type: row.type,
     profession: profession.label,
-    professionId: row.professionId ?? null,
+    professionId: row.professionId,
     professionIsTeaching: profession.isTeaching,
-    incomeBandId: row.incomeBandId ?? null,
+    incomeBandId: row.incomeBandId,
     incomeBandLabel: incomeBand.label,
-    paymentMode: row.paymentMode ?? null,
+    paymentMode: row.paymentMode,
     employeurId: row.employeurId,
     employeur: row.employeurRef?.label ?? row.employeur,
     typeContrat: row.typeContrat,

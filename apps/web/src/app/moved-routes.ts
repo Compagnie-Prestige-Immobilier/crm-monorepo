@@ -5,7 +5,7 @@
  * blanche de `lib/data/inbox.ts`) : sans ces renvois, chacun de leurs liens
  * tombe en 404 le jour du déploiement.
  */
-export const MOVED_ROUTES: Readonly<Record<string, string>> = {
+const MOVED_ROUTES: Readonly<Record<string, string>> = {
   'tableau-de-bord': '/chues/tableau-de-bord',
   statistiques: '/chues/statistiques',
   prospects: '/chues/prospects',
@@ -37,7 +37,7 @@ export const MOVED_ROUTES: Readonly<Record<string, string>> = {
  * règle de préfixe l'enverrait sur `/chues/campagnes/callbacks`, qui n'existe
  * pas.
  */
-export const MOVED_PATHS: Readonly<Record<string, string>> = {
+const MOVED_PATHS: Readonly<Record<string, string>> = {
   '/phase2/callbacks': '/chues/rappels',
 };
 

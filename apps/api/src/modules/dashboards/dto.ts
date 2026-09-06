@@ -105,7 +105,7 @@ const SOURCES_ENROLEMENT = [
   'enrolement-par-teleconseiller',
 ] as const;
 
-export const DASHBOARD_SOURCES = [
+const DASHBOARD_SOURCES = [
   ...SOURCES_VISITES,
   ...SOURCES_QUALIFICATION,
   ...SOURCES_PROSPECTS,
@@ -119,16 +119,6 @@ export const SOURCES_PAR_ECRAN: Record<DashboardEcran, readonly DashboardSource[
   chues: [...SOURCES_QUALIFICATION, ...SOURCES_PROSPECTS, ...SOURCES_ENROLEMENT],
   'grand-public': [...SOURCES_PROSPECTS, ...SOURCES_ENROLEMENT],
 };
-
-/**
- * Les montants ne s'offrent qu'à la direction. Ce n'est pas un cloisonnement :
- * `GET /api/v1/analytics/funnel` reste ouvert à la supervision. C'est un choix
- * d'écran, pour que le pilotage d'équipe parle d'appels et pas de recette.
- */
-export const SOURCES_DIRECTION: readonly DashboardSource[] = [
-  'encaisse',
-  'de-l-appel-a-l-encaissement',
-];
 
 export const DASHBOARD_MARQUES = [
   'barres-verticales',
@@ -155,14 +145,14 @@ export const DASHBOARD_MARQUES = [
 
 export type DashboardMarque = (typeof DASHBOARD_MARQUES)[number];
 
-export const DASHBOARD_TAILLES = ['demi', 'pleine'] as const;
+const DASHBOARD_TAILLES = ['demi', 'pleine'] as const;
 export type DashboardTaille = (typeof DASHBOARD_TAILLES)[number];
 
 export const DASHBOARD_PRESETS = ['essentiel', 'affluence', 'organisation', 'complet'] as const;
 export type DashboardPreset = (typeof DASHBOARD_PRESETS)[number];
 
 @ValidatorConstraint({ name: 'uniqueDispositionSources', async: false })
-export class UniqueDispositionSourcesConstraint implements ValidatorConstraintInterface {
+class UniqueDispositionSourcesConstraint implements ValidatorConstraintInterface {
   validate(widgets: unknown): boolean {
     if (!Array.isArray(widgets)) return true;
     const sources = new Set<string>();

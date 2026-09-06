@@ -159,11 +159,3 @@ export const demandePubliqueSchema = z.object({
 });
 
 export type DemandePubliqueInput = z.infer<typeof demandePubliqueSchema>;
-
-export const representantSchema = z.object({
-  fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
-  phone: z.string().trim().min(1, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
-  departementId: z.string().trim().min(1, 'Le département est obligatoire.'),
-  notes: z.string().trim().max(2000, 'Notes trop longues (2000 caractères maximum).'),
-});
-export type RepresentantFormInput = z.infer<typeof representantSchema>;

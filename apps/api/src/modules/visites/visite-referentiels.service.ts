@@ -30,7 +30,7 @@ export class VisiteReferentielUsageDto {
   objets!: VisiteReferentielUsageEntryDto[];
 }
 
-export const VisiteReferentielError = {
+const VisiteReferentielError = {
   NOT_FOUND: 'VISITE_REFERENTIEL_NOT_FOUND',
   CODE_CONFLICT: 'VISITE_REFERENTIEL_CODE_CONFLICT',
   LABEL_CONFLICT: 'VISITE_REFERENTIEL_LABEL_CONFLICT',

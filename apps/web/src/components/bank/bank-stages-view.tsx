@@ -695,7 +695,7 @@ function StageFormDialog({
   );
 }
 
-export function BankStagesSkeleton() {
+function BankStagesSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-hidden="true">
       <Skeleton className="h-4 w-96" />

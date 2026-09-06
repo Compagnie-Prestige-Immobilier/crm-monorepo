@@ -1,9 +1,9 @@
-export const LIVE_INTERVAL_MS = 10_000;
+const LIVE_INTERVAL_MS = 10_000;
 
 /** Pour un état qui change quelques fois par jour, pas au rythme des saisies. */
 export const LIVE_SLOW_INTERVAL_MS = 60_000;
 
-export const LIVE_ERROR_INTERVAL_MS = 60_000;
+const LIVE_ERROR_INTERVAL_MS = 60_000;
 
 export interface LiveState {
   readonly hidden: boolean;

@@ -6,7 +6,7 @@ const booleanFlag = (fallback: boolean) =>
     .default(fallback ? 'true' : 'false')
     .transform((value) => value === 'true');
 
-export const notificationsEnvSchema = z.object({
+const notificationsEnvSchema = z.object({
   NOTIFICATIONS_REMINDERS_ENABLED: booleanFlag(true),
 
   NOTIFICATIONS_REMINDERS_AT: z

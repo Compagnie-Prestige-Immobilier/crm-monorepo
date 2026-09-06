@@ -7,7 +7,7 @@ export interface StreamPosition {
   id: string;
 }
 
-export const SYNC_STREAMS = [
+const SYNC_STREAMS = [
   'departements',
   'iefs',
   'banques',
@@ -33,9 +33,9 @@ export interface SyncCursor {
   streams: Partial<Record<SyncStream, StreamPosition>>;
 }
 
-export const EMPTY_CURSOR: SyncCursor = { v: 1, streams: {} };
+const EMPTY_CURSOR: SyncCursor = { v: 1, streams: {} };
 
-export const toMicros = (date: Date): number => date.getTime() * 1000;
+const toMicros = (date: Date): number => date.getTime() * 1000;
 export const fromMicros = (micros: number): Date => new Date(Math.floor(micros / 1000));
 
 export function encodeCursor(cursor: SyncCursor): string {

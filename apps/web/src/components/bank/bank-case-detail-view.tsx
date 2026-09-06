@@ -725,7 +725,7 @@ function RejectDialog({
   );
 }
 
-export function BankCaseDetailSkeleton() {
+function BankCaseDetailSkeleton() {
   return (
     <div className="flex flex-col gap-6" aria-hidden="true">
       <Skeleton className="h-11 w-44" />

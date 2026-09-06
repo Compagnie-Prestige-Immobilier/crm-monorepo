@@ -71,9 +71,9 @@ import {
   VisiteReferentielRefDto,
 } from '../visites/dto.js';
 
-export const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
+const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
 
-export const SYNC_MAX_DEPENDENCY_GROUPS = 25;
+const SYNC_MAX_DEPENDENCY_GROUPS = 25;
 
 export enum SyncEntity {
   REPRESENTANT = 'representant',
@@ -98,7 +98,7 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = [
+const CLEARABLE_FIELDS = [
   'iefId',
   'notes',
   'whatsappE164',
@@ -118,8 +118,6 @@ export const CLEARABLE_FIELDS = [
   'syndicatId',
   'representantId',
 ] as const;
-
-export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
 export class SyncEntityDataDto {
   @ApiPropertyOptional({ maxLength: 160, description: 'Représentant : nom complet.' })
@@ -708,7 +706,7 @@ export class SyncOperationDto {
 }
 
 @ValidatorConstraint({ name: 'maxDependencyGroups', async: false })
-export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
+class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
   validate(operations: unknown): boolean {
     if (!Array.isArray(operations)) return true;
     const groups = new Set<string>();

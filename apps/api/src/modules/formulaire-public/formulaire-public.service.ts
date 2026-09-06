@@ -23,7 +23,7 @@ const CORPS_MAX = 500;
 
 type Agent = Pick<AuthenticatedUser, 'id' | 'email' | 'username' | 'fullName' | 'role'>;
 
-export const lienInvalide = (): NotFoundException =>
+const lienInvalide = (): NotFoundException =>
   new NotFoundException({
     code: 'LIEN_INVALIDE',
     message: 'Ce lien ne fonctionne plus. Demandez-en un nouveau à votre conseiller CPI.',

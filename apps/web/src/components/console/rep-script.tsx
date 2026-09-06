@@ -89,7 +89,7 @@ const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']>
 };
 
 /** Le serveur dérive la même issue et refuse celle qui le contredit. */
-export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
+const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
   OUTCOME_PAR_EFFET[effect];
 
 /** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */

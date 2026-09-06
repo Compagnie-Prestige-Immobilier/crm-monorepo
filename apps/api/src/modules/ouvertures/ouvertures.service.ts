@@ -43,7 +43,7 @@ function nomDeLaFiche(row: OuvertureRow): string {
  * jamais zéro, sans quoi une fiche seulement consultée tirerait la DMT vers le
  * bas.
  */
-export function dureeTraitementSecondes(borne: {
+function dureeTraitementSecondes(borne: {
   firstInputAt: Date | null;
   closedAt: Date | null;
 }): number | null {

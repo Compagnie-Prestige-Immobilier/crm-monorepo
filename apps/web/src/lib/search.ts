@@ -3,7 +3,7 @@ const LIGATURES: readonly (readonly [RegExp, string])[] = [
   [/æ/gu, 'ae'],
 ];
 
-export function foldForSearch(value: string): string {
+function foldForSearch(value: string): string {
   let folded = value.normalize('NFD').replace(/\p{Diacritic}/gu, '');
   for (const [pattern, replacement] of LIGATURES) {
     folded = folded.replace(pattern, replacement);

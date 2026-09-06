@@ -1,7 +1,7 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 import type { BddSegment } from '@crm/database';
 
-export const ProspectSegmentError = {
+const ProspectSegmentError = {
   NOT_FOUND: 'PROSPECT_NOT_FOUND',
   UNCHANGED: 'PROSPECT_SEGMENT_UNCHANGED',
   REV_CONFLICT: 'PROSPECT_REV_CONFLICT',

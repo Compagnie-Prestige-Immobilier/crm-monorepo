@@ -235,7 +235,7 @@ function marqueSerie(
   }
 }
 
-export function renderMark(
+function renderMark(
   source: string,
   marque: DashboardMarque | undefined,
   donnees: DonneesSource,

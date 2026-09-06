@@ -1,7 +1,7 @@
 import { BadRequestException, UnprocessableEntityException } from '@nestjs/common';
 import ApkReader from '@devicefarmer/adbkit-apkreader';
 
-export const EXPECTED_PACKAGE_NAME = 'sn.cpi.go';
+const EXPECTED_PACKAGE_NAME = 'sn.cpi.go';
 
 export interface ApkIdentity {
   readonly packageName: string;
@@ -9,13 +9,13 @@ export interface ApkIdentity {
   readonly versionName: string;
 }
 
-export const ApkError = {
+const ApkError = {
   UNREADABLE: 'APK_MANIFEST_UNREADABLE',
   FOREIGN_PACKAGE: 'APK_FOREIGN_PACKAGE',
   VERSION_NOT_GREATER: 'APK_VERSION_NOT_GREATER',
 } as const;
 
-export const apkManifestUnreadable = (detail: string): BadRequestException =>
+const apkManifestUnreadable = (detail: string): BadRequestException =>
   new BadRequestException({
     code: ApkError.UNREADABLE,
     message:
@@ -23,7 +23,7 @@ export const apkManifestUnreadable = (detail: string): BadRequestException =>
       `extraite, et rien ne sera publié. Détail technique : ${detail}`,
   });
 
-export const apkForeignPackage = (found: string): UnprocessableEntityException =>
+const apkForeignPackage = (found: string): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkError.FOREIGN_PACKAGE,
     message:
@@ -31,10 +31,7 @@ export const apkForeignPackage = (found: string): UnprocessableEntityException =
       'Android refuserait de l’installer par-dessus CPI GO : la publication est annulée.',
   });
 
-export const apkVersionNotGreater = (
-  found: number,
-  current: number,
-): UnprocessableEntityException =>
+const apkVersionNotGreater = (found: number, current: number): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkError.VERSION_NOT_GREATER,
     message:

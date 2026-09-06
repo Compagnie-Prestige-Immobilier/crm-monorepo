@@ -43,7 +43,7 @@ const INCLUDE = {
 
 type RequestRow = Prisma.ClientCreationRequestGetPayload<{ include: typeof INCLUDE }>;
 
-export function toClientRequestDto(row: RequestRow): ClientRequestDto {
+function toClientRequestDto(row: RequestRow): ClientRequestDto {
   return {
     id: row.id,
     nom: row.nom,

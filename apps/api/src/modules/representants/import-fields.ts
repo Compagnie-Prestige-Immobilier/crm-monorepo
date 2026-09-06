@@ -49,7 +49,7 @@ const WHATSAPP = tableDe<WhatsappStatus>([
 ]);
 
 /** Le statut, ou `null` si le libellé n'est pas reconnu. Vide rend le défaut. */
-export function parseRelation(raw: string): RepresentantRelation | null {
+function parseRelation(raw: string): RepresentantRelation | null {
   if (raw.trim() === '') return RepresentantRelation.INCONNU;
   return RELATIONS.get(normalizeKey(raw)) ?? null;
 }
@@ -61,7 +61,7 @@ export function parseRelation(raw: string): RepresentantRelation | null {
  * `whatsappE164`, que le modèle de fichier ne porte pas. Accepter le libellé
  * écrirait une ligne qui viole sa propre contrainte CHECK.
  */
-export function parseWhatsapp(raw: string): WhatsappStatus | null {
+function parseWhatsapp(raw: string): WhatsappStatus | null {
   if (raw.trim() === '') return WhatsappStatus.NON_DEMANDE;
   const valeur = WHATSAPP.get(normalizeKey(raw)) ?? null;
   return valeur === WhatsappStatus.AUTRE_NUMERO ? null : valeur;
@@ -85,7 +85,7 @@ const OUTCOMES = tableDe<RepCallOutcome>([
  * de fichier ne porte ni l'un ni l'autre. Les accepter écrirait des lignes qui
  * violent leur propre contrainte.
  */
-export function parseOutcome(raw: string): RepCallOutcome | null {
+function parseOutcome(raw: string): RepCallOutcome | null {
   if (raw.trim() === '') return RepCallOutcome.REACHED;
   return OUTCOMES.get(normalizeKey(raw)) ?? null;
 }
@@ -217,7 +217,7 @@ const AN_MOIS_JOUR = /^(\d{4})-(\d{2})-(\d{2})/;
  * coïncident, et une conversion de fuseau ferait glisser la date d'un jour sur
  * une machine de développement européenne.
  */
-export function parseDateAppel(raw: string, maintenant = new Date()): Date | null {
+function parseDateAppel(raw: string, maintenant = new Date()): Date | null {
   const texte = raw.trim();
   if (texte === '') return null;
 

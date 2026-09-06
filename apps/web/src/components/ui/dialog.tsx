@@ -8,24 +8,8 @@ import { cn } from '@/lib/utils';
 
 const Dialog = DialogPrimitive.Root;
 
-type DialogTriggerProps = Omit<DialogPrimitive.Trigger.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function DialogTrigger(props: DialogTriggerProps) {
-  return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
-}
-
 function DialogPortal(props: DialogPrimitive.Portal.Props) {
   return <DialogPrimitive.Portal {...props} />;
-}
-
-type DialogCloseProps = Omit<DialogPrimitive.Close.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function DialogClose(props: DialogCloseProps) {
-  return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
 type DialogOverlayProps = Omit<DialogPrimitive.Backdrop.Props, 'className'> & {
@@ -140,15 +124,4 @@ function DialogDescription({ className, ...props }: DialogDescriptionProps) {
   );
 }
 
-export {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogOverlay,
-  DialogPortal,
-  DialogTitle,
-  DialogTrigger,
-};
+export { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle };

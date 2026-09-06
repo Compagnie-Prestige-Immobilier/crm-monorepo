@@ -25,7 +25,7 @@ import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Role } from '@/lib/types';
 
-export type ChiffreSource = components['schemas']['DashboardSource'];
+type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =
@@ -281,7 +281,7 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
  * Le catalogue de l'écran « Chiffres ». Une entrée par carte, et rien qui ne
  * soit pas une carte : tout ce qui s'affiche se déplace et se retire.
  */
-export const SOURCES_CHIFFRES = {
+const SOURCES_CHIFFRES = {
   'taux-de-contact': {
     label: 'Taux de contact',
     forme: 'scalaire',

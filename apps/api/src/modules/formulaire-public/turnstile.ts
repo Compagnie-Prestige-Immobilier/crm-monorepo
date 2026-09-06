@@ -8,23 +8,17 @@ const TIMEOUT_MS = 10_000;
 
 const logger = new Logger('Turnstile');
 
-export const captchaIndisponible = (): ServiceUnavailableException =>
+const captchaIndisponible = (): ServiceUnavailableException =>
   new ServiceUnavailableException({
     code: 'CAPTCHA_INDISPONIBLE',
     message: 'La vérification anti-robot est indisponible. Réessayez dans un instant.',
   });
 
-export const captchaRefuse = (): BadRequestException =>
+const captchaRefuse = (): BadRequestException =>
   new BadRequestException({
     code: 'CAPTCHA_REFUSE',
     message: 'La vérification anti-robot n’a pas abouti. Rechargez la page et recommencez.',
   });
-
-export interface OptionsTurnstile {
-  readonly env?: NodeJS.ProcessEnv;
-  /** Injecté par les tests ; sinon le `fetch` du runtime. */
-  readonly fetch?: typeof globalThis.fetch;
-}
 
 const codesDErreur = (charge: unknown): string => {
   if (typeof charge !== 'object' || charge === null) return 'réponse illisible';
@@ -43,9 +37,8 @@ const codesDErreur = (charge: unknown): string => {
 export async function verifierTurnstile(
   jeton: string | undefined,
   ip: string | undefined,
-  options: OptionsTurnstile = {},
 ): Promise<void> {
-  const config = readTurnstileEnv(options.env);
+  const config = readTurnstileEnv();
   const secret = config.TURNSTILE_SECRET_KEY?.trim();
 
   if (!secret) {
@@ -59,13 +52,12 @@ export async function verifierTurnstile(
   const reponse = jeton?.trim();
   if (!reponse) throw captchaRefuse();
 
-  const envoyer = options.fetch ?? globalThis.fetch;
   const corps = new URLSearchParams({ secret, response: reponse });
   if (ip !== undefined && ip !== '') corps.set('remoteip', ip);
 
   let recue: Response;
   try {
-    recue = await envoyer(SITEVERIFY, {
+    recue = await fetch(SITEVERIFY, {
       method: 'POST',
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },

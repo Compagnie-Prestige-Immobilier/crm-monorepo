@@ -19,22 +19,6 @@ function Popover({ children, ...props }: PopoverPrimitive.Root.Props) {
   );
 }
 
-function PopoverAnchor({ children, ...props }: React.ComponentProps<'span'>) {
-  const context = useContext(PopoverAnchorContext);
-  return (
-    <span
-      data-slot="popover-anchor"
-      style={{ display: 'contents' }}
-      ref={(element) => {
-        context?.setAnchor(element);
-      }}
-      {...props}
-    >
-      {children}
-    </span>
-  );
-}
-
 type PopoverTriggerProps = Omit<PopoverPrimitive.Trigger.Props, 'className'> & {
   className?: string | undefined;
 };
@@ -92,4 +76,4 @@ function PopoverContent({
   );
 }
 
-export { Popover, PopoverAnchor, PopoverContent, PopoverTrigger };
+export { Popover, PopoverContent, PopoverTrigger };

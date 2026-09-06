@@ -9,8 +9,6 @@ import {
   ecrireValeur,
   lireValeur,
   peutEcrire,
-  type CleParametre,
-  type ParametresChues,
 } from './parametres.js';
 import { JournalParametresDto, ParametresChuesDto, UpdateParametresChuesDto } from './dto.js';
 
@@ -104,5 +102,3 @@ export class ParametresChuesService {
     };
   }
 }
-
-export type { CleParametre, ParametresChues };

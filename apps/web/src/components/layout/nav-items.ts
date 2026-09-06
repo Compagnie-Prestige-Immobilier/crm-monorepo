@@ -808,10 +808,6 @@ export function coqueOf(pathname: string): Coque | null {
   return match?.id ?? null;
 }
 
-export function coqueAllowed(role: Role, coque: Coque): boolean {
-  return COQUES.find((entry) => entry.id === coque)?.roles.includes(role) === true;
-}
-
 /**
  * Les QUATRE tuiles, toujours, avec l'autorisation de chacune.
  *
@@ -842,7 +838,7 @@ export function navSections(role: Role, coque: Coque): NavSection[] {
 }
 
 /** À plat, pour les recherches par chemin. */
-export function navItems(role: Role, coque: Coque): NavItem[] {
+function navItems(role: Role, coque: Coque): NavItem[] {
   return navSections(role, coque).flatMap((section) => section.items);
 }
 

@@ -33,13 +33,13 @@ export const DUMP_TTL_MS = 6 * 60 * 60 * 1_000;
  * Un processus ne survit pas à un redéploiement, mais sa ligne si : sans cette
  * borne, un `queued` ou `running` orphelin interdit tout export à jamais.
  */
-export const DUMP_MAX_RUNTIME_MS = 30 * 60 * 1_000;
+const DUMP_MAX_RUNTIME_MS = 30 * 60 * 1_000;
 
 /**
  * Une horloge qui recule rend l'âge négatif, donc jamais au-delà de la borne.
  * Cinq minutes séparent l'ajustement NTP ordinaire du vrai saut en arrière.
  */
-export const DUMP_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1_000;
+const DUMP_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1_000;
 
 /** Un état encore en cours : il interdit d'en démarrer un second. */
 export const isInFlight = (status: DumpStatus): boolean =>

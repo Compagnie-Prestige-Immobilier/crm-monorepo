@@ -89,26 +89,6 @@ export async function createBankCase(
   return unwrap(await client.POST('/api/v1/bank-cases', { body: input }));
 }
 
-export interface UpdateBankCaseInput {
-  expectedRev: number;
-  reference?: string | undefined;
-  processingBankId?: string | undefined;
-}
-
-export async function updateBankCase(
-  id: string,
-  input: UpdateBankCaseInput,
-  client: ApiClient = getApiClient(),
-): Promise<BankCase> {
-  const body: { expectedRev: number; reference?: string; processingBankId?: string } = {
-    expectedRev: input.expectedRev,
-  };
-  if (input.reference !== undefined) body.reference = input.reference;
-  if (input.processingBankId !== undefined) body.processingBankId = input.processingBankId;
-
-  return unwrap(await client.PATCH('/api/v1/bank-cases/{id}', { params: { path: { id } }, body }));
-}
-
 export interface TransitionInput {
   targetStageId: string;
   expectedRev: number;
@@ -150,19 +130,6 @@ export async function createBankCaseTransition(
     await client.POST('/api/v1/bank-cases/{id}/transitions', {
       params: { path: { id } },
       body: toTransitionBody(input),
-    }),
-  );
-}
-
-export async function createBankCaseCorrection(
-  id: string,
-  input: TransitionInput & { reason: string },
-  client: ApiClient = getApiClient(),
-): Promise<BankCaseDetail> {
-  return unwrap(
-    await client.POST('/api/v1/bank-cases/{id}/corrections', {
-      params: { path: { id } },
-      body: { ...toTransitionBody(input), reason: input.reason.trim() },
     }),
   );
 }
@@ -224,7 +191,7 @@ export async function setBankStageActive(
 const byPosition = (a: BankCaseStage, b: BankCaseStage): number =>
   a.position - b.position || a.id.localeCompare(b.id);
 
-export function activeOpenStages(stages: readonly BankCaseStage[]): BankCaseStage[] {
+function activeOpenStages(stages: readonly BankCaseStage[]): BankCaseStage[] {
   return stages.filter((stage) => stage.isActive && stage.type === 'OPEN').sort(byPosition);
 }
 
@@ -243,15 +210,11 @@ export function stageOfType(
   return stages.find((stage) => stage.type === type);
 }
 
-export function nextOpenStage(
+function nextOpenStage(
   stages: readonly BankCaseStage[],
   current: BankCaseStage,
 ): BankCaseStage | undefined {
   return activeOpenStages(stages).find((stage) => stage.position > current.position);
-}
-
-export function lastOpenStage(stages: readonly BankCaseStage[]): BankCaseStage | undefined {
-  return activeOpenStages(stages).at(-1);
 }
 
 export type PrimaryAction =

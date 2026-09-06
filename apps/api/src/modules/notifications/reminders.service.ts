@@ -25,18 +25,16 @@ import type { ReminderRunDto } from './dto.js';
 
 const env = readNotificationsEnv();
 
-export const remindersCron = (at: string): string => {
+const remindersCron = (at: string): string => {
   const [hours, minutes] = at.split(':');
   return `0 ${minutes ?? '0'} ${hours ?? '8'} * * *`;
 };
 
-export const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
+const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
 
-export const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT);
+const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT);
 
-export { SENDING_LEASE_MS };
-
-export const ReminderKey = {
+const ReminderKey = {
   BANK_CASES_PENDING: 'bank-cases-pending',
   BANK_CASES_STALE: 'bank-cases-stale',
   DUE_CALLBACKS: 'due-callbacks',
@@ -46,15 +44,15 @@ export const ReminderKey = {
 
 export type ReminderKeyValue = (typeof ReminderKey)[keyof typeof ReminderKey];
 
-export const UNLOGGED_CALL_BUCKET_MS = 30 * 60 * 1000;
+const UNLOGGED_CALL_BUCKET_MS = 30 * 60 * 1000;
 
 /** La tranche de 30 minutes qui regroupe les alertes d'appels non consignés. */
-export const trancheDe = (now: Date): string =>
+const trancheDe = (now: Date): string =>
   new Date(Math.floor(now.getTime() / UNLOGGED_CALL_BUCKET_MS) * UNLOGGED_CALL_BUCKET_MS)
     .toISOString()
     .slice(0, 16);
 
-export const periodFor = (date: Date, timeZone: string): string =>
+const periodFor = (date: Date, timeZone: string): string =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -568,5 +566,3 @@ export class RemindersService {
     }
   }
 }
-
-export const REMINDER_ROLE_DEFAULT = Role.COMMERCIAL;

@@ -11,7 +11,7 @@ import type {
   UpdateCallOutcomeReasonDto,
 } from './dto.js';
 
-export const CallOutcomeReasonError = {
+const CallOutcomeReasonError = {
   NOT_FOUND: 'OUTCOME_REASON_NOT_FOUND',
   CODE_CONFLICT: 'OUTCOME_REASON_CODE_CONFLICT',
   LABEL_CONFLICT: 'OUTCOME_REASON_LABEL_CONFLICT',
