@@ -163,6 +163,18 @@ function PanneauProjet({ projet }: { projet: Projet }) {
   );
 }
 
+function isActionDisabled(pending: boolean, configuree: boolean): boolean {
+  return pending || !configuree;
+}
+
+function libelleBouton(pending: boolean, enCours: string, repos: string): string {
+  return pending ? enCours : repos;
+}
+
+function repriseDefaultValue(repriseDepuis: string | null | undefined): string {
+  return repriseDepuis?.slice(0, 10) ?? '';
+}
+
 function CarteReglages({ projet }: { projet: Projet }) {
   const queryClient = useQueryClient();
   const [reconstruction, setReconstruction] = useState(false);
@@ -274,7 +286,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
                 id={`reprise-${projet}`}
                 type="date"
                 className="w-44"
-                defaultValue={donnees.repriseDepuis?.slice(0, 10) ?? ''}
+                defaultValue={repriseDefaultValue(donnees.repriseDepuis)}
                 onBlur={(event) => {
                   enregistrer.mutate({ repriseDepuis: event.target.value });
                 }}
@@ -286,24 +298,24 @@ function CarteReglages({ projet }: { projet: Projet }) {
             <Button
               type="button"
               variant="outline"
-              disabled={reconstruire.isPending || !donnees.configuree}
+              disabled={isActionDisabled(reconstruire.isPending, donnees.configuree)}
               onClick={() => {
                 setReconstruction(true);
               }}
             >
               <RefreshCwIcon className="size-4" />
-              {reconstruire.isPending ? 'Reconstruction…' : 'Vider puis tirer'}
+              {libelleBouton(reconstruire.isPending, 'Reconstruction…', 'Vider puis tirer')}
             </Button>
 
             <Button
               type="button"
-              disabled={tirer.isPending || !donnees.configuree}
+              disabled={isActionDisabled(tirer.isPending, donnees.configuree)}
               onClick={() => {
                 tirer.mutate();
               }}
             >
               <DownloadCloudIcon className="size-4" />
-              {tirer.isPending ? 'Tirage en cours…' : 'Tirer maintenant'}
+              {libelleBouton(tirer.isPending, 'Tirage en cours…', 'Tirer maintenant')}
             </Button>
           </div>
         </div>
