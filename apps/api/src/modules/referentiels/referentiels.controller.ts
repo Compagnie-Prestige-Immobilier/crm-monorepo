@@ -8,9 +8,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
-import { Role } from '@crm/database';
 
-import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, ENCADREMENT, Roles } from '../../common/decorators/roles.decorator.js';
 import { Cached } from '../../redis/cache.interceptor.js';
 import { ReferentielsService } from './referentiels.service.js';
 import {
@@ -101,7 +100,7 @@ export class ReferentielsController {
   }
 
   @Post('professions')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'createProfession', summary: 'Ajoute une profession.' })
   @ApiResponse({ status: 201, type: ProfessionDto })
   createProfession(@Body() body: CreateProfessionDto): Promise<ProfessionDto> {
@@ -109,7 +108,7 @@ export class ReferentielsController {
   }
 
   @Patch('professions/:id')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'updateProfession', summary: 'Modifie une profession.' })
   @ApiResponse({ status: 200, type: ProfessionDto })
   updateProfession(
@@ -128,7 +127,7 @@ export class ReferentielsController {
   }
 
   @Post('tranches-revenu')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'createIncomeBand', summary: 'Ajoute une tranche de revenu.' })
   @ApiResponse({ status: 201, type: IncomeBandDto })
   createIncomeBand(@Body() body: CreateIncomeBandDto): Promise<IncomeBandDto> {
@@ -136,7 +135,7 @@ export class ReferentielsController {
   }
 
   @Patch('tranches-revenu/:id')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'updateIncomeBand', summary: 'Modifie une tranche de revenu.' })
   @ApiResponse({ status: 200, type: IncomeBandDto })
   updateIncomeBand(
@@ -158,7 +157,7 @@ export class ReferentielsController {
   }
 
   @Post('employeurs')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'createEmployeur', summary: 'Ajoute un employeur.' })
   @ApiResponse({ status: 201, type: EmployeurDto })
   createEmployeur(@Body() body: CreateEmployeurDto): Promise<EmployeurDto> {
@@ -166,7 +165,7 @@ export class ReferentielsController {
   }
 
   @Patch('employeurs/:id')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'updateEmployeur', summary: 'Modifie un employeur.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: EmployeurDto })
@@ -194,7 +193,7 @@ export class ReferentielsController {
   }
 
   @Post('offres')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'createOffer', summary: 'Ajoute une offre.' })
   @ApiResponse({ status: 201, type: OfferDto })
   createOffer(@Body() body: CreateOfferDto): Promise<OfferDto> {
@@ -202,7 +201,7 @@ export class ReferentielsController {
   }
 
   @Patch('offres/:id')
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @ApiOperation({ operationId: 'updateOffer', summary: 'Modifie une offre.' })
   @ApiResponse({ status: 200, type: OfferDto })
   updateOffer(
@@ -212,7 +211,7 @@ export class ReferentielsController {
     return this.referentiels.updateOffer(id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post('canaux-provenance')
   @ApiOperation({
     operationId: 'createCanalProvenance',
@@ -223,7 +222,7 @@ export class ReferentielsController {
     return this.referentiels.createCanalProvenance(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch('canaux-provenance/:id')
   @ApiOperation({
     operationId: 'updateCanalProvenance',
@@ -286,7 +285,7 @@ export class ReferentielsController {
     return this.referentiels.listRegionsWithDepartements(query);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post('banques')
   @ApiOperation({ operationId: 'createBanque', summary: 'Ajoute une banque.' })
   @ApiResponse({ status: 201, type: BanqueDto })
@@ -294,7 +293,7 @@ export class ReferentielsController {
     return this.referentiels.createBanque(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch('banques/:id')
   @ApiOperation({
     operationId: 'updateBanque',
@@ -309,7 +308,7 @@ export class ReferentielsController {
     return this.referentiels.updateBanque(id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post('syndicats')
   @ApiOperation({ operationId: 'createSyndicat', summary: 'Ajoute un syndicat.' })
   @ApiResponse({ status: 201, type: SyndicatDto })
@@ -317,7 +316,7 @@ export class ReferentielsController {
     return this.referentiels.createSyndicat(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch('syndicats/:id')
   @ApiOperation({ operationId: 'updateSyndicat', summary: 'Modifie un syndicat.' })
   @ApiParam({ name: 'id', format: 'uuid' })
@@ -329,7 +328,7 @@ export class ReferentielsController {
     return this.referentiels.updateSyndicat(id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post('departements')
   @ApiOperation({ operationId: 'createDepartement', summary: 'Ajoute un département.' })
   @ApiResponse({ status: 201, type: DepartementDto })
@@ -337,7 +336,7 @@ export class ReferentielsController {
     return this.referentiels.createDepartement(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch('departements/:id')
   @ApiOperation({ operationId: 'updateDepartement', summary: 'Modifie un département.' })
   @ApiParam({ name: 'id', format: 'uuid' })

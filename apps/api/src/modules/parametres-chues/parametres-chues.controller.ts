@@ -1,6 +1,5 @@
 import { Body, Controller, Get, Patch, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Role } from '@crm/database';
 
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
@@ -8,7 +7,7 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
-import { PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
+import { ENCADREMENT, PARCOURS_ROLES, Roles } from '../../common/decorators/roles.decorator.js';
 import {
   JournalParametresDto,
   JournalParametresQueryDto,
@@ -16,8 +15,6 @@ import {
   UpdateParametresChuesDto,
 } from './dto.js';
 import { ParametresChuesService } from './parametres-chues.service.js';
-
-const ENCADREMENT = [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] as const;
 
 @ApiTags('parametres-chues')
 @ApiBearerAuth()
