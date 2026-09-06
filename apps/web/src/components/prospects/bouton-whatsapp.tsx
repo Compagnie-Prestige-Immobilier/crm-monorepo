@@ -7,20 +7,11 @@ import { buttonVariants } from '@/components/ui/button';
 import { fetchSessionUser } from '@/lib/data/auth';
 import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { formatPhone } from '@/lib/format';
+import { lienFormulairePublic, texteDuMessage } from '@/lib/formulaire-public';
 import { queryKeys } from '@/lib/query-keys';
 import type { ProspectRow } from '@/lib/types';
 
 const STALE_TIME = 300_000;
-
-/**
- * Le formulaire public d'EB-27 n'a pas encore d'adresse : `{lien}` s'efface,
- * avec le deux-points qui l'introduit, plutôt que de partir tel quel.
- */
-function texteDuMessage(modele: string, valeurs: Record<string, string>): string {
-  return modele
-    .replaceAll(/\s*:?\s*\{lien\}/gu, '')
-    .replaceAll(/\{(\w+)\}/gu, (jeton, cle: string) => valeurs[cle] ?? jeton);
-}
 
 /** EB-26 : WhatsApp s'ouvre sur le numéro du prospect, message déjà écrit. */
 export function BoutonWhatsApp({ prospect }: { prospect: ProspectRow }) {
@@ -43,6 +34,7 @@ export function BoutonWhatsApp({ prospect }: { prospect: ProspectRow }) {
     prenom: prospect.prenom,
     teleconseiller: moi.data.fullName,
     telephoneTeleconseiller: formatPhone(moi.data.phoneE164 ?? ''),
+    lien: lienFormulairePublic(moi.data.id),
   });
 
   return (
