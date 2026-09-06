@@ -510,8 +510,11 @@ model Representant {
   // pull plus ancienne que ce qu'il a déjà (`WHERE excluded.rev > rev`).
   rev Int @default(1)
 
-  departementId String
-  departement   Departement @relation(fields: [departementId], references: [id], onDelete: Restrict)
+  /// Facultatif : une fiche naît normalement en tournée, où le département se
+  /// déduit du secteur ; la saisie manuelle (l'exception) ne le connaît pas
+  /// toujours.
+  departementId String?
+  departement   Departement? @relation(fields: [departementId], references: [id], onDelete: SetNull)
 
   /// IEF de rattachement, facultative. Voir le modele `Ief`.
   iefId String?
@@ -2163,9 +2166,7 @@ model RepresentantComment {
 /// Le teleconseiller qui rencontrerait un jour cette personne pour de vrai
 /// recevrait REPRESENTANT_PHONE_CONFLICT, et la fusion automatique du mobile ne
 /// se declenche que sur une fiche qui lui appartient deja : le conflit serait
-/// definitif, sans geste capable de le resoudre. `Representant.departementId`
-/// est en outre NOT NULL, qu'il faudrait inventer pour un contact dont on ne
-/// connait que le numero.
+/// definitif, sans geste capable de le resoudre.
 model RepresentantSuggestion {
   id String @id @default(uuid(7))
 
