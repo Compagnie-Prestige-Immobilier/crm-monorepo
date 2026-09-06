@@ -60,6 +60,24 @@ const DIRECTION_ITEMS: { value: SortDirection; label: string }[] = [
   { value: 'asc', label: 'Croissant' },
 ];
 
+type Referentiels = Awaited<ReturnType<typeof fetchReferenceData>> | undefined;
+
+function departementsDe(reference: Referentiels) {
+  return reference?.departements ?? [];
+}
+
+function regionsDe(reference: Referentiels) {
+  return reference?.regions ?? [];
+}
+
+function iefsDe(reference: Referentiels) {
+  return reference?.iefs ?? [];
+}
+
+function commerciauxDe(reference: Referentiels) {
+  return reference?.commerciaux ?? [];
+}
+
 export function RepresentantsFiltersBar() {
   const { filters, setFilters, resetFilters } = useRepresentantFilters();
   const sortId = useId();
@@ -86,7 +104,7 @@ export function RepresentantsFiltersBar() {
   ];
 
   const [regionDraft, setRegionDraft] = useState<string | null>(null);
-  const departements = reference?.departements ?? [];
+  const departements = departementsDe(reference);
   const regionId =
     departements.find((departement) => departement.id === filters.departementId)?.regionId ??
     regionDraft;
@@ -179,7 +197,7 @@ export function RepresentantsFiltersBar() {
             label="Région"
             placeholder="Toutes les régions"
             value={regionId}
-            options={(reference?.regions ?? []).map((region) => ({
+            options={regionsDe(reference).map((region) => ({
               value: region.id,
               label: region.name,
             }))}
@@ -214,7 +232,7 @@ export function RepresentantsFiltersBar() {
             label="IEF"
             placeholder="Toutes les IEF"
             value={filters.iefId}
-            options={(reference?.iefs ?? [])
+            options={iefsDe(reference)
               .filter((ief) =>
                 filters.departementId === null ? true : ief.departementId === filters.departementId,
               )
@@ -234,7 +252,7 @@ export function RepresentantsFiltersBar() {
             label="Téléconseiller"
             placeholder="Tous les téléconseillers"
             value={filters.commercialId}
-            options={reference?.commerciaux ?? []}
+            options={commerciauxDe(reference)}
             onChange={(value) => {
               setFilters({ commercialId: value });
             }}
