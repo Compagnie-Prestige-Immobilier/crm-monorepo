@@ -9,6 +9,17 @@ import {
 } from '@/lib/api/config';
 import { isAccessTokenStale, rotateRefreshTokenDetailed } from '@/lib/api/tokens';
 
+type OrigineResolue = { ok: true; origin: string } | { ok: false };
+
+function resolveOrigin(): OrigineResolue {
+  try {
+    return { ok: true, origin: serverApiOrigin() };
+  } catch (error) {
+    if (error instanceof ApiConfigurationError) return { ok: false };
+    throw error;
+  }
+}
+
 const proxy: NextProxy = async (request) => {
   const access = request.cookies.get(ACCESS_COOKIE)?.value;
   const refresh = request.cookies.get(REFRESH_COOKIE)?.value;
@@ -16,15 +27,10 @@ const proxy: NextProxy = async (request) => {
   if (refresh === undefined || refresh === '') return NextResponse.next();
   if (!isAccessTokenStale(access)) return NextResponse.next();
 
-  let origin: string;
-  try {
-    origin = serverApiOrigin();
-  } catch (error) {
-    if (error instanceof ApiConfigurationError) return NextResponse.next();
-    throw error;
-  }
+  const origine = resolveOrigin();
+  if (!origine.ok) return NextResponse.next();
 
-  const rotation = await rotateRefreshTokenDetailed(origin, refresh);
+  const rotation = await rotateRefreshTokenDetailed(origine.origin, refresh);
 
   if (!rotation.ok && rotation.reason === 'unavailable') {
     return NextResponse.next();
