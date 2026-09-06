@@ -1,0 +1,230 @@
+import type { components } from '@crm/api-client';
+
+import { DUREE_ETABLISSEMENT_MAX_MOIS } from '@/lib/types';
+
+type Schemas = components['schemas'];
+
+export type FormulairePublic = Schemas['FormulairePublicDto'];
+export type OptionPublique = Schemas['OptionPubliqueDto'];
+export type ReglageChampPublic = Schemas['ReglageChampDto'];
+export type ChampLibrePublic = Schemas['ChampLibreDto'];
+type WhatsappStatus = Schemas['WhatsappStatus'];
+
+export type Saisie = Readonly<Record<string, string>>;
+
+export const MESSAGE_MAX = 500;
+
+export type SourceListe =
+  'banques' | 'syndicats' | 'revenus' | 'situations' | 'paiements' | 'durees' | 'whatsapp';
+
+export interface Widget {
+  readonly saisie: 'texte' | 'liste' | 'ouinon';
+  readonly source?: SourceListe;
+  readonly type?: 'tel' | 'email' | 'number';
+  readonly autoComplete?: string;
+  readonly min?: number;
+  readonly max?: number;
+  readonly nombre?: true;
+  readonly longueurMax?: number;
+}
+
+interface Section {
+  readonly titre: string;
+  readonly widgets: Readonly<Record<string, Widget>>;
+}
+
+/**
+ * Les sections REGROUPENT, elles ne classent pas : l'ordre des champs reste
+ * celui que l'API envoie, et une section apparaît là où son premier champ tombe.
+ */
+const SECTIONS: readonly Section[] = [
+  {
+    titre: 'Vos coordonnées',
+    widgets: {
+      nom: { saisie: 'texte', autoComplete: 'family-name', longueurMax: 120 },
+      prenom: { saisie: 'texte', autoComplete: 'given-name', longueurMax: 120 },
+      phoneE164: { saisie: 'texte', type: 'tel', autoComplete: 'tel', longueurMax: 40 },
+      whatsappStatus: { saisie: 'liste', source: 'whatsapp' },
+      whatsappE164: { saisie: 'texte', type: 'tel', longueurMax: 40 },
+      email: { saisie: 'texte', type: 'email', autoComplete: 'email', longueurMax: 254 },
+    },
+  },
+  {
+    titre: 'Votre situation',
+    widgets: {
+      profession: { saisie: 'texte', autoComplete: 'organization-title', longueurMax: 120 },
+      etablissement: { saisie: 'texte', autoComplete: 'organization', longueurMax: 160 },
+      dureeEtablissementMois: {
+        saisie: 'texte',
+        type: 'number',
+        nombre: true,
+        min: 0,
+        max: DUREE_ETABLISSEMENT_MAX_MOIS,
+      },
+      fonctionnaire: { saisie: 'ouinon' },
+      type: { saisie: 'liste', source: 'situations' },
+      syndicatId: { saisie: 'liste', source: 'syndicats' },
+    },
+  },
+  {
+    titre: 'Votre banque',
+    widgets: {
+      banqueId: { saisie: 'liste', source: 'banques' },
+      engagementEnCours: { saisie: 'ouinon' },
+      incomeBandId: { saisie: 'liste', source: 'revenus' },
+      paymentMode: { saisie: 'liste', source: 'paiements' },
+      dureeSystemeMois: { saisie: 'liste', source: 'durees', nombre: true },
+    },
+  },
+];
+
+const WIDGETS = new Map<string, Widget>(
+  SECTIONS.flatMap((section) => Object.entries(section.widgets)),
+);
+
+export const widgetDe = (champ: string): Widget | undefined => WIDGETS.get(champ);
+
+export const CHOIX_WHATSAPP: readonly { readonly value: WhatsappStatus; readonly label: string }[] =
+  [
+    { value: 'MEME_NUMERO', label: 'Le même que mon téléphone' },
+    { value: 'AUTRE_NUMERO', label: 'Un autre numéro' },
+    { value: 'AUCUN', label: 'Pas de WhatsApp' },
+  ];
+
+/** L'identité et le numéro portent la demande : l'API les exige quel que soit le réglage. */
+const TOUJOURS_REQUIS = new Set(['nom', 'prenom', 'phoneE164']);
+
+export const estRequis = (champ: ReglageChampPublic): boolean =>
+  champ.obligatoire || TOUJOURS_REQUIS.has(champ.champ);
+
+export const cleLibre = (id: string): string => `libre:${id}`;
+
+export function valeursLibre(champ: ChampLibrePublic): readonly string[] {
+  if (champ.type === 'OUI_NON') return ['Oui', 'Non'];
+  return champ.options;
+}
+
+function champMasque(champ: string, saisie: Saisie): boolean {
+  if (champ === 'whatsappE164') return saisie.whatsappStatus !== 'AUTRE_NUMERO';
+  if (champ === 'dureeSystemeMois') return saisie.paymentMode !== 'ECHELONNE';
+  return false;
+}
+
+const lire = (saisie: Saisie, cle: string): string => (saisie[cle] ?? '').trim();
+
+export function champsRendus(
+  champs: readonly ReglageChampPublic[],
+  saisie: Saisie,
+): readonly ReglageChampPublic[] {
+  return champs.filter(
+    (champ) => champ.visible && WIDGETS.has(champ.champ) && !champMasque(champ.champ, saisie),
+  );
+}
+
+export interface SectionRendue {
+  readonly titre: string;
+  readonly champs: readonly ReglageChampPublic[];
+}
+
+export function grouperChamps(rendus: readonly ReglageChampPublic[]): readonly SectionRendue[] {
+  return SECTIONS.map((section) => ({
+    titre: section.titre,
+    rang: rendus.findIndex((champ) => Object.hasOwn(section.widgets, champ.champ)),
+    champs: rendus.filter((champ) => Object.hasOwn(section.widgets, champ.champ)),
+  }))
+    .filter((section) => section.champs.length > 0)
+    .sort((gauche, droite) => gauche.rang - droite.rang);
+}
+
+const REQUIS = 'À renseigner.';
+const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const trop = (max: number): string => `Ne dépassez pas ${String(max)} caractères.`;
+
+function nombreInvalide(widget: Widget, valeur: string): string | undefined {
+  const min = widget.min ?? 0;
+  const max = widget.max ?? Number.MAX_SAFE_INTEGER;
+  const nombre = Number(valeur);
+  if (Number.isInteger(nombre) && nombre >= min && nombre <= max) return undefined;
+  return `Indiquez un nombre entier entre ${String(min)} et ${String(max)}.`;
+}
+
+function formatInvalide(widget: Widget, valeur: string): string | undefined {
+  if (widget.longueurMax !== undefined && valeur.length > widget.longueurMax)
+    return trop(widget.longueurMax);
+  if (widget.type === 'email' && !EMAIL.test(valeur)) return 'Adresse e-mail invalide.';
+  if (widget.type === 'tel' && valeur.replaceAll(/\D/g, '').length < 6) return 'Numéro incomplet.';
+  if (widget.type === 'number') return nombreInvalide(widget, valeur);
+  return undefined;
+}
+
+function erreurDuChamp(champ: ReglageChampPublic, valeur: string): string | undefined {
+  const widget = widgetDe(champ.champ);
+  if (widget === undefined) return undefined;
+  if (valeur === '') return estRequis(champ) ? REQUIS : undefined;
+  return formatInvalide(widget, valeur);
+}
+
+export function validerDemande(
+  saisie: Saisie,
+  champs: readonly ReglageChampPublic[],
+  libres: readonly ChampLibrePublic[],
+): Readonly<Record<string, string>> {
+  const erreurs: Record<string, string> = {};
+
+  for (const champ of champsRendus(champs, saisie)) {
+    const probleme = erreurDuChamp(champ, lire(saisie, champ.champ));
+    if (probleme !== undefined) erreurs[champ.champ] = probleme;
+  }
+
+  for (const libre of libres) {
+    const cle = cleLibre(libre.id);
+    if (libre.obligatoire && lire(saisie, cle) === '') erreurs[cle] = REQUIS;
+  }
+
+  if (lire(saisie, 'message').length > MESSAGE_MAX) erreurs.message = trop(MESSAGE_MAX);
+
+  return erreurs;
+}
+
+function valeurEnvoyee(widget: Widget, valeur: string): unknown {
+  if (widget.saisie === 'ouinon') return valeur === 'oui';
+  if (widget.nombre === true) return Number(valeur);
+  return valeur;
+}
+
+function reponsesLibres(
+  saisie: Saisie,
+  libres: readonly ChampLibrePublic[],
+): Record<string, string> {
+  const reponses: Record<string, string> = {};
+  for (const libre of libres) {
+    const valeur = lire(saisie, cleLibre(libre.id));
+    if (valeur !== '') reponses[libre.id] = valeur;
+  }
+  return reponses;
+}
+
+/** Le visiteur saisit un numéro libre : la clé `phone` le distingue de `phoneE164`, normalisé par le serveur. */
+export function corpsDemande(
+  saisie: Saisie,
+  champs: readonly ReglageChampPublic[],
+  libres: readonly ChampLibrePublic[],
+): Record<string, unknown> {
+  const corps: Record<string, unknown> = {};
+
+  for (const champ of champsRendus(champs, saisie)) {
+    const widget = widgetDe(champ.champ);
+    const valeur = lire(saisie, champ.champ);
+    if (widget === undefined || valeur === '') continue;
+    corps[champ.champ === 'phoneE164' ? 'phone' : champ.champ] = valeurEnvoyee(widget, valeur);
+  }
+
+  const reponses = reponsesLibres(saisie, libres);
+  if (Object.keys(reponses).length > 0) corps.champsLibres = reponses;
+
+  const message = lire(saisie, 'message');
+  if (message !== '') corps.message = message;
+
+  return corps;
+}
