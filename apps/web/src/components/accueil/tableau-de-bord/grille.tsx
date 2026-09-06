@@ -192,6 +192,39 @@ function PetitsMultiples({
   );
 }
 
+type SerieContext = {
+  items: DonneeDe<'classement'>;
+  presentation: Presentation;
+  titre: string;
+  onSelect: ((index: number) => void) | undefined;
+};
+
+const RENDUS_SERIE: Partial<Record<DashboardMarque, (ctx: SerieContext) => ReactNode>> = {
+  'barres-horizontales': ({ items, presentation }) => (
+    <BarresHorizontalesChart items={items} presentation={presentation} />
+  ),
+  'barres-groupees': ({ items, presentation }) => (
+    <BarresGroupeesChart items={items} presentation={presentation} />
+  ),
+  courbe: ({ items, presentation }) => <CourbeChart items={items} presentation={presentation} />,
+  aire: ({ items, presentation }) => <AireChart items={items} presentation={presentation} />,
+  escalier: ({ items, presentation }) => (
+    <EscalierChart items={items} presentation={presentation} />
+  ),
+  anneau: ({ items, presentation, onSelect }) => (
+    <AnneauChart items={items} presentation={presentation} onSelect={onSelect} />
+  ),
+  camembert: ({ items, presentation, onSelect }) => (
+    <CamembertChart items={items} presentation={presentation} onSelect={onSelect} />
+  ),
+  'aire-polaire': ({ items, presentation }) => (
+    <AirePolaireChart items={items} presentation={presentation} />
+  ),
+  radar: ({ items, presentation }) => <RadarChart items={items} presentation={presentation} />,
+  mixte: ({ items, presentation }) => <MixteChart items={items} presentation={presentation} />,
+  tableau: ({ items, titre }) => <TableauWidget items={items} entete={titre} caption={titre} />,
+};
+
 function marqueSerie(
   items: DonneeDe<'classement'>,
   marque: DashboardMarque | undefined,
@@ -206,33 +239,14 @@ function marqueSerie(
           const item = items[index];
           if (item !== undefined) ouvrir(item.id);
         };
-  switch (marque) {
-    case 'barres-horizontales':
-      return <BarresHorizontalesChart items={items} presentation={presentation} />;
-    case 'barres-groupees':
-      return <BarresGroupeesChart items={items} presentation={presentation} />;
-    case 'courbe':
-      return <CourbeChart items={items} presentation={presentation} />;
-    case 'aire':
-      return <AireChart items={items} presentation={presentation} />;
-    case 'escalier':
-      return <EscalierChart items={items} presentation={presentation} />;
-    case 'anneau':
-      return <AnneauChart items={items} presentation={presentation} onSelect={onSelect} />;
-    case 'camembert':
-      return <CamembertChart items={items} presentation={presentation} onSelect={onSelect} />;
-    case 'aire-polaire':
-      return <AirePolaireChart items={items} presentation={presentation} />;
-    case 'radar':
-      return <RadarChart items={items} presentation={presentation} />;
-    case 'mixte':
-      return <MixteChart items={items} presentation={presentation} />;
-    case 'tableau':
-      return <TableauWidget items={items} entete={titre} caption={titre} />;
-    case 'barres-verticales':
-    default:
-      return <BarresVerticalesChart items={items} presentation={presentation} />;
-  }
+  const rendu = marque === undefined ? undefined : RENDUS_SERIE[marque];
+  if (rendu === undefined)
+    return <BarresVerticalesChart items={items} presentation={presentation} />;
+  return rendu({ items, presentation, titre, onSelect });
+}
+
+function libelleSource(catalogue: Catalogue, source: string): string {
+  return catalogue[source]?.label ?? source;
 }
 
 function renderMark(
@@ -244,7 +258,7 @@ function renderMark(
   messageVide = 'Aucune visite sur la période.',
   ouvrir?: (id: string) => void,
 ): ReactNode {
-  const titre = catalogue[source]?.label ?? source;
+  const titre = libelleSource(catalogue, source);
 
   if (donnees.forme === 'equipe') return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
   if (donnees.forme === 'scalaire') return marqueScalaire(donnees.donnee, marque, titre);
