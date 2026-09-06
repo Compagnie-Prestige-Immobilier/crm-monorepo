@@ -192,6 +192,9 @@ services:
       # Chemin serveur→serveur, à l'intérieur du réseau Docker : les Route
       # Handlers de Next joignent l'API sans repasser par Internet ni par TLS.
       API_INTERNAL_URL: http://api:3001
+      # Clé publique du widget anti-robot du formulaire public. Lue au rendu de
+      # /demande/:jeton, donc au démarrage du conteneur et non au build.
+      TURNSTILE_SITE_KEY: ${TURNSTILE_SITE_KEY:-}
     depends_on:
       api:
         condition: service_healthy

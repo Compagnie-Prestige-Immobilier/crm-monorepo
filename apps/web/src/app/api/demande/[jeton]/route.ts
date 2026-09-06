@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { z } from 'zod';
 
 import {
   API_PREFIX,
@@ -8,11 +9,31 @@ import {
 } from '@/lib/api/config';
 import { demandePubliqueSchema } from '@/lib/schemas';
 
+/** Le jeton anti-robot n'est pas un champ du formulaire : le widget le pose. */
+const corpsSchema = demandePubliqueSchema.extend({
+  turnstileToken: z.string().max(2048).default(''),
+});
+
+const REFUS_CAPTCHA =
+  'La vérification anti-robot n’a pas abouti. Rechargez la page et recommencez.';
+
 const REFUS: Readonly<Record<number, string>> = {
   400: 'Vérifiez les champs signalés.',
   404: 'Ce lien ne fonctionne plus. Demandez-en un nouveau à votre conseiller CPI.',
   429: 'Trop d’envois depuis cette connexion. Patientez une minute.',
+  503: 'La vérification anti-robot est indisponible. Réessayez dans un instant.',
 };
+
+/**
+ * Un 400 anti-robot n'est pas une saisie fautive : sans son code, le visiteur
+ * relirait ses champs sans jamais trouver ce qui cloche.
+ */
+async function messageDeRefus(amont: Response): Promise<string | undefined> {
+  const charge: unknown = await amont.json().catch(() => null);
+  const code =
+    typeof charge === 'object' && charge !== null ? (charge as { code?: unknown }).code : undefined;
+  return code === 'CAPTCHA_REFUSE' ? REFUS_CAPTCHA : REFUS[amont.status];
+}
 
 /**
  * Le relais `/api/v1` attache toujours un jeton de session et renvoie 401 sans
@@ -36,12 +57,12 @@ export async function POST(
     return NextResponse.json({ error: 'Demande illisible.' }, { status: 400 });
   }
 
-  const parsed = demandePubliqueSchema.safeParse(corps);
+  const parsed = corpsSchema.safeParse(corps);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Vérifiez les champs signalés.' }, { status: 400 });
   }
 
-  const { site, email, profession, employeur, message, ...identite } = parsed.data;
+  const { site, email, profession, employeur, message, turnstileToken, ...identite } = parsed.data;
   const demande = {
     ...identite,
     ...(email === '' ? {} : { email }),
@@ -49,6 +70,7 @@ export async function POST(
     ...(employeur === '' ? {} : { employeur }),
     ...(message === '' ? {} : { message }),
     ...(site === '' ? {} : { site }),
+    ...(turnstileToken === '' ? {} : { turnstileToken }),
   };
 
   let origin: string;
@@ -83,7 +105,7 @@ export async function POST(
 
   if (amont.ok) return NextResponse.json({ ok: true });
 
-  const connu = REFUS[amont.status];
+  const connu = await messageDeRefus(amont);
   if (connu !== undefined) return NextResponse.json({ error: connu }, { status: amont.status });
 
   return NextResponse.json(

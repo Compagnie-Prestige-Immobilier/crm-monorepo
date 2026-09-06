@@ -34,6 +34,8 @@ class DemandePubliqueDto {
     this.message,
 
     this.site,
+
+    this.turnstileToken,
   });
 
   @JsonKey(name: r'nom', required: true, includeIfNull: false)
@@ -63,12 +65,26 @@ class DemandePubliqueDto {
   @JsonKey(name: r'site', required: false, includeIfNull: false)
   final String? site;
 
+  /// Jeton rendu par le widget Cloudflare Turnstile de la page.
+  @JsonKey(name: r'turnstileToken', required: false, includeIfNull: false)
+  final String? turnstileToken;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is DemandePubliqueDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [nom, prenom, phone, email, profession, employeur, message, site],
+              [
+                nom,
+                prenom,
+                phone,
+                email,
+                profession,
+                employeur,
+                message,
+                site,
+                turnstileToken,
+              ],
               [
                 other.nom,
                 other.prenom,
@@ -78,6 +94,7 @@ class DemandePubliqueDto {
                 other.employeur,
                 other.message,
                 other.site,
+                other.turnstileToken,
               ],
             );
   }
@@ -94,6 +111,7 @@ class DemandePubliqueDto {
         employeur,
         message,
         site,
+        turnstileToken,
       ]);
 
   factory DemandePubliqueDto.fromJson(Map<String, dynamic> json) =>
