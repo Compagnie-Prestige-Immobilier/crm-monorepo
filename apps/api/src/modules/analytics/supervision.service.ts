@@ -73,6 +73,18 @@ function creneauxEffectifs(shifts: readonly WorkShiftDto[], query: SupervisionQu
     .filter((creneau) => creneau.fin > creneau.debut);
 }
 
+/** Les créneaux hors filtre horaire retombent sur `FALSE` : aucune tranche ne matche un jeu vide. */
+function dansCreneauCondition(creneaux: readonly Creneau[]): Prisma.Sql {
+  if (!creneaux.length) return Prisma.sql`FALSE`;
+  return Prisma.join(
+    creneaux.map(
+      (creneau) =>
+        Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
+    ),
+    ' OR ',
+  );
+}
+
 /** Un jour passé compte ses créneaux entiers, le jour courant sa portion écoulée. */
 function secondesEcoulees(jour: string, creneaux: readonly Creneau[], now: Date): number {
   const aujourdhui = now.toISOString().slice(0, 10);
@@ -240,6 +252,32 @@ interface JourVuRow {
   actifs: number;
 }
 
+function resolveGranularity(query: SupervisionQueryDto): {
+  granularity: SupervisionGranularity;
+  unit: Prisma.Sql;
+} {
+  const granularity = query.granularity ?? SupervisionGranularity.DAY;
+  // `date_trunc` exige un littéral, jamais un paramètre.
+  const unit = granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
+  return { granularity, unit };
+}
+
+function userScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
+}
+
+/** Un représentant est CHUES par construction : filtrer Grand Public le sort. */
+function repScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
+}
+
+function windowBounds(query: SupervisionQueryDto): { from: string | null; to: string | null } {
+  return {
+    from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
+    to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
+  };
+}
+
 @Injectable()
 export class SupervisionActivityService {
   private readonly logger = new Logger(SupervisionActivityService.name);
@@ -250,20 +288,15 @@ export class SupervisionActivityService {
   ) {}
 
   async activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
-    const granularity = query.granularity ?? SupervisionGranularity.DAY;
-    // `date_trunc` exige un littéral, jamais un paramètre.
-    const unit =
-      granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
+    const { granularity, unit } = resolveGranularity(query);
 
     const attemptScope = ALL_ROWS;
-    const userScope = query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
     const rolesDuPlateau = Prisma.join(
       TELECONSEIL_ROLES.map((role) => Prisma.sql`${role}::"Role"`),
     );
-    const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScope}`;
+    const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScopeCondition(query)}`;
 
-    // Un représentant est CHUES par construction : filtrer Grand Public le sort.
-    const repScope = query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
+    const repScope = repScopeCondition(query);
 
     const repWindow = withinWindow(Prisma.sql`rca."clientCreatedAt"`, query);
     const projetScope = (prospectId: Prisma.Sql): Prisma.Sql =>
@@ -541,15 +574,7 @@ export class SupervisionActivityService {
       AND p.creneau = p."creneauPrecedent" AND p.jour = p."jourPrecedent"
     `;
 
-    const dansCreneau = creneaux.length
-      ? Prisma.join(
-          creneaux.map(
-            (creneau) =>
-              Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
-          ),
-          ' OR ',
-        )
-      : Prisma.sql`FALSE`;
+    const dansCreneau = dansCreneauCondition(creneaux);
 
     const [
       rows,
@@ -888,9 +913,10 @@ export class SupervisionActivityService {
       };
     }
 
+    const { from, to } = windowBounds(query);
     return {
-      from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
-      to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
+      from,
+      to,
       granularity,
       totals: chiffres(totalRow ?? TOTAL_VIDE, repTotalRow ?? REP_VIDE, extraTotal),
       items: rows.map((row): SupervisionActivityRowDto => {
