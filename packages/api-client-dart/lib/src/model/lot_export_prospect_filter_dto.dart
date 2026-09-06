@@ -61,6 +61,8 @@ class LotExportProspectFilterDto {
 
     this.dateTo,
 
+    this.revue,
+
     this.includeDeleted = false,
 
     required this.projet,
@@ -168,6 +170,10 @@ class LotExportProspectFilterDto {
   @JsonKey(name: r'dateTo', required: false, includeIfNull: false)
   final DateTime? dateTo;
 
+  /// Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
+  @JsonKey(name: r'revue', required: false, includeIfNull: false)
+  final bool? revue;
+
   /// Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   @JsonKey(
     defaultValue: false,
@@ -210,6 +216,7 @@ class LotExportProspectFilterDto {
                 origin,
                 dateFrom,
                 dateTo,
+                revue,
                 includeDeleted,
                 projet,
               ],
@@ -232,6 +239,7 @@ class LotExportProspectFilterDto {
                 other.origin,
                 other.dateFrom,
                 other.dateTo,
+                other.revue,
                 other.includeDeleted,
                 other.projet,
               ],
@@ -260,6 +268,7 @@ class LotExportProspectFilterDto {
         origin,
         dateFrom,
         dateTo,
+        revue,
         includeDeleted,
         projet,
       ]);

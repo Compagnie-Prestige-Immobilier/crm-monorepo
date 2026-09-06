@@ -5430,6 +5430,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -10108,6 +10117,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -10353,6 +10371,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -10595,6 +10622,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -10848,6 +10884,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11107,6 +11152,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -11352,6 +11406,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -11594,6 +11657,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11843,6 +11915,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -12086,6 +12167,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12335,6 +12425,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -12577,6 +12676,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12837,6 +12945,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -13080,6 +13197,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13329,6 +13455,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -13571,6 +13706,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13817,6 +13961,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -14089,6 +14242,15 @@
             }
           },
           {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
             "name": "includeDeleted",
             "required": false,
             "in": "query",
@@ -14332,6 +14494,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -14704,6 +14875,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -17909,6 +18089,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -32647,6 +32836,10 @@
             "type": "string",
             "format": "date-time",
             "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "revue": {
+            "type": "boolean",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été."
           },
           "includeDeleted": {
             "type": "boolean",
