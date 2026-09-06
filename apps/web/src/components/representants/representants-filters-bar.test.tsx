@@ -6,7 +6,7 @@ import { RepresentantsFiltersBar } from '@/components/representants/representant
 import { parseRepresentantFilters } from '@/lib/representant-filters';
 import type * as ReferenceModule from '@/lib/data/reference';
 import { renderWithQuery } from '@/test/render-query';
-import { routerMock, setUrl } from '@/test/router-mock';
+import { historyMock, setUrl } from '@/test/router-mock';
 
 const reference = vi.hoisted(() => vi.fn());
 
@@ -86,7 +86,7 @@ describe('RepresentantsFiltersBar, cascade région → département', () => {
 
     await choose('Région', 'Dakar');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/representants');
   });
 
   it('sans département ni IEF retenus, choisir une région ne navigue pas', async () => {
@@ -95,7 +95,7 @@ describe('RepresentantsFiltersBar, cascade région → département', () => {
 
     await choose('Région', 'Dakar');
 
-    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(historyMock.pushState).not.toHaveBeenCalled();
   });
 
   it('un lien portant un département sans région affiche quand même sa région', async () => {
@@ -121,9 +121,11 @@ describe('RepresentantsFiltersBar, état de la relation', () => {
     // L'intitulé lu à l'écran change, la valeur envoyée à l'API ne bouge pas.
     await choose('Relation', 'A accepté');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants?relationStatus=AMBASSADEUR', {
-      scroll: false,
-    });
+    expect(historyMock.pushState).toHaveBeenCalledWith(
+      null,
+      '',
+      '/representants?relationStatus=AMBASSADEUR',
+    );
   });
 
   it('relit le choix depuis l’URL', async () => {
@@ -141,7 +143,7 @@ describe('RepresentantsFiltersBar, état de la relation', () => {
 
     await choose('Relation', 'Tous');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/representants');
   });
 });
 
@@ -157,9 +159,7 @@ describe('RepresentantsFiltersBar, tri par priorité de traitement', () => {
     await openAdvanced();
     await choose('Trier par', 'Priorité de traitement');
 
-    expect(routerMock.push).toHaveBeenCalledWith('/representants?sortBy=priorite', {
-      scroll: false,
-    });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/representants?sortBy=priorite');
   });
 
   it('relit le choix depuis l’URL', () => {

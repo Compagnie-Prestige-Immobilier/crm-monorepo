@@ -9,6 +9,11 @@ export const routerMock = {
   prefetch: vi.fn(),
 };
 
+export const historyMock = {
+  pushState: vi.fn<History['pushState']>(),
+  replaceState: vi.fn<History['replaceState']>(),
+};
+
 let pathname = '/';
 let searchParams = new URLSearchParams();
 
@@ -28,5 +33,10 @@ export function resetRouterMock(): void {
   routerMock.back.mockClear();
   routerMock.forward.mockClear();
   routerMock.prefetch.mockClear();
+  historyMock.pushState.mockClear();
+  historyMock.replaceState.mockClear();
+  // restoreMocks détache les espions après chaque test : on les repose ici.
+  vi.spyOn(window.history, 'pushState').mockImplementation(historyMock.pushState);
+  vi.spyOn(window.history, 'replaceState').mockImplementation(historyMock.replaceState);
   setUrl('/');
 }

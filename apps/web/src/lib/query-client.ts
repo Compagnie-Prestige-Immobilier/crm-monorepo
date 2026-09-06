@@ -12,6 +12,8 @@ function makeQueryClient(): QueryClient {
         staleTime: 30_000,
         refetchOnWindowFocus: false,
         retry: 1,
+        // Hors ligne, une requête doit échouer et le dire, pas rester en pause sur un squelette.
+        networkMode: 'always',
       },
       dehydrate: {
         shouldDehydrateQuery: (query) =>

@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { GrandPublicProspectsView } from '@/components/grand-public/prospects-view';
 import type * as GrandPublicModule from '@/lib/data/grand-public';
 import { renderWithQuery } from '@/test/render-query';
-import { routerMock, setUrl } from '@/test/router-mock';
+import { historyMock, setUrl } from '@/test/router-mock';
 import type { ProspectRow } from '@/lib/types';
 
 const list = vi.hoisted(() => vi.fn());
@@ -209,9 +209,7 @@ describe('la liste', () => {
     await user.click(screen.getByRole('button', { name: 'Diaspora' }));
 
     await waitFor(() => {
-      expect(routerMock.push).toHaveBeenCalledWith('/grand-public?type=DIASPORA', {
-        scroll: false,
-      });
+      expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/grand-public?type=DIASPORA');
     });
   });
 

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type * as VisitesModule from '@/lib/data/visites';
 import { renderWithQuery } from '@/test/render-query';
-import { routerMock, setUrl } from '@/test/router-mock';
+import { historyMock, setUrl } from '@/test/router-mock';
 
 const fetchVisites = vi.hoisted(() => vi.fn());
 const fetchReferentiels = vi.hoisted(() => vi.fn());
@@ -161,7 +161,7 @@ describe('registre du jour', () => {
       .setup()
       .click(await screen.findByRole('button', { name: 'Voir tout le registre' }));
 
-    expect(routerMock.push).toHaveBeenCalledWith('/accueil?periode=tout', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/accueil?periode=tout');
   });
 
   it('prépare une impression en paysage avant d’ouvrir la boîte système', async () => {
@@ -209,7 +209,7 @@ describe('filtres du registre, dans l’adresse', () => {
     await user.click(within(filtres).getByRole('combobox', { name: /OBJET VISITE/u }));
     await user.click(await screen.findByRole('option', { name: /ACHAT TERRAIN/u }));
 
-    expect(routerMock.push).toHaveBeenCalledWith('/accueil?objetId=o-achat', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/accueil?objetId=o-achat');
   });
 
   it('porte la recherche par nom ou n° de registre dans l’URL', async () => {
@@ -223,7 +223,7 @@ describe('filtres du registre, dans l’adresse', () => {
 
     await waitFor(
       () => {
-        expect(routerMock.replace).toHaveBeenCalledWith('/accueil?search=77', { scroll: false });
+        expect(historyMock.replaceState).toHaveBeenCalledWith(null, '', '/accueil?search=77');
       },
       { timeout: 2000 },
     );
@@ -234,7 +234,7 @@ describe('filtres du registre, dans l’adresse', () => {
 
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Tout le registre' }));
 
-    expect(routerMock.push).toHaveBeenCalledWith('/accueil?periode=tout', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/accueil?periode=tout');
   });
 
   it('mène au-delà de la centième ligne, que la période entière dépasse', async () => {
@@ -243,7 +243,7 @@ describe('filtres du registre, dans l’adresse', () => {
 
     await userEvent.setup().click(await screen.findByRole('button', { name: 'Page suivante' }));
 
-    expect(routerMock.push).toHaveBeenCalledWith('/accueil?page=2', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/accueil?page=2');
   });
 
   // La pagination est masquée à l'impression : rien sur le papier n'indiquait
@@ -319,7 +319,7 @@ describe('filtres avancés du registre', () => {
     });
     await user.click(puce);
 
-    expect(routerMock.push).toHaveBeenCalledWith('/accueil', { scroll: false });
+    expect(historyMock.pushState).toHaveBeenCalledWith(null, '', '/accueil');
   });
 });
 
@@ -332,9 +332,11 @@ describe('tri des colonnes du registre', () => {
     const bouton = within(entete).getByRole('button');
 
     await userEvent.setup().click(bouton);
-    expect(routerMock.push).toHaveBeenLastCalledWith('/accueil?sortBy=visitorName&sortDir=asc', {
-      scroll: false,
-    });
+    expect(historyMock.pushState).toHaveBeenLastCalledWith(
+      null,
+      '',
+      '/accueil?sortBy=visitorName&sortDir=asc',
+    );
   });
 });
 
@@ -359,7 +361,7 @@ describe('correction d’une ligne', () => {
         expect.objectContaining({ visitorName: 'Awa Ndiaye Sow' }),
       );
     });
-    expect(routerMock.push).not.toHaveBeenCalled();
+    expect(historyMock.pushState).not.toHaveBeenCalled();
   });
 
   it('referme la correction sans rien changer quand elle annule', async () => {
