@@ -137,16 +137,22 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
+function filtresLabel(activeCount: number): string {
+  return activeCount > 0 ? `Filtres (${String(activeCount)})` : 'Filtres';
+}
+
 export function GrandPublicProspectsView({
   canCreate,
-  canExport = false,
-  campaignScoped = false,
+  canExport,
+  campaignScoped,
 }: {
   canCreate: boolean;
   canExport?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {
+  const canExporter = Boolean(canExport);
+  const scopedParCampagnes = Boolean(campaignScoped);
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
   const telechargement = useFileDownload();
 
@@ -197,7 +203,7 @@ export function GrandPublicProspectsView({
             <ClockIcon aria-hidden="true" />
             Voir les rappels
           </Link>
-          {canExport ? (
+          {canExporter ? (
             <Button
               variant="outline"
               size="lg"
@@ -256,7 +262,7 @@ export function GrandPublicProspectsView({
             }}
           >
             <SlidersHorizontalIcon aria-hidden="true" />
-            Filtres{activeCount > 0 ? ` (${String(activeCount)})` : ''}
+            {filtresLabel(activeCount)}
             <ChevronDownIcon
               aria-hidden="true"
               className={cn('transition-transform', filtersOpen && 'rotate-180')}
@@ -340,7 +346,7 @@ export function GrandPublicProspectsView({
         setFilters={setFilters}
         hasFilters={activeCount > 0}
         canCreate={canCreate}
-        campaignScoped={campaignScoped}
+        campaignScoped={scopedParCampagnes}
         onCreate={() => setCreateOpen(true)}
       />
 
