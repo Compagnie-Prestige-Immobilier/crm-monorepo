@@ -621,11 +621,13 @@ export class SyncService {
           visitorName: data.visitorName,
           entrepriseId: data.entrepriseId,
           objetId: data.objetId,
-          ...(data.visitTime === undefined ? {} : { time: data.visitTime }),
-          ...(data.phone === undefined ? {} : { phone: data.phone }),
-          ...(data.directionId === undefined ? {} : { directionId: data.directionId }),
-          ...(data.destinataireId === undefined ? {} : { destinataireId: data.destinataireId }),
-          ...(data.comment === undefined ? {} : { comment: data.comment }),
+          ...definedValues({
+            time: data.visitTime,
+            phone: data.phone,
+            directionId: data.directionId,
+            destinataireId: data.destinataireId,
+            comment: data.comment,
+          }),
         },
         user.id,
       );
