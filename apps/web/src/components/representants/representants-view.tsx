@@ -71,6 +71,32 @@ function pagination(
   };
 }
 
+function ambassadorCountDe(
+  filters: RepresentantFilters,
+  ambassadors: { total: number } | undefined,
+): number | null {
+  if (filters.relationStatus === 'AMBASSADEUR') return null;
+  return ambassadors?.total ?? null;
+}
+
+function libelleResultats(
+  total: number,
+  first: number,
+  last: number,
+  ambassadorCount: number | null,
+): string {
+  if (total === 0) return 'Aucun résultat';
+  const base = `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`;
+  if (ambassadorCount === null) return base;
+  return `${base}, dont ${formatNumber(ambassadorCount)} qui ont accepté`;
+}
+
+function representantEnEdition(
+  editing: { representant: RepresentantRow | null } | null,
+): RepresentantRow | null {
+  return editing?.representant ?? null;
+}
+
 function messageVide(
   activeFilterCount: number,
   campaignScoped: boolean,
@@ -163,6 +189,76 @@ function MenuExport({
   );
 }
 
+function PiedTableau({
+  isPending,
+  isError,
+  total,
+  first,
+  last,
+  ambassadorCount,
+  page,
+  pageCount,
+  onPageChange,
+}: {
+  isPending: boolean;
+  isError: boolean;
+  total: number;
+  first: number;
+  last: number;
+  ambassadorCount: number | null;
+  page: number;
+  pageCount: number;
+  onPageChange: (page: number) => void;
+}) {
+  if (isPending || isError) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {/*
+          L'intitulé est DONNÉ EN TEXTE (`sr-only`), pas en `aria-label` :
+          `aria-label` est interdit sur un `<p>` (rôle `paragraph`, liste « name
+          prohibited » d'ARIA 1.2), et là où un lecteur d'écran l'honore quand
+          même, le nom REMPLACE le contenu annoncé : l'utilisateur entendrait
+          l'intitulé au lieu du décompte. Le préfixe suffit à distinguer cette
+          région de celle du Toaster. `role="status"` implique déjà
+          `aria-live="polite"`.
+        */}
+      <p className="text-[0.8125rem] text-muted-foreground" role="status">
+        <span className="sr-only">Représentants affichés&nbsp;: </span>
+        {libelleResultats(total, first, last, ambassadorCount)}
+      </p>
+
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page précédente"
+          disabled={page <= 1}
+          onClick={() => {
+            onPageChange(page - 1);
+          }}
+        >
+          <ChevronLeftIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+          {page} / {pageCount}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page suivante"
+          disabled={page >= pageCount}
+          onClick={() => {
+            onPageChange(page + 1);
+          }}
+        >
+          <ChevronRightIcon className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function RepresentantsView({
   canAdminister,
   readOnly = false,
@@ -197,8 +293,7 @@ export function RepresentantsView({
     queryFn: () => fetchRepresentants(ambassadorFilters),
     placeholderData: (previous) => previous,
   });
-  const ambassadorCount =
-    filters.relationStatus === 'AMBASSADEUR' ? null : (ambassadors.data?.total ?? null);
+  const ambassadorCount = ambassadorCountDe(filters, ambassadors.data);
 
   const { total, page, pageCount, first, last } = pagination(data, filters.pageSize);
   const activeFilterCount = countActiveRepresentantFilters(filters);
@@ -389,63 +484,26 @@ export function RepresentantsView({
         d'erreur, qu'elle contredisait. La pagination affichait « 1 / 1 » dans
         les deux cas.
       */}
-      {isPending || isError ? null : (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          {/*
-          L'intitulé est DONNÉ EN TEXTE (`sr-only`), pas en `aria-label` :
-          `aria-label` est interdit sur un `<p>` (rôle `paragraph`, liste « name
-          prohibited » d'ARIA 1.2), et là où un lecteur d'écran l'honore quand
-          même, le nom REMPLACE le contenu annoncé : l'utilisateur entendrait
-          l'intitulé au lieu du décompte. Le préfixe suffit à distinguer cette
-          région de celle du Toaster. `role="status"` implique déjà
-          `aria-live="polite"`.
-        */}
-          <p className="text-[0.8125rem] text-muted-foreground" role="status">
-            <span className="sr-only">Représentants affichés&nbsp;: </span>
-            {total === 0
-              ? 'Aucun résultat'
-              : `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`}
-            {total === 0 || ambassadorCount === null
-              ? ''
-              : `, dont ${formatNumber(ambassadorCount)} qui ont accepté`}
-          </p>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page précédente"
-              disabled={page <= 1}
-              onClick={() => {
-                setFilters({ page: page - 1 });
-              }}
-            >
-              <ChevronLeftIcon className="size-4" aria-hidden="true" />
-            </Button>
-            <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-              {page} / {pageCount}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page suivante"
-              disabled={page >= pageCount}
-              onClick={() => {
-                setFilters({ page: page + 1 });
-              }}
-            >
-              <ChevronRightIcon className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <PiedTableau
+        isPending={isPending}
+        isError={isError}
+        total={total}
+        first={first}
+        last={last}
+        ambassadorCount={ambassadorCount}
+        page={page}
+        pageCount={pageCount}
+        onPageChange={(nextPage) => {
+          setFilters({ page: nextPage });
+        }}
+      />
 
       <RepresentantFormDialog
         open={editing !== null}
         onOpenChange={(open) => {
           if (!open) setEditing(null);
         }}
-        representant={editing?.representant ?? null}
+        representant={representantEnEdition(editing)}
       />
     </div>
   );
