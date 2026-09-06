@@ -45,25 +45,29 @@ const DUMP_CLOCK_SKEW_TOLERANCE_MS = 5 * 60 * 1_000;
 export const isInFlight = (status: DumpStatus): boolean =>
   status === 'queued' || status === 'running';
 
+// Échéance absente ou illisible: détruire. Garder un exemplaire de la base
+// à tort coûte plus cher qu'un export à relancer.
+function readyStatus(job: DumpJob, now: Date): DumpStatus {
+  const expiresAt = job.expiresAt === null ? Number.NaN : Date.parse(job.expiresAt);
+  if (!Number.isFinite(expiresAt) || expiresAt <= now.getTime()) return 'expired';
+  return 'ready';
+}
+
+// Un `queued` n'a pas encore de `startedAt`, et c'est lui qu'il ne faut pas
+// laisser passer à travers la borne.
+function inFlightStatus(job: DumpJob, now: Date): DumpStatus {
+  const since = Date.parse(job.startedAt ?? job.requestedAt);
+  if (!Number.isFinite(since)) return 'failed';
+  const age = now.getTime() - since;
+  if (age > DUMP_MAX_RUNTIME_MS) return 'failed';
+  if (age < -DUMP_CLOCK_SKEW_TOLERANCE_MS) return 'failed';
+  return job.status;
+}
+
 /** Dit l'état réel horloge en main; la destruction du fichier revient à l'appelant. */
 export function effectiveStatus(job: DumpJob, now: Date): DumpStatus {
-  if (job.status === 'ready') {
-    // Échéance absente ou illisible: détruire. Garder un exemplaire de la base
-    // à tort coûte plus cher qu'un export à relancer.
-    const expiresAt = job.expiresAt === null ? Number.NaN : Date.parse(job.expiresAt);
-    if (!Number.isFinite(expiresAt) || expiresAt <= now.getTime()) return 'expired';
-    return 'ready';
-  }
-  if (isInFlight(job.status)) {
-    // Un `queued` n'a pas encore de `startedAt`, et c'est lui qu'il ne faut pas
-    // laisser passer à travers la borne.
-    const since = Date.parse(job.startedAt ?? job.requestedAt);
-    if (!Number.isFinite(since)) return 'failed';
-
-    const age = now.getTime() - since;
-    if (age > DUMP_MAX_RUNTIME_MS) return 'failed';
-    if (age < -DUMP_CLOCK_SKEW_TOLERANCE_MS) return 'failed';
-  }
+  if (job.status === 'ready') return readyStatus(job, now);
+  if (isInFlight(job.status)) return inFlightStatus(job, now);
   return job.status;
 }
 
