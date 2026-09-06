@@ -288,6 +288,12 @@ const colorLabel = (color: string): string =>
 const isKnownColor = (color: string | null): color is CallOutcomeColor =>
   color !== null && (CALL_OUTCOME_COLORS as readonly string[]).includes(color);
 
+const isLocked = (reason: CallOutcomeReason | undefined): boolean => reason?.isSystem ?? false;
+
+function errorMessage(error?: { message?: string }): string | undefined {
+  return error?.message;
+}
+
 function ReasonFormDialog({
   open,
   onOpenChange,
@@ -301,7 +307,7 @@ function ReasonFormDialog({
 }) {
   const queryClient = useQueryClient();
   const isEdit = reason !== undefined;
-  const locked = reason?.isSystem ?? false;
+  const locked = isLocked(reason);
 
   const { register, handleSubmit, reset, watch, setValue, formState } = useForm<ReasonFormValues>({
     defaultValues: EMPTY,
@@ -395,7 +401,7 @@ function ReasonFormDialog({
               label="Code"
               required
               description="Majuscules, chiffres et tirets bas. Définitif."
-              error={formState.errors.code?.message}
+              error={errorMessage(formState.errors.code)}
             >
               {(props) => (
                 <Input
@@ -413,7 +419,7 @@ function ReasonFormDialog({
             </Field>
           )}
 
-          <Field label="Libellé" required error={formState.errors.label?.message}>
+          <Field label="Libellé" required error={errorMessage(formState.errors.label)}>
             {(props) => (
               <Input
                 {...props}
@@ -501,7 +507,7 @@ function ReasonFormDialog({
             )}
           </Field>
 
-          <Field label="Ordre d’affichage" required error={formState.errors.sortOrder?.message}>
+          <Field label="Ordre d’affichage" required error={errorMessage(formState.errors.sortOrder)}>
             {(props) => (
               <Input
                 {...props}
