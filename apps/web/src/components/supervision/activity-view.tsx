@@ -76,6 +76,7 @@ import {
   type ActivityLine,
   type ActivityRange,
   type ActivitySortKey,
+  type BucketTotals,
   type PeriodPreset,
   type SortDirection,
   type SupervisionGranularity,
@@ -143,127 +144,36 @@ export function ActivityView({ projet }: { projet: Projet }) {
     setSortDir(key === 'name' ? 'asc' : 'desc');
   }
 
+  function selectCustomPreset(): void {
+    setPreset('custom');
+  }
+
+  function handleExport(): void {
+    if (data === undefined) return;
+    const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
+    downloadCsv(
+      activityCsv({ lines, totals: activityTotals(lines), range, granularity, projet, famille }),
+      activityCsvFileName(range, projet, famille),
+    );
+  }
+
   const hasData = data !== undefined;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {PRESETS.map((value) => (
-          <Button
-            key={value}
-            variant={preset === value ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={preset === value}
-            onClick={() => {
-              selectPreset(value);
-            }}
-          >
-            {PERIOD_LABELS[value]}
-          </Button>
-        ))}
-        <Button
-          variant={preset === 'custom' ? 'default' : 'outline'}
-          size="sm"
-          aria-pressed={preset === 'custom'}
-          onClick={() => {
-            setPreset('custom');
-          }}
-        >
-          {PERIOD_LABELS.custom}
-        </Button>
-
-        <span className="ml-auto flex items-center gap-2">
-          {familles.length > 1 ? (
-            <span className="inline-flex overflow-hidden rounded-md border border-border">
-              {familles.map((value) => (
-                <Button
-                  key={value}
-                  variant={famille === value ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none"
-                  aria-pressed={famille === value}
-                  onClick={() => {
-                    selectFamille(value);
-                  }}
-                >
-                  {FAMILLE_LABELS[value]}
-                </Button>
-              ))}
-            </span>
-          ) : null}
-          <span className="inline-flex overflow-hidden rounded-md border border-border">
-            <Button
-              variant={granularity === 'day' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none"
-              aria-pressed={granularity === 'day'}
-              onClick={() => {
-                setGranularity('day');
-              }}
-            >
-              Par jour
-            </Button>
-            <Button
-              variant={granularity === 'week' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none"
-              aria-pressed={granularity === 'week'}
-              onClick={() => {
-                setGranularity('week');
-              }}
-            >
-              Par semaine
-            </Button>
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!hasData}
-            onClick={() => {
-              if (data === undefined) return;
-              const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
-              downloadCsv(
-                activityCsv({
-                  lines,
-                  totals: activityTotals(lines),
-                  range,
-                  granularity,
-                  projet,
-                  famille,
-                }),
-                activityCsvFileName(range, projet, famille),
-              );
-            }}
-          >
-            <DownloadIcon aria-hidden="true" />
-            Exporter en CSV
-          </Button>
-        </span>
-      </div>
-
-      {preset === 'custom' ? (
-        <div className="flex flex-wrap items-end gap-3">
-          <DatePicker
-            id="activite-du"
-            label="Du"
-            value={range.from}
-            max={range.to}
-            onChange={(from) => {
-              setRange({ from: from ?? dakarToday(), to: range.to });
-            }}
-          />
-          <DatePicker
-            id="activite-au"
-            label="Au"
-            value={range.to}
-            min={range.from}
-            onChange={(to) => {
-              setRange({ from: range.from, to: to ?? dakarToday() });
-            }}
-          />
-        </div>
-      ) : null}
-    </div>
+    <ActivityToolbar
+      familles={familles}
+      famille={famille}
+      onSelectFamille={selectFamille}
+      preset={preset}
+      onSelectPreset={selectPreset}
+      onSelectCustomPreset={selectCustomPreset}
+      granularity={granularity}
+      onGranularityChange={setGranularity}
+      hasData={hasData}
+      onExport={handleExport}
+      range={range}
+      onRangeChange={setRange}
+    />
   );
 
   if (shouldShowError({ isError, hasData })) {
@@ -320,65 +230,15 @@ export function ActivityView({ projet }: { projet: Projet }) {
         })}
       </div>
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead aria-sort={ariaSort(sortKey === 'name', sortDir)}>
-                  <SortButton
-                    label="Téléconseiller"
-                    active={sortKey === 'name'}
-                    direction={sortDir}
-                    onClick={() => {
-                      toggleSort('name');
-                    }}
-                  />
-                </TableHead>
-                {colonnes.map((column) => (
-                  <TableHead
-                    key={column.key}
-                    className="text-right"
-                    aria-sort={ariaSort(sortKey === column.key, sortDir)}
-                  >
-                    <SortButton
-                      label={column.label}
-                      active={sortKey === column.key}
-                      direction={sortDir}
-                      onClick={() => {
-                        toggleSort(column.key);
-                      }}
-                    />
-                  </TableHead>
-                ))}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((line) => (
-                <ActivityRow key={line.id} line={line} colonnes={colonnes} />
-              ))}
-              {lines.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={colonnes.length + 1} className="py-8 text-center">
-                    Aucun compte téléconseiller. Créez-en un depuis les comptes.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-            {lines.length > 0 ? (
-              <TableFooter>
-                <TotalsRow label="Total équipe" values={totals} colonnes={colonnes} />
-                <TotalsRow
-                  label="Moyenne par téléconseiller"
-                  values={averages}
-                  colonnes={colonnes}
-                  decimal
-                />
-              </TableFooter>
-            ) : null}
-          </Table>
-        </CardContent>
-      </Card>
+      <ActivityDataTable
+        lines={lines}
+        totals={totals}
+        averages={averages}
+        colonnes={colonnes}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onToggleSort={toggleSort}
+      />
 
       <p className="text-[0.8125rem] text-muted-foreground">
         Chaque colonne porte sur la date de l’acte, dans la période choisie.
@@ -390,42 +250,264 @@ export function ActivityView({ projet }: { projet: Projet }) {
 
       <ScoreSection scores={data.scores} />
 
-      {buckets.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
-                {granularity === 'week' ? 'Équipe, par semaine' : 'Équipe, par jour'}
-              </caption>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{granularity === 'week' ? 'Semaine' : 'Jour'}</TableHead>
-                  {colonnes.map((colonne) => (
-                    <TableHead key={colonne.key} className="text-right">
-                      {colonne.label}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {buckets.map((bucket) => (
-                  <TableRow key={bucket.bucket}>
-                    <TableCell className="font-[600]">
-                      {granularity === 'week'
-                        ? `Semaine du ${formatShortDate(bucket.bucket)}`
-                        : formatShortDate(bucket.bucket)}
-                    </TableCell>
-                    {colonnes.map((colonne) => (
-                      <Cellule key={colonne.key} colonne={colonne} valeur={bucket[colonne.key]} />
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+      <BucketsSection buckets={buckets} colonnes={colonnes} granularity={granularity} />
+    </div>
+  );
+}
+
+function ActivityToolbar({
+  familles,
+  famille,
+  onSelectFamille,
+  preset,
+  onSelectPreset,
+  onSelectCustomPreset,
+  granularity,
+  onGranularityChange,
+  hasData,
+  onExport,
+  range,
+  onRangeChange,
+}: {
+  familles: ActivityFamille[];
+  famille: ActivityFamille;
+  onSelectFamille: (value: ActivityFamille) => void;
+  preset: PeriodPreset;
+  onSelectPreset: (value: Exclude<PeriodPreset, 'custom'>) => void;
+  onSelectCustomPreset: () => void;
+  granularity: SupervisionGranularity;
+  onGranularityChange: (value: SupervisionGranularity) => void;
+  hasData: boolean;
+  onExport: () => void;
+  range: ActivityRange;
+  onRangeChange: (range: ActivityRange) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map((value) => (
+          <Button
+            key={value}
+            variant={preset === value ? 'default' : 'outline'}
+            size="sm"
+            aria-pressed={preset === value}
+            onClick={() => {
+              onSelectPreset(value);
+            }}
+          >
+            {PERIOD_LABELS[value]}
+          </Button>
+        ))}
+        <Button
+          variant={preset === 'custom' ? 'default' : 'outline'}
+          size="sm"
+          aria-pressed={preset === 'custom'}
+          onClick={onSelectCustomPreset}
+        >
+          {PERIOD_LABELS.custom}
+        </Button>
+
+        <span className="ml-auto flex items-center gap-2">
+          {familles.length > 1 ? (
+            <span className="inline-flex overflow-hidden rounded-md border border-border">
+              {familles.map((value) => (
+                <Button
+                  key={value}
+                  variant={famille === value ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-none"
+                  aria-pressed={famille === value}
+                  onClick={() => {
+                    onSelectFamille(value);
+                  }}
+                >
+                  {FAMILLE_LABELS[value]}
+                </Button>
+              ))}
+            </span>
+          ) : null}
+          <span className="inline-flex overflow-hidden rounded-md border border-border">
+            <Button
+              variant={granularity === 'day' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              aria-pressed={granularity === 'day'}
+              onClick={() => {
+                onGranularityChange('day');
+              }}
+            >
+              Par jour
+            </Button>
+            <Button
+              variant={granularity === 'week' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              aria-pressed={granularity === 'week'}
+              onClick={() => {
+                onGranularityChange('week');
+              }}
+            >
+              Par semaine
+            </Button>
+          </span>
+          <Button variant="outline" size="sm" disabled={!hasData} onClick={onExport}>
+            <DownloadIcon aria-hidden="true" />
+            Exporter en CSV
+          </Button>
+        </span>
+      </div>
+
+      {preset === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <DatePicker
+            id="activite-du"
+            label="Du"
+            value={range.from}
+            max={range.to}
+            onChange={(from) => {
+              onRangeChange({ from: from ?? dakarToday(), to: range.to });
+            }}
+          />
+          <DatePicker
+            id="activite-au"
+            label="Au"
+            value={range.to}
+            min={range.from}
+            onChange={(to) => {
+              onRangeChange({ from: range.from, to: to ?? dakarToday() });
+            }}
+          />
+        </div>
       ) : null}
     </div>
+  );
+}
+
+function ActivityDataTable({
+  lines,
+  totals,
+  averages,
+  colonnes,
+  sortKey,
+  sortDir,
+  onToggleSort,
+}: {
+  lines: ActivityLine[];
+  totals: ActivityCounts;
+  averages: ActivityCounts;
+  colonnes: ActivityColumn[];
+  sortKey: ActivitySortKey;
+  sortDir: SortDirection;
+  onToggleSort: (key: ActivitySortKey) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead aria-sort={ariaSort(sortKey === 'name', sortDir)}>
+                <SortButton
+                  label="Téléconseiller"
+                  active={sortKey === 'name'}
+                  direction={sortDir}
+                  onClick={() => {
+                    onToggleSort('name');
+                  }}
+                />
+              </TableHead>
+              {colonnes.map((column) => (
+                <TableHead
+                  key={column.key}
+                  className="text-right"
+                  aria-sort={ariaSort(sortKey === column.key, sortDir)}
+                >
+                  <SortButton
+                    label={column.label}
+                    active={sortKey === column.key}
+                    direction={sortDir}
+                    onClick={() => {
+                      onToggleSort(column.key);
+                    }}
+                  />
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((line) => (
+              <ActivityRow key={line.id} line={line} colonnes={colonnes} />
+            ))}
+            {lines.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={colonnes.length + 1} className="py-8 text-center">
+                  Aucun compte téléconseiller. Créez-en un depuis les comptes.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+          {lines.length > 0 ? (
+            <TableFooter>
+              <TotalsRow label="Total équipe" values={totals} colonnes={colonnes} />
+              <TotalsRow
+                label="Moyenne par téléconseiller"
+                values={averages}
+                colonnes={colonnes}
+                decimal
+              />
+            </TableFooter>
+          ) : null}
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BucketsSection({
+  buckets,
+  colonnes,
+  granularity,
+}: {
+  buckets: BucketTotals[];
+  colonnes: ActivityColumn[];
+  granularity: SupervisionGranularity;
+}) {
+  if (buckets.length === 0) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+            {granularity === 'week' ? 'Équipe, par semaine' : 'Équipe, par jour'}
+          </caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{granularity === 'week' ? 'Semaine' : 'Jour'}</TableHead>
+              {colonnes.map((colonne) => (
+                <TableHead key={colonne.key} className="text-right">
+                  {colonne.label}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {buckets.map((bucket) => (
+              <TableRow key={bucket.bucket}>
+                <TableCell className="font-[600]">
+                  {granularity === 'week'
+                    ? `Semaine du ${formatShortDate(bucket.bucket)}`
+                    : formatShortDate(bucket.bucket)}
+                </TableCell>
+                {colonnes.map((colonne) => (
+                  <Cellule key={colonne.key} colonne={colonne} valeur={bucket[colonne.key]} />
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
