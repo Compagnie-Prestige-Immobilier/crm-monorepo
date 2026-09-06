@@ -155,6 +155,38 @@ interface DeliveryRowSeed {
   readonly userId: string;
 }
 
+function buildCreateData(
+  user: AuthenticatedUser,
+  body: CreateNotificationDto,
+  scheduledFor: Date | null,
+  recipients: readonly DeliveryRowSeed[],
+): Prisma.NotificationUncheckedCreateInput {
+  return {
+    title: body.title,
+    body: body.body,
+    category: body.category ?? NotificationCategory.ANNONCE,
+    route: body.route ?? null,
+    audience: body.audience,
+    audienceRole: body.audienceRole ?? null,
+    audienceUserIds:
+      body.audience === NotificationAudience.USERS ? dedupe(body.audienceUserIds ?? []) : [],
+    status: scheduledFor ? NotificationStatus.SCHEDULED : NotificationStatus.SENDING,
+    scheduledFor,
+    templateId: body.templateId ?? null,
+    createdById: user.id,
+    deliveries: {
+      createMany: {
+        data: recipients.map(
+          (recipient): Prisma.NotificationDeliveryCreateManyNotificationInput => ({
+            userId: recipient.userId,
+            status: NotificationDeliveryStatus.PENDING,
+          }),
+        ),
+      },
+    },
+  };
+}
+
 /** Une livraison encore en file, avec de quoi la servir puis l'écrire. */
 interface PendingDelivery {
   readonly id: string;
@@ -196,6 +228,16 @@ function verdictFor(
     : { kind: 'retry', error: DELIVERY_RETRY_ERROR };
 }
 
+/**
+ * `TRANSPORT_ERROR` ne se dit que si RIEN n'est passé. Une vague refusée
+ * derrière une vague acceptée décrit une panne partielle : l'annoncer comme
+ * une panne de transport ferait croire que la clé est en cause, alors que des
+ * e-mails sont bel et bien partis.
+ */
+function transportStatusAfterSend(refused: boolean, acceptedCount: number): BrevoTransportStatus {
+  return refused && acceptedCount === 0 ? 'TRANSPORT_ERROR' : 'SENT';
+}
+
 function waveVerdicts(
   result: BrevoDispatchResult,
   wave: readonly EmailJob[],
@@ -204,12 +246,10 @@ function waveVerdicts(
   const byEmail = new Map(result.outcomes.map((outcome) => [outcome.email, outcome]));
   const verdicts = new Map<string, DeliveryVerdict>();
   const refused = result.status === 'TRANSPORT_ERROR';
-  for (const job of wave) {
-    for (const row of job.rows) {
-      const outcome = byEmail.get(row.email);
-      if (outcome?.ok) accepted.add(row.id);
-      verdicts.set(row.id, verdictFor(outcome, refused));
-    }
+  for (const row of wave.flatMap((job) => job.rows)) {
+    const outcome = byEmail.get(row.email);
+    if (outcome?.ok) accepted.add(row.id);
+    verdicts.set(row.id, verdictFor(outcome, refused));
   }
   return verdicts;
 }
@@ -234,6 +274,44 @@ function countDelivery(
   else if (verdict.kind === 'retry') bucket.pending += 1;
   else bucket.failed += 1;
   return false;
+}
+
+/** Compte chaque livraison servie et rend celles laissées à la seule boîte interne. */
+function applyDeliveryCounters(
+  served: readonly PendingDelivery[],
+  email: EmailLegResult,
+  counters: Map<string, DeliveryCounters>,
+  emailed: Map<string, number>,
+): string[] {
+  const inboxOnly: string[] = [];
+  for (const delivery of served) {
+    if (countDelivery(delivery, email, counters, emailed)) inboxOnly.push(delivery.id);
+  }
+  return inboxOnly;
+}
+
+function totalPending(counters: ReadonlyMap<string, DeliveryCounters>): number {
+  let outstanding = 0;
+  for (const bucket of counters.values()) outstanding += bucket.pending;
+  return outstanding;
+}
+
+function buildDispatchSummaries(
+  live: readonly DispatchRow[],
+  counters: ReadonlyMap<string, DeliveryCounters>,
+  emailed: ReadonlyMap<string, number>,
+  email: EmailLegResult,
+  summaries: Map<string, DispatchSummary>,
+): void {
+  for (const row of live) {
+    const bucket = counters.get(row.id) ?? { sent: 0, failed: 0, pending: 0 };
+    summaries.set(row.id, {
+      claimed: true,
+      ...bucket,
+      emailed: emailed.get(row.id) ?? 0,
+      emailStatus: email.status,
+    });
+  }
 }
 
 /**
@@ -306,11 +384,7 @@ export class NotificationsService {
    * ignore, donc une question « qui a reçu ? » sans réponse.
    */
   async create(user: AuthenticatedUser, body: CreateNotificationDto): Promise<NotificationDto> {
-    if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
-
-    const now = new Date();
-    const scheduledFor = body.scheduledFor ? new Date(body.scheduledFor) : null;
-    if (scheduledFor && scheduledFor.getTime() <= now.getTime()) throw scheduleInPast();
+    const scheduledFor = this.validateSchedule(body, new Date());
 
     const recipients = await this.resolveRecipients({
       audience: body.audience,
@@ -320,36 +394,21 @@ export class NotificationsService {
     if (!recipients.length) throw audienceEmpty();
 
     const created = await this.prisma.notification.create({
-      data: {
-        title: body.title,
-        body: body.body,
-        category: body.category ?? NotificationCategory.ANNONCE,
-        route: body.route ?? null,
-        audience: body.audience,
-        audienceRole: body.audienceRole ?? null,
-        audienceUserIds:
-          body.audience === NotificationAudience.USERS ? dedupe(body.audienceUserIds ?? []) : [],
-        status: scheduledFor ? NotificationStatus.SCHEDULED : NotificationStatus.SENDING,
-        scheduledFor,
-        templateId: body.templateId ?? null,
-        createdById: user.id,
-        deliveries: {
-          createMany: {
-            data: recipients.map(
-              (recipient): Prisma.NotificationDeliveryCreateManyNotificationInput => ({
-                userId: recipient.userId,
-                status: NotificationDeliveryStatus.PENDING,
-              }),
-            ),
-          },
-        },
-      },
+      data: buildCreateData(user, body, scheduledFor, recipients),
       select: NOTIFICATION_SELECT,
     });
 
     if (!scheduledFor) await this.dispatch(created.id);
 
     return this.get(created.id).then((detail) => detail.notification);
+  }
+
+  /** Route et programmation, seules validations avant composition. */
+  private validateSchedule(body: CreateNotificationDto, now: Date): Date | null {
+    if (body.route !== undefined && !ROUTE_PATTERN.test(body.route)) throw routeInvalid();
+    const scheduledFor = body.scheduledFor ? new Date(body.scheduledFor) : null;
+    if (scheduledFor && scheduledFor.getTime() <= now.getTime()) throw scheduleInPast();
+    return scheduledFor;
   }
 
   /**
@@ -465,15 +524,7 @@ export class NotificationsService {
       select: DISPATCH_SELECT,
     });
 
-    const held: DispatchRow[] = [];
-    for (const row of rows) {
-      if (row.status === NotificationStatus.SENDING && row.dispatchClaim === attempt.token) {
-        held.push(row);
-        continue;
-      }
-      summaries.set(row.id, NOT_CLAIMED);
-      this.logger.debug(`Notification ${row.id} : envoi non réclamé (état ${row.status}).`);
-    }
+    const held = this.partitionHeld(rows, attempt, summaries);
     if (!held.length) return summaries;
 
     // LECTURE GLOBALE délibérée : l'expédition doit servir TOUTES les
@@ -519,11 +570,7 @@ export class NotificationsService {
       live.map((row) => [row.id, { sent: 0, failed: 0, pending: 0 }]),
     );
     const emailed = new Map(live.map((row) => [row.id, 0]));
-    const inboxOnly: string[] = [];
-
-    for (const delivery of served) {
-      if (countDelivery(delivery, email, counters, emailed)) inboxOnly.push(delivery.id);
-    }
+    const inboxOnly = applyDeliveryCounters(served, email, counters, emailed);
 
     // LE MARQUEUR DÉCRIT LE DESTINATAIRE, il ne dépend donc plus de l'état du
     // transport : `emailable` vient de la base, pas de la clé Brevo. Il est
@@ -536,20 +583,31 @@ export class NotificationsService {
       });
     }
 
-    let outstanding = 0;
-    for (const bucket of counters.values()) outstanding += bucket.pending;
+    const outstanding = totalPending(counters);
     await this.settleNotifications(claim, email.status, outstanding, now);
 
-    for (const row of live) {
-      const bucket = counters.get(row.id) ?? { sent: 0, failed: 0, pending: 0 };
-      summaries.set(row.id, {
-        claimed: true,
-        ...bucket,
-        emailed: emailed.get(row.id) ?? 0,
-        emailStatus: email.status,
-      });
-    }
+    buildDispatchSummaries(live, counters, emailed, email, summaries);
     return summaries;
+  }
+
+  /** Sépare ce qui reste tenu par CE bail de ce que quelqu'un d'autre détient déjà. */
+  private partitionHeld(
+    rows: readonly DispatchRow[],
+    attempt: DispatchClaim,
+    summaries: Map<string, DispatchSummary>,
+  ): DispatchRow[] {
+    const held: DispatchRow[] = [];
+    for (const row of rows) {
+      const isHeldByThisAttempt =
+        row.status === NotificationStatus.SENDING && row.dispatchClaim === attempt.token;
+      if (isHeldByThisAttempt) {
+        held.push(row);
+        continue;
+      }
+      summaries.set(row.id, NOT_CLAIMED);
+      this.logger.debug(`Notification ${row.id} : envoi non réclamé (état ${row.status}).`);
+    }
+    return held;
   }
 
   /** L'envoi a-t-il dépassé le délai que la plateforme s'accorde ? */
@@ -657,56 +715,24 @@ export class NotificationsService {
      * ne revient JAMAIS. Une fois les comptes lus, elle se resserre sur les
      * seules livraisons réellement visées.
      */
-    let candidates: readonly PendingDelivery[] = deliveries;
-
     /**
-     * Qui est servi par e-mail. `null` tant que la base n'a pas répondu.
+     * Population du rattrapage, VALABLE DÈS LA PREMIÈRE LIGNE DU `try`.
      *
-     * Voir `EmailLegResult.emailable` : tant qu'il vaut `null`, `dispatchMany()`
-     * n'estampille personne « boîte de réception seule ».
+     * Elle vaut d'abord toutes les livraisons visées, faute de savoir qui est
+     * réellement servi par e-mail : cette réponse-là est précisément ce que la
+     * lecture des comptes devait apporter. Une fois les comptes lus, elle se
+     * resserre sur les seules livraisons réellement visées. Voir
+     * `recoverEmailFailure` pour ce que ce choix évite.
      */
+    let candidates: readonly PendingDelivery[] = deliveries;
     let emailable: Set<string> | null = null;
-
-    /** Verdicts DÉJÀ ÉCRITS en base, vague par vague. */
     const verdicts = new Map<string, DeliveryVerdict>();
     const accepted = new Set<string>();
-    let refused = false;
 
     try {
-      // ═══ LA NATURE DU DESTINATAIRE SE LIT AVANT L'ÉTAT DU TRANSPORT ═══
-      //
-      // Cette lecture précédait autrefois le contrôle `isConfigured()`, qui
-      // rendait la main sans elle. Sans clé, on ignorait donc QUI aurait dû
-      // recevoir un e-mail, et `dispatch()` estampillait tout le monde « boîte
-      // de réception seule », téléconseillers compris, avant de refermer
-      // l'envoi sur SENT. Le jour où une clé était branchée, ces e-mails-là
-      // n'existaient plus pour personne.
-      //
-      // Le rôle et l'adresse ne dépendent pas de la clé : on les lit d'abord,
-      // et une lecture par identifiants est de toute façon négligeable devant
-      // ce qu'elle évite.
-      const users = await this.prisma.user.findMany({
-        where: {
-          id: { in: [...new Set(deliveries.map((delivery) => delivery.userId))] },
-          role: Role.COMMERCIAL,
-        },
-        select: { id: true, email: true, fullName: true },
-      });
-
-      const addressed = new Map(
-        users
-          .filter((user) => user.email.trim().length > 0)
-          .map((user) => [user.id, { email: user.email.trim(), fullName: user.fullName }]),
-      );
-      emailable = new Set(addressed.keys());
-
-      const targeted = deliveries.flatMap((delivery): EmailRecipient[] => {
-        const account = addressed.get(delivery.userId);
-        return account === undefined ? [] : [{ ...delivery, ...account }];
-      });
-      // Les comptes sont connus : le rattrapage se resserre sur eux, et la
-      // nature de chaque destinataire est désormais établie.
-      candidates = targeted;
+      const targets = await this.resolveEmailTargets(deliveries);
+      emailable = targets.emailable;
+      candidates = targets.targeted;
 
       // SANS CLÉ, RIEN N'EST JUGÉ, ET RIEN N'EST ENTERRÉ. Les téléconseillers
       // restent en file sans marqueur, donc `settleNotifications` retient la
@@ -715,59 +741,109 @@ export class NotificationsService {
       if (!this.email.isConfigured())
         return { accepted, status: 'NOT_CONFIGURED', verdicts: empty, emailable };
 
-      if (!targeted.length) return { accepted, status: 'SENT', verdicts: empty, emailable };
+      if (!targets.targeted.length) return { accepted, status: 'SENT', verdicts: empty, emailable };
 
       // UNE VAGUE, PUIS SON ÉCRITURE, PUIS LA SUIVANTE. Voir
       // `EMAIL_PERSIST_GROUP_SIZE` : ce qui a été accepté par Brevo est acquis
       // en base avant qu'on n'expose la suite, faute de quoi une reprise
       // renverrait le message à des gens qui l'ont déjà reçu.
-      refused = await this.sendEmailWaves(claim, targeted, notifications, accepted, verdicts);
+      const refused = await this.sendEmailWaves(
+        claim,
+        targets.targeted,
+        notifications,
+        accepted,
+        verdicts,
+      );
 
       if (accepted.size) {
         this.logger.log(`${String(accepted.size)} e-mail(s) remis à Brevo.`);
       }
 
-      // `TRANSPORT_ERROR` ne se dit que si RIEN n'est passé. Une vague refusée
-      // derrière une vague acceptée décrit une panne partielle : l'annoncer
-      // comme une panne de transport ferait croire que la clé est en cause,
-      // alors que des e-mails sont bel et bien partis.
       return {
         accepted,
-        status: refused && accepted.size === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+        status: transportStatusAfterSend(refused, accepted.size),
         verdicts,
         emailable,
       };
     } catch (error) {
-      const detail = error instanceof Error ? error.message : String(error);
-      this.logger.warn(`Branche e-mail interrompue (${detail}). Les livraisons restent en file.`);
-
-      // SEULS LES DESTINATAIRES PAS ENCORE TRANCHÉS repartent en file. Remettre
-      // tout le monde à réessayer réécrirait en `PENDING` des lignes déjà
-      // passées à `SENT` par un groupe précédent, et le passage suivant leur
-      // renverrait l'e-mail qu'elles ont reçu.
-      //
-      // `candidates` et non `targeted` : voir sa déclaration. Avant la lecture
-      // des comptes, `targeted` est vide, et filtrer une liste vide ne rend
-      // rien à réessayer, donc rien qui retienne la notification.
-      const unresolved = retryAll(candidates.filter((row) => !verdicts.has(row.id)));
-      // L'écriture peut échouer à son tour, c'est même le cas typique quand
-      // c'est la base qui a lâché. Sans marqueur, les lignes restent `PENDING`
-      // et la notification reste prenable : la reprise est assurée par le bail,
-      // pas par ce marqueur.
-      await this.persistVerdicts(claim, unresolved).catch(() => undefined);
-      for (const [deliveryId, verdict] of unresolved) verdicts.set(deliveryId, verdict);
-
-      // MÊME RÈGLE QUE LE CHEMIN NOMINAL, et pour la même raison : annoncer
-      // une panne de transport alors que des e-mails sont partis ferait
-      // chercher du côté de la clé. L'interruption reste visible, dans le
-      // journal et dans les lignes laissées en file.
-      return {
-        accepted,
-        status: accepted.size === 0 ? 'TRANSPORT_ERROR' : 'SENT',
-        verdicts,
-        emailable,
-      };
+      return this.recoverEmailFailure(claim, error, candidates, verdicts, accepted, emailable);
     }
+  }
+
+  /**
+   * Rôle et adresse de chaque destinataire, indépendamment de la clé Brevo.
+   *
+   * ═══ LA NATURE DU DESTINATAIRE SE LIT AVANT L'ÉTAT DU TRANSPORT ═══
+   *
+   * Cette lecture précédait autrefois le contrôle `isConfigured()`, qui rendait
+   * la main sans elle. Sans clé, on ignorait donc QUI aurait dû recevoir un
+   * e-mail, et `dispatch()` estampillait tout le monde « boîte de réception
+   * seule », téléconseillers compris, avant de refermer l'envoi sur SENT. Le
+   * jour où une clé était branchée, ces e-mails-là n'existaient plus pour
+   * personne.
+   */
+  private async resolveEmailTargets(
+    deliveries: readonly PendingDelivery[],
+  ): Promise<{ readonly emailable: Set<string>; readonly targeted: EmailRecipient[] }> {
+    const users = await this.prisma.user.findMany({
+      where: {
+        id: { in: [...new Set(deliveries.map((delivery) => delivery.userId))] },
+        role: Role.COMMERCIAL,
+      },
+      select: { id: true, email: true, fullName: true },
+    });
+
+    const addressed = new Map(
+      users
+        .filter((user) => user.email.trim().length > 0)
+        .map((user) => [user.id, { email: user.email.trim(), fullName: user.fullName }]),
+    );
+
+    const targeted = deliveries.flatMap((delivery): EmailRecipient[] => {
+      const account = addressed.get(delivery.userId);
+      return account === undefined ? [] : [{ ...delivery, ...account }];
+    });
+
+    return { emailable: new Set(addressed.keys()), targeted };
+  }
+
+  /**
+   * Ce que `sendByEmail` rend quand la branche e-mail lève en cours de route.
+   *
+   * SEULS LES DESTINATAIRES PAS ENCORE TRANCHÉS repartent en file. Remettre
+   * tout le monde à réessayer réécrirait en `PENDING` des lignes déjà passées à
+   * `SENT` par un groupe précédent, et le passage suivant leur renverrait
+   * l'e-mail qu'elles ont reçu.
+   *
+   * `candidates` est déjà resserré sur les seuls comptes servis par e-mail dès
+   * que la lecture des comptes a abouti ; avant elle, il vaut toutes les
+   * livraisons visées, faute de mieux.
+   */
+  private async recoverEmailFailure(
+    claim: DispatchClaim,
+    error: unknown,
+    candidates: readonly PendingDelivery[],
+    verdicts: Map<string, DeliveryVerdict>,
+    accepted: Set<string>,
+    emailable: Set<string> | null,
+  ): Promise<EmailLegResult> {
+    const detail = error instanceof Error ? error.message : String(error);
+    this.logger.warn(`Branche e-mail interrompue (${detail}). Les livraisons restent en file.`);
+
+    const unresolved = retryAll(candidates.filter((row) => !verdicts.has(row.id)));
+    // L'écriture peut échouer à son tour, c'est même le cas typique quand c'est
+    // la base qui a lâché. Sans marqueur, les lignes restent `PENDING` et la
+    // notification reste prenable : la reprise est assurée par le bail, pas
+    // par ce marqueur.
+    await this.persistVerdicts(claim, unresolved).catch(() => undefined);
+    for (const [deliveryId, verdict] of unresolved) verdicts.set(deliveryId, verdict);
+
+    return {
+      accepted,
+      status: accepted.size === 0 ? 'TRANSPORT_ERROR' : 'SENT',
+      verdicts,
+      emailable,
+    };
   }
 
   private async sendEmailWaves(
@@ -830,22 +906,8 @@ export class NotificationsService {
   ): Promise<void> {
     if (!verdicts.size) return;
     const notificationId = { in: [...claim.notificationIds] };
-
     const now = new Date();
-    const sent: string[] = [];
-    const retry = new Map<string, string[]>();
-    const failed = new Map<string, string[]>();
-
-    for (const [deliveryId, verdict] of verdicts) {
-      if (verdict.kind === 'sent') {
-        sent.push(deliveryId);
-        continue;
-      }
-      const bucket = verdict.kind === 'retry' ? retry : failed;
-      const ids = bucket.get(verdict.error);
-      if (ids) ids.push(deliveryId);
-      else bucket.set(verdict.error, [deliveryId]);
-    }
+    const { sent, retry, failed } = classifyVerdicts(verdicts);
 
     // L'ACCEPTATION D'ABORD, avant les réessais et les échecs : c'est la seule
     // des trois écritures qu'une interruption ne pardonne pas, puisque son
@@ -1326,6 +1388,30 @@ const retryAll = (targeted: readonly { id: string }[]): ReadonlyMap<string, Deli
   return verdicts;
 };
 
+/** Répartit les verdicts d'une vague par issue, pour une écriture groupée. */
+function classifyVerdicts(verdicts: ReadonlyMap<string, DeliveryVerdict>): {
+  readonly sent: string[];
+  readonly retry: Map<string, string[]>;
+  readonly failed: Map<string, string[]>;
+} {
+  const sent: string[] = [];
+  const retry = new Map<string, string[]>();
+  const failed = new Map<string, string[]>();
+
+  for (const [deliveryId, verdict] of verdicts) {
+    if (verdict.kind === 'sent') {
+      sent.push(deliveryId);
+      continue;
+    }
+    const bucket = verdict.kind === 'retry' ? retry : failed;
+    const ids = bucket.get(verdict.error);
+    if (ids) ids.push(deliveryId);
+    else bucket.set(verdict.error, [deliveryId]);
+  }
+
+  return { sent, retry, failed };
+}
+
 /**
  * Découpe une vague en appels de transport, puis en tranches d'écriture.
  *
@@ -1337,11 +1423,17 @@ const retryAll = (targeted: readonly { id: string }[]): ReadonlyMap<string, Deli
  * Chaque tranche rendue est écrite en base avant que la suivante ne parte, voir
  * `EMAIL_PERSIST_GROUP_SIZE`.
  */
-const emailWaves = (
+interface EmailContentGroup {
+  readonly title: string;
+  readonly body: string;
+  readonly rows: EmailRecipient[];
+}
+
+function groupByContent(
   targeted: readonly EmailRecipient[],
   notifications: ReadonlyMap<string, NotificationRow>,
-): EmailJob[][] => {
-  const byContent = new Map<string, { title: string; body: string; rows: EmailRecipient[] }>();
+): Map<string, EmailContentGroup> {
+  const byContent = new Map<string, EmailContentGroup>();
   for (const row of targeted) {
     const notification = notifications.get(row.notificationId);
     if (!notification) continue;
@@ -1350,7 +1442,10 @@ const emailWaves = (
     if (bucket) bucket.rows.push(row);
     else byContent.set(key, { title: notification.title, body: notification.body, rows: [row] });
   }
+  return byContent;
+}
 
+function buildEmailJobs(byContent: ReadonlyMap<string, EmailContentGroup>): EmailJob[] {
   const jobs: EmailJob[] = [];
   for (const group of byContent.values()) {
     const content = buildEmailContent(group.title, group.body);
@@ -1358,7 +1453,10 @@ const emailWaves = (
       jobs.push({ subject: group.title, html: content.html, text: content.text, rows: chunk });
     }
   }
+  return jobs;
+}
 
+function groupIntoWaves(jobs: readonly EmailJob[]): EmailJob[][] {
   const waves: EmailJob[][] = [];
   let current: EmailJob[] = [];
   let size = 0;
@@ -1372,7 +1470,12 @@ const emailWaves = (
   }
   if (current.length) waves.push(current);
   return waves;
-};
+}
+
+const emailWaves = (
+  targeted: readonly EmailRecipient[],
+  notifications: ReadonlyMap<string, NotificationRow>,
+): EmailJob[][] => groupIntoWaves(buildEmailJobs(groupByContent(targeted, notifications)));
 
 /**
  * Enveloppe HTML de l'e-mail. Un gabarit `{{}}` et non une concaténation :
