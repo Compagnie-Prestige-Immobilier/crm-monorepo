@@ -18,6 +18,10 @@ import { matchesSearch } from '@/lib/search';
 import type { FilterOption } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
+function labelSelectionne(selected: FilterOption | undefined, placeholder: string): string {
+  return selected?.label ?? placeholder;
+}
+
 export function FilterCombobox({
   label,
   placeholder,
@@ -87,7 +91,7 @@ export function FilterCombobox({
             }
           >
             <span className={cn('truncate', selected === undefined && 'text-muted-foreground')}>
-              {selected?.label ?? placeholder}
+              {labelSelectionne(selected, placeholder)}
             </span>
             <ChevronsUpDownIcon className="size-4 shrink-0 opacity-50" aria-hidden="true" />
           </PopoverTrigger>
@@ -118,68 +122,18 @@ export function FilterCombobox({
                   onSearchChange?.(next);
                 }}
               />
-              <CommandList>
-                <CommandEmpty>Aucun résultat.</CommandEmpty>
-                <CommandGroup>
-                  <CommandItem
-                    value="__tous__"
-                    onSelect={() => {
-                      onChange(null);
-                      setOpen(false);
-                    }}
-                  >
-                    <CheckIcon
-                      className={cn('size-4', value === null ? 'opacity-100' : 'opacity-0')}
-                      aria-hidden="true"
-                    />
-                    <span className="text-muted-foreground">{placeholder}</span>
-                  </CommandItem>
-
-                  {options
-                    .filter((option) =>
-                      filterOptions
-                        ? matchesSearch(`${option.label} ${option.hint ?? ''}`, search)
-                        : true,
-                    )
-                    .map((option) => (
-                      <CommandItem
-                        key={option.value}
-                        value={`${option.label} ${option.hint ?? ''}`}
-                        onSelect={() => {
-                          onChange(option.value === value ? null : option.value);
-                          setOpen(false);
-                        }}
-                      >
-                        <CheckIcon
-                          className={cn(
-                            'size-4 shrink-0',
-                            value === option.value ? 'opacity-100' : 'opacity-0',
-                          )}
-                          aria-hidden="true"
-                        />
-                        <span className="min-w-0 flex-1 truncate">{option.label}</span>
-                        {option.hint !== undefined && option.hint !== '' ? (
-                          <span className="shrink-0 text-[0.75rem] text-muted-foreground">
-                            {option.hint}
-                          </span>
-                        ) : null}
-                      </CommandItem>
-                    ))}
-
-                  {onCreate !== undefined && search.trim() !== '' ? (
-                    <CommandItem
-                      value={`__creer__ ${search}`}
-                      onSelect={() => {
-                        onCreate(search.trim());
-                        setOpen(false);
-                      }}
-                    >
-                      <PlusIcon className="size-4 shrink-0" aria-hidden="true" />
-                      Créer « {search.trim()} »
-                    </CommandItem>
-                  ) : null}
-                </CommandGroup>
-              </CommandList>
+              <ComboboxList
+                options={options}
+                value={value}
+                search={search}
+                placeholder={placeholder}
+                filterOptions={filterOptions}
+                onChangeValue={onChange}
+                onClose={() => {
+                  setOpen(false);
+                }}
+                onCreate={onCreate}
+              />
             </Command>
           </PopoverContent>
         </Popover>
@@ -204,5 +158,88 @@ export function FilterCombobox({
         ) : null}
       </div>
     </div>
+  );
+}
+
+function ComboboxList({
+  options,
+  value,
+  search,
+  placeholder,
+  filterOptions,
+  onChangeValue,
+  onClose,
+  onCreate,
+}: {
+  options: readonly FilterOption[];
+  value: string | null;
+  search: string;
+  placeholder: string;
+  filterOptions: boolean;
+  onChangeValue: (value: string | null) => void;
+  onClose: () => void;
+  onCreate?: ((search: string) => void) | undefined;
+}) {
+  return (
+    <CommandList>
+      <CommandEmpty>Aucun résultat.</CommandEmpty>
+      <CommandGroup>
+        <CommandItem
+          value="__tous__"
+          onSelect={() => {
+            onChangeValue(null);
+            onClose();
+          }}
+        >
+          <CheckIcon
+            className={cn('size-4', value === null ? 'opacity-100' : 'opacity-0')}
+            aria-hidden="true"
+          />
+          <span className="text-muted-foreground">{placeholder}</span>
+        </CommandItem>
+
+        {options
+          .filter((option) =>
+            filterOptions ? matchesSearch(`${option.label} ${option.hint ?? ''}`, search) : true,
+          )
+          .map((option) => (
+            <CommandItem
+              key={option.value}
+              value={`${option.label} ${option.hint ?? ''}`}
+              onSelect={() => {
+                onChangeValue(option.value === value ? null : option.value);
+                onClose();
+              }}
+            >
+              <CheckIcon
+                className={cn(
+                  'size-4 shrink-0',
+                  value === option.value ? 'opacity-100' : 'opacity-0',
+                )}
+                aria-hidden="true"
+              />
+              <span className="min-w-0 flex-1 truncate">{option.label}</span>
+              {option.hint !== undefined && option.hint !== '' ? (
+                <span className="shrink-0 text-[0.75rem] text-muted-foreground">
+                  {option.hint}
+                </span>
+              ) : null}
+            </CommandItem>
+          ))}
+
+        {onCreate !== undefined && search.trim() !== '' ? (
+          <CommandItem
+            value={`__creer__ ${search}`}
+            onSelect={() => {
+              onCreate(search.trim());
+              onClose();
+            }}
+          >
+            <PlusIcon className="size-4 shrink-0" aria-hidden="true" />
+            Créer « {search.trim()} »
+          </CommandItem>
+        ) : null}
+      </CommandGroup>
+    </CommandList>
   );
 }
