@@ -832,6 +832,15 @@ model Prospect {
   origin      String?
   originLabel String?
 
+  /// Quand la fiche a été posée « à revoir » par le formulaire public.
+  ///
+  /// Une date et non un booléen : la relecture se fait dans l'ordre d'arrivée,
+  /// et `false` ne dirait pas si la demande date d'une heure ou d'un mois.
+  /// Indexée en index PARTIEL (`WHERE "aRevoirAt" IS NOT NULL`) dans la
+  /// migration : la file de relecture tient quelques lignes, un index plein
+  /// porterait toutes les autres pour rien. Voir `prospects_a_revoir_idx`.
+  aRevoirAt DateTime?
+
   // ── Phase 2 : méthode d'enrôlement ──────────────────────────────────────
   // Dimension indépendante de `statut`. Invariant applicatif, testé :
   // `enrollmentMethod` est OBLIGATOIRE si et seulement si

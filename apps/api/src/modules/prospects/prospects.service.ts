@@ -280,6 +280,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     enrollmentCapturedAt: isoOrNull(row.enrollmentCapturedAt),
     origin: row.origin,
     originLabel: row.originLabel,
+    aRevoirAt: isoOrNull(row.aRevoirAt),
     lastOutcome: attempt.outcome,
     lastComment: attempt.comment,
     lastAttemptAt: isoOrNull(attempt.at),
