@@ -473,7 +473,7 @@ function countRepresentant(representants: Map<string, RepresentantTally>, row: E
   representants.set(representant.id, {
     fullName: representant.fullName,
     phoneE164: representant.phoneE164,
-    departement: representant.departement?.name ?? '',
+    departement: representant.departement.name,
     commercial: representant.createdBy.fullName,
     clientCreatedAt: representant.clientCreatedAt,
     prospects: 1,

@@ -71,22 +71,17 @@ export class CreateRepresentantDto {
   @MaxLength(40)
   phone!: string;
 
-  @ApiPropertyOptional({
-    format: 'uuid',
-    description:
-      'FACULTATIF : une fiche naît normalement en tournée, où le département se ' +
-      'déduit du secteur. La saisie manuelle ne le connaît pas toujours.',
-  })
-  @IsOptional()
+  @ApiProperty({ format: 'uuid' })
   @IsUUID()
-  departementId?: string;
+  departementId!: string;
 
   @ApiPropertyOptional({
     format: 'uuid',
     description:
       'IEF de rattachement. FACULTATIVE : les fiches saisies avant l’arrivée de ' +
       'ce référentiel n’en portent pas, et la rendre obligatoire les invaliderait ' +
-      'rétroactivement.',
+      'rétroactivement. Le département reste obligatoire, il se déduit de l’IEF, ' +
+      'jamais l’inverse.',
   })
   @IsOptional()
   @IsUUID()
@@ -199,8 +194,8 @@ export class RepresentantDto {
   @ApiProperty({ type: String, nullable: true }) notes!: string | null;
   @ApiProperty({ type: Number, description: 'Révision serveur, incrémentée à chaque écriture.' })
   rev!: number;
-  @ApiProperty({ type: String, format: 'uuid', nullable: true }) departementId!: string | null;
-  @ApiProperty({ type: String, nullable: true }) departementName!: string | null;
+  @ApiProperty({ format: 'uuid' }) departementId!: string;
+  @ApiProperty() departementName!: string;
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) iefId!: string | null;
   @ApiProperty({ type: String, nullable: true }) iefName!: string | null;
   @ApiProperty({ format: 'uuid' }) createdById!: string;

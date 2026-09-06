@@ -167,7 +167,7 @@ export class RepresentantsExportService {
           .addRow({
             fullName: row.fullName,
             phone: row.phoneE164,
-            departement: row.departement?.name ?? '',
+            departement: row.departement.name,
             ief: row.ief?.name ?? '',
             commercial: row.createdBy.fullName,
             prospects: row._count.prospects,

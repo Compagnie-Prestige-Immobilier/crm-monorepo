@@ -201,27 +201,6 @@ describe('conflit de téléphone à la création', () => {
   });
 });
 
-describe('création sans département', () => {
-  it('crée la fiche : une saisie manuelle ne le connaît pas toujours', async () => {
-    db.representant.create.mockResolvedValue({
-      ...foreignRow(),
-      departementId: null,
-      departement: null,
-    });
-
-    const result = await service.create(COMMERCIAL, {
-      fullName: 'Awa Fall',
-      phone: '77 123 45 67',
-    });
-
-    expect(result.departementId).toBeNull();
-    expect(result.departementName).toBeNull();
-    const data = (db.representant.create.mock.calls[0] as [{ data: Record<string, unknown> }])[0]
-      .data;
-    expect(data.departementId).toBeNull();
-  });
-});
-
 describe('cloisonnement de la route', () => {
   it('réserve tout le contrôleur aux commerciaux et aux administrateurs', () => {
     const roles = Reflect.getMetadata(ROLES_KEY, RepresentantsController) as Role[] | undefined;
