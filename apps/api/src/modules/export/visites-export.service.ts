@@ -1,6 +1,7 @@
 import type { Writable } from 'node:stream';
 
 import { Injectable } from '@nestjs/common';
+import type { Prisma } from '@crm/database';
 import ExcelJS from 'exceljs';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
@@ -35,6 +36,24 @@ const VISITE_INCLUDE = {
   destinataire: { select: { label: true } },
   objet: { select: { label: true } },
 } as const;
+
+type VisiteRow = Prisma.VisiteGetPayload<{ include: typeof VISITE_INCLUDE }>;
+
+function visiteRowValues(row: VisiteRow): Record<string, unknown> {
+  return {
+    [H.numero]: row.reference,
+    [H.date]: dateOnlyCell(row.visitedAt),
+    [H.heure]: row.timeKnown ? timeCell(row.visitedAt) : '',
+    [H.nom]: row.visitorName,
+    [H.telephone]: row.phone ?? '',
+    [H.entreprise]: row.entreprise.label,
+    [H.direction]: row.direction?.label ?? '',
+    [H.destinataire]: row.destinataire?.label ?? '',
+    [H.objet]: row.objet.label,
+    [H.commentaire]: row.comment ?? '',
+    [H.saisieLe]: toDakarCell(row.createdAt),
+  };
+}
 
 /** Le jour de la visite à Dakar, à MINUIT : jamais l'instant. Sérialisé en fraction sinon. */
 function dateOnlyCell(instant: Date): Date {
@@ -125,6 +144,13 @@ export class VisitesExportService {
       writeRappelRow(sheet, VISITES_REGISTRE_COLUMNS.length);
     }
 
+    await this.writeRows(sheet, where);
+
+    sheet.commit();
+    await workbook.commit();
+  }
+
+  private async writeRows(sheet: ExcelJS.Worksheet, where: Prisma.VisiteWhereInput): Promise<void> {
     let after: string | undefined;
     for (;;) {
       const rows = await this.prisma.visite.findMany({
@@ -136,28 +162,11 @@ export class VisitesExportService {
       if (rows.length === 0) break;
 
       for (const row of rows) {
-        sheet
-          .addRow({
-            [H.numero]: row.reference,
-            [H.date]: dateOnlyCell(row.visitedAt),
-            [H.heure]: row.timeKnown ? timeCell(row.visitedAt) : '',
-            [H.nom]: row.visitorName,
-            [H.telephone]: row.phone ?? '',
-            [H.entreprise]: row.entreprise.label,
-            [H.direction]: row.direction?.label ?? '',
-            [H.destinataire]: row.destinataire?.label ?? '',
-            [H.objet]: row.objet.label,
-            [H.commentaire]: row.comment ?? '',
-            [H.saisieLe]: toDakarCell(row.createdAt),
-          })
-          .commit();
+        sheet.addRow(visiteRowValues(row)).commit();
       }
 
       after = rows.at(-1)?.reference;
       if (rows.length < PAGE_SIZE) break;
     }
-
-    sheet.commit();
-    await workbook.commit();
   }
 }
