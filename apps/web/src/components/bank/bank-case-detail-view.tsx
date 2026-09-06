@@ -49,7 +49,14 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { formatXof, parseMoneyInput } from '@/lib/money';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type { BankCaseTransition, BankRejectionReason, Projet, Role } from '@/lib/types';
+import type {
+  BankCase,
+  BankCaseStage,
+  BankCaseTransition,
+  BankRejectionReason,
+  Projet,
+  Role,
+} from '@/lib/types';
 
 const OTHER_REASON_CODE = 'AUTRE';
 
@@ -82,6 +89,162 @@ function ActionPrincipale({
     <p role="status" className="text-[0.8125rem] text-muted-foreground">
       {action.reason}
     </p>
+  );
+}
+
+function BankCaseHeader({ bankCase }: { bankCase: BankCase }) {
+  return (
+    <CardHeader>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <CardTitle className="text-[1.25rem] tabular-nums">{bankCase.reference}</CardTitle>
+          <p className="mt-1 truncate text-[0.9375rem]">{bankCase.customerName}</p>
+          <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
+            {formatPhone(bankCase.customerPhoneE164)}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-2">
+          <StageBadge stage={bankCase.currentStage} />
+          {bankCase.amountXof !== null ? (
+            <p className="font-display text-[1.5rem] font-[800] tracking-[-0.02em] tabular-nums">
+              {formatXof(bankCase.amountXof)}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </CardHeader>
+  );
+}
+
+function lastActor(bankCase: BankCase): string {
+  return bankCase.updatedByName ?? bankCase.createdByName;
+}
+
+function RejectionNotice({
+  reason,
+  detail,
+}: {
+  reason: BankRejectionReason | null;
+  detail: string | null;
+}) {
+  if (reason === null) return null;
+  return (
+    <p className="rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.875rem] text-destructive">
+      <span className="font-[600]">Rejeté : {reason.label}.</span>
+      {detail !== null && detail !== '' ? ` ${detail}` : ''}
+    </p>
+  );
+}
+
+function RejectButton({
+  rejectedStage,
+  onReject,
+}: {
+  rejectedStage: BankCaseStage | undefined;
+  onReject: () => void;
+}) {
+  if (rejectedStage === undefined || !rejectedStage.isActive) return null;
+  return (
+    <Button type="button" variant="destructive" onClick={onReject}>
+      <CircleSlashIcon aria-hidden="true" />
+      Rejeter le dossier
+    </Button>
+  );
+}
+
+function BankCaseActions({
+  canAct,
+  action,
+  rejectedStage,
+  role,
+  onAdvance,
+  onReject,
+}: {
+  canAct: boolean;
+  action: ReturnType<typeof primaryAction>;
+  rejectedStage: BankCaseStage | undefined;
+  role: Role;
+  onAdvance: () => void;
+  onReject: () => void;
+}) {
+  if (!canAct) {
+    return (
+      <p
+        role="status"
+        className="flex items-start gap-2 rounded-md bg-muted px-3 py-2.5 text-[0.8125rem] text-muted-foreground"
+      >
+        <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+        {role === 'ADMIN'
+          ? 'Étape terminale. Correction possible par un administrateur, avec justification.'
+          : 'Étape terminale. Dossier verrouillé.'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
+      {/* L'action principale est ÉPINGLÉE en tête, en pleine variante :
+          faire avancer un dossier est le geste que l'agent répète
+          vingt fois par jour. Le rejet est à côté, en `destructive`
+          et sans place privilégiée : il ne doit jamais être le bouton
+          qu'on atteint par réflexe. */}
+      <ActionPrincipale action={action} onAdvance={onAdvance} />
+      <RejectButton rejectedStage={rejectedStage} onReject={onReject} />
+    </div>
+  );
+}
+
+function BankCaseSummaryCard({
+  bankCase,
+  canAct,
+  action,
+  rejectedStage,
+  role,
+  onAdvance,
+  onReject,
+}: {
+  bankCase: BankCase;
+  canAct: boolean;
+  action: ReturnType<typeof primaryAction>;
+  rejectedStage: BankCaseStage | undefined;
+  role: Role;
+  onAdvance: () => void;
+  onReject: () => void;
+}) {
+  return (
+    <Card className="animate-rise">
+      <BankCaseHeader bankCase={bankCase} />
+      <CardContent className="flex flex-col gap-4">
+        <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-3">
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Banque de traitement</dt>
+            <dd className="truncate font-[600]">{bankCase.processingBankName}</dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Ouvert le</dt>
+            <dd className="font-[600]">
+              <time dateTime={bankCase.createdAt}>{formatDateTime(bankCase.createdAt)}</time>
+            </dd>
+          </div>
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Dernière intervention</dt>
+            <dd className="truncate font-[600]">{lastActor(bankCase)}</dd>
+          </div>
+        </dl>
+
+        <RejectionNotice reason={bankCase.rejectionReason} detail={bankCase.rejectionDetail} />
+
+        {/* ─── Actions ─────────────────────────────────────────────── */}
+        <BankCaseActions
+          canAct={canAct}
+          action={action}
+          rejectedStage={rejectedStage}
+          role={role}
+          onAdvance={onAdvance}
+          onReject={onReject}
+        />
+      </CardContent>
+    </Card>
   );
 }
 
@@ -158,96 +321,19 @@ export function BankCaseDetailView({
       <DetailBackLink href={listHref}>Tous les dossiers</DetailBackLink>
 
       {/* ─── En-tête ─────────────────────────────────────────────────── */}
-      <Card className="animate-rise">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-[1.25rem] tabular-nums">{bankCase.reference}</CardTitle>
-              <p className="mt-1 truncate text-[0.9375rem]">{bankCase.customerName}</p>
-              <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
-                {formatPhone(bankCase.customerPhoneE164)}
-              </p>
-            </div>
-            <div className="flex flex-col items-end gap-2">
-              <StageBadge stage={bankCase.currentStage} />
-              {bankCase.amountXof !== null ? (
-                <p className="font-display text-[1.5rem] font-[800] tracking-[-0.02em] tabular-nums">
-                  {formatXof(bankCase.amountXof)}
-                </p>
-              ) : null}
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-3">
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Banque de traitement</dt>
-              <dd className="truncate font-[600]">{bankCase.processingBankName}</dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Ouvert le</dt>
-              <dd className="font-[600]">
-                <time dateTime={bankCase.createdAt}>{formatDateTime(bankCase.createdAt)}</time>
-              </dd>
-            </div>
-            <div className="min-w-0">
-              <dt className="text-muted-foreground">Dernière intervention</dt>
-              <dd className="truncate font-[600]">
-                {bankCase.updatedByName ?? bankCase.createdByName}
-              </dd>
-            </div>
-          </dl>
-
-          {bankCase.rejectionReason !== null ? (
-            <p className="rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.875rem] text-destructive">
-              <span className="font-[600]">Rejeté : {bankCase.rejectionReason.label}.</span>
-              {bankCase.rejectionDetail !== null && bankCase.rejectionDetail !== ''
-                ? ` ${bankCase.rejectionDetail}`
-                : ''}
-            </p>
-          ) : null}
-
-          {/* ─── Actions ─────────────────────────────────────────────── */}
-          {canAct ? (
-            <div className="flex flex-wrap items-center gap-3 border-t border-border pt-4">
-              {/* L'action principale est ÉPINGLÉE en tête, en pleine variante :
-                  faire avancer un dossier est le geste que l'agent répète
-                  vingt fois par jour. Le rejet est à côté, en `destructive`
-                  et sans place privilégiée : il ne doit jamais être le bouton
-                  qu'on atteint par réflexe. */}
-              <ActionPrincipale
-                action={action}
-                onAdvance={() => {
-                  setAdvancing(true);
-                }}
-              />
-
-              {rejectedStage !== undefined && rejectedStage.isActive ? (
-                <Button
-                  type="button"
-                  variant="destructive"
-                  onClick={() => {
-                    setRejecting(true);
-                  }}
-                >
-                  <CircleSlashIcon aria-hidden="true" />
-                  Rejeter le dossier
-                </Button>
-              ) : null}
-            </div>
-          ) : (
-            <p
-              role="status"
-              className="flex items-start gap-2 rounded-md bg-muted px-3 py-2.5 text-[0.8125rem] text-muted-foreground"
-            >
-              <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-              {role === 'ADMIN'
-                ? 'Étape terminale. Correction possible par un administrateur, avec justification.'
-                : 'Étape terminale. Dossier verrouillé.'}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <BankCaseSummaryCard
+        bankCase={bankCase}
+        canAct={canAct}
+        action={action}
+        rejectedStage={rejectedStage}
+        role={role}
+        onAdvance={() => {
+          setAdvancing(true);
+        }}
+        onReject={() => {
+          setRejecting(true);
+        }}
+      />
 
       {/* ─── Historique ──────────────────────────────────────────────── */}
       <section className="flex flex-col gap-3">
@@ -356,6 +442,76 @@ function Timeline({ history }: { history: readonly BankCaseTransition[] }) {
   );
 }
 
+function advanceDialogTitle(isCashing: boolean, target: { label: string } | null): string {
+  if (isCashing) return 'Déclarer l’encaissement';
+  return `Passer à « ${target?.label ?? ''} »`;
+}
+
+function advanceDialogDescription(isCashing: boolean): string {
+  return isCashing
+    ? 'L’encaissement clôt le dossier. Correction possible ensuite par un administrateur.'
+    : 'Étape suivante du flux ouvert.';
+}
+
+function AdvanceAmountField({
+  isCashing,
+  amountId,
+  amount,
+  onChange,
+}: {
+  isCashing: boolean;
+  amountId: string;
+  amount: string | null;
+  onChange: (value: string | null) => void;
+}) {
+  if (!isCashing) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Label htmlFor={amountId}>
+        Montant encaissé
+        <span className="text-destructive" aria-label="obligatoire">
+          *
+        </span>
+      </Label>
+      <Input
+        id={amountId}
+        inputMode="numeric"
+        autoComplete="off"
+        // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
+        autoFocus
+        value={amount ?? ''}
+        placeholder="1200000"
+        aria-describedby={`${amountId}-apercu`}
+        onChange={(event) => {
+          onChange(parseMoneyInput(event.target.value));
+        }}
+      />
+      {/* Aperçu formaté EN DIRECT : « 1200000 » et « 12000000 » se
+          distinguent mal à la lecture, et un zéro de trop est une
+          erreur qu'on ne rattrape pas après validation. */}
+      <p id={`${amountId}-apercu`} role="status" className="text-[0.9375rem] font-[600] tabular-nums">
+        {amount === null ? (
+          <span className="font-[400] text-muted-foreground">Montant strictement positif.</span>
+        ) : (
+          formatXof(amount)
+        )}
+      </p>
+    </div>
+  );
+}
+
+function AdvanceSubmitLabel({ pending, isCashing }: { pending: boolean; isCashing: boolean }) {
+  if (pending) {
+    return (
+      <>
+        <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+        Enregistrement…
+      </>
+    );
+  }
+  return isCashing ? 'Confirmer l’encaissement' : 'Confirmer';
+}
+
 function AdvanceDialog({
   open,
   onOpenChange,
@@ -417,56 +573,17 @@ function AdvanceDialog({
     >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>
-            {isCashing ? 'Déclarer l’encaissement' : `Passer à « ${target?.label ?? ''} »`}
-          </DialogTitle>
-          <DialogDescription>
-            {isCashing
-              ? 'L’encaissement clôt le dossier. Correction possible ensuite par un administrateur.'
-              : 'Étape suivante du flux ouvert.'}
-          </DialogDescription>
+          <DialogTitle>{advanceDialogTitle(isCashing, target)}</DialogTitle>
+          <DialogDescription>{advanceDialogDescription(isCashing)}</DialogDescription>
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          {isCashing ? (
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={amountId}>
-                Montant encaissé
-                <span className="text-destructive" aria-label="obligatoire">
-                  *
-                </span>
-              </Label>
-              <Input
-                id={amountId}
-                inputMode="numeric"
-                autoComplete="off"
-                // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-                autoFocus
-                value={amount ?? ''}
-                placeholder="1200000"
-                aria-describedby={`${amountId}-apercu`}
-                onChange={(event) => {
-                  setAmount(parseMoneyInput(event.target.value));
-                }}
-              />
-              {/* Aperçu formaté EN DIRECT : « 1200000 » et « 12000000 » se
-                  distinguent mal à la lecture, et un zéro de trop est une
-                  erreur qu'on ne rattrape pas après validation. */}
-              <p
-                id={`${amountId}-apercu`}
-                role="status"
-                className="text-[0.9375rem] font-[600] tabular-nums"
-              >
-                {amount === null ? (
-                  <span className="font-[400] text-muted-foreground">
-                    Montant strictement positif.
-                  </span>
-                ) : (
-                  formatXof(amount)
-                )}
-              </p>
-            </div>
-          ) : null}
+          <AdvanceAmountField
+            isCashing={isCashing}
+            amountId={amountId}
+            amount={amount}
+            onChange={setAmount}
+          />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={commentId}>Commentaire (facultatif)</Label>
@@ -500,23 +617,37 @@ function AdvanceDialog({
               advance.mutate();
             }}
           >
-            {(() => {
-              if (advance.isPending)
-                return (
-                  <>
-                    <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                    Enregistrement…
-                  </>
-                );
-              return (() => {
-                if (isCashing) return 'Confirmer l’encaissement';
-                return 'Confirmer';
-              })();
-            })()}
+            <AdvanceSubmitLabel pending={advance.isPending} isCashing={isCashing} />
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function isDetailRequired(reasons: readonly BankRejectionReason[], reasonId: string | null): boolean {
+  const selected = reasons.find((reason) => reason.id === reasonId);
+  return selected?.code === OTHER_REASON_CODE;
+}
+
+function canSubmitReject({
+  targetStageId,
+  reasonIdValue,
+  detailRequired,
+  detail,
+  pending,
+}: {
+  targetStageId: string | null;
+  reasonIdValue: string | null;
+  detailRequired: boolean;
+  detail: string;
+  pending: boolean;
+}): boolean {
+  return (
+    targetStageId !== null &&
+    reasonIdValue !== null &&
+    (!detailRequired || detail.trim() !== '') &&
+    !pending
   );
 }
 
@@ -550,10 +681,8 @@ function RejectDialog({
     enabled: open,
   });
 
-  const selectedReason: BankRejectionReason | undefined = (reasons.data ?? []).find(
-    (reason) => reason.id === reasonIdValue,
-  );
-  const detailRequired = selectedReason?.code === OTHER_REASON_CODE;
+  const reasonList = reasons.data ?? [];
+  const detailRequired = isDetailRequired(reasonList, reasonIdValue);
 
   const reject = useMutation({
     mutationFn: () => {
@@ -585,11 +714,13 @@ function RejectDialog({
     setComment('');
   }
 
-  const canSubmit =
-    targetStageId !== null &&
-    reasonIdValue !== null &&
-    (!detailRequired || detail.trim() !== '') &&
-    !reject.isPending;
+  const canSubmit = canSubmitReject({
+    targetStageId,
+    reasonIdValue,
+    detailRequired,
+    detail,
+    pending: reject.isPending,
+  });
 
   return (
     <Dialog
@@ -629,7 +760,7 @@ function RejectDialog({
               {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
                   pas le texte de l'item — ici, l'identifiant du motif. */}
               <Select
-                items={(reasons.data ?? []).map((reason) => ({
+                items={reasonList.map((reason) => ({
                   value: reason.id,
                   label: reason.label,
                 }))}
@@ -643,7 +774,7 @@ function RejectDialog({
                   <SelectValue placeholder="Choisir un motif" />
                 </SelectTrigger>
                 <SelectContent>
-                  {(reasons.data ?? []).map((reason) => (
+                  {reasonList.map((reason) => (
                     <SelectItem key={reason.id} value={reason.id}>
                       {reason.label}
                     </SelectItem>
