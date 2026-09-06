@@ -133,6 +133,8 @@ abstract class _$SyncEntityDataDtoCWProxy {
 
   SyncEntityDataDto destinataireId(String? destinataireId);
 
+  SyncEntityDataDto champsLibres(Map<String, String>? champsLibres);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -202,6 +204,7 @@ abstract class _$SyncEntityDataDtoCWProxy {
     String? objetId,
     String? directionId,
     String? destinataireId,
+    Map<String, String>? champsLibres,
   });
 }
 
@@ -439,6 +442,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
       this(destinataireId: destinataireId);
 
   @override
+  SyncEntityDataDto champsLibres(Map<String, String>? champsLibres) =>
+      this(champsLibres: champsLibres);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncEntityDataDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -508,6 +515,7 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
     Object? objetId = const $CopyWithPlaceholder(),
     Object? directionId = const $CopyWithPlaceholder(),
     Object? destinataireId = const $CopyWithPlaceholder(),
+    Object? champsLibres = const $CopyWithPlaceholder(),
   }) {
     return SyncEntityDataDto(
       fullName: fullName == const $CopyWithPlaceholder()
@@ -760,6 +768,10 @@ class _$SyncEntityDataDtoCWProxyImpl implements _$SyncEntityDataDtoCWProxy {
           ? _value.destinataireId
           // ignore: cast_nullable_to_non_nullable
           : destinataireId as String?,
+      champsLibres: champsLibres == const $CopyWithPlaceholder()
+          ? _value.champsLibres
+          // ignore: cast_nullable_to_non_nullable
+          : champsLibres as Map<String, String>?,
     );
   }
 }
@@ -942,6 +954,11 @@ SyncEntityDataDto _$SyncEntityDataDtoFromJson(
     objetId: $checkedConvert('objetId', (v) => v as String?),
     directionId: $checkedConvert('directionId', (v) => v as String?),
     destinataireId: $checkedConvert('destinataireId', (v) => v as String?),
+    champsLibres: $checkedConvert(
+      'champsLibres',
+      (v) =>
+          (v as Map<String, dynamic>?)?.map((k, e) => MapEntry(k, e as String)),
+    ),
   );
   return val;
 });
@@ -1028,6 +1045,7 @@ Map<String, dynamic> _$SyncEntityDataDtoToJson(
   if (instance.objetId case final value?) 'objetId': value,
   if (instance.directionId case final value?) 'directionId': value,
   if (instance.destinataireId case final value?) 'destinataireId': value,
+  if (instance.champsLibres case final value?) 'champsLibres': value,
 };
 
 const _$ProspectStatutEnumMap = {
@@ -1105,6 +1123,7 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
+  EnrollmentMethod.WHATSAPP: 'WHATSAPP',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

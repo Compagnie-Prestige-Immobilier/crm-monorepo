@@ -18,6 +18,8 @@ enum Role {
   DIRECTION(r'DIRECTION'),
   @JsonValue(r'ACCUEIL')
   ACCUEIL(r'ACCUEIL'),
+  @JsonValue(r'CHARGE_CLIENTELE')
+  CHARGE_CLIENTELE(r'CHARGE_CLIENTELE'),
   @JsonValue(r'unknown_default_open_api')
   unknownDefaultOpenApi(r'unknown_default_open_api');
 

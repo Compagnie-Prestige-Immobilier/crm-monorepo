@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VisitesService } from '../visites/visites.service.js';
 import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
+import { CONVERSION_CHUES_PAYLOAD_VERSION } from '../phase2/attempt-rules.js';
 import { SyncBatchStore } from './batch-store.js';
 import { SyncService } from './sync.service.js';
 import { FakePrisma, fakeReminders, type ProspectRow } from './fake-prisma.js';
@@ -37,6 +38,8 @@ const seedProspect = (id: string): void => {
     phoneE164: '+221771000001',
     rev: 1,
     statut: 'NOUVEAU',
+    projet: 'CHUES',
+    incomeBandId: null,
     phase2Status: 'PENDING',
     enrollmentMethod: null,
     enrollmentCapturedById: null,
@@ -103,9 +106,13 @@ const attempt = (
   },
 });
 
-const push = (operations: SyncOperationDto[], id = 'lot-1'): SyncPushDto => ({
+const push = (
+  operations: SyncOperationDto[],
+  id = 'lot-1',
+  payloadVersion = 1,
+): SyncPushDto => ({
   clientBatchId: id,
-  payloadVersion: 1,
+  payloadVersion,
   operations,
 });
 
@@ -417,5 +424,37 @@ describe('la tentative d’un prospect ferme l’ouverture qui la chronométrait
 
     expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
     expect(db.ouverturesFiche.get(OUVERTURE)?.closedAt).toBeNull();
+  });
+});
+
+// La version du lot est portée par l'EN-TÊTE du lot, pas par l'opération : ce
+// test vérifie qu'elle atteint bien la règle de conversion, seize appels plus
+// bas, sans quoi EB-21 ne s'appliquerait à personne.
+describe('la version de charge utile du lot atteint la règle de conversion', () => {
+  const CONVERSION = {
+    outcome: CallOutcome.METHOD_OBTAINED,
+    method: EnrollmentMethod.PLATFORM,
+    dureeEtablissementMois: 36,
+  };
+
+  it('un lot en version 8 sans revenu voit SA SEULE opération refusée', async () => {
+    const result = await sync.push(
+      alice,
+      push([attempt(PROSPECT_A, CONVERSION)], 'lot-v8', CONVERSION_CHUES_PAYLOAD_VERSION),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.INVALID]);
+    expect(result.body.results[0]?.errorCode).toBe('PHASE2_REVENU_REQUIRED');
+    expect(db.callAttempts.size).toBe(0);
+  });
+
+  it('le même lot en version 7 passe : les APK déployés ne perdent rien', async () => {
+    const result = await sync.push(
+      alice,
+      push([attempt(PROSPECT_A, CONVERSION)], 'lot-v7', CONVERSION_CHUES_PAYLOAD_VERSION - 1),
+    );
+
+    expect(statuses(result.body.results)).toEqual([SyncOpStatus.APPLIED]);
+    expect(db.prospects.get(PROSPECT_A)?.enrollmentMethod).toBe(EnrollmentMethod.PLATFORM);
   });
 });

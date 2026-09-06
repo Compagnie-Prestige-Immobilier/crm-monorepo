@@ -14,7 +14,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Nouveau prospect Grand Public' };
 
 export default async function NouveauGrandPublicPage() {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL']);
+  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La saisie d’un prospect Grand Public" />;

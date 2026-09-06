@@ -121,11 +121,18 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     expect(direction).toContain('de-l-appel-a-l-encaissement');
   });
 
-  it('place le suivi de la dernière campagne sur le tableau de bord de direction', () => {
-    const direction = dispositionUsine('chues', true).widgets.map((widget) => widget.source);
+  // EB-32 : le suivi de campagne et le rendement pilotent des appels, pas une
+  // recette. La supervision les ouvre comme la direction.
+  it('place le suivi de la dernière campagne sur les deux tableaux de bord', () => {
+    for (const voitLesMontants of [false, true]) {
+      const sources = dispositionUsine('chues', voitLesMontants).widgets.map(
+        (widget) => widget.source,
+      );
 
-    expect(direction).toContain('couverture-derniere-campagne');
-    expect(direction).toContain('hors-attribution-derniere-campagne');
+      expect(sources).toContain('couverture-derniere-campagne');
+      expect(sources).toContain('hors-attribution-derniere-campagne');
+      expect(sources).toContain('rendement-par-departement');
+    }
   });
 
   // EB-13 : le compte des fiches ouvertes se lit SUR le tableau de bord. Posé

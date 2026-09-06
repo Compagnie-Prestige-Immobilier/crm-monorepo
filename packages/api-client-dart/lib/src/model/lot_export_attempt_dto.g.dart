@@ -296,6 +296,7 @@ const _$LotExportAttemptDtoMethodEnumEnumMap = {
   LotExportAttemptDtoMethodEnum.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   LotExportAttemptDtoMethodEnum.APPOINTMENT: 'APPOINTMENT',
+  LotExportAttemptDtoMethodEnum.WHATSAPP: 'WHATSAPP',
   LotExportAttemptDtoMethodEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };

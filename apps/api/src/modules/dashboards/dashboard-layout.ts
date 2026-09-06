@@ -314,6 +314,9 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
     },
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'rendement-par-departement',
   ],
   'grand-public': [
     'taux-de-joignabilite',
@@ -321,26 +324,17 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
     'adhesions',
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'methodes-d-adhesion',
   ],
 };
 
-/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
-const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
+/** Les montants, ajoutés en fin d'écran pour l'administrateur et la direction. */
+const USINE_MONTANTS: Record<DashboardEcran, readonly DashboardSource[]> = {
   visites: [],
-  chues: [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
-    'encaisse',
-    'de-l-appel-a-l-encaissement',
-    'rendement-par-departement',
-  ],
-  'grand-public': [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
-    'encaisse',
-    'de-l-appel-a-l-encaissement',
-    'methodes-d-adhesion',
-  ],
+  chues: ['encaisse', 'de-l-appel-a-l-encaissement'],
+  'grand-public': ['encaisse', 'de-l-appel-a-l-encaissement'],
 };
 
 function widgetUsine(item: WidgetUsine): DispositionWidget {
@@ -351,7 +345,7 @@ export function dispositionUsine(
   ecran: DashboardEcran,
   voitLesMontants = false,
 ): DispositionLayout {
-  const sources = voitLesMontants ? [...USINE[ecran], ...USINE_DIRECTION[ecran]] : USINE[ecran];
+  const sources = voitLesMontants ? [...USINE[ecran], ...USINE_MONTANTS[ecran]] : USINE[ecran];
   return {
     version: LAYOUT_VERSION,
     preset: 'essentiel',

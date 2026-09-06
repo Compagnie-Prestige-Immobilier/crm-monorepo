@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ImportKind, ImportMode, Projet, ProspectType } from '@crm/database';
+import { ImportKind, ImportMode, Projet, ProspectType, WhatsappStatus } from '@crm/database';
 import type { ModeEpargne, TypeContrat } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
 import { normalizeKey } from '../representants/representants-import.service.js';
+import { whatsappDuProspect } from '../prospects/whatsapp.js';
 import type {
   ChunkOutcome,
   ImportAdapter,
@@ -472,7 +473,14 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
         modeEpargne: row.modeEpargne,
         paysResidenceId: row.paysResidenceId,
         villeResidence: row.villeResidence,
-        whatsappE164: row.whatsappE164,
+        ...whatsappDuProspect(
+          { numero: row.whatsappE164 },
+          {
+            whatsappStatus: WhatsappStatus.NON_DEMANDE,
+            whatsappE164: null,
+            phoneE164: row.phoneE164,
+          },
+        ),
         relaisNom: row.relaisNom,
         relaisPhoneE164: row.relaisPhoneE164,
         createdById: ctx.requestedById,

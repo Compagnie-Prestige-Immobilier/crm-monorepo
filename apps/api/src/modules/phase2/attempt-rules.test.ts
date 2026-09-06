@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
+import { CallOutcome, EnrollmentMethod, Phase2Status, Projet } from '@crm/database';
 import { describe, expect, it } from 'vitest';
 
 import { CallOutcomeEffect, SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
@@ -7,7 +7,9 @@ import {
   CALLBACK_CLOCK_SKEW_TOLERANCE_MS,
   COMMENT_MAX_LENGTH,
   DUREE_ETABLISSEMENT_MAX_MOIS,
+  CONVERSION_CHUES_PAYLOAD_VERSION,
   PHASE2_STATUS_FOR_OUTCOME,
+  assertConversionChues,
   isTerminalOutcome,
   normalizeAttempt,
   systemReasonFor,
@@ -477,5 +479,70 @@ describe('normalizeAttempt, motif du référentiel', () => {
 
   it('rompt sur une issue sans motif système, plutôt que de la laisser passer', () => {
     expect(() => systemReasonFor('INCONNUE' as CallOutcome)).toThrow(/motif système/);
+  });
+});
+
+describe('exigences de la conversion CHUES', () => {
+  const complet = {
+    payloadVersion: CONVERSION_CHUES_PAYLOAD_VERSION,
+    projet: Projet.CHUES,
+    method: EnrollmentMethod.PLATFORM,
+    incomeBandId: 'band-1',
+    dureeEtablissementMois: 24,
+  };
+
+  it('exige le revenu mensuel', () => {
+    expect(codeOf(() => assertConversionChues({ ...complet, incomeBandId: null }))).toBe(
+      'PHASE2_REVENU_REQUIRED',
+    );
+  });
+
+  it('exige la durée dans la fonction', () => {
+    expect(codeOf(() => assertConversionChues({ ...complet, dureeEtablissementMois: null }))).toBe(
+      'PHASE2_DUREE_FONCTION_REQUIRED',
+    );
+  });
+
+  it('refuse la méthode retirée « Physique »', () => {
+    expect(
+      codeOf(() => assertConversionChues({ ...complet, method: EnrollmentMethod.PHYSICAL })),
+    ).toBe('PHASE2_METHOD_RETIREE');
+  });
+
+  // LE POINT DE TOUT LE DISPOSITIF : hors ligne, un 400 est définitif, et
+  // l'écran « À corriger » ne propose qu'un renvoi à l'identique. Une version
+  // installée qui ne sait pas poser ces champs doit voir sa saisie acceptée.
+  it('n’oppose rien à une version antérieure', () => {
+    expect(() =>
+      assertConversionChues({
+        ...complet,
+        payloadVersion: CONVERSION_CHUES_PAYLOAD_VERSION - 1,
+        incomeBandId: null,
+        dureeEtablissementMois: null,
+        method: EnrollmentMethod.PHYSICAL,
+      }),
+    ).not.toThrow();
+  });
+
+  it('ne s’applique pas au Grand Public, dont le formulaire est inchangé', () => {
+    expect(() =>
+      assertConversionChues({
+        ...complet,
+        projet: Projet.GRAND_PUBLIC,
+        incomeBandId: null,
+        dureeEtablissementMois: null,
+      }),
+    ).not.toThrow();
+  });
+
+  it('ne s’applique pas hors conversion : sans méthode, rien n’est exigé', () => {
+    expect(() =>
+      assertConversionChues({
+        ...complet,
+        method: null,
+        incomeBandId: null,
+        dureeEtablissementMois: null,
+      }),
+    ).not.toThrow();
   });
 });

@@ -145,6 +145,7 @@ export const PURGE_STEPS: Readonly<Record<PurgeStepKey, PurgeStep>> = {
     remove: async (db) => (await db.auditLog.deleteMany({})).count,
   },
   commercialAccounts: accountsOfRole(Role.COMMERCIAL),
+  chargeClienteleAccounts: accountsOfRole(Role.CHARGE_CLIENTELE),
   financeAccounts: accountsOfRole(Role.BANQUE_FINANCE),
   supervisionAccounts: accountsOfRole(Role.SUPERVISEUR),
   directionAccounts: accountsOfRole(Role.DIRECTION),

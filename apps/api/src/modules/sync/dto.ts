@@ -10,6 +10,7 @@ import {
   IsISO8601,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -624,6 +625,17 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsUUID()
   destinataireId?: string;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par ' +
+      'l’administrateur, par identifiant de champ.',
+  })
+  @IsOptional()
+  @IsObject()
+  champsLibres?: Record<string, string>;
 }
 
 export class SyncOperationDto {

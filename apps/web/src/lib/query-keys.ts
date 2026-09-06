@@ -65,6 +65,8 @@ export const queryKeys = {
   lotsExportDetail: (id: string) => ['lots-export', 'detail', id] as const,
   lotsExportApercu: (critere: Record<string, unknown>) =>
     ['lots-export', 'apercu', critere] as const,
+  parametresChues: ['parametres-chues'] as const,
+  parametresChuesJournal: ['parametres-chues', 'journal'] as const,
   lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
   lotsExportFiches: (id: string, filtres: Record<string, unknown> = {}) =>
     ['lots-export', 'detail', id, 'fiches', filtres] as const,
@@ -97,6 +99,8 @@ export const queryKeys = {
   demoBanner: ['demo-status', 'banner'] as const,
 
   // ─── Administration ───────────────────────────────────────────────────────
+  champsConversionRoot: ['champs-conversion'] as const,
+  champsConversion: (projet: Projet) => ['champs-conversion', projet] as const,
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
 

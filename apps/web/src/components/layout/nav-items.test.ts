@@ -163,6 +163,7 @@ const MASQUEES: Readonly<Record<Role, readonly string[]>> = {
   // Les deux redirections ne portent aucun garde : elles renvoient vers
   // « Chiffres », qui refuse lui-même qui n'y a pas droit.
   COMMERCIAL: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
+  CHARGE_CLIENTELE: ['/chues/tableau-de-bord', '/compte', '/grand-public/tableau-de-bord'],
   BANQUE_FINANCE: [
     '/chues',
     '/chues/tableau-de-bord',
@@ -280,6 +281,7 @@ describe('navigation d’un ADMIN', () => {
       '/chues/statistiques',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
       '/chues/dossiers',
       '/chues/dossiers/etapes',
       '/chues/dossiers/export',
@@ -375,6 +377,7 @@ describe('navigation d’un ADMIN', () => {
       '/chues/dossiers',
     ]);
     expect(items.filter((item) => item.secondary === true).map((item) => item.href)).toEqual([
+      '/chues/parametres-chues',
       '/chues',
       '/chues/supervision',
       '/chues/rappels',
@@ -401,6 +404,7 @@ describe('navigation d’un ADMIN', () => {
       '/admin/notifications',
       '/admin/enrolement',
       '/admin/parametres',
+      '/admin/champs-conversion',
     ]);
   });
 
@@ -412,6 +416,7 @@ describe('navigation d’un ADMIN', () => {
       'Envoyer une notification',
       'Plateformes d’enrôlement',
       'Paramètres',
+      'Champs de la conversion',
     ]);
   });
 });
@@ -776,6 +781,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
     ]);
     expect(navItems('SUPERVISEUR', 'chues').map((item) => item.label)).toEqual([
       'Tableau de bord',
@@ -789,6 +795,7 @@ describe('navigation d’un SUPERVISEUR', () => {
       'Représentants',
       'Prospects',
       'Campagnes',
+      'Paramètres CHUES',
     ]);
   });
 
@@ -937,6 +944,7 @@ describe('navigation de la DIRECTION', () => {
       '/chues/representants',
       '/chues/prospects',
       '/chues/campagnes',
+      '/chues/parametres-chues',
     ]);
   });
 
@@ -979,7 +987,7 @@ describe('boîte de réception, hors coque', () => {
     // La cloche s'affichait à l'ACCUEIL, dont le garde de l'écran ne voulait
     // pas : la pastille menait à un refus de permission.
     expect([...INBOX_ROLES].sort()).toEqual(
-      PANEL_ROLES.filter((role) => role !== 'COMMERCIAL')
+      PANEL_ROLES.filter((role) => role !== 'COMMERCIAL' && role !== 'CHARGE_CLIENTELE')
         .slice()
         .sort(),
     );

@@ -1910,6 +1910,7 @@ class _SlowWrites extends WriteRepository {
     String? paysResidenceId,
     String? villeResidence,
     String? whatsappE164,
+    String? etablissement,
     String? relaisNom,
     String? relaisPhoneE164,
     String? id,

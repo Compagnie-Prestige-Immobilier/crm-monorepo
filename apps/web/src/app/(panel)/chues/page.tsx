@@ -1,9 +1,11 @@
 import { HydrationBoundary, dehydrate } from '@tanstack/react-query';
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { redirect } from 'next/navigation';
 
 import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-filters';
 import { HubView } from '@/components/chues/hub-view';
+import { LienFormulairePublic } from '@/components/chues/lien-formulaire-public';
 import { PermissionDenied } from '@/components/permission-denied';
 import { getServerApiClient } from '@/lib/api/server';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
@@ -24,6 +26,7 @@ export default async function ProjetChuesPage() {
   const guard = await guardRoles([
     'ADMIN',
     'COMMERCIAL',
+    'CHARGE_CLIENTELE',
     'SUPERVISEUR',
     'DIRECTION',
     'BANQUE_FINANCE',
@@ -33,6 +36,12 @@ export default async function ProjetChuesPage() {
     return <PermissionDenied role={guard.user.role} what="Le projet CHUES" />;
   }
   if (guard.user.role === 'BANQUE_FINANCE') redirect('/chues/banque');
+
+  // Le lien se partage hors du panel : il lui faut une adresse absolue, et
+  // seule la requête sait sous quel nom le panel a été atteint.
+  const entetes = await headers();
+  const hote = entetes.get('host') ?? '';
+  const protocole = entetes.get('x-forwarded-proto') ?? 'https';
 
   const client = getServerApiClient();
   const queryClient = getQueryClient();
@@ -59,7 +68,10 @@ export default async function ProjetChuesPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <HubView prenom={guard.user.fullName.split(' ')[0] ?? guard.user.fullName} />
+      <div className="flex flex-col gap-6">
+        <HubView prenom={guard.user.fullName.split(' ')[0] ?? guard.user.fullName} />
+        <LienFormulairePublic lien={`${protocole}://${hote}/demande/${guard.user.id}`} />
+      </div>
     </HydrationBoundary>
   );
 }

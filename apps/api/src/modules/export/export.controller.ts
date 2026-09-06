@@ -1,7 +1,7 @@
 import { Controller, Get, Query, Res } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiProduces, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
-import { Role } from '@crm/database';
+import { Projet, Role } from '@crm/database';
 import type { FastifyReply } from 'fastify';
 
 import { Roles } from '../../common/decorators/roles.decorator.js';
@@ -9,6 +9,8 @@ import {
   CurrentUser,
   type AuthenticatedUser,
 } from '../../common/decorators/current-user.decorator.js';
+import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
+import type { ChampLibre } from '../champs-conversion/catalogue.js';
 import { ExportService } from './export.service.js';
 import { ExportMode, ExportQueryDto } from './dto.js';
 import { formatDakarDate } from './dakar.js';
@@ -35,12 +37,13 @@ export class ExportController {
     private readonly representants: RepresentantsExportService,
     private readonly visitesExport: VisitesExportService,
     private readonly demo: WorkspaceContext,
+    private readonly champs: ChampsConversionService,
   ) {}
 
   // ADMIN, COMMERCIAL, DIRECTION : la feuille Synthèse porte les agrégats d'`AnalyticsController`,
   // moins le SUPERVISEUR, écarté ici à dessein — voir `representantsExport` plus bas.
   @Get('prospects.xlsx')
-  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.DIRECTION)
+  @Roles(Role.ADMIN, Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportProspectsXlsx',
@@ -83,7 +86,8 @@ export class ExportController {
     setDemoHeader(reply.raw, demoEnabled);
 
     try {
-      await this.exports.writeProspects(user, query, reply.raw, mode);
+      const libres = await champsLibresDe(this.champs, query.projet);
+      await this.exports.writeProspects(user, query, reply.raw, mode, libres);
     } catch (error) {
       // En-têtes déjà partis : couper vaut mieux qu'un classeur tronqué qui s'ouvre quand même.
       reply.raw.destroy(error instanceof Error ? error : new Error(String(error)));
@@ -193,7 +197,7 @@ export class ExportController {
 
   // Le SUPERVISEUR peut exporter l'annuaire qu'il consulte pour travailler hors ligne.
   @Get('representants.xlsx')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiProduces(XLSX_MIME)
   @ApiOperation({
     operationId: 'exportRepresentantsXlsx',
@@ -280,4 +284,14 @@ export class ExportController {
       throw error;
     }
   }
+}
+
+/** Sans projet au filtre, le classeur porte les deux : ses colonnes aussi. */
+async function champsLibresDe(
+  champs: ChampsConversionService,
+  projet: Projet | undefined,
+): Promise<ChampLibre[]> {
+  const projets = projet === undefined ? [Projet.CHUES, Projet.GRAND_PUBLIC] : [projet];
+  const listes = await Promise.all(projets.map((cible) => champs.champsLibres(cible)));
+  return listes.flat();
 }

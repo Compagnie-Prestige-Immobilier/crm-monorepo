@@ -45,6 +45,9 @@ enum Role {
   SUPERVISEUR
   DIRECTION
   ACCUEIL
+  /// Le closing : tout ce que fait un téléconseiller, plus la lecture et la
+  /// revue de TOUTE demande convertie, quel qu'en soit l'auteur.
+  CHARGE_CLIENTELE
 }
 
 // Où en est la relation avec un représentant, du point de vue de l'équipe qui
@@ -87,13 +90,18 @@ enum Phase2Status {
   WRONG_NUMBER
 }
 
+/// Les CODES sont immuables : l'historique des tentatives les designe. Seuls
+/// leurs libelles suivent EB-24, dans `phase2-labels.ts`. `PHYSICAL` n'est plus
+/// proposable, mais ses lignes gardent leur valeur : les convertir en
+/// `APPOINTMENT` leur inventerait une date de rendez-vous qui n'a jamais existe.
 enum EnrollmentMethod {
   PLATFORM
   PHYSICAL
   VOICE_OR_ELECTRONIC_MESSAGING
-  /// Prise de rendez-vous. Seule methode qui exige une date : `rendezVousAt`
-  /// sur la tentative, contrainte CHECK comprise.
+  /// RDV CPI. Seule methode qui exige une date : `rendezVousAt` sur la
+  /// tentative, contrainte CHECK comprise.
   APPOINTMENT
+  WHATSAPP
 }
 
 // BDD1..BDD4 ne sont PAS quatre bases physiques : ce sont des segments calculés
@@ -295,6 +303,7 @@ model User {
 
   // Phase 2
   enrollmentsCaptured  Prospect[]           @relation("ProspectEnrollmentCapturedBy")
+  prospectsRevus       Prospect[]           @relation("ProspectRevueBy")
   callAttempts         CallAttempt[]        @relation("CallAttemptPerformedBy")
   journeysConsented    ProspectJourney[]    @relation("ProspectJourneyConsentBy")
   journeysConverted    ProspectJourney[]    @relation("ProspectJourneyConvertedBy")
@@ -318,7 +327,8 @@ model User {
   clientRequestsReviewed ClientCreationRequest[] @relation("ClientCreationRequestReviewedBy")
 
   // Démonstration
-  appSettingsUpdated AppSetting[] @relation("AppSettingUpdatedBy")
+  appSettingsUpdated AppSetting[]       @relation("AppSettingUpdatedBy")
+  appSettingsChanged AppSettingChange[] @relation("AppSettingChangedBy")
 
   androidReleasesPublished AndroidRelease[] @relation("AndroidReleasePublishedBy")
 
@@ -751,6 +761,10 @@ model Prospect {
   /// Hors CHUES seulement. Voir `ProspectType`.
   type ProspectType?
 
+  /// L'etablissement ou il exerce, tel qu'il le declare. Meme champ que sur
+  /// `Representant`, et facultatif pour la meme raison.
+  etablissement String?
+
   /// Le metier declare, en clair. Pas un referentiel : la variete du secteur
   /// informel n'en supporterait pas un, et une liste fermee ferait saisir
   /// « autre » partout.
@@ -785,11 +799,22 @@ model Prospect {
   paysResidenceId String?
   paysResidence   Pays?   @relation(fields: [paysResidenceId], references: [id], onDelete: Restrict)
   villeResidence  String?
-  whatsappE164    String?
   relaisNom       String?
   relaisPhoneE164 String?
 
+  // Meme invariant que sur `Representant`, pose en CHECK dans la migration :
+  // `whatsappE164` est renseigne SI ET SEULEMENT SI `whatsappStatus` vaut
+  // AUTRE_NUMERO. Sur MEME_NUMERO la colonne reste NULLE, recopier `phoneE164`
+  // creerait une seconde verite qui divergerait a la premiere correction.
+  whatsappStatus WhatsappStatus @default(NON_DEMANDE)
+  whatsappE164   String?
+
   paymentMode PaymentMode?
+
+  /// Reponses aux champs libres que l'administrateur ajoute au formulaire de
+  /// conversion. Objet plat `identifiant du champ` -> valeur, les definitions
+  /// vivant dans `AppSetting` sous `conversion.champs.<projet>`.
+  champsLibres Json?
 
   /// Duree du systeme de paiement retenue, en mois.
   ///
@@ -832,6 +857,15 @@ model Prospect {
   origin      String?
   originLabel String?
 
+  /// Quand la fiche a été posée « à revoir » par le formulaire public.
+  ///
+  /// Une date et non un booléen : la relecture se fait dans l'ordre d'arrivée,
+  /// et `false` ne dirait pas si la demande date d'une heure ou d'un mois.
+  /// Indexée en index PARTIEL (`WHERE "aRevoirAt" IS NOT NULL`) dans la
+  /// migration : la file de relecture tient quelques lignes, un index plein
+  /// porterait toutes les autres pour rien. Voir `prospects_a_revoir_idx`.
+  aRevoirAt DateTime?
+
   // ── Phase 2 : méthode d'enrôlement ──────────────────────────────────────
   // Dimension indépendante de `statut`. Invariant applicatif, testé :
   // `enrollmentMethod` est OBLIGATOIRE si et seulement si
@@ -843,6 +877,14 @@ model Prospect {
   enrollmentCapturedAt   DateTime?
   enrollmentCapturedById String?
   enrollmentCapturedBy   User?             @relation("ProspectEnrollmentCapturedBy", fields: [enrollmentCapturedById], references: [id], onDelete: SetNull)
+
+  /// La revue du closing, avant transmission à l'enrôlement. Nulle tant que
+  /// personne n'a relu la demande, et c'est cette absence que l'écran signale.
+  /// `SetNull` comme les colonnes voisines : le départ d'un compte ne doit pas
+  /// retenir la fiche, seule la date porte la preuve que la revue a eu lieu.
+  revueAt   DateTime?
+  revueById String?
+  revueBy   User?     @relation("ProspectRevueBy", fields: [revueById], references: [id], onDelete: SetNull)
 
   /// Le DERNIER appel (par `clientCreatedAt`), recopié depuis `CallAttempt` pour
   /// que « mes contacts » se filtre sur la fiche. Pas de `nextCallbackAt` ici :
@@ -1063,12 +1105,12 @@ model AgentHeartbeat {
   userId String @id
   user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  lastPullAt DateTime?
-  lastPushAt DateTime?
+  lastPullAt            DateTime?
+  lastPushAt            DateTime?
   /// NULLABLE et sans valeur par défaut : un appareil qui ne l'annonce pas
   /// laisse « inconnu », et non « zéro en attente », qui serait un fait faux.
-  pendingOps Int?
-  appVersion String?
+  pendingOps            Int?
+  appVersion            String?
   /// EB-37 : lecture du journal d'appels accordée. Nul tant que l'appareil ne
   /// l'annonce pas ; faux, la DMC de ce compte ne se mesure pas.
   journalAppelsAutorise Boolean?
@@ -1583,6 +1625,29 @@ model BankCaseTransition {
 }
 
 /// Réglages de la plateforme, en clé/valeur.
+/// EB-29 : ce qu'une valeur de reglage valait AVANT, et ce qu'elle vaut apres.
+///
+/// `AppSetting` ecrase : elle porte son dernier auteur et sa derniere date,
+/// jamais l'ancienne valeur. Sans cette table, personne ne peut dire qui a
+/// change le message envoye aux prospects, ni ce qu'il disait la veille.
+///
+/// Append-only. Aucune mise a jour, aucune suppression hors purge.
+model AppSettingChange {
+  id  String @id @default(uuid(7))
+  key String
+
+  /// Nul a la premiere ecriture : le reglage n'existait pas encore.
+  oldValue String?
+  newValue String
+
+  changedById String
+  changedBy   User     @relation("AppSettingChangedBy", fields: [changedById], references: [id], onDelete: Restrict)
+  changedAt   DateTime @default(now())
+
+  @@index([key, changedAt])
+  @@map("app_setting_changes")
+}
+
 model AppSetting {
   key         String   @id
   value       String

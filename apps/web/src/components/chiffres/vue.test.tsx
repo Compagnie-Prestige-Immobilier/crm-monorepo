@@ -385,17 +385,18 @@ describe('l’écran Chiffres, du squelette aux chiffres', () => {
     expect(screen.queryByText('Encaissé')).toBeNull();
   });
 
-  it('ne propose pas les résultats par banque à un SUPERVISEUR', async () => {
-    setUrl('/chues/statistiques');
-    dispositionMock.mockResolvedValue(disposition(['par-banque']));
-    activiteMock.mockResolvedValue(activite);
+  // EB-32 : le superviseur compose avec tout le catalogue, les montants exceptés.
+  it('propose au SUPERVISEUR le suivi de campagne, le rendement et les banques', () => {
+    const catalogue = catalogueDe({ chues: true, voitLesMontants: false, role: SUPERVISEUR });
 
-    renderWithQuery(<ChiffresView ecran="chues" role={SUPERVISEUR} />);
-
-    await waitFor(() => {
-      expect(screen.getByText(/écran est vide/iu)).toBeTruthy();
-    });
-    expect(screen.queryByText('Par banque')).toBeNull();
+    for (const carte of [
+      'couverture-derniere-campagne',
+      'hors-attribution-derniere-campagne',
+      'rendement-par-departement',
+      'par-banque',
+    ]) {
+      expect(catalogue[carte], carte).toBeDefined();
+    }
   });
 
   // Un représentant syndical n'existe pas hors CHUES : ces cartes seraient à zéro.

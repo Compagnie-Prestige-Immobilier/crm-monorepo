@@ -3,6 +3,8 @@ import { unwrap } from '@crm/api-client/query';
 import { z } from 'zod';
 
 import { getApiClient } from '@/lib/api/browser';
+import type { ChampLibre, ReglageChamp } from '@/lib/data/champs-conversion';
+import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
 import { dakarLocalToIso } from '@/lib/format';
 import type {
   RepresentantScriptPatch,
@@ -196,12 +198,19 @@ export interface ConversionDraft {
   readonly incomeBandId: string;
   readonly paymentMode: PaymentMode | null;
   readonly dureeSystemeMois: string;
+  readonly memeWhatsapp: boolean | null;
+  readonly whatsapp: string;
   readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
+  /** Réponses aux champs que l'administrateur a ajoutés, par identifiant de champ. */
+  readonly champsLibres: Record<string, string>;
 }
 
-export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
-export type ConversionErrors = Partial<Record<ConversionField, string>>;
+export type ConversionField = Exclude<keyof ConversionDraft, 'projet' | 'champsLibres'>;
+
+export type ConversionErrors = Partial<Record<ConversionField, string>> & {
+  readonly libres?: Record<string, string>;
+};
 
 const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   projet: z.enum(['CHUES', 'GRAND_PUBLIC']),
@@ -218,8 +227,13 @@ const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   incomeBandId: z.string(),
   paymentMode: z.enum(['COMPTANT', 'ECHELONNE']).nullable(),
   dureeSystemeMois: z.string(),
+  memeWhatsapp: z.boolean().nullable().catch(null),
+  whatsapp: z.string().catch(''),
   method: z.enum(ENROLLMENT_METHODS).nullable(),
   rendezVousAt: z.string(),
+  // `.catch` et non `.optional` : un brouillon écrit avant EB-28 n'a pas la clé,
+  // et le refuser reviendrait à jeter la saisie que le rappel devait retrouver.
+  champsLibres: z.record(z.string(), z.string()).catch({}),
 });
 
 const brouillonSchema = z.object({
@@ -313,8 +327,43 @@ export function conversionFrom(
     incomeBandId: prospect.incomeBandId ?? '',
     paymentMode: prospect.paymentMode,
     dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
+    memeWhatsapp: null,
+    whatsapp: '',
     method,
     rendezVousAt: '',
+    champsLibres: { ...prospect.champsLibres },
+  };
+}
+
+/**
+ * Les identifiants du catalogue serveur : `phoneE164` s'affiche en lecture
+ * seule, et le couple WhatsApp y est nommé autrement que dans le brouillon.
+ */
+export type ChampReglable =
+  | Exclude<ConversionField, 'memeWhatsapp' | 'whatsapp'>
+  | 'phoneE164'
+  | 'whatsappStatus'
+  | 'whatsappE164';
+
+/**
+ * Les réglages de l'administrateur, appliqués champ par champ : masqué, un
+ * champ n'est plus exigé ; sans réglage, la règle du projet reste celle du
+ * serveur.
+ */
+export interface ReglesChamps {
+  readonly visible: (champ: ChampReglable, defaut: boolean) => boolean;
+  readonly requis: (champ: ChampReglable, defaut: boolean) => boolean;
+}
+
+export function reglesChamps(reglages: readonly ReglageChamp[]): ReglesChamps {
+  const parChamp = new Map(reglages.map((regle) => [regle.champ, regle]));
+  return {
+    visible: (champ, defaut) => parChamp.get(champ)?.visible ?? defaut,
+    requis: (champ, defaut) => {
+      const regle = parChamp.get(champ);
+      if (regle === undefined) return defaut;
+      return regle.visible && regle.obligatoire;
+    },
   };
 }
 
@@ -322,74 +371,120 @@ export function conversionFrom(
 export function validateConversion(
   draft: ConversionDraft,
   now: number = Date.now(),
+  reglages: readonly ReglageChamp[] = [],
+  libres: readonly ChampLibre[] = [],
 ): ConversionErrors {
   const complet = draft.projet === 'CHUES';
+  const regles = reglesChamps(reglages);
+  const manquantes = libresManquants(draft, libres);
   return {
-    ...identiteErreurs(draft, complet),
-    ...dossierErreurs(draft, complet),
-    ...methodeErreurs(draft, now),
+    ...identiteErreurs(draft, complet, regles),
+    ...dossierErreurs(draft, complet, regles),
+    ...methodeErreurs(draft, now, regles),
+    ...(Object.keys(manquantes).length === 0 ? {} : { libres: manquantes }),
   };
 }
 
-function identiteErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
+function libresManquants(
+  draft: ConversionDraft,
+  libres: readonly ChampLibre[],
+): Record<string, string> {
+  const manquants: Record<string, string> = {};
+  for (const champ of libres) {
+    if (!champ.obligatoire) continue;
+    if ((draft.champsLibres[champ.id] ?? '').trim() === '') {
+      manquants[champ.id] = `« ${champ.libelle} » est obligatoire.`;
+    }
+  }
+  return manquants;
+}
+
+function identiteErreurs(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
 
   const nom = draft.nom.trim();
-  if (nom === '') errors.nom = 'Le nom est obligatoire.';
+  if (regles.requis('nom', true) && nom === '') errors.nom = 'Le nom est obligatoire.';
   else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
 
   const prenom = draft.prenom.trim();
-  if (complet && prenom === '') errors.prenom = 'Le prénom est obligatoire.';
-  else if (prenom.length > NAME_MAX_LENGTH) {
+  if (regles.requis('prenom', complet) && prenom === '') {
+    errors.prenom = 'Le prénom est obligatoire.';
+  } else if (prenom.length > NAME_MAX_LENGTH) {
     errors.prenom = 'Prénom trop long (120 caractères maximum).';
   }
 
   const profession = draft.profession.trim();
-  if (complet && profession === '') errors.profession = 'La profession est obligatoire.';
-  else if (profession.length > NAME_MAX_LENGTH) {
+  if (regles.requis('profession', complet) && profession === '') {
+    errors.profession = 'La profession est obligatoire.';
+  } else if (profession.length > NAME_MAX_LENGTH) {
     errors.profession = 'Profession trop longue (120 caractères maximum).';
   }
 
   const email = draft.email.trim();
-  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+  if (regles.requis('email', false) && email === '') {
+    errors.email = 'L’adresse électronique est obligatoire.';
+  } else if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
     errors.email = 'Cette adresse électronique n’en est pas une.';
   }
 
   return errors;
 }
 
-const CHAMPS_CHUES: readonly [ConversionField, (draft: ConversionDraft) => boolean, string][] = [
-  ['fonctionnaire', (draft) => draft.fonctionnaire === null, 'Dites s’il est fonctionnaire.'],
-  ['syndicatId', (draft) => draft.syndicatId === '', 'Choisissez le syndicat.'],
-  ['banqueId', (draft) => draft.banqueId === '', 'Choisissez la banque.'],
+/** Le dernier membre dit si le champ est obligatoire sur CHUES sans réglage. */
+const CHAMPS_DOSSIER: readonly [
+  Extract<ConversionField, ChampReglable>,
+  (draft: ConversionDraft) => boolean,
+  string,
+  boolean,
+][] = [
+  ['fonctionnaire', (draft) => draft.fonctionnaire === null, 'Dites s’il est fonctionnaire.', true],
+  ['syndicatId', (draft) => draft.syndicatId === '', 'Choisissez le syndicat.', true],
+  ['banqueId', (draft) => draft.banqueId === '', 'Choisissez la banque.', true],
   [
     'engagementEnCours',
     (draft) => draft.engagementEnCours === null,
     'Dites s’il a un engagement en cours à la banque.',
+    true,
   ],
-  ['incomeBandId', (draft) => draft.incomeBandId === '', 'Choisissez la tranche de revenu.'],
+  ['incomeBandId', (draft) => draft.incomeBandId === '', 'Choisissez la tranche de revenu.', true],
+  ['type', (draft) => draft.type === null, 'Choisissez la situation.', false],
+  ['paymentMode', (draft) => draft.paymentMode === null, 'Choisissez le mode de paiement.', false],
 ];
 
-function chuesObligatoires(draft: ConversionDraft): ConversionErrors {
+function dossierObligatoires(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
-  for (const [field, manquant, message] of CHAMPS_CHUES) {
-    if (manquant(draft)) errors[field] = message;
+  for (const [field, manquant, message, surChues] of CHAMPS_DOSSIER) {
+    if (regles.requis(field, surChues && complet) && manquant(draft)) errors[field] = message;
   }
   return errors;
 }
 
-function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
-  const errors: ConversionErrors = complet ? chuesObligatoires(draft) : {};
+const chiffres = (value: string): number => value.replace(/\D/gu, '').length;
+
+function dossierErreurs(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
+  const errors: ConversionErrors = dossierObligatoires(draft, complet, regles);
 
   const mois = draft.dureeEtablissementMois.trim();
-  if (complet && mois === '') {
-    errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
+  if (regles.requis('dureeEtablissementMois', complet) && mois === '') {
+    errors.dureeEtablissementMois = 'La durée dans la fonction est obligatoire.';
   } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
     errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
   }
 
   const systeme = draft.dureeSystemeMois.trim();
-  if (complet && systeme === '') {
+  if (regles.requis('dureeSystemeMois', false) && systeme === '') {
     errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
   } else if (
     systeme !== '' &&
@@ -398,26 +493,39 @@ function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErr
     errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
   }
 
+  if (
+    draft.memeWhatsapp === false &&
+    draft.whatsapp.trim() !== '' &&
+    chiffres(draft.whatsapp) < 9
+  ) {
+    errors.whatsapp = 'Le numéro WhatsApp est incomplet.';
+  }
+
   return errors;
 }
 
-function methodeErreurs(draft: ConversionDraft, now: number): ConversionErrors {
+function methodeErreurs(
+  draft: ConversionDraft,
+  now: number,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
 
   if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
 
   const rendezVous = draft.rendezVousAt.trim();
+  if (!regles.visible('rendezVousAt', true)) return errors;
   if (draft.method === 'APPOINTMENT') {
     const iso = dakarLocalToIso(rendezVous);
     if (rendezVous === '') {
-      errors.rendezVousAt = 'La prise de rendez-vous exige la date du rendez-vous.';
+      errors.rendezVousAt = 'Le RDV CPI exige la date et l’heure du rendez-vous.';
     } else if (iso === null) {
       errors.rendezVousAt = 'La date du rendez-vous est illisible.';
     } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
       errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
     }
   } else if (rendezVous !== '') {
-    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».';
+    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « RDV CPI ».';
   }
 
   return errors;
@@ -432,11 +540,23 @@ export const CONVERSION_ERRORS: Readonly<
 > = {
   PHASE2_RENDEZ_VOUS_REQUIRED: {
     field: 'rendezVousAt',
-    message: 'La prise de rendez-vous exige la date du rendez-vous.',
+    message: 'Le RDV CPI exige la date et l’heure du rendez-vous.',
   },
   PHASE2_RENDEZ_VOUS_NOT_ALLOWED: {
     field: 'rendezVousAt',
-    message: 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».',
+    message: 'Une date de rendez-vous n’est admise que sur « RDV CPI ».',
+  },
+  PHASE2_METHOD_RETIREE: {
+    field: 'method',
+    message: 'Cette méthode n’existe plus. Choisissez « RDV CPI ».',
+  },
+  PHASE2_REVENU_REQUIRED: {
+    field: 'incomeBandId',
+    message: 'Choisissez la tranche de revenu.',
+  },
+  PHASE2_DUREE_FONCTION_REQUIRED: {
+    field: 'dureeEtablissementMois',
+    message: 'La durée dans la fonction est obligatoire.',
   },
   PHASE2_RENDEZ_VOUS_INVALID: {
     field: 'rendezVousAt',
@@ -496,7 +616,8 @@ export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): 
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
   if (draft.conversion !== undefined) {
-    return Object.values(validateConversion(draft.conversion, now))[0] ?? null;
+    const problems = validateConversion(draft.conversion, now);
+    return Object.values(problems).find((message) => typeof message === 'string') ?? null;
   }
   return null;
 }
@@ -548,9 +669,31 @@ function conversionData(draft: ConversionDraft): SyncEntityData {
     ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
     ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
     ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+    ...whatsappData(draft),
     ...(rendezVousAt === null ? {} : { rendezVousAt }),
+    ...siRenseignes(draft.champsLibres),
   };
 }
+
+/**
+ * EB-23. Sur « oui » la colonne `whatsappE164` reste nulle : le serveur la
+ * recompose depuis le numéro appelé. Sur « non » sans numéro, il retient AUCUN.
+ */
+function whatsappData(draft: ConversionDraft): SyncEntityData {
+  if (draft.memeWhatsapp === null) return {};
+  if (draft.memeWhatsapp) return { whatsappStatus: 'MEME_NUMERO' };
+
+  const numero = draft.whatsapp.trim();
+  return {
+    whatsappStatus: 'AUTRE_NUMERO',
+    ...(numero === '' ? {} : { whatsappE164: numero }),
+  };
+}
+
+const siRenseignes = (
+  champsLibres: Record<string, string>,
+): { champsLibres?: Record<string, string> } =>
+  Object.keys(champsLibres).length === 0 ? {} : { champsLibres };
 
 export interface AttemptInput {
   readonly prospectId: string;
@@ -566,7 +709,7 @@ export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
 
   return {
     clientBatchId: input.batchId,
-    payloadVersion: 1,
+    payloadVersion: PANEL_PAYLOAD_VERSION,
     operations: [
       {
         opId: input.attemptId,

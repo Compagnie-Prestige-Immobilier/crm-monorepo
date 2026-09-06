@@ -11,7 +11,9 @@ entier, le lot 7 à une ventilation près. Les lots 4 et 6 n'ont pas commencé.
 
 ## Lot 4, conversion et paramètres
 
-Aucune des sept exigences n'est commencée.
+Six des sept exigences restent à faire. EB-29 est livrée, et les autres en
+dépendaient : EB-24 affiche le lien et l'adresse qu'elle porte, EB-26 le texte
+du message.
 
 - [ ] EB-20 Champ « Établissement » à la création d'un prospect. Absent en base.
 - [ ] EB-21 Revenu mensuel obligatoire côté API. `incomeBandId` est
@@ -22,8 +24,12 @@ Aucune des sept exigences n'est commencée.
 - [ ] EB-24 Méthodes d'enrôlement recomposées, plus la migration des valeurs
       existantes. L'enum n'a ni WHATSAPP ni fusion RDV CPI / Physique.
 - [ ] EB-26 Bouton « Écrire sur WhatsApp ». Aucun lien `wa.me` dans le dépôt.
-- [ ] EB-29 Page « Paramètres CHUES ». Les réglages du connecteur vivent en
-      variables d'environnement, pas en base.
+- [x] EB-29 Page « Paramètres CHUES ». Faite, branche `feat/lot4-conversion`.
+      Écran `/chues/parametres-chues`, ouvert à l'administrateur, à la
+      supervision et à la direction ; ces deux dernières n'écrivent que le
+      message WhatsApp et l'accusé de réception. La trace « ancienne et
+      nouvelle valeur » tient dans `app_setting_changes` : `app_settings`
+      écrase et ne garde que la dernière écriture.
 
 ## Lot 5, rôles
 

@@ -75,6 +75,8 @@ class UpdateProspectDto {
 
     this.villeResidence,
 
+    this.etablissement,
+
     this.whatsappE164,
 
     this.relaisNom,
@@ -197,6 +199,9 @@ class UpdateProspectDto {
   @JsonKey(name: r'villeResidence', required: false, includeIfNull: false)
   final String? villeResidence;
 
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
+
   @JsonKey(name: r'whatsappE164', required: false, includeIfNull: false)
   final String? whatsappE164;
 
@@ -237,6 +242,7 @@ class UpdateProspectDto {
                 modeEpargne,
                 paysResidenceId,
                 villeResidence,
+                etablissement,
                 whatsappE164,
                 relaisNom,
                 relaisPhoneE164,
@@ -267,6 +273,7 @@ class UpdateProspectDto {
                 other.modeEpargne,
                 other.paysResidenceId,
                 other.villeResidence,
+                other.etablissement,
                 other.whatsappE164,
                 other.relaisNom,
                 other.relaisPhoneE164,
@@ -303,6 +310,7 @@ class UpdateProspectDto {
         modeEpargne,
         paysResidenceId,
         villeResidence,
+        etablissement,
         whatsappE164,
         relaisNom,
         relaisPhoneE164,

@@ -19,8 +19,8 @@ import { withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   BDD_SEGMENTS,
-  ENROLLMENT_METHODS,
   ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUTS,
@@ -49,7 +49,7 @@ const PHASE2_STATUS_OPTIONS: FilterOption[] = PHASE2_STATUSES.map((status) => ({
   label: PHASE2_STATUS_LABELS[status],
 }));
 
-const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHODS.map((method) => ({
+const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
   value: method,
   label: ENROLLMENT_METHOD_LABELS[method],
 }));

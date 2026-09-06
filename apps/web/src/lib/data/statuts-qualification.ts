@@ -14,9 +14,10 @@ export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationD
 /**
  * Version de charge utile du PANEL. Le serveur ne sert que les statuts qu'un
  * appelant de cette version sait renvoyer ; le panel les sait tous, mais il
- * déclare quand même la sienne, comme le fera le terrain.
+ * déclare quand même la sienne, comme le fera le terrain. En 8, il consent
+ * aussi aux refus de conversion CHUES d'EB-21, EB-22 et EB-24.
  */
-export const PANEL_PAYLOAD_VERSION = 7;
+export const PANEL_PAYLOAD_VERSION = 8;
 
 export const STATUT_QUALIFICATION_EFFECTS = [
   'REACHED',

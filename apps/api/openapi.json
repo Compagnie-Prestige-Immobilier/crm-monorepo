@@ -6111,6 +6111,82 @@
         "tags": ["prospects"]
       }
     },
+    "/api/v1/prospects/{id}/revue": {
+      "post": {
+        "description": "La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.",
+        "operationId": "marquerProspectRevue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PROSPECT_NOT_FOUND · fiche absente ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marque une demande convertie « revue » avant sa transmission à l’enrôlement.",
+        "tags": ["prospects"]
+      }
+    },
     "/api/v1/prospects/merge": {
       "post": {
         "operationId": "mergeProspects",
@@ -18405,6 +18481,144 @@
         "tags": ["export"]
       }
     },
+    "/api/v1/champs-conversion/{projet}": {
+      "get": {
+        "description": "Lu par le formulaire du téléconseiller comme par le formulaire public : un champ masqué n’est ni rendu ni exigé. Les champs imposés reviennent toujours visibles, quel que soit le réglage enregistré.",
+        "operationId": "getChampsConversion",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglagesConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Champs du formulaire de conversion, dans l’ordre d’affichage.",
+        "tags": ["champs-conversion"]
+      },
+      "put": {
+        "description": "La liste entière est remplacée. Masquer un champ imposé est refusé en 400.",
+        "operationId": "updateChampsConversion",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReglagesConversionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglagesConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre visibilité, caractère obligatoire, ordre et champs ajoutés.",
+        "tags": ["champs-conversion"]
+      }
+    },
     "/api/v1/app-updates/android/current": {
       "get": {
         "description": "`minVersionCode` est le plus haut `versionCode` marqué obligatoire encore en ligne, ou `null`. `forceUpdate` vaut `versionCode < minVersionCode`.",
@@ -20269,6 +20483,192 @@
         "tags": ["lots-export"]
       }
     },
+    "/api/v1/parametres-chues": {
+      "get": {
+        "operationId": "getParametresChues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les réglages CHUES, valeurs d’usine comprises.",
+        "tags": ["parametres-chues"]
+      },
+      "patch": {
+        "description": "La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.",
+        "operationId": "updateParametresChues",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParametresChuesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PARAMETRE_RESERVE_ADMIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Règle les paramètres CHUES.",
+        "tags": ["parametres-chues"]
+      }
+    },
+    "/api/v1/parametres-chues/journal": {
+      "get": {
+        "operationId": "getJournalParametresChues",
+        "parameters": [
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalParametresDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qui a changé quoi, et ce que la valeur disait avant.",
+        "tags": ["parametres-chues"]
+      }
+    },
     "/api/v1/enrolement/{projet}/inscriptions": {
       "get": {
         "operationId": "listEnrolementInscriptions",
@@ -21079,7 +21479,15 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION", "ACCUEIL"]
+        "enum": [
+          "ADMIN",
+          "COMMERCIAL",
+          "BANQUE_FINANCE",
+          "SUPERVISEUR",
+          "DIRECTION",
+          "ACCUEIL",
+          "CHARGE_CLIENTELE"
+        ]
       },
       "AuthUserDto": {
         "type": "object",
@@ -23842,7 +24250,7 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"]
+        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT", "WHATSAPP"]
       },
       "ProspectSortField": {
         "type": "string",
@@ -24078,9 +24486,26 @@
             "type": "string",
             "nullable": true
           },
-          "whatsappE164": {
+          "etablissement": {
             "type": "string",
             "nullable": true
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Renseigné avec le seul statut AUTRE_NUMERO."
+          },
+          "whatsappNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon."
           },
           "relaisNom": {
             "type": "string",
@@ -24095,6 +24520,13 @@
             "items": {
               "$ref": "#/components/schemas/ProspectJourneyDto"
             }
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}."
           },
           "dureeSystemeMois": {
             "type": "number",
@@ -24149,6 +24581,21 @@
           "enrollmentCapturedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "revueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue."
+          },
+          "revueById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "revueByName": {
+            "type": "string",
             "nullable": true
           },
           "lastOutcome": {
@@ -24259,10 +24706,14 @@
           "paysResidenceId",
           "paysResidenceLabel",
           "villeResidence",
+          "etablissement",
+          "whatsappStatus",
           "whatsappE164",
+          "whatsappNumber",
           "relaisNom",
           "relaisPhoneE164",
           "journeys",
+          "champsLibres",
           "dureeSystemeMois",
           "canalProvenanceId",
           "canalProvenanceLabel",
@@ -24272,6 +24723,9 @@
           "enrollmentCapturedById",
           "enrollmentCapturedByName",
           "enrollmentCapturedAt",
+          "revueAt",
+          "revueById",
+          "revueByName",
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
@@ -24476,6 +24930,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Profession choisie dans le référentiel."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où le prospect exerce."
           },
           "incomeBandId": {
             "type": "string",
@@ -24799,6 +25258,11 @@
           "villeResidence": {
             "type": "string",
             "maxLength": 120,
+            "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
             "nullable": true
           },
           "whatsappE164": {
@@ -25403,6 +25867,13 @@
             "type": "string",
             "format": "uuid",
             "description": "Visite : destinataire visé."
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ."
           }
         }
       },
@@ -30982,6 +31453,7 @@
         "type": "string",
         "enum": [
           "teleconseillers",
+          "chargesClientele",
           "finances",
           "supervision",
           "directionAccueil",
@@ -31359,6 +31831,151 @@
       "ExportMode": {
         "type": "string",
         "enum": ["filtered", "consolidated"]
+      },
+      "ReglageChampDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string",
+            "description": "Clé du champ dans le catalogue de la conversion."
+          },
+          "libelle": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "obligatoire": {
+            "type": "boolean"
+          },
+          "impose": {
+            "type": "boolean",
+            "description": "Champ exigé par les indicateurs et le closing : il ne peut pas être masqué."
+          }
+        },
+        "required": ["champ", "libelle", "visible", "obligatoire", "impose"]
+      },
+      "ChampLibreDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "libelle": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["TEXTE", "LISTE", "OUI_NON"]
+          },
+          "options": {
+            "description": "Valeurs proposées, pour le type LISTE seulement.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "libelle", "type", "options", "obligatoire"]
+      },
+      "ReglagesConversionDto": {
+        "type": "object",
+        "properties": {
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "champs": {
+            "description": "Dans l’ordre d’affichage. Un champ masqué n’est ni rendu ni exigé.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampDto"
+            }
+          },
+          "libres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreDto"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["projet", "champs", "libres", "updatedAt"]
+      },
+      "ReglageChampInputDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["champ", "visible", "obligatoire"]
+      },
+      "ChampLibreInputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Absent : le champ vient d’être ajouté."
+          },
+          "libelle": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": ["TEXTE", "LISTE", "OUI_NON"]
+          },
+          "options": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["libelle", "type", "obligatoire"]
+      },
+      "UpdateReglagesConversionDto": {
+        "type": "object",
+        "properties": {
+          "champs": {
+            "description": "La liste ENTIÈRE, dans l’ordre d’affichage voulu.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampInputDto"
+            }
+          },
+          "libres": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreInputDto"
+            }
+          }
+        },
+        "required": ["champs", "libres"]
       },
       "AppUpdateDto": {
         "type": "object",
@@ -32198,7 +32815,13 @@
           },
           "method": {
             "type": "string",
-            "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"],
+            "enum": [
+              "PLATFORM",
+              "PHYSICAL",
+              "VOICE_OR_ELECTRONIC_MESSAGING",
+              "APPOINTMENT",
+              "WHATSAPP"
+            ],
             "nullable": true
           },
           "comment": {
@@ -32567,6 +33190,168 @@
           }
         },
         "required": ["teleconseillerId"]
+      },
+      "ParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string"
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string"
+          },
+          "emailChues": {
+            "type": "string"
+          },
+          "whatsappChuesE164": {
+            "type": "string"
+          },
+          "messageWhatsapp": {
+            "type": "string"
+          },
+          "accuseReceptionObjet": {
+            "type": "string"
+          },
+          "accuseReceptionCorps": {
+            "type": "string"
+          },
+          "destinatairesEnrolement": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "plateformeChuesUrl",
+          "plateformeGrandPublicUrl",
+          "emailChues",
+          "whatsappChuesE164",
+          "messageWhatsapp",
+          "accuseReceptionObjet",
+          "accuseReceptionCorps",
+          "destinatairesEnrolement",
+          "destinatairesBpe",
+          "destinatairesSupervision",
+          "destinatairesDirection"
+        ]
+      },
+      "UpdateParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "emailChues": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "whatsappChuesE164": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "messageWhatsapp": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "accuseReceptionObjet": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "accuseReceptionCorps": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "destinatairesEnrolement": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ParametreChangementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cle": {
+            "type": "string"
+          },
+          "ancienne": {
+            "type": "string",
+            "nullable": true
+          },
+          "nouvelle": {
+            "type": "string"
+          },
+          "parNom": {
+            "type": "string"
+          },
+          "le": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "cle", "ancienne", "nouvelle", "parNom", "le"]
+      },
+      "JournalParametresDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParametreChangementDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "InscriptionPlateformeDto": {
         "type": "object",

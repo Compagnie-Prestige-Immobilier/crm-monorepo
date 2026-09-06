@@ -14,6 +14,11 @@ const EXEMPT = new Map<string, string>([
 
   ['modules/app-updates/app-updates.controller.ts#current', '@Public, version disponible'],
   ['modules/app-updates/app-updates.controller.ts#download', '@Public, récupération de l’APK'],
+
+  [
+    'modules/formulaire-public/formulaire-public.controller.ts#envoyer',
+    '@Public, EB-27 : dépôt d’une demande, aucune lecture, limité par adresse réseau',
+  ],
 ]);
 
 async function walkControllers(dir: string): Promise<string[]> {

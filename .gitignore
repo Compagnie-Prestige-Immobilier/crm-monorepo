@@ -189,3 +189,4 @@ temp/
 
 # Données d'exécution de l'API (APK publiés, imports, enregistrements, dumps)
 apps/api/storage/
+.claude/worktrees/

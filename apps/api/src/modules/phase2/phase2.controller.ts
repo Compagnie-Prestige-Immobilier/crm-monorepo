@@ -76,7 +76,7 @@ export class Phase2Controller {
   }
 
   @Get('call-attempts/:id/recording')
-  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION, Role.COMMERCIAL)
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION, Role.COMMERCIAL, Role.CHARGE_CLIENTELE)
   @ApiProduces('audio/mp4')
   @ApiOperation({
     operationId: 'downloadCallRecording',

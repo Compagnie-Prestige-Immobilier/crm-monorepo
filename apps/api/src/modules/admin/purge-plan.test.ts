@@ -22,6 +22,10 @@ const SCHEMA_PATH = new URL(
 const PURGE_EXEMPT = new Map<string, string>([
   ['app_settings', 'réglages de workflow et non données métier'],
   [
+    'app_setting_changes',
+    'histoire des réglages, pour la même raison qu’`app_settings` : un geste d’administration et non une donnée métier. Purger la clientèle n’efface pas la trace qu’on a changé le message envoyé aux prospects, de la même façon que la purge ne réécrit pas le journal d’audit. `changedById` pointe vers `users` en SetNull : le compte auteur peut partir sans laisser de ligne orpheline',
+  ],
+  [
     'statuts_qualification',
     'référentiel administrable, comme les banques ou les syndicats : la purge efface les fiches, pas le vocabulaire avec lequel on les qualifie. Les fiches qui le désignent partent par « Représentants », et `onDelete: Restrict` interdit qu’un statut disparaisse en laissant une fiche orpheline',
   ],

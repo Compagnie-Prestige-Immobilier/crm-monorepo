@@ -152,6 +152,8 @@ class SyncEntityDataDto {
     this.directionId,
 
     this.destinataireId,
+
+    this.champsLibres,
   });
 
   /// Représentant : nom complet.
@@ -471,6 +473,10 @@ class SyncEntityDataDto {
   @JsonKey(name: r'destinataireId', required: false, includeIfNull: false)
   final String? destinataireId;
 
+  /// Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ.
+  @JsonKey(name: r'champsLibres', required: false, includeIfNull: false)
+  final Map<String, String>? champsLibres;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is SyncEntityDataDto &&
@@ -539,6 +545,7 @@ class SyncEntityDataDto {
                 objetId,
                 directionId,
                 destinataireId,
+                champsLibres,
               ],
               [
                 other.fullName,
@@ -603,6 +610,7 @@ class SyncEntityDataDto {
                 other.objetId,
                 other.directionId,
                 other.destinataireId,
+                other.champsLibres,
               ],
             );
   }
@@ -673,6 +681,7 @@ class SyncEntityDataDto {
         objetId,
         directionId,
         destinataireId,
+        champsLibres,
       ]);
 
   factory SyncEntityDataDto.fromJson(Map<String, dynamic> json) =>

@@ -458,6 +458,7 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
+  EnrollmentMethod.WHATSAPP: 'WHATSAPP',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

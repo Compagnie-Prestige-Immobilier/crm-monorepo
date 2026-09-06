@@ -1,12 +1,16 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { ReactNode } from 'react';
+import { toast } from 'sonner';
 
 import { DetailBackLink } from '@/components/detail-back-link';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDuration } from '@/lib/data/admin';
@@ -14,8 +18,10 @@ import {
   fetchProspect,
   fetchProspectCallAttempts,
   fetchProspectDeviceCalls,
+  marquerProspectRevue,
   type DeviceCallDetection,
 } from '@/lib/data/prospects';
+import { toastApiError } from '@/lib/mutation-feedback';
 import {
   formatDate,
   formatDateTime,
@@ -31,6 +37,7 @@ import {
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  peutRevoirUneDemande,
   type ProspectRow,
   type Role,
 } from '@/lib/types';
@@ -111,15 +118,18 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             <div className="flex flex-wrap items-center justify-end gap-2">
               <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
               <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
+              <RevueDemande prospect={prospect} role={role} />
+              <BoutonWhatsApp prospect={prospect} />
             </div>
           </div>
         </CardHeader>
         <CardContent>
           <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
             <Ligne label="WhatsApp">
-              {prospect.whatsappE164 === null ? NO_VALUE : formatPhone(prospect.whatsappE164)}
+              {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
             </Ligne>
             <Ligne label="Profession">{prospect.profession ?? NO_VALUE}</Ligne>
+            <Ligne label="Établissement">{prospect.etablissement ?? NO_VALUE}</Ligne>
             <Ligne label="Banque">{prospect.banqueName ?? NO_VALUE}</Ligne>
             <Ligne label="Syndicat">{prospect.syndicatSigle ?? NO_VALUE}</Ligne>
             <Ligne label="Représentant">{prospect.representantName ?? NO_VALUE}</Ligne>
@@ -145,6 +155,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
           </dl>
         </CardContent>
       </Card>
+
+      <ChampsAjoutes prospect={prospect} />
 
       {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
       <Card id="appels">
@@ -178,6 +190,52 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         </Card>
       ) : null}
     </div>
+  );
+}
+
+/**
+ * La revue du closing. Rien à afficher tant que la demande n'est pas convertie :
+ * il n'y a alors rien à transmettre à l'enrôlement.
+ */
+function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+  const queryClient = useQueryClient();
+  const revue = useMutation({
+    mutationFn: () => marquerProspectRevue(prospect.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+      toast.success('Demande revue.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'La revue n’a pas pu être enregistrée.');
+    },
+  });
+
+  if (prospect.statut !== 'CONVERTI') return null;
+
+  if (prospect.revueAt !== null) {
+    return (
+      <Badge variant="success">
+        Revue le {formatDate(prospect.revueAt)}
+        {prospect.revueByName === null ? '' : ` par ${prospect.revueByName}`}
+      </Badge>
+    );
+  }
+
+  return (
+    <>
+      <Badge variant="warning">Demande non revue</Badge>
+      {peutRevoirUneDemande(role) ? (
+        <Button
+          size="sm"
+          disabled={revue.isPending}
+          onClick={() => {
+            revue.mutate();
+          }}
+        >
+          Marquer revue
+        </Button>
+      ) : null}
+    </>
   );
 }
 
@@ -269,7 +327,7 @@ function AppelsProspect({ items }: { items: readonly Appel[] }) {
             {ouiNon(appel.engagementEnCours)}
             {appel.dureeEtablissementMois === null
               ? ''
-              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans l’établissement`}
+              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans la fonction`}
             {appel.email === null || appel.email === '' ? '' : ` · ${appel.email}`}
           </p>
           {appel.rendezVousAt === null ? null : (
