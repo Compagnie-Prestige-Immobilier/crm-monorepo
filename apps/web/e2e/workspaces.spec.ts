@@ -4,7 +4,6 @@ import { stat } from 'node:fs/promises';
 import { expect, test, type Page } from '@playwright/test';
 
 import {
-  adminApi,
   BANK_CLIENT_PHONE,
   BANQUIER,
   ensureWorkspaceFixtures,
@@ -16,35 +15,7 @@ test.describe.configure({ mode: 'serial' });
 test.beforeAll(async () => {
   test.setTimeout(180_000);
   await ensureWorkspaceFixtures();
-  await closeLeftoverCampaigns();
 });
-
-/**
- * Un tirage prend chaque fiche dans une tache active, et l'index partiel n'en
- * autorise qu'une. Sans cette cloture, la suite ne passe qu'UNE fois: au
- * deuxieme tirage plus rien n'est eligible, et l'echec accuse le tirage au
- * lieu du reliquat laisse par l'execution precedente.
- */
-async function closeLeftoverCampaigns(): Promise<void> {
-  const api = await adminApi();
-  try {
-    for (const [route, prefix] of [
-      ['/api/v1/rep-campaigns', 'E2E REP '],
-      ['/api/v1/phase2/campaigns', 'E2E '],
-    ] as const) {
-      const listed = (await (await api.get(route, { params: { pageSize: '100' } })).json()) as {
-        items: { id: string; name: string; status: string }[];
-      };
-      for (const campaign of listed.items) {
-        if (campaign.name.startsWith(prefix) && campaign.status !== 'CLOSED') {
-          await api.post(`${route}/${campaign.id}/close`);
-        }
-      }
-    }
-  } finally {
-    await api.dispose();
-  }
-}
 
 /** Les quatre premiers octets d'un `.xlsx` : la signature ZIP « PK\x03\x04 ». */
 async function readMagic(path: string, length = 4): Promise<number[]> {

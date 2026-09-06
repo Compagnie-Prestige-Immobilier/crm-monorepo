@@ -45,20 +45,16 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
    * L'écran des campagnes de représentants a été SUPPRIMÉ (`Plan.md`), mais son
    * adresse n'est pas devenue une 404 : le segment dynamique
    * `chues/campagnes/[id]` la capte avec `id = "representants"` et
-   * `LotExportDetailView` rend « Ce lot n’a pas pu être chargé. ». La ligne
+   * l'API refuse l'identifiant et l'écran dit « Requête refusée ». La ligne
    * reste : c'est cet écran-là que le terrain voit, et c'est lui qu'on audite.
    */
-  ['/chues/campagnes/representants', 'Tableau de bord', 'Ce lot n’a pas pu être chargé.'],
+  ['/chues/campagnes/representants', 'Tableau de bord', 'Requête refusée'],
   // `ConsoleView` a été vidé : plus de file d'appels ni de carte clavier, un
   // titre de page et un lien vers l'annuaire.
-  ['/chues/console', 'Convertir un prospect', 'Ouvrir l’annuaire'],
+  ['/chues/console', 'Convertir un prospect', 'Les vingt dernières fiches ajoutées.'],
   // `RepScript` s'ouvre désormais sur un ANNUAIRE cherchable ; la carte clavier
   // n'apparaît qu'une fois un représentant choisi.
-  [
-    '/chues/appels-representants',
-    'Qualifier un représentant',
-    'Choisissez qui vous venez d’appeler.',
-  ],
+  ['/chues/appels-representants', 'Qualifier un représentant', null],
   ['/chues/rappels', 'Rappels', 'En retard'],
   ['/chues/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
   ['/chues/dossiers', 'Dossiers bancaires', null],

@@ -46,7 +46,8 @@ const RESERVE = 20;
 const RANG_TARDIF = 21;
 
 /** Le 22ᵉ numéro de la plage ne porte aucune fiche : il n'est QUE suggéré. */
-const TELEPHONE_SUGGERE = telephone(22);
+const RANG_SUGGERE = 22;
+const TELEPHONE_SUGGERE = telephone(RANG_SUGGERE);
 
 const FICHES_PAR_JOUR = 3;
 const JOURS = 2;
@@ -93,11 +94,30 @@ interface Detail extends Lot {
 let lot: Lot | null = null;
 
 /**
- * Le premier département du référentiel, seul lieu de la réserve. Les campagnes
- * du superviseur s'y bornent : sans ce filtre, elles tireraient des fiches
- * appartenant à d'autres specs, qu'un appel consigné modifierait.
+ * Un département à ce fichier, seul lieu de la réserve. Le tirage prend les
+ * fiches d'un département par identifiant croissant : dans un département
+ * partagé, les fiches d'amorçage passaient devant la réserve, et un appel
+ * consigné modifiait des données que d'autres specs lisent.
  */
+const DEPARTEMENT_RESERVE = { code: 'E2E_CHUES_LOT', name: `${PREFIXE}Département` };
+
 let departement: { id: string; name: string } | null = null;
+
+async function departementReserve(api: APIRequestContext): Promise<{ id: string; name: string }> {
+  const departements = await lire<{ id: string; name: string }[]>(
+    await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
+  );
+  const existant = departements.find((row) => row.name === DEPARTEMENT_RESERVE.name);
+  if (existant !== undefined) return existant;
+  const regions = await lire<{ id: string }[]>(await api.get('/api/v1/referentiels/regions'));
+  const regionId = regions[0]?.id;
+  expect(regionId, 'Aucune région dans le référentiel').toBeDefined();
+  return lire<{ id: string; name: string }>(
+    await api.post('/api/v1/referentiels/departements', {
+      data: { ...DEPARTEMENT_RESERVE, regionId },
+    }),
+  );
+}
 
 function leDepartement(): { id: string; name: string } {
   expect(departement, 'Aucun département dans le référentiel').not.toBeNull();
@@ -171,28 +191,36 @@ test.beforeAll(async () => {
   try {
     await exigerEquipe(api);
 
-    const departements = await lire<{ id: string; name: string }[]>(
-      await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
-    );
-    departement = departements[0] ?? null;
-    const departementId = departement?.id;
-    expect(departementId, 'Aucun département dans le référentiel').toBeDefined();
-    if (departementId === undefined) return;
+    departement = await departementReserve(api);
+    const departementId = departement.id;
 
     for (let rang = 1; rang <= RESERVE; rang += 1) {
-      if ((await representantExistant(api, rang)) !== undefined) continue;
-      await creerRepresentant(api, rang, departementId);
+      const existant = await representantExistant(api, rang);
+      if (existant === undefined) {
+        await creerRepresentant(api, rang, departementId);
+        continue;
+      }
+      // Une fiche posée par une exécution d'avant le département dédié rejoint la réserve.
+      await lire(
+        await api.patch(`/api/v1/representants/${existant.id}`, {
+          data: { departementId, fullName: nomRepresentant(rang) },
+        }),
+      );
     }
 
     // CHU-LOT-09 exige que le 21ᵉ N'EXISTE PAS encore : il doit naître APRÈS le
     // lot. Le retrait est doux et l'index d'unicité du téléphone est partiel,
     // donc le numéro se libère pour l'exécution suivante.
-    const tardif = await representantExistant(api, RANG_TARDIF);
-    if (tardif !== undefined) {
-      const retire = await api.delete(`/api/v1/representants/${tardif.id}`);
+    // Le 22ᵉ non plus : une fiche à ce numéro, née du lancement d'une campagne
+    // de contacts recommandés (EB-19), résoudrait la suggestion et la sortirait
+    // de la cible de CHU-LOT-21.
+    for (const rang of [RANG_TARDIF, RANG_SUGGERE]) {
+      const existant = await representantExistant(api, rang);
+      if (existant === undefined) continue;
+      const retire = await api.delete(`/api/v1/representants/${existant.id}`);
       expect(
         retire.ok(),
-        `Le représentant ${nomRepresentant(RANG_TARDIF)} d’une exécution précédente n’a pas pu être retiré : ${await retire.text()}`,
+        `Le représentant ${nomRepresentant(rang)} d’une exécution précédente n’a pas pu être retiré : ${await retire.text()}`,
       ).toBe(true);
     }
 
@@ -551,13 +579,7 @@ test('CHU-LOT-09 · le lot est figé : un représentant créé après lui n’y 
       await api.post('/api/v1/lots-export/apercu', { data: corpsApercu }),
     );
 
-    const departements = await lire<{ id: string }[]>(
-      await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
-    );
-    const departementId = departements[0]?.id;
-    expect(departementId).toBeDefined();
-    if (departementId === undefined) return;
-    await creerRepresentant(api, RANG_TARDIF, departementId);
+    await creerRepresentant(api, RANG_TARDIF, leDepartement().id);
 
     const apres = await lire<Apercu>(
       await api.post('/api/v1/lots-export/apercu', { data: corpsApercu }),
@@ -858,15 +880,16 @@ test.describe('campagne réglée par un superviseur', () => {
   }) => {
     const cree = laCampagne();
     const fiches = await fichesDeLaCampagne(cree.id);
+    // Le département de la réserve loge aussi des fiches d'amorçage : l'appel
+    // ne se consigne que sur une fiche de ce fichier.
     const cible = fiches.find(
-      (fiche) => fiche.teleconseillerName === AWA && fiche.etat === 'NON_TRAITEE',
+      (fiche) =>
+        fiche.teleconseillerName === AWA &&
+        fiche.etat === 'NON_TRAITEE' &&
+        fiche.fullName.startsWith(PREFIXE),
     );
-    expect(cible, `aucune fiche non traitée confiée à ${AWA}`).toBeDefined();
+    expect(cible, `aucune fiche de la réserve non traitée confiée à ${AWA}`).toBeDefined();
     if (cible === undefined) return;
-    expect(
-      cible.fullName.startsWith(PREFIXE),
-      `la campagne a tiré « ${cible.fullName} », hors de la réserve de ce fichier`,
-    ).toBe(true);
 
     // L'appel se consigne SOUS LE COMPTE D'AWA : la fiche est la sienne, et la
     // performance ne compte que les appels de l'attributaire.

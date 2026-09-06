@@ -165,8 +165,8 @@ const CAS: readonly Cas[] = [
     intitule: 'barre Grand Public d’un téléconseiller',
     session: 'e2e/.auth/commercial.json',
     route: '/grand-public/console',
-    principales: ['Appeler les prospects', 'Rappels promis', 'Noter un prospect'],
-    repliees: ['Mes prospects'],
+    principales: ['Grand Public', 'Appeler les prospects', 'Rappels promis'],
+    repliees: ['Mes contacts', 'Noter un prospect'],
     absentes: ['Tableau de bord', 'Mon travail', 'Prospects'],
     courant: 'Appeler les prospects',
   },
@@ -195,7 +195,7 @@ const CAS: readonly Cas[] = [
     intitule: 'barre Grand Public d’un administrateur',
     session: 'e2e/.auth/admin.json',
     route: '/grand-public/statistiques',
-    principales: ['Tableau de bord', 'Prospects'],
+    principales: ['Tableau de bord', 'Prospects', 'Dossiers bancaires'],
     repliees: ['Rappels', 'Appeler les prospects', 'Noter un prospect'],
     absentes: ['Mon travail'],
     courant: 'Tableau de bord',
@@ -210,6 +210,7 @@ const CAS: readonly Cas[] = [
       'Listes de référence',
       'Importer un fichier Excel',
       'Envoyer une notification',
+      'Plateformes d’enrôlement',
       'Paramètres',
     ],
     repliees: [],
@@ -221,29 +222,27 @@ const CAS: readonly Cas[] = [
     intitule: 'barre Accueil',
     session: 'e2e/.auth/admin.json',
     route: '/accueil',
-    principales: ['Registre des visites'],
+    principales: [],
     repliees: [],
     // `hidden: true` : les trois onglets du registre ne sont PAS dans la
     // barre, même pour un administrateur. Deux chemins pour le même clic.
     absentes: ['Tableau de bord', 'Listes', 'Import du registre', 'Mon travail'],
-    courant: 'Registre des visites',
   },
   {
     id: 'ROL-15 · direction',
     intitule: 'barre Accueil',
     session: 'e2e/.auth/direction.json',
     route: '/accueil',
-    principales: ['Registre des visites'],
+    principales: [],
     repliees: [],
     absentes: ['Tableau de bord', 'Listes', 'Import du registre', 'Mon travail'],
-    courant: 'Registre des visites',
   },
   {
     id: 'ROL-16',
     intitule: 'la barre d’un agent d’accueil ne montre qu’une entrée',
     session: 'e2e/.auth/accueil.json',
     route: '/accueil',
-    principales: ['Registre des visites'],
+    principales: [],
     repliees: [],
     absentes: [
       'Tableau de bord',
@@ -254,13 +253,21 @@ const CAS: readonly Cas[] = [
       'Paramètres',
       'Mon travail',
     ],
-    courant: 'Registre des visites',
   },
 ];
 
 async function verifierLaBarre(page: Page, cas: Cas): Promise<void> {
   await page.goto(cas.route);
   const nav = page.getByRole('navigation', { name: NAV });
+
+  // Le registre n'a pas de barre : une seule entrée, portée par le titre de l'écran.
+  if (cas.principales.length === 0) {
+    await expect(nav, `${cas.id} : aucune barre attendue`).toHaveCount(0);
+    await expect(
+      page.getByRole('heading', { name: 'Registre des visites', level: 1 }),
+    ).toBeVisible();
+    return;
+  }
 
   for (const libelle of cas.principales) {
     await expect(

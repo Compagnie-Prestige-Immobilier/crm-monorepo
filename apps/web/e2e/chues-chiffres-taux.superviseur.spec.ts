@@ -114,7 +114,9 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
     'Référentiel des départements',
   );
-  const departementId = departements[0]?.id;
+  // Le DERNIER département : le premier est la réserve où chues-lots-export
+  // tire ses campagnes, et ces fiches n'ont rien à y faire.
+  const departementId = departements.at(-1)?.id;
   expect(departementId, 'Aucun département dans le référentiel').toBeDefined();
 
   const parCle = new Map<string, string>();
@@ -127,6 +129,7 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     );
     const deja = existants.items.find((item) => item.phoneE164 === fiche.phone);
     if (deja !== undefined) {
+      await api.patch(`/api/v1/representants/${deja.id}`, { data: { departementId } });
       parCle.set(fiche.cle, deja.id);
       continue;
     }
