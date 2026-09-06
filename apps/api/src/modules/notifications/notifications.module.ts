@@ -26,6 +26,6 @@ import { readNotificationsEnv } from './notifications.env.js';
       },
     },
   ],
-  exports: [NotificationsService, RemindersService],
+  exports: [NotificationsService, RemindersService, BREVO_TRANSPORT],
 })
 export class NotificationsModule {}
