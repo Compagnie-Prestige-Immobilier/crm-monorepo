@@ -108,10 +108,39 @@ function marqueComposition(
   if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
   if (marque === 'barres-empilees')
     return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
+  if ((marque === 'anneau' || marque === 'camembert') && lignes.length > 1)
+    return <PetitsMultiples lignes={lignes} marque={marque} presentation={presentation} />;
   if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
   if (marque === 'camembert') return <CamembertChart items={items} presentation={presentation} />;
   if (marque === 'tableau') return <TableauWidget items={items} entete={titre} caption={titre} />;
   return <Barres100Chart lignes={lignes} presentation={presentation} />;
+}
+
+/** EB-34 : un diagramme circulaire PAR campagne, côte à côte, la ligne défile au-delà. */
+function PetitsMultiples({
+  lignes,
+  marque,
+  presentation,
+}: {
+  lignes: DonneeDe<'composition'>;
+  marque: 'anneau' | 'camembert';
+  presentation: Presentation;
+}) {
+  const Diagramme = marque === 'anneau' ? AnneauChart : CamembertChart;
+  return (
+    <div className="grid h-full auto-rows-[11rem] grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 overflow-y-auto">
+      {lignes.map((ligne) => (
+        <figure key={ligne.ligne} className="flex min-h-0 flex-col gap-1">
+          <div className="min-h-0 flex-1">
+            <Diagramme items={ligne.segments} presentation={presentation} />
+          </div>
+          <figcaption className="truncate text-center text-[0.8125rem] font-[600]">
+            {ligne.ligne}
+          </figcaption>
+        </figure>
+      ))}
+    </div>
+  );
 }
 
 function marqueSerie(
@@ -222,7 +251,7 @@ export function WidgetGrid({
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
   onChangeMarque: (id: string, marque: DashboardMarque) => void;
-  onChangeTaille: (id: string, taille: DashboardTaille) => void;
+  onChangeTaille: (id: string, taille: DashboardTaille | undefined) => void;
   onChangePresentation: (id: string, presentation: DispositionPresentation) => void;
 }) {
   const sensors = useSensors(
@@ -294,7 +323,7 @@ export function WidgetGrid({
   });
 
   if (!editing) {
-    return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
+    return <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
   }
 
   return (
@@ -309,7 +338,7 @@ export function WidgetGrid({
       }}
     >
       <SortableContext items={widgets.map((widget) => widget.id)} strategy={rectSortingStrategy}>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
+        <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
       </SortableContext>
       {/* Aperçu sans canevas : déplacer une carte contenant un graphique vivant
           déclenche la boucle de redimensionnement de Chart.js. */}

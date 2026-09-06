@@ -212,7 +212,7 @@ export function CarteWidget({
   onMoveUp: () => void;
   onMoveDown: () => void;
   onChangeMarque: (marque: DashboardMarque) => void;
-  onChangeTaille: (taille: DashboardTaille) => void;
+  onChangeTaille: (taille: DashboardTaille | undefined) => void;
   onChangePresentation: (presentation: DispositionPresentation) => void;
   children: ReactNode;
 }) {
@@ -241,7 +241,11 @@ export function CarteWidget({
       id={`widget-${widget.id}`}
       ref={setNodeRef}
       tabIndex={-1}
-      style={{ transform: CSS.Transform.toString(transform), transition }}
+      style={{
+        transform: CSS.Transform.toString(transform),
+        transition,
+        viewTransitionName: `carte-${widget.id}`,
+      }}
       className={cn('min-w-0', spanClass(widget.marque, widget.taille), isDragging && 'opacity-40')}
     >
       <ChartCard
@@ -335,7 +339,7 @@ export function CarteWidget({
                 size="icon-sm"
                 aria-label={`${taille === 'pleine' ? 'Réduire' : 'Agrandir'} ${titre}`}
                 onClick={() => {
-                  onChangeTaille(taille === 'pleine' ? 'demi' : 'pleine');
+                  onChangeTaille(taille === 'pleine' ? undefined : 'pleine');
                 }}
               >
                 <span className="text-[0.6875rem] font-[700]">

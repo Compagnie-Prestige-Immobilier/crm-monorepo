@@ -3,6 +3,7 @@ import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 
 import { LotsExportView } from '@/components/lots-export/lots-export-view';
+import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { getServerApiClient } from '@/lib/api/server';
 import { fetchLotsExport } from '@/lib/data/lots-export';
 import { getQueryClient } from '@/lib/query-client';
@@ -27,9 +28,14 @@ export default async function LotsExportPage() {
 
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
-      <LotsExportView         canCreate={guard.user.role === 'ADMIN' || guard.user.role === 'SUPERVISEUR'}
-        canDelete={guard.user.role === 'ADMIN'}
-        projet="CHUES" />
+      <div className="flex flex-col gap-6">
+        <OngletsPilotage coque="chues" />
+        <LotsExportView
+          canCreate={guard.user.role === 'ADMIN' || guard.user.role === 'SUPERVISEUR'}
+          canDelete={guard.user.role === 'ADMIN'}
+          projet="CHUES"
+        />
+      </div>
     </HydrationBoundary>
   );
 }

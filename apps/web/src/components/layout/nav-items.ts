@@ -125,6 +125,8 @@ export interface NavItem {
    * `isNavItemActive` lisent dans la liste COMPLÈTE.
    */
   hidden?: boolean;
+  /** Entrée de la barre à surligner quand cet écran caché s'ouvre par un onglet de pilotage. */
+  onglet?: string;
 }
 
 export interface NavSection {
@@ -255,13 +257,14 @@ const SECTIONS: readonly NavSection[] = [
         roles: TERRAIN,
       },
       {
-        // Le seul écran qui montre le travail de chaque téléconseiller ligne à
-        // ligne : c'est là que l'encadrement passe le reste de sa journée.
+        // Onglets Activité et Présence du pilotage : même titre que le tableau de bord.
         href: '/chues/supervision',
-        label: 'Mon équipe',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ENCADREMENT,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/mes-contacts',
@@ -299,11 +302,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
-        secondary: true,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
 
       // ─── Administration ───────────────────────────────────────────────────
@@ -338,10 +342,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN'],
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/dossiers',
@@ -352,11 +358,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/supervision',
-        label: 'Équipes',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/rappels',
@@ -575,10 +582,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/supervision',
-        label: 'Mon équipe',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+        hidden: true,
+        onglet: '/grand-public/statistiques',
       },
       {
         href: '/grand-public/dossiers',
@@ -605,11 +614,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        secondary: true,
+        hidden: true,
+        onglet: '/grand-public/statistiques',
       },
       {
         href: '/grand-public/console',
@@ -841,7 +851,8 @@ export function fallbackCoque(role: Role): Coque | null {
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */
 export function isNavItemActive(role: Role, pathname: string, item: NavItem): boolean {
-  return matchNavItem(role, pathname)?.href === item.href;
+  const courant = matchNavItem(role, pathname);
+  return (courant?.onglet ?? courant?.href) === item.href;
 }
 
 function matchNavItem(role: Role, pathname: string): NavItem | undefined {

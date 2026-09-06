@@ -475,13 +475,14 @@ export function donneesVides(donnees: DonneesSource): boolean {
   }
 }
 
+/** Une tuile prend une colonne, un graphique deux, un tableau ou une carte pleine quatre. */
 export function spanClass(
   marque: DashboardMarque | undefined,
   taille: DashboardTaille | undefined,
 ): string {
-  if (marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge') return '';
-  if (marque === 'tableau') return 'sm:col-span-2 xl:col-span-4';
-  if (taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  if (marque === 'tableau' || taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  const tuile = marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge';
+  if (tuile && taille === undefined) return '';
   return 'sm:col-span-2 xl:col-span-2';
 }
 

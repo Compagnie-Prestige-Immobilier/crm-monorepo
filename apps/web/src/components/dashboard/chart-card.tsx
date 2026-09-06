@@ -33,7 +33,7 @@ export function ChartCard({
   useCanvasPresentation(chartRegion);
 
   return (
-    <Card className={cn('animate-rise', className)}>
+    <Card className={cn('h-full animate-rise', className)}>
       <CardHeader className={actions === undefined ? undefined : 'flex-row items-start gap-3'}>
         <div className="min-w-0 flex-1">
           <CardTitle className="flex items-center gap-1.5">

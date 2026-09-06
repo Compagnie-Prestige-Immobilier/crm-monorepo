@@ -69,8 +69,11 @@ const ouverture = (
 describe('les cartes du lot 2', () => {
   it('lit le taux de qualification sur les fiches ouvertes, « Sans objet » sans ouverture', () => {
     const carte = chues['taux-de-qualification'];
-    expect(carte?.extraire({ ouvertures: [ouverture('Awa', 10, 8, 60), ouverture('Ba', 10, 7, 60)] }))
-      .toMatchObject({ donnee: { valeur: 75, libelle: '75,0 % · 15 qualifiées sur 20 fiches ouvertes' } });
+    expect(
+      carte?.extraire({ ouvertures: [ouverture('Awa', 10, 8, 60), ouverture('Ba', 10, 7, 60)] }),
+    ).toMatchObject({
+      donnee: { valeur: 75, affichage: '75,0 %', libelle: '15 qualifiées sur 20 fiches ouvertes' },
+    });
     expect(carte?.extraire({ ouvertures: [] })).toMatchObject({
       donnee: { affichage: 'Sans objet' },
     });
@@ -146,7 +149,7 @@ describe('les cartes du lot 2', () => {
       donnee: [{ ligne: 'Dakar', segments: [{ value: 30 }, { value: 20 }] }, { ligne: 'Thiès' }],
     });
     expect(chues['taux-de-contact']?.extraire({ campagnes })).toMatchObject({
-      donnee: { valeur: 50, libelle: '50,0 % · 35 appelées sur 70 fiches prévues' },
+      donnee: { valeur: 50, affichage: '50,0 %', libelle: '35 appelées sur 70 fiches prévues' },
     });
   });
 });

@@ -82,17 +82,15 @@ const CAS: readonly Cas[] = [
     intitule: 'barre CHUES de l’encadrement',
     session: 'e2e/.auth/superviseur.json',
     route: '/chues/statistiques',
+    // L'équipe et les campagnes sont des onglets du tableau de bord, plus des entrées.
     principales: [
       'Tableau de bord',
       'Qualifier un représentant',
       'Ajouter un prospect',
       'Convertir un prospect',
       'Rappels promis',
-      'Mon équipe',
     ],
-    // CIBLE MOUVANTE - E2E.md §2.2 : « Lots d’export » (`/chues/campagnes`)
-    // peut disparaître entièrement. Si c'est le cas, ce test reste rouge.
-    repliees: ['Contacts recommandés', 'Représentants', 'Prospects', 'Lots d’export'],
+    repliees: ['Contacts recommandés', 'Représentants', 'Prospects'],
     absentes: [
       'Mon travail',
       'Dossiers bancaires',
@@ -114,9 +112,8 @@ const CAS: readonly Cas[] = [
       'Ajouter un prospect',
       'Convertir un prospect',
       'Rappels promis',
-      'Mon équipe',
     ],
-    repliees: ['Contacts recommandés', 'Représentants', 'Prospects', 'Lots d’export'],
+    repliees: ['Contacts recommandés', 'Représentants', 'Prospects'],
     absentes: [
       'Mon travail',
       'Dossiers bancaires',
@@ -135,16 +132,9 @@ const CAS: readonly Cas[] = [
     // Réponse à la question Q-13 du §8, relevée en navigateur : `navSections`
     // concatène deux blocs d'entrées ADMIN écrits à des endroits différents de
     // `nav-items.ts`, et c'est cet ordre-là qui est rendu.
-    principales: [
-      'Tableau de bord',
-      'Prospects',
-      'Représentants',
-      'Lots d’export',
-      'Dossiers bancaires',
-    ],
+    principales: ['Tableau de bord', 'Prospects', 'Représentants', 'Dossiers bancaires'],
     repliees: [
       'Les trois étapes',
-      'Équipes',
       'Rappels',
       'Contacts recommandés',
       'Vue d’ensemble bancaire',
