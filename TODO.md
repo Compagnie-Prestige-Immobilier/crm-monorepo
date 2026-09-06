@@ -1,54 +1,13 @@
 # TODO
 
 Les 39 exigences de l'expression de besoins CHUES du 4 septembre 2026, avec
-leur état vérifié dans le code de `dev` le 5 septembre 2026.
+leur état vérifié dans le code le 6 septembre 2026.
 
 Lire ce fichier avant d'ouvrir un chantier. S'il contredit le code, c'est le
 code qui a raison : corriger le fichier.
 
-**25 faites, 1 partielle, 13 absentes.** Les lots 1, 2 et 3 sont livrés en
-entier, le lot 7 à une ventilation près. Les lots 4 et 6 n'ont pas commencé.
-
-## Lot 4, conversion et paramètres
-
-Six des sept exigences restent à faire. EB-29 est livrée, et les autres en
-dépendaient : EB-24 affiche le lien et l'adresse qu'elle porte, EB-26 le texte
-du message.
-
-- [ ] EB-20 Champ « Établissement » à la création d'un prospect. Absent en base.
-- [ ] EB-21 Revenu mensuel obligatoire côté API. `incomeBandId` est
-      `@IsOptional`, seul l'écran l'impose.
-- [ ] EB-22 « Durée dans la fonction » et retrait de la durée du système de
-      paiement.
-- [ ] EB-23 Numéro WhatsApp à la conversion. N'existe que pour la diaspora.
-- [ ] EB-24 Méthodes d'enrôlement recomposées, plus la migration des valeurs
-      existantes. L'enum n'a ni WHATSAPP ni fusion RDV CPI / Physique.
-- [ ] EB-26 Bouton « Écrire sur WhatsApp ». Aucun lien `wa.me` dans le dépôt.
-- [x] EB-29 Page « Paramètres CHUES ». Faite, branche `feat/lot4-conversion`.
-      Écran `/chues/parametres-chues`, ouvert à l'administrateur, à la
-      supervision et à la direction ; ces deux dernières n'écrivent que le
-      message WhatsApp et l'accusé de réception. La trace « ancienne et
-      nouvelle valeur » tient dans `app_setting_changes` : `app_settings`
-      écrase et ne garde que la dernière écriture.
-
-## Lot 5, rôles
-
-- [ ] EB-31 Rôle Chargé de clientèle. L'enum `Role` ne le porte pas, et la revue
-      avant enrôlement n'existe sous aucun nom.
-- [ ] EB-32 Rendre au superviseur les cartes couverture de campagne, appels hors
-      attribution et rendement par département (`sources.ts:639`). Le reste est
-      déjà conforme : les montants restent à l'administrateur et à la direction,
-      l'enrôlement à l'administrateur seul.
-
-## Lot 6, formulaire public
-
-Aucune des quatre exigences n'est commencée. EB-30 dépend d'EB-27.
-
-- [ ] EB-25 Deux modes de conversion, dont l'envoi du lien.
-- [ ] EB-27 Formulaire public sans connexion. Tous les groupes de routes sont
-      derrière `guardRoles`.
-- [ ] EB-28 Champs de conversion réglables par l'administrateur.
-- [ ] EB-30 Notifications à la réception d'une demande.
+**38 faites, 1 partielle.** Les lots 1 à 6 sont livrés en entier. Il ne reste
+du lot 7 que la ventilation par superviseur des indicateurs d'enrôlement.
 
 ## Lot 7, connecteur
 
@@ -116,6 +75,47 @@ Les six exigences EB-14 à EB-19 sont dans le code. Pièges déjà payés :
   entière échoue.
 - La suppression d'une campagne reste à l'administrateur seul. Elle était gardée
   par le même drapeau que la création côté web ; les deux sont séparés.
+
+### Lots 4, 5 et 6, conversion, rôles et formulaire public
+
+Branche `feat/lot4-conversion`. Treize exigences : EB-20 à EB-26, EB-27 à
+EB-32, EB-29.
+
+**DETTE ASSUMÉE : aucun test neuf n'a été écrit sur ces trois lots.** Décision
+du 6 septembre 2026 sous contrainte de délai. Les parcours E2E et journey sont
+à écrire à partir de la semaine du 8 septembre. Deux règles resteront hors de
+leur portée et demandent un test d'un autre genre : la reprise des données
+d'EB-24, et la protection `minPayloadVersion` d'EB-21 qu'un navigateur ne sait
+pas rejouer.
+
+Pièges déjà payés :
+
+- EB-21 ne mord qu'à partir de `payloadVersion` 8. Appliquer le refus tout de
+  suite condamnerait une saisie faite hors ligne, où un 400 est TERMINAL. Le
+  web et le mobile sont passés à 8 ; la file repart avec le MINIMUM des
+  versions qu'elle porte, donc une saisie mise en file en 7 repart en 7.
+- EB-24 ne réécrit PAS `call_attempts`. La contrainte interdit une date sur
+  PHYSICAL, donc aucune ligne n'en porte et les convertir les violerait toutes.
+  Les fiches et les parcours sont convertis, l'historique garde son code et se
+  LIT « RDV CPI ».
+- Une base mobile d'avant la v13 ne pouvait plus migrer : `_prospectsCopy`
+  ignorait les colonnes neuves, et les paliers v6 et v13 recréent `prospects`.
+  Invisible à l'analyse et à la compilation.
+- EB-27 n'a pas un lien général mais un lien PAR COMPTE : `createdById` est NOT
+  NULL et commande la visibilité.
+- Le catalogue d'EB-28 est DÉRIVÉ du DTO par soustraction : un champ ajouté au
+  formulaire sans libellé fait échouer la compilation.
+
+Restent à décider :
+
+- `GET /analytics/funnel` rend `montantEncaisse` à TOUS les rôles. « Réservé à
+  l'administrateur et à la direction » n'est qu'une convention d'affichage.
+- `API_TRUST_PROXY_HEADERS` vaut `false` : la limitation du formulaire public
+  est GLOBALE et non par visiteur tant qu'il n'est pas à `true`.
+- EB-25 : « Lien envoyé le {date} » et la mise à jour de la fiche visée
+  demandent deux colonnes et un jeton qui porte le prospect. PR suivante.
+- Le formulaire mobile ignore les réglages d'EB-28.
+- Un import portant « Physique » est désormais refusé ligne à ligne.
 
 ### Lot 7, connecteur d'enrôlement
 
