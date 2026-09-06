@@ -34,6 +34,7 @@ import type {
   RepresentantLookupDto,
   RepresentantQueryDto,
   UpdateRepresentantDto,
+  RepresentantCallAttemptDto,
   RepresentantCallAttemptListDto,
   RepresentantRelationChangeListDto,
 } from './dto.js';
@@ -65,30 +66,49 @@ const INCLUDE = REPRESENTANT_INCLUDE;
  * `_count`. Le calculer côté Node imposerait de charger toute la population
  * avant de pouvoir paginer.
  */
-function orderByFor(query: RepresentantQueryDto): Prisma.RepresentantOrderByWithRelationInput[] {
-  const direction = query.sortOrder ?? 'desc';
+type OrderBy = Prisma.RepresentantOrderByWithRelationInput[];
 
-  switch (query.sortBy ?? (query.suivi && TRI_DU_SUIVI[query.suivi])) {
-    case RepresentantSortField.FULL_NAME:
-      return [{ fullName: direction }, { id: 'desc' }];
-    case RepresentantSortField.CREATED_AT:
-      return [{ createdAt: direction }, { id: 'desc' }];
-    case RepresentantSortField.PROSPECTS:
-      return [{ prospects: { _count: direction } }, { id: 'desc' }];
-    case RepresentantSortField.LAST_CALL_AT:
-      return [{ lastCallAt: direction }, { id: 'desc' }];
-    case RepresentantSortField.NEXT_CALLBACK_AT:
-      // Le rappel le plus proche d'abord, sauf tri explicite.
-      return [{ nextCallbackAt: query.sortOrder ?? 'asc' }, { id: 'desc' }];
-    case RepresentantSortField.PRIORITE:
-      // `asc` suit l'ordre de declaration de l'enumeration, HAUTE d'abord, et
-      // PostgreSQL classe les NULL en dernier dans ce sens : une fiche jamais
-      // qualifiee ne double pas celles qu'on a jointes.
-      return [{ statutQualification: { priorite: query.sortOrder ?? 'asc' } }, { id: 'desc' }];
-    case RepresentantSortField.CLIENT_CREATED_AT:
-    default:
-      return [{ clientCreatedAt: direction }, { id: 'desc' }];
-  }
+const ORDER_BY_BUILDERS: Record<RepresentantSortField, (query: RepresentantQueryDto) => OrderBy> = {
+  [RepresentantSortField.FULL_NAME]: (query) => [
+    { fullName: query.sortOrder ?? 'desc' },
+    { id: 'desc' },
+  ],
+  [RepresentantSortField.CREATED_AT]: (query) => [
+    { createdAt: query.sortOrder ?? 'desc' },
+    { id: 'desc' },
+  ],
+  [RepresentantSortField.PROSPECTS]: (query) => [
+    { prospects: { _count: query.sortOrder ?? 'desc' } },
+    { id: 'desc' },
+  ],
+  [RepresentantSortField.LAST_CALL_AT]: (query) => [
+    { lastCallAt: query.sortOrder ?? 'desc' },
+    { id: 'desc' },
+  ],
+  // Le rappel le plus proche d'abord, sauf tri explicite.
+  [RepresentantSortField.NEXT_CALLBACK_AT]: (query) => [
+    { nextCallbackAt: query.sortOrder ?? 'asc' },
+    { id: 'desc' },
+  ],
+  // `asc` suit l'ordre de declaration de l'enumeration, HAUTE d'abord, et
+  // PostgreSQL classe les NULL en dernier dans ce sens : une fiche jamais
+  // qualifiee ne double pas celles qu'on a jointes.
+  [RepresentantSortField.PRIORITE]: (query) => [
+    { statutQualification: { priorite: query.sortOrder ?? 'asc' } },
+    { id: 'desc' },
+  ],
+  [RepresentantSortField.CLIENT_CREATED_AT]: (query) => [
+    { clientCreatedAt: query.sortOrder ?? 'desc' },
+    { id: 'desc' },
+  ],
+};
+
+function orderByFor(query: RepresentantQueryDto): OrderBy {
+  const sortBy =
+    query.sortBy ??
+    (query.suivi ? TRI_DU_SUIVI[query.suivi] : undefined) ??
+    RepresentantSortField.CLIENT_CREATED_AT;
+  return ORDER_BY_BUILDERS[sortBy](query);
 }
 
 const TRI_DU_SUIVI: Record<RepresentantSuivi, RepresentantSortField> = {
@@ -119,7 +139,19 @@ function relationWhere(relations: RepresentantRelation[] = []): Prisma.Represent
 
 type RepresentantRow = Prisma.RepresentantGetPayload<{ include: typeof REPRESENTANT_INCLUDE }>;
 
+function isoOrNull(date: Date | null | undefined): string | null {
+  return date?.toISOString() ?? null;
+}
+
+function statutQualificationFields(statut: RepresentantRow['statutQualification']): {
+  readonly label: RepresentantDto['statutQualificationLabel'];
+  readonly effect: RepresentantDto['statutQualificationEffect'];
+} {
+  return { label: statut?.label ?? null, effect: statut?.effect ?? null };
+}
+
 export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
+  const qualification = statutQualificationFields(row.statutQualification);
   return {
     id: row.id,
     fullName: row.fullName,
@@ -138,8 +170,8 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     prospectCount: row._count.prospects,
     relationStatus: row.relationStatus,
     statutQualificationId: row.statutQualificationId,
-    statutQualificationLabel: row.statutQualification?.label ?? null,
-    statutQualificationEffect: row.statutQualification?.effect ?? null,
+    statutQualificationLabel: qualification.label,
+    statutQualificationEffect: qualification.effect,
     whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
     whatsappNumber: whatsappNumberOf(row),
@@ -150,11 +182,11 @@ export function toRepresentantDto(row: RepresentantRow): RepresentantDto {
     connaitUES: row.connaitUES,
     contacte: row.contacte,
     lastCallOutcome: row.lastCallOutcome,
-    lastCallAt: row.lastCallAt?.toISOString() ?? null,
+    lastCallAt: isoOrNull(row.lastCallAt),
     callAttemptCount: row._count.repCallAttempts,
     lastCallById: row.lastCallById,
     lastCallByName: row.lastCallBy?.fullName ?? null,
-    nextCallbackAt: row.nextCallbackAt?.toISOString() ?? null,
+    nextCallbackAt: isoOrNull(row.nextCallbackAt),
     nextCallbackOrigine: row.nextCallbackOrigine,
   };
 }
@@ -170,6 +202,71 @@ function allowedWhatsappStatuses(query: RepresentantQueryDto): WhatsappStatus[] 
   if (query.hasWhatsapp === false) allowed = allowed.filter((s) => !hasReachableWhatsapp(s));
   if (query.whatsappStatus) allowed = allowed.filter((s) => s === query.whatsappStatus);
   return allowed;
+}
+
+/**
+ * Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
+ * cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
+ */
+function scopeWhere(
+  user: AuthenticatedUser,
+  query: Pick<RepresentantQueryDto, 'mesFiches' | 'commercialId' | 'departementId' | 'iefId'>,
+): Prisma.RepresentantWhereInput {
+  const where: Prisma.RepresentantWhereInput = {};
+  const portee = attributionScope(user, { malgreLeRole: query.mesFiches === true });
+  if (portee.OR) where.AND = [portee];
+  if (query.commercialId) where.createdById = query.commercialId;
+  if (query.departementId) where.departementId = query.departementId;
+  if (query.iefId) where.iefId = query.iefId;
+  return where;
+}
+
+function whatsappWhere(query: RepresentantQueryDto): Prisma.RepresentantWhereInput {
+  if (!query.whatsappStatus && query.hasWhatsapp === undefined) return {};
+  return { whatsappStatus: { in: allowedWhatsappStatuses(query) } };
+}
+
+function dateRangeWhere(
+  query: Pick<RepresentantQueryDto, 'dateFrom' | 'dateTo'>,
+): Prisma.RepresentantWhereInput {
+  if (!query.dateFrom && !query.dateTo) return {};
+  return {
+    clientCreatedAt: {
+      ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
+      ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
+    },
+  };
+}
+
+/**
+ * `deletedAt: null` dans les deux branches : un représentant dont toutes
+ * les fiches ont été effacées est REDEVENU dormant, et le compter comme
+ * actif ferait manquer exactement les cas qu'une relance doit rattraper.
+ */
+function prospectsWhere(
+  query: Pick<RepresentantQueryDto, 'hasProspects'>,
+): Prisma.RepresentantWhereInput {
+  if (query.hasProspects === true) return { prospects: { some: { deletedAt: null } } };
+  if (query.hasProspects === false) return { prospects: { none: { deletedAt: null } } };
+  return {};
+}
+
+function buildListWhere(
+  user: AuthenticatedUser,
+  query: RepresentantQueryDto,
+): Prisma.RepresentantWhereInput {
+  const where: Prisma.RepresentantWhereInput = {
+    deletedAt: null,
+    ...suiviWhere(query),
+    ...relationWhere(query.relationStatus),
+    ...scopeWhere(user, query),
+    ...whatsappWhere(query),
+    ...dateRangeWhere(query),
+    ...prospectsWhere(query),
+  };
+  const search = rechercheLibre(query.search);
+  if (search) where.OR = search;
+  return where;
 }
 
 function rechercheLibre(raw: string | undefined): Prisma.RepresentantWhereInput[] | null {
@@ -205,6 +302,105 @@ function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDto {
   };
 }
 
+const CALL_ATTEMPT_INCLUDE = {
+  performedBy: { select: { fullName: true } },
+  statutQualification: { select: { label: true, requiresComment: true } },
+  suggestion: { select: { suggestedName: true, suggestedPhoneE164: true, note: true } },
+} satisfies Prisma.RepCallAttemptInclude;
+
+type CallAttemptRow = Prisma.RepCallAttemptGetPayload<{ include: typeof CALL_ATTEMPT_INCLUDE }>;
+
+function callAttemptQualificationFields(statut: CallAttemptRow['statutQualification']): {
+  readonly label: string | null;
+  readonly requiresComment: boolean;
+} {
+  return { label: statut?.label ?? null, requiresComment: statut?.requiresComment ?? false };
+}
+
+function callAttemptSuggestionFields(suggestion: CallAttemptRow['suggestion']): {
+  readonly suggestedName: string | null;
+  readonly suggestedPhoneE164: string | null;
+  readonly suggestedNote: string | null;
+} {
+  return {
+    suggestedName: suggestion?.suggestedName ?? null,
+    suggestedPhoneE164: suggestion?.suggestedPhoneE164 ?? null,
+    suggestedNote: suggestion?.note ?? null,
+  };
+}
+
+function toCallAttemptDto(
+  row: CallAttemptRow,
+  durees: ReadonlyMap<string, number>,
+): RepresentantCallAttemptDto {
+  const qualification = callAttemptQualificationFields(row.statutQualification);
+  const suggestion = callAttemptSuggestionFields(row.suggestion);
+  return {
+    id: row.id,
+    outcome: row.outcome,
+    statutQualificationId: row.statutQualificationId,
+    statutQualificationLabel: qualification.label,
+    statutQualificationRequiresComment: qualification.requiresComment,
+    comment: row.comment,
+    callbackAt: isoOrNull(row.callbackAt),
+    promisedProspects: row.promisedProspects,
+    etablissementConfirme: row.etablissementConfirme,
+    numeroConfirme: row.numeroConfirme,
+    contacte: row.contacte,
+    connaitUES: row.connaitUES,
+    syndicat: row.syndicat,
+    suggestedName: suggestion.suggestedName,
+    suggestedPhoneE164: suggestion.suggestedPhoneE164,
+    suggestedNote: suggestion.suggestedNote,
+    deviceCallType: row.deviceCallType,
+    deviceCallDurationSeconds: row.deviceCallDurationSeconds,
+    deviceCallAt: isoOrNull(row.deviceCallAt),
+    performedById: row.performedById,
+    performedByName: row.performedBy.fullName,
+    clientCreatedAt: row.clientCreatedAt.toISOString(),
+    dureeTraitementSecondes: durees.get(row.id) ?? null,
+  };
+}
+
+function updateIdentityFields(
+  input: UpdateRepresentantDto,
+  phoneE164: string | undefined,
+): Prisma.RepresentantUpdateInput {
+  return {
+    ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
+    ...(phoneE164 ? { phoneE164 } : {}),
+    ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
+    ...(input.prenom !== undefined ? { prenom: input.prenom.trim() || null } : {}),
+    ...(input.etablissement !== undefined
+      ? { etablissement: input.etablissement.trim() || null }
+      : {}),
+  };
+}
+
+function updateContextFields(input: UpdateRepresentantDto): Prisma.RepresentantUpdateInput {
+  return {
+    ...(input.syndicat !== undefined ? { syndicat: input.syndicat.trim() || null } : {}),
+    ...(input.connaitUES !== undefined ? { connaitUES: input.connaitUES } : {}),
+    ...(input.contacte !== undefined ? { contacte: input.contacte } : {}),
+    ...(input.departementId ? { departementId: input.departementId } : {}),
+    ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
+    ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
+  };
+}
+
+function updateData(
+  input: UpdateRepresentantDto,
+  phoneE164: string | undefined,
+  whatsapp: ReturnType<typeof resolveWhatsappPatch>,
+): Prisma.RepresentantUpdateInput {
+  return {
+    ...updateIdentityFields(input, phoneE164),
+    ...updateContextFields(input),
+    ...whatsapp,
+    rev: { increment: 1 },
+  };
+}
+
 @Injectable()
 export class RepresentantsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -212,40 +408,7 @@ export class RepresentantsService {
   async list(user: AuthenticatedUser, query: RepresentantQueryDto): Promise<RepresentantListDto> {
     const page = query.page ?? 1;
     const pageSize = query.pageSize ?? 25;
-
-    // Un téléconseiller ne lit que ses campagnes ; l'encadrement lit tout. Le
-    // cloisonnement voyage dans `AND` : `where.OR` porte déjà la recherche libre.
-    const where: Prisma.RepresentantWhereInput = {
-      deletedAt: null,
-      ...suiviWhere(query),
-      ...relationWhere(query.relationStatus),
-    };
-    const portee = attributionScope(user, { malgreLeRole: query.mesFiches === true });
-    if (portee.OR) where.AND = [portee];
-    if (query.commercialId) {
-      where.createdById = query.commercialId;
-    }
-    if (query.departementId) where.departementId = query.departementId;
-    if (query.iefId) where.iefId = query.iefId;
-    if (query.whatsappStatus || query.hasWhatsapp !== undefined) {
-      where.whatsappStatus = { in: allowedWhatsappStatuses(query) };
-    }
-
-    if (query.dateFrom || query.dateTo) {
-      where.clientCreatedAt = {
-        ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
-      };
-    }
-
-    // `deletedAt: null` dans les deux branches : un représentant dont toutes
-    // les fiches ont été effacées est REDEVENU dormant, et le compter comme
-    // actif ferait manquer exactement les cas qu'une relance doit rattraper.
-    if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
-    if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
-
-    const search = rechercheLibre(query.search);
-    if (search) where.OR = search;
+    const where = buildListWhere(user, query);
 
     const [total, rows] = await Promise.all([
       this.prisma.representant.count({ where }),
@@ -379,23 +542,7 @@ export class RepresentantsService {
 
       return tx.representant.update({
         where: { id },
-        data: {
-          ...(input.fullName ? { fullName: input.fullName.trim() } : {}),
-          ...(phoneE164 ? { phoneE164 } : {}),
-          ...(input.notes !== undefined ? { notes: input.notes || null } : {}),
-          ...(input.prenom !== undefined ? { prenom: input.prenom.trim() || null } : {}),
-          ...(input.etablissement !== undefined
-            ? { etablissement: input.etablissement.trim() || null }
-            : {}),
-          ...(input.syndicat !== undefined ? { syndicat: input.syndicat.trim() || null } : {}),
-          ...(input.connaitUES !== undefined ? { connaitUES: input.connaitUES } : {}),
-          ...(input.contacte !== undefined ? { contacte: input.contacte } : {}),
-          ...(input.departementId ? { departementId: input.departementId } : {}),
-          ...(input.iefId === undefined ? {} : { iefId: input.iefId }),
-          ...(input.clientCreatedAt ? { clientCreatedAt: new Date(input.clientCreatedAt) } : {}),
-          ...whatsapp,
-          rev: { increment: 1 },
-        },
+        data: updateData(input, phoneE164, whatsapp),
         include: INCLUDE,
       });
     });
@@ -465,42 +612,12 @@ export class RepresentantsService {
 
     const rows = await this.prisma.repCallAttempt.findMany({
       where: { representantId: id },
-      include: {
-        performedBy: { select: { fullName: true } },
-        statutQualification: { select: { label: true, requiresComment: true } },
-        suggestion: { select: { suggestedName: true, suggestedPhoneE164: true, note: true } },
-      },
+      include: CALL_ATTEMPT_INCLUDE,
       orderBy: [{ clientCreatedAt: 'desc' }, { id: 'desc' }],
     });
     const durees = await dureesDeTraitement(this.prisma, { representantId: id });
 
-    return {
-      items: rows.map((row) => ({
-        id: row.id,
-        outcome: row.outcome,
-        statutQualificationId: row.statutQualificationId,
-        statutQualificationLabel: row.statutQualification?.label ?? null,
-        statutQualificationRequiresComment: row.statutQualification?.requiresComment ?? false,
-        comment: row.comment,
-        callbackAt: row.callbackAt?.toISOString() ?? null,
-        promisedProspects: row.promisedProspects,
-        etablissementConfirme: row.etablissementConfirme,
-        numeroConfirme: row.numeroConfirme,
-        contacte: row.contacte,
-        connaitUES: row.connaitUES,
-        syndicat: row.syndicat,
-        suggestedName: row.suggestion?.suggestedName ?? null,
-        suggestedPhoneE164: row.suggestion?.suggestedPhoneE164 ?? null,
-        suggestedNote: row.suggestion?.note ?? null,
-        deviceCallType: row.deviceCallType,
-        deviceCallDurationSeconds: row.deviceCallDurationSeconds,
-        deviceCallAt: row.deviceCallAt?.toISOString() ?? null,
-        performedById: row.performedById,
-        performedByName: row.performedBy.fullName,
-        clientCreatedAt: row.clientCreatedAt.toISOString(),
-        dureeTraitementSecondes: durees.get(row.id) ?? null,
-      })),
-    };
+    return { items: rows.map((row) => toCallAttemptDto(row, durees)) };
   }
 
   async listComments(
