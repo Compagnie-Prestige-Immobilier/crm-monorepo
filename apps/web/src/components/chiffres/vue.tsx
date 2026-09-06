@@ -26,6 +26,7 @@ import {
 } from '@/components/accueil/tableau-de-bord/sources';
 import { TiroirWidgets } from '@/components/accueil/tableau-de-bord/tiroir-widgets';
 import { chiffresFiltersAdapter, type ChiffresFilters } from '@/components/chiffres/filtres';
+import { BoutonExportExcel } from '@/components/dashboard/bouton-export-excel';
 import {
   catalogueDe,
   type Jeu,
@@ -73,7 +74,11 @@ import {
   type Disposition,
 } from '@/lib/data/disposition';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
-import { formatNumber } from '@/lib/format';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
+import type {
+  ClasseurTableauDeBord,
+  FeuilleTableauDeBord,
+} from '@/lib/tableau-de-bord-xlsx';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
@@ -207,6 +212,46 @@ function buildDonneesParWidget(
     if (donnee !== undefined) donnees.set(widget.id, donnee);
   }
   return donnees;
+}
+
+/** Le classeur suit l'écran : ses feuilles sont les cartes posées, dans leur ordre. */
+function feuillesDesWidgets(
+  widgets: readonly DashboardWidget[],
+  catalogue: Record<string, SourceChiffre>,
+  donneesParWidget: Map<string, DonneesSource>,
+): FeuilleTableauDeBord[] {
+  const feuilles: FeuilleTableauDeBord[] = [];
+  for (const widget of widgets) {
+    const entree = catalogue[widget.source];
+    const donnee = donneesParWidget.get(widget.id);
+    if (entree === undefined || donnee === undefined) continue;
+    feuilles.push({ titre: entree.label, question: entree.question, donnees: donnee });
+  }
+  return feuilles;
+}
+
+function classeurDesChiffres(input: {
+  projet: Projet;
+  periode: string;
+  plage: { du: string; au: string };
+  equipe: readonly { id: string; fullName: string }[];
+  teleconseiller: string | null;
+  feuilles: FeuilleTableauDeBord[];
+}): ClasseurTableauDeBord {
+  const nomProjet = input.projet === 'CHUES' ? 'CHUES' : 'Grand Public';
+  return {
+    fichier: `cpi-tableau-de-bord-${input.projet.toLowerCase()}-${input.plage.du}-${input.plage.au}`,
+    titre: `Tableau de bord ${nomProjet}`,
+    sousTitre: input.periode,
+    reperes: [
+      { libelle: 'Projet', valeur: nomProjet },
+      { libelle: 'Période', valeur: `du ${formatDate(input.plage.du)} au ${formatDate(input.plage.au)}` },
+      { libelle: 'Téléconseiller', valeur: nomDeLEquipe(input.equipe, input.teleconseiller) },
+      { libelle: 'Feuilles de chiffres', valeur: String(input.feuilles.length) },
+      { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
+    ],
+    feuilles: input.feuilles,
+  };
 }
 
 function equipeDe(jeux: Jeux): readonly { id: string; fullName: string }[] {
@@ -367,6 +412,17 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     if (brouillon !== null) setDefaultMutation.mutate(brouillon);
   }
 
+  function preparerClasseur(): ClasseurTableauDeBord {
+    return classeurDesChiffres({
+      projet,
+      periode: periodeAffichee(filters),
+      plage,
+      equipe,
+      teleconseiller: filters.teleconseiller,
+      feuilles: feuillesDesWidgets(widgets, catalogue, donneesParWidget),
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <ChiffresToolbar
@@ -394,6 +450,8 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
         onSave={handleSave}
         onCancel={cancelEdition}
         onSetDefault={handleSetDefault}
+        onPreparerClasseur={preparerClasseur}
+        exportPret={hasData && widgets.length > 0}
       />
 
       {/* « Comparer à » n'agit que sur le registre des visites : ici il serait inerte. */}
@@ -500,6 +558,8 @@ function ChiffresToolbar({
   onSave,
   onCancel,
   onSetDefault,
+  onPreparerClasseur,
+  exportPret,
 }: {
   filters: ChiffresFilters;
   onFiltersChange: (patch: Partial<ChiffresFilters>) => void;
@@ -523,6 +583,8 @@ function ChiffresToolbar({
   onSave: () => void;
   onCancel: () => void;
   onSetDefault: () => void;
+  onPreparerClasseur: () => ClasseurTableauDeBord;
+  exportPret: boolean;
 }) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -570,11 +632,14 @@ function ChiffresToolbar({
             onAdd={onAddWidget}
           />
         ) : (
-          dispositionSource === 'utilisateur' && (
-            <Button type="button" variant="ghost" disabled={resetPending} onClick={onReset}>
-              Revenir à l’écran par défaut
-            </Button>
-          )
+          <>
+            {dispositionSource === 'utilisateur' ? (
+              <Button type="button" variant="ghost" disabled={resetPending} onClick={onReset}>
+                Revenir à l’écran par défaut
+              </Button>
+            ) : null}
+            <BoutonExportExcel preparer={onPreparerClasseur} disabled={!exportPret} />
+          </>
         )}
         <BarreEdition
           editing={editing}
