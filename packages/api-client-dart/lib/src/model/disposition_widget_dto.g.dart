@@ -176,7 +176,6 @@ const _$DashboardSourceEnumMap = {
   DashboardSource.statutsParFamille: 'statuts-par-famille',
   DashboardSource.joignabiliteParCreneau: 'joignabilite-par-creneau',
   DashboardSource.tauxDExploitation: 'taux-d-exploitation',
-  DashboardSource.exploitationParCampagne: 'exploitation-par-campagne',
   DashboardSource.representantsParDepartement: 'representants-par-departement',
   DashboardSource.representantsParIef: 'representants-par-ief',
   DashboardSource.representantsJamaisAppeles: 'representants-jamais-appeles',

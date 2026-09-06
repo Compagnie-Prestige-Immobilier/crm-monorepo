@@ -156,11 +156,10 @@ describe('assainissement de la disposition d’un écran de chiffres', () => {
     },
   );
 
-  it('propose le camembert sur l’exploitation par campagne (EB-34)', () => {
-    const [widget] = sanitize('chues', [
-      { source: 'exploitation-par-campagne', marque: 'camembert' },
-    ]);
-
-    expect(widget?.marque).toBe('camembert');
+  it('garde le camembert et les barres empilées sur le taux d’exploitation (EB-34)', () => {
+    for (const marque of ['camembert', 'barres-empilees'] as const) {
+      const [widget] = sanitize('chues', [{ source: 'taux-d-exploitation', marque }]);
+      expect(widget?.marque).toBe(marque);
+    }
   });
 });

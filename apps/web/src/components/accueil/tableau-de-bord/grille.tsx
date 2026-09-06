@@ -44,6 +44,7 @@ import {
   BarresVerticalesChart,
   BullesChart,
   CamembertChart,
+  paletteFill,
   CarteDeChaleurTable,
   CourbeChart,
   EscalierChart,
@@ -57,6 +58,7 @@ import {
   TuileWidget,
 } from '@/components/dashboard/visites-charts';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { useChartTheme } from '@/lib/chart-theme';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
 type Presentation = DashboardWidget['presentation'];
@@ -104,42 +106,88 @@ function marqueComposition(
   titre: string,
   presentation: Presentation,
   messageVide: string,
+  ouvrir?: (id: string) => void,
 ): ReactNode {
   const items = lignes[0]?.segments ?? [];
-  if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
+  if (lignes.every((ligne) => ligne.segments.every((item) => item.value === 0)))
+    return <EmptyChart message={messageVide} />;
   if (marque === 'barres-empilees')
     return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
-  if ((marque === 'anneau' || marque === 'camembert') && lignes.length > 1)
-    return <PetitsMultiples lignes={lignes} marque={marque} presentation={presentation} />;
-  if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
-  if (marque === 'camembert') return <CamembertChart items={items} presentation={presentation} />;
+  if (marque === 'anneau' || marque === 'camembert')
+    return (
+      <PetitsMultiples
+        lignes={lignes}
+        marque={marque}
+        presentation={presentation}
+        ouvrir={ouvrir}
+      />
+    );
   if (marque === 'tableau') return <TableauWidget items={items} entete={titre} caption={titre} />;
   return <Barres100Chart lignes={lignes} presentation={presentation} />;
 }
 
-/** EB-34 : un diagramme circulaire PAR campagne, côte à côte, la ligne défile au-delà. */
+/** EB-34 : un diagramme circulaire PAR ligne (une campagne), une seule légende, la carte grandit avec eux. */
 function PetitsMultiples({
   lignes,
   marque,
   presentation,
+  ouvrir,
 }: {
   lignes: DonneeDe<'composition'>;
   marque: 'anneau' | 'camembert';
   presentation: Presentation;
+  ouvrir?: ((id: string) => void) | undefined;
 }) {
+  const theme = useChartTheme();
   const Diagramme = marque === 'anneau' ? AnneauChart : CamembertChart;
+  const sansLegende = { ...presentation, legende: false };
   return (
-    <div className="grid h-full auto-rows-[11rem] grid-cols-[repeat(auto-fill,minmax(13rem,1fr))] gap-3 overflow-y-auto">
-      {lignes.map((ligne) => (
-        <figure key={ligne.ligne} className="flex min-h-0 flex-col gap-1">
-          <div className="min-h-0 flex-1">
-            <Diagramme items={ligne.segments} presentation={presentation} />
-          </div>
-          <figcaption className="truncate text-center text-[0.8125rem] font-[600]">
-            {ligne.ligne}
-          </figcaption>
-        </figure>
-      ))}
+    <div className="flex flex-col gap-3 pb-3">
+      <ul
+        className="flex flex-wrap gap-3 text-[0.8125rem] text-muted-foreground"
+        aria-label="Légende"
+      >
+        {(lignes[0]?.segments ?? []).map((segment, index) => (
+          <li key={segment.id} className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="size-2.5 rounded-full"
+              style={{ backgroundColor: paletteFill(theme, presentation?.palette, index) }}
+            />
+            {segment.label}
+          </li>
+        ))}
+      </ul>
+      <div className="grid auto-rows-[12rem] grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+        {lignes.map((ligne) => {
+          const id = ligne.id;
+          return (
+            <figure key={id ?? ligne.ligne} className="flex min-h-0 flex-col gap-1">
+              <div className="min-h-0 flex-1">
+                <Diagramme
+                  items={ligne.segments}
+                  presentation={sansLegende}
+                  onSelect={
+                    ouvrir === undefined || id === undefined
+                      ? undefined
+                      : () => {
+                          ouvrir(id);
+                        }
+                  }
+                />
+              </div>
+              <figcaption className="text-center">
+                <span className="block truncate text-[0.8125rem] font-[600]">{ligne.ligne}</span>
+                {ligne.detail === undefined ? null : (
+                  <span className="block truncate text-[0.75rem] text-muted-foreground">
+                    {ligne.detail}
+                  </span>
+                )}
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -204,7 +252,7 @@ export function renderMark(
   if (donnees.forme === 'matrice')
     return marqueMatrice(donnees.donnee, marque, titre, presentation, messageVide);
   if (donnees.forme === 'composition')
-    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide);
+    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide, ouvrir);
 
   // Le tri et le regroupement en « Autres » n'ont de sens que pour un
   // classement : réordonner une série chronologique ou un cycle la rendrait
