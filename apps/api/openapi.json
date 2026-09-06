@@ -28619,7 +28619,7 @@
       },
       "LotExportCible": {
         "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS"]
+        "enum": ["REPRESENTANTS", "PROSPECTS", "REPRESENTANTS_INJOIGNABLES", "CONTACTS_RECOMMANDES"]
       },
       "SupervisionCampagneTeleconseillerDto": {
         "type": "object",

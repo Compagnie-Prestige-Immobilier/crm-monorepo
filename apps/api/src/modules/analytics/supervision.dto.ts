@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Projet } from '@crm/database';
+import { LotExportCible, Projet } from '@crm/database';
 import { IsEnum, IsISO8601, IsOptional, IsUUID, Matches } from 'class-validator';
 
 import { PerformanceScore } from '../admin/performance-score.js';
@@ -490,8 +490,8 @@ export class SupervisionCampagneTeleconseillerDto extends SupervisionCampagnesTo
 export class SupervisionCampagneDto extends SupervisionCampagnesTotauxDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() name!: string;
-  @ApiProperty({ enum: ['REPRESENTANTS', 'PROSPECTS'], enumName: 'LotExportCible' })
-  cible!: 'REPRESENTANTS' | 'PROSPECTS';
+  @ApiProperty({ enum: LotExportCible, enumName: 'LotExportCible' })
+  cible!: LotExportCible;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
 
   @ApiProperty({ type: () => [SupervisionCampagneTeleconseillerDto] })

@@ -6086,7 +6086,8 @@ export interface components {
     /** @enum {string} */
     SupervisionGranularity: 'day' | 'week';
     /** @enum {string} */
-    LotExportCible: 'REPRESENTANTS' | 'PROSPECTS';
+    LotExportCible:
+      'REPRESENTANTS' | 'PROSPECTS' | 'REPRESENTANTS_INJOIGNABLES' | 'CONTACTS_RECOMMANDES';
     SupervisionCampagneTeleconseillerDto: {
       /** @description Fiches confiées pour les jours de programme de la fenêtre. */
       prevues: number;

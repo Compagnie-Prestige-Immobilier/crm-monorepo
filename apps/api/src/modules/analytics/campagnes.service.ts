@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma } from '@crm/database';
+import { Prisma, type LotExportCible } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -14,7 +14,7 @@ import type {
 interface LigneRow {
   lotId: string;
   name: string;
-  cible: 'REPRESENTANTS' | 'PROSPECTS';
+  cible: LotExportCible;
   createdAt: Date;
   teleconseillerId: string;
   teleconseillerName: string;
@@ -54,7 +54,7 @@ export class CampagnesService {
     const avantLaFin = to ? Prisma.sql`t."clientCreatedAt" <= ${to}` : ALL_ROWS;
     const viseLaFiche = Prisma.sql`
       t."clientCreatedAt" >= l."createdAt" AND ${avantLaFin}
-      AND CASE WHEN l."cible" = 'REPRESENTANTS'
+      AND CASE WHEN i."representantId" IS NOT NULL
                THEN t."representantId" = i."representantId"
                ELSE t."prospectId" = i."prospectId" END
     `;
