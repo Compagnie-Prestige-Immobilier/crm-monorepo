@@ -585,6 +585,14 @@ export class ProspectDto {
   })
   originLabel!: string | null;
 
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Date de la demande publique qui attend une relecture.',
+  })
+  aRevoirAt!: string | null;
+
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) updatedAt!: string;
