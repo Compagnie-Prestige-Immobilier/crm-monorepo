@@ -75,7 +75,13 @@ abstract class _$ProspectDtoCWProxy {
 
   ProspectDto villeResidence(String? villeResidence);
 
+  ProspectDto etablissement(String? etablissement);
+
+  ProspectDto whatsappStatus(WhatsappStatus whatsappStatus);
+
   ProspectDto whatsappE164(String? whatsappE164);
+
+  ProspectDto whatsappNumber(String? whatsappNumber);
 
   ProspectDto relaisNom(String? relaisNom);
 
@@ -170,7 +176,10 @@ abstract class _$ProspectDtoCWProxy {
     String? paysResidenceId,
     String? paysResidenceLabel,
     String? villeResidence,
+    String? etablissement,
+    WhatsappStatus whatsappStatus,
     String? whatsappE164,
+    String? whatsappNumber,
     String? relaisNom,
     String? relaisPhoneE164,
     List<ProspectJourneyDto> journeys,
@@ -330,8 +339,20 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
       this(villeResidence: villeResidence);
 
   @override
+  ProspectDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
+  ProspectDto whatsappStatus(WhatsappStatus whatsappStatus) =>
+      this(whatsappStatus: whatsappStatus);
+
+  @override
   ProspectDto whatsappE164(String? whatsappE164) =>
       this(whatsappE164: whatsappE164);
+
+  @override
+  ProspectDto whatsappNumber(String? whatsappNumber) =>
+      this(whatsappNumber: whatsappNumber);
 
   @override
   ProspectDto relaisNom(String? relaisNom) => this(relaisNom: relaisNom);
@@ -472,7 +493,10 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
     Object? paysResidenceId = const $CopyWithPlaceholder(),
     Object? paysResidenceLabel = const $CopyWithPlaceholder(),
     Object? villeResidence = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
+    Object? whatsappStatus = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
+    Object? whatsappNumber = const $CopyWithPlaceholder(),
     Object? relaisNom = const $CopyWithPlaceholder(),
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
     Object? journeys = const $CopyWithPlaceholder(),
@@ -639,10 +663,22 @@ class _$ProspectDtoCWProxyImpl implements _$ProspectDtoCWProxy {
           ? _value.villeResidence
           // ignore: cast_nullable_to_non_nullable
           : villeResidence as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
+      whatsappStatus: whatsappStatus == const $CopyWithPlaceholder()
+          ? _value.whatsappStatus
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappStatus as WhatsappStatus,
       whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
           ? _value.whatsappE164
           // ignore: cast_nullable_to_non_nullable
           : whatsappE164 as String?,
+      whatsappNumber: whatsappNumber == const $CopyWithPlaceholder()
+          ? _value.whatsappNumber
+          // ignore: cast_nullable_to_non_nullable
+          : whatsappNumber as String?,
       relaisNom: relaisNom == const $CopyWithPlaceholder()
           ? _value.relaisNom
           // ignore: cast_nullable_to_non_nullable
@@ -803,7 +839,10 @@ ProspectDto _$ProspectDtoFromJson(
       'paysResidenceId',
       'paysResidenceLabel',
       'villeResidence',
+      'etablissement',
+      'whatsappStatus',
       'whatsappE164',
+      'whatsappNumber',
       'relaisNom',
       'relaisPhoneE164',
       'journeys',
@@ -924,7 +963,17 @@ ProspectDto _$ProspectDtoFromJson(
       (v) => v as String?,
     ),
     villeResidence: $checkedConvert('villeResidence', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
+    whatsappStatus: $checkedConvert(
+      'whatsappStatus',
+      (v) => $enumDecode(
+        _$WhatsappStatusEnumMap,
+        v,
+        unknownValue: WhatsappStatus.unknownDefaultOpenApi,
+      ),
+    ),
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
+    whatsappNumber: $checkedConvert('whatsappNumber', (v) => v as String?),
     relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
     relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
     journeys: $checkedConvert(
@@ -1058,7 +1107,10 @@ Map<String, dynamic> _$ProspectDtoToJson(ProspectDto instance) =>
       'paysResidenceId': instance.paysResidenceId,
       'paysResidenceLabel': instance.paysResidenceLabel,
       'villeResidence': instance.villeResidence,
+      'etablissement': instance.etablissement,
+      'whatsappStatus': _$WhatsappStatusEnumMap[instance.whatsappStatus]!,
       'whatsappE164': instance.whatsappE164,
+      'whatsappNumber': instance.whatsappNumber,
       'relaisNom': instance.relaisNom,
       'relaisPhoneE164': instance.relaisPhoneE164,
       'journeys': instance.journeys.map((e) => e.toJson()).toList(),
@@ -1130,6 +1182,14 @@ const _$ModeEpargneEnumMap = {
   ModeEpargne.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
+const _$WhatsappStatusEnumMap = {
+  WhatsappStatus.NON_DEMANDE: 'NON_DEMANDE',
+  WhatsappStatus.MEME_NUMERO: 'MEME_NUMERO',
+  WhatsappStatus.AUTRE_NUMERO: 'AUTRE_NUMERO',
+  WhatsappStatus.AUCUN: 'AUCUN',
+  WhatsappStatus.unknownDefaultOpenApi: 'unknown_default_open_api',
+};
+
 const _$BddSegmentEnumMap = {
   BddSegment.BDD1: 'BDD1',
   BddSegment.BDD2: 'BDD2',
@@ -1152,6 +1212,7 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
+  EnrollmentMethod.WHATSAPP: 'WHATSAPP',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 

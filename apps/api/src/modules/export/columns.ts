@@ -12,6 +12,7 @@ import {
   TYPE_CONTRAT_LABELS,
 } from '../prospects/phase2-labels.js';
 import type { LastAttempt } from '../prospects/last-attempt.js';
+import { whatsappNumberOf } from '../representants/whatsapp.js';
 import { toDakarCell } from './dakar.js';
 
 export const EXPORT_INCLUDE = {
@@ -138,7 +139,11 @@ export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
     value: (row) => row.paysResidence?.label ?? '',
   },
   { header: 'Ville de résidence', key: 'villeResidence', value: (row) => row.villeResidence ?? '' },
-  { header: 'WhatsApp', key: 'whatsappE164', value: (row) => row.whatsappE164 ?? '' },
+  {
+    header: 'WhatsApp',
+    key: 'whatsappE164',
+    value: (row) => whatsappNumberOf(row) ?? '',
+  },
   { header: 'Relais au Sénégal', key: 'relaisNom', value: (row) => row.relaisNom ?? '' },
   { header: 'Tél. relais', key: 'relaisPhoneE164', value: (row) => row.relaisPhoneE164 ?? '' },
 

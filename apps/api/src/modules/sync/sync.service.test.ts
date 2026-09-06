@@ -1034,3 +1034,44 @@ describe('vider un lien de prospect depuis le terrain', () => {
     );
   });
 });
+
+// EB-20 et EB-23 : le mobile crée un prospect avec son établissement, et un
+// numéro WhatsApp envoyé seul, comme le font les versions déjà installées,
+// doit continuer de s'enregistrer.
+describe('établissement et WhatsApp d’un prospect créé hors ligne', () => {
+  const creation = (data: Record<string, unknown>): SyncOperationDto => ({
+    opId: opId(),
+    seq: 0,
+    entity: SyncEntity.PROSPECT,
+    op: SyncOp.CREATE,
+    entityId: '0198c000-0000-7000-8000-000000000009',
+    clientUpdatedAt: '2026-08-10T10:00:00.000Z',
+    data: { nom: 'Fall', prenom: 'Moussa', phone: '77 100 00 91', ...data },
+  });
+
+  it('enregistre l’établissement saisi à la création', async () => {
+    await sync.push(alice, batch([creation({ etablissement: 'Lycée Blaise Diagne' })], 'lot-etab'));
+
+    expect(db.prospects.get('0198c000-0000-7000-8000-000000000009')?.etablissement).toBe(
+      'Lycée Blaise Diagne',
+    );
+  });
+
+  it('un numéro WhatsApp envoyé SANS statut se range en AUTRE_NUMERO', async () => {
+    await sync.push(alice, batch([creation({ whatsappE164: '+33612345678' })], 'lot-wa'));
+
+    expect(db.prospects.get('0198c000-0000-7000-8000-000000000009')).toMatchObject({
+      whatsappStatus: 'AUTRE_NUMERO',
+      whatsappE164: '+33612345678',
+    });
+  });
+
+  it('le numéro principal renvoyé comme WhatsApp se range en MEME_NUMERO, colonne vide', async () => {
+    await sync.push(alice, batch([creation({ whatsappE164: '77 100 00 91' })], 'lot-wa-meme'));
+
+    expect(db.prospects.get('0198c000-0000-7000-8000-000000000009')).toMatchObject({
+      whatsappStatus: 'MEME_NUMERO',
+      whatsappE164: null,
+    });
+  });
+});

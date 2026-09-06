@@ -6,11 +6,13 @@ import {
   ProspectType,
   Role,
   ScheduledCallbackStatus,
+  WhatsappStatus,
 } from '@crm/database';
 import { BadRequestException } from '@nestjs/common';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SYSTEM_OUTCOME_REASONS } from '../referentiels/call-outcome-rules.js';
+import { CONVERSION_CHUES_PAYLOAD_VERSION } from './attempt-rules.js';
 import { Phase2SyncService, type Phase2TransactionClient } from './phase2-sync.service.js';
 import type { CallAttemptOpDto } from './dto.js';
 
@@ -46,6 +48,10 @@ const prospectRow = (): Record<string, unknown> => ({
   rev: 3,
   updatedAt: new Date('2026-08-01T09:00:00.000Z'),
   lastCallAt: null,
+  incomeBandId: null,
+  phoneE164: '+221771234567',
+  whatsappStatus: WhatsappStatus.NON_DEMANDE,
+  whatsappE164: null,
 });
 
 /** L'état de phase 2 vit sur le parcours, plus sur la fiche. */
@@ -98,11 +104,17 @@ const op = {
 
 const ALICE = { id: 'com-1', role: Role.COMMERCIAL };
 
-const apply = (override: Partial<CallAttemptOpDto> = {}): Promise<unknown> =>
-  new Phase2SyncService().applyCallAttempt(tx as unknown as Phase2TransactionClient, ALICE, {
-    ...op,
-    ...override,
-  });
+/** Par defaut, la version d'AVANT EB-21 : les tentatives deja couvertes ne changent pas. */
+const apply = (
+  override: Partial<CallAttemptOpDto> = {},
+  payloadVersion: number = CONVERSION_CHUES_PAYLOAD_VERSION - 1,
+): Promise<unknown> =>
+  new Phase2SyncService().applyCallAttempt(
+    tx as unknown as Phase2TransactionClient,
+    ALICE,
+    { ...op, ...override },
+    payloadVersion,
+  );
 
 const writtenRow = (): Record<string, unknown> =>
   (tx.callAttempt.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0].data[0] ??
@@ -335,6 +347,103 @@ const RAPPEL = '2026-08-02T09:00:00.000Z';
 const callbackWritten = (): Record<string, unknown> =>
   (tx.scheduledCallback.createMany.mock.calls[0] as [{ data: Record<string, unknown>[] }])[0]
     .data[0] ?? {};
+
+describe('exigences de la conversion CHUES à partir de la version 8', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  const conversion = {
+    ...priseDeRendezVous,
+    incomeBandId: 'i-1',
+    dureeEtablissementMois: 84,
+  };
+
+  it('refuse la conversion sans revenu, et n’écrit aucune tentative', async () => {
+    const { incomeBandId, ...sansRevenu } = conversion;
+    void incomeBandId;
+
+    expect(await codeOf(apply(sansRevenu, CONVERSION_CHUES_PAYLOAD_VERSION))).toBe(
+      'PHASE2_REVENU_REQUIRED',
+    );
+    expect(tx.callAttempt.createMany).not.toHaveBeenCalled();
+  });
+
+  // Le formulaire ne renvoie pas une tranche déjà portée par la fiche : c'est
+  // l'état APRÈS correction qui doit la porter, pas la charge utile.
+  it('se contente de la tranche déjà portée par la fiche', async () => {
+    tx.prospect.findFirst.mockResolvedValue({ ...prospectRow(), incomeBandId: 'i-9' });
+    const { incomeBandId, ...sansRevenu } = conversion;
+    void incomeBandId;
+
+    await apply(sansRevenu, CONVERSION_CHUES_PAYLOAD_VERSION);
+
+    expect(tx.callAttempt.createMany).toHaveBeenCalled();
+  });
+
+  it('refuse la conversion sans durée dans la fonction', async () => {
+    const { dureeEtablissementMois, ...sansDuree } = conversion;
+    void dureeEtablissementMois;
+
+    expect(await codeOf(apply(sansDuree, CONVERSION_CHUES_PAYLOAD_VERSION))).toBe(
+      'PHASE2_DUREE_FONCTION_REQUIRED',
+    );
+  });
+
+  it('laisse passer la même saisie venue d’une version antérieure', async () => {
+    const { incomeBandId, dureeEtablissementMois, ...nu } = conversion;
+    void incomeBandId;
+    void dureeEtablissementMois;
+
+    await apply(nu);
+
+    expect(tx.callAttempt.createMany).toHaveBeenCalled();
+  });
+});
+
+describe('numéro WhatsApp recueilli à la conversion', () => {
+  beforeEach(() => {
+    prepare();
+  });
+
+  it('« oui » range le numéro appelé en MEME_NUMERO sans le recopier', async () => {
+    await apply({ ...priseDeRendezVous, whatsappStatus: WhatsappStatus.MEME_NUMERO });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toMatchObject({
+      whatsappStatus: WhatsappStatus.MEME_NUMERO,
+      whatsappE164: null,
+    });
+  });
+
+  it('« non » avec un second numéro l’enregistre normalisé', async () => {
+    await apply({
+      ...priseDeRendezVous,
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '77 555 44 33',
+    });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toMatchObject({
+      whatsappStatus: WhatsappStatus.AUTRE_NUMERO,
+      whatsappE164: '+221775554433',
+    });
+  });
+
+  it('l’établissement recueilli pendant l’appel va sur la fiche', async () => {
+    await apply({ ...priseDeRendezVous, etablissement: '  Lycée Blaise Diagne ' });
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).toMatchObject({ etablissement: 'Lycée Blaise Diagne' });
+  });
+
+  it('une tentative muette sur WhatsApp ne touche pas à la fiche', async () => {
+    await apply(priseDeRendezVous);
+
+    const [args] = tx.prospect.update.mock.calls[0] as [{ data: Record<string, unknown> }];
+    expect(args.data).not.toHaveProperty('whatsappStatus');
+  });
+});
 
 describe('rappel planifié', () => {
   beforeEach(() => {
@@ -617,6 +726,7 @@ describe('périmètre par campagne', () => {
       tx as unknown as Phase2TransactionClient,
       { id: 'sup-1', role: Role.SUPERVISEUR },
       op as CallAttemptOpDto,
+      CONVERSION_CHUES_PAYLOAD_VERSION - 1,
     );
 
     const wheres = (tx.prospect.findFirst.mock.calls as [{ where: Record<string, unknown> }][]).map(

@@ -57,6 +57,8 @@ abstract class _$UpdateProspectDtoCWProxy {
 
   UpdateProspectDto villeResidence(String? villeResidence);
 
+  UpdateProspectDto etablissement(String? etablissement);
+
   UpdateProspectDto whatsappE164(String? whatsappE164);
 
   UpdateProspectDto relaisNom(String? relaisNom);
@@ -95,6 +97,7 @@ abstract class _$UpdateProspectDtoCWProxy {
     ModeEpargne? modeEpargne,
     String? paysResidenceId,
     String? villeResidence,
+    String? etablissement,
     String? whatsappE164,
     String? relaisNom,
     String? relaisPhoneE164,
@@ -199,6 +202,10 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
       this(villeResidence: villeResidence);
 
   @override
+  UpdateProspectDto etablissement(String? etablissement) =>
+      this(etablissement: etablissement);
+
+  @override
   UpdateProspectDto whatsappE164(String? whatsappE164) =>
       this(whatsappE164: whatsappE164);
 
@@ -242,6 +249,7 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
     Object? modeEpargne = const $CopyWithPlaceholder(),
     Object? paysResidenceId = const $CopyWithPlaceholder(),
     Object? villeResidence = const $CopyWithPlaceholder(),
+    Object? etablissement = const $CopyWithPlaceholder(),
     Object? whatsappE164 = const $CopyWithPlaceholder(),
     Object? relaisNom = const $CopyWithPlaceholder(),
     Object? relaisPhoneE164 = const $CopyWithPlaceholder(),
@@ -347,6 +355,10 @@ class _$UpdateProspectDtoCWProxyImpl implements _$UpdateProspectDtoCWProxy {
           ? _value.villeResidence
           // ignore: cast_nullable_to_non_nullable
           : villeResidence as String?,
+      etablissement: etablissement == const $CopyWithPlaceholder()
+          ? _value.etablissement
+          // ignore: cast_nullable_to_non_nullable
+          : etablissement as String?,
       whatsappE164: whatsappE164 == const $CopyWithPlaceholder()
           ? _value.whatsappE164
           // ignore: cast_nullable_to_non_nullable
@@ -451,6 +463,7 @@ UpdateProspectDto _$UpdateProspectDtoFromJson(
     ),
     paysResidenceId: $checkedConvert('paysResidenceId', (v) => v as String?),
     villeResidence: $checkedConvert('villeResidence', (v) => v as String?),
+    etablissement: $checkedConvert('etablissement', (v) => v as String?),
     whatsappE164: $checkedConvert('whatsappE164', (v) => v as String?),
     relaisNom: $checkedConvert('relaisNom', (v) => v as String?),
     relaisPhoneE164: $checkedConvert('relaisPhoneE164', (v) => v as String?),
@@ -491,6 +504,7 @@ Map<String, dynamic> _$UpdateProspectDtoToJson(
     'modeEpargne': value,
   if (instance.paysResidenceId case final value?) 'paysResidenceId': value,
   if (instance.villeResidence case final value?) 'villeResidence': value,
+  if (instance.etablissement case final value?) 'etablissement': value,
   if (instance.whatsappE164 case final value?) 'whatsappE164': value,
   if (instance.relaisNom case final value?) 'relaisNom': value,
   if (instance.relaisPhoneE164 case final value?) 'relaisPhoneE164': value,

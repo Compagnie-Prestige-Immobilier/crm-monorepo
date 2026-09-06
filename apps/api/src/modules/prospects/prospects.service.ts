@@ -11,12 +11,15 @@ import {
   Projet,
   type ProspectStatut,
   ScheduledCallbackStatus,
+  WhatsappStatus,
   classifySegment,
 } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
+import { whatsappDuProspect, type WhatsappSaisi } from './whatsapp.js';
+import { whatsappNumberOf } from '../representants/whatsapp.js';
 import { normalizePhone } from '../../common/phone.js';
 import { AuditAction, audit } from '../../common/audit.js';
 import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
@@ -107,11 +110,13 @@ function situationGrandPublic(input: UpdateProspectDto): Record<string, unknown>
     modeEpargne: input.modeEpargne,
     paysResidenceId: input.paysResidenceId,
     villeResidence: trimOrNull(input.villeResidence),
-    whatsappE164: phoneOrNull(input.whatsappE164),
     relaisNom: trimOrNull(input.relaisNom),
     relaisPhoneE164: phoneOrNull(input.relaisPhoneE164),
   });
 }
+
+const saisieWhatsapp = (input: UpdateProspectDto): WhatsappSaisi =>
+  input.whatsappE164 === undefined ? {} : { numero: phoneOrNull(input.whatsappE164) ?? null };
 
 const isoOrNull = (value: Date | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toISOString();
@@ -256,7 +261,10 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     paysResidenceId: row.paysResidenceId,
     paysResidenceLabel: row.paysResidence?.label ?? null,
     villeResidence: row.villeResidence,
+    etablissement: row.etablissement,
+    whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
+    whatsappNumber: whatsappNumberOf(row),
     relaisNom: row.relaisNom,
     relaisPhoneE164: row.relaisPhoneE164,
     journeys: row.journeys.map((journey) => ({
@@ -435,8 +443,14 @@ export class ProspectsService {
           dureeSystemeMois: input.dureeSystemeMois,
           canalProvenanceId: input.canalProvenanceId,
           statut: input.statut,
+          etablissement: trimOrNull(input.etablissement),
         }),
         ...situationGrandPublic(input),
+        ...whatsappDuProspect(saisieWhatsapp(input), {
+          whatsappStatus: WhatsappStatus.NON_DEMANDE,
+          whatsappE164: null,
+          phoneE164,
+        }),
         journeys: {
           create: {
             projet,
@@ -504,10 +518,16 @@ export class ProspectsService {
           dureeSystemeMois: input.dureeSystemeMois,
           canalProvenanceId: input.canalProvenanceId,
           statut: input.statut,
+          etablissement: trimOrNull(input.etablissement),
           clientCreatedAt:
             input.clientCreatedAt === undefined ? undefined : new Date(input.clientCreatedAt),
         }),
         ...situationGrandPublic(input),
+        ...whatsappDuProspect(saisieWhatsapp(input), {
+          whatsappStatus: existing.whatsappStatus,
+          whatsappE164: existing.whatsappE164,
+          phoneE164: phoneE164 ?? existing.phoneE164,
+        }),
         rev: { increment: 1 },
       },
       include: PROSPECT_INCLUDE,

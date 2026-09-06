@@ -9,6 +9,7 @@ import {
   Phase2Status,
   Prisma,
   ScheduledCallbackStatus,
+  WhatsappStatus,
   type EnrollmentMethod,
   type Projet,
 } from '@crm/database';
@@ -16,7 +17,14 @@ import {
 import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
+import { normalizePhone } from '../../common/phone.js';
+import { whatsappDuProspect } from '../prospects/whatsapp.js';
+import {
+  assertConversionChues,
+  normalizeAttempt,
+  systemReasonFor,
+  type AttemptReason,
+} from './attempt-rules.js';
 import {
   CallAttemptApplyStatus,
   type CallAttemptOpDto,
@@ -32,6 +40,10 @@ interface ProspectState {
   rev: number;
   updatedAt: Date;
   lastCallAt: Date | null;
+  incomeBandId: string | null;
+  phoneE164: string;
+  whatsappStatus: WhatsappStatus;
+  whatsappE164: string | null;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -49,6 +61,10 @@ const PROSPECT_STATE_SELECT = {
   rev: true,
   updatedAt: true,
   lastCallAt: true,
+  incomeBandId: true,
+  phoneE164: true,
+  whatsappStatus: true,
+  whatsappE164: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -111,6 +127,7 @@ export class Phase2SyncService {
     tx: Phase2TransactionClient,
     user: Pick<AuthenticatedUser, 'id' | 'role'>,
     op: CallAttemptOpDto,
+    payloadVersion: number,
   ): Promise<CallAttemptResultDto> {
     const attempt = normalizeAttempt(op, await this.resolveReason(tx, op));
 
@@ -132,6 +149,14 @@ export class Phase2SyncService {
     if (journey.phase2Status !== Phase2Status.PENDING) {
       throw alreadyCompleted(toState(prospect, journey));
     }
+
+    assertConversionChues({
+      payloadVersion,
+      projet,
+      method: attempt.method,
+      incomeBandId: op.incomeBandId ?? prospect.incomeBandId ?? null,
+      dureeEtablissementMois: attempt.dureeEtablissementMois,
+    });
 
     const inserted = await tx.callAttempt.createMany({
       data: [
@@ -220,12 +245,20 @@ export class Phase2SyncService {
       ...(nom === '' ? {} : { nom }),
       ...(op.prenom === undefined ? {} : { prenom: op.prenom.trim() }),
       ...(op.profession === undefined ? {} : { profession: op.profession.trim() }),
+      ...(op.etablissement === undefined ? {} : { etablissement: op.etablissement.trim() }),
       ...(op.banqueId === undefined ? {} : { banqueId: op.banqueId }),
       ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
       ...(op.type === undefined ? {} : { type: op.type }),
       ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
       ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
       ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
+      ...whatsappDuProspect(
+        {
+          ...(op.whatsappStatus === undefined ? {} : { statut: op.whatsappStatus }),
+          ...(op.whatsappE164 === undefined ? {} : { numero: normalizePhone(op.whatsappE164) }),
+        },
+        current,
+      ),
     };
     const dernier = dernierAppel(op, userId, current.lastCallAt);
     if (Object.keys(data).length === 0 && Object.keys(dernier).length === 0) return current;
