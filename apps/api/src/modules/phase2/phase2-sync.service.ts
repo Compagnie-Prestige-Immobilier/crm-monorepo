@@ -18,6 +18,7 @@ import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { normalizePhone } from '../../common/phone.js';
+import { normaliserReponses } from '../champs-conversion/catalogue.js';
 import { whatsappDuProspect } from '../prospects/whatsapp.js';
 import {
   assertConversionChues,
@@ -44,6 +45,7 @@ interface ProspectState {
   phoneE164: string;
   whatsappStatus: WhatsappStatus;
   whatsappE164: string | null;
+  champsLibres: Prisma.JsonValue;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -65,6 +67,7 @@ const PROSPECT_STATE_SELECT = {
   phoneE164: true,
   whatsappStatus: true,
   whatsappE164: true,
+  champsLibres: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -259,6 +262,7 @@ export class Phase2SyncService {
         },
         current,
       ),
+      ...champsLibresPatch(op.champsLibres, current.champsLibres),
     };
     const dernier = dernierAppel(op, userId, current.lastCallAt);
     if (Object.keys(data).length === 0 && Object.keys(dernier).length === 0) return current;
@@ -453,4 +457,20 @@ export class Phase2SyncService {
       select: JOURNEY_STATE_SELECT,
     });
   }
+}
+
+/**
+ * Les réponses aux champs ajoutés par l'administrateur, fusionnées : le
+ * formulaire d'un projet ne connaît pas les champs de l'autre, et remplacer
+ * l'objet entier effacerait les réponses du parcours voisin.
+ */
+function champsLibresPatch(
+  envoyees: Record<string, string> | undefined,
+  courantes: Prisma.JsonValue,
+): { champsLibres?: Prisma.InputJsonValue } {
+  if (envoyees === undefined) return {};
+  const reponses = normaliserReponses(envoyees);
+  if (reponses === null || Object.keys(reponses).length === 0) return {};
+  const deja = normaliserReponses(courantes) ?? {};
+  return { champsLibres: { ...deja, ...reponses } };
 }

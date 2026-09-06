@@ -231,6 +231,7 @@ function conversion(over: Partial<ConversionDraft> = {}): ConversionDraft {
     whatsapp: '',
     method: 'PLATFORM',
     rendezVousAt: '',
+    champsLibres: {},
     ...over,
   };
 }

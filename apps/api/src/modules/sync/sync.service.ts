@@ -875,6 +875,7 @@ export class SyncService {
             incomeBandId: data.incomeBandId,
             paymentMode: data.paymentMode,
             dureeSystemeMois: data.dureeSystemeMois,
+            champsLibres: data.champsLibres,
             whatsappStatus: data.whatsappStatus,
             whatsappE164: data.whatsappE164,
             deviceCallType: data.deviceCallType,

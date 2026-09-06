@@ -489,6 +489,15 @@ export class ProspectDto {
   journeys!: ProspectJourneyDto[];
 
   @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. ' +
+      'Les libellés se lisent dans GET /champs-conversion/{projet}.',
+  })
+  champsLibres!: Record<string, string>;
+
+  @ApiProperty({
     type: Number,
     nullable: true,
     description: 'Durée du système de paiement retenue, en MOIS.',

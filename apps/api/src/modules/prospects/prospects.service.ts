@@ -17,6 +17,7 @@ import {
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { normaliserReponses } from '../champs-conversion/catalogue.js';
 import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
 import { whatsappDuProspect, type WhatsappSaisi } from './whatsapp.js';
 import { whatsappNumberOf } from '../representants/whatsapp.js';
@@ -268,6 +269,7 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     whatsappNumber: whatsappNumberOf(row),
     relaisNom: row.relaisNom,
     relaisPhoneE164: row.relaisPhoneE164,
+    champsLibres: normaliserReponses(row.champsLibres) ?? {},
     journeys: row.journeys.map((journey) => ({
       ...journey,
       consentAt: isoOrNull(journey.consentAt),

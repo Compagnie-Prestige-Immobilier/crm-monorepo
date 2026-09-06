@@ -2909,6 +2909,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/champs-conversion/{projet}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Champs du formulaire de conversion, dans l’ordre d’affichage.
+     * @description Lu par le formulaire du téléconseiller comme par le formulaire public : un champ masqué n’est ni rendu ni exigé. Les champs imposés reviennent toujours visibles, quel que soit le réglage enregistré.
+     */
+    get: operations['getChampsConversion'];
+    /**
+     * Enregistre visibilité, caractère obligatoire, ordre et champs ajoutés.
+     * @description La liste entière est remplacée. Masquer un champ imposé est refusé en 400.
+     */
+    put: operations['updateChampsConversion'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/app-updates/android/current': {
     parameters: {
       query?: never;
@@ -4544,6 +4568,10 @@ export interface components {
       relaisNom: string | null;
       relaisPhoneE164: string | null;
       journeys: components['schemas']['ProspectJourneyDto'][];
+      /** @description Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}. */
+      champsLibres: {
+        [key: string]: string;
+      };
       /** @description Durée du système de paiement retenue, en MOIS. */
       dureeSystemeMois: number | null;
       /** Format: uuid */
@@ -5109,6 +5137,10 @@ export interface components {
        * @description Visite : destinataire visé.
        */
       destinataireId?: string;
+      /** @description Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ. */
+      champsLibres?: {
+        [key: string]: string;
+      };
     };
     SyncOperationDto: {
       /**
@@ -7196,6 +7228,55 @@ export interface components {
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
+    ReglageChampDto: {
+      /** @description Clé du champ dans le catalogue de la conversion. */
+      champ: string;
+      libelle: string;
+      visible: boolean;
+      obligatoire: boolean;
+      /** @description Champ exigé par les indicateurs et le closing : il ne peut pas être masqué. */
+      impose: boolean;
+    };
+    ChampLibreDto: {
+      /** Format: uuid */
+      id: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      /** @description Valeurs proposées, pour le type LISTE seulement. */
+      options: string[];
+      obligatoire: boolean;
+    };
+    ReglagesConversionDto: {
+      projet: components['schemas']['Projet'];
+      /** @description Dans l’ordre d’affichage. Un champ masqué n’est ni rendu ni exigé. */
+      champs: components['schemas']['ReglageChampDto'][];
+      libres: components['schemas']['ChampLibreDto'][];
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    ReglageChampInputDto: {
+      champ: string;
+      visible: boolean;
+      obligatoire: boolean;
+    };
+    ChampLibreInputDto: {
+      /**
+       * Format: uuid
+       * @description Absent : le champ vient d’être ajouté.
+       */
+      id?: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      options?: string[];
+      obligatoire: boolean;
+    };
+    UpdateReglagesConversionDto: {
+      /** @description La liste ENTIÈRE, dans l’ordre d’affichage voulu. */
+      champs: components['schemas']['ReglageChampInputDto'][];
+      libres: components['schemas']['ChampLibreInputDto'][];
+    };
     AppUpdateDto: {
       available: boolean;
       /** @description Le poste est sous le plancher obligatoire. */
@@ -18594,6 +18675,106 @@ export interface operations {
         };
         content: {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateReglagesConversionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

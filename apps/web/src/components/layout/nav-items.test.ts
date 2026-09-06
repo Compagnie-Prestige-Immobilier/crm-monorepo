@@ -404,6 +404,7 @@ describe('navigation d’un ADMIN', () => {
       '/admin/notifications',
       '/admin/enrolement',
       '/admin/parametres',
+      '/admin/champs-conversion',
     ]);
   });
 
@@ -415,6 +416,7 @@ describe('navigation d’un ADMIN', () => {
       'Envoyer une notification',
       'Plateformes d’enrôlement',
       'Paramètres',
+      'Champs de la conversion',
     ]);
   });
 });

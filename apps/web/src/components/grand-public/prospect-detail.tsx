@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
+import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -459,6 +460,8 @@ export function GrandPublicProspectDetail({
           </dl>
         </CardContent>
       </Card>
+
+      <ChampsAjoutes prospect={prospect} />
 
       <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
         <DialogContent>

@@ -13,6 +13,7 @@ export function prospectFixture(over: Partial<ProspectRow> & { id: string }): Pr
     rev: 1,
     statut: 'NOUVEAU',
     projet: 'CHUES',
+    champsLibres: {},
     banqueId: 'b-1',
     banqueName: 'CBAO',
     syndicatId: 's-1',

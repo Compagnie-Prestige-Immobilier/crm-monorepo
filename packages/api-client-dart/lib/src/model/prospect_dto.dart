@@ -113,6 +113,8 @@ class ProspectDto {
 
     required this.journeys,
 
+    required this.champsLibres,
+
     required this.dureeSystemeMois,
 
     required this.canalProvenanceId,
@@ -330,6 +332,10 @@ class ProspectDto {
   @JsonKey(name: r'journeys', required: true, includeIfNull: false)
   final List<ProspectJourneyDto> journeys;
 
+  /// Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}.
+  @JsonKey(name: r'champsLibres', required: true, includeIfNull: false)
+  final Map<String, String> champsLibres;
+
   /// Durée du système de paiement retenue, en MOIS.
   @JsonKey(name: r'dureeSystemeMois', required: true, includeIfNull: true)
   final num? dureeSystemeMois;
@@ -495,6 +501,7 @@ class ProspectDto {
                 relaisNom,
                 relaisPhoneE164,
                 journeys,
+                champsLibres,
                 dureeSystemeMois,
                 canalProvenanceId,
                 canalProvenanceLabel,
@@ -564,6 +571,7 @@ class ProspectDto {
                 other.relaisNom,
                 other.relaisPhoneE164,
                 other.journeys,
+                other.champsLibres,
                 other.dureeSystemeMois,
                 other.canalProvenanceId,
                 other.canalProvenanceLabel,
@@ -639,6 +647,7 @@ class ProspectDto {
         relaisNom,
         relaisPhoneE164,
         journeys,
+        champsLibres,
         dureeSystemeMois,
         canalProvenanceId,
         canalProvenanceLabel,

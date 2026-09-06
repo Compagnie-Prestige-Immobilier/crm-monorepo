@@ -11,6 +11,7 @@ import {
   HouseIcon,
   LayoutDashboardIcon,
   LibraryIcon,
+  ListChecksIcon,
   ListIcon,
   ListOrderedIcon,
   MegaphoneIcon,
@@ -774,6 +775,16 @@ const SECTIONS: readonly NavSection[] = [
         icon: SettingsIcon,
         description: 'Démonstration et suppression',
         roles: ['ADMIN'],
+      },
+      {
+        // Sous « Plus » : on règle le formulaire une fois, on ne le rouvre pas
+        // chaque jour, et la barre tient à six entrées.
+        href: '/admin/champs-conversion',
+        label: 'Champs de la conversion',
+        icon: ListChecksIcon,
+        description: 'Ordre, visibilité et champs ajoutés',
+        roles: ['ADMIN'],
+        secondary: true,
       },
     ],
   },

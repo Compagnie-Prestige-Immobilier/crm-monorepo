@@ -582,6 +582,7 @@ ProspectDto prospectDto({
         ),
       )
       .toList(growable: false),
+  champsLibres: const <String, String>{},
   dureeSystemeMois: null,
   canalProvenanceId: null,
   canalProvenanceLabel: null,
@@ -606,6 +607,9 @@ ProspectDto prospectDto({
   enrollmentCapturedById: null,
   enrollmentCapturedByName: null,
   enrollmentCapturedAt: null,
+  revueAt: null,
+  revueById: null,
+  revueByName: null,
   lastOutcome: null,
   lastComment: null,
   lastAttemptAt: null,

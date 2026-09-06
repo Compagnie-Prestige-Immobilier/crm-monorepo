@@ -19,6 +19,7 @@ import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { ChampsConversionModule } from './modules/champs-conversion/champs-conversion.module.js';
 import { EnrolementModule } from './modules/enrolement/enrolement.module.js';
 import { FormulairePublicModule } from './modules/formulaire-public/formulaire-public.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
@@ -131,6 +132,7 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     ParametresChuesModule,
     EnrolementModule,
     FormulairePublicModule,
+    ChampsConversionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },
