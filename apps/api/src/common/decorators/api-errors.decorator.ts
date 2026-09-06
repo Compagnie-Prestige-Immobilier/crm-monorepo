@@ -32,8 +32,3 @@ export function ApiErrors(
 
   return applyDecorators(...decorators);
 }
-
-export const ApiAuthErrors = (): ClassDecorator & MethodDecorator =>
-  ApiErrors({ 401: true, 403: true });
-
-export const ApiValidationError = (): ClassDecorator & MethodDecorator => ApiErrors({ 400: true });

@@ -38,7 +38,7 @@ export interface CompositionLigne {
   detail?: string;
 }
 
-export interface MatriceCellule {
+interface MatriceCellule {
   ligne: string;
   colonne: string;
   value: number;
@@ -424,11 +424,6 @@ export function catalogueVisitesDe(role: Role): Readonly<Record<string, SourceDe
   return Object.fromEntries(SOURCES_REGISTRE_ACCUEIL.map((source) => [source, SOURCES[source]]));
 }
 
-/** Une clé qui n'existe pas dans le contrat de l'API rougit sur cette ligne. */
-export const SOURCES_DU_REGISTRE: readonly DashboardSource[] = Object.keys(
-  SOURCES,
-) as VisiteSource[];
-
 export function mesurerDonnees(donnees: DonneesSource): {
   nombreCategories: number;
   nombrePoints: number;
@@ -522,7 +517,7 @@ export interface ReglagesHonores {
   legende: boolean;
 }
 
-export const REGLAGES_HONORES: Record<DashboardMarque, ReglagesHonores> = {
+const REGLAGES_HONORES: Record<DashboardMarque, ReglagesHonores> = {
   'barres-verticales': { palette: true, valeurs: true, legende: false },
   'barres-horizontales': { palette: true, valeurs: true, legende: false },
   'barres-empilees': { palette: true, valeurs: true, legende: true },

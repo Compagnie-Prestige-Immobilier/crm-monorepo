@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
-  ArrayMinSize,
   IsArray,
   IsBoolean,
   IsEnum,
@@ -406,13 +405,4 @@ export class IncludeInactiveQueryDto {
   @Transform(queryBoolean)
   @IsBoolean()
   includeInactive?: boolean;
-}
-
-export class ArrayOfUuidDto {
-  @ApiProperty({ type: [String], minItems: 1, maxItems: 1000 })
-  @IsArray()
-  @ArrayMinSize(1)
-  @ArrayMaxSize(1000)
-  @IsUUID(undefined, { each: true })
-  ids!: string[];
 }

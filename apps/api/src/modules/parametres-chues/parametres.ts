@@ -28,7 +28,7 @@ export type CleParametre = keyof ParametresChues;
  * faux detournent des inscriptions, et la liste des destinataires decide qui
  * lit les demandes.
  */
-export const TEXTES_PARTAGES: readonly CleParametre[] = [
+const TEXTES_PARTAGES: readonly CleParametre[] = [
   'messageWhatsapp',
   'accuseReceptionObjet',
   'accuseReceptionCorps',
@@ -74,7 +74,7 @@ const LISTES: readonly CleParametre[] = [
   'destinatairesDirection',
 ];
 
-export const estUneListe = (cle: CleParametre): boolean => LISTES.includes(cle);
+const estUneListe = (cle: CleParametre): boolean => LISTES.includes(cle);
 
 /** `AppSetting` est partagee : le prefixe evite qu'un reglage CHUES en ecrase un autre. */
 export const cleStockee = (cle: CleParametre): string => `chues.${cle}`;

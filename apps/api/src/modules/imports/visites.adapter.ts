@@ -27,8 +27,6 @@ import {
 } from './visites-referentiels.js';
 import { SHEET_CELL } from './xlsx-rows.js';
 
-export { VisiteImportError, readSheetDate, readSheetTime };
-
 /**
  * Reprise du classeur de visites tenu à l'accueil depuis des années.
  *
@@ -38,9 +36,9 @@ export { VisiteImportError, readSheetDate, readSheetTime };
  * `layout`, qui fait retrouver les colonnes par leur en-tête, onglet par onglet.
  */
 
-export const VISITES_MAX_ROWS = 20_000;
+const VISITES_MAX_ROWS = 20_000;
 
-export const VISITE_IMPORT_HEADERS = {
+const VISITE_IMPORT_HEADERS = {
   date: 'DATE VISITE',
   heure: 'HEURE VISITE',
   nom: 'PRENOM ET NOMS',
@@ -62,7 +60,7 @@ const H = VISITE_IMPORT_HEADERS;
  * la laissant hors du modèle, ces lignes se projettent vides et le moteur les
  * saute, au lieu de compter cinq mille refus « date absente ».
  */
-export const VISITES_IMPORT_COLUMNS: readonly ImportColumn[] = [
+const VISITES_IMPORT_COLUMNS: readonly ImportColumn[] = [
   {
     header: H.date,
     width: 14,
@@ -128,7 +126,7 @@ export const VISITES_IMPORT_COLUMNS: readonly ImportColumn[] = [
   },
 ];
 
-export const VISITES_SHEET_LAYOUT: SheetLayout = {
+const VISITES_SHEET_LAYOUT: SheetLayout = {
   sheetPattern: /BDD VISITES/i,
   headerRow: 3,
 };
@@ -163,7 +161,7 @@ const LIBELLES_DU_CLASSEUR: ReadonlyMap<string, string> = new Map([
   [normalizeKey('ACHAT PRODUITS SANTARGILE ET/OU MAK'), 'ACHAT_PRODUITS'],
 ]);
 
-export const visiteDedupKey = (row: {
+const visiteDedupKey = (row: {
   date: string;
   time: string | null;
   visitorName: string;

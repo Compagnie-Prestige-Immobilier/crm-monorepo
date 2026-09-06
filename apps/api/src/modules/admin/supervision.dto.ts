@@ -5,7 +5,7 @@ import { WorkShiftDto } from '../analytics/supervision.dto.js';
 import { PerformanceScore } from './performance-score.js';
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
-export const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
+const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
 
 export class SupervisedUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;

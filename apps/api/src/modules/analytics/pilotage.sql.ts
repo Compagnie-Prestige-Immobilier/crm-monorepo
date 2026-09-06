@@ -2,12 +2,7 @@ import { Prisma } from '@crm/database';
 
 export const ALL_ROWS = Prisma.sql`TRUE`;
 
-export const TASK = Prisma.sql`ct`;
-export const ATTEMPT = Prisma.sql`ca`;
-export const CAMPAIGN = Prisma.sql`cc`;
 export const BANK_CASE = Prisma.sql`bc`;
-export const TRANSITION = Prisma.sql`tr`;
-export const RELATION_CHANGE = Prisma.sql`rc`;
 
 /**
  * Clés de `CallOutcome` qui ne comptent PAS comme un contact. Un faux numéro

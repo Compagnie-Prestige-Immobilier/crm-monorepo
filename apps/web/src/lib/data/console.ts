@@ -38,7 +38,7 @@ export interface CallbackList {
 }
 
 /** L'heure promise croissante : le retard étant une heure dépassée, il vient en tête. */
-export function sortCallbacks(items: readonly Callback[]): Callback[] {
+function sortCallbacks(items: readonly Callback[]): Callback[] {
   return [...items].sort((left, right) => {
     if (left.scheduledAt !== right.scheduledAt)
       return left.scheduledAt < right.scheduledAt ? -1 : 1;
@@ -162,11 +162,11 @@ export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
   return slots;
 }
 
-export const COMMENT_MAX_LENGTH = 2_000;
-export const EMAIL_MAX_LENGTH = 160;
-export const NAME_MAX_LENGTH = 120;
-export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
-export const DUREE_SYSTEME_MAX_MOIS = 300;
+const COMMENT_MAX_LENGTH = 2_000;
+const EMAIL_MAX_LENGTH = 160;
+const NAME_MAX_LENGTH = 120;
+const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
 const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
@@ -535,7 +535,7 @@ function methodeErreurs(
  * Le serveur répond en 200 avec un code par opération : le refus doit revenir
  * SOUS le champ fautif, sinon la téléconseillère relit tout le formulaire.
  */
-export const CONVERSION_ERRORS: Readonly<
+const CONVERSION_ERRORS: Readonly<
   Record<string, { readonly field: ConversionField; readonly message: string }>
 > = {
   PHASE2_RENDEZ_VOUS_REQUIRED: {
@@ -703,7 +703,7 @@ export interface AttemptInput {
   readonly at: string;
 }
 
-export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
+function buildAttemptBatch(input: AttemptInput): SyncPushBody {
   const comment = input.draft.comment.trim();
   const callbackAt = input.draft.callbackAt ?? null;
 
@@ -801,7 +801,7 @@ export function repRelationSettled(representant: ScriptedRepresentant): boolean 
   return REP_RELATION_RANK[representant.relationStatus] === 2;
 }
 
-export type RepCallOutcome = components['schemas']['RepCallOutcome'];
+type RepCallOutcome = components['schemas']['RepCallOutcome'];
 
 type RepAttemptBody = components['schemas']['CreateRepCallAttemptDto'];
 

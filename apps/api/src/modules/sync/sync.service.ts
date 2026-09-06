@@ -78,7 +78,7 @@ import {
  * plus vieilles que deux secondes, on laisse toute écriture en vol le temps de
  * se valider avant d'entrer dans la fenêtre de pagination.
  */
-export const PULL_SAFETY_LAG_MS = 2_000;
+const PULL_SAFETY_LAG_MS = 2_000;
 
 /** Une transaction de groupe ne doit jamais immobiliser une connexion au-delà. */
 const GROUP_TRANSACTION_TIMEOUT_MS = 15_000;

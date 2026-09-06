@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEnum, IsIn, IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
+import { IsIn, IsString, MaxLength, MinLength } from 'class-validator';
 import { Role } from '@crm/database';
 import { WORKSPACES, type Workspace } from '../../workspaces/workspace.js';
 import { IsPasswordLength } from './password-policy.js';
@@ -80,11 +80,4 @@ export class AuthTokensDto {
 
 export class LogoutResponseDto {
   @ApiProperty({ type: Boolean }) revoked!: boolean;
-}
-
-export class RoleFilterDto {
-  @ApiPropertyOptional({ enum: Role, enumName: 'Role' })
-  @IsOptional()
-  @IsEnum(Role)
-  role?: Role;
 }

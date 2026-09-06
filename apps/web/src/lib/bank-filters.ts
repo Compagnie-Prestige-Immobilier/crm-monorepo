@@ -20,7 +20,7 @@ export type BankAnalyticsQuery = NonNullable<
   operations['getBankCaseAnalytics']['parameters']['query']
 >;
 
-export const BANK_DEFAULT_PAGE_SIZE = 25;
+const BANK_DEFAULT_PAGE_SIZE = 25;
 export const BANK_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
 const STAGE_TYPES: readonly BankStageType[] = ['OPEN', 'CASHED', 'REJECTED'];
@@ -170,18 +170,6 @@ export const BANK_ADVANCED_FILTER_KEYS = [
 ] as const;
 
 export type BankAdvancedFilterKey = (typeof BANK_ADVANCED_FILTER_KEYS)[number];
-
-export function activeBankAdvancedKeys(filters: BankCaseFilters): BankAdvancedFilterKey[] {
-  return BANK_ADVANCED_FILTER_KEYS.filter((key) => filters[key] !== null);
-}
-
-export function countBankAdvancedFilters(filters: BankCaseFilters): number {
-  return activeBankAdvancedKeys(filters).length;
-}
-
-export function hasBankAdvancedFilters(filters: BankCaseFilters): boolean {
-  return BANK_ADVANCED_FILTER_KEYS.some((key) => filters[key] !== null);
-}
 
 export function clearBankAdvancedFilters(): Partial<BankCaseFilters> {
   return {

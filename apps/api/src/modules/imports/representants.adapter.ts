@@ -63,7 +63,7 @@ import type {
  */
 
 /** Le plafond, et il appartient à l'entité, pas au moteur. */
-export const REPRESENTANTS_MAX_ROWS = 50_000;
+const REPRESENTANTS_MAX_ROWS = 50_000;
 
 /** Une ligne de représentant prête à écrire. */
 export interface RepresentantImportRow {

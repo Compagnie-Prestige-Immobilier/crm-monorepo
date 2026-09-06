@@ -1,6 +1,6 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 
-export const OuvertureErrorCode = {
+const OuvertureErrorCode = {
   CIBLE_INVALIDE: 'OUVERTURE_CIBLE_INVALIDE',
   DEJA_OUVERTE: 'OUVERTURE_FICHE_DEJA_OUVERTE',
   INTROUVABLE: 'OUVERTURE_INTROUVABLE',

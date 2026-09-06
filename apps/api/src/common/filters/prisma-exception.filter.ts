@@ -3,7 +3,7 @@ import { BaseExceptionFilter } from '@nestjs/core';
 
 import { normalizeErrorBody, type NormalizedError } from '../errors/normalize.js';
 
-export interface PrismaErrorBody {
+interface PrismaErrorBody {
   statusCode: number;
   code: string;
   message: string;
@@ -35,7 +35,7 @@ const targetOf = (error: KnownPrismaError): string[] | undefined => {
   return undefined;
 };
 
-export function mapPrismaError(error: KnownPrismaError): PrismaErrorBody | undefined {
+function mapPrismaError(error: KnownPrismaError): PrismaErrorBody | undefined {
   const target = targetOf(error);
   switch (error.code) {
     case 'P2002':

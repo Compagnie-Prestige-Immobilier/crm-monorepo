@@ -34,7 +34,7 @@ import { referentialAmbiguous } from './prospects-import.errors.js';
 
 const H = GRAND_PUBLIC_IMPORT_HEADERS;
 
-export const GrandPublicImportError = {
+const GrandPublicImportError = {
   NOM_ABSENT: 'PROSPECT_GP_IMPORT_NOM_ABSENT',
   TELEPHONE_ILLISIBLE: 'PROSPECT_GP_IMPORT_TELEPHONE_ILLISIBLE',
   BANQUE_INCONNUE: 'PROSPECT_GP_IMPORT_BANQUE_INCONNUE',
@@ -557,7 +557,7 @@ const cut = (value: string, max: number): string | null =>
   value === '' ? null : value.slice(0, max);
 
 /** « 36 » et « 36 mois » se lisent. Zéro est une vraie réponse : il vient d'être embauché. */
-export function readAncienneteMois(raw: string): number | null {
+function readAncienneteMois(raw: string): number | null {
   const match = /^(\d{1,4})(?:\s*mois)?$/i.exec(raw.trim());
   if (match === null) return null;
 
@@ -578,7 +578,7 @@ function indexBySigle(
   return map;
 }
 
-export function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'illisible' {
+function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'illisible' {
   const key = normalizeKey(raw);
   if (key === '') return 'inconnu';
   if (OUI_TOKENS.includes(key)) return 'oui';
@@ -587,7 +587,7 @@ export function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'ill
 }
 
 /** « 24 » et « 24 mois » se lisent. « 2 ans » ne se devine pas. */
-export function readDureeMois(raw: string): number | null {
+function readDureeMois(raw: string): number | null {
   const match = /^(\d{1,4})(?:\s*mois)?$/i.exec(raw.trim());
   if (match === null) return null;
 

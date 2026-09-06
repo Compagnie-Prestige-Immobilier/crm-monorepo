@@ -2,7 +2,7 @@
 
 const REFERENCE = /^V-(\d{4})-(\d{6})$/;
 
-export const MAX_VISITE_SEQUENCE = 999_999;
+const MAX_VISITE_SEQUENCE = 999_999;
 
 export const visiteReferencePrefix = (year: number): string => `V-${String(year)}-`;
 

@@ -193,7 +193,7 @@ interface CommentRow {
   createdAt: Date;
 }
 
-export function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDto {
+function toRepresentantCommentDto(row: CommentRow): RepresentantCommentDto {
   return {
     id: row.id,
     representantId: row.representantId,

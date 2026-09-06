@@ -15,7 +15,7 @@ export const VISITE_REFERENTIEL_KINDS: readonly VisiteReferentielKind[] = [
   'objets',
 ];
 
-export type UsageCounts = Readonly<Record<string, number>>;
+type UsageCounts = Readonly<Record<string, number>>;
 
 export interface VisiteReferentielUsage {
   entreprises: UsageCounts;

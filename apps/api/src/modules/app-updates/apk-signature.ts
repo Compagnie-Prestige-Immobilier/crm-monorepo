@@ -3,12 +3,12 @@ import { open } from 'node:fs/promises';
 
 import { UnprocessableEntityException } from '@nestjs/common';
 
-export const ApkSignerError = {
+const ApkSignerError = {
   UNSIGNED: 'APK_UNSIGNED',
   MISMATCH: 'APK_SIGNER_MISMATCH',
 } as const;
 
-export const apkUnsigned = (detail: string): UnprocessableEntityException =>
+const apkUnsigned = (detail: string): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkSignerError.UNSIGNED,
     message:
@@ -16,7 +16,7 @@ export const apkUnsigned = (detail: string): UnprocessableEntityException =>
       `refuserait de l’installer, et la publication est annulée. Détail technique : ${detail}`,
   });
 
-export const apkSignerMismatch = (found: string, expected: string): UnprocessableEntityException =>
+const apkSignerMismatch = (found: string, expected: string): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkSignerError.MISMATCH,
     message:

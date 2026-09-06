@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import {
-  BellIcon,
   BellOffIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -671,5 +670,3 @@ function TableSkeleton() {
     </div>
   );
 }
-
-export { BellIcon };

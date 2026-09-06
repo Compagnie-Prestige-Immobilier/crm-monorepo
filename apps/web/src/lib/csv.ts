@@ -8,7 +8,7 @@ const FORMULA_START = /^[=+\-@\t\r]/u;
  * la cellule. Seule l'apostrophe de tête, qu'il consomme sans l'afficher,
  * neutralise `=`, `+`, `-`, `@`, la tabulation et le retour chariot.
  */
-export function csvCell(value: string | number | null): string {
+function csvCell(value: string | number | null): string {
   if (value === null) return '';
   if (typeof value === 'number') return String(value).replace('.', ',');
 

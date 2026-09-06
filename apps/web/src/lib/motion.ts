@@ -1,13 +1,4 @@
-export const DUR_1_MS = 150;
-export const DUR_2_MS = 220;
-export const DUR_3_MS = 300;
-
-export function cubicBezier(
-  x1: number,
-  y1: number,
-  x2: number,
-  y2: number,
-): (time: number) => number {
+function cubicBezier(x1: number, y1: number, x2: number, y2: number): (time: number) => number {
   const ax = 3 * x1 - 3 * x2 + 1;
   const bx = 3 * x2 - 6 * x1;
   const cx = 3 * x1;
@@ -37,9 +28,7 @@ export function cubicBezier(
   };
 }
 
-export const easeOut = cubicBezier(0.22, 1, 0.36, 1);
-
-export const easeSpring = cubicBezier(0.34, 1.56, 0.64, 1);
+const easeOut = cubicBezier(0.22, 1, 0.36, 1);
 
 export function interpolateCount(from: number, to: number, progress: number): number {
   if (progress <= 0) return from;

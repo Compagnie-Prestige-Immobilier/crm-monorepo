@@ -7,7 +7,7 @@ export const REFRESH_TTL_SECONDS = 30 * 24 * 60 * 60;
 
 export const REFRESH_SKEW_SECONDS = 60;
 
-export const CONFIG_ERROR_CODE = 'CONFIGURATION_MANQUANTE';
+const CONFIG_ERROR_CODE = 'CONFIGURATION_MANQUANTE';
 
 export class ApiConfigurationError extends Error {
   readonly variable: string;

@@ -30,30 +30,25 @@ export interface TransitionEffect {
 }
 
 /** Le seul motif de rejet qui exige une précision libre. */
-export const OTHER_REJECTION_CODE = 'AUTRE';
+const OTHER_REJECTION_CODE = 'AUTRE';
 
 const byPosition = (left: WorkflowStage, right: WorkflowStage): number =>
   left.position - right.position || left.id.localeCompare(right.id);
 
-export const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStage[] =>
+const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStage[] =>
   stages.filter((stage) => stage.isActive && stage.type === BankStageType.OPEN).sort(byPosition);
 
 // Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
 // ne touche que les transitions futures. Une étape désactivée est sautée.
-export function nextOpenStage(
+function nextOpenStage(
   stages: readonly WorkflowStage[],
   current: WorkflowStage,
 ): WorkflowStage | undefined {
   return activeOpenStages(stages).find((stage) => stage.position > current.position);
 }
 
-export const lastOpenStage = (stages: readonly WorkflowStage[]): WorkflowStage | undefined =>
+const lastOpenStage = (stages: readonly WorkflowStage[]): WorkflowStage | undefined =>
   activeOpenStages(stages).at(-1);
-
-export const stageOfType = (
-  stages: readonly WorkflowStage[],
-  type: BankStageType,
-): WorkflowStage | undefined => stages.find((stage) => stage.type === type);
 
 // L'encaissement clôt le parcours : il ne se déclare qu'à la DERNIÈRE étape
 // ouverte active, et une étape ouverte ne s'atteint que depuis la précédente.

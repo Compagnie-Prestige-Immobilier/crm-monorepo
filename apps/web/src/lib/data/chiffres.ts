@@ -10,7 +10,6 @@ type Schemas = components['schemas'];
 export type Projet = Schemas['Projet'];
 export type ChiffresActivite = Schemas['SupervisionActivityDto'];
 export type ChiffresTotaux = Schemas['SupervisionActivityCountsDto'];
-export type ChiffresLigne = Schemas['SupervisionActivityRowDto'];
 export type ChiffresEntonnoir = Schemas['AnalyticsFunnelDto'];
 export type ChiffresDelais = Schemas['AnalyticsDelaysDto'];
 export type ChiffresRendement = Schemas['DepartementYieldListDto'];

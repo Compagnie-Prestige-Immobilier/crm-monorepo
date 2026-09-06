@@ -53,7 +53,7 @@ export interface ColumnSpec {
 
 // Liste partagee par les deux modes : l'onglet BDD1 et l'export filtre sur BDD1 ne peuvent
 // pas differer de colonnes ni d'ordre.
-export const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
+const PROSPECT_COLUMNS: readonly ColumnSpec[] = [
   { header: 'Nom', key: 'nom', value: (row) => row.nom },
   { header: 'Prénom', key: 'prenom', value: (row) => row.prenom },
   { header: 'Téléphone', key: 'phone', value: (row) => row.phoneE164 },

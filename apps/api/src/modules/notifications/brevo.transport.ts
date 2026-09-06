@@ -6,7 +6,7 @@ export const BREVO_MAX_RECIPIENTS_PER_CALL = 99;
 
 export const BREVO_MAX_CONCURRENT_CALLS = 8;
 
-export const BREVO_REQUEST_TIMEOUT_MS = 15_000;
+const BREVO_REQUEST_TIMEOUT_MS = 15_000;
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
@@ -26,7 +26,7 @@ export interface BrevoMessage {
 
 export type BrevoFailureKind = 'transient' | 'permanent';
 
-export interface BrevoSendOutcome {
+interface BrevoSendOutcome {
   readonly email: string;
   readonly ok: boolean;
   readonly errorCode?: string;
@@ -60,7 +60,7 @@ export const chunkRecipients = <T>(
   return chunks;
 };
 
-export const mapWithConcurrency = async <T, R>(
+const mapWithConcurrency = async <T, R>(
   items: readonly T[],
   limit: number,
   worker: (item: T) => Promise<R>,
@@ -86,7 +86,7 @@ export const mapWithConcurrency = async <T, R>(
   return results;
 };
 
-export const classifyBrevoFailure = (httpStatus: number): BrevoFailureKind =>
+const classifyBrevoFailure = (httpStatus: number): BrevoFailureKind =>
   httpStatus === 429 || httpStatus >= 500 ? 'transient' : 'permanent';
 
 @Injectable()
@@ -237,7 +237,7 @@ export class BrevoHttpTransport implements BrevoTransport {
   }
 }
 
-export const readBrevoErrorCode = (payload: unknown): string | undefined => {
+const readBrevoErrorCode = (payload: unknown): string | undefined => {
   if (typeof payload !== 'object' || payload === null) return undefined;
   const code = (payload as { code?: unknown }).code;
   return typeof code === 'string' && code ? code : undefined;

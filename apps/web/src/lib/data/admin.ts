@@ -3,7 +3,6 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { csvRows } from '@/lib/csv';
-import type { Role } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
@@ -71,7 +70,7 @@ export function canSubmitPurge(input: {
   return matchesHint(input.confirmation, input.catalog.confirmationHint);
 }
 
-export function matchesHint(typed: string, hint: string): boolean {
+function matchesHint(typed: string, hint: string): boolean {
   const normalized = typed.trim().toLocaleLowerCase();
   if (normalized === '') return false;
   return normalized === hint.trim().toLocaleLowerCase();
@@ -101,20 +100,6 @@ export async function updateWorkShifts(
 }
 
 const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const satisfies readonly PresenceState[];
-
-const ROLES = [
-  'ADMIN',
-  'COMMERCIAL',
-  'BANQUE_FINANCE',
-  'SUPERVISEUR',
-  'DIRECTION',
-  'ACCUEIL',
-  'CHARGE_CLIENTELE',
-] as const satisfies readonly Role[];
-
-export function knownRole(value: string): Role {
-  return (ROLES as readonly string[]).includes(value) ? (value as Role) : 'COMMERCIAL';
-}
 
 export function knownPresence(value: string): PresenceState {
   return (PRESENCE_STATES as readonly string[]).includes(value) ? (value as PresenceState) : 'AWAY';
@@ -175,7 +160,6 @@ export function formatActiveDuration(seconds: number): string {
 
 export type SupervisionGranularity = Schemas['SupervisionGranularity'];
 export type ActivityRow = Schemas['SupervisionActivityRowDto'];
-export type ActivityTeleconseiller = Schemas['SupervisionTeleconseillerDto'];
 export type SupervisionActivity = Schemas['SupervisionActivityDto'];
 
 /** Bornes en AAAA-MM-JJ, incluses, journée d'Africa/Dakar. */
@@ -195,7 +179,7 @@ export function dakarToday(now: Date = new Date()): string {
   return now.toISOString().slice(0, 10);
 }
 
-export function shiftDays(isoDate: string, days: number): string {
+function shiftDays(isoDate: string, days: number): string {
   const at = new Date(`${isoDate}T00:00:00.000Z`);
   at.setUTCDate(at.getUTCDate() + days);
   return at.toISOString().slice(0, 10);

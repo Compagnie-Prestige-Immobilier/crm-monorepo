@@ -30,7 +30,7 @@ export const PARCOURS_ROLES = [
 ] as const;
 
 /** Les comptes servis par CPI GO. */
-export const MOBILE_ROLES = [
+const MOBILE_ROLES = [
   Role.ADMIN,
   Role.COMMERCIAL,
   Role.BANQUE_FINANCE,

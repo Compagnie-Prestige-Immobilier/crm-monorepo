@@ -4,7 +4,6 @@ import { InfoIcon } from 'lucide-react';
 import { useState } from 'react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { explain, type StatKey } from '@/lib/stat-explanations';
 
 export function InfoPopover({ label, description }: { label: string; description: string }) {
   const [hovered, setHovered] = useState(false);
@@ -40,8 +39,4 @@ export function InfoPopover({ label, description }: { label: string; description
       </PopoverContent>
     </Popover>
   );
-}
-
-export function StatInfo({ stat, label }: { stat: StatKey; label: string }) {
-  return <InfoPopover label={label} description={explain(stat)} />;
 }

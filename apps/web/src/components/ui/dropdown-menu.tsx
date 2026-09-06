@@ -1,7 +1,6 @@
 'use client';
 
 import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
-import { CheckIcon, ChevronRightIcon } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -13,14 +12,6 @@ type DropdownMenuTriggerProps = Omit<DropdownMenuPrimitive.Trigger.Props, 'class
 
 function DropdownMenuTrigger(props: DropdownMenuTriggerProps) {
   return <DropdownMenuPrimitive.Trigger data-slot="dropdown-menu-trigger" {...props} />;
-}
-
-type DropdownMenuGroupProps = Omit<DropdownMenuPrimitive.Group.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function DropdownMenuGroup(props: DropdownMenuGroupProps) {
-  return <DropdownMenuPrimitive.Group data-slot="dropdown-menu-group" {...props} />;
 }
 
 type DropdownMenuContentProps = Omit<DropdownMenuPrimitive.Popup.Props, 'className'> & {
@@ -104,41 +95,6 @@ function DropdownMenuItem({
   );
 }
 
-type DropdownMenuCheckboxItemProps = Omit<DropdownMenuPrimitive.CheckboxItem.Props, 'className'> &
-  NoOnSelect & {
-    className?: string | undefined;
-  };
-
-function DropdownMenuCheckboxItem({
-  className,
-  children,
-  closeOnClick = true,
-  ...props
-}: DropdownMenuCheckboxItemProps) {
-  return (
-    <DropdownMenuPrimitive.CheckboxItem
-      data-slot="dropdown-menu-checkbox-item"
-      closeOnClick={closeOnClick}
-      className={cn(
-        'relative flex cursor-default select-none items-center gap-2 rounded-sm py-2 pr-2 pl-8',
-        'text-[0.875rem] outline-none',
-        'data-highlighted:bg-secondary data-highlighted:text-secondary-foreground',
-        'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
-        'data-disabled:pointer-events-none data-disabled:opacity-40',
-        className,
-      )}
-      {...props}
-    >
-      <span className="pointer-events-none absolute left-2 flex size-3.5 items-center justify-center">
-        <DropdownMenuPrimitive.CheckboxItemIndicator>
-          <CheckIcon className="size-4 text-primary" />
-        </DropdownMenuPrimitive.CheckboxItemIndicator>
-      </span>
-      {children}
-    </DropdownMenuPrimitive.CheckboxItem>
-  );
-}
-
 type DropdownMenuLabelProps = Omit<DropdownMenuPrimitive.GroupLabel.Props, 'className'> & {
   className?: string | undefined;
   inset?: boolean | undefined;
@@ -171,55 +127,11 @@ function DropdownMenuSeparator({ className, ...props }: DropdownMenuSeparatorPro
   );
 }
 
-const DropdownMenuSub = DropdownMenuPrimitive.SubmenuRoot;
-
-type DropdownMenuSubTriggerProps = Omit<DropdownMenuPrimitive.SubmenuTrigger.Props, 'className'> &
-  NoOnSelect & {
-    className?: string | undefined;
-  };
-
-function DropdownMenuSubTrigger({ className, children, ...props }: DropdownMenuSubTriggerProps) {
-  return (
-    <DropdownMenuPrimitive.SubmenuTrigger
-      data-slot="dropdown-menu-sub-trigger"
-      className={cn(
-        'flex cursor-default select-none items-center rounded-sm px-2 py-2 text-[0.875rem] outline-none',
-        'data-highlighted:outline-2 data-highlighted:-outline-offset-2 data-highlighted:outline-ring',
-        'data-highlighted:bg-secondary data-popup-open:bg-secondary',
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <ChevronRightIcon className="ml-auto size-4" />
-    </DropdownMenuPrimitive.SubmenuTrigger>
-  );
-}
-
-function DropdownMenuSubContent({ className, ...props }: DropdownMenuContentProps) {
-  return (
-    <DropdownMenuContent
-      data-slot="dropdown-menu-sub-content"
-      align="start"
-      alignOffset={-3}
-      side="right"
-      sideOffset={0}
-      className={cn('min-w-[8rem]', className)}
-      {...props}
-    />
-  );
-}
-
 export {
   DropdownMenu,
-  DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
 };

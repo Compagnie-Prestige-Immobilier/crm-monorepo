@@ -2,13 +2,11 @@ const MONEY_PATTERN = /^\d{1,18}$/u;
 
 const GROUP_SEPARATOR = ' ';
 
-export const ZERO_XOF = '0';
-
 export function isMoneyString(value: unknown): value is string {
   return typeof value === 'string' && MONEY_PATTERN.test(value);
 }
 
-export function groupDigits(digits: string): string {
+function groupDigits(digits: string): string {
   const groups: string[] = [];
   for (let end = digits.length; end > 0; end -= 3) {
     groups.unshift(digits.slice(Math.max(0, end - 3), end));
@@ -64,14 +62,6 @@ export function parseMoneyInput(raw: string): string | null {
   if (digits === '') return null;
   const normalized = digits.replace(/^0+(?=\d)/u, '');
   return normalized.length > 18 ? null : normalized;
-}
-
-export function sumXof(values: readonly (string | null | undefined)[]): string {
-  let total = 0n;
-  for (const value of values) {
-    if (isMoneyString(value)) total += BigInt(value);
-  }
-  return total.toString();
 }
 
 export function xofToChartNumber(value: string | null | undefined): number {

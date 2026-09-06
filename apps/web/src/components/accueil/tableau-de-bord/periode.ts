@@ -31,7 +31,7 @@ export interface Plage {
   au: string;
 }
 
-export const PLAGE_MAX_JOURS = 400;
+const PLAGE_MAX_JOURS = 400;
 
 export const PILLS: readonly { preset: PeriodePreset; label: string }[] = [
   { preset: 'aujourdhui', label: 'Aujourd’hui' },
@@ -95,13 +95,13 @@ export function plageTropLarge(plage: Plage): boolean {
   return joursDansPlage(plage) > PLAGE_MAX_JOURS;
 }
 
-export function plagePrecedente(plage: Plage): Plage {
+function plagePrecedente(plage: Plage): Plage {
   const jours = joursDansPlage(plage);
   const debut = dateUtc(plage.du);
   return { du: iso(subDays(debut, jours)), au: iso(subDays(debut, 1)) };
 }
 
-export function plageAnneePrecedente(plage: Plage): Plage {
+function plageAnneePrecedente(plage: Plage): Plage {
   return { du: iso(subYears(dateUtc(plage.du), 1)), au: iso(subYears(dateUtc(plage.au), 1)) };
 }
 

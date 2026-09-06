@@ -19,7 +19,7 @@ export class SessionExpiredError extends Error {
   }
 }
 
-export class SessionUnavailableError extends Error {
+class SessionUnavailableError extends Error {
   constructor() {
     super('Le serveur CPI est momentanément injoignable.');
     this.name = 'SessionUnavailableError';

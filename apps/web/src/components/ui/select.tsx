@@ -8,14 +8,6 @@ import { cn } from '@/lib/utils';
 /** Sans la prop `items` sur le `Root`, `Select.Value` affiche la valeur brute et non le libelle. */
 const Select = SelectPrimitive.Root;
 
-type SelectGroupProps = Omit<SelectPrimitive.Group.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function SelectGroup(props: SelectGroupProps) {
-  return <SelectPrimitive.Group data-slot="select-group" {...props} />;
-}
-
 type SelectValueProps = Omit<SelectPrimitive.Value.Props, 'className'> & {
   className?: string | undefined;
 };
@@ -114,22 +106,6 @@ function SelectContent({
   );
 }
 
-type SelectLabelProps = Omit<SelectPrimitive.GroupLabel.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function SelectLabel({ className, ...props }: SelectLabelProps) {
-  return (
-    <SelectPrimitive.Group>
-      <SelectPrimitive.GroupLabel
-        data-slot="select-label"
-        className={cn('px-2 py-1.5 text-[0.75rem] font-[600] text-muted-foreground', className)}
-        {...props}
-      />
-    </SelectPrimitive.Group>
-  );
-}
-
 type SelectItemProps = Omit<SelectPrimitive.Item.Props, 'className'> & {
   className?: string | undefined;
 };
@@ -157,20 +133,6 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
         <CheckIcon className="size-4 text-primary" />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
-  );
-}
-
-type SelectSeparatorProps = Omit<SelectPrimitive.Separator.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function SelectSeparator({ className, ...props }: SelectSeparatorProps) {
-  return (
-    <SelectPrimitive.Separator
-      data-slot="select-separator"
-      className={cn('-mx-1 my-1 h-px bg-border', className)}
-      {...props}
-    />
   );
 }
 
@@ -212,15 +174,4 @@ function SelectScrollDownButton({ className, ...props }: SelectScrollDownButtonP
   );
 }
 
-export {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectScrollDownButton,
-  SelectScrollUpButton,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-};
+export { Select, SelectContent, SelectItem, SelectTrigger, SelectValue };

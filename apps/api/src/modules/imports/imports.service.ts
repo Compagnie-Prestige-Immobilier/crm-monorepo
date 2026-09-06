@@ -403,7 +403,7 @@ function toReportDto(value: Prisma.JsonValue | null): ImportJobReportDto | null 
 const numberOr = (value: unknown, fallback: number): number =>
   typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 
-export function toDto(job: ImportJob): ImportJobDto {
+function toDto(job: ImportJob): ImportJobDto {
   return {
     id: job.id,
     kind: job.kind,

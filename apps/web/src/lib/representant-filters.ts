@@ -10,11 +10,11 @@ import {
 } from '@/lib/search-params';
 import type { SortDirection } from '@/lib/types';
 
-export const REPRESENTANT_PAGE_SIZE = 25;
+const REPRESENTANT_PAGE_SIZE = 25;
 
 export type RepresentantRelation = components['schemas']['RepresentantRelation'];
 
-export const REPRESENTANT_RELATIONS = [
+const REPRESENTANT_RELATIONS = [
   'INCONNU',
   'CONTACTE',
   'AMBASSADEUR',
@@ -149,7 +149,7 @@ export function representantFiltersQueryKey(filters: RepresentantFilters): strin
   return serializeRepresentantFilters(filters).toString();
 }
 
-export const REPRESENTANT_ADVANCED_FILTER_KEYS = ['dateFrom', 'dateTo', 'hasProspects'] as const;
+const REPRESENTANT_ADVANCED_FILTER_KEYS = ['dateFrom', 'dateTo', 'hasProspects'] as const;
 
 export type RepresentantAdvancedFilterKey = (typeof REPRESENTANT_ADVANCED_FILTER_KEYS)[number];
 

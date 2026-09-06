@@ -1,7 +1,7 @@
 // Une cellule date Excel ne transporte aucun fuseau et exceljs y serialise l'instant UTC :
 // sans reecriture sur l'heure murale de Dakar, un serveur hors fuseau decale tout le classeur.
 
-export const DAKAR_TIME_ZONE = 'Africa/Dakar';
+const DAKAR_TIME_ZONE = 'Africa/Dakar';
 
 const PARTS = new Intl.DateTimeFormat('en-US', {
   timeZone: DAKAR_TIME_ZONE,

@@ -103,7 +103,7 @@ export class NotificationTemplatesService {
   }
 }
 
-export const mergedVariables = (titleTemplate: string, bodyTemplate: string): string[] => {
+const mergedVariables = (titleTemplate: string, bodyTemplate: string): string[] => {
   const names = extractVariables(titleTemplate);
   for (const name of extractVariables(bodyTemplate)) {
     if (!names.includes(name)) names.push(name);

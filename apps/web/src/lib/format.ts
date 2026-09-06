@@ -1,7 +1,7 @@
 import { format, parseISO } from 'date-fns';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
-export const DAKAR_UTC_OFFSET = '+00:00';
+const DAKAR_UTC_OFFSET = '+00:00';
 
 export function dakarLocalToIso(local: string): string | null {
   const trimmed = local.trim();
@@ -43,11 +43,6 @@ export function formatRate(value: number): string {
 
 export function formatRateOrNone(value: number | null): string {
   return value === null ? 'Sans objet' : formatRate(value);
-}
-
-export function formatPercent(value: number): string {
-  const sign = value > 0 ? '+' : '';
-  return `${sign}${decimalFormatter.format(value)} %`;
 }
 
 export function formatDate(iso: string): string {

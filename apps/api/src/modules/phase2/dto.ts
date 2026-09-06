@@ -409,9 +409,3 @@ export class CallAttemptResultDto {
 
   @ApiProperty({ type: () => ProspectPhase2StateDto }) state!: ProspectPhase2StateDto;
 }
-
-export class Phase2ConflictDto {
-  @ApiProperty({ enum: ['PHASE2_ALREADY_COMPLETED'] }) code!: 'PHASE2_ALREADY_COMPLETED';
-  @ApiProperty() message!: string;
-  @ApiProperty({ type: () => ProspectPhase2StateDto }) state!: ProspectPhase2StateDto;
-}

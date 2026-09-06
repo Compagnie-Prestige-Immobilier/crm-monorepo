@@ -193,7 +193,7 @@ export class SegmentChangeService {
 }
 
 /** Ligne de bascule telle que la lisent l'historique et le tableau de bord. */
-export interface SegmentChangeRow {
+interface SegmentChangeRow {
   id: string;
   prospectId: string;
   fromSegment: BddSegment;
@@ -209,7 +209,7 @@ export interface SegmentChangeRow {
   changedAt: Date;
 }
 
-export function toSegmentChangeDto(row: SegmentChangeRow): SegmentChangeDto {
+function toSegmentChangeDto(row: SegmentChangeRow): SegmentChangeDto {
   return {
     id: row.id,
     prospectId: row.prospectId,

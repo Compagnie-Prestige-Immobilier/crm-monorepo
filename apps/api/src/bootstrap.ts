@@ -34,7 +34,7 @@ function flattenValidationErrors(errors: ValidationError[], path = ''): string[]
   });
 }
 
-export const REQUEST_BODY_LIMIT_BYTES = 4_194_304;
+const REQUEST_BODY_LIMIT_BYTES = 4_194_304;
 const requestStartedAt = new WeakMap<object, number>();
 
 export const buildOpenApiDocument = (app: NestFastifyApplication): OpenAPIObject =>
@@ -50,7 +50,7 @@ export const buildOpenApiDocument = (app: NestFastifyApplication): OpenAPIObject
       .build(),
   );
 
-export function createApiAdapter(env: ApiEnv): FastifyAdapter {
+function createApiAdapter(env: ApiEnv): FastifyAdapter {
   return new FastifyAdapter({
     trustProxy: env.API_TRUST_PROXY_HEADERS,
     bodyLimit: REQUEST_BODY_LIMIT_BYTES,

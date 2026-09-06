@@ -48,16 +48,16 @@ import { LiveService } from '../live/live.service.js';
 export const DELIVERY_RETRY_ERROR = 'EMAIL_RETRY';
 
 /** Terminal pour les destinataires servis uniquement dans la boîte interne. */
-export const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
+const DELIVERY_INBOX_ONLY = 'INBOX_ONLY';
 
 /** Motif terminal d'une livraison restée en attente au-delà de la limite. */
-export const DELIVERY_ABANDONED = 'EMAIL_ABANDONED';
+const DELIVERY_ABANDONED = 'EMAIL_ABANDONED';
 
 /** Après 24 heures, les livraisons e-mail en attente passent à `FAILED` sans rejeu. */
-export const DISPATCH_DEADLINE_MS = 24 * 60 * 60 * 1_000;
+const DISPATCH_DEADLINE_MS = 24 * 60 * 60 * 1_000;
 
 /** Écrit une vague du transport avant de lancer la suivante. */
-export const EMAIL_PERSIST_GROUP_SIZE = BREVO_MAX_RECIPIENTS_PER_CALL * BREVO_MAX_CONCURRENT_CALLS;
+const EMAIL_PERSIST_GROUP_SIZE = BREVO_MAX_RECIPIENTS_PER_CALL * BREVO_MAX_CONCURRENT_CALLS;
 
 /**
  * Ce que l'éventail a réellement produit. Sert aux tests et au journal.
@@ -1405,7 +1405,7 @@ const escapeHtml = (value: string): string =>
     .replace(/'/g, '&#39;');
 
 /** Corps de l'e-mail, en HTML et en texte brut (certains clients n'affichent que celui-ci). */
-export const buildEmailContent = (title: string, body: string): { html: string; text: string } => ({
+const buildEmailContent = (title: string, body: string): { html: string; text: string } => ({
   html: renderTemplate(EMAIL_HTML_TEMPLATE, {
     titre: escapeHtml(title),
     corps: escapeHtml(body).replace(/\n/g, '<br />'),

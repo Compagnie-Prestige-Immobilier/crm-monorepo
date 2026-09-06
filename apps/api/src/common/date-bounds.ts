@@ -1,4 +1,4 @@
-export const DAKAR_TIME_ZONE = 'Africa/Dakar';
+const DAKAR_TIME_ZONE = 'Africa/Dakar';
 
 const PARTS = new Intl.DateTimeFormat('en-US', {
   timeZone: DAKAR_TIME_ZONE,

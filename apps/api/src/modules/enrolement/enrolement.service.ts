@@ -544,7 +544,7 @@ function normaliserReprise(valeur: string | undefined, courant: string | null): 
   return Number.isNaN(date.getTime()) ? courant : date.toISOString();
 }
 
-export function filtrerDepuis(
+function filtrerDepuis(
   lignes: readonly InscriptionDistante[],
   repriseDepuis: string | null,
 ): InscriptionDistante[] {
@@ -556,7 +556,7 @@ export function filtrerDepuis(
   return lignes.filter((ligne) => ligne.inscriteLe === null || ligne.inscriteLe >= borne);
 }
 
-export function estEchu(reglages: EnrolementReglagesDto, now: Date): boolean {
+function estEchu(reglages: EnrolementReglagesDto, now: Date): boolean {
   const dernier = reglages.dernierTirage;
   if (dernier === null) return true;
   const termine = new Date(dernier.termineLe).getTime();

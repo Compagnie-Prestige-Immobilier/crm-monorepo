@@ -139,18 +139,6 @@ export const ADVANCED_FILTER_KEYS = [
 
 export type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
 
-export function activeAdvancedKeys(filters: ProspectFilters): AdvancedFilterKey[] {
-  return ADVANCED_FILTER_KEYS.filter((key) => filters[key] !== null);
-}
-
-export function countAdvancedFilters(filters: ProspectFilters): number {
-  return activeAdvancedKeys(filters).length;
-}
-
-export function hasAdvancedFilters(filters: ProspectFilters): boolean {
-  return ADVANCED_FILTER_KEYS.some((key) => filters[key] !== null);
-}
-
 export function clearAdvancedFilters(): Partial<ProspectFilters> {
   return {
     representantId: null,
@@ -164,10 +152,6 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
     enrollmentCapturedById: null,
     revue: null,
   } satisfies Record<AdvancedFilterKey, null>;
-}
-
-export function initialAdvancedOpen(filters: ProspectFilters, stored: boolean | null): boolean {
-  return advancedOpenFrom(hasAdvancedFilters(filters), stored);
 }
 
 export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): boolean {

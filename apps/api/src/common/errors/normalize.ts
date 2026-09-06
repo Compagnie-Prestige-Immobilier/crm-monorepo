@@ -14,7 +14,7 @@ const GENERIC_CODES: Record<number, string> = {
   [HttpStatus.SERVICE_UNAVAILABLE]: 'SERVICE_UNAVAILABLE',
 };
 
-export const genericCode = (status: number): string =>
+const genericCode = (status: number): string =>
   GENERIC_CODES[status] ?? (status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_FAILED');
 
 const FALLBACK_MESSAGE = 'Une erreur est survenue.';

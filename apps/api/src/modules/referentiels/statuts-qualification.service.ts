@@ -17,7 +17,7 @@ import type {
   UpdateStatutQualificationDto,
 } from './dto.js';
 
-export const StatutQualificationError = {
+const StatutQualificationError = {
   NOT_FOUND: 'STATUT_QUALIFICATION_NOT_FOUND',
   CODE_CONFLICT: 'STATUT_QUALIFICATION_CODE_CONFLICT',
   LABEL_CONFLICT: 'STATUT_QUALIFICATION_LABEL_CONFLICT',
@@ -28,7 +28,7 @@ export const StatutQualificationError = {
 } as const;
 
 /** Version de charge utile qu'un client doit atteindre pour émettre un statut créé ici. */
-export const NEW_STATUT_PAYLOAD_VERSION = 6;
+const NEW_STATUT_PAYLOAD_VERSION = 6;
 
 /**
  * L'issue enregistrée découle de l'effet, jamais de ce que le client envoie.
@@ -66,9 +66,8 @@ const JOINT: readonly StatutQualificationEffect[] = [
 
 const NON_JOINT: readonly StatutQualificationEffect[] = [StatutQualificationEffect.UNREACHABLE];
 
-export const brancheDe = (
-  effect: StatutQualificationEffect,
-): readonly StatutQualificationEffect[] => (JOINT.includes(effect) ? JOINT : NON_JOINT);
+const brancheDe = (effect: StatutQualificationEffect): readonly StatutQualificationEffect[] =>
+  JOINT.includes(effect) ? JOINT : NON_JOINT;
 
 /**
  * Le code se lit dans le libellé : l'administrateur n'en saisit plus. Il ne se

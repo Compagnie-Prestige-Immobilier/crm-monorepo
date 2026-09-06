@@ -6,7 +6,6 @@ import { flattenPage } from '@/lib/api/query-params';
 import type { Paginated, Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
-export type LotExportCible = Schemas['LotExportCible'];
 export type LotExportSummary = Schemas['LotExportSummaryDto'];
 export type LotExportDetail = Schemas['LotExportDetailDto'];
 export type CreateLotExportInput = Schemas['CreateLotExportDto'];

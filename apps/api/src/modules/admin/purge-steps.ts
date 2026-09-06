@@ -6,7 +6,7 @@ export interface PurgeContext {
   readonly actorId: string;
 }
 
-export type PurgeClient = Prisma.TransactionClient;
+type PurgeClient = Prisma.TransactionClient;
 
 export interface PurgeStep {
   readonly table: string;

@@ -2,7 +2,7 @@
 // une rotation de jeton ne survient qu'au bout d'un quart d'heure d'usage.
 export const PRESENCE_ONLINE_WINDOW_MINUTES = 20;
 
-export const PRESENCE_RECENT_WINDOW_HOURS = 24;
+const PRESENCE_RECENT_WINDOW_HOURS = 24;
 
 export type PresenceState = 'ONLINE' | 'RECENT' | 'AWAY';
 

@@ -48,7 +48,7 @@ const DOWNLOAD_RATE_LIMIT = Number(process.env.APK_DOWNLOAD_RATE_LIMIT) || 1000;
 const isResume = (context: ExecutionContext): boolean =>
   context.switchToHttp().getRequest<FastifyRequest>().headers.range !== undefined;
 
-export const downloadThrottle = {
+const downloadThrottle = {
   default: {
     ttl: seconds(3_600),
     limit: (context: ExecutionContext): number =>

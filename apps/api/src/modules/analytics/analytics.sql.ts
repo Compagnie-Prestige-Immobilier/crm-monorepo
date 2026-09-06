@@ -162,7 +162,7 @@ export const PROSPECT_FROM = Prisma.sql`
   LEFT JOIN "banques" bq ON bq."id" = p."banqueId"
 `;
 
-export function segmentCondition(segment: BddSegment): Prisma.Sql {
+function segmentCondition(segment: BddSegment): Prisma.Sql {
   const { isChues, isCbao } = segmentAxes(segment);
   const syndicat = isChues
     ? Prisma.sql`sy."sigle" = ${CHUES_SIGLE}`

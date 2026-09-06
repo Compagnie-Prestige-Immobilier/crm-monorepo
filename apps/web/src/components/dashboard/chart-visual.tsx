@@ -534,7 +534,7 @@ const APERCUS: Record<DashboardMarque, ReactElement> = {
   ),
 };
 
-export const MARQUE_TEXTES: Record<DashboardMarque, { nom: string; usage: string }> = {
+const MARQUE_TEXTES: Record<DashboardMarque, { nom: string; usage: string }> = {
   'barres-verticales': { nom: 'Barres debout', usage: 'Comparer les quantités d’un coup d’œil' },
   'barres-horizontales': {
     nom: 'Barres couchées',
@@ -565,23 +565,6 @@ export const MARQUE_TEXTES: Record<DashboardMarque, { nom: string; usage: string
 
 export function marqueTexte(marque: DashboardMarque): { nom: string; usage: string } {
   return MARQUE_TEXTES[marque];
-}
-
-/** Une phrase complète pour un bouton : « Anneau : voir la part de chacun ». */
-export function marquePhrase(marque: DashboardMarque): string {
-  const texte = MARQUE_TEXTES[marque];
-  return `${texte.nom} : ${texte.usage.charAt(0).toLowerCase()}${texte.usage.slice(1)}`;
-}
-
-const MARQUE_PAR_KIND: Record<'trend' | 'rank' | 'share' | 'category', DashboardMarque> = {
-  trend: 'courbe',
-  rank: 'barres-horizontales',
-  share: 'anneau',
-  category: 'tableau',
-};
-
-export function marquePourKind(kind: 'trend' | 'rank' | 'share' | 'category'): DashboardMarque {
-  return MARQUE_PAR_KIND[kind];
 }
 
 export function ChartPreview({

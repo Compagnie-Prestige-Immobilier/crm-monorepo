@@ -16,7 +16,7 @@ import type {
   VisiteQueryDto,
 } from './dto.js';
 
-export const VisiteError = {
+const VisiteError = {
   NOT_FOUND: 'VISITE_NOT_FOUND',
   REFERENTIEL_UNAVAILABLE: 'VISITE_REFERENTIEL_UNAVAILABLE',
   REFERENCE_EXHAUSTED: 'VISITE_REFERENCE_EXHAUSTED',

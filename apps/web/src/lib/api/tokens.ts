@@ -11,7 +11,7 @@ const inFlightRotations = new Map<string, Promise<RefreshRotationResult>>();
 export type RefreshRotationResult =
   { ok: true; tokens: RotatedTokens } | { ok: false; reason: 'invalid' | 'unavailable' };
 
-export function readJwtExpiry(token: string): number | null {
+function readJwtExpiry(token: string): number | null {
   const payload = token.split('.')[1];
   if (payload === undefined || payload === '') return null;
   try {
@@ -31,15 +31,6 @@ export function isAccessTokenStale(token: string | null | undefined, now = Date.
   const exp = readJwtExpiry(token);
   if (exp === null) return true;
   return exp - REFRESH_SKEW_SECONDS <= Math.floor(now / 1000);
-}
-
-export async function rotateRefreshToken(
-  origin: string,
-  refreshToken: string,
-  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
-): Promise<RotatedTokens | null> {
-  const result = await rotateRefreshTokenDetailed(origin, refreshToken, fetchImpl);
-  return result.ok ? result.tokens : null;
 }
 
 export async function rotateRefreshTokenDetailed(

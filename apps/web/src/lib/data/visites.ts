@@ -12,7 +12,7 @@ export type VisiteReferentielItem = components['schemas']['VisiteReferentielDto'
 export type VisiteReferentiels = components['schemas']['VisiteReferentielsBundleDto'];
 export type CreateVisiteInput = components['schemas']['CreateVisiteDto'];
 export type UpdateVisiteInput = components['schemas']['UpdateVisiteDto'];
-export type VisitesQuery = NonNullable<operations['listVisites']['parameters']['query']>;
+type VisitesQuery = NonNullable<operations['listVisites']['parameters']['query']>;
 
 export const VISITE_SORT_FIELDS = [
   'visitedAt',
@@ -38,7 +38,7 @@ export const VISITE_COLONNES = {
   comment: 'COMMENTAIRES / NOTES',
 } as const;
 
-export const VISITE_PAGE_SIZE = 100;
+const VISITE_PAGE_SIZE = 100;
 
 /** Le classeur, colonne à colonne, dans l'ordre où l'accueil le lit — et où il s'imprime. */
 export const IMPRESSION_COLONNES = [
@@ -85,7 +85,7 @@ export function toggleImpressionColonne(
 }
 
 /** `VisiteQueryDto.search` exige deux caractères ; en dessous l'API répond 400. */
-export const SEARCH_MIN_LENGTH = 2;
+const SEARCH_MIN_LENGTH = 2;
 
 export interface VisiteFilters {
   search: string;
@@ -174,7 +174,7 @@ export function countActiveVisiteFilters(filters: VisiteFilters): number {
 }
 
 /** Sans date choisie ni registre entier demandé, le registre est celui du jour. */
-export function visiteDateRange(
+function visiteDateRange(
   filters: VisiteFilters,
   today: string,
 ): { dateFrom: string | null; dateTo: string | null } {
@@ -185,7 +185,7 @@ export function visiteDateRange(
   return { dateFrom: today, dateTo: today };
 }
 
-export function visitesQuery(filters: VisiteFilters, today: string): VisitesQuery {
+function visitesQuery(filters: VisiteFilters, today: string): VisitesQuery {
   const range = visiteDateRange(filters, today);
   const query: VisitesQuery = {
     page: filters.page,

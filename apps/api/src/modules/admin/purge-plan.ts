@@ -1,6 +1,6 @@
 // ORDRE GLOBAL, enfants avant parents ; toute purge en est un sous-mot. Déplacer une étape
 // au-dessus de son parent viole une clé étrangère et annule la transaction entière.
-export const PURGE_STEP_ORDER = [
+const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
   // Avant `commercialAccounts` : une détection pointe son téléconseiller en
@@ -249,10 +249,6 @@ export function purgeDomain(key: PurgeDomainKey): PurgeDomain {
   const domain = BY_KEY.get(key);
   if (!domain) throw new Error(`Domaine de purge inconnu : ${key}`);
   return domain;
-}
-
-export function isPurgeDomainKey(value: string): value is PurgeDomainKey {
-  return BY_KEY.has(value as PurgeDomainKey);
 }
 
 export function expandPurgeSelection(

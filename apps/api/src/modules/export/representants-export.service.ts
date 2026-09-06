@@ -15,7 +15,6 @@ import {
   WHATSAPP_LABELS,
 } from '../representants/import-fields.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
-import { RepresentantSortField } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
 import {
   COMMON_TEMPLATE_RULES,
@@ -252,6 +251,3 @@ function whatsappStatuses(query: RepresentantExportQueryDto): WhatsappStatus[] |
     return statuses.filter((status) => !reachable.includes(status as WhatsappStatus));
   return statuses;
 }
-
-/** Champs de tri exposés, réexportés pour que le test de cohérence les compare. */
-export const REPRESENTANT_SORT_FIELDS = Object.values(RepresentantSortField);
