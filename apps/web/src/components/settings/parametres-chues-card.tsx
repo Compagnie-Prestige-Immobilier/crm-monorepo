@@ -22,13 +22,6 @@ import { formatDateTime } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-/** EB-29 : les seuls réglages que la supervision et la direction écrivent aussi. */
-const TEXTES_PARTAGES = [
-  'messageWhatsapp',
-  'accuseReceptionObjet',
-  'accuseReceptionCorps',
-] as const;
-
 const LIBELLES: Record<string, string> = {
   plateformeChuesUrl: 'Lien de la plateforme CPI CHUES',
   plateformeGrandPublicUrl: 'Lien de la plateforme Grand Public',
@@ -98,8 +91,6 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     const stockee = lus[cle];
     return Array.isArray(stockee) ? enLignes(stockee) : stockee;
   };
-  const modifiable = (cle: string): boolean =>
-    peutToutRegler || (TEXTES_PARTAGES as readonly string[]).includes(cle);
   const saisir = (cle: string, texte: string) => {
     setBrouillon((courant) => ({ ...courant, [cle]: texte }));
   };
@@ -116,40 +107,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
 
   return (
     <div className="flex flex-col gap-6">
-      <Card>
-        <CardHeader>
-          <CardTitle>Plateformes et contacts</CardTitle>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            {peutToutRegler
-              ? 'Ces valeurs s’affichent en lecture seule dans le formulaire de conversion et dans les messages envoyés.'
-              : 'Seul l’administrateur règle ces valeurs. Vous pouvez modifier les deux textes plus bas.'}
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          {(
-            [
-              'plateformeChuesUrl',
-              'plateformeGrandPublicUrl',
-              'emailChues',
-              'whatsappChuesE164',
-            ] as const
-          ).map((cle) => (
-            <Field key={cle} label={LIBELLES[cle] ?? cle}>
-              {(props) => (
-                <Input
-                  {...props}
-                  value={valeur(cle)}
-                  disabled={!modifiable(cle)}
-                  placeholder={cle.endsWith('Url') ? 'https://…' : undefined}
-                  onChange={(event) => {
-                    saisir(cle, event.target.value);
-                  }}
-                />
-              )}
-            </Field>
-          ))}
-        </CardContent>
-      </Card>
+      {peutToutRegler ? <CartePlateformes valeur={valeur} saisir={saisir} /> : null}
 
       <Card>
         <CardHeader>
@@ -188,31 +146,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Destinataires en copie</CardTitle>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Une adresse par ligne. Ces comptes reçoivent une copie des demandes déposées.
-          </p>
-        </CardHeader>
-        <CardContent className="grid gap-4 sm:grid-cols-2">
-          {LISTES.map((cle) => (
-            <Field key={cle} label={LIBELLES[cle] ?? cle}>
-              {(props) => (
-                <Textarea
-                  {...props}
-                  rows={4}
-                  value={valeur(cle)}
-                  disabled={!modifiable(cle)}
-                  onChange={(event) => {
-                    saisir(cle, event.target.value);
-                  }}
-                />
-              )}
-            </Field>
-          ))}
-        </CardContent>
-      </Card>
+      {peutToutRegler ? <CarteDestinataires valeur={valeur} saisir={saisir} /> : null}
 
       <div className="flex items-center justify-end gap-3">
         {enregistrement.isError ? (
@@ -230,6 +164,77 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
 
       <JournalDesParametres />
     </div>
+  );
+}
+
+type ChampsProps = {
+  valeur: (cle: keyof ParametresChues) => string;
+  saisir: (cle: string, texte: string) => void;
+};
+
+function CartePlateformes({ valeur, saisir }: ChampsProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Plateformes et contacts</CardTitle>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Ces valeurs s’affichent en lecture seule dans le formulaire de conversion et dans les
+          messages envoyés.
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        {(
+          [
+            'plateformeChuesUrl',
+            'plateformeGrandPublicUrl',
+            'emailChues',
+            'whatsappChuesE164',
+          ] as const
+        ).map((cle) => (
+          <Field key={cle} label={LIBELLES[cle] ?? cle}>
+            {(props) => (
+              <Input
+                {...props}
+                value={valeur(cle)}
+                placeholder={cle.endsWith('Url') ? 'https://…' : undefined}
+                onChange={(event) => {
+                  saisir(cle, event.target.value);
+                }}
+              />
+            )}
+          </Field>
+        ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CarteDestinataires({ valeur, saisir }: ChampsProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Destinataires en copie</CardTitle>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Une adresse par ligne. Ces comptes reçoivent une copie des demandes déposées.
+        </p>
+      </CardHeader>
+      <CardContent className="grid gap-4 sm:grid-cols-2">
+        {LISTES.map((cle) => (
+          <Field key={cle} label={LIBELLES[cle] ?? cle}>
+            {(props) => (
+              <Textarea
+                {...props}
+                rows={4}
+                value={valeur(cle)}
+                onChange={(event) => {
+                  saisir(cle, event.target.value);
+                }}
+              />
+            )}
+          </Field>
+        ))}
+      </CardContent>
+    </Card>
   );
 }
 
