@@ -182,25 +182,46 @@ export function SidebarNav({
 
       {/* Le retour au hub est un LIEN VISIBLE, pas seulement le logo : personne
           ne devine qu'un logo change de projet. */}
-      <div className={cn('border-t border-sidebar-border', collapsed ? 'p-2' : 'px-3 py-3')}>
-        <Link
-          href={hubHref}
-          onClick={onNavigate}
-          title={collapsed ? 'Tous les espaces' : undefined}
-          className={cn(
-            'flex min-h-11 items-center rounded-md text-[0.875rem] font-[600] text-sidebar-foreground',
-            collapsed ? 'justify-center px-2' : 'gap-3 px-3',
-            'transition-colors duration-150 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
-            'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring',
-          )}
-        >
-          <LayoutGridIcon className="size-4 shrink-0" aria-hidden="true" />
-          <span className={cn(collapsed ? 'sr-only' : 'truncate')}>Tous les espaces</span>
-        </Link>
-        {collapsed ? null : (
-          <p className="eyebrow px-3 pt-2 text-sidebar-muted-foreground">{coqueLabel}</p>
+      <SidebarFooterLink
+        collapsed={collapsed}
+        hubHref={hubHref}
+        onNavigate={onNavigate}
+        coqueLabel={coqueLabel}
+      />
+    </div>
+  );
+}
+
+function SidebarFooterLink({
+  collapsed,
+  hubHref,
+  onNavigate,
+  coqueLabel,
+}: {
+  collapsed: boolean;
+  hubHref: string;
+  onNavigate: () => void;
+  coqueLabel: string;
+}) {
+  return (
+    <div className={cn('border-t border-sidebar-border', collapsed ? 'p-2' : 'px-3 py-3')}>
+      <Link
+        href={hubHref}
+        onClick={onNavigate}
+        title={collapsed ? 'Tous les espaces' : undefined}
+        className={cn(
+          'flex min-h-11 items-center rounded-md text-[0.875rem] font-[600] text-sidebar-foreground',
+          collapsed ? 'justify-center px-2' : 'gap-3 px-3',
+          'transition-colors duration-150 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground',
+          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring',
         )}
-      </div>
+      >
+        <LayoutGridIcon className="size-4 shrink-0" aria-hidden="true" />
+        <span className={cn(collapsed ? 'sr-only' : 'truncate')}>Tous les espaces</span>
+      </Link>
+      {collapsed ? null : (
+        <p className="eyebrow px-3 pt-2 text-sidebar-muted-foreground">{coqueLabel}</p>
+      )}
     </div>
   );
 }
