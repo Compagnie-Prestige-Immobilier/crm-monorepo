@@ -28,6 +28,21 @@ const TERRAIN = 'Saisie terrain';
 const originLabel = (origin: string | null): string =>
   origin === null ? TERRAIN : (ORIGIN_LABELS[origin] ?? origin);
 
+function ambassadorConversionResult(
+  bascules: readonly { contactes: number; ambassadeurs: number; revenus: number }[],
+  jamaisTravailles: readonly { orphelins: number }[],
+): AmbassadorConversionDto {
+  const contacted = bascules[0]?.contactes ?? 0;
+  const ambassadors = bascules[0]?.ambassadeurs ?? 0;
+  return {
+    contacted,
+    ambassadors,
+    conversionRate: rate(ambassadors, contacted),
+    reverted: bascules[0]?.revenus ?? 0,
+    untracked: jamaisTravailles[0]?.orphelins ?? 0,
+  };
+}
+
 @Injectable()
 export class QualityService {
   constructor(private readonly prisma: PrismaService) {}
@@ -135,16 +150,7 @@ export class QualityService {
       `,
     ]);
 
-    const contacted = bascules[0]?.contactes ?? 0;
-    const ambassadors = bascules[0]?.ambassadeurs ?? 0;
-
-    return {
-      contacted,
-      ambassadors,
-      conversionRate: rate(ambassadors, contacted),
-      reverted: bascules[0]?.revenus ?? 0,
-      untracked: jamaisTravailles[0]?.orphelins ?? 0,
-    };
+    return ambassadorConversionResult(bascules, jamaisTravailles);
   }
 
   async dataQuality(user: AuthenticatedUser, filter: ProspectFilterDto): Promise<DataQualityDto> {
