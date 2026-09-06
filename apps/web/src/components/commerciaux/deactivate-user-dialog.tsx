@@ -15,6 +15,32 @@ import {
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
 
+function TransfertInfo({
+  reprisRequise,
+  choisi,
+}: {
+  reprisRequise: boolean;
+  choisi: UserRow | null;
+}) {
+  if (!reprisRequise) {
+    return (
+      <>
+        <strong>Rien n’est supprimé.</strong> Ce compte ne détient aucune fiche : son historique
+        reste en place et il peut être réactivé à tout moment.
+      </>
+    );
+  }
+
+  return (
+    <>
+      <strong>Rien n’est supprimé.</strong> Ses prospects, ses représentants et ses appels à
+      passer sont transférés
+      {choisi === null ? ' au repreneur' : ` à ${choisi.fullName}`}, et son historique reste à son
+      nom. Le compte peut être réactivé à tout moment.
+    </>
+  );
+}
+
 export function DeactivateUserDialog({
   user,
   repreneurs,
@@ -101,19 +127,7 @@ export function DeactivateUserDialog({
           <p className="flex items-start gap-2 rounded-md border border-accent-border/30 bg-accent-surface px-3 py-2.5 text-[0.8125rem]">
             <InfoIcon className="mt-0.5 size-4 shrink-0 text-accent-text" aria-hidden="true" />
             <span>
-              {reprisRequise ? (
-                <>
-                  <strong>Rien n’est supprimé.</strong> Ses prospects, ses représentants et ses
-                  appels à passer sont transférés
-                  {choisi === null ? ' au repreneur' : ` à ${choisi.fullName}`}, et son historique
-                  reste à son nom. Le compte peut être réactivé à tout moment.
-                </>
-              ) : (
-                <>
-                  <strong>Rien n’est supprimé.</strong> Ce compte ne détient aucune fiche : son
-                  historique reste en place et il peut être réactivé à tout moment.
-                </>
-              )}
+              <TransfertInfo reprisRequise={reprisRequise} choisi={choisi} />
             </span>
           </p>
         </div>
