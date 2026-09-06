@@ -948,7 +948,9 @@ class _RepresentantQualificationScreenState
       // qualifiée pour de bon les rouvrirait sans raison.
       discardDraft();
       if (rappelAt == null) await draftRepository.delete(draftId);
-      if (context.mounted) Navigator.of(context).pop();
+      // Rouverte au démarrage, la fiche est la seule route : la dépiler
+      // laisserait un écran noir.
+      if (context.mounted) popOrHome(context, fallback: Routes.chues);
     } on Object catch (error) {
       if (!context.mounted) return;
       setState(() {
