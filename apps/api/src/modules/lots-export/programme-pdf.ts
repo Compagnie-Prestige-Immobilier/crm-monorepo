@@ -13,8 +13,10 @@ interface ProgrammeRow {
 
 export interface ProgrammeData {
   readonly teleconseillerName: string;
-  readonly dayNumber: number;
-  readonly dayCount: number;
+  /** « Programme d’appel » ou « Fiches reçues ». */
+  readonly titre: string;
+  /** « Jour 2 sur 3 » ou « Reçues le 7 septembre 2026 ». */
+  readonly periode: string;
   readonly lotName: string;
   readonly cibleLabel: string;
   readonly generatedAt: Date;
@@ -81,18 +83,23 @@ function formatPhone(phoneE164: string): string {
   return phoneE164.replace(/^(\+221)(\d{2})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4 $5');
 }
 
+const slugDe = (teleconseillerName: string): string =>
+  teleconseillerName
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '') || 'teleconseiller';
+
 export function programmeFilename(data: {
   readonly teleconseillerName: string;
   readonly dayNumber: number;
 }): string {
-  const slug =
-    data.teleconseillerName
-      .normalize('NFD')
-      .replace(/\p{Diacritic}/gu, '')
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '') || 'teleconseiller';
-  return `programme-${slug}-jour-${String(data.dayNumber)}.pdf`;
+  return `programme-${slugDe(data.teleconseillerName)}-jour-${String(data.dayNumber)}.pdf`;
+}
+
+export function fichesRecuesFilename(teleconseillerName: string): string {
+  return `fiches-recues-${slugDe(teleconseillerName)}.pdf`;
 }
 
 function drawBand(doc: Doc, data: ProgrammeData): void {
@@ -108,7 +115,7 @@ function drawBand(doc: Doc, data: ProgrammeData): void {
   const textWidth = width - textLeft - MARGIN;
 
   doc.font('Helvetica').fontSize(10).fillColor('#f3e4e7');
-  doc.text('Programme d’appel', textLeft, 16, { width: textWidth, height: 12, ellipsis: true });
+  doc.text(data.titre, textLeft, 16, { width: textWidth, height: 12, ellipsis: true });
 
   doc.font('Helvetica-Bold').fontSize(21).fillColor('#ffffff');
   doc.text(data.teleconseillerName, textLeft, 30, {
@@ -118,12 +125,11 @@ function drawBand(doc: Doc, data: ProgrammeData): void {
   });
 
   doc.font('Helvetica').fontSize(10).fillColor('#f3e4e7');
-  doc.text(
-    `Jour ${String(data.dayNumber)} sur ${String(data.dayCount)}   ·   ${formatDakar(data.generatedAt)}`,
-    textLeft,
-    62,
-    { width: textWidth, height: 12, ellipsis: true },
-  );
+  doc.text(`${data.periode}   ·   ${formatDakar(data.generatedAt)}`, textLeft, 62, {
+    width: textWidth,
+    height: 12,
+    ellipsis: true,
+  });
   doc.fontSize(9);
   doc.text(`${data.lotName}   ·   ${data.cibleLabel}`, textLeft, 78, {
     width: textWidth,
@@ -213,7 +219,7 @@ export function writeProgrammePdf(
       margin: MARGIN,
       compress: options.compress ?? true,
       info: {
-        Title: `Programme d’appel : ${data.teleconseillerName}, jour ${String(data.dayNumber)}`,
+        Title: `${data.titre} : ${data.teleconseillerName}, ${data.periode}`,
         Author: 'CRM Prospection CPI',
         CreationDate: data.generatedAt,
       },

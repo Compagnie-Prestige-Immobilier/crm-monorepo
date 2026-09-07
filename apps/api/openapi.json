@@ -20129,6 +20129,90 @@
         "tags": ["lots-export"]
       }
     },
+    "/api/v1/lots-export/{id}/fiches-recues.pdf": {
+      "get": {
+        "operationId": "downloadLotExportFichesRecues",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "teleconseillerId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "reaffectationId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Télécharge les fiches qu’un téléconseiller a reçues par réaffectation et tient encore.",
+        "tags": ["lots-export"]
+      }
+    },
     "/api/v1/lots-export/{id}/programmes.zip": {
       "get": {
         "operationId": "downloadLotExportProgrammesZip",
@@ -33421,9 +33505,12 @@
             "items": {
               "$ref": "#/components/schemas/LotExportRepartitionJourDto"
             }
+          },
+          "recues": {
+            "type": "number"
           }
         },
-        "required": ["teleconseillerId", "teleconseillerName", "jours"]
+        "required": ["teleconseillerId", "teleconseillerName", "jours", "recues"]
       },
       "LotExportPerformanceDto": {
         "type": "object",
@@ -33476,10 +33563,17 @@
             "type": "string",
             "nullable": true
           },
+          "toTeleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
           "toName": {
             "type": "string"
           },
           "fiches": {
+            "type": "number"
+          },
+          "fichesEnMain": {
             "type": "number"
           },
           "performedByName": {
@@ -33489,7 +33583,16 @@
             "type": "string"
           }
         },
-        "required": ["id", "fromName", "toName", "fiches", "performedByName", "createdAt"]
+        "required": [
+          "id",
+          "fromName",
+          "toTeleconseillerId",
+          "toName",
+          "fiches",
+          "fichesEnMain",
+          "performedByName",
+          "createdAt"
+        ]
       },
       "LotExportDetailDto": {
         "type": "object",
