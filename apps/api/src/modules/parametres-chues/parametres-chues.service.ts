@@ -56,7 +56,7 @@ export class ParametresChuesService {
     const courants = await this.lire();
     await this.prisma.$transaction(async (tx) => {
       for (const cle of demandees) {
-        const nouvelle = ecrireValeur(body[cle] as string | string[]);
+        const nouvelle = ecrireValeur(body[cle] as string | string[] | boolean);
         const ancienne = ecrireValeur(courants[cle]);
         if (nouvelle === ancienne) continue;
 

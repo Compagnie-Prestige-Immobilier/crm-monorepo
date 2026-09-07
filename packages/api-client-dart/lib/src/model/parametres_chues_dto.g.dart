@@ -35,6 +35,8 @@ abstract class _$ParametresChuesDtoCWProxy {
     List<String> destinatairesDirection,
   );
 
+  ParametresChuesDto verrouFiches(bool verrouFiches);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ParametresChuesDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -53,6 +55,7 @@ abstract class _$ParametresChuesDtoCWProxy {
     List<String> destinatairesBpe,
     List<String> destinatairesSupervision,
     List<String> destinatairesDirection,
+    bool verrouFiches,
   });
 }
 
@@ -111,6 +114,10 @@ class _$ParametresChuesDtoCWProxyImpl implements _$ParametresChuesDtoCWProxy {
   ) => this(destinatairesDirection: destinatairesDirection);
 
   @override
+  ParametresChuesDto verrouFiches(bool verrouFiches) =>
+      this(verrouFiches: verrouFiches);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ParametresChuesDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -129,6 +136,7 @@ class _$ParametresChuesDtoCWProxyImpl implements _$ParametresChuesDtoCWProxy {
     Object? destinatairesBpe = const $CopyWithPlaceholder(),
     Object? destinatairesSupervision = const $CopyWithPlaceholder(),
     Object? destinatairesDirection = const $CopyWithPlaceholder(),
+    Object? verrouFiches = const $CopyWithPlaceholder(),
   }) {
     return ParametresChuesDto(
       plateformeChuesUrl: plateformeChuesUrl == const $CopyWithPlaceholder()
@@ -179,6 +187,10 @@ class _$ParametresChuesDtoCWProxyImpl implements _$ParametresChuesDtoCWProxy {
           ? _value.destinatairesDirection
           // ignore: cast_nullable_to_non_nullable
           : destinatairesDirection as List<String>,
+      verrouFiches: verrouFiches == const $CopyWithPlaceholder()
+          ? _value.verrouFiches
+          // ignore: cast_nullable_to_non_nullable
+          : verrouFiches as bool,
     );
   }
 }
@@ -210,6 +222,7 @@ ParametresChuesDto _$ParametresChuesDtoFromJson(Map<String, dynamic> json) =>
           'destinatairesBpe',
           'destinatairesSupervision',
           'destinatairesDirection',
+          'verrouFiches',
         ],
       );
       final val = ParametresChuesDto(
@@ -251,6 +264,7 @@ ParametresChuesDto _$ParametresChuesDtoFromJson(Map<String, dynamic> json) =>
           'destinatairesDirection',
           (v) => (v as List<dynamic>).map((e) => e as String).toList(),
         ),
+        verrouFiches: $checkedConvert('verrouFiches', (v) => v as bool),
       );
       return val;
     });
@@ -268,4 +282,5 @@ Map<String, dynamic> _$ParametresChuesDtoToJson(ParametresChuesDto instance) =>
       'destinatairesBpe': instance.destinatairesBpe,
       'destinatairesSupervision': instance.destinatairesSupervision,
       'destinatairesDirection': instance.destinatairesDirection,
+      'verrouFiches': instance.verrouFiches,
     };

@@ -2,6 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
   ArrayMaxSize,
   IsArray,
+  IsBoolean,
   IsEmail,
   IsInt,
   IsOptional,
@@ -28,6 +29,7 @@ export class ParametresChuesDto {
   @ApiProperty({ type: [String] }) destinatairesBpe!: string[];
   @ApiProperty({ type: [String] }) destinatairesSupervision!: string[];
   @ApiProperty({ type: [String] }) destinatairesDirection!: string[];
+  @ApiProperty() verrouFiches!: boolean;
 }
 
 /**
@@ -102,6 +104,11 @@ export class UpdateParametresChuesDto {
   @ArrayMaxSize(50)
   @IsEmail({}, { each: true })
   destinatairesDirection?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  verrouFiches?: boolean;
 }
 
 export class ParametreChangementDto {

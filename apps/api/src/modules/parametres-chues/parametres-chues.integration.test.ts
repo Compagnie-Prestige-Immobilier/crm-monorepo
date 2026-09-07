@@ -71,6 +71,7 @@ afterAll(async () => {
 describe('EB-29 lecture', () => {
   it('rend l’usine tant que rien n’a été réglé', async () => {
     await expect(service.lire()).resolves.toEqual(PARAMETRES_USINE);
+    expect((await service.lire()).verrouFiches).toBe(true);
   });
 
   it('rend la valeur réglée, listes comprises', async () => {
@@ -83,6 +84,14 @@ describe('EB-29 lecture', () => {
     expect(lus.plateformeChuesUrl).toBe('https://chues.cpi.sn');
     expect(lus.destinatairesBpe).toEqual(['bpe@cpi.sn', 'pilotage@cpi.sn']);
     expect(lus.emailChues).toBe(PARAMETRES_USINE.emailChues);
+  });
+
+  it('le booléen verrouFiches fait l’aller-retour', async () => {
+    await service.ecrire(admin, { verrouFiches: false });
+    expect((await service.lire()).verrouFiches).toBe(false);
+
+    await service.ecrire(admin, { verrouFiches: true });
+    expect((await service.lire()).verrouFiches).toBe(true);
   });
 });
 

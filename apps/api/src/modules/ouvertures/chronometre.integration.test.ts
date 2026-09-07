@@ -7,6 +7,7 @@ import { afterAll, describe, expect, it } from 'vitest';
 
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { PrismaService } from '../../prisma/prisma.service.js';
+import { ParametresChuesService } from '../parametres-chues/parametres-chues.service.js';
 import { OuverturesService } from './ouvertures.service.js';
 
 const prisma = new PrismaClient({
@@ -56,7 +57,12 @@ async function semer(tx: Prisma.TransactionClient): Promise<Decor> {
     get: (cible, propriete, recepteur) => Reflect.get(cible, propriete, recepteur) as unknown,
   }) as unknown as PrismaService;
 
-  return { service: new OuverturesService(client), tx, awa: compte, prospectId: prospect.id };
+  return {
+    service: new OuverturesService(client, new ParametresChuesService(client)),
+    tx,
+    awa: compte,
+    prospectId: prospect.id,
+  };
 }
 
 async function surLeJeu<T>(run: (decor: Decor) => Promise<T>): Promise<T> {
