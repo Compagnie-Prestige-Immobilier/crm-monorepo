@@ -75,10 +75,7 @@ import {
 } from '@/lib/data/disposition';
 import { callbackKeys, fetchCallbacks } from '@/lib/data/console';
 import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
-import type {
-  ClasseurTableauDeBord,
-  FeuilleTableauDeBord,
-} from '@/lib/tableau-de-bord-xlsx';
+import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
@@ -214,20 +211,25 @@ function buildDonneesParWidget(
   return donnees;
 }
 
-/** Le classeur suit l'écran : ses feuilles sont les cartes posées, dans leur ordre. */
-function feuillesDesWidgets(
+/** Le classeur suit l'écran : ses blocs sont les cartes posées, dans leur ordre. */
+function blocsDesWidgets(
   widgets: readonly DashboardWidget[],
   catalogue: Record<string, SourceChiffre>,
   donneesParWidget: Map<string, DonneesSource>,
-): FeuilleTableauDeBord[] {
-  const feuilles: FeuilleTableauDeBord[] = [];
+): BlocTableauDeBord[] {
+  const blocs: BlocTableauDeBord[] = [];
   for (const widget of widgets) {
     const entree = catalogue[widget.source];
     const donnee = donneesParWidget.get(widget.id);
     if (entree === undefined || donnee === undefined) continue;
-    feuilles.push({ titre: entree.label, question: entree.question, donnees: donnee });
+    blocs.push({
+      titre: entree.label,
+      question: entree.question,
+      groupe: entree.groupe,
+      donnees: donnee,
+    });
   }
-  return feuilles;
+  return blocs;
 }
 
 function classeurDesChiffres(input: {
@@ -236,7 +238,7 @@ function classeurDesChiffres(input: {
   plage: { du: string; au: string };
   equipe: readonly { id: string; fullName: string }[];
   teleconseiller: string | null;
-  feuilles: FeuilleTableauDeBord[];
+  blocs: BlocTableauDeBord[];
 }): ClasseurTableauDeBord {
   const nomProjet = input.projet === 'CHUES' ? 'CHUES' : 'Grand Public';
   return {
@@ -247,10 +249,10 @@ function classeurDesChiffres(input: {
       { libelle: 'Projet', valeur: nomProjet },
       { libelle: 'Période', valeur: `du ${formatDate(input.plage.du)} au ${formatDate(input.plage.au)}` },
       { libelle: 'Téléconseiller', valeur: nomDeLEquipe(input.equipe, input.teleconseiller) },
-      { libelle: 'Feuilles de chiffres', valeur: String(input.feuilles.length) },
+      { libelle: 'Chiffres repris', valeur: String(input.blocs.length) },
       { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
     ],
-    feuilles: input.feuilles,
+    blocs: input.blocs,
   };
 }
 
@@ -419,7 +421,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
       plage,
       equipe,
       teleconseiller: filters.teleconseiller,
-      feuilles: feuillesDesWidgets(widgets, catalogue, donneesParWidget),
+      blocs: blocsDesWidgets(widgets, catalogue, donneesParWidget),
     });
   }
 
