@@ -871,6 +871,24 @@ class _RepresentantQualificationScreenState
     final String? moi = ref.read(authControllerProvider).userId;
     final _Fiche? avant = renseigne ? fiche : null;
 
+    final String? numeroCorrige = Phone.toE164(telephone.text);
+    if (avant != null &&
+        numeroCorrige != null &&
+        numeroCorrige != avant.phoneE164) {
+      final Representant? autre = await ref
+          .read(referenceRepositoryProvider)
+          .findRepresentantByPhone(numeroCorrige);
+      if (!context.mounted) return;
+      if (autre != null && autre.id != widget.representantId) {
+        erreur(
+          context,
+          'Ce numéro est déjà celui de ${autre.fullName}. Corrigez-le ou '
+          'gardez le numéro de la fiche.',
+        );
+        return;
+      }
+    }
+
     setState(() {
       saving = true;
       echec = null;
