@@ -88,7 +88,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     );
 
   const lus = parametres.data;
-  const valeur = (cle: keyof ParametresChues): string => {
+  const valeur = (cle: CleTexte): string => {
     const saisi = brouillon[cle];
     if (saisi !== undefined) return saisi;
     const stockee = lus[cle];
@@ -172,8 +172,10 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
+type CleTexte = Exclude<keyof ParametresChues, 'verrouFiches'>;
+
 type ChampsProps = {
-  valeur: (cle: keyof ParametresChues) => string;
+  valeur: (cle: CleTexte) => string;
   saisir: (cle: string, texte: string) => void;
 };
 
