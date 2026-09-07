@@ -34,6 +34,7 @@ import { whatsappDuProspect, type WhatsappPatchProspect } from '../prospects/wha
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
+import { ficheSnapshot, recordFicheChange } from '../representants/fiche-change.js';
 import { CallAttemptApplyStatus, type CallAttemptResultDto } from '../phase2/dto.js';
 import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
@@ -185,7 +186,9 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
   return error.message;
 }
 
-function requireCallAttemptFields(data: SyncEntityDataDto | undefined): asserts data is SyncEntityDataDto & {
+function requireCallAttemptFields(
+  data: SyncEntityDataDto | undefined,
+): asserts data is SyncEntityDataDto & {
   prospectId: string;
   outcome: NonNullable<SyncEntityDataDto['outcome']>;
   clientCreatedAt: string;
@@ -476,12 +479,7 @@ export class SyncService {
             continue;
           }
 
-          const outcome = await this.applyGroupOperation(
-            tx,
-            author,
-            operation,
-            parentUnavailable,
-          );
+          const outcome = await this.applyGroupOperation(tx, author, operation, parentUnavailable);
           if (
             operation.entity === SyncEntity.REPRESENTANT &&
             outcome.status !== SyncOpStatus.APPLIED
@@ -800,7 +798,13 @@ export class SyncService {
         rev: { increment: 1 },
       },
     });
-    // Inscrite au registre pour que la purge sache la reprendre : sans cela
+    await recordFicheChange(tx, {
+      representantId: row.id,
+      userId: user.id,
+      source: 'MOBILE',
+      before: null,
+      after: ficheSnapshot(row),
+    });
     return applied(row.id, row.rev, row.updatedAt);
   }
 
@@ -853,6 +857,13 @@ export class SyncService {
         source: ChangeSource.MOBILE,
       });
     }
+    await recordFicheChange(tx, {
+      representantId: row.id,
+      userId: user.id,
+      source: 'MOBILE',
+      before: ficheSnapshot(existing),
+      after: ficheSnapshot(row),
+    });
     return applied(row.id, row.rev, row.updatedAt);
   }
 

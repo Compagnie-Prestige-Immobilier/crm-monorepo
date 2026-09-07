@@ -855,6 +855,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/representants/{id}/fiche-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les versions du formulaire de la fiche, de la plus récente à la plus ancienne.
+     * @description Chaque écriture sur la fiche (panneau, mobile, appel de qualification, import) laisse une version : les champs modifiés, avec leur valeur d’avant et d’après.
+     */
+    get: operations['listRepresentantFicheChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants/{id}/device-calls': {
     parameters: {
       query?: never;
@@ -4317,6 +4337,32 @@ export interface components {
     RepresentantCallAttemptListDto: {
       /** @description Du plus récent au plus ancien. */
       items: components['schemas']['RepresentantCallAttemptDto'][];
+    };
+    /** @enum {string} */
+    FicheChangeSource: 'WEB' | 'MOBILE' | 'APPEL' | 'IMPORT';
+    RepresentantFicheChampDto: {
+      /** @description Le nom du champ du formulaire, tel que la base le porte. */
+      champ: string;
+      /** @description Booléen rendu « true »/« false ». */
+      avant: string | null;
+      apres: string | null;
+    };
+    RepresentantFicheChangeDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      source: components['schemas']['FicheChangeSource'];
+      /** Format: uuid */
+      changedById: string | null;
+      changedByName: string;
+      /** Format: date-time */
+      changedAt: string;
+      champs: components['schemas']['RepresentantFicheChampDto'][];
+    };
+    RepresentantFicheChangeListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['RepresentantFicheChangeDto'][];
     };
     DeviceCallDetectionDto: {
       /** Format: uuid */
@@ -11081,6 +11127,63 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['RepresentantCallAttemptListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  listRepresentantFicheChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantFicheChangeListDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

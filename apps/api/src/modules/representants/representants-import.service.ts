@@ -9,6 +9,7 @@ import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { FICHE_SELECT, ficheSnapshot, recordFicheChange } from './fiche-change.js';
 import { IMPORT_COLUMNS } from './import-template.js';
 import { normalizeKey, parseComplements } from './import-fields.js';
 import type { Complements } from './import-fields.js';
@@ -156,7 +157,7 @@ export class RepresentantsImportService {
 
     let enriched = 0;
     if (!dryRun && aEnrichir.length > 0) {
-      enriched = await this.applyEnrichissement(aEnrichir);
+      enriched = await this.applyEnrichissement(user, aEnrichir);
       this.logger.log(
         `Enrichissement représentants par ${user.username} : ${String(enriched)} fiches complétées.`,
       );
@@ -338,7 +339,10 @@ export class RepresentantsImportService {
    * transaction unique de trois mille mises à jour tiendrait un verrou pendant
    * des minutes pour perdre le tout sur la dernière ligne.
    */
-  private async applyEnrichissement(rows: readonly Enrichissement[]): Promise<number> {
+  private async applyEnrichissement(
+    user: AuthenticatedUser,
+    rows: readonly Enrichissement[],
+  ): Promise<number> {
     const CHUNK = 500;
     let total = 0;
 
@@ -347,8 +351,19 @@ export class RepresentantsImportService {
       await this.prisma.$transaction(
         async (tx) => {
           for (const { id, champs } of slice) {
-            if (Object.keys(champs).length > 0)
-              await tx.representant.update({ where: { id }, data: champs });
+            if (Object.keys(champs).length === 0) continue;
+            const avant = await tx.representant.findUniqueOrThrow({
+              where: { id },
+              select: FICHE_SELECT,
+            });
+            const apres = await tx.representant.update({ where: { id }, data: champs });
+            await recordFicheChange(tx, {
+              representantId: id,
+              userId: user.id,
+              source: 'IMPORT',
+              before: ficheSnapshot(avant),
+              after: ficheSnapshot(apres),
+            });
           }
           const appels = slice.flatMap(({ id, appel }) => (appel ? [{ id, appel }] : []));
           if (appels.length > 0) {

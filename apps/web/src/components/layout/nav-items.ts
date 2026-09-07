@@ -429,12 +429,14 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
+        // Onglet « Banque » du pilotage : un tableau de bord, pas une entrée de plus.
         href: '/chues/banque',
-        label: 'Vue d’ensemble bancaire',
+        label: 'Tableau de bord',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         // L'arbitrage des demandes déposées par les banques. Sans entrée de
@@ -688,11 +690,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/banque',
-        label: 'Vue d’ensemble bancaire',
+        label: 'Tableau de bord',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/grand-public/statistiques',
       },
       {
         href: '/grand-public/dossiers/export',

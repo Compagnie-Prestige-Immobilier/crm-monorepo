@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useSearchParams } from 'next/navigation';
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import type { Role } from '@/lib/types';
 
 type Coque = 'chues' | 'grand-public';
 
@@ -11,6 +12,8 @@ interface Onglet {
   label: string;
   chemin: string;
   volet?: string;
+  /** Sans rôle : ouvert à tous ceux qui voient le pilotage. */
+  roles?: readonly Role[];
 }
 
 /** Le pilotage tient en un écran à onglets : chaque onglet garde sa route, les anciens liens vivent. */
@@ -20,11 +23,15 @@ const ONGLETS: Record<Coque, readonly Onglet[]> = {
     { label: 'Activité', chemin: 'supervision' },
     { label: 'Présence', chemin: 'supervision', volet: 'comptes' },
     { label: 'Campagnes', chemin: 'campagnes' },
+    // La vue bancaire est le tableau de bord de l'agent bancaire ; l'ADMIN la
+    // lit ici plutôt que dans une entrée de barre de plus.
+    { label: 'Banque', chemin: 'banque', roles: ['ADMIN'] },
   ],
   'grand-public': [
     { label: 'Tableau de bord', chemin: 'statistiques' },
     { label: 'Activité', chemin: 'supervision' },
     { label: 'Campagnes', chemin: 'campagnes' },
+    { label: 'Banque', chemin: 'banque', roles: ['ADMIN'] },
   ],
 };
 
@@ -33,10 +40,12 @@ function hrefDe(coque: Coque, onglet: Onglet): string {
   return onglet.volet === undefined ? base : `${base}?volet=${onglet.volet}`;
 }
 
-export function OngletsPilotage({ coque }: { coque: Coque }) {
+export function OngletsPilotage({ coque, role }: { coque: Coque; role: Role }) {
   const pathname = usePathname();
   const volet = useSearchParams().get('volet') ?? undefined;
-  const onglets = ONGLETS[coque];
+  const onglets = ONGLETS[coque].filter(
+    (onglet) => onglet.roles === undefined || onglet.roles.includes(role),
+  );
   const actif =
     onglets.find((onglet) => pathname === `/${coque}/${onglet.chemin}` && onglet.volet === volet) ??
     onglets[0];

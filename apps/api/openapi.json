@@ -4439,6 +4439,82 @@
         "tags": ["representants"]
       }
     },
+    "/api/v1/representants/{id}/fiche-history": {
+      "get": {
+        "description": "Chaque écriture sur la fiche (panneau, mobile, appel de qualification, import) laisse une version : les champs modifiés, avec leur valeur d’avant et d’après.",
+        "operationId": "listRepresentantFicheChanges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepresentantFicheChangeListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les versions du formulaire de la fiche, de la plus récente à la plus ancienne.",
+        "tags": ["representants"]
+      }
+    },
     "/api/v1/representants/{id}/device-calls": {
       "get": {
         "description": "Une détection sans `attemptId` est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.",
@@ -24141,6 +24217,89 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/RepresentantCallAttemptDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "FicheChangeSource": {
+        "type": "string",
+        "enum": ["WEB", "MOBILE", "APPEL", "IMPORT"]
+      },
+      "RepresentantFicheChampDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string",
+            "description": "Le nom du champ du formulaire, tel que la base le porte."
+          },
+          "avant": {
+            "type": "string",
+            "nullable": true,
+            "description": "Booléen rendu « true »/« false »."
+          },
+          "apres": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["champ", "avant", "apres"]
+      },
+      "RepresentantFicheChangeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FicheChangeSource"
+              }
+            ]
+          },
+          "changedById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "changedByName": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "champs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantFicheChampDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "representantId",
+          "source",
+          "changedById",
+          "changedByName",
+          "changedAt",
+          "champs"
+        ]
+      },
+      "RepresentantFicheChangeListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "De la plus récente à la plus ancienne.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantFicheChangeDto"
             }
           }
         },

@@ -36,8 +36,16 @@ import type {
   UpdateRepresentantDto,
   RepresentantCallAttemptDto,
   RepresentantCallAttemptListDto,
+  RepresentantFicheChangeDto,
+  RepresentantFicheChangeListDto,
   RepresentantRelationChangeListDto,
 } from './dto.js';
+import {
+  FICHE_CHANGE_ACTION_PREFIX,
+  ficheChangeSourceOf,
+  ficheSnapshot,
+  recordFicheChange,
+} from './fiche-change.js';
 import { applyRelationChange, toRelationChangeDto } from './relation-change.js';
 import { hasReachableWhatsapp, resolveWhatsappPatch, whatsappNumberOf } from './whatsapp.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
@@ -486,20 +494,30 @@ export class RepresentantsService {
     await this.assertIdAvailable(user, id);
     await this.assertPhoneFree(user, phoneE164);
 
-    const created = await this.prisma.representant.create({
-      data: {
-        id,
-        fullName: input.fullName.trim(),
-        phoneE164,
-        ...(input.notes ? { notes: input.notes } : {}),
-        ...(input.prenom ? { prenom: input.prenom.trim() } : {}),
-        ...(input.etablissement ? { etablissement: input.etablissement.trim() } : {}),
-        departementId: input.departementId,
-        iefId: input.iefId ?? null,
-        createdById: user.id,
-        clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
-      },
-      include: INCLUDE,
+    const created = await this.prisma.$transaction(async (tx) => {
+      const row = await tx.representant.create({
+        data: {
+          id,
+          fullName: input.fullName.trim(),
+          phoneE164,
+          ...(input.notes ? { notes: input.notes } : {}),
+          ...(input.prenom ? { prenom: input.prenom.trim() } : {}),
+          ...(input.etablissement ? { etablissement: input.etablissement.trim() } : {}),
+          departementId: input.departementId,
+          iefId: input.iefId ?? null,
+          createdById: user.id,
+          clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
+        },
+        include: INCLUDE,
+      });
+      await recordFicheChange(tx, {
+        representantId: id,
+        userId: user.id,
+        source: 'WEB',
+        before: null,
+        after: ficheSnapshot(row),
+      });
+      return row;
     });
     return toRepresentantDto(created);
   }
@@ -540,13 +558,90 @@ export class RepresentantsService {
         });
       }
 
-      return tx.representant.update({
+      const row = await tx.representant.update({
         where: { id },
         data: updateData(input, phoneE164, whatsapp),
         include: INCLUDE,
       });
+      await recordFicheChange(tx, {
+        representantId: id,
+        userId: user.id,
+        source: 'WEB',
+        before: ficheSnapshot(existing),
+        after: ficheSnapshot(row),
+      });
+      return row;
     });
     return toRepresentantDto(updated);
+  }
+
+  /** Les versions du formulaire de la fiche, lues dans le journal d'audit. */
+  async ficheHistory(id: string): Promise<RepresentantFicheChangeListDto> {
+    const representant = await this.prisma.representant.findFirst({
+      where: { id, deletedAt: null },
+      select: { id: true },
+    });
+    if (!representant) {
+      throw new NotFoundException({
+        code: 'REPRESENTANT_NOT_FOUND',
+        message: 'Représentant introuvable.',
+      });
+    }
+
+    const rows = await this.prisma.auditLog.findMany({
+      where: {
+        entity: 'representant',
+        entityId: id,
+        action: { startsWith: FICHE_CHANGE_ACTION_PREFIX },
+      },
+      include: { user: { select: { fullName: true } } },
+      orderBy: [{ at: 'desc' }, { id: 'desc' }],
+    });
+
+    // Les identifiants de département et d'IEF se lisent par leur nom.
+    const noms = await this.nomsDesReferences(rows.map((row) => [row.before, row.after]).flat());
+
+    const items: RepresentantFicheChangeDto[] = rows.map((row) => {
+      const avant = jsonObject(row.before);
+      const apres = jsonObject(row.after);
+      return {
+        id: row.id,
+        representantId: id,
+        source: ficheChangeSourceOf(row.action),
+        changedById: row.userId,
+        changedByName: row.user?.fullName ?? 'Compte supprimé',
+        changedAt: row.at.toISOString(),
+        champs: Object.keys(apres).map((champ) => ({
+          champ,
+          avant: valeurLisible(champ, avant[champ], noms),
+          apres: valeurLisible(champ, apres[champ], noms),
+        })),
+      };
+    });
+    return { items };
+  }
+
+  private async nomsDesReferences(
+    valeurs: readonly Prisma.JsonValue[],
+  ): Promise<Map<string, string>> {
+    const departements = new Set<string>();
+    const iefs = new Set<string>();
+    for (const valeur of valeurs) {
+      const objet = jsonObject(valeur);
+      if (typeof objet.departementId === 'string') departements.add(objet.departementId);
+      if (typeof objet.iefId === 'string') iefs.add(objet.iefId);
+    }
+    const [d, i] = await Promise.all([
+      this.prisma.departement.findMany({
+        where: { id: { in: [...departements] } },
+        select: { id: true, name: true },
+      }),
+      this.prisma.ief.findMany({
+        where: { id: { in: [...iefs] } },
+        select: { id: true, name: true },
+      }),
+    ]);
+    return new Map([...d, ...i].map((ref) => [ref.id, ref.name]));
   }
 
   /**
@@ -826,4 +921,21 @@ export class RepresentantsService {
           },
     });
   }
+}
+
+function jsonObject(value: Prisma.JsonValue | null): Record<string, Prisma.JsonValue> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return {};
+  return value as Record<string, Prisma.JsonValue>;
+}
+
+function valeurLisible(
+  champ: string,
+  valeur: Prisma.JsonValue | undefined,
+  noms: ReadonlyMap<string, string>,
+): string | null {
+  if (valeur === undefined || valeur === null) return null;
+  if (typeof valeur === 'boolean') return valeur ? 'true' : 'false';
+  if (typeof valeur !== 'string') return JSON.stringify(valeur);
+  if (champ === 'departementId' || champ === 'iefId') return noms.get(valeur) ?? valeur;
+  return valeur;
 }

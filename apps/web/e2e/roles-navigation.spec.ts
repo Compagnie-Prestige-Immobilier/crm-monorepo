@@ -137,12 +137,12 @@ const CAS: readonly Cas[] = [
       'Les trois étapes',
       'Rappels',
       'Contacts recommandés',
-      'Vue d’ensemble bancaire',
       'Créations de client à valider',
       'Exporter les dossiers',
       'Étapes des dossiers',
     ],
-    absentes: ['Mon travail', 'Mes demandes de création'],
+    // La vue bancaire est un ONGLET du tableau de bord, plus une entrée de barre.
+    absentes: ['Mon travail', 'Mes demandes de création', 'Vue d’ensemble bancaire'],
     courant: 'Tableau de bord',
   },
   {
@@ -197,7 +197,7 @@ const CAS: readonly Cas[] = [
     route: '/grand-public/statistiques',
     principales: ['Tableau de bord', 'Prospects', 'Dossiers bancaires'],
     repliees: ['Rappels', 'Appeler les prospects', 'Noter un prospect'],
-    absentes: ['Mon travail'],
+    absentes: ['Mon travail', 'Vue d’ensemble bancaire'],
     courant: 'Tableau de bord',
   },
   {

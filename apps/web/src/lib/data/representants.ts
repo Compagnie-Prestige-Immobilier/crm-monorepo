@@ -228,6 +228,18 @@ export async function fetchRepresentantRelationHistory(
   return payload.items;
 }
 
+export type RepresentantFicheChange = components['schemas']['RepresentantFicheChangeDto'];
+
+export async function fetchRepresentantFicheHistory(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantFicheChange[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/fiche-history', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function createRepresentant(
   input: CreateRepresentantInput,
   client: ApiClient = getApiClient(),

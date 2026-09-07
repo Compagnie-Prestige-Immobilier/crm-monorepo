@@ -12,6 +12,12 @@ import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../comm
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { applyRelationChange } from '../representants/relation-change.js';
+import {
+  FICHE_SELECT,
+  ficheSnapshot,
+  recordFicheChange,
+  type FicheSnapshot,
+} from '../representants/fiche-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import type { RepresentantLookupDto } from '../representants/dto.js';
@@ -55,14 +61,7 @@ export class RepCampaignsService {
 
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null, ...attributionScope(user) },
-      select: {
-        id: true,
-        relationStatus: true,
-        whatsappStatus: true,
-        whatsappE164: true,
-        phoneE164: true,
-        lastCallAt: true,
-      },
+      select: { ...FICHE_SELECT, id: true, relationStatus: true, lastCallAt: true },
     });
     if (!representant) throw await this.absent(body.representantId);
     const whatsapp = resolveWhatsappPatch(body, representant);
@@ -104,7 +103,7 @@ export class RepCampaignsService {
       body: CreateRepCallAttemptDto;
       comment: string | null;
       suggested: { lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null;
-      representant: {
+      representant: FicheSnapshot & {
         relationStatus: RepresentantRelation;
         lastCallAt: Date | null;
       };
@@ -180,7 +179,7 @@ export class RepCampaignsService {
     whatsapp: WhatsappPatch,
     newPhone: string | undefined,
     performedById: string,
-    representant: { lastCallAt: Date | null },
+    representant: FicheSnapshot & { lastCallAt: Date | null },
     statut: StatutQualification | null,
   ): Promise<void> {
     const state = {
@@ -188,9 +187,16 @@ export class RepCampaignsService {
       ...dernierAppel(body, performedById, representant.lastCallAt, statut),
     };
     if (Object.keys(state).length === 0) return;
-    await tx.representant.update({
+    const row = await tx.representant.update({
       where: { id: body.representantId },
       data: { ...state, rev: { increment: 1 } },
+    });
+    await recordFicheChange(tx, {
+      representantId: body.representantId,
+      userId: performedById,
+      source: 'APPEL',
+      before: ficheSnapshot(representant),
+      after: ficheSnapshot(row),
     });
   }
 

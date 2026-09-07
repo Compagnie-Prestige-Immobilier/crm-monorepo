@@ -50,6 +50,7 @@ import {
   RepresentantLookupQueryDto,
   RepresentantQueryDto,
   RepresentantCallAttemptListDto,
+  RepresentantFicheChangeListDto,
   RepresentantRelationChangeListDto,
   UpdateRepresentantDto,
 } from './dto.js';
@@ -212,6 +213,22 @@ export class RepresentantsController {
   @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
   callHistory(@Param('id', ParseUUIDPipe) id: string): Promise<RepresentantCallAttemptListDto> {
     return this.representants.callHistory(id);
+  }
+
+  @Get(':id/fiche-history')
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiOperation({
+    operationId: 'listRepresentantFicheChanges',
+    summary: 'Les versions du formulaire de la fiche, de la plus récente à la plus ancienne.',
+    description:
+      'Chaque écriture sur la fiche (panneau, mobile, appel de qualification, import) laisse ' +
+      'une version : les champs modifiés, avec leur valeur d’avant et d’après.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: RepresentantFicheChangeListDto })
+  @ApiResponse({ status: 404, type: ApiErrorDto, description: 'REPRESENTANT_NOT_FOUND.' })
+  ficheHistory(@Param('id', ParseUUIDPipe) id: string): Promise<RepresentantFicheChangeListDto> {
+    return this.representants.ficheHistory(id);
   }
 
   @Get(':id/device-calls')

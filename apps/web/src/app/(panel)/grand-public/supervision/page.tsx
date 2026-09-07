@@ -21,7 +21,7 @@ export default async function SupervisionGrandPublicPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <OngletsPilotage coque="grand-public" />
+      <OngletsPilotage coque="grand-public" role={guard.user.role} />
       <ActivityView projet="GRAND_PUBLIC" />
     </div>
   );

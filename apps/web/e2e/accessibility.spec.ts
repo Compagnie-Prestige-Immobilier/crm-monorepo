@@ -72,9 +72,8 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   // `/notifications` renvoie l'ADMIN sur le COMPOSEUR, qui porte le même
   // onglet « Boîte de réception » : c'est le composeur qu'on audite.
   ['/admin/notifications', 'Envoyer une notification', 'Boîte de réception'],
-  // `/chues/banque` appartient désormais à la navigation de l'ADMIN, replié
-  // sous « Plus » : `navTitle` y lit son propre intitulé.
-  ['/chues/banque', 'Vue d’ensemble bancaire', null],
+  // Pour l'ADMIN, `/chues/banque` est l'onglet « Banque » du tableau de bord.
+  ['/chues/banque', 'Tableau de bord', 'Banque'],
 ];
 
 async function analyze(page: Page, where: string): Promise<void> {
