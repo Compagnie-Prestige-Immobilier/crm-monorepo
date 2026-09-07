@@ -28,8 +28,11 @@ export interface Widget {
   readonly longueurMax?: number;
 }
 
+export type Etape = 'coordonnees' | 'complement';
+
 interface Section {
   readonly titre: string;
+  readonly etape: Etape;
   readonly widgets: Readonly<Record<string, Widget>>;
 }
 
@@ -40,6 +43,7 @@ interface Section {
 const SECTIONS: readonly Section[] = [
   {
     titre: 'Vos coordonnées',
+    etape: 'coordonnees',
     widgets: {
       nom: { saisie: 'texte', autoComplete: 'family-name', longueurMax: 120 },
       prenom: { saisie: 'texte', autoComplete: 'given-name', longueurMax: 120 },
@@ -51,6 +55,7 @@ const SECTIONS: readonly Section[] = [
   },
   {
     titre: 'Votre situation',
+    etape: 'complement',
     widgets: {
       profession: { saisie: 'texte', autoComplete: 'organization-title', longueurMax: 120 },
       etablissement: { saisie: 'texte', autoComplete: 'organization', longueurMax: 160 },
@@ -68,6 +73,7 @@ const SECTIONS: readonly Section[] = [
   },
   {
     titre: 'Votre banque',
+    etape: 'complement',
     widgets: {
       banqueId: { saisie: 'liste', source: 'banques' },
       engagementEnCours: { saisie: 'ouinon' },
@@ -82,7 +88,16 @@ const WIDGETS = new Map<string, Widget>(
   SECTIONS.flatMap((section) => Object.entries(section.widgets)),
 );
 
+const ETAPES = new Map<string, Etape>(
+  SECTIONS.flatMap((section) => Object.keys(section.widgets).map((cle) => [cle, section.etape])),
+);
+
 export const widgetDe = (champ: string): Widget | undefined => WIDGETS.get(champ);
+
+export const etapeDuChamp = (champ: string): Etape | undefined => ETAPES.get(champ);
+
+export const aDesCoordonnees = (champs: readonly ReglageChampPublic[]): boolean =>
+  champs.some((champ) => champ.visible && ETAPES.get(champ.champ) === 'coordonnees');
 
 export const CHOIX_WHATSAPP: readonly { readonly value: WhatsappStatus; readonly label: string }[] =
   [
@@ -123,15 +138,21 @@ export function champsRendus(
 
 export interface SectionRendue {
   readonly titre: string;
+  readonly etape: Etape;
   readonly champs: readonly ReglageChampPublic[];
 }
 
-export function grouperChamps(rendus: readonly ReglageChampPublic[]): readonly SectionRendue[] {
-  return SECTIONS.map((section) => ({
-    titre: section.titre,
-    rang: rendus.findIndex((champ) => Object.hasOwn(section.widgets, champ.champ)),
-    champs: rendus.filter((champ) => Object.hasOwn(section.widgets, champ.champ)),
-  }))
+export function grouperChamps(
+  rendus: readonly ReglageChampPublic[],
+  etape: Etape,
+): readonly SectionRendue[] {
+  return SECTIONS.filter((section) => section.etape === etape)
+    .map((section) => ({
+      titre: section.titre,
+      etape: section.etape,
+      rang: rendus.findIndex((champ) => Object.hasOwn(section.widgets, champ.champ)),
+      champs: rendus.filter((champ) => Object.hasOwn(section.widgets, champ.champ)),
+    }))
     .filter((section) => section.champs.length > 0)
     .sort((gauche, droite) => gauche.rang - droite.rang);
 }
@@ -165,25 +186,47 @@ function erreurDuChamp(champ: ReglageChampPublic, valeur: string): string | unde
   return formatInvalide(widget, valeur);
 }
 
-export function validerDemande(
+function erreursDesChamps(
   saisie: Saisie,
   champs: readonly ReglageChampPublic[],
-  libres: readonly ChampLibrePublic[],
-): Readonly<Record<string, string>> {
+  portee: Etape | 'tout',
+): Record<string, string> {
   const erreurs: Record<string, string> = {};
-
   for (const champ of champsRendus(champs, saisie)) {
+    if (portee !== 'tout' && etapeDuChamp(champ.champ) !== portee) continue;
     const probleme = erreurDuChamp(champ, lire(saisie, champ.champ));
     if (probleme !== undefined) erreurs[champ.champ] = probleme;
   }
+  return erreurs;
+}
 
+function erreursDesLibres(
+  saisie: Saisie,
+  libres: readonly ChampLibrePublic[],
+): Record<string, string> {
+  const erreurs: Record<string, string> = {};
   for (const libre of libres) {
     const cle = cleLibre(libre.id);
     if (libre.obligatoire && lire(saisie, cle) === '') erreurs[cle] = REQUIS;
   }
+  return erreurs;
+}
 
+/**
+ * `portee` arrête la validation à l'étape en cours : sans elle, l'étape 1
+ * signalerait des champs que le visiteur n'a pas encore vus.
+ */
+export function validerDemande(
+  saisie: Saisie,
+  champs: readonly ReglageChampPublic[],
+  libres: readonly ChampLibrePublic[],
+  portee: Etape | 'tout' = 'tout',
+): Readonly<Record<string, string>> {
+  const erreurs = erreursDesChamps(saisie, champs, portee);
+  if (portee === 'coordonnees') return erreurs;
+
+  Object.assign(erreurs, erreursDesLibres(saisie, libres));
   if (lire(saisie, 'message').length > MESSAGE_MAX) erreurs.message = trop(MESSAGE_MAX);
-
   return erreurs;
 }
 
