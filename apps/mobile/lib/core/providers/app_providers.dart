@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart'
@@ -103,6 +105,26 @@ final FutureProvider<ParametresChuesDto?> parametresChuesProvider =
         return null;
       }
     });
+
+const String _verrouFichesKey = 'chues.verrouFiches';
+
+/// Le verrou CHUES (« une fiche ouverte à la fois »), mis en cache : la
+/// dernière valeur connue du serveur, pour que la coupure tienne aussi hors
+/// ligne. `true` par défaut, l'état historique d'un appareil qui n'a encore
+/// jamais lu ce réglage.
+final Provider<bool> verrouFichesProvider = Provider<bool>((Ref ref) {
+  final SharedPreferences prefs = ref.watch(sharedPreferencesProvider);
+  ref.listen<AsyncValue<ParametresChuesDto?>>(parametresChuesProvider, (
+    AsyncValue<ParametresChuesDto?>? previous,
+    AsyncValue<ParametresChuesDto?> next,
+  ) {
+    final bool? recu = next.value?.verrouFiches;
+    if (recu != null) unawaited(prefs.setBool(_verrouFichesKey, recu));
+  });
+  return ref.watch(parametresChuesProvider).value?.verrouFiches ??
+      prefs.getBool(_verrouFichesKey) ??
+      true;
+});
 
 /// EB-27 : les réglages du formulaire de conversion, les mêmes qu'au panel.
 ///

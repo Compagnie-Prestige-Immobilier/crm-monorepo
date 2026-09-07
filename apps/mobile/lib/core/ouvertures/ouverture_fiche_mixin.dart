@@ -82,6 +82,7 @@ mixin OuvertureFicheMixin<T extends ConsumerStatefulWidget>
         .read(ouvertureRepositoryProvider)
         .ouvrir(
           openedById: moi,
+          verrou: ref.read(verrouFichesProvider),
           representantId: representantId,
           prospectId: prospectId,
         );
