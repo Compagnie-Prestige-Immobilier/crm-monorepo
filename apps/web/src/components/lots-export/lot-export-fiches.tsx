@@ -1,14 +1,24 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronLeftIcon, ChevronRightIcon, LoaderIcon } from 'lucide-react';
+import { ChevronLeftIcon, ChevronRightIcon, FileDownIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { useFileDownload } from '@/components/exports/download-button';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -27,6 +37,8 @@ import {
 } from '@/components/ui/table';
 import {
   fetchLotExportFiches,
+  lotFichesRecuesFileName,
+  lotFichesRecuesUrl,
   reaffecterFiches,
   type LotExportDetail,
   type LotExportFiche,
@@ -77,6 +89,9 @@ export function LotExportFiches({
   const [page, setPage] = useState(1);
   const [cochees, setCochees] = useState<readonly number[]>([]);
   const [vers, setVers] = useState<string>(TOUS);
+  const [confirmation, setConfirmation] = useState(false);
+  const [recues, setRecues] = useState<LotExportDetail['reaffectations']>([]);
+  const telechargement = useFileDownload();
 
   const filtres = buildFiltres(page, teleconseillerId, etat);
   const fiches = useQuery({
@@ -84,15 +99,32 @@ export function LotExportFiches({
     queryFn: () => fetchLotExportFiches(lot.id, filtres),
   });
 
+  const telechargerRecues = (trace: LotExportDetail['reaffectations'][number]) =>
+    telechargement.download({
+      url: lotFichesRecuesUrl(lot.id, trace.toTeleconseillerId, trace.id),
+      fileName: lotFichesRecuesFileName(trace.toName),
+      failureMessage: 'Les fiches reçues n’ont pas pu être générées.',
+    });
+
   const reaffectation = useMutation({
     mutationFn: () =>
       reaffecterFiches(lot.id, { positions: [...cochees], versTeleconseillerId: vers }),
     onSuccess: (detail) => {
+      const connues = new Set(lot.reaffectations.map((trace) => trace.id));
+      const nouvelles = detail.reaffectations.filter((trace) => !connues.has(trace.id));
       queryClient.setQueryData(queryKeys.lotsExportDetail(lot.id), detail);
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(lot.id) });
       void queryClient.invalidateQueries({ queryKey: ['lots-export', 'detail', lot.id, 'fiches'] });
       setCochees([]);
-      toast.success('Fiches attribuées.');
+      setConfirmation(false);
+      setRecues(nouvelles);
+      const premiere = nouvelles[0];
+      toast.success(
+        'Fiches attribuées.',
+        premiere
+          ? { action: { label: 'Télécharger', onClick: () => void telechargerRecues(premiere) } }
+          : {},
+      );
     },
     onError: (erreur) => {
       toast.error(apiErrorText(erreur, 'Les fiches n’ont pas pu être attribuées.'));
@@ -100,6 +132,8 @@ export function LotExportFiches({
   });
 
   const equipe = lot.repartition;
+  const destinataire =
+    equipe.find((ligne) => ligne.teleconseillerId === vers)?.teleconseillerName ?? '';
   const lignes = fiches.data?.items ?? [];
   const total = fiches.data?.total ?? 0;
   const pageCount = fiches.data?.pageCount ?? 1;
@@ -161,11 +195,37 @@ export function LotExportFiches({
           pending={reaffectation.isPending}
           onVers={setVers}
           onAttribuer={() => {
+            setConfirmation(true);
+          }}
+        />
+
+        <ConfirmDialog
+          open={confirmation}
+          onOpenChange={setConfirmation}
+          title={`Attribuer ${String(cochees.length)} fiche${cochees.length > 1 ? 's' : ''} à ${destinataire} ?`}
+          description="Elles rejoignent son programme. Son papier déjà imprimé ne les contient pas : un PDF des fiches reçues sera proposé."
+          confirmLabel="Attribuer"
+          confirmVariant="default"
+          pending={reaffectation.isPending}
+          onConfirm={() => {
             reaffectation.mutate();
           }}
         />
 
-        <EtatChargement isPending={fiches.isPending} isSuccess={fiches.isSuccess} vide={lignes.length === 0} />
+        <FenetreFichesRecues
+          recues={recues}
+          pending={telechargement.pending}
+          onFermer={() => {
+            setRecues([]);
+          }}
+          onTelecharger={telechargerRecues}
+        />
+
+        <EtatChargement
+          isPending={fiches.isPending}
+          isSuccess={fiches.isSuccess}
+          vide={lignes.length === 0}
+        />
 
         <TableFiches
           peutReaffecter={peutReaffecter}
@@ -194,6 +254,63 @@ export function LotExportFiches({
         />
       </CardContent>
     </Card>
+  );
+}
+
+function FenetreFichesRecues({
+  recues,
+  pending,
+  onFermer,
+  onTelecharger,
+}: {
+  recues: LotExportDetail['reaffectations'];
+  pending: boolean;
+  onFermer: () => void;
+  onTelecharger: (trace: LotExportDetail['reaffectations'][number]) => Promise<void>;
+}) {
+  const attribuees = recues.reduce((somme, trace) => somme + trace.fiches, 0);
+  const pluriel = attribuees > 1 ? 's' : '';
+  return (
+    <Dialog
+      open={recues.length > 0}
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onFermer();
+      }}
+    >
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>
+            {attribuees} fiche{pluriel} attribuée{pluriel} à {recues[0]?.toName}
+          </DialogTitle>
+          <DialogDescription>
+            Son programme papier ne les contient pas. Le PDF ne reprend que ces fiches, à imprimer
+            en complément.
+          </DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={onFermer}>
+            Fermer
+          </Button>
+          {recues.map((trace) => (
+            <Button
+              key={trace.id}
+              type="button"
+              disabled={pending}
+              onClick={() => void onTelecharger(trace)}
+            >
+              {pending ? (
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <FileDownIcon aria-hidden="true" />
+              )}
+              {recues.length > 1
+                ? `Fiches de ${trace.fromName ?? 'personne'} (PDF)`
+                : 'Télécharger ses fiches reçues (PDF)'}
+            </Button>
+          ))}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
 

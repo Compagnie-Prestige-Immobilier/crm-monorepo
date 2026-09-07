@@ -154,6 +154,12 @@ export class LotExportProgrammeQueryDto {
   jour: number = 1;
 }
 
+export class LotExportFichesRecuesQueryDto {
+  @ApiProperty({ format: 'uuid' }) @IsUUID() teleconseillerId!: string;
+  /** Une seule trace ; sinon tout ce que le téléconseiller a reçu et tient encore. */
+  @ApiPropertyOptional({ format: 'uuid' }) @IsOptional() @IsUUID() reaffectationId?: string;
+}
+
 export class LotExportQueryDto {
   @ApiPropertyOptional({ maxLength: 120 })
   @IsOptional()
@@ -242,8 +248,11 @@ export class LotExportFichesDto {
 export class LotExportReaffectationDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty({ type: String, nullable: true }) fromName!: string | null;
+  @ApiProperty({ format: 'uuid' }) toTeleconseillerId!: string;
   @ApiProperty() toName!: string;
   @ApiProperty() fiches!: number;
+  /** Celles que le destinataire tient encore : ce que son PDF « Fiches reçues » contiendra. */
+  @ApiProperty() fichesEnMain!: number;
   @ApiProperty() performedByName!: string;
   @ApiProperty() createdAt!: string;
 }
@@ -295,6 +304,8 @@ export class LotExportRepartitionDto {
   @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;
   @ApiProperty() teleconseillerName!: string;
   @ApiProperty({ type: () => [LotExportRepartitionJourDto] }) jours!: LotExportRepartitionJourDto[];
+  /** EB-16 : fiches reçues par réaffectation et encore en main, hors du programme imprimé. */
+  @ApiProperty() recues!: number;
 }
 export class LotExportPerformanceDto {
   @ApiProperty({ format: 'uuid' }) teleconseillerId!: string;

@@ -3225,6 +3225,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/lots-export/{id}/fiches-recues.pdf': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Télécharge les fiches qu’un téléconseiller a reçues par réaffectation et tient encore. */
+    get: operations['downloadLotExportFichesRecues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/lots-export/{id}/programmes.zip': {
     parameters: {
       query?: never;
@@ -7774,6 +7791,7 @@ export interface components {
       teleconseillerId: string;
       teleconseillerName: string;
       jours: components['schemas']['LotExportRepartitionJourDto'][];
+      recues: number;
     };
     LotExportPerformanceDto: {
       /** Format: uuid */
@@ -7790,8 +7808,11 @@ export interface components {
       /** Format: uuid */
       id: string;
       fromName: string | null;
+      /** Format: uuid */
+      toTeleconseillerId: string;
       toName: string;
       fiches: number;
+      fichesEnMain: number;
       performedByName: string;
       createdAt: string;
     };
@@ -19937,6 +19958,57 @@ export interface operations {
       query: {
         teleconseillerId: string;
         jour?: number;
+      };
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/pdf': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  downloadLotExportFichesRecues: {
+    parameters: {
+      query: {
+        teleconseillerId: string;
+        reaffectationId?: string;
       };
       header?: never;
       path: {

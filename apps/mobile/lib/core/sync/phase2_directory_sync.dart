@@ -85,9 +85,15 @@ class Phase2DirectorySync {
                 'excluded.updated_at',
               ),
             ),
-            where: (Phase2Directory old) => const CustomExpression<int>(
-              'excluded.rev',
-            ).isBiggerOrEqual(old.rev),
+            // C'est cette colonne qui dit « déjà traité » ou « à qualifier ».
+            // Une qualification encore en file n'est pas connue du serveur :
+            // la redescendre ferait réapparaître la fiche comme neuve.
+            where: (Phase2Directory old) => const CustomExpression<bool>(
+              'excluded.rev >= phase2_directory.rev AND NOT EXISTS ('
+              'SELECT 1 FROM outbox o WHERE o.status IN '
+              "('pending', 'syncing', 'conflict', 'failed') "
+              "AND o.dependency_key = 'phase2:' || phase2_directory.prospect_id)",
+            ),
           ),
         );
       }

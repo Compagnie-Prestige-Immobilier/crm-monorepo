@@ -38,6 +38,8 @@ import {
   fetchLotExport,
   lotExportFileName,
   lotExportUrl,
+  lotFichesRecuesFileName,
+  lotFichesRecuesUrl,
   lotProgrammeFileName,
   lotProgrammeUrl,
   retirerTeleconseiller,
@@ -108,8 +110,8 @@ function LotSummary({
         {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
         {itemCount > 1 ? 's' : ''} réparties entre{' '}
         <span className="tabular-nums">{formatNumber(equipeCount)}</span> téléconseiller
-        {equipeCount > 1 ? 's' : ''} sur{' '}
-        <span className="tabular-nums">{formatNumber(jours)}</span> jour
+        {equipeCount > 1 ? 's' : ''} sur <span className="tabular-nums">{formatNumber(jours)}</span>{' '}
+        jour
         {jours > 1 ? 's' : ''}, le {formatDate(createdAt)}, par {createdByName}.
       </p>
     </div>
@@ -185,8 +187,9 @@ function ProgrammesCard({
         </h3>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
           Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
-          {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la
-          supervision et la direction.
+          {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la supervision
+          et la direction. « Reçues » : les fiches arrivées après impression, à imprimer en
+          complément.
         </p>
       </CardHeader>
       <CardContent>
@@ -204,6 +207,9 @@ function ProgrammesCard({
                     Jour {jour}
                   </TableHead>
                 ))}
+                <TableHead scope="col" className="text-right">
+                  Reçues
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -238,6 +244,29 @@ function ProgrammesCard({
                       </TableCell>
                     );
                   })}
+                  <TableCell>
+                    <span className="flex items-center justify-end gap-2">
+                      <span className="tabular-nums">
+                        {ligne.recues > 0 ? `+${formatNumber(ligne.recues)}` : '0'}
+                      </span>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="icon-sm"
+                        aria-label={`Fiches reçues par ${ligne.teleconseillerName}`}
+                        disabled={ligne.recues === 0 || telechargement.pending}
+                        onClick={() => {
+                          void telechargement.download({
+                            url: lotFichesRecuesUrl(id, ligne.teleconseillerId),
+                            fileName: lotFichesRecuesFileName(ligne.teleconseillerName),
+                            failureMessage: 'Les fiches reçues n’ont pas pu être générées.',
+                          });
+                        }}
+                      >
+                        <FileDownIcon aria-hidden="true" />
+                      </Button>
+                    </span>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -249,9 +278,13 @@ function ProgrammesCard({
 }
 
 function ReaffectationsCard({
+  id,
   reaffectations,
+  telechargement,
 }: {
+  id: string;
   reaffectations: LotExportDetail['reaffectations'];
+  telechargement: ReturnType<typeof useFileDownload>;
 }) {
   if (reaffectations.length === 0) return null;
   return (
@@ -260,16 +293,42 @@ function ReaffectationsCard({
         <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
           Réaffectations
         </h3>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Le PDF d’un mouvement ne reprend que les fiches que le destinataire tient encore.
+        </p>
       </CardHeader>
       <CardContent>
         <ul className="divide-y divide-border">
           {reaffectations.map((trace) => (
-            <li key={trace.id} className="py-2.5 text-[0.875rem]">
-              <span className="tabular-nums font-[600]">{formatNumber(trace.fiches)}</span> fiche
-              {trace.fiches > 1 ? 's' : ''} de {trace.fromName ?? 'personne'} vers {trace.toName}
-              <span className="block text-[0.8125rem] text-muted-foreground">
-                {formatDateTime(trace.createdAt)}, par {trace.performedByName}
+            <li
+              key={trace.id}
+              className="flex items-center justify-between gap-3 py-2.5 text-[0.875rem]"
+            >
+              <span>
+                <span className="tabular-nums font-[600]">{formatNumber(trace.fiches)}</span> fiche
+                {trace.fiches > 1 ? 's' : ''} de {trace.fromName ?? 'personne'} vers {trace.toName}
+                <span className="block text-[0.8125rem] text-muted-foreground">
+                  {formatDateTime(trace.createdAt)}, par {trace.performedByName}
+                </span>
               </span>
+              {trace.fichesEnMain > 0 ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={telechargement.pending}
+                  onClick={() => {
+                    void telechargement.download({
+                      url: lotFichesRecuesUrl(id, trace.toTeleconseillerId, trace.id),
+                      fileName: lotFichesRecuesFileName(trace.toName),
+                      failureMessage: 'Les fiches reçues n’ont pas pu être générées.',
+                    });
+                  }}
+                >
+                  <FileDownIcon aria-hidden="true" />
+                  PDF
+                </Button>
+              ) : null}
             </li>
           ))}
         </ul>
@@ -353,7 +412,9 @@ function RecentAttemptsList({
       {recentAttempts.map((tentative) => (
         <li key={tentative.id} className="flex flex-col gap-1 py-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">{ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}</Badge>
+            <Badge variant="secondary">
+              {ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}
+            </Badge>
             <span className="font-[600]">{tentative.shortCode}</span>
             <span className="text-[0.8125rem] text-muted-foreground tabular-nums">
               {formatPhone(tentative.phoneE164)}
@@ -461,11 +522,15 @@ export function LotExportDetailView({
         telechargement={telechargement}
       />
 
+      <ReaffectationsCard
+        id={id}
+        reaffectations={lot.data.reaffectations}
+        telechargement={telechargement}
+      />
+
       <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
 
       <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
-
-      <ReaffectationsCard reaffectations={lot.data.reaffectations} />
 
       <AppelsCard
         fichesAppelees={fichesAppelees}
@@ -682,84 +747,84 @@ function CartePerformance({
   peutRegler: boolean;
 }) {
   return (
-      <Card>
-        <CardHeader>
-          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-            Performance de la campagne
-          </h3>
-          <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
-            hors attribution vise une fiche confiée à un collègue dans cette campagne.
-          </p>
-        </CardHeader>
-        <CardContent>
-          <Table aria-label="Performance de la campagne">
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">Téléconseiller</TableHead>
+    <Card>
+      <CardHeader>
+        <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+          Performance de la campagne
+        </h3>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
+          hors attribution vise une fiche confiée à un collègue dans cette campagne.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Table aria-label="Performance de la campagne">
+          <TableHeader>
+            <TableRow>
+              <TableHead scope="col">Téléconseiller</TableHead>
+              <TableHead scope="col" className="text-right">
+                Objectif par jour
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                Traitées
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                Couverture
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                Appels attribués
+              </TableHead>
+              <TableHead scope="col" className="text-right">
+                Hors attribution
+              </TableHead>
+              {peutRegler ? (
                 <TableHead scope="col" className="text-right">
-                  Objectif par jour
+                  <span className="sr-only">Retirer de la campagne</span>
                 </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Traitées
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Couverture
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Appels attribués
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Hors attribution
-                </TableHead>
+              ) : null}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lot.performance.map((ligne) => (
+              <TableRow key={ligne.teleconseillerId}>
+                <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                  {ligne.teleconseillerName}
+                </th>
+                <TableCell className="text-right tabular-nums">
+                  {peutRegler ? (
+                    <ChampObjectif id={id} lot={lot} ligne={ligne} />
+                  ) : (
+                    formatNumber(ligne.objectif)
+                  )}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatRate(ligne.completionRate)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {formatNumber(ligne.assignedCalls)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">
+                  {ligne.outsideAssignmentCalls === 0 ? (
+                    '0'
+                  ) : (
+                    <Badge variant="outline" className="border-warning/40 text-warning">
+                      {formatNumber(ligne.outsideAssignmentCalls)}
+                    </Badge>
+                  )}
+                </TableCell>
                 {peutRegler ? (
-                  <TableHead scope="col" className="text-right">
-                    <span className="sr-only">Retirer de la campagne</span>
-                  </TableHead>
+                  <TableCell className="text-right">
+                    <BoutonRetrait id={id} ligne={ligne} seul={lot.performance.length < 2} />
+                  </TableCell>
                 ) : null}
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lot.performance.map((ligne) => (
-                <TableRow key={ligne.teleconseillerId}>
-                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
-                    {ligne.teleconseillerName}
-                  </th>
-                  <TableCell className="text-right tabular-nums">
-                    {peutRegler ? (
-                      <ChampObjectif id={id} lot={lot} ligne={ligne} />
-                    ) : (
-                      formatNumber(ligne.objectif)
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ligne.treated)} sur {formatNumber(ligne.assigned)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRate(ligne.completionRate)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ligne.assignedCalls)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {ligne.outsideAssignmentCalls === 0 ? (
-                      '0'
-                    ) : (
-                      <Badge variant="outline" className="border-warning/40 text-warning">
-                        {formatNumber(ligne.outsideAssignmentCalls)}
-                      </Badge>
-                    )}
-                  </TableCell>
-                  {peutRegler ? (
-                    <TableCell className="text-right">
-                      <BoutonRetrait id={id} ligne={ligne} seul={lot.performance.length < 2} />
-                    </TableCell>
-                  ) : null}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }

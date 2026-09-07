@@ -675,7 +675,9 @@ function lignePerformance(page: Page, nom: string): Locator {
 /** Les listes déroulantes du panel sont des boutons ; leurs options vivent dans un portail. */
 async function choisir(page: Page, champ: string, option: string): Promise<void> {
   await page.getByRole('combobox', { name: champ, exact: true }).click();
-  await page.getByRole('option', { name: option, exact: true }).click();
+  const listes = page.getByRole('listbox');
+  await expect(listes, 'la liste précédente se referme encore').toHaveCount(1);
+  await listes.getByRole('option', { name: option, exact: true }).click();
 }
 
 async function fichesDeLaCampagne(id: string): Promise<Fiche[]> {
@@ -975,11 +977,40 @@ test.describe('campagne réglée par un superviseur', () => {
         candidate.request().method() === 'POST',
     );
     await page.getByRole('button', { name: 'Attribuer', exact: true }).click();
+    const confirmation = page.getByRole('dialog', {
+      name: `Attribuer ${String(FICHES_FATOU)} fiches à ${SUPERVISEUR} ?`,
+    });
+    await expect(confirmation).toBeVisible();
+    await confirmation.getByRole('button', { name: 'Attribuer', exact: true }).click();
     expect((await envoi).status()).toBe(200);
+
+    // Le papier du destinataire est déjà imprimé : le complément se télécharge
+    // tout de suite, et ne contient que ce qui vient d'arriver.
+    const resultat = page.getByRole('dialog', {
+      name: `${String(FICHES_FATOU)} fiches attribuées à ${SUPERVISEUR}`,
+    });
+    await expect(resultat).toBeVisible();
+    const [fichier] = await Promise.all([
+      page.waitForEvent('download'),
+      resultat.getByRole('button', { name: 'Télécharger ses fiches reçues (PDF)' }).click(),
+    ]);
+    expect(fichier.suggestedFilename()).toMatch(/^fiches-recues-.*\.pdf$/);
+    expect((await readFile(await fichier.path())).subarray(0, 4).toString()).toBe('%PDF');
+    await resultat.getByRole('button', { name: 'Fermer', exact: true }).last().click();
+    await expect(resultat).toBeHidden();
 
     // Le filtre n'a pas bougé : ce qui reste sous le nom du cédant est ce qu'il
     // n'a pas rendu.
     await expect(page.getByText('Aucune fiche ne correspond à ces filtres.')).toBeVisible();
+
+    await expect(
+      page
+        .getByRole('table', { name: 'Programmes d’appel' })
+        .getByRole('row')
+        .filter({ has: page.getByRole('rowheader', { name: SUPERVISEUR, exact: true }) })
+        .getByText(`+${String(FICHES_FATOU)}`),
+      'la colonne « Reçues » ne montre pas le complément',
+    ).toBeVisible();
 
     await choisir(page, 'Téléconseiller', SUPERVISEUR);
     await expect(tableau.getByRole('rowheader')).toHaveCount(FICHES_SUPERVISEUR + FICHES_FATOU);

@@ -35,6 +35,7 @@ import {
   LotExportDetailDto,
   LotExportFichesDto,
   LotExportFichesQueryDto,
+  LotExportFichesRecuesQueryDto,
   LotExportListDto,
   LotExportPreviewDto,
   LotExportProgrammeQueryDto,
@@ -46,7 +47,7 @@ import {
   UpdateLotExportDto,
 } from './dto.js';
 import { LotsExportService } from './lots-export.service.js';
-import { programmeFilename } from './programme-pdf.js';
+import { fichesRecuesFilename, programmeFilename, type ProgrammeData } from './programme-pdf.js';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
@@ -127,9 +128,33 @@ export class LotsExportController {
     // Le programme est assemblé AVANT le détournement : une réponse détournée
     // ne saurait plus porter le 404 du couple téléconseiller / journée.
     const data = await this.lots.programme(id, query.teleconseillerId, query.jour);
+    await this.envoyerPdf(reply, data, programmeFilename({ ...data, dayNumber: query.jour }));
+  }
+  @Get(':id/fiches-recues.pdf')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiProduces('application/pdf')
+  @ApiOperation({
+    operationId: 'downloadLotExportFichesRecues',
+    summary:
+      'Télécharge les fiches qu’un téléconseiller a reçues par réaffectation et tient encore.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({
+    status: 200,
+    content: { 'application/pdf': { schema: { type: 'string', format: 'binary' } } },
+  })
+  async fichesRecues(
+    @Param('id', ParseUUIDPipe) id: string,
+    @Query() query: LotExportFichesRecuesQueryDto,
+    @Res() reply: FastifyReply,
+  ): Promise<void> {
+    const data = await this.lots.fichesRecues(id, query.teleconseillerId, query.reaffectationId);
+    await this.envoyerPdf(reply, data, fichesRecuesFilename(data.teleconseillerName));
+  }
+  private async envoyerPdf(reply: FastifyReply, data: ProgrammeData, nom: string): Promise<void> {
     reply.hijack();
     reply.raw.setHeader('Content-Type', 'application/pdf');
-    reply.raw.setHeader('Content-Disposition', `attachment; filename="${programmeFilename(data)}"`);
+    reply.raw.setHeader('Content-Disposition', `attachment; filename="${nom}"`);
     reply.raw.setHeader('Cache-Control', 'no-store');
     await this.lots.writeProgramme(data, reply.raw);
   }

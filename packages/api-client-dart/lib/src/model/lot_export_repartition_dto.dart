@@ -25,6 +25,8 @@ class LotExportRepartitionDto {
     required this.teleconseillerName,
 
     required this.jours,
+
+    required this.recues,
   });
 
   @JsonKey(name: r'teleconseillerId', required: true, includeIfNull: false)
@@ -36,20 +38,28 @@ class LotExportRepartitionDto {
   @JsonKey(name: r'jours', required: true, includeIfNull: false)
   final List<LotExportRepartitionJourDto> jours;
 
+  @JsonKey(name: r'recues', required: true, includeIfNull: false)
+  final num recues;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is LotExportRepartitionDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [teleconseillerId, teleconseillerName, jours],
-              [other.teleconseillerId, other.teleconseillerName, other.jours],
+              [teleconseillerId, teleconseillerName, jours, recues],
+              [
+                other.teleconseillerId,
+                other.teleconseillerName,
+                other.jours,
+                other.recues,
+              ],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([teleconseillerId, teleconseillerName, jours]);
+      mapPropsToHashCode([teleconseillerId, teleconseillerName, jours, recues]);
 
   factory LotExportRepartitionDto.fromJson(Map<String, dynamic> json) =>
       _$LotExportRepartitionDtoFromJson(json);

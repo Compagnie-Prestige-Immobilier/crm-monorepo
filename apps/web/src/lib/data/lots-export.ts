@@ -138,6 +138,23 @@ export function lotProgrammeUrl(id: string, teleconseillerId: string, jour: numb
   return `/api/v1/lots-export/${encodeURIComponent(id)}/programme.pdf?${query.toString()}`;
 }
 
+export function lotFichesRecuesUrl(
+  id: string,
+  teleconseillerId: string,
+  reaffectationId?: string,
+): string {
+  const query = new URLSearchParams({
+    teleconseillerId,
+    ...(reaffectationId === undefined ? {} : { reaffectationId }),
+  });
+  return `/api/v1/lots-export/${encodeURIComponent(id)}/fiches-recues.pdf?${query.toString()}`;
+}
+
+export function lotFichesRecuesFileName(teleconseillerName: string): string {
+  const base = slug(teleconseillerName);
+  return `fiches-recues-${base === '' ? 'teleconseiller' : base}.pdf`;
+}
+
 function slug(value: string): string {
   return value
     .normalize('NFD')

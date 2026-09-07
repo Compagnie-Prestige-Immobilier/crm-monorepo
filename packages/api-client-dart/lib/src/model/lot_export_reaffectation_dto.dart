@@ -23,9 +23,13 @@ class LotExportReaffectationDto {
 
     required this.fromName,
 
+    required this.toTeleconseillerId,
+
     required this.toName,
 
     required this.fiches,
+
+    required this.fichesEnMain,
 
     required this.performedByName,
 
@@ -38,11 +42,17 @@ class LotExportReaffectationDto {
   @JsonKey(name: r'fromName', required: true, includeIfNull: true)
   final String? fromName;
 
+  @JsonKey(name: r'toTeleconseillerId', required: true, includeIfNull: false)
+  final String toTeleconseillerId;
+
   @JsonKey(name: r'toName', required: true, includeIfNull: false)
   final String toName;
 
   @JsonKey(name: r'fiches', required: true, includeIfNull: false)
   final num fiches;
+
+  @JsonKey(name: r'fichesEnMain', required: true, includeIfNull: false)
+  final num fichesEnMain;
 
   @JsonKey(name: r'performedByName', required: true, includeIfNull: false)
   final String performedByName;
@@ -55,12 +65,23 @@ class LotExportReaffectationDto {
         other is LotExportReaffectationDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [id, fromName, toName, fiches, performedByName, createdAt],
+              [
+                id,
+                fromName,
+                toTeleconseillerId,
+                toName,
+                fiches,
+                fichesEnMain,
+                performedByName,
+                createdAt,
+              ],
               [
                 other.id,
                 other.fromName,
+                other.toTeleconseillerId,
                 other.toName,
                 other.fiches,
+                other.fichesEnMain,
                 other.performedByName,
                 other.createdAt,
               ],
@@ -73,8 +94,10 @@ class LotExportReaffectationDto {
       mapPropsToHashCode([
         id,
         fromName,
+        toTeleconseillerId,
         toName,
         fiches,
+        fichesEnMain,
         performedByName,
         createdAt,
       ]);
