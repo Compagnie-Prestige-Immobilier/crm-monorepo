@@ -971,10 +971,11 @@ export class SupervisionActivityService {
           )`;
 
     const rows = await this.prisma.$queryRaw<ProspectAppeleRow[]>`
-      SELECT f."id", f."nom", f."prenom", f."derniereIssue", COUNT(*) OVER ()::int AS total
+      SELECT f."id", f."nom", f."prenom", f."phoneE164", f."derniereIssue",
+             COUNT(*) OVER ()::int AS total
       FROM (
         SELECT DISTINCT ON (ca."prospectId")
-          p."id", p."nom", p."prenom", ca."outcome" AS "derniereIssue"
+          p."id", p."nom", p."prenom", p."phoneE164", ca."outcome" AS "derniereIssue"
         FROM "call_attempts" ca
         JOIN "prospects" p ON p."id" = ca."prospectId"
         WHERE p."deletedAt" IS NULL
@@ -989,7 +990,13 @@ export class SupervisionActivityService {
 
     const total = rows[0]?.total ?? 0;
     return {
-      items: rows.map(({ id, nom, prenom, derniereIssue }) => ({ id, nom, prenom, derniereIssue })),
+      items: rows.map(({ id, nom, prenom, phoneE164, derniereIssue }) => ({
+        id,
+        nom,
+        prenom,
+        phoneE164,
+        derniereIssue,
+      })),
       total,
       tronque: total > PLAFOND_APPELES,
     };

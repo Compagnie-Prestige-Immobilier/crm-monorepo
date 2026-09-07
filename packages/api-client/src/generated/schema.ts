@@ -6685,6 +6685,8 @@ export interface components {
       id: string;
       nom: string;
       prenom: string;
+      /** @description Le numéro de la fiche, au format E.164. */
+      phoneE164: string;
       /** @description Issue du DERNIER appel de la fenêtre, pas du dernier appel de la fiche : un rappel passé après la période raconterait autre chose que ce que la période a vu. */
       derniereIssue: components['schemas']['CallOutcome'];
     };

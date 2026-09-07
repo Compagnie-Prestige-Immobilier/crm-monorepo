@@ -30784,6 +30784,10 @@
           "prenom": {
             "type": "string"
           },
+          "phoneE164": {
+            "type": "string",
+            "description": "Le numéro de la fiche, au format E.164."
+          },
           "derniereIssue": {
             "description": "Issue du DERNIER appel de la fenêtre, pas du dernier appel de la fiche : un rappel passé après la période raconterait autre chose que ce que la période a vu.",
             "allOf": [
@@ -30793,7 +30797,7 @@
             ]
           }
         },
-        "required": ["id", "nom", "prenom", "derniereIssue"]
+        "required": ["id", "nom", "prenom", "phoneE164", "derniereIssue"]
       },
       "ProspectsAppelesDto": {
         "type": "object",

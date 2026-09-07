@@ -21,8 +21,14 @@ import type { AuthenticatedUser } from '../../common/decorators/current-user.dec
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
 import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
-import { EXPORT_INCLUDE, cellValue, prospectColumns } from '../export/columns.js';
+import {
+  EXPORT_INCLUDE,
+  STATUT_QUALIFICATION_COLUMN,
+  cellValue,
+  prospectColumns,
+} from '../export/columns.js';
 import type { ColumnSpec } from '../export/columns.js';
+import type { ChampLibre } from '../champs-conversion/catalogue.js';
 import { markWorkbook, writeDemoWarningRow } from '../export/demo-marking.js';
 import { styleHeader } from '../export/import-template.workbook.js';
 import { toDakarCell } from '../export/dakar.js';
@@ -67,6 +73,12 @@ const CIBLES_REPRESENTANTS: readonly LotExportCible[] = [
 ];
 
 const surRepresentants = (cible: LotExportCible): boolean => CIBLES_REPRESENTANTS.includes(cible);
+
+function colonnesCampagne(libres: readonly ChampLibre[]): readonly ColumnSpec[] {
+  const colonnes = [...prospectColumns(libres)];
+  colonnes.splice(colonnes.findIndex((c) => c.key === 'phone') + 1, 0, STATUT_QUALIFICATION_COLUMN);
+  return colonnes;
+}
 
 function lotExportCreatedAtRange(query: LotExportQueryDto): Prisma.LotExportWhereInput {
   if (!query.dateFrom && !query.dateTo) return {};
@@ -600,7 +612,7 @@ export class LotsExportService {
       await this.writeRepresentantsSheet(workbook, ordonnes, demoEnabled);
     else {
       const libres = await this.champs.champsLibres(lot.projet);
-      await this.writeProspectsSheet(workbook, ordonnes, demoEnabled, prospectColumns(libres));
+      await this.writeProspectsSheet(workbook, ordonnes, demoEnabled, colonnesCampagne(libres));
     }
     await workbook.commit();
   }
@@ -734,6 +746,10 @@ export class LotsExportService {
     return Buffer.concat(chunks);
   }
 
+  /**
+   * Le statut de qualification se lit à côté du numéro, pas en trente-sixième
+   * colonne : le téléconseiller décroche avec ces deux-là sous les yeux.
+   */
   private async writeProspectsSheet(
     workbook: ExcelJS.stream.xlsx.WorkbookWriter,
     items: readonly ItemRow[],
@@ -791,6 +807,7 @@ export class LotsExportService {
       ...REPARTITION_COLUMNS,
       { header: 'Nom complet', key: 'fullName', width: 30 },
       { header: 'Téléphone', key: 'phone', width: 20 },
+      { header: 'Statut de qualification', key: 'statutQualification', width: 26 },
       { header: 'Département', key: 'departement', width: 24 },
       { header: 'IEF', key: 'ief', width: 26 },
       { header: 'Commercial', key: 'commercial', width: 26 },
@@ -809,6 +826,7 @@ export class LotsExportService {
           departement: { select: { name: true } },
           ief: { select: { name: true } },
           createdBy: { select: { fullName: true } },
+          statutQualification: { select: { label: true } },
         },
       });
       const byId = new Map(rows.map((row) => [row.id, row]));
@@ -822,6 +840,7 @@ export class LotsExportService {
             jour: item.day,
             fullName: row.fullName,
             phone: row.phoneE164,
+            statutQualification: row.statutQualification?.label ?? '',
             departement: row.departement.name,
             ief: row.ief?.name ?? '',
             commercial: row.createdBy.fullName,

@@ -619,6 +619,7 @@ export class ProspectAppeleDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
   @ApiProperty() nom!: string;
   @ApiProperty() prenom!: string;
+  @ApiProperty({ description: 'Le numéro de la fiche, au format E.164.' }) phoneE164!: string;
 
   @ApiProperty({
     enum: CallOutcome,

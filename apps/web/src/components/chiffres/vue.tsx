@@ -251,10 +251,11 @@ function blocDesProspectsAppeles(liste: ProspectsAppeles): BlocTableauDeBord {
         : `Les fiches appelées sur la période, avec l’issue de leur dernier appel.${coupe}`,
     groupe: 'Prospects appelés',
     tableau: {
-      colonnes: ['Nom', 'Prénom', 'Issue du dernier appel'],
+      colonnes: ['Nom', 'Prénom', 'Téléphone', 'Issue du dernier appel'],
       lignes: liste.items.map((fiche) => [
         fiche.nom,
         fiche.prenom,
+        fiche.phoneE164,
         CALL_OUTCOME_LABELS[fiche.derniereIssue],
       ]),
     },

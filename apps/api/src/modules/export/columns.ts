@@ -34,6 +34,7 @@ export const EXPORT_INCLUDE = {
       clientCreatedAt: true,
       departement: { select: { name: true } },
       createdBy: { select: { fullName: true } },
+      statutQualification: { select: { label: true } },
     },
   },
 } satisfies Prisma.ProspectInclude;
@@ -212,6 +213,21 @@ export function cellValue(
  * classeur : intercales, ils decaleraient des colonnes que les feuilles de
  * calcul du client referencent par position.
  */
+/**
+ * Le statut de qualification du REPRÉSENTANT qui a donné la fiche : le
+ * référentiel ne qualifie que lui, un prospect n'en porte pas. Vide sur une
+ * fiche sans représentant, et sur celle d'un représentant jamais qualifié.
+ *
+ * Hors de `PROSPECT_COLUMNS` : cette colonne sert le classeur d'une campagne,
+ * où l'on appelle les fiches d'un représentant, et l'export de prospects garde
+ * les colonnes que ses deux modes doivent partager.
+ */
+export const STATUT_QUALIFICATION_COLUMN: ColumnSpec = {
+  header: 'Statut de qualification',
+  key: 'statutQualification',
+  value: (row) => row.representant?.statutQualification?.label ?? '',
+};
+
 export function prospectColumns(libres: readonly ChampLibre[]): readonly ColumnSpec[] {
   if (libres.length === 0) return PROSPECT_COLUMNS;
   return [
