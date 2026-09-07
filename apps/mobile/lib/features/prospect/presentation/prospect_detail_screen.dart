@@ -7,6 +7,7 @@ import 'package:forui/forui.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
+import '../../../core/network/api_environment.dart';
 import '../../../core/providers/app_providers.dart';
 import '../../../core/router/back_navigation.dart';
 import '../../../core/router/route_paths.dart';
@@ -14,6 +15,7 @@ import '../../../core/router/single_push.dart';
 import '../../../core/telephonie/appels_crm.dart';
 import '../../../core/theme/cpi_tokens.dart';
 import '../../../core/utils/phone.dart';
+import '../../../core/utils/whatsapp.dart';
 import '../../../data/local/database.dart';
 import '../../../ui/async_value_x.dart';
 import '../../../ui/widgets/cpi_action_bar.dart';
@@ -21,6 +23,7 @@ import '../../../ui/widgets/cpi_kit.dart';
 import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
+import '../../auth/auth_state.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../shell/projects.dart';
 import '../../telephonie/appels_a_consigner.dart';
@@ -86,42 +89,89 @@ class _Pied extends ConsumerWidget {
   final bool chues;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) => CpiActionBar(
-    child: Column(
-      mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        CpiButton(
-          'Appeler',
-          icon: PhosphorIconsRegular.phoneCall,
-          onPressed: () => unawaited(
-            ref
-                .read(appelsCrmProvider.notifier)
-                .lancer(
-                  context,
-                  kind: 'prospect',
-                  id: data.id,
-                  e164: data.phoneE164,
-                ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final String? numeroWhatsapp = _numeroWhatsapp(data);
+    return CpiActionBar(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          CpiButton(
+            'Appeler',
+            icon: PhosphorIconsRegular.phoneCall,
+            onPressed: () => unawaited(
+              ref
+                  .read(appelsCrmProvider.notifier)
+                  .lancer(
+                    context,
+                    kind: 'prospect',
+                    id: data.id,
+                    e164: data.phoneE164,
+                  ),
+            ),
           ),
-        ),
-        const SizedBox(height: CpiSpacing.xs),
-        CpiButton(
-          'Consigner l\'appel',
-          variant: CpiButtonVariant.secondary,
-          icon: PhosphorIconsRegular.notePencil,
-          onPressed: () => context.pushOnce(
-            Uri(
-              path: chues ? Routes.phase2 : '/grand-public/phase2',
-              queryParameters: <String, String>{
-                Routes.prefillPhoneParam: data.phoneE164,
-              },
-            ).toString(),
+          const SizedBox(height: CpiSpacing.xs),
+          CpiButton(
+            'Consigner l\'appel',
+            variant: CpiButtonVariant.secondary,
+            icon: PhosphorIconsRegular.notePencil,
+            onPressed: () => context.pushOnce(
+              Uri(
+                path: chues ? Routes.phase2 : '/grand-public/phase2',
+                queryParameters: <String, String>{
+                  Routes.prefillPhoneParam: data.phoneE164,
+                },
+              ).toString(),
+            ),
           ),
-        ),
-      ],
-    ),
-  );
+          const SizedBox(height: CpiSpacing.xs),
+          // EB-26. Éteint tant qu'aucun numéro WhatsApp n'est connu : le
+          // téléphone principal n'en est pas un tant que personne ne l'a dit.
+          CpiButton(
+            'Écrire sur WhatsApp',
+            variant: CpiButtonVariant.ghost,
+            icon: PhosphorIconsRegular.whatsappLogo,
+            onPressed: numeroWhatsapp == null
+                ? null
+                : () => unawaited(
+                    ecrireSurWhatsapp(
+                      context,
+                      numeroWhatsapp,
+                      _messageWhatsapp(ref, data),
+                    ),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  static String? _numeroWhatsapp(ProspectSyncViewData data) =>
+      switch (WhatsappStatus.parse(data.whatsappStatus)) {
+        WhatsappStatus.memeNumero => data.phoneE164,
+        WhatsappStatus.autreNumero => data.whatsappE164,
+        _ => null,
+      };
+
+  /// Le gabarit `messageWhatsapp` (EB-29) rendu pour ce prospect, ou nul tant
+  /// que les paramètres n'ont pas répondu — le bouton part alors sans texte
+  /// plutôt que d'attendre.
+  static String? _messageWhatsapp(WidgetRef ref, ProspectSyncViewData data) {
+    final String? gabarit = ref
+        .watch(parametresChuesProvider)
+        .value
+        ?.messageWhatsapp;
+    if (gabarit == null) return null;
+    final AuthState moi = ref.watch(authControllerProvider);
+    return rendreMessageWhatsapp(gabarit, <String, String>{
+      'prenom': data.prenom,
+      'lien': moi.userId == null
+          ? ''
+          : '${ApiEnvironment.baseUrl}/demande/${moi.userId}',
+      'teleconseiller': moi.fullName ?? '',
+      'telephoneTeleconseiller': moi.phoneE164 ?? '',
+    });
+  }
 }
 
 class _Fiche extends ConsumerWidget {
@@ -275,7 +325,8 @@ class _Situation extends ConsumerWidget {
       _ligne('Mode d\'épargne', kModeEpargneLabels[data.modeEpargne ?? '']),
       _ligne('Pays de résidence', pays),
       _ligne('Ville', data.villeResidence),
-      _ligne('WhatsApp', data.whatsappE164),
+      _ligne('WhatsApp', _whatsapp(data)),
+      _ligne('Établissement', data.etablissement),
       _ligne('Personne relais', data.relaisNom),
       _ligne('Téléphone du relais', data.relaisPhoneE164),
       _ligne('Tranche de revenus', tranche),
@@ -292,6 +343,15 @@ class _Situation extends ConsumerWidget {
       child: CpiCard.rows(lignes),
     );
   }
+
+  /// Un numéro sur `AUTRE_NUMERO`, la réponse sinon. Une fiche de la diaspora
+  /// d'avant EB-23 porte son numéro sans statut : il reste lisible.
+  static String? _whatsapp(ProspectSyncViewData data) =>
+      switch (WhatsappStatus.parse(data.whatsappStatus)) {
+        WhatsappStatus.memeNumero => 'Même numéro',
+        WhatsappStatus.aucun => 'Pas de WhatsApp',
+        _ => data.whatsappE164,
+      };
 
   static CpiRow? _ligne(String titre, String? valeur) =>
       valeur == null || valeur.trim().isEmpty

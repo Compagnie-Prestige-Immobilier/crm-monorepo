@@ -1,19 +1,23 @@
 import type { components } from '@crm/api-client';
 
 import type {
+  CatalogueEntree,
   DonneesSource,
   EquipeLigne,
-  Forme,
 } from '@/components/accueil/tableau-de-bord/sources';
+import { activityLines, formatDuration } from '@/lib/data/admin';
 import type {
   ChiffresActivite,
   ChiffresBanques,
   ChiffresCampagne,
+  ChiffresCampagnes,
+  ChiffresCreneaux,
   ChiffresDelais,
   ChiffresEnrolement,
   ChiffresEntonnoir,
   ChiffresMethodes,
   ChiffresRendement,
+  ChiffresRepresentants,
   ChiffresTotaux,
 } from '@/lib/data/chiffres';
 import type { ComptageOuvertures } from '@/lib/data/ouvertures';
@@ -21,7 +25,7 @@ import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Role } from '@/lib/types';
 
-export type ChiffreSource = components['schemas']['DashboardSource'];
+type ChiffreSource = components['schemas']['DashboardSource'];
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =
@@ -32,6 +36,9 @@ export type Jeu =
   | 'methodes'
   | 'banques'
   | 'campagne'
+  | 'campagnes'
+  | 'creneaux'
+  | 'representants'
   | 'ouvertures'
   | 'enrolement';
 
@@ -43,13 +50,14 @@ export interface Jeux {
   methodes?: ChiffresMethodes;
   banques?: ChiffresBanques;
   campagne?: ChiffresCampagne;
+  campagnes?: ChiffresCampagnes;
+  creneaux?: ChiffresCreneaux;
+  representants?: ChiffresRepresentants;
   ouvertures?: ComptageOuvertures[];
   enrolement?: ChiffresEnrolement;
 }
 
-export interface SourceChiffre {
-  label: string;
-  forme: Forme;
+export interface SourceChiffre extends CatalogueEntree {
   jeu: Jeu;
   description: string;
   groupe: string;
@@ -72,33 +80,32 @@ const scalaire = (libelle: string, valeur: number): DonneesSource => ({
   donnee: { libelle, valeur },
 });
 
-/**
- * Un taux se range dans une tuile : la jauge lit `valeur` (le pourcentage), la
- * tuile affiche en grand le nombre brut qui le fait, le taux et son
- * dénominateur en dessous. Sans dénominateur, la tuile dit « Sans objet » et
- * non « 0 % ».
- */
+/** Un taux en tuile : le pourcentage en grand, numérateur et dénominateur dessous. « Sans objet » sans dénominateur, jamais « 0 % ». */
 const scalaireTaux = (
   valeur: number | null,
-  numerateur: number,
   libelle: string,
   sansDenominateur: string,
 ): DonneesSource => ({
   forme: 'scalaire',
   donnee: {
-    libelle: valeur === null ? sansDenominateur : `${taux(valeur)} · ${libelle}`,
+    libelle: valeur === null ? sansDenominateur : libelle,
     valeur: valeur ?? 0,
-    affichage: valeur === null ? taux(valeur) : { valeur: numerateur, format: formatNumber },
+    affichage: taux(valeur),
   },
 });
 
-const joignables = (t: ChiffresTotaux): number => t.calls - t.unreachable - t.wrongNumber;
+/** Une durée en tuile : le texte remplace le nombre, « Sans objet » sans mesure. */
+const scalaireDuree = (secondes: number | null, libelle: string): DonneesSource => ({
+  forme: 'scalaire',
+  donnee: { libelle, valeur: secondes ?? 0, affichage: formatDuration(secondes) },
+});
 
 const COLONNES_CHUES = [
   'Appels représentants',
-  'Contact',
-  'Rendez-vous',
-  'Qualification',
+  'Joignabilité',
+  'Acceptés',
+  'À rappeler',
+  'Acceptation',
   'Prospects saisis',
   'Méthodes obtenues',
 ] as const;
@@ -113,26 +120,28 @@ const COLONNES_GRAND_PUBLIC = [
 type Cumul = Pick<
   ChiffresTotaux,
   | 'repCalls'
-  | 'repReached'
-  | 'repCallback'
-  | 'repQuestioned'
-  | 'repQualified'
+  | 'repFiches'
+  | 'repFichesJointes'
+  | 'repFichesAcceptees'
+  | 'repFichesARappeler'
+  | 'repFichesEligibles'
   | 'calls'
-  | 'unreachable'
-  | 'wrongNumber'
+  | 'fiches'
+  | 'fichesJointes'
   | 'prospectsCreated'
   | 'methodObtained'
 >;
 
 const CUMUL_VIDE: Cumul = {
   repCalls: 0,
-  repReached: 0,
-  repCallback: 0,
-  repQuestioned: 0,
-  repQualified: 0,
+  repFiches: 0,
+  repFichesJointes: 0,
+  repFichesAcceptees: 0,
+  repFichesARappeler: 0,
+  repFichesEligibles: 0,
   calls: 0,
-  unreachable: 0,
-  wrongNumber: 0,
+  fiches: 0,
+  fichesJointes: 0,
   prospectsCreated: 0,
   methodObtained: 0,
 };
@@ -141,15 +150,16 @@ function cellules(cumul: Cumul, chues: boolean): EquipeLigne['cellules'] {
   const textes = chues
     ? [
         formatNumber(cumul.repCalls),
-        taux(part(cumul.repReached, cumul.repCalls)),
-        taux(part(cumul.repCallback, cumul.repCalls)),
-        taux(part(cumul.repQualified, cumul.repQuestioned)),
+        taux(part(cumul.repFichesJointes, cumul.repFiches)),
+        formatNumber(cumul.repFichesAcceptees),
+        formatNumber(cumul.repFichesARappeler),
+        taux(part(cumul.repFichesAcceptees, cumul.repFichesEligibles)),
         formatNumber(cumul.prospectsCreated),
         formatNumber(cumul.methodObtained),
       ]
     : [
         formatNumber(cumul.calls),
-        taux(part(joignables(cumul as ChiffresTotaux), cumul.calls)),
+        taux(part(cumul.fichesJointes, cumul.fiches)),
         formatNumber(cumul.prospectsCreated),
         formatNumber(cumul.methodObtained),
       ];
@@ -159,8 +169,8 @@ function cellules(cumul: Cumul, chues: boolean): EquipeLigne['cellules'] {
 
 /**
  * Les lignes se somment par téléconseiller sur la fenêtre demandée, y compris
- * `repQuestioned` : un représentant n'est attribué qu'une fois, à qui a obtenu
- * sa dernière réponse. Le pied reprend `totals`, calculé par le serveur.
+ * les fiches : une fiche n'est attribuée qu'une fois, à qui a posé son dernier
+ * statut. Le pied reprend `totals`, calculé par le serveur.
  */
 function tableauEquipe(activite: ChiffresActivite, chues: boolean): DonneesSource {
   const cumul = new Map<string, Cumul>();
@@ -208,14 +218,61 @@ function matriceOuvertures(lignes: readonly ComptageOuvertures[]): DonneesSource
   };
 }
 
+/** Une ligne par téléconseiller, une colonne par créneau, le taux de joignabilité dans la case. */
+function matriceCreneaux(creneaux: ChiffresCreneaux): DonneesSource {
+  const lignes = creneaux.activites.map((activite) => activityLines(activite));
+  const noms = [...new Set(lignes.flat().map((ligne) => ligne.name))].sort();
+  const colonnes = creneaux.creneaux.map(
+    (creneau) => `${creneau.label} ${creneau.start}–${creneau.end}`,
+  );
+  return {
+    forme: 'matrice',
+    donnee: {
+      lignes: noms,
+      colonnes,
+      cellules: noms.flatMap((nom) =>
+        colonnes.map((colonne, index) => ({
+          ligne: nom,
+          colonne,
+          value: lignes[index]?.find((ligne) => ligne.name === nom)?.repReachabilityRate ?? 0,
+        })),
+      ),
+    },
+  };
+}
+
+const sommeOuvertures = (
+  lignes: readonly ComptageOuvertures[],
+  cle: 'ouvertures' | 'qualifiees' | 'liberees',
+): number => lignes.reduce((total, ligne) => total + ligne[cle], 0);
+
+/** DMT d'équipe pondérée par les fiches qualifiées de chaque ligne, jamais une moyenne de moyennes. */
+function dureeMoyenneSurLaFiche(lignes: readonly ComptageOuvertures[]): number | null {
+  const mesurees = lignes.filter((ligne) => ligne.dureeMoyenneSecondes !== null);
+  const poids = sommeOuvertures(mesurees, 'qualifiees');
+  if (poids === 0) return null;
+  const total = mesurees.reduce(
+    (cumul, ligne) => cumul + (ligne.dureeMoyenneSecondes ?? 0) * ligne.qualifiees,
+    0,
+  );
+  return Math.round(total / poids);
+}
+
+const partsStock = (parts: ChiffresRepresentants['parDepartement']): DonneesSource => ({
+  forme: 'classement',
+  donnee: parts
+    .filter((p) => p.count > 0)
+    .map((p) => ({ id: p.id, label: p.label, value: p.count })),
+});
+
 /** Les colonnes suivent le projet : sans représentant, aucun des taux CHUES n'a de sujet. */
 const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   label: 'Par téléconseiller',
   forme: 'equipe',
   jeu: 'activite',
   description: chues
-    ? 'Les taux d’appel aux représentants, téléconseiller par téléconseiller, plus les fiches notées et les méthodes obtenues auprès des prospects. Ligne d’équipe en pied.'
-    : 'Les appels aux prospects, téléconseiller par téléconseiller, avec la ligne d’équipe en pied.',
+    ? 'Une ligne par téléconseiller : appels aux représentants, joignabilité, acceptés, à rappeler, acceptation, prospects saisis, méthodes obtenues. Équipe en pied.'
+    : 'Une ligne par téléconseiller, équipe en pied.',
   groupe: 'Équipe',
   extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
 });
@@ -224,63 +281,76 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
  * Le catalogue de l'écran « Chiffres ». Une entrée par carte, et rien qui ne
  * soit pas une carte : tout ce qui s'affiche se déplace et se retire.
  */
-export const SOURCES_CHIFFRES = {
+const SOURCES_CHIFFRES = {
   'taux-de-contact': {
+    label: 'Taux de contact',
+    forme: 'scalaire',
+    jeu: 'campagnes',
+    description:
+      'Fiches appelées ÷ fiches prévues par les campagnes de la période. Peut dépasser 100 %.',
+    groupe: 'Campagnes',
+    extraire: ({ campagnes }) =>
+      campagnes === undefined
+        ? null
+        : scalaireTaux(
+            campagnes.totals.contactRate,
+            `${formatNumber(campagnes.totals.appelees)} appelées sur ${formatNumber(campagnes.totals.prevues)} fiches prévues`,
+            'Aucune campagne sur la période',
+          ),
+  },
+  'taux-de-joignabilite-representants': {
     label: 'Taux de joignabilité des représentants',
     forme: 'scalaire',
     jeu: 'activite',
     description:
-      'La part des appels aux représentants où quelqu’un a décroché. Un refus compte : il a répondu.',
+      'Fiches jointes ÷ fiches appelées, sur le dernier statut de la période. Refus et faux numéro comptent comme joints.',
     groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
-            activite.totals.repContactRate,
-            activite.totals.repReached,
-            `${formatNumber(activite.totals.repReached)} joints sur ${formatNumber(activite.totals.repCalls)} appels`,
-            'Aucun appel à un représentant sur la période',
+            activite.totals.repReachabilityRate,
+            `${formatNumber(activite.totals.repFichesJointes)} joints sur ${formatNumber(activite.totals.repFiches)} fiches`,
+            'Aucun représentant appelé sur la période',
           ),
   },
-  'a-rappeler': {
-    label: 'Taux de rappel des représentants',
+  'taux-d-acceptation': {
+    label: 'Taux d’acceptation',
     forme: 'scalaire',
     jeu: 'activite',
     description:
-      'La part des appels aux représentants qui finissent par un rappel promis, date posée.',
+      'Fiches Accepté ÷ fiches jointes, hors Faux numéro, Décédé, Retraité, Hors cible et Affecté ailleurs.',
     groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
-            activite.totals.repCallbackRate,
-            activite.totals.repCallback,
-            `${formatNumber(activite.totals.repCallback)} rappels sur ${formatNumber(activite.totals.repCalls)} appels`,
-            'Aucun appel à un représentant sur la période',
+            activite.totals.repAcceptanceRate,
+            `${formatNumber(activite.totals.repFichesAcceptees)} acceptent sur ${formatNumber(activite.totals.repFichesEligibles)} joints`,
+            'Aucun représentant joint sur la période',
           ),
   },
-  'taux-de-qualification': {
-    label: 'Taux de qualification des représentants',
+  'taux-de-rappel': {
+    label: 'Taux de rappel',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'La part des représentants interrogés qui acceptent d’être représentant CHUES.',
+    description:
+      'Fiches À rappeler ÷ fiches appelées. Dessous, les rappels à venir, tenus et en retard.',
     groupe: 'Appels aux représentants',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
-            activite.totals.repQualificationRate,
-            activite.totals.repQualified,
-            `${formatNumber(activite.totals.repQualified)} acceptent sur ${formatNumber(activite.totals.repQuestioned)} interrogés`,
-            'Aucun représentant interrogé sur la période',
+            activite.totals.repCallbackFicheRate,
+            `${formatNumber(activite.totals.repFichesARappeler)} à rappeler sur ${formatNumber(activite.totals.repFiches)} fiches · ${formatNumber(activite.totals.repCallbacksUpcoming)} à venir, ${formatNumber(activite.totals.repCallbacksHonored)} tenus, ${formatNumber(activite.totals.repCallbacksLate)} en retard`,
+            'Aucun représentant appelé sur la période',
           ),
   },
   'repartition-statuts-qualification': {
     label: 'Répartition des statuts de qualification',
     forme: 'classement',
     jeu: 'activite',
-    description:
-      'Nombre de représentants par statut de qualification, basé sur leur dernier appel dans la période.',
+    description: 'Une part par statut de qualification, sur le dernier appel de la période.',
     groupe: 'Appels aux représentants',
     extraire: ({ activite }) => {
       if (activite === undefined || activite.repQualificationStatuses === null) return null;
@@ -297,20 +367,219 @@ export const SOURCES_CHIFFRES = {
       };
     },
   },
+  'joints-non-joints': {
+    label: 'Joints et non joints',
+    forme: 'classement',
+    jeu: 'activite',
+    description: 'Fiches jointes et fiches non jointes, sur le dernier statut de la période.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) =>
+      activite === undefined
+        ? null
+        : {
+            forme: 'classement',
+            donnee:
+              activite.totals.repFiches === 0
+                ? []
+                : [
+                    { id: 'joints', label: 'Joints', value: activite.totals.repFichesJointes },
+                    {
+                      id: 'non-joints',
+                      label: 'Non joints',
+                      value: activite.totals.repFichesNonJointes,
+                    },
+                  ],
+          },
+  },
+  'statuts-par-famille': {
+    label: 'Statuts par famille',
+    forme: 'composition',
+    jeu: 'activite',
+    description: 'Les statuts de chaque famille, joint et non joint, empilés.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ activite }) => {
+      if (activite === undefined || activite.repQualificationStatuses === null) return null;
+      const items = activite.repQualificationStatuses.items;
+      const segments = (famille: 'JOINT' | 'NON_JOINT') =>
+        items
+          .filter((item) => item.famille === famille && item.count > 0)
+          .map((item) => ({ id: item.id, label: item.label, value: item.count }));
+      return {
+        forme: 'composition',
+        donnee: [
+          { ligne: 'Joint', segments: segments('JOINT') },
+          { ligne: 'Non joint', segments: segments('NON_JOINT') },
+        ],
+      };
+    },
+  },
+  'joignabilite-par-creneau': {
+    label: 'Joignabilité par créneau',
+    forme: 'matrice',
+    jeu: 'creneaux',
+    description: 'Fiches jointes ÷ fiches appelées, par téléconseiller et par créneau.',
+    groupe: 'Appels aux représentants',
+    extraire: ({ creneaux }) => (creneaux === undefined ? null : matriceCreneaux(creneaux)),
+  },
+  'taux-d-exploitation': {
+    label: 'Taux d’exploitation',
+    forme: 'composition',
+    jeu: 'campagnes',
+    description:
+      'Un camembert par campagne : fiches traitées ÷ fiches de la campagne. Le camembert ouvre sa campagne.',
+    groupe: 'Campagnes',
+    lien: (id) => `/chues/campagnes/${id}`,
+    extraire: ({ campagnes }) =>
+      campagnes === undefined
+        ? null
+        : {
+            forme: 'composition',
+            donnee: campagnes.items.map((campagne) => ({
+              id: campagne.id,
+              ligne: campagne.name,
+              detail: `${formatNumber(campagne.traitees)} traitées sur ${formatNumber(campagne.prevues)} · ${taux(part(campagne.traitees, campagne.prevues))}`,
+              segments: [
+                { id: 'traitees', label: 'Traitées', value: campagne.traitees },
+                {
+                  id: 'restantes',
+                  label: 'Restantes',
+                  value: Math.max(0, campagne.prevues - campagne.traitees),
+                },
+              ],
+            })),
+          },
+  },
+  'representants-par-departement': {
+    label: 'Représentants par département',
+    forme: 'classement',
+    jeu: 'representants',
+    description: 'Stock des représentants par département, hors période.',
+    groupe: 'Représentants',
+    extraire: ({ representants }) =>
+      representants === undefined ? null : partsStock(representants.parDepartement),
+  },
+  'representants-par-ief': {
+    label: 'Représentants par IEF',
+    forme: 'classement',
+    jeu: 'representants',
+    description: 'Stock des représentants par IEF, hors période.',
+    groupe: 'Représentants',
+    extraire: ({ representants }) =>
+      representants === undefined ? null : partsStock(representants.parIef),
+  },
+  'representants-jamais-appeles': {
+    label: 'Représentants jamais appelés',
+    forme: 'scalaire',
+    jeu: 'representants',
+    description: 'Représentants sans aucun appel, hors période.',
+    groupe: 'Représentants',
+    extraire: ({ representants }) =>
+      representants === undefined
+        ? null
+        : scalaire(
+            `sur ${formatNumber(representants.total)} représentants`,
+            representants.jamaisAppeles,
+          ),
+  },
+  'representants-injoignables': {
+    label: 'Représentants injoignables',
+    forme: 'scalaire',
+    jeu: 'representants',
+    description:
+      'Représentants au dernier statut non joint, hors Injoignable définitif. Hors période.',
+    groupe: 'Représentants',
+    extraire: ({ representants }) =>
+      representants === undefined
+        ? null
+        : scalaire(
+            `sur ${formatNumber(representants.total)} représentants`,
+            representants.injoignables,
+          ),
+  },
+  'taux-de-qualification': {
+    label: 'Taux de qualification',
+    forme: 'scalaire',
+    jeu: 'ouvertures',
+    description: 'Fiches qualifiées ÷ fiches ouvertes. L’écart avec 100 % : les sorties forcées.',
+    groupe: 'Fiches',
+    extraire: ({ ouvertures }) => {
+      if (ouvertures === undefined) return null;
+      const ouvertes = sommeOuvertures(ouvertures, 'ouvertures');
+      const qualifiees = sommeOuvertures(ouvertures, 'qualifiees');
+      return scalaireTaux(
+        part(qualifiees, ouvertes),
+        `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} fiches ouvertes`,
+        'Aucune fiche ouverte sur la période',
+      );
+    },
+  },
+  'duree-moyenne-sur-la-fiche': {
+    label: 'Durée moyenne sur la fiche',
+    forme: 'scalaire',
+    jeu: 'ouvertures',
+    description: 'Temps de la première saisie à la qualification ÷ fiches qualifiées.',
+    groupe: 'Fiches',
+    extraire: ({ ouvertures }) =>
+      ouvertures === undefined
+        ? null
+        : scalaireDuree(
+            dureeMoyenneSurLaFiche(ouvertures),
+            `sur ${formatNumber(sommeOuvertures(ouvertures, 'qualifiees'))} fiches qualifiées`,
+          ),
+  },
+  'duree-moyenne-de-communication': {
+    label: 'Durée moyenne de communication',
+    forme: 'scalaire',
+    jeu: 'activite',
+    description: 'Durées d’appel lues au journal du téléphone ÷ appels retrouvés.',
+    groupe: 'Appels',
+    extraire: ({ activite }) => {
+      if (activite === undefined) return null;
+      const t = activite.totals;
+      const appels = t.confirmedCalls + t.repConfirmedCalls;
+      const secondes =
+        appels === 0
+          ? null
+          : Math.round(
+              ((t.avgCallSeconds ?? 0) * t.confirmedCalls +
+                (t.repAvgCallSeconds ?? 0) * t.repConfirmedCalls) /
+                appels,
+            );
+      return scalaireDuree(secondes, `sur ${formatNumber(appels)} appels retrouvés au journal`);
+    },
+  },
+  'appels-par-jour': {
+    label: 'Appels par jour',
+    forme: 'serie-temporelle',
+    jeu: 'activite',
+    description: 'Appels passés par jour, représentants et prospects confondus.',
+    groupe: 'Appels',
+    extraire: ({ activite }) => {
+      if (activite === undefined) return null;
+      const parJour = new Map<string, number>();
+      for (const ligne of activite.items) {
+        parJour.set(ligne.bucket, (parJour.get(ligne.bucket) ?? 0) + ligne.calls + ligne.repCalls);
+      }
+      return {
+        forme: 'serie-temporelle',
+        donnee: [...parJour.entries()]
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([jour, value]) => ({ id: jour, label: formatShortDate(jour), value })),
+      };
+    },
+  },
   'taux-de-joignabilite': {
     label: 'Taux de joignabilité des prospects',
     forme: 'scalaire',
     jeu: 'activite',
-    description:
-      'La part des appels aux prospects, à l’étape conversion, dont le numéro s’est révélé exploitable. Un faux numéro compte comme un injoignable.',
+    description: 'Prospects joints ÷ prospects appelés, sur le dernier appel de la période.',
     groupe: 'Appels aux prospects',
     extraire: ({ activite }) =>
       activite === undefined
         ? null
         : scalaireTaux(
-            activite.totals.reachRate,
-            joignables(activite.totals),
-            `${formatNumber(joignables(activite.totals))} numéros exploitables sur ${formatNumber(activite.totals.calls)} appels aux prospects`,
+            activite.totals.ficheReachRate,
+            `${formatNumber(activite.totals.fichesJointes)} joints sur ${formatNumber(activite.totals.fiches)} prospects appelés`,
             'Aucun appel à un prospect sur la période',
           ),
   },
@@ -318,7 +587,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Prospects saisis',
     forme: 'scalaire',
     jeu: 'activite',
-    description: 'Le nombre de nouvelles fiches saisies pendant la période.',
+    description: 'Fiches prospect saisies sur la période.',
     groupe: 'Saisie',
     extraire: ({ activite }) =>
       activite === undefined
@@ -329,8 +598,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Méthodes obtenues',
     forme: 'scalaire',
     jeu: 'activite',
-    description:
-      'Les appels aux prospects qui se terminent par une méthode d’adhésion obtenue. Ce n’est pas encore un dossier bancaire.',
+    description: 'Appels aux prospects terminés par une méthode d’adhésion obtenue.',
     groupe: 'Appels aux prospects',
     extraire: ({ activite }) =>
       activite === undefined
@@ -345,8 +613,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Fiches ouvertes',
     forme: 'matrice',
     jeu: 'ouvertures',
-    description:
-      'Les fiches ouvertes depuis la liste, téléconseiller par téléconseiller et jour par jour. Prospects et représentants confondus. Une fiche rouverte compte à chaque fois.',
+    description: 'Ouvertures confirmées, par téléconseiller et par jour. Une réouverture compte.',
     groupe: 'Équipe',
     extraire: ({ ouvertures }) => (ouvertures === undefined ? null : matriceOuvertures(ouvertures)),
   },
@@ -355,7 +622,7 @@ export const SOURCES_CHIFFRES = {
     forme: 'composition',
     jeu: 'campagne',
     description:
-      'Pour chaque téléconseiller, la part des fiches assignées qui ont reçu au moins un appel. La période choisie ne change pas la dernière campagne.',
+      'Fiches appelées et fiches restantes par téléconseiller, sur la dernière campagne quelle que soit la période.',
     groupe: 'Campagnes',
     extraire: ({ campagne }) =>
       campagne == null
@@ -380,7 +647,7 @@ export const SOURCES_CHIFFRES = {
     forme: 'classement',
     jeu: 'campagne',
     description:
-      'Les appels passés sur une fiche confiée à un collègue dans la dernière campagne. La période choisie ne change pas la dernière campagne.',
+      'Appels sur la fiche d’un collègue, sur la dernière campagne quelle que soit la période.',
     groupe: 'Campagnes',
     extraire: ({ campagne }) =>
       campagne == null
@@ -398,7 +665,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Encaissé',
     forme: 'scalaire',
     jeu: 'entonnoir',
-    description: 'Le montant réellement encaissé sur les dossiers terminés.',
+    description: 'Montant encaissé sur les dossiers terminés.',
     groupe: 'Résultats',
     extraire: ({ entonnoir }) =>
       entonnoir === undefined
@@ -416,7 +683,7 @@ export const SOURCES_CHIFFRES = {
     label: 'De l’appel à l’encaissement',
     forme: 'classement',
     jeu: 'entonnoir',
-    description: 'Voir combien de dossiers passent chaque étape, du premier appel au paiement.',
+    description: 'Dossiers à chaque étape, du premier appel au paiement.',
     groupe: 'Résultats',
     extraire: ({ entonnoir }) =>
       entonnoir === undefined
@@ -437,7 +704,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Méthodes d’adhésion',
     forme: 'composition',
     jeu: 'methodes',
-    description: 'Voir quelle méthode d’adhésion les prospects choisissent le plus souvent.',
+    description: 'Prospects par méthode d’adhésion choisie.',
     groupe: 'Résultats',
     extraire: ({ methodes }) =>
       methodes === undefined
@@ -501,7 +768,7 @@ export const SOURCES_CHIFFRES = {
     label: 'Rendement par département',
     forme: 'classement',
     jeu: 'rendement',
-    description: 'Comparer le taux de conversion des prospects de chaque département.',
+    description: 'Prospects convertis ÷ prospects, par département.',
     groupe: 'Analyses',
     extraire: ({ rendement }) =>
       rendement === undefined
@@ -540,7 +807,6 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             enrolement.tauxRapprochement,
-            enrolement.rapprochees,
             `${formatNumber(enrolement.rapprochees)} inscriptions reconnues sur ${formatNumber(enrolement.inscriptions)}`,
             'Aucune inscription sur la période',
           ),
@@ -557,7 +823,6 @@ export const SOURCES_CHIFFRES = {
         ? null
         : scalaireTaux(
             enrolement.tauxConversion,
-            enrolement.rapprochees,
             `${formatNumber(enrolement.rapprochees)} prospects convertis retrouvés inscrits`,
             'Aucun prospect converti sur la période',
           ),
@@ -627,23 +892,22 @@ export const SOURCES_CHIFFRES = {
 /** Un représentant n'existe que dans CHUES : ces taux seraient vides ailleurs. */
 const SOURCES_CHUES_SEULEMENT: readonly string[] = [
   'taux-de-contact',
-  'a-rappeler',
-  'taux-de-qualification',
+  'taux-de-joignabilite-representants',
+  'taux-d-acceptation',
+  'taux-de-rappel',
   'repartition-statuts-qualification',
+  'joints-non-joints',
+  'statuts-par-famille',
+  'joignabilite-par-creneau',
+  'taux-d-exploitation',
+  'representants-par-departement',
+  'representants-par-ief',
+  'representants-jamais-appeles',
+  'representants-injoignables',
 ];
 
 /** Les montants ne s'ouvrent qu'à la direction, comme la disposition d'usine du serveur. */
 const SOURCES_MONTANTS: readonly string[] = ['encaisse', 'de-l-appel-a-l-encaissement'];
-
-/** Le pilotage d'équipe parle d'appels, pas de recette ni de portefeuille. */
-const SOURCES_SUPERVISION: readonly string[] = [
-  'par-banque',
-  'encaisse',
-  'de-l-appel-a-l-encaissement',
-  'rendement-par-departement',
-  'couverture-derniere-campagne',
-  'hors-attribution-derniere-campagne',
-];
 
 /**
  * Ce que les plateformes d'enrôlement rendent ne sort pas de la cellule
@@ -667,7 +931,6 @@ export function catalogueDe(input: {
   const entrees = Object.entries(SOURCES_CHIFFRES).filter(([cle]) => {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
-    if (input.role === 'SUPERVISEUR' && SOURCES_SUPERVISION.includes(cle)) return false;
     if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });

@@ -53,7 +53,11 @@ import {
   type VisitesImportChange,
   type VisitesImportJob,
 } from '@/lib/data/visites-import';
-import { fetchVisiteReferentiels, VISITE_COLONNES } from '@/lib/data/visites';
+import {
+  fetchVisiteReferentiels,
+  VISITE_COLONNES,
+  type VisiteReferentiels,
+} from '@/lib/data/visites';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
@@ -80,9 +84,30 @@ function options(items: { id: string; label: string }[] | undefined): FilterOpti
   return (items ?? []).map((item) => ({ value: item.id, label: item.label }));
 }
 
+function optionsReferentiel<K extends keyof VisiteReferentiels>(
+  data: VisiteReferentiels | undefined,
+  key: K,
+): FilterOption[] {
+  return options(data?.[key]);
+}
+
 /** Créations et corrections seules composent la revue : les lignes inchangées n'y figurent pas. */
 function totalDiffs(job: VisitesImportJob): number {
   return job.createdRows + job.updatedRows;
+}
+
+function pluriel(n: number): string {
+  return n > 1 ? 's' : '';
+}
+
+function classeurIdentique(job: VisitesImportJob, diffs: number): boolean {
+  return job.status === 'succeeded' && job.mode === 'DRY_RUN' && diffs === 0;
+}
+
+function aDesErreurs(
+  job: VisitesImportJob,
+): job is VisitesImportJob & { report: NonNullable<VisitesImportJob['report']> } {
+  return job.report !== null && job.report.errors.length > 0;
 }
 
 interface Rapport {
@@ -111,6 +136,48 @@ function peutAppliquer(
   return selection.created + selection.updated > 0;
 }
 
+function diffsDe(job: VisitesImportJob | undefined): number {
+  return job === undefined ? 0 : totalDiffs(job);
+}
+
+function estEnRevue(
+  job: VisitesImportJob | undefined,
+  rapportPret: boolean,
+  diffs: number,
+): boolean {
+  return job !== undefined && rapportPret && diffs > 0;
+}
+
+function ErreurJobInline({
+  jobQuery,
+  job,
+}: {
+  jobQuery: { isError: boolean; error: unknown; refetch: () => unknown };
+  job: VisitesImportJob | undefined;
+}) {
+  if (!jobQuery.isError || job !== undefined) return null;
+  return (
+    <QueryErrorInline
+      error={jobQuery.error}
+      onRetry={() => {
+        void jobQuery.refetch();
+      }}
+      fallback="Ce travail d’import n’a pas pu être relu."
+    />
+  );
+}
+
+function AnalysePanelSiPresent({
+  job,
+  onReset,
+}: {
+  job: VisitesImportJob | undefined;
+  onReset: () => void;
+}) {
+  if (job === undefined) return null;
+  return <AnalysePanel job={job} onReset={onReset} />;
+}
+
 export function RegistreImportView() {
   const queryClient = useQueryClient();
   const live = useLive({ topic: 'imports' });
@@ -133,22 +200,24 @@ export function RegistreImportView() {
     staleTime: 5 * 60_000,
   });
 
+  const jobIdKey = jobId ?? '';
+
   const jobQuery = useQuery({
-    queryKey: queryKeys.visitesImport(jobId ?? ''),
-    queryFn: () => fetchVisitesImportJob(jobId ?? ''),
+    queryKey: queryKeys.visitesImport(jobIdKey),
+    queryFn: () => fetchVisitesImportJob(jobIdKey),
     enabled: jobId !== null,
     refetchInterval: (query) => (isRunning(query.state.data) ? live.refetchInterval(query) : false),
   });
 
   const job = jobQuery.data;
-  const diffs = job === undefined ? 0 : totalDiffs(job);
+  const diffs = diffsDe(job);
   const {
     id: rapportId,
     pret: rapportPret,
     created: rapportCreated,
     updated: rapportUpdated,
   } = rapportDe(job);
-  const enReview = job !== undefined && rapportPret && diffs > 0;
+  const enReview = estEnRevue(job, rapportPret, diffs);
 
   // La sélection démarre calée sur le rapport : le serveur pré-coche tout à la détection.
   useEffect(() => {
@@ -158,8 +227,8 @@ export function RegistreImportView() {
   }, [rapportId, rapportPret, rapportCreated, rapportUpdated]);
 
   const revueQuery = useQuery({
-    queryKey: queryKeys.visitesImportRevue(jobId ?? '', page),
-    queryFn: () => fetchVisitesImportRevue(jobId ?? '', page),
+    queryKey: queryKeys.visitesImportRevue(jobIdKey, page),
+    queryFn: () => fetchVisitesImportRevue(jobIdKey, page),
     enabled: jobId !== null && enReview,
     placeholderData: keepPreviousData,
   });
@@ -320,7 +389,7 @@ export function RegistreImportView() {
             <FilterCombobox
               label={VISITE_COLONNES.entreprise}
               placeholder="Toutes"
-              options={options(referentiels.data?.entreprises)}
+              options={optionsReferentiel(referentiels.data, 'entreprises')}
               value={filters.entrepriseId}
               onChange={(value) => {
                 setFilters((prev) => ({ ...prev, entrepriseId: value }));
@@ -329,7 +398,7 @@ export function RegistreImportView() {
             <FilterCombobox
               label={VISITE_COLONNES.direction}
               placeholder="Toutes"
-              options={options(referentiels.data?.directions)}
+              options={optionsReferentiel(referentiels.data, 'directions')}
               value={filters.directionId}
               onChange={(value) => {
                 setFilters((prev) => ({ ...prev, directionId: value }));
@@ -338,7 +407,7 @@ export function RegistreImportView() {
             <FilterCombobox
               label={VISITE_COLONNES.destinataire}
               placeholder="Tous"
-              options={options(referentiels.data?.destinataires)}
+              options={optionsReferentiel(referentiels.data, 'destinataires')}
               value={filters.destinataireId}
               onChange={(value) => {
                 setFilters((prev) => ({ ...prev, destinataireId: value }));
@@ -435,46 +504,35 @@ export function RegistreImportView() {
         </CardContent>
       </Card>
 
-      {jobQuery.isError && job === undefined ? (
-        <QueryErrorInline
-          error={jobQuery.error}
-          onRetry={() => {
-            void jobQuery.refetch();
-          }}
-          fallback="Ce travail d’import n’a pas pu être relu."
-        />
-      ) : null}
+      <ErreurJobInline jobQuery={jobQuery} job={job} />
 
-      {job === undefined ? null : (
-        <AnalysePanel
-          job={job}
-          onReset={() => {
-            setJobId(null);
-            setPage(1);
-            inputRef.current?.focus();
-          }}
-        />
-      )}
+      <AnalysePanelSiPresent
+        job={job}
+        onReset={() => {
+          setJobId(null);
+          setPage(1);
+          inputRef.current?.focus();
+        }}
+      />
 
-      {enReview ? (
-        <RevuePanel
-          job={job}
-          onPageChange={setPage}
-          revueQuery={revueQuery}
-          selection={selection}
-          onToggle={(change, selected) => {
-            toggle.mutate({ change, selected });
-          }}
-          onSelectAll={(selected) => {
-            selectAll.mutate(selected);
-          }}
-          selectAllPending={selectAll.isPending}
-          canApply={canApply}
-          onApply={() => {
-            setConfirming(true);
-          }}
-        />
-      ) : null}
+      <RevuePanelSiActif
+        enReview={enReview}
+        job={job}
+        onPageChange={setPage}
+        revueQuery={revueQuery}
+        selection={selection}
+        onToggle={(change, selected) => {
+          toggle.mutate({ change, selected });
+        }}
+        onSelectAll={(selected) => {
+          selectAll.mutate(selected);
+        }}
+        selectAllPending={selectAll.isPending}
+        canApply={canApply}
+        onApply={() => {
+          setConfirming(true);
+        }}
+      />
 
       <ApplyDialog
         job={confirming && job !== undefined ? job : null}
@@ -558,7 +616,7 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
           </dl>
         )}
 
-        {job.status === 'succeeded' && job.mode === 'DRY_RUN' && diffs === 0 ? (
+        {classeurIdentique(job, diffs) ? (
           <p role="status" className="text-[0.875rem] text-muted-foreground">
             Votre classeur est identique au registre. Rien à appliquer.
           </p>
@@ -572,17 +630,15 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
             <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
             <div className="min-w-0 text-[0.875rem]">
               <p className="font-[600]">
-                {formatNumber(job.createdRows)} visite{job.createdRows > 1 ? 's' : ''} créée
-                {job.createdRows > 1 ? 's' : ''}, {formatNumber(job.updatedRows)} corrigée
-                {job.updatedRows > 1 ? 's' : ''}.
+                {formatNumber(job.createdRows)} visite{pluriel(job.createdRows)} créée
+                {pluriel(job.createdRows)}, {formatNumber(job.updatedRows)} corrigée
+                {pluriel(job.updatedRows)}.
               </p>
             </div>
           </div>
         ) : null}
 
-        {job.report !== null && job.report.errors.length > 0 ? (
-          <RapportErreurs report={job.report} />
-        ) : null}
+        {aDesErreurs(job) ? <RapportErreurs report={job.report} /> : null}
 
         {running ? null : (
           <div>
@@ -786,6 +842,18 @@ function RevuePanel({
       </CardContent>
     </Card>
   );
+}
+
+function RevuePanelSiActif({
+  enReview,
+  job,
+  ...reste
+}: {
+  enReview: boolean;
+  job: VisitesImportJob | undefined;
+} & Omit<Parameters<typeof RevuePanel>[0], 'job'>) {
+  if (!enReview || job === undefined) return null;
+  return <RevuePanel job={job} {...reste} />;
 }
 
 function applyLabel(selection: { created: number; updated: number }): string {

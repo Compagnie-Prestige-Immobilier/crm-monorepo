@@ -543,6 +543,29 @@ def _brevo_env() -> list[str]:
     ]
 
 
+def _turnstile_env() -> list[str]:
+    """Anti-bot Cloudflare Turnstile du formulaire public, EB-27.
+
+    Même règle que Brevo : la clé secrète n'est jamais écrite dans le dépôt,
+    elle ne vit que dans la variable d'environnement de l'opérateur. Absente,
+    les lignes disparaissent — l'API bascule alors sur son défaut fermé
+    (`TURNSTILE_ALLOW_DEGRADED=false`) et refuse les soumissions plutôt que de
+    dégrader en silence.
+    """
+    secret = os.environ.get("TURNSTILE_SECRET_KEY", "").strip()
+    if not secret:
+        return []
+    site = os.environ.get("TURNSTILE_SITE_KEY", "").strip()
+    if not site:
+        raise DokployError("TURNSTILE_SECRET_KEY posée sans TURNSTILE_SITE_KEY.")
+    degraded = setting("TURNSTILE_ALLOW_DEGRADED", "false")
+    return [
+        f"TURNSTILE_SITE_KEY={site}",
+        f"TURNSTILE_SECRET_KEY={secret}",
+        f"TURNSTILE_ALLOW_DEGRADED={degraded}",
+    ]
+
+
 def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
     return "\n".join(
         [
@@ -578,6 +601,7 @@ def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
             f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
             "SEED_ADMIN_FULL_NAME=Administrateur CPI",
             *_brevo_env(),
+            *_turnstile_env(),
         ]
     )
 

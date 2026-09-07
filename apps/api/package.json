@@ -9,8 +9,6 @@
     "start": "node dist/main.js",
     "lint": "oxlint --config .oxlintrc.json --report-unused-disable-directives src",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run",
-    "test:coverage": "vitest run --coverage",
     "test:integration": "VITEST_INCLUDE_INTEGRATION=1 vitest run --config vitest.integration.config.ts --passWithNoTests",
     "openapi:generate": "tsc -p tsconfig.gen.json && node dist/openapi.js && prettier openapi.json --write"
   },
@@ -46,6 +44,7 @@
     "pino": "catalog:",
     "pino-http": "catalog:",
     "pino-pretty": "catalog:",
+    "pino-roll": "catalog:",
     "reflect-metadata": "catalog:",
     "rxjs": "catalog:",
     "uuid": "catalog:",
@@ -53,11 +52,9 @@
   },
   "devDependencies": {
     "@crm/typescript-config": "workspace:*",
-    "@nestjs/testing": "catalog:",
     "@types/node": "catalog:",
     "@types/pdfkit": "catalog:",
     "@types/ws": "8.18.1",
-    "@vitest/coverage-v8": "catalog:",
     "prettier": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"

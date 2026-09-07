@@ -9,7 +9,7 @@ import { REP_CALL_OUTCOME_LABELS, type RepCallOutcome } from '@/lib/types';
 
 type Variant = NonNullable<BadgeProps['variant']>;
 
-const RELATION_VARIANTS: Record<RepresentantRelation, Variant> = {
+export const RELATION_VARIANTS: Record<RepresentantRelation, Variant> = {
   INCONNU: 'outline',
   CONTACTE: 'info',
   AMBASSADEUR: 'success',
@@ -30,6 +30,28 @@ function varianteDeLEffet(effet: string | null): Variant {
     default:
       return 'outline';
   }
+}
+
+function texteDeBadge(
+  status: RepresentantRelation,
+  label: string | null | undefined,
+  lastCallOutcome: RepCallOutcome | null | undefined,
+  decision: boolean,
+): string {
+  if (decision) return REPRESENTANT_RELATION_LABELS[status];
+  if (label != null) return label;
+  return lastCallOutcome == null ? 'Jamais appelé' : REP_CALL_OUTCOME_LABELS[lastCallOutcome];
+}
+
+function varianteDeBadge(
+  status: RepresentantRelation,
+  label: string | null | undefined,
+  effect: string | null,
+  lastCallOutcome: RepCallOutcome | null | undefined,
+  decision: boolean,
+): Variant {
+  if (decision) return RELATION_VARIANTS[status];
+  return varianteDeLEffet(label == null ? (lastCallOutcome ?? null) : effect);
 }
 
 /**
@@ -53,13 +75,8 @@ export function RelationBadge({
   lastCallOutcome?: RepCallOutcome | null;
 }) {
   const decision = label === undefined && lastCallOutcome === undefined;
-  const texte = decision
-    ? REPRESENTANT_RELATION_LABELS[status]
-    : (label ??
-      (lastCallOutcome == null ? 'Jamais appelé' : REP_CALL_OUTCOME_LABELS[lastCallOutcome]));
-  const variant = decision
-    ? RELATION_VARIANTS[status]
-    : varianteDeLEffet(label == null ? (lastCallOutcome ?? null) : effect);
+  const texte = texteDeBadge(status, label, lastCallOutcome, decision);
+  const variant = varianteDeBadge(status, label, effect, lastCallOutcome, decision);
   return (
     <Badge variant={variant}>
       {status === 'AMBASSADEUR' ? <StarIcon className="fill-current" aria-hidden="true" /> : null}

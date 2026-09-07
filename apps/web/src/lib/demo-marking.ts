@@ -1,6 +1,6 @@
 export const DEMO_MODE_HEADER = 'X-Demo-Mode';
 
-export const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
+const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
 
 export function isDemoExport(headers: Headers): boolean {
   return headers.get(DEMO_MODE_HEADER)?.trim().toLowerCase() === 'true';

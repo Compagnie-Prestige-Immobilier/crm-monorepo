@@ -18,6 +18,7 @@ class SecureTokenStore implements TokenStore {
   static const String _userNameKey = 'user_name';
   static const String _userRoleKey = 'user_role';
   static const String _userEmailKey = 'user_email';
+  static const String _userPhoneKey = 'user_phone';
 
   /// Un compte n'a plus de département : la clé ne survit que le temps
   /// d'être effacée des installations qui l'ont écrite.
@@ -66,6 +67,7 @@ class SecureTokenStore implements TokenStore {
     await _storage.delete(key: _userNameKey);
     await _storage.delete(key: _userRoleKey);
     await _storage.delete(key: _userEmailKey);
+    await _storage.delete(key: _userPhoneKey);
     await _storage.delete(key: _legacyUserDepartementKey);
   }
 
@@ -77,14 +79,20 @@ class SecureTokenStore implements TokenStore {
     required String fullName,
     String? role,
     String? email,
+    String? phoneE164,
   }) async {
     await _storage.write(key: _userIdKey, value: userId);
     await _storage.write(key: _userNameKey, value: fullName);
     if (role != null) await _storage.write(key: _userRoleKey, value: role);
     if (email != null) await _storage.write(key: _userEmailKey, value: email);
+    if (phoneE164 != null) {
+      await _storage.write(key: _userPhoneKey, value: phoneE164);
+    }
   }
 
-  Future<({String id, String fullName, String? role, String? email})?>
+  Future<
+    ({String id, String fullName, String? role, String? email, String? phoneE164})?
+  >
   readIdentity() async {
     final String? id = await _storage.read(key: _userIdKey);
     if (id == null) return null;
@@ -94,6 +102,7 @@ class SecureTokenStore implements TokenStore {
       fullName: name,
       role: await _storage.read(key: _userRoleKey),
       email: await _storage.read(key: _userEmailKey),
+      phoneE164: await _storage.read(key: _userPhoneKey),
     );
   }
 }

@@ -34,6 +34,34 @@ export function demoId(key: string): string {
   return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20)}`;
 }
 
+function demoProspectProfil(
+  grandPublic: boolean,
+  banque: { id: string } | null | undefined,
+  syndicat: { id: string } | null | undefined,
+  representant: { id: string } | null | undefined,
+) {
+  if (grandPublic) {
+    return {
+      prenom: 'Grand Public',
+      projet: Projet.GRAND_PUBLIC,
+      type: ProspectType.INFORMEL,
+      profession: 'Activité de démonstration',
+      banqueId: null,
+      syndicatId: null,
+      representantId: null,
+    };
+  }
+  return {
+    prenom: 'CHUES',
+    projet: Projet.CHUES,
+    type: null,
+    profession: null,
+    banqueId: banque?.id ?? null,
+    syndicatId: syndicat?.id ?? null,
+    representantId: representant?.id ?? null,
+  };
+}
+
 export class DemoWorkspaceFactory {
   constructor(private readonly demoDb: PrismaClient) {}
 
@@ -90,14 +118,8 @@ export class DemoWorkspaceFactory {
       return {
         id: demoId(`prospect:${String(index)}`),
         nom: `Prospect Démo ${String(index + 1).padStart(2, '0')}`,
-        prenom: grandPublic ? 'Grand Public' : 'CHUES',
         phoneE164: `+22177020${String(index + 1).padStart(4, '0')}`,
-        projet: grandPublic ? Projet.GRAND_PUBLIC : Projet.CHUES,
-        type: grandPublic ? ProspectType.INFORMEL : null,
-        profession: grandPublic ? 'Activité de démonstration' : null,
-        banqueId: grandPublic ? null : (banque?.id ?? null),
-        syndicatId: grandPublic ? null : (syndicat?.id ?? null),
-        representantId: grandPublic ? null : (representatives[index]?.id ?? null),
+        ...demoProspectProfil(grandPublic, banque, syndicat, representatives[index]),
         createdById: author.id,
         clientCreatedAt: new Date(createdAt.getTime() + index * 3_600_000),
         createdAt: new Date(createdAt.getTime() + index * 3_600_000),

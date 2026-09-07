@@ -48,11 +48,20 @@ export const PHASE2_STATUS_LABELS: Readonly<Record<Phase2Status, string>> = {
   [Phase2Status.WRONG_NUMBER]: 'Mauvais numéro',
 };
 
+/**
+ * EB-24. `PHYSICAL` porte le même libellé qu'`APPOINTMENT` : il est retiré des
+ * méthodes proposées mais reste sur les tentatives déjà enregistrées, que
+ * `ENROLLMENT_METHOD_ORDER` n'énumère plus.
+ */
 export const ENROLLMENT_METHOD_LABELS: Readonly<Record<EnrollmentMethod, string>> = {
-  [EnrollmentMethod.PLATFORM]: 'Plateforme',
-  [EnrollmentMethod.PHYSICAL]: 'Physique',
-  [EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING]: 'Vocal ou messagerie électronique',
-  [EnrollmentMethod.APPOINTMENT]: 'Prise de rendez-vous',
+  [EnrollmentMethod.APPOINTMENT]: 'RDV CPI',
+  [EnrollmentMethod.PHYSICAL]: 'RDV CPI',
+  [EnrollmentMethod.PLATFORM]: 'Plateforme en ligne',
+  [EnrollmentMethod.PLATEFORME_EN_LIGNE]: 'Plateforme en ligne',
+  [EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING]: 'Mail',
+  [EnrollmentMethod.MAIL]: 'Mail',
+  [EnrollmentMethod.WHATSAPP]: 'WhatsApp',
+  [EnrollmentMethod.RDV_CPI]: 'RDV CPI',
 };
 
 export const CALL_OUTCOME_LABELS: Readonly<Record<CallOutcome, string>> = {
@@ -71,9 +80,10 @@ export const PHASE2_STATUS_ORDER: readonly Phase2Status[] = [
   Phase2Status.WRONG_NUMBER,
 ];
 
+/** Ce que les écrans proposent et ce que les répartitions énumèrent. `PHYSICAL` en sort. */
 export const ENROLLMENT_METHOD_ORDER: readonly EnrollmentMethod[] = [
-  EnrollmentMethod.PLATFORM,
-  EnrollmentMethod.PHYSICAL,
-  EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
   EnrollmentMethod.APPOINTMENT,
+  EnrollmentMethod.PLATFORM,
+  EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING,
+  EnrollmentMethod.WHATSAPP,
 ];

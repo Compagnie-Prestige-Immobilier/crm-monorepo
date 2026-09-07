@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-export const MAX_CURSOR_MICROS = 8.64e18;
+const MAX_CURSOR_MICROS = 8.64e18;
 
 const microsSchema = z.number().int().min(0).max(MAX_CURSOR_MICROS);
 

@@ -8,11 +8,8 @@ export type NotificationAudience = Schemas['NotificationAudience'];
 export type NotificationStatus = Schemas['NotificationStatus'];
 export type NotificationDeliveryStatus = Schemas['NotificationDeliveryStatus'];
 
-export type NotificationCounts = Schemas['NotificationDeliveryCountsDto'];
 export type NotificationRow = Schemas['NotificationDto'];
-export type PageMeta = Schemas['PageMetaDto'];
 export type NotificationList = Schemas['NotificationListDto'];
-export type NotificationRecipient = Schemas['NotificationRecipientDto'];
 export type NotificationDetail = Schemas['NotificationDetailDto'];
 export type AudiencePreview = Schemas['AudiencePreviewDto'];
 export type NotificationTemplate = Schemas['NotificationTemplateDto'];
@@ -63,4 +60,5 @@ export const ROLE_LABELS: Record<Role, string> = {
   SUPERVISEUR: 'Supervision',
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
+  CHARGE_CLIENTELE: 'Chargé de clientèle',
 };

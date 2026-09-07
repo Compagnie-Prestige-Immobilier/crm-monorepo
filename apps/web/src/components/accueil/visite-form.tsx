@@ -74,6 +74,71 @@ function validateComment(value: string): string | undefined {
   return undefined;
 }
 
+function validerVisiteForm({
+  visitorName,
+  phone,
+  comment,
+  entrepriseId,
+  objetId,
+  date,
+}: {
+  visitorName: string;
+  phone: string;
+  comment: string;
+  entrepriseId: string | null;
+  objetId: string | null;
+  date: string | null;
+}): Errors {
+  const found: Errors = {};
+  const nomErreur = validateNom(visitorName);
+  if (nomErreur !== undefined) found.visitorName = nomErreur;
+  const phoneErreur = validatePhone(phone);
+  if (phoneErreur !== undefined) found.phone = phoneErreur;
+  const commentErreur = validateComment(comment);
+  if (commentErreur !== undefined) found.comment = commentErreur;
+  if (entrepriseId === null) found.entrepriseId = 'À choisir dans la liste.';
+  if (objetId === null) found.objetId = 'À choisir dans la liste.';
+  // La date effacée par la croix du sélecteur ne remplissait AUCUNE entrée :
+  // le bouton ne faisait rien, sans message, pendant que le visiteur attend.
+  if (date === null) found.date = 'À renseigner.';
+  return found;
+}
+
+function construireVisiteInput({
+  date,
+  visitorName,
+  entrepriseId,
+  objetId,
+  time,
+  phone,
+  directionId,
+  destinataireId,
+  comment,
+}: {
+  date: string;
+  visitorName: string;
+  entrepriseId: string;
+  objetId: string;
+  time: string;
+  phone: string;
+  directionId: string | null;
+  destinataireId: string | null;
+  comment: string;
+}): CreateVisiteInput {
+  const input: CreateVisiteInput = {
+    date,
+    visitorName: visitorName.trim(),
+    entrepriseId,
+    objetId,
+  };
+  if (time !== '') input.time = time;
+  if (phone.trim() !== '') input.phone = phone.trim();
+  if (directionId !== null) input.directionId = directionId;
+  if (destinataireId !== null) input.destinataireId = destinataireId;
+  if (comment.trim() !== '') input.comment = comment.trim();
+  return input;
+}
+
 /** `exactOptionalPropertyTypes` refuse `{ key: undefined }` : la clé doit disparaître, pas valoir vide. */
 function withFieldError(prev: Errors, key: keyof Errors, message: string | undefined): Errors {
   if (message === undefined) {
@@ -81,6 +146,35 @@ function withFieldError(prev: Errors, key: keyof Errors, message: string | undef
     return Object.fromEntries(entries);
   }
   return { ...prev, [key]: message };
+}
+
+type CourantsVisite = {
+  entreprise: VisiteRef | null;
+  direction: VisiteRef | null;
+  destinataire: VisiteRef | null;
+  objet: VisiteRef | null;
+};
+
+// Regroupé pour n'exposer aucun `?.` au corps de VisiteForm : sans visite en
+// correction, chaque champ référentiel repart simplement à vide.
+function courantsDe(visite: Visite | null): CourantsVisite {
+  if (visite === null) {
+    return { entreprise: null, direction: null, destinataire: null, objet: null };
+  }
+  return {
+    entreprise: visite.entreprise,
+    direction: visite.direction ?? null,
+    destinataire: visite.destinataire ?? null,
+    objet: visite.objet,
+  };
+}
+
+function optionsChamp<K extends keyof VisiteReferentiels>(
+  referentiels: VisiteReferentiels | undefined,
+  key: K,
+  courant: VisiteRef | null,
+): FilterOption[] {
+  return options(referentiels?.[key], courant);
 }
 
 function ChoiceError({ message }: { message: string | undefined }): ReactNode {
@@ -185,6 +279,7 @@ export function VisiteForm({
   const [errors, setErrors] = useState<Errors>({});
 
   const correction = visite !== null;
+  const courants = courantsDe(visite);
 
   const save = useMutation({
     mutationFn: (input: CreateVisiteInput) =>
@@ -219,36 +314,24 @@ export function VisiteForm({
   function submit(): void {
     if (save.isPending) return;
 
-    const found: Errors = {};
-    const nomErreur = validateNom(visitorName);
-    if (nomErreur !== undefined) found.visitorName = nomErreur;
-    const phoneErreur = validatePhone(phone);
-    if (phoneErreur !== undefined) found.phone = phoneErreur;
-    const commentErreur = validateComment(comment);
-    if (commentErreur !== undefined) found.comment = commentErreur;
-    if (entrepriseId === null) found.entrepriseId = 'À choisir dans la liste.';
-    if (objetId === null) found.objetId = 'À choisir dans la liste.';
-    // La date effacée par la croix du sélecteur ne remplissait AUCUNE entrée :
-    // le bouton ne faisait rien, sans message, pendant que le visiteur attend.
-    if (date === null) found.date = 'À renseigner.';
-
+    const found = validerVisiteForm({ visitorName, phone, comment, entrepriseId, objetId, date });
     setErrors(found);
     if (entrepriseId === null || objetId === null || date === null) return;
     if (Object.keys(found).length > 0) return;
 
-    const input: CreateVisiteInput = {
-      date,
-      visitorName: visitorName.trim(),
-      entrepriseId,
-      objetId,
-    };
-    if (time !== '') input.time = time;
-    if (phone.trim() !== '') input.phone = phone.trim();
-    if (directionId !== null) input.directionId = directionId;
-    if (destinataireId !== null) input.destinataireId = destinataireId;
-    if (comment.trim() !== '') input.comment = comment.trim();
-
-    save.mutate(input);
+    save.mutate(
+      construireVisiteInput({
+        date,
+        visitorName,
+        entrepriseId,
+        objetId,
+        time,
+        phone,
+        directionId,
+        destinataireId,
+        comment,
+      }),
+    );
   }
 
   return (
@@ -327,7 +410,7 @@ export function VisiteForm({
           <FilterCombobox
             label={VISITE_COLONNES.entreprise}
             placeholder="Choisir"
-            options={options(referentiels?.entreprises, visite?.entreprise ?? null)}
+            options={optionsChamp(referentiels, 'entreprises', courants.entreprise)}
             value={entrepriseId}
             onChange={setEntrepriseId}
             onBlur={() => {
@@ -347,7 +430,7 @@ export function VisiteForm({
         <FilterCombobox
           label={VISITE_COLONNES.direction}
           placeholder="Choisir"
-          options={options(referentiels?.directions, visite?.direction ?? null)}
+          options={optionsChamp(referentiels, 'directions', courants.direction)}
           value={directionId}
           onChange={setDirectionId}
         />
@@ -355,7 +438,7 @@ export function VisiteForm({
         <FilterCombobox
           label={VISITE_COLONNES.destinataire}
           placeholder="Choisir"
-          options={options(referentiels?.destinataires, visite?.destinataire ?? null)}
+          options={optionsChamp(referentiels, 'destinataires', courants.destinataire)}
           value={destinataireId}
           onChange={setDestinataireId}
         />
@@ -364,7 +447,7 @@ export function VisiteForm({
           <FilterCombobox
             label={VISITE_COLONNES.objet}
             placeholder="Choisir"
-            options={options(referentiels?.objets, visite?.objet ?? null)}
+            options={optionsChamp(referentiels, 'objets', courants.objet)}
             value={objetId}
             onChange={setObjetId}
             onBlur={() => {

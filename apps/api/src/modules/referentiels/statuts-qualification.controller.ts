@@ -1,10 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Role } from '@crm/database';
-
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
-import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, ENCADREMENT, Roles } from '../../common/decorators/roles.decorator.js';
 import { Cached } from '../../redis/cache.interceptor.js';
 import { StatutsQualificationService } from './statuts-qualification.service.js';
 import {
@@ -37,7 +35,7 @@ export class StatutsQualificationController {
     return this.statuts.listForField(query.payloadVersion);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Get('administration')
   @ApiOperation({
     operationId: 'listAllStatutsQualification',
@@ -48,7 +46,7 @@ export class StatutsQualificationController {
     return this.statuts.listAll();
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post()
   @ApiOperation({
     operationId: 'createStatutQualification',
@@ -66,7 +64,7 @@ export class StatutsQualificationController {
     return this.statuts.create(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateStatutQualification',
@@ -91,7 +89,7 @@ export class StatutsQualificationController {
     return this.statuts.update(id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post(':id/active')
   @ApiOperation({
     operationId: 'setStatutQualificationActive',

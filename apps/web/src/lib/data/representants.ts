@@ -80,18 +80,19 @@ export function whatsappLabel(script: RepresentantScript): string {
 const startOfDay = (isoDate: string): string => `${isoDate}T00:00:00.000Z`;
 const endOfDay = (isoDate: string): string => `${isoDate}T23:59:59.999Z`;
 
-export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQuery {
-  const query: RepresentantQuery = {
-    page: filters.page,
-    pageSize: filters.pageSize,
-  };
-
+function localisationQuery(filters: RepresentantFilters): Partial<RepresentantQuery> {
+  const query: Partial<RepresentantQuery> = {};
   const search = filters.search.trim();
   if (search !== '') query.search = search;
   if (filters.departementId !== null) query.departementId = filters.departementId;
   if (filters.iefId !== null) query.iefId = filters.iefId;
   if (filters.commercialId !== null) query.commercialId = filters.commercialId;
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);
+  return query;
+}
+
+function critereQuery(filters: RepresentantFilters): Partial<RepresentantQuery> {
+  const query: Partial<RepresentantQuery> = {};
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
   if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects;
   if (filters.relationStatus !== null) query.relationStatus = filters.relationStatus;
@@ -99,11 +100,17 @@ export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQ
     query.statutQualificationId = filters.statutQualificationId;
   }
   if (filters.sortBy !== EMPTY_REPRESENTANT_FILTERS.sortBy) query.sortBy = filters.sortBy;
-  if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) {
-    query.sortOrder = filters.sortDir;
-  }
-
+  if (filters.sortDir !== EMPTY_REPRESENTANT_FILTERS.sortDir) query.sortOrder = filters.sortDir;
   return query;
+}
+
+export function toRepresentantQuery(filters: RepresentantFilters): RepresentantQuery {
+  return {
+    page: filters.page,
+    pageSize: filters.pageSize,
+    ...localisationQuery(filters),
+    ...critereQuery(filters),
+  };
 }
 
 export async function fetchRepresentants(
@@ -221,6 +228,18 @@ export async function fetchRepresentantRelationHistory(
   return payload.items;
 }
 
+export type RepresentantFicheChange = components['schemas']['RepresentantFicheChangeDto'];
+
+export async function fetchRepresentantFicheHistory(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<RepresentantFicheChange[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/representants/{id}/fiche-history', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export async function createRepresentant(
   input: CreateRepresentantInput,
   client: ApiClient = getApiClient(),
@@ -243,13 +262,6 @@ export async function updateRepresentant(
   return unwrap(
     await client.PATCH('/api/v1/representants/{id}', { params: { path: { id } }, body: patch }),
   );
-}
-
-export async function deleteRepresentant(
-  id: string,
-  client: ApiClient = getApiClient(),
-): Promise<void> {
-  unwrap(await client.DELETE('/api/v1/representants/{id}', { params: { path: { id } } }));
 }
 
 export type RepresentantComment = components['schemas']['RepresentantCommentDto'];

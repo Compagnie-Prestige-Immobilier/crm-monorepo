@@ -16,7 +16,7 @@ export interface ImportJobPage {
   pageCount: number;
 }
 
-export const IMPORT_HISTORY_PAGE_SIZE = 10;
+const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: 'Représentants',

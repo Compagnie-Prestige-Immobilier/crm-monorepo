@@ -26,7 +26,7 @@ import { Roles, SYNC_ROLES } from '../../common/decorators/roles.decorator.js';
 import { HeartbeatService } from '../heartbeat/heartbeat.service.js';
 
 /** Palier où les liens banque, syndicat et représentant d’un prospect sont devenus nuls. */
-export const MIN_PULL_PAYLOAD_VERSION = 5;
+const MIN_PULL_PAYLOAD_VERSION = 5;
 
 const UPGRADE_REQUIRED = 426;
 

@@ -390,7 +390,11 @@ CREATE TABLE prospects (
     mode_epargne TEXT,
     pays_residence_id TEXT,
     ville_residence TEXT,
+    -- Le couple de `representants`, aux mêmes règles : sans CHECK, et le numéro
+    -- n'est renseigné que sur `AUTRE_NUMERO`.
+    whatsapp_status TEXT NOT NULL DEFAULT 'NON_DEMANDE',
     whatsapp_e164 TEXT,
+    etablissement TEXT,
     relais_nom TEXT,
     relais_phone_e164 TEXT,
     -- Dernier appel consigné, écrit par le SERVEUR au pull et, hors ligne, par
@@ -1077,9 +1081,12 @@ dernierePreuvePour:
 -- `unixepoch()` et non `>=` sur le texte : les horodatages sont stockés en
 -- ISO-8601 avec leur décalage (voir `build.yaml`), et deux décalages différents
 -- se compareraient dans le désordre. Le seuil voyage donc en secondes UNIX.
-preuvesEnAttente:
+-- Tant qu'aucune tentative ne l'a consommée, une preuve se rapproche encore :
+-- le dernier appel du journal vers ce numéro fait foi, et un sortant avorté
+-- suivi d'un vrai échange se corrige.
+preuvesARapprocher:
     SELECT * FROM preuves_appel
-    WHERE unixepoch(lance_at) >= :seuilSecondes AND journal_at IS NULL
+    WHERE unixepoch(lance_at) >= :seuilSecondes AND attempt_id IS NULL
     ORDER BY lance_at DESC;
 
 -- Une preuve détectée porte `lance_at = journal_at` : elle entre donc dans cette

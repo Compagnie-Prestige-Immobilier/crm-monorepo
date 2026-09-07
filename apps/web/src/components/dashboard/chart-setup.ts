@@ -44,5 +44,3 @@ Chart.register(
   ScatterController,
   Tooltip,
 );
-
-export { Chart };

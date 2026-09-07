@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   ArrayMinSize,
@@ -10,6 +10,7 @@ import {
   IsISO8601,
   IsIn,
   IsInt,
+  IsObject,
   IsOptional,
   IsString,
   IsUUID,
@@ -61,6 +62,7 @@ import {
   DEVICE_CALL_TYPES,
   type DeviceCallType,
 } from '../../common/device-call.js';
+import { queryBoolean } from '../../common/dto/query-boolean.js';
 import {
   DATE_PATTERN as VISITE_DATE_PATTERN,
   TIME_PATTERN as VISITE_TIME_PATTERN,
@@ -69,9 +71,9 @@ import {
   VisiteReferentielRefDto,
 } from '../visites/dto.js';
 
-export const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
+const SYNC_MAX_BATCH_SIZE = Number(process.env.SYNC_MAX_BATCH_SIZE ?? 200) || 200;
 
-export const SYNC_MAX_DEPENDENCY_GROUPS = 25;
+const SYNC_MAX_DEPENDENCY_GROUPS = 25;
 
 export enum SyncEntity {
   REPRESENTANT = 'representant',
@@ -96,7 +98,7 @@ export enum SyncOpStatus {
   SKIPPED_DEPENDENCY_FAILED = 'skipped_dependency_failed',
 }
 
-export const CLEARABLE_FIELDS = [
+const CLEARABLE_FIELDS = [
   'iefId',
   'notes',
   'whatsappE164',
@@ -116,8 +118,6 @@ export const CLEARABLE_FIELDS = [
   'syndicatId',
   'representantId',
 ] as const;
-
-export type ClearableField = (typeof CLEARABLE_FIELDS)[number];
 
 export class SyncEntityDataDto {
   @ApiPropertyOptional({ maxLength: 160, description: 'Représentant : nom complet.' })
@@ -623,6 +623,17 @@ export class SyncEntityDataDto {
   @IsOptional()
   @IsUUID()
   destinataireId?: string;
+
+  @ApiPropertyOptional({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par ' +
+      'l’administrateur, par identifiant de champ.',
+  })
+  @IsOptional()
+  @IsObject()
+  champsLibres?: Record<string, string>;
 }
 
 export class SyncOperationDto {
@@ -695,7 +706,7 @@ export class SyncOperationDto {
 }
 
 @ValidatorConstraint({ name: 'maxDependencyGroups', async: false })
-export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
+class MaxDependencyGroupsConstraint implements ValidatorConstraintInterface {
   validate(operations: unknown): boolean {
     if (!Array.isArray(operations)) return true;
     const groups = new Set<string>();
@@ -710,38 +721,54 @@ export class MaxDependencyGroupsConstraint implements ValidatorConstraintInterfa
   }
 }
 
-export function dependencyKeyOf(operation: {
-  entity: SyncEntity;
+type DependencyOperation = {
   entityId: string;
   data?: { representantId?: string; prospectId?: string } | undefined;
-}): string {
-  if (operation.entity === SyncEntity.REPRESENTANT) return `representant:${operation.entityId}`;
+};
 
-  if (operation.entity === SyncEntity.REPRESENTANT_COMMENT) {
-    return `representant:${operation.data?.representantId ?? operation.entityId}`;
-  }
+function representantCommentDependencyKey(operation: DependencyOperation): string {
+  return `representant:${operation.data?.representantId ?? operation.entityId}`;
+}
 
-  if (operation.entity === SyncEntity.CALL_ATTEMPT) {
-    return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
-  }
+function callAttemptDependencyKey(operation: DependencyOperation): string {
+  return `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+}
 
-  // Une visite ne dépend de rien : chaque inscription est sa propre partition.
-  if (operation.entity === SyncEntity.VISITE) {
-    return `visite:${operation.entityId}`;
-  }
+/**
+ * Un appel détecté suit SA fiche, comme la tentative qui le consignera. Le
+ * laisser tomber dans le repli lui donnerait une partition par appel, et une
+ * session d'appels dépasserait seule la limite de groupes du lot.
+ */
+function appelDetecteDependencyKey(operation: DependencyOperation): string {
+  const fiche = operation.data?.representantId;
+  return fiche
+    ? `representant:${fiche}`
+    : `prospect:${operation.data?.prospectId ?? operation.entityId}`;
+}
 
-  // Un appel détecté suit SA fiche, comme la tentative qui le consignera. Le
-  // laisser tomber dans le repli lui donnerait une partition par appel, et une
-  // session d'appels dépasserait seule la limite de groupes du lot.
-  if (operation.entity === SyncEntity.APPEL_DETECTE) {
-    const fiche = operation.data?.representantId;
-    return fiche
-      ? `representant:${fiche}`
-      : `prospect:${operation.data?.prospectId ?? operation.entityId}`;
-  }
-
+function representantOrEntityKey(operation: DependencyOperation): string {
   const parent = operation.data?.representantId;
   return parent ? `representant:${parent}` : `prospect:${operation.entityId}`;
+}
+
+export function dependencyKeyOf(
+  operation: DependencyOperation & { entity: SyncEntity },
+): string {
+  switch (operation.entity) {
+    case SyncEntity.REPRESENTANT:
+      return `representant:${operation.entityId}`;
+    case SyncEntity.REPRESENTANT_COMMENT:
+      return representantCommentDependencyKey(operation);
+    case SyncEntity.CALL_ATTEMPT:
+      return callAttemptDependencyKey(operation);
+    // Une visite ne dépend de rien : chaque inscription est sa propre partition.
+    case SyncEntity.VISITE:
+      return `visite:${operation.entityId}`;
+    case SyncEntity.APPEL_DETECTE:
+      return appelDetecteDependencyKey(operation);
+    default:
+      return representantOrEntityKey(operation);
+  }
 }
 
 export class SyncPushDto {
@@ -792,6 +819,16 @@ export class SyncPushDto {
   @IsString()
   @MaxLength(32)
   appVersion?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description:
+      'Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de ' +
+      'communication n’est jamais relevée. Facultatif sans limite de temps.',
+  })
+  @IsOptional()
+  @IsBoolean()
+  journalAppelsAutorise?: boolean;
 }
 
 export class SyncOperationResultDto {
@@ -876,6 +913,15 @@ export class SyncPullQueryDto {
   @IsString()
   @MaxLength(32)
   appVersion?: string;
+
+  @ApiPropertyOptional({
+    type: Boolean,
+    description: 'Lecture du journal d’appels accordée sur l’appareil. Facultatif.',
+  })
+  @IsOptional()
+  @Transform(queryBoolean)
+  @IsBoolean()
+  journalAppelsAutorise?: boolean;
 }
 
 /**

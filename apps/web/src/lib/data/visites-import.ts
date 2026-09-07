@@ -9,12 +9,11 @@ type Schemas = components['schemas'];
 
 export type VisitesImportJob = Schemas['ImportJobDto'];
 export type VisitesImportChange = Schemas['VisiteImportChangeDto'];
-export type VisitesImportChangeField = Schemas['VisiteImportChangeFieldDto'];
 
 /** Aligné sur `IMPORTS_MAX_BYTES` de l'API : refuser ici évite un 413. */
 export const VISITES_IMPORT_MAX_BYTES = 25 * 1024 * 1024;
 
-export const VISITES_IMPORT_REVUE_PAGE_SIZE = 50;
+const VISITES_IMPORT_REVUE_PAGE_SIZE = 50;
 
 export interface VisitesExportFilters {
   from: string | null;
@@ -25,16 +24,6 @@ export interface VisitesExportFilters {
   objetId: string | null;
   search: string;
 }
-
-export const EMPTY_VISITES_EXPORT_FILTERS: VisitesExportFilters = {
-  from: null,
-  to: null,
-  entrepriseId: null,
-  directionId: null,
-  destinataireId: null,
-  objetId: null,
-  search: '',
-};
 
 export function buildVisitesExportUrl(filters: VisitesExportFilters): string {
   const params = new URLSearchParams();

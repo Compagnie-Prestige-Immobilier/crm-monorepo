@@ -25,13 +25,25 @@ export interface DispositionWidget {
 }
 
 export interface DispositionLayout {
-  version: 1;
+  version: 2;
   preset: DashboardPreset;
   widgets: DispositionWidget[];
 }
 
-const LAYOUT_VERSION = 1;
+const LAYOUT_VERSION = 2;
 const MAX_WIDGETS = 40;
+
+/**
+ * Version 1 : ces trois clés mesuraient par tentative sous d'autres noms.
+ * `taux-de-contact` et `taux-de-qualification` existent toujours en version 2,
+ * avec le sens de l'expression de besoins (EB-33) : relire une version 1 sans
+ * cette table les afficherait avec un autre chiffre.
+ */
+const RENOMMAGES_V1: Readonly<Record<string, DashboardSource>> = {
+  'taux-de-contact': 'taux-de-joignabilite-representants',
+  'taux-de-qualification': 'taux-d-acceptation',
+  'a-rappeler': 'taux-de-rappel',
+};
 
 const MARQUE_SET = new Set<string>(DASHBOARD_MARQUES);
 const PRESET_SET = new Set<string>(DASHBOARD_PRESETS);
@@ -113,14 +125,27 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   },
 
   'taux-de-contact': TAUX,
-  'a-rappeler': TAUX,
-  'taux-de-qualification': TAUX,
+  'taux-de-joignabilite-representants': TAUX,
+  'taux-d-acceptation': TAUX,
+  'taux-de-rappel': TAUX,
   'repartition-statuts-qualification': CLASSEMENT,
+  'joints-non-joints': { defaut: 'barres-verticales', compatibles: CATEGORIE_MARQUES },
+  'statuts-par-famille': { defaut: 'barres-empilees', compatibles: COMPOSITION_MARQUES },
+  'joignabilite-par-creneau': MATRICE,
+  'taux-d-exploitation': { defaut: 'camembert', compatibles: COMPOSITION_MARQUES },
+  'representants-par-departement': CLASSEMENT,
+  'representants-par-ief': CLASSEMENT,
+  'representants-jamais-appeles': CHIFFRE,
+  'representants-injoignables': CHIFFRE,
   'taux-de-joignabilite': TAUX,
   'prospects-notes': { defaut: 'tuile', compatibles: CHIFFRE_MARQUES },
   adhesions: CHIFFRE,
   'reste-a-appeler': { defaut: 'tuile', compatibles: ['tuile'] },
   'fiches-ouvertes': MATRICE,
+  'taux-de-qualification': TAUX,
+  'duree-moyenne-sur-la-fiche': CHIFFRE,
+  'duree-moyenne-de-communication': CHIFFRE,
+  'appels-par-jour': { defaut: 'courbe', compatibles: SERIE_TEMPORELLE_MARQUES },
   'par-teleconseiller': { defaut: 'tableau', compatibles: ['tableau'] },
   'couverture-derniere-campagne': {
     defaut: 'barres-100',
@@ -142,23 +167,31 @@ const SOURCE_MARQUES: Record<DashboardSource, ReglesDeMarque> = {
   'enrolement-par-teleconseiller': CLASSEMENT,
 };
 
+function palettePresentation(value: unknown): DispositionPresentation['palette'] {
+  if (typeof value !== 'string' || !PALETTES.has(value)) return undefined;
+  return value as 'neutre' | 'serie' | 'categorielle';
+}
+
+function triPresentation(value: unknown): DispositionPresentation['tri'] {
+  if (typeof value !== 'string' || !TRIS.has(value)) return undefined;
+  return value as 'valeur-desc' | 'valeur-asc' | 'alphabetique';
+}
+
+function autresApresPresentation(value: unknown): number | undefined {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < 1) return undefined;
+  return value;
+}
+
 function toPresentation(raw: Record<string, unknown>): DispositionPresentation | undefined {
   const presentation: DispositionPresentation = {};
-  if (typeof raw.palette === 'string' && PALETTES.has(raw.palette)) {
-    presentation.palette = raw.palette as 'neutre' | 'serie' | 'categorielle';
-  }
+  const palette = palettePresentation(raw.palette);
+  if (palette !== undefined) presentation.palette = palette;
   if (typeof raw.valeurs === 'boolean') presentation.valeurs = raw.valeurs;
   if (typeof raw.legende === 'boolean') presentation.legende = raw.legende;
-  if (typeof raw.tri === 'string' && TRIS.has(raw.tri)) {
-    presentation.tri = raw.tri as 'valeur-desc' | 'valeur-asc' | 'alphabetique';
-  }
-  if (
-    typeof raw.autresApres === 'number' &&
-    Number.isInteger(raw.autresApres) &&
-    raw.autresApres >= 1
-  ) {
-    presentation.autresApres = raw.autresApres;
-  }
+  const tri = triPresentation(raw.tri);
+  if (tri !== undefined) presentation.tri = tri;
+  const autresApres = autresApresPresentation(raw.autresApres);
+  if (autresApres !== undefined) presentation.autresApres = autresApres;
   return Object.keys(presentation).length === 0 ? undefined : presentation;
 }
 
@@ -174,26 +207,55 @@ function toWidget(raw: Record<string, unknown>): DispositionWidget | null {
   return widget;
 }
 
+function resolvePreset(record: Record<string, unknown>): DashboardPreset {
+  if (typeof record.preset === 'string' && PRESET_SET.has(record.preset)) {
+    return record.preset as DashboardPreset;
+  }
+  return 'essentiel';
+}
+
+function widgetDepuisBrut(raw: unknown, version: unknown): DispositionWidget | null {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const widget = toWidget(raw as Record<string, unknown>);
+  if (widget === null) return null;
+  if (version === 1) widget.source = RENOMMAGES_V1[widget.source] ?? widget.source;
+  return widget;
+}
+
 /** Rend `null` sur une version inconnue ou une forme qui ne tient pas : le repli prend le relais. */
-export function parseLayout(value: unknown): DispositionLayout | null {
+function parseLayout(value: unknown): DispositionLayout | null {
   if (typeof value !== 'object' || value === null) return null;
   const record = value as Record<string, unknown>;
-  if (record.version !== LAYOUT_VERSION) return null;
+  if (record.version !== LAYOUT_VERSION && record.version !== 1) return null;
   if (!Array.isArray(record.widgets)) return null;
 
-  const preset =
-    typeof record.preset === 'string' && PRESET_SET.has(record.preset)
-      ? (record.preset as DashboardPreset)
-      : 'essentiel';
-
+  const preset = resolvePreset(record);
   const widgets: DispositionWidget[] = [];
   for (const raw of record.widgets as unknown[]) {
-    if (typeof raw !== 'object' || raw === null) continue;
-    const widget = toWidget(raw as Record<string, unknown>);
+    const widget = widgetDepuisBrut(raw, record.version);
     if (widget !== null) widgets.push(widget);
   }
 
-  return { version: 1, preset, widgets };
+  return { version: LAYOUT_VERSION, preset, widgets };
+}
+
+function marqueRetenue(
+  rules: ReglesDeMarque,
+  marque: DashboardMarque | undefined,
+): DashboardMarque {
+  if (marque === undefined) return rules.defaut;
+  if (!MARQUE_SET.has(marque)) return rules.defaut;
+  if (!rules.compatibles.includes(marque)) return rules.defaut;
+  return marque;
+}
+
+function widgetNettoye(widget: DispositionWidget, marque: DashboardMarque): DispositionWidget {
+  return {
+    source: widget.source,
+    marque,
+    ...(widget.taille === undefined ? {} : { taille: widget.taille }),
+    ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
+  };
 }
 
 /**
@@ -216,19 +278,8 @@ export function sanitize(
     seen.add(widget.source);
 
     const rules = SOURCE_MARQUES[widget.source];
-    const marque =
-      widget.marque !== undefined &&
-      MARQUE_SET.has(widget.marque) &&
-      rules.compatibles.includes(widget.marque)
-        ? widget.marque
-        : rules.defaut;
-
-    cleaned.push({
-      source: widget.source,
-      marque,
-      ...(widget.taille === undefined ? {} : { taille: widget.taille }),
-      ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
-    });
+    const marque = marqueRetenue(rules, widget.marque);
+    cleaned.push(widgetNettoye(widget, marque));
 
     if (cleaned.length >= MAX_WIDGETS) break;
   }
@@ -251,13 +302,12 @@ export function resolveLayout(
   const widgets = sanitize(ecran, parsed.widgets);
   // Un compte peut vouloir un écran vide ; une disposition par défaut vide retombe sur l'usine.
   if (widgets.length === 0 && !options.videAutorise) return null;
-  return { version: 1, preset: parsed.preset, widgets };
+  return { version: LAYOUT_VERSION, preset: parsed.preset, widgets };
 }
 
 /**
- * Ce qu'un compte voit à sa première ouverture : une ligne de taux, le tableau
- * par téléconseiller dessous. Courte à dessein, et tout y est déplaçable et
- * retirable comme le reste.
+ * Ce qu'un compte voit à sa première ouverture, en lignes pleines sur la
+ * grille de quatre colonnes : quatre tuiles, deux graphiques, puis les tableaux.
  */
 type WidgetUsine = DashboardSource | DispositionWidget;
 
@@ -273,40 +323,47 @@ const USINE: Record<DashboardEcran, readonly WidgetUsine[]> = {
   ],
   chues: [
     'taux-de-contact',
-    'a-rappeler',
+    'taux-de-joignabilite-representants',
+    'taux-d-acceptation',
     'taux-de-qualification',
-    'adhesions',
-    {
-      source: 'repartition-statuts-qualification',
-      taille: 'pleine',
-      presentation: { valeurs: true },
-    },
+    { source: 'taux-d-exploitation', marque: 'camembert', taille: 'pleine' },
+    { source: 'repartition-statuts-qualification', marque: 'camembert', taille: 'pleine' },
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'rendement-par-departement',
   ],
   'grand-public': [
     'taux-de-joignabilite',
+    'taux-de-qualification',
     'prospects-notes',
     'adhesions',
     'par-teleconseiller',
     { source: 'fiches-ouvertes', taille: 'pleine' },
+    'couverture-derniere-campagne',
+    'hors-attribution-derniere-campagne',
+    'methodes-d-adhesion',
   ],
 };
 
-/** Ce que la direction voit EN PLUS, ajouté après le tableau d'équipe : le résultat. */
-const USINE_DIRECTION: Record<DashboardEcran, readonly DashboardSource[]> = {
+/**
+ * Ce que la direction voit EN PLUS. EB-32 a déplacé campagne/rendement dans
+ * `USINE` (visibles aussi en supervision) ; ce bloc ne garde que le reste.
+ */
+const USINE_DIRECTION: Record<DashboardEcran, readonly WidgetUsine[]> = {
   visites: [],
   chues: [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
     'encaisse',
+    'taux-de-rappel',
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
     'de-l-appel-a-l-encaissement',
-    'rendement-par-departement',
   ],
   'grand-public': [
-    'couverture-derniere-campagne',
-    'hors-attribution-derniere-campagne',
-    'encaisse',
+    { source: 'encaisse', taille: 'demi' },
+    'duree-moyenne-de-communication',
+    'duree-moyenne-sur-la-fiche',
     'de-l-appel-a-l-encaissement',
     'methodes-d-adhesion',
   ],
@@ -322,7 +379,7 @@ export function dispositionUsine(
 ): DispositionLayout {
   const sources = voitLesMontants ? [...USINE[ecran], ...USINE_DIRECTION[ecran]] : USINE[ecran];
   return {
-    version: 1,
+    version: LAYOUT_VERSION,
     preset: 'essentiel',
     widgets: sanitize(ecran, sources.map(widgetUsine)),
   };

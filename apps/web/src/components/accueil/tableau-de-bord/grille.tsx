@@ -4,7 +4,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCenter,
   useSensor,
   useSensors,
@@ -18,6 +19,7 @@ import {
   rectSortingStrategy,
   sortableKeyboardCoordinates,
 } from '@dnd-kit/sortable';
+import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
 import { CarteWidget } from '@/components/accueil/tableau-de-bord/carte-widget';
@@ -43,6 +45,7 @@ import {
   BarresVerticalesChart,
   BullesChart,
   CamembertChart,
+  paletteFill,
   CarteDeChaleurTable,
   CourbeChart,
   EscalierChart,
@@ -56,6 +59,7 @@ import {
   TuileWidget,
 } from '@/components/dashboard/visites-charts';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { useChartTheme } from '@/lib/chart-theme';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
 type Presentation = DashboardWidget['presentation'];
@@ -103,61 +107,159 @@ function marqueComposition(
   titre: string,
   presentation: Presentation,
   messageVide: string,
+  ouvrir?: (id: string) => void,
 ): ReactNode {
   const items = lignes[0]?.segments ?? [];
-  if (items.every((item) => item.value === 0)) return <EmptyChart message={messageVide} />;
+  if (lignes.every((ligne) => ligne.segments.every((item) => item.value === 0)))
+    return <EmptyChart message={messageVide} />;
   if (marque === 'barres-empilees')
     return <BarresEmpileesChart lignes={lignes} presentation={presentation} />;
-  if (marque === 'anneau') return <AnneauChart items={items} presentation={presentation} />;
-  if (marque === 'camembert') return <CamembertChart items={items} presentation={presentation} />;
+  if (marque === 'anneau' || marque === 'camembert')
+    return (
+      <PetitsMultiples
+        lignes={lignes}
+        marque={marque}
+        presentation={presentation}
+        ouvrir={ouvrir}
+      />
+    );
   if (marque === 'tableau') return <TableauWidget items={items} entete={titre} caption={titre} />;
   return <Barres100Chart lignes={lignes} presentation={presentation} />;
 }
+
+/** EB-34 : un diagramme circulaire PAR ligne (une campagne), une seule légende, la carte grandit avec eux. */
+function PetitsMultiples({
+  lignes,
+  marque,
+  presentation,
+  ouvrir,
+}: {
+  lignes: DonneeDe<'composition'>;
+  marque: 'anneau' | 'camembert';
+  presentation: Presentation;
+  ouvrir?: ((id: string) => void) | undefined;
+}) {
+  const theme = useChartTheme();
+  const Diagramme = marque === 'anneau' ? AnneauChart : CamembertChart;
+  const sansLegende = { ...presentation, legende: false };
+  return (
+    <div className="flex flex-col gap-3 pb-3">
+      <ul
+        className="flex flex-wrap gap-3 text-[0.8125rem] text-muted-foreground"
+        aria-label="Légende"
+      >
+        {(lignes[0]?.segments ?? []).map((segment, index) => (
+          <li key={segment.id} className="flex items-center gap-1.5">
+            <span
+              aria-hidden="true"
+              className="size-2.5 rounded-full"
+              style={{ backgroundColor: paletteFill(theme, presentation?.palette, index) }}
+            />
+            {segment.label}
+          </li>
+        ))}
+      </ul>
+      <div className="grid auto-rows-[13rem] grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+        {lignes.map((ligne) => {
+          const id = ligne.id;
+          return (
+            <figure key={id ?? ligne.ligne} className="flex min-h-0 flex-col gap-1">
+              <div className="min-h-0 flex-1">
+                <Diagramme
+                  items={ligne.segments}
+                  presentation={sansLegende}
+                  onSelect={
+                    ouvrir === undefined || id === undefined
+                      ? undefined
+                      : () => {
+                          ouvrir(id);
+                        }
+                  }
+                />
+              </div>
+              <figcaption className="text-center">
+                <span className="line-clamp-2 text-[0.8125rem] font-[600]">{ligne.ligne}</span>
+                {ligne.detail === undefined ? null : (
+                  <span className="block truncate text-[0.75rem] text-muted-foreground">
+                    {ligne.detail}
+                  </span>
+                )}
+              </figcaption>
+            </figure>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+type SerieContext = {
+  items: DonneeDe<'classement'>;
+  presentation: Presentation;
+  titre: string;
+  onSelect: ((index: number) => void) | undefined;
+};
+
+const RENDUS_SERIE: Partial<Record<DashboardMarque, (ctx: SerieContext) => ReactNode>> = {
+  'barres-horizontales': ({ items, presentation }) => (
+    <BarresHorizontalesChart items={items} presentation={presentation} />
+  ),
+  'barres-groupees': ({ items, presentation }) => (
+    <BarresGroupeesChart items={items} presentation={presentation} />
+  ),
+  courbe: ({ items, presentation }) => <CourbeChart items={items} presentation={presentation} />,
+  aire: ({ items, presentation }) => <AireChart items={items} presentation={presentation} />,
+  escalier: ({ items, presentation }) => (
+    <EscalierChart items={items} presentation={presentation} />
+  ),
+  anneau: ({ items, presentation, onSelect }) => (
+    <AnneauChart items={items} presentation={presentation} onSelect={onSelect} />
+  ),
+  camembert: ({ items, presentation, onSelect }) => (
+    <CamembertChart items={items} presentation={presentation} onSelect={onSelect} />
+  ),
+  'aire-polaire': ({ items, presentation }) => (
+    <AirePolaireChart items={items} presentation={presentation} />
+  ),
+  radar: ({ items, presentation }) => <RadarChart items={items} presentation={presentation} />,
+  mixte: ({ items, presentation }) => <MixteChart items={items} presentation={presentation} />,
+  tableau: ({ items, titre }) => <TableauWidget items={items} entete={titre} caption={titre} />,
+};
 
 function marqueSerie(
   items: DonneeDe<'classement'>,
   marque: DashboardMarque | undefined,
   titre: string,
   presentation: Presentation,
+  ouvrir?: (id: string) => void,
 ): ReactNode {
-  switch (marque) {
-    case 'barres-horizontales':
-      return <BarresHorizontalesChart items={items} presentation={presentation} />;
-    case 'barres-groupees':
-      return <BarresGroupeesChart items={items} presentation={presentation} />;
-    case 'courbe':
-      return <CourbeChart items={items} presentation={presentation} />;
-    case 'aire':
-      return <AireChart items={items} presentation={presentation} />;
-    case 'escalier':
-      return <EscalierChart items={items} presentation={presentation} />;
-    case 'anneau':
-      return <AnneauChart items={items} presentation={presentation} />;
-    case 'camembert':
-      return <CamembertChart items={items} presentation={presentation} />;
-    case 'aire-polaire':
-      return <AirePolaireChart items={items} presentation={presentation} />;
-    case 'radar':
-      return <RadarChart items={items} presentation={presentation} />;
-    case 'mixte':
-      return <MixteChart items={items} presentation={presentation} />;
-    case 'tableau':
-      return <TableauWidget items={items} entete={titre} caption={titre} />;
-    case 'barres-verticales':
-    default:
-      return <BarresVerticalesChart items={items} presentation={presentation} />;
-  }
+  const onSelect =
+    ouvrir === undefined
+      ? undefined
+      : (index: number): void => {
+          const item = items[index];
+          if (item !== undefined) ouvrir(item.id);
+        };
+  const rendu = marque === undefined ? undefined : RENDUS_SERIE[marque];
+  if (rendu === undefined)
+    return <BarresVerticalesChart items={items} presentation={presentation} />;
+  return rendu({ items, presentation, titre, onSelect });
 }
 
-export function renderMark(
+function libelleSource(catalogue: Catalogue, source: string): string {
+  return catalogue[source]?.label ?? source;
+}
+
+function renderMark(
   source: string,
   marque: DashboardMarque | undefined,
   donnees: DonneesSource,
   presentation: Presentation,
   catalogue: Catalogue = SOURCES,
   messageVide = 'Aucune visite sur la période.',
+  ouvrir?: (id: string) => void,
 ): ReactNode {
-  const titre = catalogue[source]?.label ?? source;
+  const titre = libelleSource(catalogue, source);
 
   if (donnees.forme === 'equipe') return <TableauEquipe donnee={donnees.donnee} caption={titre} />;
   if (donnees.forme === 'scalaire') return marqueScalaire(donnees.donnee, marque, titre);
@@ -165,7 +267,7 @@ export function renderMark(
   if (donnees.forme === 'matrice')
     return marqueMatrice(donnees.donnee, marque, titre, presentation, messageVide);
   if (donnees.forme === 'composition')
-    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide);
+    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide, ouvrir);
 
   // Le tri et le regroupement en « Autres » n'ont de sens que pour un
   // classement : réordonner une série chronologique ou un cycle la rendrait
@@ -174,7 +276,7 @@ export function renderMark(
     donnees.forme === 'classement'
       ? appliquerPresentation(donnees.donnee, presentation)
       : donnees.donnee;
-  return marqueSerie(items, marque, titre, presentation);
+  return marqueSerie(items, marque, titre, presentation, ouvrir);
 }
 
 /** dnd-kit ne traduit rien par défaut : ces textes seraient sinon lus en anglais. */
@@ -222,11 +324,15 @@ export function WidgetGrid({
   onRemove: (id: string) => void;
   onMove: (id: string, direction: -1 | 1) => void;
   onChangeMarque: (id: string, marque: DashboardMarque) => void;
-  onChangeTaille: (id: string, taille: DashboardTaille) => void;
+  onChangeTaille: (id: string, taille: DashboardTaille | undefined) => void;
   onChangePresentation: (id: string, presentation: DispositionPresentation) => void;
 }) {
+  // Souris et tactile séparés : un PointerSensor unique capte le `pointerdown`
+  // du doigt avant tout `touchstart` et le glissement partirait au premier pixel
+  // de défilement de la tablette.
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(MouseSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 220, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -237,6 +343,7 @@ export function WidgetGrid({
   };
 
   const [activeId, setActiveId] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleDragStart = (event: DragStartEvent): void => {
     setActiveId(String(event.active.id));
@@ -251,6 +358,7 @@ export function WidgetGrid({
 
   const cards = widgets.map((widget, index) => {
     const source = donnees.get(widget.id);
+    const lien = catalogue[widget.source]?.lien;
     return (
       <CarteWidget
         key={widget.id}
@@ -288,13 +396,18 @@ export function WidgetGrid({
               widget.presentation,
               catalogue,
               messageVide,
+              lien === undefined
+                ? undefined
+                : (id) => {
+                    router.push(lien(id));
+                  },
             )}
       </CarteWidget>
     );
   });
 
   if (!editing) {
-    return <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
+    return <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>;
   }
 
   return (
@@ -309,7 +422,7 @@ export function WidgetGrid({
       }}
     >
       <SortableContext items={widgets.map((widget) => widget.id)} strategy={rectSortingStrategy}>
-        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
+        <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
       </SortableContext>
       {/* Aperçu sans canevas : déplacer une carte contenant un graphique vivant
           déclenche la boucle de redimensionnement de Chart.js. */}

@@ -1,5 +1,6 @@
 import {
   readEnum,
+  readFrenchBoolean,
   readIsoDate,
   readPositiveInt,
   readString,
@@ -38,6 +39,7 @@ export const EMPTY_FILTERS: ProspectFilters = {
   phase2Status: null,
   enrollmentMethod: null,
   enrollmentCapturedById: null,
+  revue: null,
   dateFrom: null,
   dateTo: null,
   page: 1,
@@ -77,6 +79,7 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     phase2Status: readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES),
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
     enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
+    revue: readFrenchBoolean(params, 'revue'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
     page: readPositiveInt(params, 'page', 1),
@@ -106,6 +109,7 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('phase2Status', filters.phase2Status);
   put('enrollmentMethod', filters.enrollmentMethod);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
+  if (filters.revue !== null) put('revue', filters.revue ? 'oui' : 'non');
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
   if (filters.page !== 1) put('page', String(filters.page));
@@ -130,21 +134,10 @@ export const ADVANCED_FILTER_KEYS = [
   'phase2Status',
   'enrollmentMethod',
   'enrollmentCapturedById',
+  'revue',
 ] as const;
 
 export type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
-
-export function activeAdvancedKeys(filters: ProspectFilters): AdvancedFilterKey[] {
-  return ADVANCED_FILTER_KEYS.filter((key) => filters[key] !== null);
-}
-
-export function countAdvancedFilters(filters: ProspectFilters): number {
-  return activeAdvancedKeys(filters).length;
-}
-
-export function hasAdvancedFilters(filters: ProspectFilters): boolean {
-  return ADVANCED_FILTER_KEYS.some((key) => filters[key] !== null);
-}
 
 export function clearAdvancedFilters(): Partial<ProspectFilters> {
   return {
@@ -157,11 +150,8 @@ export function clearAdvancedFilters(): Partial<ProspectFilters> {
     phase2Status: null,
     enrollmentMethod: null,
     enrollmentCapturedById: null,
+    revue: null,
   } satisfies Record<AdvancedFilterKey, null>;
-}
-
-export function initialAdvancedOpen(filters: ProspectFilters, stored: boolean | null): boolean {
-  return advancedOpenFrom(hasAdvancedFilters(filters), stored);
 }
 
 export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): boolean {
@@ -170,18 +160,20 @@ export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): 
 }
 
 export function countActiveFilters(filters: ProspectFilters): number {
-  let count = 0;
-  if (filters.search.trim() !== '') count += 1;
-  if (filters.commercialId !== null) count += 1;
-  if (filters.representantId !== null) count += 1;
-  if (filters.departementId !== null) count += 1;
-  if (filters.banqueId !== null) count += 1;
-  if (filters.syndicatId !== null) count += 1;
-  if (filters.statut !== null) count += 1;
-  if (filters.segment !== null) count += 1;
-  if (filters.phase2Status !== null) count += 1;
-  if (filters.enrollmentMethod !== null) count += 1;
-  if (filters.enrollmentCapturedById !== null) count += 1;
-  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
-  return count;
+  const filtresActifs = [
+    filters.search.trim() !== '',
+    filters.commercialId !== null,
+    filters.representantId !== null,
+    filters.departementId !== null,
+    filters.banqueId !== null,
+    filters.syndicatId !== null,
+    filters.statut !== null,
+    filters.segment !== null,
+    filters.phase2Status !== null,
+    filters.enrollmentMethod !== null,
+    filters.enrollmentCapturedById !== null,
+    filters.revue !== null,
+    filters.dateFrom !== null || filters.dateTo !== null,
+  ];
+  return filtresActifs.filter(Boolean).length;
 }

@@ -48,6 +48,15 @@ const ETAT_LABELS: Record<LotExportFicheEtat, string> = {
 /** Une fiche traitée ne se déplace pas : le travail resterait au compteur d'un autre. */
 const deplacable = (fiche: LotExportFiche): boolean => fiche.etat === 'NON_TRAITEE';
 
+function buildFiltres(page: number, teleconseillerId: string, etat: string) {
+  return {
+    page,
+    pageSize: PAGE_SIZE,
+    ...(teleconseillerId === TOUS ? {} : { teleconseillerId }),
+    ...(etat === TOUS ? {} : { etat: etat as LotExportFicheEtat }),
+  };
+}
+
 const ficheHref = (fiche: LotExportFiche, cible: LotExportDetail['cible']): string | null => {
   if (fiche.ficheId === null) return null;
   return cible === 'PROSPECTS'
@@ -69,12 +78,7 @@ export function LotExportFiches({
   const [cochees, setCochees] = useState<readonly number[]>([]);
   const [vers, setVers] = useState<string>(TOUS);
 
-  const filtres = {
-    page,
-    pageSize: PAGE_SIZE,
-    ...(teleconseillerId === TOUS ? {} : { teleconseillerId }),
-    ...(etat === TOUS ? {} : { etat: etat as LotExportFicheEtat }),
-  };
+  const filtres = buildFiltres(page, teleconseillerId, etat);
   const fiches = useQuery({
     queryKey: queryKeys.lotsExportFiches(lot.id, filtres),
     queryFn: () => fetchLotExportFiches(lot.id, filtres),
@@ -149,89 +153,130 @@ export function LotExportFiches({
           />
         </div>
 
-        {peutReaffecter && cochees.length > 0 ? (
-          <BandeauReaffectation
-            equipe={equipe}
-            nombre={cochees.length}
-            vers={vers}
-            pending={reaffectation.isPending}
-            onVers={setVers}
-            onAttribuer={() => {
-              reaffectation.mutate();
-            }}
-          />
-        ) : null}
+        <BandeauReaffectation
+          visible={peutReaffecter}
+          equipe={equipe}
+          nombre={cochees.length}
+          vers={vers}
+          pending={reaffectation.isPending}
+          onVers={setVers}
+          onAttribuer={() => {
+            reaffectation.mutate();
+          }}
+        />
 
-        {fiches.isPending ? <Skeleton className="h-64 rounded-lg" /> : null}
+        <EtatChargement isPending={fiches.isPending} isSuccess={fiches.isSuccess} vide={lignes.length === 0} />
 
-        {fiches.isSuccess && lignes.length === 0 ? (
-          <p className="text-[0.875rem] text-muted-foreground">
-            Aucune fiche ne correspond à ces filtres.
-          </p>
-        ) : null}
+        <TableFiches
+          peutReaffecter={peutReaffecter}
+          cible={lot.cible}
+          lignes={lignes}
+          cochables={cochables}
+          cochees={cochees}
+          onCocherTout={(toutes) => {
+            setCochees(toutes ? cochables.map((fiche) => fiche.position) : []);
+          }}
+          onCocherUne={(position, coche) => {
+            setCochees((courantes) =>
+              coche ? [...courantes, position] : courantes.filter((p) => p !== position),
+            );
+          }}
+        />
 
-        {lignes.length === 0 ? null : (
-          <Table aria-label="Fiches de la campagne">
-            <TableHeader>
-              <TableRow>
-                {peutReaffecter ? (
-                  <TableHead scope="col" className="w-10">
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      aria-label="Cocher toutes les fiches non traitées de la page"
-                      checked={cochables.length > 0 && cochees.length === cochables.length}
-                      disabled={cochables.length === 0}
-                      onChange={(event) => {
-                        setCochees(
-                          event.target.checked ? cochables.map((fiche) => fiche.position) : [],
-                        );
-                      }}
-                    />
-                  </TableHead>
-                ) : null}
-                <TableHead scope="col">Fiche</TableHead>
-                <TableHead scope="col">Téléphone</TableHead>
-                <TableHead scope="col">Téléconseiller</TableHead>
-                <TableHead scope="col">Jour</TableHead>
-                <TableHead scope="col">État</TableHead>
-                <TableHead scope="col">Statut posé</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lignes.map((fiche) => (
-                <LigneFiche
-                  key={fiche.position}
-                  fiche={fiche}
-                  cible={lot.cible}
-                  cochable={peutReaffecter}
-                  cochee={cochees.includes(fiche.position)}
-                  onCocher={(coche) => {
-                    setCochees((courantes) =>
-                      coche
-                        ? [...courantes, fiche.position]
-                        : courantes.filter((position) => position !== fiche.position),
-                    );
-                  }}
-                />
-              ))}
-            </TableBody>
-          </Table>
-        )}
-
-        {pageCount > 1 ? (
-          <Pagination
-            page={page}
-            pageCount={pageCount}
-            total={total}
-            onPage={(suivante) => {
-              setPage(suivante);
-              setCochees([]);
-            }}
-          />
-        ) : null}
+        <Pagination
+          page={page}
+          pageCount={pageCount}
+          total={total}
+          onPage={(suivante) => {
+            setPage(suivante);
+            setCochees([]);
+          }}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+function EtatChargement({
+  isPending,
+  isSuccess,
+  vide,
+}: {
+  isPending: boolean;
+  isSuccess: boolean;
+  vide: boolean;
+}) {
+  if (isPending) return <Skeleton className="h-64 rounded-lg" />;
+  if (isSuccess && vide) {
+    return (
+      <p className="text-[0.875rem] text-muted-foreground">
+        Aucune fiche ne correspond à ces filtres.
+      </p>
+    );
+  }
+  return null;
+}
+
+function TableFiches({
+  peutReaffecter,
+  cible,
+  lignes,
+  cochables,
+  cochees,
+  onCocherTout,
+  onCocherUne,
+}: {
+  peutReaffecter: boolean;
+  cible: LotExportDetail['cible'];
+  lignes: readonly LotExportFiche[];
+  cochables: readonly LotExportFiche[];
+  cochees: readonly number[];
+  onCocherTout: (toutes: boolean) => void;
+  onCocherUne: (position: number, coche: boolean) => void;
+}) {
+  if (lignes.length === 0) return null;
+
+  return (
+    <Table aria-label="Fiches de la campagne">
+      <TableHeader>
+        <TableRow>
+          {peutReaffecter ? (
+            <TableHead scope="col" className="w-10">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                aria-label="Cocher toutes les fiches non traitées de la page"
+                checked={cochables.length > 0 && cochees.length === cochables.length}
+                disabled={cochables.length === 0}
+                onChange={(event) => {
+                  onCocherTout(event.target.checked);
+                }}
+              />
+            </TableHead>
+          ) : null}
+          <TableHead scope="col">Fiche</TableHead>
+          <TableHead scope="col">Téléphone</TableHead>
+          <TableHead scope="col">Téléconseiller</TableHead>
+          <TableHead scope="col">Jour</TableHead>
+          <TableHead scope="col">État</TableHead>
+          <TableHead scope="col">Statut posé</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lignes.map((fiche) => (
+          <LigneFiche
+            key={fiche.position}
+            fiche={fiche}
+            cible={cible}
+            cochable={peutReaffecter}
+            cochee={cochees.includes(fiche.position)}
+            onCocher={(coche) => {
+              onCocherUne(fiche.position, coche);
+            }}
+          />
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -329,6 +374,7 @@ function LigneFiche({
 }
 
 function BandeauReaffectation({
+  visible,
   equipe,
   nombre,
   vers,
@@ -336,6 +382,7 @@ function BandeauReaffectation({
   onVers,
   onAttribuer,
 }: {
+  visible: boolean;
   equipe: LotExportDetail['repartition'];
   nombre: number;
   vers: string;
@@ -343,6 +390,7 @@ function BandeauReaffectation({
   onVers: (id: string) => void;
   onAttribuer: () => void;
 }) {
+  if (!visible || nombre === 0) return null;
   const items = equipe.map((ligne) => ({
     value: ligne.teleconseillerId,
     label: ligne.teleconseillerName,
@@ -389,6 +437,8 @@ function Pagination({
   total: number;
   onPage: (page: number) => void;
 }) {
+  if (pageCount <= 1) return null;
+
   return (
     <div className="flex items-center justify-end gap-2">
       <p className="text-[0.8125rem] tabular-nums text-muted-foreground">

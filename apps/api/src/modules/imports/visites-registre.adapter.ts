@@ -1,7 +1,13 @@
 import { createHash } from 'node:crypto';
 
 import { Injectable } from '@nestjs/common';
-import { ImportKind, ImportMode, VisiteImportChangeKind, type Prisma } from '@crm/database';
+import {
+  ImportKind,
+  ImportMode,
+  VisiteImportChangeKind,
+  type Prisma,
+  type VisiteImportChange,
+} from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { audit, AuditAction } from '../../common/audit.js';
@@ -48,8 +54,8 @@ import { SHEET_CELL } from './xlsx-rows.js';
  * pour l'écran de revue et `writeChunk` ci-dessous pour les deux passes.
  */
 
-export const VISITES_REGISTRE_MAX_ROWS = 20_000;
-export const VISITES_REGISTRE_MAX_DIFFERENCES = 5_000;
+const VISITES_REGISTRE_MAX_ROWS = 20_000;
+const VISITES_REGISTRE_MAX_DIFFERENCES = 5_000;
 
 const H = VISITES_REGISTRE_HEADERS;
 
@@ -57,7 +63,7 @@ const DATE_FR = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
 const pad2 = (value: number): string => String(value).padStart(2, '0');
 
 /** Une date retapée à la française se lit ; un mois > 12 ne se devine pas. */
-export function readRegistreDate(raw: string): string | null {
+function readRegistreDate(raw: string): string | null {
   const iso = readSheetDate(raw);
   if (iso !== null) return iso;
 
@@ -75,7 +81,7 @@ export function readRegistreDate(raw: string): string | null {
  * d'Excel : `0,604166…` pour 14:30. Essayée EN PREMIER, avant de déléguer au
  * lecteur du classeur historique.
  */
-export function readRegistreTime(raw: string): string | null {
+function readRegistreTime(raw: string): string | null {
   const trimmed = raw.trim();
   const fraction = Number(trimmed);
   if (Number.isFinite(fraction) && fraction >= 0 && fraction < 1 && /[.,]/.test(trimmed)) {
@@ -218,6 +224,147 @@ function labelOf(row: { date: string; time: string | null; visitorName: string }
     : `${row.visitorName}, ${jour} ${row.time}`;
 }
 
+type Resolved<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ImportRowError };
+
+function refuseField(
+  rowNumber: number,
+  column: string,
+  code: string,
+  detail: string,
+): { readonly ok: false; readonly error: ImportRowError } {
+  return { ok: false, error: { rowNumber, column, code, message: detail } };
+}
+
+function resolveRegistreDate(cells: Record<string, string>, rowNumber: number): Resolved<string> {
+  const rawDate = importCell(cells, H.date);
+  if (rawDate === '') {
+    return refuseField(rowNumber, H.date, VisiteImportError.DATE_ABSENTE, 'la date de la visite manque.');
+  }
+
+  const date = readRegistreDate(rawDate);
+  if (date === null) {
+    return refuseField(
+      rowNumber,
+      H.date,
+      VisiteImportError.DATE_ILLISIBLE,
+      `« ${rawDate} » n’est pas une date. Écrivez jj/mm/aaaa, ou laissez une vraie date Excel.`,
+    );
+  }
+  return { ok: true, value: date };
+}
+
+function resolveRegistreTime(cells: Record<string, string>, rowNumber: number): Resolved<string | null> {
+  const rawTime = importCell(cells, H.heure);
+  const time = rawTime === '' ? null : readRegistreTime(rawTime);
+  if (unresolvedImportValue(rawTime, time)) {
+    return refuseField(
+      rowNumber,
+      H.heure,
+      VisiteImportError.HEURE_ILLISIBLE,
+      `« ${rawTime} » ne se lit pas comme une heure. Écrivez 14:30, ou laissez vide.`,
+    );
+  }
+  return { ok: true, value: time };
+}
+
+function resolveVisitorName(cells: Record<string, string>, rowNumber: number): Resolved<string> {
+  const visitorName = importCell(cells, H.nom);
+  if (visitorName.length < 2) {
+    return refuseField(rowNumber, H.nom, VisiteImportError.NOM_ABSENT, 'le nom du visiteur manque.');
+  }
+  return { ok: true, value: visitorName };
+}
+
+function resolveEntreprise(
+  cells: Record<string, string>,
+  rowNumber: number,
+  refs: VisiteReferentiels,
+): Resolved<Entry> {
+  const entreprise = resolveReferentiel(refs.entreprises, cells[H.entreprise]);
+  if (entreprise === null) {
+    return refuseField(
+      rowNumber,
+      H.entreprise,
+      ...referentielMissReason(refs, importCell(cells, H.entreprise), 'entreprise'),
+    );
+  }
+  return { ok: true, value: entreprise };
+}
+
+function resolveDirection(
+  cells: Record<string, string>,
+  rowNumber: number,
+  refs: VisiteReferentiels,
+): Resolved<Entry | null> {
+  const rawDirection = importCell(cells, H.direction);
+  const direction = rawDirection === '' ? null : resolveReferentiel(refs.directions, rawDirection);
+  if (unresolvedImportValue(rawDirection, direction)) {
+    return refuseField(rowNumber, H.direction, ...referentielMissReason(refs, rawDirection, 'direction'));
+  }
+  return { ok: true, value: direction };
+}
+
+function resolveDestinataire(
+  cells: Record<string, string>,
+  rowNumber: number,
+  refs: VisiteReferentiels,
+): Resolved<Entry | null> {
+  const rawDestinataire = importCell(cells, H.destinataire);
+  const destinataire =
+    rawDestinataire === '' ? null : resolveReferentiel(refs.destinataires, rawDestinataire);
+  if (unresolvedImportValue(rawDestinataire, destinataire)) {
+    return refuseField(
+      rowNumber,
+      H.destinataire,
+      ...referentielMissReason(refs, rawDestinataire, 'destinataire'),
+    );
+  }
+  return { ok: true, value: destinataire };
+}
+
+function resolveObjet(
+  cells: Record<string, string>,
+  rowNumber: number,
+  refs: VisiteReferentiels,
+): Resolved<Entry> {
+  const objet = resolveReferentiel(refs.objets, cells[H.objet]);
+  if (objet === null) {
+    return refuseField(rowNumber, H.objet, ...referentielMissReason(refs, importCell(cells, H.objet), 'objet'));
+  }
+  return { ok: true, value: objet };
+}
+
+function buildRegistreRow(
+  rowNumber: number,
+  sheet: string,
+  reference: string,
+  date: string,
+  time: string | null,
+  visitorName: string,
+  entreprise: Entry,
+  direction: Entry | null,
+  destinataire: Entry | null,
+  objet: Entry,
+  phone: string,
+  comment: string,
+): VisiteRegistreRow {
+  return {
+    rowNumber,
+    sheet,
+    reference: reference === '' ? null : reference,
+    date,
+    time,
+    visitorName: visitorName.slice(0, 160),
+    phone: phone === '' ? null : phone.slice(0, 40),
+    phoneE164: tryNormalizePhone(phone) ?? null,
+    entreprise,
+    objet,
+    direction,
+    destinataire,
+    comment: comment === '' ? null : comment.slice(0, 2_000),
+  };
+}
+
 @Injectable()
 export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, VisiteRegistreRun> {
   readonly kind = ImportKind.VISITES_REGISTRE;
@@ -236,95 +383,48 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
   ): ParsedRow<VisiteRegistreRow> {
     const refs = run.refs;
     const sheet = importCell(cells, SHEET_CELL);
-    const refuse = (
-      column: string,
-      code: string,
-      detail: string,
-    ): ParsedRow<VisiteRegistreRow> => ({
-      ok: false,
-      error: { rowNumber, column, code, message: detail },
-    });
-
     const reference = importCell(cells, H.numero);
 
-    const rawDate = importCell(cells, H.date);
-    if (rawDate === '') {
-      return refuse(H.date, VisiteImportError.DATE_ABSENTE, 'la date de la visite manque.');
-    }
-    const date = readRegistreDate(rawDate);
-    if (date === null) {
-      return refuse(
-        H.date,
-        VisiteImportError.DATE_ILLISIBLE,
-        `« ${rawDate} » n’est pas une date. Écrivez jj/mm/aaaa, ou laissez une vraie date Excel.`,
-      );
-    }
+    const date = resolveRegistreDate(cells, rowNumber);
+    if (!date.ok) return date;
 
-    const rawTime = importCell(cells, H.heure);
-    const time = rawTime === '' ? null : readRegistreTime(rawTime);
-    if (unresolvedImportValue(rawTime, time)) {
-      return refuse(
-        H.heure,
-        VisiteImportError.HEURE_ILLISIBLE,
-        `« ${rawTime} » ne se lit pas comme une heure. Écrivez 14:30, ou laissez vide.`,
-      );
-    }
+    const time = resolveRegistreTime(cells, rowNumber);
+    if (!time.ok) return time;
 
-    const visitorName = importCell(cells, H.nom);
-    if (visitorName.length < 2) {
-      return refuse(H.nom, VisiteImportError.NOM_ABSENT, 'le nom du visiteur manque.');
-    }
+    const visitorName = resolveVisitorName(cells, rowNumber);
+    if (!visitorName.ok) return visitorName;
 
-    const entreprise = resolveReferentiel(refs.entreprises, cells[H.entreprise]);
-    if (entreprise === null) {
-      return refuse(
-        H.entreprise,
-        ...referentielMissReason(refs, importCell(cells, H.entreprise), 'entreprise'),
-      );
-    }
+    const entreprise = resolveEntreprise(cells, rowNumber, refs);
+    if (!entreprise.ok) return entreprise;
 
-    const rawDirection = importCell(cells, H.direction);
-    const direction =
-      rawDirection === '' ? null : resolveReferentiel(refs.directions, rawDirection);
-    if (unresolvedImportValue(rawDirection, direction)) {
-      return refuse(H.direction, ...referentielMissReason(refs, rawDirection, 'direction'));
-    }
+    const direction = resolveDirection(cells, rowNumber, refs);
+    if (!direction.ok) return direction;
 
-    const rawDestinataire = importCell(cells, H.destinataire);
-    const destinataire =
-      rawDestinataire === '' ? null : resolveReferentiel(refs.destinataires, rawDestinataire);
-    if (unresolvedImportValue(rawDestinataire, destinataire)) {
-      return refuse(
-        H.destinataire,
-        ...referentielMissReason(refs, rawDestinataire, 'destinataire'),
-      );
-    }
+    const destinataire = resolveDestinataire(cells, rowNumber, refs);
+    if (!destinataire.ok) return destinataire;
 
-    const objet = resolveReferentiel(refs.objets, cells[H.objet]);
-    if (objet === null) {
-      return refuse(H.objet, ...referentielMissReason(refs, importCell(cells, H.objet), 'objet'));
-    }
+    const objet = resolveObjet(cells, rowNumber, refs);
+    if (!objet.ok) return objet;
 
     const phone = importCell(cells, H.telephone);
     const comment = importCell(cells, H.commentaire);
 
     return {
       ok: true,
-      row: {
+      row: buildRegistreRow(
         rowNumber,
         sheet,
-        reference: reference === '' ? null : reference,
-        date,
-        time,
-        visitorName: visitorName.slice(0, 160),
-        phone: phone === '' ? null : phone.slice(0, 40),
-        phoneE164: tryNormalizePhone(phone) ?? null,
-        entreprise,
-        objet,
-        direction,
-        destinataire,
-        comment: comment === '' ? null : comment.slice(0, 2_000),
-      },
+        reference,
+        date.value,
+        time.value,
+        visitorName.value,
+        entreprise.value,
+        direction.value,
+        destinataire.value,
+        objet.value,
+        phone,
+        comment,
+      ),
     };
   }
 
@@ -462,114 +562,29 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
     rows: readonly VisiteRegistreRow[],
     ctx: ImportRunContext,
   ): Promise<ChunkOutcome> {
+    const byKey = await loadChangesByKey(ctx, rows);
+    const visiteById = await loadCurrentVisites(ctx, rows, byKey);
+
     const errors: ImportRowError[] = [];
     let created = 0;
     let updated = 0;
     let skipped = 0;
-
-    const changes = await ctx.tx.visiteImportChange.findMany({
-      where: {
-        importJobId: ctx.jobId,
-        OR: rows.map((row) => ({ sheet: row.sheet, rowNumber: row.rowNumber })),
-      },
-    });
-    const byKey = new Map(
-      changes.map((change) => [changeKey(change.sheet, change.rowNumber), change]),
-    );
-
-    const toUpdate = rows.filter((row) => {
-      const change = byKey.get(changeKey(row.sheet, row.rowNumber));
-      return (
-        change !== undefined && change.selected && change.kind === VisiteImportChangeKind.UPDATE
-      );
-    });
-    const visiteIds = toUpdate
-      .map((row) => byKey.get(changeKey(row.sheet, row.rowNumber))?.visiteId)
-      .filter((id): id is string => id !== null && id !== undefined);
-    const currentVisites =
-      visiteIds.length === 0
-        ? []
-        : await ctx.tx.visite.findMany({
-            where: { id: { in: visiteIds } },
-            include: VISITE_INCLUDE,
-          });
-    const visiteById = new Map(currentVisites.map((visite) => [visite.id, visite]));
-
     const toCreate: VisiteRegistreRow[] = [];
 
     for (const row of rows) {
-      const change = byKey.get(changeKey(row.sheet, row.rowNumber));
-      if (change === undefined || !change.selected) {
+      const outcome = await applyRegistreRow(ctx, row, byKey, visiteById);
+      if (outcome.kind === 'skipped') {
         skipped += 1;
         continue;
       }
-
-      if (change.kind === VisiteImportChangeKind.CREATE) {
-        toCreate.push(row);
+      if (outcome.kind === 'create') {
+        toCreate.push(outcome.row);
         continue;
       }
-
-      const visite = change.visiteId === null ? undefined : visiteById.get(change.visiteId);
-      if (visite === undefined) {
-        errors.push({
-          rowNumber: row.rowNumber,
-          column: H.numero,
-          code: VisiteImportError.REGISTRE_NUMERO_INCONNU,
-          message: `« ${row.reference ?? ''} » ne figure plus au registre.`,
-        });
+      if (outcome.kind === 'error') {
+        errors.push(outcome.error);
         continue;
       }
-
-      const currentFields = fieldsOfVisite(visite);
-      if (hashOf(currentFields) !== change.rowHash) {
-        errors.push({
-          rowNumber: row.rowNumber,
-          column: H.numero,
-          code: VisiteImportError.REGISTRE_MODIFIEE_DEPUIS,
-          message: `${change.label} a été corrigée à l’accueil depuis votre revue. Sa ligne n’a pas été écrite. Réexportez pour la revoir.`,
-        });
-        continue;
-      }
-
-      const after = fieldsOfRow(row);
-      const before: Record<string, string> = {};
-      const afterChanged: Record<string, string> = {};
-      for (const diff of diffOf(currentFields, after)) {
-        before[diff.label] = diff.before;
-        afterChanged[diff.label] = diff.after;
-      }
-
-      await ctx.tx.visite.update({
-        where: { id: visite.id },
-        data: {
-          visitedAt: visiteInstant(row.date, row.time ?? undefined),
-          timeKnown: row.time !== null,
-          visitorName: row.visitorName,
-          phone: row.phone,
-          phoneE164: row.phoneE164,
-          entrepriseId: row.entreprise.id,
-          objetId: row.objet.id,
-          directionId: row.direction?.id ?? null,
-          destinataireId: row.destinataire?.id ?? null,
-          comment: row.comment,
-        },
-      });
-
-      // `updatedAt` avance : c'est aussi le curseur de synchronisation mobile, une
-      // application de plusieurs centaines de corrections remet ces visites en
-      // tête du flux des téléphones. Voulu, mais bon à savoir.
-      await audit(
-        ctx.tx,
-        { id: ctx.requestedById },
-        {
-          action: AuditAction.VISITE_REGISTRE_CORRECTION,
-          entity: 'visite',
-          entityId: visite.id,
-          before,
-          after: afterChanged,
-        },
-      );
-
       updated += 1;
     }
 
@@ -617,6 +632,135 @@ export class VisitesRegistreAdapter implements ImportAdapter<VisiteRegistreRow, 
       },
     };
   }
+}
+
+async function loadChangesByKey(
+  ctx: ImportRunContext,
+  rows: readonly VisiteRegistreRow[],
+): Promise<Map<string, VisiteImportChange>> {
+  const changes = await ctx.tx.visiteImportChange.findMany({
+    where: {
+      importJobId: ctx.jobId,
+      OR: rows.map((row) => ({ sheet: row.sheet, rowNumber: row.rowNumber })),
+    },
+  });
+  return new Map(changes.map((change) => [changeKey(change.sheet, change.rowNumber), change]));
+}
+
+function isSelectedUpdate(change: VisiteImportChange | undefined): change is VisiteImportChange {
+  return change !== undefined && change.selected && change.kind === VisiteImportChangeKind.UPDATE;
+}
+
+async function loadCurrentVisites(
+  ctx: ImportRunContext,
+  rows: readonly VisiteRegistreRow[],
+  byKey: ReadonlyMap<string, VisiteImportChange>,
+): Promise<Map<string, VisiteRow>> {
+  const toUpdate = rows.filter((row) => isSelectedUpdate(byKey.get(changeKey(row.sheet, row.rowNumber))));
+  const visiteIds = toUpdate
+    .map((row) => byKey.get(changeKey(row.sheet, row.rowNumber))?.visiteId)
+    .filter((id): id is string => id !== null && id !== undefined);
+  if (visiteIds.length === 0) return new Map();
+
+  const currentVisites = await ctx.tx.visite.findMany({
+    where: { id: { in: visiteIds } },
+    include: VISITE_INCLUDE,
+  });
+  return new Map(currentVisites.map((visite) => [visite.id, visite]));
+}
+
+type RowOutcome =
+  | { readonly kind: 'skipped' }
+  | { readonly kind: 'create'; readonly row: VisiteRegistreRow }
+  | { readonly kind: 'updated' }
+  | { readonly kind: 'error'; readonly error: ImportRowError };
+
+async function applyRegistreRow(
+  ctx: ImportRunContext,
+  row: VisiteRegistreRow,
+  byKey: ReadonlyMap<string, VisiteImportChange>,
+  visiteById: ReadonlyMap<string, VisiteRow>,
+): Promise<RowOutcome> {
+  const change = byKey.get(changeKey(row.sheet, row.rowNumber));
+  if (change === undefined || !change.selected) return { kind: 'skipped' };
+  if (change.kind === VisiteImportChangeKind.CREATE) return { kind: 'create', row };
+
+  const visite = change.visiteId === null ? undefined : visiteById.get(change.visiteId);
+  if (visite === undefined) {
+    return {
+      kind: 'error',
+      error: {
+        rowNumber: row.rowNumber,
+        column: H.numero,
+        code: VisiteImportError.REGISTRE_NUMERO_INCONNU,
+        message: `« ${row.reference ?? ''} » ne figure plus au registre.`,
+      },
+    };
+  }
+
+  const currentFields = fieldsOfVisite(visite);
+  if (hashOf(currentFields) !== change.rowHash) {
+    return {
+      kind: 'error',
+      error: {
+        rowNumber: row.rowNumber,
+        column: H.numero,
+        code: VisiteImportError.REGISTRE_MODIFIEE_DEPUIS,
+        message: `${change.label} a été corrigée à l’accueil depuis votre revue. Sa ligne n’a pas été écrite. Réexportez pour la revoir.`,
+      },
+    };
+  }
+
+  await writeRegistreUpdate(ctx, row, visite, currentFields);
+  return { kind: 'updated' };
+}
+
+/**
+ * `updatedAt` avance : c'est aussi le curseur de synchronisation mobile, une
+ * application de plusieurs centaines de corrections remet ces visites en
+ * tête du flux des téléphones. Voulu, mais bon à savoir.
+ */
+async function writeRegistreUpdate(
+  ctx: ImportRunContext,
+  row: VisiteRegistreRow,
+  visite: VisiteRow,
+  currentFields: Fields,
+): Promise<void> {
+  const after = fieldsOfRow(row);
+  const before: Record<string, string> = {};
+  const afterChanged: Record<string, string> = {};
+  for (const diff of diffOf(currentFields, after)) {
+    before[diff.label] = diff.before;
+    afterChanged[diff.label] = diff.after;
+  }
+
+  await ctx.tx.visite.update({
+    where: { id: visite.id },
+    data: {
+      visitedAt: visiteInstant(row.date, row.time ?? undefined),
+      timeKnown: row.time !== null,
+      visitorName: row.visitorName,
+      phone: row.phone,
+      phoneE164: row.phoneE164,
+      entrepriseId: row.entreprise.id,
+      objetId: row.objet.id,
+      directionId: row.direction?.id ?? null,
+      destinataireId: row.destinataire?.id ?? null,
+      comment: row.comment,
+    },
+  });
+
+  await audit(
+    ctx.tx,
+    { id: ctx.requestedById },
+    {
+      action: AuditAction.VISITE_REGISTRE_CORRECTION,
+      entity: 'visite',
+      entityId: visite.id,
+      before,
+      after: afterChanged,
+    },
+  );
 }
 
 function blankFields(): Fields {

@@ -3,7 +3,7 @@ import type { NotificationCategory, NotificationStatus } from '@/components/noti
 
 export const NOTIFICATION_PAGE_SIZE = 20;
 
-export const NOTIFICATION_TABS = ['reception', 'historique', 'gabarits'] as const;
+const NOTIFICATION_TABS = ['reception', 'historique', 'gabarits'] as const;
 
 export type NotificationTab = (typeof NOTIFICATION_TABS)[number];
 
@@ -30,19 +30,8 @@ export interface NotificationFiltersState {
   unreadOnly: boolean;
 }
 
-export function defaultNotificationTab(isAdmin: boolean): NotificationTab {
+function defaultNotificationTab(isAdmin: boolean): NotificationTab {
   return isAdmin ? 'historique' : 'reception';
-}
-
-export function emptyNotificationFilters(isAdmin: boolean): NotificationFiltersState {
-  return {
-    tab: defaultNotificationTab(isAdmin),
-    status: null,
-    category: null,
-    page: 1,
-    inboxPage: 1,
-    unreadOnly: false,
-  };
 }
 
 export function parseNotificationFilters(

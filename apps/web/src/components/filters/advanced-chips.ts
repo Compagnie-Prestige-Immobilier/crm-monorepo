@@ -15,7 +15,7 @@ export interface AdvancedChip {
   value: string;
 }
 
-export const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
+const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   representantId: 'Représentant',
   departementId: 'Département',
   banqueId: 'Banque',
@@ -27,6 +27,7 @@ export const ADVANCED_FILTER_LABELS: Record<AdvancedFilterKey, string> = {
   phase2Status: 'Résultat de l’appel',
   enrollmentMethod: 'Comment il a adhéré',
   enrollmentCapturedById: 'Adhésion obtenue par',
+  revue: 'Revue de la demande',
 };
 
 const UNKNOWN_VALUE = 'Valeur inconnue';
@@ -75,6 +76,11 @@ const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
     filters.enrollmentCapturedById === null
       ? null
       : optionLabel(reference?.commerciaux ?? [], filters.enrollmentCapturedById),
+
+  revue: (filters) => {
+    if (filters.revue === null) return null;
+    return filters.revue ? 'Revue' : 'Non revue';
+  },
 };
 
 export function buildAdvancedChips(

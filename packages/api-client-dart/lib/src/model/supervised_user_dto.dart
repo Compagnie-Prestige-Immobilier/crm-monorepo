@@ -52,6 +52,8 @@ class SupervisedUserDto {
 
     required this.appVersion,
 
+    required this.journalAppelsAutorise,
+
     required this.lastWriteAt,
 
     required this.activeSecondsToday,
@@ -145,6 +147,10 @@ class SupervisedUserDto {
   @JsonKey(name: r'appVersion', required: true, includeIfNull: true)
   final String? appVersion;
 
+  /// Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : la durée de communication de ce compte ne se mesure pas. `null` : inconnu.
+  @JsonKey(name: r'journalAppelsAutorise', required: true, includeIfNull: true)
+  final bool? journalAppelsAutorise;
+
   /// Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
   @JsonKey(name: r'lastWriteAt', required: true, includeIfNull: true)
   final DateTime? lastWriteAt;
@@ -223,6 +229,7 @@ class SupervisedUserDto {
                 lastPullAt,
                 pendingOps,
                 appVersion,
+                journalAppelsAutorise,
                 lastWriteAt,
                 activeSecondsToday,
                 activeSecondsInShifts,
@@ -255,6 +262,7 @@ class SupervisedUserDto {
                 other.lastPullAt,
                 other.pendingOps,
                 other.appVersion,
+                other.journalAppelsAutorise,
                 other.lastWriteAt,
                 other.activeSecondsToday,
                 other.activeSecondsInShifts,
@@ -293,6 +301,7 @@ class SupervisedUserDto {
         lastPullAt,
         pendingOps,
         appVersion,
+        journalAppelsAutorise,
         lastWriteAt,
         activeSecondsToday,
         activeSecondsInShifts,

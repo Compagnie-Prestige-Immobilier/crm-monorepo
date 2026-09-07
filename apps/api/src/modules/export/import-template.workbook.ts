@@ -6,7 +6,7 @@ import { CPI_BURGUNDY_ARGB } from '../../common/brand.js';
 import type { ImportColumn } from '../representants/import-template.js';
 import { INSTRUCTIONS_SHEET_NAME, LISTS_SHEET_NAME } from '../representants/import-template.js';
 
-export interface TemplateDropdown {
+interface TemplateDropdown {
   /** Rang de la colonne de saisie, 1 pour la première. */
   readonly column: number;
   readonly label: string;

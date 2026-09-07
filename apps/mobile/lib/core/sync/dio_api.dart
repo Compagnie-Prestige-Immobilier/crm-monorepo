@@ -48,9 +48,14 @@ class _CorpsCorrectionVisite extends UpdateVisiteDto {
 }
 
 class DioApi implements ApiPort {
-  DioApi(this._client);
+  DioApi(this._client, {Future<bool?> Function()? journalAppelsAutorise})
+    : _journalAppelsAutorise = journalAppelsAutorise;
 
   final CrmApiClient _client;
+
+  /// EB-37 : chaque synchronisation dit à la supervision si la durée de
+  /// communication se mesure sur cet appareil. Nul : rien n'est envoyé.
+  final Future<bool?> Function()? _journalAppelsAutorise;
 
   AuthApi get _auth => _client.getAuthApi();
   SyncApi get _sync => _client.getSyncApi();
@@ -151,6 +156,7 @@ class DioApi implements ApiPort {
       fullName: dto.user.fullName,
       role: dto.user.role.value,
       email: dto.user.email,
+      phoneE164: dto.user.phoneE164,
     );
   }
 
@@ -165,6 +171,7 @@ class DioApi implements ApiPort {
           .pullSyncChanges(
             since: cursor,
             limit: limit,
+            journalAppelsAutorise: await _journalAppelsAutorise?.call(),
             xCPIPayloadVersion: payloadVersion,
             extra: TimeoutProfile.read.extra,
           );
@@ -192,6 +199,7 @@ class DioApi implements ApiPort {
           clientBatchId: batchId,
           payloadVersion: payloadVersion,
           operations: operations,
+          journalAppelsAutorise: await _journalAppelsAutorise?.call(),
         ),
         extra: TimeoutProfile.push.extra,
       );

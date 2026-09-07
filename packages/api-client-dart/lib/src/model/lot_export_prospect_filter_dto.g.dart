@@ -49,6 +49,8 @@ abstract class _$LotExportProspectFilterDtoCWProxy {
 
   LotExportProspectFilterDto dateTo(DateTime? dateTo);
 
+  LotExportProspectFilterDto revue(bool? revue);
+
   LotExportProspectFilterDto includeDeleted(bool? includeDeleted);
 
   LotExportProspectFilterDto projet(Projet projet);
@@ -78,6 +80,7 @@ abstract class _$LotExportProspectFilterDtoCWProxy {
     LotExportProspectFilterDtoOriginEnum? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted,
     Projet projet,
   });
@@ -163,6 +166,9 @@ class _$LotExportProspectFilterDtoCWProxyImpl
   LotExportProspectFilterDto dateTo(DateTime? dateTo) => this(dateTo: dateTo);
 
   @override
+  LotExportProspectFilterDto revue(bool? revue) => this(revue: revue);
+
+  @override
   LotExportProspectFilterDto includeDeleted(bool? includeDeleted) =>
       this(includeDeleted: includeDeleted);
 
@@ -195,6 +201,7 @@ class _$LotExportProspectFilterDtoCWProxyImpl
     Object? origin = const $CopyWithPlaceholder(),
     Object? dateFrom = const $CopyWithPlaceholder(),
     Object? dateTo = const $CopyWithPlaceholder(),
+    Object? revue = const $CopyWithPlaceholder(),
     Object? includeDeleted = const $CopyWithPlaceholder(),
     Object? projet = const $CopyWithPlaceholder(),
   }) {
@@ -272,6 +279,10 @@ class _$LotExportProspectFilterDtoCWProxyImpl
           ? _value.dateTo
           // ignore: cast_nullable_to_non_nullable
           : dateTo as DateTime?,
+      revue: revue == const $CopyWithPlaceholder()
+          ? _value.revue
+          // ignore: cast_nullable_to_non_nullable
+          : revue as bool?,
       includeDeleted: includeDeleted == const $CopyWithPlaceholder()
           ? _value.includeDeleted
           // ignore: cast_nullable_to_non_nullable
@@ -373,6 +384,7 @@ LotExportProspectFilterDto _$LotExportProspectFilterDtoFromJson(
       'dateTo',
       (v) => v == null ? null : DateTime.parse(v as String),
     ),
+    revue: $checkedConvert('revue', (v) => v as bool?),
     includeDeleted: $checkedConvert(
       'includeDeleted',
       (v) => v as bool? ?? false,
@@ -416,6 +428,7 @@ Map<String, dynamic> _$LotExportProspectFilterDtoToJson(
     'origin': value,
   if (instance.dateFrom?.toIso8601String() case final value?) 'dateFrom': value,
   if (instance.dateTo?.toIso8601String() case final value?) 'dateTo': value,
+  if (instance.revue case final value?) 'revue': value,
   if (instance.includeDeleted case final value?) 'includeDeleted': value,
   'projet': _$ProjetEnumMap[instance.projet]!,
 };
@@ -458,11 +471,16 @@ const _$EnrollmentMethodEnumMap = {
   EnrollmentMethod.VOICE_OR_ELECTRONIC_MESSAGING:
       'VOICE_OR_ELECTRONIC_MESSAGING',
   EnrollmentMethod.APPOINTMENT: 'APPOINTMENT',
+  EnrollmentMethod.WHATSAPP: 'WHATSAPP',
+  EnrollmentMethod.RDV_CPI: 'RDV_CPI',
+  EnrollmentMethod.PLATEFORME_EN_LIGNE: 'PLATEFORME_EN_LIGNE',
+  EnrollmentMethod.MAIL: 'MAIL',
   EnrollmentMethod.unknownDefaultOpenApi: 'unknown_default_open_api',
 };
 
 const _$LotExportProspectFilterDtoOriginEnumEnumMap = {
   LotExportProspectFilterDtoOriginEnum.BANQUE: 'BANQUE',
+  LotExportProspectFilterDtoOriginEnum.FORMULAIRE_PUBLIC: 'FORMULAIRE_PUBLIC',
   LotExportProspectFilterDtoOriginEnum.unknownDefaultOpenApi:
       'unknown_default_open_api',
 };

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ChangeSource, RappelOrigine, RepCallOutcome, RepresentantRelation } from '@crm/database';
-import type { StatutQualification } from '@crm/database';
+import type { Prisma, StatutQualification } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { outcomeOf } from '../referentiels/statuts-qualification.service.js';
@@ -12,6 +12,12 @@ import { REPRESENTANT_RELATION_TRANSITIONS, isLegalTransition } from '../../comm
 import { COMMENT_MAX_LENGTH } from '../phase2/attempt-rules.js';
 import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { applyRelationChange } from '../representants/relation-change.js';
+import {
+  FICHE_SELECT,
+  ficheSnapshot,
+  recordFicheChange,
+  type FicheSnapshot,
+} from '../representants/fiche-change.js';
 import { resolveWhatsappPatch, type WhatsappPatch } from '../representants/whatsapp.js';
 import { RepresentantsService } from '../representants/representants.service.js';
 import type { RepresentantLookupDto } from '../representants/dto.js';
@@ -55,103 +61,174 @@ export class RepCampaignsService {
 
     const representant = await this.prisma.representant.findFirst({
       where: { id: body.representantId, deletedAt: null, ...attributionScope(user) },
-      select: {
-        id: true,
-        relationStatus: true,
-        whatsappStatus: true,
-        whatsappE164: true,
-        phoneE164: true,
-        lastCallAt: true,
-      },
+      select: { ...FICHE_SELECT, id: true, relationStatus: true, lastCallAt: true },
     });
     if (!representant) throw await this.absent(body.representantId);
     const whatsapp = resolveWhatsappPatch(body, representant);
     // Normalisé hors transaction (opération pure) ; un numéro illisible refuse
     // la tentative entière, comme `suggestedPhone`.
-    const newPhone =
-      body.numeroConfirme === false && body.phone ? normalizePhone(body.phone) : undefined;
+    const newPhone = newPhoneFrom(body);
+    const changesPhone = newPhone !== undefined && newPhone !== representant.phoneE164;
 
     // Le statut commande l'issue. Résolu AVANT la transaction : c'est une
     // lecture, et la faire dedans allongerait le verrou pour rien.
     const statut = await this.statutCoherent(body, comment);
     const relation = relationAPoser(body, statut, representant.relationStatus);
 
-    const applied = await this.prisma.$transaction(async (tx) => {
-      const inserted = await tx.repCallAttempt.createMany({
-        data: [attemptRow(body, user.id, comment)],
-        skipDuplicates: true,
-      });
-      if (inserted.count === 0) return false;
-
-      await rattacherDetections(tx, {
-        performedById: user.id,
-        representantId: body.representantId,
-        attemptId: body.id,
-        clientCreatedAt: new Date(body.clientCreatedAt),
-        deviceCallAt: body.deviceCallAt ? new Date(body.deviceCallAt) : null,
-      });
-
-      if (suggested) {
-        await tx.representantSuggestion.create({
-          data: {
-            sourceRepresentantId: body.representantId,
-            suggestedName: body.suggestedName?.trim() || null,
-            suggestedPhoneE164: suggested.lookup.phoneE164,
-            note: body.suggestedNote?.trim() || null,
-            suggestedById: user.id,
-            resolvedRepresentantId: suggested.resolvedRepresentantId,
-            sourceAttemptId: body.id,
-            clientCreatedAt: new Date(body.clientCreatedAt),
-          },
-        });
-      }
-
-      const changesPhone = newPhone !== undefined && newPhone !== representant.phoneE164;
-      if (changesPhone) {
-        // MÊME garde d'unicité que le module representants : lecture globale sur
-        // l'index partiel, jamais une contrainte SQL brute laissée lever.
-        const clash = await tx.representant.findFirst({
-          where: { phoneE164: newPhone, deletedAt: null, id: { not: body.representantId } },
-          select: { createdBy: { select: { fullName: true } } },
-        });
-        if (clash) throw phoneConflict(clash.createdBy.fullName);
-      }
-
-      const state = {
-        ...representantPatch(body, whatsapp, changesPhone ? newPhone : undefined),
-        ...dernierAppel(body, user.id, representant.lastCallAt, statut),
-      };
-      if (Object.keys(state).length > 0) {
-        await tx.representant.update({
-          where: { id: body.representantId },
-          data: { ...state, rev: { increment: 1 } },
-        });
-      }
-      if (body.ouvertureId) {
-        await fermerOuverture(tx, {
-          ouvertureId: body.ouvertureId,
-          openedById: user.id,
-          attemptId: body.id,
-          at: new Date(body.clientCreatedAt),
-        });
-      }
-      if (relation !== null) {
-        await applyRelationChange(tx, {
-          representantId: body.representantId,
-          fromStatus: representant.relationStatus,
-          toStatus: relation,
-          changedById: user.id,
-          source: ChangeSource.MOBILE,
-        });
-      }
-      return true;
-    });
+    const applied = await this.prisma.$transaction((tx) =>
+      this.applyAttempt(tx, {
+        user,
+        body,
+        comment,
+        suggested,
+        representant,
+        whatsapp,
+        newPhone: changesPhone ? newPhone : undefined,
+        statut,
+        relation,
+      }),
+    );
 
     return attemptResult(
       applied ? RepCallAttemptApplyStatus.APPLIED : RepCallAttemptApplyStatus.DUPLICATE,
       body.id,
       suggested,
     );
+  }
+
+  private async applyAttempt(
+    tx: Prisma.TransactionClient,
+    ctx: {
+      user: AuthenticatedUser;
+      body: CreateRepCallAttemptDto;
+      comment: string | null;
+      suggested: { lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null;
+      representant: FicheSnapshot & {
+        relationStatus: RepresentantRelation;
+        lastCallAt: Date | null;
+      };
+      whatsapp: WhatsappPatch;
+      newPhone: string | undefined;
+      statut: StatutQualification | null;
+      relation: RepresentantRelation | null;
+    },
+  ): Promise<boolean> {
+    const { user, body, comment, suggested, representant, whatsapp, newPhone, statut, relation } =
+      ctx;
+    const inserted = await tx.repCallAttempt.createMany({
+      data: [attemptRow(body, user.id, comment)],
+      skipDuplicates: true,
+    });
+    if (inserted.count === 0) return false;
+
+    await rattacherDetections(tx, {
+      performedById: user.id,
+      representantId: body.representantId,
+      attemptId: body.id,
+      clientCreatedAt: new Date(body.clientCreatedAt),
+      deviceCallAt: body.deviceCallAt ? new Date(body.deviceCallAt) : null,
+    });
+
+    await this.recordSuggestion(tx, body, user.id, suggested);
+    await this.assertPhoneAvailable(tx, body.representantId, newPhone);
+    await this.updateRepresentant(tx, body, whatsapp, newPhone, user.id, representant, statut);
+    await this.closeOuvertureIfRequested(tx, body, user.id);
+    await this.applyRelationIfRequested(tx, body, representant.relationStatus, relation, user.id);
+    return true;
+  }
+
+  private async recordSuggestion(
+    tx: Prisma.TransactionClient,
+    body: CreateRepCallAttemptDto,
+    performedById: string,
+    suggested: { lookup: RepresentantLookupDto; resolvedRepresentantId: string | null } | null,
+  ): Promise<void> {
+    if (!suggested) return;
+    await tx.representantSuggestion.create({
+      data: {
+        sourceRepresentantId: body.representantId,
+        suggestedName: body.suggestedName?.trim() || null,
+        suggestedPhoneE164: suggested.lookup.phoneE164,
+        note: body.suggestedNote?.trim() || null,
+        suggestedById: performedById,
+        resolvedRepresentantId: suggested.resolvedRepresentantId,
+        sourceAttemptId: body.id,
+        clientCreatedAt: new Date(body.clientCreatedAt),
+      },
+    });
+  }
+
+  /** MÊME garde d'unicité que le module representants : lecture globale sur
+   * l'index partiel, jamais une contrainte SQL brute laissée lever. */
+  private async assertPhoneAvailable(
+    tx: Prisma.TransactionClient,
+    representantId: string,
+    newPhone: string | undefined,
+  ): Promise<void> {
+    if (newPhone === undefined) return;
+    const clash = await tx.representant.findFirst({
+      where: { phoneE164: newPhone, deletedAt: null, id: { not: representantId } },
+      select: { createdBy: { select: { fullName: true } } },
+    });
+    if (clash) throw phoneConflict(clash.createdBy.fullName);
+  }
+
+  private async updateRepresentant(
+    tx: Prisma.TransactionClient,
+    body: CreateRepCallAttemptDto,
+    whatsapp: WhatsappPatch,
+    newPhone: string | undefined,
+    performedById: string,
+    representant: FicheSnapshot & { lastCallAt: Date | null },
+    statut: StatutQualification | null,
+  ): Promise<void> {
+    const state = {
+      ...representantPatch(body, whatsapp, newPhone),
+      ...dernierAppel(body, performedById, representant.lastCallAt, statut),
+    };
+    if (Object.keys(state).length === 0) return;
+    const row = await tx.representant.update({
+      where: { id: body.representantId },
+      data: { ...state, rev: { increment: 1 } },
+    });
+    await recordFicheChange(tx, {
+      representantId: body.representantId,
+      userId: performedById,
+      source: 'APPEL',
+      before: ficheSnapshot(representant),
+      after: ficheSnapshot(row),
+    });
+  }
+
+  private async closeOuvertureIfRequested(
+    tx: Prisma.TransactionClient,
+    body: CreateRepCallAttemptDto,
+    openedById: string,
+  ): Promise<void> {
+    if (!body.ouvertureId) return;
+    await fermerOuverture(tx, {
+      ouvertureId: body.ouvertureId,
+      openedById,
+      attemptId: body.id,
+      at: new Date(body.clientCreatedAt),
+    });
+  }
+
+  private async applyRelationIfRequested(
+    tx: Prisma.TransactionClient,
+    body: CreateRepCallAttemptDto,
+    fromStatus: RepresentantRelation,
+    relation: RepresentantRelation | null,
+    changedById: string,
+  ): Promise<void> {
+    if (relation === null) return;
+    await applyRelationChange(tx, {
+      representantId: body.representantId,
+      fromStatus,
+      toStatus: relation,
+      changedById,
+      source: ChangeSource.MOBILE,
+    });
   }
 
   /**
@@ -171,18 +248,7 @@ export class RepCampaignsService {
     if (!statut) throw statutInconnu();
     if (!statut.isActive) throw statutInactif(statut.label);
 
-    const attendue = outcomeOf(statut.effect);
-    if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
-
-    if (contreditLeRattachement(body.relationStatus, statut.relationStatus)) {
-      throw relationContreditStatut(statut.label);
-    }
-
-    // `validatedComment` n'exige un commentaire que sur l'issue OTHER, qu'aucun
-    // effet ne dérive : la garde du motif est donc atteignable, contrairement à
-    // celle de `requiresCallback`, que l'issue CALLBACK couvre déjà.
-    if (statut.requiresComment && comment === null) throw motifRequis(statut.label);
-
+    assertStatutMatchesAttempt(statut, body, comment);
     return statut;
   }
 
@@ -238,14 +304,50 @@ function contreditLeRattachement(
   return repondue !== posee;
 }
 
+/** Résolu hors transaction (opération pure) ; un numéro illisible refuse la tentative entière. */
+function newPhoneFrom(body: CreateRepCallAttemptDto): string | undefined {
+  if (body.numeroConfirme !== false || !body.phone) return undefined;
+  return normalizePhone(body.phone);
+}
+
+function orNull<T>(value: T | undefined): T | null {
+  return value === undefined ? null : value;
+}
+
+function dateOrNull(value: string | undefined): Date | null {
+  return value ? new Date(value) : null;
+}
+
+function trimmedOrNull(value: string | undefined): string | null {
+  return value?.trim() || null;
+}
+
+function assertStatutMatchesAttempt(
+  statut: StatutQualification,
+  body: CreateRepCallAttemptDto,
+  comment: string | null,
+): void {
+  const attendue = outcomeOf(statut.effect);
+  if (body.outcome !== attendue) throw issueContreditStatut(attendue, body.outcome);
+
+  if (contreditLeRattachement(body.relationStatus, statut.relationStatus)) {
+    throw relationContreditStatut(statut.label);
+  }
+
+  // `validatedComment` n'exige un commentaire que sur l'issue OTHER, qu'aucun
+  // effet ne dérive : la garde du motif est donc atteignable, contrairement à
+  // celle de `requiresCallback`, que l'issue CALLBACK couvre déjà.
+  if (statut.requiresComment && comment === null) throw motifRequis(statut.label);
+}
+
 function relationAPoser(
   body: CreateRepCallAttemptDto,
   statut: StatutQualification | null,
   courante: RepresentantRelation,
 ): RepresentantRelation | null {
   if (body.relationStatus !== undefined) return body.relationStatus;
-  const posee = statut?.relationStatus ?? null;
-  if (posee === null) return null;
+  if (statut === null || statut.relationStatus === null) return null;
+  const posee = statut.relationStatus;
   return isLegalTransition(REPRESENTANT_RELATION_TRANSITIONS, courante, posee) ? posee : null;
 }
 
@@ -255,20 +357,32 @@ function attemptRow(body: CreateRepCallAttemptDto, performedById: string, commen
     representantId: body.representantId,
     performedById,
     outcome: body.outcome,
-    promisedProspects: body.promisedProspects ?? null,
+    promisedProspects: orNull(body.promisedProspects),
     comment,
-    callbackAt: body.callbackAt ? new Date(body.callbackAt) : null,
-    etablissementConfirme: body.etablissementConfirme ?? null,
-    numeroConfirme: body.numeroConfirme ?? null,
-    contacte: body.contacte ?? null,
-    connaitUES: body.connaitUES ?? null,
-    syndicat: body.syndicat?.trim() || null,
-    statutQualificationId: body.statutQualificationId ?? null,
-    deviceCallType: body.deviceCallType ?? null,
-    deviceCallDurationSeconds: body.deviceCallDurationSeconds ?? null,
-    deviceCallAt: body.deviceCallAt ? new Date(body.deviceCallAt) : null,
+    callbackAt: dateOrNull(body.callbackAt),
+    etablissementConfirme: orNull(body.etablissementConfirme),
+    numeroConfirme: orNull(body.numeroConfirme),
+    contacte: orNull(body.contacte),
+    connaitUES: orNull(body.connaitUES),
+    syndicat: trimmedOrNull(body.syndicat),
+    statutQualificationId: orNull(body.statutQualificationId),
+    deviceCallType: orNull(body.deviceCallType),
+    deviceCallDurationSeconds: orNull(body.deviceCallDurationSeconds),
+    deviceCallAt: dateOrNull(body.deviceCallAt),
     clientCreatedAt: new Date(body.clientCreatedAt),
   };
+}
+
+function syndicatPatch(body: CreateRepCallAttemptDto): Partial<{ syndicat: string | null }> {
+  if (body.syndicat === undefined) return {};
+  return { syndicat: trimmedOrNull(body.syndicat) };
+}
+
+function etablissementPatch(
+  body: CreateRepCallAttemptDto,
+): Partial<{ etablissement: string | null }> {
+  if (body.etablissementConfirme !== false || body.etablissement === undefined) return {};
+  return { etablissement: trimmedOrNull(body.etablissement) };
 }
 
 function representantPatch(
@@ -278,15 +392,13 @@ function representantPatch(
 ) {
   return {
     ...whatsapp,
-    ...(body.syndicat !== undefined ? { syndicat: body.syndicat.trim() || null } : {}),
+    ...syndicatPatch(body),
     ...(body.connaitUES !== undefined ? { connaitUES: body.connaitUES } : {}),
     ...(body.contacte !== undefined ? { contacte: body.contacte } : {}),
     ...(body.statutQualificationId !== undefined
       ? { statutQualificationId: body.statutQualificationId }
       : {}),
-    ...(body.etablissementConfirme === false && body.etablissement !== undefined
-      ? { etablissement: body.etablissement.trim() || null }
-      : {}),
+    ...etablissementPatch(body),
     ...(newPhone !== undefined ? { phoneE164: newPhone } : {}),
   };
 }
@@ -340,14 +452,22 @@ function prochainRappel(
   };
 }
 
-function validatedComment(body: CreateRepCallAttemptDto): string | null {
-  const comment = body.comment?.trim() || null;
+function assertCommentRules(body: CreateRepCallAttemptDto, comment: string | null): void {
   if (body.outcome === RepCallOutcome.OTHER && comment === null) throw commentRequired();
+  if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
+}
+
+function assertOutcomeRules(body: CreateRepCallAttemptDto): void {
   if (body.promisedProspects !== undefined && body.outcome !== RepCallOutcome.PROSPECTS_PROMISED)
     throw promisedNotAllowed();
-  if (comment !== null && comment.length > COMMENT_MAX_LENGTH) throw commentRequired();
   if (body.outcome === RepCallOutcome.CALLBACK && body.callbackAt === undefined)
     throw callbackAtRequired();
+}
+
+function validatedComment(body: CreateRepCallAttemptDto): string | null {
+  const comment = trimmedOrNull(body.comment);
+  assertCommentRules(body, comment);
+  assertOutcomeRules(body);
   return comment;
 }
 

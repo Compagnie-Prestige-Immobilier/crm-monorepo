@@ -14,9 +14,10 @@ export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationD
 /**
  * Version de charge utile du PANEL. Le serveur ne sert que les statuts qu'un
  * appelant de cette version sait renvoyer ; le panel les sait tous, mais il
- * déclare quand même la sienne, comme le fera le terrain.
+ * déclare quand même la sienne, comme le fera le terrain. En 8, il consent
+ * aussi aux refus de conversion CHUES d'EB-21, EB-22 et EB-24.
  */
-export const PANEL_PAYLOAD_VERSION = 7;
+export const PANEL_PAYLOAD_VERSION = 8;
 
 export const STATUT_QUALIFICATION_EFFECTS = [
   'REACHED',
@@ -89,7 +90,7 @@ export const libelleStatut = (statut: Pick<StatutQualification, 'code' | 'label'
 export const exigeMotif = (statut: StatutQualification): boolean => statut.requiresComment;
 
 /** Les deux statuts que la question du script pose seule : ils ne se choisissent plus. */
-export const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
+const STATUTS_DE_LA_QUESTION = { oui: 'ACCEPTE', non: 'REFUSE' } as const;
 
 export const statutDuSouhait = (
   statuts: readonly StatutQualification[],

@@ -759,6 +759,7 @@ class ProspectsApi {
   /// * [origin] - Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
   /// * [dateFrom] - Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
   /// * [dateTo] - Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
+  /// * [revue] - Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.
   /// * [includeDeleted] - Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
   /// * [page]
   /// * [pageSize]
@@ -793,6 +794,7 @@ class ProspectsApi {
     String? origin,
     DateTime? dateFrom,
     DateTime? dateTo,
+    bool? revue,
     bool? includeDeleted = false,
     num? page = 1,
     num? pageSize = 25,
@@ -839,6 +841,7 @@ class ProspectsApi {
       if (origin != null) r'origin': origin,
       if (dateFrom != null) r'dateFrom': dateFrom,
       if (dateTo != null) r'dateTo': dateTo,
+      if (revue != null) r'revue': revue,
       if (includeDeleted != null) r'includeDeleted': includeDeleted,
       if (page != null) r'page': page,
       if (pageSize != null) r'pageSize': pageSize,
@@ -877,6 +880,88 @@ class ProspectsApi {
     }
 
     return Response<ProspectListDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Marque une demande convertie « revue » avant sa transmission à l’enrôlement.
+  /// La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.
+  ///
+  /// Parameters:
+  /// * [id]
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [ProspectDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<ProspectDto>> marquerProspectRevue({
+    required String id,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/prospects/{id}/revue'.replaceAll(
+      '{'
+      r'id'
+      '}',
+      id.toString(),
+    );
+    final _options = Options(
+      method: r'POST',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    ProspectDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<ProspectDto, ProspectDto>(
+              rawData,
+              'ProspectDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<ProspectDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

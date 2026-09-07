@@ -13,7 +13,7 @@ import { queryKeys } from '@/lib/query-keys';
  * route rend 404 ; l'espace de démonstration rend 403. Ce sont des réponses
  * normales, pas des pannes.
  */
-export function estIndisponible(error: unknown): boolean {
+function estIndisponible(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 404 || error.status === 403);
 }
 

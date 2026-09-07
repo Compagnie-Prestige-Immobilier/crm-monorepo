@@ -46,12 +46,30 @@ enum DashboardSource {
   qualiteDeSaisie(r'qualite-de-saisie'),
   @JsonValue(r'taux-de-contact')
   tauxDeContact(r'taux-de-contact'),
-  @JsonValue(r'a-rappeler')
-  aRappeler(r'a-rappeler'),
-  @JsonValue(r'taux-de-qualification')
-  tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'taux-de-joignabilite-representants')
+  tauxDeJoignabiliteRepresentants(r'taux-de-joignabilite-representants'),
+  @JsonValue(r'taux-d-acceptation')
+  tauxDAcceptation(r'taux-d-acceptation'),
+  @JsonValue(r'taux-de-rappel')
+  tauxDeRappel(r'taux-de-rappel'),
   @JsonValue(r'repartition-statuts-qualification')
   repartitionStatutsQualification(r'repartition-statuts-qualification'),
+  @JsonValue(r'joints-non-joints')
+  jointsNonJoints(r'joints-non-joints'),
+  @JsonValue(r'statuts-par-famille')
+  statutsParFamille(r'statuts-par-famille'),
+  @JsonValue(r'joignabilite-par-creneau')
+  joignabiliteParCreneau(r'joignabilite-par-creneau'),
+  @JsonValue(r'taux-d-exploitation')
+  tauxDExploitation(r'taux-d-exploitation'),
+  @JsonValue(r'representants-par-departement')
+  representantsParDepartement(r'representants-par-departement'),
+  @JsonValue(r'representants-par-ief')
+  representantsParIef(r'representants-par-ief'),
+  @JsonValue(r'representants-jamais-appeles')
+  representantsJamaisAppeles(r'representants-jamais-appeles'),
+  @JsonValue(r'representants-injoignables')
+  representantsInjoignables(r'representants-injoignables'),
   @JsonValue(r'taux-de-joignabilite')
   tauxDeJoignabilite(r'taux-de-joignabilite'),
   @JsonValue(r'prospects-notes')
@@ -62,6 +80,14 @@ enum DashboardSource {
   resteAAppeler(r'reste-a-appeler'),
   @JsonValue(r'fiches-ouvertes')
   fichesOuvertes(r'fiches-ouvertes'),
+  @JsonValue(r'taux-de-qualification')
+  tauxDeQualification(r'taux-de-qualification'),
+  @JsonValue(r'duree-moyenne-sur-la-fiche')
+  dureeMoyenneSurLaFiche(r'duree-moyenne-sur-la-fiche'),
+  @JsonValue(r'duree-moyenne-de-communication')
+  dureeMoyenneDeCommunication(r'duree-moyenne-de-communication'),
+  @JsonValue(r'appels-par-jour')
+  appelsParJour(r'appels-par-jour'),
   @JsonValue(r'par-teleconseiller')
   parTeleconseiller(r'par-teleconseiller'),
   @JsonValue(r'couverture-derniere-campagne')

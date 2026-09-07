@@ -146,6 +146,18 @@ export class ComptageOuverturesJourDto {
 
   @ApiProperty({
     type: Number,
+    description: 'Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`.',
+  })
+  qualifiees!: number;
+
+  @ApiProperty({
+    type: Number,
+    description: 'Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur.',
+  })
+  liberees!: number;
+
+  @ApiProperty({
+    type: Number,
     nullable: true,
     description:
       'DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête.',

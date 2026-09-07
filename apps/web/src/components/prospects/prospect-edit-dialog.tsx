@@ -86,6 +86,135 @@ function segmentBascule(prospect: ProspectRow, banqueId: string, syndicatId: str
   return !memeChoix(banqueId, prospect.banqueId) || !memeChoix(syndicatId, prospect.syndicatId);
 }
 
+function isSegmentChanged(
+  prospect: ProspectRow | null,
+  banqueId: string,
+  syndicatId: string,
+): boolean {
+  if (prospect === null) return false;
+  return segmentBascule(prospect, banqueId, syndicatId);
+}
+
+function savedByLabel(prospect: ProspectRow | null): string {
+  if (prospect === null) return '–';
+  return prospect.ownedByCommercialName;
+}
+
+function segmentLabel(segment: BddSegment | null, fallback: string): string {
+  return segment === null ? fallback : SEGMENT_LABELS[segment];
+}
+
+function applyIfSelected<T extends string>(value: T | null, apply: (value: T) => void): void {
+  if (value === null) return;
+  apply(value);
+}
+
+function reasonValidationError(segmentChanged: boolean, reason: string): string | undefined {
+  if (!segmentChanged) return undefined;
+  if (reason.trim().length >= MIN_REASON_LENGTH) return undefined;
+  return 'Expliquez la bascule : elle est enregistrée et rendue à la direction.';
+}
+
+function identityPatch(
+  values: ProspectFormInput,
+  prospect: ProspectRow,
+): UpdateProspectInput | null {
+  const changed =
+    values.nom !== prospect.nom ||
+    values.prenom !== prospect.prenom ||
+    values.phone !== prospect.phoneE164 ||
+    !memeChoix(values.representantId, prospect.representantId) ||
+    values.statut !== prospect.statut;
+  if (!changed) return null;
+  return {
+    nom: values.nom,
+    prenom: values.prenom,
+    phone: values.phone,
+    representantId: values.representantId,
+    statut: values.statut,
+  };
+}
+
+function segmentPatchInput(
+  values: ProspectFormInput,
+  prospect: ProspectRow,
+  reason: string,
+): { banqueId?: string; syndicatId?: string; reason: string; expectedRev: number } | null {
+  const banqueChanged = !memeChoix(values.banqueId, prospect.banqueId);
+  const syndicatChanged = !memeChoix(values.syndicatId, prospect.syndicatId);
+  if (!banqueChanged && !syndicatChanged) return null;
+  return {
+    ...(banqueChanged ? { banqueId: values.banqueId } : {}),
+    ...(syndicatChanged ? { syndicatId: values.syndicatId } : {}),
+    reason: reason.trim(),
+    expectedRev: prospect.rev,
+  };
+}
+
+function SubmitIcon({ pending }: { pending: boolean }) {
+  if (!pending) return null;
+  return <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />;
+}
+
+function ProspectSegmentHistoryOrNull({ prospect }: { prospect: ProspectRow | null }) {
+  if (prospect === null) return null;
+  return <ProspectSegmentHistory prospectId={prospect.id} />;
+}
+
+function SegmentBasculePanel({
+  prospect,
+  segmentChanged,
+  nextSegment,
+  reason,
+  setReason,
+  reasonError,
+}: {
+  prospect: ProspectRow | null;
+  segmentChanged: boolean;
+  nextSegment: BddSegment | null;
+  reason: string;
+  setReason: (value: string) => void;
+  reasonError: string | undefined;
+}) {
+  if (!segmentChanged || prospect === null) return null;
+
+  return (
+    <div className="flex flex-col gap-3">
+      {/*
+        `role="alert"` : le bloc APPARAÎT en cours de saisie, en
+        réaction à un choix. Sans lui, un utilisateur au lecteur
+        d'écran changerait de banque et n'entendrait jamais que la
+        fiche vient de changer de base.
+      */}
+      <div role="alert" className="flex flex-col gap-1.5">
+        <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
+          <span>{segmentLabel(prospect.segment, 'Aucun')}</span>
+          <ArrowRightIcon className="size-3.5" aria-hidden="true" />
+          <span className="font-[600]">{segmentLabel(nextSegment, 'segment indéterminé')}</span>
+        </p>
+        <p className="text-[0.75rem] text-muted-foreground">
+          Changer de banque ou de syndicat fait CHANGER LA FICHE DE BASE. Ce n’est pas une
+          correction de faute de frappe&nbsp;: la bascule est enregistrée avec votre nom, la date
+          et le motif, et elle est comptée dans les conversions du mois.
+        </p>
+      </div>
+
+      <Field label="Motif de la bascule" required error={reasonError}>
+        {(props) => (
+          <Textarea
+            {...props}
+            value={reason}
+            onChange={(event) => {
+              setReason(event.target.value);
+            }}
+            placeholder="Ex. : le client a domicilié son salaire à la CBAO le 12 août."
+          />
+        )}
+      </Field>
+    </div>
+  );
+}
+
 export function ProspectEditDialog({
   prospect,
   onOpenChange,
@@ -136,34 +265,15 @@ export function ProspectEditDialog({
     mutationFn: async (values: ProspectFormInput) => {
       if (prospect === null) throw new Error('Aucun prospect sélectionné.');
 
-      const banqueChanged = !memeChoix(values.banqueId, prospect.banqueId);
-      const syndicatChanged = !memeChoix(values.syndicatId, prospect.syndicatId);
-
       let saved: ProspectRow | undefined;
-      if (banqueChanged || syndicatChanged) {
-        saved = await changeProspectSegment(prospect.id, {
-          ...(banqueChanged ? { banqueId: values.banqueId } : {}),
-          ...(syndicatChanged ? { syndicatId: values.syndicatId } : {}),
-          reason: reason.trim(),
-          expectedRev: prospect.rev,
-        });
+
+      const segmentPatch = segmentPatchInput(values, prospect, reason);
+      if (segmentPatch !== null) {
+        saved = await changeProspectSegment(prospect.id, segmentPatch);
       }
 
-      const identityChanged =
-        values.nom !== prospect.nom ||
-        values.prenom !== prospect.prenom ||
-        values.phone !== prospect.phoneE164 ||
-        !memeChoix(values.representantId, prospect.representantId) ||
-        values.statut !== prospect.statut;
-
-      if (identityChanged) {
-        const patch: UpdateProspectInput = {
-          nom: values.nom,
-          prenom: values.prenom,
-          phone: values.phone,
-          representantId: values.representantId,
-          statut: values.statut,
-        };
+      const patch = identityPatch(values, prospect);
+      if (patch !== null) {
         saved = await updateProspect(prospect.id, patch);
       }
 
@@ -192,7 +302,7 @@ export function ProspectEditDialog({
     syndicatId,
   );
 
-  const segmentChanged = prospect !== null && segmentBascule(prospect, banqueId, syndicatId);
+  const segmentChanged = isSegmentChanged(prospect, banqueId, syndicatId);
 
   return (
     <Dialog
@@ -204,7 +314,7 @@ export function ProspectEditDialog({
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
           <DialogTitle>Modifier le prospect</DialogTitle>
-          <DialogDescription>Saisi par {prospect?.ownedByCommercialName ?? '–'}.</DialogDescription>
+          <DialogDescription>Saisi par {savedByLabel(prospect)}.</DialogDescription>
         </DialogHeader>
 
         <form
@@ -212,14 +322,9 @@ export function ProspectEditDialog({
           className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
             void handleSubmit((values) => {
-              if (segmentChanged && reason.trim().length < MIN_REASON_LENGTH) {
-                setReasonError(
-                  'Expliquez la bascule : elle est enregistrée et rendue à la direction.',
-                );
-                return;
-              }
-              setReasonError(undefined);
-              mutation.mutate(values);
+              const error = reasonValidationError(segmentChanged, reason);
+              setReasonError(error);
+              if (error === undefined) mutation.mutate(values);
             })(event);
           }}
         >
@@ -246,8 +351,9 @@ export function ProspectEditDialog({
                 items={PROSPECT_STATUT_LABELS}
                 value={statut}
                 onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('statut', value, { shouldDirty: true });
+                  applyIfSelected(value, (statutValue) => {
+                    setValue('statut', statutValue, { shouldDirty: true });
+                  });
                 }}
               >
                 <SelectTrigger id={props.id}>
@@ -270,8 +376,9 @@ export function ProspectEditDialog({
                 items={banqueItems}
                 value={banqueId}
                 onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('banqueId', value, { shouldDirty: true });
+                  applyIfSelected(value, (banqueValue) => {
+                    setValue('banqueId', banqueValue, { shouldDirty: true });
+                  });
                 }}
               >
                 <SelectTrigger id={props.id}>
@@ -294,8 +401,9 @@ export function ProspectEditDialog({
                 items={syndicatItems}
                 value={syndicatId}
                 onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('syndicatId', value, { shouldDirty: true });
+                  applyIfSelected(value, (syndicatValue) => {
+                    setValue('syndicatId', syndicatValue, { shouldDirty: true });
+                  });
                 }}
               >
                 <SelectTrigger id={props.id}>
@@ -323,51 +431,20 @@ export function ProspectEditDialog({
             <p className="text-[0.8125rem]">
               <span className="text-muted-foreground">Segment actuel&nbsp;: </span>
               <span className="font-[600]">
-                {prospect?.segment == null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}
+                {segmentLabel(prospect === null ? null : prospect.segment, 'Aucun')}
               </span>
             </p>
 
-            {segmentChanged ? (
-              <div className="flex flex-col gap-3">
-                {/*
-                  `role="alert"` : le bloc APPARAÎT en cours de saisie, en
-                  réaction à un choix. Sans lui, un utilisateur au lecteur
-                  d'écran changerait de banque et n'entendrait jamais que la
-                  fiche vient de changer de base.
-                */}
-                <div role="alert" className="flex flex-col gap-1.5">
-                  <p className="flex flex-wrap items-center gap-1.5 text-[0.8125rem]">
-                    <span>
-                      {prospect.segment === null ? 'Aucun' : SEGMENT_LABELS[prospect.segment]}
-                    </span>
-                    <ArrowRightIcon className="size-3.5" aria-hidden="true" />
-                    <span className="font-[600]">
-                      {nextSegment === null ? 'segment indéterminé' : SEGMENT_LABELS[nextSegment]}
-                    </span>
-                  </p>
-                  <p className="text-[0.75rem] text-muted-foreground">
-                    Changer de banque ou de syndicat fait CHANGER LA FICHE DE BASE. Ce n’est pas une
-                    correction de faute de frappe&nbsp;: la bascule est enregistrée avec votre nom,
-                    la date et le motif, et elle est comptée dans les conversions du mois.
-                  </p>
-                </div>
+            <SegmentBasculePanel
+              prospect={prospect}
+              segmentChanged={segmentChanged}
+              nextSegment={nextSegment}
+              reason={reason}
+              setReason={setReason}
+              reasonError={reasonError}
+            />
 
-                <Field label="Motif de la bascule" required error={reasonError}>
-                  {(props) => (
-                    <Textarea
-                      {...props}
-                      value={reason}
-                      onChange={(event) => {
-                        setReason(event.target.value);
-                      }}
-                      placeholder="Ex. : le client a domicilié son salaire à la CBAO le 12 août."
-                    />
-                  )}
-                </Field>
-              </div>
-            ) : null}
-
-            {prospect === null ? null : <ProspectSegmentHistory prospectId={prospect.id} />}
+            <ProspectSegmentHistoryOrNull prospect={prospect} />
           </div>
 
           <Field
@@ -381,8 +458,9 @@ export function ProspectEditDialog({
                 items={representantItems}
                 value={representantId}
                 onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('representantId', value, { shouldDirty: true });
+                  applyIfSelected(value, (representantValue) => {
+                    setValue('representantId', representantValue, { shouldDirty: true });
+                  });
                 }}
               >
                 <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
@@ -410,9 +488,7 @@ export function ProspectEditDialog({
               Annuler
             </Button>
             <Button type="submit" disabled={mutation.isPending}>
-              {mutation.isPending ? (
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              ) : null}
+              <SubmitIcon pending={mutation.isPending} />
               Enregistrer
             </Button>
           </DialogFooter>

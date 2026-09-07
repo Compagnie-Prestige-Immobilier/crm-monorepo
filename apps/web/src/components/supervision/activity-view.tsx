@@ -76,9 +76,9 @@ import {
   type ActivityLine,
   type ActivityRange,
   type ActivitySortKey,
+  type BucketTotals,
   type PeriodPreset,
   type SortDirection,
-  type SupervisionActivity,
   type SupervisionGranularity,
   type SupervisionScore,
   type UpdateWorkShifts,
@@ -94,13 +94,13 @@ import { cn } from '@/lib/utils';
 const TUILES: Record<ActivityFamille, { key: ActivityKey; icon: LucideIcon }[]> = {
   representants: [
     { key: 'repCalls', icon: PhoneCallIcon },
-    { key: 'repContactRate', icon: PhoneOffIcon },
-    { key: 'repCallback', icon: TargetIcon },
+    { key: 'repReachabilityRate', icon: PhoneOffIcon },
+    { key: 'repFichesAcceptees', icon: TargetIcon },
     { key: 'prospectsCreated', icon: UserPlusIcon },
   ],
   prospects: [
     { key: 'calls', icon: PhoneCallIcon },
-    { key: 'reachRate', icon: PhoneOffIcon },
+    { key: 'ficheReachRate', icon: PhoneOffIcon },
     { key: 'methodObtained', icon: TargetIcon },
     { key: 'prospectsCreated', icon: UserPlusIcon },
   ],
@@ -144,127 +144,36 @@ export function ActivityView({ projet }: { projet: Projet }) {
     setSortDir(key === 'name' ? 'asc' : 'desc');
   }
 
+  function selectCustomPreset(): void {
+    setPreset('custom');
+  }
+
+  function handleExport(): void {
+    if (data === undefined) return;
+    const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
+    downloadCsv(
+      activityCsv({ lines, totals: activityTotals(lines), range, granularity, projet, famille }),
+      activityCsvFileName(range, projet, famille),
+    );
+  }
+
   const hasData = data !== undefined;
 
   const toolbar = (
-    <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        {PRESETS.map((value) => (
-          <Button
-            key={value}
-            variant={preset === value ? 'default' : 'outline'}
-            size="sm"
-            aria-pressed={preset === value}
-            onClick={() => {
-              selectPreset(value);
-            }}
-          >
-            {PERIOD_LABELS[value]}
-          </Button>
-        ))}
-        <Button
-          variant={preset === 'custom' ? 'default' : 'outline'}
-          size="sm"
-          aria-pressed={preset === 'custom'}
-          onClick={() => {
-            setPreset('custom');
-          }}
-        >
-          {PERIOD_LABELS.custom}
-        </Button>
-
-        <span className="ml-auto flex items-center gap-2">
-          {familles.length > 1 ? (
-            <span className="inline-flex overflow-hidden rounded-md border border-border">
-              {familles.map((value) => (
-                <Button
-                  key={value}
-                  variant={famille === value ? 'default' : 'ghost'}
-                  size="sm"
-                  className="rounded-none"
-                  aria-pressed={famille === value}
-                  onClick={() => {
-                    selectFamille(value);
-                  }}
-                >
-                  {FAMILLE_LABELS[value]}
-                </Button>
-              ))}
-            </span>
-          ) : null}
-          <span className="inline-flex overflow-hidden rounded-md border border-border">
-            <Button
-              variant={granularity === 'day' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none"
-              aria-pressed={granularity === 'day'}
-              onClick={() => {
-                setGranularity('day');
-              }}
-            >
-              Par jour
-            </Button>
-            <Button
-              variant={granularity === 'week' ? 'default' : 'ghost'}
-              size="sm"
-              className="rounded-none"
-              aria-pressed={granularity === 'week'}
-              onClick={() => {
-                setGranularity('week');
-              }}
-            >
-              Par semaine
-            </Button>
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={!hasData}
-            onClick={() => {
-              if (data === undefined) return;
-              const lines = sortActivityLines(activityLines(data), sortKey, sortDir);
-              downloadCsv(
-                activityCsv({
-                  lines,
-                  totals: activityTotals(lines),
-                  range,
-                  granularity,
-                  projet,
-                  famille,
-                }),
-                activityCsvFileName(range, projet, famille),
-              );
-            }}
-          >
-            <DownloadIcon aria-hidden="true" />
-            Exporter en CSV
-          </Button>
-        </span>
-      </div>
-
-      {preset === 'custom' ? (
-        <div className="flex flex-wrap items-end gap-3">
-          <DatePicker
-            id="activite-du"
-            label="Du"
-            value={range.from}
-            max={range.to}
-            onChange={(from) => {
-              setRange({ from: from ?? dakarToday(), to: range.to });
-            }}
-          />
-          <DatePicker
-            id="activite-au"
-            label="Au"
-            value={range.to}
-            min={range.from}
-            onChange={(to) => {
-              setRange({ from: range.from, to: to ?? dakarToday() });
-            }}
-          />
-        </div>
-      ) : null}
-    </div>
+    <ActivityToolbar
+      familles={familles}
+      famille={famille}
+      onSelectFamille={selectFamille}
+      preset={preset}
+      onSelectPreset={selectPreset}
+      onSelectCustomPreset={selectCustomPreset}
+      granularity={granularity}
+      onGranularityChange={setGranularity}
+      hasData={hasData}
+      onExport={handleExport}
+      range={range}
+      onRangeChange={setRange}
+    />
   );
 
   if (shouldShowError({ isError, hasData })) {
@@ -321,112 +230,284 @@ export function ActivityView({ projet }: { projet: Projet }) {
         })}
       </div>
 
+      <ActivityDataTable
+        lines={lines}
+        totals={totals}
+        averages={averages}
+        colonnes={colonnes}
+        sortKey={sortKey}
+        sortDir={sortDir}
+        onToggleSort={toggleSort}
+      />
+
+      <p className="text-[0.8125rem] text-muted-foreground">
+        Chaque colonne porte sur la date de l’acte, dans la période choisie.
+      </p>
+
       <ShiftComparison range={range} granularity={granularity} projet={projet} famille={famille} />
 
       <FichesOuvertes range={range} />
 
       <ScoreSection scores={data.scores} />
 
-      <Card>
-        <CardContent className="p-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead aria-sort={ariaSort(sortKey === 'name', sortDir)}>
+      <BucketsSection buckets={buckets} colonnes={colonnes} granularity={granularity} />
+    </div>
+  );
+}
+
+function ActivityToolbar({
+  familles,
+  famille,
+  onSelectFamille,
+  preset,
+  onSelectPreset,
+  onSelectCustomPreset,
+  granularity,
+  onGranularityChange,
+  hasData,
+  onExport,
+  range,
+  onRangeChange,
+}: {
+  familles: ActivityFamille[];
+  famille: ActivityFamille;
+  onSelectFamille: (value: ActivityFamille) => void;
+  preset: PeriodPreset;
+  onSelectPreset: (value: Exclude<PeriodPreset, 'custom'>) => void;
+  onSelectCustomPreset: () => void;
+  granularity: SupervisionGranularity;
+  onGranularityChange: (value: SupervisionGranularity) => void;
+  hasData: boolean;
+  onExport: () => void;
+  range: ActivityRange;
+  onRangeChange: (range: ActivityRange) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-center gap-2">
+        {PRESETS.map((value) => (
+          <Button
+            key={value}
+            variant={preset === value ? 'default' : 'outline'}
+            size="sm"
+            aria-pressed={preset === value}
+            onClick={() => {
+              onSelectPreset(value);
+            }}
+          >
+            {PERIOD_LABELS[value]}
+          </Button>
+        ))}
+        <Button
+          variant={preset === 'custom' ? 'default' : 'outline'}
+          size="sm"
+          aria-pressed={preset === 'custom'}
+          onClick={onSelectCustomPreset}
+        >
+          {PERIOD_LABELS.custom}
+        </Button>
+
+        <span className="ml-auto flex items-center gap-2">
+          {familles.length > 1 ? (
+            <span className="inline-flex overflow-hidden rounded-md border border-border">
+              {familles.map((value) => (
+                <Button
+                  key={value}
+                  variant={famille === value ? 'default' : 'ghost'}
+                  size="sm"
+                  className="rounded-none"
+                  aria-pressed={famille === value}
+                  onClick={() => {
+                    onSelectFamille(value);
+                  }}
+                >
+                  {FAMILLE_LABELS[value]}
+                </Button>
+              ))}
+            </span>
+          ) : null}
+          <span className="inline-flex overflow-hidden rounded-md border border-border">
+            <Button
+              variant={granularity === 'day' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              aria-pressed={granularity === 'day'}
+              onClick={() => {
+                onGranularityChange('day');
+              }}
+            >
+              Par jour
+            </Button>
+            <Button
+              variant={granularity === 'week' ? 'default' : 'ghost'}
+              size="sm"
+              className="rounded-none"
+              aria-pressed={granularity === 'week'}
+              onClick={() => {
+                onGranularityChange('week');
+              }}
+            >
+              Par semaine
+            </Button>
+          </span>
+          <Button variant="outline" size="sm" disabled={!hasData} onClick={onExport}>
+            <DownloadIcon aria-hidden="true" />
+            Exporter en CSV
+          </Button>
+        </span>
+      </div>
+
+      {preset === 'custom' ? (
+        <div className="flex flex-wrap items-end gap-3">
+          <DatePicker
+            id="activite-du"
+            label="Du"
+            value={range.from}
+            max={range.to}
+            onChange={(from) => {
+              onRangeChange({ from: from ?? dakarToday(), to: range.to });
+            }}
+          />
+          <DatePicker
+            id="activite-au"
+            label="Au"
+            value={range.to}
+            min={range.from}
+            onChange={(to) => {
+              onRangeChange({ from: range.from, to: to ?? dakarToday() });
+            }}
+          />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function ActivityDataTable({
+  lines,
+  totals,
+  averages,
+  colonnes,
+  sortKey,
+  sortDir,
+  onToggleSort,
+}: {
+  lines: ActivityLine[];
+  totals: ActivityCounts;
+  averages: ActivityCounts;
+  colonnes: ActivityColumn[];
+  sortKey: ActivitySortKey;
+  sortDir: SortDirection;
+  onToggleSort: (key: ActivitySortKey) => void;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead aria-sort={ariaSort(sortKey === 'name', sortDir)}>
+                <SortButton
+                  label="Téléconseiller"
+                  active={sortKey === 'name'}
+                  direction={sortDir}
+                  onClick={() => {
+                    onToggleSort('name');
+                  }}
+                />
+              </TableHead>
+              {colonnes.map((column) => (
+                <TableHead
+                  key={column.key}
+                  className="text-right"
+                  aria-sort={ariaSort(sortKey === column.key, sortDir)}
+                >
                   <SortButton
-                    label="Téléconseiller"
-                    active={sortKey === 'name'}
+                    label={column.label}
+                    active={sortKey === column.key}
                     direction={sortDir}
                     onClick={() => {
-                      toggleSort('name');
+                      onToggleSort(column.key);
                     }}
                   />
                 </TableHead>
-                {colonnes.map((column) => (
-                  <TableHead
-                    key={column.key}
-                    className="text-right"
-                    aria-sort={ariaSort(sortKey === column.key, sortDir)}
-                  >
-                    <SortButton
-                      label={column.label}
-                      active={sortKey === column.key}
-                      direction={sortDir}
-                      onClick={() => {
-                        toggleSort(column.key);
-                      }}
-                    />
-                  </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {lines.map((line) => (
+              <ActivityRow key={line.id} line={line} colonnes={colonnes} />
+            ))}
+            {lines.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={colonnes.length + 1} className="py-8 text-center">
+                  Aucun compte téléconseiller. Créez-en un depuis les comptes.
+                </TableCell>
+              </TableRow>
+            ) : null}
+          </TableBody>
+          {lines.length > 0 ? (
+            <TableFooter>
+              <TotalsRow label="Total équipe" values={totals} colonnes={colonnes} />
+              <TotalsRow
+                label="Moyenne par téléconseiller"
+                values={averages}
+                colonnes={colonnes}
+                decimal
+              />
+            </TableFooter>
+          ) : null}
+        </Table>
+      </CardContent>
+    </Card>
+  );
+}
+
+function BucketsSection({
+  buckets,
+  colonnes,
+  granularity,
+}: {
+  buckets: BucketTotals[];
+  colonnes: ActivityColumn[];
+  granularity: SupervisionGranularity;
+}) {
+  if (buckets.length === 0) return null;
+
+  return (
+    <Card>
+      <CardContent className="p-0">
+        <Table>
+          <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
+            {granularity === 'week' ? 'Équipe, par semaine' : 'Équipe, par jour'}
+          </caption>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>{granularity === 'week' ? 'Semaine' : 'Jour'}</TableHead>
+              {colonnes.map((colonne) => (
+                <TableHead key={colonne.key} className="text-right">
+                  {colonne.label}
+                </TableHead>
+              ))}
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {buckets.map((bucket) => (
+              <TableRow key={bucket.bucket}>
+                <TableCell className="font-[600]">
+                  {granularity === 'week'
+                    ? `Semaine du ${formatShortDate(bucket.bucket)}`
+                    : formatShortDate(bucket.bucket)}
+                </TableCell>
+                {colonnes.map((colonne) => (
+                  <Cellule key={colonne.key} colonne={colonne} valeur={bucket[colonne.key]} />
                 ))}
               </TableRow>
-            </TableHeader>
-            <TableBody>
-              {lines.map((line) => (
-                <ActivityRow key={line.id} line={line} colonnes={colonnes} />
-              ))}
-              {lines.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={colonnes.length + 1} className="py-8 text-center">
-                    Aucun compte téléconseiller. Créez-en un depuis les comptes.
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-            {lines.length > 0 ? (
-              <TableFooter>
-                <TotalsRow label="Total équipe" values={totals} colonnes={colonnes} />
-                <TotalsRow
-                  label="Moyenne par téléconseiller"
-                  values={averages}
-                  colonnes={colonnes}
-                  decimal
-                />
-              </TableFooter>
-            ) : null}
-          </Table>
-        </CardContent>
-      </Card>
-
-      <p className="text-[0.8125rem] text-muted-foreground">
-        Chaque colonne porte sur la date de l’acte, dans la période choisie.
-      </p>
-
-      {buckets.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <Table>
-              <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
-                {granularity === 'week' ? 'Équipe, par semaine' : 'Équipe, par jour'}
-              </caption>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{granularity === 'week' ? 'Semaine' : 'Jour'}</TableHead>
-                  {colonnes.map((colonne) => (
-                    <TableHead key={colonne.key} className="text-right">
-                      {colonne.label}
-                    </TableHead>
-                  ))}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {buckets.map((bucket) => (
-                  <TableRow key={bucket.bucket}>
-                    <TableCell className="font-[600]">
-                      {granularity === 'week'
-                        ? `Semaine du ${formatShortDate(bucket.bucket)}`
-                        : formatShortDate(bucket.bucket)}
-                    </TableCell>
-                    {colonnes.map((colonne) => (
-                      <Cellule key={colonne.key} colonne={colonne} valeur={bucket[colonne.key]} />
-                    ))}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      ) : null}
-    </div>
+            ))}
+          </TableBody>
+        </Table>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -637,13 +718,39 @@ function ShiftComparison({
 
   if (shiftsQuery.isPending || shifts.length === 0) return null;
 
-  type ApiCounts = SupervisionActivity['totals'];
-  const callsOf = (counts: ApiCounts): number =>
+  // EB-33 : une ligne par téléconseiller, un groupe de colonnes par créneau.
+  // Chaque créneau est une fenêtre à part : une fiche appelée le matin et
+  // l'après-midi compte dans les deux.
+  const parCreneau = results.map((result) =>
+    result.data === undefined ? [] : activityLines(result.data),
+  );
+  const personnes = [...new Map(parCreneau.flat().map((ligne) => [ligne.id, ligne.name]))]
+    .sort(([, a], [, b]) => a.localeCompare(b, 'fr'));
+  type Compteurs = Pick<
+    ActivityCounts,
+    | 'repCalls'
+    | 'calls'
+    | 'repFichesAcceptees'
+    | 'methodObtained'
+    | 'repReachabilityRate'
+    | 'ficheReachRate'
+  >;
+  const ligneDe = (index: number, id: string): Compteurs | undefined =>
+    parCreneau[index]?.find((ligne) => ligne.id === id);
+  const totauxDe = (index: number): Compteurs | undefined => results[index]?.data?.totals;
+
+  const callsOf = (counts: Compteurs): number =>
     famille === 'representants' ? counts.repCalls : counts.calls;
-  const successOf = (counts: ApiCounts): number =>
-    famille === 'representants' ? counts.repReached : counts.methodObtained;
-  const rateOf = (counts: ApiCounts): number | null =>
-    famille === 'representants' ? counts.repContactRate : counts.reachRate;
+  const successOf = (counts: Compteurs): number =>
+    famille === 'representants' ? counts.repFichesAcceptees : counts.methodObtained;
+  const rateOf = (counts: Compteurs): number | null =>
+    famille === 'representants' ? counts.repReachabilityRate : counts.ficheReachRate;
+
+  const cellules = (counts: Compteurs | undefined): [string, string, string] => [
+    formatNumber(counts === undefined ? 0 : callsOf(counts)),
+    formatRateOrNone(counts === undefined ? null : rateOf(counts)),
+    formatNumber(counts === undefined ? 0 : successOf(counts)),
+  ];
 
   return (
     <Card>
@@ -655,7 +762,8 @@ function ShiftComparison({
               Efficacité par créneau
             </h2>
             <p className="mt-1 text-[0.8125rem] text-muted-foreground">
-              Appels par heure et résultat des appels, sur la période choisie.
+              Appels, joignabilité et {famille === 'representants' ? 'acceptés' : 'méthodes'} de
+              chaque téléconseiller, créneau par créneau, sur la période choisie.
             </p>
           </div>
           <Button
@@ -720,45 +828,59 @@ function ShiftComparison({
           </form>
         ) : null}
 
-        <Table>
+        <Table aria-label="Efficacité par créneau">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Créneau</TableHead>
-              <TableHead className="text-right">Appels</TableHead>
-              <TableHead className="text-right">Appels/h</TableHead>
-              <TableHead className="text-right">
-                {famille === 'representants' ? 'Joints' : 'Méthodes'}
-              </TableHead>
-              <TableHead className="text-right">Taux</TableHead>
-              <TableHead className="text-right">Prospects saisis</TableHead>
+              <TableHead rowSpan={2}>Téléconseiller</TableHead>
+              {shifts.map((shift) => (
+                <TableHead key={shift.key} colSpan={3} className="text-center">
+                  {shift.label} · {shift.start}–{shift.end}
+                </TableHead>
+              ))}
+            </TableRow>
+            <TableRow className="hover:bg-transparent">
+              {shifts.flatMap((shift) => [
+                <TableHead key={`${shift.key}-appels`} className="text-right">
+                  Appels
+                </TableHead>,
+                <TableHead key={`${shift.key}-taux`} className="text-right">
+                  Joignabilité
+                </TableHead>,
+                <TableHead key={`${shift.key}-succes`} className="text-right">
+                  {famille === 'representants' ? 'Acceptés' : 'Méthodes'}
+                </TableHead>,
+              ])}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {shifts.map((shift, index) => {
-              const counts = results[index]?.data?.totals;
-              const duration = (shiftMinutes(shift.start, shift.end) / 60) * rangeDays(range);
-              const calls = counts === undefined ? 0 : callsOf(counts);
-              return (
-                <TableRow key={shift.key}>
-                  <TableCell className="font-[600]">
-                    {shift.label} · {shift.start}–{shift.end}
+            {personnes.map(([id, nom]) => (
+              <TableRow key={id}>
+                <TableCell className="font-[600]">{nom}</TableCell>
+                {shifts.flatMap((shift, index) =>
+                  cellules(ligneDe(index, id)).map((texte, colonne) => (
+                    <TableCell
+                      key={`${shift.key}-${String(colonne)}`}
+                      className="text-right tabular-nums"
+                    >
+                      {texte}
+                    </TableCell>
+                  )),
+                )}
+              </TableRow>
+            ))}
+            <TableRow className="font-[600]">
+              <TableCell>Équipe</TableCell>
+              {shifts.flatMap((shift, index) =>
+                cellules(totauxDe(index)).map((texte, colonne) => (
+                  <TableCell
+                    key={`${shift.key}-${String(colonne)}`}
+                    className="text-right tabular-nums"
+                  >
+                    {texte}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums">{formatNumber(calls)}</TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatDecimal(duration === 0 ? 0 : calls / duration)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(counts === undefined ? 0 : successOf(counts))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatRateOrNone(counts === undefined ? null : rateOf(counts))}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(counts?.prospectsCreated ?? 0)}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+                )),
+              )}
+            </TableRow>
           </TableBody>
         </Table>
       </CardContent>
@@ -788,18 +910,6 @@ function TimeField({
       />
     </div>
   );
-}
-
-function shiftMinutes(start: string, end: string): number {
-  const [startHour = 0, startMinute = 0] = start.split(':').map(Number);
-  const [endHour = 0, endMinute = 0] = end.split(':').map(Number);
-  return endHour * 60 + endMinute - startHour * 60 - startMinute;
-}
-
-function rangeDays(range: ActivityRange): number {
-  const from = Date.parse(`${range.from}T00:00:00.000Z`);
-  const to = Date.parse(`${range.to}T00:00:00.000Z`);
-  return Math.max(1, Math.floor((to - from) / 86_400_000) + 1);
 }
 
 function dureeAffichee(secondes: number): string {

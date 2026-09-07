@@ -18,7 +18,7 @@ import { DEMO_MODE_HEADER, isDemoExport, withDemoSuffix } from '@/lib/demo-marki
 import { getSession } from '@/lib/session';
 import type { Role } from '@/lib/types';
 
-export const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 export interface XlsxRelayOptions {
   upstreamPath: string;
@@ -67,43 +67,77 @@ async function renouvelerSession(): Promise<Renouvellement> {
   return { ok: true, accessToken: rotation.tokens.accessToken };
 }
 
-export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
+type UpstreamRetryResult = { ok: true; response: Response } | { ok: false; reponse: Response };
+
+async function fetchUpstreamAvecRenouvellement(
+  options: XlsxRelayOptions,
+  accessToken: string,
+): Promise<UpstreamRetryResult> {
+  const first = await requestUpstream(options, accessToken);
+  if (first.status !== 401) {
+    return { ok: true, response: first };
+  }
+
+  const renouvelle = await renouvelerSession();
+  if (!renouvelle.ok) {
+    return { ok: false, reponse: renouvelle.reponse };
+  }
+
+  return { ok: true, response: await requestUpstream(options, renouvelle.accessToken) };
+}
+
+type ExportAuthResult = { ok: true; accessToken: string } | { ok: false; reponse: Response };
+
+async function resolveExportAuth(options: XlsxRelayOptions): Promise<ExportAuthResult> {
   try {
     serverApiOrigin();
   } catch (error) {
     if (error instanceof ApiConfigurationError) {
-      return NextResponse.json(configErrorBody(error), { status: 500 });
+      return { ok: false, reponse: NextResponse.json(configErrorBody(error), { status: 500 }) };
     }
     throw error;
   }
 
   const session = await getSession();
   if (session === null) {
-    return NextResponse.json({ error: 'Session expirée.' }, { status: 401 });
+    return {
+      ok: false,
+      reponse: NextResponse.json({ error: 'Session expirée.' }, { status: 401 }),
+    };
   }
 
   const allowed = options.allowedRoles;
   if (allowed !== undefined && !allowed.includes(session.role)) {
-    return NextResponse.json(
-      { error: 'Cet export n’est pas accessible avec votre rôle.' },
-      { status: 403 },
-    );
+    return {
+      ok: false,
+      reponse: NextResponse.json(
+        { error: 'Cet export n’est pas accessible avec votre rôle.' },
+        { status: 403 },
+      ),
+    };
   }
 
   const accessToken = await getAccessToken();
   if (accessToken === null || accessToken === '') {
-    return NextResponse.json({ error: 'Session expirée.' }, { status: 401 });
+    return {
+      ok: false,
+      reponse: NextResponse.json({ error: 'Session expirée.' }, { status: 401 }),
+    };
   }
+
+  return { ok: true, accessToken };
+}
+
+export async function relayXlsx(options: XlsxRelayOptions): Promise<Response> {
+  const auth = await resolveExportAuth(options);
+  if (!auth.ok) return auth.reponse;
+  const { accessToken } = auth;
 
   let upstream: Response;
   try {
-    upstream = await requestUpstream(options, accessToken);
-
-    if (upstream.status === 401) {
-      const renouvelle = await renouvelerSession();
-      if (!renouvelle.ok) return renouvelle.reponse;
-      upstream = await requestUpstream(options, renouvelle.accessToken);
-    }
+    const result = await fetchUpstreamAvecRenouvellement(options, accessToken);
+    if (!result.ok) return result.reponse;
+    upstream = result.response;
   } catch {
     return NextResponse.json({ error: 'Le serveur CPI est injoignable.' }, { status: 502 });
   }

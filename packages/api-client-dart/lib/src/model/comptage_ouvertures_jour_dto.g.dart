@@ -15,6 +15,10 @@ abstract class _$ComptageOuverturesJourDtoCWProxy {
 
   ComptageOuverturesJourDto ouvertures(num ouvertures);
 
+  ComptageOuverturesJourDto qualifiees(num qualifiees);
+
+  ComptageOuverturesJourDto liberees(num liberees);
+
   ComptageOuverturesJourDto dureeMoyenneSecondes(num? dureeMoyenneSecondes);
 
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `ComptageOuverturesJourDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
@@ -28,6 +32,8 @@ abstract class _$ComptageOuverturesJourDtoCWProxy {
     String openedByName,
     DateTime jour,
     num ouvertures,
+    num qualifiees,
+    num liberees,
     num? dureeMoyenneSecondes,
   });
 }
@@ -55,6 +61,13 @@ class _$ComptageOuverturesJourDtoCWProxyImpl
       this(ouvertures: ouvertures);
 
   @override
+  ComptageOuverturesJourDto qualifiees(num qualifiees) =>
+      this(qualifiees: qualifiees);
+
+  @override
+  ComptageOuverturesJourDto liberees(num liberees) => this(liberees: liberees);
+
+  @override
   ComptageOuverturesJourDto dureeMoyenneSecondes(num? dureeMoyenneSecondes) =>
       this(dureeMoyenneSecondes: dureeMoyenneSecondes);
 
@@ -70,6 +83,8 @@ class _$ComptageOuverturesJourDtoCWProxyImpl
     Object? openedByName = const $CopyWithPlaceholder(),
     Object? jour = const $CopyWithPlaceholder(),
     Object? ouvertures = const $CopyWithPlaceholder(),
+    Object? qualifiees = const $CopyWithPlaceholder(),
+    Object? liberees = const $CopyWithPlaceholder(),
     Object? dureeMoyenneSecondes = const $CopyWithPlaceholder(),
   }) {
     return ComptageOuverturesJourDto(
@@ -89,6 +104,14 @@ class _$ComptageOuverturesJourDtoCWProxyImpl
           ? _value.ouvertures
           // ignore: cast_nullable_to_non_nullable
           : ouvertures as num,
+      qualifiees: qualifiees == const $CopyWithPlaceholder()
+          ? _value.qualifiees
+          // ignore: cast_nullable_to_non_nullable
+          : qualifiees as num,
+      liberees: liberees == const $CopyWithPlaceholder()
+          ? _value.liberees
+          // ignore: cast_nullable_to_non_nullable
+          : liberees as num,
       dureeMoyenneSecondes: dureeMoyenneSecondes == const $CopyWithPlaceholder()
           ? _value.dureeMoyenneSecondes
           // ignore: cast_nullable_to_non_nullable
@@ -118,6 +141,8 @@ ComptageOuverturesJourDto _$ComptageOuverturesJourDtoFromJson(
       'openedByName',
       'jour',
       'ouvertures',
+      'qualifiees',
+      'liberees',
       'dureeMoyenneSecondes',
     ],
   );
@@ -126,6 +151,8 @@ ComptageOuverturesJourDto _$ComptageOuverturesJourDtoFromJson(
     openedByName: $checkedConvert('openedByName', (v) => v as String),
     jour: $checkedConvert('jour', (v) => DateTime.parse(v as String)),
     ouvertures: $checkedConvert('ouvertures', (v) => v as num),
+    qualifiees: $checkedConvert('qualifiees', (v) => v as num),
+    liberees: $checkedConvert('liberees', (v) => v as num),
     dureeMoyenneSecondes: $checkedConvert(
       'dureeMoyenneSecondes',
       (v) => v as num?,
@@ -141,5 +168,7 @@ Map<String, dynamic> _$ComptageOuverturesJourDtoToJson(
   'openedByName': instance.openedByName,
   'jour': instance.jour.toIso8601String(),
   'ouvertures': instance.ouvertures,
+  'qualifiees': instance.qualifiees,
+  'liberees': instance.liberees,
   'dureeMoyenneSecondes': instance.dureeMoyenneSecondes,
 };

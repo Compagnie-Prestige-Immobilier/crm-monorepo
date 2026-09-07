@@ -2,7 +2,7 @@ import { ConflictException, NotFoundException, UnprocessableEntityException } fr
 
 // Codes stables, publiés dans l'OpenAPI et filtrés par le web et le mobile : les renommer casse
 // les clients. Aucune de ces situations n'est un 500, le demandeur doit pouvoir agir dessus.
-export const ClientRequestError = {
+const ClientRequestError = {
   NOT_FOUND: 'CLIENT_REQUEST_NOT_FOUND',
   ALREADY_REVIEWED: 'CLIENT_REQUEST_ALREADY_REVIEWED',
   ALREADY_PENDING: 'CLIENT_REQUEST_ALREADY_PENDING',

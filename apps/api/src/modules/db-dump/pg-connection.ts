@@ -7,7 +7,7 @@ export interface PgEnvironment {
   PGSSLMODE?: string;
 }
 
-export class InvalidDatabaseUrlError extends Error {}
+class InvalidDatabaseUrlError extends Error {}
 
 export function pgEnvironmentFrom(databaseUrl: string): PgEnvironment {
   let url: URL;

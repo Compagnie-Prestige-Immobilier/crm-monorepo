@@ -19,7 +19,9 @@ import { CallbacksModule } from './modules/callbacks/callbacks.module.js';
 import { ClientRequestsModule } from './modules/client-requests/client-requests.module.js';
 import { DbDumpModule } from './modules/db-dump/db-dump.module.js';
 import { DemoModule } from './modules/demo/demo.module.js';
+import { ChampsConversionModule } from './modules/champs-conversion/champs-conversion.module.js';
 import { EnrolementModule } from './modules/enrolement/enrolement.module.js';
+import { FormulairePublicModule } from './modules/formulaire-public/formulaire-public.module.js';
 import { NotificationsModule } from './modules/notifications/notifications.module.js';
 import { OuverturesModule } from './modules/ouvertures/ouvertures.module.js';
 import { Phase2Module } from './modules/phase2/phase2.module.js';
@@ -38,6 +40,7 @@ import { AppUpdatesModule } from './modules/app-updates/app-updates.module.js';
 import { VisitesModule } from './modules/visites/visites.module.js';
 import { DashboardsModule } from './modules/dashboards/dashboards.module.js';
 import { LotsExportModule } from './modules/lots-export/lots-export.module.js';
+import { ParametresChuesModule } from './modules/parametres-chues/parametres-chues.module.js';
 import { LiveModule } from './modules/live/live.module.js';
 
 const env = readEnv();
@@ -62,9 +65,15 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
                     options: { colorize: true, translateTime: 'SYS:standard' },
                   },
                   {
-                    target: 'pino/file',
+                    target: 'pino-roll',
                     level: env.LOG_LEVEL,
-                    options: { destination: apiLogPath, mkdir: true },
+                    options: {
+                      file: apiLogPath,
+                      frequency: 'daily',
+                      size: '10m',
+                      limit: { count: 7, removeOtherLogFiles: true },
+                      mkdir: true,
+                    },
                   },
                 ],
               },
@@ -126,7 +135,10 @@ const apiLogPath = resolve(import.meta.dirname, '../../../logs/api.log');
     VisitesModule,
     DashboardsModule,
     LotsExportModule,
+    ParametresChuesModule,
     EnrolementModule,
+    FormulairePublicModule,
+    ChampsConversionModule,
   ],
   providers: [
     { provide: APP_GUARD, useClass: ThrottlerGuard },

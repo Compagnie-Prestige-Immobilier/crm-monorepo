@@ -9,6 +9,7 @@ import {
   Phase2Status,
   Prisma,
   ScheduledCallbackStatus,
+  WhatsappStatus,
   type EnrollmentMethod,
   type Projet,
 } from '@crm/database';
@@ -16,7 +17,15 @@ import {
 import { attributionScope } from '../../common/scope.js';
 import { rattacherDetections } from '../../common/device-call.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
-import { normalizeAttempt, systemReasonFor, type AttemptReason } from './attempt-rules.js';
+import { normalizePhone } from '../../common/phone.js';
+import { normaliserReponses } from '../champs-conversion/catalogue.js';
+import { whatsappDuProspect } from '../prospects/whatsapp.js';
+import {
+  assertConversionChues,
+  normalizeAttempt,
+  systemReasonFor,
+  type AttemptReason,
+} from './attempt-rules.js';
 import {
   CallAttemptApplyStatus,
   type CallAttemptOpDto,
@@ -32,6 +41,11 @@ interface ProspectState {
   rev: number;
   updatedAt: Date;
   lastCallAt: Date | null;
+  incomeBandId: string | null;
+  phoneE164: string;
+  whatsappStatus: WhatsappStatus;
+  whatsappE164: string | null;
+  champsLibres: Prisma.JsonValue;
 }
 
 /** L'état de phase 2 vit sur le PARCOURS ; la fiche ne porte plus que sa révision. */
@@ -49,6 +63,11 @@ const PROSPECT_STATE_SELECT = {
   rev: true,
   updatedAt: true,
   lastCallAt: true,
+  incomeBandId: true,
+  phoneE164: true,
+  whatsappStatus: true,
+  whatsappE164: true,
+  champsLibres: true,
 } satisfies Prisma.ProspectSelect;
 
 const JOURNEY_STATE_SELECT = {
@@ -79,9 +98,9 @@ const REASON_SELECT = {
   isActive: true,
 } satisfies Prisma.CallOutcomeReasonSelect;
 
-export const PHASE2_REASON_UNKNOWN = 'PHASE2_REASON_UNKNOWN';
-export const PHASE2_REASON_INACTIVE = 'PHASE2_REASON_INACTIVE';
-export const PHASE2_REASON_OUTCOME_MISMATCH = 'PHASE2_REASON_OUTCOME_MISMATCH';
+const PHASE2_REASON_UNKNOWN = 'PHASE2_REASON_UNKNOWN';
+const PHASE2_REASON_INACTIVE = 'PHASE2_REASON_INACTIVE';
+const PHASE2_REASON_OUTCOME_MISMATCH = 'PHASE2_REASON_OUTCOME_MISMATCH';
 
 const notAssigned = (): ForbiddenException =>
   new ForbiddenException({
@@ -105,12 +124,63 @@ function dernierAppel(op: CallAttemptOpDto, userId: string, lastCallAt: Date | n
   return { lastCallOutcome: op.outcome, lastCallAt: at, lastCallById: userId };
 }
 
+function callAttemptRow(
+  op: CallAttemptOpDto,
+  performedById: string,
+  attempt: ReturnType<typeof normalizeAttempt>,
+  deviceCallAt: Date | null,
+) {
+  return {
+    id: op.id,
+    prospectId: op.prospectId,
+    performedById,
+    outcome: attempt.outcome,
+    reasonId: attempt.reasonId,
+    method: attempt.method,
+    comment: attempt.comment,
+    email: attempt.email,
+    fonctionnaire: attempt.fonctionnaire,
+    engagementEnCours: attempt.engagementEnCours,
+    dureeEtablissementMois: attempt.dureeEtablissementMois,
+    rendezVousAt: attempt.rendezVousAt,
+    deviceCallType: op.deviceCallType ?? null,
+    deviceCallDurationSeconds: op.deviceCallDurationSeconds ?? null,
+    deviceCallAt,
+    clientCreatedAt: new Date(op.clientCreatedAt),
+  };
+}
+
+// `Partial<T>` seul ne suffit pas : sous `exactOptionalPropertyTypes`, une
+// clé `profession?: string | undefined` reste distincte de `profession?:
+// string`, alors que les deux décrivent la même absence pour Prisma. Le
+// mapped type retire `undefined` du type de chaque valeur en plus de rendre
+// la clé optionnelle. Voir `defined` dans prospects.service.ts.
+function defined<T extends Record<string, unknown>>(
+  values: T,
+): { [K in keyof T]?: Exclude<T[K], undefined> } {
+  return Object.fromEntries(Object.entries(values).filter(([, value]) => value !== undefined)) as {
+    [K in keyof T]?: Exclude<T[K], undefined>;
+  };
+}
+
+const trimOrUndefined = (value: string | undefined): string | undefined => value?.trim();
+
+/** Un nom vidé n'est pas une correction : la colonne est obligatoire. */
+const nomCorrige = (value: string | undefined): string | undefined => {
+  const trimmed = trimOrUndefined(value);
+  return trimmed ? trimmed : undefined;
+};
+
+const normalizePhoneOrUndefined = (value: string | undefined): string | undefined =>
+  value === undefined ? undefined : normalizePhone(value);
+
 @Injectable()
 export class Phase2SyncService {
   async applyCallAttempt(
     tx: Phase2TransactionClient,
     user: Pick<AuthenticatedUser, 'id' | 'role'>,
     op: CallAttemptOpDto,
+    payloadVersion: number,
   ): Promise<CallAttemptResultDto> {
     const attempt = normalizeAttempt(op, await this.resolveReason(tx, op));
 
@@ -133,27 +203,17 @@ export class Phase2SyncService {
       throw alreadyCompleted(toState(prospect, journey));
     }
 
+    assertConversionChues({
+      payloadVersion,
+      projet,
+      method: attempt.method,
+      incomeBandId: op.incomeBandId ?? prospect.incomeBandId ?? null,
+      dureeEtablissementMois: attempt.dureeEtablissementMois,
+    });
+
+    const deviceCallAt = op.deviceCallAt ? new Date(op.deviceCallAt) : null;
     const inserted = await tx.callAttempt.createMany({
-      data: [
-        {
-          id: op.id,
-          prospectId: op.prospectId,
-          performedById: user.id,
-          outcome: attempt.outcome,
-          reasonId: attempt.reasonId,
-          method: attempt.method,
-          comment: attempt.comment,
-          email: attempt.email,
-          fonctionnaire: attempt.fonctionnaire,
-          engagementEnCours: attempt.engagementEnCours,
-          dureeEtablissementMois: attempt.dureeEtablissementMois,
-          rendezVousAt: attempt.rendezVousAt,
-          deviceCallType: op.deviceCallType ?? null,
-          deviceCallDurationSeconds: op.deviceCallDurationSeconds ?? null,
-          deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
-          clientCreatedAt: new Date(op.clientCreatedAt),
-        },
-      ],
+      data: [callAttemptRow(op, user.id, attempt, deviceCallAt)],
       skipDuplicates: true,
     });
 
@@ -166,7 +226,7 @@ export class Phase2SyncService {
       prospectId: op.prospectId,
       attemptId: op.id,
       clientCreatedAt: new Date(op.clientCreatedAt),
-      deviceCallAt: op.deviceCallAt ? new Date(op.deviceCallAt) : null,
+      deviceCallAt,
     });
 
     const corrige = await this.correctProspect(tx, user.id, op, prospect);
@@ -213,19 +273,24 @@ export class Phase2SyncService {
     op: CallAttemptOpDto,
     current: ProspectState,
   ): Promise<ProspectState> {
-    // Un nom vidé n'est pas une correction : la colonne est obligatoire, et
-    // l'écraser rendrait la fiche illisible dans toutes les listes.
-    const nom = op.nom?.trim() ?? '';
     const data = {
-      ...(nom === '' ? {} : { nom }),
-      ...(op.prenom === undefined ? {} : { prenom: op.prenom.trim() }),
-      ...(op.profession === undefined ? {} : { profession: op.profession.trim() }),
-      ...(op.banqueId === undefined ? {} : { banqueId: op.banqueId }),
-      ...(op.syndicatId === undefined ? {} : { syndicatId: op.syndicatId }),
-      ...(op.type === undefined ? {} : { type: op.type }),
-      ...(op.incomeBandId === undefined ? {} : { incomeBandId: op.incomeBandId }),
-      ...(op.paymentMode === undefined ? {} : { paymentMode: op.paymentMode }),
-      ...(op.dureeSystemeMois === undefined ? {} : { dureeSystemeMois: op.dureeSystemeMois }),
+      ...defined({
+        nom: nomCorrige(op.nom),
+        prenom: trimOrUndefined(op.prenom),
+        profession: trimOrUndefined(op.profession),
+        etablissement: trimOrUndefined(op.etablissement),
+        banqueId: op.banqueId,
+        syndicatId: op.syndicatId,
+        type: op.type,
+        incomeBandId: op.incomeBandId,
+        paymentMode: op.paymentMode,
+        dureeSystemeMois: op.dureeSystemeMois,
+      }),
+      ...whatsappDuProspect(
+        defined({ statut: op.whatsappStatus, numero: normalizePhoneOrUndefined(op.whatsappE164) }),
+        current,
+      ),
+      ...champsLibresPatch(op.champsLibres, current.champsLibres),
     };
     const dernier = dernierAppel(op, userId, current.lastCallAt);
     if (Object.keys(data).length === 0 && Object.keys(dernier).length === 0) return current;
@@ -420,4 +485,20 @@ export class Phase2SyncService {
       select: JOURNEY_STATE_SELECT,
     });
   }
+}
+
+/**
+ * Les réponses aux champs ajoutés par l'administrateur, fusionnées : le
+ * formulaire d'un projet ne connaît pas les champs de l'autre, et remplacer
+ * l'objet entier effacerait les réponses du parcours voisin.
+ */
+function champsLibresPatch(
+  envoyees: Record<string, string> | undefined,
+  courantes: Prisma.JsonValue,
+): { champsLibres?: Prisma.InputJsonValue } {
+  if (envoyees === undefined) return {};
+  const reponses = normaliserReponses(envoyees);
+  if (reponses === null || Object.keys(reponses).length === 0) return {};
+  const deja = normaliserReponses(courantes) ?? {};
+  return { champsLibres: { ...deja, ...reponses } };
 }

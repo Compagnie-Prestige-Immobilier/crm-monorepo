@@ -24,6 +24,7 @@ import {
   quickViewPatch,
   type BankAdvancedFilterKey,
   type BankCaseFilters,
+  type BankQuickView,
 } from '@/lib/bank-filters';
 import { fetchBankStages, fetchRejectionReasons, initialStage } from '@/lib/data/bank-cases';
 import { fetchBanques } from '@/lib/data/reference';
@@ -33,6 +34,70 @@ import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
+
+function optionsOrEmpty<T>(data: readonly T[] | undefined): readonly T[] {
+  return data ?? [];
+}
+
+function moneyFieldValue(value: string | null): string {
+  return value ?? '';
+}
+
+function stageComboOptions(
+  stages: readonly { id: string; label: string; isActive: boolean }[],
+): { value: string; label: string; hint: string | undefined }[] {
+  return stages.map((stage) => ({
+    value: stage.id,
+    label: stage.label,
+    hint: stage.isActive ? undefined : 'désactivée',
+  }));
+}
+
+function BankQuickViewButtons({
+  currentView,
+  onSelect,
+}: {
+  currentView: BankQuickView;
+  onSelect: (viewId: BankQuickView) => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Vues rapides">
+      {BANK_QUICK_VIEWS.map((view) => (
+        <BankQuickViewButton
+          key={view.id}
+          view={view}
+          active={currentView === view.id}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
+  );
+}
+
+function BankQuickViewButton({
+  view,
+  active,
+  onSelect,
+}: {
+  view: { id: BankQuickView; label: string };
+  active: boolean;
+  onSelect: (viewId: BankQuickView) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={active ? 'default' : 'outline'}
+      size="sm"
+      aria-pressed={active}
+      className="tap-target"
+      onClick={() => {
+        onSelect(view.id);
+      }}
+    >
+      {view.label}
+    </Button>
+  );
+}
 
 export function BankFiltersBar({
   agentOptions = [],
@@ -93,16 +158,21 @@ export function BankFiltersBar({
 
   if (stages.isPending) return <BankFiltersBarSkeleton />;
 
+  function stageId(stage: { id: string } | undefined): string | null {
+    return stage?.id ?? null;
+  }
+
   const initial = initialStage(stages.data);
-  const currentView = activeQuickView(filters, initial?.id ?? null);
+  const initialId = stageId(initial);
+  const currentView = activeQuickView(filters, initialId);
   const activeCount = countActiveBankFilters(filters);
 
-  const banqueOptions: FilterOption[] = (banques.data ?? []).map((banque) => ({
+  const banqueOptions: FilterOption[] = optionsOrEmpty(banques.data).map((banque) => ({
     value: banque.id,
     label: withRetired(banque.shortName, banque.isActive),
     hint: banque.name,
   }));
-  const reasonOptions: FilterOption[] = (reasons.data ?? []).map((reason) => ({
+  const reasonOptions: FilterOption[] = optionsOrEmpty(reasons.data).map((reason) => ({
     value: reason.id,
     label: reason.label,
   }));
@@ -121,26 +191,12 @@ export function BankFiltersBar({
       {/* Vues rapides. `role="group"` et non `tablist` : ce ne sont pas des
           onglets : rien n'est masqué, ils écrivent un filtre dans l'URL, et
           `aria-pressed` décrit exactement cet état. */}
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Vues rapides">
-        {BANK_QUICK_VIEWS.map((view) => {
-          const isActive = currentView === view.id;
-          return (
-            <Button
-              key={view.id}
-              type="button"
-              variant={isActive ? 'default' : 'outline'}
-              size="sm"
-              aria-pressed={isActive}
-              className="tap-target"
-              onClick={() => {
-                setFilters(quickViewPatch(view.id, initial?.id ?? null));
-              }}
-            >
-              {view.label}
-            </Button>
-          );
-        })}
-      </div>
+      <BankQuickViewButtons
+        currentView={currentView}
+        onSelect={(viewId) => {
+          setFilters(quickViewPatch(viewId, initialId));
+        }}
+      />
 
       {/* ─── Filtrage simple ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
@@ -156,11 +212,7 @@ export function BankFiltersBar({
           <FilterCombobox
             label="Étape"
             placeholder="Toutes les étapes"
-            options={stages.data.map((stage) => ({
-              value: stage.id,
-              label: stage.label,
-              hint: stage.isActive ? undefined : 'désactivée',
-            }))}
+            options={stageComboOptions(stages.data)}
             value={filters.stageId}
             onChange={(value) => {
               setFilters({ stageId: value, stageType: null });
@@ -247,7 +299,7 @@ export function BankFiltersBar({
               id={minId}
               inputMode="numeric"
               autoComplete="off"
-              value={filters.amountMin ?? ''}
+              value={moneyFieldValue(filters.amountMin)}
               placeholder="0"
               onChange={(event) => {
                 setFilters({ amountMin: parseMoneyInput(event.target.value) });
@@ -260,7 +312,7 @@ export function BankFiltersBar({
               id={maxId}
               inputMode="numeric"
               autoComplete="off"
-              value={filters.amountMax ?? ''}
+              value={moneyFieldValue(filters.amountMax)}
               placeholder="Sans limite"
               onChange={(event) => {
                 setFilters({ amountMax: parseMoneyInput(event.target.value) });

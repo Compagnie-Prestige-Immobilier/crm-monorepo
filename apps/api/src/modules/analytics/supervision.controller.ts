@@ -9,9 +9,13 @@ import {
 } from '../../common/decorators/current-user.decorator.js';
 import { Roles } from '../../common/decorators/roles.decorator.js';
 import { Cached } from '../../redis/cache.interceptor.js';
+import { CampagnesService } from './campagnes.service.js';
+import { StockRepresentantsService } from './stock-representants.service.js';
 import { SupervisionActivityService } from './supervision.service.js';
 import {
+  StockRepresentantsDto,
   SupervisionActivityDto,
+  SupervisionCampagnesDto,
   SupervisionQueryDto,
   UpdateWorkShiftsDto,
   WorkShiftsDto,
@@ -26,8 +30,35 @@ import { WorkShiftsService } from './work-shifts.service.js';
 export class SupervisionController {
   constructor(
     private readonly activity: SupervisionActivityService,
+    private readonly campagnesService: CampagnesService,
+    private readonly stockRepresentants: StockRepresentantsService,
     private readonly shifts: WorkShiftsService,
   ) {}
+
+  @Get('representants')
+  @Cached(60)
+  @ApiOperation({
+    operationId: 'getSupervisionRepresentants',
+    summary: 'Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables.',
+  })
+  @ApiResponse({ status: 200, type: StockRepresentantsDto })
+  representants(): Promise<StockRepresentantsDto> {
+    return this.stockRepresentants.stock();
+  }
+
+  @Get('campagnes')
+  @Cached(30)
+  @ApiOperation({
+    operationId: 'getSupervisionCampagnes',
+    summary: 'Taux de contact et d’exploitation des campagnes de la fenêtre.',
+    description:
+      'Une campagne entre dans la fenêtre par ses jours de programme. `granularity`, ' +
+      '`timeFrom` et `timeTo` sont ignorés.',
+  })
+  @ApiResponse({ status: 200, type: SupervisionCampagnesDto })
+  campagnes(@Query() query: SupervisionQueryDto): Promise<SupervisionCampagnesDto> {
+    return this.campagnesService.campagnes(query);
+  }
 
   @Get('activite')
   @Cached(30)

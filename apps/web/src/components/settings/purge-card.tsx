@@ -348,7 +348,7 @@ export function PurgeCard() {
   );
 }
 
-export function PurgeSkeleton() {
+function PurgeSkeleton() {
   return (
     <Card aria-hidden="true">
       <CardContent className="flex flex-col gap-4">

@@ -11,7 +11,7 @@ import type {
   UpdateCallOutcomeReasonDto,
 } from './dto.js';
 
-export const CallOutcomeReasonError = {
+const CallOutcomeReasonError = {
   NOT_FOUND: 'OUTCOME_REASON_NOT_FOUND',
   CODE_CONFLICT: 'OUTCOME_REASON_CODE_CONFLICT',
   LABEL_CONFLICT: 'OUTCOME_REASON_LABEL_CONFLICT',
@@ -110,30 +110,14 @@ export class CallOutcomeReasonsService {
       requiresCallback: input.requiresCallback,
       countsAsReached: input.countsAsReached,
     };
-    const touchesRules = Object.values(rules).some((value) => value !== undefined);
-
-    if (existing.isSystem && touchesRules) {
-      throw new ConflictException({
-        code: CallOutcomeReasonError.SYSTEM_IMMUTABLE,
-        message: `« ${existing.label} » est un motif système : sa règle est compilée dans l’application de terrain et ne se reconfigure pas ici.`,
-        reasonId: existing.id,
-      });
-    }
+    this.assertSystemRuleUnchanged(existing, rules);
 
     if (input.requiresCallback !== undefined) {
       this.assertCallbackAllowed(existing.effect, input.requiresCallback);
     }
 
     if (input.label !== undefined) {
-      const label = input.label.trim();
-      const sameLabel = await this.prisma.callOutcomeReason.findUnique({ where: { label } });
-      if (sameLabel && sameLabel.id !== id) {
-        throw new ConflictException({
-          code: CallOutcomeReasonError.LABEL_CONFLICT,
-          message: `Le libellé « ${label} » est déjà porté par le motif « ${sameLabel.code} ».`,
-          existingId: sameLabel.id,
-        });
-      }
+      await this.assertLabelAvailable(id, input.label);
     }
 
     const updated = await this.prisma.callOutcomeReason.update({
@@ -179,6 +163,34 @@ export class CallOutcomeReasonsService {
       });
     }
     return found;
+  }
+
+  private assertSystemRuleUnchanged(
+    existing: CallOutcomeReason,
+    rules: {
+      requiresComment: boolean | undefined;
+      requiresCallback: boolean | undefined;
+      countsAsReached: boolean | undefined;
+    },
+  ): void {
+    const touchesRules = Object.values(rules).some((value) => value !== undefined);
+    if (!existing.isSystem || !touchesRules) return;
+    throw new ConflictException({
+      code: CallOutcomeReasonError.SYSTEM_IMMUTABLE,
+      message: `« ${existing.label} » est un motif système : sa règle est compilée dans l’application de terrain et ne se reconfigure pas ici.`,
+      reasonId: existing.id,
+    });
+  }
+
+  private async assertLabelAvailable(id: string, rawLabel: string): Promise<void> {
+    const label = rawLabel.trim();
+    const sameLabel = await this.prisma.callOutcomeReason.findUnique({ where: { label } });
+    if (!sameLabel || sameLabel.id === id) return;
+    throw new ConflictException({
+      code: CallOutcomeReasonError.LABEL_CONFLICT,
+      message: `Le libellé « ${label} » est déjà porté par le motif « ${sameLabel.code} ».`,
+      existingId: sameLabel.id,
+    });
   }
 
   private assertCallbackAllowed(effect: string, requiresCallback: boolean): void {

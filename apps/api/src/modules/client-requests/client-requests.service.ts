@@ -43,7 +43,7 @@ const INCLUDE = {
 
 type RequestRow = Prisma.ClientCreationRequestGetPayload<{ include: typeof INCLUDE }>;
 
-export function toClientRequestDto(row: RequestRow): ClientRequestDto {
+function toClientRequestDto(row: RequestRow): ClientRequestDto {
   return {
     id: row.id,
     nom: row.nom,
@@ -130,23 +130,7 @@ export class ClientRequestsService {
     // les clients qu'une concurrente cherche à faire créer.
     const scope: Prisma.ClientCreationRequestWhereInput =
       user.role === Role.ADMIN ? {} : { requestedById: user.id };
-
-    const search = query.search?.trim();
-    const phoneDigits = search?.replace(/\D/g, '') ?? '';
-    const where: Prisma.ClientCreationRequestWhereInput = {
-      ...scope,
-      ...(query.status ? { status: query.status } : {}),
-      ...(query.banqueId ? { banqueId: query.banqueId } : {}),
-      ...(search
-        ? {
-            OR: [
-              { nom: { contains: search, mode: 'insensitive' } },
-              { prenom: { contains: search, mode: 'insensitive' } },
-              ...(phoneDigits.length >= 4 ? [{ phoneE164: { contains: phoneDigits } }] : []),
-            ],
-          }
-        : {}),
-    };
+    const where = this.buildListWhere(scope, query);
 
     const [total, rows, pendingCount] = await Promise.all([
       this.prisma.clientCreationRequest.count({ where }),
@@ -288,6 +272,28 @@ export class ClientRequestsService {
     const updated = await this.reload(id);
     await this.notifyRequester(user, updated, false);
     return toClientRequestDto(updated);
+  }
+
+  private buildSearchClause(search: string): Prisma.ClientCreationRequestWhereInput[] {
+    const phoneDigits = search.replace(/\D/g, '');
+    return [
+      { nom: { contains: search, mode: 'insensitive' } },
+      { prenom: { contains: search, mode: 'insensitive' } },
+      ...(phoneDigits.length >= 4 ? [{ phoneE164: { contains: phoneDigits } }] : []),
+    ];
+  }
+
+  private buildListWhere(
+    scope: Prisma.ClientCreationRequestWhereInput,
+    query: ClientRequestQueryDto,
+  ): Prisma.ClientCreationRequestWhereInput {
+    const search = query.search?.trim();
+    return {
+      ...scope,
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.banqueId ? { banqueId: query.banqueId } : {}),
+      ...(search ? { OR: this.buildSearchClause(search) } : {}),
+    };
   }
 
   private async loadPending(id: string): Promise<RequestRow> {

@@ -40,6 +40,8 @@ export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
   AUCUN: 'Aucune',
 };
 
+export const PAYMENT_MODES = ['COMPTANT', 'ECHELONNE'] as const satisfies readonly PaymentMode[];
+
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   COMPTANT: 'Comptant',
   ECHELONNE: 'Échelonné',
@@ -54,6 +56,9 @@ export type CreateUserInput = Schemas['CreateUserDto'];
 export type UpdateUserInput = Schemas['UpdateUserDto'];
 export type UpdateProspectInput = Schemas['UpdateProspectDto'];
 export type UpdateRepresentantInput = Schemas['UpdateRepresentantDto'];
+
+/** Borne du serveur (`attempt-rules.ts`) : la conversion et le formulaire public la partagent. */
+export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
 
 export const PROSPECT_STATUTS = [
   'NOUVEAU',
@@ -92,6 +97,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   SUPERVISEUR: 'Supervision',
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
+  CHARGE_CLIENTELE: 'Chargé de clientèle',
 };
 
 /**
@@ -106,22 +112,32 @@ export const readsOnly = (role: Role | undefined): boolean =>
  * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'DIRECTION';
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
  * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
  */
 export const peutTenirUneFiche = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
 
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'SUPERVISEUR' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
+
+/** Qui marque une demande convertie « revue ». Miroir de `POST /prospects/{id}/revue`. */
+export const peutRevoirUneDemande = (role: Role | undefined): boolean =>
+  role === 'ADMIN' || role === 'CHARGE_CLIENTELE' || role === 'SUPERVISEUR';
 
 export const RETIRED_SUFFIX = '(retiré)';
-
-export type PageMeta = Schemas['PageMetaDto'];
 
 export interface Paginated<T> {
   items: T[];
@@ -157,6 +173,8 @@ export interface ProspectFilters {
   phase2Status: Phase2Status | null;
   enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
+  /** Revue du closing : `false` isole les demandes converties qui restent à revoir. */
+  revue: boolean | null;
   dateFrom: string | null;
   dateTo: string | null;
   page: number;
@@ -202,13 +220,26 @@ export const ENROLLMENT_METHODS = [
   'PHYSICAL',
   'VOICE_OR_ELECTRONIC_MESSAGING',
   'APPOINTMENT',
+  'WHATSAPP',
+] as const satisfies readonly EnrollmentMethod[];
+
+/** Ce que l'écran propose. `PHYSICAL` en sort : EB-24 l'a versé dans « RDV CPI ». */
+export const ENROLLMENT_METHOD_ORDER = [
+  'APPOINTMENT',
+  'PLATFORM',
+  'VOICE_OR_ELECTRONIC_MESSAGING',
+  'WHATSAPP',
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
-  PLATFORM: 'Plateforme',
-  PHYSICAL: 'Physique',
-  VOICE_OR_ELECTRONIC_MESSAGING: 'Vocal ou messagerie électronique',
-  APPOINTMENT: 'Prise de rendez-vous',
+  APPOINTMENT: 'RDV CPI',
+  PHYSICAL: 'RDV CPI',
+  PLATFORM: 'Plateforme en ligne',
+  PLATEFORME_EN_LIGNE: 'Plateforme en ligne',
+  VOICE_OR_ELECTRONIC_MESSAGING: 'Mail',
+  MAIL: 'Mail',
+  WHATSAPP: 'WhatsApp',
+  RDV_CPI: 'RDV CPI',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
@@ -257,7 +288,10 @@ type FilterListCoverage = {
   PROSPECT_STATUTS: MissingFrom<ProspectStatut, (typeof PROSPECT_STATUTS)[number]>;
   BDD_SEGMENTS: MissingFrom<BddSegment, (typeof BDD_SEGMENTS)[number]>;
   PHASE2_STATUSES: MissingFrom<Phase2Status, (typeof PHASE2_STATUSES)[number]>;
-  ENROLLMENT_METHODS: MissingFrom<EnrollmentMethod, (typeof ENROLLMENT_METHODS)[number]>;
+  ENROLLMENT_METHODS: MissingFrom<
+    Exclude<EnrollmentMethod, 'RDV_CPI' | 'PLATEFORME_EN_LIGNE' | 'MAIL'>,
+    (typeof ENROLLMENT_METHODS)[number]
+  >;
   PROSPECT_SORT_FIELDS: MissingFrom<
     Schemas['ProspectSortField'],
     (typeof PROSPECT_SORT_FIELDS)[number]
@@ -265,8 +299,7 @@ type FilterListCoverage = {
   BANK_CASE_SORT_FIELDS: MissingFrom<BankCaseSortField, (typeof BANK_CASE_SORT_FIELDS)[number]>;
 };
 
-export const FILTER_LISTS_ARE_EXHAUSTIVE: Record<keyof FilterListCoverage, never> =
-  {} as FilterListCoverage;
+void ({} as FilterListCoverage satisfies Record<keyof FilterListCoverage, never>);
 
 export type BankStageType = Schemas['BankStageType'];
 export type BankCaseStage = Schemas['BankCaseStageDto'];
@@ -316,30 +349,11 @@ export const BANK_STAGE_TYPE_LABELS: Record<BankStageType, string> = {
 };
 
 export type DemoStatus = Schemas['DemoWorkspaceStatusDto'];
-export type DemoCounts = Schemas['DemoWorkspaceCountsDto'];
-
-export type DashboardKpis = Schemas['AnalyticsTotalsDto'];
-
-export interface TimeSeriePoint {
-  date: string;
-  count: number;
-  cumulative: number;
-}
 
 export interface NamedCount {
   id: string;
   label: string;
   value: number;
-}
-
-export interface DashboardStats {
-  kpis: DashboardKpis;
-  prospectsOverTime: TimeSeriePoint[];
-  topCommerciaux: NamedCount[];
-  parDepartement: NamedCount[];
-  parBanque: NamedCount[];
-  parSyndicat: NamedCount[];
-  topRepresentants: NamedCount[];
 }
 
 export interface FilterOption {

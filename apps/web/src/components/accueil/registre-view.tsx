@@ -11,7 +11,7 @@ import {
   RotateCcwIcon,
   SearchIcon,
 } from 'lucide-react';
-import { useId, useState } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 
 import { ImpressionDialog } from '@/components/accueil/impression-dialog';
 import { VisiteForm } from '@/components/accueil/visite-form';
@@ -58,6 +58,7 @@ import {
   type Visite,
   type VisiteFilters,
   type VisiteReferentielItem,
+  type VisiteReferentiels,
   type VisiteSortField,
 } from '@/lib/data/visites';
 import { formatDate, formatNumber } from '@/lib/format';
@@ -101,6 +102,13 @@ function options(items: readonly VisiteReferentielItem[] | undefined): FilterOpt
   return (items ?? []).map((item) => ({ value: item.id, label: item.label }));
 }
 
+function optionsReferentiel<K extends keyof VisiteReferentiels>(
+  data: VisiteReferentiels | undefined,
+  key: K,
+): FilterOption[] {
+  return options(data?.[key]);
+}
+
 interface Pagination {
   total: number;
   page: number;
@@ -124,6 +132,14 @@ function pagination(
   };
 }
 
+// Le classement du serveur fait foi dès qu'on trie sur autre chose que la
+// date : le re-tri client, pensé pour « le plus récent en haut », le
+// contredirait sur un tri par nom ou par entreprise.
+function visitesTriees(data: { items: Visite[] } | undefined, sortBy: VisiteSortField): Visite[] {
+  const items = data?.items ?? [];
+  return sortBy === 'visitedAt' ? orderVisites(items) : items;
+}
+
 /** La journée seule : aucun critère posé, le registre n'est pas amputé. */
 function estJourSeul(filters: VisiteFilters, chips: number): boolean {
   return (
@@ -132,6 +148,153 @@ function estJourSeul(filters: VisiteFilters, chips: number): boolean {
     filters.dateTo === null &&
     filters.search === '' &&
     chips === 0
+  );
+}
+
+function contenuRegistreVide(jourSeul: boolean): { titre: string; description: string } {
+  if (jourSeul) {
+    return {
+      titre: 'Aucune visite enregistrée aujourd’hui',
+      description: 'Enregistrez la première ou consultez les visites précédentes.',
+    };
+  }
+  return {
+    titre: 'Aucune visite pour cette recherche',
+    description: 'Élargissez la période ou retirez un filtre.',
+  };
+}
+
+function RegistreCorps({
+  isPending,
+  isError,
+  error,
+  isFetching,
+  onRetry,
+  visites,
+  jourSeul,
+  colonnesImprimees,
+  corrigeeId,
+  referentielsData,
+  filters,
+  toggleSort,
+  onVoirToutLeRegistre,
+  onCorriger,
+  onAnnulerCorrection,
+  onCorrige,
+}: {
+  isPending: boolean;
+  isError: boolean;
+  error: unknown;
+  isFetching: boolean;
+  onRetry: () => void;
+  visites: Visite[];
+  jourSeul: boolean;
+  colonnesImprimees: ReadonlySet<ImpressionColonne>;
+  corrigeeId: string | null;
+  referentielsData: VisiteReferentiels | undefined;
+  filters: VisiteFilters;
+  toggleSort: (columnId: string) => void;
+  onVoirToutLeRegistre: () => void;
+  onCorriger: (id: string) => void;
+  onAnnulerCorrection: () => void;
+  onCorrige: () => void;
+}): ReactNode {
+  if (isPending) return <Skeleton className="h-64 w-full" />;
+  if (isError)
+    return (
+      <QueryErrorState
+        error={error}
+        onRetry={onRetry}
+        fallback="Le registre n’a pas pu être chargé."
+      />
+    );
+  if (visites.length === 0) {
+    const { titre, description } = contenuRegistreVide(jourSeul);
+    return (
+      <EmptyState
+        icon={ClipboardListIcon}
+        title={titre}
+        description={description}
+        action={
+          jourSeul ? (
+            <Button type="button" variant="outline" onClick={onVoirToutLeRegistre}>
+              Voir tout le registre
+            </Button>
+          ) : undefined
+        }
+      />
+    );
+  }
+  return (
+    <div
+      className={cn(
+        'rounded-lg border border-border bg-card shadow-elev-sm transition-opacity print:text-[10px]',
+        '[&_[data-slot=table-container]]:max-h-[calc(100dvh-17rem)] [&_[data-slot=table-container]]:overflow-auto',
+        isFetching && 'opacity-80',
+      )}
+    >
+      <Table>
+        <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
+          <TableRow className="hover:bg-transparent">
+            <TableHead
+              className={
+                impressionColonneVisible('N° REGISTRE', colonnesImprimees)
+                  ? undefined
+                  : 'print:hidden'
+              }
+            >
+              N° REGISTRE
+            </TableHead>
+            {COLONNES.map((colonne) => {
+              const sortField = SORT_FIELD_OF[colonne];
+              const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
+                ? undefined
+                : 'print:hidden';
+              return sortField === undefined ? (
+                <TableHead key={colonne} className={printClassName}>
+                  {colonne}
+                </TableHead>
+              ) : (
+                <SortableTableHead
+                  key={colonne}
+                  column={{ id: sortField, label: colonne }}
+                  sortBy={filters.sortBy}
+                  sortDir={filters.sortDir}
+                  onToggle={toggleSort}
+                  className={printClassName}
+                />
+              );
+            })}
+            <TableHead className="print:hidden">CORRIGER</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {visites.map((visite) =>
+            visite.id === corrigeeId ? (
+              <TableRow key={visite.id}>
+                <TableCell colSpan={COLONNES.length + 2} className="bg-secondary/40 p-4">
+                  <VisiteForm
+                    referentiels={referentielsData}
+                    visite={visite}
+                    onSaved={onCorrige}
+                    onCancel={onAnnulerCorrection}
+                  />
+                </TableCell>
+              </TableRow>
+            ) : (
+              <LigneVisite
+                key={visite.id}
+                visite={visite}
+                colonnesImprimees={colonnesImprimees}
+                onCorriger={() => {
+                  onCorriger(visite.id);
+                }}
+              />
+            ),
+          )}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 
@@ -173,11 +336,7 @@ export function RegistreView() {
     placeholderData: (previous) => previous,
   });
 
-  // Le classement du serveur fait foi dès qu'on trie sur autre chose que la
-  // date : le re-tri client, pensé pour « le plus récent en haut », le
-  // contredirait sur un tri par nom ou par entreprise.
-  const items = registre.data?.items ?? [];
-  const visites = filters.sortBy === 'visitedAt' ? orderVisites(items) : items;
+  const visites = visitesTriees(registre.data, filters.sortBy);
   const { total, page, pageCount, premiere, derniere } = pagination(
     registre.data,
     filters.pageSize,
@@ -315,7 +474,7 @@ export function RegistreView() {
                 <FilterCombobox
                   label={VISITE_COLONNES.entreprise}
                   placeholder="Toutes"
-                  options={options(referentiels.data?.entreprises)}
+                  options={optionsReferentiel(referentiels.data, 'entreprises')}
                   value={filters.entrepriseId}
                   onChange={(value) => {
                     setFilters({ entrepriseId: value });
@@ -324,7 +483,7 @@ export function RegistreView() {
                 <FilterCombobox
                   label={VISITE_COLONNES.direction}
                   placeholder="Toutes"
-                  options={options(referentiels.data?.directions)}
+                  options={optionsReferentiel(referentiels.data, 'directions')}
                   value={filters.directionId}
                   onChange={(value) => {
                     setFilters({ directionId: value });
@@ -333,7 +492,7 @@ export function RegistreView() {
                 <FilterCombobox
                   label={VISITE_COLONNES.destinataire}
                   placeholder="Tous"
-                  options={options(referentiels.data?.destinataires)}
+                  options={optionsReferentiel(referentiels.data, 'destinataires')}
                   value={filters.destinataireId}
                   onChange={(value) => {
                     setFilters({ destinataireId: value });
@@ -342,7 +501,7 @@ export function RegistreView() {
                 <FilterCombobox
                   label={VISITE_COLONNES.objet}
                   placeholder="Tous"
-                  options={options(referentiels.data?.objets)}
+                  options={optionsReferentiel(referentiels.data, 'objets')}
                   value={filters.objetId}
                   onChange={(value) => {
                     setFilters({ objetId: value });
@@ -383,128 +542,33 @@ export function RegistreView() {
         </p>
       ) : null}
 
-      {(() => {
-        if (registre.isPending) return <Skeleton className="h-64 w-full" />;
-        return (() => {
-          if (registre.isError)
-            return (
-              <QueryErrorState
-                error={registre.error}
-                onRetry={() => {
-                  void registre.refetch();
-                }}
-                fallback="Le registre n’a pas pu être chargé."
-              />
-            );
-          return (() => {
-            if (visites.length === 0)
-              return (
-                <EmptyState
-                  icon={ClipboardListIcon}
-                  title={
-                    jourSeul
-                      ? 'Aucune visite enregistrée aujourd’hui'
-                      : 'Aucune visite pour cette recherche'
-                  }
-                  description={
-                    jourSeul
-                      ? 'Enregistrez la première ou consultez les visites précédentes.'
-                      : 'Élargissez la période ou retirez un filtre.'
-                  }
-                  action={
-                    jourSeul ? (
-                      <Button
-                        type="button"
-                        variant="outline"
-                        onClick={() => {
-                          setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
-                        }}
-                      >
-                        Voir tout le registre
-                      </Button>
-                    ) : undefined
-                  }
-                />
-              );
-            return (
-              <div
-                className={cn(
-                  'rounded-lg border border-border bg-card shadow-elev-sm transition-opacity print:text-[10px]',
-                  '[&_[data-slot=table-container]]:max-h-[calc(100dvh-17rem)] [&_[data-slot=table-container]]:overflow-auto',
-                  registre.isFetching && 'opacity-80',
-                )}
-              >
-                <Table>
-                  <TableHeader className="sticky top-0 z-10 bg-card shadow-[0_1px_0_var(--border)]">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead
-                        className={
-                          impressionColonneVisible('N° REGISTRE', colonnesImprimees)
-                            ? undefined
-                            : 'print:hidden'
-                        }
-                      >
-                        N° REGISTRE
-                      </TableHead>
-                      {COLONNES.map((colonne) => {
-                        const sortField = SORT_FIELD_OF[colonne];
-                        const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
-                          ? undefined
-                          : 'print:hidden';
-                        return sortField === undefined ? (
-                          <TableHead key={colonne} className={printClassName}>
-                            {colonne}
-                          </TableHead>
-                        ) : (
-                          <SortableTableHead
-                            key={colonne}
-                            column={{ id: sortField, label: colonne }}
-                            sortBy={filters.sortBy}
-                            sortDir={filters.sortDir}
-                            onToggle={toggleSort}
-                            className={printClassName}
-                          />
-                        );
-                      })}
-                      <TableHead className="print:hidden">CORRIGER</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visites.map((visite) =>
-                      visite.id === corrigeeId ? (
-                        <TableRow key={visite.id}>
-                          <TableCell colSpan={COLONNES.length + 2} className="bg-secondary/40 p-4">
-                            <VisiteForm
-                              referentiels={referentiels.data}
-                              visite={visite}
-                              onSaved={() => {
-                                setCorrigeeId(null);
-                                rafraichir();
-                              }}
-                              onCancel={() => {
-                                setCorrigeeId(null);
-                              }}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      ) : (
-                        <LigneVisite
-                          key={visite.id}
-                          visite={visite}
-                          colonnesImprimees={colonnesImprimees}
-                          onCorriger={() => {
-                            setCorrigeeId(visite.id);
-                          }}
-                        />
-                      ),
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            );
-          })();
-        })();
-      })()}
+      <RegistreCorps
+        isPending={registre.isPending}
+        isError={registre.isError}
+        error={registre.error}
+        isFetching={registre.isFetching}
+        onRetry={() => {
+          void registre.refetch();
+        }}
+        visites={visites}
+        jourSeul={jourSeul}
+        colonnesImprimees={colonnesImprimees}
+        corrigeeId={corrigeeId}
+        referentielsData={referentiels.data}
+        filters={filters}
+        toggleSort={toggleSort}
+        onVoirToutLeRegistre={() => {
+          setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+        }}
+        onCorriger={setCorrigeeId}
+        onAnnulerCorrection={() => {
+          setCorrigeeId(null);
+        }}
+        onCorrige={() => {
+          setCorrigeeId(null);
+          rafraichir();
+        }}
+      />
 
       {pageCount > 1 ? (
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">

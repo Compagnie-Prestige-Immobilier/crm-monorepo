@@ -18,7 +18,13 @@ export default async function NouveauProspectPage({
 }: {
   searchParams: Promise<RawSearchParams>;
 }) {
-  const guard = await guardRoles(['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION']);
+  const guard = await guardRoles([
+    'ADMIN',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'SUPERVISEUR',
+    'DIRECTION',
+  ]);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La saisie d’un prospect" />;

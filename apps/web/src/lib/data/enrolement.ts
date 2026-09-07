@@ -6,7 +6,6 @@ import { getApiClient } from '@/lib/api/browser';
 type Schemas = components['schemas'];
 
 export type Projet = Schemas['Projet'];
-export type Inscription = Schemas['InscriptionPlateformeDto'];
 export type InscriptionsPage = Schemas['InscriptionsPageDto'];
 export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
 export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];

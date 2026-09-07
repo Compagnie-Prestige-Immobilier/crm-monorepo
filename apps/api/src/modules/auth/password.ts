@@ -2,7 +2,7 @@ import { argon2id, hash, verify } from 'argon2';
 
 // Doivent rester IDENTIQUES à `packages/database/src/seed.ts` : un écart rend le
 // mot de passe de l'admin initial invérifiable sur une base fraîchement semée.
-export const ARGON2_OPTIONS = {
+const ARGON2_OPTIONS = {
   type: argon2id,
   memoryCost: 19_456,
   timeCost: 2,

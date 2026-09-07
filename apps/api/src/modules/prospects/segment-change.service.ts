@@ -29,6 +29,20 @@ function requireSegment(segment: BddSegment | null): BddSegment {
   return segment;
 }
 
+/** Lève `segmentUnavailable` si la fiche n'a ni banque ni syndicat renseignés. */
+function assertSegmentAvailable(existing: {
+  banque: { shortName: string } | null;
+  syndicat: { sigle: string } | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+}): { banque: { shortName: string }; syndicat: { sigle: string }; banqueId: string; syndicatId: string } {
+  const { banque, syndicat, banqueId, syndicatId } = existing;
+  if (banque === null || syndicat === null || banqueId === null || syndicatId === null) {
+    throw segmentUnavailable();
+  }
+  return { banque, syndicat, banqueId, syndicatId };
+}
+
 const REV_MISMATCH = Symbol('rev-mismatch');
 
 /**
@@ -69,10 +83,8 @@ export class SegmentChangeService {
     // On ne bascule pas un segment qui n'existe pas. Une fiche sans banque ni
     // syndicat n'est dans aucun BDD : il faut d'abord la renseigner, et c'est
     // une correction de saisie, pas un changement de segment.
-    const { banque, syndicat, banqueId: fromBanqueId, syndicatId: fromSyndicatId } = existing;
-    if (banque === null || syndicat === null || fromBanqueId === null || fromSyndicatId === null) {
-      throw segmentUnavailable();
-    }
+    const { banque, syndicat, banqueId: fromBanqueId, syndicatId: fromSyndicatId } =
+      assertSegmentAvailable(existing);
 
     // Le segment AVANT, calculé par la définition PARTAGÉE et non par une
     // reformulation locale : une seconde définition finirait par diverger, et
@@ -93,10 +105,10 @@ export class SegmentChangeService {
       throw segmentUnchanged(fromSegment);
     }
 
-    const banqueShortName =
-      toBanqueId === fromBanqueId ? banque.shortName : await this.resolveBanque(toBanqueId);
-    const syndicatSigle =
-      toSyndicatId === fromSyndicatId ? syndicat.sigle : await this.resolveSyndicat(toSyndicatId);
+    const { banqueShortName, syndicatSigle } = await this.resolveTargetAxis(
+      { toBanqueId, fromBanqueId, banqueShortName: banque.shortName },
+      { toSyndicatId, fromSyndicatId, syndicatSigle: syndicat.sigle },
+    );
 
     const toSegment = requireSegment(classifySegment({ syndicatSigle, banqueShortName }));
 
@@ -171,6 +183,22 @@ export class SegmentChangeService {
     return { items: rows.map(toSegmentChangeDto) };
   }
 
+  /** N'interroge la base que pour l'axe qui change réellement de valeur. */
+  private async resolveTargetAxis(
+    banque: { toBanqueId: string; fromBanqueId: string; banqueShortName: string },
+    syndicat: { toSyndicatId: string; fromSyndicatId: string; syndicatSigle: string },
+  ): Promise<{ banqueShortName: string; syndicatSigle: string }> {
+    const banqueShortName =
+      banque.toBanqueId === banque.fromBanqueId
+        ? banque.banqueShortName
+        : await this.resolveBanque(banque.toBanqueId);
+    const syndicatSigle =
+      syndicat.toSyndicatId === syndicat.fromSyndicatId
+        ? syndicat.syndicatSigle
+        : await this.resolveSyndicat(syndicat.toSyndicatId);
+    return { banqueShortName, syndicatSigle };
+  }
+
   private async resolveBanque(banqueId: string): Promise<string> {
     const banque = await this.prisma.banque.findUnique({
       where: { id: banqueId },
@@ -193,7 +221,7 @@ export class SegmentChangeService {
 }
 
 /** Ligne de bascule telle que la lisent l'historique et le tableau de bord. */
-export interface SegmentChangeRow {
+interface SegmentChangeRow {
   id: string;
   prospectId: string;
   fromSegment: BddSegment;
@@ -209,7 +237,7 @@ export interface SegmentChangeRow {
   changedAt: Date;
 }
 
-export function toSegmentChangeDto(row: SegmentChangeRow): SegmentChangeDto {
+function toSegmentChangeDto(row: SegmentChangeRow): SegmentChangeDto {
   return {
     id: row.id,
     prospectId: row.prospectId,

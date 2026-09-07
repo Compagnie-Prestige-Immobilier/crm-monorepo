@@ -1,11 +1,11 @@
 const PLACEHOLDER = /\{\{\s*([A-Za-z0-9_.]+)\s*\}\}/g;
 
-export interface TemplateRenderResult {
+interface TemplateRenderResult {
   readonly text: string;
   readonly missing: readonly string[];
 }
 
-export function extractVariables(template: string): string[] {
+function extractVariables(template: string): string[] {
   const found: string[] = [];
   for (const match of template.matchAll(PLACEHOLDER)) {
     const name = match[1];
@@ -14,7 +14,7 @@ export function extractVariables(template: string): string[] {
   return found;
 }
 
-export function renderTemplate(
+function renderTemplate(
   template: string,
   variables: Readonly<Record<string, string | number | null | undefined>>,
 ): TemplateRenderResult {

@@ -1,6 +1,6 @@
 // ORDRE GLOBAL, enfants avant parents ; toute purge en est un sous-mot. Déplacer une étape
 // au-dessus de son parent viole une clé étrangère et annule la transaction entière.
-export const PURGE_STEP_ORDER = [
+const PURGE_STEP_ORDER = [
   'bankCaseTransitions',
   'bankCases',
   // Avant `commercialAccounts` : une détection pointe son téléconseiller en
@@ -34,6 +34,7 @@ export const PURGE_STEP_ORDER = [
   'syncBatches',
   'auditLogs',
   'commercialAccounts',
+  'chargeClienteleAccounts',
   'financeAccounts',
   'supervisionAccounts',
   'directionAccounts',
@@ -62,6 +63,7 @@ export type PurgeStepKey = (typeof PURGE_STEP_ORDER)[number];
 
 export const PURGE_DOMAIN_KEYS = [
   'teleconseillers',
+  'chargesClientele',
   'finances',
   'supervision',
   'directionAccueil',
@@ -183,6 +185,13 @@ export const PURGE_DOMAINS: readonly PurgeDomain[] = [
     requires: ['dossiers', 'tentatives', 'fileAppels', 'lotsExport', 'prospects', 'representants'],
   },
   {
+    key: 'chargesClientele',
+    label: 'Comptes chargés de clientèle',
+    hint: 'Comptes du closing et tout ce qu’ils ont saisi.',
+    steps: ['chargeClienteleAccounts'],
+    requires: ['dossiers', 'tentatives', 'fileAppels', 'lotsExport', 'prospects', 'representants'],
+  },
+  {
     key: 'finances',
     label: 'Comptes Finances générales',
     hint: 'Comptes du pôle, dossiers qu’ils ont ouverts et demandes qu’ils ont déposées.',
@@ -240,10 +249,6 @@ export function purgeDomain(key: PurgeDomainKey): PurgeDomain {
   const domain = BY_KEY.get(key);
   if (!domain) throw new Error(`Domaine de purge inconnu : ${key}`);
   return domain;
-}
-
-export function isPurgeDomainKey(value: string): value is PurgeDomainKey {
-  return BY_KEY.has(value as PurgeDomainKey);
 }
 
 export function expandPurgeSelection(

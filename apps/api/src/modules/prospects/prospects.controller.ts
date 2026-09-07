@@ -42,7 +42,7 @@ import {
 @ApiTags('prospects')
 @ApiBearerAuth()
 @ApiErrors({ 400: true, 401: true, 403: true })
-@Roles(Role.COMMERCIAL, Role.ADMIN)
+@Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN)
 @Controller({ path: 'prospects', version: '1' })
 export class ProspectsController {
   constructor(
@@ -51,7 +51,7 @@ export class ProspectsController {
   ) {}
 
   @Get()
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listProspects',
     summary: 'Liste filtrée, triée et paginée côté serveur.',
@@ -66,7 +66,7 @@ export class ProspectsController {
   }
 
   @Get(':id')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({ operationId: 'getProspect', summary: 'Détail d’un prospect.' })
   @ApiParam({ name: 'id', format: 'uuid' })
   @ApiResponse({ status: 200, type: ProspectDto })
@@ -78,7 +78,7 @@ export class ProspectsController {
   }
 
   @Get(':id/call-attempts')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listProspectCallAttempts',
     summary:
@@ -95,7 +95,7 @@ export class ProspectsController {
   }
 
   @Get(':id/device-calls')
-  @Roles(Role.COMMERCIAL, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
   @ApiOperation({
     operationId: 'listProspectDeviceCalls',
     summary: 'Les appels que le journal du téléphone a relevés sur une fiche.',
@@ -172,6 +172,28 @@ export class ProspectsController {
     return this.prospects.confirmGrandPublicConversion(user, id, body);
   }
 
+  @Post(':id/revue')
+  @Roles(Role.CHARGE_CLIENTELE, Role.SUPERVISEUR, Role.ADMIN)
+  @ApiOperation({
+    operationId: 'marquerProspectRevue',
+    summary: 'Marque une demande convertie « revue » avant sa transmission à l’enrôlement.',
+    description:
+      'La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route ' +
+      'sur une demande déjà revue ne les réécrit pas.',
+  })
+  @ApiParam({ name: 'id', format: 'uuid' })
+  @ApiResponse({ status: 200, type: ProspectDto })
+  @ApiErrors({
+    400: 'PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie.',
+    404: 'PROSPECT_NOT_FOUND · fiche absente ou supprimée.',
+  })
+  marquerRevue(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ): Promise<ProspectDto> {
+    return this.prospects.marquerRevue(user, id);
+  }
+
   @Delete(':id')
   @Roles(...PARCOURS_ROLES)
   @ApiOperation({
@@ -201,7 +223,7 @@ export class ProspectsController {
   }
 
   @Patch(':id/segment')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN)
   @ApiOperation({
     operationId: 'changeProspectSegment',
     summary: 'Fait basculer un prospect de segment, avec motif et trace.',
@@ -229,7 +251,7 @@ export class ProspectsController {
   }
 
   @Get(':id/segment-history')
-  @Roles(Role.COMMERCIAL, Role.ADMIN)
+  @Roles(Role.COMMERCIAL, Role.CHARGE_CLIENTELE, Role.ADMIN)
   @ApiOperation({
     operationId: 'listProspectSegmentChanges',
     summary:

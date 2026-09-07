@@ -25,8 +25,11 @@ import '../../data/repositories/write_repository.dart';
 import '../../data/secure/secure_token_store.dart';
 import '../../features/auth/auth_controller.dart';
 import '../../features/auth/auth_state.dart';
+import '../../features/permissions/journal_appels.dart';
+import '../../features/phase2/regles_conversion.dart';
 import '../network/dio_factory.dart';
 import '../router/route_memory.dart';
+import '../telephonie/telephonie_port.dart';
 import '../router/route_paths.dart';
 import '../sync/api_port.dart';
 import '../sync/clock.dart';
@@ -77,8 +80,54 @@ final Provider<({Dio dio, CrmApiClient client})> apiClientProvider =
     });
 
 final Provider<ApiPort> apiPortProvider = Provider<ApiPort>((Ref ref) {
-  return DioApi(ref.watch(apiClientProvider).client);
+  return DioApi(
+    ref.watch(apiClientProvider).client,
+    journalAppelsAutorise: () =>
+        journalAppelsAutorise(ref.read(telephonieProvider)),
+  );
 });
+
+/// EB-26 : le gabarit du message WhatsApp et les autres réglages CHUES. Nul
+/// hors ligne ou en cas d'échec — ces valeurs n'affichent qu'une aide, jamais
+/// un blocage du parcours.
+final FutureProvider<ParametresChuesDto?> parametresChuesProvider =
+    FutureProvider<ParametresChuesDto?>((Ref ref) async {
+      try {
+        final Response<ParametresChuesDto> reponse = await ref
+            .watch(apiClientProvider)
+            .client
+            .getParametresChuesApi()
+            .getParametresChues();
+        return reponse.data;
+      } on DioException {
+        return null;
+      }
+    });
+
+/// EB-27 : les réglages du formulaire de conversion, les mêmes qu'au panel.
+///
+/// Ils ne sont pas mis au miroir local : hors ligne, le formulaire retombe sur
+/// ses champs d'usine plutôt que de retenir une saisie sur une règle qu'il ne
+/// peut pas lire. Le serveur n'exige aucun de ces champs.
+final reglesConversionProvider =
+    FutureProvider.family<ReglesConversion, Projet>((
+      Ref ref,
+      Projet projet,
+    ) async {
+      try {
+        final Response<ReglagesConversionDto> reponse = await ref
+            .watch(apiClientProvider)
+            .client
+            .getChampsConversionApi()
+            .getChampsConversion(projet: projet);
+        final ReglagesConversionDto? reglages = reponse.data;
+        return reglages == null
+            ? ReglesConversion.aucune
+            : ReglesConversion.de(reglages);
+      } on DioException {
+        return ReglesConversion.aucune;
+      }
+    });
 
 final Provider<RouteMemory> routeMemoryProvider = Provider<RouteMemory>((
   Ref ref,

@@ -1,28 +1,31 @@
 'use client';
 
+import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Field } from '@/components/forms/field';
+import { Liste } from '@/components/forms/liste';
 import { Input } from '@/components/ui/input';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import type { ConversionDraft, ConversionErrors } from '@/lib/data/console';
+  reglesChamps,
+  type ChampReglable,
+  type ConversionDraft,
+  type ConversionErrors,
+} from '@/lib/data/console';
+import { valeursProposees, type ChampLibre, type ReglageChamp } from '@/lib/data/champs-conversion';
 import {
   DUREES_MOIS,
   formatDureeMois,
   PROSPECT_TYPE_LABELS,
   PROSPECT_TYPES,
 } from '@/lib/data/grand-public';
+import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { fetchBanques, fetchIncomeBands, fetchSyndicats } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
   type EnrollmentMethod,
   type PaymentMode,
   type ProspectType,
@@ -31,14 +34,6 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-/** La prise de rendez-vous en tête : c'est l'issue que l'appel cherche. */
-const METHOD_ORDER: readonly EnrollmentMethod[] = [
-  'APPOINTMENT',
-  'VOICE_OR_ELECTRONIC_MESSAGING',
-  'PLATFORM',
-  'PHYSICAL',
-];
-
 const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
   { value: 'COMPTANT', label: 'Comptant' },
   { value: 'ECHELONNE', label: 'Échelonné' },
@@ -46,25 +41,43 @@ const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
 
 const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
 
+const COORDONNEES: Partial<
+  Record<
+    EnrollmentMethod,
+    {
+      readonly libelle: string;
+      readonly cle: 'plateformeChuesUrl' | 'emailChues' | 'whatsappChuesE164';
+    }
+  >
+> = {
+  PLATFORM: { libelle: 'Lien de la plateforme CPI CHUES', cle: 'plateformeChuesUrl' },
+  VOICE_OR_ELECTRONIC_MESSAGING: { libelle: 'Adresse e-mail CHUES', cle: 'emailChues' },
+  WHATSAPP: { libelle: 'Numéro WhatsApp CHUES', cle: 'whatsappChuesE164' },
+};
+
 /**
- * Sur CHUES le prospect est enseignant : ni situation ni mode de paiement, et
- * l'adhésion exige le dossier complet. Le Grand Public garde ces deux champs,
- * facultatifs, et « non demandé » pour les questions qu'on n'a pas posées.
+ * L'ordre, la visibilité et le caractère obligatoire viennent de
+ * `reglages` : sans réglage chargé, le formulaire reste celui du projet.
  */
 export function ConversionFields({
   draft,
   errors,
   phoneE164,
   disabled,
+  reglages,
+  libres,
   onChange,
 }: {
   draft: ConversionDraft;
   errors: ConversionErrors;
   phoneE164: string;
   disabled: boolean;
+  reglages: readonly ReglageChamp[];
+  libres: readonly ChampLibre[];
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
+  const regles = reglesChamps(reglages);
 
   const banques = useQuery({
     queryKey: queryKeys.banques,
@@ -95,13 +108,9 @@ export function ConversionFields({
     label: withRetired(tranche.label, tranche.isActive),
   }));
 
-  return (
-    <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
-      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Phase 3 · Conversion
-      </legend>
-
-      <Field label="Nom" required error={errors.nom}>
+  const noeuds: Readonly<Record<ChampReglable, ReactNode>> = {
+    nom: (
+      <Field label="Nom" required={regles.requis('nom', true)} error={errors.nom}>
         {(props) => (
           <Input
             {...props}
@@ -112,8 +121,9 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Prénom" required={complet} error={errors.prenom}>
+    ),
+    prenom: (
+      <Field label="Prénom" required={regles.requis('prenom', complet)} error={errors.prenom}>
         {(props) => (
           <Input
             {...props}
@@ -124,12 +134,42 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    phoneE164: (
       <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
         {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
       </Field>
-
-      <Field label="E-mail" error={errors.email}>
+    ),
+    whatsappStatus: (
+      <ChoixOuiNon
+        label="Ce numéro est-il un numéro WhatsApp ?"
+        name="console-whatsapp"
+        value={draft.memeWhatsapp}
+        nonDemande={false}
+        onChange={(memeWhatsapp) => {
+          onChange({ memeWhatsapp, ...(memeWhatsapp === false ? {} : { whatsapp: '' }) });
+        }}
+      />
+    ),
+    whatsappE164:
+      draft.memeWhatsapp === false ? (
+        <Field label="Numéro WhatsApp" error={errors.whatsapp}>
+          {(props) => (
+            <Input
+              {...props}
+              inputMode="tel"
+              autoComplete="off"
+              placeholder="77 123 45 67"
+              value={draft.whatsapp}
+              onChange={(event) => {
+                onChange({ whatsapp: event.target.value });
+              }}
+            />
+          )}
+        </Field>
+      ) : null,
+    email: (
+      <Field label="E-mail" required={regles.requis('email', false)} error={errors.email}>
         {(props) => (
           <Input
             {...props}
@@ -142,8 +182,13 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Profession" required={complet} error={errors.profession}>
+    ),
+    profession: (
+      <Field
+        label="Profession"
+        required={regles.requis('profession', complet)}
+        error={errors.profession}
+      >
         {(props) => (
           <Input
             {...props}
@@ -154,12 +199,12 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    dureeEtablissementMois: (
       <Field
-        label="Durée dans l’établissement (mois)"
-        required={complet}
+        label="Durée dans la fonction (mois)"
+        required={regles.requis('dureeEtablissementMois', complet)}
         error={errors.dureeEtablissementMois}
-        description="Ancienneté au poste, pas la durée du système de paiement."
       >
         {(props) => (
           <Input
@@ -176,37 +221,47 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    fonctionnaire: (
       <ChoixOuiNon
         label="Fonctionnaire"
         name="console-fonctionnaire"
         value={draft.fonctionnaire}
-        nonDemande={!complet}
+        nonDemande={!regles.requis('fonctionnaire', complet)}
         error={errors.fonctionnaire}
         onChange={(fonctionnaire) => {
           onChange({ fonctionnaire });
         }}
       />
-
-      {complet ? null : (
-        <fieldset className="flex min-w-0 flex-col gap-2">
-          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
-          <div className="flex flex-wrap gap-2">
-            {PROSPECT_TYPES.map((option) => (
-              <ChoixSituation
-                key={option}
-                option={option}
-                checked={draft.type === option}
-                onSelect={() => {
-                  onChange({ type: draft.type === option ? null : option });
-                }}
-              />
-            ))}
-          </div>
-        </fieldset>
-      )}
-
-      <Field label="Syndicat" required={complet} error={errors.syndicatId}>
+    ),
+    type: (
+      <fieldset className="flex min-w-0 flex-col gap-2">
+        <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
+        <div className="flex flex-wrap gap-2">
+          {PROSPECT_TYPES.map((option) => (
+            <ChoixSituation
+              key={option}
+              option={option}
+              checked={draft.type === option}
+              onSelect={() => {
+                onChange({ type: draft.type === option ? null : option });
+              }}
+            />
+          ))}
+        </div>
+        {errors.type === undefined ? null : (
+          <p role="alert" className="text-[0.75rem] text-destructive">
+            {errors.type}
+          </p>
+        )}
+      </fieldset>
+    ),
+    syndicatId: (
+      <Field
+        label="Syndicat"
+        required={regles.requis('syndicatId', complet)}
+        error={errors.syndicatId}
+      >
         {(props) => (
           <Liste
             id={props.id}
@@ -220,8 +275,9 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      <Field label="Banque" required={complet} error={errors.banqueId}>
+    ),
+    banqueId: (
+      <Field label="Banque" required={regles.requis('banqueId', complet)} error={errors.banqueId}>
         {(props) => (
           <Liste
             id={props.id}
@@ -235,19 +291,25 @@ export function ConversionFields({
           />
         )}
       </Field>
-
+    ),
+    engagementEnCours: (
       <ChoixOuiNon
         label="Engagement en cours à la banque"
         name="console-engagement"
         value={draft.engagementEnCours}
-        nonDemande={!complet}
+        nonDemande={!regles.requis('engagementEnCours', complet)}
         error={errors.engagementEnCours}
         onChange={(engagementEnCours) => {
           onChange({ engagementEnCours });
         }}
       />
-
-      <Field label="Revenu mensuel" required={complet} error={errors.incomeBandId}>
+    ),
+    incomeBandId: (
+      <Field
+        label="Revenu mensuel"
+        required={regles.requis('incomeBandId', complet)}
+        error={errors.incomeBandId}
+      >
         {(props) => (
           <Liste
             id={props.id}
@@ -261,32 +323,36 @@ export function ConversionFields({
           />
         )}
       </Field>
-
-      {complet ? null : (
-        <Field label="Paiement">
-          {(props) => (
-            <Liste
-              id={props.id}
-              describedBy={props['aria-describedby']}
-              items={PAIEMENTS}
-              value={draft.paymentMode ?? ''}
-              placeholder="Choisir un mode"
-              onChange={(value) => {
-                const paymentMode = value as PaymentMode;
-                onChange({
-                  paymentMode,
-                  ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
-                });
-              }}
-            />
-          )}
-        </Field>
-      )}
-
-      {complet || draft.paymentMode === 'ECHELONNE' ? (
+    ),
+    paymentMode: (
+      <Field
+        label="Paiement"
+        required={regles.requis('paymentMode', false)}
+        error={errors.paymentMode}
+      >
+        {(props) => (
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
+            items={PAIEMENTS}
+            value={draft.paymentMode ?? ''}
+            placeholder="Choisir un mode"
+            onChange={(value) => {
+              const paymentMode = value as PaymentMode;
+              onChange({
+                paymentMode,
+                ...(paymentMode === 'ECHELONNE' ? {} : { dureeSystemeMois: '' }),
+              });
+            }}
+          />
+        )}
+      </Field>
+    ),
+    dureeSystemeMois:
+      draft.paymentMode === 'ECHELONNE' ? (
         <Field
           label="Durée du système de paiement"
-          required={complet}
+          required={regles.requis('dureeSystemeMois', false)}
           error={errors.dureeSystemeMois}
         >
           {(props) => (
@@ -302,39 +368,43 @@ export function ConversionFields({
             />
           )}
         </Field>
-      ) : null}
-
-      <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-        <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-          Méthode d’enrôlement
-        </legend>
-        <div className="grid gap-2 sm:grid-cols-2">
-          {METHOD_ORDER.map((method) => (
-            <MethodChoice
-              key={method}
-              method={method}
-              checked={draft.method === method}
-              onSelect={() => {
-                // Changer de méthode efface la date : le serveur refuse un
-                // rendez-vous sur toute autre méthode que la prise de rendez-vous.
-                onChange({
-                  method,
-                  ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
-                });
-              }}
-            />
-          ))}
-        </div>
-        {errors.method === undefined ? null : (
-          <p role="alert" className="text-[0.75rem] text-destructive">
-            {errors.method}
-          </p>
-        )}
-      </fieldset>
-
-      {draft.method === 'APPOINTMENT' ? (
+      ) : null,
+    method: (
+      <>
+        <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
+          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
+            Méthode d’enrôlement
+          </legend>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {ENROLLMENT_METHOD_ORDER.map((method) => (
+              <MethodChoice
+                key={method}
+                method={method}
+                checked={draft.method === method}
+                onSelect={() => {
+                  // Changer de méthode efface la date : le serveur refuse un
+                  // rendez-vous sur toute autre méthode que la prise de rendez-vous.
+                  onChange({
+                    method,
+                    ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
+                  });
+                }}
+              />
+            ))}
+          </div>
+          {errors.method === undefined ? null : (
+            <p role="alert" className="text-[0.75rem] text-destructive">
+              {errors.method}
+            </p>
+          )}
+        </fieldset>
+        <CoordonneeChues method={draft.method} />
+      </>
+    ),
+    rendezVousAt:
+      draft.method === 'APPOINTMENT' ? (
         <Field
-          label="Date du rendez-vous"
+          label="Date et heure du rendez-vous"
           required
           error={errors.rendezVousAt}
           description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
@@ -351,46 +421,111 @@ export function ConversionFields({
             />
           )}
         </Field>
-      ) : null}
+      ) : null,
+  };
+
+  const ordre = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
+
+  return (
+    <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
+      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        Phase 3 · Conversion
+      </legend>
+
+      {ordre.map((champ) =>
+        regles.visible(champ as ChampReglable, visibleParDefaut(champ, complet)) ? (
+          <Fragment key={champ}>{noeuds[champ as ChampReglable]}</Fragment>
+        ) : null,
+      )}
+
+      {libres.map((champ) => (
+        <ChampAjoute
+          key={champ.id}
+          champ={champ}
+          value={draft.champsLibres[champ.id] ?? ''}
+          error={errors.libres?.[champ.id]}
+          onChange={(valeur) => {
+            onChange({ champsLibres: { ...draft.champsLibres, [champ.id]: valeur } });
+          }}
+        />
+      ))}
     </fieldset>
   );
 }
 
-function Liste({
-  id,
-  describedBy,
-  items,
+/** EB-24 : ce que le téléconseiller dicte au prospect, selon la méthode choisie. */
+function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
+  const parametres = useQuery({
+    queryKey: queryKeys.parametresChues,
+    queryFn: () => fetchParametresChues(),
+    staleTime: REFERENCE_STALE_TIME,
+  });
+
+  const attendue = method === null ? undefined : COORDONNEES[method];
+  if (attendue === undefined || parametres.data === undefined) return null;
+
+  const valeur = parametres.data[attendue.cle];
+  return (
+    <p className="rounded-md border border-border px-3 py-2 text-[0.875rem] sm:col-span-2">
+      <span className="text-muted-foreground">{attendue.libelle} : </span>
+      {valeur === '' ? (
+        'à renseigner dans les paramètres CHUES.'
+      ) : (
+        <span className="select-all font-[600]">{valeur}</span>
+      )}
+    </p>
+  );
+}
+
+/** Situation et mode de paiement n'existent pas sur CHUES : le prospect y est enseignant. */
+function visibleParDefaut(champ: string, complet: boolean): boolean {
+  if (champ === 'type' || champ === 'paymentMode' || champ === 'dureeSystemeMois') {
+    return !complet;
+  }
+  return true;
+}
+
+function ChampAjoute({
+  champ,
   value,
-  placeholder,
+  error,
   onChange,
 }: {
-  id: string;
-  describedBy: string | undefined;
-  items: readonly { value: string; label: string }[];
+  champ: ChampLibre;
   value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
+  error: string | undefined;
+  onChange: (valeur: string) => void;
 }) {
+  if (champ.type === 'TEXTE') {
+    return (
+      <Field label={champ.libelle} required={champ.obligatoire} error={error}>
+        {(props) => (
+          <Input
+            {...props}
+            value={value}
+            onChange={(event) => {
+              onChange(event.target.value);
+            }}
+          />
+        )}
+      </Field>
+    );
+  }
+
+  const items = valeursProposees(champ).map((option) => ({ value: option, label: option }));
   return (
-    <Select
-      items={items}
-      value={value}
-      onValueChange={(next) => {
-        if (next === null || next === '') return;
-        onChange(next);
-      }}
-    >
-      <SelectTrigger id={id} aria-describedby={describedBy}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <Field label={champ.libelle} required={champ.obligatoire} error={error}>
+      {(props) => (
+        <Liste
+          id={props.id}
+          describedBy={props['aria-describedby']}
+          items={items}
+          value={value}
+          placeholder="Choisir une valeur"
+          onChange={onChange}
+        />
+      )}
+    </Field>
   );
 }
 

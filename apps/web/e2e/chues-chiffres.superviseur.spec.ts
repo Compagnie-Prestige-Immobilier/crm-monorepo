@@ -26,9 +26,9 @@ function carte(page: Page, titre: string) {
 
 const CARTES_USINE = [
   'Taux de contact',
-  'Taux de rendez-vous',
+  'Taux de joignabilité des représentants',
+  'Taux d’acceptation',
   'Taux de qualification',
-  'Adhésions',
   'Par téléconseiller',
 ] as const;
 
@@ -248,12 +248,13 @@ test('CHU-CHF-12 · le tableau « Par téléconseiller » nomme tout le plateau'
 
   for (const entete of [
     'Téléconseiller',
-    'Appels',
-    'Contact',
-    'Rendez-vous',
-    'Qualification',
-    'Prospects notés',
-    'Adhésions',
+    'Appels représentants',
+    'Joignabilité',
+    'Acceptés',
+    'À rappeler',
+    'Acceptation',
+    'Prospects saisis',
+    'Méthodes obtenues',
   ]) {
     await expect(tableau.getByRole('columnheader', { name: entete, exact: true })).toBeVisible();
   }
@@ -377,14 +378,16 @@ test('CHU-TRV-06 · la navigation de l’encadrement ouvre sur les chiffres', as
 
   const navigation = page.getByRole('navigation', { name: 'Navigation principale' });
   await expect(navigation.getByRole('link', { name: 'Tableau de bord' })).toBeVisible();
-  await expect(navigation.getByRole('link', { name: 'Mon équipe' })).toBeVisible();
-  /**
-   * « Lots d’export » est rangé sous le repli « Plus », un `<details>` fermé :
-   * son contenu sort de l'arbre d'accessibilité, donc `getByRole` ne le voit
-   * pas. On le vise par son `href`, ce qui prouve sa présence sans ouvrir le
-   * repli — dont l'état est un cookie partagé par toutes les specs.
-   */
-  const lotsExport = navigation.locator('a[href="/chues/campagnes"]');
-  await expect(lotsExport).toHaveCount(1);
-  await expect(lotsExport).toHaveText('Lots d’export');
+
+  // L'équipe et les campagnes sont des onglets du tableau de bord, pas des entrées de la barre.
+  await expect(navigation.locator('a[href="/chues/supervision"]')).toHaveCount(0);
+  await expect(navigation.locator('a[href="/chues/campagnes"]')).toHaveCount(0);
+  const onglets = page.getByRole('tablist', { name: 'Pilotage' });
+  for (const onglet of ['Tableau de bord', 'Activité', 'Présence', 'Campagnes']) {
+    await expect(onglets.getByRole('tab', { name: onglet })).toBeVisible();
+  }
+  await expect(onglets.getByRole('tab', { name: 'Tableau de bord' })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 });

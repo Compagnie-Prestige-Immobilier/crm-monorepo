@@ -22,6 +22,7 @@ import {
   type VisiteStats,
 } from '@/components/accueil/tableau-de-bord/sources';
 import { TiroirWidgets } from '@/components/accueil/tableau-de-bord/tiroir-widgets';
+import { BoutonExportExcel } from '@/components/dashboard/bouton-export-excel';
 import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -39,8 +40,11 @@ import {
   serializeDisposition,
   type DashboardWidget,
 } from '@/lib/data/visites-dashboard';
+import { formatDate, formatDateTime } from '@/lib/format';
 import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { queryKeys } from '@/lib/query-keys';
+import { avecTransition } from '@/lib/transition-de-vue';
 import type { Role } from '@/lib/types';
 
 function exportCsv(stats: VisiteStats, plage: { du: string; au: string }): void {
@@ -103,6 +107,66 @@ function donneesDesWidgets(
   return donnees;
 }
 
+/** L'onglet du classeur où chaque source se range : ce qui se lit ensemble reste ensemble. */
+const GROUPES_EXPORT: Record<string, string> = {
+  'par-entreprise': 'Qui vient, et pourquoi',
+  'par-objet': 'Qui vient, et pourquoi',
+  'par-entreprise-objet': 'Qui vient, et pourquoi',
+  'visiteurs-recurrents': 'Qui vient, et pourquoi',
+  'par-direction': 'Qui reçoit',
+  'par-destinataire': 'Qui reçoit',
+  'par-destinataire-direction': 'Qui reçoit',
+  'par-jour': 'Dans le temps',
+  'par-mois': 'Dans le temps',
+  'par-heure': 'Dans le temps',
+  'par-jour-semaine': 'Dans le temps',
+  'par-heure-jour-semaine': 'Dans le temps',
+  'par-objet-mois': 'Dans le temps',
+  'par-agent': 'Travail de l’accueil',
+  'qualite-de-saisie': 'Travail de l’accueil',
+  'avec-telephone': 'Travail de l’accueil',
+};
+
+/** Le classeur suit l'écran : ses blocs sont les cartes posées, dans leur ordre. */
+function blocsDesWidgets(
+  widgets: readonly DashboardWidget[],
+  catalogue: Catalogue,
+  donneesParWidget: Map<string, DonneesSource>,
+): BlocTableauDeBord[] {
+  const blocs: BlocTableauDeBord[] = [];
+  for (const widget of widgets) {
+    const entree = catalogue[widget.source];
+    const donnee = donneesParWidget.get(widget.id);
+    if (entree === undefined || donnee === undefined) continue;
+    blocs.push({
+      titre: entree.label,
+      question: entree.question,
+      groupe: GROUPES_EXPORT[widget.source],
+      donnees: donnee,
+    });
+  }
+  return blocs;
+}
+
+function classeurDesVisites(
+  plage: { du: string; au: string },
+  periode: string,
+  blocs: BlocTableauDeBord[],
+): ClasseurTableauDeBord {
+  return {
+    fichier: `cpi-visites-${plage.du}-${plage.au}`,
+    titre: 'Tableau de bord des visites',
+    sousTitre: periode,
+    reperes: [
+      { libelle: 'Registre', valeur: 'Visites reçues à l’accueil' },
+      { libelle: 'Période', valeur: `du ${formatDate(plage.du)} au ${formatDate(plage.au)}` },
+      { libelle: 'Chiffres repris', valeur: String(blocs.length) },
+      { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
+    ],
+    blocs,
+  };
+}
+
 type Brouillon = DashboardWidget[] | null;
 
 function reordonner(widgets: Brouillon, fromId: string, toId: string): Brouillon {
@@ -133,6 +197,46 @@ function modifier(widgets: Brouillon, id: string, patch: Partial<DashboardWidget
   return widgets?.map((widget) => (widget.id === id ? { ...widget, ...patch } : widget)) ?? widgets;
 }
 
+function widgetsActifs(
+  editing: boolean,
+  brouillon: Brouillon,
+  disposition: { widgets: DashboardWidget[] } | undefined,
+  catalogue: Catalogue,
+): DashboardWidget[] {
+  const base = editing ? (brouillon ?? []) : (disposition?.widgets ?? []);
+  return base.filter((widget) => catalogue[widget.source] !== undefined);
+}
+
+function clePeriodeComparaison(
+  comparaisonPlage: ReturnType<typeof plageComparaison>,
+): ReturnType<typeof queryKeys.visitesStats> {
+  return queryKeys.visitesStats(comparaisonPlage?.du ?? '', comparaisonPlage?.au ?? '');
+}
+
+function comparaisonActivee(
+  comparaisonPlage: ReturnType<typeof plageComparaison>,
+  tropLarge: boolean,
+): boolean {
+  return comparaisonPlage !== null && !tropLarge;
+}
+
+function BoutonReinitialiser({
+  disposition,
+  pending,
+  onReset,
+}: {
+  disposition: { source: string } | undefined;
+  pending: boolean;
+  onReset: () => void;
+}) {
+  if (disposition?.source !== 'utilisateur') return null;
+  return (
+    <Button type="button" variant="ghost" disabled={pending} onClick={onReset}>
+      Revenir à la disposition par défaut
+    </Button>
+  );
+}
+
 export function DashboardVisitesView({ role }: { role: Role }) {
   const { filters, setFilters } = useUrlFilters(dashboardFiltersAdapter);
   const plage = plageDeFiltres(filters);
@@ -152,12 +256,12 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   });
 
   const comparaisonQuery = useQuery({
-    queryKey: queryKeys.visitesStats(comparaisonPlage?.du ?? '', comparaisonPlage?.au ?? ''),
+    queryKey: clePeriodeComparaison(comparaisonPlage),
     queryFn: () => {
       const cible = comparaisonPlage ?? plage;
       return fetchVisiteDashboardStats(cible.du, cible.au);
     },
-    enabled: comparaisonPlage !== null && !tropLarge,
+    enabled: comparaisonActivee(comparaisonPlage, tropLarge),
   });
 
   const dispositionQuery = useQuery({
@@ -205,9 +309,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
     },
   });
 
-  const widgets = (editing ? brouillon : (dispositionQuery.data?.widgets ?? [])).filter(
-    (widget) => catalogue[widget.source] !== undefined,
-  );
+  const widgets = widgetsActifs(editing, brouillon, dispositionQuery.data, catalogue);
 
   const donneesParSource = donneesDuCatalogue(catalogue, statsQuery.data);
   const donneesParWidget = donneesDesWidgets(widgets, donneesParSource);
@@ -263,27 +365,21 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                     ? undefined
                     : marqueRecommandee(forme, mesurerDonnees(donneesSource)));
                 const id = `${source}-${String(Date.now())}`;
-                setBrouillon((current) => [
-                  ...(current ?? []),
-                  { id, source, marque, taille: 'demi' },
-                ]);
+                avecTransition(() => {
+                  setBrouillon((current) => [...(current ?? []), { id, source, marque }]);
+                });
                 dernierAjoutRef.current = id;
               }}
             />
           ) : (
             <>
-              {dispositionQuery.data?.source === 'utilisateur' ? (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={resetMutation.isPending}
-                  onClick={() => {
-                    resetMutation.mutate();
-                  }}
-                >
-                  Revenir à la disposition par défaut
-                </Button>
-              ) : null}
+              <BoutonReinitialiser
+                disposition={dispositionQuery.data}
+                pending={resetMutation.isPending}
+                onReset={() => {
+                  resetMutation.mutate();
+                }}
+              />
               <Button
                 type="button"
                 variant="outline"
@@ -295,6 +391,16 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                 <FileSpreadsheetIcon aria-hidden="true" />
                 Exporter le détail
               </Button>
+              <BoutonExportExcel
+                preparer={() =>
+                  classeurDesVisites(
+                    plage,
+                    periodeAffichee(filters),
+                    blocsDesWidgets(widgets, catalogue, donneesParWidget),
+                  )
+                }
+                disabled={!hasData || widgets.length === 0}
+              />
             </>
           )}
           <BarreEdition
@@ -357,16 +463,22 @@ export function DashboardVisitesView({ role }: { role: Role }) {
                   setBrouillon((current) => reordonner(current, fromId, toId));
                 }}
                 onRemove={(id) => {
-                  setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                  avecTransition(() => {
+                    setBrouillon((current) => current?.filter((w) => w.id !== id) ?? current);
+                  });
                 }}
                 onMove={(id, direction) => {
-                  setBrouillon((current) => decaler(current, id, direction));
+                  avecTransition(() => {
+                    setBrouillon((current) => decaler(current, id, direction));
+                  });
                 }}
                 onChangeMarque={(id, marque) => {
                   setBrouillon((current) => modifier(current, id, { marque }));
                 }}
                 onChangeTaille={(id, taille) => {
-                  setBrouillon((current) => modifier(current, id, { taille }));
+                  avecTransition(() => {
+                    setBrouillon((current) => modifier(current, id, { taille }));
+                  });
                 }}
                 onChangePresentation={(id, presentation) => {
                   setBrouillon((current) => modifier(current, id, { presentation }));
@@ -380,9 +492,9 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   );
 }
 
-export function DashboardVisitesSkeleton() {
+function DashboardVisitesSkeleton() {
   return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
+    <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-hidden="true">
       {[0, 1, 2].map((index) => (
         <Card key={`tuile-${String(index)}`}>
           <CardContent>

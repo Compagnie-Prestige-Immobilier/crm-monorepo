@@ -8,6 +8,8 @@ import 'package:json_annotation/json_annotation.dart';
 enum PurgeDomainKey {
   @JsonValue(r'teleconseillers')
   teleconseillers(r'teleconseillers'),
+  @JsonValue(r'chargesClientele')
+  chargesClientele(r'chargesClientele'),
   @JsonValue(r'finances')
   finances(r'finances'),
   @JsonValue(r'supervision')

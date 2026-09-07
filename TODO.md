@@ -1,72 +1,13 @@
 # TODO
 
 Les 39 exigences de l'expression de besoins CHUES du 4 septembre 2026, avec
-leur état vérifié dans le code de `dev` le 5 septembre 2026.
+leur état vérifié dans le code le 6 septembre 2026.
 
 Lire ce fichier avant d'ouvrir un chantier. S'il contredit le code, c'est le
 code qui a raison : corriger le fichier.
 
-**20 faites, 5 partielles, 14 absentes.** Les lots 1 et 3 sont livrés en
-entier, le lot 7 à une ventilation près. Les lots 4 et 6 n'ont pas commencé.
-
-## Lot 2, indicateurs et tableau de bord
-
-- [ ] EB-33 Définition des taux. Faits : fiches ouvertes par téléconseiller et
-      par jour, DMC, DMT, affichage « Sans objet » sans dénominateur. Manquent :
-      taux de joignabilité PAR FICHE sur le dernier statut (aujourd'hui calculé
-      par tentative, `supervision.service.ts:881`), taux de qualification
-      (qualifiées / ouvertes, n'existe nulle part), taux d'exploitation, et le
-      croisement téléconseiller x créneau horaire (`activity-view.tsx:591` ne
-      croise que l'équipe entière). Partiels : taux de contact borné à la
-      dernière campagne et plafonné à 100 %, taux d'acceptation et taux de
-      rappel côté représentants seulement.
-- [ ] EB-34 Diagrammes. La répartition des statuts en circulaire existe
-      (`sources.ts:278`). Manquent le taux d'exploitation par campagne et les
-      deux histogrammes joint / non joint.
-- [ ] EB-35 La colonne « Rendez-vous » du tableau par téléconseiller compte
-      encore le taux de rappel (`sources.ts:97,140`). La renommer « Acceptés »
-      et compter les fiches au statut Accepté.
-- [ ] EB-36 Catalogue de cartes. Représentants, prospects, appels, fiches et
-      enrôlement sont couverts. Manquent les campagnes au-delà de la dernière,
-      et les rappels honorés, en retard, à venir.
-- [ ] EB-37 La permission de lecture du journal d'appels n'est demandée que
-      depuis l'écran de diagnostic. La demander à la première ouverture de
-      fiche, et signaler le refus en supervision et sur l'accueil.
-
-## Lot 4, conversion et paramètres
-
-Aucune des sept exigences n'est commencée.
-
-- [ ] EB-20 Champ « Établissement » à la création d'un prospect. Absent en base.
-- [ ] EB-21 Revenu mensuel obligatoire côté API. `incomeBandId` est
-      `@IsOptional`, seul l'écran l'impose.
-- [ ] EB-22 « Durée dans la fonction » et retrait de la durée du système de
-      paiement.
-- [ ] EB-23 Numéro WhatsApp à la conversion. N'existe que pour la diaspora.
-- [ ] EB-24 Méthodes d'enrôlement recomposées, plus la migration des valeurs
-      existantes. L'enum n'a ni WHATSAPP ni fusion RDV CPI / Physique.
-- [ ] EB-26 Bouton « Écrire sur WhatsApp ». Aucun lien `wa.me` dans le dépôt.
-- [ ] EB-29 Page « Paramètres CHUES ». Les réglages du connecteur vivent en
-      variables d'environnement, pas en base.
-
-## Lot 5, rôles
-
-- [ ] EB-31 Rôle Chargé de clientèle. L'enum `Role` ne le porte pas, et la revue
-      avant enrôlement n'existe sous aucun nom.
-- [ ] EB-32 Rendre au superviseur les cartes couverture de campagne, appels hors
-      attribution et rendement par département (`sources.ts:639`). Le reste est
-      déjà conforme : les montants restent à l'administrateur et à la direction,
-      l'enrôlement à l'administrateur seul.
-
-## Lot 6, formulaire public
-
-Aucune des quatre exigences n'est commencée. EB-30 dépend d'EB-27.
-
-- [ ] EB-25 Deux modes de conversion, dont l'envoi du lien.
-- [ ] EB-27 Formulaire public sans connexion. Tous les groupes de routes sont
-      derrière `guardRoles`.
-- [ ] EB-28 Champs de conversion réglables par l'administrateur.
-- [ ] EB-30 Notifications à la réception d'une demande.
+**38 faites, 1 partielle.** Les lots 1 à 6 sont livrés en entier. Il ne reste
+du lot 7 que la ventilation par superviseur des indicateurs d'enrôlement.
 
 ## Lot 7, connecteur
 
@@ -90,6 +31,29 @@ reprise comprises. Pièges déjà payés :
 - Sous verrou, la déconnexion et le changement d'espace sont REFUSÉS : la fiche
   resterait verrouillée côté serveur, hors de vue.
 
+### Lot 2 en entier, indicateurs et tableau de bord
+
+Branche `feat/lot2-indicateurs`. EB-33 à EB-37 sont dans le code. Pièges
+déjà payés :
+
+- Les taux se lisent PAR FICHE, sur le dernier statut de la fenêtre, attribués
+  à qui l'a posé (`REP_FICHE_COLONNES`, `pilotage.sql.ts`). Une fiche par
+  fenêtre : sommable entre téléconseillers d'une même fenêtre, pas entre
+  fenêtres. Le tableau par créneau interroge une fenêtre par créneau : une
+  fiche appelée matin et après-midi compte dans les deux.
+- Le taux de contact se calcule sur les fiches CONFIÉES par les campagnes de
+  la période (`campagnes.service.ts`). EB-17 remplacera ce dénominateur par
+  l'objectif du téléconseiller.
+- La disposition est en `version: 2`. Une version 1 relue renomme
+  `taux-de-contact`, `taux-de-qualification` et `a-rappeler`, dont le sens a
+  changé (`RENOMMAGES_V1`, `dashboard-layout.ts`).
+- La permission du journal d'appels se demande UNE fois, à la première
+  ouverture de fiche, et l'appareil déclare son état à chaque synchronisation
+  (`journalAppelsAutorise` sur le battement de cœur).
+- Les specs Playwright `chues-chiffres*.spec.ts` portent les nouveaux titres
+  mais leurs valeurs attendues datent du calcul par tentative : à reprendre
+  avec le jeu de données avant de les relancer.
+
 ### Lot 3 en entier, campagnes
 
 Branche `feat/lot2-compagnes`.
@@ -111,6 +75,47 @@ Les six exigences EB-14 à EB-19 sont dans le code. Pièges déjà payés :
   entière échoue.
 - La suppression d'une campagne reste à l'administrateur seul. Elle était gardée
   par le même drapeau que la création côté web ; les deux sont séparés.
+
+### Lots 4, 5 et 6, conversion, rôles et formulaire public
+
+Branche `feat/lot4-conversion`. Treize exigences : EB-20 à EB-26, EB-27 à
+EB-32, EB-29.
+
+**DETTE ASSUMÉE : aucun test neuf n'a été écrit sur ces trois lots.** Décision
+du 6 septembre 2026 sous contrainte de délai. Les parcours E2E et journey sont
+à écrire à partir de la semaine du 8 septembre. Deux règles resteront hors de
+leur portée et demandent un test d'un autre genre : la reprise des données
+d'EB-24, et la protection `minPayloadVersion` d'EB-21 qu'un navigateur ne sait
+pas rejouer.
+
+Pièges déjà payés :
+
+- EB-21 ne mord qu'à partir de `payloadVersion` 8. Appliquer le refus tout de
+  suite condamnerait une saisie faite hors ligne, où un 400 est TERMINAL. Le
+  web et le mobile sont passés à 8 ; la file repart avec le MINIMUM des
+  versions qu'elle porte, donc une saisie mise en file en 7 repart en 7.
+- EB-24 ne réécrit PAS `call_attempts`. La contrainte interdit une date sur
+  PHYSICAL, donc aucune ligne n'en porte et les convertir les violerait toutes.
+  Les fiches et les parcours sont convertis, l'historique garde son code et se
+  LIT « RDV CPI ».
+- Une base mobile d'avant la v13 ne pouvait plus migrer : `_prospectsCopy`
+  ignorait les colonnes neuves, et les paliers v6 et v13 recréent `prospects`.
+  Invisible à l'analyse et à la compilation.
+- EB-27 n'a pas un lien général mais un lien PAR COMPTE : `createdById` est NOT
+  NULL et commande la visibilité.
+- Le catalogue d'EB-28 est DÉRIVÉ du DTO par soustraction : un champ ajouté au
+  formulaire sans libellé fait échouer la compilation.
+
+Restent à décider :
+
+- `GET /analytics/funnel` rend `montantEncaisse` à TOUS les rôles. « Réservé à
+  l'administrateur et à la direction » n'est qu'une convention d'affichage.
+- `API_TRUST_PROXY_HEADERS` vaut `false` : la limitation du formulaire public
+  est GLOBALE et non par visiteur tant qu'il n'est pas à `true`.
+- EB-25 : « Lien envoyé le {date} » et la mise à jour de la fiche visée
+  demandent deux colonnes et un jeton qui porte le prospect. PR suivante.
+- Le formulaire mobile ignore les réglages d'EB-28.
+- Un import portant « Physique » est désormais refusé ligne à ligne.
 
 ### Lot 7, connecteur d'enrôlement
 
@@ -142,7 +147,8 @@ Merges `2c508581` et `5e9458af`. Deux pièges qui se reproduisent :
 
 ## Exploitation
 
-- [ ] Appliquer la migration `20260905090000_inscriptions_plateforme` hors local.
+- [ ] Appliquer les migrations `20260905090000_inscriptions_plateforme` et
+      `20260905200000_journal_appels_dans_le_battement` hors local.
 - [ ] Délivrer le jeton machine Grand Public : `php artisan integration:token crm`
       dans son conteneur. C'est la dernière variable manquante ; l'URL et le
       couple CHUES sont posés et vérifiés. Sans jeton, le connecteur ne tire pas

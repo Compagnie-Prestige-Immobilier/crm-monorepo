@@ -1,4 +1,4 @@
-import { segmentWhere } from '@crm/database';
+import { ProspectStatut, segmentWhere } from '@crm/database';
 import type { Prisma } from '@crm/database';
 
 import type { AuthenticatedUser } from './decorators/current-user.decorator.js';
@@ -71,6 +71,14 @@ function relationFilters(filter: ProspectFilterDto): Prisma.ProspectWhereInput[]
       journeys: {
         some: journey,
       },
+    });
+  }
+  // Dans l'`AND` et non à la racine : `where.statut` porte déjà le filtre de
+  // statut, et l'écraser ferait rendre des demandes non converties.
+  if (filter.revue !== undefined) {
+    and.push({
+      statut: ProspectStatut.CONVERTI,
+      revueAt: filter.revue ? { not: null } : null,
     });
   }
   if (filter.segment) and.push(segmentWhere(filter.segment));

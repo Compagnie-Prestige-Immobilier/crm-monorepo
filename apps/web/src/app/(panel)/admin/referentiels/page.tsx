@@ -14,7 +14,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Référentiels' };
 
 export default async function ReferentielsPage() {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="La gestion des référentiels" />;

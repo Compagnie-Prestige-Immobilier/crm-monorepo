@@ -4,7 +4,7 @@ import PDFDocument from 'pdfkit';
 
 import { CPI_BURGUNDY, CPI_RULE_GREY, CPI_ZEBRA, cpiLogo } from '../../common/brand.js';
 
-export interface ProgrammeRow {
+interface ProgrammeRow {
   readonly position: number;
   readonly fullName: string;
   readonly etablissement: string;
@@ -69,7 +69,7 @@ function columnBounds(pageWidth: number): Bound[] {
   });
 }
 
-export function formatDakar(date: Date): string {
+function formatDakar(date: Date): string {
   return new Intl.DateTimeFormat('fr-FR', {
     timeZone: 'Africa/Dakar',
     dateStyle: 'long',
@@ -77,7 +77,7 @@ export function formatDakar(date: Date): string {
   }).format(date);
 }
 
-export function formatPhone(phoneE164: string): string {
+function formatPhone(phoneE164: string): string {
   return phoneE164.replace(/^(\+221)(\d{2})(\d{3})(\d{2})(\d{2})$/, '$1 $2 $3 $4 $5');
 }
 

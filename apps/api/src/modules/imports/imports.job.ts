@@ -10,7 +10,7 @@ export const IMPORT_LEASE_MS = 10 * 60_000;
 
 export const IMPORT_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
 
-export const isInFlight = (status: ImportStatus): boolean =>
+const isInFlight = (status: ImportStatus): boolean =>
   status === ImportStatus.queued || status === ImportStatus.running;
 
 export interface ImportLeaseView {

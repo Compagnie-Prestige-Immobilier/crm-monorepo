@@ -71,6 +71,10 @@ const CONFIG = {
 
 const EMPLOYEUR_TYPES = Object.keys(EMPLOYEUR_TYPE_LABELS) as EmployeurType[];
 
+function employeurTypeLabel(row: Row): string {
+  return 'type' in row ? EMPLOYEUR_TYPE_LABELS[row.type] : '';
+}
+
 interface Draft {
   id?: string;
   code: string;
@@ -81,6 +85,97 @@ interface Draft {
   maxXof: string;
   description: string;
   type: EmployeurType;
+}
+
+function KindSpecificFields({
+  kind,
+  draft,
+  onChange,
+}: {
+  kind: Kind;
+  draft: Draft;
+  onChange: (draft: Draft) => void;
+}) {
+  if (kind === 'employeurs') {
+    return (
+      <div className="grid gap-1.5">
+        <Label htmlFor="employeur-type">Type</Label>
+        <select
+          id="employeur-type"
+          value={draft.type}
+          className="h-11 rounded-md border border-input bg-background px-3 text-[0.875rem]"
+          onChange={(event) => {
+            onChange({ ...draft, type: event.target.value as EmployeurType });
+          }}
+        >
+          {EMPLOYEUR_TYPES.map((type) => (
+            <option key={type} value={type}>
+              {EMPLOYEUR_TYPE_LABELS[type]}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  }
+  if (kind === 'professions') {
+    return (
+      <label className="flex items-center gap-2">
+        <input
+          type="checkbox"
+          checked={draft.isTeaching}
+          onChange={(event) => {
+            onChange({ ...draft, isTeaching: event.target.checked });
+          }}
+        />
+        Profession enseignante
+      </label>
+    );
+  }
+  if (kind === 'incomeBands') {
+    return (
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label htmlFor="income-min">Minimum FCFA</Label>
+          <Input
+            id="income-min"
+            type="number"
+            min="0"
+            value={draft.minXof}
+            onChange={(event) => {
+              onChange({ ...draft, minXof: event.target.value });
+            }}
+          />
+        </div>
+        <div>
+          <Label htmlFor="income-max">Maximum FCFA</Label>
+          <Input
+            id="income-max"
+            type="number"
+            min="0"
+            value={draft.maxXof}
+            onChange={(event) => {
+              onChange({ ...draft, maxXof: event.target.value });
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+  if (kind === 'offers') {
+    return (
+      <div className="grid gap-1.5">
+        <Label htmlFor="offer-description">Description</Label>
+        <Input
+          id="offer-description"
+          value={draft.description}
+          onChange={(event) => {
+            onChange({ ...draft, description: event.target.value });
+          }}
+        />
+      </div>
+    );
+  }
+  return null;
 }
 
 const EMPTY: Draft = {
@@ -94,6 +189,49 @@ const EMPTY: Draft = {
   type: 'MINISTERE',
 };
 
+const FETCHERS: Record<Kind, () => Promise<Row[]>> = {
+  professions: fetchProfessions,
+  incomeBands: fetchIncomeBands,
+  employeurs: fetchEmployeurs,
+  offers: fetchOffers,
+};
+
+const SAVERS: Record<Kind, (value: Draft) => Promise<Row>> = {
+  professions: (value) =>
+    saveProfession({
+      ...(value.id ? { id: value.id } : {}),
+      code: value.code,
+      label: value.label,
+      isTeaching: value.isTeaching,
+      isActive: value.isActive,
+    }),
+  incomeBands: (value) =>
+    saveIncomeBand({
+      ...(value.id ? { id: value.id } : {}),
+      code: value.code,
+      label: value.label,
+      ...(value.minXof ? { minXof: Number(value.minXof) } : {}),
+      ...(value.maxXof ? { maxXof: Number(value.maxXof) } : {}),
+      isActive: value.isActive,
+    }),
+  employeurs: (value) =>
+    saveEmployeur({
+      ...(value.id ? { id: value.id } : {}),
+      code: value.code,
+      label: value.label,
+      type: value.type,
+      isActive: value.isActive,
+    }),
+  offers: (value) =>
+    saveOffer({
+      ...(value.id ? { id: value.id } : {}),
+      code: value.code,
+      label: value.label,
+      ...(value.description ? { description: value.description } : {}),
+      isActive: value.isActive,
+    }),
+};
+
 export function OpenReferentialTab({ kind }: { kind: Kind }) {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState('');
@@ -102,52 +240,11 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
   const queryKey = ['referentiels', kind] as const;
   const query = useQuery<Row[]>({
     queryKey,
-    queryFn: async (): Promise<Row[]> => {
-      if (kind === 'professions') return fetchProfessions();
-      if (kind === 'incomeBands') return fetchIncomeBands();
-      if (kind === 'employeurs') return fetchEmployeurs();
-      return fetchOffers();
-    },
+    queryFn: FETCHERS[kind],
   });
 
   const save = useMutation({
-    mutationFn: async (value: Draft) => {
-      if (kind === 'professions') {
-        return saveProfession({
-          ...(value.id ? { id: value.id } : {}),
-          code: value.code,
-          label: value.label,
-          isTeaching: value.isTeaching,
-          isActive: value.isActive,
-        });
-      }
-      if (kind === 'incomeBands') {
-        return saveIncomeBand({
-          ...(value.id ? { id: value.id } : {}),
-          code: value.code,
-          label: value.label,
-          ...(value.minXof ? { minXof: Number(value.minXof) } : {}),
-          ...(value.maxXof ? { maxXof: Number(value.maxXof) } : {}),
-          isActive: value.isActive,
-        });
-      }
-      if (kind === 'employeurs') {
-        return saveEmployeur({
-          ...(value.id ? { id: value.id } : {}),
-          code: value.code,
-          label: value.label,
-          type: value.type,
-          isActive: value.isActive,
-        });
-      }
-      return saveOffer({
-        ...(value.id ? { id: value.id } : {}),
-        code: value.code,
-        label: value.label,
-        ...(value.description ? { description: value.description } : {}),
-        isActive: value.isActive,
-      });
-    },
+    mutationFn: (value: Draft) => SAVERS[kind](value),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey });
       void queryClient.invalidateQueries({ queryKey: ['reference'] });
@@ -212,9 +309,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
               <TableRow key={row.id}>
                 <TableCell className="font-[600]">{row.code}</TableCell>
                 <TableCell>{row.label}</TableCell>
-                {kind === 'employeurs' ? (
-                  <TableCell>{'type' in row ? EMPLOYEUR_TYPE_LABELS[row.type] : ''}</TableCell>
-                ) : null}
+                {kind === 'employeurs' ? <TableCell>{employeurTypeLabel(row)}</TableCell> : null}
                 <TableCell>{row.isActive ? 'Active' : 'Retirée'}</TableCell>
                 <TableCell className="text-right">
                   <Button
@@ -270,77 +365,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
                   }}
                 />
               </div>
-              {kind === 'employeurs' ? (
-                <div className="grid gap-1.5">
-                  <Label htmlFor="employeur-type">Type</Label>
-                  <select
-                    id="employeur-type"
-                    value={draft.type}
-                    className="h-11 rounded-md border border-input bg-background px-3 text-[0.875rem]"
-                    onChange={(event) => {
-                      setDraft({ ...draft, type: event.target.value as EmployeurType });
-                    }}
-                  >
-                    {EMPLOYEUR_TYPES.map((type) => (
-                      <option key={type} value={type}>
-                        {EMPLOYEUR_TYPE_LABELS[type]}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              ) : null}
-              {kind === 'professions' ? (
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={draft.isTeaching}
-                    onChange={(event) => {
-                      setDraft({ ...draft, isTeaching: event.target.checked });
-                    }}
-                  />
-                  Profession enseignante
-                </label>
-              ) : null}
-              {kind === 'incomeBands' ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label htmlFor="income-min">Minimum FCFA</Label>
-                    <Input
-                      id="income-min"
-                      type="number"
-                      min="0"
-                      value={draft.minXof}
-                      onChange={(event) => {
-                        setDraft({ ...draft, minXof: event.target.value });
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="income-max">Maximum FCFA</Label>
-                    <Input
-                      id="income-max"
-                      type="number"
-                      min="0"
-                      value={draft.maxXof}
-                      onChange={(event) => {
-                        setDraft({ ...draft, maxXof: event.target.value });
-                      }}
-                    />
-                  </div>
-                </div>
-              ) : null}
-              {kind === 'offers' ? (
-                <div className="grid gap-1.5">
-                  <Label htmlFor="offer-description">Description</Label>
-                  <Input
-                    id="offer-description"
-                    value={draft.description}
-                    onChange={(event) => {
-                      setDraft({ ...draft, description: event.target.value });
-                    }}
-                  />
-                </div>
-              ) : null}
+              <KindSpecificFields kind={kind} draft={draft} onChange={setDraft} />
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"

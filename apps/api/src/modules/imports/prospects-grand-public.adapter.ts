@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { ImportKind, ImportMode, Projet, ProspectType } from '@crm/database';
+import { ImportKind, ImportMode, Projet, ProspectType, WhatsappStatus } from '@crm/database';
 import type { ModeEpargne, TypeContrat } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
 import { normalizeKey } from '../representants/representants-import.service.js';
+import { whatsappDuProspect } from '../prospects/whatsapp.js';
 import type {
   ChunkOutcome,
   ImportAdapter,
@@ -33,7 +34,26 @@ import { referentialAmbiguous } from './prospects-import.errors.js';
 
 const H = GRAND_PUBLIC_IMPORT_HEADERS;
 
-export const GrandPublicImportError = {
+/** Cellule vide -> `null` ; sinon la clé du référentiel, résolue ou non. */
+function resolveReferential(
+  raw: string,
+  index: ReadonlyMap<string, string>,
+  keyOf: (value: string) => string,
+): string | null {
+  return raw === '' ? null : (index.get(keyOf(raw)) ?? null);
+}
+
+const normalizedOrNull = (raw: string): string | null => tryNormalizePhone(raw) ?? null;
+
+/** Enregistre chaque libellé non vide de `values` sous le même identifiant. */
+function registerLabelKeys(map: Map<string, string>, id: string, values: readonly string[]): void {
+  for (const value of values) {
+    const key = normalizeKey(value);
+    if (key !== '' && !map.has(key)) map.set(key, id);
+  }
+}
+
+const GrandPublicImportError = {
   NOM_ABSENT: 'PROSPECT_GP_IMPORT_NOM_ABSENT',
   TELEPHONE_ILLISIBLE: 'PROSPECT_GP_IMPORT_TELEPHONE_ILLISIBLE',
   BANQUE_INCONNUE: 'PROSPECT_GP_IMPORT_BANQUE_INCONNUE',
@@ -156,16 +176,11 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
       }),
     ]);
 
+    // Libellés en toutes lettres : accents indifférents, contrairement aux
+    // sigles de banque et de syndicat, où « BNDE » et « B.N.D.E. » peuvent
+    // désigner deux entrées distinctes.
     const canaux0 = new Map<string, string>();
-    for (const canal of canaux) {
-      // Libellés en toutes lettres : accents indifférents, contrairement aux
-      // sigles de banque et de syndicat, où « BNDE » et « B.N.D.E. » peuvent
-      // désigner deux entrées distinctes.
-      for (const label of [canal.label, canal.code]) {
-        const key = normalizeKey(label);
-        if (key !== '' && !canaux0.has(key)) canaux0.set(key, canal.id);
-      }
-    }
+    for (const canal of canaux) registerLabelKeys(canaux0, canal.id, [canal.label, canal.code]);
 
     return {
       employeurs: indexByLabel(employeurs),
@@ -223,8 +238,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawBanque = importCell(cells, H.banque);
-    const banqueId =
-      rawBanque === '' ? null : (refs.banques.get(referentialKey(rawBanque)) ?? null);
+    const banqueId = resolveReferential(rawBanque, refs.banques, referentialKey);
     if (unresolvedImportValue(rawBanque, banqueId)) {
       return refuse(
         H.banque,
@@ -234,8 +248,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawSyndicat = importCell(cells, H.syndicat);
-    const syndicatId =
-      rawSyndicat === '' ? null : (refs.syndicats.get(referentialKey(rawSyndicat)) ?? null);
+    const syndicatId = resolveReferential(rawSyndicat, refs.syndicats, referentialKey);
     if (unresolvedImportValue(rawSyndicat, syndicatId)) {
       return refuse(
         H.syndicat,
@@ -245,8 +258,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawCanal = importCell(cells, H.canal);
-    const canalProvenanceId =
-      rawCanal === '' ? null : (refs.canaux.get(normalizeKey(rawCanal)) ?? null);
+    const canalProvenanceId = resolveReferential(rawCanal, refs.canaux, normalizeKey);
     if (unresolvedImportValue(rawCanal, canalProvenanceId)) {
       return refuse(
         H.canal,
@@ -287,12 +299,10 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
         nom,
         prenom: importCell(cells, H.prenom),
         phoneE164,
-        profession: profession === '' ? null : profession.slice(0, PROFESSION_MAX),
+        profession: cut(profession, PROFESSION_MAX),
         syndicatId,
         banqueId,
-        // « Non » dit ce que la personne n'est PAS : il ne choisit pas entre
-        // secteur privé, informel et diaspora, donc le type reste vide.
-        type: fonctionnaire === 'oui' ? ProspectType.FONCTIONNAIRE : null,
+        type: fonctionnaireType(fonctionnaire),
         dureeSystemeMois,
         canalProvenanceId,
         ...situation.row,
@@ -318,8 +328,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     });
 
     const rawEmployeur = importCell(cells, H.employeur);
-    const employeurId =
-      rawEmployeur === '' ? null : (refs.employeurs.get(normalizeKey(rawEmployeur)) ?? null);
+    const employeurId = resolveReferential(rawEmployeur, refs.employeurs, normalizeKey);
 
     const rawContrat = importCell(cells, H.typeContrat);
     const typeContrat = readTypeContrat(rawContrat);
@@ -352,7 +361,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawPays = importCell(cells, H.paysResidence);
-    const paysResidenceId = rawPays === '' ? null : (refs.pays.get(normalizeKey(rawPays)) ?? null);
+    const paysResidenceId = resolveReferential(rawPays, refs.pays, normalizeKey);
     if (unresolvedImportValue(rawPays, paysResidenceId)) {
       return refuse(
         H.paysResidence,
@@ -362,7 +371,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawWhatsapp = importCell(cells, H.whatsapp);
-    const whatsappE164 = tryNormalizePhone(rawWhatsapp) ?? null;
+    const whatsappE164 = normalizedOrNull(rawWhatsapp);
     if (unresolvedImportValue(rawWhatsapp, whatsappE164)) {
       return refuse(
         H.whatsapp,
@@ -372,7 +381,7 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
     }
 
     const rawRelaisPhone = importCell(cells, H.relaisPhone);
-    const relaisPhoneE164 = tryNormalizePhone(rawRelaisPhone) ?? null;
+    const relaisPhoneE164 = normalizedOrNull(rawRelaisPhone);
     if (unresolvedImportValue(rawRelaisPhone, relaisPhoneE164)) {
       return refuse(
         H.relaisPhone,
@@ -472,7 +481,14 @@ export class ProspectsGrandPublicImportAdapter implements ImportAdapter<
         modeEpargne: row.modeEpargne,
         paysResidenceId: row.paysResidenceId,
         villeResidence: row.villeResidence,
-        whatsappE164: row.whatsappE164,
+        ...whatsappDuProspect(
+          { numero: row.whatsappE164 },
+          {
+            whatsappStatus: WhatsappStatus.NON_DEMANDE,
+            whatsappE164: null,
+            phoneE164: row.phoneE164,
+          },
+        ),
         relaisNom: row.relaisNom,
         relaisPhoneE164: row.relaisPhoneE164,
         createdById: ctx.requestedById,
@@ -536,12 +552,7 @@ function indexByLabel(
   rows: readonly { id: string; code: string; label: string }[],
 ): ReadonlyMap<string, string> {
   const map = new Map<string, string>();
-  for (const row of rows) {
-    for (const value of [row.label, row.code]) {
-      const key = normalizeKey(value);
-      if (key !== '' && !map.has(key)) map.set(key, row.id);
-    }
-  }
+  for (const row of rows) registerLabelKeys(map, row.id, [row.label, row.code]);
   return map;
 }
 
@@ -549,7 +560,7 @@ const cut = (value: string, max: number): string | null =>
   value === '' ? null : value.slice(0, max);
 
 /** « 36 » et « 36 mois » se lisent. Zéro est une vraie réponse : il vient d'être embauché. */
-export function readAncienneteMois(raw: string): number | null {
+function readAncienneteMois(raw: string): number | null {
   const match = /^(\d{1,4})(?:\s*mois)?$/i.exec(raw.trim());
   if (match === null) return null;
 
@@ -570,7 +581,7 @@ function indexBySigle(
   return map;
 }
 
-export function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'illisible' {
+function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'illisible' {
   const key = normalizeKey(raw);
   if (key === '') return 'inconnu';
   if (OUI_TOKENS.includes(key)) return 'oui';
@@ -578,8 +589,13 @@ export function readFonctionnaire(raw: string): 'oui' | 'non' | 'inconnu' | 'ill
   return 'illisible';
 }
 
+/** « Non » dit ce que la personne n'est PAS : il ne choisit pas entre secteur privé, informel et diaspora. */
+function fonctionnaireType(fonctionnaire: ReturnType<typeof readFonctionnaire>): ProspectType | null {
+  return fonctionnaire === 'oui' ? ProspectType.FONCTIONNAIRE : null;
+}
+
 /** « 24 » et « 24 mois » se lisent. « 2 ans » ne se devine pas. */
-export function readDureeMois(raw: string): number | null {
+function readDureeMois(raw: string): number | null {
   const match = /^(\d{1,4})(?:\s*mois)?$/i.exec(raw.trim());
   if (match === null) return null;
 

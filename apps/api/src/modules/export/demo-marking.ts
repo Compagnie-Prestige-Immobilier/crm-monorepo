@@ -5,7 +5,7 @@ import type ExcelJS from 'exceljs';
 /** Pose dans LES DEUX etats : un en-tete absent ne distingue pas mode eteint et proxy filtrant. */
 export const DEMO_MODE_HEADER = 'X-Demo-Mode';
 
-export const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
+const DEMO_FILENAME_SUFFIX = '-DEMONSTRATION';
 
 const WARNING_TEXT =
   'ATTENTION : ce fichier provient de l’espace démo et contient des données fictives. Il ne doit servir à aucune décision ni à aucun reporting.';

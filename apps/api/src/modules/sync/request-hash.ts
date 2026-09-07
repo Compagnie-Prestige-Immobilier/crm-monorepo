@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-export function canonicalize(value: unknown): unknown {
+function canonicalize(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(canonicalize);
   if (value instanceof Date) return value.toISOString();
   if (typeof value === 'object' && value !== null) {

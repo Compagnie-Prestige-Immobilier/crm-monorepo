@@ -31,7 +31,7 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { EMPTY_REPRESENTANT_FILTERS } from '@/lib/representant-filters';
-import type { FilterOption } from '@/lib/types';
+import type { FilterOption, ReferenceData } from '@/lib/types';
 
 type FieldName = 'prenom' | 'nom' | 'phone';
 
@@ -62,6 +62,204 @@ function optionsRepresentants(source: {
   );
 }
 
+function pluralSuffix(count: number): string {
+  return count > 1 ? 's' : '';
+}
+
+function shouldSearchRepresentants(representantId: string | null, repSearch: string): boolean {
+  return representantId === null && repSearch.trim() !== '';
+}
+
+function activeBankOptions(reference: ReferenceData | undefined): FilterOption[] {
+  const banques = reference?.banques ?? [];
+  return banques
+    .filter((banque) => banque.isActive)
+    .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }));
+}
+
+function activeSyndicatOptions(reference: ReferenceData | undefined): FilterOption[] {
+  const syndicats = reference?.syndicats ?? [];
+  return syndicats
+    .filter((syndicat) => syndicat.isActive)
+    .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle }));
+}
+
+function representantLabelFor(options: FilterOption[], repId: string | null): string | undefined {
+  return options.find((option) => option.value === repId)?.label.split(' - ')[0];
+}
+
+function validateProspectForm(
+  prenom: string,
+  nom: string,
+  phone: string,
+  e164: string | null,
+): Errors {
+  const found: Errors = {};
+  if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
+  if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
+  if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
+  else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
+  return found;
+}
+
+function buildCreateProspectInput(fields: {
+  prenom: string;
+  nom: string;
+  e164: string;
+  etablissement: string;
+  repId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+}): CreateProspectInput {
+  return {
+    prenom: fields.prenom.trim(),
+    nom: fields.nom.trim(),
+    phone: fields.e164,
+    ...(fields.etablissement.trim() === '' ? {} : { etablissement: fields.etablissement.trim() }),
+    ...(fields.repId === null ? {} : { representantId: fields.repId }),
+    ...(fields.banqueId === null ? {} : { banqueId: fields.banqueId }),
+    ...(fields.syndicatId === null ? {} : { syndicatId: fields.syndicatId }),
+  };
+}
+
+function RepresentantPicker({
+  representantId,
+  repId,
+  options,
+  onChange,
+  onSearchChange,
+  onCreate,
+}: {
+  representantId: string | null;
+  repId: string | null;
+  options: FilterOption[];
+  onChange: (value: string | null) => void;
+  onSearchChange: (value: string) => void;
+  onCreate: (search: string) => void;
+}) {
+  if (representantId !== null) return null;
+  return (
+    <div className="flex flex-col gap-1.5">
+      <FilterCombobox
+        label="Représentant (facultatif)"
+        placeholder="Choisir un représentant"
+        value={repId}
+        options={options}
+        onChange={onChange}
+        onSearchChange={onSearchChange}
+        filterOptions={false}
+        onCreate={onCreate}
+      />
+    </div>
+  );
+}
+
+function PhoneConflictCard({
+  conflict,
+  phone,
+  callingCode,
+}: {
+  conflict: ProspectPhoneConflict | null;
+  phone: string;
+  callingCode: string;
+}) {
+  if (conflict === null) return null;
+  return (
+    <Card className="border-destructive/40">
+      <CardContent className="flex items-start gap-3">
+        <AlertTriangleIcon
+          className="mt-0.5 size-5 shrink-0 text-destructive"
+          aria-hidden="true"
+        />
+        <div role="alert" className="flex min-w-0 flex-col gap-1">
+          <p className="font-[600]">
+            Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
+          </p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Rattaché à {conflict.representantName}, saisi par le téléconseiller{' '}
+            {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
+          </p>
+          <Link
+            href={`/chues/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}
+            className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            Ouvrir la fiche existante
+          </Link>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SubmitLabel({ pending }: { pending: boolean }) {
+  if (!pending) return 'Enregistrer ce prospect';
+  return (
+    <>
+      <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+      Enregistrement…
+    </>
+  );
+}
+
+function SubmitRow({
+  showSaveAndClose,
+  pending,
+  onSaveAndClose,
+}: {
+  showSaveAndClose: boolean;
+  pending: boolean;
+  onSaveAndClose: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-end gap-3">
+      <p className="mr-auto text-[0.8125rem] text-muted-foreground">
+        Ctrl + Entrée enregistre et enchaîne.
+      </p>
+      {showSaveAndClose ? (
+        <Button type="button" variant="outline" disabled={pending} onClick={onSaveAndClose}>
+          Enregistrer et terminer
+        </Button>
+      ) : null}
+      <Button type="submit" disabled={pending}>
+        <SubmitLabel pending={pending} />
+      </Button>
+    </div>
+  );
+}
+
+function SavedStatusLine({
+  visible,
+  saved,
+  representantLabel,
+}: {
+  visible: boolean;
+  saved: string[];
+  representantLabel: string | undefined;
+}) {
+  if (!visible) return null;
+
+  const plural = pluralSuffix(saved.length);
+  const pourLabel = representantLabel === undefined ? '' : ` pour ${representantLabel}`;
+  const texte =
+    saved.length === 0
+      ? 'Aucun prospect noté pour l’instant.'
+      : `${String(saved.length)} prospect${plural} noté${plural}${pourLabel} aujourd’hui`;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+      <p aria-live="polite" className="text-[0.875rem] text-muted-foreground">
+        {texte}
+      </p>
+      <Link
+        href="/chues"
+        className="rounded-sm text-[0.875rem] font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+      >
+        Terminé, revenir au projet
+      </Link>
+    </div>
+  );
+}
+
 export function ProspectCreateForm({
   representantId,
   onSaved,
@@ -76,6 +274,7 @@ export function ProspectCreateForm({
   const [nom, setNom] = useState('');
   const [phone, setPhone] = useState('');
   const [callingCode, setCallingCode] = useState('221');
+  const [etablissement, setEtablissement] = useState('');
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const [syndicatId, setSyndicatId] = useState<string | null>(null);
   const [repId, setRepId] = useState<string | null>(representantId);
@@ -102,7 +301,7 @@ export function ProspectCreateForm({
         sortDir: 'asc',
         pageSize: 20,
       }),
-    enabled: representantId === null && repSearch.trim() !== '',
+    enabled: shouldSearchRepresentants(representantId, repSearch),
   });
 
   const save = useMutation({
@@ -120,8 +319,9 @@ export function ProspectCreateForm({
         return;
       }
 
-      // La rafale : seule l'identité repart de zéro. La banque et le syndicat
-      // sont les mêmes pour toute une tournée chez le même représentant.
+      // La rafale : seule l'identité repart de zéro. L'établissement, la banque
+      // et le syndicat sont les mêmes pour toute une tournée chez le même
+      // représentant.
       setPrenom('');
       setNom('');
       setPhone('');
@@ -142,31 +342,25 @@ export function ProspectCreateForm({
     if (save.isPending) return;
 
     const e164 = toInternationalE164(phone, callingCode);
-    const found: Errors = {};
-    if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
-    if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
-    if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
-    else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
-
+    const found = validateProspectForm(prenom, nom, phone, e164);
     setErrors(found);
-    if (e164 === null) return;
-    if (Object.keys(found).length > 0) return;
+    if (e164 === null || Object.keys(found).length > 0) return;
 
     setConflict(null);
     save.mutate({
-      input: {
-        prenom: prenom.trim(),
-        nom: nom.trim(),
-        phone: e164,
-        ...(repId === null ? {} : { representantId: repId }),
-        ...(banqueId === null ? {} : { banqueId }),
-        ...(syndicatId === null ? {} : { syndicatId }),
-      },
+      input: buildCreateProspectInput({
+        prenom,
+        nom,
+        e164,
+        etablissement,
+        repId,
+        banqueId,
+        syndicatId,
+      }),
       andNext,
     });
   }
 
-  const plural = saved.length > 1 ? 's' : '';
   const representantOptions = optionsRepresentants({
     createdRep,
     repSearch,
@@ -175,9 +369,7 @@ export function ProspectCreateForm({
   });
 
   // Le libellé porte « Nom - téléphone » ; sous le formulaire, seul le nom se lit.
-  const representantLabel = representantOptions
-    .find((option) => option.value === repId)
-    ?.label.split(' - ')[0];
+  const representantLabel = representantLabelFor(representantOptions, repId);
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
@@ -193,27 +385,21 @@ export function ProspectCreateForm({
         submit(true);
       }}
     >
-      {representantId === null ? (
-        <div className="flex flex-col gap-1.5">
-          <FilterCombobox
-            label="Représentant (facultatif)"
-            placeholder="Choisir un représentant"
-            value={repId}
-            options={representantOptions}
-            onChange={setRepId}
-            onSearchChange={setRepSearch}
-            filterOptions={false}
-            onCreate={(search) => {
-              const hasLetters = /\p{Letter}/u.test(search);
-              setRepPrefill({
-                fullName: hasLetters ? search : '',
-                phone: hasLetters ? '' : search,
-                notes: '',
-              });
-            }}
-          />
-        </div>
-      ) : null}
+      <RepresentantPicker
+        representantId={representantId}
+        repId={repId}
+        options={representantOptions}
+        onChange={setRepId}
+        onSearchChange={setRepSearch}
+        onCreate={(search) => {
+          const hasLetters = /\p{Letter}/u.test(search);
+          setRepPrefill({
+            fullName: hasLetters ? search : '',
+            phone: hasLetters ? '' : search,
+            notes: '',
+          });
+        }}
+      />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom}>
@@ -259,31 +445,21 @@ export function ProspectCreateForm({
         }}
       />
 
-      {conflict !== null ? (
-        <Card className="border-destructive/40">
-          <CardContent className="flex items-start gap-3">
-            <AlertTriangleIcon
-              className="mt-0.5 size-5 shrink-0 text-destructive"
-              aria-hidden="true"
-            />
-            <div role="alert" className="flex min-w-0 flex-col gap-1">
-              <p className="font-[600]">
-                Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
-              </p>
-              <p className="text-[0.8125rem] text-muted-foreground">
-                Rattaché à {conflict.representantName}, saisi par le téléconseiller{' '}
-                {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
-              </p>
-              <Link
-                href={`/chues/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}
-                className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-              >
-                Ouvrir la fiche existante
-              </Link>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <PhoneConflictCard conflict={conflict} phone={phone} callingCode={callingCode} />
+
+      <Field label="Établissement">
+        {(props) => (
+          <Input
+            {...props}
+            value={etablissement}
+            maxLength={160}
+            autoComplete="off"
+            onChange={(event) => {
+              setEtablissement(event.target.value);
+            }}
+          />
+        )}
+      </Field>
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="flex flex-col gap-1.5">
@@ -291,9 +467,7 @@ export function ProspectCreateForm({
             label="Banque"
             placeholder="Choisir une banque"
             value={banqueId}
-            options={(reference.data?.banques ?? [])
-              .filter((banque) => banque.isActive)
-              .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }))}
+            options={activeBankOptions(reference.data)}
             onChange={setBanqueId}
           />
         </div>
@@ -303,13 +477,7 @@ export function ProspectCreateForm({
             label="Syndicat"
             placeholder="Choisir un syndicat"
             value={syndicatId}
-            options={(reference.data?.syndicats ?? [])
-              .filter((syndicat) => syndicat.isActive)
-              .map((syndicat) => ({
-                value: syndicat.id,
-                label: syndicat.name,
-                hint: syndicat.sigle,
-              }))}
+            options={activeSyndicatOptions(reference.data)}
             onChange={setSyndicatId}
           />
         </div>
@@ -318,51 +486,19 @@ export function ProspectCreateForm({
       {/* UNE action : enregistrer. Le formulaire se vide, le représentant, la
           banque et le syndicat restent : la tournée s'enchaîne sans un clic de
           plus, et sortir de l'écran est un lien, pas un second bouton. */}
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <p className="mr-auto text-[0.8125rem] text-muted-foreground">
-          Ctrl + Entrée enregistre et enchaîne.
-        </p>
-        {onSaved === undefined ? null : (
-          <Button
-            type="button"
-            variant="outline"
-            disabled={save.isPending}
-            onClick={() => {
-              submit(false);
-            }}
-          >
-            Enregistrer et terminer
-          </Button>
-        )}
-        <Button type="submit" disabled={save.isPending}>
-          {save.isPending ? (
-            <>
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              Enregistrement…
-            </>
-          ) : (
-            'Enregistrer ce prospect'
-          )}
-        </Button>
-      </div>
+      <SubmitRow
+        showSaveAndClose={onSaved !== undefined}
+        pending={save.isPending}
+        onSaveAndClose={() => {
+          submit(false);
+        }}
+      />
 
-      {onSaved === undefined ? (
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
-          <p aria-live="polite" className="text-[0.875rem] text-muted-foreground">
-            {saved.length === 0
-              ? 'Aucun prospect noté pour l’instant.'
-              : `${String(saved.length)} prospect${plural} noté${plural}${
-                  representantLabel === undefined ? '' : ` pour ${representantLabel}`
-                } aujourd’hui`}
-          </p>
-          <Link
-            href="/chues"
-            className="rounded-sm text-[0.875rem] font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            Terminé, revenir au projet
-          </Link>
-        </div>
-      ) : null}
+      <SavedStatusLine
+        visible={onSaved === undefined}
+        saved={saved}
+        representantLabel={representantLabel}
+      />
 
       <RepresentantFormDialog
         open={repPrefill !== null}

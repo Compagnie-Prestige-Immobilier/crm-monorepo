@@ -4,14 +4,14 @@ import { useEffect, useRef } from 'react';
 
 export type ShortcutMap = Readonly<Record<string, () => void>>;
 
-export function isTextEntry(target: EventTarget | null): boolean {
+function isTextEntry(target: EventTarget | null): boolean {
   if (target === null || !(target instanceof HTMLElement)) return false;
   if (target.isContentEditable) return true;
   const tag = target.tagName;
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
-export function chordOf(event: KeyboardEvent): string {
+function chordOf(event: KeyboardEvent): string {
   const key = event.key === ' ' ? 'Space' : event.key;
   if (event.ctrlKey || event.metaKey) return `mod+${key.toLowerCase()}`;
   return key.length === 1 ? key.toLowerCase() : key;

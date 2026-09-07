@@ -33,12 +33,65 @@ export function prospectConditions(
   return Prisma.join(conditions, ' AND ');
 }
 
+/** Les deux valeurs bornent aux demandes converties : rien d'autre ne se revoit. */
+function revueConditions(revue: boolean): Prisma.Sql[] {
+  return [
+    Prisma.sql`p."statut" = 'CONVERTI'::"ProspectStatut"`,
+    revue ? Prisma.sql`p."revueAt" IS NOT NULL` : Prisma.sql`p."revueAt" IS NULL`,
+  ];
+}
+
+function directConditionsMatched(directConditions: Array<[unknown, Prisma.Sql]>): Prisma.Sql[] {
+  const matched: Prisma.Sql[] = [];
+  for (const [value, condition] of directConditions) {
+    if (value) matched.push(condition);
+  }
+  return matched;
+}
+
+function projetCondition(filter: ProspectFilterDto): Prisma.Sql | undefined {
+  if (!filter.projet) return undefined;
+  let statut = Prisma.empty;
+  if (filter.statut) {
+    statut = Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`;
+  }
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "prospect_journeys" pj
+    WHERE pj."prospectId" = p."id"
+      AND pj."projet" = ${filter.projet}::"Projet"
+      ${statut}
+  )`;
+}
+
+function statutCondition(filter: ProspectFilterDto): Prisma.Sql | undefined {
+  if (!filter.statut || filter.projet) return undefined;
+  return Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`;
+}
+
+function appeleParCondition(filter: ProspectFilterDto): Prisma.Sql | undefined {
+  if (!filter.appelePar) return undefined;
+  return Prisma.sql`EXISTS (
+    SELECT 1 FROM "call_attempts" ca
+    WHERE ca."prospectId" = p."id" AND ca."performedById" = ${filter.appelePar}
+  )`;
+}
+
+function dateRangeConditions(filter: ProspectFilterDto): Prisma.Sql[] {
+  const conditions: Prisma.Sql[] = [];
+  if (filter.dateFrom) {
+    conditions.push(Prisma.sql`p."clientCreatedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
+  }
+  if (filter.dateTo) {
+    conditions.push(Prisma.sql`p."clientCreatedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
+  }
+  return conditions;
+}
+
 /**
  * Portée des prospects en SQL. Les agrégats sont écrits en SQL brut, une clause
  * Prisma ne s'y réemploie pas ; c'est la même règle, elle doit bouger en même temps.
  */
 function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
-  const conditions: Prisma.Sql[] = [];
   const directConditions: Array<[unknown, Prisma.Sql]> = [
     [filter.representantId, Prisma.sql`p."representantId" = ${filter.representantId}`],
     [filter.banqueId, Prisma.sql`p."banqueId" = ${filter.banqueId}`],
@@ -57,40 +110,21 @@ function prospectFilterConditions(filter: ProspectFilterDto): Prisma.Sql[] {
       Prisma.sql`p."enrollmentCapturedById" = ${filter.enrollmentCapturedById}`,
     ],
   ];
-  for (const [value, condition] of directConditions) {
-    if (value) conditions.push(condition);
-  }
+  const conditions: Prisma.Sql[] = directConditionsMatched(directConditions);
 
-  if (filter.projet) {
-    let statut = Prisma.empty;
-    if (filter.statut) {
-      statut = Prisma.sql`AND pj."statut" = ${filter.statut}::"ProspectStatut"`;
-    }
-    conditions.push(
-      Prisma.sql`EXISTS (
-        SELECT 1 FROM "prospect_journeys" pj
-        WHERE pj."prospectId" = p."id"
-          AND pj."projet" = ${filter.projet}::"Projet"
-          ${statut}
-      )`,
-    );
-  }
-  if (filter.statut && !filter.projet) {
-    conditions.push(Prisma.sql`p."statut" = ${filter.statut}::"ProspectStatut"`);
-  }
+  const projet = projetCondition(filter);
+  if (projet) conditions.push(projet);
+
+  const statut = statutCondition(filter);
+  if (statut) conditions.push(statut);
+
+  if (filter.revue !== undefined) conditions.push(...revueConditions(filter.revue));
   if (filter.segment) conditions.push(segmentCondition(filter.segment));
-  if (filter.appelePar) {
-    conditions.push(Prisma.sql`EXISTS (
-      SELECT 1 FROM "call_attempts" ca
-      WHERE ca."prospectId" = p."id" AND ca."performedById" = ${filter.appelePar}
-    )`);
-  }
-  if (filter.dateFrom) {
-    conditions.push(Prisma.sql`p."clientCreatedAt" >= ${inclusiveDateFrom(filter.dateFrom)}`);
-  }
-  if (filter.dateTo) {
-    conditions.push(Prisma.sql`p."clientCreatedAt" <= ${inclusiveDateTo(filter.dateTo)}`);
-  }
+
+  const appelePar = appeleParCondition(filter);
+  if (appelePar) conditions.push(appelePar);
+
+  conditions.push(...dateRangeConditions(filter));
 
   const search = searchCondition(filter.search);
   if (search) conditions.push(search);
@@ -153,7 +187,7 @@ export const PROSPECT_FROM = Prisma.sql`
   LEFT JOIN "banques" bq ON bq."id" = p."banqueId"
 `;
 
-export function segmentCondition(segment: BddSegment): Prisma.Sql {
+function segmentCondition(segment: BddSegment): Prisma.Sql {
   const { isChues, isCbao } = segmentAxes(segment);
   const syndicat = isChues
     ? Prisma.sql`sy."sigle" = ${CHUES_SIGLE}`

@@ -8,6 +8,40 @@ import { previewClamp } from './template';
 const TITLE_CLAMP = 42;
 const BODY_CLAMP = 96;
 
+function truncationMessage(titleTruncated: boolean, bodyTruncated: boolean): string | null {
+  if (titleTruncated && bodyTruncated) return 'Titre et corps coupés une fois repliés.';
+  if (titleTruncated) return 'Titre coupé une fois replié.';
+  if (bodyTruncated) return 'Corps coupé une fois replié.';
+  return null;
+}
+
+function TruncationNotice({
+  titleTruncated,
+  bodyTruncated,
+}: {
+  titleTruncated: boolean;
+  bodyTruncated: boolean;
+}) {
+  const message = truncationMessage(titleTruncated, bodyTruncated);
+  if (message === null) return null;
+  return (
+    <p role="status" className="text-warning">
+      {message}
+    </p>
+  );
+}
+
+function RouteLine({ route }: { route?: string | null | undefined }) {
+  if (route === null || route === undefined || route === '') {
+    return <p>Sans lien : ouvre le centre de notifications.</p>;
+  }
+  return (
+    <p>
+      Ouvre <code className="font-mono text-foreground">{route}</code>.
+    </p>
+  );
+}
+
 export function AndroidPreview({
   title,
   body,
@@ -22,11 +56,6 @@ export function AndroidPreview({
   const shownTitle = previewClamp(title === '' ? 'Titre de la notification' : title, TITLE_CLAMP);
   const shownBody = previewClamp(body === '' ? 'Corps du message' : body, BODY_CLAMP);
   const isPlaceholder = title === '' && body === '';
-  let truncation = 'Corps coupé une fois replié.';
-  if (shownTitle.truncated) truncation = 'Titre coupé une fois replié.';
-  if (shownTitle.truncated && shownBody.truncated) {
-    truncation = 'Titre et corps coupés une fois repliés.';
-  }
 
   return (
     <figure className={cn('flex flex-col gap-2', className)}>
@@ -67,20 +96,11 @@ export function AndroidPreview({
       {/* Deux informations que l'auteur ne peut deviner autrement : ce qui sera
           coupé, et où le tap conduira. */}
       <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
-        {shownTitle.truncated || shownBody.truncated ? (
-          <p role="status" className="text-warning">
-            {truncation}
-          </p>
-        ) : null}
-        <p>
-          {route === null || route === undefined || route === '' ? (
-            'Sans lien : ouvre le centre de notifications.'
-          ) : (
-            <>
-              Ouvre <code className="font-mono text-foreground">{route}</code>.
-            </>
-          )}
-        </p>
+        <TruncationNotice
+          titleTruncated={shownTitle.truncated}
+          bodyTruncated={shownBody.truncated}
+        />
+        <RouteLine route={route} />
       </div>
     </figure>
   );

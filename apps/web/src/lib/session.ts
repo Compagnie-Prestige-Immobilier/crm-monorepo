@@ -3,20 +3,9 @@ import 'server-only';
 import { ApiError } from '@crm/api-client/query';
 import { unstable_rethrow } from 'next/navigation';
 
-import { ACCESS_COOKIE, REFRESH_COOKIE } from '@/lib/api/config';
 import { SessionExpiredError, getServerApiClient } from '@/lib/api/server';
 import { fetchSessionUser } from '@/lib/data/auth';
 import type { SessionUser } from '@/lib/types';
-
-export { ACCESS_COOKIE, REFRESH_COOKIE };
-export {
-  clearSessionCookies,
-  getAccessToken,
-  getRefreshToken,
-  setSessionCookies,
-  toAuthTokens,
-  type AuthTokens,
-} from '@/lib/api/server';
 
 export type SessionResult =
   | { status: 'authenticated'; user: SessionUser }
@@ -40,11 +29,6 @@ export async function readSession(): Promise<SessionResult> {
 export async function getSession(): Promise<SessionUser | null> {
   const result = await readSession();
   return result.status === 'authenticated' ? result.user : null;
-}
-
-export async function getAdminSession(): Promise<SessionUser | null> {
-  const session = await getSession();
-  return session !== null && session.role === 'ADMIN' ? session : null;
 }
 
 export type RoleGuard =

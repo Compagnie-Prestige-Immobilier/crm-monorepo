@@ -386,132 +386,33 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
                     </TableRow>
                   ) : (
                     data.items.map((user) => (
-                      <TableRow
+                      <UserTableRow
                         key={user.id}
-                        data-inactive={!user.isActive}
-                        className={cn(
-                          !user.isActive &&
-                            'bg-destructive-surface/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-destructive',
-                        )}
-                      >
-                        <TableCell>
-                          <input
-                            type="checkbox"
-                            className="size-4 align-middle"
-                            aria-label={`Sélectionner ${user.fullName}`}
-                            disabled={user.id === currentUserId}
-                            checked={selectedIds.includes(user.id)}
-                            onChange={(event) => {
-                              setSelectedIds((current) =>
-                                event.target.checked
-                                  ? [...current, user.id]
-                                  : current.filter((id) => id !== user.id),
-                              );
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex min-w-0 flex-col gap-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span
-                                className={cn(
-                                  'truncate font-[600]',
-                                  !user.isActive && 'text-muted-foreground',
-                                )}
-                              >
-                                {user.fullName}
-                              </span>
-                              <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
-                              {user.isActive ? null : (
-                                <Badge variant="destructive">Désactivé</Badge>
-                              )}
-                            </div>
-                            <span className="truncate text-[0.75rem] text-muted-foreground">
-                              {user.phoneE164 === null ? '–' : formatPhone(user.phoneE164)}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex min-w-0 flex-col">
-                            <span className="truncate">{user.email}</span>
-                            <span className="truncate text-[0.75rem] text-muted-foreground">
-                              @{user.username}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {formatNumber(user.prospectCount)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-[0.8125rem]">
-                          {user.lastLoginAt === null ? (
-                            <span className="text-muted-foreground">Jamais connecté</span>
-                          ) : (
-                            <time dateTime={user.lastLoginAt}>
-                              {formatDateTime(user.lastLoginAt)}
-                            </time>
-                          )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger
-                              render={
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={`Actions pour ${user.fullName}`}
-                                />
-                              }
-                            >
-                              <MoreHorizontalIcon className="size-4" aria-hidden="true" />
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56">
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setEditing(user);
-                                  setFormOpen(true);
-                                }}
-                              >
-                                <PencilIcon aria-hidden="true" />
-                                Modifier
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onClick={() => {
-                                  setPasswordTarget(user);
-                                }}
-                              >
-                                <KeyRoundIcon aria-hidden="true" />
-                                Réinitialiser le mot de passe
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                disabled={user.id === currentUserId || toggleActive.isPending}
-                                variant={user.isActive ? 'destructive' : 'default'}
-                                onClick={() => {
-                                  if (user.isActive) setDeactivating(user);
-                                  else toggleActive.mutate({ user, isActive: true });
-                                }}
-                              >
-                                {user.isActive ? (
-                                  <PowerOffIcon aria-hidden="true" />
-                                ) : (
-                                  <PowerIcon aria-hidden="true" />
-                                )}
-                                {user.isActive ? 'Désactiver le compte' : 'Réactiver le compte'}
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                disabled={user.id === currentUserId || remove.isPending}
-                                variant="destructive"
-                                onClick={() => {
-                                  setDeleting([user]);
-                                }}
-                              >
-                                <Trash2Icon aria-hidden="true" />
-                                Supprimer le compte
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
+                        user={user}
+                        currentUserId={currentUserId}
+                        selected={selectedIds.includes(user.id)}
+                        onToggleSelected={(checked) => {
+                          setSelectedIds((current) =>
+                            checked ? [...current, user.id] : current.filter((id) => id !== user.id),
+                          );
+                        }}
+                        onEdit={() => {
+                          setEditing(user);
+                          setFormOpen(true);
+                        }}
+                        onResetPassword={() => {
+                          setPasswordTarget(user);
+                        }}
+                        togglePending={toggleActive.isPending}
+                        onToggleActive={() => {
+                          if (user.isActive) setDeactivating(user);
+                          else toggleActive.mutate({ user, isActive: true });
+                        }}
+                        removePending={remove.isPending}
+                        onDelete={() => {
+                          setDeleting([user]);
+                        }}
+                      />
                     ))
                   )}
                 </TableBody>
@@ -561,6 +462,152 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
         user={passwordTarget}
       />
     </div>
+  );
+}
+
+function UserTableRow({
+  user,
+  currentUserId,
+  selected,
+  onToggleSelected,
+  onEdit,
+  onResetPassword,
+  togglePending,
+  onToggleActive,
+  removePending,
+  onDelete,
+}: {
+  user: UserRow;
+  currentUserId: string;
+  selected: boolean;
+  onToggleSelected: (checked: boolean) => void;
+  onEdit: () => void;
+  onResetPassword: () => void;
+  togglePending: boolean;
+  onToggleActive: () => void;
+  removePending: boolean;
+  onDelete: () => void;
+}) {
+  const isSelf = user.id === currentUserId;
+
+  return (
+    <TableRow
+      data-inactive={!user.isActive}
+      className={cn(
+        !user.isActive &&
+          'bg-destructive-surface/50 [&>td:first-child]:border-l-2 [&>td:first-child]:border-l-destructive',
+      )}
+    >
+      <TableCell>
+        <input
+          type="checkbox"
+          className="size-4 align-middle"
+          aria-label={`Sélectionner ${user.fullName}`}
+          disabled={isSelf}
+          checked={selected}
+          onChange={(event) => {
+            onToggleSelected(event.target.checked);
+          }}
+        />
+      </TableCell>
+      <TableCell>
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span
+              className={cn('truncate font-[600]', !user.isActive && 'text-muted-foreground')}
+            >
+              {user.fullName}
+            </span>
+            <Badge variant="secondary">{ROLE_LABELS[user.role]}</Badge>
+            {user.isActive ? null : <Badge variant="destructive">Désactivé</Badge>}
+          </div>
+          <span className="truncate text-[0.75rem] text-muted-foreground">
+            {user.phoneE164 === null ? '–' : formatPhone(user.phoneE164)}
+          </span>
+        </div>
+      </TableCell>
+      <TableCell>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate">{user.email}</span>
+          <span className="truncate text-[0.75rem] text-muted-foreground">@{user.username}</span>
+        </div>
+      </TableCell>
+      <TableCell className="text-right tabular-nums">{formatNumber(user.prospectCount)}</TableCell>
+      <TableCell className="whitespace-nowrap text-[0.8125rem]">
+        {user.lastLoginAt === null ? (
+          <span className="text-muted-foreground">Jamais connecté</span>
+        ) : (
+          <time dateTime={user.lastLoginAt}>{formatDateTime(user.lastLoginAt)}</time>
+        )}
+      </TableCell>
+      <TableCell className="text-right">
+        <UserRowActions
+          user={user}
+          isSelf={isSelf}
+          onEdit={onEdit}
+          onResetPassword={onResetPassword}
+          togglePending={togglePending}
+          onToggleActive={onToggleActive}
+          removePending={removePending}
+          onDelete={onDelete}
+        />
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function UserRowActions({
+  user,
+  isSelf,
+  onEdit,
+  onResetPassword,
+  togglePending,
+  onToggleActive,
+  removePending,
+  onDelete,
+}: {
+  user: UserRow;
+  isSelf: boolean;
+  onEdit: () => void;
+  onResetPassword: () => void;
+  togglePending: boolean;
+  onToggleActive: () => void;
+  removePending: boolean;
+  onDelete: () => void;
+}) {
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        render={
+          <Button variant="ghost" size="icon-sm" aria-label={`Actions pour ${user.fullName}`} />
+        }
+      >
+        <MoreHorizontalIcon className="size-4" aria-hidden="true" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuItem onClick={onEdit}>
+          <PencilIcon aria-hidden="true" />
+          Modifier
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={onResetPassword}>
+          <KeyRoundIcon aria-hidden="true" />
+          Réinitialiser le mot de passe
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem
+          disabled={isSelf || togglePending}
+          variant={user.isActive ? 'destructive' : 'default'}
+          onClick={onToggleActive}
+        >
+          {user.isActive ? <PowerOffIcon aria-hidden="true" /> : <PowerIcon aria-hidden="true" />}
+          {user.isActive ? 'Désactiver le compte' : 'Réactiver le compte'}
+        </DropdownMenuItem>
+        <DropdownMenuItem disabled={isSelf || removePending} variant="destructive" onClick={onDelete}>
+          <Trash2Icon aria-hidden="true" />
+          Supprimer le compte
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 

@@ -17,6 +17,8 @@ abstract class _$SyncPushDtoCWProxy {
 
   SyncPushDto appVersion(String? appVersion);
 
+  SyncPushDto journalAppelsAutorise(bool? journalAppelsAutorise);
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncPushDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +31,7 @@ abstract class _$SyncPushDtoCWProxy {
     List<SyncOperationDto> operations,
     num? pendingOps,
     String? appVersion,
+    bool? journalAppelsAutorise,
   });
 }
 
@@ -57,6 +60,10 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
   SyncPushDto appVersion(String? appVersion) => this(appVersion: appVersion);
 
   @override
+  SyncPushDto journalAppelsAutorise(bool? journalAppelsAutorise) =>
+      this(journalAppelsAutorise: journalAppelsAutorise);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `SyncPushDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -69,6 +76,7 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
     Object? operations = const $CopyWithPlaceholder(),
     Object? pendingOps = const $CopyWithPlaceholder(),
     Object? appVersion = const $CopyWithPlaceholder(),
+    Object? journalAppelsAutorise = const $CopyWithPlaceholder(),
   }) {
     return SyncPushDto(
       clientBatchId: clientBatchId == const $CopyWithPlaceholder()
@@ -91,6 +99,11 @@ class _$SyncPushDtoCWProxyImpl implements _$SyncPushDtoCWProxy {
           ? _value.appVersion
           // ignore: cast_nullable_to_non_nullable
           : appVersion as String?,
+      journalAppelsAutorise:
+          journalAppelsAutorise == const $CopyWithPlaceholder()
+          ? _value.journalAppelsAutorise
+          // ignore: cast_nullable_to_non_nullable
+          : journalAppelsAutorise as bool?,
     );
   }
 }
@@ -122,6 +135,10 @@ SyncPushDto _$SyncPushDtoFromJson(Map<String, dynamic> json) =>
         ),
         pendingOps: $checkedConvert('pendingOps', (v) => v as num?),
         appVersion: $checkedConvert('appVersion', (v) => v as String?),
+        journalAppelsAutorise: $checkedConvert(
+          'journalAppelsAutorise',
+          (v) => v as bool?,
+        ),
       );
       return val;
     });
@@ -133,4 +150,6 @@ Map<String, dynamic> _$SyncPushDtoToJson(SyncPushDto instance) =>
       'operations': instance.operations.map((e) => e.toJson()).toList(),
       if (instance.pendingOps case final value?) 'pendingOps': value,
       if (instance.appVersion case final value?) 'appVersion': value,
+      if (instance.journalAppelsAutorise case final value?)
+        'journalAppelsAutorise': value,
     };

@@ -49,7 +49,7 @@ const WHATSAPP = tableDe<WhatsappStatus>([
 ]);
 
 /** Le statut, ou `null` si le libellé n'est pas reconnu. Vide rend le défaut. */
-export function parseRelation(raw: string): RepresentantRelation | null {
+function parseRelation(raw: string): RepresentantRelation | null {
   if (raw.trim() === '') return RepresentantRelation.INCONNU;
   return RELATIONS.get(normalizeKey(raw)) ?? null;
 }
@@ -61,7 +61,7 @@ export function parseRelation(raw: string): RepresentantRelation | null {
  * `whatsappE164`, que le modèle de fichier ne porte pas. Accepter le libellé
  * écrirait une ligne qui viole sa propre contrainte CHECK.
  */
-export function parseWhatsapp(raw: string): WhatsappStatus | null {
+function parseWhatsapp(raw: string): WhatsappStatus | null {
   if (raw.trim() === '') return WhatsappStatus.NON_DEMANDE;
   const valeur = WHATSAPP.get(normalizeKey(raw)) ?? null;
   return valeur === WhatsappStatus.AUTRE_NUMERO ? null : valeur;
@@ -85,7 +85,7 @@ const OUTCOMES = tableDe<RepCallOutcome>([
  * de fichier ne porte ni l'un ni l'autre. Les accepter écrirait des lignes qui
  * violent leur propre contrainte.
  */
-export function parseOutcome(raw: string): RepCallOutcome | null {
+function parseOutcome(raw: string): RepCallOutcome | null {
   if (raw.trim() === '') return RepCallOutcome.REACHED;
   return OUTCOMES.get(normalizeKey(raw)) ?? null;
 }
@@ -111,52 +111,55 @@ export interface ComplementRefus {
   readonly value: string;
 }
 
-/**
- * Valide les cinq colonnes de qualification, POUR LES DEUX CHEMINS D'IMPORT.
- *
- * L'import synchrone et le moteur d'arrière-plan appliquent les mêmes règles ;
- * les écrire deux fois les ferait diverger au premier correctif, et l'écart se
- * verrait comme un import qui accepte ce que l'autre refuse.
- */
-export function parseComplements(
-  cells: Record<'notes' | 'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue', string>,
+type ComplementCells = Record<
+  'notes' | 'relation' | 'whatsapp' | 'charge' | 'dateAppel' | 'issue',
+  string
+>;
+
+function parseRelationStep(raw: string): RepresentantRelation | ComplementRefus {
+  const relationStatus = parseRelation(raw);
+  if (relationStatus) return relationStatus;
+  return {
+    rang: 6,
+    code: 'RELATION_UNKNOWN',
+    message: 'Statut de relation inconnu. Inconnu, Contacté, Ambassadeur ou Refus.',
+    value: raw,
+  };
+}
+
+function parseWhatsappStep(raw: string): WhatsappStatus | ComplementRefus {
+  const whatsappStatus = parseWhatsapp(raw);
+  if (whatsappStatus) return whatsappStatus;
+  return {
+    rang: 7,
+    code: 'WHATSAPP_UNKNOWN',
+    message:
+      'Statut WhatsApp inconnu. Non demandé, Même numéro ou Aucun. « Autre numéro » ne s’importe pas : le second numéro n’a pas de colonne.',
+    value: raw,
+  };
+}
+
+function parseOwnerStep(
+  raw: string,
   comptes: ReadonlyMap<string, { readonly id: string }>,
-): Complements | ComplementRefus {
-  const relationStatus = parseRelation(cells.relation);
-  if (!relationStatus) {
-    return {
-      rang: 6,
-      code: 'RELATION_UNKNOWN',
-      message: 'Statut de relation inconnu. Inconnu, Contacté, Ambassadeur ou Refus.',
-      value: cells.relation,
-    };
-  }
+): string | null | ComplementRefus {
+  if (raw === '') return null;
+  const owner = comptes.get(normalizeKey(raw));
+  if (owner) return owner.id;
+  return {
+    rang: 8,
+    code: 'OWNER_UNKNOWN',
+    message: 'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
+    value: raw,
+  };
+}
 
-  const whatsappStatus = parseWhatsapp(cells.whatsapp);
-  if (!whatsappStatus) {
-    return {
-      rang: 7,
-      code: 'WHATSAPP_UNKNOWN',
-      message:
-        'Statut WhatsApp inconnu. Non demandé, Même numéro ou Aucun. « Autre numéro » ne s’importe pas : le second numéro n’a pas de colonne.',
-      value: cells.whatsapp,
-    };
-  }
-
-  const owner = cells.charge === '' ? undefined : comptes.get(normalizeKey(cells.charge));
-  if (cells.charge !== '' && owner === undefined) {
-    return {
-      rang: 8,
-      code: 'OWNER_UNKNOWN',
-      message:
-        'Chargé de compte introuvable. Identifiant, e-mail ou nom complet d’un compte actif.',
-      value: cells.charge,
-    };
-  }
-
-  // L'issue ne vaut RIEN sans sa date : elle décrit un appel, et un appel sans
-  // date ne peut pas être écrit — `clientCreatedAt` est obligatoire, et
-  // l'inventer daterait l'appel du jour de l'import.
+/**
+ * L'issue ne vaut RIEN sans sa date : elle décrit un appel, et un appel sans
+ * date ne peut pas être écrit — `clientCreatedAt` est obligatoire, et
+ * l'inventer daterait l'appel du jour de l'import.
+ */
+function parseCallDateStep(cells: Pick<ComplementCells, 'dateAppel' | 'issue'>): Date | null | ComplementRefus {
   const date = parseDateAppel(cells.dateAppel);
   if (cells.dateAppel !== '' && date === null) {
     return {
@@ -174,36 +177,91 @@ export function parseComplements(
       value: cells.issue,
     };
   }
+  return date;
+}
 
-  const outcome = parseOutcome(cells.issue);
+/**
+ * La MÊME règle qu'en base : `rep_call_attempts_other_requires_comment`.
+ * « Autre » sans un mot d'explication est un fourre-tout dont personne ne
+ * tire rien six mois plus tard — et la contrainte ferait échouer la tranche
+ * entière au lieu de cette seule ligne.
+ */
+function parseOutcomeStep(
+  issue: string,
+  notes: string,
+): { readonly outcome: RepCallOutcome; readonly comment: string | null } | ComplementRefus {
+  const outcome = parseOutcome(issue);
   if (!outcome) {
     return {
       rang: 10,
       code: 'CALL_OUTCOME_UNKNOWN',
       message: 'Issue d’appel inconnue. Joint, Injoignable, Refus, Faux numéro ou Autre.',
-      value: cells.issue,
+      value: issue,
     };
   }
 
-  // La MÊME règle qu'en base : `rep_call_attempts_other_requires_comment`.
-  // « Autre » sans un mot d'explication est un fourre-tout dont personne ne
-  // tire rien six mois plus tard — et la contrainte ferait échouer la tranche
-  // entière au lieu de cette seule ligne.
-  const comment = cells.notes.trim() === '' ? null : cells.notes.trim().slice(0, 2_000);
+  const comment = notes.trim() === '' ? null : notes.trim().slice(0, 2_000);
   if (outcome === RepCallOutcome.OTHER && comment === null) {
     return {
       rang: 10,
       code: 'CALL_COMMENT_REQUIRED',
       message: 'L’issue « Autre » exige une note : sans elle, l’appel n’apprend rien.',
-      value: cells.issue,
+      value: issue,
     };
   }
+
+  return { outcome, comment };
+}
+
+function parseAppelStep(cells: ComplementCells): Complements['appel'] | ComplementRefus {
+  const date = parseCallDateStep(cells);
+  if (date === null) return null;
+  if (!(date instanceof Date)) return date;
+
+  const parsedOutcome = parseOutcomeStep(cells.issue, cells.notes);
+  if (!('outcome' in parsedOutcome)) return parsedOutcome;
+
+  return { date, outcome: parsedOutcome.outcome, comment: parsedOutcome.comment };
+}
+
+function resolveOwnerAndAppel(
+  cells: ComplementCells,
+  comptes: ReadonlyMap<string, { readonly id: string }>,
+): { readonly ownerId: string | null; readonly appel: Complements['appel'] } | ComplementRefus {
+  const ownerId = parseOwnerStep(cells.charge, comptes);
+  if (ownerId !== null && typeof ownerId !== 'string') return ownerId;
+
+  const appel = parseAppelStep(cells);
+  if (appel !== null && !('date' in appel)) return appel;
+
+  return { ownerId, appel };
+}
+
+/**
+ * Valide les cinq colonnes de qualification, POUR LES DEUX CHEMINS D'IMPORT.
+ *
+ * L'import synchrone et le moteur d'arrière-plan appliquent les mêmes règles ;
+ * les écrire deux fois les ferait diverger au premier correctif, et l'écart se
+ * verrait comme un import qui accepte ce que l'autre refuse.
+ */
+export function parseComplements(
+  cells: ComplementCells,
+  comptes: ReadonlyMap<string, { readonly id: string }>,
+): Complements | ComplementRefus {
+  const relationStatus = parseRelationStep(cells.relation);
+  if (typeof relationStatus !== 'string') return relationStatus;
+
+  const whatsappStatus = parseWhatsappStep(cells.whatsapp);
+  if (typeof whatsappStatus !== 'string') return whatsappStatus;
+
+  const resolved = resolveOwnerAndAppel(cells, comptes);
+  if ('code' in resolved) return resolved;
 
   return {
     relationStatus,
     whatsappStatus,
-    ownerId: owner?.id ?? null,
-    appel: date === null ? null : { date, outcome, comment },
+    ownerId: resolved.ownerId,
+    appel: resolved.appel,
   };
 }
 
@@ -217,22 +275,34 @@ const AN_MOIS_JOUR = /^(\d{4})-(\d{2})-(\d{2})/;
  * coïncident, et une conversion de fuseau ferait glisser la date d'un jour sur
  * une machine de développement européenne.
  */
-export function parseDateAppel(raw: string, maintenant = new Date()): Date | null {
+function extractDateParts(texte: string): readonly [number, number, number] | null {
+  const jma = JOUR_MOIS_AN.exec(texte);
+  if (jma) return [Number(jma[3]), Number(jma[2]), Number(jma[1])];
+  const amj = AN_MOIS_JOUR.exec(texte);
+  if (amj) return [Number(amj[1]), Number(amj[2]), Number(amj[3])];
+  return null;
+}
+
+/**
+ * Attrape le 31 février, que `Date.UTC` accepte en le reportant au 3 mars
+ * sans rien dire.
+ */
+function estMemeDateCalendaire(date: Date, annee: number, mois: number, jour: number): boolean {
+  return (
+    date.getUTCFullYear() === annee && date.getUTCMonth() === mois - 1 && date.getUTCDate() === jour
+  );
+}
+
+function parseDateAppel(raw: string, maintenant = new Date()): Date | null {
   const texte = raw.trim();
   if (texte === '') return null;
 
-  const jma = JOUR_MOIS_AN.exec(texte);
-  const amj = AN_MOIS_JOUR.exec(texte);
-  if (!jma && !amj) return null;
-  const [annee, mois, jour] = jma
-    ? [Number(jma[3]), Number(jma[2]), Number(jma[1])]
-    : [Number(amj?.[1]), Number(amj?.[2]), Number(amj?.[3])];
+  const parts = extractDateParts(texte);
+  if (!parts) return null;
+  const [annee, mois, jour] = parts;
 
   const date = new Date(Date.UTC(annee, mois - 1, jour));
-  // Le contrôle de recomposition attrape le 31 février, que `Date.UTC` accepte
-  // en le reportant au 3 mars sans rien dire.
-  if (date.getUTCFullYear() !== annee || date.getUTCMonth() !== mois - 1) return null;
-  if (date.getUTCDate() !== jour) return null;
+  if (!estMemeDateCalendaire(date, annee, mois, jour)) return null;
   if (date.getTime() > maintenant.getTime()) return null;
   return date;
 }

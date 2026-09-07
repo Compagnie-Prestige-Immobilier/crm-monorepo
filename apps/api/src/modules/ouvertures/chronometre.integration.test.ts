@@ -80,7 +80,7 @@ async function surLeJeu<T>(run: (decor: Decor) => Promise<T>): Promise<T> {
 
 async function ouverture(
   decor: Decor,
-  data: { openedAt: Date; firstInputAt?: Date; closedAt?: Date },
+  data: { openedAt: Date; firstInputAt?: Date; closedAt?: Date; liberee?: boolean },
 ): Promise<string> {
   const row = await decor.tx.ouvertureFiche.create({
     data: {
@@ -90,7 +90,9 @@ async function ouverture(
       openedAt: data.openedAt,
       firstInputAt: data.firstInputAt ?? null,
       closedAt: data.closedAt ?? null,
-      closingAttemptId: data.closedAt ? uuidv7() : null,
+      closingAttemptId: data.closedAt && !data.liberee ? uuidv7() : null,
+      releasedById: data.liberee ? decor.awa.id : null,
+      releasedAt: data.liberee ? (data.closedAt ?? null) : null,
     },
     select: { id: true },
   });
@@ -135,12 +137,15 @@ describe('le chronomètre démarre à la première saisie', () => {
         closedAt: heure(9, 7),
       });
       await ouverture(decor, { openedAt: heure(11), closedAt: heure(11, 0.5) });
+      await ouverture(decor, { openedAt: heure(12), closedAt: heure(13), liberee: true });
 
       const { items } = await decor.service.comptage(decor.awa, {});
       return items[0];
     });
 
-    expect(ligne?.ouvertures).toBe(2);
+    expect(ligne?.ouvertures).toBe(3);
+    expect(ligne?.qualifiees).toBe(2);
+    expect(ligne?.liberees).toBe(1);
     expect(ligne?.dureeMoyenneSecondes).toBe(300);
   });
 });

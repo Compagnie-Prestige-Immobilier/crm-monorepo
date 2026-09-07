@@ -5,7 +5,7 @@ import { v7 as uuidv7 } from 'uuid';
 
 import { tryNormalizePhone } from '../../common/phone.js';
 import { IMPORT_COLUMNS } from '../representants/import-template.js';
-import { normalizeKey, parseComplements } from '../representants/import-fields.js';
+import { normalizeKey, parseComplements, type Complements } from '../representants/import-fields.js';
 import { chunkOf } from './imports.job.js';
 import type {
   ChunkOutcome,
@@ -14,6 +14,7 @@ import type {
   ImportRowError,
   ImportRunContext,
   ParsedRow,
+  PrismaTransactionClient,
 } from './import-adapter.js';
 
 /**
@@ -63,7 +64,7 @@ import type {
  */
 
 /** Le plafond, et il appartient à l'entité, pas au moteur. */
-export const REPRESENTANTS_MAX_ROWS = 50_000;
+const REPRESENTANTS_MAX_ROWS = 50_000;
 
 /** Une ligne de représentant prête à écrire. */
 export interface RepresentantImportRow {
@@ -128,6 +129,116 @@ const cellAt = (cells: Record<string, string>, index: number): string => {
 
 const columnAt = (index: number, fallback: string): string =>
   IMPORT_COLUMNS[index]?.header ?? fallback;
+
+type Resolved<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly error: ImportRowError };
+
+function resolveFullName(fullName: string, rowNumber: number): Resolved<string> {
+  if (fullName.length < 2) {
+    return {
+      ok: false,
+      error: {
+        rowNumber,
+        column: columnAt(0, 'Nom complet'),
+        code: 'NAME_INVALID',
+        message: 'Le nom complet est obligatoire (2 caractères au minimum).',
+      },
+    };
+  }
+  return { ok: true, value: fullName };
+}
+
+function resolvePhone(phone: string, rowNumber: number): Resolved<string> {
+  const phoneE164 = tryNormalizePhone(phone);
+  if (!phoneE164) {
+    return {
+      ok: false,
+      error: {
+        rowNumber,
+        column: columnAt(1, 'Téléphone'),
+        code: 'PHONE_INVALID',
+        message: 'Numéro de téléphone inexploitable.',
+      },
+    };
+  }
+  return { ok: true, value: phoneE164 };
+}
+
+function resolveDepartement(
+  departement: string,
+  rowNumber: number,
+  refs: RepresentantImportRun,
+): Resolved<ReferentielRow> {
+  const departementRow = refs.departements.get(normalizeKey(departement));
+  if (!departementRow) {
+    return {
+      ok: false,
+      error: {
+        rowNumber,
+        column: columnAt(2, 'Département'),
+        code: 'DEPARTEMENT_UNKNOWN',
+        message: 'Département inconnu. Reprenez exactement un libellé de la liste déroulante.',
+      },
+    };
+  }
+  return { ok: true, value: departementRow };
+}
+
+/** Le département se DÉDUIT de l'IEF, jamais l'inverse : voir l'en-tête du fichier. */
+function resolveIef(
+  ief: string,
+  departementRow: ReferentielRow,
+  rowNumber: number,
+  refs: RepresentantImportRun,
+): Resolved<IefRow | null> {
+  if (!ief) return { ok: true, value: null };
+
+  const iefRow = refs.iefs.get(normalizeKey(ief)) ?? null;
+  if (!iefRow) {
+    return {
+      ok: false,
+      error: {
+        rowNumber,
+        column: columnAt(3, 'IEF'),
+        code: 'IEF_UNKNOWN',
+        message: 'IEF inconnue. Laissez la cellule vide si elle n’est pas connue.',
+      },
+    };
+  }
+  if (iefRow.departementId !== departementRow.id) {
+    return {
+      ok: false,
+      error: {
+        rowNumber,
+        column: columnAt(3, 'IEF'),
+        code: 'IEF_DEPARTEMENT_MISMATCH',
+        message: `L’IEF « ${iefRow.name} » n’appartient pas au département « ${departementRow.name} ».`,
+      },
+    };
+  }
+  return { ok: true, value: iefRow };
+}
+
+function buildRepresentantRow(
+  rowNumber: number,
+  fullName: string,
+  phoneE164: string,
+  departementRow: ReferentielRow,
+  iefRow: IefRow | null,
+  notes: string,
+  etablissement: string,
+  complements: Complements,
+): RepresentantImportRow {
+  return {
+    rowNumber,
+    fullName: fullName.slice(0, 160),
+    phoneE164,
+    departementId: departementRow.id,
+    iefId: iefRow?.id ?? null,
+    notes: notes ? notes.slice(0, 2_000) : null,
+    etablissement: etablissement ? etablissement.slice(0, 200) : null,
+    ...complements,
+  };
+}
 
 @Injectable()
 export class RepresentantsImportAdapter implements ImportAdapter<
@@ -230,87 +341,30 @@ export class RepresentantsImportAdapter implements ImportAdapter<
       return { ok: false, error: { rowNumber, column: columnAt(rang, ''), code, message } };
     }
 
-    if (fullName.length < 2) {
-      return {
-        ok: false,
-        error: {
-          rowNumber,
-          column: columnAt(0, 'Nom complet'),
-          code: 'NAME_INVALID',
-          message: 'Le nom complet est obligatoire (2 caractères au minimum).',
-        },
-      };
-    }
+    const resolvedName = resolveFullName(fullName, rowNumber);
+    if (!resolvedName.ok) return resolvedName;
 
-    const phoneE164 = tryNormalizePhone(phone);
-    if (!phoneE164) {
-      return {
-        ok: false,
-        error: {
-          rowNumber,
-          column: columnAt(1, 'Téléphone'),
-          code: 'PHONE_INVALID',
-          message: 'Numéro de téléphone inexploitable.',
-        },
-      };
-    }
+    const resolvedPhone = resolvePhone(phone, rowNumber);
+    if (!resolvedPhone.ok) return resolvedPhone;
 
-    const departementRow = refs.departements.get(normalizeKey(departement));
-    if (!departementRow) {
-      return {
-        ok: false,
-        error: {
-          rowNumber,
-          column: columnAt(2, 'Département'),
-          code: 'DEPARTEMENT_UNKNOWN',
-          message: 'Département inconnu. Reprenez exactement un libellé de la liste déroulante.',
-        },
-      };
-    }
+    const departementRow = resolveDepartement(departement, rowNumber, refs);
+    if (!departementRow.ok) return departementRow;
 
-    let iefRow: IefRow | null = null;
-    if (ief) {
-      iefRow = refs.iefs.get(normalizeKey(ief)) ?? null;
-      if (!iefRow) {
-        return {
-          ok: false,
-          error: {
-            rowNumber,
-            column: columnAt(3, 'IEF'),
-            code: 'IEF_UNKNOWN',
-            message: 'IEF inconnue. Laissez la cellule vide si elle n’est pas connue.',
-          },
-        };
-      }
-      // Le département se DÉDUIT de l'IEF, jamais l'inverse. Une incohérence
-      // entre les deux colonnes est une faute de saisie qu'il vaut mieux
-      // signaler que trancher en silence : le rattachement décide du reporting
-      // terrain.
-      if (iefRow.departementId !== departementRow.id) {
-        return {
-          ok: false,
-          error: {
-            rowNumber,
-            column: columnAt(3, 'IEF'),
-            code: 'IEF_DEPARTEMENT_MISMATCH',
-            message: `L’IEF « ${iefRow.name} » n’appartient pas au département « ${departementRow.name} ».`,
-          },
-        };
-      }
-    }
+    const iefRow = resolveIef(ief, departementRow.value, rowNumber, refs);
+    if (!iefRow.ok) return iefRow;
 
     return {
       ok: true,
-      row: {
+      row: buildRepresentantRow(
         rowNumber,
-        fullName: fullName.slice(0, 160),
-        phoneE164,
-        departementId: departementRow.id,
-        iefId: iefRow?.id ?? null,
-        notes: notes ? notes.slice(0, 2_000) : null,
-        etablissement: etablissement ? etablissement.slice(0, 200) : null,
-        ...complements,
-      },
+        resolvedName.value,
+        resolvedPhone.value,
+        departementRow.value,
+        iefRow.value,
+        notes,
+        etablissement,
+        complements,
+      ),
     };
   }
 
@@ -328,136 +382,185 @@ export class RepresentantsImportAdapter implements ImportAdapter<
     ctx: ImportRunContext,
     run: RepresentantImportRun,
   ): Promise<ChunkOutcome> {
-    const errors: ImportRowError[] = [];
-    let skipped = 0;
-
-    // PREMIÈRE FAMILLE : le fichier contre lui-même. La seconde occurrence est
-    // rejetée, jamais la première : c'est celle du haut du fichier que
-    // l'utilisateur reconnaît.
-    const unique: RepresentantImportRow[] = [];
-    for (const row of rows) {
-      const previous = run.seen.get(row.phoneE164);
-      if (previous !== undefined) {
-        skipped += 1;
-        errors.push({
-          rowNumber: row.rowNumber,
-          column: IMPORT_COLUMNS[1]?.header ?? 'Téléphone',
-          code: 'DUPLICATE_IN_FILE',
-          message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
-        });
-        continue;
-      }
-      run.seen.set(row.phoneE164, row.rowNumber);
-      unique.push(row);
-    }
-
-    const known = new Set<string>();
-    for (const slice of chunkOf(
-      unique.map((row) => row.phoneE164),
-      PHONE_LOOKUP_CHUNK,
-    )) {
-      const found = await ctx.tx.representant.findMany({
-        where: { phoneE164: { in: slice }, deletedAt: null },
-        select: { phoneE164: true },
-      });
-      for (const row of found) known.add(row.phoneE164);
-    }
-
-    const retained: RepresentantImportRow[] = [];
-    for (const row of unique) {
-      if (known.has(row.phoneE164)) {
-        skipped += 1;
-        errors.push({
-          rowNumber: row.rowNumber,
-          column: IMPORT_COLUMNS[1]?.header ?? 'Téléphone',
-          code: 'DUPLICATE_IN_DATABASE',
-          message: 'Un représentant porte déjà ce numéro en base.',
-        });
-        continue;
-      }
-      retained.push(row);
-    }
+    const deduped = dedupWithinChunk(rows, run.seen);
+    const filtered = await filterAgainstDatabase(ctx.tx, deduped.unique);
+    const skipped = deduped.skipped + filtered.skipped;
+    const errors = [...deduped.errors, ...filtered.errors];
 
     if (ctx.mode === ImportMode.DRY_RUN) {
-      return { created: retained.length, skipped, errors };
+      return { created: filtered.retained.length, skipped, errors };
     }
+    if (filtered.retained.length === 0) return { created: 0, skipped, errors };
 
-    if (retained.length === 0) return { created: 0, skipped, errors };
+    const persisted = await persistRepresentants(ctx, filtered.retained);
+    return {
+      created: persisted.created,
+      skipped: skipped + persisted.skipped,
+      errors: [...errors, ...persisted.errors],
+    };
+  }
+}
 
-    const now = new Date();
-    // UUID v7 engendrés AVANT l'écriture : les appels déjà passés s'y rattachent
-    // par clé étrangère, et il faut donc les connaître. L'import n'a pas de
-    // client hors ligne, mais l'identifiant doit rester du même format que ceux
-    // du mobile, sinon l'ordre lexicographique cesse d'être l'ordre temporel.
-    const avecId = retained.map((row) => ({ row, id: uuidv7() }));
+/**
+ * PREMIÈRE FAMILLE : le fichier contre lui-même. La seconde occurrence est
+ * rejetée, jamais la première : c'est celle du haut du fichier que
+ * l'utilisateur reconnaît.
+ */
+function dedupWithinChunk(
+  rows: readonly RepresentantImportRow[],
+  seen: Map<string, number>,
+): { unique: RepresentantImportRow[]; skipped: number; errors: ImportRowError[] } {
+  const errors: ImportRowError[] = [];
+  let skipped = 0;
+  const unique: RepresentantImportRow[] = [];
 
-    const written = await ctx.tx.representant.createMany({
-      data: avecId.map(({ row, id }) => ({
-        id,
-        fullName: row.fullName,
-        phoneE164: row.phoneE164,
-        departementId: row.departementId,
-        iefId: row.iefId,
-        notes: row.notes,
-        etablissement: row.etablissement,
-        relationStatus: row.relationStatus,
-        whatsappStatus: row.whatsappStatus,
-        createdById: row.ownerId ?? ctx.requestedById,
-        // La saisie terrain est inconnue pour un import : on retient l'instant
-        // de l'écriture, jamais une date inventée. Les statistiques d'activité
-        // s'appuient dessus, une valeur fabriquée les fausserait.
-        clientCreatedAt: now,
-      })),
-      // L'index partiel double la contrainte : une ligne qui s'y heurterait
-      // malgré nos contrôles est ignorée plutôt que de faire échouer les 499
-      // autres. L'ÉCART EST DIT, il n'est pas avalé, voir juste en dessous.
-      skipDuplicates: true,
-    });
-
-    // Les appels ne se rattachent qu'aux fiches RÉELLEMENT écrites : une ligne
-    // écartée par `skipDuplicates` laisserait un appel pointant sur un
-    // identifiant absent, et la clé étrangère ferait échouer toute la tranche.
-    const appels = avecId.flatMap(({ row, id }) =>
-      row.appel === null
-        ? []
-        : [{ id, appel: row.appel, performedById: row.ownerId ?? ctx.requestedById }],
-    );
-    if (appels.length > 0) {
-      const presentes = new Set(
-        (
-          await ctx.tx.representant.findMany({
-            where: { id: { in: appels.map(({ id }) => id) } },
-            select: { id: true },
-          })
-        ).map((found) => found.id),
-      );
-      await ctx.tx.repCallAttempt.createMany({
-        data: appels
-          .filter(({ id }) => presentes.has(id))
-          .map(({ id, appel, performedById }) => ({
-            id: uuidv7(),
-            representantId: id,
-            performedById,
-            outcome: appel.outcome,
-            comment: appel.comment,
-            clientCreatedAt: appel.date,
-          })),
-      });
-    }
-
-    if (written.count < retained.length) {
-      // Entre la lecture des téléphones connus et l'écriture, un commercial a pu
-      // saisir la même fiche sur le terrain. La ligne disparaîtrait alors sans un
-      // mot, et le rapport annoncerait plus de créations qu'il n'y a de fiches.
-      const perdues = retained.length - written.count;
-      skipped += perdues;
+  for (const row of rows) {
+    const previous = seen.get(row.phoneE164);
+    if (previous !== undefined) {
+      skipped += 1;
       errors.push({
+        rowNumber: row.rowNumber,
+        column: IMPORT_COLUMNS[1]?.header ?? 'Téléphone',
+        code: 'DUPLICATE_IN_FILE',
+        message: `Ce numéro figure déjà à la ligne ${String(previous)} du fichier.`,
+      });
+      continue;
+    }
+    seen.set(row.phoneE164, row.rowNumber);
+    unique.push(row);
+  }
+
+  return { unique, skipped, errors };
+}
+
+/** SECONDE FAMILLE : le fichier contre la base, par tranche de numéros. */
+async function filterAgainstDatabase(
+  tx: PrismaTransactionClient,
+  unique: readonly RepresentantImportRow[],
+): Promise<{ retained: RepresentantImportRow[]; skipped: number; errors: ImportRowError[] }> {
+  const known = new Set<string>();
+  for (const slice of chunkOf(
+    unique.map((row) => row.phoneE164),
+    PHONE_LOOKUP_CHUNK,
+  )) {
+    const found = await tx.representant.findMany({
+      where: { phoneE164: { in: slice }, deletedAt: null },
+      select: { phoneE164: true },
+    });
+    for (const row of found) known.add(row.phoneE164);
+  }
+
+  const errors: ImportRowError[] = [];
+  let skipped = 0;
+  const retained: RepresentantImportRow[] = [];
+  for (const row of unique) {
+    if (known.has(row.phoneE164)) {
+      skipped += 1;
+      errors.push({
+        rowNumber: row.rowNumber,
+        column: IMPORT_COLUMNS[1]?.header ?? 'Téléphone',
+        code: 'DUPLICATE_IN_DATABASE',
+        message: 'Un représentant porte déjà ce numéro en base.',
+      });
+      continue;
+    }
+    retained.push(row);
+  }
+
+  return { retained, skipped, errors };
+}
+
+async function persistRepresentants(
+  ctx: ImportRunContext,
+  retained: readonly RepresentantImportRow[],
+): Promise<{ created: number; skipped: number; errors: ImportRowError[] }> {
+  const now = new Date();
+  // UUID v7 engendrés AVANT l'écriture : les appels déjà passés s'y rattachent
+  // par clé étrangère, et il faut donc les connaître. L'import n'a pas de
+  // client hors ligne, mais l'identifiant doit rester du même format que ceux
+  // du mobile, sinon l'ordre lexicographique cesse d'être l'ordre temporel.
+  const avecId = retained.map((row) => ({ row, id: uuidv7() }));
+
+  const written = await ctx.tx.representant.createMany({
+    data: avecId.map(({ row, id }) => ({
+      id,
+      fullName: row.fullName,
+      phoneE164: row.phoneE164,
+      departementId: row.departementId,
+      iefId: row.iefId,
+      notes: row.notes,
+      etablissement: row.etablissement,
+      relationStatus: row.relationStatus,
+      whatsappStatus: row.whatsappStatus,
+      createdById: row.ownerId ?? ctx.requestedById,
+      // La saisie terrain est inconnue pour un import : on retient l'instant
+      // de l'écriture, jamais une date inventée. Les statistiques d'activité
+      // s'appuient dessus, une valeur fabriquée les fausserait.
+      clientCreatedAt: now,
+    })),
+    // L'index partiel double la contrainte : une ligne qui s'y heurterait
+    // malgré nos contrôles est ignorée plutôt que de faire échouer les 499
+    // autres. L'ÉCART EST DIT, il n'est pas avalé, voir juste en dessous.
+    skipDuplicates: true,
+  });
+
+  await writeRepresentantCallAttempts(ctx, avecId);
+
+  if (written.count >= retained.length) {
+    return { created: written.count, skipped: 0, errors: [] };
+  }
+
+  // Entre la lecture des téléphones connus et l'écriture, un commercial a pu
+  // saisir la même fiche sur le terrain. La ligne disparaîtrait alors sans un
+  // mot, et le rapport annoncerait plus de créations qu'il n'y a de fiches.
+  const perdues = retained.length - written.count;
+  return {
+    created: written.count,
+    skipped: perdues,
+    errors: [
+      {
         rowNumber: retained[0]?.rowNumber ?? 0,
         code: 'SKIPPED_ON_WRITE',
         message: `${String(perdues)} ligne(s) retenue(s) n’ont pas été écrites : leur numéro a été pris par une autre saisie pendant l’import.`,
-      });
-    }
+      },
+    ],
+  };
+}
 
-    return { created: written.count, skipped, errors };
-  }
+/**
+ * Les appels ne se rattachent qu'aux fiches RÉELLEMENT écrites : une ligne
+ * écartée par `skipDuplicates` laisserait un appel pointant sur un identifiant
+ * absent, et la clé étrangère ferait échouer toute la tranche.
+ */
+async function writeRepresentantCallAttempts(
+  ctx: ImportRunContext,
+  avecId: readonly { row: RepresentantImportRow; id: string }[],
+): Promise<void> {
+  const appels = avecId.flatMap(({ row, id }) =>
+    row.appel === null
+      ? []
+      : [{ id, appel: row.appel, performedById: row.ownerId ?? ctx.requestedById }],
+  );
+  if (appels.length === 0) return;
+
+  const presentes = new Set(
+    (
+      await ctx.tx.representant.findMany({
+        where: { id: { in: appels.map(({ id }) => id) } },
+        select: { id: true },
+      })
+    ).map((found) => found.id),
+  );
+  await ctx.tx.repCallAttempt.createMany({
+    data: appels
+      .filter(({ id }) => presentes.has(id))
+      .map(({ id, appel, performedById }) => ({
+        id: uuidv7(),
+        representantId: id,
+        performedById,
+        outcome: appel.outcome,
+        comment: appel.comment,
+        clientCreatedAt: appel.date,
+      })),
+  });
 }

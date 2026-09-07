@@ -80,9 +80,12 @@ class SyncEngine {
   /// avant l'envoi. Les APK d'avant ne le lisent pas : servis, les deux statuts
   /// « Autre » repartiraient sans motif, le serveur refuserait, et un refus
   /// hors ligne est définitif.
+  /// v8 : la conversion CHUES porte la tranche de revenu et la durée dans la
+  /// fonction, et ne propose plus la méthode `PHYSICAL`. Le serveur n'impose
+  /// ces trois règles qu'à partir de ce numéro.
   /// C'est ce nombre que la route dédiée compare au `minPayloadVersion` de
   /// chaque statut ; en dessous, aucun statut ne descend.
-  static const int payloadVersion = 7;
+  static const int payloadVersion = 8;
 
   /// Poids qu'un lot peut atteindre sur le fil ; c'est lui que le `sendTimeout`
   /// du profil `push` doit pouvoir émettre sur un lien montant EDGE.
@@ -585,7 +588,7 @@ class SyncEngine {
     if (raw is! Map<String, dynamic>) {
       throw FormatException('payload non objet', row.payload);
     }
-    Map<String, dynamic> decoded = raw;
+    Map<String, dynamic> decoded = EnrollmentMethods.normalizeLegacyMethod(raw);
     if (row.entityType == callAttemptEntity) {
       final CallReason reason = _resolveCallAttempt(
         decoded,
@@ -621,12 +624,19 @@ class SyncEngine {
     );
   }
 
+  /// La PLUS ANCIENNE du lot, et non la version de ce code : le serveur durcit
+  /// ses règles à partir du numéro annoncé, et une saisie mise en file par
+  /// l'APK précédent se verrait refuser des champs qu'elle ignorait.
+  static int _versionDuLot(List<OutboxData> rows) => rows
+      .map((OutboxData r) => r.payloadVersion)
+      .reduce((int a, int b) => a < b ? a : b);
+
   Future<_SendReport> _sendBatch(_PreparedBatch prepared) async {
     final PushResult result;
     try {
       result = await _api.push(
         batchId: prepared.batchId,
-        payloadVersion: payloadVersion,
+        payloadVersion: _versionDuLot(prepared.rows),
         operations: prepared.operations,
       );
     } on ApiException catch (e) {
@@ -2337,7 +2347,9 @@ class SyncEngine {
                 professionId: Value<String?>(p.professionId),
                 paysResidenceId: Value<String?>(p.paysResidenceId),
                 villeResidence: Value<String?>(p.villeResidence),
+                whatsappStatus: Value<String>(p.whatsappStatus.value),
                 whatsappE164: Value<String?>(p.whatsappE164),
+                etablissement: Value<String?>(p.etablissement),
                 relaisNom: Value<String?>(p.relaisNom),
                 relaisPhoneE164: Value<String?>(p.relaisPhoneE164),
                 lastCallOutcome: Value<String?>(p.lastCallOutcome?.value),
@@ -2409,8 +2421,14 @@ class SyncEngine {
                   villeResidence: const CustomExpression<String>(
                     'excluded.ville_residence',
                   ),
+                  whatsappStatus: const CustomExpression<String>(
+                    'excluded.whatsapp_status',
+                  ),
                   whatsappE164: const CustomExpression<String>(
                     'excluded.whatsapp_e164',
+                  ),
+                  etablissement: const CustomExpression<String>(
+                    'excluded.etablissement',
                   ),
                   relaisNom: const CustomExpression<String>(
                     'excluded.relais_nom',

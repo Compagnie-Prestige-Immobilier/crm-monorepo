@@ -443,6 +443,11 @@ function KindPanel({
   );
 }
 
+function texteUsage(usageCount: number | null): string {
+  if (usageCount === null) return '';
+  return ` · ${String(usageCount)} visite${usageCount === 1 ? '' : 's'}`;
+}
+
 function SortableRow({
   entry,
   disabled,
@@ -505,9 +510,7 @@ function SortableRow({
         </div>
         <p className="mt-0.5 truncate text-[0.75rem] text-muted-foreground">
           Code {entry.code}
-          {usageCount === null
-            ? ''
-            : ` · ${String(usageCount)} visite${usageCount === 1 ? '' : 's'}`}
+          {texteUsage(usageCount)}
         </p>
       </div>
 

@@ -1,6 +1,6 @@
 export type RawSearchParams = Record<string, string | string[] | undefined>;
 
-export function readOne(params: RawSearchParams | URLSearchParams, key: string): string | null {
+function readOne(params: RawSearchParams | URLSearchParams, key: string): string | null {
   if (params instanceof URLSearchParams) return params.get(key);
   const raw = params[key];
   if (Array.isArray(raw)) return raw[0] ?? null;

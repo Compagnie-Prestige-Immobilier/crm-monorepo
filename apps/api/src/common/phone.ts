@@ -11,7 +11,7 @@ const DEFAULT_REGION_FALLBACK = 'SN';
 
 const SEPARATORS = /[\s.\-() ‐-―/]/g;
 
-export const phoneDefaultRegion = (): CountryCode =>
+const phoneDefaultRegion = (): CountryCode =>
   (process.env.PHONE_DEFAULT_REGION ?? DEFAULT_REGION_FALLBACK).toUpperCase() as CountryCode;
 
 /**

@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
 
-export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
+const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-export const SHORT_CODE_LENGTH = 6;
+const SHORT_CODE_LENGTH = 6;
 
-export const SHORT_CODE_BITS = SHORT_CODE_LENGTH * 5;
+const SHORT_CODE_BITS = SHORT_CODE_LENGTH * 5;
 
 export function shortCode(id: string): string {
   const digest = createHash('sha256').update(id.trim().toLowerCase(), 'utf8').digest();
@@ -18,14 +18,4 @@ export function shortCode(id: string): string {
     code += character;
   }
   return code;
-}
-
-export function hasShortCodeCollision(ids: readonly string[]): boolean {
-  const seen = new Set<string>();
-  for (const id of ids) {
-    const code = shortCode(id);
-    if (seen.has(code)) return true;
-    seen.add(code);
-  }
-  return false;
 }

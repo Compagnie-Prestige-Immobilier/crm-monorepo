@@ -3,6 +3,8 @@ import { unwrap } from '@crm/api-client/query';
 import { z } from 'zod';
 
 import { getApiClient } from '@/lib/api/browser';
+import type { ChampLibre, ReglageChamp } from '@/lib/data/champs-conversion';
+import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
 import { dakarLocalToIso } from '@/lib/format';
 import type {
   RepresentantScriptPatch,
@@ -10,7 +12,7 @@ import type {
   WhatsappStatus,
 } from '@/lib/data/representants';
 import type { RepresentantRelation } from '@/lib/representant-filters';
-import { ENROLLMENT_METHODS } from '@/lib/types';
+import { DUREE_ETABLISSEMENT_MAX_MOIS, ENROLLMENT_METHODS } from '@/lib/types';
 import type {
   CallOutcome,
   EnrollmentMethod,
@@ -36,7 +38,7 @@ export interface CallbackList {
 }
 
 /** L'heure promise croissante : le retard étant une heure dépassée, il vient en tête. */
-export function sortCallbacks(items: readonly Callback[]): Callback[] {
+function sortCallbacks(items: readonly Callback[]): Callback[] {
   return [...items].sort((left, right) => {
     if (left.scheduledAt !== right.scheduledAt)
       return left.scheduledAt < right.scheduledAt ? -1 : 1;
@@ -160,11 +162,10 @@ export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
   return slots;
 }
 
-export const COMMENT_MAX_LENGTH = 2_000;
-export const EMAIL_MAX_LENGTH = 160;
-export const NAME_MAX_LENGTH = 120;
-export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
-export const DUREE_SYSTEME_MAX_MOIS = 300;
+const COMMENT_MAX_LENGTH = 2_000;
+const EMAIL_MAX_LENGTH = 160;
+const NAME_MAX_LENGTH = 120;
+const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
 const RENDEZ_VOUS_SKEW_MS = 5 * 60_000;
@@ -196,12 +197,19 @@ export interface ConversionDraft {
   readonly incomeBandId: string;
   readonly paymentMode: PaymentMode | null;
   readonly dureeSystemeMois: string;
+  readonly memeWhatsapp: boolean | null;
+  readonly whatsapp: string;
   readonly method: EnrollmentMethod | null;
   readonly rendezVousAt: string;
+  /** Réponses aux champs que l'administrateur a ajoutés, par identifiant de champ. */
+  readonly champsLibres: Record<string, string>;
 }
 
-export type ConversionField = Exclude<keyof ConversionDraft, 'projet'>;
-export type ConversionErrors = Partial<Record<ConversionField, string>>;
+export type ConversionField = Exclude<keyof ConversionDraft, 'projet' | 'champsLibres'>;
+
+export type ConversionErrors = Partial<Record<ConversionField, string>> & {
+  readonly libres?: Record<string, string>;
+};
 
 const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   projet: z.enum(['CHUES', 'GRAND_PUBLIC']),
@@ -218,8 +226,13 @@ const conversionSchema: z.ZodType<ConversionDraft> = z.object({
   incomeBandId: z.string(),
   paymentMode: z.enum(['COMPTANT', 'ECHELONNE']).nullable(),
   dureeSystemeMois: z.string(),
+  memeWhatsapp: z.boolean().nullable().catch(null),
+  whatsapp: z.string().catch(''),
   method: z.enum(ENROLLMENT_METHODS).nullable(),
   rendezVousAt: z.string(),
+  // `.catch` et non `.optional` : un brouillon écrit avant EB-28 n'a pas la clé,
+  // et le refuser reviendrait à jeter la saisie que le rappel devait retrouver.
+  champsLibres: z.record(z.string(), z.string()).catch({}),
 });
 
 const brouillonSchema = z.object({
@@ -313,8 +326,43 @@ export function conversionFrom(
     incomeBandId: prospect.incomeBandId ?? '',
     paymentMode: prospect.paymentMode,
     dureeSystemeMois: prospect.dureeSystemeMois === null ? '' : String(prospect.dureeSystemeMois),
+    memeWhatsapp: null,
+    whatsapp: '',
     method,
     rendezVousAt: '',
+    champsLibres: { ...prospect.champsLibres },
+  };
+}
+
+/**
+ * Les identifiants du catalogue serveur : `phoneE164` s'affiche en lecture
+ * seule, et le couple WhatsApp y est nommé autrement que dans le brouillon.
+ */
+export type ChampReglable =
+  | Exclude<ConversionField, 'memeWhatsapp' | 'whatsapp'>
+  | 'phoneE164'
+  | 'whatsappStatus'
+  | 'whatsappE164';
+
+/**
+ * Les réglages de l'administrateur, appliqués champ par champ : masqué, un
+ * champ n'est plus exigé ; sans réglage, la règle du projet reste celle du
+ * serveur.
+ */
+export interface ReglesChamps {
+  readonly visible: (champ: ChampReglable, defaut: boolean) => boolean;
+  readonly requis: (champ: ChampReglable, defaut: boolean) => boolean;
+}
+
+export function reglesChamps(reglages: readonly ReglageChamp[]): ReglesChamps {
+  const parChamp = new Map(reglages.map((regle) => [regle.champ, regle]));
+  return {
+    visible: (champ, defaut) => parChamp.get(champ)?.visible ?? defaut,
+    requis: (champ, defaut) => {
+      const regle = parChamp.get(champ);
+      if (regle === undefined) return defaut;
+      return regle.visible && regle.obligatoire;
+    },
   };
 }
 
@@ -322,102 +370,204 @@ export function conversionFrom(
 export function validateConversion(
   draft: ConversionDraft,
   now: number = Date.now(),
+  reglages: readonly ReglageChamp[] = [],
+  libres: readonly ChampLibre[] = [],
 ): ConversionErrors {
   const complet = draft.projet === 'CHUES';
+  const regles = reglesChamps(reglages);
+  const manquantes = libresManquants(draft, libres);
   return {
-    ...identiteErreurs(draft, complet),
-    ...dossierErreurs(draft, complet),
-    ...methodeErreurs(draft, now),
+    ...identiteErreurs(draft, complet, regles),
+    ...dossierErreurs(draft, complet, regles),
+    ...methodeErreurs(draft, now, regles),
+    ...(Object.keys(manquantes).length === 0 ? {} : { libres: manquantes }),
   };
 }
 
-function identiteErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
+function libresManquants(
+  draft: ConversionDraft,
+  libres: readonly ChampLibre[],
+): Record<string, string> {
+  const manquants: Record<string, string> = {};
+  for (const champ of libres) {
+    if (!champ.obligatoire) continue;
+    if ((draft.champsLibres[champ.id] ?? '').trim() === '') {
+      manquants[champ.id] = `« ${champ.libelle} » est obligatoire.`;
+    }
+  }
+  return manquants;
+}
+
+function texteErreur(
+  value: string,
+  requis: boolean,
+  obligatoire: string,
+  tropLong: string,
+): string | undefined {
+  const texteTrim = value.trim();
+  if (requis && texteTrim === '') return obligatoire;
+  if (texteTrim.length > NAME_MAX_LENGTH) return tropLong;
+  return undefined;
+}
+
+function emailErreur(value: string, requis: boolean): string | undefined {
+  const email = value.trim();
+  if (requis && email === '') return 'L’adresse électronique est obligatoire.';
+  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
+    return 'Cette adresse électronique n’en est pas une.';
+  }
+  return undefined;
+}
+
+function identiteErreurs(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
 
-  const nom = draft.nom.trim();
-  if (nom === '') errors.nom = 'Le nom est obligatoire.';
-  else if (nom.length > NAME_MAX_LENGTH) errors.nom = 'Nom trop long (120 caractères maximum).';
+  const nomErr = texteErreur(
+    draft.nom,
+    regles.requis('nom', true),
+    'Le nom est obligatoire.',
+    'Nom trop long (120 caractères maximum).',
+  );
+  if (nomErr !== undefined) errors.nom = nomErr;
 
-  const prenom = draft.prenom.trim();
-  if (complet && prenom === '') errors.prenom = 'Le prénom est obligatoire.';
-  else if (prenom.length > NAME_MAX_LENGTH) {
-    errors.prenom = 'Prénom trop long (120 caractères maximum).';
-  }
+  const prenomErr = texteErreur(
+    draft.prenom,
+    regles.requis('prenom', complet),
+    'Le prénom est obligatoire.',
+    'Prénom trop long (120 caractères maximum).',
+  );
+  if (prenomErr !== undefined) errors.prenom = prenomErr;
 
-  const profession = draft.profession.trim();
-  if (complet && profession === '') errors.profession = 'La profession est obligatoire.';
-  else if (profession.length > NAME_MAX_LENGTH) {
-    errors.profession = 'Profession trop longue (120 caractères maximum).';
-  }
+  const professionErr = texteErreur(
+    draft.profession,
+    regles.requis('profession', complet),
+    'La profession est obligatoire.',
+    'Profession trop longue (120 caractères maximum).',
+  );
+  if (professionErr !== undefined) errors.profession = professionErr;
 
-  const email = draft.email.trim();
-  if (email !== '' && (email.length > EMAIL_MAX_LENGTH || !EMAIL_PATTERN.test(email))) {
-    errors.email = 'Cette adresse électronique n’en est pas une.';
-  }
+  const emailErr = emailErreur(draft.email, regles.requis('email', false));
+  if (emailErr !== undefined) errors.email = emailErr;
 
   return errors;
 }
 
-const CHAMPS_CHUES: readonly [ConversionField, (draft: ConversionDraft) => boolean, string][] = [
-  ['fonctionnaire', (draft) => draft.fonctionnaire === null, 'Dites s’il est fonctionnaire.'],
-  ['syndicatId', (draft) => draft.syndicatId === '', 'Choisissez le syndicat.'],
-  ['banqueId', (draft) => draft.banqueId === '', 'Choisissez la banque.'],
+/** Le dernier membre dit si le champ est obligatoire sur CHUES sans réglage. */
+const CHAMPS_DOSSIER: readonly [
+  Extract<ConversionField, ChampReglable>,
+  (draft: ConversionDraft) => boolean,
+  string,
+  boolean,
+][] = [
+  ['fonctionnaire', (draft) => draft.fonctionnaire === null, 'Dites s’il est fonctionnaire.', true],
+  ['syndicatId', (draft) => draft.syndicatId === '', 'Choisissez le syndicat.', true],
+  ['banqueId', (draft) => draft.banqueId === '', 'Choisissez la banque.', true],
   [
     'engagementEnCours',
     (draft) => draft.engagementEnCours === null,
     'Dites s’il a un engagement en cours à la banque.',
+    true,
   ],
-  ['incomeBandId', (draft) => draft.incomeBandId === '', 'Choisissez la tranche de revenu.'],
+  ['incomeBandId', (draft) => draft.incomeBandId === '', 'Choisissez la tranche de revenu.', true],
+  ['type', (draft) => draft.type === null, 'Choisissez la situation.', false],
+  ['paymentMode', (draft) => draft.paymentMode === null, 'Choisissez le mode de paiement.', false],
 ];
 
-function chuesObligatoires(draft: ConversionDraft): ConversionErrors {
+function dossierObligatoires(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
-  for (const [field, manquant, message] of CHAMPS_CHUES) {
-    if (manquant(draft)) errors[field] = message;
+  for (const [field, manquant, message, surChues] of CHAMPS_DOSSIER) {
+    if (regles.requis(field, surChues && complet) && manquant(draft)) errors[field] = message;
   }
   return errors;
 }
 
-function dossierErreurs(draft: ConversionDraft, complet: boolean): ConversionErrors {
-  const errors: ConversionErrors = complet ? chuesObligatoires(draft) : {};
+const chiffres = (value: string): number => value.replace(/\D/gu, '').length;
 
-  const mois = draft.dureeEtablissementMois.trim();
-  if (complet && mois === '') {
-    errors.dureeEtablissementMois = 'La durée dans l’établissement est obligatoire.';
-  } else if (mois !== '' && (!/^\d+$/u.test(mois) || Number(mois) > DUREE_ETABLISSEMENT_MAX_MOIS)) {
-    errors.dureeEtablissementMois = `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`;
-  }
+function dureeErreur(
+  value: string,
+  requis: boolean,
+  min: number,
+  max: number,
+  obligatoire: string,
+  invalide: string,
+): string | undefined {
+  const duree = value.trim();
+  if (requis && duree === '') return obligatoire;
+  if (duree === '') return undefined;
+  if (!/^\d+$/u.test(duree) || Number(duree) < min || Number(duree) > max) return invalide;
+  return undefined;
+}
 
-  const systeme = draft.dureeSystemeMois.trim();
-  if (complet && systeme === '') {
-    errors.dureeSystemeMois = 'Choisissez la durée du système de paiement.';
-  } else if (
-    systeme !== '' &&
-    (!/^\d+$/u.test(systeme) || Number(systeme) < 1 || Number(systeme) > DUREE_SYSTEME_MAX_MOIS)
-  ) {
-    errors.dureeSystemeMois = `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`;
-  }
+function whatsappDossierErreur(draft: ConversionDraft): string | undefined {
+  if (draft.memeWhatsapp !== false) return undefined;
+  if (draft.whatsapp.trim() === '') return undefined;
+  if (chiffres(draft.whatsapp) >= 9) return undefined;
+  return 'Le numéro WhatsApp est incomplet.';
+}
+
+function dossierErreurs(
+  draft: ConversionDraft,
+  complet: boolean,
+  regles: ReglesChamps,
+): ConversionErrors {
+  const errors: ConversionErrors = dossierObligatoires(draft, complet, regles);
+
+  const etablissementErr = dureeErreur(
+    draft.dureeEtablissementMois,
+    regles.requis('dureeEtablissementMois', complet),
+    0,
+    DUREE_ETABLISSEMENT_MAX_MOIS,
+    'La durée dans la fonction est obligatoire.',
+    `La durée s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
+  );
+  if (etablissementErr !== undefined) errors.dureeEtablissementMois = etablissementErr;
+
+  const systemeErr = dureeErreur(
+    draft.dureeSystemeMois,
+    regles.requis('dureeSystemeMois', false),
+    1,
+    DUREE_SYSTEME_MAX_MOIS,
+    'Choisissez la durée du système de paiement.',
+    `La durée du système s’exprime en mois entiers, de 1 à ${String(DUREE_SYSTEME_MAX_MOIS)}.`,
+  );
+  if (systemeErr !== undefined) errors.dureeSystemeMois = systemeErr;
+
+  const whatsappErr = whatsappDossierErreur(draft);
+  if (whatsappErr !== undefined) errors.whatsapp = whatsappErr;
 
   return errors;
 }
 
-function methodeErreurs(draft: ConversionDraft, now: number): ConversionErrors {
+function methodeErreurs(
+  draft: ConversionDraft,
+  now: number,
+  regles: ReglesChamps,
+): ConversionErrors {
   const errors: ConversionErrors = {};
 
   if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
 
   const rendezVous = draft.rendezVousAt.trim();
+  if (!regles.visible('rendezVousAt', true)) return errors;
   if (draft.method === 'APPOINTMENT') {
     const iso = dakarLocalToIso(rendezVous);
     if (rendezVous === '') {
-      errors.rendezVousAt = 'La prise de rendez-vous exige la date du rendez-vous.';
+      errors.rendezVousAt = 'Le RDV CPI exige la date et l’heure du rendez-vous.';
     } else if (iso === null) {
       errors.rendezVousAt = 'La date du rendez-vous est illisible.';
     } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
       errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
     }
   } else if (rendezVous !== '') {
-    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».';
+    errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « RDV CPI ».';
   }
 
   return errors;
@@ -427,16 +577,28 @@ function methodeErreurs(draft: ConversionDraft, now: number): ConversionErrors {
  * Le serveur répond en 200 avec un code par opération : le refus doit revenir
  * SOUS le champ fautif, sinon la téléconseillère relit tout le formulaire.
  */
-export const CONVERSION_ERRORS: Readonly<
+const CONVERSION_ERRORS: Readonly<
   Record<string, { readonly field: ConversionField; readonly message: string }>
 > = {
   PHASE2_RENDEZ_VOUS_REQUIRED: {
     field: 'rendezVousAt',
-    message: 'La prise de rendez-vous exige la date du rendez-vous.',
+    message: 'Le RDV CPI exige la date et l’heure du rendez-vous.',
   },
   PHASE2_RENDEZ_VOUS_NOT_ALLOWED: {
     field: 'rendezVousAt',
-    message: 'Une date de rendez-vous n’est admise que sur « Prise de rendez-vous ».',
+    message: 'Une date de rendez-vous n’est admise que sur « RDV CPI ».',
+  },
+  PHASE2_METHOD_RETIREE: {
+    field: 'method',
+    message: 'Cette méthode n’existe plus. Choisissez « RDV CPI ».',
+  },
+  PHASE2_REVENU_REQUIRED: {
+    field: 'incomeBandId',
+    message: 'Choisissez la tranche de revenu.',
+  },
+  PHASE2_DUREE_FONCTION_REQUIRED: {
+    field: 'dureeEtablissementMois',
+    message: 'La durée dans la fonction est obligatoire.',
   },
   PHASE2_RENDEZ_VOUS_INVALID: {
     field: 'rendezVousAt',
@@ -472,31 +634,44 @@ export interface AttemptDraft {
   readonly ouvertureId?: string;
 }
 
-/** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
-export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
-  const comment = draft.comment.trim();
-  const callbackAt = draft.callbackAt ?? null;
-
+function methodeAttemptErreur(draft: AttemptDraft): string | null {
   if (draft.outcome === 'METHOD_OBTAINED' && draft.method === null) {
     return 'Choisissez la méthode obtenue.';
   }
   if (draft.outcome !== 'METHOD_OBTAINED' && draft.method !== null) {
     return 'Une méthode ne s’enregistre que sur « Méthode obtenue ».';
   }
-  if (callbackAt !== null && draft.outcome !== 'CALLBACK') {
-    return 'Une échéance ne s’enregistre que sur « À rappeler ».';
-  }
-  if (callbackAt !== null && !(Date.parse(callbackAt) > now)) {
-    return 'Choisissez une échéance à venir.';
-  }
-  if (draft.outcome === 'OTHER' && comment === '') {
-    return 'L’issue « Autre » exige un commentaire.';
-  }
+  return null;
+}
+
+function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null {
+  const callbackAt = draft.callbackAt ?? null;
+  if (callbackAt === null) return null;
+  if (draft.outcome !== 'CALLBACK') return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  if (!(Date.parse(callbackAt) > now)) return 'Choisissez une échéance à venir.';
+  return null;
+}
+
+function commentAttemptErreur(draft: AttemptDraft): string | null {
+  const comment = draft.comment.trim();
+  if (draft.outcome === 'OTHER' && comment === '') return 'L’issue « Autre » exige un commentaire.';
   if (comment.length > COMMENT_MAX_LENGTH) {
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
+  return null;
+}
+
+/** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
+export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
+  const methodeErr = methodeAttemptErreur(draft);
+  if (methodeErr !== null) return methodeErr;
+  const callbackErr = callbackAttemptErreur(draft, now);
+  if (callbackErr !== null) return callbackErr;
+  const commentErr = commentAttemptErreur(draft);
+  if (commentErr !== null) return commentErr;
   if (draft.conversion !== undefined) {
-    return Object.values(validateConversion(draft.conversion, now))[0] ?? null;
+    const problems = validateConversion(draft.conversion, now);
+    return Object.values(problems).find((message) => typeof message === 'string') ?? null;
   }
   return null;
 }
@@ -519,38 +694,81 @@ export function uuidV7(now: number = Date.now(), random: () => number = Math.ran
 type SyncPushBody = components['schemas']['SyncPushDto'];
 type SyncEntityData = components['schemas']['SyncEntityDataDto'];
 
+function identiteData(draft: ConversionDraft): SyncEntityData {
+  const nom = draft.nom.trim();
+  const prenom = draft.prenom.trim();
+  const email = draft.email.trim();
+  const profession = draft.profession.trim();
+  return {
+    ...(nom === '' ? {} : { nom }),
+    ...(prenom === '' ? {} : { prenom }),
+    ...(email === '' ? {} : { email }),
+    ...(profession === '' ? {} : { profession }),
+  };
+}
+
+function dossierChoixData(draft: ConversionDraft): SyncEntityData {
+  return {
+    ...(draft.type === null ? {} : { type: draft.type }),
+    ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
+    ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
+    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
+    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
+  };
+}
+
+function dossierDureesData(draft: ConversionDraft): SyncEntityData {
+  const mois = draft.dureeEtablissementMois.trim();
+  const systeme = draft.dureeSystemeMois.trim();
+  return {
+    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
+    ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
+    ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
+    ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
+  };
+}
+
+function rendezVousData(draft: ConversionDraft): SyncEntityData {
+  if (draft.method !== 'APPOINTMENT') return {};
+  const rendezVousAt = dakarLocalToIso(draft.rendezVousAt.trim());
+  return rendezVousAt === null ? {} : { rendezVousAt };
+}
+
 /**
  * Un champ laissé vide n'est PAS envoyé : le serveur écrirait la chaîne vide
  * sur le prospect, et un formulaire dont la profession n'a pas été demandée
  * effacerait celle que le représentant avait relevée.
  */
 function conversionData(draft: ConversionDraft): SyncEntityData {
-  const nom = draft.nom.trim();
-  const prenom = draft.prenom.trim();
-  const email = draft.email.trim();
-  const profession = draft.profession.trim();
-  const mois = draft.dureeEtablissementMois.trim();
-  const systeme = draft.dureeSystemeMois.trim();
-  const rendezVousAt =
-    draft.method === 'APPOINTMENT' ? dakarLocalToIso(draft.rendezVousAt.trim()) : null;
-
   return {
-    ...(nom === '' ? {} : { nom }),
-    ...(prenom === '' ? {} : { prenom }),
-    ...(email === '' ? {} : { email }),
-    ...(profession === '' ? {} : { profession }),
-    ...(draft.type === null ? {} : { type: draft.type }),
-    ...(draft.syndicatId === '' ? {} : { syndicatId: draft.syndicatId }),
-    ...(draft.banqueId === '' ? {} : { banqueId: draft.banqueId }),
-    ...(draft.incomeBandId === '' ? {} : { incomeBandId: draft.incomeBandId }),
-    ...(draft.paymentMode === null ? {} : { paymentMode: draft.paymentMode }),
-    ...(systeme === '' ? {} : { dureeSystemeMois: Number(systeme) }),
-    ...(mois === '' ? {} : { dureeEtablissementMois: Number(mois) }),
-    ...(draft.fonctionnaire === null ? {} : { fonctionnaire: draft.fonctionnaire }),
-    ...(draft.engagementEnCours === null ? {} : { engagementEnCours: draft.engagementEnCours }),
-    ...(rendezVousAt === null ? {} : { rendezVousAt }),
+    ...identiteData(draft),
+    ...dossierChoixData(draft),
+    ...dossierDureesData(draft),
+    ...whatsappData(draft),
+    ...rendezVousData(draft),
+    ...siRenseignes(draft.champsLibres),
   };
 }
+
+/**
+ * EB-23. Sur « oui » la colonne `whatsappE164` reste nulle : le serveur la
+ * recompose depuis le numéro appelé. Sur « non » sans numéro, il retient AUCUN.
+ */
+function whatsappData(draft: ConversionDraft): SyncEntityData {
+  if (draft.memeWhatsapp === null) return {};
+  if (draft.memeWhatsapp) return { whatsappStatus: 'MEME_NUMERO' };
+
+  const numero = draft.whatsapp.trim();
+  return {
+    whatsappStatus: 'AUTRE_NUMERO',
+    ...(numero === '' ? {} : { whatsappE164: numero }),
+  };
+}
+
+const siRenseignes = (
+  champsLibres: Record<string, string>,
+): { champsLibres?: Record<string, string> } =>
+  Object.keys(champsLibres).length === 0 ? {} : { champsLibres };
 
 export interface AttemptInput {
   readonly prospectId: string;
@@ -560,13 +778,13 @@ export interface AttemptInput {
   readonly at: string;
 }
 
-export function buildAttemptBatch(input: AttemptInput): SyncPushBody {
+function buildAttemptBatch(input: AttemptInput): SyncPushBody {
   const comment = input.draft.comment.trim();
   const callbackAt = input.draft.callbackAt ?? null;
 
   return {
     clientBatchId: input.batchId,
-    payloadVersion: 1,
+    payloadVersion: PANEL_PAYLOAD_VERSION,
     operations: [
       {
         opId: input.attemptId,
@@ -658,7 +876,7 @@ export function repRelationSettled(representant: ScriptedRepresentant): boolean 
   return REP_RELATION_RANK[representant.relationStatus] === 2;
 }
 
-export type RepCallOutcome = components['schemas']['RepCallOutcome'];
+type RepCallOutcome = components['schemas']['RepCallOutcome'];
 
 type RepAttemptBody = components['schemas']['CreateRepCallAttemptDto'];
 
