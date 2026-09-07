@@ -237,6 +237,42 @@ describe('EB-16 réaffectation', () => {
       carine,
     ]);
   });
+
+  it('le PDF des fiches reçues ne reprend que celles que le destinataire tient encore', async () => {
+    await fiches(4);
+    const lot = await service.create(admin, campagne('reçues', [alice, bruno], 2));
+    // alice tient 0 et 2 : les deux vont à carine, puis la 2 repart chez bruno.
+    const apres = await service.reaffecter(admin, lot.id, {
+      positions: [0, 2],
+      versTeleconseillerId: carine,
+    });
+    const trace = apres.reaffectations[0];
+    expect(trace).toMatchObject({ toTeleconseillerId: carine, fiches: 2, fichesEnMain: 2 });
+
+    const detail = await service.reaffecter(admin, lot.id, {
+      positions: [2],
+      versTeleconseillerId: bruno,
+    });
+
+    expect(detail.reaffectations.find((ligne) => ligne.id === trace?.id)?.fichesEnMain).toBe(1);
+    expect(
+      detail.repartition.map((ligne) => [ligne.teleconseillerId, ligne.recues]),
+    ).toEqual([
+      [alice, 0],
+      [bruno, 1],
+      [carine, 1],
+    ]);
+
+    const pdf = await service.fichesRecues(lot.id, carine);
+    expect(pdf.titre).toBe('Fiches reçues');
+    expect(pdf.rows.map((row) => row.fullName)).toEqual([`${TAG} Fiche 00`]);
+
+    const parTrace = await service.fichesRecues(lot.id, bruno, detail.reaffectations[0]?.id);
+    expect(parTrace.rows.map((row) => row.fullName)).toEqual([`${TAG} Fiche 02`]);
+
+    const refuse = await refus(() => service.fichesRecues(lot.id, alice));
+    expect(codeDe(refuse)).toBe('LOT_EXPORT_FICHES_RECUES_INTROUVABLES');
+  });
 });
 
 describe('EB-16 retrait', () => {
