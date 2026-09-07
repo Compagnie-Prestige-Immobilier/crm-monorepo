@@ -16,14 +16,6 @@ function SheetTrigger(props: SheetTriggerProps) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
-type SheetCloseProps = Omit<SheetPrimitive.Close.Props, 'className'> & {
-  className?: string | undefined;
-};
-
-function SheetClose(props: SheetCloseProps) {
-  return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
-}
-
 type SheetContentProps = Omit<SheetPrimitive.Popup.Props, 'className'> & {
   className?: string | undefined;
   side?: 'top' | 'right' | 'bottom' | 'left' | undefined;
@@ -80,16 +72,6 @@ function SheetHeader({ className, ...props }: React.ComponentProps<'div'>) {
   );
 }
 
-function SheetFooter({ className, ...props }: React.ComponentProps<'div'>) {
-  return (
-    <div
-      data-slot="sheet-footer"
-      className={cn('mt-auto flex flex-col gap-2 p-4', className)}
-      {...props}
-    />
-  );
-}
-
 type SheetTitleProps = Omit<SheetPrimitive.Title.Props, 'className'> & {
   className?: string | undefined;
 };
@@ -118,13 +100,4 @@ function SheetDescription({ className, ...props }: SheetDescriptionProps) {
   );
 }
 
-export {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-};
+export { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger };

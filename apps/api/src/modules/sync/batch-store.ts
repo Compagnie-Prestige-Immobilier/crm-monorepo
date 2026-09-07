@@ -3,7 +3,7 @@ import { Prisma } from '@crm/database';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
 
-export const IN_PROGRESS_TIMEOUT_MS = 60_000;
+const IN_PROGRESS_TIMEOUT_MS = 60_000;
 
 export type BatchClaim =
   | { outcome: 'claimed' }

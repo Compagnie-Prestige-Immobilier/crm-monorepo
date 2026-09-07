@@ -58,6 +58,30 @@ const NAME_MAX = 80;
 const TITLE_MAX = 120;
 const BODY_MAX = 500;
 
+function templateFormValues(template: NotificationTemplate | null): {
+  name: string;
+  category: NotificationCategory;
+  titleTemplate: string;
+  bodyTemplate: string;
+  route: string;
+} {
+  if (template === null) {
+    return { name: '', category: 'ANNONCE', titleTemplate: '', bodyTemplate: '', route: '' };
+  }
+  return {
+    name: template.name,
+    category: template.category,
+    titleTemplate: template.titleTemplate,
+    bodyTemplate: template.bodyTemplate,
+    route: template.route ?? '',
+  };
+}
+
+function requiredFieldIssue(value: string, issue: string | null): string | undefined {
+  if (value.trim() === '') return undefined;
+  return issue ?? undefined;
+}
+
 export function TemplateManager() {
   const [editing, setEditing] = useState<NotificationTemplate | null>(null);
   const [formOpen, setFormOpen] = useState(false);
@@ -193,12 +217,13 @@ function TemplateFormDialog({
 
   useEffect(() => {
     if (!open) return;
+    const values = templateFormValues(template);
     // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
-    setName(template?.name ?? '');
-    setCategory(template?.category ?? 'ANNONCE');
-    setTitleTemplate(template?.titleTemplate ?? '');
-    setBodyTemplate(template?.bodyTemplate ?? '');
-    setRoute(template?.route ?? '');
+    setName(values.name);
+    setCategory(values.category);
+    setTitleTemplate(values.titleTemplate);
+    setBodyTemplate(values.bodyTemplate);
+    setRoute(values.route);
   }, [open, template]);
 
   const variables = mergedVariables(titleTemplate, bodyTemplate);
@@ -235,7 +260,8 @@ function TemplateFormDialog({
     })();
   })();
 
-  const blocking = nameIssue ?? titleIssue ?? bodyIssue ?? routeIssue;
+  const blocking =
+    [nameIssue, titleIssue, bodyIssue, routeIssue].find((issue) => issue !== null) ?? null;
 
   const save = useMutation({
     mutationFn: () => {
@@ -278,7 +304,7 @@ function TemplateFormDialog({
               label="Nom du gabarit"
               required
               description={`${String(name.length)} / ${String(NAME_MAX)} caractères`}
-              error={name.trim() === '' ? undefined : (nameIssue ?? undefined)}
+              error={requiredFieldIssue(name, nameIssue)}
             >
               {(props) => (
                 <Input
@@ -319,7 +345,7 @@ function TemplateFormDialog({
               label="Titre"
               required
               description={`${String(titleTemplate.length)} / ${String(TITLE_MAX)} caractères`}
-              error={titleTemplate.trim() === '' ? undefined : (titleIssue ?? undefined)}
+              error={requiredFieldIssue(titleTemplate, titleIssue)}
             >
               {(props) => (
                 <Input
@@ -337,7 +363,7 @@ function TemplateFormDialog({
               label="Message"
               required
               description={`${String(bodyTemplate.length)} / ${String(BODY_MAX)} caractères`}
-              error={bodyTemplate.trim() === '' ? undefined : (bodyIssue ?? undefined)}
+              error={requiredFieldIssue(bodyTemplate, bodyIssue)}
             >
               {(props) => (
                 <Textarea

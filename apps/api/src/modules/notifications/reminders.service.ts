@@ -25,18 +25,16 @@ import type { ReminderRunDto } from './dto.js';
 
 const env = readNotificationsEnv();
 
-export const remindersCron = (at: string): string => {
+const remindersCron = (at: string): string => {
   const [hours, minutes] = at.split(':');
   return `0 ${minutes ?? '0'} ${hours ?? '8'} * * *`;
 };
 
-export const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
+const REMINDERS_CRON = remindersCron(env.NOTIFICATIONS_REMINDERS_AT);
 
-export const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT);
+const DAILY_REPORT_CRON = remindersCron(env.NOTIFICATIONS_DAILY_REPORT_AT);
 
-export { SENDING_LEASE_MS };
-
-export const ReminderKey = {
+const ReminderKey = {
   BANK_CASES_PENDING: 'bank-cases-pending',
   BANK_CASES_STALE: 'bank-cases-stale',
   DUE_CALLBACKS: 'due-callbacks',
@@ -46,15 +44,15 @@ export const ReminderKey = {
 
 export type ReminderKeyValue = (typeof ReminderKey)[keyof typeof ReminderKey];
 
-export const UNLOGGED_CALL_BUCKET_MS = 30 * 60 * 1000;
+const UNLOGGED_CALL_BUCKET_MS = 30 * 60 * 1000;
 
 /** La tranche de 30 minutes qui regroupe les alertes d'appels non consignés. */
-export const trancheDe = (now: Date): string =>
+const trancheDe = (now: Date): string =>
   new Date(Math.floor(now.getTime() / UNLOGGED_CALL_BUCKET_MS) * UNLOGGED_CALL_BUCKET_MS)
     .toISOString()
     .slice(0, 16);
 
-export const periodFor = (date: Date, timeZone: string): string =>
+const periodFor = (date: Date, timeZone: string): string =>
   new Intl.DateTimeFormat('en-CA', {
     timeZone,
     year: 'numeric',
@@ -67,6 +65,22 @@ interface ReminderCandidate {
   readonly fullName: string;
   readonly variables: Record<string, string>;
 }
+
+interface UnloggedCallDetection {
+  readonly deviceCallType: string;
+  readonly representant: { readonly fullName: string } | null;
+  readonly prospect: { readonly nom: string; readonly prenom: string } | null;
+}
+
+/** Fiche et libellé du type d'appel, pour le message d'alerte. */
+const describeUnloggedCall = (
+  detection: UnloggedCallDetection,
+): { readonly fiche: string; readonly type: string } => ({
+  fiche:
+    detection.representant?.fullName ??
+    [detection.prospect?.prenom, detection.prospect?.nom].filter(Boolean).join(' ').trim(),
+  type: DEVICE_CALL_LABELS[detection.deviceCallType as DeviceCallType] ?? detection.deviceCallType,
+});
 
 @Injectable()
 export class RemindersService {
@@ -101,18 +115,23 @@ export class RemindersService {
 
     let dispatched = 0;
     for (const row of due) {
-      try {
-        if ((await this.notifications.dispatch(row.id, now)).claimed) dispatched += 1;
-      } catch (error) {
-        this.logger.error(
-          `Expédition programmée ${row.id} en échec : ${error instanceof Error ? error.message : String(error)}`,
-        );
-      }
+      if (await this.dispatchDueOne(row.id, now)) dispatched += 1;
     }
 
     if (dispatched)
       this.logger.log(`${String(dispatched)} notification(s) programmée(s) expédiée(s).`);
     return dispatched;
+  }
+
+  private async dispatchDueOne(notificationId: string, now: Date): Promise<boolean> {
+    try {
+      return (await this.notifications.dispatch(notificationId, now)).claimed;
+    } catch (error) {
+      this.logger.error(
+        `Expédition programmée ${notificationId} en échec : ${error instanceof Error ? error.message : String(error)}`,
+      );
+      return false;
+    }
   }
 
   @Cron(REMINDERS_CRON, { name: 'cpi.notifications.reminders', timeZone: env.BUSINESS_TIME_ZONE })
@@ -356,11 +375,7 @@ export class RemindersService {
     });
     if (!destinataires.length) return 0;
 
-    const fiche =
-      detection.representant?.fullName ??
-      [detection.prospect?.prenom, detection.prospect?.nom].filter(Boolean).join(' ').trim();
-    const type =
-      DEVICE_CALL_LABELS[detection.deviceCallType as DeviceCallType] ?? detection.deviceCallType;
+    const { fiche, type } = describeUnloggedCall(detection);
     const heure = new Intl.DateTimeFormat('fr-FR', {
       timeZone: this.config.BUSINESS_TIME_ZONE,
       hour: '2-digit',
@@ -568,5 +583,3 @@ export class RemindersService {
     }
   }
 }
-
-export const REMINDER_ROLE_DEFAULT = Role.COMMERCIAL;

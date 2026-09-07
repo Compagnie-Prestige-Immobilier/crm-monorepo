@@ -34,6 +34,7 @@ import { fetchReferenceData } from '@/lib/data/reference';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import type { FilterOption, Syndicat } from '@/lib/types';
 
 export function ClientRequestReviewDialogs({
   pending,
@@ -53,6 +54,99 @@ export function ClientRequestReviewDialogs({
         onClose={onClose}
       />
     </>
+  );
+}
+
+function ApproveDialogFields({
+  referenceError,
+  representants,
+  syndicats,
+  representant,
+  syndicat,
+  syndicatId,
+  onRepresentantChange,
+  onSyndicatChange,
+  onRetryReference,
+}: {
+  referenceError: unknown;
+  representants: FilterOption[];
+  syndicats: Syndicat[];
+  representant: string | null;
+  syndicat: string | null;
+  syndicatId: string;
+  onRepresentantChange: (value: string | null) => void;
+  onSyndicatChange: (value: string) => void;
+  onRetryReference: () => void;
+}) {
+  if (referenceError !== null) {
+    return (
+      <QueryErrorInline
+        error={referenceError}
+        fallback="Les listes nécessaires à l’approbation n’ont pas pu être chargées."
+        onRetry={onRetryReference}
+      />
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* `required` : le champ bloque l'envoi au même titre que ses deux
+        voisins, il doit donc porter la même marque. */}
+      <FilterCombobox
+        label="Représentant de rattachement"
+        placeholder="Choisir un représentant"
+        value={representant}
+        options={representants}
+        onChange={onRepresentantChange}
+        required
+      />
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={syndicatId}>
+          Syndicat
+          <span className="text-destructive" aria-label="obligatoire">
+            *
+          </span>
+        </Label>
+        {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+          pas le texte de l'item — ici, l'identifiant du syndicat. */}
+        <Select
+          items={syndicats.map((item) => ({
+            value: item.id,
+            label: `${item.sigle}, ${item.name}`,
+          }))}
+          value={syndicat ?? ''}
+          onValueChange={(value) => {
+            if (value === null) return;
+            onSyndicatChange(value);
+          }}
+        >
+          <SelectTrigger id={syndicatId} className="w-full">
+            <SelectValue placeholder="Choisir un syndicat" />
+          </SelectTrigger>
+          <SelectContent>
+            {syndicats.map((item) => (
+              <SelectItem key={item.id} value={item.id}>
+                {item.sigle}, {item.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/*
+        L'identifiant porté ici ne servait à RIEN : il était engendré pour le
+        champ « Représentant », posé sur ce paragraphe, et le
+        `FilterCombobox` ne le référençait nulle part. Un `id` qu'aucun
+        `aria-labelledby` ni `aria-describedby` ne cite n'est pas une demi-
+        mesure d'accessibilité, c'est du bruit qui donne l'illusion qu'un
+        champ est décrit. La phrase vaut pour le dialogue entier, pas pour un
+        champ, et reste donc un simple paragraphe.
+      */}
+      <p className="text-[0.75rem] text-muted-foreground">
+        La banque demandeuse devient la provenance de la fiche, que l’équipe CHUES qualifie ensuite.
+      </p>
+    </div>
   );
 }
 
@@ -110,6 +204,8 @@ function ApproveDialog({
   });
 
   const canSubmit = representant !== null && syndicat !== null && !approve.isPending;
+  const representants = reference?.representants ?? [];
+  const syndicats = reference?.syndicats ?? [];
 
   return (
     <Dialog
@@ -129,75 +225,19 @@ function ApproveDialog({
           </DialogDescription>
         </DialogHeader>
 
-        {referenceError === null ? (
-          <div className="flex flex-col gap-4">
-            {/* `required` : le champ bloque l'envoi au même titre que ses deux
-              voisins, il doit donc porter la même marque. */}
-            <FilterCombobox
-              label="Représentant de rattachement"
-              placeholder="Choisir un représentant"
-              value={representant}
-              options={reference?.representants ?? []}
-              onChange={setRepresentant}
-              required
-            />
-
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={syndicatId}>
-                Syndicat
-                <span className="text-destructive" aria-label="obligatoire">
-                  *
-                </span>
-              </Label>
-              {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-                pas le texte de l'item — ici, l'identifiant du syndicat. */}
-              <Select
-                items={(reference?.syndicats ?? []).map((item) => ({
-                  value: item.id,
-                  label: `${item.sigle}, ${item.name}`,
-                }))}
-                value={syndicat ?? ''}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setSyndicat(value);
-                }}
-              >
-                <SelectTrigger id={syndicatId} className="w-full">
-                  <SelectValue placeholder="Choisir un syndicat" />
-                </SelectTrigger>
-                <SelectContent>
-                  {(reference?.syndicats ?? []).map((item) => (
-                    <SelectItem key={item.id} value={item.id}>
-                      {item.sigle}, {item.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {/*
-            L'identifiant porté ici ne servait à RIEN : il était engendré pour le
-            champ « Représentant », posé sur ce paragraphe, et le
-            `FilterCombobox` ne le référençait nulle part. Un `id` qu'aucun
-            `aria-labelledby` ni `aria-describedby` ne cite n'est pas une demi-
-            mesure d'accessibilité, c'est du bruit qui donne l'illusion qu'un
-            champ est décrit. La phrase vaut pour le dialogue entier, pas pour un
-            champ, et reste donc un simple paragraphe.
-          */}
-            <p className="text-[0.75rem] text-muted-foreground">
-              La banque demandeuse devient la provenance de la fiche, que l’équipe CHUES qualifie
-              ensuite.
-            </p>
-          </div>
-        ) : (
-          <QueryErrorInline
-            error={referenceError}
-            fallback="Les listes nécessaires à l’approbation n’ont pas pu être chargées."
-            onRetry={() => {
-              void refetchReference();
-            }}
-          />
-        )}
+        <ApproveDialogFields
+          referenceError={referenceError}
+          representants={representants}
+          syndicats={syndicats}
+          representant={representant}
+          syndicat={syndicat}
+          syndicatId={syndicatId}
+          onRepresentantChange={setRepresentant}
+          onSyndicatChange={setSyndicat}
+          onRetryReference={() => {
+            void refetchReference();
+          }}
+        />
 
         <DialogFooter>
           <Button type="button" variant="ghost" disabled={approve.isPending} onClick={onClose}>

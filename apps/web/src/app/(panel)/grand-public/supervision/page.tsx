@@ -3,12 +3,13 @@ import { redirect } from 'next/navigation';
 
 import { ActivityView } from '@/components/supervision/activity-view';
 import { PermissionDenied } from '@/components/permission-denied';
+import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { guardRoles } from '@/lib/session';
 
 export const metadata: Metadata = { title: 'Supervision Grand Public' };
 
 /**
- * Pas d'onglet « Comptes » ici : la présence en direct des comptes ne connaît
+ * Pas d'onglet « Présence » ici : la présence en direct des comptes ne connaît
  * aucun projet, et la coque CHUES la montre déjà.
  */
 export default async function SupervisionGrandPublicPage() {
@@ -18,5 +19,10 @@ export default async function SupervisionGrandPublicPage() {
     return <PermissionDenied role={guard.user.role} what="La supervision du Grand Public" />;
   }
 
-  return <ActivityView projet="GRAND_PUBLIC" />;
+  return (
+    <div className="flex flex-col gap-6">
+      <OngletsPilotage coque="grand-public" role={guard.user.role} />
+      <ActivityView projet="GRAND_PUBLIC" />
+    </div>
+  );
 }

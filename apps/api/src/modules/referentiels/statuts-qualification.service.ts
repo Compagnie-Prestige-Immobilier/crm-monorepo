@@ -17,7 +17,7 @@ import type {
   UpdateStatutQualificationDto,
 } from './dto.js';
 
-export const StatutQualificationError = {
+const StatutQualificationError = {
   NOT_FOUND: 'STATUT_QUALIFICATION_NOT_FOUND',
   CODE_CONFLICT: 'STATUT_QUALIFICATION_CODE_CONFLICT',
   LABEL_CONFLICT: 'STATUT_QUALIFICATION_LABEL_CONFLICT',
@@ -28,26 +28,23 @@ export const StatutQualificationError = {
 } as const;
 
 /** Version de charge utile qu'un client doit atteindre pour émettre un statut créé ici. */
-export const NEW_STATUT_PAYLOAD_VERSION = 6;
+const NEW_STATUT_PAYLOAD_VERSION = 6;
 
 /**
  * L'issue enregistrée découle de l'effet, jamais de ce que le client envoie.
  * Écrite une seule fois : quand la règle vivait dans les deux clients, ils
  * divergeaient au premier libellé ajouté.
  */
+const OUTCOME_BY_EFFECT: Record<StatutQualificationEffect, RepCallOutcome> = {
+  [StatutQualificationEffect.REACHED]: RepCallOutcome.REACHED,
+  [StatutQualificationEffect.REFUSED]: RepCallOutcome.REFUSED,
+  [StatutQualificationEffect.SCHEDULE_CALLBACK]: RepCallOutcome.CALLBACK,
+  [StatutQualificationEffect.UNREACHABLE]: RepCallOutcome.UNREACHABLE,
+  [StatutQualificationEffect.WRONG_NUMBER]: RepCallOutcome.WRONG_NUMBER,
+};
+
 export function outcomeOf(effect: StatutQualificationEffect): RepCallOutcome {
-  switch (effect) {
-    case StatutQualificationEffect.REACHED:
-      return RepCallOutcome.REACHED;
-    case StatutQualificationEffect.REFUSED:
-      return RepCallOutcome.REFUSED;
-    case StatutQualificationEffect.SCHEDULE_CALLBACK:
-      return RepCallOutcome.CALLBACK;
-    case StatutQualificationEffect.UNREACHABLE:
-      return RepCallOutcome.UNREACHABLE;
-    case StatutQualificationEffect.WRONG_NUMBER:
-      return RepCallOutcome.WRONG_NUMBER;
-  }
+  return OUTCOME_BY_EFFECT[effect];
 }
 
 /**
@@ -66,9 +63,8 @@ const JOINT: readonly StatutQualificationEffect[] = [
 
 const NON_JOINT: readonly StatutQualificationEffect[] = [StatutQualificationEffect.UNREACHABLE];
 
-export const brancheDe = (
-  effect: StatutQualificationEffect,
-): readonly StatutQualificationEffect[] => (JOINT.includes(effect) ? JOINT : NON_JOINT);
+const brancheDe = (effect: StatutQualificationEffect): readonly StatutQualificationEffect[] =>
+  JOINT.includes(effect) ? JOINT : NON_JOINT;
 
 /**
  * Le code se lit dans le libellé : l'administrateur n'en saisit plus. Il ne se
@@ -96,6 +92,11 @@ const toDto = (row: StatutQualification): StatutQualificationDto => ({
 });
 
 const ORDER = [{ sortOrder: 'asc' as const }, { label: 'asc' as const }];
+
+const withDefault = <T>(value: T | undefined, fallback: T): T => value ?? fallback;
+
+const optionalField = <K extends string, V>(key: K, value: V | undefined): Partial<Record<K, V>> =>
+  value === undefined ? {} : ({ [key]: value } as Record<K, V>);
 
 @Injectable()
 export class StatutsQualificationService {
@@ -130,14 +131,7 @@ export class StatutsQualificationService {
       });
     }
 
-    const sameLabel = await this.prisma.statutQualification.findUnique({ where: { label } });
-    if (sameLabel) {
-      throw new ConflictException({
-        code: StatutQualificationError.LABEL_CONFLICT,
-        message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
-        existingId: sameLabel.id,
-      });
-    }
+    await this.assertLabelAvailable(label);
 
     const clash = await this.prisma.statutQualification.findUnique({ where: { code } });
     if (clash) {
@@ -148,7 +142,7 @@ export class StatutsQualificationService {
       });
     }
 
-    const requiresCallback = input.requiresCallback ?? false;
+    const requiresCallback = withDefault(input.requiresCallback, false);
     this.assertCallbackAllowed(input.effect, requiresCallback);
 
     const created = await this.prisma.statutQualification.create({
@@ -157,10 +151,10 @@ export class StatutsQualificationService {
         label,
         effect: input.effect,
         requiresCallback,
-        requiresComment: input.requiresComment ?? false,
-        retryAfterMinutes: input.retryAfterMinutes ?? null,
-        priorite: input.priorite ?? PrioriteTraitement.NORMALE,
-        relationStatus: input.relationStatus ?? null,
+        requiresComment: withDefault(input.requiresComment, false),
+        retryAfterMinutes: withDefault(input.retryAfterMinutes, null),
+        priorite: withDefault(input.priorite, PrioriteTraitement.NORMALE),
+        relationStatus: withDefault(input.relationStatus, null),
         sortOrder: await this.rangSuivant(input.effect),
         isActive: true,
         isSystem: false,
@@ -173,49 +167,25 @@ export class StatutsQualificationService {
   async update(id: string, input: UpdateStatutQualificationDto): Promise<StatutQualificationDto> {
     const existing = await this.statut(id);
 
-    // Le libellé, la priorité et la relation posée se corrigent toujours,
-    // système compris : ce sont des arbitrages du métier. La RÈGLE, elle, ne se
-    // reconfigure pas : le script s'appuie dessus, et les clients déployés
-    // l'ont compilée.
-    const regleTouchee =
-      input.requiresCallback !== undefined || input.requiresComment !== undefined;
-    if (existing.isSystem && regleTouchee) {
-      throw new ConflictException({
-        code: StatutQualificationError.SYSTEM_IMMUTABLE,
-        message: `« ${existing.label} » est un statut système : sa règle est celle du script et ne se reconfigure pas ici.`,
-        statutId: existing.id,
-      });
-    }
+    this.assertSystemRuleUnchanged(existing, input);
 
     if (input.requiresCallback !== undefined) {
       this.assertCallbackAllowed(existing.effect, input.requiresCallback);
     }
 
     if (input.label !== undefined) {
-      const label = input.label.trim();
-      const sameLabel = await this.prisma.statutQualification.findUnique({ where: { label } });
-      if (sameLabel && sameLabel.id !== id) {
-        throw new ConflictException({
-          code: StatutQualificationError.LABEL_CONFLICT,
-          message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
-          existingId: sameLabel.id,
-        });
-      }
+      await this.assertLabelAvailable(input.label.trim(), id);
     }
 
     const updated = await this.prisma.statutQualification.update({
       where: { id },
       data: {
-        ...(input.label === undefined ? {} : { label: input.label.trim() }),
-        ...(input.requiresCallback === undefined
-          ? {}
-          : { requiresCallback: input.requiresCallback }),
-        ...(input.requiresComment === undefined ? {} : { requiresComment: input.requiresComment }),
-        ...(input.priorite === undefined ? {} : { priorite: input.priorite }),
-        ...(input.relationStatus === undefined ? {} : { relationStatus: input.relationStatus }),
-        ...(input.retryAfterMinutes === undefined
-          ? {}
-          : { retryAfterMinutes: input.retryAfterMinutes }),
+        ...optionalField('label', input.label?.trim()),
+        ...optionalField('requiresCallback', input.requiresCallback),
+        ...optionalField('requiresComment', input.requiresComment),
+        ...optionalField('priorite', input.priorite),
+        ...optionalField('relationStatus', input.relationStatus),
+        ...optionalField('retryAfterMinutes', input.retryAfterMinutes),
       },
     });
     return toDto(updated);
@@ -234,20 +204,7 @@ export class StatutsQualificationService {
     const existing = await this.statut(id);
 
     if (!input.isActive && existing.isActive) {
-      const restants = await this.prisma.statutQualification.count({
-        where: {
-          isActive: true,
-          effect: { in: [...brancheDe(existing.effect)] },
-          id: { not: id },
-        },
-      });
-      if (restants === 0) {
-        throw new ConflictException({
-          code: StatutQualificationError.LAST_OF_BRANCH,
-          message: `« ${existing.label} » est le dernier statut actif de sa branche : la retirer laisserait le script sans issue possible.`,
-          statutId: existing.id,
-        });
-      }
+      await this.assertBranchStaysReachable(existing);
     }
 
     const updated = await this.prisma.statutQualification.update({
@@ -292,6 +249,50 @@ export class StatutsQualificationService {
       code: StatutQualificationError.CALLBACK_NOT_ALLOWED,
       message: `Seul l’effet SCHEDULE_CALLBACK planifie un rappel : « ${effect} » ne peut pas en exiger la date.`,
       effect,
+    });
+  }
+
+  private async assertLabelAvailable(label: string, excludeId?: string): Promise<void> {
+    const sameLabel = await this.prisma.statutQualification.findUnique({ where: { label } });
+    if (!sameLabel || sameLabel.id === excludeId) return;
+    throw new ConflictException({
+      code: StatutQualificationError.LABEL_CONFLICT,
+      message: `Le libellé « ${label} » est déjà porté par un autre statut.`,
+      existingId: sameLabel.id,
+    });
+  }
+
+  // Le libellé, la priorité et la relation posée se corrigent toujours,
+  // système compris : ce sont des arbitrages du métier. La RÈGLE, elle, ne se
+  // reconfigure pas : le script s'appuie dessus, et les clients déployés
+  // l'ont compilée.
+  private assertSystemRuleUnchanged(
+    existing: StatutQualification,
+    input: UpdateStatutQualificationDto,
+  ): void {
+    const regleTouchee =
+      input.requiresCallback !== undefined || input.requiresComment !== undefined;
+    if (!existing.isSystem || !regleTouchee) return;
+    throw new ConflictException({
+      code: StatutQualificationError.SYSTEM_IMMUTABLE,
+      message: `« ${existing.label} » est un statut système : sa règle est celle du script et ne se reconfigure pas ici.`,
+      statutId: existing.id,
+    });
+  }
+
+  private async assertBranchStaysReachable(existing: StatutQualification): Promise<void> {
+    const restants = await this.prisma.statutQualification.count({
+      where: {
+        isActive: true,
+        effect: { in: [...brancheDe(existing.effect)] },
+        id: { not: existing.id },
+      },
+    });
+    if (restants > 0) return;
+    throw new ConflictException({
+      code: StatutQualificationError.LAST_OF_BRANCH,
+      message: `« ${existing.label} » est le dernier statut actif de sa branche : la retirer laisserait le script sans issue possible.`,
+      statutId: existing.id,
     });
   }
 }

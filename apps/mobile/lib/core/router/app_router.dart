@@ -48,13 +48,27 @@ class _RouterRefreshNotifier extends ChangeNotifier {
       if (previous?.status != next.status) notifyListeners();
     });
     // La fiche tenue est lue en base, donc APRÈS la première trame : sans ce
-    // réveil, le démarrage resterait sur l'écran mémorisé.
+    // réveil, le démarrage resterait sur l'écran mémorisé. Le réveil attend la
+    // fin de la trame : la qualification ferme la fiche PENDANT le `pop` de
+    // son écran, et relancer le routeur à cet instant rebâtit le Navigator
+    // verrouillé.
     ref.listen<AsyncValue<String?>>(routeFicheTenueProvider, (
       AsyncValue<String?>? previous,
       AsyncValue<String?> next,
     ) {
-      if (previous?.value != next.value) notifyListeners();
+      if (previous?.value == next.value) return;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!_disposed) notifyListeners();
+      });
     });
+  }
+
+  bool _disposed = false;
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }
 

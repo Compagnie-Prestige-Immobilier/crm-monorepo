@@ -1,6 +1,6 @@
 'use client';
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import { usePathname, useSearchParams } from 'next/navigation';
 import { useCallback, useMemo } from 'react';
 
 export interface UrlFilterAdapter<T> {
@@ -30,7 +30,6 @@ export function useUrlFilters<T>(adapter: UrlFilterAdapter<T>): {
   setFilters: (patch: Partial<T>) => void;
   resetFilters: () => void;
 } {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -39,17 +38,19 @@ export function useUrlFilters<T>(adapter: UrlFilterAdapter<T>): {
     [adapter, searchParams],
   );
 
+  // Un filtre ne change rien côté serveur : l'historique natif suffit et, hors
+  // ligne, évite le rechargement complet que le routeur tente quand son fetch échoue.
   const navigate = useCallback(
     (next: T, transient: boolean) => {
       const query = adapter.serialize(next).toString();
       const url = query === '' ? pathname : `${pathname}?${query}`;
       if (transient) {
-        router.replace(url, { scroll: false });
+        window.history.replaceState(null, '', url);
       } else {
-        router.push(url, { scroll: false });
+        window.history.pushState(null, '', url);
       }
     },
-    [adapter, pathname, router],
+    [adapter, pathname],
   );
 
   const setFilters = useCallback(

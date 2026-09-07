@@ -12,7 +12,7 @@ import { FIRST_DATA_ROW } from './imports.job.js';
  */
 export const SHEET_CELL = '#feuille';
 
-export interface SheetRow {
+interface SheetRow {
   readonly rowNumber: number;
   readonly cells: Record<string, string>;
 }
@@ -40,21 +40,24 @@ export class UnreadableWorkbookError extends Error {
   }
 }
 
-export function cellText(value: ExcelJS.CellValue): string {
+function objectCellText(value: Extract<ExcelJS.CellValue, object>): string {
+  if ('text' in value && typeof value.text === 'string') return value.text.trim();
+  if ('result' in value) return cellText(value.result);
+  if ('richText' in value && Array.isArray(value.richText)) {
+    return value.richText
+      .map((part) => part.text)
+      .join('')
+      .trim();
+  }
+  return '';
+}
+
+function cellText(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object') {
-    if ('text' in value && typeof value.text === 'string') return value.text.trim();
-    if ('result' in value) return cellText(value.result);
-    if ('richText' in value && Array.isArray(value.richText)) {
-      return value.richText
-        .map((part) => part.text)
-        .join('')
-        .trim();
-    }
-  }
+  if (typeof value === 'object') return objectCellText(value);
   return '';
 }
 
@@ -141,13 +144,13 @@ async function* readRows(
 type Worksheets = AsyncIterator<ExcelJS.stream.xlsx.WorksheetReader>;
 
 /** Ce que la projection multi-onglets demande d'une feuille, et rien de plus. */
-export interface RowLike {
+interface RowLike {
   readonly number: number;
   readonly cellCount: number;
   getCell(index: number): { readonly value: ExcelJS.CellValue };
 }
 
-export interface SheetLike extends AsyncIterable<RowLike> {
+interface SheetLike extends AsyncIterable<RowLike> {
   readonly name?: string;
 }
 
@@ -161,7 +164,7 @@ async function* sheetsFrom(first: SheetLike, rest: Worksheets): AsyncIterable<Sh
   }
 }
 
-export async function* projectSheets(
+async function* projectSheets(
   sheets: AsyncIterable<SheetLike>,
   columns: readonly ImportColumn[],
   layout: SheetLayout,

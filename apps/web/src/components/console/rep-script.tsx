@@ -89,7 +89,7 @@ const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']>
 };
 
 /** Le serveur dérive la même issue et refuse celle qui le contredit. */
-export const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
+const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
   OUTCOME_PAR_EFFET[effect];
 
 /** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */
@@ -149,6 +149,27 @@ const RELATION_ITEMS = [
   })),
 ];
 
+function parametresAnnuaire(
+  cherche: string,
+  relation: RepresentantRelation | null,
+  page: number,
+): { search: string; relationStatus: RepresentantRelation[] | null; page: number } {
+  return {
+    search: cherche,
+    relationStatus: relation === null ? null : RELATIONS_DEMANDEES[relation],
+    page,
+  };
+}
+
+/** Le titre de la confirmation d'ouverture, sans fiche visée hors du dialogue. */
+function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
+  return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
+}
+
+function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
+  return cherche !== '' || relation !== null;
+}
+
 /**
  * L'annuaire, cherché par le SERVEUR : il compare le nom et le numéro réduit à
  * ses chiffres, donc « 77 123 45 67 » trouve la même fiche que « 771234567 ».
@@ -173,12 +194,7 @@ export function RepScript() {
 
   const annuaire = useQuery({
     queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche, relation, page] as const,
-    queryFn: () =>
-      fetchRepresentantsAQualifier({
-        search: cherche,
-        relationStatus: relation === null ? null : RELATIONS_DEMANDEES[relation],
-        page,
-      }),
+    queryFn: () => fetchRepresentantsAQualifier(parametresAnnuaire(cherche, relation, page)),
     enabled: choisi === null,
     placeholderData: (previous) => previous,
   });
@@ -218,6 +234,14 @@ export function RepScript() {
   });
 
   const tranchee = aConfirmer === null ? null : relationTrancheeTexte(aConfirmer);
+
+  function fermerConfirmation(ouvert: boolean): void {
+    if (!ouvert) setAConfirmer(null);
+  }
+
+  function confirmerOuverture(): void {
+    if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
+  }
 
   if (choisi !== null) {
     return (
@@ -269,7 +293,7 @@ export function RepScript() {
       <ResultatsAnnuaire
         annuaire={annuaire}
         liste={liste}
-        critereEnCours={cherche !== '' || relation !== null}
+        critereEnCours={critereEnCoursDe(cherche, relation)}
         onOuvrir={setAConfirmer}
       />
 
@@ -277,17 +301,13 @@ export function RepScript() {
 
       <ConfirmDialog
         open={aConfirmer !== null}
-        onOpenChange={(next) => {
-          if (!next) setAConfirmer(null);
-        }}
-        title={`Ouvrir la fiche de ${aConfirmer?.fullName ?? ''} ?`}
+        onOpenChange={fermerConfirmation}
+        title={titreOuverture(aConfirmer)}
         description="Vous ne pourrez pas la quitter sans la qualifier."
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
-        onConfirm={() => {
-          if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
-        }}
+        onConfirm={confirmerOuverture}
       >
         {tranchee === null ? null : <p className="text-[0.9375rem]">{tranchee}</p>}
       </ConfirmDialog>
@@ -970,6 +990,39 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
   );
 }
 
+interface QualificationDerivee {
+  statuts: readonly StatutQualification[];
+  statutPose: StatutQualification | null;
+  statutChoisi: StatutQualification | null;
+  statut: StatutQualification | null;
+  proposeQuelquUn: boolean;
+  suggestionCommencee: boolean;
+}
+
+/** Accepté et Refusé restent dans la liste : le téléconseiller qui ne voit pas
+ * que la question les a posés les y cherche. Les choisir répond à la question. */
+function deriverQualification(
+  referentiel: readonly StatutQualification[],
+  joignable: boolean,
+  ambassadeur: boolean | null,
+  statutId: string | null,
+  sugPhone: string,
+  sugName: string,
+  sugNote: string,
+): QualificationDerivee {
+  const statuts = statutsDeLaBranche(referentiel, joignable);
+  const statutPose = joignable ? statutDuSouhait(statuts, ambassadeur) : null;
+  const statutChoisi = statuts.find((ligne) => ligne.id === statutId) ?? null;
+  return {
+    statuts,
+    statutPose,
+    statutChoisi,
+    statut: statutChoisi ?? statutPose,
+    proposeQuelquUn: joignable && ambassadeur === false,
+    suggestionCommencee: sugPhone.trim() !== '' || sugName.trim() !== '' || sugNote.trim() !== '',
+  };
+}
+
 function syndicatsDe(
   reference: Awaited<ReturnType<typeof fetchReferenceData>> | undefined,
   syndicatId: string | null,
@@ -1030,22 +1083,28 @@ function manqueJoignable(etat: EtatManque): string | null {
   return null;
 }
 
+function manqueResultatOuScript(etat: EtatManque): string | null {
+  if (etat.resultat === null) return 'Choisissez d’abord le résultat';
+  if (!etat.joignable) return null;
+  return manqueJoignable(etat);
+}
+
+// Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
+// silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
+function manqueSuggestion(etat: EtatManque): string | null {
+  if (!etat.proposeQuelquUn || !etat.suggestionCommencee) return null;
+  if (digitsOf(etat.sugPhone) < 9) return 'Écrivez le numéro de la personne proposée';
+  return null;
+}
+
 /** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
 function manqueDe(etat: EtatManque): string | null {
-  if (etat.resultat === null) return 'Choisissez d’abord le résultat';
-  if (etat.joignable) {
-    const script = manqueJoignable(etat);
-    if (script !== null) return script;
-  }
+  const avantStatut = manqueResultatOuScript(etat);
+  if (avantStatut !== null) return avantStatut;
   if (etat.statut === null) return 'Choisissez un statut de qualification';
   if (exigeMotif(etat.statut) && etat.commentaire.trim() === '') return 'Écrivez le motif';
   if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
-  // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
-  // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
-  if (etat.proposeQuelquUn && etat.suggestionCommencee && digitsOf(etat.sugPhone) < 9) {
-    return 'Écrivez le numéro de la personne proposée';
-  }
-  return null;
+  return manqueSuggestion(etat);
 }
 
 interface EtatReponse {
@@ -1199,17 +1258,16 @@ function Qualification({
   });
 
   const joignable = resultat === 'JOIGNABLE';
-  const branche = statutsDeLaBranche(referentielStatuts.data ?? [], joignable);
-  // Accepté et Refusé restent dans la liste : le téléconseiller qui ne voit pas
-  // que la question les a posés les y cherche. Les choisir répond à la question.
-  const statuts = branche;
-  const statutPose = joignable ? statutDuSouhait(branche, ambassadeur) : null;
-  const statutChoisi = statuts.find((ligne) => ligne.id === statutId) ?? null;
-  const statut = statutChoisi ?? statutPose;
-  /** Une personne proposée n'a de sens que si l'appelé a dit non. */
-  const proposeQuelquUn = joignable && ambassadeur === false;
-  const suggestionCommencee =
-    sugPhone.trim() !== '' || sugName.trim() !== '' || sugNote.trim() !== '';
+  const { statuts, statutPose, statutChoisi, statut, proposeQuelquUn, suggestionCommencee } =
+    deriverQualification(
+      referentielStatuts.data ?? [],
+      joignable,
+      ambassadeur,
+      statutId,
+      sugPhone,
+      sugName,
+      sugNote,
+    );
 
   const manque = manqueDe({
     resultat,
@@ -1232,7 +1290,7 @@ function Qualification({
 
   const motifObligatoire = statut !== null && exigeMotif(statut);
 
-  const enregistrer = (): void => {
+  function enregistrer(): void {
     if (manque !== null || resultat === null || statut === null || send.isPending) return;
     send.mutate(
       reponseDe({
@@ -1255,24 +1313,19 @@ function Qualification({
         commentaire,
       }),
     );
-  };
+  }
 
   // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
   // délai du statut, le téléconseiller le déplace s'il veut.
-  const choisirStatut = (id: string | null): void => {
+  function choisirStatut(id: string | null): void {
     setStatutId(id);
-    const choisi = statuts.find((ligne) => ligne.id === id);
-    const souhait = souhaitDuStatut(choisi ?? null);
+    const choisi = statuts.find((ligne) => ligne.id === id) ?? null;
+    const souhait = souhaitDuStatut(choisi);
     if (souhait !== null) setAmbassadeur(souhait);
-    const reessai = choisi?.retryAfterMinutes ?? null;
-    setRappelAt(
-      reessai === null || choisi?.requiresCallback === true
-        ? null
-        : new Date(now + reessai * 60_000).toISOString(),
-    );
-  };
+    setRappelAt(rappelInitialDuStatut(choisi, now));
+  }
 
-  const choisirResultat = (valeur: Resultat): void => {
+  function choisirResultat(valeur: Resultat): void {
     setResultat(valeur);
     // Chaque branche a ses propres statuts : celui d'en face ne vaut plus.
     setStatutId(null);
@@ -1284,7 +1337,7 @@ function Qualification({
       setMemeWhatsapp(null);
     }
     if (valeur === 'INJOIGNABLE') setRappelAt(null);
-  };
+  }
 
   const retenu = useCallback(() => {
     toast.error('Posez un statut de qualification avant de quitter cette fiche.');
@@ -1318,40 +1371,22 @@ function Qualification({
     !edit,
   );
 
-  return (
-    <div className="flex w-full flex-col gap-5">
-      {etape === 2 ? (
-        <Button variant="ghost" className="self-start px-0" onClick={reculer}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Étape précédente
-        </Button>
-      ) : null}
+  // Le curseur part sur le motif, une fois le sélecteur refermé : sans cela
+  // l'obligation ne se voit pas. Il rend le focus en dernier.
+  function fermerStatut(): void {
+    if (motifObligatoire) commentaireRef.current?.focus();
+  }
 
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
-
-      <EnTeteRepresentant representant={representant} />
-
-      {representant.callAttemptCount === 0 ? null : (
-        <HistoriqueAppels representantId={representant.id} />
-      )}
-
-      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-        Étape {etape} sur 2 ·{' '}
-        {etape === 1 ? 'Comment s’est passé l’appel ?' : 'Quelque chose à ajouter ?'}
-      </p>
-
-      {etape === 1 ? (
+  function corpsEtape(): React.ReactNode {
+    if (etape === 1) {
+      return (
         <EtapeQuestions
           resultat={resultat}
           onResultat={choisirResultat}
           statuts={statuts}
           statutId={statutId}
           onStatut={choisirStatut}
-          onStatutFerme={() => {
-            // Le curseur part sur le motif, une fois le sélecteur refermé : sans
-            // cela l'obligation ne se voit pas. Il rend le focus en dernier.
-            if (motifObligatoire) commentaireRef.current?.focus();
-          }}
+          onStatutFerme={fermerStatut}
           statutPose={statutPose}
           exigeRappel={statut !== null && dateDemandee(statut)}
           joignable={joignable}
@@ -1386,40 +1421,67 @@ function Qualification({
             setEtape(2);
           }}
         />
-      ) : (
-        <div className="flex flex-col gap-5">
-          <RecapAppel
-            representant={representant}
-            resultat={resultat}
-            statutLabel={statut === null ? null : libelleStatut(statut)}
-            joignable={joignable}
-            etablissementConfirme={etablissementConfirme}
-            nouvelEtablissement={nouvelEtablissement}
-            contacte={contacte}
-            connaitUES={connaitUES}
-            syndicatName={syndicatName}
-            ambassadeur={ambassadeur}
-            rappelAt={rappelAt}
-            now={now}
-            personneProposee={
-              proposeQuelquUn && suggestionCommencee
-                ? [sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')
-                : null
-            }
-            commentaire={commentaire.trim()}
-          />
+      );
+    }
+    return (
+      <div className="flex flex-col gap-5">
+        <RecapAppel
+          representant={representant}
+          resultat={resultat}
+          statutLabel={statut === null ? null : libelleStatut(statut)}
+          joignable={joignable}
+          etablissementConfirme={etablissementConfirme}
+          nouvelEtablissement={nouvelEtablissement}
+          contacte={contacte}
+          connaitUES={connaitUES}
+          syndicatName={syndicatName}
+          ambassadeur={ambassadeur}
+          rappelAt={rappelAt}
+          now={now}
+          personneProposee={
+            proposeQuelquUn && suggestionCommencee
+              ? [sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')
+              : null
+          }
+          commentaire={commentaire.trim()}
+        />
 
-          {/* Un seul retour à l'écran, en tête : deux boutons du même nom
-              rendraient le chemin ambigu. */}
-          <Button
-            className="self-start"
-            disabled={manque !== null || send.isPending}
-            onClick={enregistrer}
-          >
-            Enregistrer
-          </Button>
-        </div>
+        {/* Un seul retour à l'écran, en tête : deux boutons du même nom
+            rendraient le chemin ambigu. */}
+        <Button
+          className="self-start"
+          disabled={manque !== null || send.isPending}
+          onClick={enregistrer}
+        >
+          Enregistrer
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex w-full flex-col gap-5">
+      {etape === 2 ? (
+        <Button variant="ghost" className="self-start px-0" onClick={reculer}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Étape précédente
+        </Button>
+      ) : null}
+
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+
+      <EnTeteRepresentant representant={representant} />
+
+      {representant.callAttemptCount === 0 ? null : (
+        <HistoriqueAppels representantId={representant.id} />
       )}
+
+      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+        Étape {etape} sur 2 ·{' '}
+        {etape === 1 ? 'Comment s’est passé l’appel ?' : 'Quelque chose à ajouter ?'}
+      </p>
+
+      {corpsEtape()}
 
       <details
         open={helpOpen}
@@ -1521,6 +1583,16 @@ function Choix<T extends string | boolean>({
 /** Le statut demande une date : rappel promis, ou réessai d'un numéro sans réponse. */
 function dateDemandee(statut: { requiresCallback: boolean; retryAfterMinutes: number | null }) {
   return statut.requiresCallback || statut.retryAfterMinutes !== null;
+}
+
+/** Le réessai du statut choisi, préréglé, sauf s'il exige un rappel promis. */
+function rappelInitialDuStatut(
+  statut: { retryAfterMinutes: number | null; requiresCallback: boolean } | null,
+  now: number,
+): string | null {
+  const reessai = statut?.retryAfterMinutes ?? null;
+  if (reessai === null || statut?.requiresCallback === true) return null;
+  return new Date(now + reessai * 60_000).toISOString();
 }
 
 function ChoixEcheance({

@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation';
 import { Suspense } from 'react';
 
 import { PermissionDenied } from '@/components/permission-denied';
+import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { SupervisionSkeleton } from '@/components/supervision/supervision-view';
 import { SupervisionTabs } from '@/components/supervision/supervision-tabs';
 import { guardRoles } from '@/lib/session';
@@ -18,7 +19,10 @@ export default async function SupervisionPage() {
 
   return (
     <Suspense fallback={<SupervisionSkeleton />}>
-      <SupervisionTabs projet="CHUES" role={guard.user.role} />
+      <div className="flex flex-col gap-6">
+        <OngletsPilotage coque="chues" role={guard.user.role} />
+        <SupervisionTabs projet="CHUES" role={guard.user.role} />
+      </div>
     </Suspense>
   );
 }

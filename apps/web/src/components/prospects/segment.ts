@@ -1,8 +1,8 @@
 import type { BddSegment } from '@/lib/types';
 
-export const CHUES_SIGLE = 'CHUES';
+const CHUES_SIGLE = 'CHUES';
 
-export const CBAO_SHORT_NAME = 'CBAO';
+const CBAO_SHORT_NAME = 'CBAO';
 
 export function classifySegment(input: {
   syndicatSigle: string;

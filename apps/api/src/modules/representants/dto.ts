@@ -689,6 +689,34 @@ export class RepresentantRelationChangeListDto {
   items!: RepresentantRelationChangeDto[];
 }
 
+export class RepresentantFicheChampDto {
+  @ApiProperty({ description: 'Le nom du champ du formulaire, tel que la base le porte.' })
+  champ!: string;
+  @ApiProperty({ type: String, nullable: true, description: 'Booléen rendu « true »/« false ».' })
+  avant!: string | null;
+  @ApiProperty({ type: String, nullable: true }) apres!: string | null;
+}
+
+/** Une version du formulaire de la fiche : qui l'a soumise, depuis quel écran, et ce qui a changé. */
+export class RepresentantFicheChangeDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty({ format: 'uuid' }) representantId!: string;
+  @ApiProperty({ enum: ['WEB', 'MOBILE', 'APPEL', 'IMPORT'], enumName: 'FicheChangeSource' })
+  source!: 'WEB' | 'MOBILE' | 'APPEL' | 'IMPORT';
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) changedById!: string | null;
+  @ApiProperty() changedByName!: string;
+  @ApiProperty({ type: String, format: 'date-time' }) changedAt!: string;
+  @ApiProperty({ type: () => [RepresentantFicheChampDto] }) champs!: RepresentantFicheChampDto[];
+}
+
+export class RepresentantFicheChangeListDto {
+  @ApiProperty({
+    type: () => [RepresentantFicheChangeDto],
+    description: 'De la plus récente à la plus ancienne.',
+  })
+  items!: RepresentantFicheChangeDto[];
+}
+
 export class CreateRepresentantCommentDto {
   @ApiProperty({
     format: 'uuid',

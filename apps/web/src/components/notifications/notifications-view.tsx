@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import {
-  BellIcon,
   BellOffIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
@@ -11,7 +10,7 @@ import {
   RotateCcwIcon,
   XIcon,
 } from 'lucide-react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
@@ -52,6 +51,7 @@ import {
   NOTIFICATION_CATEGORIES,
   NOTIFICATION_PAGE_SIZE,
   NOTIFICATION_STATUSES,
+  type NotificationFiltersState,
   type NotificationTab,
 } from '@/lib/notification-filters';
 import { cn } from '@/lib/utils';
@@ -114,6 +114,96 @@ const CATEGORY_ITEMS = [
 const dateTime = (value: string | null): string =>
   value === null ? '–' : new Date(value).toLocaleString('fr-SN');
 
+function buildListQuery(filters: Pick<NotificationFiltersState, 'page' | 'status' | 'category'>) {
+  return {
+    page: filters.page,
+    pageSize: NOTIFICATION_PAGE_SIZE,
+    ...(filters.status === null ? {} : { status: filters.status }),
+    ...(filters.category === null ? {} : { category: filters.category }),
+  };
+}
+
+function AdminOnly({ isAdmin, children }: { isAdmin: boolean; children: ReactNode }) {
+  if (!isAdmin) return null;
+  return <>{children}</>;
+}
+
+function HistoriqueFilters({
+  status,
+  category,
+  activeFilterCount,
+  onStatusChange,
+  onCategoryChange,
+  onClear,
+}: {
+  status: NotificationStatus | null;
+  category: NotificationCategory | null;
+  activeFilterCount: number;
+  onStatusChange: (status: NotificationStatus | null) => void;
+  onCategoryChange: (category: NotificationCategory | null) => void;
+  onClear: () => void;
+}) {
+  return (
+    <section
+      aria-label="Filtres des envois"
+      className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
+    >
+      <div className="flex w-48 flex-col gap-1.5">
+        <Label htmlFor="statut-envoi">État</Label>
+        <Select
+          items={STATUS_ITEMS}
+          value={status ?? ALL}
+          onValueChange={(value) => {
+            if (value === null) return;
+            onStatusChange(value === ALL ? null : (value as NotificationStatus));
+          }}
+        >
+          <SelectTrigger id="statut-envoi">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {STATUS_ITEMS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex w-48 flex-col gap-1.5">
+        <Label htmlFor="categorie-envoi">Catégorie</Label>
+        <Select
+          items={CATEGORY_ITEMS}
+          value={category ?? ALL}
+          onValueChange={(value) => {
+            if (value === null) return;
+            onCategoryChange(value === ALL ? null : (value as NotificationCategory));
+          }}
+        >
+          <SelectTrigger id="categorie-envoi">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {CATEGORY_ITEMS.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {activeFilterCount > 0 ? (
+        <Button variant="ghost" onClick={onClear}>
+          <RotateCcwIcon aria-hidden="true" />
+          Tout effacer
+        </Button>
+      ) : null}
+    </section>
+  );
+}
+
 export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
   const queryClient = useQueryClient();
   const { filters, setFilters } = useNotificationFilters(isAdmin);
@@ -121,12 +211,7 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
   const [detailId, setDetailId] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<NotificationRow | null>(null);
 
-  const listQuery = {
-    page: filters.page,
-    pageSize: NOTIFICATION_PAGE_SIZE,
-    ...(filters.status === null ? {} : { status: filters.status }),
-    ...(filters.category === null ? {} : { category: filters.category }),
-  };
+  const listQuery = buildListQuery(filters);
 
   const list = useQuery({
     queryKey: notificationKeys.list(listQuery),
@@ -161,10 +246,14 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <TabsList>
             <TabsTrigger value="reception">Boîte de réception</TabsTrigger>
-            {isAdmin ? <TabsTrigger value="historique">Historique</TabsTrigger> : null}
-            {isAdmin ? <TabsTrigger value="gabarits">Gabarits</TabsTrigger> : null}
+            <AdminOnly isAdmin={isAdmin}>
+              <TabsTrigger value="historique">Historique</TabsTrigger>
+            </AdminOnly>
+            <AdminOnly isAdmin={isAdmin}>
+              <TabsTrigger value="gabarits">Gabarits</TabsTrigger>
+            </AdminOnly>
           </TabsList>
-          {isAdmin ? (
+          <AdminOnly isAdmin={isAdmin}>
             <Button
               type="button"
               onClick={() => {
@@ -174,7 +263,7 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
               <PlusIcon aria-hidden="true" />
               Nouvelle notification
             </Button>
-          ) : null}
+          </AdminOnly>
         </div>
 
         <TabsContent value="reception" className="mt-4">
@@ -190,75 +279,25 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
           />
         </TabsContent>
 
-        {isAdmin ? (
+        <AdminOnly isAdmin={isAdmin}>
           <TabsContent value="historique" className="mt-4 flex flex-col gap-4">
             {/* Les critères que l'API expose depuis le début, et que l'écran
                 n'offrait pas : sans eux, retrouver « l'annonce de mardi » se
                 faisait à l'œil sur une seule page de vingt. */}
-            <section
-              aria-label="Filtres des envois"
-              className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
-            >
-              <div className="flex w-48 flex-col gap-1.5">
-                <Label htmlFor="statut-envoi">État</Label>
-                <Select
-                  items={STATUS_ITEMS}
-                  value={filters.status ?? ALL}
-                  onValueChange={(value) => {
-                    if (value === null) return;
-                    setFilters({ status: value === ALL ? null : (value as NotificationStatus) });
-                  }}
-                >
-                  <SelectTrigger id="statut-envoi">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {STATUS_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex w-48 flex-col gap-1.5">
-                <Label htmlFor="categorie-envoi">Catégorie</Label>
-                <Select
-                  items={CATEGORY_ITEMS}
-                  value={filters.category ?? ALL}
-                  onValueChange={(value) => {
-                    if (value === null) return;
-                    setFilters({
-                      category: value === ALL ? null : (value as NotificationCategory),
-                    });
-                  }}
-                >
-                  <SelectTrigger id="categorie-envoi">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {CATEGORY_ITEMS.map((item) => (
-                      <SelectItem key={item.value} value={item.value}>
-                        {item.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {activeFilterCount > 0 ? (
-                <Button
-                  variant="ghost"
-                  onClick={() => {
-                    setFilters({ status: null, category: null });
-                  }}
-                >
-                  <RotateCcwIcon aria-hidden="true" />
-                  Tout effacer
-                </Button>
-              ) : null}
-            </section>
+            <HistoriqueFilters
+              status={filters.status}
+              category={filters.category}
+              activeFilterCount={activeFilterCount}
+              onStatusChange={(status) => {
+                setFilters({ status });
+              }}
+              onCategoryChange={(category) => {
+                setFilters({ category });
+              }}
+              onClear={() => {
+                setFilters({ status: null, category: null });
+              }}
+            />
 
             <HistoriqueEnvois
               list={list}
@@ -275,16 +314,16 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
               }}
             />
           </TabsContent>
-        ) : null}
+        </AdminOnly>
 
-        {isAdmin ? (
+        <AdminOnly isAdmin={isAdmin}>
           <TabsContent value="gabarits" className="mt-4">
             <TemplateManager />
           </TabsContent>
-        ) : null}
+        </AdminOnly>
       </Tabs>
 
-      {isAdmin ? (
+      <AdminOnly isAdmin={isAdmin}>
         <>
           <NotificationComposer open={composerOpen} onOpenChange={setComposerOpen} />
           <CancelSendDialog
@@ -298,7 +337,7 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
             }}
           />
         </>
-      ) : null}
+      </AdminOnly>
 
       <NotificationDetailDialog
         id={detailId}
@@ -319,6 +358,123 @@ interface HistoriqueEnvoisProps {
   onCancelRow: (row: NotificationRow) => void;
   onComposer: () => void;
   onPage: (page: number) => void;
+}
+
+function HistoriqueRow({
+  row,
+  cancel,
+  onDetail,
+  onCancelRow,
+}: {
+  row: NotificationRow;
+  cancel: { isPending: boolean; variables: string | undefined };
+  onDetail: (id: string) => void;
+  onCancelRow: (row: NotificationRow) => void;
+}) {
+  const cancelling = cancel.isPending && cancel.variables === row.id;
+
+  return (
+    <TableRow>
+      <TableCell className="max-w-xs">
+        <button
+          type="button"
+          className="min-h-11 text-left"
+          onClick={() => {
+            onDetail(row.id);
+          }}
+        >
+          <span className="block font-[600]">{row.title}</span>
+          <span className="block truncate text-[0.8125rem] text-muted-foreground">{row.body}</span>
+        </button>
+      </TableCell>
+      <TableCell>
+        <span className="block">{describeAudience(row)}</span>
+        <span className="block text-[0.75rem] text-muted-foreground">
+          {CATEGORY_LABELS[row.category]}
+        </span>
+      </TableCell>
+      <TableCell>
+        <Badge variant={STATUS_VARIANT[row.status]}>{STATUS_LABELS[row.status]}</Badge>
+        {row.transportStatus === 'NOT_CONFIGURED' ? (
+          <Badge variant="warning" className="mt-1 block w-fit">
+            Aucun push remis
+          </Badge>
+        ) : null}
+      </TableCell>
+      <TableCell>
+        <DeliverySummary row={row} />
+      </TableCell>
+      <TableCell className="text-[0.8125rem] text-muted-foreground">
+        {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
+      </TableCell>
+      <TableCell>
+        {row.status === 'SCHEDULED' ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            disabled={cancelling}
+            onClick={() => {
+              onCancelRow(row);
+            }}
+          >
+            {cancelling ? (
+              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <XIcon aria-hidden="true" />
+            )}
+            Annuler l’envoi
+          </Button>
+        ) : null}
+      </TableCell>
+    </TableRow>
+  );
+}
+
+function HistoriquePagination({
+  meta,
+  onPage,
+}: {
+  meta: Awaited<ReturnType<typeof fetchNotifications>>['meta'] | undefined;
+  onPage: (page: number) => void;
+}) {
+  if (meta === undefined) return null;
+
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="text-[0.8125rem] text-muted-foreground" role="status">
+        <span className="sr-only">Envois affichés&nbsp;: </span>
+        {meta.total} envoi{meta.total > 1 ? 's' : ''}
+      </p>
+      <div className="flex items-center gap-1">
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page précédente"
+          disabled={meta.page <= 1}
+          onClick={() => {
+            onPage(meta.page - 1);
+          }}
+        >
+          <ChevronLeftIcon className="size-4" aria-hidden="true" />
+        </Button>
+        <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
+          {meta.page} / {Math.max(1, meta.pageCount)}
+        </span>
+        <Button
+          variant="outline"
+          size="icon"
+          aria-label="Page suivante"
+          disabled={meta.page >= meta.pageCount}
+          onClick={() => {
+            onPage(meta.page + 1);
+          }}
+        >
+          <ChevronRightIcon className="size-4" aria-hidden="true" />
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 function HistoriqueEnvois({
@@ -394,102 +550,19 @@ function HistoriqueEnvois({
           </TableHeader>
           <TableBody>
             {list.data.items.map((row) => (
-              <TableRow key={row.id}>
-                <TableCell className="max-w-xs">
-                  <button
-                    type="button"
-                    className="min-h-11 text-left"
-                    onClick={() => {
-                      onDetail(row.id);
-                    }}
-                  >
-                    <span className="block font-[600]">{row.title}</span>
-                    <span className="block truncate text-[0.8125rem] text-muted-foreground">
-                      {row.body}
-                    </span>
-                  </button>
-                </TableCell>
-                <TableCell>
-                  <span className="block">{describeAudience(row)}</span>
-                  <span className="block text-[0.75rem] text-muted-foreground">
-                    {CATEGORY_LABELS[row.category]}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={STATUS_VARIANT[row.status]}>{STATUS_LABELS[row.status]}</Badge>
-                  {row.transportStatus === 'NOT_CONFIGURED' ? (
-                    <Badge variant="warning" className="mt-1 block w-fit">
-                      Aucun push remis
-                    </Badge>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <DeliverySummary row={row} />
-                </TableCell>
-                <TableCell className="text-[0.8125rem] text-muted-foreground">
-                  {dateTime(row.sentAt ?? row.scheduledFor ?? row.createdAt)}
-                </TableCell>
-                <TableCell>
-                  {row.status === 'SCHEDULED' ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={cancel.isPending && cancel.variables === row.id}
-                      onClick={() => {
-                        onCancelRow(row);
-                      }}
-                    >
-                      {cancel.isPending && cancel.variables === row.id ? (
-                        <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                      ) : (
-                        <XIcon aria-hidden="true" />
-                      )}
-                      Annuler l’envoi
-                    </Button>
-                  ) : null}
-                </TableCell>
-              </TableRow>
+              <HistoriqueRow
+                key={row.id}
+                row={row}
+                cancel={cancel}
+                onDetail={onDetail}
+                onCancelRow={onCancelRow}
+              />
             ))}
           </TableBody>
         </Table>
       </div>
 
-      {meta === undefined ? null : (
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[0.8125rem] text-muted-foreground" role="status">
-            <span className="sr-only">Envois affichés&nbsp;: </span>
-            {meta.total} envoi{meta.total > 1 ? 's' : ''}
-          </p>
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page précédente"
-              disabled={meta.page <= 1}
-              onClick={() => {
-                onPage(meta.page - 1);
-              }}
-            >
-              <ChevronLeftIcon className="size-4" aria-hidden="true" />
-            </Button>
-            <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-              {meta.page} / {Math.max(1, meta.pageCount)}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page suivante"
-              disabled={meta.page >= meta.pageCount}
-              onClick={() => {
-                onPage(meta.page + 1);
-              }}
-            >
-              <ChevronRightIcon className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      )}
+      <HistoriquePagination meta={meta} onPage={onPage} />
     </>
   );
 }
@@ -671,5 +744,3 @@ function TableSkeleton() {
     </div>
   );
 }
-
-export { BellIcon };

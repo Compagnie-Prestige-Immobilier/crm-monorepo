@@ -13,6 +13,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ROLE_LABELS, type Role } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 const DEV_ROLES = [
   'ADMIN',
@@ -21,6 +22,7 @@ const DEV_ROLES = [
   'SUPERVISEUR',
   'DIRECTION',
   'ACCUEIL',
+  'CHARGE_CLIENTELE',
 ] as const satisfies readonly Role[];
 
 function roleFromPayload(payload: unknown, fallback: Role): Role {
@@ -34,10 +36,12 @@ export function DevRoleSwitcher({
   currentRole,
   enabled,
   next,
+  className,
 }: {
   currentRole: Role;
   enabled: boolean;
   next?: string | null;
+  className?: string;
 }) {
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<Role>(currentRole);
@@ -73,7 +77,12 @@ export function DevRoleSwitcher({
   if (!enabled) return null;
 
   return (
-    <div className="rounded-md border border-accent-border/50 bg-accent-surface/50 p-3">
+    <div
+      className={cn(
+        'rounded-md border border-accent-border/50 bg-accent-surface/50 p-3',
+        className,
+      )}
+    >
       <div className="mb-2 flex items-center gap-2 text-[0.75rem] font-[600] text-warning">
         <ShieldCheckIcon className="size-4" aria-hidden="true" />
         Accès développeur

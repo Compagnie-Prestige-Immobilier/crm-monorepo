@@ -28,6 +28,7 @@ import {
   ProspectStatut,
   ProspectType,
   TypeContrat,
+  WhatsappStatus,
 } from '@crm/database';
 
 import { PageMetaDto } from '../../common/dto/prospect-filter.dto.js';
@@ -124,6 +125,12 @@ export class CreateProspectDto {
   @IsOptional()
   @IsUUID()
   professionId?: string;
+
+  @ApiPropertyOptional({ maxLength: 160, description: 'Établissement où le prospect exerce.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string;
 
   @ApiPropertyOptional({ format: 'uuid', description: 'Tranche de revenu mensuel déclaré.' })
   @IsOptional()
@@ -269,6 +276,7 @@ const EFFACABLES = [
   'modeEpargne',
   'paysResidenceId',
   'villeResidence',
+  'etablissement',
   'whatsappE164',
   'relaisNom',
   'relaisPhoneE164',
@@ -357,6 +365,12 @@ export class UpdateProspectDto extends PartialType(OmitType(CreateProspectDto, E
   @IsString()
   @MaxLength(120)
   villeResidence?: string | null;
+
+  @ApiPropertyOptional({ type: String, maxLength: 160, nullable: true })
+  @IsOptional()
+  @IsString()
+  @MaxLength(160)
+  etablissement?: string | null;
 
   @ApiPropertyOptional({ type: String, maxLength: 40, nullable: true })
   @IsOptional()
@@ -449,12 +463,39 @@ export class ProspectDto {
   @ApiProperty({ type: String, format: 'uuid', nullable: true }) paysResidenceId!: string | null;
   @ApiProperty({ type: String, nullable: true }) paysResidenceLabel!: string | null;
   @ApiProperty({ type: String, nullable: true }) villeResidence!: string | null;
-  @ApiProperty({ type: String, nullable: true }) whatsappE164!: string | null;
+  @ApiProperty({ type: String, nullable: true }) etablissement!: string | null;
+
+  @ApiProperty({ enum: WhatsappStatus, enumName: 'WhatsappStatus' })
+  whatsappStatus!: WhatsappStatus;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description: 'Renseigné avec le seul statut AUTRE_NUMERO.',
+  })
+  whatsappE164!: string | null;
+
+  @ApiProperty({
+    type: String,
+    nullable: true,
+    description:
+      'Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon.',
+  })
+  whatsappNumber!: string | null;
   @ApiProperty({ type: String, nullable: true }) relaisNom!: string | null;
   @ApiProperty({ type: String, nullable: true }) relaisPhoneE164!: string | null;
 
   @ApiProperty({ type: () => [ProspectJourneyDto] })
   journeys!: ProspectJourneyDto[];
+
+  @ApiProperty({
+    type: 'object',
+    additionalProperties: { type: 'string' },
+    description:
+      'Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. ' +
+      'Les libellés se lisent dans GET /champs-conversion/{projet}.',
+  })
+  champsLibres!: Record<string, string>;
 
   @ApiProperty({
     type: Number,
@@ -507,6 +548,19 @@ export class ProspectDto {
   enrollmentCapturedAt!: string | null;
 
   @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description:
+      'Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.',
+  })
+  revueAt!: string | null;
+
+  @ApiProperty({ type: String, format: 'uuid', nullable: true }) revueById!: string | null;
+
+  @ApiProperty({ type: String, nullable: true }) revueByName!: string | null;
+
+  @ApiProperty({
     enum: CallOutcome,
     enumName: 'CallOutcome',
     nullable: true,
@@ -552,6 +606,14 @@ export class ProspectDto {
     description: 'Détail conservé à la création (nom de la banque demandeuse, par exemple).',
   })
   originLabel!: string | null;
+
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    nullable: true,
+    description: 'Date de la demande publique qui attend une relecture.',
+  })
+  aRevoirAt!: string | null;
 
   @ApiProperty({ type: String, format: 'date-time' }) clientCreatedAt!: string;
   @ApiProperty({ type: String, format: 'date-time' }) createdAt!: string;

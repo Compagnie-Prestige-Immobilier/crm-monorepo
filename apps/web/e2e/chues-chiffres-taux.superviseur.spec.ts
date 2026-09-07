@@ -80,7 +80,8 @@ const TENTATIVES = [
   },
 ] as const;
 
-const TITRES_DE_TAUX = ['Taux de contact', 'Taux de rendez-vous', 'Taux de qualification'] as const;
+const JOIGNABILITE = 'Taux de joignabilité des représentants';
+const TITRES_DE_TAUX = [JOIGNABILITE, 'Taux d’acceptation', 'Taux de qualification'] as const;
 
 let superviseurId = '';
 let awaId = '';
@@ -113,7 +114,9 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),
     'Référentiel des départements',
   );
-  const departementId = departements[0]?.id;
+  // Le DERNIER département : le premier est la réserve où chues-lots-export
+  // tire ses campagnes, et ces fiches n'ont rien à y faire.
+  const departementId = departements.at(-1)?.id;
   expect(departementId, 'Aucun département dans le référentiel').toBeDefined();
 
   const parCle = new Map<string, string>();
@@ -126,6 +129,7 @@ async function poserRepresentants(api: APIRequestContext): Promise<Map<string, s
     );
     const deja = existants.items.find((item) => item.phoneE164 === fiche.phone);
     if (deja !== undefined) {
+      await api.patch(`/api/v1/representants/${deja.id}`, { data: { departementId } });
       parCle.set(fiche.cle, deja.id);
       continue;
     }
@@ -202,38 +206,41 @@ test.beforeAll(async () => {
   }
 });
 
-test('CHU-CHF-13 le taux de contact vaut exactement 50 % sur 2 joints pour 4 appels', async ({
+// EB-33 : les taux se lisent PAR FICHE, sur le dernier statut. Quatre fiches
+// appelées dans la journée : R1 accepté, R2 refusé, R3 à rappeler, R4 sans
+// réponse. Trois jointes sur quatre.
+test('CHU-CHF-13 la joignabilité vaut exactement 75 % sur 3 fiches jointes pour 4', async ({
   page,
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('50,0 %');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('75,0 %');
   await expect(
-    carte(page, 'Taux de contact').getByText('2 joints sur 4 appels', { exact: true }),
+    carte(page, JOIGNABILITE).getByText('3 joints sur 4 fiches', { exact: true }),
   ).toHaveCount(1);
 });
 
-test('CHU-CHF-14 le taux de rappel vaut exactement 25 % sur 1 rappel pour 4 appels', async ({
-  page,
-}) => {
+// Le taux de contact se mesure sur les fiches prévues par les campagnes de la
+// période : sans campagne, il n'a pas de dénominateur.
+test('CHU-CHF-14 le taux de contact sans campagne se lit « Sans objet »', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Taux de rendez-vous')).toHaveText('25,0 %');
+  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('Sans objet');
   await expect(
-    carte(page, 'Taux de rendez-vous').getByText('1 rendez-vous sur 4 appels', { exact: true }),
+    carte(page, 'Taux de contact').getByText('Aucune campagne sur la période', { exact: true }),
   ).toHaveCount(1);
 });
 
-test('CHU-CHF-15 le taux de qualification vaut exactement 50 % sur 1 accepté pour 2 interrogés', async ({
+// Le dénominateur de l'acceptation : les fiches jointes qui ont pu répondre,
+// R1, R2 et R3. Une seule a dit oui.
+test('CHU-CHF-15 le taux d’acceptation vaut exactement 33,3 % sur 1 accepté pour 3 joints', async ({
   page,
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  await expect(chiffreDe(page, 'Taux de qualification')).toHaveText('50,0 %');
+  await expect(chiffreDe(page, 'Taux d’acceptation')).toHaveText('33,3 %');
   await expect(
-    carte(page, 'Taux de qualification').getByText('1 acceptent sur 2 interrogés', {
-      exact: true,
-    }),
+    carte(page, 'Taux d’acceptation').getByText('1 acceptent sur 3 joints', { exact: true }),
   ).toHaveCount(1);
 });
 
@@ -242,7 +249,8 @@ test('CHU-CHF-16 la ligne du superviseur porte ses trois taux, et le pied « Éq
 }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
 
-  const attendu = ['4', '50,0 %', '25,0 %', '50,0 %', '0', '0'];
+  // Appels, joignabilité, acceptés, à rappeler, acceptation, prospects, méthodes.
+  const attendu = ['4', '75,0 %', '1', '1', '33,3 %', '0', '0'];
   const ligne = tableauEquipe(page)
     .getByRole('row')
     .filter({ has: page.getByRole('rowheader', { name: 'Superviseur Fixture', exact: true }) });
@@ -257,19 +265,21 @@ test('CHU-CHF-16 la ligne du superviseur porte ses trois taux, et le pied « Éq
 test('CHU-CHF-17 une journée sans aucun appel ne se lit pas « 0 % »', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE_VIDE, JOURNEE_VIDE, superviseurId));
 
-  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('Sans objet');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('Sans objet');
   await expect(
-    carte(page, 'Taux de contact').getByText('Aucun appel sur la période', { exact: true }),
+    carte(page, JOIGNABILITE).getByText('Aucun représentant appelé sur la période', {
+      exact: true,
+    }),
   ).toHaveCount(1);
-  await expect(carte(page, 'Taux de contact').getByText('0,0 %')).toHaveCount(0);
+  await expect(carte(page, JOIGNABILITE).getByText('0,0 %')).toHaveCount(0);
 });
 
 test('CHU-CHF-18 le filtre par téléconseiller borne réellement les chiffres', async ({ page }) => {
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, superviseurId));
-  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('50,0 %');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('75,0 %');
 
   await page.goto(urlDuJeu(JOURNEE, JOURNEE, awaId));
-  await expect(chiffreDe(page, 'Taux de contact')).toHaveText('Sans objet');
+  await expect(chiffreDe(page, JOIGNABILITE)).toHaveText('Sans objet');
   // Une ligne pour Awa, et le pied « Équipe » qui ne dit plus qu'elle.
   await expect(tableauEquipe(page).getByRole('rowheader')).toHaveText(['Awa Fixture', 'Équipe']);
   await expect(tableauEquipe(page).getByRole('row')).toHaveCount(3);

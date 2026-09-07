@@ -22,10 +22,19 @@ Future<void> main() async {
     SemanticsBinding.instance.ensureSemantics();
   }
 
-  await SystemChrome.setPreferredOrientations(<DeviceOrientation>[
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
+  // Les trois amorces passent par le canal de plateforme, et le fil principal
+  // d'Android monte encore l'activite : les enchainer fait attendre trois fois
+  // la meme file. Elles partent ensemble, on les recueille ensuite.
+  final Future<void> orientation = SystemChrome.setPreferredOrientations(
+    <DeviceOrientation>[
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ],
+  );
+  final Future<SharedPreferences> preferencesLues =
+      SharedPreferences.getInstance();
+  final Future<PackageInfo> packageLu = PackageInfo.fromPlatform();
+
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
@@ -34,8 +43,9 @@ Future<void> main() async {
   );
 
   final AppDatabase database = openAppDatabase();
-  final SharedPreferences preferences = await SharedPreferences.getInstance();
-  final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+  final SharedPreferences preferences = await preferencesLues;
+  final PackageInfo packageInfo = await packageLu;
+  await orientation;
 
   unawaited(DraftRepository(database).purgeStale());
 

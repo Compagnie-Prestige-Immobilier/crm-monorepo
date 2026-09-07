@@ -855,6 +855,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/representants/{id}/fiche-history': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les versions du formulaire de la fiche, de la plus récente à la plus ancienne.
+     * @description Chaque écriture sur la fiche (panneau, mobile, appel de qualification, import) laisse une version : les champs modifiés, avec leur valeur d’avant et d’après.
+     */
+    get: operations['listRepresentantFicheChanges'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/representants/{id}/device-calls': {
     parameters: {
       query?: never;
@@ -1135,6 +1155,26 @@ export interface paths {
     put?: never;
     /** Confirme une vente ou adhésion Grand Public. */
     post: operations['confirmGrandPublicConversion'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/prospects/{id}/revue': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Marque une demande convertie « revue » avant sa transmission à l’enrôlement.
+     * @description La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.
+     */
+    post: operations['marquerProspectRevue'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2232,6 +2272,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/representants': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables. */
+    get: operations['getSupervisionRepresentants'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/supervision/campagnes': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Taux de contact et d’exploitation des campagnes de la fenêtre.
+     * @description Une campagne entre dans la fenêtre par ses jours de programme. `granularity`, `timeFrom` et `timeTo` sont ignorés.
+     */
+    get: operations['getSupervisionCampagnes'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supervision/activite': {
     parameters: {
       query?: never;
@@ -2852,6 +2929,30 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/champs-conversion/{projet}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Champs du formulaire de conversion, dans l’ordre d’affichage.
+     * @description Lu par le formulaire du téléconseiller comme par le formulaire public : un champ masqué n’est ni rendu ni exigé. Les champs imposés reviennent toujours visibles, quel que soit le réglage enregistré.
+     */
+    get: operations['getChampsConversion'];
+    /**
+     * Enregistre visibilité, caractère obligatoire, ordre et champs ajoutés.
+     * @description La liste entière est remplacée. Masquer un champ imposé est refusé en 400.
+     */
+    put: operations['updateChampsConversion'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/app-updates/android/current': {
     parameters: {
       query?: never;
@@ -3231,6 +3332,44 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/parametres-chues': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Les réglages CHUES, valeurs d’usine comprises. */
+    get: operations['getParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /**
+     * Règle les paramètres CHUES.
+     * @description La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.
+     */
+    patch: operations['updateParametresChues'];
+    trace?: never;
+  };
+  '/api/v1/parametres-chues/journal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Qui a changé quoi, et ce que la valeur disait avant. */
+    get: operations['getJournalParametresChues'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/enrolement/{projet}/inscriptions': {
     parameters: {
       query?: never;
@@ -3325,6 +3464,43 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/formulaire-public/formulaire': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Champs à rendre et listes à proposer sur le formulaire public. */
+    get: operations['lireFormulairePublic'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/formulaire-public/{jeton}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /**
+     * Reçoit une demande envoyée depuis le formulaire public.
+     * @description Le jeton est le compte qui a partagé le lien : il devient auteur de la fiche et reçoit l’avis.
+     */
+    post: operations['envoyerDemandePublique'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -3339,7 +3515,14 @@ export interface components {
       password: string;
     };
     /** @enum {string} */
-    Role: 'ADMIN' | 'COMMERCIAL' | 'BANQUE_FINANCE' | 'SUPERVISEUR' | 'DIRECTION' | 'ACCUEIL';
+    Role:
+      | 'ADMIN'
+      | 'COMMERCIAL'
+      | 'BANQUE_FINANCE'
+      | 'SUPERVISEUR'
+      | 'DIRECTION'
+      | 'ACCUEIL'
+      | 'CHARGE_CLIENTELE';
     AuthUserDto: {
       /** Format: uuid */
       id: string;
@@ -4172,6 +4355,32 @@ export interface components {
       /** @description Du plus récent au plus ancien. */
       items: components['schemas']['RepresentantCallAttemptDto'][];
     };
+    /** @enum {string} */
+    FicheChangeSource: 'WEB' | 'MOBILE' | 'APPEL' | 'IMPORT';
+    RepresentantFicheChampDto: {
+      /** @description Le nom du champ du formulaire, tel que la base le porte. */
+      champ: string;
+      /** @description Booléen rendu « true »/« false ». */
+      avant: string | null;
+      apres: string | null;
+    };
+    RepresentantFicheChangeDto: {
+      /** Format: uuid */
+      id: string;
+      /** Format: uuid */
+      representantId: string;
+      source: components['schemas']['FicheChangeSource'];
+      /** Format: uuid */
+      changedById: string | null;
+      changedByName: string;
+      /** Format: date-time */
+      changedAt: string;
+      champs: components['schemas']['RepresentantFicheChampDto'][];
+    };
+    RepresentantFicheChangeListDto: {
+      /** @description De la plus récente à la plus ancienne. */
+      items: components['schemas']['RepresentantFicheChangeDto'][];
+    };
     DeviceCallDetectionDto: {
       /** Format: uuid */
       id: string;
@@ -4333,6 +4542,10 @@ export interface components {
        */
       jour: string;
       ouvertures: number;
+      /** @description Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`. */
+      qualifiees: number;
+      /** @description Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur. */
+      liberees: number;
       /** @description DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête. */
       dureeMoyenneSecondes: number | null;
     };
@@ -4351,7 +4564,15 @@ export interface components {
     /** @enum {string} */
     Phase2Status: 'PENDING' | 'METHOD_OBTAINED' | 'REFUSED' | 'WRONG_NUMBER';
     /** @enum {string} */
-    EnrollmentMethod: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT';
+    EnrollmentMethod:
+      | 'PLATFORM'
+      | 'PHYSICAL'
+      | 'VOICE_OR_ELECTRONIC_MESSAGING'
+      | 'APPOINTMENT'
+      | 'WHATSAPP'
+      | 'RDV_CPI'
+      | 'PLATEFORME_EN_LIGNE'
+      | 'MAIL';
     /** @enum {string} */
     ProspectSortField: 'createdAt' | 'clientCreatedAt' | 'nom' | 'prenom' | 'statut' | 'lastCallAt';
     /** @enum {string} */
@@ -4428,10 +4649,19 @@ export interface components {
       paysResidenceId: string | null;
       paysResidenceLabel: string | null;
       villeResidence: string | null;
+      etablissement: string | null;
+      whatsappStatus: components['schemas']['WhatsappStatus'];
+      /** @description Renseigné avec le seul statut AUTRE_NUMERO. */
       whatsappE164: string | null;
+      /** @description Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon. */
+      whatsappNumber: string | null;
       relaisNom: string | null;
       relaisPhoneE164: string | null;
       journeys: components['schemas']['ProspectJourneyDto'][];
+      /** @description Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}. */
+      champsLibres: {
+        [key: string]: string;
+      };
       /** @description Durée du système de paiement retenue, en MOIS. */
       dureeSystemeMois: number | null;
       /** Format: uuid */
@@ -4451,6 +4681,14 @@ export interface components {
       enrollmentCapturedByName: string | null;
       /** Format: date-time */
       enrollmentCapturedAt: string | null;
+      /**
+       * Format: date-time
+       * @description Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue.
+       */
+      revueAt: string | null;
+      /** Format: uuid */
+      revueById: string | null;
+      revueByName: string | null;
       /** @description Résultat de la dernière tentative d’appel enregistrée. */
       lastOutcome: components['schemas']['CallOutcome'] | null;
       /** @description Commentaire de cette tentative. */
@@ -4469,6 +4707,11 @@ export interface components {
       origin: string | null;
       /** @description Détail conservé à la création (nom de la banque demandeuse, par exemple). */
       originLabel: string | null;
+      /**
+       * Format: date-time
+       * @description Date de la demande publique qui attend une relecture.
+       */
+      aRevoirAt: string | null;
       /** Format: date-time */
       clientCreatedAt: string;
       /** Format: date-time */
@@ -4541,6 +4784,8 @@ export interface components {
        * @description Profession choisie dans le référentiel.
        */
       professionId?: string;
+      /** @description Établissement où le prospect exerce. */
+      etablissement?: string;
       /**
        * Format: uuid
        * @description Tranche de revenu mensuel déclaré.
@@ -4679,6 +4924,7 @@ export interface components {
       /** Format: uuid */
       paysResidenceId?: string | null;
       villeResidence?: string | null;
+      etablissement?: string | null;
       whatsappE164?: string | null;
       relaisNom?: string | null;
       relaisPhoneE164?: string | null;
@@ -4986,6 +5232,10 @@ export interface components {
        * @description Visite : destinataire visé.
        */
       destinataireId?: string;
+      /** @description Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ. */
+      champsLibres?: {
+        [key: string]: string;
+      };
     };
     SyncOperationDto: {
       /**
@@ -5023,6 +5273,8 @@ export interface components {
       pendingOps?: number;
       /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
       appVersion?: string;
+      /** @description Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de communication n’est jamais relevée. Facultatif sans limite de temps. */
+      journalAppelsAutorise?: boolean;
     };
     /** @enum {string} */
     SyncOpStatus: 'applied' | 'duplicate' | 'conflict' | 'invalid' | 'skipped_dependency_failed';
@@ -6024,8 +6276,78 @@ export interface components {
       byLabel: components['schemas']['OriginLabelCountDto'][];
       total: number;
     };
+    StockRepresentantsPartDto: {
+      /** Format: uuid */
+      id: string;
+      label: string;
+      count: number;
+    };
+    StockRepresentantsDto: {
+      /** @description Représentants non supprimés, toutes fiches. */
+      total: number;
+      /** @description Représentants sans aucun appel. */
+      jamaisAppeles: number;
+      /** @description Représentants dont le statut est non joint, hors « Injoignable définitif ». */
+      injoignables: number;
+      parDepartement: components['schemas']['StockRepresentantsPartDto'][];
+      parIef: components['schemas']['StockRepresentantsPartDto'][];
+    };
     /** @enum {string} */
     SupervisionGranularity: 'day' | 'week';
+    /** @enum {string} */
+    LotExportCible:
+      'REPRESENTANTS' | 'PROSPECTS' | 'REPRESENTANTS_INJOIGNABLES' | 'CONTACTS_RECOMMANDES';
+    SupervisionCampagneTeleconseillerDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+      /** Format: uuid */
+      teleconseillerId: string;
+      teleconseillerName: string;
+    };
+    SupervisionCampagneDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+      /** Format: uuid */
+      id: string;
+      name: string;
+      cible: components['schemas']['LotExportCible'];
+      /** Format: date-time */
+      createdAt: string;
+      parTeleconseiller: components['schemas']['SupervisionCampagneTeleconseillerDto'][];
+    };
+    SupervisionCampagnesTotauxDto: {
+      /** @description Fiches confiées pour les jours de programme de la fenêtre. */
+      prevues: number;
+      /** @description Parmi `prevues`, celles qui ont reçu au moins un appel. */
+      appelees: number;
+      /** @description Parmi `prevues`, celles qui portent au moins une qualification. */
+      traitees: number;
+      /** @description Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue. */
+      contactRate: number | null;
+      /** @description Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue. */
+      exploitationRate: number | null;
+    };
+    SupervisionCampagnesDto: {
+      /** @description Les campagnes dont un jour de programme tombe dans la fenêtre, la plus récente en tête. */
+      items: components['schemas']['SupervisionCampagneDto'][];
+      totals: components['schemas']['SupervisionCampagnesTotauxDto'];
+    };
     SupervisionActivityRowDto: {
       /** @description Appels passés à des prospects. */
       calls: number;
@@ -6051,6 +6373,12 @@ export interface components {
       callback: number;
       /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
+      /** @description Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre. */
+      fiches: number;
+      /** @description Parmi `fiches`, celles dont le dernier appel a joint. */
+      fichesJointes: number;
+      /** @description Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche. */
+      ficheReachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
@@ -6085,6 +6413,26 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres. */
+      repFiches: number;
+      /** @description Parmi `repFiches`, dernier statut de la famille jointe. */
+      repFichesJointes: number;
+      /** @description Parmi `repFiches`, dernier statut non joint. */
+      repFichesNonJointes: number;
+      /** @description Parmi `repFiches`, dernier statut Accepté. */
+      repFichesAcceptees: number;
+      /** @description Parmi `repFiches`, dernier statut Refusé. */
+      repFichesRefusees: number;
+      /** @description Parmi `repFiches`, dernier statut À rappeler. */
+      repFichesARappeler: number;
+      /** @description Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs. */
+      repFichesEligibles: number;
+      /** @description Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche. */
+      repReachabilityRate: number | null;
+      /** @description Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible. */
+      repAcceptanceRate: number | null;
+      /** @description Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche. */
+      repCallbackFicheRate: number | null;
       /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
       inboundCalls: number;
       /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
@@ -6132,6 +6480,12 @@ export interface components {
       callback: number;
       /** @description Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ». */
       reachRate: number | null;
+      /** @description Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre. */
+      fiches: number;
+      /** @description Parmi `fiches`, celles dont le dernier appel a joint. */
+      fichesJointes: number;
+      /** @description Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche. */
+      ficheReachRate: number | null;
       /** @description Fiches prospect saisies sur la période. */
       prospectsCreated: number;
       /** @description Représentants distincts appelés sur la période. */
@@ -6166,6 +6520,26 @@ export interface components {
       repQualified: number;
       /** @description Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé. */
       repQualificationRate: number | null;
+      /** @description Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres. */
+      repFiches: number;
+      /** @description Parmi `repFiches`, dernier statut de la famille jointe. */
+      repFichesJointes: number;
+      /** @description Parmi `repFiches`, dernier statut non joint. */
+      repFichesNonJointes: number;
+      /** @description Parmi `repFiches`, dernier statut Accepté. */
+      repFichesAcceptees: number;
+      /** @description Parmi `repFiches`, dernier statut Refusé. */
+      repFichesRefusees: number;
+      /** @description Parmi `repFiches`, dernier statut À rappeler. */
+      repFichesARappeler: number;
+      /** @description Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs. */
+      repFichesEligibles: number;
+      /** @description Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche. */
+      repReachabilityRate: number | null;
+      /** @description Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible. */
+      repAcceptanceRate: number | null;
+      /** @description Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche. */
+      repCallbackFicheRate: number | null;
       /** @description Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative. */
       inboundCalls: number;
       /** @description Appels manqués relevés au journal du téléphone, les deux familles confondues. */
@@ -6232,12 +6606,15 @@ export interface components {
       label: string;
       prospects: number;
     };
+    /** @enum {string} */
+    FamilleStatut: 'JOINT' | 'NON_JOINT';
     SupervisionRepStatutDto: {
       /** Format: uuid */
       id: string;
       code: string;
       label: string;
       isActive: boolean;
+      famille: components['schemas']['FamilleStatut'];
       count: number;
     };
     SupervisionRepStatutsDto: {
@@ -6794,6 +7171,7 @@ export interface components {
     /** @enum {string} */
     PurgeDomainKey:
       | 'teleconseillers'
+      | 'chargesClientele'
       | 'finances'
       | 'supervision'
       | 'directionAccueil'
@@ -6881,6 +7259,8 @@ export interface components {
       pendingOps: number | null;
       /** @description Version de l’application mobile, telle qu’elle s’annonce. */
       appVersion: string | null;
+      /** @description Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : la durée de communication de ce compte ne se mesure pas. `null` : inconnu. */
+      journalAppelsAutorise: boolean | null;
       /**
        * Format: date-time
        * @description Dernière écriture métier : tentative d’appel ou transition de dossier. Cherchée sur les 31 derniers jours seulement ; au-delà, vaut null.
@@ -6943,6 +7323,55 @@ export interface components {
     };
     /** @enum {string} */
     ExportMode: 'filtered' | 'consolidated';
+    ReglageChampDto: {
+      /** @description Clé du champ dans le catalogue de la conversion. */
+      champ: string;
+      libelle: string;
+      visible: boolean;
+      obligatoire: boolean;
+      /** @description Champ exigé par les indicateurs et le closing : il ne peut pas être masqué. */
+      impose: boolean;
+    };
+    ChampLibreDto: {
+      /** Format: uuid */
+      id: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      /** @description Valeurs proposées, pour le type LISTE seulement. */
+      options: string[];
+      obligatoire: boolean;
+    };
+    ReglagesConversionDto: {
+      projet: components['schemas']['Projet'];
+      /** @description Dans l’ordre d’affichage. Un champ masqué n’est ni rendu ni exigé. */
+      champs: components['schemas']['ReglageChampDto'][];
+      libres: components['schemas']['ChampLibreDto'][];
+      /** Format: date-time */
+      updatedAt: string | null;
+    };
+    ReglageChampInputDto: {
+      champ: string;
+      visible: boolean;
+      obligatoire: boolean;
+    };
+    ChampLibreInputDto: {
+      /**
+       * Format: uuid
+       * @description Absent : le champ vient d’être ajouté.
+       */
+      id?: string;
+      libelle: string;
+      /** @enum {string} */
+      type: 'TEXTE' | 'LISTE' | 'OUI_NON';
+      options?: string[];
+      obligatoire: boolean;
+    };
+    UpdateReglagesConversionDto: {
+      /** @description La liste ENTIÈRE, dans l’ordre d’affichage voulu. */
+      champs: components['schemas']['ReglageChampInputDto'][];
+      libres: components['schemas']['ChampLibreInputDto'][];
+    };
     AppUpdateDto: {
       available: boolean;
       /** @description Le poste est sous le plancher obligatoire. */
@@ -7035,14 +7464,27 @@ export interface components {
       | 'avec-telephone'
       | 'qualite-de-saisie'
       | 'taux-de-contact'
-      | 'a-rappeler'
-      | 'taux-de-qualification'
+      | 'taux-de-joignabilite-representants'
+      | 'taux-d-acceptation'
+      | 'taux-de-rappel'
       | 'repartition-statuts-qualification'
+      | 'joints-non-joints'
+      | 'statuts-par-famille'
+      | 'joignabilite-par-creneau'
+      | 'taux-d-exploitation'
+      | 'representants-par-departement'
+      | 'representants-par-ief'
+      | 'representants-jamais-appeles'
+      | 'representants-injoignables'
       | 'taux-de-joignabilite'
       | 'prospects-notes'
       | 'adhesions'
       | 'reste-a-appeler'
       | 'fiches-ouvertes'
+      | 'taux-de-qualification'
+      | 'duree-moyenne-sur-la-fiche'
+      | 'duree-moyenne-de-communication'
+      | 'appels-par-jour'
       | 'par-teleconseiller'
       | 'couverture-derniere-campagne'
       | 'hors-attribution-derniere-campagne'
@@ -7115,9 +7557,6 @@ export interface components {
       /** @description Les éléments du tableau de bord. `version` est fixé par le serveur et refusé s’il est transmis. */
       widgets: components['schemas']['DispositionWidgetDto'][];
     };
-    /** @enum {string} */
-    LotExportCible:
-      'REPRESENTANTS' | 'PROSPECTS' | 'REPRESENTANTS_INJOIGNABLES' | 'CONTACTS_RECOMMANDES';
     RepresentantExportQueryDto: {
       search?: string;
       /** Format: uuid */
@@ -7209,7 +7648,7 @@ export interface components {
        * @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.
        * @enum {string}
        */
-      origin?: 'BANQUE';
+      origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
       /**
        * Format: date-time
        * @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse.
@@ -7220,6 +7659,8 @@ export interface components {
        * @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse.
        */
       dateTo?: string;
+      /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+      revue?: boolean;
       /**
        * @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN.
        * @default false
@@ -7301,7 +7742,16 @@ export interface components {
         | 'WRONG_NUMBER'
         | 'OTHER';
       /** @enum {string|null} */
-      method: 'PLATFORM' | 'PHYSICAL' | 'VOICE_OR_ELECTRONIC_MESSAGING' | 'APPOINTMENT' | null;
+      method:
+        | 'PLATFORM'
+        | 'PHYSICAL'
+        | 'VOICE_OR_ELECTRONIC_MESSAGING'
+        | 'APPOINTMENT'
+        | 'WHATSAPP'
+        | 'RDV_CPI'
+        | 'PLATEFORME_EN_LIGNE'
+        | 'MAIL'
+        | null;
       comment: string | null;
       performedByName: string;
       createdAt: string;
@@ -7397,6 +7847,44 @@ export interface components {
     RetirerTeleconseillerDto: {
       /** Format: uuid */
       teleconseillerId: string;
+    };
+    ParametresChuesDto: {
+      plateformeChuesUrl: string;
+      plateformeGrandPublicUrl: string;
+      emailChues: string;
+      whatsappChuesE164: string;
+      messageWhatsapp: string;
+      accuseReceptionObjet: string;
+      accuseReceptionCorps: string;
+      destinatairesEnrolement: string[];
+      destinatairesBpe: string[];
+      destinatairesSupervision: string[];
+      destinatairesDirection: string[];
+    };
+    UpdateParametresChuesDto: {
+      plateformeChuesUrl?: string;
+      plateformeGrandPublicUrl?: string;
+      emailChues?: string;
+      whatsappChuesE164?: string;
+      messageWhatsapp?: string;
+      accuseReceptionObjet?: string;
+      accuseReceptionCorps?: string;
+      destinatairesEnrolement?: string[];
+      destinatairesBpe?: string[];
+      destinatairesSupervision?: string[];
+      destinatairesDirection?: string[];
+    };
+    ParametreChangementDto: {
+      /** Format: uuid */
+      id: string;
+      cle: string;
+      ancienne: string | null;
+      nouvelle: string;
+      parNom: string;
+      le: string;
+    };
+    JournalParametresDto: {
+      items: components['schemas']['ParametreChangementDto'][];
     };
     InscriptionPlateformeDto: {
       /** Format: uuid */
@@ -7537,6 +8025,85 @@ export interface components {
     };
     SuppressionDto: {
       supprimees: number;
+    };
+    OptionPubliqueDto: {
+      /** Format: uuid */
+      id: string;
+      libelle: string;
+    };
+    TrancheDureeDto: {
+      mois: number;
+      libelle: string;
+    };
+    FormulairePublicDto: {
+      /** @description Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller. */
+      champs: components['schemas']['ReglageChampDto'][];
+      libres: components['schemas']['ChampLibreDto'][];
+      banques: components['schemas']['OptionPubliqueDto'][];
+      syndicats: components['schemas']['OptionPubliqueDto'][];
+      /** @description Tranches de revenu mensuel. */
+      revenus: components['schemas']['OptionPubliqueDto'][];
+      professions: components['schemas']['OptionPubliqueDto'][];
+      /** @description Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`. */
+      dureesEtablissement: components['schemas']['TrancheDureeDto'][];
+    };
+    DemandePubliqueDto: {
+      nom: string;
+      prenom: string;
+      /** @description Saisie libre, normalisé en E.164 par le serveur. */
+      phone: string;
+      /** @description Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu. */
+      email?: string;
+      /**
+       * Format: uuid
+       * @description Profession choisie dans la liste rendue par `GET /formulaire`.
+       */
+      professionId?: string;
+      /**
+       * @deprecated
+       * @description Conservé pour les pages déjà en ligne. `professionId` le remplace.
+       */
+      profession?: string;
+      /** @description Établissement où le visiteur exerce. */
+      etablissement?: string;
+      /**
+       * @deprecated
+       * @description Conservé pour les pages déjà en ligne. `etablissement` le remplace.
+       */
+      employeur?: string;
+      dureeEtablissementMois?: number;
+      fonctionnaire?: boolean;
+      engagementEnCours?: boolean;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      syndicatId?: string;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      banqueId?: string;
+      /**
+       * Format: uuid
+       * @description Identifiant rendu par `GET /formulaire`.
+       */
+      incomeBandId?: string;
+      type?: components['schemas']['ProspectType'];
+      paymentMode?: components['schemas']['PaymentMode'];
+      dureeSystemeMois?: number;
+      whatsappStatus?: components['schemas']['WhatsappStatus'];
+      /** @description Exigé quand le statut vaut AUTRE_NUMERO. */
+      whatsappE164?: string;
+      /** @description Réponses aux champs ajoutés par l’administrateur, par identifiant de champ. */
+      champsLibres?: {
+        [key: string]: string;
+      };
+      message?: string;
+      /** @description Laisser vide. */
+      site?: string;
+      /** @description Jeton rendu par le widget Cloudflare Turnstile de la page. */
+      turnstileToken?: string;
     };
   };
   responses: never;
@@ -10681,6 +11248,63 @@ export interface operations {
       };
     };
   };
+  listRepresentantFicheChanges: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RepresentantFicheChangeListDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description REPRESENTANT_NOT_FOUND. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listRepresentantDeviceCalls: {
     parameters: {
       query?: never;
@@ -11297,11 +11921,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         page?: number;
@@ -11785,6 +12411,63 @@ export interface operations {
       };
     };
   };
+  marquerProspectRevue: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        id: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectDto'];
+        };
+      };
+      /** @description PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PROSPECT_NOT_FOUND · fiche absente ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   mergeProspects: {
     parameters: {
       query?: never;
@@ -12106,6 +12789,8 @@ export interface operations {
         pendingOps?: number;
         /** @description Version de l’application mobile, telle qu’elle s’annonce. Facultative. */
         appVersion?: string;
+        /** @description Lecture du journal d’appels accordée sur l’appareil. Facultatif. */
+        journalAppelsAutorise?: boolean;
       };
       header: {
         /** @description Format de données que le client sait lire. En dessous de 5, le tirage est refusé au lieu d’être servi : les liens banque, syndicat et représentant d’un prospect peuvent être nuls, et un client plus ancien échoue à les décoder. */
@@ -14410,11 +15095,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14492,11 +15179,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14574,11 +15263,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         granularity?: components['schemas']['TimeGranularity'];
@@ -14657,11 +15348,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -14740,11 +15433,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14822,11 +15517,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14904,11 +15601,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -14986,11 +15685,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15068,11 +15769,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15150,11 +15853,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15232,11 +15937,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -15315,11 +16022,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15397,11 +16106,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15479,11 +16190,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15561,11 +16274,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15643,11 +16358,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         limit?: number;
@@ -15728,11 +16445,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15810,11 +16529,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15951,11 +16672,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
       };
@@ -15971,6 +16694,112 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OriginBreakdownDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionRepresentants: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StockRepresentantsDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionCampagnes: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar. */
+        actFrom?: string;
+        /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
+        actTo?: string;
+        granularity?: components['schemas']['SupervisionGranularity'];
+        /** @description Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`. */
+        projet?: components['schemas']['Projet'];
+        /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
+        commercialId?: string;
+        /** @description Heure de début quotidienne, Dakar. */
+        timeFrom?: string;
+        /** @description Heure de fin quotidienne, exclue. */
+        timeTo?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SupervisionCampagnesDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -17826,11 +18655,13 @@ export interface operations {
         /** @description Commercial ayant obtenu la méthode d’enrôlement. À ne pas confondre avec `commercialId`, auteur de la saisie de phase 1. */
         enrollmentCapturedById?: string;
         /** @description Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses. */
-        origin?: 'BANQUE';
+        origin?: 'BANQUE' | 'FORMULAIRE_PUBLIC';
         /** @description Borne basse sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateFrom?: string;
         /** @description Borne haute sur la date de saisie terrain (clientCreatedAt), incluse. */
         dateTo?: string;
+        /** @description Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été. */
+        revue?: boolean;
         /** @description Inclure les fiches supprimées logiquement. Réservé à l’ADMIN. */
         includeDeleted?: boolean;
         /** @description `filtered` : une feuille correspondant aux filtres. `consolidated` : cinq feuilles (Consolidé, BDD1…BDD4) ; le paramètre `segment` y est sans effet, puisque c’est le classeur lui-même qui porte la segmentation. */
@@ -18121,6 +18952,106 @@ export interface operations {
         };
         content: {
           'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': string;
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateChampsConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projet: components['schemas']['Projet'];
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateReglagesConversionDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReglagesConversionDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
@@ -19495,6 +20426,150 @@ export interface operations {
       };
     };
   };
+  getParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  updateParametresChues: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateParametresChuesDto'];
+      };
+    };
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ParametresChuesDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description PARAMETRE_RESERVE_ADMIN. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getJournalParametresChues: {
+    parameters: {
+      query?: {
+        limite?: number;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JournalParametresDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
   listEnrolementInscriptions: {
     parameters: {
       query?: {
@@ -19978,6 +21053,122 @@ export interface operations {
       };
       /** @description Ressource introuvable, ou supprimée. */
       404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  lireFormulairePublic: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FormulairePublicDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Service momentanément indisponible. */
+      503: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  envoyerDemandePublique: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        jeton: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DemandePubliqueDto'];
+      };
+    };
+    responses: {
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OkDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Ressource introuvable, ou supprimée. */
+      404: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Trop de requêtes : réessayez plus tard. */
+      429: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Service momentanément indisponible. */
+      503: {
         headers: {
           [name: string]: unknown;
         };

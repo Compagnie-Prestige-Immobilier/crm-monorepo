@@ -173,7 +173,7 @@ const ISSUES_PROSPECT: readonly IssueProspect[] = [
   { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.PLATFORM },
   { outcome: CallOutcome.UNREACHABLE },
   { outcome: CallOutcome.CALLBACK },
-  { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.PHYSICAL },
+  { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.WHATSAPP },
   { outcome: CallOutcome.REFUSED },
   { outcome: CallOutcome.METHOD_OBTAINED, method: EnrollmentMethod.APPOINTMENT },
   { outcome: CallOutcome.WRONG_NUMBER },
@@ -222,6 +222,37 @@ interface Contexte {
   };
 }
 
+function validerContexte(
+  plateauLength: number,
+  accueilId: string | undefined,
+  banqueId: string | undefined,
+  iefsLength: number,
+  departementsSansIefLength: number,
+  statutsLength: number,
+  banquesLength: number,
+  stagesLength: number,
+  entreprisesLength: number,
+  objetsLength: number,
+): void {
+  const conditions: [boolean, string][] = [
+    [
+      plateauLength < 3 || !accueilId || !banqueId,
+      'Comptes fixture absents : lancer d’abord `db:seed`.',
+    ],
+    [iefsLength < IEF_CODES.length, 'Référentiel IEF incomplet.'],
+    [
+      departementsSansIefLength < DEPARTEMENT_CODES_SANS_IEF.length,
+      'Référentiel des départements incomplet.',
+    ],
+    [!statutsLength, 'Référentiel des statuts de qualification vide.'],
+    [!banquesLength || !stagesLength, 'Référentiel bancaire vide.'],
+    [!entreprisesLength || !objetsLength, 'Référentiel des visites vide.'],
+  ];
+  for (const [condition, message] of conditions) {
+    if (condition) throw new Error(message);
+  }
+}
+
 async function chargerContexte(): Promise<Contexte> {
   const emails = [
     'fixture.awa@cpi.sn',
@@ -267,20 +298,23 @@ async function chargerContexte(): Promise<Contexte> {
   });
   const accueilId = parEmail.get('fixture.accueil@cpi.sn');
   const banqueId = parEmail.get('fixture.banque@cpi.sn');
-  if (plateau.length < 3 || !accueilId || !banqueId)
-    throw new Error('Comptes fixture absents : lancer d’abord `db:seed`.');
-  if (iefs.length < IEF_CODES.length) throw new Error('Référentiel IEF incomplet.');
-  if (departementsSansIef.length < DEPARTEMENT_CODES_SANS_IEF.length)
-    throw new Error('Référentiel des départements incomplet.');
-  if (!statuts.length) throw new Error('Référentiel des statuts de qualification vide.');
-  if (!banques.length || !stages.length) throw new Error('Référentiel bancaire vide.');
   const [entreprises, objets, directions, destinataires] = visite;
-  if (!entreprises.length || !objets.length) throw new Error('Référentiel des visites vide.');
-
-  return {
-    plateau,
+  validerContexte(
+    plateau.length,
     accueilId,
     banqueId,
+    iefs.length,
+    departementsSansIef.length,
+    statuts.length,
+    banques.length,
+    stages.length,
+    entreprises.length,
+    objets.length,
+  );
+  return {
+    plateau,
+    accueilId: accueilId as string,
+    banqueId: banqueId as string,
     iefs: IEF_CODES.map((code) => {
       const trouvee = iefs.find((ief) => ief.code === code);
       if (!trouvee) throw new Error(`IEF ${code} introuvable.`);
@@ -323,6 +357,38 @@ function appelsRepresentant(rang: number) {
   }).sort((a, b) => a.clientCreatedAt.getTime() - b.clientCreatedAt.getTime());
 }
 
+function rattachementIef(
+  sansIef: boolean,
+  ief: { id: string; departementId: string },
+  contexte: Contexte,
+  rang: number,
+) {
+  if (sansIef)
+    return { departementId: elementA(contexte.departementsSansIef, rang).id, iefId: null };
+  return { departementId: ief.departementId, iefId: ief.id };
+}
+
+function derniersChampsRepresentant(
+  dernier: ReturnType<typeof appelsRepresentant>[number] | undefined,
+  contexte: Contexte,
+) {
+  if (!dernier)
+    return {
+      statutQualificationId: null,
+      lastCallOutcome: null,
+      lastCallAt: null,
+      nextCallbackAt: null,
+      nextCallbackOrigine: null,
+    };
+  return {
+    statutQualificationId: contexte.statutParCode.get(dernier.issue.statutCode) ?? null,
+    lastCallOutcome: dernier.issue.outcome,
+    lastCallAt: dernier.clientCreatedAt,
+    nextCallbackAt: dernier.callbackAt,
+    nextCallbackOrigine: dernier.callbackAt ? RappelOrigine.PROMIS : null,
+  };
+}
+
 function fiche(rang: number, fullName: string, contexte: Contexte) {
   const appels = appelsRepresentant(rang);
   const dernier = appels.at(-1);
@@ -336,8 +402,7 @@ function fiche(rang: number, fullName: string, contexte: Contexte) {
     etablissement: elementA(ETABLISSEMENTS, rang),
     phoneE164: telephone(rang, 3_000_000, rang),
     notes: MARQUEUR,
-    departementId: sansIef ? elementA(contexte.departementsSansIef, rang).id : ief.departementId,
-    iefId: sansIef ? null : ief.id,
+    ...rattachementIef(sansIef, ief, contexte, rang),
     createdById: auteurId,
     clientCreatedAt: quand(60 - rang, rang),
     relationStatus: elementA(RELATIONS, rang),
@@ -348,14 +413,8 @@ function fiche(rang: number, fullName: string, contexte: Contexte) {
     syndicat: elementA(SYNDICATS, rang),
     connaitUES: rang % 3 === 0,
     contacte: true,
-    statutQualificationId: dernier
-      ? (contexte.statutParCode.get(dernier.issue.statutCode) ?? null)
-      : null,
-    lastCallOutcome: dernier?.issue.outcome ?? null,
-    lastCallAt: dernier?.clientCreatedAt ?? null,
+    ...derniersChampsRepresentant(dernier, contexte),
     lastCallById: auteurId,
-    nextCallbackAt: dernier?.callbackAt ?? null,
-    nextCallbackOrigine: dernier?.callbackAt ? RappelOrigine.PROMIS : null,
   };
 }
 
@@ -447,6 +506,47 @@ async function ecrireProspects(
   }
 }
 
+function resultatConversion(etat: ReturnType<typeof phase2>, prospectRang: number) {
+  const converti = etat.phase2Status === Phase2Status.METHOD_OBTAINED && prospectRang % 3 === 0;
+  const statut = converti ? ProspectStatut.CONVERTI : ProspectStatut.CONTACTE;
+  return { converti, statut };
+}
+
+function captureDate(
+  etat: ReturnType<typeof phase2>,
+  dernier: ReturnType<typeof appelsProspect>[number] | undefined,
+): Date | null {
+  if (!etat.enrollmentMethod) return null;
+  return dernier?.clientCreatedAt ?? null;
+}
+
+function champsCapture(capture: Date | null, createdById: string) {
+  return { enrollmentCapturedAt: capture, enrollmentCapturedById: capture ? createdById : null };
+}
+
+function derniersChampsProspect(
+  dernier: ReturnType<typeof appelsProspect>[number] | undefined,
+  createdById: string,
+) {
+  if (!dernier) return { lastCallOutcome: null, lastCallAt: null, lastCallById: null };
+  return {
+    lastCallOutcome: dernier.issue.outcome,
+    lastCallAt: dernier.clientCreatedAt,
+    lastCallById: createdById,
+  };
+}
+
+function construireConversion(prospectRang: number, contexte: Contexte, convertedAt: Date | null) {
+  return {
+    offerId: contexte.offerId,
+    paymentMode: prospectRang % 2 === 0 ? PaymentMode.ECHELONNE : PaymentMode.COMPTANT,
+    amountXof: 150_000 + prospectRang * 5_000,
+    durationMonths: prospectRang % 2 === 0 ? 12 : null,
+    confirmedById: contexte.banqueId,
+    confirmedAt: convertedAt ?? MAINTENANT,
+  };
+}
+
 async function ecrireProspect(
   prospectRang: number,
   rang: number,
@@ -458,9 +558,8 @@ async function ecrireProspect(
   const appels = appelsProspect(prospectRang);
   const dernier = appels.at(-1);
   const etat = phase2(appels);
-  const converti = etat.phase2Status === Phase2Status.METHOD_OBTAINED && prospectRang % 3 === 0;
-  const statut = converti ? ProspectStatut.CONVERTI : ProspectStatut.CONTACTE;
-  const capture = etat.enrollmentMethod ? (dernier?.clientCreatedAt ?? null) : null;
+  const { converti, statut } = resultatConversion(etat, prospectRang);
+  const capture = captureDate(etat, dernier);
   const prospect = {
     nom: valeurs.fullName.split(' ')[1] ?? valeurs.fullName,
     prenom: `Prospect ${String(prospectRang + 1).padStart(2, '0')}`,
@@ -471,11 +570,8 @@ async function ecrireProspect(
     createdById: valeurs.createdById,
     statut,
     ...etat,
-    enrollmentCapturedAt: capture,
-    enrollmentCapturedById: capture ? valeurs.createdById : null,
-    lastCallOutcome: dernier?.issue.outcome ?? null,
-    lastCallAt: dernier?.clientCreatedAt ?? null,
-    lastCallById: dernier ? valeurs.createdById : null,
+    ...champsCapture(capture, valeurs.createdById),
+    ...derniersChampsProspect(dernier, valeurs.createdById),
     clientCreatedAt: quand((rang * 5) % 20, prospectRang),
   };
   await prisma.prospect.upsert({
@@ -489,8 +585,7 @@ async function ecrireProspect(
   const parcours = {
     statut,
     ...etat,
-    enrollmentCapturedAt: capture,
-    enrollmentCapturedById: prospect.enrollmentCapturedById,
+    ...champsCapture(capture, valeurs.createdById),
     convertedAt,
     convertedById: converti ? contexte.banqueId : null,
   };
@@ -503,14 +598,7 @@ async function ecrireProspect(
   await ecrireAppelsProspect(prospectRang, prospectId, appels, contexte);
   if (!converti) return;
 
-  const conversion = {
-    offerId: contexte.offerId,
-    paymentMode: prospectRang % 2 === 0 ? PaymentMode.ECHELONNE : PaymentMode.COMPTANT,
-    amountXof: 150_000 + prospectRang * 5_000,
-    durationMonths: prospectRang % 2 === 0 ? 12 : null,
-    confirmedById: contexte.banqueId,
-    confirmedAt: convertedAt ?? MAINTENANT,
-  };
+  const conversion = construireConversion(prospectRang, contexte, convertedAt);
   await prisma.prospectConversion.upsert({
     where: { journeyId },
     create: {
@@ -521,6 +609,47 @@ async function ecrireProspect(
     update: conversion,
   });
   await ecrireDossierBancaire(prospectRang, prospectId, prospect, contexte);
+}
+
+function deviceCallChamps(confirme: boolean, prospectRang: number, clientCreatedAt: Date) {
+  if (!confirme)
+    return { deviceCallType: null, deviceCallDurationSeconds: null, deviceCallAt: null };
+  return {
+    deviceCallType: 'sortant',
+    deviceCallDurationSeconds: 60 + ((prospectRang * 13) % 200),
+    deviceCallAt: clientCreatedAt,
+  };
+}
+
+async function ecrireRappelPromis(
+  prospectRang: number,
+  prospectId: string,
+  appel: ReturnType<typeof appelsProspect>[number],
+  performedById: string,
+  dernier: boolean,
+): Promise<void> {
+  const scheduledAt = new Date(appel.clientCreatedAt.getTime() + ((prospectRang % 3) + 1) * JOUR);
+  const honore = scheduledAt < MAINTENANT && prospectRang % 2 === 0;
+  // Un seul rappel PENDING par prospect : index unique partiel en base.
+  let status: ScheduledCallbackStatus = ScheduledCallbackStatus.SUPERSEDED;
+  if (honore) status = ScheduledCallbackStatus.DONE;
+  else if (dernier) status = ScheduledCallbackStatus.PENDING;
+  const rappel = {
+    prospectId,
+    assignedToId: performedById,
+    scheduledAt,
+    comment: 'Rappel promis lors de l’appel.',
+    status,
+  };
+  await prisma.scheduledCallback.upsert({
+    where: { sourceAttemptId: appel.id },
+    create: {
+      id: devId(`rappel:${appel.id}`, 600 + prospectRang),
+      sourceAttemptId: appel.id,
+      ...rappel,
+    },
+    update: rappel,
+  });
 }
 
 async function ecrireAppelsProspect(
@@ -539,9 +668,7 @@ async function ecrireAppelsProspect(
       method: appel.issue.method ?? null,
       comment: appel.issue.comment ?? null,
       rendezVousAt: appel.rendezVousAt,
-      deviceCallType: confirme ? 'sortant' : null,
-      deviceCallDurationSeconds: confirme ? 60 + ((prospectRang * 13) % 200) : null,
-      deviceCallAt: confirme ? appel.clientCreatedAt : null,
+      ...deviceCallChamps(confirme, prospectRang, appel.clientCreatedAt),
       clientCreatedAt: appel.clientCreatedAt,
     };
     await prisma.callAttempt.upsert({
@@ -550,30 +677,13 @@ async function ecrireAppelsProspect(
       update: tentative,
     });
     if (appel.issue.outcome !== CallOutcome.CALLBACK) continue;
-
-    const scheduledAt = new Date(appel.clientCreatedAt.getTime() + ((prospectRang % 3) + 1) * JOUR);
-    const honore = scheduledAt < MAINTENANT && prospectRang % 2 === 0;
-    // Un seul rappel PENDING par prospect : index unique partiel en base.
-    const dernier = k === appels.length - 1;
-    let status: ScheduledCallbackStatus = ScheduledCallbackStatus.SUPERSEDED;
-    if (honore) status = ScheduledCallbackStatus.DONE;
-    else if (dernier) status = ScheduledCallbackStatus.PENDING;
-    const rappel = {
+    await ecrireRappelPromis(
+      prospectRang,
       prospectId,
-      assignedToId: performedById,
-      scheduledAt,
-      comment: 'Rappel promis lors de l’appel.',
-      status,
-    };
-    await prisma.scheduledCallback.upsert({
-      where: { sourceAttemptId: appel.id },
-      create: {
-        id: devId(`rappel:${appel.id}`, 600 + prospectRang),
-        sourceAttemptId: appel.id,
-        ...rappel,
-      },
-      update: rappel,
-    });
+      appel,
+      performedById,
+      k === appels.length - 1,
+    );
   }
 }
 

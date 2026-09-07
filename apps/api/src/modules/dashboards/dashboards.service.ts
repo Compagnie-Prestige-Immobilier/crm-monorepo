@@ -62,7 +62,7 @@ const toPlainWidgets = (widgets: readonly DispositionWidgetDto[]): DispositionWi
   }));
 
 const toStoredLayout = (ecran: DashboardEcran, body: UpdateDispositionDto): DispositionLayout => ({
-  version: 1,
+  version: 2,
   preset: body.preset ?? 'essentiel',
   widgets: sanitize(ecran, toPlainWidgets(body.widgets)),
 });

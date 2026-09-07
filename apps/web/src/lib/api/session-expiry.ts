@@ -1,4 +1,4 @@
-export const LOGIN_PATH = '/connexion';
+const LOGIN_PATH = '/connexion';
 
 export const SESSION_EXPIRED_PARAM = 'session';
 export const SESSION_EXPIRED_VALUE = 'expiree';

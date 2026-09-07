@@ -176,8 +176,8 @@ export class UsersService {
     const email = input.email?.trim().toLowerCase();
     const username = input.username?.trim().toLowerCase();
     await this.assertIdentifiersFree(
-      email && email !== existing.email ? email : undefined,
-      username && username !== existing.username ? username : undefined,
+      this.identifierIfChanged(email, existing.email),
+      this.identifierIfChanged(username, existing.username),
     );
 
     const roleChanged = input.role !== undefined && input.role !== existing.role;
@@ -253,6 +253,42 @@ export class UsersService {
    * qu'une campagne ultérieure les reprenne. La reprise est donc exigée, pas
    * proposée.
    */
+  private assertHandoverProvided(
+    handoverToId: string | undefined,
+    aReprendre: number,
+    representants: number,
+  ): asserts handoverToId is string {
+    if (handoverToId) return;
+    throw new BadRequestException({
+      code: 'HANDOVER_REQUIRED',
+      message:
+        `Ce compte détient ${String(aReprendre)} prospect(s) et ${String(representants)} ` +
+        'représentant(s) : désignez le téléconseiller qui les reprend.',
+    });
+  }
+
+  private assertHandoverDifferent(id: string, handoverToId: string): void {
+    if (handoverToId !== id) return;
+    throw new BadRequestException({
+      code: 'HANDOVER_TO_SELF',
+      message: 'Le repreneur doit être un autre compte.',
+    });
+  }
+
+  private async resolveHandoverTarget(
+    handoverToId: string,
+  ): Promise<{ id: string; role: Role; fullName: string }> {
+    const repreneur = await this.prisma.user.findFirst({
+      where: { id: handoverToId, isActive: true, deletedAt: null },
+      select: { id: true, role: true, fullName: true },
+    });
+    if (repreneur && repreneur.role === Role.COMMERCIAL) return repreneur;
+    throw new BadRequestException({
+      code: 'HANDOVER_TARGET_INVALID',
+      message: 'Le repreneur doit être un téléconseiller actif.',
+    });
+  }
+
   private async handOverPortfolio(
     id: string,
     handoverToId: string | undefined,
@@ -266,31 +302,9 @@ export class UsersService {
     });
     if (aReprendre === 0 && representants === 0) return;
 
-    if (!handoverToId) {
-      throw new BadRequestException({
-        code: 'HANDOVER_REQUIRED',
-        message:
-          `Ce compte détient ${String(aReprendre)} prospect(s) et ${String(representants)} ` +
-          'représentant(s) : désignez le téléconseiller qui les reprend.',
-      });
-    }
-    if (handoverToId === id) {
-      throw new BadRequestException({
-        code: 'HANDOVER_TO_SELF',
-        message: 'Le repreneur doit être un autre compte.',
-      });
-    }
-
-    const repreneur = await this.prisma.user.findFirst({
-      where: { id: handoverToId, isActive: true, deletedAt: null },
-      select: { id: true, role: true, fullName: true },
-    });
-    if (!repreneur || repreneur.role !== Role.COMMERCIAL) {
-      throw new BadRequestException({
-        code: 'HANDOVER_TARGET_INVALID',
-        message: 'Le repreneur doit être un téléconseiller actif.',
-      });
-    }
+    this.assertHandoverProvided(handoverToId, aReprendre, representants);
+    this.assertHandoverDifferent(id, handoverToId);
+    const repreneur = await this.resolveHandoverTarget(handoverToId);
 
     await this.prisma.$transaction(async (tx) => {
       await tx.prospect.updateMany({
@@ -380,6 +394,10 @@ export class UsersService {
     await this.revokeSessions(id);
     await this.redis.bust(freshUserKey(id));
     return { ok: true };
+  }
+
+  private identifierIfChanged(next: string | undefined, current: string): string | undefined {
+    return next && next !== current ? next : undefined;
   }
 
   private async revokeSessions(userId: string): Promise<void> {

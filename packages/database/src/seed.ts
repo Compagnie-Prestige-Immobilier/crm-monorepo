@@ -75,6 +75,12 @@ const FIXTURE_USERS = [
     fullName: 'Accueil Fixture',
     role: Role.ACCUEIL,
   },
+  {
+    email: 'fixture.clientele@cpi.sn',
+    username: 'fixture.clientele',
+    fullName: 'Clientèle Fixture',
+    role: Role.CHARGE_CLIENTELE,
+  },
 ] as const;
 
 async function seedGeography(): Promise<void> {
@@ -343,12 +349,23 @@ async function seedVisiteReferentiels(): Promise<void> {
   );
 }
 
+function envOrDevDefault(
+  value: string | undefined,
+  devDefaults: boolean,
+  defaut: string,
+): string | undefined {
+  return value ?? (devDefaults ? defaut : undefined);
+}
+
 async function seedAdmin(): Promise<void> {
   const devDefaults = process.env.NODE_ENV === 'development';
-  const email = process.env.SEED_ADMIN_EMAIL ?? (devDefaults ? 'admin@cpi.sn' : undefined);
-  const username = process.env.SEED_ADMIN_USERNAME ?? (devDefaults ? 'admin' : undefined);
-  const password =
-    process.env.SEED_ADMIN_PASSWORD ?? (devDefaults ? 'ChangeMoiEnProd2026' : undefined);
+  const email = envOrDevDefault(process.env.SEED_ADMIN_EMAIL, devDefaults, 'admin@cpi.sn');
+  const username = envOrDevDefault(process.env.SEED_ADMIN_USERNAME, devDefaults, 'admin');
+  const password = envOrDevDefault(
+    process.env.SEED_ADMIN_PASSWORD,
+    devDefaults,
+    'ChangeMoiEnProd2026',
+  );
   const fullName = process.env.SEED_ADMIN_FULL_NAME ?? 'Administrateur CPI';
 
   if (!email || !username || !password) {

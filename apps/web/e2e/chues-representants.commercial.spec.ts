@@ -199,8 +199,9 @@ test('CHU-REPD-03 une relation jamais tranchée le dit aussi', async ({ page }) 
   await ouvrir(page, MARIAMA.fullName);
 
   // La fiche vient d'être créée : sa relation vaut INCONNU, « Pas encore
-  // contacté », et aucune bascule n'a été consignée.
+  // contacté », et l'onglet des statuts de l'histoire ne montre aucune bascule.
   await expect(page.getByText('Pas encore contacté', { exact: true })).toBeVisible();
+  await page.getByRole('tab', { name: /^Statuts/ }).click();
   await expect(page.getByText('Aucune bascule enregistrée.')).toBeVisible();
 });
 

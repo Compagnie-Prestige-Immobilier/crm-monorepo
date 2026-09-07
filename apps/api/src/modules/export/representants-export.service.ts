@@ -15,7 +15,6 @@ import {
   WHATSAPP_LABELS,
 } from '../representants/import-fields.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
-import { RepresentantSortField } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
 import {
   COMMON_TEMPLATE_RULES,
@@ -202,41 +201,69 @@ export class RepresentantsExportService {
     const where: Prisma.RepresentantWhereInput = {
       deletedAt: null,
       ...suiviWhere(query),
+      ...directFilters(user, query, ids),
     };
     // Dans `AND`, comme la liste : `where.OR` porte la recherche libre.
     const portee = attributionScope(user);
     if (portee.OR) where.AND = [portee];
 
-    if (query.commercialId) {
-      where.createdById = readableOwnerId(user, query.commercialId);
-    }
-    if (query.departementId) where.departementId = query.departementId;
-    if (query.iefId) where.iefId = query.iefId;
+    const dateRange = clientCreatedAtFilter(query);
+    if (dateRange) where.clientCreatedAt = dateRange;
 
-    if (query.dateFrom || query.dateTo) {
-      where.clientCreatedAt = {
-        ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
-        ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
-      };
-    }
+    const prospects = prospectsFilter(query);
+    if (prospects) where.prospects = prospects;
 
-    if (query.hasProspects === true) where.prospects = { some: { deletedAt: null } };
-    if (query.hasProspects === false) where.prospects = { none: { deletedAt: null } };
-    if (query.relationStatus) where.relationStatus = query.relationStatus;
     const whatsapp = whatsappStatuses(query);
     if (whatsapp) where.whatsappStatus = { in: whatsapp };
-    if (ids) where.id = { in: [...ids] };
 
-    const search = query.search?.trim();
-    if (search) {
-      where.OR = [
-        { fullName: { contains: search, mode: 'insensitive' } },
-        { phoneE164: { contains: search.replace(/[^\d+]/g, '') } },
-      ];
-    }
+    const search = searchFilter(query);
+    if (search) where.OR = search;
 
     return where;
   }
+}
+
+function directFilters(
+  user: AuthenticatedUser,
+  query: RepresentantExportQueryDto,
+  ids?: readonly string[],
+): Partial<Prisma.RepresentantWhereInput> {
+  const direct: Partial<Prisma.RepresentantWhereInput> = {};
+  if (query.commercialId) direct.createdById = readableOwnerId(user, query.commercialId);
+  if (query.departementId) direct.departementId = query.departementId;
+  if (query.iefId) direct.iefId = query.iefId;
+  if (query.relationStatus) direct.relationStatus = query.relationStatus;
+  if (ids) direct.id = { in: [...ids] };
+  return direct;
+}
+
+function clientCreatedAtFilter(
+  query: RepresentantExportQueryDto,
+): Prisma.RepresentantWhereInput['clientCreatedAt'] | undefined {
+  if (!query.dateFrom && !query.dateTo) return undefined;
+  return {
+    ...(query.dateFrom ? { gte: inclusiveDateFrom(query.dateFrom) } : {}),
+    ...(query.dateTo ? { lte: inclusiveDateTo(query.dateTo) } : {}),
+  };
+}
+
+function prospectsFilter(
+  query: RepresentantExportQueryDto,
+): Prisma.RepresentantWhereInput['prospects'] | undefined {
+  if (query.hasProspects === true) return { some: { deletedAt: null } };
+  if (query.hasProspects === false) return { none: { deletedAt: null } };
+  return undefined;
+}
+
+function searchFilter(
+  query: RepresentantExportQueryDto,
+): Prisma.RepresentantWhereInput['OR'] | undefined {
+  const search = query.search?.trim();
+  if (!search) return undefined;
+  return [
+    { fullName: { contains: search, mode: 'insensitive' } },
+    { phoneE164: { contains: search.replace(/[^\d+]/g, '') } },
+  ];
 }
 
 function whatsappStatuses(query: RepresentantExportQueryDto): WhatsappStatus[] | null {
@@ -252,6 +279,3 @@ function whatsappStatuses(query: RepresentantExportQueryDto): WhatsappStatus[] |
     return statuses.filter((status) => !reachable.includes(status as WhatsappStatus));
   return statuses;
 }
-
-/** Champs de tri exposés, réexportés pour que le test de cohérence les compare. */
-export const REPRESENTANT_SORT_FIELDS = Object.values(RepresentantSortField);

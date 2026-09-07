@@ -28,6 +28,7 @@ class SyncApi {
   /// * [limit]
   /// * [pendingOps] - Opérations en attente de remontée dans l’appareil. Le serveur ne peut pas la deviner. Facultatif sans limite de temps.
   /// * [appVersion] - Version de l’application mobile, telle qu’elle s’annonce. Facultative.
+  /// * [journalAppelsAutorise] - Lecture du journal d’appels accordée sur l’appareil. Facultatif.
   /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
   /// * [headers] - Can be used to add additional headers to the request
   /// * [extras] - Can be used to add flags to the request
@@ -43,6 +44,7 @@ class SyncApi {
     num? limit = 200,
     num? pendingOps,
     String? appVersion,
+    bool? journalAppelsAutorise,
     CancelToken? cancelToken,
     Map<String, dynamic>? headers,
     Map<String, dynamic>? extra,
@@ -71,6 +73,8 @@ class SyncApi {
       if (limit != null) r'limit': limit,
       if (pendingOps != null) r'pendingOps': pendingOps,
       if (appVersion != null) r'appVersion': appVersion,
+      if (journalAppelsAutorise != null)
+        r'journalAppelsAutorise': journalAppelsAutorise,
     };
 
     final _response = await _dio.request<Object>(

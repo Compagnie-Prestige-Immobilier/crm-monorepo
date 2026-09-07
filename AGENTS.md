@@ -43,26 +43,28 @@ couperait, il faut le couper:
 Un etat vide dit quoi faire ensuite, pas seulement que la liste est vide. Une
 erreur dit ce qui s'est passe et ce que le lecteur peut faire.
 
-Le vocabulaire est FIGE et garde par `apps/web/src/lib/vocabulaire.test.ts`:
-`teleconseiller`, `Banque & Finance`, `campagne d'appels prospects`, `campagne
-d'appels representants`. Les mots `commercial` et ses declinaisons sont
-interdits dans une chaine affichee.
+Le vocabulaire est FIGE: `teleconseiller`, `Banque & Finance`, `campagne
+d'appels prospects`, `campagne d'appels representants`. Les mots `commercial`
+et ses declinaisons sont interdits dans une chaine affichee.
 
 Pas de tiret cadratin. Il ne se saisit pas au clavier et se lit mal en
 terminal.
 
 ## Tests
 
-Un test qui passe sur du code casse est PIRE que pas de test: il fabrique une
-confiance fausse et fait cesser la verification a la main.
+**Les tests unitaires sont INTERDITS.** Aucun `*.test.ts`, `*.test.tsx`,
+`*_test.dart`, aucun `describe`/`it` sur une fonction isolee, aucun double
+(`fake-*`, mock, stub) ecrit pour eux. La CI refuse tout fichier de ce type.
+Ne pas en proposer, ne pas en ecrire meme "pour verifier".
 
-Avant de garder un test, le casser: modifier le code qu'il couvre, verifier
-qu'il rougit, remettre. Un test qu'on n'a pas vu rougir n'a rien prouve.
+Ce qui reste et ce qui prouve: les tests d'integration API contre Postgres
+(`*.integration.test.ts`, `pnpm test:integration`), les parcours Playwright
+(`apps/web/e2e`, `pnpm test:e2e`) et le smoke Maestro. Un comportement se
+verifie contre la pile reelle ou a la main, pas contre un mock.
 
-Ce depot en a heberge six qui ne pouvaient pas echouer, retires un par un:
-une assertion tautologique, une boucle sur son propre litteral au lieu du
-document engendre, un `test.skip` conditionne par une connexion qui echouait
-en silence, un `toBeDefined` sur une fonction sans valeur de retour.
+Un test qui passe sur du code casse est PIRE que pas de test. Avant de garder
+un test d'integration ou e2e, le casser: modifier le code qu'il couvre,
+verifier qu'il rougit, remettre.
 
 ## Commentaires
 

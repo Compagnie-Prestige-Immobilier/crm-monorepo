@@ -2,12 +2,7 @@ import { Prisma } from '@crm/database';
 
 export const ALL_ROWS = Prisma.sql`TRUE`;
 
-export const TASK = Prisma.sql`ct`;
-export const ATTEMPT = Prisma.sql`ca`;
-export const CAMPAIGN = Prisma.sql`cc`;
 export const BANK_CASE = Prisma.sql`bc`;
-export const TRANSITION = Prisma.sql`tr`;
-export const RELATION_CHANGE = Prisma.sql`rc`;
 
 /**
  * Clés de `CallOutcome` qui ne comptent PAS comme un contact. Un faux numéro
@@ -30,6 +25,9 @@ export const REP_LIVE_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', '
  */
 export const REP_JOINT_OUTCOMES = Prisma.sql`('REACHED', 'REFUSED', 'CALLBACK', 'WRONG_NUMBER')`;
 
+/** Les effets de la branche jointe, miroir de `brancheDe` tenu par `pilotage.sql.test.ts`. */
+export const REP_JOINT_EFFECTS = Prisma.sql`('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK', 'WRONG_NUMBER')`;
+
 /** À placer après `FROM "rep_call_attempts" rca` pour lire `REP_ARBITRAGE`. */
 export const REP_STATUT_JOIN = Prisma.sql`LEFT JOIN "statuts_qualification" sq ON sq."id" = rca."statutQualificationId"`;
 
@@ -48,6 +46,26 @@ export const REP_ARBITRAGE = Prisma.sql`CASE
     WHEN rca."outcome" = 'REACHED' THEN 'AMBASSADEUR'
     WHEN rca."outcome" = 'REFUSED' THEN 'REFUS'
   END`;
+
+/**
+ * Une tentative lue comme DERNIER statut de sa fiche (EB-33). Sans statut,
+ * tentative d'avant le référentiel, l'issue seule parle. « Éligible » borne le
+ * taux d'acceptation : joint, hors faux numéro et hors fermeture sans arbitrage
+ * (décédé, retraité, hors cible, affecté ailleurs).
+ */
+export const REP_FICHE_COLONNES = Prisma.sql`
+    (CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ${REP_JOINT_EFFECTS}
+          ELSE rca."outcome" IN ${REP_JOINT_OUTCOMES} END)::int          AS joint,
+    (${REP_ARBITRAGE} = 'AMBASSADEUR')::int                             AS accepte,
+    (${REP_ARBITRAGE} = 'REFUS')::int                                   AS refuse,
+    (CASE WHEN sq."id" IS NOT NULL THEN sq."effect" = 'SCHEDULE_CALLBACK'
+          ELSE rca."outcome" = 'CALLBACK' END)::int                     AS rappel,
+    (CASE WHEN sq."id" IS NOT NULL
+          THEN sq."effect" IN ${REP_JOINT_EFFECTS}
+               AND sq."effect" <> 'WRONG_NUMBER'
+               AND NOT (sq."effect" = 'REFUSED' AND sq."relationStatus" IS NULL)
+          ELSE rca."outcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END)::int AS eligible
+`;
 
 /**
  * Sous-requêtes et non jointures : un prospect porte plusieurs dossiers, une

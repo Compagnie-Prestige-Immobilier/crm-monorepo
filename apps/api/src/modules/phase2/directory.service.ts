@@ -11,9 +11,9 @@ import {
 } from './directory-cursor.js';
 import type { DirectoryEntryDto, DirectoryPageDto, DirectoryQueryDto } from './dto.js';
 
-export const DIRECTORY_SAFETY_LAG_MS = 2_000;
+const DIRECTORY_SAFETY_LAG_MS = 2_000;
 
-export const DIRECTORY_DEFAULT_PAGE_SIZE = 2_000;
+const DIRECTORY_DEFAULT_PAGE_SIZE = 2_000;
 
 const DIRECTORY_SELECT = {
   id: true,

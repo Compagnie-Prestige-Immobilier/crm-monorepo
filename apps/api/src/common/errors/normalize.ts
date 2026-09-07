@@ -14,7 +14,7 @@ const GENERIC_CODES: Record<number, string> = {
   [HttpStatus.SERVICE_UNAVAILABLE]: 'SERVICE_UNAVAILABLE',
 };
 
-export const genericCode = (status: number): string =>
+const genericCode = (status: number): string =>
   GENERIC_CODES[status] ?? (status >= 500 ? 'INTERNAL_SERVER_ERROR' : 'REQUEST_FAILED');
 
 const FALLBACK_MESSAGE = 'Une erreur est survenue.';
@@ -28,6 +28,15 @@ export interface NormalizedError {
   [key: string]: unknown;
 }
 
+const detailsFrom = (rawMessage: unknown): string[] | undefined =>
+  Array.isArray(rawMessage) ? rawMessage.map(String) : undefined;
+
+const messageFrom = (rawMessage: unknown, details: string[] | undefined): string => {
+  if (details) return details.length > 0 ? details.join(' ') : FALLBACK_MESSAGE;
+  if (typeof rawMessage === 'string' && rawMessage !== '') return rawMessage;
+  return FALLBACK_MESSAGE;
+};
+
 export function normalizeErrorBody(
   status: number,
   payload: unknown,
@@ -39,18 +48,8 @@ export function normalizeErrorBody(
   delete record.error;
 
   const rawMessage = typeof payload === 'string' ? payload : record.message;
-  let message: string;
-  let details: string[] | undefined;
-
-  if (Array.isArray(rawMessage)) {
-    details = rawMessage.map(String);
-    message = details.length > 0 ? details.join(' ') : FALLBACK_MESSAGE;
-  } else if (typeof rawMessage === 'string' && rawMessage !== '') {
-    message = rawMessage;
-  } else {
-    message = FALLBACK_MESSAGE;
-  }
-
+  const details = detailsFrom(rawMessage);
+  const message = messageFrom(rawMessage, details);
   const code = typeof record.code === 'string' && record.code !== '' ? record.code : undefined;
 
   return {

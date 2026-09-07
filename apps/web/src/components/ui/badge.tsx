@@ -45,4 +45,4 @@ function Badge({ className, variant, render, ...props }: BadgeProps) {
   });
 }
 
-export { Badge, badgeVariants };
+export { Badge };

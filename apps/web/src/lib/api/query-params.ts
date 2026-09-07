@@ -15,9 +15,7 @@ function endOfDay(isoDate: string): string {
   return `${isoDate}T23:59:59.999Z`;
 }
 
-export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
-  const query: AnalyticsQuery = {};
-
+function applyIdentityFilters(query: AnalyticsQuery, filters: ProspectFilters): void {
   if (filters.projet !== null) query.projet = filters.projet;
   const search = filters.search.trim();
   if (search !== '') query.search = search;
@@ -26,6 +24,9 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   if (filters.departementId !== null) query.departementId = filters.departementId;
   if (filters.banqueId !== null) query.banqueId = filters.banqueId;
   if (filters.syndicatId !== null) query.syndicatId = filters.syndicatId;
+}
+
+function applyStatusFilters(query: AnalyticsQuery, filters: ProspectFilters): void {
   if (filters.statut !== null) query.statut = filters.statut;
   if (filters.segment !== null) query.segment = filters.segment;
   if (filters.phase2Status !== null) query.phase2Status = filters.phase2Status;
@@ -33,9 +34,19 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
   if (filters.enrollmentCapturedById !== null) {
     query.enrollmentCapturedById = filters.enrollmentCapturedById;
   }
+  if (filters.revue !== null) query.revue = filters.revue;
+}
+
+function applyDateFilters(query: AnalyticsQuery, filters: ProspectFilters): void {
   if (filters.dateFrom !== null) query.dateFrom = startOfDay(filters.dateFrom);
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
+}
 
+export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
+  const query: AnalyticsQuery = {};
+  applyIdentityFilters(query, filters);
+  applyStatusFilters(query, filters);
+  applyDateFilters(query, filters);
   return query;
 }
 

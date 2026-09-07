@@ -29,6 +29,97 @@ import { withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+function canSubmitClientRequest(fields: {
+  nom: string;
+  prenom: string;
+  phone: string;
+  banque: string | null;
+  pending: boolean;
+}): boolean {
+  return (
+    fields.nom.trim().length >= 2 &&
+    fields.prenom.trim().length >= 2 &&
+    fields.phone.trim().length >= 6 &&
+    fields.banque !== null &&
+    !fields.pending
+  );
+}
+
+function splitInitialTerm(term: string): { phone: string; nom: string; prenom: string } {
+  const trimmed = term.trim();
+  const digits = trimmed.replace(/\D/gu, '');
+  const looksLikePhone = digits.length >= 6 && digits.length >= trimmed.length / 2;
+
+  if (looksLikePhone) {
+    return { phone: trimmed, nom: '', prenom: '' };
+  }
+
+  const parts = trimmed.split(/\s+/u).filter((part) => part !== '');
+  return { phone: '', prenom: parts[0] ?? '', nom: parts.slice(1).join(' ') };
+}
+
+function ClientRequestSuccess({ prenom, nom }: { prenom: string; nom: string }) {
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
+    >
+      <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
+      <div className="min-w-0 text-[0.875rem]">
+        <p className="font-[600]">
+          {prenom} {nom} est en attente d’approbation.
+        </p>
+        <p className="mt-1 text-muted-foreground">
+          Vous recevrez une notification dès que le siège aura tranché.
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function ClientRequestFooter({
+  sent,
+  canSubmit,
+  isPending,
+  onClose,
+  onSubmit,
+}: {
+  sent: boolean;
+  canSubmit: boolean;
+  isPending: boolean;
+  onClose: () => void;
+  onSubmit: () => void;
+}) {
+  if (sent) {
+    return (
+      <Button type="button" onClick={onClose}>
+        Fermer
+      </Button>
+    );
+  }
+
+  return (
+    <>
+      <Button type="button" variant="ghost" disabled={isPending} onClick={onClose}>
+        Annuler
+      </Button>
+      <Button type="button" disabled={!canSubmit} onClick={onSubmit}>
+        {isPending ? (
+          <>
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            Envoi…
+          </>
+        ) : (
+          <>
+            <SendIcon aria-hidden="true" />
+            Envoyer la demande
+          </>
+        )}
+      </Button>
+    </>
+  );
+}
+
 export function ClientRequestDialog({
   open,
   onOpenChange,
@@ -62,21 +153,10 @@ export function ClientRequestDialog({
     if (!open) return;
     // oxlint-disable-next-line react/set-state-in-effect -- formulaire recalé à l'ouverture
     setSent(false);
-    const term = initialTerm.trim();
-    const digits = term.replace(/\D/gu, '');
-    const looksLikePhone = digits.length >= 6 && digits.length >= term.length / 2;
-
-    if (looksLikePhone) {
-      setPhone(term);
-      setNom('');
-      setPrenom('');
-      return;
-    }
-
-    setPhone('');
-    const parts = term.split(/\s+/u).filter((part) => part !== '');
-    setPrenom(parts[0] ?? '');
-    setNom(parts.slice(1).join(' '));
+    const fields = splitInitialTerm(initialTerm);
+    setPhone(fields.phone);
+    setNom(fields.nom);
+    setPrenom(fields.prenom);
   }, [open, initialTerm]);
 
   const create = useMutation({
@@ -100,21 +180,19 @@ export function ClientRequestDialog({
     },
   });
 
-  const canSubmit =
-    nom.trim().length >= 2 &&
-    prenom.trim().length >= 2 &&
-    phone.trim().length >= 6 &&
-    banque !== null &&
-    !create.isPending;
+  const canSubmit = canSubmitClientRequest({ nom, prenom, phone, banque, pending: create.isPending });
+
+  function handleOpenChange(next: boolean): void {
+    if (!next && create.isPending) return;
+    onOpenChange(next);
+  }
+
+  function close(): void {
+    onOpenChange(false);
+  }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(next) => {
-        if (!next && create.isPending) return;
-        onOpenChange(next);
-      }}
-    >
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{sent ? 'Demande envoyée' : 'Demander la création du client'}</DialogTitle>
@@ -126,20 +204,7 @@ export function ClientRequestDialog({
         </DialogHeader>
 
         {sent ? (
-          <div
-            role="status"
-            className="flex items-start gap-3 rounded-md border border-border bg-secondary p-4"
-          >
-            <CheckCircle2Icon className="mt-0.5 size-5 shrink-0 text-success" aria-hidden="true" />
-            <div className="min-w-0 text-[0.875rem]">
-              <p className="font-[600]">
-                {prenom.trim()} {nom.trim()} est en attente d’approbation.
-              </p>
-              <p className="mt-1 text-muted-foreground">
-                Vous recevrez une notification dès que le siège aura tranché.
-              </p>
-            </div>
-          </div>
+          <ClientRequestSuccess prenom={prenom.trim()} nom={nom.trim()} />
         ) : (
           <div className="flex flex-col gap-4">
             <div className="grid gap-3 sm:grid-cols-2">
@@ -256,48 +321,15 @@ export function ClientRequestDialog({
         )}
 
         <DialogFooter>
-          {sent ? (
-            <Button
-              type="button"
-              onClick={() => {
-                onOpenChange(false);
-              }}
-            >
-              Fermer
-            </Button>
-          ) : (
-            <>
-              <Button
-                type="button"
-                variant="ghost"
-                disabled={create.isPending}
-                onClick={() => {
-                  onOpenChange(false);
-                }}
-              >
-                Annuler
-              </Button>
-              <Button
-                type="button"
-                disabled={!canSubmit}
-                onClick={() => {
-                  create.mutate();
-                }}
-              >
-                {create.isPending ? (
-                  <>
-                    <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                    Envoi…
-                  </>
-                ) : (
-                  <>
-                    <SendIcon aria-hidden="true" />
-                    Envoyer la demande
-                  </>
-                )}
-              </Button>
-            </>
-          )}
+          <ClientRequestFooter
+            sent={sent}
+            canSubmit={canSubmit}
+            isPending={create.isPending}
+            onClose={close}
+            onSubmit={() => {
+              create.mutate();
+            }}
+          />
         </DialogFooter>
       </DialogContent>
     </Dialog>

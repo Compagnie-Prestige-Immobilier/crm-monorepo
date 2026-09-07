@@ -39,25 +39,22 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   // « Organiser les graphiques » ici, « Composer l’écran » sur les écrans de
   // chiffres : `BarreEdition` porte deux intitulés, un par écran.
   ['/accueil/tableau-de-bord', 'Tableau de bord', 'Organiser les graphiques'],
-  ['/chues/campagnes', 'Lots d’export', 'Fiches figées pour Excel, impression ou terrain.'],
+  // Les campagnes sont un onglet du pilotage : le titre de l'écran est celui du tableau de bord.
+  ['/chues/campagnes', 'Tableau de bord', 'Une campagne répartit des fiches'],
   /**
    * L'écran des campagnes de représentants a été SUPPRIMÉ (`Plan.md`), mais son
    * adresse n'est pas devenue une 404 : le segment dynamique
    * `chues/campagnes/[id]` la capte avec `id = "representants"` et
-   * `LotExportDetailView` rend « Ce lot n’a pas pu être chargé. ». La ligne
+   * l'API refuse l'identifiant et l'écran dit « Requête refusée ». La ligne
    * reste : c'est cet écran-là que le terrain voit, et c'est lui qu'on audite.
    */
-  ['/chues/campagnes/representants', 'Lots d’export', 'Ce lot n’a pas pu être chargé.'],
+  ['/chues/campagnes/representants', 'Tableau de bord', 'Requête refusée'],
   // `ConsoleView` a été vidé : plus de file d'appels ni de carte clavier, un
   // titre de page et un lien vers l'annuaire.
-  ['/chues/console', 'Convertir un prospect', 'Ouvrir l’annuaire'],
+  ['/chues/console', 'Convertir un prospect', 'Les vingt dernières fiches ajoutées.'],
   // `RepScript` s'ouvre désormais sur un ANNUAIRE cherchable ; la carte clavier
   // n'apparaît qu'une fois un représentant choisi.
-  [
-    '/chues/appels-representants',
-    'Qualifier un représentant',
-    'Choisissez qui vous venez d’appeler.',
-  ],
+  ['/chues/appels-representants', 'Qualifier un représentant', null],
   ['/chues/rappels', 'Rappels', 'En retard'],
   ['/chues/suggestions', 'Contacts recommandés', 'Numéros donnés par un représentant'],
   ['/chues/dossiers', 'Dossiers bancaires', null],
@@ -68,24 +65,16 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/chues/representants', 'Représentants', null],
   ['/chues/representants/import', 'Importer des représentants', 'Partir du modèle'],
   ['/admin/commerciaux', 'Utilisateurs', null],
-  ['/chues/supervision', 'Équipes', 'Activité'],
+  ['/chues/supervision', 'Tableau de bord', 'Activité'],
   ['/admin/referentiels', 'Listes de référence', null],
   ['/admin/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
   ['/admin/parametres', 'Paramètres', null],
   // `/notifications` renvoie l'ADMIN sur le COMPOSEUR, qui porte le même
   // onglet « Boîte de réception » : c'est le composeur qu'on audite.
   ['/admin/notifications', 'Envoyer une notification', 'Boîte de réception'],
-  // `/chues/banque` appartient désormais à la navigation de l'ADMIN, replié
-  // sous « Plus » : `navTitle` y lit son propre intitulé.
-  ['/chues/banque', 'Vue d’ensemble bancaire', null],
+  // Pour l'ADMIN, `/chues/banque` est l'onglet « Banque » du tableau de bord.
+  ['/chues/banque', 'Tableau de bord', 'Banque'],
 ];
-
-/**
- * Les écrans qui portent DEUX titres de niveau 1 identiques : celui de la
- * barre supérieure et celui de la page. Le mode strict refuse les deux, on
- * vise celui de la page.
- */
-const DOUBLE_TITRE = new Set(['/chues/campagnes']);
 
 async function analyze(page: Page, where: string): Promise<void> {
   // Le serveur de developpement compile la route a la demande: sans cette
@@ -113,8 +102,7 @@ test.describe('aucune violation axe sur tous les écrans panel', () => {
     test(path, async ({ page }) => {
       await page.emulateMedia({ colorScheme: 'light' });
       await page.goto(path);
-      const portee = DOUBLE_TITRE.has(path) ? page.getByRole('main') : page;
-      await expect(portee.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
+      await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
       if (marker !== null) {
         await expect(page.getByText(marker).first()).toBeVisible();
       }
@@ -146,8 +134,8 @@ test('aucune violation axe sur la fiche représentant et le volet des comptes', 
   await analyze(page, '/chues/representants/<id>');
 
   await page.goto('/chues/supervision');
-  await page.getByRole('tab', { name: 'Comptes' }).click();
-  await expect(page.getByText('Présence et dernière activité des comptes.')).toBeVisible();
+  await page.getByRole('tab', { name: 'Présence' }).click();
+  await expect(page.getByText('Présence observée par l’application.')).toBeVisible();
   await analyze(page, '/chues/supervision?volet=comptes');
 });
 

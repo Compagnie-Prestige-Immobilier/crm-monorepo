@@ -4,11 +4,7 @@ import { readPositiveInt, readString, type RawSearchParams } from '@/lib/search-
 
 export type ClientRequestStatus = components['schemas']['ClientRequestStatus'];
 
-export const CLIENT_REQUEST_STATUSES: readonly ClientRequestStatus[] = [
-  'PENDING',
-  'APPROVED',
-  'REJECTED',
-];
+const CLIENT_REQUEST_STATUSES: readonly ClientRequestStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
 
 export const CLIENT_REQUEST_STATUS_LABELS: Record<ClientRequestStatus, string> = {
   PENDING: 'En attente',
@@ -16,7 +12,7 @@ export const CLIENT_REQUEST_STATUS_LABELS: Record<ClientRequestStatus, string> =
   REJECTED: 'Refusée',
 };
 
-export const CLIENT_REQUEST_PAGE_SIZE = 25;
+const CLIENT_REQUEST_PAGE_SIZE = 25;
 
 export interface ClientRequestFilters {
   status: ClientRequestStatus | null;

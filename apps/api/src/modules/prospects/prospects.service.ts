@@ -11,12 +11,16 @@ import {
   Projet,
   type ProspectStatut,
   ScheduledCallbackStatus,
+  WhatsappStatus,
   classifySegment,
 } from '@crm/database';
 import { v7 as uuidv7 } from 'uuid';
 
 import { PrismaService } from '../../prisma/prisma.service.js';
+import { normaliserReponses } from '../champs-conversion/catalogue.js';
 import { lastAttemptsByProspect, type LastAttempt } from './last-attempt.js';
+import { whatsappDuProspect, type WhatsappSaisi } from './whatsapp.js';
+import { whatsappNumberOf } from '../representants/whatsapp.js';
 import { normalizePhone } from '../../common/phone.js';
 import { AuditAction, audit } from '../../common/audit.js';
 import { PROSPECT_STATUT_TRANSITIONS, assertTransition } from '../../common/transitions.js';
@@ -47,6 +51,7 @@ export const PROSPECT_INCLUDE = {
   syndicat: { select: { sigle: true } },
   createdBy: { select: { id: true, fullName: true } },
   enrollmentCapturedBy: { select: { id: true, fullName: true } },
+  revueBy: { select: { fullName: true } },
   lastCallBy: { select: { fullName: true } },
   canalProvenance: { select: { label: true } },
   professionRef: { select: { label: true, isTeaching: true } },
@@ -96,6 +101,37 @@ const trimOrNull = (value: string | null | undefined): string | null | undefined
 const phoneOrNull = (value: string | null | undefined): string | null | undefined =>
   value === null || value === undefined ? value : normalizePhone(value);
 
+function createBaseFields(
+  id: string,
+  phoneE164: string,
+  createdById: string,
+  projet: Projet,
+  input: CreateProspectDto,
+) {
+  return {
+    id,
+    nom: input.nom.trim(),
+    prenom: input.prenom?.trim() ?? '',
+    phoneE164,
+    banqueId: input.banqueId ?? null,
+    syndicatId: input.syndicatId ?? null,
+    representantId: input.representantId ?? null,
+    createdById,
+    ...defined({
+      projet: input.projet === undefined ? undefined : projet,
+      type: input.type,
+      profession: input.profession?.trim(),
+      professionId: input.professionId,
+      incomeBandId: input.incomeBandId,
+      paymentMode: input.paymentMode,
+      dureeSystemeMois: input.dureeSystemeMois,
+      canalProvenanceId: input.canalProvenanceId,
+      statut: input.statut,
+      etablissement: trimOrNull(input.etablissement),
+    }),
+  };
+}
+
 /** Champs propres à la situation Grand Public, identiques à la création et à la mise à jour. */
 function situationGrandPublic(input: UpdateProspectDto): Record<string, unknown> {
   return defined({
@@ -107,19 +143,28 @@ function situationGrandPublic(input: UpdateProspectDto): Record<string, unknown>
     modeEpargne: input.modeEpargne,
     paysResidenceId: input.paysResidenceId,
     villeResidence: trimOrNull(input.villeResidence),
-    whatsappE164: phoneOrNull(input.whatsappE164),
     relaisNom: trimOrNull(input.relaisNom),
     relaisPhoneE164: phoneOrNull(input.relaisPhoneE164),
   });
 }
 
+const saisieWhatsapp = (input: UpdateProspectDto): WhatsappSaisi =>
+  input.whatsappE164 === undefined ? {} : { numero: phoneOrNull(input.whatsappE164) ?? null };
+
+/** Consentement par défaut d'un parcours créé : acquis pour Grand Public, sinon non demandé. */
+function grandPublicJourneyDefaults(projet: Projet): {
+  consent: GrandPublicConsent;
+  consentAt: Date | null;
+} {
+  return projet === Projet.GRAND_PUBLIC
+    ? { consent: GrandPublicConsent.INTERESSE, consentAt: new Date() }
+    : { consent: GrandPublicConsent.NON_DEMANDE, consentAt: null };
+}
+
 const isoOrNull = (value: Date | null | undefined): string | null =>
   value === null || value === undefined ? null : value.toISOString();
 
-export async function closeProspectWork(
-  tx: Prisma.TransactionClient,
-  prospectId: string,
-): Promise<void> {
+async function closeProspectWork(tx: Prisma.TransactionClient, prospectId: string): Promise<void> {
   await tx.scheduledCallback.updateMany({
     where: { prospectId, status: ScheduledCallbackStatus.PENDING },
     data: { status: ScheduledCallbackStatus.CANCELLED },
@@ -143,6 +188,56 @@ const STATUT_RANK: Record<ProspectStatut, number> = {
  * Cascade` sur le parcours, donc supprimer le mauvais parcours effacerait
  * silencieusement un engagement signé et daté.
  */
+type JourneyToMerge = {
+  id: string;
+  projet: Projet;
+  statut: ProspectStatut;
+  consent: GrandPublicConsent;
+  conversion: { id: string } | null;
+};
+
+async function moveOneJourney(
+  tx: Prisma.TransactionClient,
+  depart: JourneyToMerge,
+  arrivee: JourneyToMerge | undefined,
+  targetId: string,
+): Promise<void> {
+  if (!arrivee) {
+    await tx.prospectJourney.update({ where: { id: depart.id }, data: { prospectId: targetId } });
+    return;
+  }
+
+  if (depart.conversion && arrivee.conversion) {
+    throw new ConflictException({
+      code: 'MERGE_TWO_CONVERSIONS',
+      message:
+        `Les deux fiches portent une conversion confirmée sur le projet ${depart.projet}. ` +
+        'Corrigez l’une des deux avant de fusionner.',
+    });
+  }
+
+  // C'est le parcours PORTEUR de la conversion qui survit.
+  if (depart.conversion) {
+    await tx.prospectJourney.delete({ where: { id: arrivee.id } });
+    await tx.prospectJourney.update({ where: { id: depart.id }, data: { prospectId: targetId } });
+    return;
+  }
+
+  await tx.prospectJourney.update({
+    where: { id: arrivee.id },
+    data: {
+      ...(STATUT_RANK[depart.statut] > STATUT_RANK[arrivee.statut]
+        ? { statut: depart.statut }
+        : {}),
+      ...(arrivee.consent === GrandPublicConsent.NON_DEMANDE &&
+      depart.consent !== GrandPublicConsent.NON_DEMANDE
+        ? { consent: depart.consent }
+        : {}),
+    },
+  });
+  await tx.prospectJourney.delete({ where: { id: depart.id } });
+}
+
 async function moveJourneys(
   tx: Prisma.TransactionClient,
   sourceId: string,
@@ -162,64 +257,31 @@ async function moveJourneys(
   const parProjet = new Map(target.map((row) => [row.projet, row]));
 
   for (const depart of source) {
-    const arrivee = parProjet.get(depart.projet);
-    if (!arrivee) {
-      await tx.prospectJourney.update({
-        where: { id: depart.id },
-        data: { prospectId: targetId },
-      });
-      continue;
-    }
-
-    if (depart.conversion && arrivee.conversion) {
-      throw new ConflictException({
-        code: 'MERGE_TWO_CONVERSIONS',
-        message:
-          `Les deux fiches portent une conversion confirmée sur le projet ${depart.projet}. ` +
-          'Corrigez l’une des deux avant de fusionner.',
-      });
-    }
-
-    // C'est le parcours PORTEUR de la conversion qui survit.
-    if (depart.conversion) {
-      await tx.prospectJourney.delete({ where: { id: arrivee.id } });
-      await tx.prospectJourney.update({
-        where: { id: depart.id },
-        data: { prospectId: targetId },
-      });
-      continue;
-    }
-
-    await tx.prospectJourney.update({
-      where: { id: arrivee.id },
-      data: {
-        ...(STATUT_RANK[depart.statut] > STATUT_RANK[arrivee.statut]
-          ? { statut: depart.statut }
-          : {}),
-        ...(arrivee.consent === GrandPublicConsent.NON_DEMANDE &&
-        depart.consent !== GrandPublicConsent.NON_DEMANDE
-          ? { consent: depart.consent }
-          : {}),
-      },
-    });
-    await tx.prospectJourney.delete({ where: { id: depart.id } });
+    await moveOneJourney(tx, depart, parProjet.get(depart.projet), targetId);
   }
 }
 
-export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): ProspectDto {
-  const banque = row.banque ?? { name: null, shortName: null };
-  const syndicat = row.syndicat ?? { sigle: null };
-  const representant = row.representant ?? {
-    fullName: null,
-    phoneE164: null,
-    departementId: null,
-    departement: { name: null },
+function prospectRowLookups(row: ProspectRow, lastAttempt?: LastAttempt) {
+  return {
+    banque: row.banque ?? { name: null, shortName: null },
+    syndicat: row.syndicat ?? { sigle: null },
+    representant: row.representant ?? {
+      fullName: null,
+      phoneE164: null,
+      departementId: null,
+      departement: { name: null },
+    },
+    profession: row.professionRef ?? { label: row.profession, isTeaching: null },
+    incomeBand: row.incomeBand ?? { label: null },
+    provenance: row.canalProvenance ?? { label: null },
+    enrollmentAuthor: row.enrollmentCapturedBy ?? { fullName: null },
+    attempt: lastAttempt ?? { outcome: null, comment: null, at: null, count: 0 },
   };
-  const profession = row.professionRef ?? { label: row.profession, isTeaching: null };
-  const incomeBand = row.incomeBand ?? { label: null };
-  const provenance = row.canalProvenance ?? { label: null };
-  const enrollmentAuthor = row.enrollmentCapturedBy ?? { fullName: null };
-  const attempt = lastAttempt ?? { outcome: null, comment: null, at: null, count: 0 };
+}
+
+export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): ProspectDto {
+  const { banque, syndicat, representant, profession, incomeBand, provenance, enrollmentAuthor, attempt } =
+    prospectRowLookups(row, lastAttempt);
 
   return {
     id: row.id,
@@ -242,11 +304,11 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     ownedByCommercialName: row.createdBy.fullName,
     type: row.type,
     profession: profession.label,
-    professionId: row.professionId ?? null,
+    professionId: row.professionId,
     professionIsTeaching: profession.isTeaching,
-    incomeBandId: row.incomeBandId ?? null,
+    incomeBandId: row.incomeBandId,
     incomeBandLabel: incomeBand.label,
-    paymentMode: row.paymentMode ?? null,
+    paymentMode: row.paymentMode,
     employeurId: row.employeurId,
     employeur: row.employeurRef?.label ?? row.employeur,
     typeContrat: row.typeContrat,
@@ -256,9 +318,13 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     paysResidenceId: row.paysResidenceId,
     paysResidenceLabel: row.paysResidence?.label ?? null,
     villeResidence: row.villeResidence,
+    etablissement: row.etablissement,
+    whatsappStatus: row.whatsappStatus,
     whatsappE164: row.whatsappE164,
+    whatsappNumber: whatsappNumberOf(row),
     relaisNom: row.relaisNom,
     relaisPhoneE164: row.relaisPhoneE164,
+    champsLibres: normaliserReponses(row.champsLibres) ?? {},
     journeys: row.journeys.map((journey) => ({
       ...journey,
       consentAt: isoOrNull(journey.consentAt),
@@ -278,8 +344,12 @@ export function toProspectDto(row: ProspectRow, lastAttempt?: LastAttempt): Pros
     enrollmentCapturedById: row.enrollmentCapturedById,
     enrollmentCapturedByName: enrollmentAuthor.fullName,
     enrollmentCapturedAt: isoOrNull(row.enrollmentCapturedAt),
+    revueAt: isoOrNull(row.revueAt),
+    revueById: row.revueById,
+    revueByName: row.revueBy?.fullName ?? null,
     origin: row.origin,
     originLabel: row.originLabel,
+    aRevoirAt: isoOrNull(row.aRevoirAt),
     lastOutcome: attempt.outcome,
     lastComment: attempt.comment,
     lastAttemptAt: isoOrNull(attempt.at),
@@ -417,35 +487,18 @@ export class ProspectsService {
 
     const created = await this.prisma.prospect.create({
       data: {
-        id,
-        nom: input.nom.trim(),
-        prenom: input.prenom?.trim() ?? '',
-        phoneE164,
-        banqueId: input.banqueId ?? null,
-        syndicatId: input.syndicatId ?? null,
-        representantId: input.representantId ?? null,
-        createdById: user.id,
-        ...defined({
-          projet: input.projet === undefined ? undefined : projet,
-          type: input.type,
-          profession: input.profession?.trim(),
-          professionId: input.professionId,
-          incomeBandId: input.incomeBandId,
-          paymentMode: input.paymentMode,
-          dureeSystemeMois: input.dureeSystemeMois,
-          canalProvenanceId: input.canalProvenanceId,
-          statut: input.statut,
-        }),
+        ...createBaseFields(id, phoneE164, user.id, projet, input),
         ...situationGrandPublic(input),
+        ...whatsappDuProspect(saisieWhatsapp(input), {
+          whatsappStatus: WhatsappStatus.NON_DEMANDE,
+          whatsappE164: null,
+          phoneE164,
+        }),
         journeys: {
           create: {
             projet,
             ...(input.statut ? { statut: input.statut } : {}),
-            consent:
-              projet === Projet.GRAND_PUBLIC
-                ? GrandPublicConsent.INTERESSE
-                : GrandPublicConsent.NON_DEMANDE,
-            consentAt: projet === Projet.GRAND_PUBLIC ? new Date() : null,
+            ...grandPublicJourneyDefaults(projet),
           },
         },
         clientCreatedAt: input.clientCreatedAt ? new Date(input.clientCreatedAt) : new Date(),
@@ -467,15 +520,7 @@ export class ProspectsService {
     assertOwnership(user, existing);
 
     const phoneE164 = input.phone ? normalizePhone(input.phone) : undefined;
-    if (phoneE164 && phoneE164 !== existing.phoneE164)
-      await this.assertPhoneFree(user, phoneE164, id);
-    if (input.representantId && input.representantId !== existing.representantId) {
-      await this.assertRepresentantUsable(input.representantId);
-    }
-    this.assertPayment(
-      input.paymentMode ?? existing.paymentMode,
-      input.dureeSystemeMois ?? existing.dureeSystemeMois,
-    );
+    await this.assertUpdateAllowed(user, id, existing, input, phoneE164);
 
     // `CONVERTI` porte une `ProspectConversion` signée et datée : on n'y entre
     // que par `confirmGrandPublicConversion`, qui exige le consentement et
@@ -504,10 +549,16 @@ export class ProspectsService {
           dureeSystemeMois: input.dureeSystemeMois,
           canalProvenanceId: input.canalProvenanceId,
           statut: input.statut,
+          etablissement: trimOrNull(input.etablissement),
           clientCreatedAt:
             input.clientCreatedAt === undefined ? undefined : new Date(input.clientCreatedAt),
         }),
         ...situationGrandPublic(input),
+        ...whatsappDuProspect(saisieWhatsapp(input), {
+          whatsappStatus: existing.whatsappStatus,
+          whatsappE164: existing.whatsappE164,
+          phoneE164: phoneE164 ?? existing.phoneE164,
+        }),
         rev: { increment: 1 },
       },
       include: PROSPECT_INCLUDE,
@@ -516,6 +567,30 @@ export class ProspectsService {
     // renverrait au client une réponse qui contredit la liste dont il vient.
     const attempts = await lastAttemptsByProspect(this.prisma, [updated.id]);
     return toProspectDto(updated, attempts.get(updated.id));
+  }
+
+  private async assertUpdateAllowed(
+    user: AuthenticatedUser,
+    id: string,
+    existing: {
+      phoneE164: string;
+      representantId: string | null;
+      paymentMode: string | null;
+      dureeSystemeMois: number | null;
+    },
+    input: UpdateProspectDto,
+    phoneE164: string | undefined,
+  ): Promise<void> {
+    if (phoneE164 && phoneE164 !== existing.phoneE164) {
+      await this.assertPhoneFree(user, phoneE164, id);
+    }
+    if (input.representantId && input.representantId !== existing.representantId) {
+      await this.assertRepresentantUsable(input.representantId);
+    }
+    this.assertPayment(
+      input.paymentMode ?? existing.paymentMode,
+      input.dureeSystemeMois ?? existing.dureeSystemeMois,
+    );
   }
 
   private assertStatusUpdate(
@@ -546,11 +621,7 @@ export class ProspectsService {
         prospectId: id,
         projet: input.projet,
         ...(input.statut ? { statut: input.statut } : {}),
-        consent:
-          input.projet === Projet.GRAND_PUBLIC
-            ? GrandPublicConsent.INTERESSE
-            : GrandPublicConsent.NON_DEMANDE,
-        consentAt: input.projet === Projet.GRAND_PUBLIC ? new Date() : null,
+        ...grandPublicJourneyDefaults(input.projet),
       },
       update: input.statut === undefined ? {} : { statut: input.statut },
     });
@@ -678,6 +749,33 @@ export class ProspectsService {
   }
 
   /**
+   * La revue du closing, avant transmission à l'enrôlement.
+   *
+   * `updateMany` sous condition plutôt que `update` : deux revues simultanées
+   * écriraient sinon deux auteurs, et c'est le PREMIER qui a relu la demande.
+   */
+  async marquerRevue(user: AuthenticatedUser, id: string): Promise<ProspectDto> {
+    const prospect = await this.prisma.prospect.findFirst({
+      where: { id, deletedAt: null },
+      select: { statut: true },
+    });
+    if (!prospect) {
+      throw new NotFoundException({ code: 'PROSPECT_NOT_FOUND', message: 'Prospect introuvable.' });
+    }
+    if (prospect.statut !== 'CONVERTI') {
+      throw new BadRequestException({
+        code: 'PROSPECT_REVUE_REQUIRES_CONVERSION',
+        message: 'Seule une demande convertie se revoit.',
+      });
+    }
+    await this.prisma.prospect.updateMany({
+      where: { id, revueAt: null },
+      data: { revueAt: new Date(), revueById: user.id },
+    });
+    return this.get(user, id);
+  }
+
+  /**
    * Fusionne deux fiches désignant la même personne.
    *
    * La source est supprimée logiquement dans la MÊME transaction que la mise à
@@ -786,6 +884,33 @@ export class ProspectsService {
   /** Réaffecte des prospects à un autre représentant, et pour l'ADMIN à un autre commercial. */
   async reassign(user: AuthenticatedUser, input: ReassignProspectsDto): Promise<ReassignResultDto> {
     if (!input.prospectIds.length) return { updated: 0, prospectIds: [] };
+    this.assertReassignTargetValid(user, input);
+
+    // Le `where` porte le cloisonnement : un COMMERCIAL ne peut désigner que
+    // ses propres lignes, et les identifiants qui ne lui appartiennent pas
+    // sortent simplement de l'ensemble au lieu de lever.
+    const rows = await this.prisma.prospect.findMany({
+      where: { id: { in: input.prospectIds }, deletedAt: null, ...ownerScope(user) },
+      select: { id: true },
+    });
+    if (!rows.length) return { updated: 0, prospectIds: [] };
+
+    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
+    if (input.commercialId) await this.assertCommercialUsable(input.commercialId);
+
+    const ids = rows.map((row) => row.id);
+    const result = await this.prisma.prospect.updateMany({
+      where: { id: { in: ids } },
+      data: {
+        ...(input.representantId ? { representantId: input.representantId } : {}),
+        ...(input.commercialId ? { createdById: input.commercialId } : {}),
+        rev: { increment: 1 },
+      },
+    });
+    return { updated: result.count, prospectIds: ids };
+  }
+
+  private assertReassignTargetValid(user: AuthenticatedUser, input: ReassignProspectsDto): void {
     if (!input.representantId && !input.commercialId) {
       throw new BadRequestException({
         code: 'REASSIGN_NO_TARGET',
@@ -798,40 +923,19 @@ export class ProspectsService {
         message: 'Seul un administrateur peut changer le commercial propriétaire.',
       });
     }
+  }
 
-    // Le `where` porte le cloisonnement : un COMMERCIAL ne peut désigner que
-    // ses propres lignes, et les identifiants qui ne lui appartiennent pas
-    // sortent simplement de l'ensemble au lieu de lever.
-    const rows = await this.prisma.prospect.findMany({
-      where: { id: { in: input.prospectIds }, deletedAt: null, ...ownerScope(user) },
+  private async assertCommercialUsable(commercialId: string): Promise<void> {
+    const owner = await this.prisma.user.findFirst({
+      where: { id: commercialId, deletedAt: null },
       select: { id: true },
     });
-    if (!rows.length) return { updated: 0, prospectIds: [] };
-
-    if (input.representantId) await this.assertRepresentantUsable(input.representantId);
-    if (input.commercialId) {
-      const owner = await this.prisma.user.findFirst({
-        where: { id: input.commercialId, deletedAt: null },
-        select: { id: true },
+    if (!owner) {
+      throw new NotFoundException({
+        code: 'USER_NOT_FOUND',
+        message: 'Commercial de destination introuvable.',
       });
-      if (!owner) {
-        throw new NotFoundException({
-          code: 'USER_NOT_FOUND',
-          message: 'Commercial de destination introuvable.',
-        });
-      }
     }
-
-    const ids = rows.map((row) => row.id);
-    const result = await this.prisma.prospect.updateMany({
-      where: { id: { in: ids } },
-      data: {
-        ...(input.representantId ? { representantId: input.representantId } : {}),
-        ...(input.commercialId ? { createdById: input.commercialId } : {}),
-        rev: { increment: 1 },
-      },
-    });
-    return { updated: result.count, prospectIds: ids };
   }
 
   /**
@@ -951,25 +1055,24 @@ export class ProspectsService {
         prospectId: existing.id,
         projet,
         ...(input.statut ? { statut: input.statut } : {}),
-        consent:
-          projet === Projet.GRAND_PUBLIC
-            ? GrandPublicConsent.INTERESSE
-            : GrandPublicConsent.NON_DEMANDE,
-        consentAt: projet === Projet.GRAND_PUBLIC ? new Date() : null,
+        ...grandPublicJourneyDefaults(projet),
       },
     });
     const updated = await this.prisma.prospect.update({
       where: { id: existing.id },
-      data: {
-        ...(input.type ? { type: input.type } : {}),
-        ...(input.professionId ? { professionId: input.professionId } : {}),
-        ...(input.incomeBandId ? { incomeBandId: input.incomeBandId } : {}),
-        ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
-        ...(input.canalProvenanceId ? { canalProvenanceId: input.canalProvenanceId } : {}),
-        rev: { increment: 1 },
-      },
+      data: { ...attachedProjectPatch(input), rev: { increment: 1 } },
       include: PROSPECT_INCLUDE,
     });
     return toProspectDto(updated);
   }
+}
+
+function attachedProjectPatch(input: CreateProspectDto) {
+  return {
+    ...(input.type ? { type: input.type } : {}),
+    ...(input.professionId ? { professionId: input.professionId } : {}),
+    ...(input.incomeBandId ? { incomeBandId: input.incomeBandId } : {}),
+    ...(input.paymentMode ? { paymentMode: input.paymentMode } : {}),
+    ...(input.canalProvenanceId ? { canalProvenanceId: input.canalProvenanceId } : {}),
+  };
 }

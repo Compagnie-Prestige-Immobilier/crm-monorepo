@@ -28,6 +28,28 @@ const share = (value: number, total: number): number =>
 const hours = (seconds: number | null): number | null =>
   seconds === null ? null : Math.round((seconds / SECONDS_PER_HOUR) * 10) / 10;
 
+interface TotalsRow {
+  total: number;
+  aTraiter: number;
+  enTraitement: number;
+  encaisses: number;
+  rejetes: number;
+  amountCashed: string;
+  delaySeconds: number | null;
+}
+
+const EMPTY_TOTALS_ROW: TotalsRow = {
+  total: 0,
+  aTraiter: 0,
+  enTraitement: 0,
+  encaisses: 0,
+  rejetes: 0,
+  amountCashed: '0',
+  delaySeconds: null,
+};
+
+const totalsRow = (row: TotalsRow | undefined): TotalsRow => row ?? EMPTY_TOTALS_ROW;
+
 @Injectable()
 export class BankCaseAnalyticsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -57,17 +79,7 @@ export class BankCaseAnalyticsService {
 
   async totals(filter: BankCaseFilterDto): Promise<BankAnalyticsTotalsDto> {
     const where = bankCaseConditions(filter);
-    const rows = await this.prisma.$queryRaw<
-      {
-        total: number;
-        aTraiter: number;
-        enTraitement: number;
-        encaisses: number;
-        rejetes: number;
-        amountCashed: string;
-        delaySeconds: number | null;
-      }[]
-    >`
+    const rows = await this.prisma.$queryRaw<TotalsRow[]>`
       SELECT
         COUNT(*)::int                                                          AS "total",
         COUNT(*) FILTER (WHERE s."isInitial")::int                             AS "aTraiter",
@@ -82,18 +94,16 @@ export class BankCaseAnalyticsService {
       WHERE ${where}
     `;
 
-    const row = rows[0];
-    const encaisses = row?.encaisses ?? 0;
-    const rejetes = row?.rejetes ?? 0;
+    const row = totalsRow(rows[0]);
     return {
-      total: row?.total ?? 0,
-      aTraiter: row?.aTraiter ?? 0,
-      enTraitement: row?.enTraitement ?? 0,
-      encaisses,
-      rejetes,
-      totalAmountCashed: sumToString(row?.amountCashed ?? null),
-      rejectionRate: share(rejetes, encaisses + rejetes),
-      meanDelayHours: hours(row?.delaySeconds ?? null),
+      total: row.total,
+      aTraiter: row.aTraiter,
+      enTraitement: row.enTraitement,
+      encaisses: row.encaisses,
+      rejetes: row.rejetes,
+      totalAmountCashed: sumToString(row.amountCashed),
+      rejectionRate: share(row.rejetes, row.encaisses + row.rejetes),
+      meanDelayHours: hours(row.delaySeconds),
     };
   }
 

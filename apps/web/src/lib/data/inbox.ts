@@ -8,7 +8,7 @@ type Schemas = components['schemas'];
 export type InboxItem = Schemas['InboxItemDto'];
 export type Inbox = Schemas['InboxDto'];
 
-export const INBOX_PAGE_SIZE = 20;
+const INBOX_PAGE_SIZE = 20;
 
 export async function fetchInbox(client: ApiClient = getApiClient()): Promise<Inbox> {
   return unwrap(
@@ -18,14 +18,12 @@ export async function fetchInbox(client: ApiClient = getApiClient()): Promise<In
   );
 }
 
-export const INBOX_SCREEN_PAGE_SIZE = 25;
+const INBOX_SCREEN_PAGE_SIZE = 25;
 
 export interface InboxPageFilters {
   page: number;
   unreadOnly: boolean;
 }
-
-export const EMPTY_INBOX_FILTERS: InboxPageFilters = { page: 1, unreadOnly: false };
 
 export async function fetchInboxPage(
   filters: InboxPageFilters,
@@ -49,8 +47,8 @@ export async function markNotificationRead(
   );
 }
 
-export const MARK_ALL_PAGE_SIZE = 50;
-export const MARK_ALL_MAX_PAGES = 6;
+const MARK_ALL_PAGE_SIZE = 50;
+const MARK_ALL_MAX_PAGES = 6;
 
 export async function markAllNotificationsRead(
   client: ApiClient = getApiClient(),
@@ -130,7 +128,7 @@ export function webRouteFor(route: string | null): string | null {
   return matches ? route : null;
 }
 
-export const UNREAD_BADGE_MAX = 99;
+const UNREAD_BADGE_MAX = 99;
 
 export function unreadBadgeLabel(unreadCount: number): string {
   if (unreadCount <= 0) return '';

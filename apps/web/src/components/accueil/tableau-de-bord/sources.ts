@@ -33,9 +33,12 @@ export interface ScalaireDatum {
 export interface CompositionLigne {
   ligne: string;
   segments: NamedCount[];
+  /** Ce que le clic sur cette ligne ouvre, et ce que sa légende ajoute sous le nom. */
+  id?: string;
+  detail?: string;
 }
 
-export interface MatriceCellule {
+interface MatriceCellule {
   ligne: string;
   colonne: string;
   value: number;
@@ -89,6 +92,8 @@ export interface CatalogueEntree {
   question?: string;
   description?: string;
   groupe?: string;
+  /** L'écran qu'ouvre une part du graphique, à partir de son identifiant. */
+  lien?: (id: string) => string;
 }
 
 export type Catalogue = Readonly<Record<string, CatalogueEntree>>;
@@ -419,11 +424,6 @@ export function catalogueVisitesDe(role: Role): Readonly<Record<string, SourceDe
   return Object.fromEntries(SOURCES_REGISTRE_ACCUEIL.map((source) => [source, SOURCES[source]]));
 }
 
-/** Une clé qui n'existe pas dans le contrat de l'API rougit sur cette ligne. */
-export const SOURCES_DU_REGISTRE: readonly DashboardSource[] = Object.keys(
-  SOURCES,
-) as VisiteSource[];
-
 export function mesurerDonnees(donnees: DonneesSource): {
   nombreCategories: number;
   nombrePoints: number;
@@ -475,13 +475,14 @@ export function donneesVides(donnees: DonneesSource): boolean {
   }
 }
 
+/** Une tuile prend une colonne, un graphique deux, un tableau ou une carte pleine quatre. */
 export function spanClass(
   marque: DashboardMarque | undefined,
   taille: DashboardTaille | undefined,
 ): string {
-  if (marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge') return '';
-  if (marque === 'tableau') return 'sm:col-span-2 xl:col-span-4';
-  if (taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  if (marque === 'tableau' || taille === 'pleine') return 'sm:col-span-2 xl:col-span-4';
+  const tuile = marque === 'tuile' || marque === 'tuile-courbe' || marque === 'jauge';
+  if (tuile && taille === undefined) return '';
   return 'sm:col-span-2 xl:col-span-2';
 }
 
@@ -516,7 +517,7 @@ export interface ReglagesHonores {
   legende: boolean;
 }
 
-export const REGLAGES_HONORES: Record<DashboardMarque, ReglagesHonores> = {
+const REGLAGES_HONORES: Record<DashboardMarque, ReglagesHonores> = {
   'barres-verticales': { palette: true, valeurs: true, legende: false },
   'barres-horizontales': { palette: true, valeurs: true, legende: false },
   'barres-empilees': { palette: true, valeurs: true, legende: true },

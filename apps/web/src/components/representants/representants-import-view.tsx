@@ -246,6 +246,168 @@ function ResumeApplique({ created }: { created: number }) {
   );
 }
 
+function plurielSiPlusieurs(count: number): string {
+  return count > 1 ? 's' : '';
+}
+
+function celluleOuVide(value: string | null): string {
+  return value ?? '–';
+}
+
+function celluleDate(value: string | null): string {
+  if (value === null) return '–';
+  return formatDate(value);
+}
+
+function LignesRejetees({ errors }: { errors: ImportReport['errors'] }) {
+  if (errors.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
+          <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
+          Lignes rejetées
+        </CardTitle>
+        <CardDescription>
+          Le numéro renvoie à la ligne DANS le classeur, en-tête compris : il suffit de l’ouvrir et
+          d’y aller.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-20">Ligne</TableHead>
+                <TableHead>Motif</TableHead>
+                <TableHead>Valeur fautive</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {errors.map((error) => (
+                <TableRow key={`${String(error.line)}-${error.code}`}>
+                  <TableCell className="tabular-nums">{error.line}</TableCell>
+                  <TableCell>{error.message}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {celluleOuVide(error.value)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ApercuLignesValides({
+  preview,
+  validCount,
+}: {
+  preview: ImportReport['preview'];
+  validCount: number;
+}) {
+  if (preview.length === 0) return null;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
+          <FileSpreadsheetIcon className="size-4" aria-hidden="true" />
+          Aperçu des lignes valides
+        </CardTitle>
+        <CardDescription>
+          {formatNumber(preview.length)} première
+          {plurielSiPlusieurs(preview.length)} ligne{plurielSiPlusieurs(preview.length)} sur{' '}
+          {formatNumber(validCount)}. Le téléphone est celui que le serveur a normalisé.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent">
+                <TableHead className="w-20">Ligne</TableHead>
+                <TableHead>Représentant</TableHead>
+                <TableHead>Téléphone</TableHead>
+                <TableHead>Département</TableHead>
+                <TableHead>IEF</TableHead>
+                <TableHead>Établissement</TableHead>
+                <TableHead>Relation</TableHead>
+                <TableHead>Dernier appel</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {preview.map((row) => (
+                <TableRow key={row.line}>
+                  <TableCell className="tabular-nums">{row.line}</TableCell>
+                  <TableCell className="font-[600]">{row.fullName}</TableCell>
+                  <TableCell className="tabular-nums">{formatPhone(row.phoneE164)}</TableCell>
+                  <TableCell>{row.departementName}</TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {celluleOuVide(row.iefName)}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {celluleOuVide(row.etablissement)}
+                  </TableCell>
+                  <TableCell>
+                    <RelationBadge status={row.relationStatus} />
+                  </TableCell>
+                  <TableCell className="text-muted-foreground tabular-nums">
+                    {celluleDate(row.calledAt)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ActionsImport({
+  applied,
+  applying,
+  validCount,
+  onApply,
+  onReset,
+}: {
+  applied: boolean;
+  applying: boolean;
+  validCount: number;
+  onApply: () => void;
+  onReset: () => void;
+}) {
+  if (applied) {
+    return (
+      <Button type="button" onClick={onReset}>
+        Importer un autre fichier
+      </Button>
+    );
+  }
+
+  return (
+    <>
+      <Button type="button" disabled={applying || validCount === 0} onClick={onApply}>
+        {applying ? (
+          <>
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+            Import en cours…
+          </>
+        ) : (
+          `Créer ${formatNumber(validCount)} représentant${plurielSiPlusieurs(validCount)}`
+        )}
+      </Button>
+      <Button type="button" variant="ghost" disabled={applying} onClick={onReset}>
+        Changer de fichier
+      </Button>
+    </>
+  );
+}
+
 function ImportReportPanel({
   report,
   applied,
@@ -270,119 +432,17 @@ function ImportReportPanel({
 
       {applied ? <ResumeApplique created={report.created} /> : null}
 
-      {report.errors.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
-              <AlertTriangleIcon className="size-4 text-destructive" aria-hidden="true" />
-              Lignes rejetées
-            </CardTitle>
-            <CardDescription>
-              Le numéro renvoie à la ligne DANS le classeur, en-tête compris : il suffit de l’ouvrir
-              et d’y aller.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-20">Ligne</TableHead>
-                    <TableHead>Motif</TableHead>
-                    <TableHead>Valeur fautive</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.errors.map((error) => (
-                    <TableRow key={`${String(error.line)}-${error.code}`}>
-                      <TableCell className="tabular-nums">{error.line}</TableCell>
-                      <TableCell>{error.message}</TableCell>
-                      <TableCell className="text-muted-foreground">{error.value ?? '–'}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
-
-      {report.preview.length > 0 ? (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
-              <FileSpreadsheetIcon className="size-4" aria-hidden="true" />
-              Aperçu des lignes valides
-            </CardTitle>
-            <CardDescription>
-              {formatNumber(report.preview.length)} première
-              {report.preview.length > 1 ? 's' : ''} ligne{report.preview.length > 1 ? 's' : ''} sur{' '}
-              {formatNumber(report.valid)}. Le téléphone est celui que le serveur a normalisé.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-20">Ligne</TableHead>
-                    <TableHead>Représentant</TableHead>
-                    <TableHead>Téléphone</TableHead>
-                    <TableHead>Département</TableHead>
-                    <TableHead>IEF</TableHead>
-                    <TableHead>Établissement</TableHead>
-                    <TableHead>Relation</TableHead>
-                    <TableHead>Dernier appel</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {report.preview.map((row) => (
-                    <TableRow key={row.line}>
-                      <TableCell className="tabular-nums">{row.line}</TableCell>
-                      <TableCell className="font-[600]">{row.fullName}</TableCell>
-                      <TableCell className="tabular-nums">{formatPhone(row.phoneE164)}</TableCell>
-                      <TableCell>{row.departementName}</TableCell>
-                      <TableCell className="text-muted-foreground">{row.iefName ?? '–'}</TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {row.etablissement ?? '–'}
-                      </TableCell>
-                      <TableCell>
-                        <RelationBadge status={row.relationStatus} />
-                      </TableCell>
-                      <TableCell className="text-muted-foreground tabular-nums">
-                        {row.calledAt === null ? '–' : formatDate(row.calledAt)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      ) : null}
+      <LignesRejetees errors={report.errors} />
+      <ApercuLignesValides preview={report.preview} validCount={report.valid} />
 
       <div className="flex flex-wrap items-center gap-3">
-        {applied ? (
-          <Button type="button" onClick={onReset}>
-            Importer un autre fichier
-          </Button>
-        ) : (
-          <>
-            <Button type="button" disabled={applying || report.valid === 0} onClick={onApply}>
-              {applying ? (
-                <>
-                  <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-                  Import en cours…
-                </>
-              ) : (
-                `Créer ${formatNumber(report.valid)} représentant${report.valid > 1 ? 's' : ''}`
-              )}
-            </Button>
-            <Button type="button" variant="ghost" disabled={applying} onClick={onReset}>
-              Changer de fichier
-            </Button>
-          </>
-        )}
+        <ActionsImport
+          applied={applied}
+          applying={applying}
+          validCount={report.valid}
+          onApply={onApply}
+          onReset={onReset}
+        />
       </div>
     </div>
   );

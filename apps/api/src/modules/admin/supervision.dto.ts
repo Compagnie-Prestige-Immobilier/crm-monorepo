@@ -5,7 +5,7 @@ import { WorkShiftDto } from '../analytics/supervision.dto.js';
 import { PerformanceScore } from './performance-score.js';
 import { PRESENCE_ONLINE_WINDOW_MINUTES, type PresenceState } from './presence.js';
 
-export const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
+const PRESENCE_STATES = ['ONLINE', 'RECENT', 'AWAY'] as const;
 
 export class SupervisedUserDto {
   @ApiProperty({ format: 'uuid' }) id!: string;
@@ -72,6 +72,15 @@ export class SupervisedUserDto {
     description: 'Version de l’application mobile, telle qu’elle s’annonce.',
   })
   appVersion!: string | null;
+
+  @ApiProperty({
+    type: Boolean,
+    nullable: true,
+    description:
+      'Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : ' +
+      'la durée de communication de ce compte ne se mesure pas. `null` : inconnu.',
+  })
+  journalAppelsAutorise!: boolean | null;
 
   @ApiProperty({
     type: String,

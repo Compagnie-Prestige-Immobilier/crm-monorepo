@@ -15,7 +15,7 @@ import type { OkDto } from '../../common/dto/ok.dto.js';
 
 // `refresh_tokens` ne stocke JAMAIS le jeton en clair. SHA-256 nu et non argon2 :
 // le jeton est déjà une valeur aléatoire de haute entropie, et le refresh doit rester rapide.
-export const hashRefreshToken = (token: string): string =>
+const hashRefreshToken = (token: string): string =>
   createHash('sha256').update(token).digest('hex');
 
 // Condensat factice payé quand l'identifiant est inconnu : sans lui, un compte
@@ -288,7 +288,7 @@ export class AuthService {
   }
 }
 
-export function ttlToSeconds(ttl: string): number {
+function ttlToSeconds(ttl: string): number {
   const match = /^(\d+)\s*([smhd]?)$/.exec(ttl.trim());
   if (!match) return 900;
   const amount = Number(match[1]);
@@ -304,7 +304,7 @@ export function ttlToSeconds(ttl: string): number {
   }
 }
 
-export function toAuthUser(user: User, workspace: Workspace = 'public'): AuthUserDto {
+function toAuthUser(user: User, workspace: Workspace = 'public'): AuthUserDto {
   return {
     id: user.id,
     email: user.email,

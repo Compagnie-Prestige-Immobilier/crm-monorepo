@@ -47,6 +47,8 @@ class CreateProspectDto {
 
     this.professionId,
 
+    this.etablissement,
+
     this.incomeBandId,
 
     this.employeurId,
@@ -129,6 +131,10 @@ class CreateProspectDto {
   /// Profession choisie dans le référentiel.
   @JsonKey(name: r'professionId', required: false, includeIfNull: false)
   final String? professionId;
+
+  /// Établissement où le prospect exerce.
+  @JsonKey(name: r'etablissement', required: false, includeIfNull: false)
+  final String? etablissement;
 
   /// Tranche de revenu mensuel déclaré.
   @JsonKey(name: r'incomeBandId', required: false, includeIfNull: false)
@@ -236,6 +242,7 @@ class CreateProspectDto {
                 type,
                 profession,
                 professionId,
+                etablissement,
                 incomeBandId,
                 employeurId,
                 employeur,
@@ -266,6 +273,7 @@ class CreateProspectDto {
                 other.type,
                 other.profession,
                 other.professionId,
+                other.etablissement,
                 other.incomeBandId,
                 other.employeurId,
                 other.employeur,
@@ -302,6 +310,7 @@ class CreateProspectDto {
         type,
         profession,
         professionId,
+        etablissement,
         incomeBandId,
         employeurId,
         employeur,

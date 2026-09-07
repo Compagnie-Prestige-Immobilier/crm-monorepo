@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException, UnprocessableEntityException } from '@nestjs/common';
 
-export const NotificationError = {
+const NotificationError = {
   NOT_FOUND: 'NOTIFICATION_NOT_FOUND',
   NOT_SCHEDULED: 'NOTIFICATION_NOT_SCHEDULED',
   ALREADY_SENT: 'NOTIFICATION_ALREADY_SENT',
@@ -74,13 +74,4 @@ export const routeInvalid = (): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: NotificationError.ROUTE_INVALID,
     message: 'Le lien profond doit être une route interne commençant par « / ».',
-  });
-
-export const templateVariablesMissing = (
-  missing: readonly string[],
-): UnprocessableEntityException =>
-  new UnprocessableEntityException({
-    code: NotificationError.TEMPLATE_VARIABLES_MISSING,
-    message: `Variables non fournies : ${missing.join(', ')}.`,
-    missing,
   });

@@ -44,7 +44,7 @@ export function ExactAmountsProvider({ children }: { children: ReactNode }) {
   return <ExactAmountsContext.Provider value={value}>{children}</ExactAmountsContext.Provider>;
 }
 
-export function useExactAmounts(): { exact: boolean; toggle: () => void } {
+function useExactAmounts(): { exact: boolean; toggle: () => void } {
   return useContext(ExactAmountsContext);
 }
 

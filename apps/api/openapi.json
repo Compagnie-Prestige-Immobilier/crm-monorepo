@@ -4439,6 +4439,82 @@
         "tags": ["representants"]
       }
     },
+    "/api/v1/representants/{id}/fiche-history": {
+      "get": {
+        "description": "Chaque écriture sur la fiche (panneau, mobile, appel de qualification, import) laisse une version : les champs modifiés, avec leur valeur d’avant et d’après.",
+        "operationId": "listRepresentantFicheChanges",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RepresentantFicheChangeListDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "REPRESENTANT_NOT_FOUND.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les versions du formulaire de la fiche, de la plus récente à la plus ancienne.",
+        "tags": ["representants"]
+      }
+    },
     "/api/v1/representants/{id}/device-calls": {
       "get": {
         "description": "Une détection sans `attemptId` est un appel que personne n’a consigné : c’est elle qui alimente l’alerte de supervision.",
@@ -5406,7 +5482,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -5427,6 +5503,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -6111,6 +6196,82 @@
         "tags": ["prospects"]
       }
     },
+    "/api/v1/prospects/{id}/revue": {
+      "post": {
+        "description": "La date et l’auteur de la PREMIÈRE revue sont conservés : rappeler la route sur une demande déjà revue ne les réécrit pas.",
+        "operationId": "marquerProspectRevue",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "PROSPECT_REVUE_REQUIRES_CONVERSION · la demande n’est pas convertie.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "PROSPECT_NOT_FOUND · fiche absente ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Marque une demande convertie « revue » avant sa transmission à l’enrôlement.",
+        "tags": ["prospects"]
+      }
+    },
     "/api/v1/prospects/merge": {
       "post": {
         "operationId": "mergeProspects",
@@ -6578,6 +6739,15 @@
             "schema": {
               "maxLength": 32,
               "type": "string"
+            }
+          },
+          {
+            "name": "journalAppelsAutorise",
+            "required": false,
+            "in": "query",
+            "description": "Lecture du journal d’appels accordée sur l’appareil. Facultatif.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -9999,7 +10169,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10020,6 +10190,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -10244,7 +10423,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10265,6 +10444,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -10489,7 +10677,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10510,6 +10698,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -10742,7 +10939,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -10763,6 +10960,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -10998,7 +11204,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11019,6 +11225,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11243,7 +11458,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11264,6 +11479,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11488,7 +11712,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11509,6 +11733,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11734,7 +11967,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -11755,6 +11988,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -11980,7 +12222,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12001,6 +12243,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12226,7 +12477,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12247,6 +12498,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12471,7 +12731,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12492,6 +12752,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12728,7 +12997,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12749,6 +13018,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -12974,7 +13252,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -12995,6 +13273,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13220,7 +13507,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13241,6 +13528,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13465,7 +13761,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13486,6 +13782,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13711,7 +14016,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -13732,6 +14037,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -13980,7 +14294,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14001,6 +14315,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -14226,7 +14549,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14247,6 +14570,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -14598,7 +14930,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -14619,6 +14951,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -14681,6 +15022,185 @@
         ],
         "summary": "Provenance des fiches, avec le détail lisible en second niveau.",
         "tags": ["analytics"]
+      }
+    },
+    "/api/v1/supervision/representants": {
+      "get": {
+        "operationId": "getSupervisionRepresentants",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StockRepresentantsDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables.",
+        "tags": ["supervision"]
+      }
+    },
+    "/api/v1/supervision/campagnes": {
+      "get": {
+        "description": "Une campagne entre dans la fenêtre par ses jours de programme. `granularity`, `timeFrom` et `timeTo` sont ignorés.",
+        "operationId": "getSupervisionCampagnes",
+        "parameters": [
+          {
+            "name": "actFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SupervisionGranularity"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Un seul téléconseiller : borne les lignes, la liste et les histogrammes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeFrom",
+            "required": false,
+            "in": "query",
+            "description": "Heure de début quotidienne, Dakar.",
+            "schema": {
+              "example": "09:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeTo",
+            "required": false,
+            "in": "query",
+            "description": "Heure de fin quotidienne, exclue.",
+            "schema": {
+              "example": "14:00",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupervisionCampagnesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Taux de contact et d’exploitation des campagnes de la fenêtre.",
+        "tags": ["supervision"]
       }
     },
     "/api/v1/supervision/activite": {
@@ -17624,7 +18144,7 @@
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses.",
             "schema": {
               "type": "string",
-              "enum": ["BANQUE"]
+              "enum": ["BANQUE", "FORMULAIRE_PUBLIC"]
             }
           },
           {
@@ -17645,6 +18165,15 @@
             "schema": {
               "format": "date-time",
               "type": "string"
+            }
+          },
+          {
+            "name": "revue",
+            "required": false,
+            "in": "query",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été.",
+            "schema": {
+              "type": "boolean"
             }
           },
           {
@@ -18215,6 +18744,144 @@
         ],
         "summary": "Export Excel du registre des visites, avec le même filtre que l’écran.",
         "tags": ["export"]
+      }
+    },
+    "/api/v1/champs-conversion/{projet}": {
+      "get": {
+        "description": "Lu par le formulaire du téléconseiller comme par le formulaire public : un champ masqué n’est ni rendu ni exigé. Les champs imposés reviennent toujours visibles, quel que soit le réglage enregistré.",
+        "operationId": "getChampsConversion",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglagesConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Champs du formulaire de conversion, dans l’ordre d’affichage.",
+        "tags": ["champs-conversion"]
+      },
+      "put": {
+        "description": "La liste entière est remplacée. Masquer un champ imposé est refusé en 400.",
+        "operationId": "updateChampsConversion",
+        "parameters": [
+          {
+            "name": "projet",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateReglagesConversionDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReglagesConversionDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Enregistre visibilité, caractère obligatoire, ordre et champs ajoutés.",
+        "tags": ["champs-conversion"]
       }
     },
     "/api/v1/app-updates/android/current": {
@@ -20081,6 +20748,192 @@
         "tags": ["lots-export"]
       }
     },
+    "/api/v1/parametres-chues": {
+      "get": {
+        "operationId": "getParametresChues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les réglages CHUES, valeurs d’usine comprises.",
+        "tags": ["parametres-chues"]
+      },
+      "patch": {
+        "description": "La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.",
+        "operationId": "updateParametresChues",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParametresChuesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PARAMETRE_RESERVE_ADMIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Règle les paramètres CHUES.",
+        "tags": ["parametres-chues"]
+      }
+    },
+    "/api/v1/parametres-chues/journal": {
+      "get": {
+        "operationId": "getJournalParametresChues",
+        "parameters": [
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalParametresDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qui a changé quoi, et ce que la valeur disait avant.",
+        "tags": ["parametres-chues"]
+      }
+    },
     "/api/v1/enrolement/{projet}/inscriptions": {
       "get": {
         "operationId": "listEnrolementInscriptions",
@@ -20852,6 +21705,147 @@
         "summary": "Tire la plateforme maintenant, sans attendre l’échéance.",
         "tags": ["enrolement"]
       }
+    },
+    "/api/v1/formulaire-public/formulaire": {
+      "get": {
+        "operationId": "lireFormulairePublic",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FormulairePublicDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Champs à rendre et listes à proposer sur le formulaire public.",
+        "tags": ["formulaire-public"]
+      }
+    },
+    "/api/v1/formulaire-public/{jeton}": {
+      "post": {
+        "description": "Le jeton est le compte qui a partagé le lien : il devient auteur de la fiche et reçoit l’avis.",
+        "operationId": "envoyerDemandePublique",
+        "parameters": [
+          {
+            "name": "jeton",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DemandePubliqueDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OkDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Ressource introuvable, ou supprimée.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Trop de requêtes : réessayez plus tard.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Service momentanément indisponible.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "summary": "Reçoit une demande envoyée depuis le formulaire public.",
+        "tags": ["formulaire-public"]
+      }
     }
   },
   "info": {
@@ -20891,7 +21885,15 @@
       },
       "Role": {
         "type": "string",
-        "enum": ["ADMIN", "COMMERCIAL", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION", "ACCUEIL"]
+        "enum": [
+          "ADMIN",
+          "COMMERCIAL",
+          "BANQUE_FINANCE",
+          "SUPERVISEUR",
+          "DIRECTION",
+          "ACCUEIL",
+          "CHARGE_CLIENTELE"
+        ]
       },
       "AuthUserDto": {
         "type": "object",
@@ -23280,6 +24282,89 @@
         },
         "required": ["items"]
       },
+      "FicheChangeSource": {
+        "type": "string",
+        "enum": ["WEB", "MOBILE", "APPEL", "IMPORT"]
+      },
+      "RepresentantFicheChampDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string",
+            "description": "Le nom du champ du formulaire, tel que la base le porte."
+          },
+          "avant": {
+            "type": "string",
+            "nullable": true,
+            "description": "Booléen rendu « true »/« false »."
+          },
+          "apres": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "required": ["champ", "avant", "apres"]
+      },
+      "RepresentantFicheChangeDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "representantId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "source": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FicheChangeSource"
+              }
+            ]
+          },
+          "changedById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "changedByName": {
+            "type": "string"
+          },
+          "changedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "champs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantFicheChampDto"
+            }
+          }
+        },
+        "required": [
+          "id",
+          "representantId",
+          "source",
+          "changedById",
+          "changedByName",
+          "changedAt",
+          "champs"
+        ]
+      },
+      "RepresentantFicheChangeListDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "De la plus récente à la plus ancienne.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RepresentantFicheChangeDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
       "DeviceCallDetectionDto": {
         "type": "object",
         "properties": {
@@ -23595,13 +24680,29 @@
           "ouvertures": {
             "type": "number"
           },
+          "qualifiees": {
+            "type": "number",
+            "description": "Parmi `ouvertures`, celles closes par une qualification. Taux de qualification : `qualifiees` / `ouvertures`."
+          },
+          "liberees": {
+            "type": "number",
+            "description": "Parmi `ouvertures`, celles libérées par un superviseur ou un administrateur."
+          },
           "dureeMoyenneSecondes": {
             "type": "number",
             "nullable": true,
             "description": "DMT du jour, en secondes, lue entre la première saisie et la qualification. Les ouvertures fermées sans aucune saisie n’entrent pas au dénominateur. Nulle tant qu’aucune ne s’y prête."
           }
         },
-        "required": ["openedById", "openedByName", "jour", "ouvertures", "dureeMoyenneSecondes"]
+        "required": [
+          "openedById",
+          "openedByName",
+          "jour",
+          "ouvertures",
+          "qualifiees",
+          "liberees",
+          "dureeMoyenneSecondes"
+        ]
       },
       "ComptageOuverturesDto": {
         "type": "object",
@@ -23638,7 +24739,16 @@
       },
       "EnrollmentMethod": {
         "type": "string",
-        "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"]
+        "enum": [
+          "PLATFORM",
+          "PHYSICAL",
+          "VOICE_OR_ELECTRONIC_MESSAGING",
+          "APPOINTMENT",
+          "WHATSAPP",
+          "RDV_CPI",
+          "PLATEFORME_EN_LIGNE",
+          "MAIL"
+        ]
       },
       "ProspectSortField": {
         "type": "string",
@@ -23874,9 +24984,26 @@
             "type": "string",
             "nullable": true
           },
-          "whatsappE164": {
+          "etablissement": {
             "type": "string",
             "nullable": true
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "nullable": true,
+            "description": "Renseigné avec le seul statut AUTRE_NUMERO."
+          },
+          "whatsappNumber": {
+            "type": "string",
+            "nullable": true,
+            "description": "Numéro joignable sur WhatsApp, recomposé : `phoneE164` sur MEME_NUMERO, `whatsappE164` sur AUTRE_NUMERO, nul sinon."
           },
           "relaisNom": {
             "type": "string",
@@ -23891,6 +25018,13 @@
             "items": {
               "$ref": "#/components/schemas/ProspectJourneyDto"
             }
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Réponses aux champs ajoutés au formulaire de conversion, par identifiant de champ. Les libellés se lisent dans GET /champs-conversion/{projet}."
           },
           "dureeSystemeMois": {
             "type": "number",
@@ -23945,6 +25079,21 @@
           "enrollmentCapturedAt": {
             "type": "string",
             "format": "date-time",
+            "nullable": true
+          },
+          "revueAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Revue du closing avant l’enrôlement. Nulle tant que la demande n’a pas été revue."
+          },
+          "revueById": {
+            "type": "string",
+            "format": "uuid",
+            "nullable": true
+          },
+          "revueByName": {
+            "type": "string",
             "nullable": true
           },
           "lastOutcome": {
@@ -24002,6 +25151,12 @@
             "nullable": true,
             "description": "Détail conservé à la création (nom de la banque demandeuse, par exemple)."
           },
+          "aRevoirAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "description": "Date de la demande publique qui attend une relecture."
+          },
           "clientCreatedAt": {
             "type": "string",
             "format": "date-time"
@@ -24055,10 +25210,14 @@
           "paysResidenceId",
           "paysResidenceLabel",
           "villeResidence",
+          "etablissement",
+          "whatsappStatus",
           "whatsappE164",
+          "whatsappNumber",
           "relaisNom",
           "relaisPhoneE164",
           "journeys",
+          "champsLibres",
           "dureeSystemeMois",
           "canalProvenanceId",
           "canalProvenanceLabel",
@@ -24068,6 +25227,9 @@
           "enrollmentCapturedById",
           "enrollmentCapturedByName",
           "enrollmentCapturedAt",
+          "revueAt",
+          "revueById",
+          "revueByName",
           "lastOutcome",
           "lastComment",
           "lastAttemptAt",
@@ -24078,6 +25240,7 @@
           "lastCallByName",
           "origin",
           "originLabel",
+          "aRevoirAt",
           "clientCreatedAt",
           "createdAt",
           "updatedAt",
@@ -24272,6 +25435,11 @@
             "type": "string",
             "format": "uuid",
             "description": "Profession choisie dans le référentiel."
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où le prospect exerce."
           },
           "incomeBandId": {
             "type": "string",
@@ -24595,6 +25763,11 @@
           "villeResidence": {
             "type": "string",
             "maxLength": 120,
+            "nullable": true
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
             "nullable": true
           },
           "whatsappE164": {
@@ -25199,6 +26372,13 @@
             "type": "string",
             "format": "uuid",
             "description": "Visite : destinataire visé."
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Tentative d’appel : réponses aux champs ajoutés au formulaire de conversion par l’administrateur, par identifiant de champ."
           }
         }
       },
@@ -25283,6 +26463,10 @@
             "type": "string",
             "maxLength": 32,
             "description": "Version de l’application mobile, telle qu’elle s’annonce. Facultative."
+          },
+          "journalAppelsAutorise": {
+            "type": "boolean",
+            "description": "Lecture du journal d’appels accordée sur l’appareil. Sans elle, la durée de communication n’est jamais relevée. Facultatif sans limite de temps."
           }
         },
         "required": ["clientBatchId", "payloadVersion", "operations"]
@@ -28359,9 +29543,209 @@
         },
         "required": ["items", "byLabel", "total"]
       },
+      "StockRepresentantsPartDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "label": {
+            "type": "string"
+          },
+          "count": {
+            "type": "number"
+          }
+        },
+        "required": ["id", "label", "count"]
+      },
+      "StockRepresentantsDto": {
+        "type": "object",
+        "properties": {
+          "total": {
+            "type": "number",
+            "description": "Représentants non supprimés, toutes fiches."
+          },
+          "jamaisAppeles": {
+            "type": "number",
+            "description": "Représentants sans aucun appel."
+          },
+          "injoignables": {
+            "type": "number",
+            "description": "Représentants dont le statut est non joint, hors « Injoignable définitif »."
+          },
+          "parDepartement": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockRepresentantsPartDto"
+            }
+          },
+          "parIef": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/StockRepresentantsPartDto"
+            }
+          }
+        },
+        "required": ["total", "jamaisAppeles", "injoignables", "parDepartement", "parIef"]
+      },
       "SupervisionGranularity": {
         "type": "string",
         "enum": ["day", "week"]
+      },
+      "LotExportCible": {
+        "type": "string",
+        "enum": ["REPRESENTANTS", "PROSPECTS", "REPRESENTANTS_INJOIGNABLES", "CONTACTS_RECOMMANDES"]
+      },
+      "SupervisionCampagneTeleconseillerDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          },
+          "teleconseillerId": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "teleconseillerName": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "prevues",
+          "appelees",
+          "traitees",
+          "contactRate",
+          "exploitationRate",
+          "teleconseillerId",
+          "teleconseillerName"
+        ]
+      },
+      "SupervisionCampagneDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          },
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "name": {
+            "type": "string"
+          },
+          "cible": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/LotExportCible"
+              }
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "parTeleconseiller": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionCampagneTeleconseillerDto"
+            }
+          }
+        },
+        "required": [
+          "prevues",
+          "appelees",
+          "traitees",
+          "contactRate",
+          "exploitationRate",
+          "id",
+          "name",
+          "cible",
+          "createdAt",
+          "parTeleconseiller"
+        ]
+      },
+      "SupervisionCampagnesTotauxDto": {
+        "type": "object",
+        "properties": {
+          "prevues": {
+            "type": "number",
+            "description": "Fiches confiées pour les jours de programme de la fenêtre."
+          },
+          "appelees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui ont reçu au moins un appel."
+          },
+          "traitees": {
+            "type": "number",
+            "description": "Parmi `prevues`, celles qui portent au moins une qualification."
+          },
+          "contactRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de contact : `appelees` / `prevues`. `null` sans fiche prévue."
+          },
+          "exploitationRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’exploitation : `traitees` / `prevues`. `null` sans fiche prévue."
+          }
+        },
+        "required": ["prevues", "appelees", "traitees", "contactRate", "exploitationRate"]
+      },
+      "SupervisionCampagnesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "description": "Les campagnes dont un jour de programme tombe dans la fenêtre, la plus récente en tête.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SupervisionCampagneDto"
+            }
+          },
+          "totals": {
+            "$ref": "#/components/schemas/SupervisionCampagnesTotauxDto"
+          }
+        },
+        "required": ["items", "totals"]
       },
       "SupervisionActivityRowDto": {
         "type": "object",
@@ -28415,6 +29799,19 @@
             "type": "number",
             "nullable": true,
             "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
+          },
+          "fiches": {
+            "type": "number",
+            "description": "Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre."
+          },
+          "fichesJointes": {
+            "type": "number",
+            "description": "Parmi `fiches`, celles dont le dernier appel a joint."
+          },
+          "ficheReachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche."
           },
           "prospectsCreated": {
             "type": "number",
@@ -28488,6 +29885,49 @@
             "nullable": true,
             "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
           },
+          "repFiches": {
+            "type": "number",
+            "description": "Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres."
+          },
+          "repFichesJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut de la famille jointe."
+          },
+          "repFichesNonJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut non joint."
+          },
+          "repFichesAcceptees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Accepté."
+          },
+          "repFichesRefusees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Refusé."
+          },
+          "repFichesARappeler": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut À rappeler."
+          },
+          "repFichesEligibles": {
+            "type": "number",
+            "description": "Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs."
+          },
+          "repReachabilityRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche."
+          },
+          "repAcceptanceRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible."
+          },
+          "repCallbackFicheRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche."
+          },
           "inboundCalls": {
             "type": "number",
             "description": "Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative."
@@ -28545,6 +29985,9 @@
           "methodObtained",
           "callback",
           "reachRate",
+          "fiches",
+          "fichesJointes",
+          "ficheReachRate",
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
@@ -28562,6 +30005,16 @@
           "repQuestioned",
           "repQualified",
           "repQualificationRate",
+          "repFiches",
+          "repFichesJointes",
+          "repFichesNonJointes",
+          "repFichesAcceptees",
+          "repFichesRefusees",
+          "repFichesARappeler",
+          "repFichesEligibles",
+          "repReachabilityRate",
+          "repAcceptanceRate",
+          "repCallbackFicheRate",
           "inboundCalls",
           "missedCalls",
           "callbacksHonored",
@@ -28628,6 +30081,19 @@
             "nullable": true,
             "description": "Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint »."
           },
+          "fiches": {
+            "type": "number",
+            "description": "Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre."
+          },
+          "fichesJointes": {
+            "type": "number",
+            "description": "Parmi `fiches`, celles dont le dernier appel a joint."
+          },
+          "ficheReachRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche."
+          },
           "prospectsCreated": {
             "type": "number",
             "description": "Fiches prospect saisies sur la période."
@@ -28700,6 +30166,49 @@
             "nullable": true,
             "description": "Part des représentants interrogés qui ont dit oui, en pourcentage. `null` sans aucun représentant interrogé."
           },
+          "repFiches": {
+            "type": "number",
+            "description": "Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres."
+          },
+          "repFichesJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut de la famille jointe."
+          },
+          "repFichesNonJointes": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut non joint."
+          },
+          "repFichesAcceptees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Accepté."
+          },
+          "repFichesRefusees": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut Refusé."
+          },
+          "repFichesARappeler": {
+            "type": "number",
+            "description": "Parmi `repFiches`, dernier statut À rappeler."
+          },
+          "repFichesEligibles": {
+            "type": "number",
+            "description": "Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs."
+          },
+          "repReachabilityRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche."
+          },
+          "repAcceptanceRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible."
+          },
+          "repCallbackFicheRate": {
+            "type": "number",
+            "nullable": true,
+            "description": "Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche."
+          },
           "inboundCalls": {
             "type": "number",
             "description": "Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative."
@@ -28746,6 +30255,9 @@
           "methodObtained",
           "callback",
           "reachRate",
+          "fiches",
+          "fichesJointes",
+          "ficheReachRate",
           "prospectsCreated",
           "representantsContacted",
           "repCalls",
@@ -28763,6 +30275,16 @@
           "repQuestioned",
           "repQualified",
           "repQualificationRate",
+          "repFiches",
+          "repFichesJointes",
+          "repFichesNonJointes",
+          "repFichesAcceptees",
+          "repFichesRefusees",
+          "repFichesARappeler",
+          "repFichesEligibles",
+          "repReachabilityRate",
+          "repAcceptanceRate",
+          "repCallbackFicheRate",
           "inboundCalls",
           "missedCalls",
           "callbacksHonored",
@@ -28905,6 +30427,10 @@
         },
         "required": ["id", "label", "prospects"]
       },
+      "FamilleStatut": {
+        "type": "string",
+        "enum": ["JOINT", "NON_JOINT"]
+      },
       "SupervisionRepStatutDto": {
         "type": "object",
         "properties": {
@@ -28921,11 +30447,18 @@
           "isActive": {
             "type": "boolean"
           },
+          "famille": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/FamilleStatut"
+              }
+            ]
+          },
           "count": {
             "type": "number"
           }
         },
-        "required": ["id", "code", "label", "isActive", "count"]
+        "required": ["id", "code", "label", "isActive", "famille", "count"]
       },
       "SupervisionRepStatutsDto": {
         "type": "object",
@@ -30425,6 +31958,7 @@
         "type": "string",
         "enum": [
           "teleconseillers",
+          "chargesClientele",
           "finances",
           "supervision",
           "directionAccueil",
@@ -30627,6 +32161,11 @@
             "nullable": true,
             "description": "Version de l’application mobile, telle qu’elle s’annonce."
           },
+          "journalAppelsAutorise": {
+            "type": "boolean",
+            "nullable": true,
+            "description": "Lecture du journal d’appels accordée sur l’appareil, DÉCLARÉE PAR LUI. `false` : la durée de communication de ce compte ne se mesure pas. `null` : inconnu."
+          },
           "lastWriteAt": {
             "type": "string",
             "format": "date-time",
@@ -30711,6 +32250,7 @@
           "lastPullAt",
           "pendingOps",
           "appVersion",
+          "journalAppelsAutorise",
           "lastWriteAt",
           "activeSecondsToday",
           "activeSecondsInShifts",
@@ -30796,6 +32336,151 @@
       "ExportMode": {
         "type": "string",
         "enum": ["filtered", "consolidated"]
+      },
+      "ReglageChampDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string",
+            "description": "Clé du champ dans le catalogue de la conversion."
+          },
+          "libelle": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "obligatoire": {
+            "type": "boolean"
+          },
+          "impose": {
+            "type": "boolean",
+            "description": "Champ exigé par les indicateurs et le closing : il ne peut pas être masqué."
+          }
+        },
+        "required": ["champ", "libelle", "visible", "obligatoire", "impose"]
+      },
+      "ChampLibreDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "libelle": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string",
+            "enum": ["TEXTE", "LISTE", "OUI_NON"]
+          },
+          "options": {
+            "description": "Valeurs proposées, pour le type LISTE seulement.",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["id", "libelle", "type", "options", "obligatoire"]
+      },
+      "ReglagesConversionDto": {
+        "type": "object",
+        "properties": {
+          "projet": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/Projet"
+              }
+            ]
+          },
+          "champs": {
+            "description": "Dans l’ordre d’affichage. Un champ masqué n’est ni rendu ni exigé.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampDto"
+            }
+          },
+          "libres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreDto"
+            }
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true
+          }
+        },
+        "required": ["projet", "champs", "libres", "updatedAt"]
+      },
+      "ReglageChampInputDto": {
+        "type": "object",
+        "properties": {
+          "champ": {
+            "type": "string"
+          },
+          "visible": {
+            "type": "boolean"
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["champ", "visible", "obligatoire"]
+      },
+      "ChampLibreInputDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Absent : le champ vient d’être ajouté."
+          },
+          "libelle": {
+            "type": "string",
+            "maxLength": 80
+          },
+          "type": {
+            "type": "string",
+            "enum": ["TEXTE", "LISTE", "OUI_NON"]
+          },
+          "options": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "obligatoire": {
+            "type": "boolean"
+          }
+        },
+        "required": ["libelle", "type", "obligatoire"]
+      },
+      "UpdateReglagesConversionDto": {
+        "type": "object",
+        "properties": {
+          "champs": {
+            "description": "La liste ENTIÈRE, dans l’ordre d’affichage voulu.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampInputDto"
+            }
+          },
+          "libres": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreInputDto"
+            }
+          }
+        },
+        "required": ["champs", "libres"]
       },
       "AppUpdateDto": {
         "type": "object",
@@ -31041,14 +32726,27 @@
           "avec-telephone",
           "qualite-de-saisie",
           "taux-de-contact",
-          "a-rappeler",
-          "taux-de-qualification",
+          "taux-de-joignabilite-representants",
+          "taux-d-acceptation",
+          "taux-de-rappel",
           "repartition-statuts-qualification",
+          "joints-non-joints",
+          "statuts-par-famille",
+          "joignabilite-par-creneau",
+          "taux-d-exploitation",
+          "representants-par-departement",
+          "representants-par-ief",
+          "representants-jamais-appeles",
+          "representants-injoignables",
           "taux-de-joignabilite",
           "prospects-notes",
           "adhesions",
           "reste-a-appeler",
           "fiches-ouvertes",
+          "taux-de-qualification",
+          "duree-moyenne-sur-la-fiche",
+          "duree-moyenne-de-communication",
+          "appels-par-jour",
           "par-teleconseiller",
           "couverture-derniere-campagne",
           "hors-attribution-derniere-campagne",
@@ -31201,10 +32899,6 @@
           }
         },
         "required": ["widgets"]
-      },
-      "LotExportCible": {
-        "type": "string",
-        "enum": ["REPRESENTANTS", "PROSPECTS", "REPRESENTANTS_INJOIGNABLES", "CONTACTS_RECOMMANDES"]
       },
       "RepresentantExportQueryDto": {
         "type": "object",
@@ -31368,7 +33062,7 @@
           },
           "origin": {
             "type": "string",
-            "enum": ["BANQUE"],
+            "enum": ["BANQUE", "FORMULAIRE_PUBLIC"],
             "description": "Provenance de la fiche. Omis, le filtre ne distingue pas : les fiches de tournée terrain (provenance nulle) restent incluses."
           },
           "dateFrom": {
@@ -31380,6 +33074,10 @@
             "type": "string",
             "format": "date-time",
             "description": "Borne haute sur la date de saisie terrain (clientCreatedAt), incluse."
+          },
+          "revue": {
+            "type": "boolean",
+            "description": "Où en est la revue du closing. Les DEUX valeurs bornent aux demandes converties : `false` rend celles que personne n’a encore revues, `true` celles qui l’ont été."
           },
           "includeDeleted": {
             "type": "boolean",
@@ -31625,7 +33323,16 @@
           },
           "method": {
             "type": "string",
-            "enum": ["PLATFORM", "PHYSICAL", "VOICE_OR_ELECTRONIC_MESSAGING", "APPOINTMENT"],
+            "enum": [
+              "PLATFORM",
+              "PHYSICAL",
+              "VOICE_OR_ELECTRONIC_MESSAGING",
+              "APPOINTMENT",
+              "WHATSAPP",
+              "RDV_CPI",
+              "PLATEFORME_EN_LIGNE",
+              "MAIL"
+            ],
             "nullable": true
           },
           "comment": {
@@ -31994,6 +33701,168 @@
           }
         },
         "required": ["teleconseillerId"]
+      },
+      "ParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string"
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string"
+          },
+          "emailChues": {
+            "type": "string"
+          },
+          "whatsappChuesE164": {
+            "type": "string"
+          },
+          "messageWhatsapp": {
+            "type": "string"
+          },
+          "accuseReceptionObjet": {
+            "type": "string"
+          },
+          "accuseReceptionCorps": {
+            "type": "string"
+          },
+          "destinatairesEnrolement": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "plateformeChuesUrl",
+          "plateformeGrandPublicUrl",
+          "emailChues",
+          "whatsappChuesE164",
+          "messageWhatsapp",
+          "accuseReceptionObjet",
+          "accuseReceptionCorps",
+          "destinatairesEnrolement",
+          "destinatairesBpe",
+          "destinatairesSupervision",
+          "destinatairesDirection"
+        ]
+      },
+      "UpdateParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "emailChues": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "whatsappChuesE164": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "messageWhatsapp": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "accuseReceptionObjet": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "accuseReceptionCorps": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "destinatairesEnrolement": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ParametreChangementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cle": {
+            "type": "string"
+          },
+          "ancienne": {
+            "type": "string",
+            "nullable": true
+          },
+          "nouvelle": {
+            "type": "string"
+          },
+          "parNom": {
+            "type": "string"
+          },
+          "le": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "cle", "ancienne", "nouvelle", "parNom", "le"]
+      },
+      "JournalParametresDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParametreChangementDto"
+            }
+          }
+        },
+        "required": ["items"]
       },
       "InscriptionPlateformeDto": {
         "type": "object",
@@ -32471,6 +34340,215 @@
           }
         },
         "required": ["supprimees"]
+      },
+      "OptionPubliqueDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "libelle": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "libelle"]
+      },
+      "TrancheDureeDto": {
+        "type": "object",
+        "properties": {
+          "mois": {
+            "type": "number",
+            "minimum": 0
+          },
+          "libelle": {
+            "type": "string"
+          }
+        },
+        "required": ["mois", "libelle"]
+      },
+      "FormulairePublicDto": {
+        "type": "object",
+        "properties": {
+          "champs": {
+            "description": "Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ReglageChampDto"
+            }
+          },
+          "libres": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ChampLibreDto"
+            }
+          },
+          "banques": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "syndicats": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "revenus": {
+            "description": "Tranches de revenu mensuel.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "professions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "dureesEtablissement": {
+            "description": "Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrancheDureeDto"
+            }
+          }
+        },
+        "required": [
+          "champs",
+          "libres",
+          "banques",
+          "syndicats",
+          "revenus",
+          "professions",
+          "dureesEtablissement"
+        ]
+      },
+      "DemandePubliqueDto": {
+        "type": "object",
+        "properties": {
+          "nom": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "prenom": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "phone": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Saisie libre, normalisé en E.164 par le serveur."
+          },
+          "email": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu."
+          },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Profession choisie dans la liste rendue par `GET /formulaire`."
+          },
+          "profession": {
+            "type": "string",
+            "maxLength": 120,
+            "description": "Conservé pour les pages déjà en ligne. `professionId` le remplace.",
+            "deprecated": true
+          },
+          "etablissement": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Établissement où le visiteur exerce."
+          },
+          "employeur": {
+            "type": "string",
+            "maxLength": 160,
+            "description": "Conservé pour les pages déjà en ligne. `etablissement` le remplace.",
+            "deprecated": true
+          },
+          "dureeEtablissementMois": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 600
+          },
+          "fonctionnaire": {
+            "type": "boolean"
+          },
+          "engagementEnCours": {
+            "type": "boolean"
+          },
+          "syndicatId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "banqueId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "incomeBandId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Identifiant rendu par `GET /formulaire`."
+          },
+          "type": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/ProspectType"
+              }
+            ]
+          },
+          "paymentMode": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/PaymentMode"
+              }
+            ]
+          },
+          "dureeSystemeMois": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 300
+          },
+          "whatsappStatus": {
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/WhatsappStatus"
+              }
+            ]
+          },
+          "whatsappE164": {
+            "type": "string",
+            "maxLength": 40,
+            "description": "Exigé quand le statut vaut AUTRE_NUMERO."
+          },
+          "champsLibres": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            },
+            "description": "Réponses aux champs ajoutés par l’administrateur, par identifiant de champ."
+          },
+          "message": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "site": {
+            "type": "string",
+            "maxLength": 200,
+            "description": "Laisser vide."
+          },
+          "turnstileToken": {
+            "type": "string",
+            "maxLength": 2048,
+            "description": "Jeton rendu par le widget Cloudflare Turnstile de la page."
+          }
+        },
+        "required": ["nom", "prenom", "phone"]
       }
     }
   }

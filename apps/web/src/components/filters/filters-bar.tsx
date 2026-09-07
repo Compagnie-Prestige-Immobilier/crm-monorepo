@@ -19,8 +19,8 @@ import { withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   BDD_SEGMENTS,
-  ENROLLMENT_METHODS,
   ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUTS,
@@ -49,10 +49,22 @@ const PHASE2_STATUS_OPTIONS: FilterOption[] = PHASE2_STATUSES.map((status) => ({
   label: PHASE2_STATUS_LABELS[status],
 }));
 
-const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHODS.map((method) => ({
+const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
   value: method,
   label: ENROLLMENT_METHOD_LABELS[method],
 }));
+
+// Les deux valeurs ne portent QUE sur des demandes converties : rien d'autre
+// n'a de revue à passer.
+const REVUE_OPTIONS: FilterOption[] = [
+  { value: 'non', label: 'Non revue' },
+  { value: 'oui', label: 'Revue' },
+];
+
+function revueValue(revue: boolean | null): string | null {
+  if (revue === null) return null;
+  return revue ? 'oui' : 'non';
+}
 
 export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolean }) {
   const { filters, setFilters, resetFilters } = useProspectFilters();
@@ -290,6 +302,15 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
             value={filters.enrollmentCapturedById}
             onChange={(value) => {
               setFilters({ enrollmentCapturedById: value });
+            }}
+          />
+          <FilterCombobox
+            label="Revue de la demande"
+            placeholder="Toutes les demandes"
+            options={REVUE_OPTIONS}
+            value={revueValue(filters.revue)}
+            onChange={(value) => {
+              setFilters({ revue: value === null ? null : value === 'oui' });
             }}
           />
         </div>

@@ -8,8 +8,6 @@ import { EMPTY_REPRESENTANT_FILTERS, type RepresentantFilters } from '@/lib/repr
 type Schemas = components['schemas'];
 
 export type ImportReport = Schemas['ImportReportDto'];
-export type ImportRowError = Schemas['ImportRowErrorDto'];
-export type ImportRowPreview = Schemas['ImportRowPreviewDto'];
 
 export async function importRepresentants(
   file: File,

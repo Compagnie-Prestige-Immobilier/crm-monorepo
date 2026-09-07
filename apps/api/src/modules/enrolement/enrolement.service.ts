@@ -25,7 +25,12 @@ import {
   type ConfigPlateforme,
   type InscriptionDistante,
 } from './plateformes.js';
-import { choisirProspect, indexerProspects, type CandidatProspect } from './rapprochement.js';
+import {
+  choisirProspect,
+  indexerProspects,
+  type CandidatProspect,
+  type IndexProspects,
+} from './rapprochement.js';
 
 export const ENROLEMENT_CONFIG = 'ENROLEMENT_CONFIG';
 
@@ -44,6 +49,12 @@ const REGLAGES_USINE: ReglagesStockes = {
   repriseDepuis: null,
   dernierTirage: null,
 };
+
+interface CompteursTirage {
+  crees: number;
+  misAJour: number;
+  rapproches: number;
+}
 
 function lireReglages(valeur: string | undefined): ReglagesStockes {
   if (valeur === undefined) return { ...REGLAGES_USINE };
@@ -203,9 +214,7 @@ export class EnrolementService {
 
     const debut = Date.now();
     let lus = 0;
-    let crees = 0;
-    let misAJour = 0;
-    let rapproches = 0;
+    const compteurs: CompteursTirage = { crees: 0, misAJour: 0, rapproches: 0 };
     let disparues = 0;
     let erreur: string | null = null;
 
@@ -226,13 +235,8 @@ export class EnrolementService {
       );
 
       const dernierTirageAt = new Date();
-      for (const ligne of retenues) {
-        const prospectId = choisirProspect(projet, ligne.phoneE164, ligne.email, index);
-        if (prospectId !== null) rapproches += 1;
-        if (connus.has(ligne.identifiantDistant)) misAJour += 1;
-        else crees += 1;
-        await this.deposer(projet, ligne, prospectId, dernierTirageAt);
-      }
+      for (const ligne of retenues)
+        await this.appliquerLigne(projet, ligne, index, connus, dernierTirageAt, compteurs);
 
       disparues = await this.marquerDisparues(
         projet,
@@ -246,14 +250,12 @@ export class EnrolementService {
         termineLe: new Date().toISOString(),
         dureeMs: Date.now() - debut,
         lus,
-        crees,
-        misAJour,
-        rapproches,
+        ...compteurs,
         disparues,
         erreur: null,
       });
       this.logger.log(
-        `Tirage ${projet} : ${String(lus)} lus, ${String(crees)} créés, ${String(misAJour)} mis à jour, ${String(rapproches)} rapprochés, ${String(disparues)} disparus en ${String(Date.now() - debut)} ms`,
+        `Tirage ${projet} : ${String(lus)} lus, ${String(compteurs.crees)} créés, ${String(compteurs.misAJour)} mis à jour, ${String(compteurs.rapproches)} rapprochés, ${String(disparues)} disparus en ${String(Date.now() - debut)} ms`,
       );
     } catch (cause) {
       erreur = messageDErreur(cause);
@@ -262,9 +264,7 @@ export class EnrolementService {
         termineLe: new Date().toISOString(),
         dureeMs: Date.now() - debut,
         lus,
-        crees,
-        misAJour,
-        rapproches,
+        ...compteurs,
         disparues,
         erreur,
       });
@@ -276,9 +276,7 @@ export class EnrolementService {
       projet,
       dureeMs: Date.now() - debut,
       lus,
-      crees,
-      misAJour,
-      rapproches,
+      ...compteurs,
       disparues,
       erreur,
     };
@@ -348,6 +346,22 @@ export class EnrolementService {
       create: { projet, identifiantDistant: ligne.identifiantDistant, ...commun },
       update: commun,
     });
+  }
+
+  /** Le résultat d'une ligne s'accumule dans `compteurs`, partagé par tout le tirage. */
+  private async appliquerLigne(
+    projet: Projet,
+    ligne: InscriptionDistante,
+    index: IndexProspects,
+    connus: ReadonlySet<string>,
+    dernierTirageAt: Date,
+    compteurs: CompteursTirage,
+  ): Promise<void> {
+    const prospectId = choisirProspect(projet, ligne.phoneE164, ligne.email, index);
+    if (prospectId !== null) compteurs.rapproches += 1;
+    if (connus.has(ligne.identifiantDistant)) compteurs.misAJour += 1;
+    else compteurs.crees += 1;
+    await this.deposer(projet, ligne, prospectId, dernierTirageAt);
   }
 
   private async consigner(projet: Projet, tirage: DernierTirageDto): Promise<void> {
@@ -423,21 +437,7 @@ export class EnrolementService {
           AND LOWER(ca."email") IN (${Prisma.join(emails)})
       `;
 
-      for (const ligne of lignesEmail) {
-        const deja = parIdentifiant.get(ligne.id);
-        if (deja === undefined) {
-          parIdentifiant.set(ligne.id, {
-            id: ligne.id,
-            projet: ligne.projet,
-            phoneE164: ligne.phoneE164,
-            whatsappE164: ligne.whatsappE164,
-            clientCreatedAt: ligne.clientCreatedAt,
-            emails: [ligne.email],
-          });
-        } else {
-          parIdentifiant.set(ligne.id, { ...deja, emails: [...deja.emails, ligne.email] });
-        }
-      }
+      for (const ligne of lignesEmail) fusionnerCandidat(parIdentifiant, ligne);
     }
 
     return [...parIdentifiant.values()];
@@ -544,7 +544,7 @@ function normaliserReprise(valeur: string | undefined, courant: string | null): 
   return Number.isNaN(date.getTime()) ? courant : date.toISOString();
 }
 
-export function filtrerDepuis(
+function filtrerDepuis(
   lignes: readonly InscriptionDistante[],
   repriseDepuis: string | null,
 ): InscriptionDistante[] {
@@ -556,7 +556,7 @@ export function filtrerDepuis(
   return lignes.filter((ligne) => ligne.inscriteLe === null || ligne.inscriteLe >= borne);
 }
 
-export function estEchu(reglages: EnrolementReglagesDto, now: Date): boolean {
+function estEchu(reglages: EnrolementReglagesDto, now: Date): boolean {
   const dernier = reglages.dernierTirage;
   if (dernier === null) return true;
   const termine = new Date(dernier.termineLe).getTime();
@@ -568,4 +568,30 @@ function messageDErreur(cause: unknown): string {
   if (cause instanceof JetonPlateformeRevoque) return cause.message;
   if (cause instanceof PlateformeNonConfiguree) return cause.message;
   return cause instanceof Error ? cause.message : String(cause);
+}
+
+function fusionnerCandidat(
+  parIdentifiant: Map<string, CandidatProspect>,
+  ligne: {
+    id: string;
+    projet: Projet;
+    phoneE164: string;
+    whatsappE164: string | null;
+    clientCreatedAt: Date;
+    email: string;
+  },
+): void {
+  const deja = parIdentifiant.get(ligne.id);
+  if (deja === undefined) {
+    parIdentifiant.set(ligne.id, {
+      id: ligne.id,
+      projet: ligne.projet,
+      phoneE164: ligne.phoneE164,
+      whatsappE164: ligne.whatsappE164,
+      clientCreatedAt: ligne.clientCreatedAt,
+      emails: [ligne.email],
+    });
+    return;
+  }
+  parIdentifiant.set(ligne.id, { ...deja, emails: [...deja.emails, ligne.email] });
 }

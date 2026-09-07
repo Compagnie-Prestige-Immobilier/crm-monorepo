@@ -30,10 +30,12 @@ import {
 import { dakarWallClock } from '../../common/date-bounds.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { PROSPECT_INCLUDE, toProspectDto } from '../prospects/prospects.service.js';
+import { whatsappDuProspect, type WhatsappPatchProspect } from '../prospects/whatsapp.js';
 import { REPRESENTANT_INCLUDE, toRepresentantDto } from '../representants/representants.service.js';
 import { resolveWhatsappPatch } from '../representants/whatsapp.js';
 import { applyRelationChange } from '../representants/relation-change.js';
-import { CallAttemptApplyStatus } from '../phase2/dto.js';
+import { ficheSnapshot, recordFicheChange } from '../representants/fiche-change.js';
+import { CallAttemptApplyStatus, type CallAttemptResultDto } from '../phase2/dto.js';
 import { fermerOuverture } from '../ouvertures/ouvertures.service.js';
 import { Phase2SyncService } from '../phase2/phase2-sync.service.js';
 import { VISITE_REGISTRE_ROLES, VisitesService, dakarDate } from '../visites/visites.service.js';
@@ -77,7 +79,7 @@ import {
  * plus vieilles que deux secondes, on laisse toute écriture en vol le temps de
  * se valider avant d'entrer dans la fenêtre de pagination.
  */
-export const PULL_SAFETY_LAG_MS = 2_000;
+const PULL_SAFETY_LAG_MS = 2_000;
 
 /** Une transaction de groupe ne doit jamais immobiliser une connexion au-delà. */
 const GROUP_TRANSACTION_TIMEOUT_MS = 15_000;
@@ -184,6 +186,63 @@ function errorMessageOf(error: { getResponse: () => unknown; message: string }):
   return error.message;
 }
 
+function requireCallAttemptFields(
+  data: SyncEntityDataDto | undefined,
+): asserts data is SyncEntityDataDto & {
+  prospectId: string;
+  outcome: NonNullable<SyncEntityDataDto['outcome']>;
+  clientCreatedAt: string;
+} {
+  if (!data?.prospectId || !data.outcome || !data.clientCreatedAt) {
+    throw new OperationError(
+      SyncOpStatus.INVALID,
+      'CALL_ATTEMPT_INCOMPLETE',
+      'Une tentative d’appel exige prospectId, outcome et clientCreatedAt.',
+    );
+  }
+}
+
+function callAttemptOutcome(entityId: string, result: CallAttemptResultDto): OperationOutcome {
+  return {
+    // Un rejeu n'est pas un échec : la tentative était déjà enregistrée, rien
+    // n'a été réécrit, et le client peut retirer l'opération de sa file en
+    // toute sécurité.
+    status:
+      result.status === CallAttemptApplyStatus.DUPLICATE
+        ? SyncOpStatus.DUPLICATE
+        : SyncOpStatus.APPLIED,
+    entityId,
+    rev: result.state.rev,
+    serverUpdatedAt: result.state.updatedAt,
+    errorCode: null,
+    error: null,
+  };
+}
+
+/** Le push ne renvoie jamais d'erreur HTTP pour une opération isolée, sous peine de condamner les autres du lot. */
+function translateCallAttemptError(error: unknown): unknown {
+  if (error instanceof ConflictException) {
+    return new OperationError(
+      SyncOpStatus.CONFLICT,
+      errorCodeOf(error) ?? 'PHASE2_ALREADY_COMPLETED',
+      errorMessageOf(error),
+    );
+  }
+  if (
+    error instanceof BadRequestException ||
+    error instanceof NotFoundException ||
+    // Hors campagne : refus DÉFINITIF de l'opération, pas du lot.
+    error instanceof ForbiddenException
+  ) {
+    return new OperationError(
+      SyncOpStatus.INVALID,
+      errorCodeOf(error) ?? 'CALL_ATTEMPT_INVALID',
+      errorMessageOf(error),
+    );
+  }
+  return error;
+}
+
 /**
  * La file confiée par une campagne, telle que le téléphone la voit.
  *
@@ -206,6 +265,13 @@ const ANNUAIRE_ROLES: readonly Role[] = [
 const mineOrAssignedRepresentant = (
   user: Pick<AuthenticatedUser, 'id' | 'role'>,
 ): Prisma.RepresentantWhereInput => (ANNUAIRE_ROLES.includes(user.role) ? {} : {});
+
+type RepresentantRow = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['representant']['findUnique']>>
+>;
+type ProspectRow = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['prospect']['findUnique']>>
+>;
 
 @Injectable()
 export class SyncService {
@@ -328,46 +394,17 @@ export class SyncService {
     user: AuthenticatedUser,
     body: SyncPushDto,
   ): Promise<SyncOperationResultDto[]> {
-    const groups = new Map<string, SyncOperationDto[]>();
-    for (const operation of body.operations) {
-      const key = dependencyKeyOf(operation);
-      const bucket = groups.get(key);
-      if (bucket) bucket.push(operation);
-      else groups.set(key, [operation]);
-    }
-
-    const ordered = [...groups.values()]
-      .map((operations) => [...operations].sort((left, right) => left.seq - right.seq))
-      .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
+    const ordered = groupOperationsByDependency(body.operations);
 
     // Le rôle est figé une fois pour éviter deux autorités dans un même lot.
-    const author = await this.readAuthority(user);
+    const author = await this.readAuthority(user, body.payloadVersion);
 
     const results: SyncOperationResultDto[] = [];
     for (const operations of ordered) {
       try {
         results.push(...(await this.runGroup(author, body.clientBatchId, operations)));
       } catch (error) {
-        // La transaction du groupe a été annulée : AUCUNE de ses opérations
-        // n'a été écrite. On le dit franchement et on passe au groupe suivant,
-        // qui est indépendant.
-        this.logger.error(
-          `Groupe de synchronisation annulé (${String(operations.length)} opérations) : ${
-            error instanceof Error ? error.message : String(error)
-          }`,
-        );
-        for (const operation of operations) {
-          results.push(
-            toResultDto(operation, {
-              status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
-              entityId: operation.entityId,
-              rev: null,
-              serverUpdatedAt: null,
-              errorCode: 'GROUP_TRANSACTION_FAILED',
-              error: 'La transaction du groupe a échoué ; aucune de ses écritures n’a été retenue.',
-            }),
-          );
-        }
+        results.push(...this.groupFailureResults(operations, error));
       }
     }
 
@@ -379,13 +416,42 @@ export class SyncService {
     );
   }
 
-  private async readAuthority(user: AuthenticatedUser): Promise<BatchAuthority> {
+  /**
+   * La transaction du groupe a été annulée : AUCUNE de ses opérations n'a été
+   * écrite. On le dit franchement et on passe au groupe suivant, indépendant.
+   */
+  private groupFailureResults(
+    operations: SyncOperationDto[],
+    error: unknown,
+  ): SyncOperationResultDto[] {
+    this.logger.error(
+      `Groupe de synchronisation annulé (${String(operations.length)} opérations) : ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+    return operations.map((operation) =>
+      toResultDto(operation, {
+        status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
+        entityId: operation.entityId,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: 'GROUP_TRANSACTION_FAILED',
+        error: 'La transaction du groupe a échoué ; aucune de ses écritures n’a été retenue.',
+      }),
+    );
+  }
+
+  private async readAuthority(
+    user: AuthenticatedUser,
+    payloadVersion: number,
+  ): Promise<BatchAuthority> {
     const author = await this.prisma.user.findUnique({
       where: { id: user.id },
       select: { role: true },
     });
     return {
       user: author?.role ? { ...user, role: author.role } : user,
+      payloadVersion,
     };
   }
 
@@ -413,31 +479,18 @@ export class SyncService {
             continue;
           }
 
-          let outcome: OperationOutcome;
-          if (parentUnavailable && operation.entity === SyncEntity.PROSPECT) {
-            outcome = {
-              status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
-              entityId: operation.entityId,
-              rev: null,
-              serverUpdatedAt: null,
-              errorCode: 'PARENT_REPRESENTANT_FAILED',
-              error: 'Le représentant de rattachement n’a pas pu être enregistré.',
-            };
-          } else {
-            outcome = await this.applyOperation(tx, user, operation);
-            if (
-              operation.entity === SyncEntity.REPRESENTANT &&
-              outcome.status !== SyncOpStatus.APPLIED
-            ) {
-              // Un « déjà présent », même sous un autre créateur, n'est pas une
-              // indisponibilité : seule l'absence effective de la ligne de
-              // l'annuaire condamne ses prospects.
-              const exists = await tx.representant.findFirst({
-                where: { id: operation.entityId, deletedAt: null },
-                select: { id: true },
-              });
-              parentUnavailable = !exists;
-            }
+          const outcome = await this.applyGroupOperation(tx, author, operation, parentUnavailable);
+          if (
+            operation.entity === SyncEntity.REPRESENTANT &&
+            outcome.status !== SyncOpStatus.APPLIED
+          ) {
+            // Un « déjà présent », même sous un autre créateur, n'est pas une
+            // indisponibilité : seule l'absence effective de la ligne de
+            // l'annuaire condamne ses prospects.
+            parentUnavailable = !(await tx.representant.findFirst({
+              where: { id: operation.entityId, deletedAt: null },
+              select: { id: true },
+            }));
           }
 
           await finalizeOperation(tx, operation.opId, outcome);
@@ -450,10 +503,30 @@ export class SyncService {
     );
   }
 
+  private async applyGroupOperation(
+    tx: Prisma.TransactionClient,
+    author: BatchAuthority,
+    operation: SyncOperationDto,
+    parentUnavailable: boolean,
+  ): Promise<OperationOutcome> {
+    if (parentUnavailable && operation.entity === SyncEntity.PROSPECT) {
+      return {
+        status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
+        entityId: operation.entityId,
+        rev: null,
+        serverUpdatedAt: null,
+        errorCode: 'PARENT_REPRESENTANT_FAILED',
+        error: 'Le représentant de rattachement n’a pas pu être enregistré.',
+      };
+    }
+    return this.applyOperation(tx, author.user, operation, author.payloadVersion);
+  }
+
   private async applyOperation(
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    payloadVersion: number,
   ): Promise<OperationOutcome> {
     try {
       if (operation.entity === SyncEntity.REPRESENTANT) {
@@ -465,7 +538,7 @@ export class SyncService {
       if (operation.entity === SyncEntity.CALL_ATTEMPT) {
         // La tentative hérite de SON PROSPECT, que `phase2-sync` lit déjà :
         // rien à transmettre ici.
-        return await this.applyCallAttempt(tx, user, operation);
+        return await this.applyCallAttempt(tx, user, operation, payloadVersion);
       }
       if (operation.entity === SyncEntity.VISITE) {
         return await this.applyVisite(tx, user, operation);
@@ -608,11 +681,13 @@ export class SyncService {
           visitorName: data.visitorName,
           entrepriseId: data.entrepriseId,
           objetId: data.objetId,
-          ...(data.visitTime === undefined ? {} : { time: data.visitTime }),
-          ...(data.phone === undefined ? {} : { phone: data.phone }),
-          ...(data.directionId === undefined ? {} : { directionId: data.directionId }),
-          ...(data.destinataireId === undefined ? {} : { destinataireId: data.destinataireId }),
-          ...(data.comment === undefined ? {} : { comment: data.comment }),
+          ...definedValues({
+            time: data.visitTime,
+            phone: data.phone,
+            directionId: data.directionId,
+            destinataireId: data.destinataireId,
+            comment: data.comment,
+          }),
         },
         user.id,
       );
@@ -643,74 +718,104 @@ export class SyncService {
     await this.assertRepresentantWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
-      if (!existing || existing.deletedAt) {
-        // Supprimer ce qui n'existe plus est le résultat voulu.
-        return existingOutcome(operation.entityId, existing);
-      }
-      assertRev(operation, existing.rev);
-      const now = new Date();
-      await tx.prospect.updateMany({
-        where: { representantId: existing.id, deletedAt: null },
-        data: { deletedAt: now, rev: { increment: 1 } },
-      });
-      const row = await tx.representant.update({
-        where: { id: existing.id },
-        data: { deletedAt: now, rev: { increment: 1 } },
-      });
-      return applied(row.id, row.rev, row.updatedAt);
+      return this.deleteRepresentant(tx, operation, existing);
     }
+    if (!existing || existing.deletedAt) {
+      return this.createRepresentant(tx, user, operation);
+    }
+    return this.updateRepresentant(tx, user, operation, existing);
+  }
 
+  private async deleteRepresentant(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: RepresentantRow | null,
+  ): Promise<OperationOutcome> {
+    if (!existing || existing.deletedAt) {
+      // Supprimer ce qui n'existe plus est le résultat voulu.
+      return existingOutcome(operation.entityId, existing);
+    }
+    assertRev(operation, existing.rev);
+    const now = new Date();
+    await tx.prospect.updateMany({
+      where: { representantId: existing.id, deletedAt: null },
+      data: { deletedAt: now, rev: { increment: 1 } },
+    });
+    const row = await tx.representant.update({
+      where: { id: existing.id },
+      data: { deletedAt: now, rev: { increment: 1 } },
+    });
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async createRepresentant(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+  ): Promise<OperationOutcome> {
     const data = operation.data || {};
     const phoneE164 = requirePhone(data);
+    requireText(data.fullName, 'fullName');
+    requireUuid(data.departementId, 'departementId');
+    await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
 
-    if (!existing || existing.deletedAt) {
-      requireText(data.fullName, 'fullName');
-      requireUuid(data.departementId, 'departementId');
-      await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
+    // `upsert` et non `create` : la ligne peut exister en supprimé logique
+    // (le commercial a effacé la fiche puis la ressaisit). Un `create` se
+    // heurterait à la clé primaire.
+    const row = await tx.representant.upsert({
+      where: { id: operation.entityId },
+      create: {
+        id: operation.entityId,
+        fullName: data.fullName.trim(),
+        phoneE164,
+        ...definedValues({ notes: data.notes || undefined }),
+        ...definedValues({
+          prenom: data.prenom || undefined,
+          etablissement: data.etablissement || undefined,
+          syndicat: data.syndicat || undefined,
+          connaitUES: data.connaitUES,
+          contacte: data.contacte,
+        }),
+        // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
+        // meme regle que le panneau, donc le CHECK ne peut pas etre viole
+        // par le chemin hors ligne.
+        ...resolveWhatsappPatch(data, {
+          whatsappStatus: WhatsappStatus.NON_DEMANDE,
+          whatsappE164: null,
+        }),
+        departementId: data.departementId,
+        ...definedValues({ iefId: data.iefId || undefined }),
+        createdById: user.id,
+        clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+      },
+      update: {
+        fullName: data.fullName.trim(),
+        phoneE164,
+        notes: valueOrNull(data.notes),
+        departementId: data.departementId,
+        ...definedValues({ iefId: data.iefId || undefined }),
+        deletedAt: null,
+        rev: { increment: 1 },
+      },
+    });
+    await recordFicheChange(tx, {
+      representantId: row.id,
+      userId: user.id,
+      source: 'MOBILE',
+      before: null,
+      after: ficheSnapshot(row),
+    });
+    return applied(row.id, row.rev, row.updatedAt);
+  }
 
-      // `upsert` et non `create` : la ligne peut exister en supprimé logique
-      // (le commercial a effacé la fiche puis la ressaisit). Un `create` se
-      // heurterait à la clé primaire.
-      const row = await tx.representant.upsert({
-        where: { id: operation.entityId },
-        create: {
-          id: operation.entityId,
-          fullName: data.fullName.trim(),
-          phoneE164,
-          ...definedValues({ notes: data.notes || undefined }),
-          ...definedValues({
-            prenom: data.prenom || undefined,
-            etablissement: data.etablissement || undefined,
-            syndicat: data.syndicat || undefined,
-            connaitUES: data.connaitUES,
-            contacte: data.contacte,
-          }),
-          // Une fiche neuve part de `NON_DEMANDE`: le resolveur applique la
-          // meme regle que le panneau, donc le CHECK ne peut pas etre viole
-          // par le chemin hors ligne.
-          ...resolveWhatsappPatch(data, {
-            whatsappStatus: WhatsappStatus.NON_DEMANDE,
-            whatsappE164: null,
-          }),
-          departementId: data.departementId,
-          ...definedValues({ iefId: data.iefId || undefined }),
-          createdById: user.id,
-          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-        },
-        update: {
-          fullName: data.fullName.trim(),
-          phoneE164,
-          notes: valueOrNull(data.notes),
-          departementId: data.departementId,
-          ...definedValues({ iefId: data.iefId || undefined }),
-          deletedAt: null,
-          rev: { increment: 1 },
-        },
-      });
-      // Inscrite au registre pour que la purge sache la reprendre : sans cela
-      return applied(row.id, row.rev, row.updatedAt);
-    }
-
+  private async updateRepresentant(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+    existing: RepresentantRow,
+  ): Promise<OperationOutcome> {
+    const data = operation.data || {};
+    const phoneE164 = requirePhone(data);
     assertRev(operation, existing.rev);
     if (phoneE164 !== existing.phoneE164) {
       await assertRepresentantPhoneFree(tx, phoneE164, operation.entityId);
@@ -752,6 +857,13 @@ export class SyncService {
         source: ChangeSource.MOBILE,
       });
     }
+    await recordFicheChange(tx, {
+      representantId: row.id,
+      userId: user.id,
+      source: 'MOBILE',
+      before: ficheSnapshot(existing),
+      after: ficheSnapshot(row),
+    });
     return applied(row.id, row.rev, row.updatedAt);
   }
 
@@ -828,48 +940,52 @@ export class SyncService {
     tx: Prisma.TransactionClient,
     user: AuthenticatedUser,
     operation: SyncOperationDto,
+    payloadVersion: number,
   ): Promise<OperationOutcome> {
     const data = operation.data;
-    if (!data?.prospectId || !data.outcome || !data.clientCreatedAt) {
-      throw new OperationError(
-        SyncOpStatus.INVALID,
-        'CALL_ATTEMPT_INCOMPLETE',
-        'Une tentative d’appel exige prospectId, outcome et clientCreatedAt.',
-      );
-    }
+    requireCallAttemptFields(data);
 
     try {
-      const result = await this.phase2Sync.applyCallAttempt(tx, user, {
-        id: operation.entityId,
-        prospectId: data.prospectId,
-        outcome: data.outcome,
-        ...(data.reasonCode === undefined ? {} : { reasonCode: data.reasonCode }),
-        ...(data.method === undefined ? {} : { method: data.method }),
-        ...(data.comment === undefined ? {} : { comment: data.comment }),
-        ...(data.callbackAt === undefined ? {} : { callbackAt: data.callbackAt }),
-        // Renseignements de conversion (phase 3). Les cinq premiers vont sur la
-        // tentative, les cinq suivants sur le prospect : voir `CallAttemptOpDto`.
-        ...definedValues({
-          email: data.email,
-          fonctionnaire: data.fonctionnaire,
-          engagementEnCours: data.engagementEnCours,
-          dureeEtablissementMois: data.dureeEtablissementMois,
-          rendezVousAt: data.rendezVousAt,
-          nom: data.nom,
-          prenom: data.prenom,
-          profession: data.profession,
-          banqueId: data.banqueId,
-          syndicatId: data.syndicatId,
-          type: data.type,
-          incomeBandId: data.incomeBandId,
-          paymentMode: data.paymentMode,
-          dureeSystemeMois: data.dureeSystemeMois,
-          deviceCallType: data.deviceCallType,
-          deviceCallDurationSeconds: data.deviceCallDurationSeconds,
-          deviceCallAt: data.deviceCallAt,
-        }),
-        clientCreatedAt: data.clientCreatedAt,
-      });
+      const result = await this.phase2Sync.applyCallAttempt(
+        tx,
+        user,
+        {
+          id: operation.entityId,
+          prospectId: data.prospectId,
+          outcome: data.outcome,
+          // Renseignements de conversion (phase 3). Les uns vont sur la tentative,
+          // les autres sur le prospect : voir `CallAttemptOpDto`.
+          ...definedValues({
+            reasonCode: data.reasonCode,
+            method: data.method,
+            comment: data.comment,
+            callbackAt: data.callbackAt,
+            email: data.email,
+            fonctionnaire: data.fonctionnaire,
+            engagementEnCours: data.engagementEnCours,
+            dureeEtablissementMois: data.dureeEtablissementMois,
+            rendezVousAt: data.rendezVousAt,
+            nom: data.nom,
+            prenom: data.prenom,
+            profession: data.profession,
+            etablissement: data.etablissement,
+            banqueId: data.banqueId,
+            syndicatId: data.syndicatId,
+            type: data.type,
+            incomeBandId: data.incomeBandId,
+            paymentMode: data.paymentMode,
+            dureeSystemeMois: data.dureeSystemeMois,
+            champsLibres: data.champsLibres,
+            whatsappStatus: data.whatsappStatus,
+            whatsappE164: data.whatsappE164,
+            deviceCallType: data.deviceCallType,
+            deviceCallDurationSeconds: data.deviceCallDurationSeconds,
+            deviceCallAt: data.deviceCallAt,
+          }),
+          clientCreatedAt: data.clientCreatedAt,
+        },
+        payloadVersion,
+      );
 
       if (data.ouvertureId) {
         await fermerOuverture(tx, {
@@ -880,45 +996,12 @@ export class SyncService {
         });
       }
 
-      return {
-        // Un rejeu n'est pas un échec : la tentative était déjà enregistrée,
-        // rien n'a été réécrit, et le client peut retirer l'opération de sa
-        // file en toute sécurité.
-        status:
-          result.status === CallAttemptApplyStatus.DUPLICATE
-            ? SyncOpStatus.DUPLICATE
-            : SyncOpStatus.APPLIED,
-        entityId: operation.entityId,
-        rev: result.state.rev,
-        serverUpdatedAt: result.state.updatedAt,
-        errorCode: null,
-        error: null,
-      };
+      return callAttemptOutcome(operation.entityId, result);
     } catch (error) {
       // Le service de phase 2 lève des exceptions HTTP ; le push ne renvoie
       // jamais d'erreur HTTP pour une opération isolée, sous peine de
       // condamner les 199 autres du lot. On les rabat donc dans le corps.
-      if (error instanceof ConflictException) {
-        throw new OperationError(
-          SyncOpStatus.CONFLICT,
-          errorCodeOf(error) ?? 'PHASE2_ALREADY_COMPLETED',
-          errorMessageOf(error),
-        );
-      }
-      if (
-        error instanceof BadRequestException ||
-        error instanceof NotFoundException ||
-        // Hors campagne : refus DÉFINITIF de l'opération, pas du lot. Une 403
-        // HTTP condamnerait les 199 autres tentatives du même envoi.
-        error instanceof ForbiddenException
-      ) {
-        throw new OperationError(
-          SyncOpStatus.INVALID,
-          errorCodeOf(error) ?? 'CALL_ATTEMPT_INVALID',
-          errorMessageOf(error),
-        );
-      }
-      throw error;
+      throw translateCallAttemptError(error);
     }
   }
 
@@ -1033,78 +1116,113 @@ export class SyncService {
     await this.assertProspectWritable(tx, user, existing);
 
     if (operation.op === SyncOp.DELETE) {
-      if (!existing || existing.deletedAt) {
-        return existingOutcome(operation.entityId, existing);
-      }
-      assertRev(operation, existing.rev);
-      const row = await tx.prospect.update({
-        where: { id: existing.id },
-        data: { deletedAt: new Date(), rev: { increment: 1 } },
-      });
-      return applied(row.id, row.rev, row.updatedAt);
+      return this.deleteProspect(tx, operation, existing);
     }
+    if (!existing || existing.deletedAt) {
+      return this.createProspect(tx, user, operation, existing);
+    }
+    return this.updateProspect(tx, operation, existing);
+  }
 
+  private async deleteProspect(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: ProspectRow | null,
+  ): Promise<OperationOutcome> {
+    if (!existing || existing.deletedAt) {
+      return existingOutcome(operation.entityId, existing);
+    }
+    assertRev(operation, existing.rev);
+    const row = await tx.prospect.update({
+      where: { id: existing.id },
+      data: { deletedAt: new Date(), rev: { increment: 1 } },
+    });
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async createProspect(
+    tx: Prisma.TransactionClient,
+    user: AuthenticatedUser,
+    operation: SyncOperationDto,
+    existing: ProspectRow | null,
+  ): Promise<OperationOutcome> {
     const data = operation.data || {};
     const phoneE164 = requirePhone(data);
+    // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
+    // supprime le `null` avant l'envoi, donc un effacement arrivait ici
+    // identique au silence d'une application ancienne.
+    const videe = new Set(operation.clearedFields ?? []);
 
-    if (!existing || existing.deletedAt) {
-      requireText(data.nom, 'nom');
-      // Le prenom est facultatif, comme tout le reste sauf le nom et le
-      // telephone : une chaine vide s'enregistre, un refus ferait abandonner
-      // la fiche entiere.
-      // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
-      // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
-      // aucun : les exiger faisait abandonner la saisie entiere.
-      if (data.representantId) {
-        await assertRepresentantUsable(tx, data.representantId);
-      }
-      await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
-
-      const row = await tx.prospect.upsert({
-        where: { id: operation.entityId },
-        create: {
-          id: operation.entityId,
-          nom: data.nom.trim(),
-          prenom: textOrEmpty(data.prenom),
-          phoneE164,
-          banqueId: valueOrNull(data.banqueId),
-          syndicatId: valueOrNull(data.syndicatId),
-          representantId: valueOrNull(data.representantId),
-          createdById: user.id,
-          ...definedValues({
-            projet: data.projet,
-            type: data.type,
-            profession: data.profession,
-            dureeSystemeMois: data.dureeSystemeMois,
-            canalProvenanceId: data.canalProvenanceId,
-            statut: data.statut,
-          }),
-          ...situationGrandPublic(data),
-          clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
-        },
-        update: {
-          nom: data.nom.trim(),
-          prenom: textOrEmpty(data.prenom),
-          phoneE164,
-          banqueId: valueOrNull(data.banqueId),
-          syndicatId: valueOrNull(data.syndicatId),
-          representantId: valueOrNull(data.representantId),
-          ...definedValues({
-            projet: data.projet,
-            type: data.type,
-            profession: data.profession,
-            dureeSystemeMois: data.dureeSystemeMois,
-            canalProvenanceId: data.canalProvenanceId,
-            statut: data.statut,
-          }),
-          ...situationGrandPublic(data),
-          deletedAt: null,
-          rev: { increment: 1 },
-        },
-      });
-      await openJourney(tx, row.id, data.projet ?? Projet.CHUES, data.statut);
-      return applied(row.id, row.rev, row.updatedAt);
+    requireText(data.nom, 'nom');
+    // Le prenom est facultatif, comme tout le reste sauf le nom et le
+    // telephone : une chaine vide s'enregistre, un refus ferait abandonner
+    // la fiche entiere.
+    // Banque, syndicat et representant sont FACULTATIFS. Un teleconseiller au
+    // telephone ne les obtient pas toujours, et une fiche Grand Public n'en a
+    // aucun : les exiger faisait abandonner la saisie entiere.
+    if (data.representantId) {
+      await assertRepresentantUsable(tx, data.representantId);
     }
+    await assertProspectPhoneFree(tx, phoneE164, operation.entityId);
+
+    const row = await tx.prospect.upsert({
+      where: { id: operation.entityId },
+      create: {
+        id: operation.entityId,
+        nom: data.nom.trim(),
+        prenom: textOrEmpty(data.prenom),
+        phoneE164,
+        banqueId: valueOrNull(data.banqueId),
+        syndicatId: valueOrNull(data.syndicatId),
+        representantId: valueOrNull(data.representantId),
+        createdById: user.id,
+        ...definedValues({
+          projet: data.projet,
+          type: data.type,
+          profession: data.profession,
+          dureeSystemeMois: data.dureeSystemeMois,
+          canalProvenanceId: data.canalProvenanceId,
+          statut: data.statut,
+        }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
+        ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, WHATSAPP_NEUF, videe),
+        clientCreatedAt: clientDate(data.clientCreatedAt, operation.clientUpdatedAt),
+      },
+      update: {
+        nom: data.nom.trim(),
+        prenom: textOrEmpty(data.prenom),
+        phoneE164,
+        banqueId: valueOrNull(data.banqueId),
+        syndicatId: valueOrNull(data.syndicatId),
+        representantId: valueOrNull(data.representantId),
+        ...definedValues({
+          projet: data.projet,
+          type: data.type,
+          profession: data.profession,
+          dureeSystemeMois: data.dureeSystemeMois,
+          canalProvenanceId: data.canalProvenanceId,
+          statut: data.statut,
+        }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
+        ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, existing ?? WHATSAPP_NEUF, videe),
+        deletedAt: null,
+        rev: { increment: 1 },
+      },
+    });
+    await openJourney(tx, row.id, data.projet ?? Projet.CHUES, data.statut);
+    return applied(row.id, row.rev, row.updatedAt);
+  }
+
+  private async updateProspect(
+    tx: Prisma.TransactionClient,
+    operation: SyncOperationDto,
+    existing: ProspectRow,
+  ): Promise<OperationOutcome> {
+    const data = operation.data || {};
+    const phoneE164 = requirePhone(data);
+    const videe = new Set(operation.clearedFields ?? []);
 
     assertRev(operation, existing.rev);
     if (phoneE164 !== existing.phoneE164) {
@@ -1114,10 +1232,6 @@ export class SyncService {
       await assertRepresentantUsable(tx, data.representantId);
     }
 
-    // Un lien VIDÉ se déclare, il ne se devine pas : `includeIfNull: false`
-    // supprime le `null` avant l'envoi, donc un effacement arrivait ici
-    // identique au silence d'une application ancienne.
-    const videe = new Set(operation.clearedFields ?? []);
     const lien = (champ: 'banqueId' | 'syndicatId' | 'representantId'): object =>
       clearableValue(champ, data[champ], videe, null);
 
@@ -1140,7 +1254,9 @@ export class SyncService {
           canalProvenanceId: data.canalProvenanceId,
           statut: data.statut,
         }),
+        ...clearableValue('etablissement', data.etablissement, videe, null),
         ...situationGrandPublic(data),
+        ...whatsappProspect(data, phoneE164, existing, videe),
         rev: { increment: 1 },
       },
     });
@@ -1523,6 +1639,19 @@ const toResultDto = (
   outcome: OperationOutcome,
 ): SyncOperationResultDto => ({ opId: operation.opId, ...outcome });
 
+function groupOperationsByDependency(operations: SyncOperationDto[]): SyncOperationDto[][] {
+  const groups = new Map<string, SyncOperationDto[]>();
+  for (const operation of operations) {
+    const key = dependencyKeyOf(operation);
+    const bucket = groups.get(key);
+    if (bucket) bucket.push(operation);
+    else groups.set(key, [operation]);
+  }
+  return [...groups.values()]
+    .map((group) => [...group].sort((left, right) => left.seq - right.seq))
+    .sort((left, right) => (left[0]?.seq ?? 0) - (right[0]?.seq ?? 0));
+}
+
 const missingResult = (operation: SyncOperationDto): SyncOperationResultDto => ({
   opId: operation.opId,
   status: SyncOpStatus.SKIPPED_DEPENDENCY_FAILED,
@@ -1540,6 +1669,75 @@ const missingResult = (operation: SyncOperationDto): SyncOperationResultDto => (
  * ou le résultat mémorisé si elle avait déjà été appliquée, auquel cas on
  * réémet ce résultat sans refaire l'écriture.
  */
+type StoredSyncOperation = NonNullable<
+  Awaited<ReturnType<Prisma.TransactionClient['syncOperation']['findUnique']>>
+>;
+
+/**
+ * Le statut réémis vient du verdict MÉMORISÉ, jamais d'une constante. La
+ * ligne `sync_operations` est écrite `APPLIED` à la réservation puis corrigée
+ * par `finalizeOperation` : c'est `result` qui porte la vérité. Réémettre un
+ * `DUPLICATE` fixe ferait passer un refus pour une réussite, et le téléphone
+ * effacerait la saisie en la croyant partie.
+ *
+ * Le repli n'est PAS `DUPLICATE`. Une base migrée avant que l'API ne soit
+ * reconstruite peut porter une valeur que cette version ne connaît pas, et la
+ * table rendrait alors `undefined`. Dans le doute on refuse : `INVALID` fait
+ * remonter la ligne dans « À corriger », là où un humain la voit. Un statut
+ * inconnu ne doit jamais pouvoir se lire comme une réussite.
+ */
+function replayedStatus(stored: StoredSyncOperation | null): {
+  status: SyncOpStatus;
+  unknownResult: boolean;
+} {
+  const memorisedStatus = stored ? storedStatusOf(stored.result) : SyncOpStatus.DUPLICATE;
+  return {
+    status: memorisedStatus ?? SyncOpStatus.INVALID,
+    unknownResult: memorisedStatus === undefined,
+  };
+}
+
+function replayedEntityId(
+  memorised: SyncOperationResultDto | null | undefined,
+  stored: StoredSyncOperation | null,
+  operation: SyncOperationDto,
+): string {
+  return memorised?.entityId ?? stored?.entityId ?? operation.entityId;
+}
+
+function replayedError(
+  unknownResult: boolean,
+  memorised: SyncOperationResultDto | null | undefined,
+): Pick<SyncOperationResultDto, 'errorCode' | 'error'> {
+  if (unknownResult) {
+    return {
+      errorCode: 'UNKNOWN_STORED_RESULT',
+      error:
+        'Verdict enregistré inconnu de cette version du serveur. Opération à revoir manuellement.',
+    };
+  }
+  return {
+    errorCode: memorised?.errorCode ?? null,
+    error: memorised?.error ?? null,
+  };
+}
+
+function replayedOperationResult(
+  operation: SyncOperationDto,
+  stored: StoredSyncOperation | null,
+): SyncOperationResultDto {
+  const memorised = stored?.resultJson as SyncOperationResultDto | null | undefined;
+  const { status, unknownResult } = replayedStatus(stored);
+  return {
+    opId: operation.opId,
+    status,
+    entityId: replayedEntityId(memorised, stored, operation),
+    rev: memorised?.rev ?? null,
+    serverUpdatedAt: memorised?.serverUpdatedAt ?? null,
+    ...replayedError(unknownResult, memorised),
+  };
+}
+
 async function claimOperation(
   tx: Prisma.TransactionClient,
   userId: string,
@@ -1555,34 +1753,7 @@ async function claimOperation(
   if (inserted === 1) return undefined;
 
   const stored = await tx.syncOperation.findUnique({ where: { opId: operation.opId } });
-  const memorised = stored?.resultJson as SyncOperationResultDto | null | undefined;
-
-  // Le statut réémis vient du verdict MÉMORISÉ, jamais d'une constante. La
-  // ligne `sync_operations` est écrite `APPLIED` à la réservation puis corrigée
-  // par `finalizeOperation` : c'est `result` qui porte la vérité. Réémettre un
-  // `DUPLICATE` fixe ferait passer un refus pour une réussite, et le téléphone
-  // effacerait la saisie en la croyant partie.
-  //
-  // Le repli n'est PAS `DUPLICATE`. Une base migrée avant que l'API ne soit
-  // reconstruite peut porter une valeur que cette version ne connaît pas, et la
-  // table rendrait alors `undefined`. Dans le doute on refuse : `INVALID` fait
-  // remonter la ligne dans « À corriger », là où un humain la voit. Un statut
-  // inconnu ne doit jamais pouvoir se lire comme une réussite.
-  const memorisedStatus = stored ? storedStatusOf(stored.result) : SyncOpStatus.DUPLICATE;
-  const unknownResult = memorisedStatus === undefined;
-  const status = memorisedStatus ?? SyncOpStatus.INVALID;
-
-  return {
-    opId: operation.opId,
-    status,
-    entityId: memorised?.entityId ?? stored?.entityId ?? operation.entityId,
-    rev: memorised?.rev ?? null,
-    serverUpdatedAt: memorised?.serverUpdatedAt ?? null,
-    errorCode: unknownResult ? 'UNKNOWN_STORED_RESULT' : (memorised?.errorCode ?? null),
-    error: unknownResult
-      ? 'Verdict enregistré inconnu de cette version du serveur. Opération à revoir manuellement.'
-      : (memorised?.error ?? null),
-  };
+  return replayedOperationResult(operation, stored);
 }
 
 async function finalizeOperation(
@@ -1659,11 +1830,32 @@ function situationGrandPublic(data: SyncEntityDataDto): Record<string, unknown> 
     modeEpargne: data.modeEpargne,
     paysResidenceId: data.paysResidenceId,
     villeResidence: data.villeResidence,
-    whatsappE164: optionalPhone(data.whatsappE164),
     relaisNom: data.relaisNom,
     relaisPhoneE164: optionalPhone(data.relaisPhoneE164),
   });
 }
+
+/**
+ * `whatsappE164` a quitte `situationGrandPublic` : sous le CHECK d'EB-23 le
+ * numero ne s'ecrit plus seul, le statut le gouverne.
+ */
+function whatsappProspect(
+  data: SyncEntityDataDto,
+  phoneE164: string,
+  courant: { whatsappStatus: WhatsappStatus; whatsappE164: string | null },
+  videe: ReadonlySet<string>,
+): WhatsappPatchProspect {
+  const numero = videe.has('whatsappE164') ? null : optionalPhone(data.whatsappE164);
+  return whatsappDuProspect(
+    {
+      ...(data.whatsappStatus === undefined ? {} : { statut: data.whatsappStatus }),
+      ...(numero === undefined ? {} : { numero }),
+    },
+    { ...courant, phoneE164 },
+  );
+}
+
+const WHATSAPP_NEUF = { whatsappStatus: WhatsappStatus.NON_DEMANDE, whatsappE164: null };
 
 /** Un appel détecté vise UNE fiche : représentant ou prospect, jamais les deux. */
 type AppelDetecte = {
@@ -1738,6 +1930,8 @@ const clientDate = (clientCreatedAt: string | undefined, fallback: string): Date
  */
 interface BatchAuthority {
   readonly user: AuthenticatedUser;
+  /** Ce que le lot annonce savoir emettre. Decide des regles opposables. */
+  readonly payloadVersion: number;
 }
 
 /**

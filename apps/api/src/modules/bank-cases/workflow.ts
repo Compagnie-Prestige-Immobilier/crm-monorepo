@@ -30,136 +30,144 @@ export interface TransitionEffect {
 }
 
 /** Le seul motif de rejet qui exige une précision libre. */
-export const OTHER_REJECTION_CODE = 'AUTRE';
+const OTHER_REJECTION_CODE = 'AUTRE';
 
 const byPosition = (left: WorkflowStage, right: WorkflowStage): number =>
   left.position - right.position || left.id.localeCompare(right.id);
 
-export const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStage[] =>
+const activeOpenStages = (stages: readonly WorkflowStage[]): WorkflowStage[] =>
   stages.filter((stage) => stage.isActive && stage.type === BankStageType.OPEN).sort(byPosition);
 
 // Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
 // ne touche que les transitions futures. Une étape désactivée est sautée.
-export function nextOpenStage(
+function nextOpenStage(
   stages: readonly WorkflowStage[],
   current: WorkflowStage,
 ): WorkflowStage | undefined {
   return activeOpenStages(stages).find((stage) => stage.position > current.position);
 }
 
-export const lastOpenStage = (stages: readonly WorkflowStage[]): WorkflowStage | undefined =>
+const lastOpenStage = (stages: readonly WorkflowStage[]): WorkflowStage | undefined =>
   activeOpenStages(stages).at(-1);
 
-export const stageOfType = (
-  stages: readonly WorkflowStage[],
-  type: BankStageType,
-): WorkflowStage | undefined => stages.find((stage) => stage.type === type);
+function assertTargetActive(target: WorkflowStage): void {
+  if (target.isActive) return;
+  throw new ConflictException({
+    code: BankCaseError.STAGE_INACTIVE,
+    message: `L’étape « ${target.label} » est désactivée : aucun dossier ne peut y être placé.`,
+    stageId: target.id,
+  });
+}
 
-// L'encaissement clôt le parcours : il ne se déclare qu'à la DERNIÈRE étape
-// ouverte active, et une étape ouverte ne s'atteint que depuis la précédente.
+function assertTargetDistinct(current: WorkflowStage, target: WorkflowStage): void {
+  if (target.id !== current.id) return;
+  throw new UnprocessableEntityException({
+    code: BankCaseError.STAGE_NOT_NEXT,
+    message: 'Le dossier est déjà sur cette étape.',
+    stageId: target.id,
+  });
+}
+
+// L'encaissement ne se déclare qu'à la DERNIÈRE étape ouverte active.
+function assertCashedReachable(stages: readonly WorkflowStage[], current: WorkflowStage): void {
+  const last = lastOpenStage(stages);
+  if (last?.id === current.id) return;
+  throw new UnprocessableEntityException({
+    code: BankCaseError.CASHED_NOT_LAST,
+    message: `L’encaissement ne se déclare qu’à la dernière étape ouverte du flux (${last?.label ?? 'aucune'}).`,
+    expectedStageId: last?.id ?? null,
+    currentStageId: current.id,
+  });
+}
+
+// Une étape ouverte ne s'atteint que depuis la précédente (par POSITION).
+function assertOpenReachable(
+  stages: readonly WorkflowStage[],
+  current: WorkflowStage,
+  target: WorkflowStage,
+): void {
+  const next = nextOpenStage(stages, current);
+  if (next?.id === target.id) return;
+  throw new UnprocessableEntityException({
+    code: BankCaseError.STAGE_NOT_NEXT,
+    message: next
+      ? `Depuis « ${current.label} », la seule étape ouverte suivante est « ${next.label} ».`
+      : `« ${current.label} » est la dernière étape ouverte du flux.`,
+    expectedStageId: next?.id ?? null,
+    currentStageId: current.id,
+  });
+}
+
+// Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
+// ne touche que les transitions futures. Une étape désactivée est sautée.
 export function assertReachable(
   stages: readonly WorkflowStage[],
   current: WorkflowStage,
   target: WorkflowStage,
 ): void {
-  if (!target.isActive) {
-    throw new ConflictException({
-      code: BankCaseError.STAGE_INACTIVE,
-      message: `L’étape « ${target.label} » est désactivée : aucun dossier ne peut y être placé.`,
-      stageId: target.id,
-    });
-  }
-
-  if (target.id === current.id) {
-    throw new UnprocessableEntityException({
-      code: BankCaseError.STAGE_NOT_NEXT,
-      message: 'Le dossier est déjà sur cette étape.',
-      stageId: target.id,
-    });
-  }
+  assertTargetActive(target);
+  assertTargetDistinct(current, target);
 
   // Une banque peut refuser à n'importe quel moment de l'instruction.
   if (target.type === BankStageType.REJECTED) return;
 
   if (target.type === BankStageType.CASHED) {
-    const last = lastOpenStage(stages);
-    if (!last || last.id !== current.id) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.CASHED_NOT_LAST,
-        message: `L’encaissement ne se déclare qu’à la dernière étape ouverte du flux (${last?.label ?? 'aucune'}).`,
-        expectedStageId: last?.id ?? null,
-        currentStageId: current.id,
-      });
-    }
+    assertCashedReachable(stages, current);
     return;
   }
 
-  const next = nextOpenStage(stages, current);
-  if (!next || next.id !== target.id) {
-    throw new UnprocessableEntityException({
-      code: BankCaseError.STAGE_NOT_NEXT,
-      message: next
-        ? `Depuis « ${current.label} », la seule étape ouverte suivante est « ${next.label} ».`
-        : `« ${current.label} » est la dernière étape ouverte du flux.`,
-      expectedStageId: next?.id ?? null,
-      currentStageId: current.id,
-    });
-  }
+  assertOpenReachable(stages, current, target);
 }
 
-// Un montant n'est accepté QUE vers un encaissement, un motif QUE vers un
-// rejet, et le montant d'un rejet est forcé à zéro sans jamais être lu du client.
-export function planTransitionEffect(
-  target: WorkflowStage,
+function planCashedEffect(input: TransitionInput): TransitionEffect {
+  if (input.amountXof === undefined) {
+    throw new UnprocessableEntityException({
+      code: BankCaseError.AMOUNT_REQUIRED,
+      message: 'Un encaissement exige un montant.',
+    });
+  }
+  if (!isStrictlyPositive(input.amountXof)) {
+    throw new UnprocessableEntityException({
+      code: BankCaseError.AMOUNT_REQUIRED,
+      message: 'Le montant encaissé doit être strictement positif.',
+    });
+  }
+  if (input.rejectionReasonId !== undefined) {
+    throw new UnprocessableEntityException({
+      code: BankCaseError.REJECTION_REASON_NOT_ALLOWED,
+      message: 'Un encaissement ne porte pas de motif de rejet.',
+    });
+  }
+  return { amountXof: input.amountXof, rejectionReasonId: null, rejectionDetail: null };
+}
+
+function planRejectedEffect(
   input: TransitionInput,
   rejectionReasonCode: string | undefined,
 ): TransitionEffect {
   const detail = input.rejectionDetail?.trim();
-
-  if (target.type === BankStageType.CASHED) {
-    if (input.amountXof === undefined) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.AMOUNT_REQUIRED,
-        message: 'Un encaissement exige un montant.',
-      });
-    }
-    if (!isStrictlyPositive(input.amountXof)) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.AMOUNT_REQUIRED,
-        message: 'Le montant encaissé doit être strictement positif.',
-      });
-    }
-    if (input.rejectionReasonId !== undefined) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.REJECTION_REASON_NOT_ALLOWED,
-        message: 'Un encaissement ne porte pas de motif de rejet.',
-      });
-    }
-    return { amountXof: input.amountXof, rejectionReasonId: null, rejectionDetail: null };
+  if (input.rejectionReasonId === undefined) {
+    throw new UnprocessableEntityException({
+      code: BankCaseError.REJECTION_REASON_REQUIRED,
+      message: 'Un rejet exige un motif.',
+    });
   }
-
-  if (target.type === BankStageType.REJECTED) {
-    if (input.rejectionReasonId === undefined) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.REJECTION_REASON_REQUIRED,
-        message: 'Un rejet exige un motif.',
-      });
-    }
-    if (rejectionReasonCode === OTHER_REJECTION_CODE && !detail) {
-      throw new UnprocessableEntityException({
-        code: BankCaseError.REJECTION_DETAIL_REQUIRED,
-        message: 'Le motif « Autre » exige une précision : sans elle, la statistique est aveugle.',
-      });
-    }
-    return {
-      // Zéro, et non le montant reçu : « rejeté, 1 200 000 » entrerait sinon
-      // dans la somme encaissée du tableau de bord.
-      amountXof: ZERO_XOF,
-      rejectionReasonId: input.rejectionReasonId,
-      rejectionDetail: detail ?? null,
-    };
+  if (rejectionReasonCode === OTHER_REJECTION_CODE && !detail) {
+    throw new UnprocessableEntityException({
+      code: BankCaseError.REJECTION_DETAIL_REQUIRED,
+      message: 'Le motif « Autre » exige une précision : sans elle, la statistique est aveugle.',
+    });
   }
+  return {
+    // Zéro, et non le montant reçu : « rejeté, 1 200 000 » entrerait sinon
+    // dans la somme encaissée du tableau de bord.
+    amountXof: ZERO_XOF,
+    rejectionReasonId: input.rejectionReasonId,
+    rejectionDetail: detail ?? null,
+  };
+}
 
+function planOpenEffect(input: TransitionInput): TransitionEffect {
   if (input.amountXof !== undefined) {
     throw new UnprocessableEntityException({
       code: BankCaseError.AMOUNT_NOT_ALLOWED,
@@ -173,4 +181,16 @@ export function planTransitionEffect(
     });
   }
   return { amountXof: null, rejectionReasonId: null, rejectionDetail: null };
+}
+
+// Un montant n'est accepté QUE vers un encaissement, un motif QUE vers un
+// rejet, et le montant d'un rejet est forcé à zéro sans jamais être lu du client.
+export function planTransitionEffect(
+  target: WorkflowStage,
+  input: TransitionInput,
+  rejectionReasonCode: string | undefined,
+): TransitionEffect {
+  if (target.type === BankStageType.CASHED) return planCashedEffect(input);
+  if (target.type === BankStageType.REJECTED) return planRejectedEffect(input, rejectionReasonCode);
+  return planOpenEffect(input);
 }

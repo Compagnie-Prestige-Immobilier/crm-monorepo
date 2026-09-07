@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { PROSPECT_STATUTS } from '@/lib/types';
+import { PROSPECT_TYPES } from '@/lib/data/grand-public';
+import { WHATSAPP_STATUSES } from '@/lib/data/representants';
+import { DUREE_ETABLISSEMENT_MAX_MOIS, PAYMENT_MODES, PROSPECT_STATUTS } from '@/lib/types';
 
 export const loginSchema = z.object({
   identifier: z
@@ -36,9 +38,18 @@ const userBaseSchema = z.object({
   username: usernameField,
   fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
   phone: z.string().trim().max(40, 'Numéro trop long.'),
-  role: z.enum(['ADMIN', 'COMMERCIAL', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION', 'ACCUEIL'], {
-    message: 'Choisissez le rôle du compte.',
-  }),
+  role: z.enum(
+    [
+      'ADMIN',
+      'COMMERCIAL',
+      'BANQUE_FINANCE',
+      'SUPERVISEUR',
+      'DIRECTION',
+      'ACCUEIL',
+      'CHARGE_CLIENTELE',
+    ],
+    { message: 'Choisissez le rôle du compte.' },
+  ),
 });
 
 export function userFormSchema(mode: 'create' | 'edit') {
@@ -130,10 +141,34 @@ export const prospectSchema = z.object({
 });
 export type ProspectFormInput = z.infer<typeof prospectSchema>;
 
-export const representantSchema = z.object({
-  fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
-  phone: z.string().trim().min(1, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
-  departementId: z.string().trim().min(1, 'Le département est obligatoire.'),
-  notes: z.string().trim().max(2000, 'Notes trop longues (2000 caractères maximum).'),
+/**
+ * Ce que le relais public accepte de transmettre à `DemandePubliqueDto`. Ce qui
+ * est réellement EXIGE vient des réglages de l'administrateur, que seule l'API
+ * connaît : hors identité et numéro, tout est facultatif ici.
+ */
+export const demandePubliqueSchema = z.object({
+  prenom: z.string().trim().min(1, 'Le prénom est obligatoire.').max(120, 'Prénom trop long.'),
+  nom: z.string().trim().min(1, 'Le nom est obligatoire.').max(120, 'Nom trop long.'),
+  phone: z.string().trim().min(6, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
+  email: z.email('Adresse e-mail invalide.').max(254, 'Adresse trop longue.').optional(),
+  professionId: z.uuid().optional(),
+  // Texte libre des pages ouvertes avant la liste fermée : l'API l'accepte encore.
+  profession: z.string().trim().max(120, 'Profession trop longue.').optional(),
+  etablissement: z.string().trim().max(160, 'Établissement trop long.').optional(),
+  dureeEtablissementMois: z.number().int().min(0).max(DUREE_ETABLISSEMENT_MAX_MOIS).optional(),
+  fonctionnaire: z.boolean().optional(),
+  engagementEnCours: z.boolean().optional(),
+  syndicatId: z.uuid().optional(),
+  banqueId: z.uuid().optional(),
+  incomeBandId: z.uuid().optional(),
+  type: z.enum(PROSPECT_TYPES).optional(),
+  paymentMode: z.enum(PAYMENT_MODES).optional(),
+  dureeSystemeMois: z.number().int().min(1).max(300).optional(),
+  whatsappStatus: z.enum(WHATSAPP_STATUSES).optional(),
+  whatsappE164: z.string().trim().min(6).max(40).optional(),
+  champsLibres: z.record(z.string().max(60), z.string().trim().max(500)).optional(),
+  message: z.string().trim().max(500, 'Message trop long (500 caractères maximum).').optional(),
+  site: z.string().max(200).optional(),
 });
-export type RepresentantFormInput = z.infer<typeof representantSchema>;
+
+export type DemandePubliqueInput = z.infer<typeof demandePubliqueSchema>;

@@ -11,7 +11,7 @@ export interface AndroidReleaseList {
 }
 
 /** Route dédiée du panel : elle relaie le fichier en flux, sans le bufferiser. */
-export const ANDROID_UPLOAD_PATH = '/api/app-updates/android';
+const ANDROID_UPLOAD_PATH = '/api/app-updates/android';
 
 export class UploadAbortedError extends Error {
   constructor() {

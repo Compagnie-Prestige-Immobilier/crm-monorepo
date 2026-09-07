@@ -8,7 +8,7 @@ import { guardRoles } from '@/lib/session';
 export const metadata: Metadata = { title: 'Issues d’appel' };
 
 export default async function IssuesAppelPage() {
-  const guard = await guardRoles(['ADMIN']);
+  const guard = await guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']);
   if (guard.status === 'anonymous') redirect('/connexion');
   if (guard.status === 'denied') {
     return <PermissionDenied role={guard.user.role} what="Le référentiel des issues d’appel" />;

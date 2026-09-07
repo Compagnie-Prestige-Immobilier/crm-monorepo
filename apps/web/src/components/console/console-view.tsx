@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
+import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { useShortcuts } from '@/components/console/use-shortcuts';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -40,6 +42,7 @@ import {
   ouvrirFiche,
   type OuvertureFiche,
 } from '@/lib/data/ouvertures';
+import { useChampsConversion } from '@/lib/data/champs-conversion';
 import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
 import { EMPTY_FILTERS } from '@/lib/filters';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
@@ -126,21 +129,13 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     retry: false,
   });
 
-  const venuDesRappels = demandee === null ? null : (parLien.data ?? null);
-  const aConfirmer =
-    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
-  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
-  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
-  const consultee =
-    ouverte ??
-    (venuDesRappels !== null && !aQualifier(venuDesRappels)
-      ? { prospect: venuDesRappels, ouverture: null }
-      : null);
+  const venuDesRappels = fichePendante(demandee, parLien.data);
+  const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
     queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
     queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
-    enabled: consultee === null && aConfirmer === null,
+    enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
 
@@ -204,7 +199,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     );
   }
 
-  if (demandee !== null && parLien.isPending) return <ListeSkeleton />;
+  if (chargementParLien(demandee, parLien.isPending)) return <ListeSkeleton />;
 
   return (
     <div className="flex w-full flex-col gap-5">
@@ -280,6 +275,61 @@ const brouillonDe = (
 });
 
 const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
+
+function fichePendante(
+  demandee: string | null,
+  data: ProspectRow | null | undefined,
+): ProspectRow | null {
+  return demandee === null ? null : (data ?? null);
+}
+
+interface FichesDerivees {
+  aConfirmer: ProspectRow | null;
+  consultee: Ouverte | null;
+}
+
+function deriverFiches(
+  vise: ProspectRow | null,
+  ouverte: Ouverte | null,
+  venuDesRappels: ProspectRow | null,
+): FichesDerivees {
+  const aConfirmer =
+    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
+  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
+  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
+  const consultee =
+    ouverte ??
+    (venuDesRappels !== null && !aQualifier(venuDesRappels)
+      ? { prospect: venuDesRappels, ouverture: null }
+      : null);
+  return { aConfirmer, consultee };
+}
+
+function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | null): boolean {
+  return consultee === null && aConfirmer === null;
+}
+
+function chargementParLien(demandee: string | null, isPending: boolean): boolean {
+  return demandee !== null && isPending;
+}
+
+function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
+  return prospect.phase2Status !== 'PENDING' || refusee;
+}
+
+function ficheVerrouillee(ouverture: OuvertureFiche | null, closed: boolean): boolean {
+  return ouverture !== null && !closed;
+}
+
+function saisieCommencee(
+  conversion: ConversionDraft | null,
+  slots: readonly CallbackSlot[] | null,
+  draftOutcome: CallOutcome | null,
+  comment: string,
+): boolean {
+  return conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+}
+
 
 /**
  * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
@@ -488,10 +538,12 @@ function Consignation({
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
+  const formulaire = useChampsConversion(projet);
+
   const nomComplet = nomDe(prospect);
-  const closed = prospect.phase2Status !== 'PENDING' || refusee;
+  const closed = estFicheClose(prospect, refusee);
   const [now] = useState(() => Date.now());
-  const verrouille = ouverture !== null && !closed;
+  const verrouille = ficheVerrouillee(ouverture, closed);
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -568,11 +620,16 @@ function Consignation({
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
-    const problems = validateConversion(conversion);
+    const problems = validateConversion(
+      conversion,
+      Date.now(),
+      formulaire.champs,
+      formulaire.libres,
+    );
     setConversionErrors(problems);
     if (Object.keys(problems).length > 0 || conversion.method === null) return;
     record('METHOD_OBTAINED', conversion.method, null, conversion);
-  }, [conversion, record]);
+  }, [conversion, formulaire, record]);
 
   const startOther = useCallback(() => {
     if (closed) return;
@@ -617,8 +674,7 @@ function Consignation({
   }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
 
   const etape = etapeCourante(closed, conversion, slots);
-  const saisieEnCours =
-    conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+  const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
 
   const retenu = useCallback(() => {
     toast.error('Consignez l’appel avant de quitter cette fiche.');
@@ -694,17 +750,8 @@ function Consignation({
     },
   });
 
-  return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      {verrouille ? null : (
-        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
-      )}
-
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
-
+  function corpsFiche(): React.ReactNode {
+    return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
@@ -723,6 +770,7 @@ function Consignation({
             Copier
             <Kbd>C</Kbd>
           </Button>
+          {etape === 'dossier' ? null : <BoutonWhatsApp prospect={prospect} />}
         </div>
 
         <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
@@ -744,11 +792,15 @@ function Consignation({
               Joignable · son dossier, et la manière dont il adhère
             </p>
 
+            <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+
             <ConversionFields
               draft={conversion}
               errors={conversionErrors}
               phoneE164={prospect.phoneE164}
               disabled={send.isPending}
+              reglages={formulaire.champs}
+              libres={formulaire.libres}
               onChange={(patch) => {
                 setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
               }}
@@ -844,6 +896,21 @@ function Consignation({
           </>
         )}
       </section>
+    );
+  }
+
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      {verrouille ? null : (
+        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Revenir à la liste
+        </Button>
+      )}
+
+      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+
+      {corpsFiche()}
 
       <details
         open={helpOpen}

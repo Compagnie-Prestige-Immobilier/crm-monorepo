@@ -1,33 +1,23 @@
 import { BadRequestException } from '@nestjs/common';
-import { CallOutcome, EnrollmentMethod, Phase2Status } from '@crm/database';
+import { CallOutcome, EnrollmentMethod, Phase2Status, Projet } from '@crm/database';
 
 import { SYSTEM_OUTCOME_REASONS, outcomeEffectRule } from '../referentiels/call-outcome-rules.js';
 
 export const COMMENT_MAX_LENGTH = 2_000;
 
-export const TERMINAL_OUTCOMES = [
-  CallOutcome.METHOD_OBTAINED,
-  CallOutcome.REFUSED,
-  CallOutcome.WRONG_NUMBER,
-] as const;
-
-export type TerminalOutcome = (typeof TERMINAL_OUTCOMES)[number];
-
-export function isTerminalOutcome(outcome: CallOutcome): outcome is TerminalOutcome {
-  return (TERMINAL_OUTCOMES as readonly CallOutcome[]).includes(outcome);
-}
-
-export const PHASE2_STATUS_FOR_OUTCOME: Readonly<Record<TerminalOutcome, Phase2Status>> = {
-  [CallOutcome.METHOD_OBTAINED]: Phase2Status.METHOD_OBTAINED,
-  [CallOutcome.REFUSED]: Phase2Status.REFUSED,
-  [CallOutcome.WRONG_NUMBER]: Phase2Status.WRONG_NUMBER,
-};
-
 /** Même valeur que `IMPORT_CLOCK_SKEW_TOLERANCE_MS` : une seule dérive admise dans le dépôt. */
-export const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
+const CALLBACK_CLOCK_SKEW_TOLERANCE_MS = 5 * 60_000;
 
 export const EMAIL_MAX_LENGTH = 160;
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
+
+/**
+ * Version de charge utile a partir de laquelle EB-21, EB-22 et EB-24 s'imposent
+ * a la conversion CHUES. Le parc en version 7 ne sait pas poser le revenu ni la
+ * duree dans la fonction : lui opposer un 400 perdrait la saisie, l'ecran
+ * « A corriger » ne proposant qu'un renvoi a l'identique.
+ */
+const CONVERSION_CHUES_PAYLOAD_VERSION = 8;
 
 /**
  * Volontairement grossier : le serveur n'a pas à trancher la RFC 5322, il refuse
@@ -120,14 +110,12 @@ const fieldTime = (iso: string | null | undefined): number => {
  * et rappel obligatoires sur le MOTIF lui-même, qui peut durcir la règle de son
  * effet sans jamais l'assouplir.
  */
-export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): NormalizedAttempt {
-  const applied = reason ?? systemReasonFor(input.outcome);
-  const rule = outcomeEffectRule(applied.effect);
-
-  const method = input.method ?? null;
-  const rawComment = input.comment ?? null;
-  const comment = rawComment === null || rawComment.trim() === '' ? null : rawComment.trim();
-
+function assertAttemptRules(
+  rule: ReturnType<typeof outcomeEffectRule>,
+  applied: AttemptReason,
+  method: EnrollmentMethod | null,
+  comment: string | null,
+): void {
   if (rule.requiresMethod && method === null) {
     invalid(
       'PHASE2_METHOD_REQUIRED',
@@ -155,6 +143,17 @@ export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): Nor
       `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`,
     );
   }
+}
+
+export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): NormalizedAttempt {
+  const applied = reason ?? systemReasonFor(input.outcome);
+  const rule = outcomeEffectRule(applied.effect);
+
+  const method = input.method ?? null;
+  const rawComment = input.comment ?? null;
+  const comment = rawComment === null || rawComment.trim() === '' ? null : rawComment.trim();
+
+  assertAttemptRules(rule, applied, method, comment);
 
   return {
     outcome: input.outcome,
@@ -170,6 +169,44 @@ export function normalizeAttempt(input: RawAttempt, reason?: AttemptReason): Nor
     dureeEtablissementMois: dureeEtablissementMois(input),
     rendezVousAt: rendezVousAt(input, method),
   };
+}
+
+export interface ConversionChues {
+  readonly payloadVersion: number;
+  readonly projet: Projet;
+  readonly method: EnrollmentMethod | null;
+  readonly incomeBandId: string | null;
+  readonly dureeEtablissementMois: number | null;
+}
+
+/**
+ * Une methode non nulle signe une conversion : `normalizeAttempt` ne l'admet
+ * que sur l'issue qui clot sur la methode obtenue.
+ */
+export function assertConversionChues(input: ConversionChues): void {
+  if (input.payloadVersion < CONVERSION_CHUES_PAYLOAD_VERSION) return;
+  if (input.projet !== Projet.CHUES || input.method === null) return;
+
+  if (input.method === EnrollmentMethod.PHYSICAL) {
+    invalid(
+      'PHASE2_METHOD_RETIREE',
+      'La méthode « Physique » est remplacée par « RDV CPI », qui exige la date du rendez-vous.',
+    );
+  }
+
+  if (input.incomeBandId === null) {
+    invalid(
+      'PHASE2_REVENU_REQUIRED',
+      'La conversion CHUES exige la tranche de revenu mensuel du prospect.',
+    );
+  }
+
+  if (input.dureeEtablissementMois === null) {
+    invalid(
+      'PHASE2_DUREE_FONCTION_REQUIRED',
+      'La conversion CHUES exige la durée dans la fonction, en mois.',
+    );
+  }
 }
 
 function email(input: RawAttempt): string | null {
@@ -189,7 +226,7 @@ function dureeEtablissementMois(input: RawAttempt): number | null {
   if (!Number.isInteger(mois) || mois < 0 || mois > DUREE_ETABLISSEMENT_MAX_MOIS) {
     invalid(
       'PHASE2_DUREE_ETABLISSEMENT_INVALID',
-      `La durée dans l’établissement s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
+      `La durée dans la fonction s’exprime en mois entiers, de 0 à ${String(DUREE_ETABLISSEMENT_MAX_MOIS)}.`,
     );
   }
   return mois;
@@ -206,10 +243,7 @@ function rendezVousAt(input: RawAttempt, method: EnrollmentMethod | null): Date 
 
   if (raw === null) {
     if (prisRendezVous) {
-      invalid(
-        'PHASE2_RENDEZ_VOUS_REQUIRED',
-        'La prise de rendez-vous exige la date du rendez-vous.',
-      );
+      invalid('PHASE2_RENDEZ_VOUS_REQUIRED', 'Le RDV CPI exige la date et l’heure du rendez-vous.');
     }
     return null;
   }
@@ -217,7 +251,7 @@ function rendezVousAt(input: RawAttempt, method: EnrollmentMethod | null): Date 
   if (!prisRendezVous) {
     invalid(
       'PHASE2_RENDEZ_VOUS_NOT_ALLOWED',
-      'Une date de rendez-vous n’est admise que pour la méthode « prise de rendez-vous ».',
+      'Une date de rendez-vous n’est admise que pour la méthode « RDV CPI ».',
     );
   }
 

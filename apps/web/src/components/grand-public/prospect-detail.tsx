@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
+import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -143,6 +144,35 @@ function raisonSansSegment(prospect: ProspectRow): string {
   return 'Le syndicat manque pour le calculer.';
 }
 
+function situationLigne(prospect: ProspectRow): ReactNode {
+  if (prospect.type === null) return <Absent>Question non posée</Absent>;
+  return PROSPECT_TYPE_LABELS[prospect.type];
+}
+
+function paiementLigne(prospect: ProspectRow): ReactNode {
+  if (prospect.paymentMode === null) return <Absent>Non renseigné</Absent>;
+  return PAYMENT_MODE_LABELS[prospect.paymentMode];
+}
+
+function dureeSystemeLigne(prospect: ProspectRow): ReactNode {
+  if (prospect.dureeSystemeMois === null) return <Absent>Non renseignée</Absent>;
+  return formatDureeMois(prospect.dureeSystemeMois);
+}
+
+function segmentLigne(prospect: ProspectRow): ReactNode {
+  if (prospect.segment === null) {
+    return (
+      <span className="flex flex-col gap-0.5">
+        <Absent>Aucun</Absent>
+        <span className="text-[0.8125rem] text-muted-foreground">
+          {raisonSansSegment(prospect)}
+        </span>
+      </span>
+    );
+  }
+  return <Badge variant="outline">{SEGMENT_LABELS[prospect.segment]}</Badge>;
+}
+
 /** Le formulaire de saisie, garni de la fiche. Monté à l'ouverture seulement : il repart de la fiche. */
 function ModifierLaFiche({
   canEdit,
@@ -195,16 +225,22 @@ function ModifierLaFiche({
 }
 
 function ActionsConsentement({
+  canEdit,
+  statut,
   consentement,
   pending,
   onConsent,
   onConvertir,
 }: {
+  canEdit: boolean;
+  statut: ProspectStatut;
   consentement: string | null;
   pending: boolean;
   onConsent: (value: 'INTERESSE' | 'REFUSE') => void;
   onConvertir: () => void;
 }) {
+  if (!canEdit || statut === 'CONVERTI') return null;
+
   return (
     <>
       <Button
@@ -255,13 +291,15 @@ function DernierAppel({ prospect }: { prospect: ProspectRow }) {
 
 export function GrandPublicProspectDetail({
   prospect: initialProspect,
-  offers = [],
-  canEdit = false,
+  offers: offersProp,
+  canEdit: canEditProp,
 }: {
   prospect: ProspectRow;
   offers?: Offer[];
   canEdit?: boolean;
 }) {
+  const offers = offersProp ?? [];
+  const canEdit = Boolean(canEditProp);
   const queryClient = useQueryClient();
   const [prospect, setProspect] = useState(initialProspect);
   const [conversionOpen, setConversionOpen] = useState(false);
@@ -354,18 +392,18 @@ export function GrandPublicProspectDetail({
             {PROSPECT_STATUT_LABELS[journey.statut]}
           </Badge>
           <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
-          {canEdit && journey.statut !== 'CONVERTI' ? (
-            <ActionsConsentement
-              consentement={journey.consent}
-              pending={consent.isPending}
-              onConsent={(value) => {
-                consent.mutate(value);
-              }}
-              onConvertir={() => {
-                setConversionOpen(true);
-              }}
-            />
-          ) : null}
+          <ActionsConsentement
+            canEdit={canEdit}
+            statut={journey.statut}
+            consentement={journey.consent}
+            pending={consent.isPending}
+            onConsent={(value) => {
+              consent.mutate(value);
+            }}
+            onConvertir={() => {
+              setConversionOpen(true);
+            }}
+          />
         </div>
       </div>
 
@@ -375,37 +413,19 @@ export function GrandPublicProspectDetail({
         </CardHeader>
         <CardContent>
           <dl>
-            <Ligne label="Situation">
-              {prospect.type === null ? (
-                <Absent>Question non posée</Absent>
-              ) : (
-                PROSPECT_TYPE_LABELS[prospect.type]
-              )}
-            </Ligne>
+            <Ligne label="Situation">{situationLigne(prospect)}</Ligne>
             <Ligne label={libelleMetier(prospect.type)}>
               <Texte value={prospect.profession} absent="Non renseignée" />
             </Ligne>
             <Ligne label="Revenu mensuel">
               <Texte value={prospect.incomeBandLabel} absent="Non renseigné" />
             </Ligne>
-            <Ligne label="Paiement">
-              {prospect.paymentMode === null ? (
-                <Absent>Non renseigné</Absent>
-              ) : (
-                PAYMENT_MODE_LABELS[prospect.paymentMode]
-              )}
-            </Ligne>
+            <Ligne label="Paiement">{paiementLigne(prospect)}</Ligne>
             <LignesSituation prospect={prospect} />
             <Ligne label="Canal de provenance">
               <Texte value={prospect.canalProvenanceLabel} absent="Non renseigné" />
             </Ligne>
-            <Ligne label="Durée du système">
-              {prospect.dureeSystemeMois === null ? (
-                <Absent>Non renseignée</Absent>
-              ) : (
-                formatDureeMois(prospect.dureeSystemeMois)
-              )}
-            </Ligne>
+            <Ligne label="Durée du système">{dureeSystemeLigne(prospect)}</Ligne>
           </dl>
         </CardContent>
       </Card>
@@ -425,18 +445,7 @@ export function GrandPublicProspectDetail({
             <Ligne label="Représentant">
               <Texte value={prospect.representantName} absent="Sans représentant" />
             </Ligne>
-            <Ligne label="Segment">
-              {prospect.segment === null ? (
-                <span className="flex flex-col gap-0.5">
-                  <Absent>Aucun</Absent>
-                  <span className="text-[0.8125rem] text-muted-foreground">
-                    {raisonSansSegment(prospect)}
-                  </span>
-                </span>
-              ) : (
-                <Badge variant="outline">{SEGMENT_LABELS[prospect.segment]}</Badge>
-              )}
-            </Ligne>
+            <Ligne label="Segment">{segmentLigne(prospect)}</Ligne>
           </dl>
         </CardContent>
       </Card>
@@ -459,6 +468,8 @@ export function GrandPublicProspectDetail({
           </dl>
         </CardContent>
       </Card>
+
+      <ChampsAjoutes prospect={prospect} />
 
       <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
         <DialogContent>

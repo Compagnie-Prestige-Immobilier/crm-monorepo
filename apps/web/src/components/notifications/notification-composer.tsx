@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { AlertTriangleIcon, CheckIcon, LoaderIcon, SendIcon } from 'lucide-react';
 import { useEffect, useId, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { toast } from 'sonner';
@@ -50,7 +50,9 @@ import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
   ROLE_LABELS,
+  type AudiencePreview,
   type NotificationCategory,
+  type NotificationTemplate,
   type Role,
 } from './types';
 
@@ -65,6 +67,7 @@ const ROLES: Role[] = [
   'SUPERVISEUR',
   'DIRECTION',
   'ACCUEIL',
+  'CHARGE_CLIENTELE',
 ];
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));
@@ -112,6 +115,37 @@ function problemeDeVariables(missing: readonly string[]): string | null {
 
 function premierBlocage(issues: readonly (string | null)[]): string | null {
   return issues.find((issue) => issue !== null) ?? null;
+}
+
+type TemplatesData = { items: NotificationTemplate[] } | undefined;
+
+function findTemplate(data: TemplatesData, id: string): NotificationTemplate | undefined {
+  return data?.items.find((item) => item.id === id);
+}
+
+function templateItemsOf(data: TemplatesData): { id: string; name: string }[] {
+  return data?.items ?? [];
+}
+
+function templateVariablesOf(template: NotificationTemplate | undefined): readonly string[] {
+  return template?.variables ?? [];
+}
+
+function previewEnabled(open: boolean, step: Step, audienceIssue: string | null): boolean {
+  return open && step === 'confirmation' && audienceIssue === null;
+}
+
+function canSend(sendPending: boolean, preview: UseQueryResult<AudiencePreview>): boolean {
+  return !sendPending && !preview.isPending && !preview.isError && preview.data.recipientCount > 0;
+}
+
+function requiredFieldIssue(value: string, issue: string | null): string | undefined {
+  if (value.trim() === '') return undefined;
+  return issue ?? undefined;
+}
+
+function orUndefined(value: string | null): string | undefined {
+  return value ?? undefined;
 }
 
 function EnTeteComposer({ step }: { step: Step }) {
@@ -414,7 +448,7 @@ export function NotificationComposer({
     staleTime: 60_000,
   });
 
-  const template = templates.data?.items.find((item) => item.id === templateId);
+  const template = findTemplate(templates.data, templateId);
 
   const rendered = useMemo(
     () => renderNotification(title, body, variables),
@@ -442,7 +476,7 @@ export function NotificationComposer({
   const preview = useQuery({
     queryKey: notificationKeys.preview(previewQuery),
     queryFn: () => fetchAudiencePreview(previewQuery),
-    enabled: open && step === 'confirmation' && audienceIssue === null,
+    enabled: previewEnabled(open, step, audienceIssue),
     staleTime: 15_000,
   });
 
@@ -515,13 +549,13 @@ export function NotificationComposer({
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="flex min-w-0 flex-col gap-4">
               <ChampGabarit
-                items={templates.data?.items ?? []}
+                items={templateItemsOf(templates.data)}
                 value={templateId}
                 onApply={applyTemplate}
               />
 
               <ChampsVariables
-                noms={template?.variables ?? []}
+                noms={templateVariablesOf(template)}
                 variables={variables}
                 onChange={setVariables}
               />
@@ -539,7 +573,7 @@ export function NotificationComposer({
                 label="Titre"
                 required
                 description={`${String(rendered.title.length)} / ${String(TITLE_MAX)} caractères une fois les variables remplacées`}
-                error={title.trim() === '' ? undefined : (titleIssue ?? undefined)}
+                error={requiredFieldIssue(title, titleIssue)}
               >
                 {(props) => (
                   <Input
@@ -556,7 +590,7 @@ export function NotificationComposer({
                 label="Message"
                 required
                 description={`${String(rendered.body.length)} / ${String(BODY_MAX)} caractères une fois les variables remplacées`}
-                error={body.trim() === '' ? undefined : (bodyIssue ?? undefined)}
+                error={requiredFieldIssue(body, bodyIssue)}
               >
                 {(props) => (
                   <Textarea
@@ -597,7 +631,7 @@ export function NotificationComposer({
                 <Field
                   label="Lien profond"
                   description="Route interne ouverte au tap."
-                  error={routeIssue ?? undefined}
+                  error={orUndefined(routeIssue)}
                 >
                   {(props) => (
                     <Input
@@ -620,7 +654,7 @@ export function NotificationComposer({
                 ))}
               </datalist>
 
-              <Field label="Destinataires" required error={audienceIssue ?? undefined}>
+              <Field label="Destinataires" required error={orUndefined(audienceIssue)}>
                 {(props) => (
                   <Select
                     items={AUDIENCE_ITEMS}
@@ -683,12 +717,7 @@ export function NotificationComposer({
             step={step}
             blocking={blocking}
             when={when}
-            envoiPossible={
-              !send.isPending &&
-              !preview.isPending &&
-              !preview.isError &&
-              preview.data.recipientCount > 0
-            }
+            envoiPossible={canSend(send.isPending, preview)}
             envoiEnCours={send.isPending}
             onAnnuler={() => {
               onOpenChange(false);

@@ -1,20 +1,35 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import type { ReactNode } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ExternalLinkIcon } from 'lucide-react';
+import Link from 'next/link';
+import { toast } from 'sonner';
 
 import { DetailBackLink } from '@/components/detail-back-link';
-import { ProspectSegmentHistory } from '@/components/prospects/prospect-segment-history';
+import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
+import {
+  CarteHistoire,
+  Champ,
+  Historique,
+  type EvenementHistorique,
+} from '@/components/historique/historique';
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDuration } from '@/lib/data/admin';
+import { useChampsConversion } from '@/lib/data/champs-conversion';
 import {
   fetchProspect,
   fetchProspectCallAttempts,
   fetchProspectDeviceCalls,
+  fetchProspectSegmentHistory,
+  marquerProspectRevue,
   type DeviceCallDetection,
+  type ProspectCallAttempt,
+  type SegmentChangeRow,
 } from '@/lib/data/prospects';
 import {
   formatDate,
@@ -24,34 +39,240 @@ import {
   formatNumber,
   formatPhone,
 } from '@/lib/format';
+import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
+  CALL_OUTCOME_VARIANTS,
   ENROLLMENT_METHOD_LABELS,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
+  peutRevoirUneDemande,
   type ProspectRow,
   type Role,
 } from '@/lib/types';
 
 const NO_VALUE = '–';
 
-function Ligne({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="min-w-0">
-      <dt className="text-muted-foreground">{label}</dt>
-      <dd className="truncate font-[600]">{children}</dd>
-    </div>
-  );
-}
+const SOURCE_LABELS = { WEB: 'Panneau', MOBILE: 'Mobile' } as const;
 
 function ouiNon(value: boolean | null): string {
   if (value === null) return NO_VALUE;
   return value ? 'Oui' : 'Non';
 }
 
-/** La fiche CHUES telle que les téléconseillers l'ont remplie, et chaque appel passé dessus. */
+function ouVide(value: string | null, repli: string = NO_VALUE): string {
+  return value === null || value === '' ? repli : value;
+}
+
+function voitLeSegment(role: Role): boolean {
+  return role === 'ADMIN' || role === 'COMMERCIAL';
+}
+
+function evenementCreation(prospect: ProspectRow): EvenementHistorique {
+  const origine =
+    prospect.representantName === null
+      ? ouVide(prospect.originLabel, 'Origine non renseignée')
+      : `Apporté par ${prospect.representantName}`;
+  return {
+    id: `creation-${prospect.id}`,
+    categorie: 'fiche',
+    at: prospect.clientCreatedAt,
+    titre: 'Fiche créée',
+    resume: origine,
+    acteur: prospect.ownedByCommercialName,
+    lien:
+      prospect.representantId === null
+        ? null
+        : {
+            href: `/chues/representants/${prospect.representantId}`,
+            label: 'Ouvrir la fiche du représentant',
+          },
+    detail: (
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <Champ label="Téléconseiller">{prospect.ownedByCommercialName}</Champ>
+        <Champ label="Le">{formatDateTime(prospect.clientCreatedAt)}</Champ>
+        <Champ label="Représentant">{ouVide(prospect.representantName)}</Champ>
+        <Champ label="Origine">{ouVide(prospect.originLabel)}</Champ>
+      </dl>
+    ),
+  };
+}
+
+function resumeAppel(appel: ProspectCallAttempt): string {
+  if (appel.comment !== null && appel.comment !== '') return appel.comment;
+  if (appel.method !== null) return `Méthode : ${ENROLLMENT_METHOD_LABELS[appel.method]}`;
+  if (appel.rendezVousAt !== null) return `Rendez-vous le ${formatDateTime(appel.rendezVousAt)}`;
+  return '';
+}
+
+function evenementAppel(appel: ProspectCallAttempt): EvenementHistorique {
+  return {
+    id: appel.id,
+    categorie: 'appel',
+    at: appel.clientCreatedAt,
+    titre: appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome],
+    variant: CALL_OUTCOME_VARIANTS[appel.outcome],
+    resume: resumeAppel(appel),
+    acteur: appel.performedByName,
+    source: appel.deviceCallAt === null ? 'Non confirmé par le téléphone' : formatDeviceCall(appel),
+    detail: (
+      <>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <Champ label="Issue">{CALL_OUTCOME_LABELS[appel.outcome]}</Champ>
+          <Champ label="Motif retenu">{ouVide(appel.reasonLabel, 'Aucun')}</Champ>
+          <Champ label="Téléphone">{formatDeviceCall(appel).replace('Téléphone : ', '')}</Champ>
+          <Champ label="Temps de traitement">
+            {appel.dureeTraitementSecondes === null
+              ? NO_VALUE
+              : formatDuration(appel.dureeTraitementSecondes)}
+          </Champ>
+          <Champ label="Méthode d’enrôlement">
+            {appel.method === null ? NO_VALUE : ENROLLMENT_METHOD_LABELS[appel.method]}
+          </Champ>
+          <Champ label="Rendez-vous">
+            {appel.rendezVousAt === null ? 'Aucun' : formatDateTime(appel.rendezVousAt)}
+          </Champ>
+        </dl>
+        <section className="flex flex-col gap-2">
+          <p className="eyebrow text-muted-foreground">Réponses du script</p>
+          <dl className="grid gap-3 sm:grid-cols-2">
+            <Champ label="Fonctionnaire">{ouiNon(appel.fonctionnaire)}</Champ>
+            <Champ label="Engagement en cours">{ouiNon(appel.engagementEnCours)}</Champ>
+            <Champ label="Ancienneté">
+              {appel.dureeEtablissementMois === null
+                ? NO_VALUE
+                : `${formatNumber(appel.dureeEtablissementMois)} mois dans la fonction`}
+            </Champ>
+            <Champ label="E-mail">{ouVide(appel.email)}</Champ>
+          </dl>
+        </section>
+        {appel.comment === null || appel.comment === '' ? null : (
+          <section className="flex flex-col gap-1">
+            <p className="eyebrow text-muted-foreground">
+              {appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire'}
+            </p>
+            <p className="whitespace-pre-wrap">{appel.comment}</p>
+          </section>
+        )}
+      </>
+    ),
+  };
+}
+
+function evenementReleve(releve: DeviceCallDetection): EvenementHistorique {
+  return {
+    id: releve.id,
+    categorie: 'appel',
+    at: releve.deviceCallAt,
+    titre: 'Appel non consigné',
+    variant: 'warning',
+    resume: formatDetectedCall(releve),
+    acteur: releve.performedByName,
+    source: 'Journal du téléphone',
+    detail: (
+      <>
+        <p className="text-muted-foreground">
+          Le téléphone a relevé cet appel, mais personne n’en a consigné le compte rendu.
+        </p>
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <Champ label="Appel">{formatDetectedCall(releve)}</Champ>
+          <Champ label="Relevé le">{formatDateTime(releve.detectedAt)}</Champ>
+        </dl>
+      </>
+    ),
+  };
+}
+
+function evenementSegment(change: SegmentChangeRow): EvenementHistorique {
+  return {
+    id: change.id,
+    categorie: 'statut',
+    at: change.changedAt,
+    titre: `${change.fromSegment} → ${change.toSegment}`,
+    variant: 'info',
+    resume: change.reason,
+    acteur: change.changedByName,
+    source: SOURCE_LABELS[change.source],
+    detail: (
+      <dl className="grid gap-3 sm:grid-cols-2">
+        <Champ label="Avant">{SEGMENT_LABELS[change.fromSegment]}</Champ>
+        <Champ label="Après">{SEGMENT_LABELS[change.toSegment]}</Champ>
+        <Champ label="Motif">{ouVide(change.reason, 'Aucun')}</Champ>
+        <Champ label="Depuis">{SOURCE_LABELS[change.source]}</Champ>
+      </dl>
+    ),
+  };
+}
+
+function evenementsDeLaFiche(prospect: ProspectRow): EvenementHistorique[] {
+  const evenements: EvenementHistorique[] = [evenementCreation(prospect)];
+  if (prospect.enrollmentCapturedAt !== null && prospect.enrollmentMethod !== null) {
+    evenements.push({
+      id: `enrolement-${prospect.id}`,
+      categorie: 'statut',
+      at: prospect.enrollmentCapturedAt,
+      titre: 'Méthode obtenue',
+      variant: 'success',
+      resume: ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod],
+      acteur: prospect.enrollmentCapturedByName ?? prospect.ownedByCommercialName,
+      detail: (
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <Champ label="Méthode d’enrôlement">
+            {ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+          </Champ>
+          <Champ label="Le">{formatDateTime(prospect.enrollmentCapturedAt)}</Champ>
+        </dl>
+      ),
+    });
+  }
+  if (prospect.revueAt !== null) {
+    evenements.push({
+      id: `revue-${prospect.id}`,
+      categorie: 'statut',
+      at: prospect.revueAt,
+      titre: 'Demande revue',
+      variant: 'success',
+      resume: 'La demande convertie a été relue avant transmission à l’enrôlement.',
+      acteur: prospect.revueByName ?? 'Revue',
+      detail: (
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <Champ label="Revue par">{ouVide(prospect.revueByName)}</Champ>
+          <Champ label="Le">{formatDateTime(prospect.revueAt)}</Champ>
+        </dl>
+      ),
+    });
+  }
+  return evenements;
+}
+
+function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
+  const dernierPar = prospect.lastCallByName === null ? '' : ` · ${prospect.lastCallByName}`;
+  return [
+    {
+      label: 'Appels consignés',
+      valeur: formatNumber(prospect.callAttemptCount),
+      precision:
+        prospect.lastCallOutcome === null
+          ? 'Jamais appelé'
+          : `Dernier : ${CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}`,
+    },
+    {
+      label: 'Dernier appel',
+      valeur: prospect.lastCallAt === null ? NO_VALUE : formatDate(prospect.lastCallAt),
+      precision:
+        prospect.lastCallAt === null ? null : `${formatDateTime(prospect.lastCallAt)}${dernierPar}`,
+    },
+    {
+      label: 'À revoir',
+      valeur: prospect.aRevoirAt === null ? 'Aucun' : formatDate(prospect.aRevoirAt),
+      precision: prospect.aRevoirAt === null ? null : formatDateTime(prospect.aRevoirAt),
+    },
+  ];
+}
+
+/** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
 export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
   const fiche = useQuery({
     queryKey: queryKeys.prospect(prospectId),
@@ -65,13 +286,18 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
     queryKey: ['prospects', 'device-calls', prospectId],
     queryFn: () => fetchProspectDeviceCalls(prospectId),
   });
+  const segments = useQuery({
+    queryKey: ['prospects', 'segment-history', prospectId],
+    queryFn: () => fetchProspectSegmentHistory(prospectId),
+    enabled: voitLeSegment(role),
+  });
 
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
         <DetailBackLink href="/chues/prospects">Tous les prospects</DetailBackLink>
-        <Skeleton className="h-48 w-full" />
-        <Skeleton className="h-64 w-full" />
+        <Skeleton className="h-44 w-full" />
+        <Skeleton className="h-96 w-full" />
       </div>
     );
   }
@@ -92,200 +318,180 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   }
 
   const prospect: ProspectRow = fiche.data;
+  const evenements: EvenementHistorique[] = [
+    ...evenementsDeLaFiche(prospect),
+    ...(appels.data ?? []).map(evenementAppel),
+    ...(releves.data ?? []).filter((r) => r.attemptId === null).map(evenementReleve),
+    ...(segments.data ?? []).map(evenementSegment),
+  ];
 
   return (
     <div className="flex flex-col gap-6">
       <DetailBackLink href="/chues/prospects">Tous les prospects</DetailBackLink>
 
-      <Card className="animate-rise">
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="min-w-0">
-              <CardTitle className="text-[1.25rem]">
-                {prospect.prenom} {prospect.nom}
-              </CardTitle>
-              <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
-                {formatPhone(prospect.phoneE164)}
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
-              <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-3 text-[0.8125rem] sm:grid-cols-4">
-            <Ligne label="WhatsApp">
-              {prospect.whatsappE164 === null ? NO_VALUE : formatPhone(prospect.whatsappE164)}
-            </Ligne>
-            <Ligne label="Profession">{prospect.profession ?? NO_VALUE}</Ligne>
-            <Ligne label="Banque">{prospect.banqueName ?? NO_VALUE}</Ligne>
-            <Ligne label="Syndicat">{prospect.syndicatSigle ?? NO_VALUE}</Ligne>
-            <Ligne label="Représentant">{prospect.representantName ?? NO_VALUE}</Ligne>
-            <Ligne label="Segment">
-              {prospect.segment === null ? NO_VALUE : SEGMENT_LABELS[prospect.segment]}
-            </Ligne>
-            <Ligne label="Méthode d’enrôlement">
-              {prospect.enrollmentMethod === null
-                ? NO_VALUE
-                : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
-            </Ligne>
-            <Ligne label="Téléconseiller">{prospect.ownedByCommercialName}</Ligne>
-            <Ligne label="Saisi le">{formatDate(prospect.clientCreatedAt)}</Ligne>
-            <Ligne label="Dernier appel">
-              {prospect.lastCallOutcome === null
-                ? 'Jamais appelé'
-                : CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
-            </Ligne>
-            <Ligne label="Appelé le">
-              {prospect.lastCallAt === null ? NO_VALUE : formatDateTime(prospect.lastCallAt)}
-            </Ligne>
-            <Ligne label="Tentatives">{formatNumber(prospect.callAttemptCount)}</Ligne>
-          </dl>
-        </CardContent>
-      </Card>
+      <FicheEnTete
+        nom={`${prospect.prenom} ${prospect.nom}`}
+        phoneE164={prospect.phoneE164}
+        badges={
+          <>
+            <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
+            <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
+            <RevueDemande prospect={prospect} role={role} />
+          </>
+        }
+        actions={<BoutonWhatsApp prospect={prospect} />}
+        chiffres={chiffresDe(prospect)}
+      />
 
-      {/* « Mes contacts » ouvre la fiche sur cette ancre. */}
-      <Card id="appels">
-        <CardHeader>
-          <CardTitle>Appels</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {appels.isPending ? <Skeleton className="h-24 w-full" /> : null}
-          {appels.isError ? (
-            <QueryErrorState
-              error={appels.error}
-              onRetry={() => {
-                void appels.refetch();
-              }}
-              fallback="Les appels n’ont pas pu être chargés."
-            />
-          ) : null}
-          {appels.isSuccess ? <AppelsProspect items={appels.data} /> : null}
-          {releves.isSuccess ? <RelevesTelephone items={releves.data} /> : null}
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <CarteHistoire
+          titre="Histoire de la fiche"
+          description="Chaque appel et chaque bascule, du plus récent au plus ancien. Cliquez une ligne pour tout voir."
+          sources={voitLeSegment(role) ? [appels, releves, segments] : [appels, releves]}
+        >
+          <Historique
+            evenements={evenements}
+            categories={['appel', 'statut', 'fiche']}
+            vide="Rien ne s’est encore passé sur cette fiche. Le premier appel consigné ouvre l’histoire."
+            videParCategorie={{
+              appel: 'Aucun appel consigné. Le premier se note depuis la console ou le téléphone.',
+              statut:
+                'Aucune bascule enregistrée. Ni méthode obtenue, ni revue, ni changement de segment.',
+            }}
+          />
+        </CarteHistoire>
 
-      {role === 'ADMIN' || role === 'COMMERCIAL' ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>Segment</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ProspectSegmentHistory prospectId={prospectId} />
-          </CardContent>
-        </Card>
-      ) : null}
+        <div className="flex min-w-0 flex-col gap-6">
+          <FicheProspect prospect={prospect} role={role} />
+          <ChampsAjoutes prospect={prospect} />
+        </div>
+      </div>
     </div>
   );
 }
 
-/** Ce que le journal du téléphone a relevé, consigné en tentative ou non. */
-function RelevesTelephone({ items }: { items: readonly DeviceCallDetection[] }) {
-  if (items.length === 0) return null;
+function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Fiche</CardTitle>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-5 text-[0.875rem]">
+        <section className="flex flex-col gap-2">
+          <p className="eyebrow text-muted-foreground">Qui il est</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <Champ label="WhatsApp">
+              {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
+            </Champ>
+            <Champ label="Profession">{ouVide(prospect.profession)}</Champ>
+            <Champ label="Établissement">{ouVide(prospect.etablissement)}</Champ>
+            <Champ label="Département">{ouVide(prospect.departementName)}</Champ>
+          </dl>
+        </section>
+        <section className="flex flex-col gap-2 border-t border-border pt-4">
+          <p className="eyebrow text-muted-foreground">Banque et syndicat</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <Champ label="Banque">{ouVide(prospect.banqueName)}</Champ>
+            <Champ label="Syndicat">{ouVide(prospect.syndicatSigle)}</Champ>
+            {voitLeSegment(role) ? (
+              <Champ label="Segment">
+                {prospect.segment === null ? NO_VALUE : SEGMENT_LABELS[prospect.segment]}
+              </Champ>
+            ) : null}
+            <Champ label="Méthode d’enrôlement">
+              {prospect.enrollmentMethod === null
+                ? NO_VALUE
+                : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+            </Champ>
+          </dl>
+        </section>
+        <section className="flex flex-col gap-2 border-t border-border pt-4">
+          <p className="eyebrow text-muted-foreground">Qui s’en occupe</p>
+          <dl className="grid grid-cols-2 gap-3">
+            <Champ label="Téléconseiller">{prospect.ownedByCommercialName}</Champ>
+            <Champ label="Saisi le">{formatDate(prospect.clientCreatedAt)}</Champ>
+            <Champ label="Représentant">{ouVide(prospect.representantName)}</Champ>
+          </dl>
+          {prospect.representantId === null ? null : (
+            <Link
+              href={`/chues/representants/${prospect.representantId}`}
+              className={buttonVariants({ variant: 'outline', size: 'sm', className: 'w-fit' })}
+            >
+              <ExternalLinkIcon aria-hidden="true" />
+              Ouvrir la fiche du représentant
+            </Link>
+          )}
+        </section>
+      </CardContent>
+    </Card>
+  );
+}
 
-  const nonConsignes = items.filter((releve) => releve.attemptId === null);
-  const consignes = items.filter((releve) => releve.attemptId !== null);
+/** Les réponses aux champs que l'administrateur a ajoutés au formulaire. Sans réponse, rien. */
+function ChampsAjoutes({ prospect }: { prospect: ProspectRow }) {
+  const formulaire = useChampsConversion(prospect.projet);
+  const renseignes = formulaire.libres.filter(
+    (champ) => (prospect.champsLibres[champ.id] ?? '') !== '',
+  );
+  if (renseignes.length === 0) return null;
 
   return (
-    <section className="mt-4 border-t border-border pt-4">
-      <p className="text-[0.75rem] text-muted-foreground">Relevés par le téléphone</p>
-      {nonConsignes.length === 0 ? null : (
-        <ul
-          aria-label="Relevés par le téléphone"
-          className="mt-2 flex flex-col divide-y divide-border"
-        >
-          {nonConsignes.map((releve) => (
-            <ReleveTelephone key={releve.id} releve={releve} />
+    <Card>
+      <CardHeader>
+        <CardTitle>Champs ajoutés</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <dl className="grid grid-cols-2 gap-3 text-[0.875rem]">
+          {renseignes.map((champ) => (
+            <Champ key={champ.id} label={champ.libelle}>
+              {prospect.champsLibres[champ.id]}
+            </Champ>
           ))}
-        </ul>
-      )}
-      {consignes.length === 0 ? null : (
-        <details className="mt-2">
-          <summary className="w-fit cursor-pointer rounded-md py-1 text-[0.8125rem] font-[600] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-            {formatNumber(consignes.length)} appel{consignes.length === 1 ? '' : 's'} consigné
-            {consignes.length === 1 ? '' : 's'}
-          </summary>
-          <ul className="mt-1 flex flex-col divide-y divide-border">
-            {consignes.map((releve) => (
-              <ReleveTelephone key={releve.id} releve={releve} />
-            ))}
-          </ul>
-        </details>
-      )}
-    </section>
+        </dl>
+      </CardContent>
+    </Card>
   );
 }
 
-function ReleveTelephone({ releve }: { releve: DeviceCallDetection }) {
-  return (
-    <li className="flex flex-wrap items-center gap-2 py-2 first:pt-0 last:pb-0">
-      <Badge variant={releve.attemptId === null ? 'warning' : 'success'}>
-        {releve.attemptId === null ? 'Non consigné' : 'Consigné'}
-      </Badge>
-      <span className="text-[0.8125rem] tabular-nums">{formatDetectedCall(releve)}</span>
-      <span className="text-[0.75rem] text-muted-foreground">{releve.performedByName}</span>
-    </li>
-  );
-}
+/** La revue du closing : rien tant que la demande n'est pas convertie. */
+function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+  const queryClient = useQueryClient();
+  const revue = useMutation({
+    mutationFn: () => marquerProspectRevue(prospect.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+      toast.success('Demande revue.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'La revue n’a pas pu être enregistrée.');
+    },
+  });
 
-type Appel = Awaited<ReturnType<typeof fetchProspectCallAttempts>>[number];
+  if (prospect.statut !== 'CONVERTI') return null;
 
-function AppelsProspect({ items }: { items: readonly Appel[] }) {
-  if (items.length === 0) {
+  if (prospect.revueAt !== null) {
     return (
-      <p className="text-[0.875rem] text-muted-foreground">
-        Aucun appel consigné. Le premier se note depuis la console ou le téléphone.
-      </p>
+      <Badge variant="success">
+        Revue le {formatDate(prospect.revueAt)}
+        {prospect.revueByName === null ? '' : ` par ${prospect.revueByName}`}
+      </Badge>
     );
   }
+
   return (
-    <ol aria-label="Appels" className="flex flex-col divide-y divide-border">
-      {items.map((appel) => (
-        <li key={appel.id} className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">
-              {appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome]}
-            </Badge>
-            {appel.method === null ? null : (
-              <span className="text-[0.8125rem]">{ENROLLMENT_METHOD_LABELS[appel.method]}</span>
-            )}
-          </div>
-          <p className="text-[0.75rem] text-muted-foreground">
-            <time dateTime={appel.clientCreatedAt} className="tabular-nums">
-              {formatDateTime(appel.clientCreatedAt)}
-            </time>{' '}
-            · {appel.performedByName}
-          </p>
-          <p className="text-[0.8125rem] text-muted-foreground">{formatDeviceCall(appel)}</p>
-          {appel.dureeTraitementSecondes === null ? null : (
-            <p className="text-[0.8125rem] text-muted-foreground">
-              Traitement : {formatDuration(appel.dureeTraitementSecondes)}
-            </p>
-          )}
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Fonctionnaire : {ouiNon(appel.fonctionnaire)} · Engagement en cours :{' '}
-            {ouiNon(appel.engagementEnCours)}
-            {appel.dureeEtablissementMois === null
-              ? ''
-              : ` · ${formatNumber(appel.dureeEtablissementMois)} mois dans l’établissement`}
-            {appel.email === null || appel.email === '' ? '' : ` · ${appel.email}`}
-          </p>
-          {appel.rendezVousAt === null ? null : (
-            <p className="text-[0.8125rem]">Rendez-vous le {formatDateTime(appel.rendezVousAt)}</p>
-          )}
-          {appel.comment === null || appel.comment === '' ? null : (
-            <p className="max-w-prose text-[0.875rem]">
-              {/* L'issue « Autre » exige le commentaire : c'est un motif. */}
-              <span className="text-muted-foreground">
-                {appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire'} :{' '}
-              </span>
-              {appel.comment}
-            </p>
-          )}
-        </li>
-      ))}
-    </ol>
+    <>
+      <Badge variant="warning">Demande non revue</Badge>
+      {peutRevoirUneDemande(role) ? (
+        <Button
+          size="sm"
+          disabled={revue.isPending}
+          onClick={() => {
+            revue.mutate();
+          }}
+        >
+          Marquer revue
+        </Button>
+      ) : null}
+    </>
   );
 }

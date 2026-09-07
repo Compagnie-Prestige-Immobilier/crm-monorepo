@@ -6,7 +6,7 @@ export const BREVO_MAX_RECIPIENTS_PER_CALL = 99;
 
 export const BREVO_MAX_CONCURRENT_CALLS = 8;
 
-export const BREVO_REQUEST_TIMEOUT_MS = 15_000;
+const BREVO_REQUEST_TIMEOUT_MS = 15_000;
 
 const BREVO_ENDPOINT = 'https://api.brevo.com/v3/smtp/email';
 
@@ -26,7 +26,7 @@ export interface BrevoMessage {
 
 export type BrevoFailureKind = 'transient' | 'permanent';
 
-export interface BrevoSendOutcome {
+interface BrevoSendOutcome {
   readonly email: string;
   readonly ok: boolean;
   readonly errorCode?: string;
@@ -60,7 +60,7 @@ export const chunkRecipients = <T>(
   return chunks;
 };
 
-export const mapWithConcurrency = async <T, R>(
+const mapWithConcurrency = async <T, R>(
   items: readonly T[],
   limit: number,
   worker: (item: T) => Promise<R>,
@@ -86,8 +86,26 @@ export const mapWithConcurrency = async <T, R>(
   return results;
 };
 
-export const classifyBrevoFailure = (httpStatus: number): BrevoFailureKind =>
+const classifyBrevoFailure = (httpStatus: number): BrevoFailureKind =>
   httpStatus === 429 || httpStatus >= 500 ? 'transient' : 'permanent';
+
+const trimmedOrNull = (value: string | undefined): string | null => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+};
+
+const trimmedOrDefault = (value: string | undefined, fallback: string): string => {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : fallback;
+};
+
+const missingBrevoConfigReason = (apiKey: string | null, senderEmail: string | null): string | null => {
+  if (!apiKey) return 'BREVO_API_KEY est absent : aucun transport e-mail configuré.';
+  if (!senderEmail) {
+    return "BREVO_SENDER_EMAIL est absent : Brevo refuse un envoi sans adresse d'expédition.";
+  }
+  return null;
+};
 
 @Injectable()
 export class BrevoHttpTransport implements BrevoTransport {
@@ -99,20 +117,10 @@ export class BrevoHttpTransport implements BrevoTransport {
 
   constructor(env: NodeJS.ProcessEnv = process.env) {
     const config = readNotificationsEnv(env);
-    this.apiKey = config.BREVO_API_KEY?.trim() ? config.BREVO_API_KEY.trim() : null;
-    this.senderEmail = config.BREVO_SENDER_EMAIL?.trim() ? config.BREVO_SENDER_EMAIL.trim() : null;
-    this.senderName = config.BREVO_SENDER_NAME?.trim()
-      ? config.BREVO_SENDER_NAME.trim()
-      : DEFAULT_SENDER_NAME;
-
-    if (!this.apiKey) {
-      this.reason = 'BREVO_API_KEY est absent : aucun transport e-mail configuré.';
-    } else if (!this.senderEmail) {
-      this.reason =
-        "BREVO_SENDER_EMAIL est absent : Brevo refuse un envoi sans adresse d'expédition.";
-    } else {
-      this.reason = null;
-    }
+    this.apiKey = trimmedOrNull(config.BREVO_API_KEY);
+    this.senderEmail = trimmedOrNull(config.BREVO_SENDER_EMAIL);
+    this.senderName = trimmedOrDefault(config.BREVO_SENDER_NAME, DEFAULT_SENDER_NAME);
+    this.reason = missingBrevoConfigReason(this.apiKey, this.senderEmail);
 
     if (this.reason) {
       this.logger.warn(`${this.reason} Les notifications partent en push uniquement.`);
@@ -145,9 +153,8 @@ export class BrevoHttpTransport implements BrevoTransport {
     }
 
     const outcomes: BrevoSendOutcome[] = [];
-    let delivered = 0;
+    const tally: OutcomeTally = { delivered: 0, firstError: undefined };
     let attempted = 0;
-    let firstError: string | undefined;
 
     for (const message of messages) {
       const chunks = chunkRecipients(message.recipients);
@@ -159,41 +166,18 @@ export class BrevoHttpTransport implements BrevoTransport {
         attempted += 1;
         const chunk = chunks[index] ?? [];
         if (result.status === 'fulfilled') {
-          if (result.value.ok) delivered += 1;
-          else firstError ??= result.value.errorCode;
-          for (const recipient of chunk) {
-            outcomes.push({
-              email: recipient.email,
-              ok: result.value.ok,
-              ...(result.value.errorCode === undefined
-                ? {}
-                : { errorCode: result.value.errorCode }),
-              ...(result.value.kind === undefined ? {} : { kind: result.value.kind }),
-            });
-          }
+          recordFulfilledOutcome(result.value, chunk, outcomes, tally);
           return;
         }
-
-        const reason =
-          result.reason instanceof Error ? result.reason.message : String(result.reason);
-        firstError ??= reason;
-        for (const recipient of chunk) {
-          outcomes.push({
-            email: recipient.email,
-            ok: false,
-            errorCode: 'NETWORK_ERROR',
-            kind: 'transient',
-          });
-        }
-        this.logger.warn(`Envoi Brevo échoué (réseau) : ${reason}`);
+        recordRejectedOutcome(result.reason, chunk, outcomes, tally, this.logger);
       });
     }
 
-    if (attempted > 0 && delivered === 0) {
+    if (attempted > 0 && tally.delivered === 0) {
       return {
         status: 'TRANSPORT_ERROR',
         outcomes,
-        ...(firstError === undefined ? {} : { detail: firstError }),
+        ...(tally.firstError === undefined ? {} : { detail: tally.firstError }),
       };
     }
 
@@ -237,7 +221,45 @@ export class BrevoHttpTransport implements BrevoTransport {
   }
 }
 
-export const readBrevoErrorCode = (payload: unknown): string | undefined => {
+interface OutcomeTally {
+  delivered: number;
+  firstError: string | undefined;
+}
+
+function recordFulfilledOutcome(
+  value: { readonly ok: boolean; readonly errorCode?: string; readonly kind?: BrevoFailureKind },
+  chunk: readonly BrevoRecipient[],
+  outcomes: BrevoSendOutcome[],
+  tally: OutcomeTally,
+): void {
+  if (value.ok) tally.delivered += 1;
+  else tally.firstError ??= value.errorCode;
+  for (const recipient of chunk) {
+    outcomes.push({
+      email: recipient.email,
+      ok: value.ok,
+      ...(value.errorCode === undefined ? {} : { errorCode: value.errorCode }),
+      ...(value.kind === undefined ? {} : { kind: value.kind }),
+    });
+  }
+}
+
+function recordRejectedOutcome(
+  reason: unknown,
+  chunk: readonly BrevoRecipient[],
+  outcomes: BrevoSendOutcome[],
+  tally: OutcomeTally,
+  logger: Logger,
+): void {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  tally.firstError ??= message;
+  for (const recipient of chunk) {
+    outcomes.push({ email: recipient.email, ok: false, errorCode: 'NETWORK_ERROR', kind: 'transient' });
+  }
+  logger.warn(`Envoi Brevo échoué (réseau) : ${message}`);
+}
+
+const readBrevoErrorCode = (payload: unknown): string | undefined => {
   if (typeof payload !== 'object' || payload === null) return undefined;
   const code = (payload as { code?: unknown }).code;
   return typeof code === 'string' && code ? code : undefined;

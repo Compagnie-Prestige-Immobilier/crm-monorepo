@@ -13,8 +13,8 @@ const bound = (raw: string | undefined, fallback: number): number => {
   return Number.isInteger(value) && value > 0 ? value : fallback;
 };
 
-export const passwordMinLength = (): number => bound(process.env.PASSWORD_MIN_LENGTH, 8);
-export const passwordMaxLength = (): number => bound(process.env.PASSWORD_MAX_LENGTH, 24);
+const passwordMinLength = (): number => bound(process.env.PASSWORD_MIN_LENGTH, 8);
+const passwordMaxLength = (): number => bound(process.env.PASSWORD_MAX_LENGTH, 24);
 
 @ValidatorConstraint({ name: 'passwordLength', async: false })
 class PasswordLengthConstraint implements ValidatorConstraintInterface {

@@ -4,7 +4,7 @@ import { Progress as ProgressPrimitive } from '@base-ui/react/progress';
 
 import { cn } from '@/lib/utils';
 
-export type ProgressProps = Omit<ProgressPrimitive.Root.Props, 'className'> & {
+type ProgressProps = Omit<ProgressPrimitive.Root.Props, 'className'> & {
   className?: string | undefined;
 };
 

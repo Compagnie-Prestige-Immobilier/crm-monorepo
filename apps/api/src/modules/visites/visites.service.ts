@@ -16,7 +16,7 @@ import type {
   VisiteQueryDto,
 } from './dto.js';
 
-export const VisiteError = {
+const VisiteError = {
   NOT_FOUND: 'VISITE_NOT_FOUND',
   REFERENTIEL_UNAVAILABLE: 'VISITE_REFERENTIEL_UNAVAILABLE',
   REFERENCE_EXHAUSTED: 'VISITE_REFERENCE_EXHAUSTED',
@@ -81,6 +81,28 @@ export const dakarDate = (instant: Date): string => {
   const { year, month, day } = dakarWallClock(instant);
   return `${String(year)}-${pad2(month)}-${pad2(day)}`;
 };
+
+function visiteCreateData(
+  input: CreateVisiteDto,
+  entityId: string | undefined,
+  createdById: string,
+  visitedAt: Date,
+) {
+  return {
+    ...(entityId === undefined ? {} : { id: entityId }),
+    visitedAt,
+    timeKnown: input.time !== undefined,
+    visitorName: input.visitorName.trim(),
+    phone: input.phone?.trim() ?? null,
+    phoneE164: tryNormalizePhone(input.phone) ?? null,
+    entrepriseId: input.entrepriseId,
+    objetId: input.objetId,
+    directionId: input.directionId ?? null,
+    destinataireId: input.destinataireId ?? null,
+    comment: input.comment?.trim() ?? null,
+    createdById,
+  };
+}
 
 function toDto(row: VisiteRow): VisiteDto {
   const { hour, minute } = dakarWallClock(row.visitedAt);
@@ -162,21 +184,7 @@ export class VisitesService {
     const visitedAt = this.instantOf(input.date, input.time);
     await this.assertReferentielsUsable(input, db);
 
-    const data = {
-      ...(entityId === undefined ? {} : { id: entityId }),
-      visitedAt,
-      timeKnown: input.time !== undefined,
-      visitorName: input.visitorName.trim(),
-      phone: input.phone?.trim() ?? null,
-      phoneE164: tryNormalizePhone(input.phone) ?? null,
-      entrepriseId: input.entrepriseId,
-      objetId: input.objetId,
-      directionId: input.directionId ?? null,
-      destinataireId: input.destinataireId ?? null,
-      comment: input.comment?.trim() ?? null,
-      createdById,
-    };
-
+    const data = visiteCreateData(input, entityId, createdById, visitedAt);
     const year = dakarWallClock(visitedAt).year;
 
     // Une seule tentative DANS la transaction d'un lot : PostgreSQL abandonne
@@ -186,22 +194,28 @@ export class VisitesService {
     const attempts = entityId === undefined ? REFERENCE_ATTEMPTS : 1;
 
     for (let attempt = 0; attempt < attempts; attempt += 1) {
-      const reference = formatVisiteReference(year, await this.nextSequence(year, db));
-      try {
-        const created = await db.visite.create({
-          data: { ...data, reference },
-          include: VISITE_INCLUDE,
-        });
-        return toDto(created);
-      } catch (error) {
-        if (!isUniqueViolation(error)) throw error;
-      }
+      const created = await this.tryCreate(db, data, year);
+      if (created) return toDto(created);
     }
 
     throw new BadRequestException({
       code: VisiteError.REFERENCE_EXHAUSTED,
       message: 'La référence de visite n’a pas pu être attribuée. Réessayez.',
     });
+  }
+
+  private async tryCreate(
+    db: VisiteDb,
+    data: ReturnType<typeof visiteCreateData>,
+    year: number,
+  ): Promise<VisiteRow | null> {
+    const reference = formatVisiteReference(year, await this.nextSequence(year, db));
+    try {
+      return await db.visite.create({ data: { ...data, reference }, include: VISITE_INCLUDE });
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error;
+      return null;
+    }
   }
 
   async update(id: string, input: UpdateVisiteDto): Promise<VisiteDto> {
@@ -213,31 +227,14 @@ export class VisitesService {
     // registre garderait une valeur que personne ne peut retirer.
     const jour = dakarDate(existing.visitedAt);
     const data: Prisma.VisiteUncheckedUpdateInput = {};
-    if (input.time === null) {
-      data.visitedAt = this.instantOf(jour, '00:00');
-      data.timeKnown = false;
-    } else if (input.time !== undefined) {
-      data.visitedAt = this.instantOf(jour, input.time);
-      data.timeKnown = true;
-    }
-
+    applyTimeUpdate(data, input, jour);
+    applyPhoneUpdate(data, input);
     if (input.visitorName !== undefined) data.visitorName = input.visitorName.trim();
-    if (input.phone === null || input.phone?.trim() === '') {
-      data.phone = null;
-      data.phoneE164 = null;
-    } else if (input.phone !== undefined) {
-      data.phone = input.phone.trim();
-      data.phoneE164 = tryNormalizePhone(input.phone) ?? null;
-    }
     if (input.entrepriseId !== undefined) data.entrepriseId = input.entrepriseId;
     if (input.objetId !== undefined) data.objetId = input.objetId;
     if (input.directionId !== undefined) data.directionId = input.directionId;
     if (input.destinataireId !== undefined) data.destinataireId = input.destinataireId;
-    if (input.comment === null || input.comment?.trim() === '') {
-      data.comment = null;
-    } else if (input.comment !== undefined) {
-      data.comment = input.comment.trim();
-    }
+    applyCommentUpdate(data, input);
 
     const updated = await this.prisma.visite.update({
       where: { id },
@@ -250,26 +247,12 @@ export class VisitesService {
   buildWhere(query: VisiteFilterDto): Prisma.VisiteWhereInput {
     const search = query.search?.trim();
     return {
-      ...(query.from === undefined && query.to === undefined
-        ? {}
-        : {
-            visitedAt: {
-              ...(query.from === undefined ? {} : { gte: inclusiveDateFrom(query.from) }),
-              ...(query.to === undefined ? {} : { lte: inclusiveDateTo(query.to) }),
-            },
-          }),
+      ...visitedAtRange(query),
       ...(query.entrepriseId === undefined ? {} : { entrepriseId: query.entrepriseId }),
       ...(query.directionId === undefined ? {} : { directionId: query.directionId }),
       ...(query.destinataireId === undefined ? {} : { destinataireId: query.destinataireId }),
       ...(query.objetId === undefined ? {} : { objetId: query.objetId }),
-      ...(search === undefined || search === ''
-        ? {}
-        : {
-            OR: [
-              { visitorName: { contains: search, mode: 'insensitive' as const } },
-              { reference: { contains: search.toUpperCase() } },
-            ],
-          }),
+      ...visitorSearchFilter(search),
     };
   }
 
@@ -347,3 +330,64 @@ export class VisitesService {
 
 const isUniqueViolation = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && 'code' in error && error.code === 'P2002';
+
+function applyTimeUpdate(
+  data: Prisma.VisiteUncheckedUpdateInput,
+  input: UpdateVisiteDto,
+  jour: string,
+): void {
+  if (input.time === null) {
+    data.visitedAt = visiteInstant(jour, '00:00');
+    data.timeKnown = false;
+    return;
+  }
+  if (input.time !== undefined) {
+    data.visitedAt = visiteInstant(jour, input.time);
+    data.timeKnown = true;
+  }
+}
+
+function applyPhoneUpdate(data: Prisma.VisiteUncheckedUpdateInput, input: UpdateVisiteDto): void {
+  const trimmed = input.phone?.trim();
+  if (input.phone === null || trimmed === '') {
+    data.phone = null;
+    data.phoneE164 = null;
+    return;
+  }
+  if (input.phone !== undefined) {
+    data.phone = input.phone.trim();
+    data.phoneE164 = tryNormalizePhone(input.phone) ?? null;
+  }
+}
+
+function applyCommentUpdate(
+  data: Prisma.VisiteUncheckedUpdateInput,
+  input: UpdateVisiteDto,
+): void {
+  const trimmed = input.comment?.trim();
+  if (input.comment === null || trimmed === '') {
+    data.comment = null;
+    return;
+  }
+  if (input.comment !== undefined) data.comment = input.comment.trim();
+}
+
+function visitedAtRange(query: VisiteFilterDto): Prisma.VisiteWhereInput {
+  if (query.from === undefined && query.to === undefined) return {};
+  return {
+    visitedAt: {
+      ...(query.from === undefined ? {} : { gte: inclusiveDateFrom(query.from) }),
+      ...(query.to === undefined ? {} : { lte: inclusiveDateTo(query.to) }),
+    },
+  };
+}
+
+function visitorSearchFilter(search: string | undefined): Prisma.VisiteWhereInput {
+  if (search === undefined || search === '') return {};
+  return {
+    OR: [
+      { visitorName: { contains: search, mode: 'insensitive' as const } },
+      { reference: { contains: search.toUpperCase() } },
+    ],
+  };
+}

@@ -1,10 +1,8 @@
 import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiParam, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Role } from '@crm/database';
-
 import { ApiErrors } from '../../common/decorators/api-errors.decorator.js';
 import { ApiErrorDto } from '../../common/dto/api-error.dto.js';
-import { ANY_AUTHENTICATED, Roles } from '../../common/decorators/roles.decorator.js';
+import { ANY_AUTHENTICATED, ENCADREMENT, Roles } from '../../common/decorators/roles.decorator.js';
 import { Cached } from '../../redis/cache.interceptor.js';
 import { CallOutcomeReasonsService } from './call-outcome-reasons.service.js';
 import {
@@ -37,7 +35,7 @@ export class CallOutcomeReasonsController {
     return this.reasons.listForField(query.payloadVersion);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Get('administration')
   @ApiOperation({
     operationId: 'listAllCallOutcomeReasons',
@@ -48,7 +46,7 @@ export class CallOutcomeReasonsController {
     return this.reasons.listAll();
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post()
   @ApiOperation({
     operationId: 'createCallOutcomeReason',
@@ -67,7 +65,7 @@ export class CallOutcomeReasonsController {
     return this.reasons.create(body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Patch(':id')
   @ApiOperation({
     operationId: 'updateCallOutcomeReason',
@@ -90,7 +88,7 @@ export class CallOutcomeReasonsController {
     return this.reasons.update(id, body);
   }
 
-  @Roles(Role.ADMIN)
+  @Roles(...ENCADREMENT)
   @Post(':id/active')
   @ApiOperation({
     operationId: 'setCallOutcomeReasonActive',

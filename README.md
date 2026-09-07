@@ -231,7 +231,6 @@ Commandes courantes:
 
 ```bash
 flutter analyze
-flutter test
 flutter build apk --debug
 ```
 
@@ -265,7 +264,7 @@ Pour ajouter une migration:
 2. lancer `pnpm db:migrate` avec un nom explicite;
 3. relire le SQL produit;
 4. lancer `pnpm db:generate`;
-5. vérifier les tests concernés.
+5. lancer `pnpm test:integration`.
 
 ## Variables d'environnement
 
@@ -300,10 +299,8 @@ Règles de sécurité:
 | `pnpm build`            | Compile les paquets Node et le web               |
 | `pnpm lint`             | Exécute Oxlint                                   |
 | `pnpm typecheck`        | Vérifie les types TypeScript                     |
-| `pnpm test`             | Exécute les tests unitaires                      |
 | `pnpm test:integration` | Exécute les tests PostgreSQL                     |
 | `pnpm test:e2e`         | Exécute les parcours Playwright                  |
-| `pnpm test:coverage`    | Produit les rapports de couverture               |
 | `pnpm dead-code`        | Recherche les fichiers et dépendances inutilisés |
 | `pnpm format`           | Formate le dépôt avec Prettier                   |
 | `pnpm format:check`     | Vérifie le formatage sans écrire                 |
@@ -315,12 +312,11 @@ Les commandes Flutter se lancent séparément depuis `apps/mobile`.
 
 ## Tests et qualité
 
-La vérification comprend:
+Les tests unitaires sont interdits dans ce dépôt: la CI refuse tout
+`*.test.ts`, `*.test.tsx` ou `*_test.dart`. La vérification comprend:
 
-- Vitest pour l'API, le web et les paquets TypeScript;
 - tests d'intégration API contre PostgreSQL;
 - Playwright pour les parcours du panel;
-- Flutter Test pour les écrans, SQLite et la synchronisation;
 - TypeScript, Oxlint, Prettier, Knip et `flutter analyze`;
 - Gitleaks, Semgrep, OSV et Trivy pour la sécurité;
 - Lighthouse, k6 et Maestro dans les contrôles étendus.
@@ -333,11 +329,11 @@ pnpm test:integration
 
 cd apps/mobile
 flutter analyze
-flutter test
 ```
 
-Un test ajouté doit avoir été observé en échec lorsque le comportement couvert
-est volontairement cassé, puis en succès après restauration.
+Un test d'intégration ou e2e ajouté doit avoir été observé en échec lorsque le
+comportement couvert est volontairement cassé, puis en succès après
+restauration.
 
 Voir [`docs/QUALITY.md`](docs/QUALITY.md) et [`E2E.md`](E2E.md).
 

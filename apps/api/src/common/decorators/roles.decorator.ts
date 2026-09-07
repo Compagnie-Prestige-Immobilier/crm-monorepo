@@ -12,7 +12,15 @@ export const ANY_AUTHENTICATED = [
   Role.SUPERVISEUR,
   Role.DIRECTION,
   Role.ACCUEIL,
+  Role.CHARGE_CLIENTELE,
 ] as const;
+
+/**
+ * Qui règle ce qui encadre le travail des autres : listes de référence,
+ * paramètres partagés. La supervision et la direction en répondent au même
+ * titre que l'administrateur.
+ */
+export const ENCADREMENT = [Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION] as const;
 
 /**
  * Qui MÈNE les trois étapes : qualifier un représentant, ajouter un prospect,
@@ -25,10 +33,16 @@ export const PARCOURS_ROLES = [
   Role.ADMIN,
   Role.SUPERVISEUR,
   Role.DIRECTION,
+  Role.CHARGE_CLIENTELE,
 ] as const;
 
 /** Les comptes servis par CPI GO. */
-export const MOBILE_ROLES = [Role.ADMIN, Role.COMMERCIAL, Role.BANQUE_FINANCE] as const;
+const MOBILE_ROLES = [
+  Role.ADMIN,
+  Role.COMMERCIAL,
+  Role.BANQUE_FINANCE,
+  Role.CHARGE_CLIENTELE,
+] as const;
 
 /**
  * Qui atteint `/sync`. L'accueil tient le registre des visites depuis le

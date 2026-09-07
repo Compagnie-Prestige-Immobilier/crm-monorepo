@@ -3,6 +3,7 @@
 //
 
 // ignore_for_file: unused_element
+import 'package:crm_api_client/src/model/famille_statut.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -27,6 +28,8 @@ class SupervisionRepStatutDto {
 
     required this.isActive,
 
+    required this.famille,
+
     required this.count,
   });
 
@@ -42,6 +45,14 @@ class SupervisionRepStatutDto {
   @JsonKey(name: r'isActive', required: true, includeIfNull: false)
   final bool isActive;
 
+  @JsonKey(
+    name: r'famille',
+    required: true,
+    includeIfNull: false,
+    unknownEnumValue: FamilleStatut.unknownDefaultOpenApi,
+  )
+  final FamilleStatut famille;
+
   @JsonKey(name: r'count', required: true, includeIfNull: false)
   final num count;
 
@@ -50,15 +61,22 @@ class SupervisionRepStatutDto {
         other is SupervisionRepStatutDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [id, code, label, isActive, count],
-              [other.id, other.code, other.label, other.isActive, other.count],
+              [id, code, label, isActive, famille, count],
+              [
+                other.id,
+                other.code,
+                other.label,
+                other.isActive,
+                other.famille,
+                other.count,
+              ],
             );
   }
 
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([id, code, label, isActive, count]);
+      mapPropsToHashCode([id, code, label, isActive, famille, count]);
 
   factory SupervisionRepStatutDto.fromJson(Map<String, dynamic> json) =>
       _$SupervisionRepStatutDtoFromJson(json);

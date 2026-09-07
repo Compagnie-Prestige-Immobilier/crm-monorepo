@@ -212,12 +212,7 @@ export class DbDumpService implements OnModuleInit {
     // Fastify sert le HEAD de chaque GET par le MÊME gestionnaire : sans cette
     // sortie, une sonde consommerait l'archive sans qu'un octet ne parte.
     if (reply.request.method.toUpperCase() !== 'GET') {
-      const probe = await this.openSealed(path);
-      if (probe === null) return this.forgetMissingFile(job);
-      await probe.handle.close();
-      this.setDownloadHeaders(reply, fileName, probe.size);
-      await reply.send();
-      return;
+      return this.respondToProbe(reply, path, job, fileName);
     }
 
     // Deux verrous pour deux courses : le contrôle explicite arrête la requête
@@ -256,6 +251,19 @@ export class DbDumpService implements OnModuleInit {
     });
 
     await reply.send(handle.createReadStream({ autoClose: true }));
+  }
+
+  private async respondToProbe(
+    reply: FastifyReply,
+    path: string,
+    job: DumpJob,
+    fileName: string,
+  ): Promise<void> {
+    const probe = await this.openSealed(path);
+    if (probe === null) return this.forgetMissingFile(job);
+    await probe.handle.close();
+    this.setDownloadHeaders(reply, fileName, probe.size);
+    await reply.send();
   }
 
   private setDownloadHeaders(reply: FastifyReply, fileName: string, size: number): void {

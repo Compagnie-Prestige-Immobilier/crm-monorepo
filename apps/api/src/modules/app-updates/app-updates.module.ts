@@ -6,7 +6,7 @@ import type { FastifyInstance } from 'fastify';
 import { AppUpdatesController } from './app-updates.controller.js';
 import { AppUpdatesService } from './app-updates.service.js';
 
-export const registerApkFileSending = async (instance: FastifyInstance): Promise<void> => {
+const registerApkFileSending = async (instance: FastifyInstance): Promise<void> => {
   if (instance.hasReplyDecorator('sendFile')) return;
   await instance.register(fastifyStatic, { serve: false });
 };

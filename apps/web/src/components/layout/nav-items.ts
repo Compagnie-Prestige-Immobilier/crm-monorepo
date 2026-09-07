@@ -11,6 +11,7 @@ import {
   HouseIcon,
   LayoutDashboardIcon,
   LibraryIcon,
+  ListChecksIcon,
   ListIcon,
   ListOrderedIcon,
   MegaphoneIcon,
@@ -19,6 +20,7 @@ import {
   PlugZapIcon,
   PlusCircleIcon,
   SettingsIcon,
+  SlidersHorizontalIcon,
   UploadIcon,
   UserPlusIcon,
   UsersIcon,
@@ -42,7 +44,8 @@ export const INBOX_PATH = '/notifications';
 
 /**
  * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le
- * téléconseiller en est absent : les siennes visent l'application mobile.
+ * téléconseiller et le chargé de clientèle en sont absents : les leurs visent
+ * l'application mobile.
  */
 export const INBOX_ROLES: readonly Role[] = [
   'ADMIN',
@@ -88,20 +91,36 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Projet CHUES',
     path: '/chues',
     description: 'Enrôlement des enseignants syndiqués',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
+    roles: [
+      'ADMIN',
+      'DIRECTION',
+      'SUPERVISEUR',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'BANQUE_FINANCE',
+    ],
   },
   {
     id: 'grand-public',
     label: 'Projet Grand Public',
     path: '/grand-public',
     description: 'Prospection, appels et conversion hors CHUES',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'BANQUE_FINANCE'],
+    roles: [
+      'ADMIN',
+      'DIRECTION',
+      'SUPERVISEUR',
+      'COMMERCIAL',
+      'CHARGE_CLIENTELE',
+      'BANQUE_FINANCE',
+    ],
   },
   {
     id: 'admin',
     label: 'Admin',
     path: '/admin',
     description: 'Comptes, listes de référence, imports et paramètres',
+    // La supervision et la direction atteignent les listes de référence par un
+    // lien direct depuis CHUES et Grand Public : elles n'ouvrent pas la coque.
     roles: ['ADMIN'],
   },
 ];
@@ -125,6 +144,8 @@ export interface NavItem {
    * `isNavItemActive` lisent dans la liste COMPLÈTE.
    */
   hidden?: boolean;
+  /** Entrée de la barre à surligner quand cet écran caché s'ouvre par un onglet de pilotage. */
+  onglet?: string;
 }
 
 export interface NavSection {
@@ -135,11 +156,11 @@ export interface NavSection {
 }
 
 /**
- * Les trois rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils
- * lisent les mêmes intitulés dans le même ordre : une seule suite d'entrées les
- * sert tous les trois, et on n'explique qu'un seul parcours au téléphone.
+ * Les rôles qui font eux-mêmes les trois étapes du projet CHUES. Ils lisent les
+ * mêmes intitulés dans le même ordre : une seule suite d'entrées les sert tous,
+ * et on n'explique qu'un seul parcours au téléphone.
  */
-const TERRAIN: readonly Role[] = ['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'];
+const TERRAIN: readonly Role[] = ['COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION'];
 
 /** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
 const ENCADREMENT: readonly Role[] = ['SUPERVISEUR', 'DIRECTION'];
@@ -216,7 +237,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/chues',
@@ -255,13 +276,14 @@ const SECTIONS: readonly NavSection[] = [
         roles: TERRAIN,
       },
       {
-        // Le seul écran qui montre le travail de chaque téléconseiller ligne à
-        // ligne : c'est là que l'encadrement passe le reste de sa journée.
+        // Onglets Activité et Présence du pilotage : même titre que le tableau de bord.
         href: '/chues/supervision',
-        label: 'Mon équipe',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ENCADREMENT,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/mes-contacts',
@@ -299,9 +321,30 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
+        roles: ENCADREMENT,
+        hidden: true,
+        onglet: '/chues/statistiques',
+      },
+      {
+        href: '/chues/parametres-chues',
+        label: 'Paramètres CHUES',
+        icon: SlidersHorizontalIcon,
+        description: 'Liens, contacts et messages envoyés',
+        // Pas `ENCADREMENT` : l'administrateur règle TOUT, la supervision et la
+        // direction seulement les deux textes envoyés aux prospects.
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+        secondary: true,
+      },
+      {
+        // Lien direct vers l'écran de l'Admin : la supervision et la direction
+        // n'ouvrent pas la coque Admin pour cette seule entrée.
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Départements, banques, syndicats',
         roles: ENCADREMENT,
         secondary: true,
       },
@@ -338,10 +381,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN'],
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/dossiers',
@@ -352,11 +397,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/supervision',
-        label: 'Équipes',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/rappels',
@@ -383,12 +429,14 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
+        // Onglet « Banque » du pilotage : un tableau de bord, pas une entrée de plus.
         href: '/chues/banque',
-        label: 'Vue d’ensemble bancaire',
+        label: 'Tableau de bord',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/chues/statistiques',
       },
       {
         // L'arbitrage des demandes déposées par les banques. Sans entrée de
@@ -518,28 +566,28 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Grand Public',
         icon: UsersIcon,
         description: 'Créer, retrouver et suivre les prospects',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/console',
         label: 'Appeler les prospects',
         icon: HeadsetIcon,
         description: 'Chercher un prospect et consigner l’appel',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/grand-public/mes-contacts',
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },
       {
@@ -547,7 +595,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Noter un prospect',
         icon: PlusCircleIcon,
         description: 'Saisie d’un prospect',
-        roles: ['COMMERCIAL'],
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },
 
@@ -575,10 +623,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/supervision',
-        label: 'Mon équipe',
+        label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+        hidden: true,
+        onglet: '/grand-public/statistiques',
       },
       {
         href: '/grand-public/dossiers',
@@ -605,10 +655,21 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/campagnes',
-        label: 'Campagnes',
+        label: 'Tableau de bord',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
+        hidden: true,
+        onglet: '/grand-public/statistiques',
+      },
+      {
+        // Lien direct vers l'écran de l'Admin : la supervision et la direction
+        // n'ouvrent pas la coque Admin pour cette seule entrée.
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Départements, banques, syndicats',
+        roles: ENCADREMENT,
         secondary: true,
       },
       {
@@ -629,11 +690,12 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/banque',
-        label: 'Vue d’ensemble bancaire',
+        label: 'Tableau de bord',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
-        secondary: true,
+        hidden: true,
+        onglet: '/grand-public/statistiques',
       },
       {
         href: '/grand-public/dossiers/export',
@@ -713,7 +775,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Listes de référence',
         icon: LibraryIcon,
         description: 'Départements, banques, syndicats',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
         // Après les listes de référence : un classeur ne peut nommer que des
@@ -749,6 +811,16 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Démonstration et suppression',
         roles: ['ADMIN'],
       },
+      {
+        // Sous « Plus » : on règle le formulaire une fois, on ne le rouvre pas
+        // chaque jour, et la barre tient à six entrées.
+        href: '/admin/champs-conversion',
+        label: 'Champs de la conversion',
+        icon: ListChecksIcon,
+        description: 'Ordre, visibilité et champs ajoutés',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
     ],
   },
 ];
@@ -759,10 +831,6 @@ export function coqueOf(pathname: string): Coque | null {
     (coque) => pathname === coque.path || pathname.startsWith(`${coque.path}/`),
   );
   return match?.id ?? null;
-}
-
-export function coqueAllowed(role: Role, coque: Coque): boolean {
-  return COQUES.find((entry) => entry.id === coque)?.roles.includes(role) === true;
 }
 
 /**
@@ -795,7 +863,7 @@ export function navSections(role: Role, coque: Coque): NavSection[] {
 }
 
 /** À plat, pour les recherches par chemin. */
-export function navItems(role: Role, coque: Coque): NavItem[] {
+function navItems(role: Role, coque: Coque): NavItem[] {
   return navSections(role, coque).flatMap((section) => section.items);
 }
 
@@ -841,7 +909,8 @@ export function fallbackCoque(role: Role): Coque | null {
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */
 export function isNavItemActive(role: Role, pathname: string, item: NavItem): boolean {
-  return matchNavItem(role, pathname)?.href === item.href;
+  const courant = matchNavItem(role, pathname);
+  return (courant?.onglet ?? courant?.href) === item.href;
 }
 
 function matchNavItem(role: Role, pathname: string): NavItem | undefined {

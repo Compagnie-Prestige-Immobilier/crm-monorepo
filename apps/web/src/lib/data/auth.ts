@@ -11,9 +11,10 @@ export const PANEL_ROLES: readonly Role[] = [
   'SUPERVISEUR',
   'DIRECTION',
   'ACCUEIL',
+  'CHARGE_CLIENTELE',
 ];
 
-export interface AuthTokens {
+interface AuthTokens {
   accessToken: string;
   refreshToken: string;
   accessTokenTtl: number;

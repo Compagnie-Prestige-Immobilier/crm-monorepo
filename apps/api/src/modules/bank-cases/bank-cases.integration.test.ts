@@ -49,6 +49,28 @@ async function refusal(run: () => Promise<unknown>): Promise<unknown> {
   throw new Error('aucune exception levée alors qu’un refus était attendu');
 }
 
+function stageIdsByCode(rows: { code: string; id: string }[]): {
+  aTraiter: string;
+  enTraitement: string;
+  encaisse: string;
+  rejete: string;
+} {
+  const byCode = new Map(rows.map((row) => [row.code, row.id]));
+  return {
+    aTraiter: byCode.get('A_TRAITER') ?? '',
+    enTraitement: byCode.get('EN_TRAITEMENT_BANQUE') ?? '',
+    encaisse: byCode.get('ENCAISSE') ?? '',
+    rejete: byCode.get('REJETE') ?? '',
+  };
+}
+
+function reasonIds(rows: { code: string; id: string }[]): { standard: string; autre: string } {
+  return {
+    standard: rows.find((row) => row.code !== 'AUTRE')?.id ?? '',
+    autre: rows.find((row) => row.code === 'AUTRE')?.id ?? '',
+  };
+}
+
 let agent: AuthenticatedUser;
 let admin: AuthenticatedUser;
 let stageATraiter: string;
@@ -85,16 +107,17 @@ beforeAll(async () => {
   banqueB = b.id;
 
   const found = await prisma.bankCaseStage.findMany();
-  const byCode = new Map(found.map((row) => [row.code, row.id]));
-  stageATraiter = byCode.get('A_TRAITER') ?? '';
-  stageEnTraitement = byCode.get('EN_TRAITEMENT_BANQUE') ?? '';
-  stageEncaisse = byCode.get('ENCAISSE') ?? '';
-  stageRejete = byCode.get('REJETE') ?? '';
+  const stageIds = stageIdsByCode(found);
+  stageATraiter = stageIds.aTraiter;
+  stageEnTraitement = stageIds.enTraitement;
+  stageEncaisse = stageIds.encaisse;
+  stageRejete = stageIds.rejete;
   if (!stageATraiter || !stageEncaisse) throw new Error('workflow bancaire non semé');
 
   const reasons = await prisma.bankRejectionReason.findMany({ orderBy: { sortOrder: 'asc' } });
-  reasonId = reasons.find((row) => row.code !== 'AUTRE')?.id ?? '';
-  reasonAutreId = reasons.find((row) => row.code === 'AUTRE')?.id ?? '';
+  const ids = reasonIds(reasons);
+  reasonId = ids.standard;
+  reasonAutreId = ids.autre;
 
   const agentRow = await prisma.user.create({
     data: {

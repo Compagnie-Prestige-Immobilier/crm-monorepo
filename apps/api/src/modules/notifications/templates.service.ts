@@ -56,29 +56,16 @@ export class NotificationTemplatesService {
   }
 
   async update(id: string, body: UpdateNotificationTemplateDto): Promise<NotificationTemplateDto> {
-    // La chaine vide passe : elle EFFACE le lien, elle ne le remplace pas par
-    // une route invalide.
-    if (body.route !== undefined && body.route !== '' && !ROUTE_PATTERN.test(body.route)) {
-      throw routeInvalid();
-    }
+    validateUpdateRoute(body);
 
     const current = await this.findVisible(id);
-
     const titleTemplate = body.titleTemplate ?? current.titleTemplate;
     const bodyTemplate = body.bodyTemplate ?? current.bodyTemplate;
 
     try {
       const row = await this.prisma.notificationTemplate.update({
         where: { id },
-        data: {
-          ...(body.name !== undefined ? { name: body.name.trim() } : {}),
-          ...(body.category !== undefined ? { category: body.category } : {}),
-          ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
-          ...(body.route !== undefined ? { route: body.route === '' ? null : body.route } : {}),
-          titleTemplate,
-          bodyTemplate,
-          variables: mergedVariables(titleTemplate, bodyTemplate),
-        },
+        data: buildTemplateUpdateData(body, titleTemplate, bodyTemplate),
       });
       return toDto(row);
     } catch (error) {
@@ -103,7 +90,28 @@ export class NotificationTemplatesService {
   }
 }
 
-export const mergedVariables = (titleTemplate: string, bodyTemplate: string): string[] => {
+/** La chaine vide passe : elle EFFACE le lien, elle ne le remplace pas par une route invalide. */
+const validateUpdateRoute = (body: UpdateNotificationTemplateDto): void => {
+  if (body.route !== undefined && body.route !== '' && !ROUTE_PATTERN.test(body.route)) {
+    throw routeInvalid();
+  }
+};
+
+const buildTemplateUpdateData = (
+  body: UpdateNotificationTemplateDto,
+  titleTemplate: string,
+  bodyTemplate: string,
+): Prisma.NotificationTemplateUpdateInput => ({
+  ...(body.name !== undefined ? { name: body.name.trim() } : {}),
+  ...(body.category !== undefined ? { category: body.category } : {}),
+  ...(body.isActive !== undefined ? { isActive: body.isActive } : {}),
+  ...(body.route !== undefined ? { route: body.route === '' ? null : body.route } : {}),
+  titleTemplate,
+  bodyTemplate,
+  variables: mergedVariables(titleTemplate, bodyTemplate),
+});
+
+const mergedVariables = (titleTemplate: string, bodyTemplate: string): string[] => {
   const names = extractVariables(titleTemplate);
   for (const name of extractVariables(bodyTemplate)) {
     if (!names.includes(name)) names.push(name);

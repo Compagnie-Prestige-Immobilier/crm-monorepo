@@ -11,7 +11,9 @@ import 'package:dio/dio.dart';
 
 import 'package:crm_api_client/src/model/api_error_dto.dart';
 import 'package:crm_api_client/src/model/projet.dart';
+import 'package:crm_api_client/src/model/stock_representants_dto.dart';
 import 'package:crm_api_client/src/model/supervision_activity_dto.dart';
+import 'package:crm_api_client/src/model/supervision_campagnes_dto.dart';
 import 'package:crm_api_client/src/model/supervision_granularity.dart';
 import 'package:crm_api_client/src/model/update_work_shifts_dto.dart';
 import 'package:crm_api_client/src/model/work_shifts_dto.dart';
@@ -121,6 +123,106 @@ class SupervisionApi {
     );
   }
 
+  /// Taux de contact et d’exploitation des campagnes de la fenêtre.
+  /// Une campagne entre dans la fenêtre par ses jours de programme. &#x60;granularity&#x60;, &#x60;timeFrom&#x60; et &#x60;timeTo&#x60; sont ignorés.
+  ///
+  /// Parameters:
+  /// * [actFrom] - Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.
+  /// * [actTo] - Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.
+  /// * [granularity]
+  /// * [projet] - Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.
+  /// * [commercialId] - Un seul téléconseiller : borne les lignes, la liste et les histogrammes.
+  /// * [timeFrom] - Heure de début quotidienne, Dakar.
+  /// * [timeTo] - Heure de fin quotidienne, exclue.
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [SupervisionCampagnesDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<SupervisionCampagnesDto>> getSupervisionCampagnes({
+    DateTime? actFrom,
+    DateTime? actTo,
+    SupervisionGranularity? granularity,
+    Projet? projet,
+    String? commercialId,
+    String? timeFrom,
+    String? timeTo,
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/supervision/campagnes';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _queryParameters = <String, dynamic>{
+      if (actFrom != null) r'actFrom': actFrom,
+      if (actTo != null) r'actTo': actTo,
+      if (granularity != null) r'granularity': granularity,
+      if (projet != null) r'projet': projet,
+      if (commercialId != null) r'commercialId': commercialId,
+      if (timeFrom != null) r'timeFrom': timeFrom,
+      if (timeTo != null) r'timeTo': timeTo,
+    };
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      queryParameters: _queryParameters,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    SupervisionCampagnesDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<SupervisionCampagnesDto, SupervisionCampagnesDto>(
+              rawData,
+              'SupervisionCampagnesDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<SupervisionCampagnesDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
   /// Créneaux de travail suivis.
   ///
   ///
@@ -185,6 +287,81 @@ class SupervisionApi {
     }
 
     return Response<WorkShiftsDto>(
+      data: _responseData,
+      headers: _response.headers,
+      isRedirect: _response.isRedirect,
+      requestOptions: _response.requestOptions,
+      redirects: _response.redirects,
+      statusCode: _response.statusCode,
+      statusMessage: _response.statusMessage,
+      extra: _response.extra,
+    );
+  }
+
+  /// Le stock des représentants : total, par département, par IEF, jamais appelés, injoignables.
+  ///
+  ///
+  /// Parameters:
+  /// * [cancelToken] - A [CancelToken] that can be used to cancel the operation
+  /// * [headers] - Can be used to add additional headers to the request
+  /// * [extras] - Can be used to add flags to the request
+  /// * [validateStatus] - A [ValidateStatus] callback that can be used to determine request success based on the HTTP status of the response
+  /// * [onSendProgress] - A [ProgressCallback] that can be used to get the send progress
+  /// * [onReceiveProgress] - A [ProgressCallback] that can be used to get the receive progress
+  ///
+  /// Returns a [Future] containing a [Response] with a [StockRepresentantsDto] as data
+  /// Throws [DioException] if API call or serialization fails
+  Future<Response<StockRepresentantsDto>> getSupervisionRepresentants({
+    CancelToken? cancelToken,
+    Map<String, dynamic>? headers,
+    Map<String, dynamic>? extra,
+    ValidateStatus? validateStatus,
+    ProgressCallback? onSendProgress,
+    ProgressCallback? onReceiveProgress,
+  }) async {
+    final _path = r'/api/v1/supervision/representants';
+    final _options = Options(
+      method: r'GET',
+      headers: <String, dynamic>{...?headers},
+      extra: <String, dynamic>{
+        'secure': <Map<String, String>>[
+          {'type': 'http', 'scheme': 'bearer', 'name': 'bearer'},
+        ],
+        ...?extra,
+      },
+      validateStatus: validateStatus,
+    );
+
+    final _response = await _dio.request<Object>(
+      _path,
+      options: _options,
+      cancelToken: cancelToken,
+      onSendProgress: onSendProgress,
+      onReceiveProgress: onReceiveProgress,
+    );
+
+    StockRepresentantsDto? _responseData;
+
+    try {
+      final rawData = _response.data;
+      _responseData = rawData == null
+          ? null
+          : deserialize<StockRepresentantsDto, StockRepresentantsDto>(
+              rawData,
+              'StockRepresentantsDto',
+              growable: true,
+            );
+    } catch (error, stackTrace) {
+      throw DioException(
+        requestOptions: _response.requestOptions,
+        response: _response,
+        type: DioExceptionType.unknown,
+        error: error,
+        stackTrace: stackTrace,
+      );
+    }
+
+    return Response<StockRepresentantsDto>(
       data: _responseData,
       headers: _response.headers,
       isRedirect: _response.isRedirect,

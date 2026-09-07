@@ -3,12 +3,12 @@ import { open } from 'node:fs/promises';
 
 import { UnprocessableEntityException } from '@nestjs/common';
 
-export const ApkSignerError = {
+const ApkSignerError = {
   UNSIGNED: 'APK_UNSIGNED',
   MISMATCH: 'APK_SIGNER_MISMATCH',
 } as const;
 
-export const apkUnsigned = (detail: string): UnprocessableEntityException =>
+const apkUnsigned = (detail: string): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkSignerError.UNSIGNED,
     message:
@@ -16,7 +16,7 @@ export const apkUnsigned = (detail: string): UnprocessableEntityException =>
       `refuserait de l’installer, et la publication est annulée. Détail technique : ${detail}`,
   });
 
-export const apkSignerMismatch = (found: string, expected: string): UnprocessableEntityException =>
+const apkSignerMismatch = (found: string, expected: string): UnprocessableEntityException =>
   new UnprocessableEntityException({
     code: ApkSignerError.MISMATCH,
     message:
@@ -107,6 +107,31 @@ async function readSigningBlock(path: string): Promise<Buffer> {
   }
 }
 
+function parseLengthPrefixedValues(pairs: Buffer): Map<number, Buffer> {
+  const values = new Map<number, Buffer>();
+  let offset = 0;
+  while (offset + 12 <= pairs.length) {
+    const length = Number(pairs.readBigUInt64LE(offset));
+    if (length < 4 || offset + 8 + length > pairs.length) break;
+    values.set(pairs.readUInt32LE(offset + 8), pairs.subarray(offset + 12, offset + 8 + length));
+    offset += 8 + length;
+  }
+  return values;
+}
+
+function fingerprintFromValues(values: Map<number, Buffer>): string {
+  for (const id of [V2_BLOCK_ID, V3_BLOCK_ID]) {
+    const signers = values.get(id);
+    if (signers === undefined) continue;
+    try {
+      return fingerprintOf(firstCertificate(signers));
+    } catch (error) {
+      throw apkUnsigned(error instanceof Error ? error.message : String(error));
+    }
+  }
+  throw apkUnsigned('le bloc de signature ne contient ni schéma v2 ni schéma v3');
+}
+
 /**
  * Lit l'empreinte du certificat DÉCLARÉ par l'APK : ce n'est pas une
  * vérification cryptographique, la signature elle-même n'est pas contrôlée.
@@ -120,26 +145,7 @@ export async function readApkSignerSha256(path: string): Promise<string> {
     throw apkUnsigned(error instanceof Error ? error.message : String(error));
   }
 
-  const values = new Map<number, Buffer>();
-  let offset = 0;
-  while (offset + 12 <= pairs.length) {
-    const length = Number(pairs.readBigUInt64LE(offset));
-    if (length < 4 || offset + 8 + length > pairs.length) break;
-    values.set(pairs.readUInt32LE(offset + 8), pairs.subarray(offset + 12, offset + 8 + length));
-    offset += 8 + length;
-  }
-
-  for (const id of [V2_BLOCK_ID, V3_BLOCK_ID]) {
-    const signers = values.get(id);
-    if (signers === undefined) continue;
-    try {
-      return fingerprintOf(firstCertificate(signers));
-    } catch (error) {
-      throw apkUnsigned(error instanceof Error ? error.message : String(error));
-    }
-  }
-
-  throw apkUnsigned('le bloc de signature ne contient ni schéma v2 ni schéma v3');
+  return fingerprintFromValues(parseLengthPrefixedValues(pairs));
 }
 
 export function assertExpectedSigner(found: string, expected: string): void {

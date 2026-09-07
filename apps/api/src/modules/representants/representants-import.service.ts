@@ -9,8 +9,10 @@ import { v7 as uuidv7 } from 'uuid';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { tryNormalizePhone } from '../../common/phone.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { FICHE_SELECT, ficheSnapshot, recordFicheChange } from './fiche-change.js';
 import { IMPORT_COLUMNS } from './import-template.js';
 import { normalizeKey, parseComplements } from './import-fields.js';
+import type { Complements } from './import-fields.js';
 import type {
   ImportQueryDto,
   ImportReportDto,
@@ -23,10 +25,10 @@ export { normalizeKey };
 /** Import Excel avec simulation préalable et dédoublonnage du téléphone normalisé. */
 
 /** Au-delà, utiliser un outil de reprise plutôt qu'un import. */
-export const IMPORT_MAX_ROWS = 5_000;
+const IMPORT_MAX_ROWS = 5_000;
 
 /** Refuse les classeurs trop volumineux avant leur lecture. */
-export const IMPORT_MAX_BYTES = 10 * 1_024 * 1_024;
+const IMPORT_MAX_BYTES = 10 * 1_024 * 1_024;
 
 /** Bornes de la transaction d'écriture massive. */
 const IMPORT_TRANSACTION_TIMEOUT_MS = 60_000;
@@ -55,7 +57,7 @@ const MAX_PREVIEW_ROWS = 50;
  * et l'onglet Instructions dit désormais la même chose. Le test
  * `l'exemple du modèle n'est jamais importé` tient les trois ensemble.
  */
-export const FIRST_DATA_ROW = 3;
+const FIRST_DATA_ROW = 3;
 
 interface ParsedRow {
   readonly line: number;
@@ -79,6 +81,45 @@ interface ParsedRow {
   } | null;
 }
 
+function classifyKnownRows(
+  parsed: readonly ParsedRow[],
+  known: ReadonlyMap<string, FicheExistante>,
+  enrichir: boolean,
+  defaultOwnerId: string,
+): { retained: ParsedRow[]; aEnrichir: Enrichissement[]; extraErrors: ImportRowErrorDto[] } {
+  const retained: ParsedRow[] = [];
+  const aEnrichir: Enrichissement[] = [];
+  const extraErrors: ImportRowErrorDto[] = [];
+
+  for (const row of parsed) {
+    const existante = known.get(row.phoneE164);
+    if (!existante) {
+      retained.push(row);
+      continue;
+    }
+    const patch = enrichir ? enrichissementDe(row, existante, defaultOwnerId) : null;
+    if (patch) aEnrichir.push(patch);
+    else extraErrors.push(refusDoublon(row, enrichir));
+  }
+
+  return { retained, aEnrichir, extraErrors };
+}
+
+function toPreviewRow(row: ParsedRow): ImportRowPreviewDto {
+  return {
+    line: row.line,
+    fullName: row.fullName,
+    phoneE164: row.phoneE164,
+    departementName: row.departementName,
+    iefName: row.iefName,
+    notes: row.notes,
+    etablissement: row.etablissement,
+    relationStatus: row.relationStatus,
+    whatsappStatus: row.whatsappStatus,
+    calledAt: row.appel?.date.toISOString() ?? null,
+  };
+}
+
 @Injectable()
 export class RepresentantsImportService {
   private readonly logger = new Logger(RepresentantsImportService.name);
@@ -100,30 +141,23 @@ export class RepresentantsImportService {
 
     const referentiels = await this.loadReferentiels();
     const { parsed, errors, duplicatesInFile } = analyser(rows, referentiels);
-    let duplicates = duplicatesInFile;
 
     // Le contrôle contre la base se fait en UNE requête, pas une par ligne : sur
     // 5 000 lignes, une lecture par ligne rendrait l'import inutilisable et
     // saturerait le pool de connexions.
     const known = await this.existingByPhone(parsed.map((row) => row.phoneE164));
-    const retained: ParsedRow[] = [];
-    const aEnrichir: Enrichissement[] = [];
-    for (const row of parsed) {
-      const existante = known.get(row.phoneE164);
-      if (!existante) {
-        retained.push(row);
-        continue;
-      }
-
-      duplicates += 1;
-      const patch = enrichir ? enrichissementDe(row, existante, user.id) : null;
-      if (patch) aEnrichir.push(patch);
-      else errors.push(refusDoublon(row, enrichir));
-    }
+    const { retained, aEnrichir, extraErrors } = classifyKnownRows(
+      parsed,
+      known,
+      enrichir,
+      user.id,
+    );
+    errors.push(...extraErrors);
+    const duplicates = duplicatesInFile + (parsed.length - retained.length);
 
     let enriched = 0;
     if (!dryRun && aEnrichir.length > 0) {
-      enriched = await this.applyEnrichissement(aEnrichir);
+      enriched = await this.applyEnrichissement(user, aEnrichir);
       this.logger.log(
         `Enrichissement représentants par ${user.username} : ${String(enriched)} fiches complétées.`,
       );
@@ -172,18 +206,7 @@ export class RepresentantsImportService {
       enrichable: aEnrichir.length,
       enriched,
       errors: errors.slice(0, MAX_REPORTED_ERRORS),
-      preview: retained.slice(0, MAX_PREVIEW_ROWS).map((row): ImportRowPreviewDto => ({
-        line: row.line,
-        fullName: row.fullName,
-        phoneE164: row.phoneE164,
-        departementName: row.departementName,
-        iefName: row.iefName,
-        notes: row.notes,
-        etablissement: row.etablissement,
-        relationStatus: row.relationStatus,
-        whatsappStatus: row.whatsappStatus,
-        calledAt: row.appel?.date.toISOString() ?? null,
-      })),
+      preview: retained.slice(0, MAX_PREVIEW_ROWS).map(toPreviewRow),
     };
   }
 
@@ -316,7 +339,10 @@ export class RepresentantsImportService {
    * transaction unique de trois mille mises à jour tiendrait un verrou pendant
    * des minutes pour perdre le tout sur la dernière ligne.
    */
-  private async applyEnrichissement(rows: readonly Enrichissement[]): Promise<number> {
+  private async applyEnrichissement(
+    user: AuthenticatedUser,
+    rows: readonly Enrichissement[],
+  ): Promise<number> {
     const CHUNK = 500;
     let total = 0;
 
@@ -325,8 +351,19 @@ export class RepresentantsImportService {
       await this.prisma.$transaction(
         async (tx) => {
           for (const { id, champs } of slice) {
-            if (Object.keys(champs).length > 0)
-              await tx.representant.update({ where: { id }, data: champs });
+            if (Object.keys(champs).length === 0) continue;
+            const avant = await tx.representant.findUniqueOrThrow({
+              where: { id },
+              select: FICHE_SELECT,
+            });
+            const apres = await tx.representant.update({ where: { id }, data: champs });
+            await recordFicheChange(tx, {
+              representantId: id,
+              userId: user.id,
+              source: 'IMPORT',
+              before: ficheSnapshot(avant),
+              after: ficheSnapshot(apres),
+            });
           }
           const appels = slice.flatMap(({ id, appel }) => (appel ? [{ id, appel }] : []));
           if (appels.length > 0) {
@@ -617,32 +654,39 @@ const refusDoublon = (row: ParsedRow, enrichir: boolean): ImportRowErrorDto => (
   value: row.phoneE164,
 });
 
+function enrichissementChamps(row: ParsedRow, fiche: FicheExistante): Enrichissement['champs'] {
+  return {
+    ...(row.etablissement !== null && !fiche.etablissement
+      ? { etablissement: row.etablissement }
+      : {}),
+    ...(row.notes !== null && !fiche.notes ? { notes: row.notes } : {}),
+    ...(row.relationStatus !== RepresentantRelation.INCONNU &&
+    fiche.relationStatus === RepresentantRelation.INCONNU
+      ? { relationStatus: row.relationStatus }
+      : {}),
+    ...(row.whatsappStatus !== WhatsappStatus.NON_DEMANDE &&
+    fiche.whatsappStatus === WhatsappStatus.NON_DEMANDE
+      ? { whatsappStatus: row.whatsappStatus }
+      : {}),
+  };
+}
+
+function enrichissementAppel(
+  row: ParsedRow,
+  fiche: FicheExistante,
+  appelantParDefautId: string,
+): Enrichissement['appel'] {
+  if (row.appel === null || fiche._count.repCallAttempts > 0) return null;
+  return { ...row.appel, performedById: row.ownerId ?? appelantParDefautId };
+}
+
 function enrichissementDe(
   row: ParsedRow,
   fiche: FicheExistante,
   appelantParDefautId: string,
 ): Enrichissement | null {
-  const champs: Enrichissement['champs'] = {};
-  if (row.etablissement !== null && !fiche.etablissement) champs.etablissement = row.etablissement;
-  if (row.notes !== null && !fiche.notes) champs.notes = row.notes;
-  if (
-    row.relationStatus !== RepresentantRelation.INCONNU &&
-    fiche.relationStatus === RepresentantRelation.INCONNU
-  ) {
-    champs.relationStatus = row.relationStatus;
-  }
-  if (
-    row.whatsappStatus !== WhatsappStatus.NON_DEMANDE &&
-    fiche.whatsappStatus === WhatsappStatus.NON_DEMANDE
-  ) {
-    champs.whatsappStatus = row.whatsappStatus;
-  }
-
-  const appel =
-    row.appel !== null && fiche._count.repCallAttempts === 0
-      ? { ...row.appel, performedById: row.ownerId ?? appelantParDefautId }
-      : null;
-
+  const champs = enrichissementChamps(row, fiche);
+  const appel = enrichissementAppel(row, fiche, appelantParDefautId);
   if (Object.keys(champs).length === 0 && appel === null) return null;
   return { id: fiche.id, champs, appel };
 }
@@ -662,106 +706,106 @@ interface Referentiels {
   readonly users: ReadonlyMap<string, { readonly id: string }>;
 }
 
+function cellObjectText(value: Extract<ExcelJS.CellValue, object>): string {
+  if ('text' in value && typeof value.text === 'string') return value.text.trim();
+  if ('result' in value) return cellText(value.result);
+  if ('richText' in value && Array.isArray(value.richText)) {
+    return value.richText
+      .map((part) => part.text)
+      .join('')
+      .trim();
+  }
+  return '';
+}
+
 /** Texte d'une cellule, quel que soit son type. Une formule rend son résultat. */
 function cellText(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return '';
   if (typeof value === 'string') return value.trim();
   if (typeof value === 'number' || typeof value === 'boolean') return String(value);
   if (value instanceof Date) return value.toISOString();
-  if (typeof value === 'object') {
-    if ('text' in value && typeof value.text === 'string') return value.text.trim();
-    if ('result' in value) return cellText(value.result);
-    if ('richText' in value && Array.isArray(value.richText)) {
-      return value.richText
-        .map((part) => part.text)
-        .join('')
-        .trim();
-    }
-  }
+  if (typeof value === 'object') return cellObjectText(value);
   return '';
 }
 
-/** Analyse une ligne. Rend soit la ligne prête à écrire, soit son motif de refus. */
-function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRowErrorDto {
-  // Par RANG dans le modèle, jamais par l'intitulé du fichier : un utilisateur
-  // renomme une colonne bien plus souvent qu'il n'en déplace une. Une colonne
-  // absente en fin de ligne se lit vide, et une cellule vide est simplement une
-  // information qu'on n'a pas.
-  const cellule = (rang: number): string => raw.cells[rang] ?? '';
-  const fullName = cellule(0);
-  const phone = cellule(1);
-  const departement = cellule(2);
-  const ief = cellule(3);
-  const notes = cellule(4);
-  const etablissement = cellule(5);
-  const relation = cellule(6);
-  const whatsapp = cellule(7);
-  const charge = cellule(8);
-  const dateAppel = cellule(9);
-  const issue = cellule(10);
+function validateFullName(raw: RawRow, fullName: string): string | ImportRowErrorDto {
+  if (fullName.length >= 2) return fullName;
+  return {
+    line: raw.line,
+    code: 'NAME_INVALID',
+    message: 'Le nom complet est obligatoire (2 caractères au minimum).',
+    value: fullName || null,
+  };
+}
 
-  if (fullName.length < 2) {
-    return {
-      line: raw.line,
-      code: 'NAME_INVALID',
-      message: 'Le nom complet est obligatoire (2 caractères au minimum).',
-      value: fullName || null,
-    };
-  }
-
+function validatePhone(raw: RawRow, phone: string): string | ImportRowErrorDto {
   const phoneE164 = tryNormalizePhone(phone);
-  if (!phoneE164) {
-    return {
-      line: raw.line,
-      code: 'PHONE_INVALID',
-      message: 'Numéro de téléphone inexploitable.',
-      value: phone || null,
-    };
-  }
+  if (phoneE164) return phoneE164;
+  return {
+    line: raw.line,
+    code: 'PHONE_INVALID',
+    message: 'Numéro de téléphone inexploitable.',
+    value: phone || null,
+  };
+}
 
+function validateDepartement(
+  raw: RawRow,
+  departement: string,
+  referentiels: Referentiels,
+): ReferentielRow | ImportRowErrorDto {
   const departementRow = referentiels.departements.get(normalizeKey(departement));
-  if (!departementRow) {
+  if (departementRow) return departementRow;
+  return {
+    line: raw.line,
+    code: 'DEPARTEMENT_UNKNOWN',
+    message: 'Département inconnu. Reprenez exactement un libellé de la liste déroulante.',
+    value: departement || null,
+  };
+}
+
+/**
+ * Le département se DÉDUIT de l'IEF, jamais l'inverse. Une incohérence entre
+ * les deux colonnes est une faute de saisie qu'il vaut mieux signaler que
+ * trancher en silence : le rattachement décide du reporting terrain.
+ */
+function validateIef(
+  raw: RawRow,
+  ief: string,
+  referentiels: Referentiels,
+  departementRow: ReferentielRow,
+): IefRow | null | ImportRowErrorDto {
+  if (!ief) return null;
+  const iefRow = referentiels.iefs.get(normalizeKey(ief)) ?? null;
+  if (!iefRow) {
     return {
       line: raw.line,
-      code: 'DEPARTEMENT_UNKNOWN',
-      message: 'Département inconnu. Reprenez exactement un libellé de la liste déroulante.',
-      value: departement || null,
+      code: 'IEF_UNKNOWN',
+      message: 'IEF inconnue. Laissez la cellule vide si elle n’est pas connue.',
+      value: ief,
     };
   }
-
-  let iefRow: IefRow | null = null;
-  if (ief) {
-    iefRow = referentiels.iefs.get(normalizeKey(ief)) ?? null;
-    if (!iefRow) {
-      return {
-        line: raw.line,
-        code: 'IEF_UNKNOWN',
-        message: 'IEF inconnue. Laissez la cellule vide si elle n’est pas connue.',
-        value: ief,
-      };
-    }
-    // Le département se DÉDUIT de l'IEF, jamais l'inverse. Une incohérence
-    // entre les deux colonnes est une faute de saisie qu'il vaut mieux signaler
-    // que trancher en silence : le rattachement décide du reporting terrain.
-    if (iefRow.departementId !== departementRow.id) {
-      return {
-        line: raw.line,
-        code: 'IEF_DEPARTEMENT_MISMATCH',
-        message: `L’IEF « ${iefRow.name} » n’appartient pas au département « ${departementRow.name} ».`,
-        value: ief,
-      };
-    }
+  if (iefRow.departementId !== departementRow.id) {
+    return {
+      line: raw.line,
+      code: 'IEF_DEPARTEMENT_MISMATCH',
+      message: `L’IEF « ${iefRow.name} » n’appartient pas au département « ${departementRow.name} ».`,
+      value: ief,
+    };
   }
+  return iefRow;
+}
 
-  const complements = parseComplements(
-    { notes, relation, whatsapp, charge, dateAppel, issue },
-    referentiels.users,
-  );
-  if ('code' in complements) {
-    const { code, message, value } = complements;
-    return { line: raw.line, code, message, value: value || null };
-  }
-
+function buildParsedRow(
+  raw: RawRow,
+  fullName: string,
+  phoneE164: string,
+  departementRow: ReferentielRow,
+  iefRow: IefRow | null,
+  notes: string,
+  etablissement: string,
+  complements: Complements,
+): ParsedRow {
   return {
     line: raw.line,
     fullName: fullName.slice(0, 160),
@@ -774,4 +818,52 @@ function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRo
     etablissement: etablissement ? etablissement.slice(0, 200) : null,
     ...complements,
   };
+}
+
+/** Analyse une ligne. Rend soit la ligne prête à écrire, soit son motif de refus. */
+function parseRow(raw: RawRow, referentiels: Referentiels): ParsedRow | ImportRowErrorDto {
+  // Par RANG dans le modèle, jamais par l'intitulé du fichier : un utilisateur
+  // renomme une colonne bien plus souvent qu'il n'en déplace une. Une colonne
+  // absente en fin de ligne se lit vide, et une cellule vide est simplement une
+  // information qu'on n'a pas.
+  const cellule = (rang: number): string => raw.cells[rang] ?? '';
+  const notes = cellule(4);
+  const etablissement = cellule(5);
+  const relation = cellule(6);
+  const whatsapp = cellule(7);
+  const charge = cellule(8);
+  const dateAppel = cellule(9);
+  const issue = cellule(10);
+
+  const fullName = validateFullName(raw, cellule(0));
+  if (typeof fullName !== 'string') return fullName;
+
+  const phoneE164 = validatePhone(raw, cellule(1));
+  if (typeof phoneE164 !== 'string') return phoneE164;
+
+  const departementRow = validateDepartement(raw, cellule(2), referentiels);
+  if ('code' in departementRow) return departementRow;
+
+  const iefRow = validateIef(raw, cellule(3), referentiels, departementRow);
+  if (iefRow !== null && 'code' in iefRow) return iefRow;
+
+  const complements = parseComplements(
+    { notes, relation, whatsapp, charge, dateAppel, issue },
+    referentiels.users,
+  );
+  if ('code' in complements) {
+    const { code, message, value } = complements;
+    return { line: raw.line, code, message, value: value || null };
+  }
+
+  return buildParsedRow(
+    raw,
+    fullName,
+    phoneE164,
+    departementRow,
+    iefRow,
+    notes,
+    etablissement,
+    complements,
+  );
 }

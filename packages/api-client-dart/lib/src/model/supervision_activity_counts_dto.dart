@@ -43,6 +43,12 @@ class SupervisionActivityCountsDto {
 
     required this.reachRate,
 
+    required this.fiches,
+
+    required this.fichesJointes,
+
+    required this.ficheReachRate,
+
     required this.prospectsCreated,
 
     required this.representantsContacted,
@@ -76,6 +82,26 @@ class SupervisionActivityCountsDto {
     required this.repQualified,
 
     required this.repQualificationRate,
+
+    required this.repFiches,
+
+    required this.repFichesJointes,
+
+    required this.repFichesNonJointes,
+
+    required this.repFichesAcceptees,
+
+    required this.repFichesRefusees,
+
+    required this.repFichesARappeler,
+
+    required this.repFichesEligibles,
+
+    required this.repReachabilityRate,
+
+    required this.repAcceptanceRate,
+
+    required this.repCallbackFicheRate,
 
     required this.inboundCalls,
 
@@ -141,6 +167,18 @@ class SupervisionActivityCountsDto {
   /// Part des appels joints, en pourcentage. Seule l’issue UNREACHABLE en est exclue : un faux numéro est une fiche traitée. `null` sans aucun appel : « personne appelé » n’est pas « personne joint ».
   @JsonKey(name: r'reachRate', required: true, includeIfNull: true)
   final num? reachRate;
+
+  /// Prospects DISTINCTS appelés, attribués à qui a passé le dernier appel de la fenêtre. Une fiche par fenêtre : sommable entre lignes de la même fenêtre.
+  @JsonKey(name: r'fiches', required: true, includeIfNull: false)
+  final num fiches;
+
+  /// Parmi `fiches`, celles dont le dernier appel a joint.
+  @JsonKey(name: r'fichesJointes', required: true, includeIfNull: false)
+  final num fichesJointes;
+
+  /// Taux de joignabilité PAR FICHE : `fichesJointes` / `fiches`. `null` sans fiche.
+  @JsonKey(name: r'ficheReachRate', required: true, includeIfNull: true)
+  final num? ficheReachRate;
 
   /// Fiches prospect saisies sur la période.
   @JsonKey(name: r'prospectsCreated', required: true, includeIfNull: false)
@@ -214,6 +252,46 @@ class SupervisionActivityCountsDto {
   @JsonKey(name: r'repQualificationRate', required: true, includeIfNull: true)
   final num? repQualificationRate;
 
+  /// Représentants DISTINCTS appelés, lus sur le DERNIER statut de la fenêtre et attribués à qui l’a posé. Une fiche par fenêtre : sommable entre lignes de la même fenêtre, pas entre fenêtres.
+  @JsonKey(name: r'repFiches', required: true, includeIfNull: false)
+  final num repFiches;
+
+  /// Parmi `repFiches`, dernier statut de la famille jointe.
+  @JsonKey(name: r'repFichesJointes', required: true, includeIfNull: false)
+  final num repFichesJointes;
+
+  /// Parmi `repFiches`, dernier statut non joint.
+  @JsonKey(name: r'repFichesNonJointes', required: true, includeIfNull: false)
+  final num repFichesNonJointes;
+
+  /// Parmi `repFiches`, dernier statut Accepté.
+  @JsonKey(name: r'repFichesAcceptees', required: true, includeIfNull: false)
+  final num repFichesAcceptees;
+
+  /// Parmi `repFiches`, dernier statut Refusé.
+  @JsonKey(name: r'repFichesRefusees', required: true, includeIfNull: false)
+  final num repFichesRefusees;
+
+  /// Parmi `repFiches`, dernier statut À rappeler.
+  @JsonKey(name: r'repFichesARappeler', required: true, includeIfNull: false)
+  final num repFichesARappeler;
+
+  /// Dénominateur du taux d’acceptation : fiches jointes hors faux numéro, décédé, retraité, hors cible et affecté ailleurs.
+  @JsonKey(name: r'repFichesEligibles', required: true, includeIfNull: false)
+  final num repFichesEligibles;
+
+  /// Taux de joignabilité PAR FICHE : `repFichesJointes` / `repFiches`. `null` sans fiche.
+  @JsonKey(name: r'repReachabilityRate', required: true, includeIfNull: true)
+  final num? repReachabilityRate;
+
+  /// Taux d’acceptation : `repFichesAcceptees` / `repFichesEligibles`. `null` sans fiche éligible.
+  @JsonKey(name: r'repAcceptanceRate', required: true, includeIfNull: true)
+  final num? repAcceptanceRate;
+
+  /// Taux de rappel PAR FICHE : `repFichesARappeler` / `repFiches`. `null` sans fiche.
+  @JsonKey(name: r'repCallbackFicheRate', required: true, includeIfNull: true)
+  final num? repCallbackFicheRate;
+
   /// Appels entrants relevés au journal du téléphone, les deux familles confondues. Une détection déjà consignée n’est comptée qu’une fois, par sa tentative.
   @JsonKey(name: r'inboundCalls', required: true, includeIfNull: false)
   final num inboundCalls;
@@ -264,6 +342,9 @@ class SupervisionActivityCountsDto {
                 methodObtained,
                 callback,
                 reachRate,
+                fiches,
+                fichesJointes,
+                ficheReachRate,
                 prospectsCreated,
                 representantsContacted,
                 repCalls,
@@ -281,6 +362,16 @@ class SupervisionActivityCountsDto {
                 repQuestioned,
                 repQualified,
                 repQualificationRate,
+                repFiches,
+                repFichesJointes,
+                repFichesNonJointes,
+                repFichesAcceptees,
+                repFichesRefusees,
+                repFichesARappeler,
+                repFichesEligibles,
+                repReachabilityRate,
+                repAcceptanceRate,
+                repCallbackFicheRate,
                 inboundCalls,
                 missedCalls,
                 callbacksHonored,
@@ -303,6 +394,9 @@ class SupervisionActivityCountsDto {
                 other.methodObtained,
                 other.callback,
                 other.reachRate,
+                other.fiches,
+                other.fichesJointes,
+                other.ficheReachRate,
                 other.prospectsCreated,
                 other.representantsContacted,
                 other.repCalls,
@@ -320,6 +414,16 @@ class SupervisionActivityCountsDto {
                 other.repQuestioned,
                 other.repQualified,
                 other.repQualificationRate,
+                other.repFiches,
+                other.repFichesJointes,
+                other.repFichesNonJointes,
+                other.repFichesAcceptees,
+                other.repFichesRefusees,
+                other.repFichesARappeler,
+                other.repFichesEligibles,
+                other.repReachabilityRate,
+                other.repAcceptanceRate,
+                other.repCallbackFicheRate,
                 other.inboundCalls,
                 other.missedCalls,
                 other.callbacksHonored,
@@ -348,6 +452,9 @@ class SupervisionActivityCountsDto {
         methodObtained,
         callback,
         reachRate,
+        fiches,
+        fichesJointes,
+        ficheReachRate,
         prospectsCreated,
         representantsContacted,
         repCalls,
@@ -365,6 +472,16 @@ class SupervisionActivityCountsDto {
         repQuestioned,
         repQualified,
         repQualificationRate,
+        repFiches,
+        repFichesJointes,
+        repFichesNonJointes,
+        repFichesAcceptees,
+        repFichesRefusees,
+        repFichesARappeler,
+        repFichesEligibles,
+        repReachabilityRate,
+        repAcceptanceRate,
+        repCallbackFicheRate,
         inboundCalls,
         missedCalls,
         callbacksHonored,

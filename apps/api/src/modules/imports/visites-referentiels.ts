@@ -45,6 +45,20 @@ export interface VisiteReferentiels {
   readonly owners: ReadonlyMap<string, string>;
 }
 
+function indexRow(
+  map: Map<string, Entry>,
+  owners: Map<string, string>,
+  owner: string,
+  row: { id: string; code: string; label: string },
+): void {
+  const entry = { id: row.id, label: row.label };
+  for (const key of [normalizeKey(row.label), normalizeKey(row.code)]) {
+    if (key === '') continue;
+    map.set(key, entry);
+    if (!owners.has(key)) owners.set(key, owner);
+  }
+}
+
 export async function loadVisiteReferentiels(
   tx: PrismaTransactionClient,
 ): Promise<VisiteReferentiels> {
@@ -64,14 +78,7 @@ export async function loadVisiteReferentiels(
     owner: string,
   ): ReadonlyMap<string, Entry> => {
     const map = new Map<string, Entry>();
-    for (const row of rows) {
-      const entry = { id: row.id, label: row.label };
-      for (const key of [normalizeKey(row.label), normalizeKey(row.code)]) {
-        if (key === '') continue;
-        map.set(key, entry);
-        if (!owners.has(key)) owners.set(key, owner);
-      }
-    }
+    for (const row of rows) indexRow(map, owners, owner, row);
     return map;
   };
 
@@ -84,6 +91,17 @@ export async function loadVisiteReferentiels(
   };
 }
 
+function resolveAlias(
+  index: ReadonlyMap<string, Entry>,
+  aliases: ReadonlyMap<string, string> | undefined,
+  key: string,
+): Entry | null {
+  if (aliases === undefined) return null;
+  const code = aliases.get(key);
+  if (code === undefined) return null;
+  return index.get(normalizeKey(code)) ?? null;
+}
+
 export function resolveReferentiel(
   index: ReadonlyMap<string, Entry>,
   raw: string | undefined,
@@ -91,13 +109,7 @@ export function resolveReferentiel(
 ): Entry | null {
   const key = normalizeKey((raw ?? '').trim());
   if (key === '') return null;
-
-  const direct = index.get(key);
-  if (direct !== undefined) return direct;
-  if (aliases === undefined) return null;
-
-  const code = aliases.get(key);
-  return code === undefined ? null : (index.get(normalizeKey(code)) ?? null);
+  return index.get(key) ?? resolveAlias(index, aliases, key);
 }
 
 export type VisiteReferentielKindAttendu = 'entreprise' | 'direction' | 'destinataire' | 'objet';
@@ -162,7 +174,7 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}/;
 const HOUR_MINUTE = /^(\d{1,2})\s*[h:]\s*(\d{2})\s*h?$/i;
 const HOUR_ALONE = /^(\d{1,2})\s*h?$/i;
 
-export const pad2 = (value: number): string => String(value).padStart(2, '0');
+const pad2 = (value: number): string => String(value).padStart(2, '0');
 
 /** Le classeur porte des dates numériques : styles ignorés, le flux rend le rang brut. */
 export function readSheetDate(raw: string): string | null {
@@ -175,20 +187,25 @@ export function readSheetDate(raw: string): string | null {
   return new Date(EXCEL_EPOCH_UTC + serial * 86_400_000).toISOString().slice(0, 10);
 }
 
+function fromHourMinute(raw: string): string | null {
+  const match = HOUR_MINUTE.exec(raw);
+  if (match === null) return null;
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour >= 24 || minute >= 60) return null;
+  return `${pad2(hour)}:${pad2(minute)}`;
+}
+
+function fromHourAlone(raw: string): string | null {
+  const match = HOUR_ALONE.exec(raw);
+  if (match === null) return null;
+  const hour = Number(match[1]);
+  return hour < 24 ? `${pad2(hour)}:00` : null;
+}
+
 /** `11H08`, `11h45`, `12H`, `15` et `14H15H` se lisent. `17H5` ne se devine pas. */
 export function readSheetTime(raw: string): string | null {
-  const both = HOUR_MINUTE.exec(raw);
-  if (both !== null) {
-    const hour = Number(both[1]);
-    const minute = Number(both[2]);
-    return hour < 24 && minute < 60 ? `${pad2(hour)}:${pad2(minute)}` : null;
-  }
-
-  const alone = HOUR_ALONE.exec(raw);
-  if (alone === null) return null;
-
-  const hour = Number(alone[1]);
-  return hour < 24 ? `${pad2(hour)}:00` : null;
+  return fromHourMinute(raw) ?? fromHourAlone(raw);
 }
 
 /**

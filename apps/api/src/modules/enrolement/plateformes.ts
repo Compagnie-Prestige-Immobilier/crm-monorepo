@@ -55,7 +55,7 @@ export class PlateformeNonConfiguree extends Error {
  */
 const SEUIL_SECONDES = 1e11;
 
-export function dateDeHorodatage(valeur: number | null | undefined): Date | null {
+function dateDeHorodatage(valeur: number | null | undefined): Date | null {
   if (valeur === null || valeur === undefined || valeur === 0) return null;
   const ms = valeur < SEUIL_SECONDES ? valeur * 1000 : valeur;
   const date = new Date(ms);
@@ -69,7 +69,7 @@ export function dateDeHorodatage(valeur: number | null | undefined): Date | null
  */
 const SANS_FUSEAU = /^\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}(\.\d+)?$/;
 
-export function dateDeTexte(valeur: string | null | undefined): Date | null {
+function dateDeTexte(valeur: string | null | undefined): Date | null {
   const propre = valeur?.trim() ?? '';
   if (propre === '') return null;
   const normalisee = SANS_FUSEAU.test(propre) ? `${propre.replace(' ', 'T')}Z` : propre;
@@ -87,7 +87,7 @@ const texte = (valeur: string | null | undefined): string | null => {
  * « Prénom Nom » : le premier mot est le prénom, le reste le nom. Le
  * rapprochement ne lit ni l'un ni l'autre, cette coupe ne sert qu'à afficher.
  */
-export function separerNom(complet: string | null): { nom: string; prenom: string } {
+function separerNom(complet: string | null): { nom: string; prenom: string } {
   const mots = (complet ?? '').trim().split(/\s+/).filter(Boolean);
   if (mots.length === 0) return { nom: '', prenom: '' };
   if (mots.length === 1) return { nom: mots[0] ?? '', prenom: '' };

@@ -7,6 +7,8 @@ import { performanceScore } from '../admin/performance-score.js';
 import {
   NOT_REACHED_OUTCOMES,
   REP_ARBITRAGE,
+  REP_FICHE_COLONNES,
+  REP_JOINT_EFFECTS,
   REP_JOINT_OUTCOMES,
   REP_LIVE_OUTCOMES,
   REP_STATUT_JOIN,
@@ -71,6 +73,18 @@ function creneauxEffectifs(shifts: readonly WorkShiftDto[], query: SupervisionQu
     .filter((creneau) => creneau.fin > creneau.debut);
 }
 
+/** Les créneaux hors filtre horaire retombent sur `FALSE` : aucune tranche ne matche un jeu vide. */
+function dansCreneauCondition(creneaux: readonly Creneau[]): Prisma.Sql {
+  if (!creneaux.length) return Prisma.sql`FALSE`;
+  return Prisma.join(
+    creneaux.map(
+      (creneau) =>
+        Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
+    ),
+    ' OR ',
+  );
+}
+
 /** Un jour passé compte ses créneaux entiers, le jour courant sa portion écoulée. */
 function secondesEcoulees(jour: string, creneaux: readonly Creneau[], now: Date): number {
   const aujourdhui = now.toISOString().slice(0, 10);
@@ -101,6 +115,8 @@ interface ActivityRow {
   joignables: number;
   prospects: number;
   representants: number;
+  fiches: number;
+  fichesJointes: number;
 }
 
 type TotalRow = Omit<ActivityRow, 'jour' | 'id' | 'nom'>;
@@ -117,6 +133,8 @@ const TOTAL_VIDE: TotalRow = {
   joignables: 0,
   prospects: 0,
   representants: 0,
+  fiches: 0,
+  fichesJointes: 0,
 };
 
 type RepTotalRow = Omit<RepRow, 'jour' | 'id'>;
@@ -133,6 +151,12 @@ interface RepRow {
   autres: number;
   interroges: number;
   qualifies: number;
+  fiches: number;
+  fichesJointes: number;
+  fichesAcceptees: number;
+  fichesRefusees: number;
+  fichesARappeler: number;
+  fichesEligibles: number;
 }
 
 const REP_VIDE: Omit<RepRow, 'jour' | 'id'> = {
@@ -145,6 +169,12 @@ const REP_VIDE: Omit<RepRow, 'jour' | 'id'> = {
   autres: 0,
   interroges: 0,
   qualifies: 0,
+  fiches: 0,
+  fichesJointes: 0,
+  fichesAcceptees: 0,
+  fichesRefusees: 0,
+  fichesARappeler: 0,
+  fichesEligibles: 0,
 };
 
 /**
@@ -222,6 +252,32 @@ interface JourVuRow {
   actifs: number;
 }
 
+function resolveGranularity(query: SupervisionQueryDto): {
+  granularity: SupervisionGranularity;
+  unit: Prisma.Sql;
+} {
+  const granularity = query.granularity ?? SupervisionGranularity.DAY;
+  // `date_trunc` exige un littéral, jamais un paramètre.
+  const unit = granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
+  return { granularity, unit };
+}
+
+function userScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
+}
+
+/** Un représentant est CHUES par construction : filtrer Grand Public le sort. */
+function repScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
+}
+
+function windowBounds(query: SupervisionQueryDto): { from: string | null; to: string | null } {
+  return {
+    from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
+    to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
+  };
+}
+
 @Injectable()
 export class SupervisionActivityService {
   private readonly logger = new Logger(SupervisionActivityService.name);
@@ -232,20 +288,15 @@ export class SupervisionActivityService {
   ) {}
 
   async activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
-    const granularity = query.granularity ?? SupervisionGranularity.DAY;
-    // `date_trunc` exige un littéral, jamais un paramètre.
-    const unit =
-      granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
+    const { granularity, unit } = resolveGranularity(query);
 
     const attemptScope = ALL_ROWS;
-    const userScope = query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
     const rolesDuPlateau = Prisma.join(
       TELECONSEIL_ROLES.map((role) => Prisma.sql`${role}::"Role"`),
     );
-    const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScope}`;
+    const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScopeCondition(query)}`;
 
-    // Un représentant est CHUES par construction : filtrer Grand Public le sort.
-    const repScope = query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
+    const repScope = repScopeCondition(query);
 
     const repWindow = withinWindow(Prisma.sql`rca."clientCreatedAt"`, query);
     const projetScope = (prospectId: Prisma.Sql): Prisma.Sql =>
@@ -423,6 +474,50 @@ export class SupervisionActivityService {
           ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
     `;
 
+    // EB-33 : les taux se lisent PAR FICHE, sur son dernier statut de la
+    // fenêtre. Une fiche rappelée cinq fois pèse une fois, chez qui l'a
+    // qualifiée en dernier.
+    const repFiches = Prisma.sql`
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById"                        AS "userId",
+            date_trunc(${unit}, rca."clientCreatedAt") AS bucket,
+            ${REP_FICHE_COLONNES}
+          FROM "rep_call_attempts" rca
+          ${REP_STATUT_JOIN}
+          WHERE rca."outcome" IN ${REP_LIVE_OUTCOMES} AND ${repScope} AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+    `;
+
+    const repFichesParLigne = Prisma.sql`
+          SELECT
+            "userId", bucket,
+            COUNT(*)::int        AS fiches,
+            SUM(joint)::int      AS "fichesJointes",
+            SUM(accepte)::int    AS "fichesAcceptees",
+            SUM(refuse)::int     AS "fichesRefusees",
+            SUM(rappel)::int     AS "fichesARappeler",
+            SUM(eligible)::int   AS "fichesEligibles"
+          FROM (${repFiches}) f
+          GROUP BY 1, 2
+    `;
+
+    const prospectFiches = Prisma.sql`
+          SELECT DISTINCT ON (ca."prospectId")
+            ca."performedById"                                 AS "userId",
+            date_trunc(${unit}, ca."clientCreatedAt")          AS bucket,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint
+          FROM "call_attempts" ca
+          WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+          ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC
+    `;
+
+    const prospectFichesParLigne = Prisma.sql`
+          SELECT "userId", bucket, COUNT(*)::int AS fiches, SUM(joint)::int AS "fichesJointes"
+          FROM (${prospectFiches}) f
+          GROUP BY 1, 2
+    `;
+
     // Les créneaux bornent le temps mort et le dénominateur de la note : lus
     // avant le reste, ils ne peuvent pas s'attendre dans le même `Promise.all`.
     const shifts = await this.workShifts
@@ -479,15 +574,7 @@ export class SupervisionActivityService {
       AND p.creneau = p."creneauPrecedent" AND p.jour = p."jourPrecedent"
     `;
 
-    const dansCreneau = creneaux.length
-      ? Prisma.join(
-          creneaux.map(
-            (creneau) =>
-              Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
-          ),
-          ' OR ',
-        )
-      : Prisma.sql`FALSE`;
+    const dansCreneau = dansCreneauCondition(creneaux);
 
     const [
       rows,
@@ -501,7 +588,8 @@ export class SupervisionActivityService {
       rendement,
     ] = await Promise.all([
       this.prisma.$queryRaw<ActivityRow[]>`
-        WITH faits AS (${faits})
+        WITH faits AS (${faits}),
+        fiches AS (${prospectFichesParLigne})
         SELECT
           to_char(f.bucket, 'YYYY-MM-DD')      AS jour,
           u."id"                               AS id,
@@ -516,9 +604,12 @@ export class SupervisionActivityService {
           SUM(f.rappel)::int                   AS rappels,
           SUM(f.joignable)::int                AS joignables,
           SUM(f.prospect)::int                 AS prospects,
-          COUNT(DISTINCT f.representant)::int  AS representants
+          COUNT(DISTINCT f.representant)::int  AS representants,
+          COALESCE(MAX(p.fiches), 0)::int          AS fiches,
+          COALESCE(MAX(p."fichesJointes"), 0)::int AS "fichesJointes"
         FROM faits f
         INNER JOIN "users" u ON u."id" = f."userId"
+        LEFT JOIN fiches p ON p."userId" = f."userId" AND p.bucket = f.bucket
         WHERE ${teleconseiller}
         GROUP BY 1, 2, 3
         ORDER BY 1 ASC, 3 ASC
@@ -530,7 +621,8 @@ export class SupervisionActivityService {
           SELECT "userId", bucket, COUNT(*)::int AS interroges, SUM(qualifie)::int AS qualifies
           FROM reponses
           GROUP BY 1, 2
-        )
+        ),
+        fiches AS (${repFichesParLigne})
         SELECT
           to_char(t.bucket, 'YYYY-MM-DD')     AS jour,
           t."userId"                          AS id,
@@ -542,9 +634,16 @@ export class SupervisionActivityService {
           SUM(t.injoignable)::int             AS injoignables,
           SUM(t.autre)::int                   AS autres,
           COALESCE(MAX(i.interroges), 0)::int AS interroges,
-          COALESCE(MAX(i.qualifies), 0)::int  AS qualifies
+          COALESCE(MAX(i.qualifies), 0)::int  AS qualifies,
+          COALESCE(MAX(f.fiches), 0)::int            AS fiches,
+          COALESCE(MAX(f."fichesJointes"), 0)::int   AS "fichesJointes",
+          COALESCE(MAX(f."fichesAcceptees"), 0)::int AS "fichesAcceptees",
+          COALESCE(MAX(f."fichesRefusees"), 0)::int  AS "fichesRefusees",
+          COALESCE(MAX(f."fichesARappeler"), 0)::int AS "fichesARappeler",
+          COALESCE(MAX(f."fichesEligibles"), 0)::int AS "fichesEligibles"
         FROM tentatives t
         LEFT JOIN interroges i ON i."userId" = t."userId" AND i.bucket = t.bucket
+        LEFT JOIN fiches f ON f."userId" = t."userId" AND f.bucket = t.bucket
         GROUP BY 1, 2
       `,
       this.prisma.$queryRaw<ExtraRow[]>`
@@ -574,7 +673,12 @@ export class SupervisionActivityService {
         GROUP BY 1, 2
       `,
       this.prisma.$queryRaw<TotalRow[]>`
-        WITH faits AS (${faits})
+        WITH faits AS (${faits}),
+        fiches AS (
+          SELECT COUNT(*)::int AS fiches, COALESCE(SUM(p.joint), 0)::int AS "fichesJointes"
+          FROM (${prospectFiches}) p
+          WHERE ${membreEquipe(Prisma.sql`p."userId"`)}
+        )
         SELECT
           COALESCE(SUM(f.appel), 0)::int       AS appels,
           COALESCE(SUM(f.confirme), 0)::int    AS confirmes,
@@ -586,13 +690,26 @@ export class SupervisionActivityService {
           COALESCE(SUM(f.rappel), 0)::int      AS rappels,
           COALESCE(SUM(f.joignable), 0)::int   AS joignables,
           COALESCE(SUM(f.prospect), 0)::int    AS prospects,
-          COUNT(DISTINCT f.representant)::int  AS representants
-        FROM faits f
-        WHERE ${membreEquipe(Prisma.sql`f."userId"`)}
+          COUNT(DISTINCT f.representant)::int  AS representants,
+          MAX(p.fiches)::int                   AS fiches,
+          MAX(p."fichesJointes")::int          AS "fichesJointes"
+        FROM fiches p
+        LEFT JOIN faits f ON ${membreEquipe(Prisma.sql`f."userId"`)}
       `,
       this.prisma.$queryRaw<RepTotalRow[]>`
         WITH tentatives AS (${repTentatives}),
-        reponses AS (${repReponses})
+        reponses AS (${repReponses}),
+        fiches AS (
+          SELECT
+            COUNT(*)::int                       AS fiches,
+            COALESCE(SUM(f.joint), 0)::int      AS "fichesJointes",
+            COALESCE(SUM(f.accepte), 0)::int    AS "fichesAcceptees",
+            COALESCE(SUM(f.refuse), 0)::int     AS "fichesRefusees",
+            COALESCE(SUM(f.rappel), 0)::int     AS "fichesARappeler",
+            COALESCE(SUM(f.eligible), 0)::int   AS "fichesEligibles"
+          FROM (${repFiches}) f
+          WHERE ${membreEquipe(Prisma.sql`f."userId"`)}
+        )
         SELECT
           COALESCE(SUM(t.appel), 0)::int       AS appels,
           COALESCE(SUM(t.confirme), 0)::int    AS confirmes,
@@ -608,9 +725,15 @@ export class SupervisionActivityService {
           (
             SELECT COALESCE(SUM(r.qualifie), 0)::int FROM reponses r
             WHERE ${membreEquipe(Prisma.sql`r."userId"`)}
-          )                                    AS qualifies
-        FROM tentatives t
-        WHERE ${membreEquipe(Prisma.sql`t."userId"`)}
+          )                                    AS qualifies,
+          MAX(f.fiches)::int                   AS fiches,
+          MAX(f."fichesJointes")::int          AS "fichesJointes",
+          MAX(f."fichesAcceptees")::int        AS "fichesAcceptees",
+          MAX(f."fichesRefusees")::int         AS "fichesRefusees",
+          MAX(f."fichesARappeler")::int        AS "fichesARappeler",
+          MAX(f."fichesEligibles")::int        AS "fichesEligibles"
+        FROM fiches f
+        LEFT JOIN tentatives t ON ${membreEquipe(Prisma.sql`t."userId"`)}
       `,
       this.prisma.$queryRaw<RosterRow[]>`
         SELECT
@@ -744,7 +867,14 @@ export class SupervisionActivityService {
     let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
     if (!estGrandPublic) {
       const repStatuts = await this.prisma.$queryRaw<
-        { id: string; code: string; label: string; isActive: boolean; count: number }[]
+        {
+          id: string;
+          code: string;
+          label: string;
+          isActive: boolean;
+          joint: boolean;
+          count: number;
+        }[]
       >`
         WITH last_calls AS (
           SELECT DISTINCT ON (rca."representantId")
@@ -761,7 +891,10 @@ export class SupervisionActivityService {
           WHERE ${membreEquipe(Prisma.sql`"userId"`)}
           GROUP BY "sid"
         )
-        SELECT sq.id, sq.code, sq.label, sq."isActive", COALESCE(c.count, 0)::int AS count
+        SELECT
+          sq.id, sq.code, sq.label, sq."isActive",
+          (sq."effect" IN ${REP_JOINT_EFFECTS}) AS joint,
+          COALESCE(c.count, 0)::int AS count
         FROM "statuts_qualification" sq
         LEFT JOIN counts c ON c."sid" = sq.id
         WHERE sq."isActive" = TRUE OR c.count > 0
@@ -774,14 +907,16 @@ export class SupervisionActivityService {
           code: row.code,
           label: row.label,
           isActive: row.isActive,
+          famille: row.joint ? 'JOINT' : 'NON_JOINT',
           count: row.count,
         })),
       };
     }
 
+    const { from, to } = windowBounds(query);
     return {
-      from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
-      to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
+      from,
+      to,
       granularity,
       totals: chiffres(totalRow ?? TOTAL_VIDE, repTotalRow ?? REP_VIDE, extraTotal),
       items: rows.map((row): SupervisionActivityRowDto => {
@@ -879,6 +1014,9 @@ function chiffres(
     methodObtained: base.methodes,
     callback: base.rappels,
     reachRate: rate(base.joignables, base.appels),
+    fiches: base.fiches,
+    fichesJointes: base.fichesJointes,
+    ficheReachRate: rate(base.fichesJointes, base.fiches),
     prospectsCreated: base.prospects,
     representantsContacted: base.representants,
     repCalls: rep.appels,
@@ -896,6 +1034,16 @@ function chiffres(
     repQuestioned: rep.interroges,
     repQualified: rep.qualifies,
     repQualificationRate: rate(rep.qualifies, rep.interroges),
+    repFiches: rep.fiches,
+    repFichesJointes: rep.fichesJointes,
+    repFichesNonJointes: rep.fiches - rep.fichesJointes,
+    repFichesAcceptees: rep.fichesAcceptees,
+    repFichesRefusees: rep.fichesRefusees,
+    repFichesARappeler: rep.fichesARappeler,
+    repFichesEligibles: rep.fichesEligibles,
+    repReachabilityRate: rate(rep.fichesJointes, rep.fiches),
+    repAcceptanceRate: rate(rep.fichesAcceptees, rep.fichesEligibles),
+    repCallbackFicheRate: rate(rep.fichesARappeler, rep.fiches),
     inboundCalls: extra.entrants,
     missedCalls: extra.manques,
     callbacksHonored: extra.rappelsHonores,
