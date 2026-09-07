@@ -29,7 +29,7 @@ export default async function LotsExportGrandPublicPage() {
   return (
     <HydrationBoundary state={dehydrate(queryClient)}>
       <div className="flex flex-col gap-6">
-        <OngletsPilotage coque="grand-public" />
+        <OngletsPilotage coque="grand-public" role={guard.user.role} />
         <LotsExportView
           canCreate={guard.user.role === 'ADMIN' || guard.user.role === 'SUPERVISEUR'}
           canDelete={guard.user.role === 'ADMIN'}

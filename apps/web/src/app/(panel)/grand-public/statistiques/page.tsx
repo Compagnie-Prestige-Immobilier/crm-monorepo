@@ -17,7 +17,7 @@ export default async function ChiffresGrandPublicPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <OngletsPilotage coque="grand-public" />
+      <OngletsPilotage coque="grand-public" role={guard.user.role} />
       <ChiffresView ecran="grand-public" role={guard.user.role} />
     </div>
   );

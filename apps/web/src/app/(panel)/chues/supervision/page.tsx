@@ -20,7 +20,7 @@ export default async function SupervisionPage() {
   return (
     <Suspense fallback={<SupervisionSkeleton />}>
       <div className="flex flex-col gap-6">
-        <OngletsPilotage coque="chues" />
+        <OngletsPilotage coque="chues" role={guard.user.role} />
         <SupervisionTabs projet="CHUES" role={guard.user.role} />
       </div>
     </Suspense>

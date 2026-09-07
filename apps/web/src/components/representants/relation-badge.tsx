@@ -9,7 +9,7 @@ import { REP_CALL_OUTCOME_LABELS, type RepCallOutcome } from '@/lib/types';
 
 type Variant = NonNullable<BadgeProps['variant']>;
 
-const RELATION_VARIANTS: Record<RepresentantRelation, Variant> = {
+export const RELATION_VARIANTS: Record<RepresentantRelation, Variant> = {
   INCONNU: 'outline',
   CONTACTE: 'info',
   AMBASSADEUR: 'success',

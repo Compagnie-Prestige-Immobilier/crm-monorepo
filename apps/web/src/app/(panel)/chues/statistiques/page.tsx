@@ -17,7 +17,7 @@ export default async function ChiffresChuesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <OngletsPilotage coque="chues" />
+      <OngletsPilotage coque="chues" role={guard.user.role} />
       <ChiffresView ecran="chues" role={guard.user.role} />
     </div>
   );
