@@ -218,7 +218,7 @@ class OuvertureRepository {
             // Même partition que l'ouverture : la borne ne peut pas atteindre
             // le serveur avant la fiche qu'elle date.
             dependencyKey: Value<String?>(
-              ligne.representantId ?? ligne.prospectId,
+              ligne.representantId ?? 'phase2:${ligne.prospectId}',
             ),
             entityType: ouvertureEntity,
             entityId: id,
@@ -307,8 +307,12 @@ class OuvertureRepository {
           OutboxCompanion.insert(
             id: Ids.newId(),
             // Même partition que les tentatives de la fiche : l'ouverture doit
-            // atteindre le serveur avant la qualification qui la ferme.
-            dependencyKey: Value<String?>(representantId ?? prospectId),
+            // atteindre le serveur avant la qualification qui la ferme. Une
+            // ouverture arrivée après elle est ignorée en silence, et le verrou
+            // ne se lève plus jamais.
+            dependencyKey: Value<String?>(
+              representantId ?? 'phase2:$prospectId',
+            ),
             entityType: ouvertureEntity,
             entityId: id,
             op: 'create',
