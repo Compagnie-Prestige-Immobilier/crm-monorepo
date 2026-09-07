@@ -1408,6 +1408,20 @@ class SyncEngine {
       await pullCallOutcomeReasons();
       await pullStatutsQualification();
       int applied = 0;
+      final int representantsLocaux = await _db
+          .customSelect(
+            'SELECT COUNT(*) AS total FROM representants WHERE deleted_at IS NULL',
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              _db.representants,
+            },
+          )
+          .map((QueryRow row) => row.read<int>('total'))
+          .getSingle();
+      if (representantsLocaux == 0) {
+        await (_db.delete(_db.syncState)
+              ..where((SyncState t) => t.collection.equals(cursorKey)))
+            .go();
+      }
       String? cursor = await readCursor();
       bool listesBougees = false;
       bool referentielsBouges = false;

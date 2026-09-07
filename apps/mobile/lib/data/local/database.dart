@@ -7,6 +7,46 @@ part 'database.g.dart';
 class AppDatabase extends _$AppDatabase {
   AppDatabase(super.executor);
 
+  Future<void> clearLocalData() async {
+    const List<String> tables = <String>[
+      'preuves_appel',
+      'rep_call_attempts',
+      'call_attempts',
+      'ouvertures_fiche',
+      'prospect_journeys',
+      'representant_comments',
+      'prospects',
+      'representants',
+      'attributions',
+      'outbox',
+      'form_drafts',
+      'sync_state',
+      'notifications',
+      'rep_callback_reminders',
+      'visites',
+      'phase2_directory',
+      'statuts_qualification',
+      'call_outcome_reasons',
+      'visite_referentiels',
+      'pays',
+      'employeurs',
+      'professions',
+      'income_bands',
+      'canaux_provenance',
+      'syndicats',
+      'banques',
+      'iefs',
+      'departements',
+    ];
+    await transaction(() async {
+      await customStatement('PRAGMA foreign_keys = OFF');
+      for (final String table in tables) {
+        await customStatement('DELETE FROM $table');
+      }
+      await customStatement('PRAGMA foreign_keys = ON');
+    });
+  }
+
   static void applyPragmas(CommonDatabase database) {
     database.execute('PRAGMA journal_mode = WAL;');
     database.execute('PRAGMA busy_timeout = 5000;');

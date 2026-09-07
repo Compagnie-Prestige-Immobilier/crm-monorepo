@@ -196,6 +196,18 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
         ),
 
         _Section(
+          title: 'Dépannage',
+          card: CpiCard.rows(<CpiRow>[
+            CpiRow(
+              title: 'Réinitialiser ce téléphone',
+              subtitle: 'Efface la base locale et recharge les fiches',
+              trailing: const _Valeur('Effacer', chevron: true),
+              onTap: () => unawaited(_resetLocal(context, pending)),
+            ),
+          ]),
+        ),
+
+        _Section(
           title: 'Affichage et retours',
           card: CpiCard.rows(<CpiRow>[
             CpiRow(
@@ -378,6 +390,40 @@ class _ReglagesScreenState extends ConsumerState<ReglagesScreen> {
     final int days = DateTime.now().toUtc().difference(last).inDays;
     return 'L\'app n\'a rien envoyé depuis $days jour${days > 1 ? 's' : ''}. '
         'Le téléphone la bloque.';
+  }
+
+  Future<void> _resetLocal(BuildContext context, int pending) async {
+    if (pending > 0) {
+      cpiToast(
+        context,
+        'Envoyez d’abord les saisies en attente avant d’effacer ce téléphone.',
+        persistent: true,
+      );
+      return;
+    }
+    final bool? confirmed = await cpiConfirm(
+      context,
+      title: 'Effacer ce téléphone ?',
+      message:
+          'Les fiches, historiques et réglages locaux seront supprimés. '
+          'Les données déjà envoyées au serveur resteront intactes.',
+      confirmLabel: 'Effacer et se reconnecter',
+      danger: true,
+    );
+    if (confirmed != true || !mounted) return;
+    try {
+      await ref.read(appDatabaseProvider).clearLocalData();
+      await ref.read(authControllerProvider.notifier).signOut();
+      if (!mounted || !context.mounted) return;
+      cpiToast(context, 'Téléphone réinitialisé. Reconnectez-vous.');
+    } on Object {
+      if (!mounted || !context.mounted) return;
+      cpiToast(
+        context,
+        'Réinitialisation impossible. Réessayez.',
+        persistent: true,
+      );
+    }
   }
 
   Future<void> _signOut(BuildContext context, int pending) async {
@@ -670,15 +716,14 @@ class _ChangePasswordSheetState extends ConsumerState<_ChangePasswordSheet> {
     } on ApiException catch (e) {
       if (!mounted) return;
       if (e.code == invalidCurrentPasswordCode) {
-        setState(
-          () => _erreurActuel = 'Le mot de passe actuel est incorrect.',
-        );
+        setState(() => _erreurActuel = 'Le mot de passe actuel est incorrect.');
       } else if (widget.toaster.mounted) {
         cpiToast(widget.toaster, messageErreur(e));
       }
     } on Object catch (error) {
       if (!mounted) return;
-      if (widget.toaster.mounted) cpiToast(widget.toaster, messageErreur(error));
+      if (widget.toaster.mounted)
+        cpiToast(widget.toaster, messageErreur(error));
     } finally {
       if (mounted) setState(() => _envoiEnCours = false);
     }
