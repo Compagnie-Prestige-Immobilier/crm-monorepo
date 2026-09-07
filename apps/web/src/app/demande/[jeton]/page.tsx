@@ -12,8 +12,11 @@ export const metadata: Metadata = {
 
 function estComposition(charge: unknown): charge is FormulairePublic {
   if (typeof charge !== 'object' || charge === null) return false;
-  const { champs, libres, banques, syndicats, revenus } = charge as Record<string, unknown>;
-  return [champs, libres, banques, syndicats, revenus].every((liste) => Array.isArray(liste));
+  const { champs, libres, banques, syndicats, revenus, professions, dureesEtablissement } =
+    charge as Record<string, unknown>;
+  return [champs, libres, banques, syndicats, revenus, professions, dureesEtablissement].every(
+    (liste) => Array.isArray(liste),
+  );
 }
 
 /** Les champs réglés par l'administrateur (EB-27) : sans eux, aucun formulaire à rendre. */
@@ -57,31 +60,22 @@ export default async function DemandePubliquePage({
           width={417}
           height={170}
           priority
-          className="mb-10 h-11 w-auto"
+          className="mb-8 h-11 w-auto"
         />
 
-        <div className="rail">
-          <h1 className="font-display text-h1 font-[800] tracking-[-0.025em]">
-            Être rappelé par un conseiller
-          </h1>
-          <p className="mt-1.5 text-body text-muted-foreground">
-            Laissez vos coordonnées, un conseiller CPI vous rappelle.
-          </p>
-        </div>
+        <h1 className="sr-only">Demande de rappel</h1>
 
-        <div className="mt-8">
-          {composition === null || composition.champs.length === 0 ? (
-            <p
-              role="alert"
-              className="rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
-            >
-              Le formulaire est indisponible pour le moment. Rechargez la page dans un instant, ou
-              appelez le conseiller qui vous a transmis ce lien.
-            </p>
-          ) : (
-            <FormulaireDemande jeton={jeton} cleSite={cleSite} formulaire={composition} />
-          )}
-        </div>
+        {composition === null || composition.champs.length === 0 ? (
+          <p
+            role="alert"
+            className="rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
+          >
+            Le formulaire est indisponible pour le moment. Rechargez la page dans un instant, ou
+            appelez le conseiller qui vous a transmis ce lien.
+          </p>
+        ) : (
+          <FormulaireDemande jeton={jeton} cleSite={cleSite} formulaire={composition} />
+        )}
 
         <p className="mt-10 text-caption text-muted-foreground">
           Compagnie Prestige Immobilier, Sénégal

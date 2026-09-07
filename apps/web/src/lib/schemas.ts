@@ -151,6 +151,8 @@ export const demandePubliqueSchema = z.object({
   nom: z.string().trim().min(1, 'Le nom est obligatoire.').max(120, 'Nom trop long.'),
   phone: z.string().trim().min(6, 'Le téléphone est obligatoire.').max(40, 'Numéro trop long.'),
   email: z.email('Adresse e-mail invalide.').max(254, 'Adresse trop longue.').optional(),
+  professionId: z.uuid().optional(),
+  // Texte libre des pages ouvertes avant la liste fermée : l'API l'accepte encore.
   profession: z.string().trim().max(120, 'Profession trop longue.').optional(),
   etablissement: z.string().trim().max(160, 'Établissement trop long.').optional(),
   dureeEtablissementMois: z.number().int().min(0).max(DUREE_ETABLISSEMENT_MAX_MOIS).optional(),

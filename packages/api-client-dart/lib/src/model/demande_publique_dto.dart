@@ -30,6 +30,8 @@ class DemandePubliqueDto {
 
     this.email,
 
+    this.professionId,
+
     this.profession,
 
     this.etablissement,
@@ -81,6 +83,12 @@ class DemandePubliqueDto {
   @JsonKey(name: r'email', required: false, includeIfNull: false)
   final String? email;
 
+  /// Profession choisie dans la liste rendue par `GET /formulaire`.
+  @JsonKey(name: r'professionId', required: false, includeIfNull: false)
+  final String? professionId;
+
+  /// Conservé pour les pages déjà en ligne. `professionId` le remplace.
+  @Deprecated('profession has been deprecated')
   @JsonKey(name: r'profession', required: false, includeIfNull: false)
   final String? profession;
 
@@ -178,6 +186,7 @@ class DemandePubliqueDto {
                 prenom,
                 phone,
                 email,
+                professionId,
                 profession,
                 etablissement,
                 employeur,
@@ -202,6 +211,7 @@ class DemandePubliqueDto {
                 other.prenom,
                 other.phone,
                 other.email,
+                other.professionId,
                 other.profession,
                 other.etablissement,
                 other.employeur,
@@ -232,6 +242,7 @@ class DemandePubliqueDto {
         prenom,
         phone,
         email,
+        professionId,
         profession,
         etablissement,
         employeur,

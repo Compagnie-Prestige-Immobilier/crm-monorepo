@@ -259,6 +259,7 @@ import 'package:crm_api_client/src/model/top_commercial_dto.dart';
 import 'package:crm_api_client/src/model/top_commercial_list_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
+import 'package:crm_api_client/src/model/tranche_duree_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/update_banque_dto.dart';
@@ -1183,6 +1184,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'TopRepresentantListDto':
       return TopRepresentantListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TrancheDureeDto':
+      return TrancheDureeDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'TypeContrat':
     case 'UpdateBankCaseDto':

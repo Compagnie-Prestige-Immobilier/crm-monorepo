@@ -15,6 +15,8 @@ abstract class _$DemandePubliqueDtoCWProxy {
 
   DemandePubliqueDto email(String? email);
 
+  DemandePubliqueDto professionId(String? professionId);
+
   DemandePubliqueDto profession(String? profession);
 
   DemandePubliqueDto etablissement(String? etablissement);
@@ -62,6 +64,7 @@ abstract class _$DemandePubliqueDtoCWProxy {
     String prenom,
     String phone,
     String? email,
+    String? professionId,
     String? profession,
     String? etablissement,
     String? employeur,
@@ -100,6 +103,10 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
 
   @override
   DemandePubliqueDto email(String? email) => this(email: email);
+
+  @override
+  DemandePubliqueDto professionId(String? professionId) =>
+      this(professionId: professionId);
 
   @override
   DemandePubliqueDto profession(String? profession) =>
@@ -180,6 +187,7 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
     Object? prenom = const $CopyWithPlaceholder(),
     Object? phone = const $CopyWithPlaceholder(),
     Object? email = const $CopyWithPlaceholder(),
+    Object? professionId = const $CopyWithPlaceholder(),
     Object? profession = const $CopyWithPlaceholder(),
     Object? etablissement = const $CopyWithPlaceholder(),
     Object? employeur = const $CopyWithPlaceholder(),
@@ -216,6 +224,10 @@ class _$DemandePubliqueDtoCWProxyImpl implements _$DemandePubliqueDtoCWProxy {
           ? _value.email
           // ignore: cast_nullable_to_non_nullable
           : email as String?,
+      professionId: professionId == const $CopyWithPlaceholder()
+          ? _value.professionId
+          // ignore: cast_nullable_to_non_nullable
+          : professionId as String?,
       profession: profession == const $CopyWithPlaceholder()
           ? _value.profession
           // ignore: cast_nullable_to_non_nullable
@@ -313,6 +325,7 @@ DemandePubliqueDto _$DemandePubliqueDtoFromJson(
     prenom: $checkedConvert('prenom', (v) => v as String),
     phone: $checkedConvert('phone', (v) => v as String),
     email: $checkedConvert('email', (v) => v as String?),
+    professionId: $checkedConvert('professionId', (v) => v as String?),
     profession: $checkedConvert('profession', (v) => v as String?),
     etablissement: $checkedConvert('etablissement', (v) => v as String?),
     employeur: $checkedConvert('employeur', (v) => v as String?),
@@ -370,6 +383,7 @@ Map<String, dynamic> _$DemandePubliqueDtoToJson(
   'prenom': instance.prenom,
   'phone': instance.phone,
   if (instance.email case final value?) 'email': value,
+  if (instance.professionId case final value?) 'professionId': value,
   if (instance.profession case final value?) 'profession': value,
   if (instance.etablissement case final value?) 'etablissement': value,
   if (instance.employeur case final value?) 'employeur': value,

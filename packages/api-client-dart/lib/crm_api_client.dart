@@ -355,6 +355,7 @@ export 'package:crm_api_client/src/model/top_commercial_dto.dart';
 export 'package:crm_api_client/src/model/top_commercial_list_dto.dart';
 export 'package:crm_api_client/src/model/top_representant_dto.dart';
 export 'package:crm_api_client/src/model/top_representant_list_dto.dart';
+export 'package:crm_api_client/src/model/tranche_duree_dto.dart';
 export 'package:crm_api_client/src/model/type_contrat.dart';
 export 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 export 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';

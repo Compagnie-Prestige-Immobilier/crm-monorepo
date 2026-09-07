@@ -34195,6 +34195,19 @@
         },
         "required": ["id", "libelle"]
       },
+      "TrancheDureeDto": {
+        "type": "object",
+        "properties": {
+          "mois": {
+            "type": "number",
+            "minimum": 0
+          },
+          "libelle": {
+            "type": "string"
+          }
+        },
+        "required": ["mois", "libelle"]
+      },
       "FormulairePublicDto": {
         "type": "object",
         "properties": {
@@ -34229,9 +34242,30 @@
             "items": {
               "$ref": "#/components/schemas/OptionPubliqueDto"
             }
+          },
+          "professions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/OptionPubliqueDto"
+            }
+          },
+          "dureesEtablissement": {
+            "description": "Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`.",
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TrancheDureeDto"
+            }
           }
         },
-        "required": ["champs", "libres", "banques", "syndicats", "revenus"]
+        "required": [
+          "champs",
+          "libres",
+          "banques",
+          "syndicats",
+          "revenus",
+          "professions",
+          "dureesEtablissement"
+        ]
       },
       "DemandePubliqueDto": {
         "type": "object",
@@ -34254,9 +34288,16 @@
             "maxLength": 160,
             "description": "Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu."
           },
+          "professionId": {
+            "type": "string",
+            "format": "uuid",
+            "description": "Profession choisie dans la liste rendue par `GET /formulaire`."
+          },
           "profession": {
             "type": "string",
-            "maxLength": 120
+            "maxLength": 120,
+            "description": "Conservé pour les pages déjà en ligne. `professionId` le remplace.",
+            "deprecated": true
           },
           "etablissement": {
             "type": "string",

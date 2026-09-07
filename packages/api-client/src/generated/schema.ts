@@ -7985,6 +7985,10 @@ export interface components {
       id: string;
       libelle: string;
     };
+    TrancheDureeDto: {
+      mois: number;
+      libelle: string;
+    };
     FormulairePublicDto: {
       /** @description Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller. */
       champs: components['schemas']['ReglageChampDto'][];
@@ -7993,6 +7997,9 @@ export interface components {
       syndicats: components['schemas']['OptionPubliqueDto'][];
       /** @description Tranches de revenu mensuel. */
       revenus: components['schemas']['OptionPubliqueDto'][];
+      professions: components['schemas']['OptionPubliqueDto'][];
+      /** @description Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`. */
+      dureesEtablissement: components['schemas']['TrancheDureeDto'][];
     };
     DemandePubliqueDto: {
       nom: string;
@@ -8001,6 +8008,15 @@ export interface components {
       phone: string;
       /** @description Sans adresse, la confirmation à l’écran vaut accusé de réception. Sert aussi à rapprocher la demande d’une fiche existante quand le numéro est inconnu. */
       email?: string;
+      /**
+       * Format: uuid
+       * @description Profession choisie dans la liste rendue par `GET /formulaire`.
+       */
+      professionId?: string;
+      /**
+       * @deprecated
+       * @description Conservé pour les pages déjà en ligne. `professionId` le remplace.
+       */
       profession?: string;
       /** @description Établissement où le visiteur exerce. */
       etablissement?: string;

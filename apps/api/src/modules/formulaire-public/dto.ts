@@ -58,7 +58,19 @@ export class DemandePubliqueDto {
   @MaxLength(EMAIL_MAX_LENGTH)
   email?: string;
 
-  @ApiPropertyOptional({ maxLength: 120 })
+  @ApiPropertyOptional({
+    format: 'uuid',
+    description: 'Profession choisie dans la liste rendue par `GET /formulaire`.',
+  })
+  @IsOptional()
+  @IsUUID()
+  professionId?: string;
+
+  @ApiPropertyOptional({
+    maxLength: 120,
+    description: 'Conservé pour les pages déjà en ligne. `professionId` le remplace.',
+    deprecated: true,
+  })
   @IsOptional()
   @IsString()
   @MaxLength(120)
@@ -181,6 +193,12 @@ export class OptionPubliqueDto {
   @ApiProperty() libelle!: string;
 }
 
+/** Une tranche d'ancienneté proposée au visiteur. `mois` en est la borne basse. */
+export class TrancheDureeDto {
+  @ApiProperty({ type: Number, minimum: 0 }) mois!: number;
+  @ApiProperty() libelle!: string;
+}
+
 export class FormulairePublicDto {
   @ApiProperty({
     type: () => [ReglageChampDto],
@@ -198,4 +216,13 @@ export class FormulairePublicDto {
 
   @ApiProperty({ type: () => [OptionPubliqueDto], description: 'Tranches de revenu mensuel.' })
   revenus!: OptionPubliqueDto[];
+
+  @ApiProperty({ type: () => [OptionPubliqueDto] }) professions!: OptionPubliqueDto[];
+
+  @ApiProperty({
+    type: () => [TrancheDureeDto],
+    description:
+      'Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`.',
+  })
+  dureesEtablissement!: TrancheDureeDto[];
 }

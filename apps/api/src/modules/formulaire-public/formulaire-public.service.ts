@@ -29,11 +29,20 @@ import { normaliserReponses, type ChampConversion } from '../champs-conversion/c
 import { whatsappDuProspect } from '../prospects/whatsapp.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import type { OkDto } from '../../common/dto/ok.dto.js';
-import type { DemandePubliqueDto, FormulairePublicDto } from './dto.js';
+import type { DemandePubliqueDto, FormulairePublicDto, TrancheDureeDto } from './dto.js';
 import { verifierTurnstile } from './turnstile.js';
 
 const TITRE_MAX = 120;
 const CORPS_MAX = 500;
+
+/** La borne BASSE fait la valeur écrite : une tranche ne surestime jamais l'ancienneté. */
+const DUREES_ETABLISSEMENT: readonly TrancheDureeDto[] = [
+  { mois: 0, libelle: 'Moins d’un an' },
+  { mois: 12, libelle: '1 à 2 ans' },
+  { mois: 24, libelle: '2 à 5 ans' },
+  { mois: 60, libelle: '5 à 10 ans' },
+  { mois: 120, libelle: 'Plus de 10 ans' },
+];
 
 type Agent = Pick<AuthenticatedUser, 'id' | 'email' | 'username' | 'fullName' | 'role'>;
 
@@ -79,6 +88,7 @@ const PROSPECT_RAPPROCHE = {
   phoneE164: true,
   email: true,
   profession: true,
+  professionId: true,
   employeur: true,
   etablissement: true,
   banqueId: true,
@@ -100,6 +110,7 @@ interface SaisiePublique {
   readonly phoneE164: string;
   readonly email?: string;
   readonly profession?: string;
+  readonly professionId?: string;
   readonly employeur?: string;
   readonly etablissement?: string;
   readonly banqueId?: string;
@@ -140,6 +151,10 @@ const enHtml = (texte: string): string =>
 const remplacerJetons = (texte: string, jetons: Readonly<Record<string, string>>): string =>
   texte.replace(/\{(\w+)\}/g, (jeton, nom: string) => jetons[nom] ?? jeton);
 
+/** Le visiteur choisit une tranche : rendre « 0 mois » au relecteur serait faux. */
+const trancheDuree = (mois: number): string =>
+  DUREES_ETABLISSEMENT.find((tranche) => tranche.mois === mois)?.libelle ?? `${String(mois)} mois`;
+
 function ouiNon(valeur: boolean | undefined): string | null {
   if (valeur === undefined) return null;
   return valeur ? 'oui' : 'non';
@@ -161,7 +176,7 @@ const resumer = (demande: DemandePubliqueDto, saisie: SaisiePublique): string =>
     saisie.employeur === undefined ? null : `Employeur : ${saisie.employeur}`,
     saisie.dureeEtablissementMois === undefined
       ? null
-      : `Durée dans l’établissement : ${saisie.dureeEtablissementMois} mois`,
+      : `Durée dans l’établissement : ${trancheDuree(saisie.dureeEtablissementMois)}`,
     fonctionnaire === null ? null : `Fonctionnaire : ${fonctionnaire}`,
     engagement === null ? null : `Engagement en cours à la banque : ${engagement}`,
     demande.message === undefined ? null : `Message : ${demande.message}`,
@@ -204,7 +219,7 @@ export class FormulairePublicService {
    * seules listes dont ces champs ont besoin. Rien d'une fiche existante.
    */
   async formulaire(): Promise<FormulairePublicDto> {
-    const [reglages, banques, syndicats, revenus] = await Promise.all([
+    const [reglages, banques, syndicats, revenus, professions] = await Promise.all([
       this.champs.reglages(Projet.CHUES),
       this.prisma.banque.findMany({
         where: { isActive: true },
@@ -221,14 +236,21 @@ export class FormulairePublicService {
         orderBy: [{ position: 'asc' }, { minXof: 'asc' }],
         select: { id: true, label: true },
       }),
+      this.prisma.profession.findMany({
+        where: { isActive: true },
+        orderBy: [{ position: 'asc' }, { label: 'asc' }],
+        select: { id: true, label: true },
+      }),
     ]);
 
     return {
-      champs: reglages.champs.filter((champ) => estChampPublic(champ.champ)),
+      champs: reglages.champs.filter((champ) => champ.visible && estChampPublic(champ.champ)),
       libres: [...reglages.libres],
       banques: banques.map((row) => ({ id: row.id, libelle: row.name })),
       syndicats: syndicats.map((row) => ({ id: row.id, libelle: row.name })),
       revenus: revenus.map((row) => ({ id: row.id, libelle: row.label })),
+      professions: professions.map((row) => ({ id: row.id, libelle: row.label })),
+      dureesEtablissement: [...DUREES_ETABLISSEMENT],
     };
   }
 
@@ -294,6 +316,7 @@ export class FormulairePublicService {
     if (manquants.length) throw champsManquants(manquants);
 
     const whatsappE164 = garde('whatsappE164', texteOuUndefined(demande.whatsappE164));
+    const profession = await this.professionChoisie(garde('profession', demande.professionId));
 
     return {
       nom: demande.nom.trim(),
@@ -302,7 +325,8 @@ export class FormulairePublicService {
       champsLibres,
       ...defini({
         email: garde('email', demande.email?.trim().toLowerCase()),
-        profession: garde('profession', texteOuUndefined(demande.profession)),
+        profession: profession?.label ?? garde('profession', texteOuUndefined(demande.profession)),
+        professionId: profession?.id,
         etablissement: garde('etablissement', texteOuUndefined(demande.etablissement)),
         employeur: texteOuUndefined(demande.employeur),
         banqueId: garde('banqueId', demande.banqueId),
@@ -318,6 +342,20 @@ export class FormulairePublicService {
         engagementEnCours: garde('engagementEnCours', demande.engagementEnCours),
       }),
     };
+  }
+
+  /**
+   * Un identifiant inconnu ou désactivé est ignoré plutôt que refusé : une page
+   * ouverte avant le retrait d'une profession doit pouvoir être envoyée.
+   */
+  private async professionChoisie(
+    id: string | undefined,
+  ): Promise<{ id: string; label: string } | null> {
+    if (id === undefined) return null;
+    return this.prisma.profession.findFirst({
+      where: { id, isActive: true },
+      select: { id: true, label: true },
+    });
   }
 
   /**
@@ -350,6 +388,7 @@ export class FormulairePublicService {
           ...defini({
             email: saisie.email,
             profession: saisie.profession,
+            professionId: saisie.professionId,
             employeur: saisie.employeur,
             etablissement: saisie.etablissement,
             banqueId: saisie.banqueId,
@@ -504,6 +543,7 @@ export class FormulairePublicService {
 
 function valeurSaisie(demande: DemandePubliqueDto, champ: ChampPublic): unknown {
   if (champ === 'phoneE164') return demande.phone;
+  if (champ === 'profession') return demande.professionId ?? demande.profession;
   return demande[champ];
 }
 
@@ -522,7 +562,10 @@ function defini<T extends Record<string, unknown>>(
  * remplit que ce qui est vide. Le numéro n'est jamais réécrit, la fiche
  * rapprochée par e-mail garde le sien.
  */
-function casesVides(existant: ProspectRapproche, saisie: SaisiePublique): Prisma.ProspectUpdateInput {
+function casesVides(
+  existant: ProspectRapproche,
+  saisie: SaisiePublique,
+): Prisma.ProspectUpdateInput {
   const patch: Record<string, unknown> = {};
   const combler = (cle: string, courant: unknown, valeur: unknown): void => {
     if (valeur === undefined) return;
@@ -534,6 +577,7 @@ function casesVides(existant: ProspectRapproche, saisie: SaisiePublique): Prisma
   combler('prenom', existant.prenom, saisie.prenom);
   combler('email', existant.email, saisie.email);
   combler('profession', existant.profession, saisie.profession);
+  combler('professionId', existant.professionId, saisie.professionId);
   combler('employeur', existant.employeur, saisie.employeur);
   combler('etablissement', existant.etablissement, saisie.etablissement);
   combler('banqueId', existant.banqueId, saisie.banqueId);
