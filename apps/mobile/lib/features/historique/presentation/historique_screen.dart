@@ -670,7 +670,9 @@ class _RepresentantTile extends StatelessWidget {
     return CpiCard.rows(<CpiRow>[
       CpiRow(
         title: data.fullName,
-        subtitle: Phone.format(data.phoneE164),
+        subtitle: signal == null
+            ? Phone.format(data.phoneE164)
+            : '${Phone.format(data.phoneE164)}\nSynchronisation : $signal',
         leading: signal == null
             ? null
             : SyncStatusIcon(
@@ -678,14 +680,12 @@ class _RepresentantTile extends StatelessWidget {
                 size: CpiIconSize.xl,
                 labelled: false,
               ),
-        trailing: signal == null
-            ? StatutTag(
-                relationStatus: data.relationStatus,
-                statutLabel: data.statutQualificationLabel,
-                statutEffect: data.statutQualificationEffect,
-                lastCallOutcome: data.lastCallOutcome,
-              )
-            : CpiTag(signal, tone: status.tone),
+        trailing: StatutTag(
+          relationStatus: data.relationStatus,
+          statutLabel: data.statutQualificationLabel,
+          statutEffect: data.statutQualificationEffect,
+          lastCallOutcome: data.lastCallOutcome,
+        ),
         onTap: () => context.pushOnce(Routes.representantDetailFor(data.id)),
       ),
     ]);

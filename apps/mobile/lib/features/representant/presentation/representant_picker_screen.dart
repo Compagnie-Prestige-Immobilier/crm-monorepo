@@ -193,15 +193,15 @@ class _RepresentantRow extends StatelessWidget {
                 labelled: false,
               ),
         title: data.fullName,
-        subtitle: subtitle,
-        trailing: signal == null
-            ? StatutTag(
-                relationStatus: data.relationStatus,
-                statutLabel: data.statutQualificationLabel,
-                statutEffect: data.statutQualificationEffect,
-                lastCallOutcome: data.lastCallOutcome,
-              )
-            : CpiTag(signal, tone: status.tone),
+        subtitle: signal == null
+            ? subtitle
+            : '$subtitle\nSynchronisation : $signal',
+        trailing: StatutTag(
+          relationStatus: data.relationStatus,
+          statutLabel: data.statutQualificationLabel,
+          statutEffect: data.statutQualificationEffect,
+          lastCallOutcome: data.lastCallOutcome,
+        ),
         // Les deux chemins passent par l'appel : celui qui vient de donner ses
         // contacts a bien decroche, et son appel se consignait nulle part.
         onTap: () => context.pushOnce(
