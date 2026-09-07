@@ -6,6 +6,7 @@
 import 'package:crm_api_client/src/model/reglage_champ_dto.dart';
 import 'package:crm_api_client/src/model/champ_libre_dto.dart';
 import 'package:crm_api_client/src/model/option_publique_dto.dart';
+import 'package:crm_api_client/src/model/tranche_duree_dto.dart';
 import 'package:copy_with_extension/copy_with_extension.dart';
 import 'package:json_annotation/json_annotation.dart';
 import 'package:equatable/src/equatable_utils.dart';
@@ -31,6 +32,10 @@ class FormulairePublicDto {
     required this.syndicats,
 
     required this.revenus,
+
+    required this.professions,
+
+    required this.dureesEtablissement,
   });
 
   /// Champs à rendre, dans l’ordre d’affichage, réglés par l’administrateur (EB-28). La méthode d’enrôlement et la date de rendez-vous en sont retirées : elles closent un dossier et n’appartiennent qu’au téléconseiller.
@@ -50,18 +55,35 @@ class FormulairePublicDto {
   @JsonKey(name: r'revenus', required: true, includeIfNull: false)
   final List<OptionPubliqueDto> revenus;
 
+  @JsonKey(name: r'professions', required: true, includeIfNull: false)
+  final List<OptionPubliqueDto> professions;
+
+  /// Tranches proposées pour `dureeEtablissementMois`, la valeur à envoyer étant `mois`.
+  @JsonKey(name: r'dureesEtablissement', required: true, includeIfNull: false)
+  final List<TrancheDureeDto> dureesEtablissement;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is FormulairePublicDto &&
             runtimeType == other.runtimeType &&
             equals(
-              [champs, libres, banques, syndicats, revenus],
+              [
+                champs,
+                libres,
+                banques,
+                syndicats,
+                revenus,
+                professions,
+                dureesEtablissement,
+              ],
               [
                 other.champs,
                 other.libres,
                 other.banques,
                 other.syndicats,
                 other.revenus,
+                other.professions,
+                other.dureesEtablissement,
               ],
             );
   }
@@ -69,7 +91,15 @@ class FormulairePublicDto {
   @override
   int get hashCode =>
       runtimeType.hashCode ^
-      mapPropsToHashCode([champs, libres, banques, syndicats, revenus]);
+      mapPropsToHashCode([
+        champs,
+        libres,
+        banques,
+        syndicats,
+        revenus,
+        professions,
+        dureesEtablissement,
+      ]);
 
   factory FormulairePublicDto.fromJson(Map<String, dynamic> json) =>
       _$FormulairePublicDtoFromJson(json);

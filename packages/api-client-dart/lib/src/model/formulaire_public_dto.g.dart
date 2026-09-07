@@ -17,6 +17,12 @@ abstract class _$FormulairePublicDtoCWProxy {
 
   FormulairePublicDto revenus(List<OptionPubliqueDto> revenus);
 
+  FormulairePublicDto professions(List<OptionPubliqueDto> professions);
+
+  FormulairePublicDto dureesEtablissement(
+    List<TrancheDureeDto> dureesEtablissement,
+  );
+
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FormulairePublicDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -29,6 +35,8 @@ abstract class _$FormulairePublicDtoCWProxy {
     List<OptionPubliqueDto> banques,
     List<OptionPubliqueDto> syndicats,
     List<OptionPubliqueDto> revenus,
+    List<OptionPubliqueDto> professions,
+    List<TrancheDureeDto> dureesEtablissement,
   });
 }
 
@@ -59,6 +67,15 @@ class _$FormulairePublicDtoCWProxyImpl implements _$FormulairePublicDtoCWProxy {
       this(revenus: revenus);
 
   @override
+  FormulairePublicDto professions(List<OptionPubliqueDto> professions) =>
+      this(professions: professions);
+
+  @override
+  FormulairePublicDto dureesEtablissement(
+    List<TrancheDureeDto> dureesEtablissement,
+  ) => this(dureesEtablissement: dureesEtablissement);
+
+  @override
   /// This function **does support** nullification of nullable fields. All `null` values passed to `non-nullable` fields will be ignored. You can also use `FormulairePublicDto(...).copyWith.fieldName(...)` to override fields one at a time with nullification support.
   ///
   /// Usage
@@ -71,6 +88,8 @@ class _$FormulairePublicDtoCWProxyImpl implements _$FormulairePublicDtoCWProxy {
     Object? banques = const $CopyWithPlaceholder(),
     Object? syndicats = const $CopyWithPlaceholder(),
     Object? revenus = const $CopyWithPlaceholder(),
+    Object? professions = const $CopyWithPlaceholder(),
+    Object? dureesEtablissement = const $CopyWithPlaceholder(),
   }) {
     return FormulairePublicDto(
       champs: champs == const $CopyWithPlaceholder()
@@ -93,6 +112,14 @@ class _$FormulairePublicDtoCWProxyImpl implements _$FormulairePublicDtoCWProxy {
           ? _value.revenus
           // ignore: cast_nullable_to_non_nullable
           : revenus as List<OptionPubliqueDto>,
+      professions: professions == const $CopyWithPlaceholder()
+          ? _value.professions
+          // ignore: cast_nullable_to_non_nullable
+          : professions as List<OptionPubliqueDto>,
+      dureesEtablissement: dureesEtablissement == const $CopyWithPlaceholder()
+          ? _value.dureesEtablissement
+          // ignore: cast_nullable_to_non_nullable
+          : dureesEtablissement as List<TrancheDureeDto>,
     );
   }
 }
@@ -118,6 +145,8 @@ FormulairePublicDto _$FormulairePublicDtoFromJson(Map<String, dynamic> json) =>
           'banques',
           'syndicats',
           'revenus',
+          'professions',
+          'dureesEtablissement',
         ],
       );
       final val = FormulairePublicDto(
@@ -151,6 +180,18 @@ FormulairePublicDto _$FormulairePublicDtoFromJson(Map<String, dynamic> json) =>
               .map((e) => OptionPubliqueDto.fromJson(e as Map<String, dynamic>))
               .toList(),
         ),
+        professions: $checkedConvert(
+          'professions',
+          (v) => (v as List<dynamic>)
+              .map((e) => OptionPubliqueDto.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
+        dureesEtablissement: $checkedConvert(
+          'dureesEtablissement',
+          (v) => (v as List<dynamic>)
+              .map((e) => TrancheDureeDto.fromJson(e as Map<String, dynamic>))
+              .toList(),
+        ),
       );
       return val;
     });
@@ -163,4 +204,8 @@ Map<String, dynamic> _$FormulairePublicDtoToJson(
   'banques': instance.banques.map((e) => e.toJson()).toList(),
   'syndicats': instance.syndicats.map((e) => e.toJson()).toList(),
   'revenus': instance.revenus.map((e) => e.toJson()).toList(),
+  'professions': instance.professions.map((e) => e.toJson()).toList(),
+  'dureesEtablissement': instance.dureesEtablissement
+      .map((e) => e.toJson())
+      .toList(),
 };

@@ -1,7 +1,5 @@
 import type { components } from '@crm/api-client';
 
-import { DUREE_ETABLISSEMENT_MAX_MOIS } from '@/lib/types';
-
 type Schemas = components['schemas'];
 
 export type FormulairePublic = Schemas['FormulairePublicDto'];
@@ -15,15 +13,21 @@ export type Saisie = Readonly<Record<string, string>>;
 export const MESSAGE_MAX = 500;
 
 export type SourceListe =
-  'banques' | 'syndicats' | 'revenus' | 'situations' | 'paiements' | 'durees' | 'whatsapp';
+  | 'banques'
+  | 'syndicats'
+  | 'revenus'
+  | 'professions'
+  | 'dureesEtablissement'
+  | 'situations'
+  | 'paiements'
+  | 'durees'
+  | 'whatsapp';
 
 export interface Widget {
   readonly saisie: 'texte' | 'liste' | 'ouinon';
   readonly source?: SourceListe;
-  readonly type?: 'tel' | 'email' | 'number';
+  readonly type?: 'tel' | 'email';
   readonly autoComplete?: string;
-  readonly min?: number;
-  readonly max?: number;
   readonly nombre?: true;
   readonly longueurMax?: number;
 }
@@ -57,14 +61,12 @@ const SECTIONS: readonly Section[] = [
     titre: 'Votre situation',
     etape: 'complement',
     widgets: {
-      profession: { saisie: 'texte', autoComplete: 'organization-title', longueurMax: 120 },
+      profession: { saisie: 'liste', source: 'professions' },
       etablissement: { saisie: 'texte', autoComplete: 'organization', longueurMax: 160 },
       dureeEtablissementMois: {
-        saisie: 'texte',
-        type: 'number',
+        saisie: 'liste',
+        source: 'dureesEtablissement',
         nombre: true,
-        min: 0,
-        max: DUREE_ETABLISSEMENT_MAX_MOIS,
       },
       fonctionnaire: { saisie: 'ouinon' },
       type: { saisie: 'liste', source: 'situations' },
@@ -162,20 +164,11 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const trop = (max: number): string => `Ne dépassez pas ${String(max)} caractères.`;
 
-function nombreInvalide(widget: Widget, valeur: string): string | undefined {
-  const min = widget.min ?? 0;
-  const max = widget.max ?? Number.MAX_SAFE_INTEGER;
-  const nombre = Number(valeur);
-  if (Number.isInteger(nombre) && nombre >= min && nombre <= max) return undefined;
-  return `Indiquez un nombre entier entre ${String(min)} et ${String(max)}.`;
-}
-
 function formatInvalide(widget: Widget, valeur: string): string | undefined {
   if (widget.longueurMax !== undefined && valeur.length > widget.longueurMax)
     return trop(widget.longueurMax);
   if (widget.type === 'email' && !EMAIL.test(valeur)) return 'Adresse e-mail invalide.';
   if (widget.type === 'tel' && valeur.replaceAll(/\D/g, '').length < 6) return 'Numéro incomplet.';
-  if (widget.type === 'number') return nombreInvalide(widget, valeur);
   return undefined;
 }
 
@@ -230,6 +223,56 @@ export function validerDemande(
   return erreurs;
 }
 
+export interface Brouillon {
+  readonly saisie: Saisie;
+  readonly etape: Etape;
+}
+
+const cleBrouillon = (jeton: string): string => `cpi:demande:${jeton}`;
+
+const ETAPES_CONNUES = new Set<string>(['coordonnees', 'complement']);
+
+function estSaisie(charge: unknown): charge is Saisie {
+  if (typeof charge !== 'object' || charge === null) return false;
+  return Object.values(charge as Record<string, unknown>).every(
+    (valeur) => typeof valeur === 'string',
+  );
+}
+
+/**
+ * Le formulaire se remplit sur un téléphone ou un poste partagé : le brouillon
+ * meurt avec l'onglet. Le jeton anti-robot et le champ piège vivent dans le
+ * DOM, hors de `saisie` : ils ne peuvent pas s'y glisser.
+ */
+export function lireBrouillon(jeton: string): Brouillon | null {
+  try {
+    const brut = globalThis.sessionStorage.getItem(cleBrouillon(jeton));
+    if (brut === null) return null;
+    const { saisie, etape } = JSON.parse(brut) as { saisie?: unknown; etape?: unknown };
+    if (!estSaisie(saisie)) return null;
+    if (typeof etape !== 'string' || !ETAPES_CONNUES.has(etape)) return null;
+    return { saisie, etape: etape as Etape };
+  } catch {
+    return null;
+  }
+}
+
+export function ecrireBrouillon(jeton: string, brouillon: Brouillon): void {
+  try {
+    globalThis.sessionStorage.setItem(cleBrouillon(jeton), JSON.stringify(brouillon));
+  } catch {
+    // Navigation privée ou stockage refusé : la page marche sans brouillon.
+  }
+}
+
+export function effacerBrouillon(jeton: string): void {
+  try {
+    globalThis.sessionStorage.removeItem(cleBrouillon(jeton));
+  } catch {
+    // Idem : rien à rattraper, le brouillon n'a jamais été écrit.
+  }
+}
+
 function valeurEnvoyee(widget: Widget, valeur: string): unknown {
   if (widget.saisie === 'ouinon') return valeur === 'oui';
   if (widget.nombre === true) return Number(valeur);
@@ -248,7 +291,16 @@ function reponsesLibres(
   return reponses;
 }
 
-/** Le visiteur saisit un numéro libre : la clé `phone` le distingue de `phoneE164`, normalisé par le serveur. */
+/**
+ * `phone` distingue le numéro saisi librement de `phoneE164` que le serveur
+ * normalise ; `professionId` dit que la liste est fermée, là où `profession`
+ * restait du texte.
+ */
+const CLES_ENVOI: Readonly<Record<string, string>> = {
+  phoneE164: 'phone',
+  profession: 'professionId',
+};
+
 export function corpsDemande(
   saisie: Saisie,
   champs: readonly ReglageChampPublic[],
@@ -260,7 +312,7 @@ export function corpsDemande(
     const widget = widgetDe(champ.champ);
     const valeur = lire(saisie, champ.champ);
     if (widget === undefined || valeur === '') continue;
-    corps[champ.champ === 'phoneE164' ? 'phone' : champ.champ] = valeurEnvoyee(widget, valeur);
+    corps[CLES_ENVOI[champ.champ] ?? champ.champ] = valeurEnvoyee(widget, valeur);
   }
 
   const reponses = reponsesLibres(saisie, libres);

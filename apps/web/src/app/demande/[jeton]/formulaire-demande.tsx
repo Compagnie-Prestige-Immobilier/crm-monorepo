@@ -2,11 +2,18 @@
 
 import { AlertCircleIcon, CheckCircle2Icon, LoaderIcon } from 'lucide-react';
 import Script from 'next/script';
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from 'react';
 
 import { Field } from '@/components/forms/field';
 import { Liste, type OptionListe } from '@/components/forms/liste';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -15,9 +22,12 @@ import {
   champsRendus,
   cleLibre,
   corpsDemande,
+  ecrireBrouillon,
+  effacerBrouillon,
   estRequis,
   etapeDuChamp,
   grouperChamps,
+  lireBrouillon,
   MESSAGE_MAX,
   valeursLibre,
   validerDemande,
@@ -60,22 +70,32 @@ const DUREES: readonly OptionListe[] = DUREES_MOIS.map((mois) => ({
   label: formatDureeMois(mois),
 }));
 
-const MODES_SAISIE: Readonly<Record<string, 'tel' | 'numeric'>> = { tel: 'tel', number: 'numeric' };
-
-function optionsDe(source: SourceListe | undefined, formulaire: FormulairePublic): OptionListe[] {
-  if (source === 'banques') return formulaire.banques.map(enOption);
-  if (source === 'syndicats') return formulaire.syndicats.map(enOption);
-  if (source === 'revenus') return formulaire.revenus.map(enOption);
-  if (source === 'situations') return [...SITUATIONS];
-  if (source === 'paiements') return [...PAIEMENTS];
-  if (source === 'durees') return [...DUREES];
-  if (source === 'whatsapp') return CHOIX_WHATSAPP.map((choix) => ({ ...choix }));
-  return [];
+function optionsDe(
+  source: SourceListe | undefined,
+  formulaire: FormulairePublic,
+): readonly OptionListe[] {
+  if (source === undefined) return [];
+  return {
+    banques: formulaire.banques.map(enOption),
+    syndicats: formulaire.syndicats.map(enOption),
+    revenus: formulaire.revenus.map(enOption),
+    professions: formulaire.professions.map(enOption),
+    dureesEtablissement: formulaire.dureesEtablissement.map(enTranche),
+    situations: SITUATIONS,
+    paiements: PAIEMENTS,
+    durees: DUREES,
+    whatsapp: CHOIX_WHATSAPP,
+  }[source];
 }
 
 const enOption = (option: { id: string; libelle: string }): OptionListe => ({
   value: option.id,
   label: option.libelle,
+});
+
+const enTranche = (tranche: { mois: number; libelle: string }): OptionListe => ({
+  value: String(tranche.mois),
+  label: tranche.libelle,
 });
 
 type Phase = 'coordonnees' | 'complement' | 'relecture' | 'envoi' | 'envoye';
@@ -98,23 +118,57 @@ export function FormulaireDemande({
   const [refus, setRefus] = useState<string | null>(null);
   const element = useRef<HTMLFormElement>(null);
   const repere = useRef<HTMLParagraphElement>(null);
+  const verifier = useRef<HTMLButtonElement>(null);
 
   const etape = etapeDe(phase);
   const rendus = champsRendus(formulaire.champs, saisie);
   const sections = grouperChamps(rendus, etape);
   const enCours = phase === 'envoi';
+  const enRelecture = phase === 'relecture' || phase === 'envoi';
 
-  function modifier(cle: string, valeur: string): void {
-    setSaisie((precedent) => ({ ...precedent, [cle]: valeur }));
+  // Le brouillon ne peut pas être lu au premier rendu : le serveur rend un
+  // formulaire vide, et l'hydratation exige le même.
+  useEffect(() => {
+    const brouillon = lireBrouillon(jeton);
+    if (brouillon === null) return;
+    // oxlint-disable-next-line react/set-state-in-effect -- brouillon relu après hydratation
+    setSaisie(brouillon.saisie);
+    if (brouillon.etape === 'complement') setPhase('complement');
+  }, [jeton]);
+
+  function retenir(valeurs: Saisie, suivante: Phase): void {
+    ecrireBrouillon(jeton, { saisie: valeurs, etape: etapeDe(suivante) });
+  }
+
+  function poser(cle: string, probleme: string | undefined): void {
     setErreurs((precedent) => {
+      if (probleme !== undefined) return { ...precedent, [cle]: probleme };
+      if (!Object.hasOwn(precedent, cle)) return precedent;
       const { [cle]: _, ...reste } = precedent;
       return reste;
     });
+  }
+
+  const problemeDe = (cle: string, valeurs: Saisie): string | undefined =>
+    validerDemande(valeurs, formulaire.champs, formulaire.libres)[cle];
+
+  /** Un champ déjà signalé se corrige à la frappe ; un champ muet le reste. */
+  function modifier(cle: string, valeur: string): void {
+    const valeurs = { ...saisie, [cle]: valeur };
+    setSaisie(valeurs);
+    if (Object.hasOwn(erreurs, cle)) poser(cle, problemeDe(cle, valeurs));
     setPhase((precedent) => (precedent === 'relecture' ? 'complement' : precedent));
+    retenir(valeurs, phase);
+  }
+
+  /** Le premier signalement attend que le champ soit quitté : le corriger à chaque lettre reprend le visiteur en permanence. */
+  function quitter(cle: string): void {
+    poser(cle, problemeDe(cle, saisie));
   }
 
   function allerA(suivante: Phase): void {
     setPhase(suivante);
+    retenir(saisie, suivante);
     element.current?.scrollIntoView({ block: 'start' });
     repere.current?.focus();
   }
@@ -131,6 +185,7 @@ export function FormulaireDemande({
   }
 
   async function envoyer(): Promise<void> {
+    if (enCours) return;
     const turnstileToken = champDom(TURNSTILE_CHAMP);
     if (cleSite !== '' && turnstileToken === '') {
       setRefus('La vérification anti-robot n’est pas terminée. Patientez, puis renvoyez.');
@@ -158,6 +213,7 @@ export function FormulaireDemande({
         setPhase('relecture');
         return;
       }
+      effacerBrouillon(jeton);
       setPhase('envoye');
     } catch {
       setRefus('Le serveur est injoignable. Vérifiez votre connexion.');
@@ -181,15 +237,18 @@ export function FormulaireDemande({
     allerA(phase === 'coordonnees' ? 'complement' : 'relecture');
   }
 
-  /** Le seul chemin vers le POST part de la relecture : aucun autre bouton n'y mène. */
+  /** Le seul chemin vers le POST part de la fenêtre de relecture : le formulaire, lui, ne fait qu'avancer d'une étape. */
   function soumettre(evenement: FormEvent<HTMLFormElement>): void {
     evenement.preventDefault();
-    if (phase === 'envoi' || phase === 'envoye') return;
-    if (phase === 'relecture') {
-      void envoyer();
-      return;
-    }
+    if (enRelecture) return;
     franchir();
+  }
+
+  /** Fermer la fenêtre revient à la saisie : ni la relecture ni le brouillon ne perdent quoi que ce soit. */
+  function corriger(): void {
+    if (enCours) return;
+    setPhase('complement');
+    retenir(saisie, 'complement');
   }
 
   if (phase === 'envoye') {
@@ -218,7 +277,7 @@ export function FormulaireDemande({
           ref={repere}
           tabIndex={-1}
           aria-live="polite"
-          className="eyebrow text-muted-foreground outline-none"
+          className="rail eyebrow text-muted-foreground outline-none"
         >
           Étape {etape === 'coordonnees' ? '1' : '2'} sur 2
         </p>
@@ -238,6 +297,9 @@ export function FormulaireDemande({
                 onChange={(valeur) => {
                   modifier(champ.champ, valeur);
                 }}
+                onBlur={() => {
+                  quitter(champ.champ);
+                }}
               />
             ))}
           </div>
@@ -251,6 +313,7 @@ export function FormulaireDemande({
           erreurs={erreurs}
           enCours={enCours}
           onChange={modifier}
+          onBlur={quitter}
         />
       ) : null}
 
@@ -274,137 +337,93 @@ export function FormulaireDemande({
         </>
       )}
 
-      {phase === 'relecture' || phase === 'envoi' ? (
-        <Relecture formulaire={formulaire} rendus={rendus} saisie={saisie} />
-      ) : null}
-
-      {refus === null ? null : (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
-        >
-          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {refus}
-        </p>
-      )}
+      {refus === null || enRelecture ? null : <Refus texte={refus} />}
 
       <Actions
         phase={phase}
         deuxEtapes={deuxEtapes}
+        verifier={verifier}
         onRetour={() => {
           setRefus(null);
           allerA('coordonnees');
         }}
-        onCorriger={() => {
-          allerA('complement');
+      />
+
+      <FenetreRelecture
+        ouverte={enRelecture}
+        enCours={enCours}
+        refus={refus}
+        formulaire={formulaire}
+        rendus={rendus}
+        saisie={saisie}
+        verifier={verifier}
+        onEnvoyer={() => {
+          void envoyer();
         }}
+        onCorriger={corriger}
       />
     </form>
   );
 }
 
-/** Ce que l'étape 2 ajoute aux sections réglées : les champs libres et le message. */
-function Complement({
-  libres,
-  saisie,
-  erreurs,
-  enCours,
-  onChange,
-}: {
-  libres: readonly ChampLibrePublic[];
-  saisie: Saisie;
-  erreurs: Readonly<Record<string, string>>;
-  enCours: boolean;
-  onChange: (cle: string, valeur: string) => void;
-}) {
-  return (
-    <>
-      {libres.length === 0 ? null : (
-        <fieldset disabled={enCours} className="grid min-w-0 gap-5 sm:grid-cols-2">
-          {libres.map((libre) => (
-            <ChampAjoute
-              key={libre.id}
-              champ={libre}
-              valeur={saisie[cleLibre(libre.id)] ?? ''}
-              erreur={erreurs[cleLibre(libre.id)]}
-              onChange={(valeur) => {
-                onChange(cleLibre(libre.id), valeur);
-              }}
-            />
-          ))}
-        </fieldset>
-      )}
-
-      <fieldset disabled={enCours} className="min-w-0">
-        <Field label="Votre message" error={erreurs.message}>
-          {(props) => (
-            <Textarea
-              {...props}
-              rows={4}
-              maxLength={MESSAGE_MAX}
-              value={saisie.message ?? ''}
-              onChange={(evenement) => {
-                onChange('message', evenement.target.value);
-              }}
-            />
-          )}
-        </Field>
-      </fieldset>
-    </>
-  );
-}
-
 /**
- * Collée en bas sur mobile : sans cela le bouton d'étape vit sous dix champs et
- * se gagne au défilement.
+ * La fenêtre est PORTÉE hors du formulaire : ses boutons ne peuvent pas le
+ * soumettre, et l'envoi passe par `onEnvoyer`.
  */
-function Actions({
-  phase,
-  deuxEtapes,
-  onRetour,
+function FenetreRelecture({
+  ouverte,
+  enCours,
+  refus,
+  formulaire,
+  rendus,
+  saisie,
+  verifier,
+  onEnvoyer,
   onCorriger,
 }: {
-  phase: Phase;
-  deuxEtapes: boolean;
-  onRetour: () => void;
+  ouverte: boolean;
+  enCours: boolean;
+  refus: string | null;
+  formulaire: FormulairePublic;
+  rendus: readonly ReglageChampPublic[];
+  saisie: Saisie;
+  verifier: RefObject<HTMLButtonElement | null>;
+  onEnvoyer: () => void;
   onCorriger: () => void;
 }) {
-  const enCours = phase === 'envoi';
   return (
-    <div
-      className={cn(
-        'sticky bottom-0 z-10 -mx-6 flex flex-col gap-3 border-t border-border bg-background px-6 py-3',
-        'sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:border-0 sm:bg-transparent sm:px-0 sm:py-0',
-      )}
+    <Dialog
+      open={ouverte}
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onCorriger();
+      }}
     >
-      {phase === 'coordonnees' ? (
-        <Button type="submit" size="lg" className="w-full sm:w-auto">
-          Suivant
-        </Button>
-      ) : null}
+      <DialogContent
+        finalFocus={verifier}
+        showCloseButton={false}
+        className="grid-rows-[auto_minmax(0,1fr)_auto] overflow-y-hidden"
+      >
+        <DialogHeader>
+          <DialogTitle>Ce qui va être envoyé</DialogTitle>
+        </DialogHeader>
 
-      {phase === 'complement' ? (
-        <>
-          <Button type="submit" size="lg" className="w-full sm:w-auto">
-            Vérifier ma demande
-          </Button>
-          {deuxEtapes ? (
-            <Button
-              type="button"
-              variant="outline"
-              size="lg"
-              onClick={onRetour}
-              className="w-full sm:w-auto"
-            >
-              Retour
-            </Button>
-          ) : null}
-        </>
-      ) : null}
+        <div className="-mx-1 min-h-0 overflow-y-auto px-1">
+          <Relecture formulaire={formulaire} rendus={rendus} saisie={saisie} />
+          {refus === null ? null : (
+            <div className="mt-4">
+              <Refus texte={refus} />
+            </div>
+          )}
+        </div>
 
-      {phase === 'relecture' || phase === 'envoi' ? (
-        <>
-          <Button type="submit" size="lg" disabled={enCours} className="w-full sm:w-auto">
+        <DialogFooter className="sm:justify-start">
+          <Button
+            type="button"
+            size="lg"
+            disabled={enCours}
+            onClick={onEnvoyer}
+            className="w-full sm:w-auto"
+          >
             {enCours ? (
               <>
                 <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
@@ -424,17 +443,131 @@ function Actions({
           >
             Corriger
           </Button>
-        </>
-      ) : null}
-    </div>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function Refus({ texte }: { texte: string }) {
+  return (
+    <p
+      role="alert"
+      className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
+    >
+      <AlertCircleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+      {texte}
+    </p>
+  );
+}
+
+/** Ce que l'étape 2 ajoute aux sections réglées : les champs libres et le message. */
+function Complement({
+  libres,
+  saisie,
+  erreurs,
+  enCours,
+  onChange,
+  onBlur,
+}: {
+  libres: readonly ChampLibrePublic[];
+  saisie: Saisie;
+  erreurs: Readonly<Record<string, string>>;
+  enCours: boolean;
+  onChange: (cle: string, valeur: string) => void;
+  onBlur: (cle: string) => void;
+}) {
+  return (
+    <>
+      {libres.length === 0 ? null : (
+        <fieldset disabled={enCours} className="grid min-w-0 gap-5 sm:grid-cols-2">
+          {libres.map((libre) => (
+            <ChampAjoute
+              key={libre.id}
+              champ={libre}
+              valeur={saisie[cleLibre(libre.id)] ?? ''}
+              erreur={erreurs[cleLibre(libre.id)]}
+              onChange={(valeur) => {
+                onChange(cleLibre(libre.id), valeur);
+              }}
+              onBlur={() => {
+                onBlur(cleLibre(libre.id));
+              }}
+            />
+          ))}
+        </fieldset>
+      )}
+
+      <fieldset disabled={enCours} className="min-w-0">
+        <Field label="Votre message" error={erreurs.message}>
+          {(props) => (
+            <Textarea
+              {...props}
+              rows={4}
+              maxLength={MESSAGE_MAX}
+              value={saisie.message ?? ''}
+              onChange={(evenement) => {
+                onChange('message', evenement.target.value);
+              }}
+              onBlur={() => {
+                onBlur('message');
+              }}
+            />
+          )}
+        </Field>
+      </fieldset>
+    </>
   );
 }
 
 /**
- * L'étape de contrôle tient dans le formulaire : les champs de l'étape 2
- * restent à l'écran et modifiables, une fenêtre de plus ferait abandonner un
- * visiteur public.
+ * Collée en bas sur mobile : sans cela le bouton d'étape vit sous dix champs et
+ * se gagne au défilement.
  */
+function Actions({
+  phase,
+  deuxEtapes,
+  verifier,
+  onRetour,
+}: {
+  phase: Phase;
+  deuxEtapes: boolean;
+  verifier: RefObject<HTMLButtonElement | null>;
+  onRetour: () => void;
+}) {
+  return (
+    <div
+      className={cn(
+        'sticky bottom-0 z-10 -mx-6 flex flex-col gap-3 border-t border-border bg-background px-6 py-3',
+        'sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:border-0 sm:bg-transparent sm:px-0 sm:py-0',
+      )}
+    >
+      {phase === 'coordonnees' ? (
+        <Button type="submit" size="lg" className="w-full sm:w-auto">
+          Suivant
+        </Button>
+      ) : (
+        <>
+          <Button ref={verifier} type="submit" size="lg" className="w-full sm:w-auto">
+            Vérifier ma demande
+          </Button>
+          {deuxEtapes ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={onRetour}
+              className="w-full sm:w-auto"
+            >
+              Retour
+            </Button>
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
+
 function Relecture({
   formulaire,
   rendus,
@@ -457,22 +590,14 @@ function Relecture({
   ].filter((ligne) => ligne.valeur !== '');
 
   return (
-    <section
-      aria-labelledby="relecture-titre"
-      className="rounded-md border border-border bg-card p-4"
-    >
-      <h2 id="relecture-titre" className="font-display text-h4 font-[700]">
-        Ce qui va être envoyé
-      </h2>
-      <dl className="mt-3 grid gap-x-6 gap-y-3 sm:grid-cols-2">
-        {lignes.map((ligne) => (
-          <div key={ligne.libelle} className="flex min-w-0 flex-col">
-            <dt className="text-[0.75rem] text-muted-foreground">{ligne.libelle}</dt>
-            <dd className="text-[0.875rem] break-words">{ligne.valeur}</dd>
-          </div>
-        ))}
-      </dl>
-    </section>
+    <dl className="grid gap-x-6 gap-y-3 sm:grid-cols-2">
+      {lignes.map((ligne) => (
+        <div key={ligne.libelle} className="flex min-w-0 flex-col">
+          <dt className="text-[0.75rem] text-muted-foreground">{ligne.libelle}</dt>
+          <dd className="text-[0.875rem] break-words">{ligne.valeur}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -493,12 +618,14 @@ function ChampPublic({
   valeur,
   erreur,
   onChange,
+  onBlur,
 }: {
   champ: ReglageChampPublic;
   formulaire: FormulairePublic;
   valeur: string;
   erreur: string | undefined;
   onChange: (valeur: string) => void;
+  onBlur: () => void;
 }) {
   const widget = widgetDe(champ.champ);
   if (widget === undefined) return null;
@@ -530,7 +657,7 @@ function ChampPublic({
             onChange={onChange}
           />
         ) : (
-          <Saisir {...props} widget={widget} valeur={valeur} onChange={onChange} />
+          <Saisir {...props} widget={widget} valeur={valeur} onChange={onChange} onBlur={onBlur} />
         )
       }
     </Field>
@@ -541,6 +668,7 @@ function Saisir({
   widget,
   valeur,
   onChange,
+  onBlur,
   ...props
 }: {
   id: string;
@@ -549,16 +677,16 @@ function Saisir({
   widget: Widget;
   valeur: string;
   onChange: (valeur: string) => void;
+  onBlur: () => void;
 }) {
   return (
     <Input
       {...props}
+      onBlur={onBlur}
       type={widget.type ?? 'text'}
-      inputMode={widget.type === undefined ? undefined : MODES_SAISIE[widget.type]}
+      inputMode={widget.type === 'tel' ? 'tel' : undefined}
       autoComplete={widget.autoComplete ?? 'off'}
       maxLength={widget.longueurMax}
-      min={widget.min}
-      max={widget.max}
       value={valeur}
       onChange={(evenement) => {
         onChange(evenement.target.value);
@@ -572,11 +700,13 @@ function ChampAjoute({
   valeur,
   erreur,
   onChange,
+  onBlur,
 }: {
   champ: ChampLibrePublic;
   valeur: string;
   erreur: string | undefined;
   onChange: (valeur: string) => void;
+  onBlur: () => void;
 }) {
   if (champ.type === 'TEXTE') {
     return (
@@ -589,6 +719,7 @@ function ChampAjoute({
             onChange={(evenement) => {
               onChange(evenement.target.value);
             }}
+            onBlur={onBlur}
           />
         )}
       </Field>
