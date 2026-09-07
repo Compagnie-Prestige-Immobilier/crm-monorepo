@@ -1548,6 +1548,10 @@ class SyncEngine {
                 label: statut.label,
                 effect: statut.effect.value,
                 requiresCallback: Value<bool>(statut.requiresCallback),
+                // Sans lui, l'ecran n'exige jamais le motif et le serveur
+                // refuse la tentative : la qualification est alors perdue et
+                // le verrou de la fiche survit a jamais.
+                requiresComment: Value<bool>(statut.requiresComment),
                 retryAfterMinutes: Value<int?>(
                   statut.retryAfterMinutes?.toInt(),
                 ),
