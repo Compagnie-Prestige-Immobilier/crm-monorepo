@@ -7,24 +7,19 @@ import '../local/database.dart';
 typedef Region = ({String id, String name});
 
 class ReferenceRepository {
-  ReferenceRepository(this._db);
+  ReferenceRepository(this._db, {bool voirTout = false}) : _voirTout = voirTout;
 
   final AppDatabase _db;
+  final bool _voirTout;
 
-  /// Le périmètre d'appel, en SQL. Le pull de synchronisation est GLOBAL :
-  /// sans cette clause, un téléconseiller voit et appelle les fiches de toutes
-  /// les campagnes. Tant que le marqueur `borne` n'est pas posé — encadrement,
-  /// ou appareil qui n'a pas encore lu ses attributions — rien n'est filtré.
-  ///
-  /// [moi] se lie en `?1` : `created_by_id` est NON NUL, une chaîne vide ne peut
-  /// donc désigner personne.
-  static String _perimetre(String kind, {String alias = ''}) {
+  // Le marqueur appartient au compte : une autre session ne réutilise pas sa liste.
+  String _perimetre(String kind, {String alias = ''}) {
     final String p = alias.isEmpty ? '' : '$alias.';
-    return 'AND (NOT EXISTS (SELECT 1 FROM attributions '
-        '                    WHERE kind = \'$attributionBorne\') '
-        '     OR ${p}created_by_id = ?1 '
-        '     OR ${p}id IN (SELECT a.id FROM attributions AS a '
-        '                   WHERE a.kind = \'$kind\')) ';
+    return 'AND (${_voirTout ? 1 : 0} = 1 OR ('
+        'EXISTS (SELECT 1 FROM attributions '
+        'WHERE kind = \'$attributionBorne\' AND id = ?1) '
+        'AND ${p}id IN (SELECT a.id FROM attributions AS a '
+        'WHERE a.kind = \'$kind\'))) ';
   }
 
   /// Les régions, dérivées des départements : il n'existe pas de table
@@ -269,28 +264,41 @@ class ReferenceRepository {
         .watch();
   }
 
-  Stream<RepresentantSyncViewData?> watchRepresentant(String id) {
+  Stream<RepresentantSyncViewData?> watchRepresentant(
+    String id, {
+    String? moi,
+  }) {
     return _db
         .customSelect(
-          'SELECT * FROM representant_sync_view WHERE id = ?1 AND deleted_at IS NULL',
-          variables: <Variable<Object>>[Variable<String>(id)],
+          'SELECT * FROM representant_sync_view WHERE id = ?2 AND deleted_at IS NULL '
+          '${_perimetre('representant')}',
+          variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
+            Variable<String>(id),
+          ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.representants,
             _db.outbox,
+            _db.attributions,
           },
         )
         .map((QueryRow row) => _db.representantSyncView.map(row.data))
         .watchSingleOrNull();
   }
 
-  Stream<ProspectSyncViewData?> watchProspect(String id) {
+  Stream<ProspectSyncViewData?> watchProspect(String id, {String? moi}) {
     return _db
         .customSelect(
-          'SELECT * FROM prospect_sync_view WHERE id = ?1 AND deleted_at IS NULL',
-          variables: <Variable<Object>>[Variable<String>(id)],
+          'SELECT * FROM prospect_sync_view WHERE id = ?2 AND deleted_at IS NULL '
+          '${_perimetre('prospect')}',
+          variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
+            Variable<String>(id),
+          ],
           readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
             _db.prospects,
             _db.outbox,
+            _db.attributions,
           },
         )
         .map((QueryRow row) => _db.prospectSyncView.map(row.data))
@@ -303,13 +311,27 @@ class ReferenceRepository {
 
   Stream<List<ProspectSyncViewData>> watchProspectsFor(
     String representantId, {
+    String? moi,
     int maxRows = ficheRowCap,
   }) {
     return _db
-        .prospectsForRepresentant(
-          representantId: representantId,
-          maxRows: maxRows,
+        .customSelect(
+          'SELECT * FROM prospect_sync_view '
+          'WHERE representant_id = ?2 AND deleted_at IS NULL '
+          '${_perimetre('prospect')} '
+          'ORDER BY client_created_at DESC LIMIT ?3',
+          variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
+            Variable<String>(representantId),
+            Variable<int>(maxRows),
+          ],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.prospects,
+            _db.outbox,
+            _db.attributions,
+          },
         )
+        .map((QueryRow row) => _db.prospectSyncView.map(row.data))
         .watch();
   }
 
@@ -450,13 +472,20 @@ class ReferenceRepository {
         .watchSingle();
   }
 
-  Stream<int> watchProspectCountFor(String representantId) {
+  Stream<int> watchProspectCountFor(String representantId, {String? moi}) {
     return _db
         .customSelect(
           'SELECT COUNT(*) AS c FROM prospects '
-          'WHERE representant_id = ?1 AND deleted_at IS NULL',
-          variables: <Variable<Object>>[Variable<String>(representantId)],
-          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{_db.prospects},
+          'WHERE representant_id = ?2 AND deleted_at IS NULL '
+          '${_perimetre('prospect')}',
+          variables: <Variable<Object>>[
+            Variable<String>(moi ?? ''),
+            Variable<String>(representantId),
+          ],
+          readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+            _db.prospects,
+            _db.attributions,
+          },
         )
         .map((QueryRow row) => row.read<int>('c'))
         .watchSingle();
