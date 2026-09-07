@@ -65,6 +65,9 @@ RUN pnpm --filter @crm/database db:generate
 # contente de compiler ce qui est dans l'arbre, et la CI garantit par
 # ailleurs que cet arbre est à jour.
 RUN pnpm --filter @crm/database build \
+    && pnpm --filter @crm/api-client build \
+    && pnpm --filter @crm/api-client-chues build \
+    && pnpm --filter @crm/api-client-grand-public build \
     && pnpm --filter @crm/api build
 
 # -----------------------------------------------------------------------------
@@ -135,6 +138,9 @@ RUN apt-get update \
 # crée rien, on cesse simplement d'être root.
 COPY --from=prod-deps --chown=node:node /repo ./
 COPY --from=builder   --chown=node:node /repo/packages/database/dist ./packages/database/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client/dist ./packages/api-client/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client-chues/dist ./packages/api-client-chues/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client-grand-public/dist ./packages/api-client-grand-public/dist
 COPY --from=builder   --chown=node:node /repo/apps/api/dist ./apps/api/dist
 # Assets statiques embarqués dans le code : aujourd'hui le logo CPI du PDF
 # « programme d'appels ». Ils vivent HORS de dist/ parce que tsc ne copie que du
