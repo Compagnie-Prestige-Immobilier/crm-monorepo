@@ -1,12 +1,35 @@
-# Migration v2 : plan et arbitrages
+# Refonte v2 : plan et arbitrages
 
-Statut : version 2 du plan, 8 septembre 2026. La version 1 (7 septembre) a été
-soumise à cinq audits en lecture seule, archivés dans `docs/audit-v2/` : `api.md`,
-`web.md`, `mobile.md`, `donnees-infra.md`, `critique-plan.md`. La critique a
-relevé quinze erreurs factuelles et quatorze manques bloquants dans la
-version 1 ; ce document les intègre. Chaque affirmation technique ci-dessous
-renvoie à un `chemin:ligne` ou à une documentation officielle citée dans les
-audits. Ce qui n'a pas pu être vérifié est marqué « à prouver en phase 0 ».
+Statut : version 2.1 du plan, 8 septembre 2026. La version 1 (7 septembre) a
+été soumise à cinq audits en lecture seule, archivés dans `audits/`. La critique
+a relevé quinze erreurs factuelles et quatorze manques bloquants dans la
+version 1 ; ce document les intègre. Chaque affirmation technique renvoie à un
+`chemin:ligne` ou à une documentation officielle citée dans les audits. Ce qui
+n'a pas pu être vérifié est marqué « à prouver en phase 0 ». Le registre des
+risques consolidé est dans `risques.md`.
+
+## 0. Où se fait le travail
+
+Toute la v2 se construit dans un worktree git séparé, jamais dans le clone
+principal, pour que `dev` et `prod` restent disponibles sans bascule de branche :
+
+```
+git fetch origin
+git worktree add ../crm-monorepo-v2 -b v2 origin/dev
+cd ../crm-monorepo-v2 && pnpm install
+```
+
+- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo` reste sur `dev` ou
+  `prod` : correctifs de production, release v1 de maintenance, déploiements.
+- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo-v2` porte la branche
+  `v2` : `apps/go`, mobile réécrit, `packages/schema`, infra v2.
+- Les correctifs prod sont reportés dans `v2` chaque soir par
+  `git -C ../crm-monorepo-v2 merge origin/prod`, résolus dans le worktree.
+- Les deux worktrees partagent le même `.git` : un `git worktree list` doit
+  toujours montrer les deux, et `git worktree remove` n'est lancé qu'après la
+  bascule.
+- Les serveurs de développement des deux arbres n'utilisent pas les mêmes
+  ports (v1 : 3000, 3001, 5434, 6381 ; v2 : 4000, 5435, 6382, PowerSync 8080).
 
 ## 1. Pourquoi
 
@@ -68,7 +91,7 @@ DTO Nest + Swagger, OpenAPI, codegen, relais Next).
 | Tests | Quinze parcours métier + un seizième « matrice des rôles » paramétré | Remplace `roles-refus`, `roles-navigation`, `roles-renvois`, `roles-espaces`, `roles-trous` |
 | Release v1 | Une seule release v1 de maintenance, exception nommée au gel | Contenu fermé : §7 phase 0 |
 | Données locales | Code d'extraction jetable dans la v1 pour tout pousser avant vidage | Brouillons, preuves d'appel, rappels remontent ; rien n'est perdu |
-| Durée | Environ 24 semaines, phase 0 de 3 semaines, durées figées après les preuves | Les durées de §7 sont indicatives |
+| Durée | 15 jours ouvrés, phase 0 de 2 jours, durées figées après les preuves | La v1 a été construite en deux semaines avec des agents ; la v2 part d'une spécification complète (audits) et ne peut pas prendre plus |
 
 ## 3. Cible
 
@@ -85,13 +108,13 @@ Téléphones Flutter ──PowerSync SDK──► powersync-service (VPS, Traefi
 Stack, versions vérifiées :
 
 - Next.js 16.2, React 19.2, zod 4.4 (catalogue du dépôt). Serveur Node
-  personnalisé (`server.ts`) : Next, `@fastify/websocket` ou `ws` pour
-  `/api/v1/presence/live`, `node-cron` pour les sept tâches de
-  `docs/audit-v2/api.md` §2, SSE `/api/v1/live` en `ReadableStream`.
+  personnalisé (`server.ts`) : Next, `ws` pour `/api/v1/presence/live`,
+  `node-cron` pour les sept tâches de `audits/api.md` §2, SSE `/api/v1/live`
+  en `ReadableStream`.
 - Drizzle ORM. `drizzle-kit pull` sert de point de départ, puis relecture
   manuelle des 76 migrations : les 20 CHECK, 12 index partiels, l'index GIN
   `immutable_unaccent`, les extensions `unaccent` et `pg_trgm` sont réécrits à
-  la main dans le schéma Drizzle (`docs/audit-v2/donnees-infra.md` §2). Les
+  la main dans le schéma Drizzle (`audits/donnees-infra.md` §2). Les
   79 requêtes SQL brutes, concentrées dans `analytics/*`, sont portées telles
   quelles en `sql` Drizzle. `@updatedAt` et `uuid(7)` deviennent applicatifs.
 - Better Auth sur la table `users` existante (`modelName: 'user'`, `fields`
@@ -108,7 +131,7 @@ Stack, versions vérifiées :
 - Mobile : `powersync` 2.4, `drift_sqlite_async` 0.3 (compatible avec
   `drift >=2.33.0 <2.34.0`). Le schéma Drift actuel n'est pas réutilisable :
   PowerSync n'a que trois types, des vues sur `ps_data__*`, pas d'index partiel
-  ni de clé étrangère (`docs/audit-v2/critique-plan.md` E13). Les 28 tables de
+  ni de clé étrangère (`audits/critique-plan.md` E13). Les 28 tables de
   `schema.drift` sont re-spécifiées ; les 6 tables purement locales (`outbox`,
   `form_drafts`, `sync_state`, `attributions`, `preuves_appel`,
   `rep_callback_reminders`) sont remplacées ou reconstruites (§4).
@@ -166,10 +189,15 @@ Règles Sync Streams par rôle, à écrire en phase 1 et à mesurer en phase 0 :
   `device_call_detections` : enfants des fiches ci-dessus.
 - `phase2_directory` : projection à six colonnes de `prospects` pour la
   détection de doublon hors ligne, jusqu'à 500 000 lignes
-  (`schema.drift:611-644`). La sélection de colonnes dans une requête de sync
-  est à prouver en phase 0 ; sinon ce canal reste en HTTP.
-- `notifications` (`mine`), `rep_callback` (rappels promis), `sync_verdicts`.
+  (`schema.drift:611-644`). La documentation PowerSync confirme qu'une requête
+  de données peut ne sélectionner que certaines colonnes et qu'une même table
+  peut apparaître dans plusieurs buckets avec des projections différentes
+  (`docs.powersync.com/usage/sync-rules/data-queries`).
+- `notifications` (`mine`), `scheduled_callbacks` et `representants.nextCallbackAt`
+  (rappels promis, source des alarmes locales), `sync_verdicts`.
 - `visites` : ACCUEIL, ADMIN, DIRECTION.
+- Colonnes tableau (`notifications.audienceUserIds`) et `Decimal` arrivent en
+  texte côté client ; les tables bancaires ne sont pas synchronisées.
 
 Exclues de la publication : `sync_batches`, `sync_operations`,
 `agent_activity_slots`, `dashboard_layouts`, `lot_export_items` sauf projection
@@ -186,7 +214,7 @@ apps/go/            Next.js + serveur Node : panneau, API, WebSocket, crons, SSE
 apps/mobile/        Flutter, réécrit sur la branche v2
 packages/schema/    zod + types partagés, sans codegen
 infra/              Dockerfiles, powersync.yaml, sync-streams.yaml, Traefik via Dokploy
-docs/               ce plan, docs/audit-v2/, ADR, runbook
+docs/v2-refonte/    ce plan, audits/, risques.md, runbook
 ```
 
 Disparaissent : `apps/api`, `apps/web`, `packages/api-client`,
@@ -199,10 +227,13 @@ départements, référentiels, workflow bancaire, compte initial,
 
 ## 7. Phases
 
-Durées indicatives pour un binôme propriétaire + assistant. Les durées
-définitives sont figées à la fin de la phase 0.
+Durées en jours ouvrés, binôme propriétaire + agents. Repère : la v1 entière a
+été construite en deux semaines ; la v2 dispose en plus d'une spécification
+complète (les cinq audits) et d'une checklist de parité écrite. Les durées
+définitives sont figées à la fin de la phase 0. Calendrier dans
+`diagrammes/07-calendrier.puml` : du 14 septembre au 2 octobre 2026.
 
-### Phase 0. Preuves et préparation, 3 semaines
+### Phase 0. Preuves et préparation, 2 jours
 
 Sortie : quatre preuves écrites, go/no-go signé par le propriétaire.
 
@@ -225,10 +256,12 @@ Sortie : quatre preuves écrites, go/no-go signé par le propriétaire.
    `demo` et de `DEMO_WORKSPACE_ENABLED` ; refus de l'installation de mise à
    jour tant que `pendingSyncCount > 0` (`app_update_screen.dart:29,80-83`
    affiche mais ne bloque pas) ; extraction jetable qui pousse `form_drafts`,
-   `preuves_appel` et `rep_callback_reminders` au serveur avant vidage ; gel
-   des patches Shorebird v1.
+   `preuves_appel` et `rep_callback_reminders` au serveur avant vidage ;
+   `pendingCount` remonté dans le heartbeat et écran admin des retardataires ;
+   suppression des colonnes mortes retenues dans
+   `docs/migrations-en-attente.md` ; gel des patches Shorebird v1.
 
-### Phase 1. Socle, 4 semaines
+### Phase 1. Socle, 3 jours
 
 `apps/go` : serveur Node personnalisé, Better Auth sur `users` avec
 `username` et `jwt`, matrice des sept rôles en une table de garde par route,
@@ -239,7 +272,7 @@ module natif rebranché, écran de diagnostic, mise à jour obligatoire. Sortie 
 un téléconseiller se connecte, reçoit ses fiches hors ligne, une saisie remonte
 avec verdict, un appel détecté se rattache.
 
-### Phase 2. CHUES, 6 semaines
+### Phase 2. CHUES, 4 jours
 
 Représentants, qualification (script, statuts, suggestions, personne
 proposée), prospects, conversion avec champs configurables, ouvertures de
@@ -252,22 +285,22 @@ export classeur, `parametres-chues`. Mobile : les 26 écrans. Sortie :
 checklist §8 cochée pour téléconseiller, chargé de clientèle, superviseur,
 direction.
 
-### Phase 3. Grand Public, 2 semaines
+### Phase 3. Grand Public, 1 jour
 
 Même arbre, `projet` en paramètre. Formulaire Grand Public, consentement,
 conversion, console, rappels, statistiques. Formulaire public `/demande/[jeton]`
 avec Turnstile. Sortie : checklist Grand Public.
 
-### Phase 4. Banque, 2 semaines
+### Phase 4. Banque, 1 jour
 
 Dossiers, étapes, transitions, corrections ADMIN, demandes de création de
 client, vue d'ensemble, export 3 feuilles. Sortie : checklist Banque & Finance.
 
-### Phase 5. Accueil, 1,5 semaine
+### Phase 5. Accueil, 1 jour
 
 Registre, listes, tableau de bord, impression, import avec revue.
 
-### Phase 6. Admin, 3 semaines
+### Phase 6. Admin, 2 jours
 
 Utilisateurs (reprise de portefeuille, dernier admin), référentiels (29 + 10
 routes), imports de masse unifiés (un seul système, job avec bail, tranches,
@@ -276,12 +309,13 @@ compte rendu), plateformes d'enrôlement (tirage, indicateurs), paramètres,
 champs de conversion, purge avec plan topologique, dump, APK (manifeste,
 signature, obligatoire, retrait).
 
-### Phase 7. Parité et bascule, 2,5 semaines
+### Phase 7. Parité et bascule, 1 jour
 
 Seize parcours Playwright dont la matrice des rôles, smoke Maestro, checklist
 complète sur copie de prod, runbook §9 répété deux fois à blanc.
 
-Total indicatif : 24 semaines.
+Total : 15 jours ouvrés. La release v1 de maintenance se fait en parallèle de
+la phase 0, dans le clone principal.
 
 ## 8. Checklist de parité
 
@@ -324,8 +358,9 @@ et `cpi-go-web` (`infra/dokploy/deploy.py`), sauvegarde nocturne Dokploy vers
 S3 au format `pg_dump -Fc`. Le `Caddyfile` et `backup.sh` du dépôt ne servent
 pas en production.
 
-1. J-7 : la release v1 de maintenance est sur tous les téléphones (vérifié par
-   `heartbeat` et par le compteur de mises à jour). Aucun patch Shorebird v1.
+1. J-3 : la release v1 de maintenance est sur tous les téléphones (vérifié par
+   le `pendingCount` du heartbeat et par le compteur de mises à jour). Aucun
+   patch Shorebird v1.
 2. J-1 : publication de l'APK v2 en mise à jour obligatoire avec date
    d'activation ; la v1 pousse ses files et refuse l'installation tant qu'il
    reste une saisie.
@@ -343,8 +378,10 @@ pas en production.
    hôte `sync.cpi-chues.com`, Cloudflare en mode proxy avec règle
    d'exception pour l'agent `CPI-GO`, `readTimeout` Traefik à `0s` posé par
    `deploy.py` et versionné.
-8. J, 6. Déploiement de `apps/go`. Vérification : connexion e-mail et nom
-   d'utilisateur, JWKS lu par PowerSync, réplication active.
+8. J, 6. Déploiement de `apps/go` par `infra/dokploy/deploy.py` (Dokploy n'a
+   pas de webhook, le job CI `deploy` fait de même sur `prod`). Vérification :
+   connexion e-mail et nom d'utilisateur, JWKS lu par PowerSync, réplication
+   active.
 9. J, 7. Un téléphone de test : resynchronisation, saisie hors ligne remontée
    avec verdict, alarme de rappel réarmée.
 10. J, 8. Ouverture générale.
@@ -357,9 +394,12 @@ rejouables en v1.
 
 ## 10. Risques
 
+Registre complet, avec gravité et phase de traitement : `risques.md`. Les
+dix premiers :
+
 | Risque | Preuve | Parade |
 | --- | --- | --- |
-| Buckets par rôle et par campagne au-delà de la limite PowerSync | `docs/audit-v2/critique-plan.md` §3 | Preuve B en phase 0 ; repli sur le tirage global si le critère échoue |
+| Buckets par rôle et par campagne au-delà de la limite PowerSync | `audits/critique-plan.md` §3 | Preuve B en phase 0 ; repli sur le tirage global si le critère échoue |
 | Un verdict `conflict` mal géré laisse une saisie orpheline | `sync.service.ts:1689-1739` | Preuve A ; « À corriger » couvert par un parcours Playwright et Maestro |
 | Réaffectation pendant une ouverture | `scope.ts:66-74` | Condition d'ouverture dans les règles de sync ; test de parcours |
 | Compte désactivé qui synchronise encore jusqu'à une heure | `fresh-session.guard.ts:8,33-52` | Accepté par écrit le 8 septembre |
@@ -369,15 +409,16 @@ rejouables en v1.
 | Shorebird conservé : un patch peut remettre du code v1 | `shorebird.yaml:8` | Aucun patch v1 après le début de la phase 7 |
 | Notes vocales, APK, dumps sur volumes | `recordings.service.ts`, `db-dump.runner.ts:25-34` | HTTP direct ; `postgresql-client` 18 dans l'image `apps/go` |
 | Deux systèmes d'import de représentants aujourd'hui | `representants-import.service.ts`, `imports/representants.adapter.ts:20-64` | Un seul système en v2, celui à jobs |
-| Gel de 24 semaines | §2.2 | Correctifs prod sur `prod`, reportés dans `v2` chaque vendredi ; une seule release v1 nommée |
+| Gel de trois semaines | §2.2 | Correctifs prod sur `prod`, reportés dans `v2` chaque soir ; une seule release v1 nommée |
 
 ## 11. Points restant à valider
 
 - Volumes réels par table sur la copie de prod (aucun chiffre hors
   `prospects` et `representants`).
-- Sélection de colonnes dans une requête Sync Streams pour `phase2_directory`.
 - Hôte et certificat de `powersync-service` (`sync.cpi-chues.com`, certificat
   d'origine Cloudflare comme les deux autres).
 - Qui coche la checklist par rôle.
-- Sort des 54 défauts documentés dans `docs/qa-mobile/` : lesquels la v2 corrige
-  par construction, lesquels restent.
+- Sort des 54 défauts documentés dans `docs/qa-mobile/` : la liste de ceux que
+  la v2 corrige par construction est dans `risques.md` §4 ; les autres sont à
+  trancher.
+- Ports de développement du worktree v2 (§0), à fixer dans `apps/go/.env.example`.

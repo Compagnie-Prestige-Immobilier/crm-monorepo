@@ -1,4 +1,7 @@
-# Audit v2 : critique adversariale de `docs/migration-v2.md` (7 septembre 2026)
+# Audit v2 : critique adversariale de la version 1 du plan (7 septembre 2026)
+
+Le plan critiqué ici est la version 1 de `../plan.md` ; ses erreurs et manques
+ont été intégrés dans la version 2.1.
 
 Périmètre lu : le plan en entier, `apps/api/src` (31 modules, 233 décorateurs de route), `apps/web/src/app` (62 `page.tsx`), `apps/mobile/lib` + `apps/mobile/android`, `packages/database/prisma`, `infra/`, `docs/`. Vérifications externes : documentations officielles PowerSync, Better Auth, Drizzle, Next.js (URLs en fin de note). Les points E3, E4, E6, E11, E12 et B11 ont été revérifiés à la main dans le code après réception.
 

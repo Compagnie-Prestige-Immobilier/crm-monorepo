@@ -1,0 +1,20 @@
+@startuml 06-flux-auth
+title Flux : connexion mobile et jeton PowerSync.
+skinparam sequenceMessageAlign center
+
+participant "App Flutter" as app
+participant "Better Auth\n(apps/go)" as ba
+database "users, account,\nsession" as db
+participant "powersync-service" as ps
+
+app -> ba : signIn (e-mail ou nom d'utilisateur)
+ba -> db : vérifie argon2id
+ba --> app : session, 30 jours
+app -> ba : GET /api/auth/token
+ba --> app : JWT EdDSA, 1 heure, sub + role
+app -> ps : connect(JWT)
+ps -> ba : GET /api/auth/jwks
+ps --> app : descente ouverte
+... hors ligne : lecture et écriture locales sans jeton ...
+... retour en ligne : nouveau JWT, reconnexion ...
+@enduml

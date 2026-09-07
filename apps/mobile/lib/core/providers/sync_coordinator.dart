@@ -288,7 +288,13 @@ class SyncCoordinator extends Notifier<SyncUiState> {
         await _reconcilierOuverture();
       }
       return outcome;
-    } on Object catch (e) {
+    } on Object catch (e, stack) {
+      developer.log(
+        'Synchronisation interrompue',
+        name: 'cpi.sync',
+        error: e,
+        stackTrace: stack,
+      );
       if (ref.mounted) {
         state = state.copyWith(
           running: false,
