@@ -26,7 +26,6 @@ import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
 import '../../phase2/phase2_controller.dart';
 import '../../shell/projects.dart';
-import '../../telephonie/appels_a_consigner.dart';
 import '../situation_labels.dart';
 
 /// La fiche d'un prospect, en LECTURE, pour préparer et consigner un appel.
@@ -196,7 +195,6 @@ class _Fiche extends ConsumerWidget {
     final DateTime? rappel = appel?.callbackAt;
 
     final List<CpiRow> faits = <CpiRow>[
-      ?ligneAppelNonConsigne(context, ref, kind: 'prospect', entityId: data.id),
       if (representantId != null)
         CpiRow(
           leading: const Icon(

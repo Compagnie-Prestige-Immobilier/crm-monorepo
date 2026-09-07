@@ -27,7 +27,6 @@ import '../../../ui/widgets/sync_status_icon.dart';
 import '../../../ui/async_value_x.dart';
 import '../../representant/presentation/representant_detail_screen.dart'
     show StatutTag, libelleIssueRepresentant, relationLabel;
-import '../../telephonie/appels_a_consigner.dart';
 import '../../shell/grand_public_fiches_screen.dart' show ProspectTile;
 
 /// La base des représentants vient du web : on ne les crée pas ici, on en
@@ -117,10 +116,6 @@ class _HistoriqueScreenState extends ConsumerState<HistoriqueScreen> {
       ),
     );
 
-    final List<AppelsAConsignerResult> aConsigner =
-        ref.watch(appelsAConsignerProvider).value ??
-        const <AppelsAConsignerResult>[];
-
     // `CpiScaffold` fait paraître et disparaître son bandeau : une bande vide
     // et permanente lui enlèverait sa transition.
     final List<Widget> bandes = <Widget>[
@@ -135,36 +130,6 @@ class _HistoriqueScreenState extends ConsumerState<HistoriqueScreen> {
           child: CpiStatusBand(
             text: 'Hors ligne. Les fiches restent consultables.',
             tone: CpiTone.warning,
-          ),
-        ),
-      if (aConsigner.isNotEmpty)
-        Padding(
-          padding: const EdgeInsets.fromLTRB(
-            CpiSpacing.md,
-            0,
-            CpiSpacing.md,
-            CpiSpacing.sm,
-          ),
-          child: CpiCard(
-            onTap: () =>
-                unawaited(ouvrirAppelsAConsigner(context, ref, aConsigner)),
-            child: Row(
-              children: <Widget>[
-                const Icon(PhosphorIconsRegular.phoneX, size: CpiIconSize.lg),
-                const SizedBox(width: CpiSpacing.sm),
-                Expanded(
-                  child: Text(
-                    aConsigner.length == 1
-                        ? '1 appel à consigner'
-                        : '${aConsigner.length} appels à consigner',
-                  ),
-                ),
-                const Icon(
-                  PhosphorIconsRegular.caretRight,
-                  size: CpiIconSize.md,
-                ),
-              ],
-            ),
           ),
         ),
     ];

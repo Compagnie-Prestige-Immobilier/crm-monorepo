@@ -198,7 +198,10 @@ final Provider<DraftRepository> draftRepositoryProvider =
 
 final Provider<ReferenceRepository> referenceRepositoryProvider =
     Provider<ReferenceRepository>((Ref ref) {
-      return ReferenceRepository(ref.watch(appDatabaseProvider));
+      return ReferenceRepository(
+        ref.watch(appDatabaseProvider),
+        voirTout: ref.watch(authControllerProvider).role == Role.ADMIN.value,
+      );
     });
 
 final Provider<OuvertureRepository> ouvertureRepositoryProvider =
@@ -555,17 +558,12 @@ final StreamProvider<List<ProspectSyncViewData>> chuesProspectListProvider =
 String _moi(Ref ref) =>
     ref.watch(authControllerProvider.select((AuthState s) => s.userId)) ?? '';
 
-/// Le compte est-il borné à ses campagnes ? Faux pour l'encadrement, et faux
-/// tant que le périmètre n'a jamais été lu. Sert à l'état vide, pas au filtre :
-/// le filtre, lui, vit dans les requêtes.
 final StreamProvider<bool> perimetreBorneProvider = StreamProvider<bool>((
   Ref ref,
 ) {
-  final AppDatabase db = ref.watch(appDatabaseProvider);
-  return (db.select(db.attributions)
-        ..where((Attributions t) => t.kind.equals(attributionBorne)))
-      .watch()
-      .map((List<Attribution> rows) => rows.isNotEmpty);
+  return Stream<bool>.value(
+    ref.watch(authControllerProvider).role != Role.ADMIN.value,
+  );
 });
 
 final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
@@ -629,7 +627,7 @@ final representantDetailProvider =
     ) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchRepresentant(representantId);
+          .watchRepresentant(representantId, moi: _moi(ref));
     });
 
 final prospectDetailProvider =
@@ -637,7 +635,9 @@ final prospectDetailProvider =
       Ref ref,
       String prospectId,
     ) {
-      return ref.watch(referenceRepositoryProvider).watchProspect(prospectId);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchProspect(prospectId, moi: _moi(ref));
     });
 
 /// Où en est la conversion de ce prospect : ce que le serveur en sait
@@ -929,7 +929,7 @@ final prospectsForRepresentantProvider =
     ) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchProspectsFor(representantId);
+          .watchProspectsFor(representantId, moi: _moi(ref));
     });
 
 final representantCommentsProvider =
@@ -948,7 +948,7 @@ final prospectCountForProvider = StreamProvider.family<int, String>((
 ) {
   return ref
       .watch(referenceRepositoryProvider)
-      .watchProspectCountFor(representantId);
+      .watchProspectCountFor(representantId, moi: _moi(ref));
 });
 
 final StreamProvider<int> phase2DirectoryCountProvider = StreamProvider<int>((
