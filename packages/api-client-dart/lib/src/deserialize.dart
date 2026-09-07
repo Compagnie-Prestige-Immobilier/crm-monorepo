@@ -96,6 +96,7 @@ import 'package:crm_api_client/src/model/enrolement_indicateurs_dto.dart';
 import 'package:crm_api_client/src/model/enrolement_reglages_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_count_dto.dart';
 import 'package:crm_api_client/src/model/enrollment_method_list_dto.dart';
+import 'package:crm_api_client/src/model/formulaire_public_dto.dart';
 import 'package:crm_api_client/src/model/funnel_stage_dto.dart';
 import 'package:crm_api_client/src/model/ief_dto.dart';
 import 'package:crm_api_client/src/model/import_job_dto.dart';
@@ -142,6 +143,7 @@ import 'package:crm_api_client/src/model/notification_template_dto.dart';
 import 'package:crm_api_client/src/model/notification_template_list_dto.dart';
 import 'package:crm_api_client/src/model/offer_dto.dart';
 import 'package:crm_api_client/src/model/ok_dto.dart';
+import 'package:crm_api_client/src/model/option_publique_dto.dart';
 import 'package:crm_api_client/src/model/origin_breakdown_dto.dart';
 import 'package:crm_api_client/src/model/origin_count_dto.dart';
 import 'package:crm_api_client/src/model/origin_label_count_dto.dart';
@@ -257,6 +259,7 @@ import 'package:crm_api_client/src/model/top_commercial_dto.dart';
 import 'package:crm_api_client/src/model/top_commercial_list_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_dto.dart';
 import 'package:crm_api_client/src/model/top_representant_list_dto.dart';
+import 'package:crm_api_client/src/model/tranche_duree_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_dto.dart';
 import 'package:crm_api_client/src/model/update_bank_case_stage_dto.dart';
 import 'package:crm_api_client/src/model/update_banque_dto.dart';
@@ -646,6 +649,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ExportMode':
     case 'FamilleStatut':
+    case 'FormulairePublicDto':
+      return FormulairePublicDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'FunnelStageDto':
       return FunnelStageDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -794,6 +800,9 @@ ReturnType deserialize<ReturnType, BaseType>(
       return OfferDto.fromJson(value as Map<String, dynamic>) as ReturnType;
     case 'OkDto':
       return OkDto.fromJson(value as Map<String, dynamic>) as ReturnType;
+    case 'OptionPubliqueDto':
+      return OptionPubliqueDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
     case 'OriginBreakdownDto':
       return OriginBreakdownDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -1175,6 +1184,9 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'TopRepresentantListDto':
       return TopRepresentantListDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'TrancheDureeDto':
+      return TrancheDureeDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
     case 'TypeContrat':
     case 'UpdateBankCaseDto':

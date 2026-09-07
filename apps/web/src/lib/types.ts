@@ -40,6 +40,8 @@ export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
   AUCUN: 'Aucune',
 };
 
+export const PAYMENT_MODES = ['COMPTANT', 'ECHELONNE'] as const satisfies readonly PaymentMode[];
+
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   COMPTANT: 'Comptant',
   ECHELONNE: 'Échelonné',
@@ -54,6 +56,9 @@ export type CreateUserInput = Schemas['CreateUserDto'];
 export type UpdateUserInput = Schemas['UpdateUserDto'];
 export type UpdateProspectInput = Schemas['UpdateProspectDto'];
 export type UpdateRepresentantInput = Schemas['UpdateRepresentantDto'];
+
+/** Borne du serveur (`attempt-rules.ts`) : la conversion et le formulaire public la partagent. */
+export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
 
 export const PROSPECT_STATUTS = [
   'NOUVEAU',

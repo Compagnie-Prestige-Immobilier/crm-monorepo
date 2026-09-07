@@ -768,6 +768,12 @@ model Prospect {
   /// `Representant`, et facultatif pour la meme raison.
   etablissement String?
 
+  /// L'adresse de la fiche, minuscules et sans espaces : le formulaire public
+  /// rapproche dessus quand le numero est inconnu, et une comparaison sensible
+  /// a la casse laisserait passer un doublon. Distincte de `CallAttempt.email`,
+  /// qui est l'adresse recueillie PENDANT un appel donne.
+  email String?
+
   /// Le metier declare, en clair. Pas un referentiel : la variete du secteur
   /// informel n'en supporterait pas un, et une liste fermee ferait saisir
   /// « autre » partout.

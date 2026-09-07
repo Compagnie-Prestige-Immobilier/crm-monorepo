@@ -4,14 +4,8 @@ import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { Field } from '@/components/forms/field';
+import { Liste } from '@/components/forms/liste';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   reglesChamps,
   type ChampReglable,
@@ -532,44 +526,6 @@ function ChampAjoute({
         />
       )}
     </Field>
-  );
-}
-
-function Liste({
-  id,
-  describedBy,
-  items,
-  value,
-  placeholder,
-  onChange,
-}: {
-  id: string;
-  describedBy: string | undefined;
-  items: readonly { value: string; label: string }[];
-  value: string;
-  placeholder: string;
-  onChange: (value: string) => void;
-}) {
-  return (
-    <Select
-      items={items}
-      value={value}
-      onValueChange={(next) => {
-        if (next === null || next === '') return;
-        onChange(next);
-      }}
-    >
-      <SelectTrigger id={id} aria-describedby={describedBy}>
-        <SelectValue placeholder={placeholder} />
-      </SelectTrigger>
-      <SelectContent>
-        {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
-            {item.label}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
   );
 }
 
