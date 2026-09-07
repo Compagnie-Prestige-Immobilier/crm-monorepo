@@ -22,6 +22,8 @@ import { formatDateTime } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+import { VerrouFichesCard } from './verrou-fiches-card';
+
 const LIBELLES: Record<string, string> = {
   plateformeChuesUrl: 'Lien de la plateforme CPI CHUES',
   plateformeGrandPublicUrl: 'Lien de la plateforme Grand Public',
@@ -34,6 +36,7 @@ const LIBELLES: Record<string, string> = {
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
   destinatairesDirection: 'Direction',
+  verrouFiches: 'Verrou des fiches',
 };
 
 const LISTES = [
@@ -107,6 +110,8 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
 
   return (
     <div className="flex flex-col gap-6">
+      {peutToutRegler ? <VerrouFichesCard /> : null}
+
       {peutToutRegler ? <CartePlateformes valeur={valeur} saisir={saisir} /> : null}
 
       <Card>
