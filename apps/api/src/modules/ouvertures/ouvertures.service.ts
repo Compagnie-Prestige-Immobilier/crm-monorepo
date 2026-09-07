@@ -4,6 +4,7 @@ import { Prisma, RappelOrigine, ScheduledCallbackStatus } from '@crm/database';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
 import { attributionScope, prospectReadScope, readsEveryone } from '../../common/scope.js';
+import { ParametresChuesService } from '../parametres-chues/parametres-chues.service.js';
 import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
 import {
   type ComptageOuverturesDto,
@@ -128,7 +129,10 @@ export async function fermerOuverture(
 
 @Injectable()
 export class OuverturesService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly parametres: ParametresChuesService,
+  ) {}
 
   async ouvrir(user: AuthenticatedUser, body: OuvrirFicheDto): Promise<OuvertureFicheDto> {
     if ((body.representantId === undefined) === (body.prospectId === undefined)) {
@@ -150,7 +154,45 @@ export class OuverturesService {
       ? (body.draft as Prisma.InputJsonObject)
       : await this.brouillonPrecedent(user, body);
 
+    const { verrouFiches } = await this.parametres.lire();
+    if (!verrouFiches) await this.fermerAutreOuverteSiCiblesDistinctes(user, body);
+
     return this.creerOuverture(user, body, draft);
+  }
+
+  /**
+   * Verrou coupe par l'administrateur : le teleconseiller peut ouvrir une
+   * autre fiche sans qualifier la precedente. Fermeture directe, hors du
+   * chemin de `liberer` : pas de rappel programme, pas de liberation tracee,
+   * la fiche precedente redevient simplement close.
+   */
+  private async fermerAutreOuverteSiCiblesDistinctes(
+    user: AuthenticatedUser,
+    body: OuvrirFicheDto,
+  ): Promise<void> {
+    const ouverte = await this.prisma.ouvertureFiche.findFirst({
+      where: { openedById: user.id, closedAt: null },
+      select: {
+        id: true,
+        representantId: true,
+        prospectId: true,
+        openedAt: true,
+        firstInputAt: true,
+      },
+    });
+    if (!ouverte) return;
+
+    const memeFiche =
+      ouverte.representantId === (body.representantId ?? null) &&
+      ouverte.prospectId === (body.prospectId ?? null);
+    if (memeFiche) return;
+
+    const plancher = ouverte.firstInputAt ?? ouverte.openedAt;
+    const maintenant = new Date();
+    await this.prisma.ouvertureFiche.updateMany({
+      where: { id: ouverte.id, closedAt: null },
+      data: { closedAt: maintenant < plancher ? plancher : maintenant, closingAttemptId: null },
+    });
   }
 
   private async creerOuverture(
