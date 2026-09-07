@@ -58,6 +58,11 @@ const PRISMA_ERROR_BODIES: Record<string, PrismaErrorBodyFactory> = {
     code: 'DATABASE_BUSY',
     message: 'Base momentanément saturée. Réessayez dans quelques instants.',
   }),
+  P2004: () => ({
+    statusCode: HttpStatus.BAD_REQUEST,
+    code: 'CHECK_CONSTRAINT_VIOLATION',
+    message: 'Cette valeur ne respecte pas une règle de cohérence des données.',
+  }),
 };
 
 function mapPrismaError(error: KnownPrismaError): PrismaErrorBody | undefined {

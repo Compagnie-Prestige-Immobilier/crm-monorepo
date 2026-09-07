@@ -17,8 +17,16 @@ const TRAIT = 'FFC9C2C4';
 const GRIS = 'FF6B5F62';
 const BLANC = 'FFFFFFFF';
 
+const POLICE = 'Arial';
+const CORPS = 14;
+const HAUTEUR_LIGNE = 22;
+
 const LARGEUR_BANDEAU = 6;
-const HAUTEUR_BANDEAU = 6;
+const HAUTEUR_BANDEAU = 7;
+
+/** Le groupe des cartes qui n'en déclarent pas, et l'onglet qui rassemble les nombres seuls. */
+const SANS_GROUPE = 'Détail';
+const CHIFFRES_CLES = 'Chiffres clés';
 
 type ModuleExcel = typeof ExcelJS;
 
@@ -32,9 +40,11 @@ interface Tableau {
   total?: readonly Cellule[];
 }
 
-export interface FeuilleTableauDeBord {
+export interface BlocTableauDeBord {
   titre: string;
   question?: string | undefined;
+  /** Le thème qui décide de l'onglet : les cartes d'un même thème se lisent ensemble. */
+  groupe?: string | undefined;
   donnees: DonneesSource;
 }
 
@@ -44,7 +54,18 @@ export interface ClasseurTableauDeBord {
   titre: string;
   sousTitre: string;
   reperes: readonly { libelle: string; valeur: string }[];
-  feuilles: readonly FeuilleTableauDeBord[];
+  blocs: readonly BlocTableauDeBord[];
+}
+
+interface Bloc {
+  titre: string;
+  question: string;
+  tableau: Tableau;
+}
+
+interface Onglet {
+  nom: string;
+  blocs: Bloc[];
 }
 
 export async function telechargerTableauDeBord(classeur: ClasseurTableauDeBord): Promise<void> {
@@ -53,15 +74,9 @@ export async function telechargerTableauDeBord(classeur: ClasseurTableauDeBord):
   workbook.creator = 'CPI GO';
   workbook.created = new Date();
 
-  const pris = new Set(['Charte']);
-  const pages = classeur.feuilles.map((feuille) => ({
-    feuille,
-    onglet: nomUnique(feuille.titre, pris),
-    tableau: enTableau(feuille.donnees),
-  }));
-
-  ecrireCharte(workbook, classeur, pages, await logoCpi());
-  for (const page of pages) ecrireFeuille(workbook, page);
+  const onglets = repartir(classeur.blocs);
+  ecrireCharte(workbook, classeur, onglets, await logoCpi());
+  for (const onglet of onglets) ecrireOnglet(workbook, onglet);
 
   const buffer = await workbook.xlsx.writeBuffer();
   telecharger(buffer, `${classeur.fichier}.xlsx`);
@@ -73,16 +88,53 @@ async function chargerExcel(): Promise<ModuleExcel> {
   return (charge as { default?: ModuleExcel }).default ?? charge;
 }
 
-interface Page {
-  feuille: FeuilleTableauDeBord;
-  onglet: string;
-  tableau: Tableau;
+/**
+ * Un nombre seul ne mérite pas un onglet : tous se rangent dans « Chiffres
+ * clés ». Le reste suit le thème de la carte, pour que ce qui se lit ensemble
+ * reste ensemble.
+ */
+function repartir(blocs: readonly BlocTableauDeBord[]): Onglet[] {
+  const cles: Cellule[][] = [];
+  const parGroupe = new Map<string, Bloc[]>();
+
+  for (const source of blocs) {
+    const tableau = enTableau(source.donnees);
+    if (estNombreSeul(source.donnees)) {
+      cles.push([source.titre, tableau.lignes[0]?.[1] ?? null]);
+      continue;
+    }
+    const groupe = source.groupe ?? SANS_GROUPE;
+    const bloc = { titre: source.titre, question: source.question ?? '', tableau };
+    parGroupe.set(groupe, [...(parGroupe.get(groupe) ?? []), bloc]);
+  }
+
+  const onglets = [...parGroupe].map(([nom, liste]) => ({ nom, blocs: liste }));
+  if (cles.length === 0) return nommerOnglets(onglets);
+  return nommerOnglets([{ nom: CHIFFRES_CLES, blocs: [blocDesCles(cles)] }, ...onglets]);
+}
+
+function estNombreSeul(donnees: DonneesSource): boolean {
+  return donnees.forme === 'scalaire' && (donnees.donnee.serie ?? []).length === 0;
+}
+
+/** Sans titre propre : l'onglet porte déjà le sien, le répéter ne dit rien de plus. */
+function blocDesCles(lignes: readonly (readonly Cellule[])[]): Bloc {
+  return {
+    titre: '',
+    question: 'Les indicateurs de l’écran, en une valeur chacun.',
+    tableau: { colonnes: ['Indicateur', 'Valeur'], lignes },
+  };
+}
+
+function nommerOnglets(onglets: readonly Onglet[]): Onglet[] {
+  const pris = new Set(['Charte']);
+  return onglets.map((onglet) => ({ ...onglet, nom: nomUnique(onglet.nom, pris) }));
 }
 
 function ecrireCharte(
   workbook: Workbook,
   classeur: ClasseurTableauDeBord,
-  pages: readonly Page[],
+  onglets: readonly Onglet[],
   logo: ArrayBuffer | null,
 ): void {
   const sheet = workbook.addWorksheet('Charte', {
@@ -92,17 +144,17 @@ function ecrireCharte(
   sheet.columns = [
     { width: 3 },
     { width: 6 },
-    { width: 42 },
-    { width: 58 },
-    { width: 11 },
+    { width: 38 },
+    { width: 62 },
+    { width: 13 },
     { width: 3 },
   ];
 
   peindreBandeau(sheet);
   poserLogo(workbook, sheet, logo);
 
-  titrerBandeau(sheet.getCell('C3'), classeur.titre, 22, BLANC);
-  titrerBandeau(sheet.getCell('C5'), classeur.sousTitre, 11, OR_CLAIR);
+  titrerBandeau(sheet.getCell('C3'), classeur.titre, 26, BLANC);
+  titrerBandeau(sheet.getCell('C6'), classeur.sousTitre, CORPS, OR_CLAIR);
 
   let ligne = HAUTEUR_BANDEAU + 2;
   for (const repere of classeur.reperes) {
@@ -110,22 +162,22 @@ function ecrireCharte(
     ligne += 1;
   }
 
-  ligne += 1;
-  intituler(sheet.getCell(ligne, 3), 'Ce que contient ce classeur');
+  ligne += 2;
+  intituler(sheet.getCell(ligne, 3), 'Ce que contient ce classeur', 18);
   ligne += 2;
 
-  ecrireEnTeteSommaire(sheet.getRow(ligne), ['Feuille', 'Ce qu’elle répond', 'Lignes']);
+  ecrireEnTete(sheet.getRow(ligne), ['Onglet', 'Ce qu’il rassemble', 'Blocs'], 3);
   ligne += 1;
 
-  pages.forEach((page, index) => {
-    ecrireLigneSommaire(sheet.getRow(ligne + index), page, index);
+  onglets.forEach((onglet, index) => {
+    ecrireLigneSommaire(sheet.getRow(ligne + index), onglet, index);
   });
 }
 
 function peindreBandeau(sheet: Worksheet): void {
   for (let ligne = 1; ligne <= HAUTEUR_BANDEAU; ligne += 1) {
     const row = sheet.getRow(ligne);
-    row.height = 20;
+    row.height = HAUTEUR_LIGNE;
     for (let colonne = 1; colonne <= LARGEUR_BANDEAU; colonne += 1) {
       row.getCell(colonne).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BORDEAUX } };
     }
@@ -135,51 +187,42 @@ function peindreBandeau(sheet: Worksheet): void {
 function poserLogo(workbook: Workbook, sheet: Worksheet, logo: ArrayBuffer | null): void {
   if (logo === null) return;
   const image = workbook.addImage({ buffer: logo, extension: 'png' });
-  sheet.addImage(image, { tl: { col: 4.35, row: 1.6 }, ext: { width: 150, height: 61 } });
+  sheet.addImage(image, { tl: { col: 4.3, row: 1.8 }, ext: { width: 172, height: 70 } });
 }
 
 function titrerBandeau(cellule: Cell, texte: string, taille: number, couleur: string): void {
   cellule.value = texte;
-  cellule.font = { bold: true, size: taille, color: { argb: couleur } };
+  cellule.font = { name: POLICE, bold: true, size: taille, color: { argb: couleur } };
   cellule.alignment = { vertical: 'middle' };
 }
 
 function ecrireRepere(row: Row, repere: { libelle: string; valeur: string }): void {
   const libelle = row.getCell(3);
   libelle.value = repere.libelle;
-  libelle.font = { bold: true, size: 10, color: { argb: GRIS } };
+  libelle.font = { name: POLICE, bold: true, size: CORPS, color: { argb: GRIS } };
   libelle.alignment = { vertical: 'middle' };
 
   const valeur = row.getCell(4);
   valeur.value = repere.valeur;
-  valeur.font = { size: 11 };
+  valeur.font = { name: POLICE, size: CORPS };
   valeur.alignment = { vertical: 'middle' };
-  row.height = 18;
+  row.height = HAUTEUR_LIGNE;
 }
 
-function intituler(cellule: Cell, texte: string): void {
+function intituler(cellule: Cell, texte: string, taille: number): void {
   cellule.value = texte;
-  cellule.font = { bold: true, size: 13, color: { argb: BORDEAUX } };
+  cellule.font = { name: POLICE, bold: true, size: taille, color: { argb: BORDEAUX } };
+  cellule.alignment = { vertical: 'middle' };
 }
 
-function ecrireEnTeteSommaire(row: Row, colonnes: readonly string[]): void {
-  row.height = 22;
-  colonnes.forEach((titre, index) => {
-    const cellule = row.getCell(index + 3);
-    cellule.value = titre;
-    cellule.font = { bold: true, size: 11, color: { argb: BLANC } };
-    cellule.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BORDEAUX } };
-    cellule.alignment = { vertical: 'middle' };
-  });
-}
-
-function ecrireLigneSommaire(row: Row, page: Page, index: number): void {
+function ecrireLigneSommaire(row: Row, onglet: Onglet, index: number): void {
+  const titres = onglet.blocs.map((bloc) => bloc.titre).filter((titre) => titre !== '');
   const cellules: Cellule[] = [
-    page.onglet,
-    page.feuille.question ?? page.feuille.titre,
-    page.tableau.lignes.length,
+    onglet.nom,
+    titres.length === 0 ? (onglet.blocs[0]?.question ?? '') : titres.join(' · '),
+    onglet.blocs.length,
   ];
-  row.height = 18;
+  row.height = HAUTEUR_LIGNE;
   cellules.forEach((valeur, colonne) => {
     habillerCelluleSommaire(row.getCell(colonne + 3), valeur, index);
   });
@@ -187,40 +230,61 @@ function ecrireLigneSommaire(row: Row, page: Page, index: number): void {
 
 function habillerCelluleSommaire(cellule: Cell, valeur: Cellule, index: number): void {
   cellule.value = valeur;
-  cellule.alignment = { vertical: 'middle' };
+  cellule.font = { name: POLICE, size: CORPS };
+  cellule.alignment = { vertical: 'middle', wrapText: true };
   cellule.border = { bottom: { style: 'hair', color: { argb: TRAIT } } };
   if (index % 2 === 1) {
     cellule.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: ZEBRE } };
   }
 }
 
-function ecrireFeuille(workbook: Workbook, page: Page): void {
-  const sheet = workbook.addWorksheet(page.onglet, {
-    views: [{ state: 'frozen', ySplit: 4, showGridLines: false }],
-  });
-  const { colonnes, lignes, total, colonnePart } = page.tableau;
+function ecrireOnglet(workbook: Workbook, onglet: Onglet): void {
+  const sheet = workbook.addWorksheet(onglet.nom, { views: [{ showGridLines: false }] });
+  intituler(sheet.getCell('A1'), onglet.nom, 18);
 
-  intituler(sheet.getCell('A1'), page.feuille.titre);
-  const question = sheet.getCell('A2');
-  question.value = page.feuille.question ?? '';
-  question.font = { size: 10, color: { argb: GRIS } };
+  let ligne = 3;
+  for (const bloc of onglet.blocs) ligne = ecrireBloc(sheet, bloc, ligne) + 3;
 
-  ecrireEnTete(sheet.getRow(4), colonnes);
-  lignes.forEach((valeurs, index) => {
-    habillerLigne(sheet.getRow(5 + index), valeurs, index, colonnePart);
-  });
-  if (total !== undefined) ecrireTotal(sheet.getRow(5 + lignes.length), total, colonnePart);
-
-  sheet.autoFilter = { from: { row: 4, column: 1 }, to: { row: 4, column: colonnes.length } };
-  ajusterLargeurs(sheet, page.tableau);
+  ajusterLargeurs(sheet, onglet.blocs);
+  poserFiltre(sheet, onglet.blocs);
 }
 
-function ecrireEnTete(row: Row, colonnes: readonly string[]): void {
-  row.height = 22;
+/** Rend le rang de la dernière ligne écrite, pour que le bloc suivant s'y accroche. */
+function ecrireBloc(sheet: Worksheet, bloc: Bloc, depart: number): number {
+  if (bloc.titre !== '') intituler(sheet.getCell(depart, 1), bloc.titre, 16);
+  const question = sheet.getCell(depart + 1, 1);
+  question.value = bloc.question;
+  question.font = { name: POLICE, size: 12, color: { argb: GRIS } };
+
+  const { colonnes, lignes, total, colonnePart } = bloc.tableau;
+  ecrireEnTete(sheet.getRow(depart + 3), colonnes, 1);
+  lignes.forEach((valeurs, index) => {
+    habillerLigne(sheet.getRow(depart + 4 + index), valeurs, index, colonnePart);
+  });
+
+  const fin = depart + 3 + lignes.length;
+  if (total === undefined) return fin;
+  ecrireTotal(sheet.getRow(fin + 1), total, colonnePart);
+  return fin + 1;
+}
+
+/**
+ * Excel n'admet qu'un filtre par onglet : il ne se pose que si l'onglet tient
+ * en un bloc. Sinon il trierait un tableau en emportant les suivants.
+ */
+function poserFiltre(sheet: Worksheet, blocs: readonly Bloc[]): void {
+  const seul = blocs.length === 1 ? blocs[0] : undefined;
+  if (seul === undefined) return;
+  sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: 6, column: seul.tableau.colonnes.length } };
+  sheet.views = [{ state: 'frozen', ySplit: 6, showGridLines: false }];
+}
+
+function ecrireEnTete(row: Row, colonnes: readonly string[], premiere: number): void {
+  row.height = HAUTEUR_LIGNE + 4;
   colonnes.forEach((titre, index) => {
-    const cellule = row.getCell(index + 1);
+    const cellule = row.getCell(index + premiere);
     cellule.value = titre;
-    cellule.font = { bold: true, size: 11, color: { argb: BLANC } };
+    cellule.font = { name: POLICE, bold: true, size: CORPS, color: { argb: BLANC } };
     cellule.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: BORDEAUX } };
     cellule.alignment = { vertical: 'middle', wrapText: true };
   });
@@ -232,9 +296,12 @@ function habillerLigne(
   index: number,
   colonnePart: number | undefined,
 ): void {
+  row.height = HAUTEUR_LIGNE;
   valeurs.forEach((valeur, colonne) => {
     const cellule = row.getCell(colonne + 1);
     cellule.value = valeur;
+    cellule.font = { name: POLICE, size: CORPS };
+    cellule.alignment = { vertical: 'middle' };
     cellule.border = { bottom: { style: 'hair', color: { argb: TRAIT } } };
     cellule.numFmt = formatDe(colonne + 1, colonnePart, typeof valeur === 'number');
     if (index % 2 === 1) {
@@ -250,19 +317,29 @@ function formatDe(colonne: number, colonnePart: number | undefined, nombre: bool
 }
 
 function ecrireTotal(row: Row, total: readonly Cellule[], colonnePart: number | undefined): void {
+  row.height = HAUTEUR_LIGNE;
   total.forEach((valeur, colonne) => {
     const cellule = row.getCell(colonne + 1);
     cellule.value = valeur;
-    cellule.font = { bold: true };
+    cellule.font = { name: POLICE, bold: true, size: CORPS };
+    cellule.alignment = { vertical: 'middle' };
     cellule.border = { top: { style: 'thin', color: { argb: BORDEAUX } } };
     cellule.numFmt = formatDe(colonne + 1, colonnePart, typeof valeur === 'number');
   });
 }
 
-function ajusterLargeurs(sheet: Worksheet, tableau: Tableau): void {
-  tableau.colonnes.forEach((titre, index) => {
-    const part = index + 1 === tableau.colonnePart;
-    sheet.getColumn(index + 1).width = part ? 12 : largeurColonne(titre, tableau.lignes, index);
+/** Les blocs d'un onglet partagent ses colonnes : la plus large commande. */
+function ajusterLargeurs(sheet: Worksheet, blocs: readonly Bloc[]): void {
+  const largeurs = new Map<number, number>();
+  for (const bloc of blocs) mesurerBloc(bloc, largeurs);
+  for (const [colonne, largeur] of largeurs) sheet.getColumn(colonne).width = largeur;
+}
+
+function mesurerBloc(bloc: Bloc, largeurs: Map<number, number>): void {
+  bloc.tableau.colonnes.forEach((titre, index) => {
+    const part = index + 1 === bloc.tableau.colonnePart;
+    const largeur = part ? 14 : largeurColonne(titre, bloc.tableau.lignes, index);
+    largeurs.set(index + 1, Math.max(largeurs.get(index + 1) ?? 0, largeur));
   });
 }
 
@@ -273,7 +350,7 @@ function largeurColonne(
   index: number,
 ): number {
   const tailles = lignes.map((ligne) => String(ligne[index] ?? '').length + 3);
-  return Math.min(52, Math.max(12, titre.length + 4, ...tailles));
+  return Math.min(58, Math.max(14, titre.length + 5, ...tailles));
 }
 
 function enTableau(donnees: DonneesSource): Tableau {
@@ -335,13 +412,13 @@ function ligneDeComposition(ligne: CompositionLigne, segments: readonly string[]
 
 function tableauMatrice(donnee: MatriceDatum): Tableau {
   const parCellule = new Map(
-    donnee.cellules.map((cellule) => [`${cellule.ligne} ${cellule.colonne}`, cellule.value]),
+    donnee.cellules.map((cellule) => [`${cellule.ligne} ${cellule.colonne}`, cellule.value]),
   );
   return {
     colonnes: ['', ...donnee.colonnes],
     lignes: donnee.lignes.map((ligne) => [
       ligne,
-      ...donnee.colonnes.map((colonne) => parCellule.get(`${ligne} ${colonne}`) ?? 0),
+      ...donnee.colonnes.map((colonne) => parCellule.get(`${ligne} ${colonne}`) ?? 0),
     ]),
   };
 }
