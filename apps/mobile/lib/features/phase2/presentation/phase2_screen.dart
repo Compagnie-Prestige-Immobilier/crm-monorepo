@@ -238,7 +238,8 @@ class _Phase2ScreenState extends ConsumerState<Phase2Screen>
 
     final OuverturesFicheData? deja = await ficheEnCours();
     if (!mounted) return;
-    if (deja?.prospectId != entry.prospectId) {
+    if (deja?.prospectId != entry.prospectId &&
+        ref.read(verrouFichesProvider)) {
       final bool ouvrir = await confirmerLOuverture(
         _nomDeLaFiche(phase2.prospect) ?? Phone.format(entry.phoneE164),
       );

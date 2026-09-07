@@ -391,7 +391,8 @@ class _RepresentantQualificationScreenState
     if (compteConnecte == null) return;
     final OuverturesFicheData? deja = await ficheEnCours();
     if (!mounted) return;
-    if (deja?.representantId != widget.representantId) {
+    if (deja?.representantId != widget.representantId &&
+        ref.read(verrouFichesProvider)) {
       final bool ouvrir = await confirmerLOuverture(
         nomComplet(importee.prenom, importee.nom),
       );
@@ -571,8 +572,7 @@ class _RepresentantQualificationScreenState
 
   /// Le référentiel pas encore descendu laisse passer, comme sur un appareil
   /// qui ne le connaît pas : l'issue se tire alors de la question.
-  String? get manqueStatut =>
-      statutRetenu == null && statutsProposes.isNotEmpty
+  String? get manqueStatut => statutRetenu == null && statutsProposes.isNotEmpty
       ? 'Choisissez un statut'
       : null;
 
@@ -1007,9 +1007,7 @@ class _RepresentantQualificationScreenState
       if (rappelAt == null) await draftRepository.delete(draftId);
       if (!context.mounted) return;
       if (widget.puisProspects && joignable) {
-        context.pushReplacement(
-          Routes.newProspectFor(widget.representantId),
-        );
+        context.pushReplacement(Routes.newProspectFor(widget.representantId));
         return;
       }
       // Rouverte au démarrage, la fiche est la seule route : la dépiler

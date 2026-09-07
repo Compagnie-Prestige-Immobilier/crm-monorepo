@@ -87,6 +87,7 @@ final GlobalKey<NavigatorState> rootNavigatorKey = GlobalKey<NavigatorState>(
 /// qui n'a plus le droit de l'ouvrir n'y est pas renvoyé : le garde la
 /// rejetterait, et les deux règles se renverraient la balle sans fin.
 String? _ficheARouvrir(Ref ref, String demande, String? role) {
+  if (!ref.read(verrouFichesProvider)) return null;
   final String? fiche = ref.read(routeFicheTenueProvider).value;
   if (fiche == null) return null;
   final String chemin = Uri.parse(fiche).path;
