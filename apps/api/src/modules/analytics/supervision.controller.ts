@@ -13,6 +13,7 @@ import { CampagnesService } from './campagnes.service.js';
 import { StockRepresentantsService } from './stock-representants.service.js';
 import { SupervisionActivityService } from './supervision.service.js';
 import {
+  ProspectsAppelesDto,
   StockRepresentantsDto,
   SupervisionActivityDto,
   SupervisionCampagnesDto,
@@ -75,6 +76,21 @@ export class SupervisionController {
   @ApiResponse({ status: 200, type: SupervisionActivityDto })
   activite(@Query() query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
     return this.activity.activite(query);
+  }
+
+  @Get('prospects-appeles')
+  @Cached(30)
+  @ApiOperation({
+    operationId: 'getSupervisionProspectsAppeles',
+    summary: 'Les fiches appelées sur la fenêtre, nommément, avec l’issue de leur dernier appel.',
+    description:
+      'Une fiche entre par ses APPELS, pas par sa date de saisie : la fenêtre, le projet ' +
+      'et le téléconseiller sont ceux du tableau de bord, dont cette liste est la feuille ' +
+      'nominative. Plafonnée à 10 000 lignes ; `total` dit combien il y en avait.',
+  })
+  @ApiResponse({ status: 200, type: ProspectsAppelesDto })
+  prospectsAppeles(@Query() query: SupervisionQueryDto): Promise<ProspectsAppelesDto> {
+    return this.activity.prospectsAppeles(query);
   }
 
   @Get('creneaux')

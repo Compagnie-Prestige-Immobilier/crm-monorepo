@@ -1,5 +1,5 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { LotExportCible, Projet } from '@crm/database';
+import { CallOutcome, LotExportCible, Projet } from '@crm/database';
 import { IsEnum, IsISO8601, IsOptional, IsUUID, Matches } from 'class-validator';
 
 import { PerformanceScore } from '../admin/performance-score.js';
@@ -613,4 +613,36 @@ export class UpdateWorkShiftsDto {
   @ApiProperty({ example: '14:00' }) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) morningEnd!: string;
   @ApiProperty({ example: '15:00' }) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) afternoonStart!: string;
   @ApiProperty({ example: '18:00' }) @Matches(/^([01]\d|2[0-3]):[0-5]\d$/) afternoonEnd!: string;
+}
+
+export class ProspectAppeleDto {
+  @ApiProperty({ format: 'uuid' }) id!: string;
+  @ApiProperty() nom!: string;
+  @ApiProperty() prenom!: string;
+
+  @ApiProperty({
+    enum: CallOutcome,
+    enumName: 'CallOutcome',
+    description:
+      'Issue du DERNIER appel de la fenêtre, pas du dernier appel de la fiche : un ' +
+      'rappel passé après la période raconterait autre chose que ce que la période a vu.',
+  })
+  derniereIssue!: CallOutcome;
+}
+
+export class ProspectsAppelesDto {
+  @ApiProperty({ type: () => [ProspectAppeleDto] })
+  items!: ProspectAppeleDto[];
+
+  @ApiProperty({
+    type: Number,
+    description: 'Le nombre de fiches appelées sur la fenêtre, AVANT le plafond de lignes.',
+  })
+  total!: number;
+
+  @ApiProperty({
+    type: Boolean,
+    description: 'Vrai quand `items` s’arrête au plafond : le classeur doit le dire au lecteur.',
+  })
+  tronque!: boolean;
 }

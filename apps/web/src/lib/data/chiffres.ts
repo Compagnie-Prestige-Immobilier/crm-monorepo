@@ -19,6 +19,7 @@ export type ChiffresCampagne = CampagnePerformance | null;
 export type ChiffresCampagnes = Schemas['SupervisionCampagnesDto'];
 export type ChiffresRepresentants = Schemas['StockRepresentantsDto'];
 export type ChiffresEnrolement = Schemas['EnrolementIndicateursDto'];
+export type ProspectsAppeles = Schemas['ProspectsAppelesDto'];
 
 /** L'activité relue créneau par créneau, dans l'ordre des créneaux. */
 export interface ChiffresCreneaux {
@@ -107,6 +108,22 @@ export async function fetchChiffresRepresentants(
   client: ApiClient = getApiClient(),
 ): Promise<ChiffresRepresentants> {
   return unwrap(await client.GET('/api/v1/supervision/representants'));
+}
+
+/**
+ * La liste nominative des fiches appelées sur la fenêtre. Aucune carte ne
+ * l'affiche : elle ne se charge qu'au clic sur l'export, et le tableau de bord
+ * ne la paie pas au rendu.
+ */
+export async function fetchProspectsAppeles(
+  perimetre: PerimetreChiffres,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectsAppeles> {
+  return unwrap(
+    await client.GET('/api/v1/supervision/prospects-appeles', {
+      params: { query: filtresSupervision(perimetre) },
+    }),
+  );
 }
 
 export async function fetchChiffresEntonnoir(

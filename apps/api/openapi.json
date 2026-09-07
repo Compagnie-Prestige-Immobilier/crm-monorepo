@@ -15327,6 +15327,130 @@
         "tags": ["supervision"]
       }
     },
+    "/api/v1/supervision/prospects-appeles": {
+      "get": {
+        "description": "Une fiche entre par ses APPELS, pas par sa date de saisie : la fenêtre, le projet et le téléconseiller sont ceux du tableau de bord, dont cette liste est la feuille nominative. Plafonnée à 10 000 lignes ; `total` dit combien il y en avait.",
+        "operationId": "getSupervisionProspectsAppeles",
+        "parameters": [
+          {
+            "name": "actFrom",
+            "required": false,
+            "in": "query",
+            "description": "Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "actTo",
+            "required": false,
+            "in": "query",
+            "description": "Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999.",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "name": "granularity",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "$ref": "#/components/schemas/SupervisionGranularity"
+            }
+          },
+          {
+            "name": "projet",
+            "required": false,
+            "in": "query",
+            "description": "Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`.",
+            "schema": {
+              "$ref": "#/components/schemas/Projet"
+            }
+          },
+          {
+            "name": "commercialId",
+            "required": false,
+            "in": "query",
+            "description": "Un seul téléconseiller : borne les lignes, la liste et les histogrammes.",
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeFrom",
+            "required": false,
+            "in": "query",
+            "description": "Heure de début quotidienne, Dakar.",
+            "schema": {
+              "example": "09:00",
+              "type": "string"
+            }
+          },
+          {
+            "name": "timeTo",
+            "required": false,
+            "in": "query",
+            "description": "Heure de fin quotidienne, exclue.",
+            "schema": {
+              "example": "14:00",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProspectsAppelesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les fiches appelées sur la fenêtre, nommément, avec l’issue de leur dernier appel.",
+        "tags": ["supervision"]
+      }
+    },
     "/api/v1/supervision/creneaux": {
       "get": {
         "operationId": "getSupervisionCreneaux",
@@ -30646,6 +30770,50 @@
           "prospectsByRepresentant",
           "repQualificationStatuses"
         ]
+      },
+      "ProspectAppeleDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "nom": {
+            "type": "string"
+          },
+          "prenom": {
+            "type": "string"
+          },
+          "derniereIssue": {
+            "description": "Issue du DERNIER appel de la fenêtre, pas du dernier appel de la fiche : un rappel passé après la période raconterait autre chose que ce que la période a vu.",
+            "allOf": [
+              {
+                "$ref": "#/components/schemas/CallOutcome"
+              }
+            ]
+          }
+        },
+        "required": ["id", "nom", "prenom", "derniereIssue"]
+      },
+      "ProspectsAppelesDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProspectAppeleDto"
+            }
+          },
+          "total": {
+            "type": "number",
+            "description": "Le nombre de fiches appelées sur la fenêtre, AVANT le plafond de lignes."
+          },
+          "tronque": {
+            "type": "boolean",
+            "description": "Vrai quand `items` s’arrête au plafond : le classeur doit le dire au lecteur."
+          }
+        },
+        "required": ["items", "total", "tronque"]
       },
       "WorkShiftDto": {
         "type": "object",

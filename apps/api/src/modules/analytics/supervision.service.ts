@@ -17,6 +17,8 @@ import {
 } from './pilotage.sql.js';
 import { SupervisionGranularity } from './supervision.dto.js';
 import type {
+  ProspectAppeleDto,
+  ProspectsAppelesDto,
   SupervisionActivityCountsDto,
   SupervisionActivityDto,
   SupervisionHistogramBarDto,
@@ -41,6 +43,17 @@ const TELECONSEIL_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION] as
 const DEAD_GAP_SECONDS = 15 * 60;
 
 const JOUR_SECONDES = 86_400;
+
+/**
+ * Plafond de la feuille nominative du classeur. Le tableur la construit dans le
+ * navigateur : au-delà, l'onglet coûte plus de mémoire qu'il ne rend de service,
+ * et le classeur annonce alors la coupe au lieu de la taire.
+ */
+const PLAFOND_APPELES = 10_000;
+
+interface ProspectAppeleRow extends ProspectAppeleDto {
+  total: number;
+}
 
 interface Creneau {
   debut: number;
@@ -937,6 +950,48 @@ export class SupervisionActivityService {
       prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
       prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
       repQualificationStatuses,
+    };
+  }
+
+  /**
+   * Les fiches appelées sur la fenêtre, avec l'issue de leur dernier appel DE
+   * CETTE FENÊTRE : un rappel passé après la période raconterait autre chose
+   * que ce que la période a vu.
+   */
+  async prospectsAppeles(query: SupervisionQueryDto): Promise<ProspectsAppelesDto> {
+    const appelant = query.commercialId
+      ? Prisma.sql`ca."performedById" = ${query.commercialId}`
+      : ALL_ROWS;
+    const projet =
+      query.projet === undefined
+        ? ALL_ROWS
+        : Prisma.sql`EXISTS (
+            SELECT 1 FROM "prospect_journeys" pj
+            WHERE pj."prospectId" = ca."prospectId" AND pj."projet" = ${query.projet}::"Projet"
+          )`;
+
+    const rows = await this.prisma.$queryRaw<ProspectAppeleRow[]>`
+      SELECT f."id", f."nom", f."prenom", f."derniereIssue", COUNT(*) OVER ()::int AS total
+      FROM (
+        SELECT DISTINCT ON (ca."prospectId")
+          p."id", p."nom", p."prenom", ca."outcome" AS "derniereIssue"
+        FROM "call_attempts" ca
+        JOIN "prospects" p ON p."id" = ca."prospectId"
+        WHERE p."deletedAt" IS NULL
+          AND ${appelant}
+          AND ${projet}
+          AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+        ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC
+      ) f
+      ORDER BY f."nom" ASC, f."prenom" ASC
+      LIMIT ${PLAFOND_APPELES}
+    `;
+
+    const total = rows[0]?.total ?? 0;
+    return {
+      items: rows.map(({ id, nom, prenom, derniereIssue }) => ({ id, nom, prenom, derniereIssue })),
+      total,
+      tronque: total > PLAFOND_APPELES,
     };
   }
 }

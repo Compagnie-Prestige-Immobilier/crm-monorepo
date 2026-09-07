@@ -59,8 +59,10 @@ import {
   fetchChiffresMethodes,
   fetchChiffresRendement,
   fetchChiffresRepresentants,
+  fetchProspectsAppeles,
   type PerimetreChiffres,
   type Projet,
+  type ProspectsAppeles,
 } from '@/lib/data/chiffres';
 import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import {
@@ -79,7 +81,7 @@ import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
-import type { Role } from '@/lib/types';
+import { CALL_OUTCOME_LABELS, type Role } from '@/lib/types';
 
 /** Une requête par jeu, et seulement pour les jeux qu'une carte posée réclame. */
 const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>> = {
@@ -232,6 +234,33 @@ function blocsDesWidgets(
   return blocs;
 }
 
+/**
+ * La feuille nominative, que l'écran n'affiche nulle part : les taux disent
+ * combien, elle dit qui. L'issue est celle du dernier appel DE LA PÉRIODE, pas
+ * celle que la fiche porte aujourd'hui.
+ */
+function blocDesProspectsAppeles(liste: ProspectsAppeles): BlocTableauDeBord {
+  const coupe = liste.tronque
+    ? ` Liste coupée aux ${formatNumber(liste.items.length)} premières fiches sur ${formatNumber(liste.total)}.`
+    : '';
+  return {
+    titre: '',
+    question:
+      liste.total === 0
+        ? 'Aucune fiche appelée sur la période.'
+        : `Les fiches appelées sur la période, avec l’issue de leur dernier appel.${coupe}`,
+    groupe: 'Prospects appelés',
+    tableau: {
+      colonnes: ['Nom', 'Prénom', 'Issue du dernier appel'],
+      lignes: liste.items.map((fiche) => [
+        fiche.nom,
+        fiche.prenom,
+        CALL_OUTCOME_LABELS[fiche.derniereIssue],
+      ]),
+    },
+  };
+}
+
 function classeurDesChiffres(input: {
   projet: Projet;
   periode: string;
@@ -239,6 +268,7 @@ function classeurDesChiffres(input: {
   equipe: readonly { id: string; fullName: string }[];
   teleconseiller: string | null;
   blocs: BlocTableauDeBord[];
+  appeles: BlocTableauDeBord;
 }): ClasseurTableauDeBord {
   const nomProjet = input.projet === 'CHUES' ? 'CHUES' : 'Grand Public';
   return {
@@ -252,7 +282,7 @@ function classeurDesChiffres(input: {
       { libelle: 'Chiffres repris', valeur: String(input.blocs.length) },
       { libelle: 'Édité le', valeur: formatDateTime(new Date().toISOString()) },
     ],
-    blocs: input.blocs,
+    blocs: [...input.blocs, input.appeles],
   };
 }
 
@@ -414,7 +444,18 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     if (brouillon !== null) setDefaultMutation.mutate(brouillon);
   }
 
-  function preparerClasseur(): ClasseurTableauDeBord {
+  async function preparerClasseur(): Promise<ClasseurTableauDeBord> {
+    const appeles = await queryClient.fetchQuery({
+      queryKey: [
+        'chiffres',
+        'prospects-appeles',
+        projet,
+        plage.du,
+        plage.au,
+        filters.teleconseiller,
+      ],
+      queryFn: () => fetchProspectsAppeles(perimetre),
+    });
     return classeurDesChiffres({
       projet,
       periode: periodeAffichee(filters),
@@ -422,6 +463,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
       equipe,
       teleconseiller: filters.teleconseiller,
       blocs: blocsDesWidgets(widgets, catalogue, donneesParWidget),
+      appeles: blocDesProspectsAppeles(appeles),
     });
   }
 
@@ -585,7 +627,7 @@ function ChiffresToolbar({
   onSave: () => void;
   onCancel: () => void;
   onSetDefault: () => void;
-  onPreparerClasseur: () => ClasseurTableauDeBord;
+  onPreparerClasseur: () => Promise<ClasseurTableauDeBord>;
   exportPret: boolean;
 }) {
   return (

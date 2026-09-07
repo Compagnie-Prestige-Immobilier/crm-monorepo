@@ -9,13 +9,14 @@ import { telechargerTableauDeBord, type ClasseurTableauDeBord } from '@/lib/tabl
 
 /**
  * Le classeur pèse une seconde de calcul et un mégaoctet de code chargé à la
- * demande : il se prépare au clic, jamais au rendu.
+ * demande : il se prépare au clic, jamais au rendu. Sa préparation peut donc
+ * aussi aller chercher ce que l'écran n'affiche pas, comme une liste nominative.
  */
 export function BoutonExportExcel({
   preparer,
   disabled = false,
 }: {
-  preparer: () => ClasseurTableauDeBord;
+  preparer: () => ClasseurTableauDeBord | Promise<ClasseurTableauDeBord>;
   disabled?: boolean;
 }) {
   const [enCours, setEnCours] = useState(false);
@@ -23,7 +24,7 @@ export function BoutonExportExcel({
   async function exporter(): Promise<void> {
     setEnCours(true);
     try {
-      await telechargerTableauDeBord(preparer());
+      await telechargerTableauDeBord(await preparer());
     } catch {
       toast.error('Le classeur n’a pas pu être produit. Réessayez.');
     } finally {

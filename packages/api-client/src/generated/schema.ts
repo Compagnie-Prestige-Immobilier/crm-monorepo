@@ -2329,6 +2329,26 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/supervision/prospects-appeles': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /**
+     * Les fiches appelées sur la fenêtre, nommément, avec l’issue de leur dernier appel.
+     * @description Une fiche entre par ses APPELS, pas par sa date de saisie : la fenêtre, le projet et le téléconseiller sont ceux du tableau de bord, dont cette liste est la feuille nominative. Plafonnée à 10 000 lignes ; `total` dit combien il y en avait.
+     */
+    get: operations['getSupervisionProspectsAppeles'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/supervision/creneaux': {
     parameters: {
       query?: never;
@@ -6659,6 +6679,21 @@ export interface components {
       prospectsByRepresentant: components['schemas']['SupervisionHistogramBarDto'][];
       /** @description Répartition des représentants par statut de qualification, basée sur leur dernier appel portant un statut dans la fenêtre. `null` sans représentant dans la fenêtre. */
       repQualificationStatuses: components['schemas']['SupervisionRepStatutsDto'] | null;
+    };
+    ProspectAppeleDto: {
+      /** Format: uuid */
+      id: string;
+      nom: string;
+      prenom: string;
+      /** @description Issue du DERNIER appel de la fenêtre, pas du dernier appel de la fiche : un rappel passé après la période raconterait autre chose que ce que la période a vu. */
+      derniereIssue: components['schemas']['CallOutcome'];
+    };
+    ProspectsAppelesDto: {
+      items: components['schemas']['ProspectAppeleDto'][];
+      /** @description Le nombre de fiches appelées sur la fenêtre, AVANT le plafond de lignes. */
+      total: number;
+      /** @description Vrai quand `items` s’arrête au plafond : le classeur doit le dire au lecteur. */
+      tronque: boolean;
     };
     WorkShiftDto: {
       /** @enum {string} */
@@ -16881,6 +16916,66 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['SupervisionActivityDto'];
+        };
+      };
+      /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */
+      400: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton absent, expiré ou invalide. */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+      /** @description Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur. */
+      403: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApiErrorDto'];
+        };
+      };
+    };
+  };
+  getSupervisionProspectsAppeles: {
+    parameters: {
+      query?: {
+        /** @description Borne basse sur la date de l’ACTE, incluse : heure d’appel, de saisie ou de clôture relevée chez le client, et non date d’arrivée en base. Une date seule (AAAA-MM-JJ) démarre à minuit, fuseau Africa/Dakar. */
+        actFrom?: string;
+        /** @description Borne haute sur la date de l’acte, incluse. Une date seule finit à 23:59:59.999. */
+        actTo?: string;
+        granularity?: components['schemas']['SupervisionGranularity'];
+        /** @description Le projet. ABSENT veut dire les deux. Un représentant n’existe que dans CHUES : sous `GRAND_PUBLIC`, toutes les colonnes `rep*` valent 0 ou `null`. */
+        projet?: components['schemas']['Projet'];
+        /** @description Un seul téléconseiller : borne les lignes, la liste et les histogrammes. */
+        commercialId?: string;
+        /** @description Heure de début quotidienne, Dakar. */
+        timeFrom?: string;
+        /** @description Heure de fin quotidienne, exclue. */
+        timeTo?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProspectsAppelesDto'];
         };
       };
       /** @description Requête mal formée : paramètre invalide ou corps refusé par la validation. */

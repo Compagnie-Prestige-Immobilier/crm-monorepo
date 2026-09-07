@@ -30,9 +30,9 @@ const CHIFFRES_CLES = 'Chiffres clés';
 
 type ModuleExcel = typeof ExcelJS;
 
-type Cellule = string | number | null;
+export type Cellule = string | number | null;
 
-interface Tableau {
+export interface Tableau {
   colonnes: readonly string[];
   lignes: readonly (readonly Cellule[])[];
   /** Rang de la colonne à mettre en pourcentage, 1 pour la première. */
@@ -40,13 +40,20 @@ interface Tableau {
   total?: readonly Cellule[];
 }
 
-export interface BlocTableauDeBord {
+interface BlocCommun {
   titre: string;
   question?: string | undefined;
   /** Le thème qui décide de l'onglet : les cartes d'un même thème se lisent ensemble. */
   groupe?: string | undefined;
-  donnees: DonneesSource;
 }
+
+/**
+ * Une carte de l'écran, dont le classeur tire le tableau, ou un tableau déjà
+ * écrit pour ce qu'aucune carte ne porte : une liste nominative n'est la mesure
+ * de rien et n'entre dans aucune des formes du tableau de bord.
+ */
+export type BlocTableauDeBord = BlocCommun &
+  ({ donnees: DonneesSource; tableau?: never } | { tableau: Tableau; donnees?: never });
 
 export interface ClasseurTableauDeBord {
   /** Sans extension : elle est ajoutée au téléchargement. */
@@ -98,8 +105,8 @@ function repartir(blocs: readonly BlocTableauDeBord[]): Onglet[] {
   const parGroupe = new Map<string, Bloc[]>();
 
   for (const source of blocs) {
-    const tableau = enTableau(source.donnees);
-    if (estNombreSeul(source.donnees)) {
+    const tableau = tableauDu(source);
+    if (estNombreSeul(source)) {
       cles.push([source.titre, tableau.lignes[0]?.[1] ?? null]);
       continue;
     }
@@ -113,7 +120,14 @@ function repartir(blocs: readonly BlocTableauDeBord[]): Onglet[] {
   return nommerOnglets([{ nom: CHIFFRES_CLES, blocs: [blocDesCles(cles)] }, ...onglets]);
 }
 
-function estNombreSeul(donnees: DonneesSource): boolean {
+/** Celui que le bloc porte déjà, ou celui que sa donnée dessine. */
+function tableauDu(bloc: BlocTableauDeBord): Tableau {
+  return bloc.tableau ?? enTableau(bloc.donnees);
+}
+
+function estNombreSeul(bloc: BlocTableauDeBord): boolean {
+  const donnees = bloc.donnees;
+  if (donnees === undefined) return false;
   return donnees.forme === 'scalaire' && (donnees.donnee.serie ?? []).length === 0;
 }
 
