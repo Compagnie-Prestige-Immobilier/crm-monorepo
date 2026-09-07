@@ -202,10 +202,13 @@ class _RepresentantRow extends StatelessWidget {
                 lastCallOutcome: data.lastCallOutcome,
               )
             : CpiTag(signal, tone: status.tone),
+        // Les deux chemins passent par l'appel : celui qui vient de donner ses
+        // contacts a bien decroche, et son appel se consignait nulle part.
         onTap: () => context.pushOnce(
-          pourQualifier
-              ? Routes.representantQualificationFor(data.id)
-              : Routes.newProspectFor(data.id),
+          Routes.representantQualificationFor(
+            data.id,
+            puisProspects: !pourQualifier,
+          ),
         ),
       ),
     ]);
