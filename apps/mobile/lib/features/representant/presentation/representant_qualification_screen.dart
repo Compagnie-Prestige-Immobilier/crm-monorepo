@@ -1328,6 +1328,10 @@ class _RepresentantQualificationScreenState
           statutChoisi = null;
           rappelAt = null;
           scriptAbrege = false;
+          // La question CHUES ne se pose qu'à qui a décroché. Gardée d'un appel
+          // précédent, elle pose un statut de la branche jointe sur un
+          // injoignable, sans rien cocher dans la liste affichée.
+          if (choix == _Resultat.injoignable) representantCHUES = null;
         }),
         options: const <(_Resultat, String)>[
           (_Resultat.joignable, 'Joignable'),
