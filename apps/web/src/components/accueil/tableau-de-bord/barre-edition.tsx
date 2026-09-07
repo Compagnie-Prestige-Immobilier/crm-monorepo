@@ -3,7 +3,6 @@
 import { LayoutGridIcon, LoaderIcon, SaveIcon, ShieldCheckIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 
-import { VisiteGuidee } from '@/components/accueil/tableau-de-bord/visite-guidee';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
@@ -34,17 +33,12 @@ export function BarreEdition({
   const [confirmAnnuler, setConfirmAnnuler] = useState(false);
   const [confirmDefaut, setConfirmDefaut] = useState(false);
 
-  const visite = <VisiteGuidee editing={editing} isAdmin={isAdmin} onEnter={onEnter} />;
-
   if (!editing) {
     return (
-      <>
-        <Button type="button" variant={entryVariant} data-visite="entrer" onClick={onEnter}>
-          <LayoutGridIcon aria-hidden="true" />
-          {entryLabel}
-        </Button>
-        {visite}
-      </>
+      <Button type="button" variant={entryVariant} onClick={onEnter}>
+        <LayoutGridIcon aria-hidden="true" />
+        {entryLabel}
+      </Button>
     );
   }
 
@@ -105,7 +99,7 @@ export function BarreEdition({
         }}
       />
 
-      <Button type="button" data-visite="enregistrer" disabled={pending} onClick={onSave}>
+      <Button type="button" disabled={pending} onClick={onSave}>
         {pending ? (
           <LoaderIcon className="animate-spin" aria-hidden="true" />
         ) : (
@@ -113,7 +107,6 @@ export function BarreEdition({
         )}
         Enregistrer
       </Button>
-      {visite}
     </div>
   );
 }
