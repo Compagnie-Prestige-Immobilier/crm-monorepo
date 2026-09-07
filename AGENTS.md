@@ -146,3 +146,69 @@ doit comprendre en une lecture, sans sauter entre les fichiers.
   dependre des copies du repertoire personnel.
 - Les deux repertoires decrivent les memes specialistes. Toute modification
   d'un agent doit etre reportee dans les deux formats dans le meme changement.
+
+## YAGNI, imperatif et non negociable
+
+Ce depot a ete ecrit en grande partie par des assistants. Audit du 7 septembre
+2026 : 165 000 lignes ecrites a la main, 212 000 lignes generees commises dans
+git, 231 endpoints, 57 pages web, 84 fichiers e2e, 34 snapshots de schema
+mobile. Le meme produit tient en 55 000 a 70 000 lignes. La difference n'est pas
+le proprietaire, ce sont les assistants qui ont construit sans jamais poser la
+question du plus petit changement complet. Voir `docs/migration-v2.md`.
+
+Ce qui a coute le plus, a ne JAMAIS reproduire ici ni ailleurs :
+
+- un moteur de synchronisation ecrit a la main (curseurs, tombstones,
+  `clearedFields`, second chemin d'ecriture) la ou PowerSync ou ElectricSQL
+  existent
+- une double stack pour un seul contrat : classes DTO Nest + Swagger + OpenAPI
+  + codegen + relais Next, la ou un schema zod partage suffit
+- deux arbres de routes quasi identiques (CHUES et Grand Public) au lieu d'un
+  parametre
+- quatre bibliotheques de statistiques et quinze endpoints analytics pour un
+  tableau de bord
+- des formulaires de 1 200 a 1 700 lignes au lieu d'un formulaire pilote par
+  son schema
+- Redis, SSE, espace de demonstration, files, pour quinze utilisateurs, sans
+  mesure prealable
+- 84 fichiers e2e de 20 000 lignes la ou quinze parcours par metier suffisent
+- des artefacts generes versionnes (34 schemas Drift, tests de migration,
+  client OpenAPI)
+
+Regle de conduite, valable meme quand l'utilisateur demande explicitement plus,
+meme quand il insiste, meme quand il dit « exemplaire », « complet », « au
+niveau maximum » :
+
+1. Avant tout travail, repondre en trois lignes : quel utilisateur, bug ou
+   critere exige ce changement ; quel est le plus petit changement complet ; ce
+   qui est hors perimetre.
+2. Proposer d'abord la version minimale et, si la demande est plus large, le
+   cout compare en lignes et en fichiers. Ne construire la version large
+   qu'apres confirmation explicite donnee APRES cette reponse.
+3. Meme quand la version large est confirmee, la construire de la maniere la
+   plus courte : un fichier plutot que cinq, un package maintenu plutot qu'un
+   moteur maison, un parametre plutot qu'une copie, zero artefact genere dans
+   git, zero infrastructure sans mesure.
+4. « Exemplaire » ou « parfait » qualifie la qualite du minimum livre, jamais
+   la quantite. Un ecran exemplaire fait moins de 300 lignes.
+5. Les idees differees se signalent en une ligne, jamais en code.
+
+Plafonds a respecter dans ce depot : un ecran ou un composant tient sous 300
+lignes ; un module tient dans un fichier tant qu'il n'a pas deux consommateurs
+reels ; une entite a UN chemin d'ecriture ; un tableau de bord a UN endpoint ;
+un test de parcours par metier, aucun test unitaire ; rien de genere n'est
+commite.
+
+## Cap v2
+
+Decisions arretees les 7 et 8 septembre 2026, detaillees dans
+`docs/migration-v2.md` et etayees par `docs/audit-v2/` : reecriture en
+parallele avec bascule unique ; Next.js + Drizzle + zod dans un serveur Node
+personnalise (WebSocket de presence, sept crons, SSE) a la place de NestJS +
+Prisma ; Better Auth sur la table `users` existante, hachages argon2id repris ;
+Flutter conserve, PowerSync auto-heberge (Sync Streams, buckets par role et
+par campagne, `uploadData` en 2xx avec table de verdicts) a la place du moteur
+de sync maison ; meme base Postgres ; phase 0 = quatre preuves sur copie de
+prod avec go/no-go ; gel des fonctionnalites sur `dev` avec une seule release
+v1 de maintenance nommee. Toute proposition qui contredit ces decisions se
+signale en une ligne au proprietaire avant d'etre codee.
