@@ -349,6 +349,7 @@ export class LotsExportService {
             fromAssigneeId: body.teleconseillerId,
             toAssigneeId: vers,
             fiches: positions.length,
+            positions,
             performedById: user.id,
           },
         });
@@ -388,6 +389,7 @@ export class LotsExportService {
             fromAssigneeId: cedant,
             toAssigneeId: vers,
             fiches: positions.length,
+            positions,
             performedById: user.id,
           },
         });
@@ -495,6 +497,7 @@ export class LotsExportService {
         groupe._count._all,
       ]),
     );
+    const { traces, recues } = await this.reaffectations(id);
     const repartition: LotExportRepartitionDto[] = ordre.map((teleconseillerId) => ({
       teleconseillerId,
       teleconseillerName: noms.get(teleconseillerId) ?? 'Compte supprimé',
@@ -502,6 +505,7 @@ export class LotsExportService {
         jour: index + 1,
         fiches: compte.get(`${teleconseillerId}#${String(index + 1)}`) ?? 0,
       })),
+      recues: recues.get(teleconseillerId)?.size ?? 0,
     }));
 
     return Object.assign(await this.summary(id, row), {
@@ -510,11 +514,17 @@ export class LotsExportService {
       distribution: { fichesParJour, jours },
       repartition,
       performance: await this.performance(row.id, row.cible, row.createdAt, stored),
-      reaffectations: await this.reaffectations(row.id),
+      reaffectations: traces,
     });
   }
 
-  private async reaffectations(id: string): Promise<LotExportReaffectationDto[]> {
+  /**
+   * Les traces, et ce qu'il en reste en main : une fiche reçue puis redonnée
+   * ne compte plus, ni sur sa trace ni dans les « reçues » du téléconseiller.
+   */
+  private async reaffectations(
+    id: string,
+  ): Promise<{ traces: LotExportReaffectationDto[]; recues: Map<string, Set<number>> }> {
     const rows = await this.prisma.lotExportReaffectation.findMany({
       where: { lotId: id },
       include: {
@@ -525,14 +535,36 @@ export class LotsExportService {
       orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: 100,
     });
-    return rows.map((row) => ({
-      id: row.id,
-      fromName: row.fromAssignee?.fullName ?? null,
-      toName: row.toAssignee.fullName,
-      fiches: row.fiches,
-      performedByName: row.performedBy.fullName,
-      createdAt: row.createdAt.toISOString(),
-    }));
+    const positions = [...new Set(rows.flatMap((row) => row.positions))];
+    const tenues = new Map(
+      positions.length
+        ? (
+            await this.prisma.lotExportItem.findMany({
+              where: { lotId: id, position: { in: positions } },
+              select: { position: true, assigneeId: true },
+            })
+          ).map((item) => [item.position, item.assigneeId])
+        : [],
+    );
+
+    const recues = new Map<string, Set<number>>();
+    const traces = rows.map((row) => {
+      const enMain = row.positions.filter((position) => tenues.get(position) === row.toAssigneeId);
+      const siennes = recues.get(row.toAssigneeId) ?? new Set<number>();
+      for (const position of enMain) siennes.add(position);
+      recues.set(row.toAssigneeId, siennes);
+      return {
+        id: row.id,
+        fromName: row.fromAssignee?.fullName ?? null,
+        toTeleconseillerId: row.toAssigneeId,
+        toName: row.toAssignee.fullName,
+        fiches: row.fiches,
+        fichesEnMain: enMain.length,
+        performedByName: row.performedBy.fullName,
+        createdAt: row.createdAt.toISOString(),
+      };
+    });
+    return { traces, recues };
   }
 
   /** Le classeur du lot : la répartition d'abord, la fiche ensuite. */
@@ -598,13 +630,78 @@ export class LotsExportService {
     for (const paire of ordonnees) {
       if (paire.assigneeId === null) continue;
       const data = await this.programme(id, paire.assigneeId, paire.day);
-      const nom = programmeFilename(data);
+      const nom = programmeFilename({ ...data, dayNumber: paire.day });
       zip.file(zip.file(nom) ? `${paire.assigneeId}-${nom}` : nom, await this.pdfBuffer(data));
     }
     return zip.generateAsync({ type: 'nodebuffer', compression: 'DEFLATE' });
   }
 
   async programme(id: string, teleconseillerId: string, jour: number): Promise<ProgrammeData> {
+    const lot = await this.lotPourPdf(id);
+    const items = await this.itemsPourPdf({ lotId: id, assigneeId: teleconseillerId, day: jour });
+    if (!items.length)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_PROGRAMME_INTROUVABLE',
+        message: 'Aucune fiche pour ce téléconseiller à cette journée.',
+      });
+
+    const dayCount =
+      readDistribution(lot.filters)?.jours ??
+      (
+        await this.prisma.lotExportItem.aggregate({
+          where: { lotId: id },
+          _max: { day: true },
+        })
+      )._max.day ??
+      1;
+
+    return programmeData(lot, items, {
+      titre: 'Programme d’appel',
+      periode: `Jour ${String(jour)} sur ${String(dayCount)}`,
+    });
+  }
+
+  /**
+   * EB-16 : les fiches arrivées après l'impression du programme, et que le
+   * destinataire tient encore. Une seule trace si `reaffectationId` est donné.
+   */
+  async fichesRecues(
+    id: string,
+    teleconseillerId: string,
+    reaffectationId?: string,
+  ): Promise<ProgrammeData> {
+    const lot = await this.lotPourPdf(id);
+    const traces = await this.prisma.lotExportReaffectation.findMany({
+      where: {
+        lotId: id,
+        toAssigneeId: teleconseillerId,
+        ...(reaffectationId === undefined ? {} : { id: reaffectationId }),
+      },
+      select: { positions: true, createdAt: true },
+      orderBy: { createdAt: 'desc' },
+    });
+    const positions = [...new Set(traces.flatMap((trace) => trace.positions))];
+    const items = positions.length
+      ? await this.itemsPourPdf({
+          lotId: id,
+          assigneeId: teleconseillerId,
+          position: { in: positions },
+        })
+      : [];
+    if (!items.length)
+      throw new NotFoundException({
+        code: 'LOT_EXPORT_FICHES_RECUES_INTROUVABLES',
+        message: 'Ce téléconseiller ne tient plus aucune fiche reçue.',
+      });
+
+    const derniere = traces[0]?.createdAt ?? new Date();
+    return programmeData(lot, items, {
+      titre: 'Fiches reçues',
+      periode: `Reçues le ${formatJourDakar(derniere)}`,
+    });
+  }
+
+  private async lotPourPdf(id: string): Promise<LotPourPdf> {
     const lot = await this.prisma.lotExport.findUnique({
       where: { id },
       select: { name: true, cible: true, filters: true },
@@ -614,9 +711,12 @@ export class LotsExportService {
         code: 'LOT_EXPORT_NOT_FOUND',
         message: 'Campagne introuvable.',
       });
+    return lot;
+  }
 
-    const items = await this.prisma.lotExportItem.findMany({
-      where: { lotId: id, assigneeId: teleconseillerId, day: jour },
+  private itemsPourPdf(where: Prisma.LotExportItemWhereInput): Promise<ItemPourPdf[]> {
+    return this.prisma.lotExportItem.findMany({
+      where,
       orderBy: { position: 'asc' },
       select: {
         assignee: { select: { fullName: true } },
@@ -624,48 +724,6 @@ export class LotsExportService {
         prospect: { select: { nom: true, prenom: true, phoneE164: true } },
       },
     });
-    if (!items.length)
-      throw new NotFoundException({
-        code: 'LOT_EXPORT_PROGRAMME_INTROUVABLE',
-        message: 'Aucune fiche pour ce téléconseiller à cette journée.',
-      });
-
-    const stored = readDistribution(lot.filters);
-    const dayCount =
-      stored?.jours ??
-      (
-        await this.prisma.lotExportItem.aggregate({
-          where: { lotId: id },
-          _max: { day: true },
-        })
-      )._max.day ??
-      1;
-    const label = scopeLabel(lot.cible, lot.filters);
-
-    function fullNameDe(item: (typeof items)[number]): string {
-      return (
-        item.representant?.fullName ??
-        [item.prospect?.nom, item.prospect?.prenom].filter(Boolean).join(' ')
-      );
-    }
-    function phoneE164De(item: (typeof items)[number]): string {
-      return item.representant?.phoneE164 ?? item.prospect?.phoneE164 ?? '';
-    }
-
-    return {
-      teleconseillerName: items[0]?.assignee?.fullName ?? 'Téléconseiller',
-      dayNumber: jour,
-      dayCount,
-      lotName: lot.name,
-      cibleLabel: surRepresentants(lot.cible) ? label : `Prospects : ${label}`,
-      generatedAt: new Date(),
-      rows: items.map((item, index) => ({
-        position: index + 1,
-        fullName: fullNameDe(item),
-        etablissement: item.representant?.etablissement ?? '',
-        phoneE164: phoneE164De(item),
-      })),
-    };
   }
 
   private async pdfBuffer(data: ProgrammeData): Promise<Buffer> {
@@ -1357,6 +1415,56 @@ function ecrireLaDistribution(
     objectifs: {},
   };
   return { ...base, distribution: { ...changer(courante) } } as Prisma.InputJsonValue;
+}
+
+interface LotPourPdf {
+  name: string;
+  cible: LotExportCible;
+  filters: Prisma.JsonValue;
+}
+
+interface ItemPourPdf {
+  assignee: { fullName: string } | null;
+  representant: { fullName: string; etablissement: string | null; phoneE164: string } | null;
+  prospect: { nom: string; prenom: string | null; phoneE164: string } | null;
+}
+
+function ligneDe(item: ItemPourPdf, index: number): ProgrammeData['rows'][number] {
+  if (item.representant)
+    return {
+      position: index + 1,
+      fullName: item.representant.fullName,
+      etablissement: item.representant.etablissement ?? '',
+      phoneE164: item.representant.phoneE164,
+    };
+  return {
+    position: index + 1,
+    fullName: [item.prospect?.nom, item.prospect?.prenom].filter(Boolean).join(' '),
+    etablissement: '',
+    phoneE164: item.prospect?.phoneE164 ?? '',
+  };
+}
+
+function programmeData(
+  lot: LotPourPdf,
+  items: readonly ItemPourPdf[],
+  entete: Pick<ProgrammeData, 'titre' | 'periode'>,
+): ProgrammeData {
+  const label = scopeLabel(lot.cible, lot.filters);
+  return {
+    ...entete,
+    teleconseillerName: items[0]?.assignee?.fullName ?? 'Téléconseiller',
+    lotName: lot.name,
+    cibleLabel: surRepresentants(lot.cible) ? label : `Prospects : ${label}`,
+    generatedAt: new Date(),
+    rows: items.map(ligneDe),
+  };
+}
+
+function formatJourDakar(date: Date): string {
+  return new Intl.DateTimeFormat('fr-FR', { timeZone: 'Africa/Dakar', dateStyle: 'long' }).format(
+    date,
+  );
 }
 
 interface FicheRow {

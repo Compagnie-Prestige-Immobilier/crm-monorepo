@@ -2580,6 +2580,9 @@ model LotExportReaffectation {
   toAssignee     User    @relation("LotExportReaffectationTo", fields: [toAssigneeId], references: [id], onDelete: Restrict)
 
   fiches Int
+  /// Les positions deplacees : c'est ce qui permet d'imprimer le complement
+  /// du destinataire. Vide sur les traces anterieures a cette colonne.
+  positions Int[] @default([])
 
   performedById String
   performedBy   User   @relation("LotExportReaffectationBy", fields: [performedById], references: [id], onDelete: Restrict)
