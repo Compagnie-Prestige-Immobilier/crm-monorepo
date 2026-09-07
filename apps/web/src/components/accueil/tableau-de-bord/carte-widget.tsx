@@ -265,11 +265,10 @@ function ActionsWidget({
   onChangePresentation: (presentation: DispositionPresentation) => void;
 }) {
   return (
-    <div data-visite="actions-carte" className="flex shrink-0 items-center gap-0.5">
+    <div className="flex shrink-0 items-center gap-0.5">
       <button
         ref={setActivatorNodeRef}
         type="button"
-        data-visite="poignee"
         aria-label={`Réordonner ${titre} par glisser-déposer`}
         className="inline-flex size-9 touch-manipulation items-center justify-center rounded-md text-muted-foreground hover:bg-secondary hover:text-foreground"
         {...attributes}

@@ -204,7 +204,7 @@ export function TiroirWidgets({
     <Sheet>
       <SheetTrigger
         render={
-          <Button type="button" variant="outline" data-visite="tiroir">
+          <Button type="button" variant="outline">
             <PlusIcon aria-hidden="true" />
             Ajouter un graphique
           </Button>
