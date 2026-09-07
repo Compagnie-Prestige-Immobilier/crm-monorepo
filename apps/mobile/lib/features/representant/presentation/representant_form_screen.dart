@@ -411,7 +411,7 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       !_saving;
 
   /// [context] est pris SOUS la coque : le message passe par son `FToaster`.
-  Future<void> _save(BuildContext context) async {
+  Future<void> _save(BuildContext context, {bool puisQualifier = false}) async {
     if (!_canSave) return;
     setState(() {
       _saving = true;
@@ -471,7 +471,11 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
       ref.read(syncCoordinatorProvider.notifier).nudge();
 
       if (!context.mounted) return;
-      context.pushReplacement(Routes.newProspectFor(_entityId));
+      context.pushReplacement(
+        puisQualifier
+            ? Routes.representantQualificationFor(_entityId)
+            : Routes.newProspectFor(_entityId),
+      );
     } on Object catch (e) {
       if (!context.mounted) return;
       final String message = _humanize(e);
@@ -533,6 +537,9 @@ class _RepresentantFormScreenState extends ConsumerState<RepresentantFormScreen>
               enabled: _canSave,
               busy: _saving,
               onPressed: _save,
+              secondLabel: 'Enregistrer et qualifier l\'appel',
+              onSecond: (BuildContext context) =>
+                  _save(context, puisQualifier: true),
               error: _error,
               subtitle: _manque,
             )
@@ -936,6 +943,8 @@ class _SaveBar extends StatelessWidget {
     required this.enabled,
     required this.busy,
     required this.onPressed,
+    required this.secondLabel,
+    required this.onSecond,
     this.error,
     this.subtitle,
   });
@@ -944,6 +953,12 @@ class _SaveBar extends StatelessWidget {
   final bool enabled;
   final bool busy;
   final ValueChanged<BuildContext> onPressed;
+
+  /// La seconde sortie. Un representant qui n'a pas decroche, ou qui refuse,
+  /// n'a pas de prospects a saisir : sans elle, l'appel ne se consigne nulle
+  /// part depuis cet ecran.
+  final String secondLabel;
+  final ValueChanged<BuildContext> onSecond;
 
   final String? error;
 
@@ -974,6 +989,15 @@ class _SaveBar extends StatelessWidget {
             loading: busy,
             subtitle: subtitle,
             onPressed: enabled ? () => onPressed(context) : null,
+          ),
+        ),
+        const SizedBox(height: CpiSpacing.xs),
+        Builder(
+          builder: (BuildContext context) => CpiButton(
+            secondLabel,
+            variant: CpiButtonVariant.secondary,
+            icon: PhosphorIconsRegular.phone,
+            onPressed: enabled && !busy ? () => onSecond(context) : null,
           ),
         ),
       ],

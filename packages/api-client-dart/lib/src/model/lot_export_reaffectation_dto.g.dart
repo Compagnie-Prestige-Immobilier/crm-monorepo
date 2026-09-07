@@ -11,9 +11,13 @@ abstract class _$LotExportReaffectationDtoCWProxy {
 
   LotExportReaffectationDto fromName(String? fromName);
 
+  LotExportReaffectationDto toTeleconseillerId(String toTeleconseillerId);
+
   LotExportReaffectationDto toName(String toName);
 
   LotExportReaffectationDto fiches(num fiches);
+
+  LotExportReaffectationDto fichesEnMain(num fichesEnMain);
 
   LotExportReaffectationDto performedByName(String performedByName);
 
@@ -28,8 +32,10 @@ abstract class _$LotExportReaffectationDtoCWProxy {
   LotExportReaffectationDto call({
     String id,
     String? fromName,
+    String toTeleconseillerId,
     String toName,
     num fiches,
+    num fichesEnMain,
     String performedByName,
     String createdAt,
   });
@@ -50,10 +56,18 @@ class _$LotExportReaffectationDtoCWProxyImpl
       this(fromName: fromName);
 
   @override
+  LotExportReaffectationDto toTeleconseillerId(String toTeleconseillerId) =>
+      this(toTeleconseillerId: toTeleconseillerId);
+
+  @override
   LotExportReaffectationDto toName(String toName) => this(toName: toName);
 
   @override
   LotExportReaffectationDto fiches(num fiches) => this(fiches: fiches);
+
+  @override
+  LotExportReaffectationDto fichesEnMain(num fichesEnMain) =>
+      this(fichesEnMain: fichesEnMain);
 
   @override
   LotExportReaffectationDto performedByName(String performedByName) =>
@@ -73,8 +87,10 @@ class _$LotExportReaffectationDtoCWProxyImpl
   LotExportReaffectationDto call({
     Object? id = const $CopyWithPlaceholder(),
     Object? fromName = const $CopyWithPlaceholder(),
+    Object? toTeleconseillerId = const $CopyWithPlaceholder(),
     Object? toName = const $CopyWithPlaceholder(),
     Object? fiches = const $CopyWithPlaceholder(),
+    Object? fichesEnMain = const $CopyWithPlaceholder(),
     Object? performedByName = const $CopyWithPlaceholder(),
     Object? createdAt = const $CopyWithPlaceholder(),
   }) {
@@ -87,6 +103,10 @@ class _$LotExportReaffectationDtoCWProxyImpl
           ? _value.fromName
           // ignore: cast_nullable_to_non_nullable
           : fromName as String?,
+      toTeleconseillerId: toTeleconseillerId == const $CopyWithPlaceholder()
+          ? _value.toTeleconseillerId
+          // ignore: cast_nullable_to_non_nullable
+          : toTeleconseillerId as String,
       toName: toName == const $CopyWithPlaceholder()
           ? _value.toName
           // ignore: cast_nullable_to_non_nullable
@@ -95,6 +115,10 @@ class _$LotExportReaffectationDtoCWProxyImpl
           ? _value.fiches
           // ignore: cast_nullable_to_non_nullable
           : fiches as num,
+      fichesEnMain: fichesEnMain == const $CopyWithPlaceholder()
+          ? _value.fichesEnMain
+          // ignore: cast_nullable_to_non_nullable
+          : fichesEnMain as num,
       performedByName: performedByName == const $CopyWithPlaceholder()
           ? _value.performedByName
           // ignore: cast_nullable_to_non_nullable
@@ -126,8 +150,10 @@ LotExportReaffectationDto _$LotExportReaffectationDtoFromJson(
     requiredKeys: const [
       'id',
       'fromName',
+      'toTeleconseillerId',
       'toName',
       'fiches',
+      'fichesEnMain',
       'performedByName',
       'createdAt',
     ],
@@ -135,8 +161,13 @@ LotExportReaffectationDto _$LotExportReaffectationDtoFromJson(
   final val = LotExportReaffectationDto(
     id: $checkedConvert('id', (v) => v as String),
     fromName: $checkedConvert('fromName', (v) => v as String?),
+    toTeleconseillerId: $checkedConvert(
+      'toTeleconseillerId',
+      (v) => v as String,
+    ),
     toName: $checkedConvert('toName', (v) => v as String),
     fiches: $checkedConvert('fiches', (v) => v as num),
+    fichesEnMain: $checkedConvert('fichesEnMain', (v) => v as num),
     performedByName: $checkedConvert('performedByName', (v) => v as String),
     createdAt: $checkedConvert('createdAt', (v) => v as String),
   );
@@ -148,8 +179,10 @@ Map<String, dynamic> _$LotExportReaffectationDtoToJson(
 ) => <String, dynamic>{
   'id': instance.id,
   'fromName': instance.fromName,
+  'toTeleconseillerId': instance.toTeleconseillerId,
   'toName': instance.toName,
   'fiches': instance.fiches,
+  'fichesEnMain': instance.fichesEnMain,
   'performedByName': instance.performedByName,
   'createdAt': instance.createdAt,
 };

@@ -196,6 +196,9 @@ import 'package:crm_api_client/src/model/representant_comment_dto.dart';
 import 'package:crm_api_client/src/model/representant_comment_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_dto.dart';
 import 'package:crm_api_client/src/model/representant_export_query_dto.dart';
+import 'package:crm_api_client/src/model/representant_fiche_champ_dto.dart';
+import 'package:crm_api_client/src/model/representant_fiche_change_dto.dart';
+import 'package:crm_api_client/src/model/representant_fiche_change_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_list_dto.dart';
 import 'package:crm_api_client/src/model/representant_lookup_dto.dart';
 import 'package:crm_api_client/src/model/representant_productivity_dto.dart';
@@ -649,6 +652,7 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'ExportMode':
     case 'FamilleStatut':
+    case 'FicheChangeSource':
     case 'FormulairePublicDto':
       return FormulairePublicDto.fromJson(value as Map<String, dynamic>)
           as ReturnType;
@@ -967,6 +971,17 @@ ReturnType deserialize<ReturnType, BaseType>(
           as ReturnType;
     case 'RepresentantExportQueryDto':
       return RepresentantExportQueryDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantFicheChampDto':
+      return RepresentantFicheChampDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantFicheChangeDto':
+      return RepresentantFicheChangeDto.fromJson(value as Map<String, dynamic>)
+          as ReturnType;
+    case 'RepresentantFicheChangeListDto':
+      return RepresentantFicheChangeListDto.fromJson(
+            value as Map<String, dynamic>,
+          )
           as ReturnType;
     case 'RepresentantListDto':
       return RepresentantListDto.fromJson(value as Map<String, dynamic>)
