@@ -12,7 +12,7 @@ import type {
   WhatsappStatus,
 } from '@/lib/data/representants';
 import type { RepresentantRelation } from '@/lib/representant-filters';
-import { ENROLLMENT_METHODS } from '@/lib/types';
+import { DUREE_ETABLISSEMENT_MAX_MOIS, ENROLLMENT_METHODS } from '@/lib/types';
 import type {
   CallOutcome,
   EnrollmentMethod,
@@ -165,7 +165,6 @@ export function callbackHalfHours(now: number, day: string): CallbackSlot[] {
 const COMMENT_MAX_LENGTH = 2_000;
 const EMAIL_MAX_LENGTH = 160;
 const NAME_MAX_LENGTH = 120;
-const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
 const DUREE_SYSTEME_MAX_MOIS = 300;
 
 /** Même tolérance que le serveur : le rendez-vous se juge sur l'horodatage terrain. */
