@@ -396,6 +396,8 @@ final Provider<GoRouter> routerProvider = Provider<GoRouter>((Ref ref) {
         builder: _chues(
           (GoRouterState state) => RepresentantQualificationScreen(
             representantId: state.pathParameters['id'] ?? '',
+            puisProspects:
+                state.uri.queryParameters[Routes.suiteParam] == 'prospects',
           ),
         ),
       ),
