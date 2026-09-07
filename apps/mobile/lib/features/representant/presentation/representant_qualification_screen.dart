@@ -119,9 +119,15 @@ class RepresentantQualificationScreen extends ConsumerStatefulWidget {
   const RepresentantQualificationScreen({
     super.key,
     required this.representantId,
+    this.puisProspects = false,
   });
 
   final String representantId;
+
+  /// L'appel vient d'aboutir et le representant donne ses contacts : la saisie
+  /// des prospects suit l'enregistrement. Un injoignable n'a rien a donner, il
+  /// rend la main comme d'habitude.
+  final bool puisProspects;
 
   @override
   ConsumerState<RepresentantQualificationScreen> createState() =>
@@ -981,9 +987,16 @@ class _RepresentantQualificationScreenState
       // qualifiée pour de bon les rouvrirait sans raison.
       discardDraft();
       if (rappelAt == null) await draftRepository.delete(draftId);
+      if (!context.mounted) return;
+      if (widget.puisProspects && joignable) {
+        context.pushReplacement(
+          Routes.newProspectFor(widget.representantId),
+        );
+        return;
+      }
       // Rouverte au démarrage, la fiche est la seule route : la dépiler
       // laisserait un écran noir.
-      if (context.mounted) popOrHome(context, fallback: Routes.chues);
+      popOrHome(context, fallback: Routes.chues);
     } on Object catch (error) {
       if (!context.mounted) return;
       setState(() {
