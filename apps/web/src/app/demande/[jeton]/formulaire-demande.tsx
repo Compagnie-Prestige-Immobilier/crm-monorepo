@@ -10,17 +10,20 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  aDesCoordonnees,
   CHOIX_WHATSAPP,
   champsRendus,
   cleLibre,
   corpsDemande,
   estRequis,
+  etapeDuChamp,
   grouperChamps,
   MESSAGE_MAX,
   valeursLibre,
   validerDemande,
   widgetDe,
   type ChampLibrePublic,
+  type Etape,
   type FormulairePublic,
   type ReglageChampPublic,
   type Saisie,
@@ -75,7 +78,9 @@ const enOption = (option: { id: string; libelle: string }): OptionListe => ({
   label: option.libelle,
 });
 
-type Etat = 'saisie' | 'relecture' | 'envoi' | 'envoye';
+type Phase = 'coordonnees' | 'complement' | 'relecture' | 'envoi' | 'envoye';
+
+const etapeDe = (phase: Phase): Etape => (phase === 'coordonnees' ? 'coordonnees' : 'complement');
 
 export function FormulaireDemande({
   jeton,
@@ -86,15 +91,18 @@ export function FormulaireDemande({
   cleSite: string;
   formulaire: FormulairePublic;
 }) {
+  const deuxEtapes = aDesCoordonnees(formulaire.champs);
   const [saisie, setSaisie] = useState<Saisie>({});
   const [erreurs, setErreurs] = useState<Readonly<Record<string, string>>>({});
-  const [etat, setEtat] = useState<Etat>('saisie');
+  const [phase, setPhase] = useState<Phase>(deuxEtapes ? 'coordonnees' : 'complement');
   const [refus, setRefus] = useState<string | null>(null);
   const element = useRef<HTMLFormElement>(null);
+  const repere = useRef<HTMLParagraphElement>(null);
 
+  const etape = etapeDe(phase);
   const rendus = champsRendus(formulaire.champs, saisie);
-  const sections = grouperChamps(rendus);
-  const enCours = etat === 'envoi';
+  const sections = grouperChamps(rendus, etape);
+  const enCours = phase === 'envoi';
 
   function modifier(cle: string, valeur: string): void {
     setSaisie((precedent) => ({ ...precedent, [cle]: valeur }));
@@ -102,7 +110,13 @@ export function FormulaireDemande({
       const { [cle]: _, ...reste } = precedent;
       return reste;
     });
-    setEtat((precedent) => (precedent === 'relecture' ? 'saisie' : precedent));
+    setPhase((precedent) => (precedent === 'relecture' ? 'complement' : precedent));
+  }
+
+  function allerA(suivante: Phase): void {
+    setPhase(suivante);
+    element.current?.scrollIntoView({ block: 'start' });
+    repere.current?.focus();
   }
 
   /**
@@ -123,7 +137,7 @@ export function FormulaireDemande({
       return;
     }
 
-    setEtat('envoi');
+    setPhase('envoi');
     setRefus(null);
     const piege = champDom(PIEGE_CHAMP);
     const corps = {
@@ -141,37 +155,44 @@ export function FormulaireDemande({
       if (!reponse.ok) {
         const charge: unknown = await reponse.json().catch(() => null);
         setRefus(apiErrorMessage(charge, 'Votre demande n’a pas pu être envoyée.'));
-        setEtat('relecture');
+        setPhase('relecture');
         return;
       }
-      setEtat('envoye');
+      setPhase('envoye');
     } catch {
       setRefus('Le serveur est injoignable. Vérifiez votre connexion.');
-      setEtat('relecture');
+      setPhase('relecture');
     }
   }
 
-  function soumettre(evenement: FormEvent<HTMLFormElement>): void {
-    evenement.preventDefault();
-    if (etat === 'envoi' || etat === 'envoye') return;
-
-    const problemes = validerDemande(saisie, formulaire.champs, formulaire.libres);
+  function franchir(): void {
+    const portee = phase === 'coordonnees' ? 'coordonnees' : 'tout';
+    const problemes = validerDemande(saisie, formulaire.champs, formulaire.libres, portee);
     setErreurs(problemes);
     if (Object.keys(problemes).length > 0) {
       setRefus('Vérifiez les champs signalés.');
-      setEtat('saisie');
+      // Une erreur sur l'étape 1 depuis l'étape 2 y ramène : la signaler sur un
+      // champ qui n'est pas à l'écran laisserait le visiteur sans recours.
+      const enAmont = Object.keys(problemes).some((cle) => etapeDuChamp(cle) === 'coordonnees');
+      allerA(enAmont && deuxEtapes ? 'coordonnees' : 'complement');
       return;
     }
-
     setRefus(null);
-    if (etat === 'saisie') {
-      setEtat('relecture');
-      return;
-    }
-    void envoyer();
+    allerA(phase === 'coordonnees' ? 'complement' : 'relecture');
   }
 
-  if (etat === 'envoye') {
+  /** Le seul chemin vers le POST part de la relecture : aucun autre bouton n'y mène. */
+  function soumettre(evenement: FormEvent<HTMLFormElement>): void {
+    evenement.preventDefault();
+    if (phase === 'envoi' || phase === 'envoye') return;
+    if (phase === 'relecture') {
+      void envoyer();
+      return;
+    }
+    franchir();
+  }
+
+  if (phase === 'envoye') {
     return (
       <div role="status" className="flex flex-col items-start gap-3">
         <CheckCircle2Icon className="size-8 text-success" aria-hidden="true" />
@@ -192,6 +213,17 @@ export function FormulaireDemande({
       onSubmit={soumettre}
       className="flex flex-col gap-8"
     >
+      {deuxEtapes ? (
+        <p
+          ref={repere}
+          tabIndex={-1}
+          aria-live="polite"
+          className="eyebrow text-muted-foreground outline-none"
+        >
+          Étape {etape === 'coordonnees' ? '1' : '2'} sur 2
+        </p>
+      ) : null}
+
       {sections.map((section) => (
         <fieldset key={section.titre} disabled={enCours} className="min-w-0">
           <legend className="eyebrow text-muted-foreground">{section.titre}</legend>
@@ -212,16 +244,91 @@ export function FormulaireDemande({
         </fieldset>
       ))}
 
-      {formulaire.libres.length === 0 ? null : (
+      {etape === 'complement' ? (
+        <Complement
+          libres={formulaire.libres}
+          saisie={saisie}
+          erreurs={erreurs}
+          enCours={enCours}
+          onChange={modifier}
+        />
+      ) : null}
+
+      {/* Piège à robots : hors de l'écran et hors du parcours au clavier, un
+          automate le remplit et son envoi est ignoré. */}
+      <input
+        name={PIEGE_CHAMP}
+        type="text"
+        tabIndex={-1}
+        autoComplete="off"
+        aria-hidden="true"
+        className="sr-only"
+      />
+
+      {/* Monté dès l'étape 1 et JAMAIS démonté : le jeton que le widget dépose
+          disparaîtrait au changement d'étape, et l'envoi serait refusé. */}
+      {cleSite === '' ? null : (
+        <>
+          <Script src={TURNSTILE_SCRIPT} async defer />
+          <div className="cf-turnstile" data-sitekey={cleSite} data-language="fr" />
+        </>
+      )}
+
+      {phase === 'relecture' || phase === 'envoi' ? (
+        <Relecture formulaire={formulaire} rendus={rendus} saisie={saisie} />
+      ) : null}
+
+      {refus === null ? null : (
+        <p
+          role="alert"
+          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
+        >
+          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+          {refus}
+        </p>
+      )}
+
+      <Actions
+        phase={phase}
+        deuxEtapes={deuxEtapes}
+        onRetour={() => {
+          setRefus(null);
+          allerA('coordonnees');
+        }}
+        onCorriger={() => {
+          allerA('complement');
+        }}
+      />
+    </form>
+  );
+}
+
+/** Ce que l'étape 2 ajoute aux sections réglées : les champs libres et le message. */
+function Complement({
+  libres,
+  saisie,
+  erreurs,
+  enCours,
+  onChange,
+}: {
+  libres: readonly ChampLibrePublic[];
+  saisie: Saisie;
+  erreurs: Readonly<Record<string, string>>;
+  enCours: boolean;
+  onChange: (cle: string, valeur: string) => void;
+}) {
+  return (
+    <>
+      {libres.length === 0 ? null : (
         <fieldset disabled={enCours} className="grid min-w-0 gap-5 sm:grid-cols-2">
-          {formulaire.libres.map((libre) => (
+          {libres.map((libre) => (
             <ChampAjoute
               key={libre.id}
               champ={libre}
               valeur={saisie[cleLibre(libre.id)] ?? ''}
               erreur={erreurs[cleLibre(libre.id)]}
               onChange={(valeur) => {
-                modifier(cleLibre(libre.id), valeur);
+                onChange(cleLibre(libre.id), valeur);
               }}
             />
           ))}
@@ -237,76 +344,105 @@ export function FormulaireDemande({
               maxLength={MESSAGE_MAX}
               value={saisie.message ?? ''}
               onChange={(evenement) => {
-                modifier('message', evenement.target.value);
+                onChange('message', evenement.target.value);
               }}
             />
           )}
         </Field>
       </fieldset>
-
-      {/* Piège à robots : hors de l'écran et hors du parcours au clavier, un
-          automate le remplit et son envoi est ignoré. */}
-      <input
-        name={PIEGE_CHAMP}
-        type="text"
-        tabIndex={-1}
-        autoComplete="off"
-        aria-hidden="true"
-        className="sr-only"
-      />
-
-      {cleSite === '' ? null : (
-        <>
-          <Script src={TURNSTILE_SCRIPT} async defer />
-          <div className="cf-turnstile" data-sitekey={cleSite} data-language="fr" />
-        </>
-      )}
-
-      {refus === null ? null : (
-        <p
-          role="alert"
-          className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive-surface px-3 py-2.5 text-[0.8125rem] text-destructive"
-        >
-          <AlertCircleIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-          {refus}
-        </p>
-      )}
-
-      {etat === 'saisie' ? (
-        <Button type="submit" size="lg" className="w-full sm:w-auto">
-          Vérifier ma demande
-        </Button>
-      ) : (
-        <Relecture
-          formulaire={formulaire}
-          rendus={rendus}
-          saisie={saisie}
-          enCours={enCours}
-          onCorriger={() => {
-            setEtat('saisie');
-          }}
-        />
-      )}
-    </form>
+    </>
   );
 }
 
 /**
- * L'étape de contrôle tient dans le formulaire : les champs restent à l'écran
- * et modifiables, une étape de plus ferait abandonner un visiteur public.
+ * Collée en bas sur mobile : sans cela le bouton d'étape vit sous dix champs et
+ * se gagne au défilement.
+ */
+function Actions({
+  phase,
+  deuxEtapes,
+  onRetour,
+  onCorriger,
+}: {
+  phase: Phase;
+  deuxEtapes: boolean;
+  onRetour: () => void;
+  onCorriger: () => void;
+}) {
+  const enCours = phase === 'envoi';
+  return (
+    <div
+      className={cn(
+        'sticky bottom-0 z-10 -mx-6 flex flex-col gap-3 border-t border-border bg-background px-6 py-3',
+        'sm:static sm:mx-0 sm:flex-row sm:flex-wrap sm:border-0 sm:bg-transparent sm:px-0 sm:py-0',
+      )}
+    >
+      {phase === 'coordonnees' ? (
+        <Button type="submit" size="lg" className="w-full sm:w-auto">
+          Suivant
+        </Button>
+      ) : null}
+
+      {phase === 'complement' ? (
+        <>
+          <Button type="submit" size="lg" className="w-full sm:w-auto">
+            Vérifier ma demande
+          </Button>
+          {deuxEtapes ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={onRetour}
+              className="w-full sm:w-auto"
+            >
+              Retour
+            </Button>
+          ) : null}
+        </>
+      ) : null}
+
+      {phase === 'relecture' || phase === 'envoi' ? (
+        <>
+          <Button type="submit" size="lg" disabled={enCours} className="w-full sm:w-auto">
+            {enCours ? (
+              <>
+                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+                Envoi…
+              </>
+            ) : (
+              'Envoyer ma demande'
+            )}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={enCours}
+            onClick={onCorriger}
+            className="w-full sm:w-auto"
+          >
+            Corriger
+          </Button>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * L'étape de contrôle tient dans le formulaire : les champs de l'étape 2
+ * restent à l'écran et modifiables, une fenêtre de plus ferait abandonner un
+ * visiteur public.
  */
 function Relecture({
   formulaire,
   rendus,
   saisie,
-  enCours,
-  onCorriger,
 }: {
   formulaire: FormulairePublic;
   rendus: readonly ReglageChampPublic[];
   saisie: Saisie;
-  enCours: boolean;
-  onCorriger: () => void;
 }) {
   const lignes = [
     ...rendus.map((champ) => ({
@@ -336,21 +472,6 @@ function Relecture({
           </div>
         ))}
       </dl>
-      <div className="mt-5 flex flex-wrap gap-3">
-        <Button type="submit" size="lg" disabled={enCours}>
-          {enCours ? (
-            <>
-              <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              Envoi…
-            </>
-          ) : (
-            'Envoyer ma demande'
-          )}
-        </Button>
-        <Button type="button" variant="outline" size="lg" disabled={enCours} onClick={onCorriger}>
-          Corriger
-        </Button>
-      </div>
     </section>
   );
 }
