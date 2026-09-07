@@ -17,6 +17,7 @@ import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { isAdmin } from '../../common/scope.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
 import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
@@ -431,8 +432,27 @@ export class LotsExportService {
    * Un item ne porte qu'une des deux clés ; le filtre de relation écarte donc
    * seul les fiches supprimées, sans qu'un `deletedAt` traîne côté item.
    */
-  async mesAttributions(_user: AuthenticatedUser): Promise<MesAttributionsDto> {
-    return { representantIds: [], prospectIds: [], tout: true };
+  async mesAttributions(user: AuthenticatedUser): Promise<MesAttributionsDto> {
+    if (isAdmin(user)) return { representantIds: [], prospectIds: [], tout: true };
+
+    const [representants, prospects] = await Promise.all([
+      this.prisma.lotExportItem.findMany({
+        where: { assigneeId: user.id, representant: { deletedAt: null } },
+        select: { representantId: true },
+        distinct: ['representantId'],
+      }),
+      this.prisma.lotExportItem.findMany({
+        where: { assigneeId: user.id, prospect: { deletedAt: null } },
+        select: { prospectId: true },
+        distinct: ['prospectId'],
+      }),
+    ]);
+
+    return {
+      representantIds: representants.flatMap((item) => item.representantId ?? []),
+      prospectIds: prospects.flatMap((item) => item.prospectId ?? []),
+      tout: false,
+    };
   }
 
   async get(id: string): Promise<LotExportDetailDto> {
