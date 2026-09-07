@@ -119,9 +119,9 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Admin',
     path: '/admin',
     description: 'Comptes, listes de référence, imports et paramètres',
-    // La supervision et la direction n'y voient que les listes de référence :
-    // chaque entrée porte ses propres rôles.
-    roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+    // La supervision et la direction atteignent les listes de référence par un
+    // lien direct depuis CHUES et Grand Public : elles n'ouvrent pas la coque.
+    roles: ['ADMIN'],
   },
 ];
 
@@ -336,6 +336,16 @@ const SECTIONS: readonly NavSection[] = [
         // Pas `ENCADREMENT` : l'administrateur règle TOUT, la supervision et la
         // direction seulement les deux textes envoyés aux prospects.
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+        secondary: true,
+      },
+      {
+        // Lien direct vers l'écran de l'Admin : la supervision et la direction
+        // n'ouvrent pas la coque Admin pour cette seule entrée.
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Départements, banques, syndicats',
+        roles: ENCADREMENT,
         secondary: true,
       },
 
@@ -649,6 +659,16 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
         hidden: true,
         onglet: '/grand-public/statistiques',
+      },
+      {
+        // Lien direct vers l'écran de l'Admin : la supervision et la direction
+        // n'ouvrent pas la coque Admin pour cette seule entrée.
+        href: '/admin/referentiels',
+        label: 'Listes de référence',
+        icon: LibraryIcon,
+        description: 'Départements, banques, syndicats',
+        roles: ENCADREMENT,
+        secondary: true,
       },
       {
         href: '/grand-public/console',
