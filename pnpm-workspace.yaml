@@ -1,6 +1,7 @@
 packages:
   - apps/api
   - apps/web
+  - apps/go/web
   - packages/*
 
 # Keep transitive packages on patched releases when an upstream tool lags
