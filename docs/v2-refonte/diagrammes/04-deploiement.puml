@@ -4,8 +4,8 @@
 LAYOUT_LEFT_RIGHT()
 title Déploiement : où tourne chaque conteneur en production.
 
-Deployment_Node(phone, "Téléphone Android", "Flotte terrain") {
-  Container(app, "CPI GO", "APK v2, mise à jour obligatoire")
+Deployment_Node(phone, "Téléphone Android", "Navigateur") {
+  Container(nav_tel, "Panneau", "go-admin.cpi-chues.com")
 }
 Deployment_Node(pc, "Poste de travail", "Navigateur") {
   Container(nav, "Panneau", "go-admin.cpi-chues.com")
@@ -16,14 +16,11 @@ Deployment_Node(cf, "Cloudflare", "Proxy, TLS") {
     Deployment_Node(dgo, "Application cpi-go", "Docker, bookworm-slim + postgresql-client-18") {
       Container(go, "apps/go", "Binaire Go, port 4000")
     }
-    Deployment_Node(dsync, "Application cpi-go-sync", "Docker") {
-      Container(ps, "powersync-service", "port 8080")
-    }
     Deployment_Node(ddata, "Données", "Docker") {
-      ContainerDb(pg, "postgres:18.4", "wal_level=logical")
+      ContainerDb(pg, "postgres:18.4", "")
     }
     Deployment_Node(dvol, "Volumes", "Disque") {
-      Container(vol, "releases, db-dumps, call-recordings, imports", "")
+      Container(vol, "db-dumps, call-recordings, imports, releases jusqu'à J+7", "")
     }
   }
 }
@@ -32,11 +29,9 @@ Deployment_Node(s3, "S3 Scaleway", "Sauvegarde nocturne") {
   Container(dump, "pg_dump -Fc", "rétention 30")
 }
 
-Rel_R(nav, go, "go-admin.cpi-chues.com", "HTTPS")
-Rel_R(app, go, "go.cpi-chues.com", "HTTPS")
-Rel_R(app, ps, "sync.cpi-chues.com", "WebSocket")
+Rel_R(nav, go, "HTTPS")
+Rel_R(nav_tel, go, "HTTPS")
 Rel_R(go, pg, "")
 Rel_R(go, vol, "")
-Rel_R(ps, pg, "réplication")
 Rel_R(pg, dump, "chaque nuit")
 @enduml
