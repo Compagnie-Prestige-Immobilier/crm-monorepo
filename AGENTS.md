@@ -203,9 +203,11 @@ commite.
 
 Decisions arretees les 7 et 8 septembre 2026, detaillees dans
 `docs/v2-refonte/plan.md` et etayees par `docs/v2-refonte/audits/` : reecriture en
-parallele avec bascule unique ; Next.js + Drizzle + zod dans un serveur Node
-personnalise (WebSocket de presence, sept crons, SSE) a la place de NestJS +
-Prisma ; Better Auth sur la table `users` existante, hachages argon2id repris ;
+parallele avec bascule unique ; un binaire Go (`net/http`, huma, pgx + sqlc,
+goose, SPA React embarquee, WebSocket de presence, sept crons, SSE, cache
+memoire) a la place de NestJS + Prisma, decision du 8 septembre pour la
+consommation, pas de framework Go, pas de Rust ; sessions opaques dans
+`refresh_tokens`, hachages argon2id repris ;
 Flutter conserve, PowerSync auto-heberge (Sync Streams, buckets par role et
 par campagne, `uploadData` en 2xx avec table de verdicts) a la place du moteur
 de sync maison ; meme base Postgres ; phase 0 = quatre preuves sur copie de

@@ -13,15 +13,14 @@ Deployment_Node(pc, "Poste de travail", "Navigateur") {
 
 Deployment_Node(cf, "Cloudflare", "Proxy, TLS") {
   Deployment_Node(vps, "VPS 72.61.198.237", "Dokploy, Traefik") {
-    Deployment_Node(dgo, "Application cpi-go", "Docker") {
-      Container(go, "apps/go", "Node, port 4000")
+    Deployment_Node(dgo, "Application cpi-go", "Docker, bookworm-slim + postgresql-client-18") {
+      Container(go, "apps/go", "Binaire Go, port 4000")
     }
     Deployment_Node(dsync, "Application cpi-go-sync", "Docker") {
       Container(ps, "powersync-service", "port 8080")
     }
     Deployment_Node(ddata, "Données", "Docker") {
       ContainerDb(pg, "postgres:18.4", "wal_level=logical")
-      ContainerDb(rd, "redis:8-alpine", "")
     }
     Deployment_Node(dvol, "Volumes", "Disque") {
       Container(vol, "releases, db-dumps, call-recordings, imports", "")
@@ -37,7 +36,6 @@ Rel_R(nav, go, "go-admin.cpi-chues.com", "HTTPS")
 Rel_R(app, go, "go.cpi-chues.com", "HTTPS")
 Rel_R(app, ps, "sync.cpi-chues.com", "WebSocket")
 Rel_R(go, pg, "")
-Rel_R(go, rd, "")
 Rel_R(go, vol, "")
 Rel_R(ps, pg, "réplication")
 Rel_R(pg, dump, "chaque nuit")

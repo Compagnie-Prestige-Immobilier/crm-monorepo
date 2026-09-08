@@ -12,12 +12,12 @@ le détail est dans `plan.md` et les audits.
 | Fichier | Type | Répond à |
 | --- | --- | --- |
 | `diagrammes/01-contexte.puml` | C4 niveau 1 | Qui utilise le système, avec quels services externes |
-| `diagrammes/02-conteneurs.puml` | C4 niveau 2 | Les cinq briques : mobile, apps/go, powersync-service, Postgres, Redis |
+| `diagrammes/02-conteneurs.puml` | C4 niveau 2 | Les quatre briques : mobile, apps/go, powersync-service, Postgres |
 | `diagrammes/03-composants-go.puml` | C4 niveau 3 | Comment le code de `apps/go` est rangé |
 | `diagrammes/04-deploiement.puml` | C4 déploiement | Où tourne chaque brique : Cloudflare, VPS Dokploy, volumes, S3 |
 | `diagrammes/05-flux-ecriture.puml` | Séquence | Une saisie hors ligne remonte et reçoit un verdict |
 | `diagrammes/06-flux-auth.puml` | Séquence | Connexion mobile, JWT PowerSync |
-| `diagrammes/07-calendrier.puml` | Gantt | 15 jours ouvrés, du 14 septembre au 2 octobre 2026 |
+| `diagrammes/07-calendrier.puml` | Gantt | 20 jours ouvrés, du 14 septembre au 9 octobre 2026 |
 
 ## Rendre les diagrammes
 
@@ -36,12 +36,12 @@ Les SVG sont produits à côté des sources et ne sont pas commités.
 1. `01-contexte` : trois personnes, un système, trois services externes.
 2. `02-conteneurs` : le mobile écrit vers `apps/go` et lit depuis
    `powersync-service` ; les deux s'appuient sur le même Postgres.
-3. `03-composants-go` : un serveur, un arbre de pages, des route handlers, des
-   domaines métier, trois bibliothèques (`auth`, `db`, `roles`) et un package
-   de schémas partagé avec le mobile.
+3. `03-composants-go` : un binaire Go, un fichier par domaine métier, trois
+   fichiers transverses (`auth.go`, `roles.go`, `sync.go`), le SQL compilé par
+   sqlc et la SPA embarquée.
 4. `04-deploiement` : deux applications Dokploy (`cpi-go`, `cpi-go-sync`), un
-   Postgres, un Redis, quatre volumes, une sauvegarde S3, trois noms d'hôte
-   derrière Cloudflare.
+   Postgres, quatre volumes, une sauvegarde S3, trois noms d'hôte derrière
+   Cloudflare.
 5. `05-flux-ecriture` : la règle centrale de la v2, le serveur répond toujours
    200 et le refus est un verdict synchronisé.
 6. `06-flux-auth` : session de 30 jours, JWT d'une heure pour PowerSync.

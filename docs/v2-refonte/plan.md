@@ -1,9 +1,10 @@
 # Refonte v2 : plan et arbitrages
 
-Statut : version 2.1 du plan, 8 septembre 2026. La version 1 (7 septembre) a
+Statut : version 2.2 du plan, 8 septembre 2026. La version 1 (7 septembre) a
 été soumise à cinq audits en lecture seule, archivés dans `audits/`. La critique
 a relevé quinze erreurs factuelles et quatorze manques bloquants dans la
-version 1 ; ce document les intègre. Chaque affirmation technique renvoie à un
+version 1 ; ce document les intègre. La version 2.2 remplace le backend Node
+par un binaire Go (§2.3). Chaque affirmation technique renvoie à un
 `chemin:ligne` ou à une documentation officielle citée dans les audits. Ce qui
 n'a pas pu être vérifié est marqué « à prouver en phase 0 ». Le registre des
 risques consolidé est dans `risques.md`.
@@ -16,20 +17,21 @@ principal, pour que `dev` et `prod` restent disponibles sans bascule de branche 
 ```
 git fetch origin
 git worktree add ../crm-monorepo-v2 -b v2 origin/dev
-cd ../crm-monorepo-v2 && pnpm install
+cd ../crm-monorepo-v2 && go build ./apps/go/... && pnpm --dir apps/go/web install
 ```
 
 - `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo` reste sur `dev` ou
   `prod` : correctifs de production, release v1 de maintenance, déploiements.
 - `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo-v2` porte la branche
-  `v2` : `apps/go`, mobile réécrit, `packages/schema`, infra v2.
+  `v2` : `apps/go`, mobile réécrit, infra v2.
 - Les correctifs prod sont reportés dans `v2` chaque soir par
   `git -C ../crm-monorepo-v2 merge origin/prod`, résolus dans le worktree.
 - Les deux worktrees partagent le même `.git` : un `git worktree list` doit
   toujours montrer les deux, et `git worktree remove` n'est lancé qu'après la
   bascule.
 - Les serveurs de développement des deux arbres n'utilisent pas les mêmes
-  ports (v1 : 3000, 3001, 5434, 6381 ; v2 : 4000, 5435, 6382, PowerSync 8080).
+  ports (v1 : 3000, 3001, 5434, 6381 ; v2 : Go 4000, Vite 5173, Postgres
+  5435, PowerSync 8080).
 
 ## 1. Pourquoi
 
@@ -93,39 +95,94 @@ DTO Nest + Swagger, OpenAPI, codegen, relais Next).
 | Données locales | Code d'extraction jetable dans la v1 pour tout pousser avant vidage | Brouillons, preuves d'appel, rappels remontent ; rien n'est perdu |
 | Durée | 15 jours ouvrés, phase 0 de 2 jours, durées figées après les preuves | La v1 a été construite en deux semaines avec des agents ; la v2 part d'une spécification complète (audits) et ne peut pas prendre plus |
 
+### 2.3 Pris le 8 septembre 2026, après comparaison des consommations
+
+Le propriétaire veut la consommation la plus basse sur le VPS. Aucune mesure
+CPU/RAM n'existe en dépôt et Dokploy ne pose aucune limite
+(`audits/donnees-infra.md` §4). Ordres de grandeur retenus pour la décision, à
+mesurer en phase 0 : un serveur Node avec Next occupe 150 à 250 Mo au repos,
+un binaire Go 15 à 40 Mo, un binaire Rust 8 à 20 Mo. Postgres et
+`powersync-service` (lui-même en Node) restent quoi qu'il arrive. Rust est
+écarté : son gain sur Go est invisible à côté de Postgres, et rien ici n'est
+limité par le CPU.
+
+| Sujet | Décision | Conséquence |
+| --- | --- | --- |
+| Backend | Un binaire Go, `apps/go`, remplace Next.js + Drizzle + Better Auth | Annule la ligne « Backend » de §2.1 et « Hors Next » de §2.2 |
+| Panneau web | SPA statique Vite + React 19, embarquée dans le binaire par `embed` | Aucun processus Node en production hors PowerSync ; un seul conteneur applicatif |
+| Cadre HTTP | `net/http` de la bibliothèque standard ; huma pour la validation des entrées et le document OpenAPI | Pas de Gin, Echo ni Fiber ; huma est une bibliothèque sur le mux standard, elle ne possède pas le processus |
+| Contrat | Les structs Go sont le contrat ; OpenAPI produit par huma au build, types TypeScript produits au build, rien de commité | Une seule définition ; `packages/schema` et zod disparaissent |
+| Base | pgx + sqlc sur des fichiers SQL ; migrations goose en SQL pur | Les 20 CHECK, 12 index partiels, l'index GIN et les 79 requêtes brutes restent du SQL tel quel ; le problème `drizzle-kit pull` (R5) disparaît |
+| Authentification | Sessions opaques dans `refresh_tokens` (table existante, `schema.prisma:378-393`) ; argon2id vérifié par `alexedwards/argon2id` sur les hachages actuels ; JWT EdDSA d'une heure pour PowerSync, JWKS sur `/api/auth/jwks` | Aucune table d'auth ajoutée, aucun script de reprise des hachages ; annule « Authentification » de §2.1 et « Identité », « Identifiant de connexion », « Révocation » de §2.2, dont le comportement est conservé sans Better Auth |
+| Redis | Supprimé ; cache en mémoire dans le processus Go avec TTL et invalidation par groupe | Annule « Redis » dans « Infra conservée » de §2.1 ; un conteneur de moins ; valable parce que l'instance est unique (`cpi-redis-cache`, décision du 5 septembre). À confirmer par le propriétaire |
+| Durée | 20 jours ouvrés au lieu de 15 | Phase 1 + 2 jours, phase 2 + 2 jours, phase 6 + 1 jour : auth, exports et imports réécrits sans bibliothèque JS reprise |
+
 ## 3. Cible
 
 ```
 Téléphones Flutter ──PowerSync SDK──► powersync-service (VPS, Traefik) ──réplication logique──► Postgres 18.4
       │                                        ▲                                      ▲
-      │ uploadData ──► Next.js (route handlers)◄── navigateur                         │
-      │                  │  Drizzle · Better Auth · zod                               │
-      │                  ├── serveur Node : WebSocket présence, 7 crons, SSE          │
-      │                  └── Redis (cache, invalidation)                              │
+      │ uploadData ──► binaire Go (apps/go) ◄── navigateur (SPA embarquée)            │
+      │                  │  net/http · huma · pgx · sqlc                              │
+      │                  ├── WebSocket présence, 7 crons, SSE, cache mémoire          │
+      │                  └── JWKS EdDSA lu par powersync-service                      │
       └── HTTP direct : notes vocales, APK, ouvertures, mot de passe ────────────────┘
 ```
 
-Stack, versions vérifiées :
+Stack, versions vérifiées sur `proxy.golang.org` et `go.dev` le 8 septembre
+2026 :
 
-- Next.js 16.2, React 19.2, zod 4.4 (catalogue du dépôt). Serveur Node
-  personnalisé (`server.ts`) : Next, `ws` pour `/api/v1/presence/live`,
-  `node-cron` pour les sept tâches de `audits/api.md` §2, SSE `/api/v1/live`
-  en `ReadableStream`.
-- Drizzle ORM. `drizzle-kit pull` sert de point de départ, puis relecture
-  manuelle des 76 migrations : les 20 CHECK, 12 index partiels, l'index GIN
-  `immutable_unaccent`, les extensions `unaccent` et `pg_trgm` sont réécrits à
-  la main dans le schéma Drizzle (`audits/donnees-infra.md` §2). Les
-  79 requêtes SQL brutes, concentrées dans `analytics/*`, sont portées telles
-  quelles en `sql` Drizzle. `@updatedAt` et `uuid(7)` deviennent applicatifs.
-- Better Auth sur la table `users` existante (`modelName: 'user'`, `fields`
-  mappés), plugins `username`, `jwt` (EdDSA, JWKS sur `/api/auth/jwks`,
-  `definePayload` avec `sub` et `role`, `expirationTime: '1h'`), `bearer`
-  pour le mobile. `password.hash`/`.verify` sur l'argon2id actuel
-  (`apps/api/src/modules/auth/password.ts`, paramètres `memoryCost 19456,
-  timeCost 2, parallelism 1`). Politique 8 à 24 caractères conservée.
+- Go 1.27. `net/http` (`ServeMux` avec méthode et motif, Go 1.22+) sert
+  l'API, la SPA embarquée (`embed`), le SSE `/api/v1/live` (`http.Flusher`)
+  et le téléchargement d'APK par `Range` (`http.ServeContent`). huma 2.39
+  (`humago`) valide les corps et paramètres depuis les tags des structs,
+  renvoie les erreurs par champ en RFC 9457 et produit le document OpenAPI.
+  `coder/websocket` 1.8 pour `/api/v1/presence/live`. `gocron` 2.22 pour les
+  sept tâches de `audits/api.md` §2. `golang.org/x/time/rate` pour les trois
+  limiteurs nommés (R27). `log/slog` pour les journaux. Configuration par
+  variables d'environnement lues dans une struct au démarrage, échec immédiat
+  si une variable obligatoire manque (mêmes noms que `apps/api/src/env.ts`).
+- pgx 5.11 et sqlc 1.31. `apps/go/sql/schema.sql` est le
+  `pg_dump --schema-only` de la copie de prod pris en phase 0, relu à la main :
+  c'est le schéma de référence que sqlc compile, comme `schema.prisma` l'était.
+  Les 20 CHECK, 12 index partiels, l'index GIN `immutable_unaccent`, les
+  extensions `unaccent` et `pg_trgm` y sont déjà ; rien à réécrire. Les 79
+  requêtes SQL brutes, concentrées dans `analytics/*`, sont collées telles
+  quelles dans `sql/queries/`. Le code sqlc est produit au build et n'est pas
+  commité. goose 3.28 applique les migrations v2 en SQL pur au démarrage,
+  depuis l'état v1 (la table `_prisma_migrations` reste en place pour le
+  retour arrière). `@updatedAt` et `uuid(7)` deviennent applicatifs
+  (`google/uuid` v7).
+- Authentification : un jeton opaque de 32 octets, haché en SHA-256 dans
+  `refresh_tokens.tokenHash`, 30 jours, `revokedAt` à la déconnexion et à la
+  désactivation. Cookie `HttpOnly` pour le panneau, `Authorization: Bearer`
+  pour le mobile. `alexedwards/argon2id` 1.0 vérifie les chaînes PHC
+  produites par `apps/api/src/modules/auth/password.ts` (`m=19456,t=2,p=1`)
+  et hache les nouveaux mots de passe avec les mêmes paramètres. Politique 8
+  à 24 caractères conservée. `golang-jwt/jwt` 5.3 signe en EdDSA le JWT
+  PowerSync d'une heure (`sub`, `role`, `aud`), clé Ed25519 lue depuis
+  l'environnement, JWKS sur `/api/auth/jwks`. Identifiant unique à l'écran,
+  aiguillage sur la présence de `@`.
+- Bibliothèques remplaçant les dépendances Node de `apps/api/package.json` :
+  excelize 2.11 (`exceljs`, avec `StreamWriter` pour l'export `consolidated`
+  à 500 000 lignes, R24), maroto 2.4 sur fpdf (`pdfkit`), `archive/zip`
+  (`jszip`), `nyaruka/phonenumbers` 1.8 (`libphonenumber-js`),
+  `shogo82148/androidbinary` 1.0 (`adbkit-apkreader`, manifeste et
+  signature d'APK), Brevo et Turnstile par `net/http` sans SDK.
+- Panneau : `apps/go/web`, Vite, React 19.2, TanStack Router (routes typées,
+  un seul arbre avec `projet` en paramètre), TanStack Query, `openapi-fetch`
+  avec les types produits par `openapi-typescript` au build depuis le
+  document huma (`go run ./apps/go -openapi`), react-hook-form sans schéma
+  client : la validation est celle du serveur, les erreurs RFC 9457 sont
+  affichées par champ. `dist/` est embarqué dans le binaire ; en
+  développement Vite sur 5173 relaie `/api` vers 4000.
+- Image Docker : deux étapes, Go puis Node pour `dist/` et les types, puis
+  `debian:bookworm-slim` avec `postgresql-client-18` PGDG pour `pg_dump`
+  (comme `Dockerfile.api:107`) et le binaire statique. Un seul conteneur
+  `cpi-go`.
 - PowerSync : `journeyapps/powersync-service`, stockage des buckets sur
   Postgres dans un schéma dédié, exclu des dumps ; `client_auth.jwks_uri` sur
-  Better Auth, `audience` fixée ; Sync Streams édition 3. Prérequis :
+  `/api/auth/jwks`, `audience` fixée ; Sync Streams édition 3. Prérequis :
   `wal_level = logical` (absent aujourd'hui, redémarrage de Postgres requis),
   publication `powersync` limitée aux tables du §5, rôle `powersync_role`.
 - Mobile : `powersync` 2.4, `drift_sqlite_async` 0.3 (compatible avec
@@ -152,7 +209,7 @@ Stack, versions vérifiées :
 | `ouverture` (ouvrir, brouillon, fermeture) par routes dédiées | HTTP direct conservé : le verrou « une fiche à la fois » est une règle serveur synchrone (`ouvertures.controller.ts:46-55`) |
 | Note vocale multipart (`phase2/call-attempts/:id/recording`) | HTTP direct conservé, PowerSync ne synchronise pas de binaire |
 | `updateVisite` (correction) | HTTP direct conservé |
-| `changeMyPassword` | Better Auth |
+| `changeMyPassword` | HTTP direct, `POST /api/auth/password`, révoque les autres sessions |
 
 Règles serveur portées dans les handlers `uploadData`, avec verdict au lieu
 d'exception : doublon de téléphone (`PROSPECT_PHONE_CONFLICT`,
@@ -210,20 +267,34 @@ release obligatoire.
 ## 6. Structure du dépôt
 
 ```
-apps/go/            Next.js + serveur Node : panneau, API, WebSocket, crons, SSE
+apps/go/
+  main.go           mux, SPA embarquée, crons, WebSocket, SSE, cache mémoire
+  auth.go           sessions, argon2id, JWT EdDSA, JWKS, limiteurs
+  roles.go          table de garde rôle x route, source du parcours « matrice »
+  sync.go           uploadData, verdicts
+  chues.go grand_public.go banque.go accueil.go admin.go
+  notifications.go imports.go exports.go
+  sql/schema.sql    pg_dump --schema-only de la prod, relu en phase 0, lu par sqlc
+  sql/queries/      requêtes sqlc, dont les 79 SQL brutes collées telles quelles
+  sql/migrations/   goose, SQL pur, à partir de l'état v1
+  sqlc.yaml go.mod
+  web/              Vite + React 19, panneau ; dist/ embarqué dans le binaire
 apps/mobile/        Flutter, réécrit sur la branche v2
-packages/schema/    zod + types partagés, sans codegen
-infra/              Dockerfiles, powersync.yaml, sync-streams.yaml, Traefik via Dokploy
+infra/              Dockerfile, powersync.yaml, sync-streams.yaml, Traefik via Dokploy
 docs/v2-refonte/    ce plan, audits/, risques.md, runbook
 ```
 
+Un seul package Go, un fichier par domaine métier, sous 1 500 lignes chacun ;
+un sous-package n'apparaît que si deux fichiers l'importent réellement. Les
+clients des deux plateformes d'enrôlement (`PLATEFORME_CHUES_URL`,
+`PLATEFORME_GRAND_PUBLIC_URL`) tiennent dans `admin.go` avec `net/http`.
+
 Disparaissent : `apps/api`, `apps/web`, `packages/api-client`,
-`packages/api-client-chues` et `-grand-public` (remplacés par deux clients
-`openapi-fetch` minimaux dans `apps/go`), `packages/database`,
+`packages/api-client-chues` et `-grand-public`, `packages/database`,
 `apps/mobile/drift_schemas`, tests de migration générés, `openapi.json`,
 `docs/adr/0001` et `0002` (remplacés par un ADR v2). Le `seed` (46
 départements, référentiels, workflow bancaire, compte initial,
-`api-entrypoint.sh:57-72`) est réécrit en Drizzle dans `apps/go`.
+`api-entrypoint.sh:57-72`) devient une commande `go run ./apps/go -seed`.
 
 ## 7. Phases
 
@@ -231,7 +302,7 @@ Durées en jours ouvrés, binôme propriétaire + agents. Repère : la v1 entiè
 été construite en deux semaines ; la v2 dispose en plus d'une spécification
 complète (les cinq audits) et d'une checklist de parité écrite. Les durées
 définitives sont figées à la fin de la phase 0. Calendrier dans
-`diagrammes/07-calendrier.puml` : du 14 septembre au 2 octobre 2026.
+`diagrammes/07-calendrier.puml` : du 14 septembre au 9 octobre 2026.
 
 ### Phase 0. Preuves et préparation, 2 jours
 
@@ -250,9 +321,14 @@ Sortie : quatre preuves écrites, go/no-go signé par le propriétaire.
 5. Preuve C, téléphonie : `CpiCallScreeningService` lit la base PowerSync,
    `SynchroService` et l'isolat Workmanager coexistent avec une seule
    instance connectée.
-6. Preuve D, schéma : `drizzle-kit pull` puis relecture des 76 migrations ;
-   diff SQL entre le schéma Drizzle régénéré et la base réelle vide.
-7. Release v1 de maintenance, exception nommée au gel : suppression du schéma
+6. Preuve D, schéma : `pg_dump --schema-only` de la copie devient
+   `sql/schema.sql` ; les 79 requêtes brutes collées dans `sql/queries/`
+   passent `sqlc generate` et `go build` ; goose démarre sur cette base sans
+   toucher `_prisma_migrations`.
+7. Mesure de consommation sur la prod : `docker stats` sur `cpi-go-api`,
+   `cpi-go-web`, Postgres et Redis, RAM totale du VPS. Ces chiffres sont la
+   référence pour juger le binaire Go au jour J.
+8. Release v1 de maintenance, exception nommée au gel : suppression du schéma
    `demo` et de `DEMO_WORKSPACE_ENABLED` ; refus de l'installation de mise à
    jour tant que `pendingSyncCount > 0` (`app_update_screen.dart:29,80-83`
    affiche mais ne bloque pas) ; extraction jetable qui pousse `form_drafts`,
@@ -261,18 +337,20 @@ Sortie : quatre preuves écrites, go/no-go signé par le propriétaire.
    suppression des colonnes mortes retenues dans
    `docs/migrations-en-attente.md` ; gel des patches Shorebird v1.
 
-### Phase 1. Socle, 3 jours
+### Phase 1. Socle, 5 jours
 
-`apps/go` : serveur Node personnalisé, Better Auth sur `users` avec
-`username` et `jwt`, matrice des sept rôles en une table de garde par route,
-layout des quatre espaces, Redis et invalidation par groupe, SSE, WebSocket de
-présence, sept crons, `packages/schema`. Mobile : coque, connexion Better Auth
-(`bearer`), PowerSync + Drift, règles du §5, `uploadData` et `sync_verdicts`,
-module natif rebranché, écran de diagnostic, mise à jour obligatoire. Sortie :
-un téléconseiller se connecte, reçoit ses fiches hors ligne, une saisie remonte
-avec verdict, un appel détecté se rattache.
+`apps/go` : `main.go` avec mux, `embed`, sqlc, goose, sessions dans
+`refresh_tokens`, argon2id, JWT EdDSA et JWKS, matrice des sept rôles en une
+table de garde par route, cache mémoire et invalidation par groupe, SSE,
+WebSocket de présence, sept crons, limiteurs, Dockerfile. Panneau : coque
+Vite, connexion, layout des quatre espaces, client typé depuis OpenAPI.
+Mobile : coque, connexion par `Bearer`, PowerSync + Drift, règles du §5,
+`uploadData` et `sync_verdicts`, module natif rebranché, écran de diagnostic,
+mise à jour obligatoire. Sortie : un téléconseiller se connecte, reçoit ses
+fiches hors ligne, une saisie remonte avec verdict, un appel détecté se
+rattache ; le binaire tourne sur le VPS de travail avec sa RSS relevée.
 
-### Phase 2. CHUES, 4 jours
+### Phase 2. CHUES, 6 jours
 
 Représentants, qualification (script, statuts, suggestions, personne
 proposée), prospects, conversion avec champs configurables, ouvertures de
@@ -300,7 +378,7 @@ client, vue d'ensemble, export 3 feuilles. Sortie : checklist Banque & Finance.
 
 Registre, listes, tableau de bord, impression, import avec revue.
 
-### Phase 6. Admin, 2 jours
+### Phase 6. Admin, 3 jours
 
 Utilisateurs (reprise de portefeuille, dernier admin), référentiels (29 + 10
 routes), imports de masse unifiés (un seul système, job avec bail, tranches,
@@ -314,7 +392,7 @@ signature, obligatoire, retrait).
 Seize parcours Playwright dont la matrice des rôles, smoke Maestro, checklist
 complète sur copie de prod, runbook §9 répété deux fois à blanc.
 
-Total : 15 jours ouvrés. La release v1 de maintenance se fait en parallèle de
+Total : 20 jours ouvrés. La release v1 de maintenance se fait en parallèle de
 la phase 0, dans le clone principal.
 
 ## 8. Checklist de parité
@@ -371,9 +449,9 @@ pas en production.
    v1 est vide.
 5. J, 3. Postgres : `ALTER SYSTEM SET wal_level = logical`, redémarrage du
    conteneur, publication et rôle.
-6. J, 4. Migrations Drizzle : `account`, `session`, `verification`,
-   `sync_verdicts`, schéma de buckets. Script de reprise des hachages vers
-   `account`.
+6. J, 4. Migrations goose : `sync_verdicts`, schéma de buckets. Aucune table
+   d'auth, aucune reprise de hachage : `users.passwordHash` et
+   `refresh_tokens` servent tels quels.
 7. J, 5. Déploiement de `powersync-service` derrière Traefik sur un nouvel
    hôte `sync.cpi-chues.com`, Cloudflare en mode proxy avec règle
    d'exception pour l'agent `CPI-GO`, `readTimeout` Traefik à `0s` posé par
@@ -387,8 +465,10 @@ pas en production.
 10. J, 8. Ouverture générale.
 
 Retour arrière, jusqu'à J+1 : arrêt de `apps/go` et de PowerSync, redémarrage
-de `cpi-go-api` et `cpi-go-web` sur la même base. Les tables Better Auth,
-`sync_verdicts` et le schéma de buckets restent sans gêner la v1. Le schéma
+de `cpi-go-api` et `cpi-go-web` sur la même base. `sync_verdicts`, la table
+`goose_db_version` et le schéma de buckets restent sans gêner la v1 ; les
+sessions v2 dans `refresh_tokens` sont ignorées par la v1 qui ne connaît pas
+leur hachage. Le schéma
 `demo` n'existe plus (phase 0). Au-delà de J+1, les écritures v2 ne sont pas
 rejouables en v1.
 
@@ -408,6 +488,8 @@ dix premiers :
 | Cloudflare : corps 100 Mo, agents non-navigateur bloqués | mémoire projet, `api_environment.dart:18` | Nouvel hôte PowerSync avec règles explicites ; APK servi par l'origine si nécessaire |
 | Shorebird conservé : un patch peut remettre du code v1 | `shorebird.yaml:8` | Aucun patch v1 après le début de la phase 7 |
 | Notes vocales, APK, dumps sur volumes | `recordings.service.ts`, `db-dump.runner.ts:25-34` | HTTP direct ; `postgresql-client` 18 dans l'image `apps/go` |
+| Aucune mesure de consommation avant le choix de Go | `audits/donnees-infra.md` §4 (aucune limite Dokploy) | Phase 0 étape 7 ; RSS du binaire relevée en phase 1 |
+| Exports xlsx, pdf, zip et lecture d'APK réécrits sans les bibliothèques JS | `apps/api/package.json` | excelize, maroto, `archive/zip`, androidbinary ; export `consolidated` à 500 000 lignes dans la checklist |
 | Deux systèmes d'import de représentants aujourd'hui | `representants-import.service.ts`, `imports/representants.adapter.ts:20-64` | Un seul système en v2, celui à jobs |
 | Gel de trois semaines | §2.2 | Correctifs prod sur `prod`, reportés dans `v2` chaque soir ; une seule release v1 nommée |
 
@@ -422,3 +504,5 @@ dix premiers :
   la v2 corrige par construction est dans `risques.md` §4 ; les autres sont à
   trancher.
 - Ports de développement du worktree v2 (§0), à fixer dans `apps/go/.env.example`.
+- Suppression de Redis (§2.3) : à confirmer par le propriétaire, la ligne
+  « Infra conservée » du 7 septembre le gardait.
