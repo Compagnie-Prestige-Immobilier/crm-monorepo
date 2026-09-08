@@ -27,10 +27,10 @@ const CONTACT = { select: { id: true, nom: true, prenom: true, phoneE164: true }
 const REP = { select: { id: true, fullName: true, phoneE164: true } } as const;
 const ACTIVE = { deletedAt: null } as const;
 const RELATIONS = {
-  INCONNU: 'Inconnu',
+  INCONNU: 'Non qualifié',
   CONTACTE: 'Contacté',
-  AMBASSADEUR: 'Ambassadeur',
-  REFUS: 'Refus',
+  AMBASSADEUR: 'Accepté',
+  REFUS: 'Refusé',
 } as const;
 const WHATSAPP = {
   NON_DEMANDE: 'Non demandé',
@@ -199,7 +199,6 @@ async function representatives(tx: Tx, book: ExcelJS.Workbook): Promise<void> {
     'IEF',
     'Téléconseiller',
     'Identifiant téléconseiller',
-    'Relation',
     'Qualification',
     'Statut WhatsApp',
     'WhatsApp',
@@ -260,7 +259,6 @@ async function representatives(tx: Tx, book: ExcelJS.Workbook): Promise<void> {
         row.ief?.name,
         row.createdBy.fullName,
         row.createdById,
-        RELATIONS[row.relationStatus],
         row.statutQualification?.label,
         WHATSAPP[row.whatsappStatus],
         whatsappNumberOf(row),
@@ -834,7 +832,7 @@ async function history(tx: Tx, book: ExcelJS.Workbook): Promise<void> {
     (row) => {
       change([
         row.id,
-        'Relation',
+        'Qualification',
         row.representantId,
         row.representant.fullName,
         RELATIONS[row.fromStatus],

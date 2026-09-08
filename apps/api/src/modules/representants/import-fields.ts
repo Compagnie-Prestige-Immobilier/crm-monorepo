@@ -19,7 +19,7 @@ export function normalizeKey(value: string): string {
 }
 
 /** Libellés proposés en liste déroulante, dans l'ordre du parcours. */
-export const RELATION_LABELS = ['Inconnu', 'Contacté', 'Ambassadeur', 'Refus'] as const;
+export const RELATION_LABELS = ['Non qualifié', 'Contacté', 'Accepté', 'Refusé'] as const;
 
 export const WHATSAPP_LABELS = ['Non demandé', 'Même numéro', 'Autre numéro', 'Aucun'] as const;
 
@@ -33,11 +33,9 @@ function tableDe<T extends string>(entrees: readonly (readonly [string, T])[]): 
 }
 
 const RELATIONS = tableDe<RepresentantRelation>([
-  ['Inconnu', RepresentantRelation.INCONNU],
-  ['À appeler', RepresentantRelation.INCONNU],
+  ['Non qualifié', RepresentantRelation.INCONNU],
   ['Contacté', RepresentantRelation.CONTACTE],
-  ['Ambassadeur', RepresentantRelation.AMBASSADEUR],
-  ['Refus', RepresentantRelation.REFUS],
+  ['Accepté', RepresentantRelation.AMBASSADEUR],
   ['Refusé', RepresentantRelation.REFUS],
 ]);
 

@@ -22,15 +22,14 @@ const REPRESENTANT_RELATIONS = [
 ] as const satisfies readonly RepresentantRelation[];
 
 /**
- * « Ambassadeur » était un titre honorifique inventé pour l'écran ; ce que la
- * relation dit vraiment, c'est qu'il a accepté de donner les contacts de ses
- * collègues. La valeur envoyée à l'API, elle, ne bouge pas.
+ * Même vocabulaire que les statuts de qualification : la relation se lit
+ * comme un statut. La valeur envoyée à l'API, elle, ne bouge pas.
  */
 export const REPRESENTANT_RELATION_LABELS: Record<RepresentantRelation, string> = {
-  INCONNU: 'Pas encore contacté',
+  INCONNU: 'Non qualifié',
   CONTACTE: 'Contacté',
-  AMBASSADEUR: 'A accepté',
-  REFUS: 'Refus',
+  AMBASSADEUR: 'Accepté',
+  REFUS: 'Refusé',
 };
 
 /**
