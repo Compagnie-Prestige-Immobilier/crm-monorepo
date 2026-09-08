@@ -55,8 +55,16 @@ export default defineConfig({
        * renvoie vers le tableau de bord, et le test échoue en cherchant un
        * champ e-mail que le serveur n'a jamais rendu.
        */
-      testIgnore: /\.anon\.spec\.ts/,
+      testIgnore: /(\.anon|responsive-mobile)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], storageState: 'e2e/.auth/admin.json' },
+      dependencies: ['setup'],
+    },
+    // Le meme panel a 393 px. Un debordement horizontal ne se voit pas sur un
+    // ecran de bureau : il faut un vrai profil mobile pour le constater.
+    {
+      name: 'mobile',
+      testMatch: /responsive-mobile\.spec\.ts/,
+      use: { ...devices['Pixel 5'], storageState: 'e2e/.auth/admin.json' },
       dependencies: ['setup'],
     },
     // Les parcours qui doivent partir d'un navigateur VIERGE : connexion,
