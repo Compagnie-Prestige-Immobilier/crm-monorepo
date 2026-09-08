@@ -379,7 +379,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
       <CardContent className="flex flex-col gap-5 text-[0.875rem]">
         <section className="flex flex-col gap-2">
           <p className="eyebrow text-muted-foreground">Qui il est</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="WhatsApp">
               {prospect.whatsappNumber === null ? NO_VALUE : formatPhone(prospect.whatsappNumber)}
             </Champ>
@@ -390,7 +390,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
         </section>
         <section className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="eyebrow text-muted-foreground">Banque et syndicat</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Banque">{ouVide(prospect.banqueName)}</Champ>
             <Champ label="Syndicat">{ouVide(prospect.syndicatSigle)}</Champ>
             {voitLeSegment(role) ? (
@@ -407,7 +407,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
         </section>
         <section className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="eyebrow text-muted-foreground">Qui s’en occupe</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Téléconseiller">{prospect.ownedByCommercialName}</Champ>
             <Champ label="Saisi le">{formatDate(prospect.clientCreatedAt)}</Champ>
             <Champ label="Représentant">{ouVide(prospect.representantName)}</Champ>
@@ -441,7 +441,7 @@ function ChampsAjoutes({ prospect }: { prospect: ProspectRow }) {
         <CardTitle>Champs ajoutés</CardTitle>
       </CardHeader>
       <CardContent>
-        <dl className="grid grid-cols-2 gap-3 text-[0.875rem]">
+        <dl className="grid gap-3 text-[0.875rem] sm:grid-cols-2">
           {renseignes.map((champ) => (
             <Champ key={champ.id} label={champ.libelle}>
               {prospect.champsLibres[champ.id]}

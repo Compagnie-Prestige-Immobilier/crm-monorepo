@@ -487,7 +487,7 @@ function Pages({
   onPage: (page: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
         variant="outline"
@@ -982,7 +982,7 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
           {formatPhone(representant.phoneE164)}
         </span>
