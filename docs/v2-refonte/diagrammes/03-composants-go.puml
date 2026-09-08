@@ -2,28 +2,28 @@
 !pragma layout smetana
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Component.puml
 LAYOUT_LEFT_RIGHT()
-title Niveau 3 : composants de apps/go. Comment le code est rangé.
+title Niveau 3 : composants de apps/go. Un binaire, un package, un fichier par domaine.
 
 Container_Boundary(go, "apps/go") {
-  Component(server, "server.ts", "Node", "Démarre Next, le WebSocket de présence, les 7 crons")
-  Component(pages, "app/(panel)/[projet]", "Next.js pages", "Un seul arbre d'écrans, projet en paramètre")
-  Component(api, "app/api/v1", "Route handlers", "Une route par geste, validation zod")
-  Component(domaines, "domaines/", "TypeScript", "Règles métier : représentants, prospects, qualification, conversion, ouvertures, campagnes, banque, visites, notifications, imports, exports, admin, sync")
-  Component(auth, "lib/auth", "Better Auth", "users, account, session, JWT")
-  Component(db, "lib/db", "Drizzle", "Schéma, SQL brut des analytics")
-  Component(roles, "lib/roles", "Table de garde", "Rôle par route, source du test matrice")
+  Component(main, "main.go", "net/http, embed, gocron, coder/websocket", "Mux, SPA embarquée, 7 crons, présence, SSE, cache mémoire")
+  Component(domaines, "chues.go, grand_public.go, banque.go, accueil.go, admin.go, notifications.go, imports.go, exports.go", "huma", "Une route par geste, validation par struct, règles métier")
+  Component(sync, "sync.go", "huma", "uploadData, verdicts, ordre des entités")
+  Component(auth, "auth.go", "argon2id, golang-jwt", "Sessions dans refresh_tokens, JWT EdDSA, JWKS, limiteurs")
+  Component(roles, "roles.go", "Table de garde", "Rôle par route, source du parcours matrice")
+  Component(sql, "sql/", "sqlc, goose", "schema.sql de référence, queries/, migrations/")
+  Component(web, "web/", "Vite, React 19, TanStack, openapi-fetch", "Panneau ; dist/ embarqué dans le binaire")
 }
 
-Container(schema, "packages/schema", "zod", "Une définition par entité, partagée avec le mobile")
 ContainerDb(pg, "Postgres 18")
 
-Rel_R(server, pages, "Sert")
-Rel_R(server, api, "Sert")
-Rel_R(pages, domaines, "Appelle")
-Rel_R(api, domaines, "Appelle")
-Rel_R(api, roles, "Vérifie")
-Rel_R(domaines, db, "Lit, écrit")
+Rel_R(main, domaines, "Monte")
+Rel_R(main, sync, "Monte")
+Rel_R(main, web, "Sert dist/")
+Rel_R(domaines, roles, "Vérifie")
+Rel_R(sync, roles, "Vérifie")
 Rel_R(domaines, auth, "Session")
-Rel_D(domaines, schema, "Valide avec")
-Rel_R(db, pg, "SQL")
+Rel_R(domaines, sql, "Appelle")
+Rel_R(sync, sql, "Appelle")
+Rel_D(web, domaines, "Types OpenAPI produits au build")
+Rel_R(sql, pg, "pgx")
 @enduml
