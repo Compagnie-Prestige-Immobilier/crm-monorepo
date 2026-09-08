@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:crm_api_client/crm_api_client.dart';
 import 'package:dio/dio.dart';
 import 'package:drift/drift.dart'
@@ -104,6 +106,26 @@ final FutureProvider<ParametresChuesDto?> parametresChuesProvider =
       }
     });
 
+const String _verrouFichesKey = 'chues.verrouFiches';
+
+/// Le verrou CHUES (« une fiche ouverte à la fois »), mis en cache : la
+/// dernière valeur connue du serveur, pour que la coupure tienne aussi hors
+/// ligne. `true` par défaut, l'état historique d'un appareil qui n'a encore
+/// jamais lu ce réglage.
+final Provider<bool> verrouFichesProvider = Provider<bool>((Ref ref) {
+  final SharedPreferences prefs = ref.watch(sharedPreferencesProvider);
+  ref.listen<AsyncValue<ParametresChuesDto?>>(parametresChuesProvider, (
+    AsyncValue<ParametresChuesDto?>? previous,
+    AsyncValue<ParametresChuesDto?> next,
+  ) {
+    final bool? recu = next.value?.verrouFiches;
+    if (recu != null) unawaited(prefs.setBool(_verrouFichesKey, recu));
+  });
+  return ref.watch(parametresChuesProvider).value?.verrouFiches ??
+      prefs.getBool(_verrouFichesKey) ??
+      true;
+});
+
 /// EB-27 : les réglages du formulaire de conversion, les mêmes qu'au panel.
 ///
 /// Ils ne sont pas mis au miroir local : hors ligne, le formulaire retombe sur
@@ -176,7 +198,10 @@ final Provider<DraftRepository> draftRepositoryProvider =
 
 final Provider<ReferenceRepository> referenceRepositoryProvider =
     Provider<ReferenceRepository>((Ref ref) {
-      return ReferenceRepository(ref.watch(appDatabaseProvider));
+      return ReferenceRepository(
+        ref.watch(appDatabaseProvider),
+        voirTout: ref.watch(authControllerProvider).role == Role.ADMIN.value,
+      );
     });
 
 final Provider<OuvertureRepository> ouvertureRepositoryProvider =
@@ -533,17 +558,12 @@ final StreamProvider<List<ProspectSyncViewData>> chuesProspectListProvider =
 String _moi(Ref ref) =>
     ref.watch(authControllerProvider.select((AuthState s) => s.userId)) ?? '';
 
-/// Le compte est-il borné à ses campagnes ? Faux pour l'encadrement, et faux
-/// tant que le périmètre n'a jamais été lu. Sert à l'état vide, pas au filtre :
-/// le filtre, lui, vit dans les requêtes.
 final StreamProvider<bool> perimetreBorneProvider = StreamProvider<bool>((
   Ref ref,
 ) {
-  final AppDatabase db = ref.watch(appDatabaseProvider);
-  return (db.select(db.attributions)
-        ..where((Attributions t) => t.kind.equals(attributionBorne)))
-      .watch()
-      .map((List<Attribution> rows) => rows.isNotEmpty);
+  return Stream<bool>.value(
+    ref.watch(authControllerProvider).role != Role.ADMIN.value,
+  );
 });
 
 final StreamProvider<List<RepresentantSyncViewData>> representantListProvider =
@@ -607,7 +627,7 @@ final representantDetailProvider =
     ) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchRepresentant(representantId);
+          .watchRepresentant(representantId, moi: _moi(ref));
     });
 
 final prospectDetailProvider =
@@ -615,7 +635,9 @@ final prospectDetailProvider =
       Ref ref,
       String prospectId,
     ) {
-      return ref.watch(referenceRepositoryProvider).watchProspect(prospectId);
+      return ref
+          .watch(referenceRepositoryProvider)
+          .watchProspect(prospectId, moi: _moi(ref));
     });
 
 /// Où en est la conversion de ce prospect : ce que le serveur en sait
@@ -907,7 +929,7 @@ final prospectsForRepresentantProvider =
     ) {
       return ref
           .watch(referenceRepositoryProvider)
-          .watchProspectsFor(representantId);
+          .watchProspectsFor(representantId, moi: _moi(ref));
     });
 
 final representantCommentsProvider =
@@ -926,7 +948,7 @@ final prospectCountForProvider = StreamProvider.family<int, String>((
 ) {
   return ref
       .watch(referenceRepositoryProvider)
-      .watchProspectCountFor(representantId);
+      .watchProspectCountFor(representantId, moi: _moi(ref));
 });
 
 final StreamProvider<int> phase2DirectoryCountProvider = StreamProvider<int>((

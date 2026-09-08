@@ -1,0 +1,24 @@
+@startuml 05-flux-ecriture
+title Flux : une saisie hors ligne remonte au serveur et reçoit un verdict.
+skinparam sequenceMessageAlign center
+
+actor "Téléconseiller" as tc
+participant "App Flutter" as app
+database "SQLite\n(PowerSync)" as sqlite
+participant "apps/go\n/api/v1/sync/upload" as go
+database "Postgres" as pg
+participant "powersync-service" as ps
+
+tc -> app : qualifie un représentant, hors ligne
+app -> sqlite : écrit la tentative et la fiche
+app --> tc : fiche à jour tout de suite
+... réseau revenu ...
+sqlite -> go : uploadData(transaction)
+go -> go : règles serveur : doublon, rev,\nrelation, journal, rappel
+go -> pg : écrit les données ou le verdict\n(applied, conflict, invalid)
+go --> sqlite : 200, jamais 4xx
+pg -> ps : réplication logique
+ps -> sqlite : bucket sync_verdicts
+sqlite --> app : « À corriger » lit le verdict
+app --> tc : verdict lisible, geste de correction
+@enduml

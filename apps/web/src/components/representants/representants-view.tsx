@@ -396,7 +396,7 @@ export function RepresentantsView({
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
                         <TableHead>Représentant</TableHead>
-                        <TableHead>Relation</TableHead>
+                        <TableHead>Qualification</TableHead>
                         <TableHead>Téléphone</TableHead>
                         <TableHead>Département</TableHead>
                         <TableHead>IEF</TableHead>

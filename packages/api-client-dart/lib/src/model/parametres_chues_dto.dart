@@ -40,6 +40,8 @@ class ParametresChuesDto {
     required this.destinatairesSupervision,
 
     required this.destinatairesDirection,
+
+    required this.verrouFiches,
   });
 
   @JsonKey(name: r'plateformeChuesUrl', required: true, includeIfNull: false)
@@ -91,6 +93,9 @@ class ParametresChuesDto {
   )
   final List<String> destinatairesDirection;
 
+  @JsonKey(name: r'verrouFiches', required: true, includeIfNull: false)
+  final bool verrouFiches;
+
   bool operator ==(Object other) {
     return identical(this, other) ||
         other is ParametresChuesDto &&
@@ -108,6 +113,7 @@ class ParametresChuesDto {
                 destinatairesBpe,
                 destinatairesSupervision,
                 destinatairesDirection,
+                verrouFiches,
               ],
               [
                 other.plateformeChuesUrl,
@@ -121,6 +127,7 @@ class ParametresChuesDto {
                 other.destinatairesBpe,
                 other.destinatairesSupervision,
                 other.destinatairesDirection,
+                other.verrouFiches,
               ],
             );
   }
@@ -140,6 +147,7 @@ class ParametresChuesDto {
         destinatairesBpe,
         destinatairesSupervision,
         destinatairesDirection,
+        verrouFiches,
       ]);
 
   factory ParametresChuesDto.fromJson(Map<String, dynamic> json) =>

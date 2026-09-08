@@ -22,6 +22,8 @@ import { formatDateTime } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+import { VerrouFichesCard } from './verrou-fiches-card';
+
 const LIBELLES: Record<string, string> = {
   plateformeChuesUrl: 'Lien de la plateforme CPI CHUES',
   plateformeGrandPublicUrl: 'Lien de la plateforme Grand Public',
@@ -34,6 +36,7 @@ const LIBELLES: Record<string, string> = {
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
   destinatairesDirection: 'Direction',
+  verrouFiches: 'Verrou des fiches',
 };
 
 const LISTES = [
@@ -85,7 +88,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     );
 
   const lus = parametres.data;
-  const valeur = (cle: keyof ParametresChues): string => {
+  const valeur = (cle: CleTexte): string => {
     const saisi = brouillon[cle];
     if (saisi !== undefined) return saisi;
     const stockee = lus[cle];
@@ -107,6 +110,8 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
 
   return (
     <div className="flex flex-col gap-6">
+      {peutToutRegler ? <VerrouFichesCard /> : null}
+
       {peutToutRegler ? <CartePlateformes valeur={valeur} saisir={saisir} /> : null}
 
       <Card>
@@ -167,8 +172,10 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
+type CleTexte = Exclude<keyof ParametresChues, 'verrouFiches'>;
+
 type ChampsProps = {
-  valeur: (cle: keyof ParametresChues) => string;
+  valeur: (cle: CleTexte) => string;
   saisir: (cle: string, texte: string) => void;
 };
 

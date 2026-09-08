@@ -20,6 +20,8 @@ analyzer:
     - lib/**/*.g.dart
     - lib/**/*.freezed.dart
     - test/data/generated_migrations/**
+    - build/**
+    - android/**
 
 linter:
   rules:

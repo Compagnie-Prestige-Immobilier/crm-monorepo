@@ -69,6 +69,10 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
       data-slot="table-head"
       className={cn(
         'eyebrow h-11 px-3 text-left align-middle whitespace-nowrap text-muted-foreground',
+        // Sous 768 px seulement : la première cellule reste visible pendant le
+        // défilement horizontal, sinon la ligne devient anonyme. Le fond opaque
+        // masquerait le survol et la sélection, qui n'existent qu'au pointeur.
+        'max-md:first:sticky max-md:first:left-0 max-md:first:z-10 max-md:first:bg-card',
         className,
       )}
       {...props}
@@ -78,7 +82,15 @@ function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
 
 function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
   return (
-    <td data-slot="table-cell" className={cn('px-3 py-2.5 align-middle', className)} {...props} />
+    <td
+      data-slot="table-cell"
+      className={cn(
+        'px-3 py-2.5 align-middle',
+        'max-md:first:sticky max-md:first:left-0 max-md:first:z-10 max-md:first:bg-card',
+        className,
+      )}
+      {...props}
+    />
   );
 }
 

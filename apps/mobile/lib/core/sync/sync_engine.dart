@@ -117,12 +117,13 @@ class SyncEngine {
 
   bool _draining = false;
   bool _pulling = false;
+  bool _running = false;
 
   bool get isDraining => _draining;
 
   bool get isPulling => _pulling;
 
-  bool get isBusy => _draining || _pulling;
+  bool get isBusy => _running || _draining || _pulling;
 
   ApiException? _lastPushFailure;
 
@@ -137,29 +138,36 @@ class SyncEngine {
   /// Pousser puis tirer : tirer d'abord écraserait une modification locale non
   /// encore poussée par une version serveur plus ancienne.
   Future<SyncOutcome> runOnce({bool pull = true}) async {
-    if (await _tokens.readRefreshToken() == null) {
-      return const SyncOutcome.skipped('no_session');
-    }
-    int pushed = 0;
+    if (isBusy) return const SyncOutcome.skipped('already_running');
+    _running = true;
     try {
-      pushed = await drain();
-    } on ApiException catch (e) {
-      return SyncOutcome.failed(e.code, kind: e.kind, pushed: pushed);
-    }
-    final ApiException? failure = lastPushFailure;
-    if (failure != null) {
-      return SyncOutcome.failed(
-        failure.code,
-        kind: failure.kind,
-        pushed: pushed,
-      );
-    }
-    if (!pull) return SyncOutcome.ok(pushed: pushed, pulled: 0);
-    try {
-      final int pulled = await pullChanges();
-      return SyncOutcome.ok(pushed: pushed, pulled: pulled);
-    } on ApiException catch (e) {
-      return SyncOutcome.failed(e.code, kind: e.kind, pushed: pushed);
+      if (await _tokens.readRefreshToken() == null) {
+        return const SyncOutcome.skipped('no_session');
+      }
+      int pushed = 0;
+      if (pull) await mirrorAttributions();
+      try {
+        pushed = await drain();
+      } on ApiException catch (e) {
+        return SyncOutcome.failed(e.code, kind: e.kind, pushed: pushed);
+      }
+      final ApiException? failure = lastPushFailure;
+      if (failure != null) {
+        return SyncOutcome.failed(
+          failure.code,
+          kind: failure.kind,
+          pushed: pushed,
+        );
+      }
+      if (!pull) return SyncOutcome.ok(pushed: pushed, pulled: 0);
+      try {
+        final int pulled = await pullChanges();
+        return SyncOutcome.ok(pushed: pushed, pulled: pulled);
+      } on ApiException catch (e) {
+        return SyncOutcome.failed(e.code, kind: e.kind, pushed: pushed);
+      }
+    } finally {
+      _running = false;
     }
   }
 
@@ -1408,6 +1416,20 @@ class SyncEngine {
       await pullCallOutcomeReasons();
       await pullStatutsQualification();
       int applied = 0;
+      final int representantsLocaux = await _db
+          .customSelect(
+            'SELECT COUNT(*) AS total FROM representants WHERE deleted_at IS NULL',
+            readsFrom: <ResultSetImplementation<dynamic, dynamic>>{
+              _db.representants,
+            },
+          )
+          .map((QueryRow row) => row.read<int>('total'))
+          .getSingle();
+      if (representantsLocaux == 0) {
+        await (_db.delete(
+          _db.syncState,
+        )..where((SyncState t) => t.collection.equals(cursorKey))).go();
+      }
       String? cursor = await readCursor();
       bool listesBougees = false;
       bool referentielsBouges = false;
@@ -1431,7 +1453,6 @@ class SyncEngine {
       }
       await mirrorVisiteReferentiels(force: listesBougees);
       await mirrorReferentiels(force: referentielsBouges);
-      await mirrorAttributions();
       return applied;
     } finally {
       _pulling = false;
@@ -1548,6 +1569,10 @@ class SyncEngine {
                 label: statut.label,
                 effect: statut.effect.value,
                 requiresCallback: Value<bool>(statut.requiresCallback),
+                // Sans lui, l'ecran n'exige jamais le motif et le serveur
+                // refuse la tentative : la qualification est alors perdue et
+                // le verrou de la fiche survit a jamais.
+                requiresComment: Value<bool>(statut.requiresComment),
                 retryAfterMinutes: Value<int?>(
                   statut.retryAfterMinutes?.toInt(),
                 ),
@@ -1569,15 +1594,18 @@ class SyncEngine {
   /// remplacement plutôt qu'une fusion. Un échec laisse le périmètre d'hier :
   /// une borne périmée vaut mieux qu'un annuaire ouvert en grand.
   Future<int> mirrorAttributions() async {
+    final String? userId = await _tokens.readUserId();
+    if (userId == null) return 0;
     final MesAttributionsDto scope;
     try {
       scope = await _api.pullMesAttributions();
     } on ApiException {
       return 0;
     }
+    if (await _tokens.readUserId() != userId) return 0;
     final List<AttributionsCompanion> lignes = <AttributionsCompanion>[
       if (!scope.tout)
-        AttributionsCompanion.insert(kind: attributionBorne, id: '1'),
+        AttributionsCompanion.insert(kind: attributionBorne, id: userId),
       for (final String id in scope.representantIds)
         AttributionsCompanion.insert(kind: 'representant', id: id),
       for (final String id in scope.prospectIds)

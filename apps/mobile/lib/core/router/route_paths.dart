@@ -83,8 +83,18 @@ abstract final class Routes {
   static String prospectDetailFor(String id) =>
       '/prospects/${Uri.encodeComponent(id)}';
 
-  static String representantQualificationFor(String id) =>
-      '/representants/${Uri.encodeComponent(id)}/qualifier';
+  /// [puisProspects] enchaine sur la saisie des prospects quand l'appel a
+  /// abouti : c'est le parcours ou le representant vient de donner ses
+  /// contacts, et ou l'appel se consignait nulle part.
+  static String representantQualificationFor(
+    String id, {
+    bool puisProspects = false,
+  }) {
+    final String base = '/representants/${Uri.encodeComponent(id)}/qualifier';
+    return puisProspects ? '$base?$suiteParam=prospects' : base;
+  }
+
+  static const String suiteParam = 'suite';
 
   /// La fiche d'un prospect se rouvre par son numéro : l'écran le cherche dans
   /// l'annuaire et retrouve l'ouverture en cours.

@@ -69,6 +69,7 @@ import {
 } from '@/lib/representant-filters';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useVerrouFiches } from '@/lib/use-verrou-fiches';
 import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
@@ -166,6 +167,11 @@ function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
   return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
 }
 
+/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
+function descriptionOuverture(verrouActif: boolean): string | null {
+  return verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
+}
+
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -183,6 +189,7 @@ function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null
  */
 export function RepScript() {
   const queryClient = useQueryClient();
+  const verrouActif = useVerrouFiches();
 
   const [choisi, setChoisi] = useState<Ouverte | null>(null);
   const [aConfirmer, setAConfirmer] = useState<ScriptedRepresentant | null>(null);
@@ -249,6 +256,10 @@ export function RepScript() {
         key={choisi.ouverture.id}
         representant={choisi.representant}
         ouverture={choisi.ouverture}
+        verrouActif={verrouActif}
+        onAbandon={() => {
+          setChoisi(null);
+        }}
         onEnregistre={(nom) => {
           setConfirme(nom);
           setChoisi(null);
@@ -303,7 +314,7 @@ export function RepScript() {
         open={aConfirmer !== null}
         onOpenChange={fermerConfirmation}
         title={titreOuverture(aConfirmer)}
-        description="Vous ne pourrez pas la quitter sans la qualifier."
+        description={descriptionOuverture(verrouActif)}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -439,7 +450,7 @@ function FiltreRelation({
   return (
     <div className="flex min-w-[12rem] flex-col gap-1.5">
       <label htmlFor={id} className="text-[0.875rem] font-[600]">
-        Relation
+        Qualification
       </label>
       {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
           VALEUR au lieu du libellé de la ligne choisie. */}
@@ -476,7 +487,7 @@ function Pages({
   onPage: (page: number) => void;
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Button
         type="button"
         variant="outline"
@@ -971,7 +982,7 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
         />
       </div>
 
-      <div className="flex items-center gap-3">
+      <div className="flex flex-wrap items-center gap-3">
         <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
           {formatPhone(representant.phoneE164)}
         </span>
@@ -1181,10 +1192,14 @@ function reponseDe(etat: EtatReponse): RepAnswer {
 function Qualification({
   representant,
   ouverture,
+  verrouActif,
+  onAbandon,
   onEnregistre,
 }: {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
+  verrouActif: boolean;
+  onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
   const [repris] = useState(() => lireBrouillonRep(ouverture.draft));
@@ -1343,17 +1358,18 @@ function Qualification({
     toast.error('Posez un statut de qualification avant de quitter cette fiche.');
   }, []);
 
-  useVerrouNavigation(true, retenu);
+  useVerrouNavigation(verrouActif, retenu);
 
   const reculer = useCallback(() => {
     setEtape((courante) => {
       if (courante === 2) return 1;
-      // EB-08 : la fiche ouverte ne se quitte pas sans statut. Seul « Enregistrer »
-      // la referme, et le chronomètre s'arrête avec elle.
-      retenu();
+      // EB-08 : verrou actif, la fiche ouverte ne se quitte pas sans statut. Seul
+      // « Enregistrer » la referme, et le chronomètre s'arrête avec elle.
+      if (verrouActif) retenu();
+      else onAbandon();
       return 1;
     });
-  }, [retenu]);
+  }, [retenu, verrouActif, onAbandon]);
 
   useShortcuts(
     {
@@ -1465,6 +1481,13 @@ function Qualification({
         <Button variant="ghost" className="self-start px-0" onClick={reculer}>
           <ArrowLeftIcon aria-hidden="true" />
           Étape précédente
+        </Button>
+      ) : null}
+
+      {etape === 1 && !verrouActif ? (
+        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+          <ArrowLeftIcon aria-hidden="true" />
+          Revenir à la liste
         </Button>
       ) : null}
 

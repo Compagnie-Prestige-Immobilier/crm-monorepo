@@ -5321,6 +5321,192 @@
         "tags": ["ouvertures"]
       }
     },
+    "/api/v1/parametres-chues": {
+      "get": {
+        "operationId": "getParametresChues",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Les réglages CHUES, valeurs d’usine comprises.",
+        "tags": ["parametres-chues"]
+      },
+      "patch": {
+        "description": "La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.",
+        "operationId": "updateParametresChues",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateParametresChuesDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ParametresChuesDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "PARAMETRE_RESERVE_ADMIN.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Règle les paramètres CHUES.",
+        "tags": ["parametres-chues"]
+      }
+    },
+    "/api/v1/parametres-chues/journal": {
+      "get": {
+        "operationId": "getJournalParametresChues",
+        "parameters": [
+          {
+            "name": "limite",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "minimum": 1,
+              "maximum": 200,
+              "default": 50,
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JournalParametresDto"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Qui a changé quoi, et ce que la valeur disait avant.",
+        "tags": ["parametres-chues"]
+      }
+    },
     "/api/v1/prospects": {
       "get": {
         "description": "Un COMMERCIAL ne voit que ses propres prospects, quels que soient les filtres.",
@@ -17983,6 +18169,62 @@
         "tags": ["admin"]
       }
     },
+    "/api/v1/export/global.xlsx": {
+      "get": {
+        "operationId": "exportGlobalXlsx",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export global du suivi métier.",
+        "tags": ["export"]
+      }
+    },
     "/api/v1/export/prospects.xlsx": {
       "get": {
         "description": "Deux modes. `filtered` (défaut) : une feuille Prospects correspondant exactement aux filtres, plus Représentants et Synthèse. `consolidated` : exactement cinq feuilles, Consolidé, BDD1, BDD2, BDD3, BDD4.",
@@ -20830,192 +21072,6 @@
         ],
         "summary": "Retire un téléconseiller et redistribue ses fiches non traitées.",
         "tags": ["lots-export"]
-      }
-    },
-    "/api/v1/parametres-chues": {
-      "get": {
-        "operationId": "getParametresChues",
-        "parameters": [],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ParametresChuesDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Les réglages CHUES, valeurs d’usine comprises.",
-        "tags": ["parametres-chues"]
-      },
-      "patch": {
-        "description": "La supervision et la direction ne changent que les textes du message WhatsApp et de l’accusé de réception. Tout le reste est réservé à l’administrateur.",
-        "operationId": "updateParametresChues",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/UpdateParametresChuesDto"
-              }
-            }
-          }
-        },
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ParametresChuesDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "PARAMETRE_RESERVE_ADMIN.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Règle les paramètres CHUES.",
-        "tags": ["parametres-chues"]
-      }
-    },
-    "/api/v1/parametres-chues/journal": {
-      "get": {
-        "operationId": "getJournalParametresChues",
-        "parameters": [
-          {
-            "name": "limite",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "minimum": 1,
-              "maximum": 200,
-              "default": 50,
-              "type": "number"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/JournalParametresDto"
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Jeton absent, expiré ou invalide.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ApiErrorDto"
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ],
-        "summary": "Qui a changé quoi, et ce que la valeur disait avant.",
-        "tags": ["parametres-chues"]
       }
     },
     "/api/v1/enrolement/{projet}/inscriptions": {
@@ -24796,6 +24852,175 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ComptageOuverturesJourDto"
+            }
+          }
+        },
+        "required": ["items"]
+      },
+      "ParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string"
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string"
+          },
+          "emailChues": {
+            "type": "string"
+          },
+          "whatsappChuesE164": {
+            "type": "string"
+          },
+          "messageWhatsapp": {
+            "type": "string"
+          },
+          "accuseReceptionObjet": {
+            "type": "string"
+          },
+          "accuseReceptionCorps": {
+            "type": "string"
+          },
+          "destinatairesEnrolement": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verrouFiches": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "plateformeChuesUrl",
+          "plateformeGrandPublicUrl",
+          "emailChues",
+          "whatsappChuesE164",
+          "messageWhatsapp",
+          "accuseReceptionObjet",
+          "accuseReceptionCorps",
+          "destinatairesEnrolement",
+          "destinatairesBpe",
+          "destinatairesSupervision",
+          "destinatairesDirection",
+          "verrouFiches"
+        ]
+      },
+      "UpdateParametresChuesDto": {
+        "type": "object",
+        "properties": {
+          "plateformeChuesUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "plateformeGrandPublicUrl": {
+            "type": "string",
+            "maxLength": 300
+          },
+          "emailChues": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "whatsappChuesE164": {
+            "type": "string",
+            "maxLength": 20
+          },
+          "messageWhatsapp": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "accuseReceptionObjet": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "accuseReceptionCorps": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "destinatairesEnrolement": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesBpe": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesSupervision": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "destinatairesDirection": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "verrouFiches": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ParametreChangementDto": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "cle": {
+            "type": "string"
+          },
+          "ancienne": {
+            "type": "string",
+            "nullable": true
+          },
+          "nouvelle": {
+            "type": "string"
+          },
+          "parNom": {
+            "type": "string"
+          },
+          "le": {
+            "type": "string"
+          }
+        },
+        "required": ["id", "cle", "ancienne", "nouvelle", "parNom", "le"]
+      },
+      "JournalParametresDto": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ParametreChangementDto"
             }
           }
         },
@@ -33804,168 +34029,6 @@
           }
         },
         "required": ["teleconseillerId"]
-      },
-      "ParametresChuesDto": {
-        "type": "object",
-        "properties": {
-          "plateformeChuesUrl": {
-            "type": "string"
-          },
-          "plateformeGrandPublicUrl": {
-            "type": "string"
-          },
-          "emailChues": {
-            "type": "string"
-          },
-          "whatsappChuesE164": {
-            "type": "string"
-          },
-          "messageWhatsapp": {
-            "type": "string"
-          },
-          "accuseReceptionObjet": {
-            "type": "string"
-          },
-          "accuseReceptionCorps": {
-            "type": "string"
-          },
-          "destinatairesEnrolement": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesBpe": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesSupervision": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesDirection": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        },
-        "required": [
-          "plateformeChuesUrl",
-          "plateformeGrandPublicUrl",
-          "emailChues",
-          "whatsappChuesE164",
-          "messageWhatsapp",
-          "accuseReceptionObjet",
-          "accuseReceptionCorps",
-          "destinatairesEnrolement",
-          "destinatairesBpe",
-          "destinatairesSupervision",
-          "destinatairesDirection"
-        ]
-      },
-      "UpdateParametresChuesDto": {
-        "type": "object",
-        "properties": {
-          "plateformeChuesUrl": {
-            "type": "string",
-            "maxLength": 300
-          },
-          "plateformeGrandPublicUrl": {
-            "type": "string",
-            "maxLength": 300
-          },
-          "emailChues": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "whatsappChuesE164": {
-            "type": "string",
-            "maxLength": 20
-          },
-          "messageWhatsapp": {
-            "type": "string",
-            "maxLength": 1000
-          },
-          "accuseReceptionObjet": {
-            "type": "string",
-            "maxLength": 200
-          },
-          "accuseReceptionCorps": {
-            "type": "string",
-            "maxLength": 4000
-          },
-          "destinatairesEnrolement": {
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesBpe": {
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesSupervision": {
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "destinatairesDirection": {
-            "maxItems": 50,
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "ParametreChangementDto": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "format": "uuid"
-          },
-          "cle": {
-            "type": "string"
-          },
-          "ancienne": {
-            "type": "string",
-            "nullable": true
-          },
-          "nouvelle": {
-            "type": "string"
-          },
-          "parNom": {
-            "type": "string"
-          },
-          "le": {
-            "type": "string"
-          }
-        },
-        "required": ["id", "cle", "ancienne", "nouvelle", "parNom", "le"]
-      },
-      "JournalParametresDto": {
-        "type": "object",
-        "properties": {
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ParametreChangementDto"
-            }
-          }
-        },
-        "required": ["items"]
       },
       "InscriptionPlateformeDto": {
         "type": "object",

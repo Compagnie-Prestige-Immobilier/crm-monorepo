@@ -29,6 +29,7 @@ import { fetchOuvertureCourante, type OuvertureFiche } from '@/lib/data/ouvertur
 import { initials } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import { peutTenirUneFiche, ROLE_LABELS, type SessionUser } from '@/lib/types';
+import { useVerrouFiches } from '@/lib/use-verrou-fiches';
 import { ficheTenue } from '@/lib/use-verrou-navigation';
 
 /**
@@ -58,7 +59,8 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
     refetchOnWindowFocus: true,
   });
   const tenue = ouverture.data ?? null;
-  const sousVerrou = (): boolean => ficheTenue() || tenue !== null;
+  const verrouActif = useVerrouFiches();
+  const sousVerrou = (): boolean => verrouActif && (ficheTenue() || tenue !== null);
   let workspaceLabel = 'Ouvrir l’espace démo';
   if (user.workspace === 'demo') workspaceLabel = 'Quitter l’espace démo';
   if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';

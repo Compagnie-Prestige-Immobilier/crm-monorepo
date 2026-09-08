@@ -59,8 +59,13 @@ class OuvertureRepository {
   /// Confirme l'ouverture. Le serveur est consulté EN PREMIER quand le réseau
   /// répond : c'est le seul endroit où le verrou d'un autre appareil se voit.
   /// Sans réseau la ligne part en file et l'écran s'ouvre quand même.
+  ///
+  /// [verrou] à faux : le serveur ferme de lui-même la fiche précédente plutôt
+  /// que de refuser la nouvelle. L'appareil fait pareil localement, y compris
+  /// hors ligne, sinon la fiche fermée sur le serveur resterait tenue ici.
   Future<OuvertureResultat> ouvrir({
     required String openedById,
+    required bool verrou,
     String? representantId,
     String? prospectId,
   }) async {
@@ -69,8 +74,9 @@ class OuvertureRepository {
       final bool memeFiche =
           deja.representantId == representantId &&
           deja.prospectId == prospectId;
-      if (!memeFiche) return (ouverte: null, tenue: _versFicheTenue(deja));
-      return (ouverte: deja, tenue: null);
+      if (memeFiche) return (ouverte: deja, tenue: null);
+      if (verrou) return (ouverte: null, tenue: _versFicheTenue(deja));
+      await fermer(id: deja.id);
     }
 
     final String id = Ids.newId();
@@ -218,7 +224,7 @@ class OuvertureRepository {
             // Même partition que l'ouverture : la borne ne peut pas atteindre
             // le serveur avant la fiche qu'elle date.
             dependencyKey: Value<String?>(
-              ligne.representantId ?? ligne.prospectId,
+              ligne.representantId ?? 'phase2:${ligne.prospectId}',
             ),
             entityType: ouvertureEntity,
             entityId: id,
@@ -307,8 +313,12 @@ class OuvertureRepository {
           OutboxCompanion.insert(
             id: Ids.newId(),
             // Même partition que les tentatives de la fiche : l'ouverture doit
-            // atteindre le serveur avant la qualification qui la ferme.
-            dependencyKey: Value<String?>(representantId ?? prospectId),
+            // atteindre le serveur avant la qualification qui la ferme. Une
+            // ouverture arrivée après elle est ignorée en silence, et le verrou
+            // ne se lève plus jamais.
+            dependencyKey: Value<String?>(
+              representantId ?? 'phase2:$prospectId',
+            ),
             entityType: ouvertureEntity,
             entityId: id,
             op: 'create',

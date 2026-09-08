@@ -195,6 +195,50 @@ afterAll(async () => {
 
 beforeEach(cleanupData);
 
+describe('attributions mobiles', () => {
+  it('isole les fiches attribuées et reflète les retraits et réaffectations', async () => {
+    const cibles = await fiches(5);
+    const lot = await service.create(admin, campagne('mobile', [alice, bruno], 2));
+    await prisma.representant.update({
+      where: { id: cibles[4] as string },
+      data: { createdById: alice },
+    });
+    const compteAlice = { ...admin, id: alice, role: Role.COMMERCIAL };
+    const compteBruno = { ...admin, id: bruno, role: Role.COMMERCIAL };
+    expect(await service.mesAttributions(compteAlice)).toEqual({
+      representantIds: expect.arrayContaining([cibles[0], cibles[2]]),
+      prospectIds: [],
+      tout: false,
+    });
+    expect((await service.mesAttributions(compteAlice)).representantIds).toHaveLength(2);
+    expect(new Set((await service.mesAttributions(compteBruno)).representantIds)).toEqual(
+      new Set([cibles[1], cibles[3]]),
+    );
+    expect(await service.mesAttributions({ ...admin, id: carine, role: Role.COMMERCIAL })).toEqual({
+      representantIds: [],
+      prospectIds: [],
+      tout: false,
+    });
+    expect(await service.mesAttributions(admin)).toEqual({
+      representantIds: [],
+      prospectIds: [],
+      tout: true,
+    });
+    await prisma.lotExportItem.updateMany({
+      where: { lotId: lot.id, representantId: cibles[0] as string },
+      data: { assigneeId: bruno },
+    });
+    await prisma.representant.update({
+      where: { id: cibles[2] as string },
+      data: { deletedAt: new Date() },
+    });
+    expect((await service.mesAttributions(compteAlice)).representantIds).toEqual([]);
+    expect(new Set((await service.mesAttributions(compteBruno)).representantIds)).toEqual(
+      new Set([cibles[0], cibles[1], cibles[3]]),
+    );
+  });
+});
+
 describe('EB-16 réaffectation', () => {
   it('laisse la fiche déjà appelée à son téléconseiller, et déplace les autres', async () => {
     const cibles = await fiches(4);
@@ -255,9 +299,7 @@ describe('EB-16 réaffectation', () => {
     });
 
     expect(detail.reaffectations.find((ligne) => ligne.id === trace?.id)?.fichesEnMain).toBe(1);
-    expect(
-      detail.repartition.map((ligne) => [ligne.teleconseillerId, ligne.recues]),
-    ).toEqual([
+    expect(detail.repartition.map((ligne) => [ligne.teleconseillerId, ligne.recues])).toEqual([
       [alice, 0],
       [bruno, 1],
       [carine, 1],

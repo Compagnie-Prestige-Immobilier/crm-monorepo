@@ -27,7 +27,6 @@ import '../../../ui/widgets/empty_state.dart';
 import '../../../ui/widgets/error_state.dart';
 import '../../../ui/widgets/sync_status_icon.dart';
 import '../../auth/auth_state.dart';
-import '../../telephonie/appels_a_consigner.dart';
 import '../../../ui/async_value_x.dart';
 
 class RepresentantDetailScreen extends ConsumerWidget {
@@ -68,10 +67,10 @@ class RepresentantDetailScreen extends ConsumerWidget {
 /// mobile pour la relation. Une valeur ajoutée côté serveur s'affiche telle
 /// quelle plutôt que de disparaître.
 String relationLabel(String status) => switch (status) {
-  'INCONNU' => 'Pas encore contacté',
+  'INCONNU' => 'Non qualifié',
   'CONTACTE' => 'Contacté',
-  'AMBASSADEUR' => 'A accepté',
-  'REFUS' => 'Refus',
+  'AMBASSADEUR' => 'Accepté',
+  'REFUS' => 'Refusé',
   _ => status,
 };
 
@@ -348,12 +347,6 @@ class _Fiche extends ConsumerWidget {
                 ? Phone.format(data.phoneE164)
                 : '${Phone.format(data.phoneE164)}\n${preuve.libelle}',
             copied: data.phoneE164,
-          ),
-          ?ligneAppelNonConsigne(
-            context,
-            ref,
-            kind: 'representant',
-            entityId: data.id,
           ),
           if (departement != null)
             _info(

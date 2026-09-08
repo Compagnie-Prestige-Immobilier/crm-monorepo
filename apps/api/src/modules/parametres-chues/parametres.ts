@@ -18,6 +18,7 @@ export interface ParametresChues {
   destinatairesBpe: string[];
   destinatairesSupervision: string[];
   destinatairesDirection: string[];
+  verrouFiches: boolean;
 }
 
 export type CleParametre = keyof ParametresChues;
@@ -63,6 +64,7 @@ export const PARAMETRES_USINE: ParametresChues = {
   destinatairesBpe: [],
   destinatairesSupervision: [],
   destinatairesDirection: [],
+  verrouFiches: true,
 };
 
 export const CLES = Object.keys(PARAMETRES_USINE) as CleParametre[];
@@ -76,15 +78,24 @@ const LISTES: readonly CleParametre[] = [
 
 const estUneListe = (cle: CleParametre): boolean => LISTES.includes(cle);
 
+const BOOLEENS: readonly CleParametre[] = ['verrouFiches'];
+
+const estUnBooleen = (cle: CleParametre): boolean => BOOLEENS.includes(cle);
+
 /** `AppSetting` est partagee : le prefixe evite qu'un reglage CHUES en ecrase un autre. */
 export const cleStockee = (cle: CleParametre): string => `chues.${cle}`;
 
 /**
  * Une liste voyage en JSON dans la colonne `value`, comme la disposition du
- * tableau de bord. Une valeur illisible retombe sur l'usine plutot que de faire
- * echouer l'ecran entier.
+ * tableau de bord ; un booleen voyage en 'true'/'false'. Une valeur illisible
+ * retombe sur l'usine plutot que de faire echouer l'ecran entier.
  */
-export function lireValeur(cle: CleParametre, brut: string): string | string[] {
+export function lireValeur(cle: CleParametre, brut: string): string | string[] | boolean {
+  if (estUnBooleen(cle)) {
+    if (brut === 'true') return true;
+    if (brut === 'false') return false;
+    return PARAMETRES_USINE[cle] as boolean;
+  }
   if (!estUneListe(cle)) return brut;
   try {
     const lu: unknown = JSON.parse(brut);
@@ -95,5 +106,8 @@ export function lireValeur(cle: CleParametre, brut: string): string | string[] {
   }
 }
 
-export const ecrireValeur = (valeur: string | string[]): string =>
-  Array.isArray(valeur) ? JSON.stringify(valeur) : valeur;
+export function ecrireValeur(valeur: string | string[] | boolean): string {
+  if (typeof valeur === 'boolean') return String(valeur);
+  if (Array.isArray(valeur)) return JSON.stringify(valeur);
+  return valeur;
+}

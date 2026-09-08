@@ -58,6 +58,7 @@ import {
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useVerrouFiches } from '@/lib/use-verrou-fiches';
 import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
@@ -114,6 +115,7 @@ const nouveauHref = (projet: Projet): string =>
 export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
+  const verrouActif = useVerrouFiches();
 
   const [ouverte, setOuverte] = useState<Ouverte | null>(null);
   const [vise, setVise] = useState<ProspectRow | null>(null);
@@ -185,6 +187,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
         projet={projet}
+        verrouActif={verrouActif}
         onAbandon={revenir}
         onEnregistre={(nom) => {
           setConfirme(nom);
@@ -245,7 +248,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
           setDemandee(null);
         }}
         title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
-        description="Vous ne pourrez pas la quitter sans la qualifier."
+        description={descriptionOuverture(verrouActif)}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -264,6 +267,10 @@ interface Ouverte {
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
+
+/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
+const descriptionOuverture = (verrouActif: boolean): string | null =>
+  verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
 
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
 const brouillonDe = (
@@ -329,7 +336,6 @@ function saisieCommencee(
 ): boolean {
   return conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
 }
-
 
 /**
  * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
@@ -515,12 +521,14 @@ function Consignation({
   prospect,
   ouverture,
   projet,
+  verrouActif,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
+  verrouActif: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -543,7 +551,7 @@ function Consignation({
   const nomComplet = nomDe(prospect);
   const closed = estFicheClose(prospect, refusee);
   const [now] = useState(() => Date.now());
-  const verrouille = ficheVerrouillee(ouverture, closed);
+  const verrouille = verrouActif && ficheVerrouillee(ouverture, closed);
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -755,7 +763,7 @@ function Consignation({
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
             {formatPhone(prospect.phoneE164)}
           </span>

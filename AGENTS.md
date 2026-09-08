@@ -154,7 +154,7 @@ Ce depot a ete ecrit en grande partie par des assistants. Audit du 7 septembre
 git, 231 endpoints, 57 pages web, 84 fichiers e2e, 34 snapshots de schema
 mobile. Le meme produit tient en 55 000 a 70 000 lignes. La difference n'est pas
 le proprietaire, ce sont les assistants qui ont construit sans jamais poser la
-question du plus petit changement complet. Voir `docs/migration-v2.md`.
+question du plus petit changement complet. Voir `docs/v2-refonte/plan.md`.
 
 Ce qui a coute le plus, a ne JAMAIS reproduire ici ni ailleurs :
 
@@ -202,13 +202,17 @@ commite.
 ## Cap v2
 
 Decisions arretees les 7 et 8 septembre 2026, detaillees dans
-`docs/migration-v2.md` et etayees par `docs/audit-v2/` : reecriture en
-parallele avec bascule unique ; Next.js + Drizzle + zod dans un serveur Node
-personnalise (WebSocket de presence, sept crons, SSE) a la place de NestJS +
-Prisma ; Better Auth sur la table `users` existante, hachages argon2id repris ;
+`docs/v2-refonte/plan.md` et etayees par `docs/v2-refonte/audits/` : reecriture en
+parallele avec bascule unique ; un binaire Go (`net/http`, huma, pgx + sqlc,
+goose, SPA React embarquee, WebSocket de presence, sept crons, SSE, cache
+memoire) a la place de NestJS + Prisma, decision du 8 septembre pour la
+consommation, pas de framework Go, pas de Rust ; sessions opaques dans
+`refresh_tokens`, hachages argon2id repris ;
 Flutter conserve, PowerSync auto-heberge (Sync Streams, buckets par role et
 par campagne, `uploadData` en 2xx avec table de verdicts) a la place du moteur
 de sync maison ; meme base Postgres ; phase 0 = quatre preuves sur copie de
 prod avec go/no-go ; gel des fonctionnalites sur `dev` avec une seule release
-v1 de maintenance nommee. Toute proposition qui contredit ces decisions se
-signale en une ligne au proprietaire avant d'etre codee.
+v1 de maintenance nommee. La v2 se construit dans le worktree
+`../crm-monorepo-v2` sur la branche `v2`, jamais dans ce clone. Toute
+proposition qui contredit ces decisions se signale en une ligne au proprietaire
+avant d'etre codee.

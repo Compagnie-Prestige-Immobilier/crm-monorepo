@@ -16,8 +16,8 @@ import type { Writable } from 'node:stream';
 import { PassThrough } from 'node:stream';
 import { PrismaService } from '../../prisma/prisma.service.js';
 import { buildProspectWhere } from '../../common/prospect-where.js';
-import { isAdmin } from '../../common/scope.js';
 import type { AuthenticatedUser } from '../../common/decorators/current-user.decorator.js';
+import { isAdmin } from '../../common/scope.js';
 import type { RepresentantExportQueryDto } from '../representants/dto.js';
 import { suiviWhere } from '../representants/representants.service.js';
 import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
@@ -1383,7 +1383,7 @@ function distributionValueOf(filters: Prisma.JsonValue): Record<string, unknown>
   return raw as Record<string, unknown>;
 }
 
-function readDistribution(filters: Prisma.JsonValue): Distribution | null {
+export function readDistribution(filters: Prisma.JsonValue): Distribution | null {
   const value = distributionValueOf(filters);
   if (!value) return null;
   const teleconseillerIds = Array.isArray(value.teleconseillerIds)
