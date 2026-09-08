@@ -550,7 +550,7 @@ function FicheRepresentant({
       <CardContent className="flex flex-col gap-5 text-[0.875rem]">
         <section className="flex flex-col gap-2">
           <p className="eyebrow text-muted-foreground">Où il travaille</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Département">{representant.departementName}</Champ>
             <Champ label="IEF">{ouVide(representant.iefName)}</Champ>
             <Champ label="Établissement">{ouVide(representant.etablissement)}</Champ>
@@ -561,14 +561,14 @@ function FicheRepresentant({
         </section>
         <section className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="eyebrow text-muted-foreground">Ce qu’il a dit</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Déjà contacté">{ouiNon(representant.contacte)}</Champ>
             <Champ label="Connaît l’UES">{ouiNon(representant.connaitUES)}</Champ>
           </dl>
         </section>
         <section className="flex flex-col gap-2 border-t border-border pt-4">
           <p className="eyebrow text-muted-foreground">Saisie</p>
-          <dl className="grid grid-cols-2 gap-3">
+          <dl className="grid gap-3 sm:grid-cols-2">
             <Champ label="Saisi par">{representant.createdByName}</Champ>
             <Champ label="Première saisie">{formatDate(representant.clientCreatedAt)}</Champ>
           </dl>
