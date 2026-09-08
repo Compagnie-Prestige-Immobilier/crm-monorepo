@@ -18169,6 +18169,62 @@
         "tags": ["admin"]
       }
     },
+    "/api/v1/export/global.xlsx": {
+      "get": {
+        "operationId": "exportGlobalXlsx",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "binary"
+                }
+              }
+            },
+            "description": ""
+          },
+          "400": {
+            "description": "Requête mal formée : paramètre invalide ou corps refusé par la validation.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Jeton absent, expiré ou invalide.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Jeton valide mais rôle insuffisant, ou ressource hors du périmètre de l’utilisateur.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ApiErrorDto"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "summary": "Export global du suivi métier.",
+        "tags": ["export"]
+      }
+    },
     "/api/v1/export/prospects.xlsx": {
       "get": {
         "description": "Deux modes. `filtered` (défaut) : une feuille Prospects correspondant exactement aux filtres, plus Représentants et Synthèse. `consolidated` : exactement cinq feuilles, Consolidé, BDD1, BDD2, BDD3, BDD4.",
