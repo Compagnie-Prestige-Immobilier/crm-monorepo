@@ -77,7 +77,7 @@ export function SidebarNav({
           href={hubHref}
           onClick={onNavigate}
           aria-label="Tous les espaces"
-          className="flex items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
+          className="flex h-full items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
         >
           {(() => {
             /*
