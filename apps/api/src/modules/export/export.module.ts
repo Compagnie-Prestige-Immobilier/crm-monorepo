@@ -5,13 +5,14 @@ import { ChampsConversionModule } from '../champs-conversion/champs-conversion.m
 import { VisitesModule } from '../visites/visites.module.js';
 import { ExportController } from './export.controller.js';
 import { ExportService } from './export.service.js';
+import { GlobalExportService } from './global-export.service.js';
 import { RepresentantsExportService } from './representants-export.service.js';
 import { VisitesExportService } from './visites-export.service.js';
 
 @Module({
   imports: [AnalyticsModule, ChampsConversionModule, VisitesModule],
   controllers: [ExportController],
-  providers: [ExportService, RepresentantsExportService, VisitesExportService],
+  providers: [ExportService, GlobalExportService, RepresentantsExportService, VisitesExportService],
   exports: [ExportService, RepresentantsExportService],
 })
 export class ExportModule {}

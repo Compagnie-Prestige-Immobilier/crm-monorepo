@@ -8,6 +8,7 @@ import { useState } from 'react';
 import { hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
+import { GlobalExportButton } from '@/components/exports/global-export-button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
 import { NotificationBell } from '@/components/notifications/notification-bell';
@@ -59,6 +60,8 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         enabled={process.env.NODE_ENV === 'development'}
         className="hidden md:block"
       />
+
+      {['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role) ? <GlobalExportButton /> : null}
 
       <Link
         href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}

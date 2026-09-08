@@ -12,6 +12,7 @@ import {
 import { ChampsConversionService } from '../champs-conversion/champs-conversion.service.js';
 import type { ChampLibre } from '../champs-conversion/catalogue.js';
 import { ExportService } from './export.service.js';
+import { GlobalExportService } from './global-export.service.js';
 import { ExportMode, ExportQueryDto } from './dto.js';
 import { formatDakarDate } from './dakar.js';
 import { DEMO_MODE_HEADER, demoFilenameSuffix, setDemoHeader } from './demo-marking.js';
@@ -34,11 +35,32 @@ const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.s
 export class ExportController {
   constructor(
     private readonly exports: ExportService,
+    private readonly globalExport: GlobalExportService,
     private readonly representants: RepresentantsExportService,
     private readonly visitesExport: VisitesExportService,
     private readonly demo: WorkspaceContext,
     private readonly champs: ChampsConversionService,
   ) {}
+
+  @Get('global.xlsx')
+  @Roles(Role.ADMIN, Role.SUPERVISEUR, Role.DIRECTION)
+  @ApiProduces(XLSX_MIME)
+  @ApiOperation({ operationId: 'exportGlobalXlsx', summary: 'Export global du suivi métier.' })
+  @ApiResponse({
+    status: 200,
+    content: { [XLSX_MIME]: { schema: { type: 'string', format: 'binary' } } },
+  })
+  async global(@Res() reply: FastifyReply): Promise<void> {
+    const workbook = await this.globalExport.build();
+    const buffer = await workbook.xlsx.writeBuffer();
+    const demoEnabled = this.demo.current() === 'demo';
+    const filename = `cpi-global-${formatDakarDate(workbook.created)}${demoFilenameSuffix(demoEnabled)}.xlsx`;
+    reply.header('Content-Type', XLSX_MIME);
+    reply.header('Content-Disposition', `attachment; filename="${filename}"`);
+    reply.header('Cache-Control', 'no-store');
+    reply.header(DEMO_MODE_HEADER, demoEnabled ? 'true' : 'false');
+    await reply.send(Buffer.from(buffer));
+  }
 
   // ADMIN, COMMERCIAL, DIRECTION : la feuille Synthèse porte les agrégats d'`AnalyticsController`,
   // moins le SUPERVISEUR, écarté ici à dessein — voir `representantsExport` plus bas.
