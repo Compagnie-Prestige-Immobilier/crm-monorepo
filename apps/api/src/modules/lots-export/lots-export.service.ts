@@ -1383,7 +1383,7 @@ function distributionValueOf(filters: Prisma.JsonValue): Record<string, unknown>
   return raw as Record<string, unknown>;
 }
 
-function readDistribution(filters: Prisma.JsonValue): Distribution | null {
+export function readDistribution(filters: Prisma.JsonValue): Distribution | null {
   const value = distributionValueOf(filters);
   if (!value) return null;
   const teleconseillerIds = Array.isArray(value.teleconseillerIds)
