@@ -1,0 +1,201 @@
+# Audit de portage API v1 vers binaire Go
+
+Lecture seule, 8 septembre 2026, base `dev` à `68217387`. Complète
+`audits/api.md` sans le réinventorier.
+
+## 0. Écarts constatés avec le plan v3 et l'audit existant
+
+| Affirmation | Preuve | Réalité |
+| --- | --- | --- |
+| `plan.md` « le beat de 10 s vient du panneau » | `apps/web/src` ne contient aucun `new WebSocket` ; `logs/api.2.log` sur `/api/v1/presence/live` ne montre qu'un seul UA : `Dart/3.11 (dart:io), CPI-GO/1.0 (Android)` | Le beat vient du mobile seul. `agent_heartbeats` cesse d'être alimenté au jour J. |
+| `plan.md` « `POST /sync/push` supprimé » | `apps/web/src/lib/data/console.ts:849` `client.POST('/api/v1/sync/push', …)`, entité `call_attempt` (`:792`), commentaire `:838-841` : « Aucune route HTTP ne consigne un appel de phase 2 » | Le panneau écrit toutes les qualifications prospects par `/sync/push`. Supprimer le module sans route de remplacement casse le geste central du téléconseiller. |
+| `plan.md` « nettoyage : colonnes `payloadVersion` » | `apps/web/src/lib/data/statuts-qualification.ts:20,125` envoie `payloadVersion=8` ; `statuts-qualification.service.ts:110-113` filtre `minPayloadVersion <= payloadVersion` | `StatutQualification.minPayloadVersion` sert au panneau. |
+| `audits/api.md` §3 « export : 6 routes » | `export.controller.ts:45` `GET global.xlsx`, appelé par `components/exports/global-export-button.tsx:17` via `app/api/export/global/route.ts:5` | 7 routes d'export. |
+| `audits/api.md` « 36 contrôleurs, ~231 routes » | 37 fichiers `*.controller.ts`, 234 couples méthode+chemin | Base retenue : 234. |
+
+## 1. Tri des routes : 196 portées, 38 supprimées, 1 nouvelle
+
+Méthode : extraction des 234 décorateurs, confrontation à toutes les
+occurrences de `/api/v1/…` dans `apps/web/src` (client `openapi-fetch`,
+`packages/api-client/src/index.ts:57`), aux relais `apps/web/src/app/api/*` et
+aux URL construites par gabarit. Faux négatifs vérifiés à la main et portés :
+`GET /lots-export/{id}/export.xlsx`, `/programmes.zip` (`lots-export.ts:131-133`),
+`/programme.pdf` (`:138`), `/fiches-recues.pdf` (`:150`), `GET /live`
+(`lib/live-stream.ts:6`), `GET /formulaire-public/formulaire` et
+`POST /formulaire-public/{jeton}` (`app/demande/[jeton]/page.tsx:25`,
+`app/api/demande/[jeton]/route.ts:64`), `GET /health/live|ready` (sonde).
+
+### 1.1 Supprimées : 38 routes
+
+| Module | Routes retirées | Preuve de non-usage | Motif |
+| --- | --- | --- | --- |
+| analytics | 13 : `totals` `:77`, `prospects-over-time` `:87`, `top-commercials` `:100`, `by-phase2-status` `:143`, `by-segment` `:172`, `top-representants` `:187`, `bank-aging` `:219`, `weekly-cohorts` `:236`, `representant-productivity` `:265`, `ambassador-conversion` `:282`, `data-quality` `:304`, `segment-conversions` `:320`, `origin-breakdown` `:339` | 0 occurrence ; le catalogue `components/chiffres/sources.ts:33-44` ne connaît que 12 jeux servis par 7 requêtes (`lib/data/chiffres.ts:64-181`) | Mortes déjà en v1 |
+| app-updates | 6 (`app-updates.controller.ts:68,84,125,138,182,204`) | | APK retiré |
+| sync | 2 (`sync.controller.ts:43,119`) | `pull` : 0 occurrence. `push` : utilisé (`console.ts:849`) | `pull` supprimée ; `push` remplacée, §1.3 |
+| phase2 | `GET directory` `:102` | 0 occurrence | annuaire de sync mobile |
+| lots-export | `GET mes-attributions` `:189` | 0 occurrence | écran mobile |
+| demo | 2 (`demo.controller.ts:16,23`) | | démo abandonnée |
+| auth | `POST refresh` `:53`, `POST workspace` `:108` | | sessions opaques ; démo |
+| prospects / representants | `GET :id/device-calls` (`prospects.controller.ts:97`, `representants.controller.ts:234`) | | détection d'appel impossible en navigateur |
+| referentiels | `GET pays` `:179`, `PATCH canaux-provenance/{id}` `:226`, `GET regions/departements` `:275` | 0 occurrence | `pays` servait `/sync/pull` |
+| prospects | `PATCH :id/segment` `:225`, `GET :id/segment-history` `:253` | 0 occurrence | segments calculés, jamais pilotés |
+| representants | `POST import` `:98` | utilisée (`lib/data/representants-import.ts:21`) | doublon du système à jobs `/imports/representants` (`lib/data/imports.ts:99`) |
+| bank-cases | `POST :id/corrections` `:186` | 0 occurrence | figure pourtant dans la checklist |
+| client-requests | `GET :id` `:80` | 0 occurrence | le panneau lit la liste seule |
+| notifications | `POST notification-templates/:id/render` `:81` | 0 occurrence | figure pourtant dans la checklist |
+
+### 1.2 Portées sans changement de contrat : 196
+
+`users` (7), `bank-cases` (8 sur 9) + `bank-case-stages` (5), `visites` (12) +
+`visites/import` (5), `referentiels` (25 sur 28) + `statuts-qualification` (5)
++ `call-outcome-reasons` (5), `lots-export` (13 sur 14), `imports` (7),
+`notifications` (7) + `notification-templates` (4 sur 5), `ouvertures` (6, tous
+consommés : `lib/data/ouvertures.ts:54-108`), `enrolement` (8), `dashboards`
+(4), `export` (7), `db-dump` (3), `admin` (3), `supervision` (5), `analytics`
+(7), `formulaire-public` (2), `champs-conversion` (2), `parametres-chues` (3),
+`suggestions` (2), `phase2/callbacks` (2), `rep-campaigns` (1), `health` (2),
+`live` (1).
+
+### 1.3 La route nouvelle
+
+`POST /api/v1/phase2/call-attempts` : corps = `operations[0].data` de
+`buildAttemptBatch` (`console.ts:780-810`), règles inchangées
+(`phase2/phase2-sync.service.ts`, 504 l., `phase2/attempt-rules.ts:148-195`).
+Idempotence par `attemptId` client (UUIDv7) : `INSERT … ON CONFLICT (id) DO
+NOTHING` puis relecture, patron déjà tenu par `ouvertures.service.ts:217-227`.
+Le rejeu rend 200 avec la tentative existante. Total v2 : 197 routes.
+
+## 2. Règles métier et invariants : portage pgx
+
+| Invariant | Preuve v1 | Portage Go/pgx | Ce qui ne se porte pas tel quel |
+| --- | --- | --- | --- |
+| Transitions `ProspectStatut`, `RepresentantRelation`, `SuggestionStatus`, réécriture à l'identique tolérée, dérogation ADMIN | `common/transitions.ts:23-27,39-47,50-54,58-63,70` | Trois `map[T][]T` + `isLegalTransition`, ~60 l. | `from == to` reste toléré comme idempotence de double-clic |
+| Doublon téléphone, 409 nommant fiche et propriétaire | `prospects.service.ts:995-1034`, `representants.service.ts:898-923` ; index partiels `20260812122400_partial_unique_phone/migration.sql:12,16` | Lecture explicite conservée, index partiel gardé comme filet | `*pgconn.PgError` `Code == "23505"` + `ConstraintName` |
+| `expectedRev` / `PROSPECT_REV_CONFLICT` | `segment-change.service.ts:115` ; `rev Int @default(1)` `schema.prisma:514,745,1579` | `UPDATE … SET rev = rev + 1 WHERE id = $1 AND rev = $2` ; 0 ligne = 409 | le commentaire `schema.prisma:513` visait l'upsert de `/sync/pull` |
+| Verrou « une fiche à la fois » | `20260905120000_ouverture_de_fiche/migration.sql` index partiel `ouvertures_fiche_verrou_unique` ; P2002 `ouvertures.service.ts:214-227` | Index inchangé ; `23505` puis relecture par `id` ; rejeu du même agent = 200, sinon `OUVERTURE_FICHE_DEJA_OUVERTE` | rien |
+| 3 CHECK d'ouverture | même migration | repris par `pg_dump --schema-only` | rien |
+| Ordre des étapes bancaires | `bank-case-stages.service.ts:50` `pg_advisory_xact_lock` | `tx.Exec(ctx, "SELECT pg_advisory_xact_lock($1)", …)` | rien |
+| 31 transactions interactives | purge 300 s `purge.service.ts:80`, export global `RepeatableRead` 120 s `global-export.service.ts:182`, tranche d'import 60 s `import-runner.service.ts:303`, lots-export 120 s `lots-export.service.ts:220` | `pgx.Tx` + `context.WithTimeout` ; `pgx.TxOptions{IsoLevel: pgx.RepeatableRead}` pour l'export global | `maxWait` n'existe pas : `MaxConns` + timeout de contexte |
+| Bail d'import, reprise par tranches | `imports/import-claim.ts:16-33`, `import-runner.service.ts:152` | `UPDATE import_jobs … WHERE id=$1 AND (…) RETURNING id` ; barrière `WHERE claim_token = $t` sur chaque écriture | rien |
+| Bail d'expédition des notifications | `notifications/dispatch-claim.ts:8,34-41,51-57,61-66` | mêmes trois requêtes ; `renew()` compare `RowsAffected()` | rien |
+| Plan topologique de purge | `admin/purge-plan.ts:3-61,96-240,264-274` | tables `[]string` et `map[string][]string` en constantes, une transaction de 300 s | rien |
+| Reprise de portefeuille, dernier admin | `users.service.ts:149,158-159,240,263,273,287,319,219-227` | comptage des ADMIN actifs dans la transaction, `SELECT … FOR UPDATE` ou `SERIALIZABLE` sur ces 3 gestes | Aujourd'hui non verrouillé : deux rétrogradations simultanées peuvent vider les ADMIN. Bug latent v1, ~5 l. |
+| Portées de lecture | `common/scope.ts:20,46,59,72` | fragments `WHERE` sqlc paramétrés (`$owner_id`, `$reads_everyone`) | `attributionScope` (jointure `lotItems`) en SQL nommé |
+| Audit dans la transaction | `common/audit.ts:26-41`, 13 actions `:44-58` | `func audit(ctx, tx, userID, entry)` | rien |
+| Journal de fiche | `fiche-change.ts` | `WEB` et `IMPORT` seuls écrits | rien |
+| Statuts filtrés par version | `statuts-qualification.service.ts:110-113` | voir A3 | |
+
+## 3. Spécificités Node à remplacer
+
+| Node v1 | Preuve | Équivalent Go le plus court |
+| --- | --- | --- |
+| `AsyncLocalStorage` + `Proxy` PrismaClient | `workspaces/workspace.ts:1,11,18-20,33-45` | Disparaît avec la démo, ~45 l. supprimées |
+| `@Cached(ttl, group?)`, 11 sites | `redis/cache.interceptor.ts:29-30,54-72,77-79` | cache mémoire à version de groupe, voir `go-securite.md` §9 |
+| `FreshSessionGuard`, cache 30 s | `common/guards/fresh-session.guard.ts:29-56` | middleware : `SELECT role, is_active, deleted_at FROM users WHERE id=$1` derrière le cache mémoire 30 s ; `SESSION_REVOKED`, `ACCOUNT_DISABLED` conservés |
+| `RolesGuard` + 155 `@Roles` + 44 contrôles de portée | | `roles.go`, middleware unique ; les 44 contrôles restent dans les handlers |
+| `DbDumpEnabledGuard` | `db-dump/db-dump-enabled.guard.ts` | clause de garde de 3 lignes |
+| Limiteurs : `@fastify/rate-limit` 600/min + `ThrottlerModule` 300/60 s + 10 `@Throttle` | `bootstrap.ts:103`, `app.module.ts:107-109`, login 10/60 s `auth.controller.ts:30`, formulaire public 30 et 5/60 s `:24,40`, 4 imports 5/60 s, dump 5/60 s, import visites 5/60 s | quatre limiteurs nommés : global, connexion, formulaire public, imports+dump. `map[clé]*rate.Limiter` avec éviction, ~50 l. |
+| `ValidationPipe` `whitelist`/`forbidNonWhitelisted` | `bootstrap.ts:121-132` | huma rejette les champs inconnus si `additionalProperties:false` ; à vérifier au premier handler |
+| Téléphone E.164, 8 régions, préfixes `00`/`221` recomposés | `common/phone.ts:24-46,50-72` | `nyaruka/phonenumbers` + la même `canonicalizePrefix` recopiée |
+| 30 `@Matches`, 94 `@IsEnum`, 15 `@IsIn`, 125 `@IsUUID`, 36 `@IsISO8601`, 172 `@MaxLength`, 88 `@Min`, 59 `@Max`, 16 `@ArrayMaxSize`, 2 `@Validate` | `money.ts:5`, `visites/dto.ts:52-55`, `notifications/dto.ts:32`, `work-shifts.service.ts:14` | tags huma `pattern`, `enum`, `format:"uuid"`, `format:"date-time"`, `maxLength`, `minimum`, `maximum`, `maxItems` ; un seul `Resolve(ctx)` à écrire (`UniqueDispositionSourcesConstraint`) |
+| Multipart Fastify | `bootstrap.ts:104-106`, `phase2.controller.ts:70-74`, `IMPORTS_MAX_BYTES` | `http.MaxBytesReader` par route + `r.MultipartReader()` en flux, jamais `ParseMultipartForm` |
+| `nestjs-pino`, masquage `authorization`, `cookie`, `idempotency-key`, mots de passe, `phoneE164` | `app.module.ts:82-104` | `log/slog` + handler masquant la même liste, ~40 l. |
+| `genReqId` sur `x-request-id` `^[\w-]{1,64}$` | `bootstrap.ts:57-60` | middleware de 8 lignes |
+| SSE `/api/v1/live`, ping 25 s, renouvellement 14 min | `live.controller.ts:27`, `lib/live-stream.ts:10-15` | `http.Flusher` + `chan []byte` par abonné ; 4 topics (`app-updates` retiré) |
+| WebSocket de présence | `bootstrap.ts:78`, `presence-socket.service.ts:12,25,29` | aucun client au jour J, voir A2 |
+
+Crons conservés, avec les notes vocales : `cpi.imports.sweep` `*/1`
+(`imports.cron.ts:44`), `cpi.enrolement.tirage` `*/1` (`enrolement.service.ts:188`),
+`cpi.notifications.due` `*/1` (`reminders.service.ts:96`),
+`cpi.notifications.reminders` (`reminders.service.ts:33,137`, TZ `Africa/Dakar`),
+`cpi.notifications.daily-report` (`:35,191`), `cpi.db-dump.sweep` `*/10`
+(`db-dump.service.ts:110`), `cpi.recordings.sweep` `0 * * * *`
+(`recordings.service.ts:35`). Sept crons.
+
+## 4. Notes vocales : ce que le handler Go reproduit
+
+`phase2/recordings.service.ts` (228 l.), routes `phase2.controller.ts:48,78`.
+
+| Point | v1 | Handler Go |
+| --- | --- | --- |
+| Formats | `AUDIO_MIMES = {audio/mp4, audio/x-m4a}` `:23`, 400 `CALL_RECORDING_INVALID` `:57-61` | Le navigateur produit `audio/webm;codecs=opus` (Chrome, Firefox) ou `audio/mp4` (Safari). Jeu : `{audio/webm, audio/ogg, audio/mp4, audio/x-m4a}`, extension selon le type, vérification par contenu |
+| Taille | limite par route `:70-74`, `CALL_RECORDING_TOO_LARGE` `:78-83`, `CALL_RECORDING_EMPTY` `:84-89` | `http.MaxBytesReader` + `io.Copy` vers `.part` |
+| Écriture | `.{uuid}.part` en `O_EXCL` 0600 puis `rename` ; répertoire 0700 `:63-93` | `os.OpenFile(O_EXCL, 0600)` + `os.Rename` |
+| Idempotence | fichier présent = 200, corps drainé `:67-73` | `os.Stat` puis `io.Copy(io.Discard, part)` |
+| Autorisation | auteur toujours ; lecture ADMIN et SUPERVISEUR ; sinon 403 `CALL_RECORDING_FORBIDDEN` `:203-213` | même asymétrie dans le handler |
+| Lecture | `Content-Type`, `Content-Length`, `Cache-Control: private, max-age=3600` `:94-100`, pas de `Range` | `http.ServeContent` : `Range`, `ETag`, `Last-Modified` gratuits, nécessaires à `<audio>` |
+| Rétention | 48 h, balayage horaire `:35`, deux critères : âge `:150-174` et orphelin `:137-146,176-186` | identique, le critère orphelin rattrape purge et suppression |
+
+Coût : ~150 l. Go sans dépendance.
+
+## 5. Contrat d'erreur
+
+Forme actuelle (`common/errors/normalize.ts:55-62`, `common/dto/api-error.dto.ts:3-56`) :
+`{ statusCode, code, message, details[], requestId, ...extensions }`, `existing`
+à plat (`prospects/dto.ts:724-729`, lu par `lib/data/prospects.ts:93` et
+`components/bank/bank-case-form.tsx:374`). Le panneau lit `message`
+(`packages/api-client/src/query.ts:55-61`), `body.code` sur 3 écrans
+(`bank-stages-view.tsx:255`, `change-password-card.tsx:37`, `lib/api/config.ts:35`),
+`body.existing` sur 2 ; statut HTTP en repli (`lib/mutation-feedback.ts:19-23,34-39`).
+
+Aiguillage huma : struct étendant `huma.ErrorModel` et `huma.NewError` de
+remplacement, ~25 l.
+
+| Champ v1 | RFC 9457 | Décision |
+| --- | --- | --- |
+| `code` | aucun | extension `code` au premier niveau, jamais dans `type` |
+| `message` | `detail` | extension `message`, copie de `detail` |
+| `details[]` | `errors[]` (`location`, `message`, `value`) | `errors[]` porte le champ ; `details[]` en projection `location: message` |
+| `statusCode` | `status` | extension en doublon |
+| `requestId` | `instance` | extension conservée |
+| `existing` | extension | à plat |
+
+## 6. Estimation par fichier Go
+
+Base : 54 133 lignes non-test dans `apps/api/src`, ratio 0,30 à 0,40.
+
+| Fichier | Sources v1 | Lignes |
+| --- | --- | --- |
+| `main.go` mux, `embed`, SSE, configuration, `slog` | `bootstrap.ts` 174, `app.module.ts`, `env.ts`, `live/` 98 | 450 |
+| `auth.go` sessions, argon2id, `me`, mot de passe | `auth/` 601, guards | 380 |
+| `roles.go` table rôle x route, 197 entrées | 155 `@Roles` + `roles.decorator.ts:58-63` | 280 |
+| `representants.go` | `representants/` 3 613 moins import ~700 | 1 050 |
+| `prospects.go` CRUD, fusion, réaffectation, revue, Grand Public | `prospects/` 2 725 | 980 |
+| `qualification.go` `rep-campaigns`, tentative phase 2, `callbacks`, `ouvertures`, `suggestions`, notes vocales | 898 + 1 709 + 261 + 831 + 264 + `phase2-sync.service.ts` | 1 350 |
+| `campagnes.go` lots d'export, PDF, ZIP | `lots-export/` 2 546 | 900 |
+| `banque.go` dossiers, étapes, demandes de création | `bank-cases/` 2 927 + `client-requests/` 757 | 1 150 |
+| `accueil.go` registre, référentiels de visite, statistiques, import | `visites/` 2 076 | 760 |
+| `admin.go` utilisateurs, purge, dump, enrôlement, tableaux de bord, paramètres, champs de conversion | 719 + 1 838 + 1 016 + 1 665 + 890 + 430 + 534 | 1 480 |
+| `referentiels.go` | `referentiels/` 2 453 | 820 |
+| `analytics.go` 7 routes + 5 supervision + créneaux | `analytics/` 4 834 | 700 |
+| `notifications.go` | `notifications/` 3 542 | 1 150 |
+| `imports.go` job unique, bail, tranches, 4 adaptateurs, revue | `imports/` 5 931 | 1 400 |
+| `exports.go` 7 classeurs, PDF, ZIP | `export/` 2 752 | 950 |
+| `formulaire_public.go` | `formulaire-public/` 1 041 | 380 |
+| Total | | ≈ 14 200 |
+
+`chues.go` tel que prévu ferait 4 280 lignes : la coupe ci-dessus s'impose.
+`grand_public.go` n'a pas lieu d'être : quatre chemins de `prospects.go`.
+
+## 7. Arbitrages
+
+| # | Question | Recommandation | Coût |
+| --- | --- | --- | --- |
+| A1 | `/sync/push` seul chemin d'écriture d'une qualification prospect | Créer `POST /phase2/call-attempts` ; le module sync (3 487 l.) part | ~180 l. Go |
+| A2 | Plus aucun client ne bat `/presence/live` | `POST /api/v1/presence/beat` toutes les 60 s depuis la SPA, `UPSERT agent_heartbeats` ; pas de WebSocket | ~25 l. Go + ~15 l. SPA |
+| A3 | `minPayloadVersion` filtre les statuts pour le panneau | Garder la colonne, retirer le paramètre, servir tous les statuts actifs | −1 paramètre |
+| A4 | `POST /bank-cases/{id}/corrections` et `POST /notification-templates/{id}/render` sans appelant mais dans la checklist | Décision du propriétaire | 2 routes, ~200 l. SPA |
+| A5 | Deux systèmes d'import de représentants, tous deux appelés | Garder le système à jobs ; l'écran `/chues/representants/import` bascule | −700 l. |
+| A6 | 13 routes analytics mortes | Supprimer | −13 routes |
+| A7 | 6 ou 7 crons | 7 avec les notes vocales | |
+| A8 | Comptage du dernier ADMIN non verrouillé | Corriger au portage | ~5 l. |
+
+## Hypothèses et non vérifié
+
+« Consommé par le panneau » = référence dans `apps/web/src`. Le ratio 0,30 à
+0,40 suppose les requêtes brutes hors du compte Go. Le tri considère démo et
+APK abandonnés même quand le panneau v1 les appelle encore. Aucune commande
+sur une base ; `apps/mobile` n'a pas été relu (supprimé de `dev`) ;
+`logs/api.2.log` est un journal local ; comportement de huma sur
+`additionalProperties:false` à valider au premier handler ; types MIME
+produits par les Android réels non mesurés.

@@ -2,23 +2,17 @@
 !pragma layout smetana
 !include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
 LAYOUT_LEFT_RIGHT()
-title Niveau 2 : conteneurs. Les quatre briques logicielles de la v2.
+title Niveau 2 : conteneurs. Les deux briques logicielles de la v2.
 
-Person(tc, "Téléconseiller")
-Person(enc, "Encadrement")
+Person(tc, "Téléconseiller", "Téléphone, navigateur")
+Person(enc, "Encadrement", "Poste, navigateur")
 
 System_Boundary(cpi, "CPI GO v2") {
-  Container(mobile, "Application mobile", "Flutter, PowerSync SDK, Drift", "Saisie hors ligne, journal d'appels natif")
-  Container(go, "apps/go", "Go 1.27, net/http, huma, pgx, sqlc ; SPA React embarquée", "Panneau, API, crons, WebSocket, SSE, cache mémoire")
-  Container(ps, "powersync-service", "Sync Streams", "Descente des buckets vers les téléphones")
-  ContainerDb(pg, "Postgres 18", "Réplication logique", "Données métier, sessions, verdicts, buckets")
+  Container(go, "apps/go", "Go 1.27, net/http, huma, pgx, sqlc ; SPA React embarquée", "Panneau, API, 7 crons, SSE, cache mémoire, notes vocales")
+  ContainerDb(pg, "Postgres 18", "", "Données métier, sessions")
 }
 
+Rel_R(tc, go, "HTTPS, cookie de session")
 Rel_R(enc, go, "HTTPS, cookie de session")
-Rel_R(tc, mobile, "Utilise")
-Rel_R(mobile, go, "Écritures : uploadData, ouvertures, notes vocales", "HTTPS, Bearer")
-Rel_R(mobile, ps, "Lectures : buckets", "WebSocket, JWT")
-Rel_R(go, pg, "Lit, écrit")
-Rel_R(ps, pg, "Réplication logique")
-Rel_U(ps, go, "JWKS")
+Rel_R(go, pg, "pgx")
 @enduml

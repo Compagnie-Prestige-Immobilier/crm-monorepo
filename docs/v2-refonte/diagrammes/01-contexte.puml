@@ -4,11 +4,11 @@
 LAYOUT_LEFT_RIGHT()
 title Niveau 1 : contexte. Qui utilise CPI GO v2 et avec quoi il parle.
 
-Person(tc, "Téléconseiller", "Terrain, téléphone Android, souvent hors ligne")
+Person(tc, "Téléconseiller", "Panneau sur téléphone Android, en navigateur")
 Person(enc, "Encadrement", "Superviseur, direction, admin, banque, accueil : navigateur")
 Person(pub, "Prospect", "Formulaire public de demande")
 
-System(cpi, "CPI GO v2", "Panneau, API, synchronisation mobile")
+System(cpi, "CPI GO v2", "Panneau et API, un binaire")
 
 System_Ext(plat, "Plateformes d'enrôlement", "CHUES, Grand Public")
 System_Ext(brevo, "Brevo", "E-mail transactionnel")
