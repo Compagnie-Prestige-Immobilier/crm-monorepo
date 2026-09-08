@@ -67,10 +67,10 @@ class RepresentantDetailScreen extends ConsumerWidget {
 /// mobile pour la relation. Une valeur ajoutée côté serveur s'affiche telle
 /// quelle plutôt que de disparaître.
 String relationLabel(String status) => switch (status) {
-  'INCONNU' => 'Pas encore contacté',
+  'INCONNU' => 'Non qualifié',
   'CONTACTE' => 'Contacté',
-  'AMBASSADEUR' => 'A accepté',
-  'REFUS' => 'Refus',
+  'AMBASSADEUR' => 'Accepté',
+  'REFUS' => 'Refusé',
   _ => status,
 };
 

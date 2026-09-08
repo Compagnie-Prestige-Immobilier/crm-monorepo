@@ -475,18 +475,12 @@ export function RepresentantDetailView({
         complement={representant.prenom}
         phoneE164={representant.phoneE164}
         badges={
-          <>
-            <RelationBadge
-              status={representant.relationStatus}
-              label={representant.statutQualificationLabel}
-              effect={representant.statutQualificationEffect}
-              lastCallOutcome={representant.lastCallOutcome}
-            />
-            <Badge variant="outline">
-              <span className="text-muted-foreground">Relation</span>
-              <span>{REPRESENTANT_RELATION_LABELS[representant.relationStatus]}</span>
-            </Badge>
-          </>
+          <RelationBadge
+            status={representant.relationStatus}
+            label={representant.statutQualificationLabel}
+            effect={representant.statutQualificationEffect}
+            lastCallOutcome={representant.lastCallOutcome}
+          />
         }
         chiffres={chiffresDe(representant)}
       />

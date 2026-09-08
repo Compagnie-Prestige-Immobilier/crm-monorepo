@@ -335,7 +335,7 @@ function ApercuLignesValides({
                 <TableHead>Département</TableHead>
                 <TableHead>IEF</TableHead>
                 <TableHead>Établissement</TableHead>
-                <TableHead>Relation</TableHead>
+                <TableHead>Qualification</TableHead>
                 <TableHead>Dernier appel</TableHead>
               </TableRow>
             </TableHeader>

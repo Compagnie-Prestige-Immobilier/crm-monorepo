@@ -60,7 +60,7 @@ export const IMPORT_COLUMNS: readonly ImportColumn[] = [
     header: 'Statut relation',
     width: 20,
     required: false,
-    help: 'Facultatif. Inconnu, Contacté, Ambassadeur ou Refus. Vide vaut Inconnu, c’est-à-dire « à appeler ».',
+    help: 'Facultatif. Non qualifié, Contacté, Accepté ou Refusé. Vide vaut Non qualifié, c’est-à-dire « à appeler ».',
     sample: 'Inconnu',
   },
   {

@@ -145,7 +145,7 @@ export function RepresentantsFiltersBar() {
         />
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <Label htmlFor={relationId}>Relation</Label>
+          <Label htmlFor={relationId}>Qualification</Label>
           <Select
             items={RELATION_ITEMS}
             value={filters.relationStatus ?? 'tous'}

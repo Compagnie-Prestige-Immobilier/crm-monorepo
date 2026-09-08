@@ -35,7 +35,7 @@ test.describe('étape 2 de la qualification d’un représentant', () => {
     // le script : on vise une fiche que personne n'a encore qualifiée.
     const fiche = page
       .getByRole('listitem')
-      .filter({ hasText: 'Pas encore contacté' })
+      .filter({ hasText: 'Non qualifié' })
       .first()
       .getByRole('button');
     await expect(fiche).toBeVisible();

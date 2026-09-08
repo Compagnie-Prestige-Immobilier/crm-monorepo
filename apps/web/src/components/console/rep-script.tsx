@@ -450,7 +450,7 @@ function FiltreRelation({
   return (
     <div className="flex min-w-[12rem] flex-col gap-1.5">
       <label htmlFor={id} className="text-[0.875rem] font-[600]">
-        Relation
+        Qualification
       </label>
       {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
           VALEUR au lieu du libellé de la ligne choisie. */}

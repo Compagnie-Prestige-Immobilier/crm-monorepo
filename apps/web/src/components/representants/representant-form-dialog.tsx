@@ -330,7 +330,7 @@ function ChampRelation({
 
   return (
     <div className="flex flex-col gap-1.5">
-      <Label htmlFor={relationId}>Relation</Label>
+      <Label htmlFor={relationId}>Qualification</Label>
       <Select
         items={relationItems(representant.relationStatus)}
         value={relationStatus}
