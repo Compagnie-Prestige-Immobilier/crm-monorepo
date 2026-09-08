@@ -307,7 +307,7 @@ function ActivityToolbar({
           {PERIOD_LABELS.custom}
         </Button>
 
-        <span className="ml-auto flex items-center gap-2">
+        <span className="ml-auto flex flex-wrap items-center gap-2">
           {familles.length > 1 ? (
             <span className="inline-flex overflow-hidden rounded-md border border-border">
               {familles.map((value) => (
@@ -724,8 +724,9 @@ function ShiftComparison({
   const parCreneau = results.map((result) =>
     result.data === undefined ? [] : activityLines(result.data),
   );
-  const personnes = [...new Map(parCreneau.flat().map((ligne) => [ligne.id, ligne.name]))]
-    .sort(([, a], [, b]) => a.localeCompare(b, 'fr'));
+  const personnes = [...new Map(parCreneau.flat().map((ligne) => [ligne.id, ligne.name]))].sort(
+    ([, a], [, b]) => a.localeCompare(b, 'fr'),
+  );
   type Compteurs = Pick<
     ActivityCounts,
     | 'repCalls'

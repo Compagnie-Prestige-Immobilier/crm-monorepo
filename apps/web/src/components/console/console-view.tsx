@@ -763,7 +763,7 @@ function Consignation({
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
         <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
             {formatPhone(prospect.phoneE164)}
           </span>

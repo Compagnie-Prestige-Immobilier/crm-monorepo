@@ -61,15 +61,25 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         className="hidden md:block"
       />
 
-      {['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role) ? <GlobalExportButton /> : null}
+      {/* Sous 768 px, la barre n'a plus la place pour ces actions secondaires :
+          « Tous les espaces » reste joignable par le pied de la navigation
+          mobile (`sidebar-nav.tsx`), et l'export global attend l'écran
+          suivant. */}
+      {['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role) ? (
+        <div className="hidden md:block">
+          <GlobalExportButton />
+        </div>
+      ) : null}
 
-      <Link
-        href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
-        className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
-      >
-        <LayoutGridIcon className="size-5" aria-hidden="true" />
-        <span className="sr-only sm:not-sr-only">Espaces</span>
-      </Link>
+      <div className="hidden md:block">
+        <Link
+          href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
+          className={buttonVariants({ variant: 'ghost', className: 'h-11 gap-2 px-3' })}
+        >
+          <LayoutGridIcon className="size-5" aria-hidden="true" />
+          <span className="sr-only sm:not-sr-only">Espaces</span>
+        </Link>
+      </div>
 
       {/* La cloche ne se montre qu'aux rôles qui ont une boîte de réception à
           ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
