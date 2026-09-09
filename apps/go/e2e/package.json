@@ -1,0 +1,21 @@
+{
+  "name": "@crm/panel-e2e",
+  "private": true,
+  "version": "2.0.0",
+  "scripts": {
+    "test": "playwright test",
+    "lint": "oxlint --config ../../../.oxlintrc.json --report-unused-disable-directives .",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@crm/typescript-config": "workspace:*",
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "catalog:",
+    "exceljs": "catalog:",
+    "oxlint": "catalog:",
+    "pg": "catalog:",
+    "typescript": "catalog:"
+  }
+}

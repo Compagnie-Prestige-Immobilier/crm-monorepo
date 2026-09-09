@@ -50,6 +50,31 @@ chemin.
 
 ## Principes structurants
 
+### YAGNI et KISS
+
+Le dépôt applique deux règles avant toute autre : YAGNI (« You Aren't Gonna
+Need It ») et KISS (« Keep It Simple, Stupid »). On écrit uniquement ce
+qu'exige la demande actuelle, un bug observé ou un critère d'acceptation, et
+on l'écrit de la manière la plus courte qui marche : un paramètre plutôt
+qu'une copie, un fichier plutôt que cinq, un package maintenu plutôt qu'un
+moteur maison, rien de généré dans git.
+
+Ces règles sont vérifiées par la CI, pas seulement lues :
+
+| Règle | Vérification |
+| --- | --- |
+| Aucun test unitaire, aucun mock | `git ls-files` sur `*.test.ts`, `*.test.tsx`, `*_test.go` sans tag `integration` |
+| Un fichier Go sous 1 500 lignes, un écran ou composant web v2 sous 300 | étape « Plafonds et artefacts générés » |
+| Rien de généré commité (`db/`, `openapi.json`, `schema.d.ts`, `*.gen.ts`, `dist/`) | même étape |
+| Pas de framework HTTP, d'ORM ni de Redis dans `apps/go` | `depguard` dans `apps/go/.golangci.yml` |
+| Complexité cyclomatique 12, cognitive 20, imbrication 4, duplication 80 jetons | `gocyclo`, `gocognit`, `nestif`, `dupl` |
+| Pas de `nolint` sans raison écrite, pas de `TODO` | `nolintlint`, `godox` |
+
+En local, les mêmes contrôles : `pnpm verify:local` (tout), `pnpm plafonds`,
+`pnpm lint:go`, et `pnpm complexite:go` pour les dix fonctions Go les plus
+complexes. Le détail et le pourquoi sont dans `AGENTS.md` et
+`docs/v2-refonte/plan.md` §1.1.
+
 ### Hors ligne d'abord
 
 Le mobile écrit les changements dans SQLite et dans une outbox locale. Le

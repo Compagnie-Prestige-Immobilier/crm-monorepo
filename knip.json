@@ -8,6 +8,12 @@
     "apps/web": {
       "entry": ["e2e/**/*.ts"]
     },
+    "apps/go/web": {
+      "entry": ["src/routes/**/*.tsx"]
+    },
+    "apps/go/e2e": {
+      "entry": ["*.ts", "*.spec.ts"]
+    },
     "packages/api-client": {
       "ignoreDependencies": ["openapi-typescript", "prettier"]
     },

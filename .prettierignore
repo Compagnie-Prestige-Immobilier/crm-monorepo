@@ -16,3 +16,7 @@ packages/api-client-dart/lib
 # retour sans fin : le build suivant défait la correction et `format:check`
 # échoue à nouveau, sur un fichier que personne n'écrit à la main.
 apps/web/next-env.d.ts
+
+# Artefacts Playwright v2 : sessions et matrice des rôles produites à chaque exécution.
+apps/go/e2e/.auth/
+apps/go/e2e/.roles.json

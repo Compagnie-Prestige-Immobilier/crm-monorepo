@@ -1,0 +1,7 @@
+db/
+cpi-go
+openapi.json
+web/dist/*
+!web/dist/.gitkeep
+web/node_modules/
+web/src/routeTree.gen.ts

@@ -1,11 +1,13 @@
 # Refonte v2 : plan et arbitrages
 
-Statut : version 3.1 du plan, 8 septembre 2026. Historique : version 1 le
+Statut : version 3.2 du plan, 8 septembre 2026. Historique : version 1 le
 7 septembre, cinq audits en lecture seule (`audits/api.md`, `web.md`,
 `mobile.md`, `donnees-infra.md`, `critique-plan.md`) ; version 2 le
 8 septembre ; version 2.2, backend Go ; version 3, abandon de l'application
 mobile ; version 3.1, quatre audits de portage Go (`audits/go-api.md`,
-`go-web.md`, `go-donnees.md`, `go-securite.md`) et leurs arbitrages. Chaque
+`go-web.md`, `go-donnees.md`, `go-securite.md`) et leurs arbitrages ;
+version 3.2, principe directeur écrit (§1) et référentiels servis par un seul
+handler, schéma conservé. Chaque
 affirmation technique renvoie à un `chemin:ligne` ou à une documentation
 officielle citée dans les audits. Ce qui n'a pas pu être vérifié est marqué
 « à prouver en phase 0 ». Le registre des risques est dans `risques.md`.
@@ -51,8 +53,35 @@ Les deux décisions qui ont coûté le plus sont le moteur de synchronisation
 maison (`sync_engine.dart` 2 647 lignes, `sync.service.ts` 2 058 lignes) et la
 double stack backend (classes DTO Nest + Swagger, OpenAPI, codegen, relais
 Next). L'abandon du mobile supprime la première sans la remplacer ; le binaire
-Go supprime la seconde. Cible mesurée par l'audit : environ 14 200 lignes de
-Go (`audits/go-api.md` §6) plus la SPA.
+Go supprime la seconde. Cible mesurée par l'audit : environ 13 700 lignes de
+Go (`audits/go-api.md` §6, moins ~470 lignes sur `referentiels.go`, §4) plus
+la SPA.
+
+### 1.1 Principe directeur
+
+La v2 n'est pas une traduction de la v1 en Go. C'est le plus petit produit
+complet qui passe la checklist de parité (§6). La mesure est le nombre de
+lignes ; la règle est YAGNI : rien qui ne serve un écran, un rôle ou une ligne
+de la checklist. Trois formes de la même erreur ont produit les 165 000 lignes
+et ne sont pas reconduites :
+
+- une copie là où un paramètre suffit : 8 listes de référence avec chacune ses
+  routes `GET`, `POST`, `PATCH`
+  (`apps/api/src/modules/referentiels/referentiels.controller.ts:67-340`),
+  deux arbres de routes CHUES et Grand Public, deux systèmes d'import ;
+- une couche là où une fonction suffit : DTO + Swagger + OpenAPI + codegen +
+  relais Next pour un seul contrat ;
+- un moteur là où un package ou rien suffit : synchronisation maison, Redis,
+  quatre bibliothèques de statistiques.
+
+Ce qui ne coûte pas de lignes ne se touche pas. Les 57 tables (52 après le
+nettoyage de J+7) restent : une table de 9 colonnes coûte 20 lignes de SQL,
+une contrainte `CHECK` ou une clé étrangère typée coûte zéro ligne de Go et
+en économise. Fusionner les 13 listes en une table `kind` ferait perdre les
+clés étrangères typées (`prospects.banqueId` pourrait viser une profession),
+imposerait une migration de données au jour J et casserait le retour arrière
+de §7, pour aucun gain de performance mesurable à 15 utilisateurs. Le gain se
+prend dans le code : un handler pour les 13 listes, pas treize.
 
 ## 2. Arbitrages
 
@@ -65,10 +94,11 @@ Go (`audits/go-api.md` §6) plus la SPA.
 | Backend | Un binaire Go, `apps/go`, à la place de NestJS + Prisma | 8 septembre |
 | Cadre HTTP | `net/http` standard ; huma pour la validation des entrées, les erreurs par champ et le document OpenAPI ; pas de Gin, Echo ni Fiber | 8 septembre |
 | Contrat | Les structs Go sont le contrat ; OpenAPI et types TypeScript produits au build, rien de commité | 8 septembre |
-| Base | Même Postgres, mêmes tables ; pgx + sqlc pour les ~250 requêtes simples et les 13 brutes statiques ; pgx direct pour les 39 agrégats analytiques et le tri bancaire ; goose en SQL | 8 septembre |
+| Base | Même Postgres, mêmes tables, aucune fusion de tables (§1.1) ; pgx + sqlc pour les ~250 requêtes simples et les 13 brutes statiques ; pgx direct pour les 39 agrégats analytiques et le tri bancaire ; goose en SQL | 8 septembre |
+| Référentiels | Un handler `GET/POST/PATCH /referentiels/{kind}` pour les 13 listes (banques, syndicats, canaux, professions, tranches, employeurs, pays, offres, motifs de rejet, 4 référentiels de visite) ; `kind` résolu par une carte figée en Go vers la table et ses colonnes propres (`sigle`, `indicatif`, `minXof`, `isSystem`...), jamais depuis l'URL ; régions, départements et IEF lus par le même handler, en lecture seule sauf départements ; statuts de qualification et motifs d'issue d'appel gardent leur handler (règles propres) | 8 septembre |
 | Authentification | Sessions opaques dans `refresh_tokens`, cookie `__Host-` avec vérification d'`Origin`, hachages argon2id repris, rôle relu à chaque requête, révocation au changement de mot de passe | 8 septembre |
 | Panneau | SPA Vite + React 19 embarquée ; TanStack Router et Query ; shadcn sur Base UI, Lucide inchangés | 8 septembre |
-| Notes vocales | Conservées, enregistrées dans le navigateur par `MediaRecorder`, mêmes routes que la v1, conteneurs `audio/webm` et `audio/mp4`, 2 minutes, 48 h ; périmètre conversion, comme le mobile | 8 septembre |
+| Notes vocales | Conservées : une note dictée au micro après l'appel, jamais l'audio de l'appel lui-même, qu'un navigateur ne peut pas capter. Enregistrées par `MediaRecorder`, mêmes routes que la v1, conteneurs `audio/webm` et `audio/mp4`, 2 minutes, 48 h ; périmètre conversion, comme le mobile. Libellé d'interface : « note vocale », jamais « enregistrement d'appel ». L'enregistrement des appels est hors périmètre : il exigerait une téléphonie par API | 8 septembre |
 | Qualification prospect | `POST /phase2/call-attempts` remplace `POST /sync/push`, seul chemin d'écriture du panneau aujourd'hui (`console.ts:849`) | 8 septembre |
 | Présence | `POST /presence/beat` toutes les 60 s depuis la SPA, `UPSERT agent_heartbeats` ; pas de WebSocket | 8 septembre |
 | Stratégie | Réécriture en parallèle, bascule unique, sans pilote, checklist de parité | 7 septembre |
@@ -229,7 +259,7 @@ Stack, versions vérifiées sur `proxy.golang.org` et `go.dev` le 8 septembre
   -trimpath -ldflags="-s -w"`, `embed`), `debian:bookworm-slim` avec le
   bloc PGDG de `Dockerfile.api:115-133` pour `pg_dump` 18, utilisateur
   10001, `HEALTHCHECK` par le binaire, 140 à 160 Mo. Volumes :
-  `db-dumps`, `call-recordings`, `imports`, `releases` jusqu'à J+7. Une
+  `db-dumps`, `notes-vocales`, `imports`, `releases` jusqu'à J+7. Une
   application Dokploy `cpi-go`, les deux domaines conservés dessus.
 - CI : `go vet`, `golangci-lint` (errcheck, govet, staticcheck, ineffassign,
   unused, gosec, bodyclose, rowserrcheck, sqlclosecheck), `sqlc vet`,
@@ -254,7 +284,7 @@ apps/go/
   banque.go            dossiers, étapes, demandes de création           ~1 150
   accueil.go           registre, référentiels de visite, import         ~760
   admin.go             utilisateurs, purge, dump, enrôlement, tableaux de bord, paramètres, champs de conversion ~1 480
-  referentiels.go                                                      ~820
+  referentiels.go      un handler par kind pour 13 listes, statuts, motifs ~350
   analytics.go         7 routes + 5 supervision + créneaux, pgx direct  ~700
   notifications.go     composeur, gabarits, bail, rappels, compte rendu ~900
   brevo.go             client Brevo                                    ~250
@@ -433,7 +463,7 @@ pas en production.
    que `sync_batches` n'a plus de lot `IN_PROGRESS` ni `import_jobs` en cours.
 5. J, 3. Déploiement de `apps/go` par `deploy.py` (Dokploy n'a pas de
    webhook, le job CI `deploy` fait de même sur `prod`), volumes
-   `call-recordings` et `imports` créés, deux domaines rattachés. goose
+   `notes-vocales` et `imports` créés, deux domaines rattachés. goose
    applique la seule migration du jour : fonction et 37 triggers `updatedAt`.
    Les variables `JWT_*` et `REDIS_URL` restent posées. Vérification :
    connexion e-mail et nom d'utilisateur, un rôle par espace, SSE, présence,
