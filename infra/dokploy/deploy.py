@@ -13,12 +13,9 @@ USAGE
     python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
     python3 infra/dokploy/deploy.py deploy      # démarrage
     python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
-    python3 infra/dokploy/deploy.py redeploy cpi-go   # le binaire Go v2 seul
     python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne hors du VPS
     python3 infra/dokploy/deploy.py status      # état courant
     python3 infra/dokploy/deploy.py all         # les trois premières d'affilée
-    python3 infra/dokploy/deploy.py bascule --oui  # jour J, les domaines passent en v2
-    python3 infra/dokploy/deploy.py retour --oui   # retour arrière, jusqu'à J+7
 
 `backup` reste HORS de `all` : il réclame les coordonnées d'un stockage S3 que
 l'opérateur seul détient, et un `all` qui échoue faute de bucket ferait échouer
@@ -89,8 +86,6 @@ PG_NAME = "cpi-go-postgres"
 REDIS_NAME = "cpi-go-redis"
 API_NAME = "cpi-go-api"
 WEB_NAME = "cpi-go-web"
-API_PORT = 3001
-WEB_PORT = 3000
 SSH_KEY_NAME = "cpi-go-deploy"
 APK_RELEASE_MOUNT = "/repo/storage/releases"
 # Nom RÉEL du volume en production : il porte les APK publiés, on ne le renomme pas.
@@ -105,22 +100,6 @@ APK_RELEASE_VOLUME = "cpi-go-releases"
 # pour accumuler des copies de la clientèle.
 DB_DUMP_MOUNT = "/repo/storage/db-dumps"
 DB_DUMP_VOLUME = "cpi-go-db-dumps"
-
-# Binaire Go v2, docs/v2-refonte/plan.md §3 et §7. UNE application : le binaire
-# sert l'API et le panneau embarqué sur le même port, il n'y a plus de service
-# web séparé. Ses deux domaines de production restent sur la v1 jusqu'au jour de
-# bascule ; en attendant il se met en scène sur GO_STAGING_DOMAIN.
-GO_NAME = "cpi-go"
-GO_PORT = 4000
-GO_STAGING_DOMAIN = setting("GO_STAGING_DOMAIN", "go-v2.cpi-chues.com")
-# Notes vocales de la consignation. Sans volume, un redéploiement pendant une
-# qualification emporte la note que l'historique continue d'annoncer.
-NOTES_VOCALES_MOUNT = "/repo/storage/notes-vocales"
-NOTES_VOCALES_VOLUME = "cpi-go-notes-vocales"
-# Fichiers d'import en cours de traitement, même raison : l'état du travail vit
-# en base et nomme un fichier sur le disque.
-IMPORTS_MOUNT = "/repo/storage/imports"
-IMPORTS_VOLUME = "cpi-go-imports"
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Sauvegarde nocturne de la base
@@ -454,8 +433,6 @@ def find_existing() -> dict[str, str]:
                 found["API_ID"] = app.get("applicationId", "")
             elif app.get("name") == WEB_NAME:
                 found["WEB_ID"] = app.get("applicationId", "")
-            elif app.get("name") == GO_NAME:
-                found["GO_ID"] = app.get("applicationId", "")
         for db in environment.get("postgres", []) or []:
             if db.get("name") == PG_NAME:
                 found["POSTGRES_ID"] = db.get("postgresId", "")
@@ -516,7 +493,6 @@ def cmd_provision() -> None:
     for key, name, description in (
         ("API_ID", API_NAME, "API NestJS, source du contrat OpenAPI"),
         ("WEB_ID", WEB_NAME, "Panel admin Next.js"),
-        ("GO_ID", GO_NAME, "Binaire Go v2, API et panneau embarqué"),
     ):
         step(f"Application {name}")
         if ids.get(key):
@@ -588,68 +564,6 @@ def _turnstile_env() -> list[str]:
         f"TURNSTILE_SECRET_KEY={secret}",
         f"TURNSTILE_ALLOW_DEGRADED={degraded}",
     ]
-
-
-def _plateformes_env() -> list[str]:
-    """Plateformes d'enrôlement CHUES et Grand Public.
-
-    Même règle que Brevo : les jetons ne sont jamais écrits dans le dépôt. Une
-    plateforme dont l'URL ou le jeton manque disparaît entièrement au lieu de
-    partir à moitié : `plateformeConfiguree` la lit comme non configurée et
-    l'écran le dit, plutôt que de tomber sur un 401 au premier tirage.
-    """
-    lignes: list[str] = []
-    for prefixe in ("PLATEFORME_CHUES", "PLATEFORME_GRAND_PUBLIC"):
-        url = os.environ.get(f"{prefixe}_URL", "").strip()
-        jeton = os.environ.get(f"{prefixe}_TOKEN", "").strip()
-        if url and jeton:
-            lignes += [f"{prefixe}_URL={url}", f"{prefixe}_TOKEN={jeton}"]
-    return lignes
-
-
-def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
-    """Environnement du binaire v2, audits/go-securite.md §5.
-
-    Ni `JWT_*`, ni `REDIS_URL`, ni `APK_*`, ni `SYNC_*`, ni `DEMO_*`, ni
-    `API_CORS_ORIGINS`, ni `API_DOCS_ENABLED`, ni `NEXT_PUBLIC_*` : le binaire
-    ne lit aucune de ces variables. Elles restent posées sur la v1 jusqu'à J+7,
-    c'est ce qui rend `retour` possible.
-
-    `PASSWORD_MIN_LENGTH` et `PASSWORD_MAX_LENGTH` sont absentes à dessein : les
-    défauts de `lireConfig` valent déjà 8 et 24.
-    """
-    return "\n".join(
-        [
-            f"PORT={GO_PORT}",
-            # PAS de `?schema=public` ici, contrairement à la v1 : ce paramètre
-            # est propre à Prisma. pgx transmet au serveur tout paramètre qu'il
-            # ne connaît pas, et Postgres refuse alors la connexion sur
-            # « unrecognized configuration parameter "schema" ».
-            f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{names['postgres']}:5432/crm",
-            "LOG_LEVEL=info",
-            "LOG_FORMAT=json",
-            "SESSION_TTL_DAYS=30",
-            "AUTH_LOGIN_RATE_LIMIT=10",
-            # Traefik est en amont et réécrit X-Forwarded-For, même raison qu'en
-            # v1 : sans cela toutes les requêtes semblent venir de Traefik et la
-            # limitation de débit devient globale.
-            "API_TRUST_PROXY_HEADERS=true",
-            "BUSINESS_TIME_ZONE=Africa/Dakar",
-            "PHONE_DEFAULT_REGION=SN",
-            f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
-            f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
-            "DB_DUMP_ENABLED=true",
-            f"NOTE_VOCALE_DIR={NOTES_VOCALES_MOUNT}",
-            f"IMPORTS_DIR={IMPORTS_MOUNT}",
-            "SEED_ADMIN_EMAIL=admin@cpi.sn",
-            "SEED_ADMIN_USERNAME=admin",
-            f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
-            "SEED_ADMIN_FULL_NAME=Administrateur CPI",
-            *_brevo_env(),
-            *_turnstile_env(),
-            *_plateformes_env(),
-        ]
-    )
 
 
 def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
@@ -740,45 +654,6 @@ def ensure_db_dump_mount(application_id: str) -> None:
     ensure_volume_mount(application_id, DB_DUMP_VOLUME, DB_DUMP_MOUNT, "exports base")
 
 
-def _attach_domain(application_id: str, host: str, port: int) -> None:
-    """Rattache un hôte à une application, sans le déplacer depuis une autre.
-
-    Dokploy refuse un hôte déjà pris, et ce refus est traité comme « déjà
-    configuré ». C'est juste tant que l'hôte est sur l'application VISÉE ; s'il
-    est sur une autre, il faut le détacher d'abord, ce que fait `bascule`.
-    """
-    try:
-        call(
-            "domain.create",
-            {
-                "applicationId": application_id,
-                "host": host,
-                "path": "/",
-                "port": port,
-                "https": True,
-                "domainType": "application",
-                "certificateType": "none",
-            },
-        )
-        ok(f"{host} → :{port}")
-    except DokployError as exc:
-        if "already" in str(exc).lower() or "unique" in str(exc).lower():
-            ok(f"{host}, déjà configuré")
-        else:
-            raise
-
-
-def _detach_domain(application_id: str, host: str) -> None:
-    """Retire un hôte d'une application. Muet si l'hôte n'y est pas."""
-    rows = call("domain.byApplicationId", {"applicationId": application_id}, method="GET") or []
-    for row in rows:
-        if row.get("host") == host:
-            call("domain.delete", {"domainId": row.get("domainId", "")})
-            ok(f"{host} détaché")
-            return
-    info(f"{host} n'était pas rattaché à cette application")
-
-
 def _web_env(names: dict[str, str]) -> str:
     return "\n".join(
         [
@@ -836,7 +711,7 @@ def cmd_configure() -> None:
     secrets_ = load_secrets()
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
-    if not ids.get("API_ID") or not ids.get("WEB_ID") or not ids.get("GO_ID"):
+    if not ids.get("API_ID") or not ids.get("WEB_ID"):
         fail("applications introuvables, lancez d'abord `provision`.")
         sys.exit(1)
     save_ids(ids)
@@ -847,7 +722,7 @@ def cmd_configure() -> None:
     ok(f"clé {ids['SSH_KEY_ID']}")
 
     step(f"Source Git, {GIT_URL} @ {BRANCH}")
-    for key in ("API_ID", "WEB_ID", "GO_ID"):
+    for key in ("API_ID", "WEB_ID"):
         call(
             "application.saveGitProvider",
             {
@@ -859,7 +734,7 @@ def cmd_configure() -> None:
                 "watchPaths": [],
             },
         )
-    ok("les trois applications pointent sur le dépôt")
+    ok("les deux applications pointent sur le dépôt")
 
     # Le Dockerfile vit dans infra/docker/ mais son CONTEXTE est la racine du
     # dépôt : le build a besoin du pnpm-workspace, du lockfile et des paquets
@@ -899,32 +774,6 @@ def cmd_configure() -> None:
     )
     ok("Web, infra/docker/Dockerfile.web")
 
-    # Pas de dockerBuildStage : `runner` est la dernière étape du Dockerfile.
-    # Le HEALTHCHECK est dans l'image, Dokploy n'expose pas de champ pour cela
-    # hors mode swarm.
-    call(
-        "application.saveBuildType",
-        {
-            "applicationId": ids["GO_ID"],
-            "buildType": "dockerfile",
-            "dockerfile": "Dockerfile",
-            "dockerContextPath": "/",
-            "dockerBuildStage": "",
-            "herokuVersion": "",
-            "railpackVersion": "",
-        },
-    )
-    ok("Go, Dockerfile à la racine")
-
-    step("Stockage persistant du binaire Go")
-    # `cpi-go-db-dumps` est le volume DÉJÀ en production sous l'API v1 : il est
-    # monté sur les deux applications, et à la bascule seule la v2 l'écrit.
-    ensure_db_dump_mount(ids["GO_ID"])
-    ensure_volume_mount(
-        ids["GO_ID"], NOTES_VOCALES_VOLUME, NOTES_VOCALES_MOUNT, "notes vocales"
-    )
-    ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
-
     step("Variables d'environnement")
     names = service_app_names(ids)
     info(f"service base : {names['postgres']}")
@@ -954,33 +803,34 @@ def cmd_configure() -> None:
     )
     ok(f"Web, {len(web_env.splitlines())} variables")
 
-    go_env = _go_env(secrets_, names)
-    call(
-        "application.saveEnvironment",
-        {
-            "applicationId": ids["GO_ID"],
-            "env": go_env,
-            "buildArgs": "",
-            "buildSecrets": "",
-            "createEnvFile": True,
-        },
-    )
-    ok(f"Go, {len(go_env.splitlines())} variables")
-
     # `https: true` SANS certificateType 'letsencrypt' : le certificat est celui
     # d'origine Cloudflare, posé sur le serveur. Demander Let's Encrypt ici
     # échouerait, Cloudflare proxifie, donc le challenge HTTP n'atteint jamais
     # Traefik.
-    #
-    # `cpi-go` ne reçoit QUE son hôte d'essai : les deux domaines de production
-    # appartiennent à la v1 tant que `bascule` n'a pas été lancée.
     step("Domaines")
     for app_key, host, port in (
-        ("API_ID", API_DOMAIN, API_PORT),
-        ("WEB_ID", WEB_DOMAIN, WEB_PORT),
-        ("GO_ID", GO_STAGING_DOMAIN, GO_PORT),
+        ("API_ID", API_DOMAIN, 3001),
+        ("WEB_ID", WEB_DOMAIN, 3000),
     ):
-        _attach_domain(ids[app_key], host, port)
+        try:
+            call(
+                "domain.create",
+                {
+                    "applicationId": ids[app_key],
+                    "host": host,
+                    "path": "/",
+                    "port": port,
+                    "https": True,
+                    "domainType": "application",
+                    "certificateType": "none",
+                },
+            )
+            ok(f"{host} → :{port}")
+        except DokployError as exc:
+            if "already" in str(exc).lower() or "unique" in str(exc).lower():
+                ok(f"{host}, déjà configuré")
+            else:
+                raise
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1069,32 +919,19 @@ def cmd_redeploy() -> None:
     net si l'une des applications manque, et demande le déploiement des deux.
     Les migrations, elles, restent jouées par `api-entrypoint.sh` au démarrage
     de l'API, exactement comme aujourd'hui.
-
-    `redeploy cpi-go` vise le binaire v2 SEUL. C'est la voie de mise en scène
-    sur l'hôte d'essai avant le jour J, et celle que le job CI devra prendre
-    après la bascule.
     """
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
 
-    cible = sys.argv[2] if len(sys.argv) > 2 else ""
-    if cible == GO_NAME:
-        couples = (("GO_ID", GO_NAME),)
-    elif cible:
-        fail(f"cible inconnue : {cible!r}. Seule « {GO_NAME} » est acceptée.")
-        sys.exit(1)
-    else:
-        couples = (("API_ID", "API"), ("WEB_ID", "panel web"))
-
     # Même raisonnement que dans `find_existing` : un identifiant manquant se
     # lit comme « rien à déployer », et un déploiement qui ne déploie rien doit
     # s'arrêter en rouge, jamais s'annoncer réussi.
-    manquants = [label for key, label in couples if not ids.get(key)]
+    manquants = [label for key, label in (("API_ID", "API"), ("WEB_ID", "panel web")) if not ids.get(key)]
     if manquants:
         fail(f"introuvable sur Dokploy : {', '.join(manquants)}. Lancez d'abord `provision`.")
         sys.exit(1)
 
-    for key, label in couples:
+    for key, label in (("API_ID", "API"), ("WEB_ID", "panel web")):
         step(f"Déploiement, {label}")
         call("application.deploy", {"applicationId": ids[key]})
         ok("demandé")
@@ -1139,137 +976,6 @@ IDENTIFIANTS
   • Changer le mot de passe administrateur à la première connexion.
 {'─' * 76}
 """
-
-
-# ─────────────────────────────────────────────────────────────────────────────
-# Bascule v1 → v2, et son retour, docs/v2-refonte/plan.md §7
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _confirmer(action: str) -> None:
-    """Ces deux commandes coupent le service : elles exigent un geste explicite."""
-    if "--oui" in sys.argv[2:]:
-        return
-    fail(f"« {action} » coupe le service en production.")
-    info(f"relancez avec : python3 infra/dokploy/deploy.py {action} --oui")
-    sys.exit(1)
-
-
-def _ids_bascule() -> dict[str, str]:
-    ids = load_ids()
-    ids.update({k: v for k, v in find_existing().items() if v})
-    manquants = [
-        nom
-        for cle, nom in (("GO_ID", GO_NAME), ("API_ID", API_NAME), ("WEB_ID", WEB_NAME))
-        if not ids.get(cle)
-    ]
-    if manquants:
-        fail(f"introuvable sur Dokploy : {', '.join(manquants)}. Lancez d'abord `provision`.")
-        sys.exit(1)
-    save_ids(ids)
-    return ids
-
-
-def cmd_bascule() -> None:
-    """Jour J : les deux domaines passent de la v1 au binaire Go.
-
-    L'ordre n'est pas interchangeable. Arrêter la v1 AVANT de toucher aux
-    domaines évite qu'une écriture en cours parte vers un service à moitié
-    coupé. Détacher AVANT de rattacher évite deux routeurs Traefik sur le même
-    hôte, cas où la destination servie est celle que Traefik a chargée en
-    dernier, donc indéterminée.
-
-    Le binaire Go est construit et vérifié sur l'hôte d'essai AVANT d'arrêter la
-    v1 : une image qui ne se construit pas laisse alors la production intacte au
-    lieu de couper les deux domaines (simulation du 9 septembre 2026 : un COPY
-    manquant dans le Dockerfile a fait échouer la première construction).
-
-    Les applications v1 restent DÉFINIES, seulement arrêtées : `retour` les
-    remet en service sans rien reconstruire.
-    """
-    _confirmer("bascule")
-    ids = _ids_bascule()
-
-    step(f"Construction et démarrage de {GO_NAME} sur {GO_STAGING_DOMAIN}")
-    call("application.deploy", {"applicationId": ids["GO_ID"]})
-    _attendre_application(ids["GO_ID"])
-    _attendre_sante(f"https://{GO_STAGING_DOMAIN}/health/ready")
-    ok("binaire en ligne, goose a appliqué la migration des triggers updatedAt")
-
-    step("Arrêt de la v1")
-    for cle, nom in (("API_ID", API_NAME), ("WEB_ID", WEB_NAME)):
-        call("application.stop", {"applicationId": ids[cle]})
-        ok(f"{nom} arrêtée")
-    warn("vérifiez maintenant qu'aucun sync_batches IN_PROGRESS ni import_jobs ne tourne")
-
-    step("Domaines détachés de la v1")
-    _detach_domain(ids["API_ID"], API_DOMAIN)
-    _detach_domain(ids["WEB_ID"], WEB_DOMAIN)
-
-    step(f"Domaines rattachés à {GO_NAME}")
-    _attach_domain(ids["GO_ID"], API_DOMAIN, GO_PORT)
-    _attach_domain(ids["GO_ID"], WEB_DOMAIN, GO_PORT)
-    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
-    ok("les deux domaines répondent depuis le binaire Go")
-    info(f"l'hôte d'essai {GO_STAGING_DOMAIN} reste rattaché, il ne gêne pas")
-
-
-def _attendre_application(application_id: str, minutes: int = 20) -> None:
-    """Dokploy construit de façon asynchrone : on attend `done`, on refuse `error`."""
-    for _ in range(minutes * 6):
-        app = call("application.one", {"applicationId": application_id}, method="GET") or {}
-        statut = app.get("applicationStatus")
-        if statut == "done":
-            return
-        if statut == "error":
-            fail("la construction a échoué sur Dokploy ; la v1 n'a pas été touchée.")
-            sys.exit(1)
-        time.sleep(10)
-    fail(f"construction toujours en cours après {minutes} minutes ; la v1 n'a pas été touchée.")
-    sys.exit(1)
-
-
-def _attendre_sante(url: str, secondes: int = 120) -> None:
-    # Cloudflare refuse les agents non navigateur (erreur 1010).
-    requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
-    for _ in range(secondes // 5):
-        try:
-            with urllib.request.urlopen(requete, timeout=10) as reponse:
-                if reponse.status == 200:
-                    return
-        except (urllib.error.URLError, TimeoutError):
-            pass
-        time.sleep(5)
-    fail(f"{url} ne répond pas 200 après {secondes} s.")
-    sys.exit(1)
-
-
-def cmd_retour() -> None:
-    """Retour arrière, valable jusqu'à J+7 SEULEMENT.
-
-    Après la migration de nettoyage de J+7 la v1 ne démarre plus : les tables
-    `sync_*` et `android_releases` qu'elle exige n'existent plus. Cette commande
-    ne peut pas le savoir, c'est la date qui tranche.
-    """
-    _confirmer("retour")
-    ids = _ids_bascule()
-
-    step(f"Domaines détachés de {GO_NAME}")
-    _detach_domain(ids["GO_ID"], API_DOMAIN)
-    _detach_domain(ids["GO_ID"], WEB_DOMAIN)
-
-    step(f"Arrêt de {GO_NAME}")
-    call("application.stop", {"applicationId": ids["GO_ID"]})
-    ok("arrêté")
-
-    step("Domaines rendus à la v1")
-    _attach_domain(ids["API_ID"], API_DOMAIN, API_PORT)
-    _attach_domain(ids["WEB_ID"], WEB_DOMAIN, WEB_PORT)
-
-    step("Redémarrage de la v1")
-    for cle, nom in (("API_ID", API_NAME), ("WEB_ID", WEB_NAME)):
-        call("application.start", {"applicationId": ids[cle]})
-        ok(f"{nom} redémarrée")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1649,8 +1355,6 @@ COMMANDS = {
     "redeploy": cmd_redeploy,
     "backup": cmd_backup,
     "status": cmd_status,
-    "bascule": cmd_bascule,
-    "retour": cmd_retour,
 }
 
 

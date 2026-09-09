@@ -1,29 +1,192 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# CPI CRM — monorepo
+#
+# Deux règles gouvernent ce fichier, et elles tirent en sens opposé :
+#
+#   1. RIEN de reproductible ne s'ignore. Les fichiers de verrouillage
+#      (`pnpm-lock.yaml`, `pubspec.lock`), les migrations Prisma et les
+#      workflows sont VERSIONNÉS. Un dépôt sans lockfile n'installe pas deux
+#      fois la même chose, et le jour où un build casse en production sans
+#      qu'aucun commit n'ait bougé, plus personne ne sait pourquoi.
+#   2. RIEN de secret ni de régénérable ne se versionne. Un secret poussé une
+#      fois reste dans l'historique pour toujours ; le retirer plus tard ne le
+#      retire pas des clones déjà faits.
+#
+# Les motifs sont ancrés (`/dist/`) quand ils ne visent que la racine, et
+# libres (`dist/`) quand ils visent tous les paquets. Un `dist` non ancré
+# ignorerait aussi un dossier de code légitimement nommé ainsi — d'où les
+# exceptions explicites plus bas.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Secrets — jamais, sous aucune forme ──────────────────────────────────────
+# `.env.example` est l'exception : c'est le contrat, pas la valeur.
 .env
 .env.*
 !.env.example
+!*.env.example
 *.pem
 *.key
+!**/public*.key
 *.p12
 *.pfx
-*.log
+*.jks
+*.keystore
+secrets.json
+**/service-account*.json
+.npmrc.local
+.netrc
+
+# ── Dépendances ──────────────────────────────────────────────────────────────
 node_modules/
 .pnpm-store/
+.yarn/cache
+.yarn/install-state.gz
+jspm_packages/
+
+# ── Sorties de build ─────────────────────────────────────────────────────────
+dist/
+out/
+.next/
+.nuxt/
+.svelte-kit/
+.vercel/
+.output/
 *.tsbuildinfo
-db/
-cpi-go
-openapi.json
-storage/
-web/dist/*
-!web/dist/.gitkeep
-web/src/routeTree.gen.ts
-web/src/api/schema.d.ts
-e2e/.auth/
-e2e/.roles.json
-e2e/fixtures/
-test-results/
+.turbo/
+.parcel-cache/
+.rollup.cache/
+.swc/
+
+# ── Tests, couverture, rapports ──────────────────────────────────────────────
+coverage/
+.nyc_output/
 playwright-report/
-.scannerwork/
+blob-report/
+test-results/
+/.playwright/
+junit.xml
+*.lcov
+
+# ── Journaux et vidages ──────────────────────────────────────────────────────
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+*.heapsnapshot
+core.[0-9]*
+
+# ── Rapports d'analyse de sécurité ───────────────────────────────────────────
+# Régénérés à chaque exécution ; les versionner ferait diverger le rapport du
+# code qu'il décrit, et un rapport périmé rassure à tort.
+/.semgrep/
+semgrep.sarif
 gitleaks-report.json
 osv-report.json
 trivy-report.json
-semgrep.sarif
+/.scannerwork/
+
+# ── Prisma ───────────────────────────────────────────────────────────────────
+# Le client est ENGENDRÉ, les migrations sont du PATRIMOINE. La distinction est
+# la seule chose qui compte ici : perdre `migrations/` rend impossible de
+# reconstruire une base de production à l'identique.
+packages/database/generated/
+packages/database/src/generated/
+!packages/database/prisma/migrations/
+!packages/database/prisma/migrations/**
+
+# ── Flutter / Dart ───────────────────────────────────────────────────────────
+apps/mobile/.dart_tool/
+apps/mobile/.flutter-plugins
+apps/mobile/.flutter-plugins-dependencies
+apps/mobile/.fvm/flutter_sdk
+apps/mobile/build/
+apps/mobile/.packages
+apps/mobile/.pub-cache/
+apps/mobile/.pub/
+# `pubspec.lock` d'une APPLICATION se versionne (reproductibilité du build) ;
+# celui d'une BIBLIOTHÈQUE ne se versionne pas — il n'engage que son auteur et
+# entre en conflit à chaque résolution chez le consommateur.
+packages/api-client-dart/pubspec.lock
+packages/api-client-dart/.dart_tool/
+
+# Android
+apps/mobile/android/.gradle/
+apps/mobile/android/captures/
+apps/mobile/android/local.properties
+apps/mobile/android/key.properties
+apps/mobile/android/app/upload-keystore.jks
+apps/mobile/android/**/GeneratedPluginRegistrant.java
+*.apk
+*.aab
+*.aar
+# EXCEPTION, et elle est délibérée : les APK d'essai du lecteur de manifeste.
+#
+# Quatre fichiers de moins de 700 octets, produits par `aapt2`, qui ne
+# contiennent qu'un manifeste et une table de ressources vide : ni code, ni
+# image. Ce sont de VRAIS APK, et il le faut : `AndroidManifest.xml` est du XML
+# binaire, et un tampon fabriqué à la main dans un test décrirait la lecture
+# qu'on imagine plutôt que le format qu'`aapt2` écrit. Voir
+# `apps/api/src/modules/app-updates/apk-manifest.test.ts`.
+!apps/api/src/modules/app-updates/fixtures/*.apk
+
+# iOS (non ciblé aujourd'hui, mais le jour où il l'est, ce sera trop tard)
+apps/mobile/ios/Pods/
+apps/mobile/ios/.symlinks/
+apps/mobile/ios/Flutter/Flutter.framework
+apps/mobile/ios/Flutter/Flutter.podspec
+apps/mobile/ios/Flutter/Generated.xcconfig
+apps/mobile/ios/Flutter/flutter_export_environment.sh
+*.ipa
+
+# Code Dart ENGENDRÉ (drift, freezed, json_serializable). Régénéré par
+# `build_runner`, et un `.g.dart` versionné produit des conflits de fusion
+# illisibles à chaque changement de schéma.
+apps/mobile/**/*.g.dart
+apps/mobile/**/*.freezed.dart
+apps/mobile/**/*.drift.dart
+apps/mobile/**/*.mocks.dart
+# Exception : les goldens de migration drift SONT du patrimoine. Ils décrivent
+# le schéma tel qu'il existe sur les appareils déjà déployés ; les régénérer ne
+# les reconstitue pas, et sans eux une migration ratée emporte les saisies non
+# encore synchronisées d'une journée de terrain.
+!apps/mobile/drift_schemas/**
+!apps/mobile/test/data/generated_migrations/**
+
+# ── Générateur OpenAPI ───────────────────────────────────────────────────────
+.openapi-generator-cli/
+**/.openapi-generator/
+openapitools-local.json
+
+# ── Système et éditeurs ──────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+*.iml
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json.example
+.fleet/
+.zed/
+
+# ── Divers ───────────────────────────────────────────────────────────────────
+tmp/
+temp/
+.cache/
+*.tgz
+*.zip
+!**/fixtures/**/*.zip
+
+# Données d'exécution de l'API (APK publiés, imports, enregistrements, dumps)
+apps/api/storage/
+.claude/worktrees/

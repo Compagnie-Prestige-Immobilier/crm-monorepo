@@ -1,0 +1,177 @@
+# syntax=docker/dockerfile:1.7
+#
+# Image de l'API NestJS, et, via la cible `migrator`, du service de migration.
+# Contexte de build : la RACINE du dépôt (voir docker-compose.prod.yml).
+#
+# Le monorepo est découpé avec `turbo prune --docker`, qui produit :
+#   out/json/  les package.json + le lockfile élagués → couche d'installation
+#              qui n'est invalidée que quand une dépendance change
+#   out/full/  les sources des seuls paquets nécessaires
+# Sans cela, toucher une ligne de apps/web réinstallerait les dépendances de
+# l'API à chaque build.
+
+ARG NODE_VERSION=24.18.0
+ARG PNPM_VERSION=11.15.1
+ARG TURBO_VERSION=2.10.5
+ARG PRISMA_VERSION=7.9.0
+# Version MAJEURE de pg_dump, dans l'image finale uniquement.
+#
+# Elle doit correspondre à celle du serveur (`postgres:18.4` dans
+# docker-compose.prod.yml comme dans infra/dokploy/deploy.py). Ce n'est pas une
+# précaution de style : pg_dump REFUSE de travailler contre un serveur plus
+# récent que lui (« aborting because of server version mismatch »), et Debian 12
+# ne fournit d'origine que la 15. Sans dépôt PGDG et sans cet épinglage,
+# l'export intégral échouerait à chaque tentative, en production seulement.
+ARG PG_MAJOR=18
+
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS base
+ARG PNPM_VERSION
+ENV PNPM_HOME=/pnpm \
+    PATH=/pnpm:$PATH \
+    CI=1 \
+    TURBO_TELEMETRY_DISABLED=1 \
+    DO_NOT_TRACK=1
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
+WORKDIR /repo
+
+# -----------------------------------------------------------------------------
+# Découpage du workspace.
+# -----------------------------------------------------------------------------
+FROM base AS pruner
+ARG TURBO_VERSION
+RUN npm install -g turbo@${TURBO_VERSION}
+COPY . .
+RUN turbo prune @crm/api --docker
+
+# -----------------------------------------------------------------------------
+# Dépendances complètes + compilation TypeScript.
+# -----------------------------------------------------------------------------
+FROM base AS builder
+# argon2 est natif. Il publie des binaires précompilés, mais si le triplet de
+# la plateforme n'en a pas, node-gyp doit pouvoir compiler, sinon l'échec
+# arrive à l'installation avec un message très indirect.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=pruner /repo/out/json/ ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+COPY --from=pruner /repo/out/full/ ./
+RUN pnpm --filter @crm/database db:generate
+# pnpm et non turbo : la tâche turbo `build` dépend de `generate`, qui dépend
+# de `@crm/api#openapi:generate`. Régénérer le contrat exigerait ici le
+# workspace entier. Le code généré étant committé (ADR 0002), l'image se
+# contente de compiler ce qui est dans l'arbre, et la CI garantit par
+# ailleurs que cet arbre est à jour.
+RUN pnpm --filter @crm/database build \
+    && pnpm --filter @crm/api-client build \
+    && pnpm --filter @crm/api-client-chues build \
+    && pnpm --filter @crm/api-client-grand-public build \
+    && pnpm --filter @crm/api build
+
+# -----------------------------------------------------------------------------
+# Dépendances de production seulement.
+# -----------------------------------------------------------------------------
+FROM base AS prod-deps
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+COPY --from=pruner /repo/out/json/ ./
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store \
+    pnpm install --frozen-lockfile --prod
+# Le client Prisma vit dans node_modules et vient d'être effacé par
+# l'installation --prod (le CLI `prisma` est une devDependency). On le
+# régénère avec un CLI global épinglé sur la même version que @prisma/client :
+# un décalage ici produit une erreur au premier accès à la base, en production.
+ARG PRISMA_VERSION
+COPY --from=pruner /repo/out/full/packages/database/prisma ./packages/database/prisma
+RUN npm install -g prisma@${PRISMA_VERSION} \
+    && prisma generate --schema packages/database/prisma/schema.prisma \
+    && npm uninstall -g prisma
+
+# -----------------------------------------------------------------------------
+# Migrations. Repose sur `builder`, pas sur `prod-deps` : `prisma migrate
+# deploy` a besoin du CLI Prisma ET de packages/database/prisma.config.ts, qui
+# importe `prisma/config`, deux devDependencies absentes d'une image de
+# production. Ce conteneur vit trente secondes ; sa taille est sans intérêt,
+# sa correction non.
+# -----------------------------------------------------------------------------
+FROM builder AS migrator
+WORKDIR /repo/packages/database
+CMD ["pnpm", "exec", "prisma", "migrate", "deploy"]
+
+# -----------------------------------------------------------------------------
+# Image finale.
+# -----------------------------------------------------------------------------
+FROM node:${NODE_VERSION}-bookworm-slim AS runner
+ARG PG_MAJOR
+ENV NODE_ENV=production \
+    PORT=3001
+WORKDIR /repo
+
+# pg_dump, et RIEN d'autre du côté client PostgreSQL.
+#
+# `postgresql-client-${PG_MAJOR}` et non `postgresql-client` : le méta-paquet
+# tirerait la version par défaut de la distribution (15 sur Bookworm), qui
+# refuserait de dumper un serveur 18.
+#
+# Le dépôt PGDG est ajouté puis RETIRÉ, avec sa clé et les listes d'index : il
+# n'a servi qu'à cette installation, et le laisser ferait qu'un futur
+# `apt upgrade` dans cette image ramène silencieusement une autre majeure.
+# `--no-install-recommends` écarte au passage la documentation et les greffons
+# qui n'ont rien à faire ici. Le coût net est d'environ 30 Mo.
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+       | gpg --dearmor -o /usr/share/keyrings/pgdg.gpg \
+    && echo "deb [signed-by=/usr/share/keyrings/pgdg.gpg] https://apt.postgresql.org/pub/repos/apt bookworm-pgdg main" \
+       > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends postgresql-client-${PG_MAJOR} \
+    && apt-get purge -y --auto-remove curl gnupg \
+    && rm -f /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/pgdg.gpg \
+    && rm -rf /var/lib/apt/lists/* \
+    && pg_dump --version
+
+# Utilisateur non root. L'image node fournit déjà `node` (uid 1000) : on ne
+# crée rien, on cesse simplement d'être root.
+COPY --from=prod-deps --chown=node:node /repo ./
+COPY --from=builder   --chown=node:node /repo/packages/database/dist ./packages/database/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client/dist ./packages/api-client/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client-chues/dist ./packages/api-client-chues/dist
+COPY --from=builder   --chown=node:node /repo/packages/api-client-grand-public/dist ./packages/api-client-grand-public/dist
+COPY --from=builder   --chown=node:node /repo/apps/api/dist ./apps/api/dist
+# Assets statiques embarqués dans le code : aujourd'hui le logo CPI du PDF
+# « programme d'appels ». Ils vivent HORS de dist/ parce que tsc ne copie que du
+# JavaScript. Le générateur dégrade proprement si le fichier manque (en-tête
+# texte au lieu du logo), mais c'est le seul document que CPI remet à
+# l'extérieur : il doit sortir avec sa marque.
+COPY --from=builder   --chown=node:node /repo/apps/api/assets ./apps/api/assets
+# Le schéma et les migrations : le point d'entrée applique `migrate deploy`
+# avant de démarrer, pour que l'image soit autonome là où il n'existe pas de
+# service de migration séparé (Dokploy, Railway…).
+COPY --from=builder   --chown=node:node /repo/packages/database/prisma ./packages/database/prisma
+# prisma.config.ts porte la chaîne de connexion : Prisma 7 l'interdit dans le
+# schéma et la lit UNIQUEMENT ici. Sans ce fichier, `migrate deploy` ne sait pas
+# où se connecter et le conteneur redémarre en boucle.
+COPY --from=builder   --chown=node:node /repo/packages/database/prisma.config.ts ./packages/database/prisma.config.ts
+COPY --chown=node:node infra/docker/api-entrypoint.sh /usr/local/bin/api-entrypoint.sh
+RUN chmod +x /usr/local/bin/api-entrypoint.sh
+# The APK volume is mounted over this directory in production. Creating it with
+# the runtime user's ownership lets Docker initialize a new named volume with
+# permissions that the non-root API can write to.
+#
+# storage/db-dumps suit exactement la même règle, et pour la même raison : les
+# exports intégraux vivent sur un volume, hors de l'image, sans quoi un
+# redéploiement laisserait un état qui annonce un fichier disparu. Le contenu,
+# lui, ne dure PAS : il est détruit dès le téléchargement, et de toute façon à
+# son échéance (voir modules/db-dump/db-dump.job.ts).
+RUN mkdir -p /repo/storage/releases /repo/storage/db-dumps && chown -R node:node /repo/storage
+
+USER node
+EXPOSE 3001
+
+# Le point d'entrée migre puis `exec` Node : le shell est remplacé, donc Node
+# reste PID 1 et reçoit SIGTERM directement.
+CMD ["/usr/local/bin/api-entrypoint.sh"]

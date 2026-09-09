@@ -105,6 +105,7 @@ jobs:
             --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age \
             --exclude-rule=javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp \
             --exclude=node_modules --exclude=build \
+            --exclude='*.g.dart' --exclude=.dart_tool \
             --metrics=off --error
 
   dependencies:
@@ -113,20 +114,25 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: pnpm/action-setup@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version-file: .node-version
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - uses: ./.github/actions/setup-node
 
+      # osv-scanner et non `pnpm audit` seul : il lit AUSSI `pubspec.lock`, donc
+      # les dépendances Dart de l'application mobile. `pnpm audit` ne connaît que
+      # npm et laisserait la moitié du monorepo non couverte.
       - name: osv-scanner
         run: |
           VERSION=2.5.0
           curl -sSfL -o /tmp/osv-scanner \
             "https://github.com/google/osv-scanner/releases/download/v${VERSION}/osv-scanner_linux_amd64"
           chmod +x /tmp/osv-scanner
-          /tmp/osv-scanner scan source --lockfile=pnpm-lock.yaml --lockfile=go.sum
+          if [ -f apps/mobile/pubspec.lock ]; then
+            /tmp/osv-scanner scan source \
+              --lockfile=pnpm-lock.yaml \
+              --lockfile=apps/mobile/pubspec.lock
+          else
+            /tmp/osv-scanner scan source \
+              --lockfile=pnpm-lock.yaml
+          fi
       - name: pnpm audit
         run: pnpm audit --audit-level=high --prod
 

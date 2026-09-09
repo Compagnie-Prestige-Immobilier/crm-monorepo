@@ -7,22 +7,40 @@
     "pnpm": "11.15.1"
   },
   "scripts": {
-    "lint": "pnpm -r lint",
-    "typecheck": "pnpm -r typecheck",
+    "dev": "turbo dev",
+    "dx": "node tools/dev/dx.mjs",
+    "dxs": "pnpm build && pnpm --filter @crm/api start",
+    "build": "turbo build",
+    "lint": "turbo lint",
     "dead-code": "knip --include files,dependencies,unlisted",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "plafonds": "tools/dev/plafonds.sh",
-    "lint:go": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...",
-    "complexite:go": "go run github.com/uudashr/gocognit/cmd/gocognit@latest -top 10 ./cmd ./internal && go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -top 10 cmd internal",
-    "verify:local": "pnpm format:check && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm plafonds && pnpm lint:go"
+    "typecheck": "turbo typecheck",
+    "test:integration": "turbo test:integration",
+    "test:e2e": "turbo test:e2e",
+    "db:generate": "pnpm --filter @crm/database db:generate",
+    "db:migrate": "pnpm --filter @crm/database db:migrate",
+    "db:deploy": "pnpm --filter @crm/database db:deploy",
+    "db:studio": "pnpm --filter @crm/database db:studio",
+    "db:seed": "pnpm --filter @crm/database db:seed",
+    "db:seed:demo": "pnpm --filter @crm/database db:seed:demo",
+    "db:seed:dev-chues": "pnpm --filter @crm/database db:seed:dev-chues",
+    "db:reset": "pnpm --filter @crm/database db:reset",
+    "openapi:generate": "pnpm --filter @crm/api openapi:generate",
+    "mobile:client:generate": "node tools/dev/generate-dart-client.mjs",
+    "codegen": "turbo run generate",
+    "codegen:check": "pnpm codegen && git add -A --intent-to-add && git diff --exit-code -- apps/api/openapi.json packages/api-client/src/generated packages/api-client-dart/lib packages/api-client-chues/src/generated packages/api-client-grand-public/src/generated",
+    "verify:local": "pnpm format:check && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm codegen:check"
   },
   "devDependencies": {
+    "@types/node": "catalog:",
     "eslint-plugin-sonarjs": "catalog:",
+    "fkill": "10.0.3",
     "knip": "catalog:",
     "oxlint": "catalog:",
     "oxlint-tsgolint": "catalog:",
     "prettier": "catalog:",
+    "turbo": "catalog:",
     "typescript": "catalog:"
   }
 }

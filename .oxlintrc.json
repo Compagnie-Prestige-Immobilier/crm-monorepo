@@ -4,13 +4,19 @@
     "correctness": "error",
     "suspicious": "off"
   },
-  "plugins": ["typescript", "import", "react", "jsx-a11y", "unicorn", "oxc"],
+  "plugins": ["typescript", "import", "react", "jsx-a11y", "nextjs", "vitest", "unicorn", "oxc"],
   "jsPlugins": ["eslint-plugin-sonarjs"],
   "env": {
     "browser": true,
     "node": true
   },
-  "ignorePatterns": ["**/dist/**", "**/node_modules/**"],
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.next/**",
+    "**/node_modules/**",
+    "**/coverage/**",
+    "**/src/generated/**"
+  ],
   "options": {
     "typeAware": true,
     "maxWarnings": 0
@@ -35,6 +41,19 @@
         "depth": 5,
         "ignoreElements": ["audio", "canvas", "embed", "input", "option", "textarea", "tr", "video"]
       }
-    ]
+    ],
+    "vitest/expect-expect": [
+      "error",
+      {
+        "assertFunctionNames": [
+          "expect",
+          "expectReadable",
+          "expectFailsAsText",
+          "expectFailsEntirely"
+        ]
+      }
+    ],
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
   }
 }

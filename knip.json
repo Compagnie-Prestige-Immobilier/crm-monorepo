@@ -1,11 +1,24 @@
 {
   "$schema": "./node_modules/knip/schema.json",
+  "ignoreDependencies": ["pino-pretty"],
   "workspaces": {
-    "web": {
-      "entry": ["src/routes/**/*.tsx"]
+    "apps/api": {
+      "entry": ["src/main.ts", "src/openapi.ts", "src/**/*.integration.test.ts"]
     },
-    "e2e": {
-      "entry": ["*.ts", "*.spec.ts"]
+    "apps/web": {
+      "entry": ["e2e/**/*.ts"]
+    },
+    "packages/api-client": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
+    "packages/api-client-chues": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
+    "packages/api-client-grand-public": {
+      "ignoreDependencies": ["openapi-typescript", "prettier"]
+    },
+    "packages/api-client-dart": {
+      "ignoreDependencies": ["@openapitools/openapi-generator-cli"]
     }
   }
 }

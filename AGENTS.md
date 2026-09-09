@@ -44,10 +44,8 @@ Un etat vide dit quoi faire ensuite, pas seulement que la liste est vide. Une
 erreur dit ce qui s'est passe et ce que le lecteur peut faire.
 
 Le vocabulaire est FIGE: `teleconseiller`, `Banque & Finance`, `campagne
-d'appels prospects`, `campagne d'appels representants`, `note vocale` (une
-note dictee apres l'appel, jamais « enregistrement d'appel » : l'audio d'un
-appel n'est pas capte et reste hors perimetre). Les mots `commercial` et ses
-declinaisons sont interdits dans une chaine affichee.
+d'appels prospects`, `campagne d'appels representants`. Les mots `commercial`
+et ses declinaisons sont interdits dans une chaine affichee.
 
 Pas de tiret cadratin. Il ne se saisit pas au clavier et se lit mal en
 terminal.
@@ -59,10 +57,10 @@ terminal.
 (`fake-*`, mock, stub) ecrit pour eux. La CI refuse tout fichier de ce type.
 Ne pas en proposer, ne pas en ecrire meme "pour verifier".
 
-Ce qui reste et ce qui prouve: les tests d'integration Go contre Postgres
-(`*_integration_test.go` sous `//go:build integration`, `make test`) et les
-parcours Playwright (`e2e/`, `make e2e`). Un comportement se verifie contre la
-pile reelle ou a la main, pas contre un mock.
+Ce qui reste et ce qui prouve: les tests d'integration API contre Postgres
+(`*.integration.test.ts`, `pnpm test:integration`), les parcours Playwright
+(`apps/web/e2e`, `pnpm test:e2e`) et le smoke Maestro. Un comportement se
+verifie contre la pile reelle ou a la main, pas contre un mock.
 
 Un test qui passe sur du code casse est PIRE que pas de test. Avant de garder
 un test d'integration ou e2e, le casser: modifier le code qu'il couvre,
@@ -94,11 +92,10 @@ devenait invisible.
 
 Ce qui doit etre conserve va dans `docs/`, pas dans le code.
 
-## Simplicite (KISS)
+## Simplicite
 
-KISS, « Keep It Simple, Stupid » : la solution la plus simple qui marche. Pas
-la plus generale, pas la plus extensible, pas celle qui prevoit un besoin qui
-n'existe pas. YAGNI dit quoi ne pas ecrire ; KISS dit comment ecrire le reste.
+La solution la plus simple qui marche. Pas la plus generale, pas la plus
+extensible, pas celle qui prevoit un besoin qui n'existe pas.
 
 - Pas d'abstraction sans DEUX appelants reels. Une interface a une seule
   implementation est un fichier de trop.
@@ -124,12 +121,6 @@ doit comprendre en une lecture, sans sauter entre les fichiers.
   qui existaient deja.
 - Garder une complexite cyclomatique basse: clauses de garde, conditions
   aplaties et fonctions avec une responsabilite lisible.
-- Nommer avec des mots que le prochain lecteur comprend sans explication :
-  le mot du metier en francais (`noteVocale`, `lotExport`, `rappel`), jamais
-  une abreviation, un jargon invente ou un nom herite d'une autre technique
-  (`call recording` pour une note dictee, `heartbeat` pour une presence). Un
-  prefixe de domaine sert a eviter une collision, pas a coder un sens. Si un
-  nom demande un commentaire pour etre compris, c'est le nom qui est faux.
 - Ne pas coder en dur une valeur metier, une URL, un secret ou une difference
   d'environnement. Reutiliser les constantes, types, contrats et mecanismes de
   configuration existants. Une constante locale evidente n'exige pas une
@@ -203,27 +194,10 @@ niveau maximum » :
 5. Les idees differees se signalent en une ligne, jamais en code.
 
 Plafonds a respecter dans ce depot : un ecran ou un composant tient sous 300
-lignes ; un fichier Go sous 1 500 ; un module tient dans un fichier tant qu'il
-n'a pas deux consommateurs reels ; une entite a UN chemin d'ecriture ; un
-tableau de bord a UN endpoint ; un test de parcours par metier, aucun test
-unitaire ; rien de genere n'est commite.
-
-Ces plafonds sont verifies par la CI et en local, pas seulement lus. Job `go`
-de `.github/workflows/ci.yml` : `tools/dev/plafonds.sh` (1 500 lignes par
-fichier Go, 300 par fichier `web/src`, aucun `db/`, `openapi.json`,
-`schema.d.ts`, `*.gen.ts` ni `dist/` suivi par git) puis `golangci-lint` avec
-`.golangci.yml` : `depguard` refuse Gin, Echo, Fiber, GORM et Redis ;
-`gocyclo` 12, `gocognit` 15 (seuil Sonar), `nestif` 4, `dupl` 80 jetons ;
-`nolintlint` exige une raison ecrite et un linteur nomme ; `godox` refuse les
-`TODO`. Un depassement se corrige en coupant, jamais en relevant le plafond, en
-ajoutant un `nolint` ou en retirant un linteur. En local, avant de terminer :
-
-```
-pnpm plafonds        # plafonds et artefacts generes
-pnpm lint:go         # golangci-lint, memes regles que la CI
-pnpm complexite:go   # dix fonctions les plus complexes, cognitive puis cyclomatique
-pnpm verify:local    # tout, TypeScript et Go
-```
+lignes ; un module tient dans un fichier tant qu'il n'a pas deux consommateurs
+reels ; une entite a UN chemin d'ecriture ; un tableau de bord a UN endpoint ;
+un test de parcours par metier, aucun test unitaire ; rien de genere n'est
+commite.
 
 ## Cap v2
 
@@ -239,9 +213,7 @@ est le seul client, ni Flutter, ni PowerSync, ni sync, ni APK en v2 ; meme
 base Postgres ; phase 0 = trois preuves sur copie de prod avec go/no-go ;
 quatre audits de portage dans `docs/v2-refonte/audits/go-*.md` font foi pour
 le detail ; gel des fonctionnalites sur `dev`
-avec une seule release v1 de maintenance nommee. Le 9 septembre la v1 (Nest,
-Next, Prisma, Flutter, clients generes) a ete purgee de ce depot et `apps/go`
-en est devenu la racine : `cmd/server`, `internal/`, `sql/`, `web/`, `e2e/`.
-Pas de stockage local ni de sync dans le panneau : une perte de donnees hors
-ligne nous serait imputee. Toute proposition qui contredit ces decisions se
-signale en une ligne au proprietaire avant d'etre codee.
+avec une seule release v1 de maintenance nommee. La v2 se construit dans le
+worktree `../crm-monorepo-v2` sur la branche `v2`, jamais dans ce clone. Toute
+proposition qui contredit ces decisions se signale en une ligne au proprietaire
+avant d'etre codee.

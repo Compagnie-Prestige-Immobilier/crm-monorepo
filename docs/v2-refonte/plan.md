@@ -1,108 +1,87 @@
 # Refonte v2 : plan et arbitrages
 
-Statut : version 3.2 du plan, 8 septembre 2026. Historique : version 1 le
+Statut : version 3.1 du plan, 8 septembre 2026. Historique : version 1 le
 7 septembre, cinq audits en lecture seule (`audits/api.md`, `web.md`,
 `mobile.md`, `donnees-infra.md`, `critique-plan.md`) ; version 2 le
 8 septembre ; version 2.2, backend Go ; version 3, abandon de l'application
 mobile ; version 3.1, quatre audits de portage Go (`audits/go-api.md`,
-`go-web.md`, `go-donnees.md`, `go-securite.md`) et leurs arbitrages ;
-version 3.2, principe directeur écrit (§1) et référentiels servis par un seul
-handler, schéma conservé. Chaque
+`go-web.md`, `go-donnees.md`, `go-securite.md`) et leurs arbitrages. Chaque
 affirmation technique renvoie à un `chemin:ligne` ou à une documentation
 officielle citée dans les audits. Ce qui n'a pas pu être vérifié est marqué
 « à prouver en phase 0 ». Le registre des risques est dans `risques.md`.
 
 ## 0. Où se fait le travail
 
-À la racine du dépôt. Le 9 septembre 2026 la v2 a été livrée (binaire Go,
-panneau embarqué, 110 tests d'intégration, 37 fichiers Playwright dont les
-parcours de parité `parite-*`), rangée par domaine (`cmd/server`,
-`internal/<domaine>`, `internal/shared/{socle,database}`) puis la v1 (Nest,
-Next, Prisma, Flutter, clients générés, audits v1) a été retirée par `git rm`
-et `apps/go` est devenu la racine. `make setup && make build` suffit ;
-l'historique reste lisible avec `git log --follow`.
+Toute la v2 se construit dans un worktree git séparé, jamais dans le clone
+principal, pour que `dev` et `prod` restent disponibles sans bascule de branche :
+
+```
+git fetch origin
+git worktree add ../crm-monorepo-v2 -b v2 origin/dev
+cd ../crm-monorepo-v2 && go build ./apps/go/... && pnpm --dir apps/go/web install
+```
+
+- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo` reste sur `dev` ou
+  `prod` : correctifs de production, release v1 de maintenance, déploiements.
+- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo-v2` porte la branche
+  `v2` : `apps/go` et l'infra v2.
+- Les correctifs prod sont reportés dans `v2` chaque soir par
+  `git -C ../crm-monorepo-v2 merge origin/prod`, résolus dans le worktree.
+- Les deux worktrees partagent le même `.git` : un `git worktree list` doit
+  toujours montrer les deux, et `git worktree remove` n'est lancé qu'après la
+  bascule.
+- Les serveurs de développement des deux arbres n'utilisent pas les mêmes
+  ports (v1 : 3000, 3001, 5434, 6381 ; v2 : Go 4000, Vite 5173, Postgres 5435).
 
 ## 1. Pourquoi
 
-| Mesure au 7 septembre 2026 | Valeur |
-| --- | --- |
-| Lignes écrites à la main (API, web, mobile, packages) | 165 000 |
-| Lignes générées commises dans git (34 schémas Drift, tests de migration, client OpenAPI) | 212 000 |
-| Routes API | 234 sur 37 contrôleurs (`audits/go-api.md` §0) |
-| Pages web (`page.tsx`) | 62, dont 55 dans les quatre espaces |
-| Écrans mobile | 26, plus 5 feuilles modales |
-| Fichiers Playwright | 82 specs |
-| Tâches planifiées | 7 crons |
-| Requêtes SQL brutes | 79, dont 13 statiques, 56 assemblées à l'exécution, 10 mortes (`audits/go-donnees.md` §1) |
-| Contraintes vivant seulement dans le SQL des migrations | ~35 CHECK, 12 index partiels, 2 extensions, 1 fonction |
-
-Après la purge du 9 septembre 2026 : 123 732 lignes suivies par git, dont
-35 938 en Go, 52 542 dans `web/src`, 9 074 dans `e2e`, 5 162 dans `sql`, le
-reste en verrou pnpm, diagrammes et configuration ; rien de généré.
+| Mesure au 7 septembre 2026                                                               | Valeur                                                                                    |
+| ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Lignes écrites à la main (API, web, mobile, packages)                                    | 165 000                                                                                   |
+| Lignes générées commises dans git (34 schémas Drift, tests de migration, client OpenAPI) | 212 000                                                                                   |
+| Routes API                                                                               | 234 sur 37 contrôleurs (`audits/go-api.md` §0)                                            |
+| Pages web (`page.tsx`)                                                                   | 62, dont 55 dans les quatre espaces                                                       |
+| Écrans mobile                                                                            | 26, plus 5 feuilles modales                                                               |
+| Fichiers Playwright                                                                      | 82 specs                                                                                  |
+| Tâches planifiées                                                                        | 7 crons                                                                                   |
+| Requêtes SQL brutes                                                                      | 79, dont 13 statiques, 56 assemblées à l'exécution, 10 mortes (`audits/go-donnees.md` §1) |
+| Contraintes vivant seulement dans le SQL des migrations                                  | ~35 CHECK, 12 index partiels, 2 extensions, 1 fonction                                    |
 
 Les deux décisions qui ont coûté le plus sont le moteur de synchronisation
 maison (`sync_engine.dart` 2 647 lignes, `sync.service.ts` 2 058 lignes) et la
 double stack backend (classes DTO Nest + Swagger, OpenAPI, codegen, relais
 Next). L'abandon du mobile supprime la première sans la remplacer ; le binaire
-Go supprime la seconde. Cible mesurée par l'audit : environ 13 700 lignes de
-Go (`audits/go-api.md` §6, moins ~470 lignes sur `referentiels.go`, §4) plus
-la SPA.
-
-### 1.1 Principe directeur
-
-La v2 n'est pas une traduction de la v1 en Go. C'est le plus petit produit
-complet qui passe la checklist de parité (§6). La mesure est le nombre de
-lignes ; la règle est YAGNI : rien qui ne serve un écran, un rôle ou une ligne
-de la checklist. Trois formes de la même erreur ont produit les 165 000 lignes
-et ne sont pas reconduites :
-
-- une copie là où un paramètre suffit : 8 listes de référence avec chacune ses
-  routes `GET`, `POST`, `PATCH`
-  (`apps/api/src/modules/referentiels/referentiels.controller.ts:67-340`),
-  deux arbres de routes CHUES et Grand Public, deux systèmes d'import ;
-- une couche là où une fonction suffit : DTO + Swagger + OpenAPI + codegen +
-  relais Next pour un seul contrat ;
-- un moteur là où un package ou rien suffit : synchronisation maison, Redis,
-  quatre bibliothèques de statistiques.
-
-Ce qui ne coûte pas de lignes ne se touche pas. Les 57 tables (52 après le
-nettoyage de J+7) restent : une table de 9 colonnes coûte 20 lignes de SQL,
-une contrainte `CHECK` ou une clé étrangère typée coûte zéro ligne de Go et
-en économise. Fusionner les 13 listes en une table `kind` ferait perdre les
-clés étrangères typées (`prospects.banqueId` pourrait viser une profession),
-imposerait une migration de données au jour J et casserait le retour arrière
-de §7, pour aucun gain de performance mesurable à 15 utilisateurs. Le gain se
-prend dans le code : un handler pour les 13 listes, pas treize.
+Go supprime la seconde. Cible mesurée par l'audit : environ 14 200 lignes de
+Go (`audits/go-api.md` §6) plus la SPA.
 
 ## 2. Arbitrages
 
 ### 2.1 En vigueur
 
-| Sujet | Décision | Date |
-| --- | --- | --- |
-| Clients | Un seul : le panneau web, même arbre sur poste et sur téléphone | 8 septembre |
-| Mobile | Application Flutter abandonnée, APK retiré au jour J ; ni PowerSync, ni sync, ni Shorebird, ni Maestro | 8 septembre |
-| Backend | Un binaire Go, `apps/go`, à la place de NestJS + Prisma | 8 septembre |
-| Cadre HTTP | `net/http` standard ; huma pour la validation des entrées, les erreurs par champ et le document OpenAPI ; pas de Gin, Echo ni Fiber | 8 septembre |
-| Contrat | Les structs Go sont le contrat ; OpenAPI et types TypeScript produits au build, rien de commité | 8 septembre |
-| Base | Même Postgres, mêmes tables, aucune fusion de tables (§1.1) ; pgx + sqlc pour les ~250 requêtes simples et les 13 brutes statiques ; pgx direct pour les 39 agrégats analytiques et le tri bancaire ; goose en SQL | 8 septembre |
-| Référentiels | Un handler `GET/POST/PATCH /referentiels/{kind}` pour les 13 listes (banques, syndicats, canaux, professions, tranches, employeurs, pays, offres, motifs de rejet, 4 référentiels de visite) ; `kind` résolu par une carte figée en Go vers la table et ses colonnes propres (`sigle`, `indicatif`, `minXof`, `isSystem`...), jamais depuis l'URL ; régions, départements et IEF lus par le même handler, en lecture seule sauf départements ; statuts de qualification et motifs d'issue d'appel gardent leur handler (règles propres) | 8 septembre |
-| Authentification | Sessions opaques dans `refresh_tokens`, cookie `__Host-` avec vérification d'`Origin`, hachages argon2id repris, rôle relu à chaque requête, révocation au changement de mot de passe | 8 septembre |
-| Panneau | SPA Vite + React 19 embarquée ; TanStack Router et Query ; shadcn sur Base UI, Lucide inchangés | 8 septembre |
-| Notes vocales | Conservées : une note dictée au micro après l'appel, jamais l'audio de l'appel lui-même, qu'un navigateur ne peut pas capter. Enregistrées par `MediaRecorder`, mêmes routes que la v1, conteneurs `audio/webm` et `audio/mp4`, 2 minutes, 48 h ; périmètre conversion, comme le mobile. Libellé d'interface : « note vocale », jamais « enregistrement d'appel ». L'enregistrement des appels est hors périmètre : il exigerait une téléphonie par API | 8 septembre |
-| Qualification prospect | `POST /phase2/call-attempts` remplace `POST /sync/push`, seul chemin d'écriture du panneau aujourd'hui (`console.ts:849`) | 8 septembre |
-| Présence | `POST /presence/beat` toutes les 60 s depuis la SPA, `UPSERT agent_heartbeats` ; pas de WebSocket | 8 septembre |
-| Stratégie | Réécriture en parallèle, bascule unique, sans pilote, checklist de parité | 7 septembre |
-| Intouchable | Les quatre espaces et les sept rôles | 7 septembre |
-| Infra conservée | SSE (4 topics) ; purge, dump par l'API ; import/export Excel complets ; export classeur du tableau de bord côté client | 7 septembre |
-| Redis | Supprimé, cache mémoire à version de groupe dans le binaire. À confirmer par le propriétaire | 8 septembre |
-| Abandonné | Espace de démonstration ; `dev-login` et `DevRoleSwitcher` ; 13 routes analytics sans écran ; import de représentants tout-ou-rien au profit du système à jobs | 8 septembre |
-| Tableaux de bord | Disposition personnalisable conservée | 7 septembre |
-| Routes web | Un seul arbre, `projet` dans l'URL ; anciennes adresses en 301 côté Go | 7 septembre |
-| Tests | Quinze parcours métier + un seizième « matrice des rôles » généré depuis `roles.go` ; parcours 3 à 8 et 11 rejoués en 390 px ; tests d'intégration Go sous tag `integration` contre Postgres ; aucun test unitaire | 8 septembre |
-| Cadre | Gel des fonctionnalités sur `dev`, une seule release v1 de maintenance nommée | 7 septembre |
-| Ordre | Socle, CHUES, Grand Public, Banque, Accueil, Admin | 7 septembre |
-| Durée | 16 jours ouvrés, phase 0 d'un jour, durées figées après les preuves | 8 septembre |
+| Sujet                  | Décision                                                                                                                                                                                                           | Date        |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------- |
+| Clients                | Un seul : le panneau web, même arbre sur poste et sur téléphone                                                                                                                                                    | 8 septembre |
+| Mobile                 | Application Flutter abandonnée, APK retiré au jour J ; ni PowerSync, ni sync, ni Shorebird, ni Maestro                                                                                                             | 8 septembre |
+| Backend                | Un binaire Go, `apps/go`, à la place de NestJS + Prisma                                                                                                                                                            | 8 septembre |
+| Cadre HTTP             | `net/http` standard ; huma pour la validation des entrées, les erreurs par champ et le document OpenAPI ; pas de Gin, Echo ni Fiber                                                                                | 8 septembre |
+| Contrat                | Les structs Go sont le contrat ; OpenAPI et types TypeScript produits au build, rien de commité                                                                                                                    | 8 septembre |
+| Base                   | Même Postgres, mêmes tables ; pgx + sqlc pour les ~250 requêtes simples et les 13 brutes statiques ; pgx direct pour les 39 agrégats analytiques et le tri bancaire ; goose en SQL                                 | 8 septembre |
+| Authentification       | Sessions opaques dans `refresh_tokens`, cookie `__Host-` avec vérification d'`Origin`, hachages argon2id repris, rôle relu à chaque requête, révocation au changement de mot de passe                              | 8 septembre |
+| Panneau                | SPA Vite + React 19 embarquée ; TanStack Router et Query ; shadcn sur Base UI, Lucide inchangés                                                                                                                    | 8 septembre |
+| Notes vocales          | Conservées, enregistrées dans le navigateur par `MediaRecorder`, mêmes routes que la v1, conteneurs `audio/webm` et `audio/mp4`, 2 minutes, 48 h ; périmètre conversion, comme le mobile                           | 8 septembre |
+| Qualification prospect | `POST /phase2/call-attempts` remplace `POST /sync/push`, seul chemin d'écriture du panneau aujourd'hui (`console.ts:849`)                                                                                          | 8 septembre |
+| Présence               | `POST /presence/beat` toutes les 60 s depuis la SPA, `UPSERT agent_heartbeats` ; pas de WebSocket                                                                                                                  | 8 septembre |
+| Stratégie              | Réécriture en parallèle, bascule unique, sans pilote, checklist de parité                                                                                                                                          | 7 septembre |
+| Intouchable            | Les quatre espaces et les sept rôles                                                                                                                                                                               | 7 septembre |
+| Infra conservée        | SSE (4 topics) ; purge, dump par l'API ; import/export Excel complets ; export classeur du tableau de bord côté client                                                                                             | 7 septembre |
+| Redis                  | Supprimé, cache mémoire à version de groupe dans le binaire. À confirmer par le propriétaire                                                                                                                       | 8 septembre |
+| Abandonné              | Espace de démonstration ; `dev-login` et `DevRoleSwitcher` ; 13 routes analytics sans écran ; import de représentants tout-ou-rien au profit du système à jobs                                                     | 8 septembre |
+| Tableaux de bord       | Disposition personnalisable conservée                                                                                                                                                                              | 7 septembre |
+| Routes web             | Un seul arbre, `projet` dans l'URL ; anciennes adresses en 301 côté Go                                                                                                                                             | 7 septembre |
+| Tests                  | Quinze parcours métier + un seizième « matrice des rôles » généré depuis `roles.go` ; parcours 3 à 8 et 11 rejoués en 390 px ; tests d'intégration Go sous tag `integration` contre Postgres ; aucun test unitaire | 8 septembre |
+| Cadre                  | Gel des fonctionnalités sur `dev`, une seule release v1 de maintenance nommée                                                                                                                                      | 7 septembre |
+| Ordre                  | Socle, CHUES, Grand Public, Banque, Accueil, Admin                                                                                                                                                                 | 7 septembre |
+| Durée                  | 16 jours ouvrés, phase 0 d'un jour, durées figées après les preuves                                                                                                                                                | 8 septembre |
 
 Pourquoi Go : le propriétaire veut la consommation la plus basse sur le VPS.
 Aucune mesure n'existe en dépôt et Dokploy ne pose aucune limite
@@ -115,18 +94,18 @@ Postgres, et rien ici n'est limité par le CPU.
 
 Source : `audits/go-api.md` §1, `audits/go-donnees.md` §5.
 
-| Élément | Sort |
-| --- | --- |
-| `POST /sync/push`, `GET /sync/pull`, `sync_batches`, `sync_operations`, `SYNC_*`, `IDEMPOTENCY_*` | Supprimés ; la qualification prospect passe par la route REST de §2.1 |
-| Détection d'appel : `device_call_detections`, `GET :id/device-calls`, `common/device-call.ts`, alerte « appels non consignés » | Supprimés, impossible depuis un navigateur |
-| APK : `app-updates` (6 routes), `android_releases`, `APK_*`, `AndroidReleaseCard` | Supprimés ; le volume `cpi-go-releases` reste monté jusqu'à J+7 |
-| `GET /lots-export/mes-attributions`, `GET /phase2/directory`, `GET /referentiels/pays` | Supprimés |
-| Hors ligne | Abandonné ; le panneau exige le réseau. Idée différée, non codée : mode hors ligne PWA |
-| `minPayloadVersion` | Colonne gardée, paramètre `payloadVersion` retiré : tous les statuts actifs sont servis (`audits/go-api.md` A3) |
-| `agent_heartbeats`, `app_settings` | Conservées, vivantes (`audits/go-donnees.md` §5) |
-| Ouvertures de fiche | Conservées : les 6 routes sont consommées par le panneau (`lib/data/ouvertures.ts:54-108`), verrou et chronomètre déjà dans `RepScript` et `ConsoleView` |
-| Journal de fiche `WEB\|MOBILE\|APPEL\|IMPORT`, enum `ChangeSource` | Valeurs conservées en lecture, `WEB` et `IMPORT` seuls écrits |
-| `apps/mobile`, `sn.cpi.go`, Shorebird, Maestro | Supprimés de la branche `v2` |
+| Élément                                                                                                                        | Sort                                                                                                                                                     |
+| ------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /sync/push`, `GET /sync/pull`, `sync_batches`, `sync_operations`, `SYNC_*`, `IDEMPOTENCY_*`                              | Supprimés ; la qualification prospect passe par la route REST de §2.1                                                                                    |
+| Détection d'appel : `device_call_detections`, `GET :id/device-calls`, `common/device-call.ts`, alerte « appels non consignés » | Supprimés, impossible depuis un navigateur                                                                                                               |
+| APK : `app-updates` (6 routes), `android_releases`, `APK_*`, `AndroidReleaseCard`                                              | Supprimés ; le volume `cpi-go-releases` reste monté jusqu'à J+7                                                                                          |
+| `GET /lots-export/mes-attributions`, `GET /phase2/directory`, `GET /referentiels/pays`                                         | Supprimés                                                                                                                                                |
+| Hors ligne                                                                                                                     | Abandonné ; le panneau exige le réseau. Idée différée, non codée : mode hors ligne PWA                                                                   |
+| `minPayloadVersion`                                                                                                            | Colonne gardée, paramètre `payloadVersion` retiré : tous les statuts actifs sont servis (`audits/go-api.md` A3)                                          |
+| `agent_heartbeats`, `app_settings`                                                                                             | Conservées, vivantes (`audits/go-donnees.md` §5)                                                                                                         |
+| Ouvertures de fiche                                                                                                            | Conservées : les 6 routes sont consommées par le panneau (`lib/data/ouvertures.ts:54-108`), verrou et chronomètre déjà dans `RepScript` et `ConsoleView` |
+| Journal de fiche `WEB\|MOBILE\|APPEL\|IMPORT`, enum `ChangeSource`                                                             | Valeurs conservées en lecture, `WEB` et `IMPORT` seuls écrits                                                                                            |
+| `apps/mobile`, `sn.cpi.go`, Shorebird, Maestro                                                                                 | Supprimés de la branche `v2`                                                                                                                             |
 
 ### 2.3 Corrections v1 faites au portage
 
@@ -181,7 +160,7 @@ Stack, versions vérifiées sur `proxy.golang.org` et `go.dev` le 8 septembre
   `API_TRUST_PROXY_HEADERS`, dernier élément ; `CF-Connecting-IP` préféré.
 - pgx 5.11 et sqlc 1.31. `apps/go/sql/schema.sql` est le
   `pg_dump --schema-only --no-owner --no-privileges --no-comments
-  --schema=public` de la copie de prod, relu à la main en phase 0 :
+--schema=public` de la copie de prod, relu à la main en phase 0 :
   extensions et `immutable_unaccent` conservées, `_prisma_migrations`
   retirée. Les 13 requêtes brutes statiques et les ~250 requêtes Prisma
   simples passent en sqlc ; les 39 agrégats analytiques à prédicats
@@ -247,10 +226,10 @@ Stack, versions vérifiées sur `proxy.golang.org` et `go.dev` le 8 septembre
   puis `rename`, idempotent, auteur en écriture, ADMIN et SUPERVISEUR en
   lecture, balayage horaire par âge et par orphelin (`audits/go-api.md` §4).
 - Image Docker : Node pour les types et `dist/`, Go (`CGO_ENABLED=0
-  -trimpath -ldflags="-s -w"`, `embed`), `debian:bookworm-slim` avec le
+-trimpath -ldflags="-s -w"`, `embed`), `debian:bookworm-slim` avec le
   bloc PGDG de `Dockerfile.api:115-133` pour `pg_dump` 18, utilisateur
   10001, `HEALTHCHECK` par le binaire, 140 à 160 Mo. Volumes :
-  `db-dumps`, `notes-vocales`, `imports`, `releases` jusqu'à J+7. Une
+  `db-dumps`, `call-recordings`, `imports`, `releases` jusqu'à J+7. Une
   application Dokploy `cpi-go`, les deux domaines conservés dessus.
 - CI : `go vet`, `golangci-lint` (errcheck, govet, staticcheck, ineffassign,
   unused, gosec, bodyclose, rowserrcheck, sqlclosecheck), `sqlc vet`,
@@ -275,7 +254,7 @@ apps/go/
   banque.go            dossiers, étapes, demandes de création           ~1 150
   accueil.go           registre, référentiels de visite, import         ~760
   admin.go             utilisateurs, purge, dump, enrôlement, tableaux de bord, paramètres, champs de conversion ~1 480
-  referentiels.go      un handler par kind pour 13 listes, statuts, motifs ~350
+  referentiels.go                                                      ~820
   analytics.go         7 routes + 5 supervision + créneaux, pgx direct  ~700
   notifications.go     composeur, gabarits, bail, rappels, compte rendu ~900
   brevo.go             client Brevo                                    ~250
@@ -450,18 +429,15 @@ pas en production.
    file vide confirmée de vive voix. Une file non vide à J est perdue.
 3. J, 1. Sauvegarde Dokploy déclenchée, fichier téléchargé hors du VPS,
    restauration vérifiée sur la machine de travail.
-4. J, 2. `deploy.py bascule --oui` : construit et démarre le binaire Go sur
-   `go-v2.cpi-chues.com`, attend `/health/ready`, puis seulement arrête
-   `cpi-go-api` et `cpi-go-web` et rattache les deux domaines. Une image qui
-   ne se construit pas laisse la v1 en place. Vérification à l'arrêt de la
-   v1 : `sync_batches` sans lot `IN_PROGRESS`, `import_jobs` vide.
-5. J, 3. goose a appliqué la seule migration du jour : fonction et 37
-   triggers `updatedAt` (simulation locale du 9 septembre sur l'image de
-   production : démarrage en 0,3 s, aucune ligne modifiée, aucune écriture
-   acquittée perdue à l'arrêt du conteneur). Les variables `JWT_*` et
-   `REDIS_URL` restent posées. Vérification : connexion e-mail et nom
-   d'utilisateur, un rôle par espace, SSE, présence, `docker stats` comparé
-   à la preuve B.
+4. J, 2. Arrêt de `cpi-go-api` et `cpi-go-web` dans Dokploy. Vérification
+   que `sync_batches` n'a plus de lot `IN_PROGRESS` ni `import_jobs` en cours.
+5. J, 3. Déploiement de `apps/go` par `deploy.py` (Dokploy n'a pas de
+   webhook, le job CI `deploy` fait de même sur `prod`), volumes
+   `call-recordings` et `imports` créés, deux domaines rattachés. goose
+   applique la seule migration du jour : fonction et 37 triggers `updatedAt`.
+   Les variables `JWT_*` et `REDIS_URL` restent posées. Vérification :
+   connexion e-mail et nom d'utilisateur, un rôle par espace, SSE, présence,
+   `docker stats` comparé à la preuve B.
 6. J, 4. Un téléphone de test : qualification complète depuis le navigateur,
    note vocale enregistrée et réécoutée.
 7. J, 5. Ouverture générale. L'application mobile v1 répond « serveur
@@ -482,18 +458,18 @@ n'existe plus (phase 0). Après le nettoyage de J+7, la v1 ne démarre plus.
 
 Registre complet : `risques.md`. Les premiers :
 
-| Risque | Preuve | Parade |
-| --- | --- | --- |
-| Restauration jamais faite | `docs/migrations-en-attente.md:50-54` | Première tâche de la phase 0 |
-| 56 requêtes brutes assemblées à l'exécution, pas 0 | `audits/go-donnees.md` §1 | pgx direct pour les 39 agrégats, une requête par variante pour 12, `narg` keyset ; preuve A élargie |
-| Saisies mobiles encore en file à J | outbox locale | J-3 et J-1 du runbook ; perte acceptée au go/no-go |
-| Écrans téléconseiller inutilisables au pouce | `rep-script.tsx` 1 728 l., `console-view.tsx` 1 069 l. | Preuve C ; refonte 390 px en phase 2 ; checklist sur téléphone |
-| `MediaRecorder` produit un conteneur inattendu sur le parc | doc MDN, non mesuré | Preuve C relève `isTypeSupported` ; serveur accepte webm et mp4 ; repli commentaire écrit |
-| Choix de Go sans mesure préalable | `audits/donnees-infra.md` §4 | Preuve B ; RSS et latence comparées en phase 7 et à J |
-| Exports xlsx, pdf, zip réécrits | `apps/api/package.json` | excelize `StreamWriter`, maroto, `archive/zip` ; chaque export dans la checklist |
-| 197 entrées de `roles.go` à remplir depuis 35 contrôleurs | `audits/go-securite.md` §2 | assertions au démarrage ; parcours matrice généré |
-| Deux systèmes d'import de représentants | `representants-import.ts:21`, `imports.ts:99` | un seul, celui à jobs ; plafond 5 000 lignes à vérifier |
-| Gel de trois semaines | §2.1 | correctifs prod sur `prod`, reportés dans `v2` chaque soir |
+| Risque                                                     | Preuve                                                 | Parade                                                                                              |
+| ---------------------------------------------------------- | ------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Restauration jamais faite                                  | `docs/migrations-en-attente.md:50-54`                  | Première tâche de la phase 0                                                                        |
+| 56 requêtes brutes assemblées à l'exécution, pas 0         | `audits/go-donnees.md` §1                              | pgx direct pour les 39 agrégats, une requête par variante pour 12, `narg` keyset ; preuve A élargie |
+| Saisies mobiles encore en file à J                         | outbox locale                                          | J-3 et J-1 du runbook ; perte acceptée au go/no-go                                                  |
+| Écrans téléconseiller inutilisables au pouce               | `rep-script.tsx` 1 728 l., `console-view.tsx` 1 069 l. | Preuve C ; refonte 390 px en phase 2 ; checklist sur téléphone                                      |
+| `MediaRecorder` produit un conteneur inattendu sur le parc | doc MDN, non mesuré                                    | Preuve C relève `isTypeSupported` ; serveur accepte webm et mp4 ; repli commentaire écrit           |
+| Choix de Go sans mesure préalable                          | `audits/donnees-infra.md` §4                           | Preuve B ; RSS et latence comparées en phase 7 et à J                                               |
+| Exports xlsx, pdf, zip réécrits                            | `apps/api/package.json`                                | excelize `StreamWriter`, maroto, `archive/zip` ; chaque export dans la checklist                    |
+| 197 entrées de `roles.go` à remplir depuis 35 contrôleurs  | `audits/go-securite.md` §2                             | assertions au démarrage ; parcours matrice généré                                                   |
+| Deux systèmes d'import de représentants                    | `representants-import.ts:21`, `imports.ts:99`          | un seul, celui à jobs ; plafond 5 000 lignes à vérifier                                             |
+| Gel de trois semaines                                      | §2.1                                                   | correctifs prod sur `prod`, reportés dans `v2` chaque soir                                          |
 
 ## 9. Points restant à valider par le propriétaire
 

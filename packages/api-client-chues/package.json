@@ -1,0 +1,35 @@
+{
+  "name": "@crm/api-client-chues",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
+    "generate": "node ../../tools/dev/generate-plateforme-client.mjs chues",
+    "spec:export": "node ../../tools/dev/generate-plateforme-client.mjs chues --export"
+  },
+  "dependencies": {
+    "@crm/api-client": "workspace:*",
+    "openapi-fetch": "catalog:"
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@types/node": "catalog:",
+    "openapi-typescript": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  }
+}

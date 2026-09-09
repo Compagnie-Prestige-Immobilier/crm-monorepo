@@ -8,13 +8,13 @@ briques déployables), les composants (le rangement du code), le déploiement
 sur une page large (`LAYOUT_LEFT_RIGHT`) et ne porte que ce qu'il faut pour
 être lu en une fois ; le détail est dans `plan.md` et les audits.
 
-| Fichier | Type | Répond à |
-| --- | --- | --- |
-| `diagrammes/01-contexte.puml` | C4 niveau 1 | Qui utilise le système, avec quels services externes |
-| `diagrammes/02-conteneurs.puml` | C4 niveau 2 | Les deux briques : apps/go, Postgres |
-| `diagrammes/03-composants-go.puml` | C4 niveau 3 | Comment le code de `apps/go` est rangé |
-| `diagrammes/04-deploiement.puml` | C4 déploiement | Où tourne chaque brique : Cloudflare, VPS Dokploy, volumes, S3 |
-| `diagrammes/07-calendrier.puml` | Gantt | 16 jours ouvrés, du 14 septembre au 5 octobre 2026 |
+| Fichier                            | Type           | Répond à                                                       |
+| ---------------------------------- | -------------- | -------------------------------------------------------------- |
+| `diagrammes/01-contexte.puml`      | C4 niveau 1    | Qui utilise le système, avec quels services externes           |
+| `diagrammes/02-conteneurs.puml`    | C4 niveau 2    | Les deux briques : apps/go, Postgres                           |
+| `diagrammes/03-composants-go.puml` | C4 niveau 3    | Comment le code de `apps/go` est rangé                         |
+| `diagrammes/04-deploiement.puml`   | C4 déploiement | Où tourne chaque brique : Cloudflare, VPS Dokploy, volumes, S3 |
+| `diagrammes/07-calendrier.puml`    | Gantt          | 16 jours ouvrés, du 14 septembre au 5 octobre 2026             |
 
 Les diagrammes 05 et 06 (flux d'écriture hors ligne, flux JWT PowerSync) ont
 été retirés avec le mobile : une écriture v2 est une requête HTTP ordinaire.

@@ -1,0 +1,1070 @@
+import { Injectable, Logger } from '@nestjs/common';
+import { Prisma, Projet, Role } from '@crm/database';
+
+import { PrismaService } from '../../prisma/prisma.service.js';
+import { inclusiveDateFrom, inclusiveDateTo } from '../../common/date-bounds.js';
+import { performanceScore } from '../admin/performance-score.js';
+import {
+  NOT_REACHED_OUTCOMES,
+  REP_ARBITRAGE,
+  REP_FICHE_COLONNES,
+  REP_JOINT_EFFECTS,
+  REP_JOINT_OUTCOMES,
+  REP_LIVE_OUTCOMES,
+  REP_STATUT_JOIN,
+  ALL_ROWS,
+  rate,
+} from './pilotage.sql.js';
+import { SupervisionGranularity } from './supervision.dto.js';
+import type {
+  SupervisionActivityCountsDto,
+  SupervisionActivityDto,
+  SupervisionHistogramBarDto,
+  SupervisionActivityRowDto,
+  SupervisionQueryDto,
+  SupervisionRepStatutDto,
+  SupervisionRepStatutsDto,
+  SupervisionScoreDto,
+  SupervisionTeleconseillerDto,
+  WorkShiftDto,
+} from './supervision.dto.js';
+import { DEFAULT_SHIFTS, WorkShiftsService } from './work-shifts.service.js';
+
+/**
+ * Qui passe des appels, et apparaît donc dans l'équipe. L'encadrement décroche
+ * lui aussi : le borner au COMMERCIAL effaçait ses propres appels de l'écran.
+ * L'ADMIN en est absent : c'est un compte d'administration, pas de plateau.
+ */
+const TELECONSEIL_ROLES = [Role.COMMERCIAL, Role.SUPERVISEUR, Role.DIRECTION] as const;
+
+/** Même seuil que la supervision des comptes : au-delà, l'écart devient du temps mort. */
+const DEAD_GAP_SECONDS = 15 * 60;
+
+const JOUR_SECONDES = 86_400;
+
+interface Creneau {
+  debut: number;
+  fin: number;
+}
+
+function secondesHorloge(value: string): number {
+  const [heures = 0, minutes = 0] = value.split(':').map(Number);
+  return heures * 3600 + minutes * 60;
+}
+
+function horloge(secondes: number): string {
+  const heures = Math.floor(secondes / 3600);
+  const minutes = Math.floor((secondes % 3600) / 60);
+  return `${String(heures).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+/**
+ * Les créneaux rabotés par le filtre horaire. Sans cette intersection, demander
+ * la seule matinée diviserait la note par une journée entière.
+ */
+function creneauxEffectifs(shifts: readonly WorkShiftDto[], query: SupervisionQueryDto): Creneau[] {
+  const bas = query.timeFrom ? secondesHorloge(query.timeFrom) : 0;
+  const haut = query.timeTo ? secondesHorloge(query.timeTo) : JOUR_SECONDES;
+  return shifts
+    .map((shift) => ({
+      debut: Math.max(secondesHorloge(shift.start), bas),
+      fin: Math.min(secondesHorloge(shift.end), haut),
+    }))
+    .filter((creneau) => creneau.fin > creneau.debut);
+}
+
+/** Les créneaux hors filtre horaire retombent sur `FALSE` : aucune tranche ne matche un jeu vide. */
+function dansCreneauCondition(creneaux: readonly Creneau[]): Prisma.Sql {
+  if (!creneaux.length) return Prisma.sql`FALSE`;
+  return Prisma.join(
+    creneaux.map(
+      (creneau) =>
+        Prisma.sql`(s."slot"::time >= ${horloge(creneau.debut)}::time AND s."slot"::time < ${horloge(creneau.fin)}::time)`,
+    ),
+    ' OR ',
+  );
+}
+
+/** Un jour passé compte ses créneaux entiers, le jour courant sa portion écoulée. */
+function secondesEcoulees(jour: string, creneaux: readonly Creneau[], now: Date): number {
+  const aujourdhui = now.toISOString().slice(0, 10);
+  if (jour > aujourdhui) return 0;
+  const instant =
+    jour < aujourdhui
+      ? JOUR_SECONDES
+      : now.getUTCHours() * 3600 + now.getUTCMinutes() * 60 + now.getUTCSeconds();
+  return creneaux.reduce(
+    (total, creneau) =>
+      total + Math.min(Math.max(instant - creneau.debut, 0), creneau.fin - creneau.debut),
+    0,
+  );
+}
+
+interface ActivityRow {
+  jour: string;
+  id: string;
+  nom: string;
+  appels: number;
+  confirmes: number;
+  injoignables: number;
+  faux: number;
+  refus: number;
+  autres: number;
+  methodes: number;
+  rappels: number;
+  joignables: number;
+  prospects: number;
+  representants: number;
+  fiches: number;
+  fichesJointes: number;
+}
+
+type TotalRow = Omit<ActivityRow, 'jour' | 'id' | 'nom'>;
+
+const TOTAL_VIDE: TotalRow = {
+  appels: 0,
+  confirmes: 0,
+  injoignables: 0,
+  faux: 0,
+  refus: 0,
+  autres: 0,
+  methodes: 0,
+  rappels: 0,
+  joignables: 0,
+  prospects: 0,
+  representants: 0,
+  fiches: 0,
+  fichesJointes: 0,
+};
+
+type RepTotalRow = Omit<RepRow, 'jour' | 'id'>;
+
+interface RepRow {
+  jour: string;
+  id: string;
+  appels: number;
+  confirmes: number;
+  faux: number;
+  joints: number;
+  rappels: number;
+  injoignables: number;
+  autres: number;
+  interroges: number;
+  qualifies: number;
+  fiches: number;
+  fichesJointes: number;
+  fichesAcceptees: number;
+  fichesRefusees: number;
+  fichesARappeler: number;
+  fichesEligibles: number;
+}
+
+const REP_VIDE: Omit<RepRow, 'jour' | 'id'> = {
+  appels: 0,
+  confirmes: 0,
+  faux: 0,
+  joints: 0,
+  rappels: 0,
+  injoignables: 0,
+  autres: 0,
+  interroges: 0,
+  qualifies: 0,
+  fiches: 0,
+  fichesJointes: 0,
+  fichesAcceptees: 0,
+  fichesRefusees: 0,
+  fichesARappeler: 0,
+  fichesEligibles: 0,
+};
+
+/**
+ * Ce que les tentatives seules ne disent pas : les appels vus par le téléphone,
+ * la durée passée en ligne, et le sort des rappels promis. Lu à part de `faits`
+ * parce que chaque source a sa propre date d'acte.
+ */
+interface ExtraRow {
+  jour: string;
+  id: string;
+  detectes: number;
+  nonConsignes: number;
+  repDetectes: number;
+  repNonConsignes: number;
+  duree: number;
+  durees: number;
+  repDuree: number;
+  repDurees: number;
+  entrants: number;
+  manques: number;
+  rappelsHonores: number;
+  rappelsRetard: number;
+  rappelsAVenir: number;
+  repRappelsHonores: number;
+  repRappelsRetard: number;
+  repRappelsAVenir: number;
+}
+
+type ExtraTotal = Omit<ExtraRow, 'jour' | 'id'>;
+
+const EXTRA_VIDE: ExtraTotal = {
+  detectes: 0,
+  nonConsignes: 0,
+  repDetectes: 0,
+  repNonConsignes: 0,
+  duree: 0,
+  durees: 0,
+  repDuree: 0,
+  repDurees: 0,
+  entrants: 0,
+  manques: 0,
+  rappelsHonores: 0,
+  rappelsRetard: 0,
+  rappelsAVenir: 0,
+  repRappelsHonores: 0,
+  repRappelsRetard: 0,
+  repRappelsAVenir: 0,
+};
+
+interface RosterRow {
+  id: string;
+  nom: string;
+  actif: boolean;
+}
+
+interface HistogramRow {
+  id: string | null;
+  label: string;
+  prospects: number;
+}
+
+interface ScoreRow {
+  id: string;
+  appels: number;
+  joints: number;
+  qualifies: number;
+  rappels: number;
+  tempsMort: number;
+}
+
+/** Un jour où le compte a été vu : une tranche de présence, un appel, ou les deux. */
+interface JourVuRow {
+  id: string;
+  jour: string;
+  actifs: number;
+}
+
+function resolveGranularity(query: SupervisionQueryDto): {
+  granularity: SupervisionGranularity;
+  unit: Prisma.Sql;
+} {
+  const granularity = query.granularity ?? SupervisionGranularity.DAY;
+  // `date_trunc` exige un littéral, jamais un paramètre.
+  const unit = granularity === SupervisionGranularity.WEEK ? Prisma.sql`'week'` : Prisma.sql`'day'`;
+  return { granularity, unit };
+}
+
+function userScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.commercialId ? Prisma.sql`u."id" = ${query.commercialId}` : ALL_ROWS;
+}
+
+/** Un représentant est CHUES par construction : filtrer Grand Public le sort. */
+function repScopeCondition(query: SupervisionQueryDto): Prisma.Sql {
+  return query.projet === Projet.GRAND_PUBLIC ? Prisma.sql`FALSE` : ALL_ROWS;
+}
+
+function windowBounds(query: SupervisionQueryDto): { from: string | null; to: string | null } {
+  return {
+    from: query.actFrom ? inclusiveDateFrom(query.actFrom).toISOString() : null,
+    to: query.actTo ? inclusiveDateTo(query.actTo).toISOString() : null,
+  };
+}
+
+@Injectable()
+export class SupervisionActivityService {
+  private readonly logger = new Logger(SupervisionActivityService.name);
+
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly workShifts: WorkShiftsService,
+  ) {}
+
+  async activite(query: SupervisionQueryDto): Promise<SupervisionActivityDto> {
+    const { granularity, unit } = resolveGranularity(query);
+
+    const attemptScope = ALL_ROWS;
+    const rolesDuPlateau = Prisma.join(
+      TELECONSEIL_ROLES.map((role) => Prisma.sql`${role}::"Role"`),
+    );
+    const teleconseiller = Prisma.sql`u."role" IN (${rolesDuPlateau}) AND u."deletedAt" IS NULL AND ${userScopeCondition(query)}`;
+
+    const repScope = repScopeCondition(query);
+
+    const repWindow = withinWindow(Prisma.sql`rca."clientCreatedAt"`, query);
+    const projetScope = (prospectId: Prisma.Sql): Prisma.Sql =>
+      query.projet === undefined
+        ? ALL_ROWS
+        : Prisma.sql`EXISTS (
+            SELECT 1 FROM "prospect_journeys" pj
+            WHERE pj."prospectId" = ${prospectId} AND pj."projet" = ${query.projet}::"Projet"
+          )`;
+
+    // La ligne d'équipe se relit sur les MÊMES faits que les lignes d'agents,
+    // sinon les deux dérivent au premier filtre ajouté.
+    const membreEquipe = (column: Prisma.Sql): Prisma.Sql =>
+      Prisma.sql`${column} IN (SELECT u."id" FROM "users" u WHERE ${teleconseiller})`;
+
+    const faits = Prisma.sql`
+          SELECT
+            ca."performedById"                              AS "userId",
+            date_trunc(${unit}, ca."clientCreatedAt")       AS bucket,
+            1                                               AS appel,
+            (ca."deviceCallAt" IS NOT NULL)::int            AS confirme,
+            (ca."outcome" = 'UNREACHABLE')::int             AS injoignable,
+            (ca."outcome" = 'WRONG_NUMBER')::int            AS faux,
+            (ca."outcome" = 'REFUSED')::int                 AS refus,
+            (ca."outcome" = 'OTHER')::int                   AS autre,
+            (ca."outcome" = 'METHOD_OBTAINED')::int         AS methode,
+            (ca."outcome" = 'CALLBACK')::int                AS rappel,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joignable,
+            0                                               AS prospect,
+            NULL::text                                      AS representant
+          FROM "call_attempts" ca
+          WHERE ${attemptScope} AND ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            p."createdById", date_trunc(${unit}, p."clientCreatedAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
+          FROM "prospects" p
+          WHERE p."deletedAt" IS NULL AND ${projetScope(Prisma.sql`p."id"`)}
+            AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
+          FROM "rep_call_attempts" rca
+          WHERE ${repScope}
+            AND ${repWindow}
+
+          -- Une ligne d'agent sans aucune tentative : c'est le cas même que la
+          -- supervision cherche, un téléphone qui appelle et rien de consigné.
+          UNION ALL
+          SELECT
+            d."performedById", date_trunc(${unit}, d."deviceCallAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL::text
+          FROM "device_call_detections" d
+          WHERE ${withinWindow(Prisma.sql`d."deviceCallAt"`, query)}
+            AND CASE
+              WHEN d."representantId" IS NOT NULL THEN ${repScope}
+              ELSE ${projetScope(Prisma.sql`d."prospectId"`)}
+            END
+    `;
+
+    const repTentatives = Prisma.sql`
+          SELECT
+            rca."performedById"                             AS "userId",
+            date_trunc(${unit}, rca."clientCreatedAt")      AS bucket,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES})::int AS appel,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL)::int AS confirme,
+            (rca."outcome" = 'WRONG_NUMBER')::int             AS faux,
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int     AS joint,
+            (rca."outcome" = 'CALLBACK')::int                AS rappel,
+            (rca."outcome" = 'UNREACHABLE')::int             AS injoignable,
+            (rca."outcome" NOT IN ${REP_LIVE_OUTCOMES})::int AS autre
+          FROM "rep_call_attempts" rca
+          WHERE ${repScope} AND ${repWindow}
+    `;
+
+    const extras = Prisma.sql`
+          SELECT
+            d."performedById"                                   AS "userId",
+            date_trunc(${unit}, d."deviceCallAt")               AS bucket,
+            (d."prospectId" IS NOT NULL)::int                   AS detecte,
+            (d."prospectId" IS NOT NULL AND d."attemptId" IS NULL)::int      AS "nonConsigne",
+            (d."representantId" IS NOT NULL)::int               AS "repDetecte",
+            (d."representantId" IS NOT NULL AND d."attemptId" IS NULL)::int  AS "repNonConsigne",
+            0 AS duree, 0 AS durees, 0 AS "repDuree", 0 AS "repDurees",
+            (d."attemptId" IS NULL AND d."deviceCallType" = 'entrant')::int  AS entrant,
+            (d."attemptId" IS NULL AND d."deviceCallType" = 'manque')::int   AS manque,
+            0 AS "rappelHonore", 0 AS "rappelRetard", 0 AS "rappelAVenir",
+            0 AS "repRappelHonore", 0 AS "repRappelRetard", 0 AS "repRappelAVenir"
+          FROM "device_call_detections" d
+          WHERE ${withinWindow(Prisma.sql`d."deviceCallAt"`, query)}
+            AND CASE
+              WHEN d."representantId" IS NOT NULL THEN ${repScope}
+              ELSE ${projetScope(Prisma.sql`d."prospectId"`)}
+            END
+
+          UNION ALL
+          SELECT
+            ca."performedById", date_trunc(${unit}, ca."clientCreatedAt"),
+            0, 0, 0, 0,
+            CASE WHEN ca."deviceCallAt" IS NOT NULL
+              THEN COALESCE(ca."deviceCallDurationSeconds", 0) ELSE 0 END,
+            (ca."deviceCallAt" IS NOT NULL)::int, 0, 0,
+            (ca."deviceCallType" = 'entrant')::int,
+            (ca."deviceCallType" = 'manque')::int,
+            0, 0, 0, 0, 0, 0
+          FROM "call_attempts" ca
+          WHERE (ca."deviceCallType" IS NOT NULL OR ca."deviceCallAt" IS NOT NULL)
+            AND ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            rca."performedById", date_trunc(${unit}, rca."clientCreatedAt"),
+            0, 0, 0, 0, 0, 0,
+            CASE WHEN rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL
+              THEN COALESCE(rca."deviceCallDurationSeconds", 0) ELSE 0 END,
+            (rca."outcome" IN ${REP_LIVE_OUTCOMES} AND rca."deviceCallAt" IS NOT NULL)::int,
+            (rca."deviceCallType" = 'entrant')::int,
+            (rca."deviceCallType" = 'manque')::int,
+            0, 0, 0, 0, 0, 0
+          FROM "rep_call_attempts" rca
+          WHERE (rca."deviceCallType" IS NOT NULL OR rca."deviceCallAt" IS NOT NULL)
+            AND ${repScope} AND ${repWindow}
+
+          UNION ALL
+          SELECT
+            sc."assignedToId", date_trunc(${unit}, sc."scheduledAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            (sc."status" = 'DONE')::int,
+            (sc."status" = 'PENDING' AND sc."scheduledAt" <= now())::int,
+            (sc."status" = 'PENDING' AND sc."scheduledAt" > now())::int,
+            0, 0, 0
+          FROM "scheduled_callbacks" sc
+          WHERE ${withinWindow(Prisma.sql`sc."scheduledAt"`, query)}
+            AND ${projetScope(Prisma.sql`sc."prospectId"`)}
+
+          UNION ALL
+          SELECT
+            h."performedById", date_trunc(${unit}, h."callbackAt"),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 0, 0,
+            h.honore::int,
+            (NOT h.honore AND h."callbackAt" <= now())::int,
+            (NOT h.honore AND h."callbackAt" > now())::int
+          FROM (
+            SELECT
+              rca."performedById", rca."callbackAt",
+              EXISTS (
+                SELECT 1 FROM "rep_call_attempts" x
+                WHERE x."representantId" = rca."representantId"
+                  AND x."clientCreatedAt" > rca."callbackAt"
+              ) AS honore
+            FROM "rep_call_attempts" rca
+            WHERE rca."callbackAt" IS NOT NULL AND ${repScope}
+              AND ${withinWindow(Prisma.sql`rca."callbackAt"`, query)}
+          ) h
+    `;
+
+    // Un représentant ne se qualifie qu'une fois : c'est sa DERNIÈRE réponse de
+    // la fenêtre qui vaut, et elle revient à qui l'a obtenue. Le classement se
+    // fait sur TOUS les agents, sans quoi filtrer sur l'un lui attribuerait une
+    // réponse que l'autre a obtenue après lui.
+    const repReponses = Prisma.sql`
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById"                        AS "userId",
+            date_trunc(${unit}, rca."clientCreatedAt") AS bucket,
+            (${REP_ARBITRAGE} = 'AMBASSADEUR')::int    AS qualifie
+          FROM "rep_call_attempts" rca
+          ${REP_STATUT_JOIN}
+          WHERE ${REP_ARBITRAGE} IS NOT NULL AND ${repScope} AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+    `;
+
+    // EB-33 : les taux se lisent PAR FICHE, sur son dernier statut de la
+    // fenêtre. Une fiche rappelée cinq fois pèse une fois, chez qui l'a
+    // qualifiée en dernier.
+    const repFiches = Prisma.sql`
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById"                        AS "userId",
+            date_trunc(${unit}, rca."clientCreatedAt") AS bucket,
+            ${REP_FICHE_COLONNES}
+          FROM "rep_call_attempts" rca
+          ${REP_STATUT_JOIN}
+          WHERE rca."outcome" IN ${REP_LIVE_OUTCOMES} AND ${repScope} AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+    `;
+
+    const repFichesParLigne = Prisma.sql`
+          SELECT
+            "userId", bucket,
+            COUNT(*)::int        AS fiches,
+            SUM(joint)::int      AS "fichesJointes",
+            SUM(accepte)::int    AS "fichesAcceptees",
+            SUM(refuse)::int     AS "fichesRefusees",
+            SUM(rappel)::int     AS "fichesARappeler",
+            SUM(eligible)::int   AS "fichesEligibles"
+          FROM (${repFiches}) f
+          GROUP BY 1, 2
+    `;
+
+    const prospectFiches = Prisma.sql`
+          SELECT DISTINCT ON (ca."prospectId")
+            ca."performedById"                                 AS "userId",
+            date_trunc(${unit}, ca."clientCreatedAt")          AS bucket,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint
+          FROM "call_attempts" ca
+          WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+          ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC
+    `;
+
+    const prospectFichesParLigne = Prisma.sql`
+          SELECT "userId", bucket, COUNT(*)::int AS fiches, SUM(joint)::int AS "fichesJointes"
+          FROM (${prospectFiches}) f
+          GROUP BY 1, 2
+    `;
+
+    // Les créneaux bornent le temps mort et le dénominateur de la note : lus
+    // avant le reste, ils ne peuvent pas s'attendre dans le même `Promise.all`.
+    const shifts = await this.workShifts
+      .get()
+      .then((settings) => settings.shifts)
+      .catch((error: unknown) => {
+        this.logger.warn(`créneaux illisibles, valeurs par défaut: ${String(error)}`);
+        return [...DEFAULT_SHIFTS];
+      });
+    const creneaux = creneauxEffectifs(shifts, query);
+
+    // Une seule ligne par appel, prospects et représentants confondus : c'est
+    // l'assiette de la note, du temps mort et des rappels.
+    const tentatives = Prisma.sql`
+          SELECT
+            ca."performedById"                              AS "userId",
+            ca."clientCreatedAt"                            AS quand,
+            'prospect'                                      AS famille,
+            ca."prospectId"::text                           AS cible,
+            (ca."outcome" NOT IN ${NOT_REACHED_OUTCOMES})::int AS joint,
+            (ca."outcome" = 'METHOD_OBTAINED')::int         AS qualifie
+          FROM "call_attempts" ca
+          WHERE ${projetScope(Prisma.sql`ca."prospectId"`)}
+            AND ${withinWindow(Prisma.sql`ca."clientCreatedAt"`, query)}
+
+          UNION ALL
+          SELECT
+            rca."performedById", rca."clientCreatedAt", 'representant',
+            rca."representantId"::text,
+            (rca."outcome" IN ${REP_JOINT_OUTCOMES})::int, 0
+          FROM "rep_call_attempts" rca
+          WHERE ${repScope} AND ${repWindow}
+    `;
+
+    const creneauDe = Prisma.sql`CASE ${Prisma.join(
+      shifts.map(
+        (shift) =>
+          Prisma.sql`WHEN a.quand::time >= ${shift.start}::time AND a.quand::time < ${shift.end}::time THEN ${shift.key}::text`,
+      ),
+      ' ',
+    )} END`;
+
+    const situes = Prisma.sql`
+          SELECT a.*, ${creneauDe} AS creneau, date_trunc('day', a.quand) AS jour
+          FROM (${tentatives}) a
+          INNER JOIN "users" u ON u."id" = a."userId"
+          WHERE ${teleconseiller}
+    `;
+
+    // Un trou n'existe qu'à l'intérieur d'un créneau ET d'une journée : sans le
+    // second test, une nuit entre deux appels passerait pour du temps mort.
+    const ecartMort = Prisma.sql`
+      EXTRACT(EPOCH FROM p.ecart) > ${DEAD_GAP_SECONDS}
+      AND p.creneau = p."creneauPrecedent" AND p.jour = p."jourPrecedent"
+    `;
+
+    const dansCreneau = dansCreneauCondition(creneaux);
+
+    const [
+      rows,
+      repRows,
+      extraRows,
+      [totalRow],
+      [repTotalRow],
+      roster,
+      prospectsByTeleconseiller,
+      prospectsByRepresentant,
+      rendement,
+    ] = await Promise.all([
+      this.prisma.$queryRaw<ActivityRow[]>`
+        WITH faits AS (${faits}),
+        fiches AS (${prospectFichesParLigne})
+        SELECT
+          to_char(f.bucket, 'YYYY-MM-DD')      AS jour,
+          u."id"                               AS id,
+          u."fullName"                         AS nom,
+          SUM(f.appel)::int                    AS appels,
+          SUM(f.confirme)::int                 AS confirmes,
+          SUM(f.injoignable)::int              AS injoignables,
+          SUM(f.faux)::int                     AS faux,
+          SUM(f.refus)::int                    AS refus,
+          SUM(f.autre)::int                    AS autres,
+          SUM(f.methode)::int                  AS methodes,
+          SUM(f.rappel)::int                   AS rappels,
+          SUM(f.joignable)::int                AS joignables,
+          SUM(f.prospect)::int                 AS prospects,
+          COUNT(DISTINCT f.representant)::int  AS representants,
+          COALESCE(MAX(p.fiches), 0)::int          AS fiches,
+          COALESCE(MAX(p."fichesJointes"), 0)::int AS "fichesJointes"
+        FROM faits f
+        INNER JOIN "users" u ON u."id" = f."userId"
+        LEFT JOIN fiches p ON p."userId" = f."userId" AND p.bucket = f.bucket
+        WHERE ${teleconseiller}
+        GROUP BY 1, 2, 3
+        ORDER BY 1 ASC, 3 ASC
+      `,
+      this.prisma.$queryRaw<RepRow[]>`
+        WITH tentatives AS (${repTentatives}),
+        reponses AS (${repReponses}),
+        interroges AS (
+          SELECT "userId", bucket, COUNT(*)::int AS interroges, SUM(qualifie)::int AS qualifies
+          FROM reponses
+          GROUP BY 1, 2
+        ),
+        fiches AS (${repFichesParLigne})
+        SELECT
+          to_char(t.bucket, 'YYYY-MM-DD')     AS jour,
+          t."userId"                          AS id,
+          SUM(t.appel)::int                   AS appels,
+          SUM(t.confirme)::int                AS confirmes,
+          SUM(t.faux)::int                    AS faux,
+          SUM(t.joint)::int                   AS joints,
+          SUM(t.rappel)::int                  AS rappels,
+          SUM(t.injoignable)::int             AS injoignables,
+          SUM(t.autre)::int                   AS autres,
+          COALESCE(MAX(i.interroges), 0)::int AS interroges,
+          COALESCE(MAX(i.qualifies), 0)::int  AS qualifies,
+          COALESCE(MAX(f.fiches), 0)::int            AS fiches,
+          COALESCE(MAX(f."fichesJointes"), 0)::int   AS "fichesJointes",
+          COALESCE(MAX(f."fichesAcceptees"), 0)::int AS "fichesAcceptees",
+          COALESCE(MAX(f."fichesRefusees"), 0)::int  AS "fichesRefusees",
+          COALESCE(MAX(f."fichesARappeler"), 0)::int AS "fichesARappeler",
+          COALESCE(MAX(f."fichesEligibles"), 0)::int AS "fichesEligibles"
+        FROM tentatives t
+        LEFT JOIN interroges i ON i."userId" = t."userId" AND i.bucket = t.bucket
+        LEFT JOIN fiches f ON f."userId" = t."userId" AND f.bucket = t.bucket
+        GROUP BY 1, 2
+      `,
+      this.prisma.$queryRaw<ExtraRow[]>`
+        WITH extras AS (${extras})
+        SELECT
+          to_char(e.bucket, 'YYYY-MM-DD')   AS jour,
+          u."id"                            AS id,
+          SUM(e.detecte)::int               AS detectes,
+          SUM(e."nonConsigne")::int         AS "nonConsignes",
+          SUM(e."repDetecte")::int          AS "repDetectes",
+          SUM(e."repNonConsigne")::int      AS "repNonConsignes",
+          SUM(e.duree)::int                 AS duree,
+          SUM(e.durees)::int                AS durees,
+          SUM(e."repDuree")::int            AS "repDuree",
+          SUM(e."repDurees")::int           AS "repDurees",
+          SUM(e.entrant)::int               AS entrants,
+          SUM(e.manque)::int                AS manques,
+          SUM(e."rappelHonore")::int        AS "rappelsHonores",
+          SUM(e."rappelRetard")::int        AS "rappelsRetard",
+          SUM(e."rappelAVenir")::int        AS "rappelsAVenir",
+          SUM(e."repRappelHonore")::int     AS "repRappelsHonores",
+          SUM(e."repRappelRetard")::int     AS "repRappelsRetard",
+          SUM(e."repRappelAVenir")::int     AS "repRappelsAVenir"
+        FROM extras e
+        INNER JOIN "users" u ON u."id" = e."userId"
+        WHERE ${teleconseiller}
+        GROUP BY 1, 2
+      `,
+      this.prisma.$queryRaw<TotalRow[]>`
+        WITH faits AS (${faits}),
+        fiches AS (
+          SELECT COUNT(*)::int AS fiches, COALESCE(SUM(p.joint), 0)::int AS "fichesJointes"
+          FROM (${prospectFiches}) p
+          WHERE ${membreEquipe(Prisma.sql`p."userId"`)}
+        )
+        SELECT
+          COALESCE(SUM(f.appel), 0)::int       AS appels,
+          COALESCE(SUM(f.confirme), 0)::int    AS confirmes,
+          COALESCE(SUM(f.injoignable), 0)::int AS injoignables,
+          COALESCE(SUM(f.faux), 0)::int        AS faux,
+          COALESCE(SUM(f.refus), 0)::int       AS refus,
+          COALESCE(SUM(f.autre), 0)::int       AS autres,
+          COALESCE(SUM(f.methode), 0)::int     AS methodes,
+          COALESCE(SUM(f.rappel), 0)::int      AS rappels,
+          COALESCE(SUM(f.joignable), 0)::int   AS joignables,
+          COALESCE(SUM(f.prospect), 0)::int    AS prospects,
+          COUNT(DISTINCT f.representant)::int  AS representants,
+          MAX(p.fiches)::int                   AS fiches,
+          MAX(p."fichesJointes")::int          AS "fichesJointes"
+        FROM fiches p
+        LEFT JOIN faits f ON ${membreEquipe(Prisma.sql`f."userId"`)}
+      `,
+      this.prisma.$queryRaw<RepTotalRow[]>`
+        WITH tentatives AS (${repTentatives}),
+        reponses AS (${repReponses}),
+        fiches AS (
+          SELECT
+            COUNT(*)::int                       AS fiches,
+            COALESCE(SUM(f.joint), 0)::int      AS "fichesJointes",
+            COALESCE(SUM(f.accepte), 0)::int    AS "fichesAcceptees",
+            COALESCE(SUM(f.refuse), 0)::int     AS "fichesRefusees",
+            COALESCE(SUM(f.rappel), 0)::int     AS "fichesARappeler",
+            COALESCE(SUM(f.eligible), 0)::int   AS "fichesEligibles"
+          FROM (${repFiches}) f
+          WHERE ${membreEquipe(Prisma.sql`f."userId"`)}
+        )
+        SELECT
+          COALESCE(SUM(t.appel), 0)::int       AS appels,
+          COALESCE(SUM(t.confirme), 0)::int    AS confirmes,
+          COALESCE(SUM(t.faux), 0)::int        AS faux,
+          COALESCE(SUM(t.joint), 0)::int       AS joints,
+          COALESCE(SUM(t.rappel), 0)::int      AS rappels,
+          COALESCE(SUM(t.injoignable), 0)::int AS injoignables,
+          COALESCE(SUM(t.autre), 0)::int       AS autres,
+          (
+            SELECT COUNT(*)::int FROM reponses r
+            WHERE ${membreEquipe(Prisma.sql`r."userId"`)}
+          )                                    AS interroges,
+          (
+            SELECT COALESCE(SUM(r.qualifie), 0)::int FROM reponses r
+            WHERE ${membreEquipe(Prisma.sql`r."userId"`)}
+          )                                    AS qualifies,
+          MAX(f.fiches)::int                   AS fiches,
+          MAX(f."fichesJointes")::int          AS "fichesJointes",
+          MAX(f."fichesAcceptees")::int        AS "fichesAcceptees",
+          MAX(f."fichesRefusees")::int         AS "fichesRefusees",
+          MAX(f."fichesARappeler")::int        AS "fichesARappeler",
+          MAX(f."fichesEligibles")::int        AS "fichesEligibles"
+        FROM fiches f
+        LEFT JOIN tentatives t ON ${membreEquipe(Prisma.sql`t."userId"`)}
+      `,
+      this.prisma.$queryRaw<RosterRow[]>`
+        SELECT
+          u."id"              AS id,
+          u."fullName"        AS nom,
+          u."isActive"        AS actif
+        FROM "users" u
+        WHERE ${teleconseiller}
+        GROUP BY u."id", u."fullName", u."isActive"
+        ORDER BY u."fullName" ASC
+      `,
+      this.prisma.$queryRaw<HistogramRow[]>`
+        SELECT
+          u."id"                   AS id,
+          u."fullName"             AS label,
+          COUNT(p."id")::int       AS prospects
+        FROM "users" u
+        LEFT JOIN "prospects" p
+          ON p."createdById" = u."id"
+          AND p."deletedAt" IS NULL
+          AND ${projetScope(Prisma.sql`p."id"`)}
+          AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
+        WHERE ${teleconseiller}
+        GROUP BY u."id", u."fullName"
+        ORDER BY prospects DESC, label ASC
+      `,
+      this.prisma.$queryRaw<HistogramRow[]>`
+        SELECT
+          r."id"                   AS id,
+          r."fullName"             AS label,
+          COUNT(p."id")::int       AS prospects
+        FROM "representants" r
+        INNER JOIN "prospects" p
+          ON p."representantId" = r."id"
+          AND p."deletedAt" IS NULL
+          AND ${projetScope(Prisma.sql`p."id"`)}
+          AND ${withinWindow(Prisma.sql`p."clientCreatedAt"`, query)}
+        GROUP BY r."id", r."fullName"
+        ORDER BY prospects DESC, label ASC
+      `,
+
+      // La note complète l'écran, elle ne le porte pas : un échec vide `scores`
+      // sans effacer l'activité.
+      Promise.all([
+        this.prisma.$queryRaw<ScoreRow[]>`
+        WITH situes AS (${situes}),
+        paced AS (
+          SELECT
+            s.*,
+            s.quand - LAG(s.quand) OVER w AS ecart,
+            LAG(s.creneau) OVER w         AS "creneauPrecedent",
+            LAG(s.jour) OVER w            AS "jourPrecedent"
+          FROM situes s
+          WINDOW w AS (PARTITION BY s."userId" ORDER BY s.quand)
+        ),
+        rappels AS (
+          SELECT "userId", SUM(n - 1)::int AS repetitions
+          FROM (
+            SELECT "userId", famille, cible, COUNT(*)::int AS n
+            FROM situes GROUP BY 1, 2, 3
+          ) t
+          GROUP BY 1
+        ),
+        reponses AS (${repReponses}),
+        representants_qualifies AS (
+          SELECT "userId", SUM(qualifie)::int AS qualifies FROM reponses GROUP BY 1
+        )
+        SELECT
+          p."userId"                                             AS id,
+          COUNT(*)::int                                          AS appels,
+          SUM(p.joint)::int                                      AS joints,
+          (SUM(p.qualifie) + COALESCE(MAX(q.qualifies), 0))::int AS qualifies,
+          COALESCE(MAX(r.repetitions), 0)::int                   AS rappels,
+          COALESCE(
+            SUM(EXTRACT(EPOCH FROM p.ecart)) FILTER (WHERE ${ecartMort}), 0
+          )::int                                                 AS "tempsMort"
+        FROM paced p
+        LEFT JOIN representants_qualifies q ON q."userId" = p."userId"
+        LEFT JOIN rappels r ON r."userId" = p."userId"
+        GROUP BY p."userId"
+      `,
+        this.prisma.$queryRaw<JourVuRow[]>`
+        WITH situes AS (${situes}),
+        tranches AS (
+          SELECT
+            s."userId"                  AS "userId",
+            date_trunc('day', s."slot") AS jour,
+            COALESCE(SUM(s."activeSeconds") FILTER (WHERE ${dansCreneau}), 0)::int AS actifs
+          FROM "agent_activity_slots" s
+          INNER JOIN "users" u ON u."id" = s."userId"
+          WHERE ${teleconseiller} AND ${withinWindow(Prisma.sql`s."slot"`, query)}
+          GROUP BY 1, 2
+        ),
+        vus AS (
+          SELECT "userId", jour, actifs FROM tranches
+          UNION ALL
+          SELECT "userId", jour, 0 FROM situes
+        )
+        SELECT
+          "userId"                    AS id,
+          to_char(jour, 'YYYY-MM-DD') AS jour,
+          SUM(actifs)::int            AS actifs
+        FROM vus
+        GROUP BY 1, 2
+      `,
+      ]).catch((error: unknown) => {
+        this.logger.warn(`rendement de la fenêtre indisponible: ${String(error)}`);
+        return null;
+      }),
+    ]);
+
+    const repParLigne = new Map(repRows.map((row) => [`${row.jour}|${row.id}`, row]));
+    const extraParLigne = new Map(extraRows.map((row) => [`${row.jour}|${row.id}`, row]));
+    // Toutes ces colonnes sont additives : le total de l'équipe est la somme
+    // des lignes, déjà bornées aux comptes du plateau par la requête.
+    const extraTotal = extraRows.reduce<ExtraTotal>(
+      (total, row) => {
+        for (const cle of Object.keys(EXTRA_VIDE) as (keyof ExtraTotal)[]) {
+          total[cle] += row[cle];
+        }
+        return total;
+      },
+      { ...EXTRA_VIDE },
+    );
+
+    // Répartition des représentants par statut de qualification : le dernier
+    // appel portant un statut dans la fenêtre détermine le comptage. Les statuts
+    // actifs apparaissent même à zéro ; les statuts désactivés n'apparaissent
+    // que s'ils sont réellement présents.
+    const estGrandPublic = query.projet === Projet.GRAND_PUBLIC;
+    let repQualificationStatuses: SupervisionRepStatutsDto | null = null;
+    if (!estGrandPublic) {
+      const repStatuts = await this.prisma.$queryRaw<
+        {
+          id: string;
+          code: string;
+          label: string;
+          isActive: boolean;
+          joint: boolean;
+          count: number;
+        }[]
+      >`
+        WITH last_calls AS (
+          SELECT DISTINCT ON (rca."representantId")
+            rca."performedById" AS "userId",
+            rca."statutQualificationId" AS "sid"
+          FROM "rep_call_attempts" rca
+          WHERE rca."statutQualificationId" IS NOT NULL
+            AND ${repWindow}
+          ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC
+        ),
+        counts AS (
+          SELECT "sid", COUNT(*)::int AS count
+          FROM last_calls
+          WHERE ${membreEquipe(Prisma.sql`"userId"`)}
+          GROUP BY "sid"
+        )
+        SELECT
+          sq.id, sq.code, sq.label, sq."isActive",
+          (sq."effect" IN ${REP_JOINT_EFFECTS}) AS joint,
+          COALESCE(c.count, 0)::int AS count
+        FROM "statuts_qualification" sq
+        LEFT JOIN counts c ON c."sid" = sq.id
+        WHERE sq."isActive" = TRUE OR c.count > 0
+        ORDER BY sq."sortOrder" ASC, sq."label" ASC
+      `;
+      repQualificationStatuses = {
+        total: repStatuts.reduce((sum, row) => sum + row.count, 0),
+        items: repStatuts.map((row): SupervisionRepStatutDto => ({
+          id: row.id,
+          code: row.code,
+          label: row.label,
+          isActive: row.isActive,
+          famille: row.joint ? 'JOINT' : 'NON_JOINT',
+          count: row.count,
+        })),
+      };
+    }
+
+    const { from, to } = windowBounds(query);
+    return {
+      from,
+      to,
+      granularity,
+      totals: chiffres(totalRow ?? TOTAL_VIDE, repTotalRow ?? REP_VIDE, extraTotal),
+      items: rows.map((row): SupervisionActivityRowDto => {
+        const rep = repParLigne.get(`${row.jour}|${row.id}`) ?? REP_VIDE;
+        const extra = extraParLigne.get(`${row.jour}|${row.id}`) ?? EXTRA_VIDE;
+        return Object.assign(chiffres(row, rep, extra), {
+          bucket: row.jour,
+          teleconseillerId: row.id,
+          teleconseillerName: row.nom,
+        });
+      }),
+      teleconseillers: roster.map((row): SupervisionTeleconseillerDto => ({
+        id: row.id,
+        fullName: row.nom,
+        isActive: row.actif,
+      })),
+      scores: rendement === null ? [] : notes(roster, rendement[0], rendement[1], creneaux),
+      prospectsByTeleconseiller: prospectsByTeleconseiller.map(toHistogramBar),
+      prospectsByRepresentant: prospectsByRepresentant.map(toHistogramBar),
+      repQualificationStatuses,
+    };
+  }
+}
+
+const AUCUN_APPEL: Omit<ScoreRow, 'id'> = {
+  appels: 0,
+  joints: 0,
+  qualifies: 0,
+  rappels: 0,
+  tempsMort: 0,
+};
+
+/**
+ * Une note par téléconseiller sur toute la fenêtre. Le dénominateur ne retient
+ * que les jours OÙ LE COMPTE A ÉTÉ VU : le dépôt n'a pas de calendrier ouvré, et
+ * facturer les dimanches ferait chuter l'assiduité de tout le monde.
+ */
+function notes(
+  roster: readonly RosterRow[],
+  metriques: readonly ScoreRow[],
+  jours: readonly JourVuRow[],
+  creneaux: readonly Creneau[],
+): SupervisionScoreDto[] {
+  const now = new Date();
+  const metriqueDe = new Map(metriques.map((row) => [row.id, row]));
+  const joursDe = new Map<string, JourVuRow[]>();
+  for (const jour of jours) {
+    const liste = joursDe.get(jour.id);
+    if (liste === undefined) joursDe.set(jour.id, [jour]);
+    else liste.push(jour);
+  }
+
+  return roster.map((membre): SupervisionScoreDto => {
+    const metrique = metriqueDe.get(membre.id) ?? AUCUN_APPEL;
+    const vus = joursDe.get(membre.id) ?? [];
+    const entrees = {
+      activeSecondsInShifts: vus.reduce((total, jour) => total + jour.actifs, 0),
+      shiftSecondsElapsed: vus.reduce(
+        (total, jour) => total + secondesEcoulees(jour.jour, creneaux, now),
+        0,
+      ),
+      calls: metrique.appels,
+      reached: metrique.joints,
+      qualified: metrique.qualifies,
+      repeatCalls: metrique.rappels,
+      deadSeconds: metrique.tempsMort,
+    };
+    return {
+      teleconseillerId: membre.id,
+      teleconseillerName: membre.nom,
+      ...entrees,
+      score: performanceScore(entrees),
+    };
+  });
+}
+
+const moyenne = (total: number, nombre: number): number | null =>
+  nombre === 0 ? null : Math.round(total / nombre);
+
+function chiffres(
+  base: TotalRow,
+  rep: RepTotalRow,
+  extra: ExtraTotal,
+): SupervisionActivityCountsDto {
+  return {
+    calls: base.appels,
+    confirmedCalls: base.confirmes,
+    detectedCalls: extra.detectes,
+    unloggedCalls: extra.nonConsignes,
+    avgCallSeconds: moyenne(extra.duree, extra.durees),
+    unreachable: base.injoignables,
+    wrongNumber: base.faux,
+    refused: base.refus,
+    other: base.autres,
+    methodObtained: base.methodes,
+    callback: base.rappels,
+    reachRate: rate(base.joignables, base.appels),
+    fiches: base.fiches,
+    fichesJointes: base.fichesJointes,
+    ficheReachRate: rate(base.fichesJointes, base.fiches),
+    prospectsCreated: base.prospects,
+    representantsContacted: base.representants,
+    repCalls: rep.appels,
+    repConfirmedCalls: rep.confirmes,
+    repDetectedCalls: extra.repDetectes,
+    repUnloggedCalls: extra.repNonConsignes,
+    repAvgCallSeconds: moyenne(extra.repDuree, extra.repDurees),
+    repWrongNumber: rep.faux,
+    repReached: rep.joints,
+    repCallback: rep.rappels,
+    repUnreachable: rep.injoignables,
+    repOther: rep.autres,
+    repContactRate: rate(rep.joints, rep.appels),
+    repCallbackRate: rate(rep.rappels, rep.appels),
+    repQuestioned: rep.interroges,
+    repQualified: rep.qualifies,
+    repQualificationRate: rate(rep.qualifies, rep.interroges),
+    repFiches: rep.fiches,
+    repFichesJointes: rep.fichesJointes,
+    repFichesNonJointes: rep.fiches - rep.fichesJointes,
+    repFichesAcceptees: rep.fichesAcceptees,
+    repFichesRefusees: rep.fichesRefusees,
+    repFichesARappeler: rep.fichesARappeler,
+    repFichesEligibles: rep.fichesEligibles,
+    repReachabilityRate: rate(rep.fichesJointes, rep.fiches),
+    repAcceptanceRate: rate(rep.fichesAcceptees, rep.fichesEligibles),
+    repCallbackFicheRate: rate(rep.fichesARappeler, rep.fiches),
+    inboundCalls: extra.entrants,
+    missedCalls: extra.manques,
+    callbacksHonored: extra.rappelsHonores,
+    callbacksLate: extra.rappelsRetard,
+    callbacksUpcoming: extra.rappelsAVenir,
+    repCallbacksHonored: extra.repRappelsHonores,
+    repCallbacksLate: extra.repRappelsRetard,
+    repCallbacksUpcoming: extra.repRappelsAVenir,
+  };
+}
+
+function toHistogramBar(row: HistogramRow): SupervisionHistogramBarDto {
+  return { id: row.id, label: row.label, prospects: row.prospects };
+}
+
+function withinWindow(column: Prisma.Sql, query: SupervisionQueryDto): Prisma.Sql {
+  const bounds: Prisma.Sql[] = [];
+  if (query.actFrom) bounds.push(Prisma.sql`${column} >= ${inclusiveDateFrom(query.actFrom)}`);
+  if (query.actTo) bounds.push(Prisma.sql`${column} <= ${inclusiveDateTo(query.actTo)}`);
+  if (query.timeFrom) bounds.push(Prisma.sql`${column}::time >= ${query.timeFrom}::time`);
+  if (query.timeTo) bounds.push(Prisma.sql`${column}::time < ${query.timeTo}::time`);
+  if (!bounds.length) return Prisma.sql`TRUE`;
+  return Prisma.join(bounds, ' AND ');
+}

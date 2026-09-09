@@ -1,0 +1,47 @@
+{
+  "name": "@crm/api-client",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./query": {
+      "types": "./dist/query.d.ts",
+      "default": "./dist/query.js"
+    }
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "oxlint --config ../../.oxlintrc.json --report-unused-disable-directives src",
+    "generate": "node scripts/generate.mjs",
+    "check-generated": "node scripts/check-generated.mjs"
+  },
+  "dependencies": {
+    "openapi-fetch": "catalog:"
+  },
+  "peerDependencies": {
+    "@tanstack/react-query": "catalog:"
+  },
+  "peerDependenciesMeta": {
+    "@tanstack/react-query": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@crm/typescript-config": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@types/node": "catalog:",
+    "openapi-typescript": "catalog:",
+    "prettier": "catalog:",
+    "typescript": "catalog:"
+  }
+}

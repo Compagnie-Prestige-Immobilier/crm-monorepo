@@ -1,0 +1,45 @@
+# Development only. Postgres alone, the API and web app run on the host via
+# `pnpm dev` so they stay hot-reloadable. Production lives in
+# docker-compose.prod.yml.
+#
+# Port 5434 on the host, not 5432: CPI-PLATFORM-NEW already binds 5433 and a
+# stock Postgres install takes 5432. This avoids a silent connection to the
+# wrong database.
+
+# Nom de projet EXPLICITE. Sans lui, Docker Compose le déduit du dossier
+# parent, ici « docker », exactement comme le compose de CPI-PLATFORM-NEW,
+# qui vit lui aussi dans infra/docker/. Les deux projets partageraient alors le
+# même espace de noms et un `up` ici remplacerait le conteneur postgres de
+# l'autre projet sans le moindre avertissement.
+name: cpi-go
+
+services:
+  postgres:
+    image: postgres:18.4
+    container_name: crm-postgres-dev
+    environment:
+      POSTGRES_USER: crm
+      POSTGRES_PASSWORD: crm
+      POSTGRES_DB: crm
+    ports: ['5434:5432']
+    volumes: [crm-postgres18-data:/var/lib/postgresql]
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U crm -d crm']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Port 6381, même raison que 5434 : un Redis local ou celui d'un autre projet
+  # tient souvent 6379/6380.
+  redis:
+    image: redis:8-alpine
+    container_name: crm-redis-dev
+    ports: ['6381:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  crm-postgres18-data:

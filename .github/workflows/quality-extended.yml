@@ -1,0 +1,157 @@
+name: quality-extended
+
+# UN SEUL JOB, ET PLUS AUCUNE PLANIFICATION.
+#
+# Lighthouse et k6 sont RETIRES : ils echouaient a CHAQUE execution, cinq matins
+# par semaine, sur une cause applicative que personne n'a jamais instruite. Un
+# job qui echoue toujours n'apprend rien ; il facture.
+#
+# Maestro reste, mais a la demande seulement : il casse sur « not enough disk
+# space » et facturait jusqu'a soixante-dix minutes pour un verdict connu
+# d'avance. La planification reviendra le jour ou il passera au vert.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-maestro:
+    name: Maestro — Android smoke journey
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # Casse systématiquement sur « not enough disk space » (voir le commentaire
+    # plus bas) et facture jusqu'à une heure certains jours pour un échec
+    # connu d'avance, sans jamais avoir tourné vert. Retiré du planning
+    # quotidien ; reste déclenchable à la main le jour où le problème de
+    # disque est corrigé.
+    if: github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      # -----------------------------------------------------------------------
+      # Ce job échoue sur « Your device does not have enough disk space to run
+      # avd ». L'image ubuntu-latest arrive avec plusieurs dizaines de gigas
+      # d'outillage préinstallé ; en y ajoutant le SDK Flutter, les dépendances
+      # Gradle de `flutter build apk` et l'image système x86_64 que tire
+      # l'émulateur, il ne reste plus de quoi créer l'AVD.
+      #
+      # Aucun cache ne remplace cette étape, et c'est la raison pour laquelle
+      # l'instantané d'AVD que propose android-emulator-runner n'est PAS ajouté
+      # ici : le restaurer suppose qu'un AVD ait pu être créé au moins une
+      # fois, et écrirait plusieurs gigas sur le disque qui manque déjà. Il
+      # coûterait de surcroît une grosse part du plafond de 10 Go par dépôt, au
+      # détriment des caches du chemin chaud (pnpm, turbo, SDK Flutter) que
+      # chaque PR utilise, alors que ce job-ci ne tourne que la nuit. Même
+      # arbitrage pour `~/.gradle` : environ un giga de quota pour faire gagner
+      # quelques minutes à un job que personne n'attend. À reconsidérer une
+      # fois ce job vu vert et sa marge disque réelle connue.
+      #
+      # DEUX répertoires sont volontairement ÉPARGNÉS, et les toucher casserait
+      # le job plus sûrement que le manque de place :
+      #   /usr/local/lib/android     SDK Android, requis par `flutter build apk`
+      #                              ET par l'émulateur.
+      #   /opt/hostedtoolcache/Java* JDK, requis par Gradle. `flutter build apk`
+      #                              échoue sans lui, et rien dans ce job ne le
+      #                              réinstalle.
+      #
+      # Le reste de la liste est du contenu qu'aucune étape de ce job n'ouvre.
+      # Ordre de grandeur libéré sur l'image ubuntu-latest actuelle, mesuré par
+      # les `df -h` encadrants au prochain passage : dotnet ~1,6 Go, ghcup+ghc
+      # ~2,7 Go, swift ~1,9 Go, powershell ~1,2 Go, CodeQL ~5,4 Go, boost ~1 Go,
+      # miniconda ~0,7 Go, Azure CLI ~1 Go. Soit une quinzaine de gigas, sur un
+      # disque qui en offre une vingtaine de libres au départ.
+      #
+      # La quantité est le point faible du dispositif : elle n'est PAS vérifiée.
+      # Le seuil ci-dessous ne fait donc pas échouer l'étape, l'émulateur restant
+      # seul juge de ce qui lui suffit, mais il inscrit le chiffre en clair
+      # dans le journal. Si ce job échoue encore sur l'espace disque, la ligne
+      # d'annotation dit immédiatement s'il faut élargir cette liste ou chercher
+      # ailleurs, au lieu de relire « does not have enough disk space » une
+      # troisième fois sans la moindre mesure.
+      # -----------------------------------------------------------------------
+      - name: Récupérer de l'espace disque
+        run: |
+          set -uo pipefail
+          echo "Avant :"; df -h /
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /usr/share/swift \
+            /usr/local/.ghcup \
+            /opt/ghc \
+            /usr/local/share/powershell \
+            /usr/local/share/boost \
+            /usr/share/miniconda \
+            /opt/az \
+            /opt/hostedtoolcache/CodeQL \
+            /opt/hostedtoolcache/PyPy \
+            /opt/hostedtoolcache/Ruby \
+            /opt/hostedtoolcache/go || true
+          docker image prune --all --force || true
+          echo "Après :"; df -h /
+          # Le repli à 999 vaut « mesure indisponible » : mieux vaut ne rien
+          # annoncer qu'avertir à tort sur une valeur vide, qui ferait en plus
+          # râler `test` sur un opérande non entier.
+          libre=$(df --output=avail --block-size=1G / | tail -1 | tr -d ' ')
+          libre=${libre:-999}
+          echo "Espace libre sur / : ${libre} Go"
+          if [ "${libre}" -lt 12 ]; then
+            echo "::warning::Seulement ${libre} Go libres avant la création de l'AVD."
+            echo "::warning::En dessous de ~12 Go ce job retombe sur « not enough disk space »."
+          fi
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        id: flutter
+        with:
+          flutter-version: 3.41.7
+          channel: stable
+          cache: true
+
+      # Même cache que le job `mobile` de ci.yml, mêmes clés : les deux jobs se
+      # partagent donc une seule entrée. Sûr par auto-validation de
+      # build_runner, voir le commentaire détaillé dans ci.yml.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
+        with:
+          path: apps/mobile/.dart_tool/build
+          key: build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-${{ github.job }}-${{ github.sha }}
+          restore-keys: |
+            build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-
+
+      - working-directory: apps/mobile
+        run: |
+          flutter pub get
+          dart run build_runner build --delete-conflicting-outputs
+          flutter build apk --debug
+      # `curl … | bash` remplacé par un téléchargement ÉPINGLÉ et VÉRIFIÉ.
+      #
+      # Le script d'installation officiel exécute, avec les droits du runner,
+      # tout ce que `get.maestro.mobile.dev` sert à cet instant précis : un
+      # détournement DNS, un compte CDN compromis ou une simple modification
+      # amont fait tourner du code arbitraire dans un job qui a accès au dépôt
+      # et aux secrets. Rien dans le pipeline ne le remarquerait.
+      #
+      # Ici la version est figée et l'archive est comparée à son empreinte
+      # SHA-256. Une archive substituée fait échouer `sha256sum -c` avant que
+      # quoi que ce soit ne s'exécute. Mettre à jour Maestro devient un commit
+      # explicite — tag et empreinte ensemble — au lieu d'un changement
+      # invisible et non daté.
+      - name: Install Maestro (pinned + checksum)
+        env:
+          MAESTRO_TAG: cli-2.8.0
+          MAESTRO_SHA256: b3e561161904fb391875ca5834d5b22cf0b01c052dd1b408ad83e30d8f8951b3
+        run: |
+          set -euo pipefail
+          curl -sSfL -o /tmp/maestro.zip \
+            "https://github.com/mobile-dev-inc/maestro/releases/download/${MAESTRO_TAG}/maestro.zip"
+          echo "${MAESTRO_SHA256}  /tmp/maestro.zip" | sha256sum -c -
+          unzip -q /tmp/maestro.zip -d "${HOME}/.maestro-dist"
+          echo "${HOME}/.maestro-dist/maestro/bin" >> "${GITHUB_PATH}"
+      - name: Android smoke journey
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_6
+          script: |
+            adb install apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+            maestro test .maestro/smoke.yaml
