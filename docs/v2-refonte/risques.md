@@ -7,6 +7,8 @@ où le risque est traité. État : ouvert, couvert (parade décidée), fermé
 
 ## 0. Réévaluation du 8 septembre
 
+- Version 3.2 : principe directeur (`plan.md` §1.1) et handler unique des
+  référentiels. R33 ajouté.
 - Version 3.1 : quatre audits de portage Go (`audits/go-*.md`). R23 à R32
   ajoutés ; R10 réécrit (beat HTTP au lieu du WebSocket).
 - Version 3 du plan : l'application mobile est abandonnée. Les risques liés à
@@ -68,3 +70,4 @@ où le risque est traité. État : ouvert, couvert (parade décidée), fermé
 | R20 | Ports de développement des deux worktrees en collision | `plan.md` §0 | v2 sur 4000, 5173, 5435 ; `.env.example` de `apps/go` | 1 | couvert |
 | R21 | Colonnes mortes (`users.departementId`, `device_tokens`, `notifications.payload`) reprises telles quelles dans `sql/schema.sql` | `docs/migrations-en-attente.md` §1-2 | Migration de suppression en phase 0, avec la release v1, avant le `pg_dump` de référence | 0 | couvert |
 | R22 | Nettoyage de J+7 rend la v1 indémarrable | `plan.md` §7 | Retour arrière borné à J+7, écrit dans le runbook et accepté au go/no-go | 7 | couvert |
+| R33 | Le handler unique des référentiels dérive vers treize copies, ou construit un nom de table depuis l'URL | `referentiels.controller.ts:67-340` (8 listes x 3 routes) ; `plan.md` §1.1 et §2.1 | Carte `kind` figée en Go vers table et colonnes propres, `kind` inconnu = 404 ; `referentiels.go` plafonné à 350 lignes ; revue du diff sur ce seul point en phase 2 | 2 | couvert |

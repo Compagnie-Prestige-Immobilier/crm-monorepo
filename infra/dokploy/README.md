@@ -74,6 +74,27 @@ Un workflow SSH lançant `docker-compose.prod.yml` sur ce VPS serait pire que
 rien : il démarrerait Caddy sur les ports 80 et 443, déjà tenus par le Traefik
 de Dokploy, et l'un des deux ne monterait pas.
 
+## v2, le binaire Go
+
+`provision` et `configure` créent et règlent une **troisième** application,
+`cpi-go` (`infra/docker/Dockerfile.go`, port 4000, volumes `cpi-go-db-dumps`
+partagé avec la v1, `cpi-go-notes-vocales` et `cpi-go-imports`). Elle ne
+reçoit que l'hôte d'essai `go-v2.cpi-chues.com` : les deux domaines de
+production restent sur `cpi-go-api` et `cpi-go-web`. Ajoutez l'enregistrement A
+`go-v2` et couvrez ce nom par le certificat d'origine, sinon l'essai répond 526.
+
+```bash
+python3 infra/dokploy/deploy.py redeploy cpi-go   # mise en scène sur go-v2
+python3 infra/dokploy/deploy.py bascule --oui     # jour J
+python3 infra/dokploy/deploy.py retour --oui      # retour arrière
+```
+
+`bascule` arrête la v1, déplace `go.cpi-chues.com` et `go-admin.cpi-chues.com`
+sur `cpi-go`, puis la déploie ; `retour` fait l'inverse. Les applications v1
+restent définies, arrêtées, **jusqu'à J+7** : passé la migration de nettoyage
+(`plan.md` §7) elles ne redémarrent plus, et le job CI `deploy` doit alors
+lancer `redeploy cpi-go` au lieu de `redeploy`.
+
 ## Pourquoi pas `docker-compose.prod.yml`
 
 Le compose de production lance Caddy sur les ports 80 et 443. Sur un hôte

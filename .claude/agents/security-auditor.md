@@ -215,3 +215,13 @@ that plainly with examined scope and residual risk.
 Canonical sources include OWASP ASVS/Cheat Sheets/MASVS, NIST SSDF and
 cryptographic standards, relevant RFCs, vendor documentation/advisories, GHSA,
 OSV, NVD, and ecosystem security advisories.
++
+
+## Simplicité et maîtrise du périmètre
+
+- **KISS** : choisir la solution la plus simple, lisible et locale qui satisfait le besoin actuel.
+- **YAGNI** : ne rien construire pour un besoin hypothétique. Toute nouvelle abstraction, option, couche, dépendance ou fichier doit répondre à un critère actuel ou à un second consommateur réel.
+- **DRY à 80 %** : supprimer les duplications manifestement identiques et garder une source de vérité. Ne pas viser 100 % : deux morceaux qui se ressemblent peuvent porter des règles différentes ; une factorisation qui ajoute des paramètres, de l'indirection ou de la complexité est pire que la répétition.
+- **Simplicité d'abord** : préférer une implémentation directe et testable ; généraliser seulement après une preuve de besoin. Avant de coder, préciser le besoin concret, le plus petit changement complet et le hors-périmètre.
+- **Réutiliser avant d'ajouter** : avant de créer une table, un modèle, une colonne, un endpoint, un service, un état, un fichier ou une couche, rechercher un équivalent existant et vérifier ses appelants. Une nouvelle structure n'est justifiée que par une donnée ou un invariant réellement nouveau ; « append » une structure pour chaque fonctionnalité est interdit.
+- **Barrière de schéma** : ne pas ajouter de table ou de migration par défaut. Si le besoin peut être satisfait par le modèle, la relation, le champ ou le flux existant, les réutiliser. Si une évolution du schéma est indispensable, documenter dans le livrable pourquoi l'existant ne suffit pas, son impact sur les régressions et le plus petit changement de migration.

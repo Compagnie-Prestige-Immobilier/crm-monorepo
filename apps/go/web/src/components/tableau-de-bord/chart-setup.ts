@@ -1,0 +1,45 @@
+import {
+  ArcElement,
+  BarController,
+  BarElement,
+  BubbleController,
+  CategoryScale,
+  Chart,
+  DoughnutController,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PieController,
+  PointElement,
+  PolarAreaController,
+  RadarController,
+  RadialLinearScale,
+  ScatterController,
+  Tooltip,
+} from 'chart.js';
+
+// Tous les contrôleurs sont enregistrés ici, et non au cas par cas : le tableau
+// de bord laisse remplacer une marque par une autre, donc n'importe laquelle
+// peut apparaître sans qu'un import l'ait annoncée.
+Chart.register(
+  ArcElement,
+  BarController,
+  BarElement,
+  BubbleController,
+  CategoryScale,
+  DoughnutController,
+  Filler,
+  Legend,
+  LineController,
+  LineElement,
+  LinearScale,
+  PieController,
+  PointElement,
+  PolarAreaController,
+  RadarController,
+  RadialLinearScale,
+  ScatterController,
+  Tooltip,
+);

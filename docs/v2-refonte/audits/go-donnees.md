@@ -107,6 +107,8 @@ Le schéma `demo` doit avoir disparu avant le dump (57 tables en double sinon).
 | `payloadVersion` | n'existe pas en base ; `minPayloadVersion` sur `call_outcome_reasons` (`schema.prisma:2261`) et `statuts_qualification` (`:2335`) | garder, colonne inerte |
 | `source MOBILE|APPEL` | suffixe de `audit_logs.action` (`fiche-change.ts:9-12`), texte | rien |
 | enum `ChangeSource {WEB, MOBILE}` | `segment_changes`, `representant_relation_changes`, append-only | garder la valeur |
+| 13 listes de référence (`banques`, `syndicats`, `canaux_provenance`, `professions`, `employeurs`, `pays`, `income_bands`, `offers`, `bank_rejection_reasons`, 4 `visite_*`) | mêmes 7 colonnes de base plus 1 ou 2 colonnes propres chacune (`schema.prisma` : `sigle`, `secteur`, `isTeaching`, `type`, `indicatif`, `minXof`/`maxXof`, `description`, `isSystem`) ; FK typées depuis `prospects`, `bank_cases`, `visites` | garder les 13 tables ; fusion en une table `kind` écartée (FK typées perdues, migration au jour J, retour arrière §7 cassé, aucun gain mesurable) ; un seul handler Go, `plan.md` §1.1 et §2.1 |
+| 6 tables d'historique (`audit_logs`, `segment_changes`, `representant_relation_changes`, `app_setting_changes`, `visite_import_changes`, `lot_export_reaffectations`) | append-only, colonnes différentes, un `INSERT` sqlc de 5 lignes chacune | garder ; fusion écartée pour la même raison |
 
 Migration goose J+7, sans `Down` :
 

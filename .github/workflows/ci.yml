@@ -162,6 +162,82 @@ jobs:
       # fichier n'ait à le savoir. Voir le job `contract` pour le détail.
       - run: pnpm build
 
+  go:
+    name: go — plafonds, sqlc, lint, vet, build, intégration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      TEST_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
+    services:
+      postgres:
+        image: postgres:18.4
+        env:
+          POSTGRES_DB: crm
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: apps/go/go.mod
+          cache-dependency-path: apps/go/go.sum
+
+      # Tout `*_test.go` sans le tag `integration` est un test unitaire, interdit ici.
+      - name: Aucun test unitaire
+        run: |
+          for f in $(git ls-files 'apps/go/*_test.go'); do
+            head -1 "$f" | grep -q '^//go:build integration$' || { echo "::error::$f sans tag integration"; exit 1; }
+          done
+
+      # Plafonds de plan.md (YAGNI) : un fichier Go sous 1 500 lignes, un
+      # composant ou écran sous 300, rien de généré dans git.
+      - name: Plafonds et artefacts générés
+        run: tools/dev/plafonds.sh
+
+      - name: Schéma v1 sur la base de test
+        run: |
+          for d in packages/database/prisma/migrations/*/; do
+            PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f "$d/migration.sql"
+          done
+      # `vet` prépare chaque requête sur la base réellement migrée : une colonne
+      # absente ou renommée rougit ici, pas en production.
+      - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 vet
+        working-directory: apps/go
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: v2.13.2
+          working-directory: apps/go
+      - run: go vet -tags integration ./... && go build ./...
+        working-directory: apps/go
+
+      # Le panneau se type depuis le document OpenAPI du binaire, produit ici
+      # et jamais commité ; `dist/` est ensuite embarqué par `go build`.
+      - uses: ./.github/actions/setup-node
+      - run: pnpm install --frozen-lockfile --filter @crm/panel --filter @crm/panel-e2e
+      - run: go run . -openapi > openapi.json
+        working-directory: apps/go
+      - run: pnpm gen && pnpm typecheck && pnpm lint && pnpm build
+        working-directory: apps/go/web
+      - run: go build ./... && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cpi-go .
+        working-directory: apps/go
+      - run: go test -tags integration -count=1 ./...
+        working-directory: apps/go
+
+      # Les parcours Playwright tournent contre le binaire et la base réelle.
+      - run: pnpm exec playwright install --with-deps chromium
+        working-directory: apps/go/e2e
+      - run: pnpm test
+        working-directory: apps/go/e2e
+        env:
+          DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
+
   # Les quatre scanners de sécurité, appelés ICI et non plus déclenchés à côté.
   # Voir l'en-tête de security.yml : `needs:` ne franchit pas la frontière d'un
   # workflow, donc tant qu'ils vivaient dans le leur, `deploy` ne pouvait pas
