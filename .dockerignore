@@ -1,0 +1,9 @@
+node_modules
+web/node_modules
+web/dist
+e2e
+db
+storage
+cpi-go
+.git
+.env

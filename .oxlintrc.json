@@ -4,29 +4,17 @@
     "correctness": "error",
     "suspicious": "off"
   },
-  "plugins": ["typescript", "import", "react", "jsx-a11y", "nextjs", "vitest", "unicorn", "oxc"],
+  "plugins": ["typescript", "import", "react", "jsx-a11y", "unicorn", "oxc"],
   "jsPlugins": ["eslint-plugin-sonarjs"],
   "env": {
     "browser": true,
     "node": true
   },
-  "ignorePatterns": [
-    "**/dist/**",
-    "**/.next/**",
-    "**/node_modules/**",
-    "**/coverage/**",
-    "**/src/generated/**"
-  ],
+  "ignorePatterns": ["**/dist/**", "**/node_modules/**"],
   "options": {
     "typeAware": true,
     "maxWarnings": 0
   },
-  "overrides": [
-    {
-      "files": ["apps/go/web/**"],
-      "rules": { "nextjs/no-img-element": "off" }
-    }
-  ],
   "rules": {
     "complexity": ["error", { "max": 10, "variant": "classic" }],
     "max-depth": ["error", 2],
@@ -47,19 +35,6 @@
         "depth": 5,
         "ignoreElements": ["audio", "canvas", "embed", "input", "option", "textarea", "tr", "video"]
       }
-    ],
-    "vitest/expect-expect": [
-      "error",
-      {
-        "assertFunctionNames": [
-          "expect",
-          "expectReadable",
-          "expectFailsAsText",
-          "expectFailsEntirely"
-        ]
-      }
-    ],
-    "vitest/require-mock-type-parameters": "off",
-    "vitest/valid-expect": ["error", { "maxArgs": 2 }]
+    ]
   }
 }

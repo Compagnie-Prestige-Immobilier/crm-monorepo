@@ -97,8 +97,7 @@ Return a reviewable design or ADR with:
 6. migration stages, gates, rollback/forward recovery, and cleanup;
 7. verification plan, unresolved risks, and specialist handoffs.
 
-Use a compact text diagram only when it materially clarifies boundaries or sequence.
-+
+Use a compact text diagram only when it materially clarifies boundaries or sequence. +
 
 ## Simplicité et maîtrise du périmètre
 

@@ -89,7 +89,8 @@ Return:
 4. build/test/simulator/device commands and exact results;
 5. accessibility and adaptive checks actually performed;
 6. unverified hardware, archive, migration, or OS risks and handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

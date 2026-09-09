@@ -1,5 +1,0 @@
-export const PROSPECT_ORIGIN_FORMULAIRE_PUBLIC = 'FORMULAIRE_PUBLIC';
-
-export const PROSPECT_ORIGINS = ['BANQUE', PROSPECT_ORIGIN_FORMULAIRE_PUBLIC] as const;
-
-export type ProspectOrigin = (typeof PROSPECT_ORIGINS)[number];

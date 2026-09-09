@@ -87,7 +87,8 @@ Return:
 4. build/test/device commands and exact results;
 5. accessibility and adaptive checks;
 6. unverified OEM, release, migration, or device risks and handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

@@ -23,16 +23,8 @@ Les audits décrivent la v1 et citent la cible Node et PowerSync de la version
 
 ## Où travailler
 
-La v2 se construit dans un worktree séparé, jamais dans le clone principal :
-
-```
-git fetch origin
-git worktree add ../crm-monorepo-v2 -b v2 origin/dev
-cd ../crm-monorepo-v2 && go build ./apps/go/... && pnpm --dir apps/go/web install
-```
-
-Le clone principal reste sur `dev` ou `prod` pour les correctifs et la release
-v1 de maintenance. Détail dans `plan.md` §0.
+À la racine du dépôt : la v1 a été purgée le 9 septembre 2026, `make setup &&
+make build` suffit. Détail dans `plan.md` §0.
 
 ## Ordre de lecture
 

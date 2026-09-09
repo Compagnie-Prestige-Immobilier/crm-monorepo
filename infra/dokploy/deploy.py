@@ -899,7 +899,7 @@ def cmd_configure() -> None:
     )
     ok("Web, infra/docker/Dockerfile.web")
 
-    # Pas de dockerBuildStage : `runner` est la dernière étape de Dockerfile.go.
+    # Pas de dockerBuildStage : `runner` est la dernière étape du Dockerfile.
     # Le HEALTHCHECK est dans l'image, Dokploy n'expose pas de champ pour cela
     # hors mode swarm.
     call(
@@ -907,14 +907,14 @@ def cmd_configure() -> None:
         {
             "applicationId": ids["GO_ID"],
             "buildType": "dockerfile",
-            "dockerfile": "infra/docker/Dockerfile.go",
+            "dockerfile": "Dockerfile",
             "dockerContextPath": "/",
             "dockerBuildStage": "",
             "herokuVersion": "",
             "railpackVersion": "",
         },
     )
-    ok("Go, infra/docker/Dockerfile.go")
+    ok("Go, Dockerfile à la racine")
 
     step("Stockage persistant du binaire Go")
     # `cpi-go-db-dumps` est le volume DÉJÀ en production sous l'API v1 : il est
@@ -1179,11 +1179,22 @@ def cmd_bascule() -> None:
     hôte, cas où la destination servie est celle que Traefik a chargée en
     dernier, donc indéterminée.
 
+    Le binaire Go est construit et vérifié sur l'hôte d'essai AVANT d'arrêter la
+    v1 : une image qui ne se construit pas laisse alors la production intacte au
+    lieu de couper les deux domaines (simulation du 9 septembre 2026 : un COPY
+    manquant dans le Dockerfile a fait échouer la première construction).
+
     Les applications v1 restent DÉFINIES, seulement arrêtées : `retour` les
     remet en service sans rien reconstruire.
     """
     _confirmer("bascule")
     ids = _ids_bascule()
+
+    step(f"Construction et démarrage de {GO_NAME} sur {GO_STAGING_DOMAIN}")
+    call("application.deploy", {"applicationId": ids["GO_ID"]})
+    _attendre_application(ids["GO_ID"])
+    _attendre_sante(f"https://{GO_STAGING_DOMAIN}/health/ready")
+    ok("binaire en ligne, goose a appliqué la migration des triggers updatedAt")
 
     step("Arrêt de la v1")
     for cle, nom in (("API_ID", API_NAME), ("WEB_ID", WEB_NAME)):
@@ -1198,11 +1209,39 @@ def cmd_bascule() -> None:
     step(f"Domaines rattachés à {GO_NAME}")
     _attach_domain(ids["GO_ID"], API_DOMAIN, GO_PORT)
     _attach_domain(ids["GO_ID"], WEB_DOMAIN, GO_PORT)
-
-    step(f"Déploiement, {GO_NAME}")
-    call("application.deploy", {"applicationId": ids["GO_ID"]})
-    ok("demandé, goose applique la migration des triggers updatedAt au démarrage")
+    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
+    ok("les deux domaines répondent depuis le binaire Go")
     info(f"l'hôte d'essai {GO_STAGING_DOMAIN} reste rattaché, il ne gêne pas")
+
+
+def _attendre_application(application_id: str, minutes: int = 20) -> None:
+    """Dokploy construit de façon asynchrone : on attend `done`, on refuse `error`."""
+    for _ in range(minutes * 6):
+        app = call("application.one", {"applicationId": application_id}, method="GET") or {}
+        statut = app.get("applicationStatus")
+        if statut == "done":
+            return
+        if statut == "error":
+            fail("la construction a échoué sur Dokploy ; la v1 n'a pas été touchée.")
+            sys.exit(1)
+        time.sleep(10)
+    fail(f"construction toujours en cours après {minutes} minutes ; la v1 n'a pas été touchée.")
+    sys.exit(1)
+
+
+def _attendre_sante(url: str, secondes: int = 120) -> None:
+    # Cloudflare refuse les agents non navigateur (erreur 1010).
+    requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
+    for _ in range(secondes // 5):
+        try:
+            with urllib.request.urlopen(requete, timeout=10) as reponse:
+                if reponse.status == 200:
+                    return
+        except (urllib.error.URLError, TimeoutError):
+            pass
+        time.sleep(5)
+    fail(f"{url} ne répond pas 200 après {secondes} s.")
+    sys.exit(1)
 
 
 def cmd_retour() -> None:

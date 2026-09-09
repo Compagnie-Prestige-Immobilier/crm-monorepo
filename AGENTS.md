@@ -59,10 +59,10 @@ terminal.
 (`fake-*`, mock, stub) ecrit pour eux. La CI refuse tout fichier de ce type.
 Ne pas en proposer, ne pas en ecrire meme "pour verifier".
 
-Ce qui reste et ce qui prouve: les tests d'integration API contre Postgres
-(`*.integration.test.ts`, `pnpm test:integration`), les parcours Playwright
-(`apps/web/e2e`, `pnpm test:e2e`) et le smoke Maestro. Un comportement se
-verifie contre la pile reelle ou a la main, pas contre un mock.
+Ce qui reste et ce qui prouve: les tests d'integration Go contre Postgres
+(`*_integration_test.go` sous `//go:build integration`, `make test`) et les
+parcours Playwright (`e2e/`, `make e2e`). Un comportement se verifie contre la
+pile reelle ou a la main, pas contre un mock.
 
 Un test qui passe sur du code casse est PIRE que pas de test. Avant de garder
 un test d'integration ou e2e, le casser: modifier le code qu'il couvre,
@@ -171,7 +171,7 @@ Ce qui a coute le plus, a ne JAMAIS reproduire ici ni ailleurs :
   `clearedFields`, second chemin d'ecriture) la ou PowerSync ou ElectricSQL
   existent
 - une double stack pour un seul contrat : classes DTO Nest + Swagger + OpenAPI
-  + codegen + relais Next, la ou un schema zod partage suffit
+  - codegen + relais Next, la ou un schema zod partage suffit
 - deux arbres de routes quasi identiques (CHUES et Grand Public) au lieu d'un
   parametre
 - quatre bibliotheques de statistiques et quinze endpoints analytics pour un
@@ -210,9 +210,9 @@ unitaire ; rien de genere n'est commite.
 
 Ces plafonds sont verifies par la CI et en local, pas seulement lus. Job `go`
 de `.github/workflows/ci.yml` : `tools/dev/plafonds.sh` (1 500 lignes par
-fichier Go, 300 par fichier `apps/go/web/src`, aucun `db/`, `openapi.json`,
+fichier Go, 300 par fichier `web/src`, aucun `db/`, `openapi.json`,
 `schema.d.ts`, `*.gen.ts` ni `dist/` suivi par git) puis `golangci-lint` avec
-`apps/go/.golangci.yml` : `depguard` refuse Gin, Echo, Fiber, GORM et Redis ;
+`.golangci.yml` : `depguard` refuse Gin, Echo, Fiber, GORM et Redis ;
 `gocyclo` 12, `gocognit` 15 (seuil Sonar), `nestif` 4, `dupl` 80 jetons ;
 `nolintlint` exige une raison ecrite et un linteur nomme ; `godox` refuse les
 `TODO`. Un depassement se corrige en coupant, jamais en relevant le plafond, en
@@ -239,7 +239,9 @@ est le seul client, ni Flutter, ni PowerSync, ni sync, ni APK en v2 ; meme
 base Postgres ; phase 0 = trois preuves sur copie de prod avec go/no-go ;
 quatre audits de portage dans `docs/v2-refonte/audits/go-*.md` font foi pour
 le detail ; gel des fonctionnalites sur `dev`
-avec une seule release v1 de maintenance nommee. La v2 se construit dans le
-worktree `../crm-monorepo-v2` sur la branche `v2`, jamais dans ce clone. Toute
-proposition qui contredit ces decisions se signale en une ligne au proprietaire
-avant d'etre codee.
+avec une seule release v1 de maintenance nommee. Le 9 septembre la v1 (Nest,
+Next, Prisma, Flutter, clients generes) a ete purgee de ce depot et `apps/go`
+en est devenu la racine : `cmd/server`, `internal/`, `sql/`, `web/`, `e2e/`.
+Pas de stockage local ni de sync dans le panneau : une perte de donnees hors
+ligne nous serait imputee. Toute proposition qui contredit ces decisions se
+signale en une ligne au proprietaire avant d'etre codee.

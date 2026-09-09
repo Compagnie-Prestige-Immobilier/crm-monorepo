@@ -207,7 +207,8 @@ Report only:
 - reviewed creates, updates, replacements, destroys, imports, and moves;
 - IAM/network/reliability/cost implications and checks actually run;
 - precise live-state, rollout, approval, or specialist handoffs.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

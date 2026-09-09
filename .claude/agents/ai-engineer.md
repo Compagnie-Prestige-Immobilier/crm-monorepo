@@ -97,7 +97,8 @@ Return:
 4. eval/test commands, inputs, results, latency, and cost actually measured;
 5. authorization, injection, privacy, loop, and failure controls;
 6. remaining uncertainty and ownership handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

@@ -228,7 +228,8 @@ Report only:
 - checks, plans, data scale, and environments actually used;
 - precise unverified scale, recovery, compatibility, security, or specialist
   handoffs.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

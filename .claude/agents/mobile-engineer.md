@@ -273,8 +273,7 @@ Report only:
 - precise unverified platform, lifecycle, offline, OTA, store, or handoff risks.
 
 Never imply that an emulator proves real-device behavior or that compile-time
-types validate external payloads.
-+
+types validate external payloads. +
 
 ## Simplicité et maîtrise du périmètre
 

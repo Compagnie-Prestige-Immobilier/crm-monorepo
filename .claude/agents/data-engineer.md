@@ -225,7 +225,8 @@ Report only:
 - contract, grain, state/checkpoint, partition, retention, or backfill impact;
 - checks, sample/window, environment, and reconciliation results;
 - precise unverified scale, quality, privacy, recovery, or specialist handoffs.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

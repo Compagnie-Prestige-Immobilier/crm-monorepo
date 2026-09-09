@@ -163,8 +163,7 @@ Then include only:
 
 If there are no findings, say so plainly and identify residual testing/scope
 limits. Do not pad with ceremonial praise, generic checklists, style nits, or a
-summary of the diff.
-+
+summary of the diff. +
 
 ## Simplicité et maîtrise du périmètre
 
