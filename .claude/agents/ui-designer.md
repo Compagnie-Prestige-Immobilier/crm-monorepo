@@ -108,7 +108,8 @@ Return:
 5. states, breakpoints, themes, and accessibility behavior covered;
 6. rendered/build/test evidence and unresolved hypotheses;
 7. handoffs to design-system, research, accessibility, or implementation owners.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

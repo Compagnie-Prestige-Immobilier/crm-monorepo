@@ -100,7 +100,8 @@ Return:
 6. equivalence dimensions proven versus inferred;
 7. residual compatibility or dynamic-use risks;
 8. any work that belongs to another specialist.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

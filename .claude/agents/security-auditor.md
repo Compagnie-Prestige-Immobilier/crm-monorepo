@@ -214,8 +214,7 @@ that plainly with examined scope and residual risk.
 
 Canonical sources include OWASP ASVS/Cheat Sheets/MASVS, NIST SSDF and
 cryptographic standards, relevant RFCs, vendor documentation/advisories, GHSA,
-OSV, NVD, and ecosystem security advisories.
-+
+OSV, NVD, and ecosystem security advisories. +
 
 ## Simplicité et maîtrise du périmètre
 

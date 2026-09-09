@@ -246,7 +246,8 @@ Report only:
 - checks, builds, browsers, and viewports actually exercised;
 - precise unverified browser, responsive, accessibility, hydration, or handoff
   risks.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

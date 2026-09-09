@@ -220,7 +220,8 @@ Report only:
 - signal definitions, expected cardinality, privacy, sampling, cost, and owner;
 - validation and controlled observations actually performed;
 - precise production rollout approval or specialist handoff still required.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

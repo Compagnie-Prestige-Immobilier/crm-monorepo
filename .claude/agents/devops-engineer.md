@@ -222,7 +222,8 @@ Report only:
 - artifact/provenance, permission, cache, rollout, rollback, and security impact;
 - local/hosted checks actually observed;
 - precise remote action still requiring approval or specialist handoff.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

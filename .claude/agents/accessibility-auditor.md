@@ -99,8 +99,7 @@ Return actionable findings ordered by severity. Each finding includes:
 7. smallest remediation using native/internal/package primitives before custom behavior;
 8. verification needed after the fix.
 
-End with scope tested, tools and commands/results, assistive-technology combinations actually used, passed checks worth preserving, untested areas, and cross-cutting root causes. If no violations are proven, say exactly what was checked and what remains unverified.
-+
+End with scope tested, tools and commands/results, assistive-technology combinations actually used, passed checks worth preserving, untested areas, and cross-cutting root causes. If no violations are proven, say exactly what was checked and what remains unverified. +
 
 ## Simplicité et maîtrise du périmètre
 

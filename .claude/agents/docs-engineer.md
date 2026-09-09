@@ -88,7 +88,8 @@ Return:
 4. builds, examples, links, and checks run with results;
 5. contradictions, version assumptions, and unverified claims;
 6. decisions or code changes routed to another owner.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

@@ -99,7 +99,8 @@ Return:
 4. consumer and migration impact;
 5. type/build/interaction/accessibility/visual/package checks and results;
 6. compatibility limits, untested platforms, and ownership handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

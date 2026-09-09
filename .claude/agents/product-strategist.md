@@ -105,7 +105,8 @@ Return the requested decision-ready artifact with:
 5. success/guardrail metrics and acceptance criteria;
 6. risks, dependencies, rollout/fallback/removal plan;
 7. confidence and specialist handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

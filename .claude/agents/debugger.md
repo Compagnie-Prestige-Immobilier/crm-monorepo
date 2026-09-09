@@ -166,7 +166,8 @@ Report only:
 - changed files and regression check;
 - exact verification results and environments;
 - remaining production/intermittency limitations or specialist handoff.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

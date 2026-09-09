@@ -235,7 +235,8 @@ Report only:
 - important semantic and compatibility decisions;
 - lint, parse, diff, generation, and contract checks actually run;
 - unresolved product, consumer, rollout, or specialist handoffs.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

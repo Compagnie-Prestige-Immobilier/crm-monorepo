@@ -1,172 +1,30 @@
 name: ci
 
 on:
-  # `dev` est la branche de travail : tout ce qui y atterrit est vérifié.
-  # `prod` ne reçoit que des PR — la CI y tourne donc AVANT la fusion, pas
-  # après, ce qui est le seul moment où son verdict peut encore empêcher un
-  # déploiement cassé.
   pull_request:
     branches: [dev, prod]
-    # `labeled` EST INDISPENSABLE, et son absence rendait muet le seul moyen
-    # d'accepter une rupture de contrat.
-    #
-    # Les types par défaut sont `opened`, `synchronize` et `reopened`. Le
-    # portillon `oasdiff` lit `github.event.pull_request.labels`, c'est à dire
-    # la charge utile de l'ÉVÉNEMENT, figée au déclenchement. Poser le label
-    # `api-breaking` après coup ne déclenchait donc rien, et relancer le job
-    # rejoue la charge utile d'origine — celle d'avant le label. Le seul recours
-    # était de pousser un commit vide ou de refermer la PR pour la rouvrir.
-    #
-    # Autrement dit : le label documenté comme « le seul moyen de passer » ne
-    # fonctionnait que si on l'avait posé AVANT de pousser, ce qu'aucun auteur
-    # ne peut deviner tant que le portillon n'a pas parlé.
-    types: [opened, synchronize, reopened, labeled]
   push:
-    # `prod` REJOINT LA LISTE, et c'est ce qui rend le déploiement automatique
-    # possible. Jusqu'ici la CI ne tournait sur `prod` qu'AVANT la fusion, via
-    # la PR. Le résultat FUSIONNÉ n'était donc éprouvé par rien, et c'est
-    # pourtant lui qu'on déploie. Le job `deploy` plus bas dépend de tous les
-    # autres : sans exécution sur `prod`, il n'aurait rien à quoi se raccrocher.
     branches: [dev, prod]
 
-# Aucun job n'écrit dans le dépôt.
 permissions:
   contents: read
 
-# Une PR poussée trois fois de suite n'occupe pas trois fois les runners.
-#
-# SAUF SUR `prod`, ET LA NUANCE EST TOUTE NEUVE. Depuis que le job `deploy` vit
-# dans ce workflow, une annulation n'économise plus seulement des minutes
-# d'exécutant : elle peut tomber PENDANT une mise en ligne. Le job porte bien
-# `concurrency: deploy-prod` avec `cancel-in-progress: false`, mais cette
-# garde-là ne protège que d'un SECOND déploiement simultané ; elle ne peut rien
-# contre une annulation venue du niveau workflow, qui emporte le job en cours.
-# Deux fusions rapprochées vers `prod` auraient donc interrompu la première
-# reconstruction à mi-course.
+# Une PR poussée trois fois n'occupe pas trois fois les runners. Pas sur `prod` :
+# une annulation y tomberait pendant la mise en ligne que `deploy` porte.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/prod' }}
 
 env:
-  TURBO_TELEMETRY_DISABLED: '1'
   DO_NOT_TRACK: '1'
-  NEXT_TELEMETRY_DISABLED: '1'
 
 jobs:
-  # ---------------------------------------------------------------------------
-  # Qualité TypeScript : format, lint, types, intégration, build.
-  # ---------------------------------------------------------------------------
-  node:
-    name: node — format, lint, types, intégration, build
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
-      # Les deux secrets doivent faire au moins 32 caractères, sinon apps/api
-      # refuse de démarrer (cf. .env.example / src/env.ts).
-      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
-      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
-      BUSINESS_TIME_ZONE: Africa/Dakar
-      PHONE_DEFAULT_REGION: SN
-      SEED_ADMIN_EMAIL: admin@cpi.sn
-      SEED_ADMIN_USERNAME: admin
-      SEED_ADMIN_PASSWORD: ci-admin-password-2026
-      REDIS_URL: redis://localhost:6379
-      DEMO_WORKSPACE_ENABLED: 'true'
-    services:
-      postgres:
-        image: postgres:18.4
-        env:
-          POSTGRES_DB: crm
-          POSTGRES_USER: crm
-          POSTGRES_PASSWORD: crm
-        ports:
-          - 5432:5432
-        options: >-
-          --health-cmd "pg_isready -U crm -d crm"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-      redis:
-        image: redis:8-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-      - uses: ./.github/actions/setup-node
-      # Le build global régénère aussi le client Dart via build_runner.
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        with:
-          flutter-version: 3.41.7
-          channel: stable
-          cache: true
-
-      - name: Client Prisma
-        run: pnpm db:generate
-
-      - run: pnpm format:check
-      - run: pnpm lint
-      - run: pnpm dead-code
-      - run: pnpm typecheck
-
-      # Les tests unitaires sont interdits dans ce dépôt (voir CLAUDE.md).
-      # Seuls restent les tests d'intégration Postgres, Playwright et Maestro.
-      - name: Aucun test unitaire
-        run: |
-          unitaires=$(git ls-files 'apps/*/src/**/*.test.ts' 'apps/*/src/**/*.test.tsx' 'packages/**/*.test.ts' 'apps/mobile/test/**' | grep -v '\.integration\.test\.ts$' || true)
-          if [ -n "$unitaires" ]; then
-            echo "::error::Tests unitaires interdits :"
-            echo "$unitaires"
-            exit 1
-          fi
-
-      - name: Migrations
-        run: pnpm db:deploy
-
-      # -----------------------------------------------------------------------
-      # RIEN ne vérifiait que la chaîne de migrations produit bien le schéma
-      # décrit par schema.prisma, et les deux se lisent séparément :
-      # `db:deploy` applique les migrations, `db:generate` engendre le client
-      # depuis schema.prisma. Ajouter un champ au schéma en oubliant sa
-      # migration donnait donc une CI verte de bout en bout, le client typé
-      # connaît la colonne et la base ne l'a pas, et la panne n'apparaissait qu'à
-      # la première requête qui touche ce champ, en production.
-      #
-      # `prisma migrate diff --exit-code` compare la base réellement migrée au
-      # schéma et sort en 2 s'il reste quoi que ce soit à appliquer. Vérifié en
-      # local dans les deux sens : 0 sur la chaîne intacte, 2 après ajout d'une
-      # colonne à la main. Un portillon qui ne sait pas devenir rouge ne vaut
-      # rien ; celui-ci sait.
-      # -----------------------------------------------------------------------
-      - name: Dérive entre les migrations et schema.prisma
-        run: |
-          if ! pnpm --filter @crm/database db:diff; then
-            echo "::error::La base issue de prisma/migrations ne correspond pas à schema.prisma."
-            echo "::error::Créer la migration manquante avec \`pnpm db:migrate\`, puis la committer."
-            exit 1
-          fi
-
-      - name: Données de test
-        run: pnpm db:seed
-      - run: pnpm test:integration
-
-      # `pnpm build` passe par turbo : la tâche `build` dépend de `generate`,
-      # qui dépend de `@crm/api#openapi:generate`. Le contrat et le client TS
-      # sont donc régénérés dans le bon ordre sans qu'aucune ligne de ce
-      # fichier n'ait à le savoir. Voir le job `contract` pour le détail.
-      - run: pnpm build
-
   go:
-    name: go — plafonds, sqlc, lint, vet, build, intégration
+    name: go — plafonds, sqlc, lint, panneau, intégration, Playwright
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
       TEST_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
     services:
       postgres:
@@ -186,73 +44,55 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - uses: actions/setup-go@v5
         with:
-          go-version-file: apps/go/go.mod
-          cache-dependency-path: apps/go/go.sum
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: pnpm
 
       # Tout `*_test.go` sans le tag `integration` est un test unitaire, interdit ici.
       - name: Aucun test unitaire
         run: |
-          for f in $(git ls-files 'apps/go/*_test.go'); do
+          for f in $(git ls-files '*_test.go'); do
             head -1 "$f" | grep -q '^//go:build integration$' || { echo "::error::$f sans tag integration"; exit 1; }
           done
-
-      # Plafonds de plan.md (YAGNI) : un fichier Go sous 1 500 lignes, un
-      # composant ou écran sous 300, rien de généré dans git.
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
 
-      - name: Schéma v1 sur la base de test
-        run: |
-          for d in packages/database/prisma/migrations/*/; do
-            PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f "$d/migration.sql"
-          done
-      # `vet` prépare chaque requête sur la base réellement migrée : une colonne
-      # absente ou renommée rougit ici, pas en production.
+      - name: Schéma sur la base de test
+        run: PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f sql/schema.sql
+      # `vet` prépare chaque requête sur la base réelle : une colonne absente
+      # rougit ici, pas en production.
       - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 vet
-        working-directory: apps/go
       - uses: golangci/golangci-lint-action@v9
         with:
           version: v2.13.2
-          working-directory: apps/go
-      - run: go vet -tags integration ./... && go build ./...
-        working-directory: apps/go
+      - run: go vet -tags integration ./...
 
       # Le panneau se type depuis le document OpenAPI du binaire, produit ici
       # et jamais commité ; `dist/` est ensuite embarqué par `go build`.
-      - uses: ./.github/actions/setup-node
-      - run: pnpm install --frozen-lockfile --filter @crm/panel --filter @crm/panel-e2e
-      - run: go run . -openapi > openapi.json
-        working-directory: apps/go
-      - run: pnpm gen && pnpm typecheck && pnpm lint && pnpm build
-        working-directory: apps/go/web
-      - run: go build ./... && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cpi-go .
-        working-directory: apps/go
+      - run: pnpm install --frozen-lockfile
+      - run: go run ./cmd/server -openapi > openapi.json
+      - run: pnpm format:check && pnpm dead-code
+      - run: pnpm --filter @crm/panel gen
+      - run: pnpm lint && pnpm typecheck
+      - run: pnpm --filter @crm/panel build
+      - run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cpi-go ./cmd/server
       - run: go test -tags integration -count=1 ./...
-        working-directory: apps/go
 
-      # Les parcours Playwright tournent contre le binaire et la base réelle.
       - run: pnpm exec playwright install --with-deps chromium
-        working-directory: apps/go/e2e
+        working-directory: e2e
       - run: pnpm test
-        working-directory: apps/go/e2e
-        env:
-          DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
+        working-directory: e2e
+      # L'image que Dokploy construira : un COPY oublié se voit ici, pas le jour J.
+      - run: docker build -t cpi-go:ci .
 
-  # Les quatre scanners de sécurité, appelés ICI et non plus déclenchés à côté.
-  # Voir l'en-tête de security.yml : `needs:` ne franchit pas la frontière d'un
-  # workflow, donc tant qu'ils vivaient dans le leur, `deploy` ne pouvait pas
-  # les attendre — et sur un push vers `prod` ils ne tournaient même pas.
+  # Appelés ici et non déclenchés à côté : `needs` ne franchit pas la frontière
+  # d'un workflow, et `deploy` doit pouvoir les attendre.
   securite:
     name: sécurité — secrets, SAST, dépendances, image
-    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
-    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
-    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
-    # semantique entre deux branches vertes separement. Le reste - contrat,
-    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
-    #
-    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
-    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
-    # lieu de ~25.
     if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
     uses: ./.github/workflows/security.yml
     permissions:
@@ -262,29 +102,9 @@ jobs:
     name: SonarQube Cloud — quality gate
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: node
-    # Configure SONAR_TOKEN as a repository secret and the two repository
-    # variables before enabling this gate. A missing token must be visible,
-    # never silently treated as a passing analysis.
-    #
-    # ═══ PAS SUR `prod`, ET CE N'EST PAS UN ASSOUPLISSEMENT ═══
-    #
-    # `prod` ne reçoit que des avances rapides de `dev` : le commit qui y arrive
-    # est, au bit près, celui que SonarCloud vient d'analyser et de valider sur
-    # `dev`. Le rejouer n'apprend donc rien.
-    #
-    # Et il ne peut de toute façon pas aboutir. SonarCloud auto-configure `prod`
-    # en branche COURTE (« Branch name: prod, type: short » dans le journal du
-    # 16 août 2026), et l'interrogation du portillon y répond « Not authorized
-    # or project not found » alors que l'analyse, elle, s'est bien televersée.
-    # Le job échouait donc sur une branche non déclarée côté SonarCloud, et
-    # entraînait le `deploy` dans sa chute : une mise en ligne empêchée par un
-    # portillon incapable de rendre un verdict, sur du code déjà validé.
-    #
-    # La garantie est conservée là où elle s'exerce vraiment : rien n'atteint
-    # `prod` sans être passé par `dev`, où ce job tourne et bloque.
-    # Meme raison que les autres : voir la garde de `contract`. La qualite se
-    # mesure sur la pull request, ou elle peut encore changer une decision.
+    needs: go
+    # Pas sur `prod` : SonarCloud la classe en branche courte et refuse de
+    # rendre le verdict ; le commit a déjà été analysé sur `dev`.
     if: >-
       ${{ vars.SONAR_ENABLED == 'true'
       && github.ref != 'refs/heads/prod'
@@ -294,16 +114,9 @@ jobs:
       SONAR_PROJECT_KEY: ${{ vars.SONAR_PROJECT_KEY }}
       SONAR_ORGANIZATION: ${{ vars.SONAR_ORGANIZATION }}
     steps:
-      # fetch-depth: 0 : le scanner lit le `git blame` pour décider ce qui est
-      # du « code nouveau », et c'est sur le code nouveau que porte la porte de
-      # qualité par défaut. Avec le clone superficiel de profondeur 1 il n'y a
-      # aucun blame : le scanner émet un WARN par fichier et l'attribution du
-      # code nouveau est dégradée. Seul ce job en a besoin ; un clone complet
-      # est plus lent et aucun autre job ne lit l'historique.
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           fetch-depth: 0
-
       - name: SonarQube Cloud scan and gate
         uses: SonarSource/sonarqube-scan-action@c7ee0f9df90b7aa20e8dcf9695dcfe2e7da5b4f2 # v7
         env:
@@ -314,385 +127,26 @@ jobs:
             -Dsonar.projectKey=${{ vars.SONAR_PROJECT_KEY }}
             -Dsonar.organization=${{ vars.SONAR_ORGANIZATION }}
 
-  # ---------------------------------------------------------------------------
-  # Le portillon central : le code généré committé correspond-il au contrat,
-  # et le contrat casse-t-il les clients déjà déployés ?
-  # ---------------------------------------------------------------------------
-  contract:
-    name: contrat — dérive du code généré + ruptures ascendantes
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
-    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
-    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
-    # semantique entre deux branches vertes separement. Le reste - contrat,
-    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
-    #
-    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
-    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
-    # lieu de ~25.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
-
-    env:
-      NODE_ENV: test
-      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?schema=public
-      JWT_ACCESS_SECRET: ci-access-secret-with-at-least-32-characters
-      JWT_REFRESH_SECRET: ci-refresh-secret-with-at-least-32-characters
-    steps:
-      # fetch-depth: 0 — oasdiff a besoin du contrat de la branche de base,
-      # que `git show origin/<base>:...` ne peut pas lire d'un clone superficiel.
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-        with:
-          fetch-depth: 0
-
-      # ---------------------------------------------------------------------
-      # `turbo-cache: 'false'`, et c'est le seul job où on le désactive.
-      #
-      # Les `inputs` de la tâche `generate` ont été complétés dans turbo.json :
-      # la version épinglée du générateur (`../../openapitools.json`, qui ne
-      # correspondait à AUCUN fichier), le script de génération lui-même
-      # (`tools/dev/generate-dart-client.mjs`), `build.yaml`, `pubspec.yaml` et
-      # `analysis_options.yaml` y figurent désormais. La justification
-      # historique de cette ligne, « pubspec.lock n'est pas dans les inputs »,
-      # n'est donc plus la bonne. Elle reste vraie, mais pour une raison qu'AUCUN
-      # réglage de turbo.json ne peut corriger, et c'est pour celle-là que le
-      # cache reste coupé ici :
-      #
-      #   1. `packages/api-client-dart/pubspec.lock` est ignoré par git
-      #      (convention Dart pour une bibliothèque). Turbo hache par l'index
-      #      git : un fichier ignoré n'est jamais haché, l'inscrire dans
-      #      `inputs` ne changerait rien. Les contraintes en `^x.y.z` de
-      #      pubspec.yaml peuvent donc se résoudre sur un json_serializable plus
-      #      récent, qui écrit d'autres `*.g.dart`, sans qu'un seul fichier suivi
-      #      ne bouge.
-      #   2. Les versions du SDK Flutter/Dart et du JDK sont épinglées DANS CE
-      #      FICHIER, que turbo ne hache pas davantage. `dart format` et
-      #      build_runner sortent des octets différents d'une version à l'autre.
-      #
-      # Dans les deux cas une entrée de cache retrouvée ferait SAUTER la
-      # génération et le portillon anti-dérive comparerait le code committé à
-      # lui-même : vert garanti, vérification nulle. Ce job existe précisément
-      # pour attraper ce vert-là ; il ne peut pas s'appuyer sur le mécanisme
-      # qu'il doit contrôler.
-      #
-      # Le coût est faible et il est délibéré : les seules tâches turbo lancées
-      # ici sont `@crm/database#build` et cette génération, qui doit réellement
-      # s'exécuter pour que le portillon veuille dire quelque chose.
-      # ---------------------------------------------------------------------
-      - uses: ./.github/actions/setup-node
-        with:
-          install: 'false'
-          turbo-cache: 'false'
-
-      # openapi-generator 7.24.0 tourne sur la JVM.
-      - uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961 # v5
-        with:
-          distribution: temurin
-          java-version: '21'
-
-      # build_runner produit les *.g.dart du client Dart.
-      # `cache: true` couvre DEUX caches dans cette version épinglée de
-      # l'action : le SDK Flutter, et `~/.pub-cache` (clé
-      # `flutter-pub-<os>-<canal>-<version>-<arch>` suffixée par
-      # `hashFiles('**/pubspec.lock')`). Inutile d'en ajouter un troisième
-      # à la main, il ferait doublon avec celui-là.
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        id: flutter
-        with:
-          flutter-version: 3.41.7
-          channel: stable
-          cache: true
-
-      # ---------------------------------------------------------------------
-      # État incrémental de build_runner pour le client Dart, ~28 Mo.
-      # `.dart_tool/build` contient `asset_graph.json` (l'empreinte de chaque
-      # entrée), `generated`, et surtout `entrypoint` : le script de build
-      # compilé, qui est la partie coûteuse d'une exécution à froid.
-      #
-      # `restore-keys` est sûr ici pour une raison DIFFÉRENTE de celle de
-      # turbo, et c'est ce qui permet de garder ce cache dans un job où le
-      # cache turbo est coupé : build_runner valide lui-même ce qu'il relit. Au
-      # chargement du graphe (build_runner_core, asset_graph/graph_loader.dart)
-      # il compare l'empreinte des phases de build, les versions de langage des
-      # paquets, les expériences activées et la version du SDK Dart ; au
-      # moindre écart il supprime le graphe ET les sorties, puis reconstruit
-      # tout. Un graphe illisible déclenche la même reconstruction complète.
-      # Une entrée périmée coûte donc au pire ce qu'aurait coûté l'absence de
-      # cache, jamais un artefact faux, y compris pour le relèvement de
-      # version Dart qui justifie la coupure du cache turbo juste au-dessus.
-      #
-      # `pubspec.yaml` ET NON `pubspec.lock` dans la clé, et c'est une
-      # correction, pas un détail de style. Ce `pubspec.lock` est ignoré par git
-      # (packages/api-client-dart/.gitignore) : il n'existe donc PAS sur le
-      # disque au moment où cette étape s'exécute, `dart pub get` ne tournant
-      # que plus bas, dans l'étape de génération. `hashFiles` sur un chemin
-      # inexistant ne remonte rien : il ne râle pas, il l'ignore. La clé ne
-      # portait en réalité que l'empreinte de build.yaml, et le commentaire qui
-      # affirmait le contraire décrivait une protection qui n'était pas là.
-      # pubspec.yaml, lui, est suivi et présent dès le checkout.
-      #
-      # Le préfixe de restauration s'arrête donc à pubspec.yaml + build.yaml :
-      # un jeu de générateurs différent n'est jamais restauré, même si
-      # build_runner saurait le rejeter.
-      # ---------------------------------------------------------------------
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: packages/api-client-dart/.dart_tool/build
-          key: build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.yaml', 'packages/api-client-dart/build.yaml') }}-${{ github.job }}-${{ github.sha }}
-          restore-keys: |
-            build-runner-dart-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('packages/api-client-dart/pubspec.yaml', 'packages/api-client-dart/build.yaml') }}-
-
-      # Le jar du générateur pèse 30 Mo. `generator-cli.storageDir` le place
-      # dans l'arbre de travail (openapitools.json) précisément pour qu'il soit
-      # cachable ici et identique d'une exécution à l'autre — la version fait
-      # partie de la clé, donc un bump de générateur invalide le cache tout seul.
-      - name: Clé de cache du générateur
-        id: generator
-        run: |
-          version=$(node -p "require('./openapitools.json')['generator-cli'].version")
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: node_modules/.cache/openapi-generator
-          key: openapi-generator-${{ steps.generator.outputs.version }}
-
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm db:generate
-
-      # `@crm/api#openapi:generate` boote l'app NestJS avec tsx, donc importe
-      # @crm/database — qui se résout sur son `dist`. La tâche turbo
-      # `openapi:generate` ne déclare que `@crm/database#db:generate` (le
-      # client Prisma), pas la compilation du paquet : sans cette ligne, la
-      # génération échoue sur un module introuvable.
-      - name: Compiler @crm/database (prérequis du contrat)
-        run: pnpm turbo run build --filter=@crm/database
-
-      # ---------------------------------------------------------------------
-      # UNE seule commande, volontairement.
-      #
-      # Le dépôt de référence enchaîne `pnpm openapi:generate` puis
-      # `pnpm api-client:generate` sur deux lignes consécutives, et ne
-      # fonctionne QUE grâce à cet ordre : son turbo.json déclare
-      # `dependsOn: ["^openapi:generate"]`, or `^` résout sur les dépendances
-      # de package et aucun paquet client ne dépend de l'API — l'ensemble
-      # résolu est vide et l'arête n'existe pas.
-      #
-      # Notre turbo.json utilise la référence explicite
-      # `@crm/api#openapi:generate`. `turbo run generate` suffit donc à
-      # ordonner contrat → client TS → client Dart. Ne PAS remplacer cette
-      # ligne par une suite de commandes : cela réintroduirait exactement la
-      # dépendance à l'ordre que la référence explicite supprime.
-      # ---------------------------------------------------------------------
-      - name: Régénérer le contrat et les deux clients
-        run: pnpm turbo run generate
-
-      # ---------------------------------------------------------------------
-      # `git add -A --intent-to-add` AVANT le diff.
-      #
-      # `git diff` ne regarde pas les fichiers non suivis. Un nouveau DTO
-      # produit des fichiers générés inédits : sans cette ligne, la CI passe au
-      # vert pendant que le dépôt est désynchronisé. C'est bénin côté
-      # TypeScript (schema.ts est un fichier unique déjà suivi) et fatal côté
-      # Dart, où chaque modèle est son propre fichier accompagné de son
-      # *.g.dart. `--intent-to-add` inscrit ces chemins dans l'index avec un
-      # contenu vide : ils apparaissent alors comme des ajouts dans le diff.
-      # ---------------------------------------------------------------------
-      - name: Portillon anti-dérive
-        run: |
-          set -euo pipefail
-          paths=(
-            apps/api/openapi.json
-            packages/api-client/src/generated
-            packages/api-client-dart/lib
-            packages/api-client-chues/src/generated
-            packages/api-client-grand-public/src/generated
-          )
-          # Un chemin généré absent n'est pas « pas de dérive » : c'est une
-          # génération qui n'a rien produit. `git add` échouerait de toute
-          # façon sur un pathspec vide, autant le dire clairement.
-          for path in "${paths[@]}"; do
-            if [ ! -e "$path" ]; then
-              echo "::error::$path n'a pas été produit par \`pnpm turbo run generate\`."
-              exit 1
-            fi
-          done
-          git add -A --intent-to-add -- "${paths[@]}"
-          if ! git diff --exit-code -- "${paths[@]}"; then
-            echo "::error::Le code généré committé ne correspond pas à apps/api/openapi.json."
-            echo "::error::Lancer \`pnpm turbo run generate\` puis committer le résultat (*.g.dart compris)."
-            exit 1
-          fi
-
-      # ---------------------------------------------------------------------
-      # Rupture de contrat. Les téléphones du terrain ne peuvent pas être mis
-      # à jour de force : un champ supprimé ou renommé est un incident de
-      # production, pas une remarque de revue. Le label `api-breaking` est le
-      # seul moyen de passer, et il laisse une trace.
-      #
-      # `--fail-on WARN`, et non `ERR`. Vérifié sur oasdiff v1.28.0 : la
-      # suppression d'un champ OPTIONNEL d'une réponse est classée `warning`,
-      # pas `error` — avec `--fail-on ERR` le portillon laisse donc passer
-      # exactement le cas pour lequel il a été construit. Un ajout
-      # rétrocompatible (nouveau champ) reste vert au niveau WARN, ce qui est
-      # la propriété qui rend ce réglage tenable au quotidien.
-      # ---------------------------------------------------------------------
-      - name: Ruptures ascendantes (oasdiff)
-        if: github.event_name == 'pull_request'
-        env:
-          BREAKING_ALLOWED: ${{ contains(github.event.pull_request.labels.*.name, 'api-breaking') }}
-          # Version épinglée : sur `latest`, une nouvelle règle de détection
-          # ferait échouer des PR sans rapport, un matin, sans qu'aucun commit
-          # du dépôt n'ait changé. Le bump est un acte délibéré.
-          OASDIFF_VERSION: v1.28.0
-        run: |
-          set -uo pipefail
-          if ! git show "origin/${GITHUB_BASE_REF}:apps/api/openapi.json" > /tmp/openapi.base.json 2>/dev/null; then
-            echo "::notice::Aucun contrat sur ${GITHUB_BASE_REF} — rien à comparer."
-            exit 0
-          fi
-          # `|| status=$?` N'EST PAS UNE COQUETTERIE DE STYLE.
-          #
-          # GitHub lance ce bloc avec `bash --noprofile --norc -e -o pipefail`.
-          # Le `-e` vient de l'INVOCATION, et `set -uo pipefail` plus haut ne le
-          # retire pas : `set` ajoute des options, il n'en enlève aucune. Écrit
-          # sans garde, `docker run` en échec terminait donc l'étape SUR PLACE,
-          # avec le code de sortie d'oasdiff. La ligne `status=$?` n'était jamais
-          # atteinte, et les six lignes qui suivent — dont l'acceptation par le
-          # label — étaient du code MORT depuis leur écriture.
-          #
-          # Constaté en clair dans le journal du 16 août 2026 : `BREAKING_ALLOWED:
-          # true` dans l'environnement de l'étape, et l'étape échoue malgré tout
-          # sans avoir imprimé ni le `::warning::` ni le `::error::`, c'est à dire
-          # sans avoir exécuté la moindre ligne après `docker run`.
-          #
-          # Une commande placée à gauche d'un `||` ne déclenche pas `-e` : c'est
-          # la seule forme qui rend le code de sortie lisible ici.
-          status=0
-          docker run --rm \
-            -v /tmp:/base:ro -v "${PWD}/apps/api:/head:ro" \
-            "tufin/oasdiff:${OASDIFF_VERSION}" breaking /base/openapi.base.json /head/openapi.json \
-            --fail-on WARN || status=$?
-          if [ "$status" -eq 0 ]; then exit 0; fi
-          if [ "${BREAKING_ALLOWED}" = "true" ]; then
-            echo "::warning::Ruptures de contrat détectées, acceptées via le label api-breaking."
-            exit 0
-          fi
-          echo "::error::Cette PR casse le contrat pour les clients déjà installés."
-          echo "::error::Soit le changement est rendu rétrocompatible, soit la PR porte le label \`api-breaking\` en connaissance de cause."
-          exit 1
-
-  # ---------------------------------------------------------------------------
-  # Mobile. Indépendant du job `contract` : le client Dart généré est committé,
-  # *.g.dart compris, donc `flutter analyze` n'a besoin ni de Node ni de Java.
-  # C'est précisément ce que le commit du code généré achète.
-  # ---------------------------------------------------------------------------
-  mobile:
-    name: flutter — analyze
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    # Sur un PUSH vers `dev`, la pull request vient de tout verifier sur le meme
-    # arbre. Seul `node` est rejoue, parce qu'il est le seul a pouvoir attraper
-    # ce qu'une FUSION introduit et qu'une PR ne pouvait pas voir : un conflit
-    # semantique entre deux branches vertes separement. Le reste - contrat,
-    # Flutter, scanners, qualite - porte sur le meme code, deja eprouve.
-    #
-    # Les 2 000 minutes mensuelles incluses etaient epuisees a mi-mois, et ce
-    # doublon en representait la moitie. Un merge coute desormais ~11 minutes au
-    # lieu de ~25.
-    if: github.event_name != 'push' || github.ref == 'refs/heads/prod'
-
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      # `cache: true` couvre le SDK Flutter ET `~/.pub-cache` (voir le job
-      # `contract`), ce qui sert les deux `pub get` de ce job.
-      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
-        id: flutter
-        with:
-          flutter-version: 3.41.7
-          channel: stable
-          cache: true
-
-      # État incrémental de build_runner pour apps/mobile, ~21 Mo, dont ~17 Mo
-      # de script de build compilé (`entrypoint`). Même raisonnement de sûreté
-      # que pour le client Dart dans le job `contract` : build_runner rejette
-      # lui-même un graphe dont les phases, les versions de langage, les
-      # expériences ou le SDK Dart ne correspondent plus, et reconstruit tout.
-      # Le préfixe de restauration s'arrête donc à pubspec.lock + build.yaml.
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4
-        with:
-          path: apps/mobile/.dart_tool/build
-          key: build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-${{ github.job }}-${{ github.sha }}
-          restore-keys: |
-            build-runner-mobile-${{ runner.os }}-${{ steps.flutter.outputs.VERSION }}-${{ hashFiles('apps/mobile/pubspec.lock', 'apps/mobile/build.yaml') }}-
-
-      - name: Client Dart généré — analyse
-        working-directory: packages/api-client-dart
-        run: |
-          dart pub get
-          dart analyze
-          dart format --output=none --set-exit-if-changed .
-
-      - name: Application
-        working-directory: apps/mobile
-        run: |
-          flutter pub get
-          dart run build_runner build --delete-conflicting-outputs
-          flutter analyze
-          # Rien ne gardait la mise en forme d'apps/mobile, et elle avait dérivé
-          # sur 87 fichiers. `lib/` seulement : le code engendré n'est pas
-          # écrit à la main et son formateur n'est pas celui-ci.
-          dart format --output=none --set-exit-if-changed lib/
-
-  # ---------------------------------------------------------------------------
-  # Déploiement, et il n'a lieu QUE si tout le reste est vert.
-  #
-  # Jusqu'ici, fusionner vers `prod` ne déployait rien : Dokploy est branché en
-  # mode « custom git » (`application.saveGitProvider`, infra/dokploy/deploy.py),
-  # pas via l'intégration GitHub, il ne reçoit donc AUCUN crochet de GitHub. Le
-  # déploiement était un geste manuel que rien dans le dépôt ne rappelait, et
-  # une fusion vers `prod` donnait toutes les apparences d'une mise en ligne
-  # sans en produire une seule.
-  #
-  # POURQUOI CE JOB VIT DANS ci.yml plutôt que dans un fichier séparé déclenché
-  # par `workflow_run`. `needs` est une garantie du moteur : ce job ne peut pas
-  # démarrer avant que les quatre autres aient rendu leur verdict, et son `if`
-  # exige que ce verdict soit « success ». Un `workflow_run` séparé, lui, se
-  # déclenche sur la FIN du workflow et doit relire sa conclusion à la main —
-  # une condition oubliée là-bas déploie une version rouge. Ici, l'oubli est
-  # impossible.
-  #
-  # `sonar` a droit à `skipped` parce qu'il porte `if: vars.SONAR_ENABLED`. Un
-  # portillon volontairement éteint ne doit pas bloquer la mise en ligne ; un
-  # portillon allumé qui ÉCHOUE, si.
-  # ---------------------------------------------------------------------------
+  # Dokploy est branché en « custom git » et ne reçoit aucun crochet GitHub :
+  # sans ce job, fusionner vers `prod` ne déploie rien. `sonar` a droit à
+  # `skipped` parce qu'il porte `if: vars.SONAR_ENABLED`.
   deploy:
     name: déploiement Dokploy (prod)
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    needs: [node, sonar, contract, mobile, securite]
+    needs: [go, sonar, securite]
     if: >-
       !cancelled()
       && github.event_name == 'push'
       && github.ref == 'refs/heads/prod'
-      && needs.node.result == 'success'
-      && needs.contract.result == 'success'
-      && needs.mobile.result == 'success'
+      && needs.go.result == 'success'
       && needs.securite.result == 'success'
       && (needs.sonar.result == 'success' || needs.sonar.result == 'skipped')
-    # Une seule mise en ligne à la fois, et celle qui est en cours n'est PAS
-    # annulée : interrompre un déploiement à mi-course laisse la pile dans un
-    # état que personne n'a décrit. La suivante attend son tour.
     concurrency:
       group: deploy-prod
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
-
-      # Le secret absent doit se voir. Sans ce contrôle, `deploy.py` partirait
-      # avec une clé vide, Dokploy répondrait 401, et le journal parlerait
-      # d'authentification alors que la cause est un secret jamais renseigné.
       - name: Vérifier le secret
         env:
           DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
@@ -702,11 +156,10 @@ jobs:
             echo "::error::Le poser avec : gh secret set DOKPLOY_KEY"
             exit 1
           fi
-
       # `redeploy` et non `deploy` : `deploy` engendrerait des secrets dans le
-      # journal et redémarrerait Postgres à chaque fusion. Voir sa docstring.
-      - name: Redéployer l'API et le panel
+      # journal et redémarrerait Postgres à chaque fusion.
+      - name: Redéployer le binaire
         env:
           DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
-        run: python3 infra/dokploy/deploy.py redeploy
+        run: python3 infra/dokploy/deploy.py redeploy cpi-go

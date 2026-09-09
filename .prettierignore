@@ -1,22 +1,12 @@
 node_modules
 dist
-.next
-.turbo
-coverage
+docs/v2-refonte
 pnpm-lock.yaml
-apps/mobile
-packages/database/prisma/migrations
-
-# Artefacts Dart : dart format en a la charge, et .dart_tool/ est du cache.
-packages/api-client-dart/.dart_tool
-packages/api-client-dart/lib
-
-# Next réécrit ce fichier à CHAQUE build, dans sa propre mise en forme. Il est
-# versionné parce que le typage en dépend, mais le formater serait un aller
-# retour sans fin : le build suivant défait la correction et `format:check`
-# échoue à nouveau, sur un fichier que personne n'écrit à la main.
-apps/web/next-env.d.ts
-
-# Artefacts Playwright v2 : sessions et matrice des rôles produites à chaque exécution.
-apps/go/e2e/.auth/
-apps/go/e2e/.roles.json
+db
+storage
+openapi.json
+web/src/routeTree.gen.ts
+web/src/api/schema.d.ts
+e2e/.auth/
+e2e/.roles.json
+e2e/fixtures/

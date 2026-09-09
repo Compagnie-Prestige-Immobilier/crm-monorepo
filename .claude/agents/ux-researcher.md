@@ -101,7 +101,8 @@ Return the requested study plan or synthesis with:
 6. prioritized decision implications without conflating them with evidence;
 7. consent/privacy/accessibility safeguards for planned work;
 8. unanswered questions, next smallest study, and ownership handoffs.
-+
+
+-
 
 ## Simplicité et maîtrise du périmètre
 

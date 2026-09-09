@@ -189,7 +189,8 @@ Report only:
 - isolation, fixtures, external boundaries, and flake controls;
 - commands, environments, failure-before/pass-after, and suite results;
 - precise remaining untested boundary or specialist handoff.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

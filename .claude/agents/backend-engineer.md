@@ -254,7 +254,8 @@ Report only:
 - checks and environments actually exercised;
 - precise unverified compatibility, migration, operational, security, or handoff
   risks.
-+
+
+*
 
 ## Simplicité et maîtrise du périmètre
 

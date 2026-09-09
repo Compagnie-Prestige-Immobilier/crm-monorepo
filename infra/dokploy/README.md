@@ -77,7 +77,7 @@ de Dokploy, et l'un des deux ne monterait pas.
 ## v2, le binaire Go
 
 `provision` et `configure` créent et règlent une **troisième** application,
-`cpi-go` (`infra/docker/Dockerfile.go`, port 4000, volumes `cpi-go-db-dumps`
+`cpi-go` (`Dockerfile` à la racine, port 4000, volumes `cpi-go-db-dumps`
 partagé avec la v1, `cpi-go-notes-vocales` et `cpi-go-imports`). Elle ne
 reçoit que l'hôte d'essai `go-v2.cpi-chues.com` : les deux domaines de
 production restent sur `cpi-go-api` et `cpi-go-web`. Ajoutez l'enregistrement A

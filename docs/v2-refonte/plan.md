@@ -14,26 +14,13 @@ officielle citée dans les audits. Ce qui n'a pas pu être vérifié est marqué
 
 ## 0. Où se fait le travail
 
-Toute la v2 se construit dans un worktree git séparé, jamais dans le clone
-principal, pour que `dev` et `prod` restent disponibles sans bascule de branche :
-
-```
-git fetch origin
-git worktree add ../crm-monorepo-v2 -b v2 origin/dev
-cd ../crm-monorepo-v2 && go build ./apps/go/... && pnpm --dir apps/go/web install
-```
-
-- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo` reste sur `dev` ou
-  `prod` : correctifs de production, release v1 de maintenance, déploiements.
-- `/Users/cheikh/Workspace/CPI/Projects/crm-monorepo-v2` porte la branche
-  `v2` : `apps/go` et l'infra v2.
-- Les correctifs prod sont reportés dans `v2` chaque soir par
-  `git -C ../crm-monorepo-v2 merge origin/prod`, résolus dans le worktree.
-- Les deux worktrees partagent le même `.git` : un `git worktree list` doit
-  toujours montrer les deux, et `git worktree remove` n'est lancé qu'après la
-  bascule.
-- Les serveurs de développement des deux arbres n'utilisent pas les mêmes
-  ports (v1 : 3000, 3001, 5434, 6381 ; v2 : Go 4000, Vite 5173, Postgres 5435).
+À la racine du dépôt. Le 9 septembre 2026 la v2 a été livrée (binaire Go,
+panneau embarqué, 110 tests d'intégration, 37 fichiers Playwright dont les
+parcours de parité `parite-*`), rangée par domaine (`cmd/server`,
+`internal/<domaine>`, `internal/shared/{socle,database}`) puis la v1 (Nest,
+Next, Prisma, Flutter, clients générés, audits v1) a été retirée par `git rm`
+et `apps/go` est devenu la racine. `make setup && make build` suffit ;
+l'historique reste lisible avec `git log --follow`.
 
 ## 1. Pourquoi
 
@@ -48,6 +35,10 @@ cd ../crm-monorepo-v2 && go build ./apps/go/... && pnpm --dir apps/go/web instal
 | Tâches planifiées | 7 crons |
 | Requêtes SQL brutes | 79, dont 13 statiques, 56 assemblées à l'exécution, 10 mortes (`audits/go-donnees.md` §1) |
 | Contraintes vivant seulement dans le SQL des migrations | ~35 CHECK, 12 index partiels, 2 extensions, 1 fonction |
+
+Après la purge du 9 septembre 2026 : 123 732 lignes suivies par git, dont
+35 938 en Go, 52 542 dans `web/src`, 9 074 dans `e2e`, 5 162 dans `sql`, le
+reste en verrou pnpm, diagrammes et configuration ; rien de généré.
 
 Les deux décisions qui ont coûté le plus sont le moteur de synchronisation
 maison (`sync_engine.dart` 2 647 lignes, `sync.service.ts` 2 058 lignes) et la
@@ -459,15 +450,18 @@ pas en production.
    file vide confirmée de vive voix. Une file non vide à J est perdue.
 3. J, 1. Sauvegarde Dokploy déclenchée, fichier téléchargé hors du VPS,
    restauration vérifiée sur la machine de travail.
-4. J, 2. Arrêt de `cpi-go-api` et `cpi-go-web` dans Dokploy. Vérification
-   que `sync_batches` n'a plus de lot `IN_PROGRESS` ni `import_jobs` en cours.
-5. J, 3. Déploiement de `apps/go` par `deploy.py` (Dokploy n'a pas de
-   webhook, le job CI `deploy` fait de même sur `prod`), volumes
-   `notes-vocales` et `imports` créés, deux domaines rattachés. goose
-   applique la seule migration du jour : fonction et 37 triggers `updatedAt`.
-   Les variables `JWT_*` et `REDIS_URL` restent posées. Vérification :
-   connexion e-mail et nom d'utilisateur, un rôle par espace, SSE, présence,
-   `docker stats` comparé à la preuve B.
+4. J, 2. `deploy.py bascule --oui` : construit et démarre le binaire Go sur
+   `go-v2.cpi-chues.com`, attend `/health/ready`, puis seulement arrête
+   `cpi-go-api` et `cpi-go-web` et rattache les deux domaines. Une image qui
+   ne se construit pas laisse la v1 en place. Vérification à l'arrêt de la
+   v1 : `sync_batches` sans lot `IN_PROGRESS`, `import_jobs` vide.
+5. J, 3. goose a appliqué la seule migration du jour : fonction et 37
+   triggers `updatedAt` (simulation locale du 9 septembre sur l'image de
+   production : démarrage en 0,3 s, aucune ligne modifiée, aucune écriture
+   acquittée perdue à l'arrêt du conteneur). Les variables `JWT_*` et
+   `REDIS_URL` restent posées. Vérification : connexion e-mail et nom
+   d'utilisateur, un rôle par espace, SSE, présence, `docker stats` comparé
+   à la preuve B.
 6. J, 4. Un téléphone de test : qualification complète depuis le navigateur,
    note vocale enregistrée et réécoutée.
 7. J, 5. Ouverture générale. L'application mobile v1 répond « serveur

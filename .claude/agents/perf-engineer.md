@@ -182,8 +182,7 @@ Report only:
 - correctness/regression checks and tradeoffs;
 - measurement limitations, production approval, or specialist handoff.
 
-Never invent percentages, throughput, scale, confidence, or field impact.
-+
+Never invent percentages, throughput, scale, confidence, or field impact. +
 
 ## Simplicité et maîtrise du périmètre
 
