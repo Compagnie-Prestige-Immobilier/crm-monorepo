@@ -228,7 +228,7 @@ test.describe('parité CHUES, la supervision lit sans écrire', () => {
       page.getByRole('button', { name: /^Modifier la fiche de /u }),
       'la supervision ne modifie aucune fiche : l’API refuserait le geste',
     ).toHaveCount(0);
-    await expect(page.getByRole('button', { name: 'Nouveau représentant' })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: 'Nouveau représentant' })).toHaveCount(0);
   });
 });
 
@@ -246,7 +246,7 @@ test.describe('parité CHUES, le téléconseiller et ses fiches', () => {
     await expect(
       page.getByRole('row').filter({ hasText: CHERCHEE.nom }),
       'la fiche d’un autre compte reste hors de sa portée',
-    ).toHaveCount(1);
+    ).toHaveCount(0);
   });
 });
 
@@ -316,7 +316,7 @@ test.describe('parité CHUES, import de représentants', () => {
     await deposer(page, 'parite-representants-nominal.xlsx', await classeurNominal());
     await attendreRapport(page);
 
-    expect(await cadran(page, 'À créer'), 'le téléphone déjà en base écarte la ligne').toBe(1);
+    expect(await cadran(page, 'À créer'), 'le téléphone déjà en base écarte la ligne').toBe(0);
     await expect(
       page.getByRole('row').filter({ hasText: 'Un représentant porte déjà ce numéro en base.' }),
     ).toHaveCount(1);

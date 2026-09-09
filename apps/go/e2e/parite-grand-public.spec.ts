@@ -55,6 +55,9 @@ const COLONNES = [
 
 const fiches = { complete: '', minimale: '', parcours: '', chues: '', rappel: '' };
 
+/** Le lien public porte l'identifiant du compte qui l'a partagé, et l'API l'exige en UUID. */
+let jetonPublic = '';
+
 const compteur = (page: Page) => page.getByRole('status').filter({ hasText: 'Prospects affichés' });
 
 /** La valeur d'une ligne de fiche, liée à son libellé par la paire dt / dd. */
@@ -88,12 +91,12 @@ async function fichesSurLeNumero(phoneE164: string): Promise<number> {
   return Number(compte?.n ?? '0');
 }
 
-interface ParcoursEnBase {
+type ParcoursEnBase = {
   consent: string;
   statut: string;
   converti: boolean;
   offre: string | null;
-}
+};
 
 async function parcoursDe(prospectId: string): Promise<ParcoursEnBase | null> {
   return ligne<ParcoursEnBase>(
@@ -109,6 +112,16 @@ async function parcoursDe(prospectId: string): Promise<ParcoursEnBase | null> {
 
 test.beforeAll(async () => {
   await effacerFiches(PLAGE);
+  const partageur = await ligne<{ id: string }>(
+    `SELECT id FROM users
+      WHERE role = 'COMMERCIAL' AND "isActive" AND "deletedAt" IS NULL
+        AND id ~ '^[0-9a-f]{8}-' ORDER BY id LIMIT 1`,
+    [],
+  );
+  if (partageur === null)
+    throw new Error('aucun téléconseiller du seed pour porter le lien public');
+  jetonPublic = partageur.id;
+
   const api = await apiDe('ADMIN', ADRESSE_SEMIS);
   try {
     for (let rang = 1; rang <= TEMOINS; rang += 1) {
@@ -394,13 +407,13 @@ test.describe('parité Grand Public, la saisie', () => {
 
     await expect(boite).toHaveCount(0);
     await expect(page).toHaveURL(new RegExp(`/grand-public\\?search=${cleSaisie}$`, 'u'));
+    expect(await fichesSurLeNumero(tel(63)), 'la boîte doit avoir écrit la fiche').toBe(1);
     await expect(
       page
         .getByRole('table')
         .getByRole('row')
         .filter({ hasText: `Boite ${cleSaisie}` }),
     ).toHaveCount(1);
-    expect(await fichesSurLeNumero(tel(63))).toBe(1);
   });
 });
 
@@ -705,7 +718,7 @@ test.describe('parité Grand Public, les chiffres', () => {
     );
 
     await page.goto(ECRAN);
-    const panne = page.getByRole('alert').filter({ hasText: 'Réessayez' });
+    const panne = page.getByRole('alert').filter({ hasText: 'Erreur serveur' });
     await expect(panne.getByRole('button', { name: 'Réessayer' })).toBeVisible();
     await expect(
       page.getByRole('navigation', { name: 'Navigation principale' }),
@@ -758,7 +771,7 @@ test.describe('parité Grand Public, accessibilité', () => {
     },
     {
       chemin: '/grand-public/console',
-      repere: (page) => page.getByRole('textbox', { name: 'Quel prospect avez-vous appelé ?' }),
+      repere: (page) => page.getByLabel('Quel prospect avez-vous appelé ?'),
     },
     {
       chemin: '/grand-public/rappels',
@@ -832,7 +845,7 @@ test.describe('parité Grand Public, le formulaire public', () => {
   test('sans clé anti-robot le serveur refuse, et le sixième envoi tombe sur le limiteur', async ({
     page,
   }) => {
-    const chemin = `/api/v1/formulaire-public/${teleconseiller.id}`;
+    const chemin = `/api/v1/formulaire-public/${jetonPublic}`;
     const corps = { nom: `Limite ${cleFiche}`, prenom: PRENOM, phone: tel(51) };
     const statuts: number[] = [];
 

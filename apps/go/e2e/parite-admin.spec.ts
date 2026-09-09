@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { compteDe } from './comptes';
@@ -71,14 +73,16 @@ test.beforeAll(async () => {
       ],
     );
   }
+  // Identifiants au format UUID : les routes d'écriture des référentiels le
+  // valident, et un `banque-<clé>` ferait échouer le PATCH sur la forme.
   await ecrire(
     `INSERT INTO banques (id, name, "shortName", "updatedAt") VALUES ($1, $2, $3, now())`,
-    [`banque-${cle}`, NOM_BANQUE, COURT_BANQUE],
+    [randomUUID(), NOM_BANQUE, COURT_BANQUE],
   );
   await ecrire(
     `INSERT INTO call_outcome_reasons (id, code, label, effect, "updatedAt")
      VALUES ($1, $2, $3, 'KEEP_OPEN', now())`,
-    [`motif-${cle}`, CODE_MOTIF, LIBELLE_MOTIF],
+    [randomUUID(), CODE_MOTIF, LIBELLE_MOTIF],
   );
 });
 
@@ -218,6 +222,16 @@ test.describe('parité admin, listes de référence', () => {
   });
 
   test('une banque se retire du service puis y revient', async ({ page }) => {
+    page.on('response', async (r) => {
+      if (r.url().includes('/api/v1/referentiels') && r.status() >= 400)
+        console.log('REP', r.status(), r.request().method(), r.request().postData(), await r.text());
+    });
+    page.on('console', (m) => {
+      console.log('CONSOLE', m.type(), m.text());
+    });
+    page.on('requestfailed', (r) => {
+      console.log('ECHEC', r.method(), r.url(), r.failure()?.errorText);
+    });
     await page.goto('/admin/referentiels');
     await page.getByLabel('Recherche').fill(COURT_BANQUE);
 

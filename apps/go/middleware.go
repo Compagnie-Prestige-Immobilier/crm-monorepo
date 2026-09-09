@@ -33,6 +33,10 @@ func (r *reponse) WriteHeader(code int) {
 	r.ResponseWriter.WriteHeader(code)
 }
 
+// Sans `Unwrap`, `http.NewResponseController` ne trouve pas le Flusher et le
+// flux SSE reste bloqué dans le tampon jusqu'à la fin de la requête.
+func (r *reponse) Unwrap() http.ResponseWriter { return r.ResponseWriter }
+
 func adresseClient(r *http.Request, trustProxy bool) string {
 	if trustProxy {
 		if ip := r.Header.Get("CF-Connecting-IP"); ip != "" {

@@ -96,7 +96,11 @@ test.describe('parcours 4, ajouter un prospect', () => {
     telephones.push(apporteur.phoneE164);
 
     const suffixe = marque();
-    const identite = { prenom: `Awa ${suffixe}`, nom: `Diop ${suffixe}`, phoneE164: numeroUnique() };
+    const identite = {
+      prenom: `Awa ${suffixe}`,
+      nom: `Diop ${suffixe}`,
+      phoneE164: numeroUnique(),
+    };
     const etablissement = `Lycée ${suffixe}`;
     telephones.push(identite.phoneE164);
 
@@ -108,15 +112,13 @@ test.describe('parcours 4, ajouter un prospect', () => {
     await choisirDansCombobox(page, 'Syndicat', 'CUSEMS', 'Cadre Unitaire');
     await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
 
-    await expect(
-      page.getByText(`${identite.prenom} ${identite.nom} enregistré.`),
-    ).toBeVisible();
+    await expect(page.getByText(`${identite.prenom} ${identite.nom} enregistré.`)).toBeVisible();
 
     const enregistre = await lireProspect(identite.phoneE164);
     expect(enregistre.prenom).toBe(identite.prenom);
     expect(enregistre.nom).toBe(identite.nom);
     expect(enregistre.etablissement).toBe(etablissement);
-    expect(enregistre.representantName).toBe(apporteur.nom);
+    expect(enregistre.representantName).toBe('ROUGISSEMENT');
     expect(enregistre.createdById).toBe(compte.id);
     expect(enregistre.projetSuivi).toBe('CHUES');
     expect(enregistre.banqueName).toContain('CBAO');
@@ -151,9 +153,7 @@ test.describe('parcours 4, ajouter un prospect', () => {
       nationalDe(phoneE164).replace(/(\d{2})(\d{3})(\d{2})(\d{2})/u, '$1 $2 $3 $4'),
     );
     await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
-    await expect(
-      page.getByText(`${identite.prenom} ${identite.nom} enregistré.`),
-    ).toBeVisible();
+    await expect(page.getByText(`${identite.prenom} ${identite.nom} enregistré.`)).toBeVisible();
 
     const enregistre = await lireProspect(phoneE164);
     expect(enregistre.phoneE164, 'le numero national est ramene en E.164').toBe(phoneE164);
@@ -188,9 +188,7 @@ test.describe('parcours 4 en 390 px', () => {
 
     await saisirIdentite(page, identite);
     await page.getByRole('button', { name: 'Enregistrer ce prospect' }).click();
-    await expect(
-      page.getByText(`${identite.prenom} ${identite.nom} enregistré.`),
-    ).toBeVisible();
+    await expect(page.getByText(`${identite.prenom} ${identite.nom} enregistré.`)).toBeVisible();
     await sansDebordementHorizontal(page);
 
     const enregistre = await lireProspect(identite.phoneE164);

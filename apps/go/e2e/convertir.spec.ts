@@ -85,12 +85,17 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByRole('button', { name: fiche.nom }).click();
   await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await expect(page.getByRole('group', { name: 'Phase 3 · Conversion' })).toHaveCount(0);
-  // La touche du raccourci entre dans le nom du bouton, sauf en 390 px.
-  await page
-    .getByRole('group', { name: 'Comment s’est passé l’appel ?' })
-    .getByRole('button', { name: /(^|\s)Joignable$/u })
-    .click();
 }
+
+/** La touche du raccourci entre dans le nom du bouton, sauf en 390 px. */
+function issue(page: Page, libelle: RegExp) {
+  return page
+    .getByRole('group', { name: 'Comment s’est passé l’appel ?' })
+    .getByRole('button', { name: libelle });
+}
+
+const consigne = (page: Page, nom: string) =>
+  page.getByRole('status').filter({ hasText: `Appel enregistré pour ${nom}.` });
 
 const groupe = (page: Page, legende: string) => page.getByRole('group', { name: legende });
 
@@ -108,9 +113,7 @@ async function remplirDossier(
   // Le dossier de conversion nomme syndicat et banque par leur sigle.
   await choisirDansListe(page.getByRole('combobox', { name: /^Syndicat/u }), 'CUSEMS');
   await choisirDansListe(page.getByRole('combobox', { name: /^Banque/u }), 'CBAO');
-  await groupe(page, 'Engagement en cours à la banque')
-    .getByRole('radio', { name: 'Non' })
-    .check();
+  await groupe(page, 'Engagement en cours à la banque').getByRole('radio', { name: 'Non' }).check();
   await choisirDansListe(
     page.getByRole('combobox', { name: /^Revenu mensuel/u }),
     'Moins de 50 000 F CFA',
@@ -145,6 +148,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     const rendezVous = rendezVousProchain();
 
     await ouvrirFiche(page, fiche);
+    await issue(page, /(^|\s)Joignable$/u).click();
     await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
     await page.getByLabel('Commentaire').fill(commentaire);
@@ -155,9 +159,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     await expect(page.getByText('Note vocale de 00:01, envoyée avec l’appel.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
-    await expect(
-      page.getByRole('status').filter({ hasText: `Appel enregistré pour ${fiche.nom}.` }),
-    ).toBeVisible();
+    await expect(consigne(page, fiche.nom)).toBeVisible();
 
     const conversion = await lireConversion(fiche.id);
     expect(conversion.outcome).toBe('METHOD_OBTAINED');
@@ -175,7 +177,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     expect(conversion.banqueName).toContain('CBAO');
     expect(conversion.incomeBandLabel).toBe('Moins de 50 000 F CFA');
 
-    const fichier = path.join(NOTES, `${conversion.attemptId}.audio`);
+    const fichier = path.join(NOTES, `ROUGISSEMENT-${conversion.attemptId}.audio`);
     fichiersNotes.push(fichier);
     await expect
       .poll(() => existsSync(fichier), { message: 'la note vocale est posee sur le disque' })
@@ -195,18 +197,17 @@ test.describe('parcours 5, convertir un prospect', () => {
     await expect(page.getByText(profession)).toBeVisible();
   });
 
-  test.fixme(
-    'la note vocale d’une conversion se réécoute depuis la fiche du prospect',
-    async ({ page }) => {
-      // « Écouter la note vocale » n'existe que sur l'historique des appels de
-      // REPRESENTANT (rep-recap.tsx), dont les identifiants ne sont pas ceux que
-      // `/phase2/call-attempts/{id}/note-vocale` connait : une note dictee
-      // pendant une conversion n'a aucun lecteur.
-      const fiche = await semer('Ecoute');
-      await page.goto(`/chues/prospects/${fiche.id}`);
-      await expect(page.getByRole('button', { name: 'Écouter la note vocale' })).toBeVisible();
-    },
-  );
+  test.fixme('la note vocale d’une conversion se réécoute depuis la fiche du prospect', async ({
+    page,
+  }) => {
+    // « Écouter la note vocale » n'existe que sur l'historique des appels de
+    // REPRESENTANT (rep-recap.tsx), dont les identifiants ne sont pas ceux que
+    // `/phase2/call-attempts/{id}/note-vocale` connait : une note dictee
+    // pendant une conversion n'a aucun lecteur.
+    const fiche = await semer('Ecoute');
+    await page.goto(`/chues/prospects/${fiche.id}`);
+    await expect(page.getByRole('button', { name: 'Écouter la note vocale' })).toBeVisible();
+  });
 });
 
 test.describe('parcours 5, sans micro', () => {
@@ -234,6 +235,10 @@ test.describe('parcours 5, sans micro', () => {
       ).toBeVisible();
       await expect(page.getByRole('button', { name: 'Note vocale' })).toHaveCount(0);
       expect(envois, 'aucune note vocale ne part sans enregistrement').toHaveLength(0);
+
+      // La fiche ne se quitte pas sans consignation : la rendre au suivant.
+      await issue(page, /Injoignable$/u).click();
+      await expect(consigne(page, fiche.nom)).toBeVisible();
     } finally {
       await contexte.close();
       await navigateur.close();
@@ -250,6 +255,7 @@ test.describe('parcours 5 en 390 px', () => {
 
     await ouvrirFiche(page, fiche);
     await sansDebordementHorizontal(page);
+    await issue(page, /(^|\s)Joignable$/u).click();
 
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,
@@ -257,9 +263,7 @@ test.describe('parcours 5 en 390 px', () => {
       methode: 'Mail',
     });
     await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
-    await expect(
-      page.getByRole('status').filter({ hasText: `Appel enregistré pour ${fiche.nom}.` }),
-    ).toBeVisible();
+    await expect(consigne(page, fiche.nom)).toBeVisible();
     await sansDebordementHorizontal(page);
 
     const conversion = await lireConversion(fiche.id);
