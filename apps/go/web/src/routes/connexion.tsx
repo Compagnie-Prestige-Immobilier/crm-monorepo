@@ -1,5 +1,7 @@
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, redirect } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { Facade } from '@/components/facade';
 import { LoginForm } from '@/components/login-form';
 import { cheminInterne } from '@/lib/nav';
@@ -9,11 +11,18 @@ export const Route = createFileRoute('/connexion')({
     const next = cheminInterne(search.next);
     return next === undefined ? {} : { next };
   },
+  beforeLoad: async ({ context }) => {
+    const user = await context.queryClient.ensureQueryData(meQueryOptions);
+    if (user !== null) throw redirect({ to: '/espaces' });
+  },
   component: ConnexionPage,
 });
 
 function ConnexionPage() {
   const { next } = Route.useSearch();
+  useEffect(() => {
+    document.title = 'Connexion · CPI GO';
+  }, []);
 
   return (
     <main className="grid min-h-dvh lg:grid-cols-[1.05fr_1fr]">

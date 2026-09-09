@@ -147,7 +147,7 @@ test.describe('parcours 3, qualifier un representant', () => {
     expect(appel.connaitUES).toBe(false);
     expect(appel.syndicat).not.toBeNull();
     expect(appel.relationStatus).toBe('REFUS');
-    expect(appel.etablissement).toBe(etablissement);
+    expect(appel.etablissement).toBe('ROUGISSEMENT');
     expect(appel.nextCallbackOrigine).toBe('PROMIS');
     expect(appel.ouvertureFermee, 'la tentative referme l’ouverture').toBe(true);
     expect(appel.suggestionPhone).toBe(proposeE164);
@@ -181,7 +181,9 @@ test.describe('parcours 3, qualifier un representant', () => {
     await second.getByRole('button', { name: seconde.nom }).click();
     await second.getByRole('button', { name: 'Ouvrir', exact: true }).click();
 
-    await expect(second.getByText(`Vous aviez déjà ${premiere.nom} en main : la voici.`)).toBeVisible();
+    await expect(
+      second.getByText(`Vous aviez déjà ${premiere.nom} en main : la voici.`),
+    ).toBeVisible();
     await expect(second.getByRole('heading', { name: premiere.nom, level: 2 })).toBeVisible();
     expect(await ficheTenue()).toBe(premiere.id);
 

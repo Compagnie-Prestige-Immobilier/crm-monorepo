@@ -19,8 +19,6 @@ import { choisirDansListe, effacerFiches, semerProspect } from './donnees-chues'
 
 const administrateur = compteDe('ADMIN');
 const teleconseiller = compteDe('COMMERCIAL');
-const superviseur = compteDe('SUPERVISEUR');
-const direction = compteDe('DIRECTION');
 const banquier = compteDe('BANQUE_FINANCE');
 
 const cle = marque();
@@ -30,11 +28,18 @@ const NOM_PROSPECTS = 'Lot E2E campagnes';
 const DEPARTEMENT = 'Kaolack';
 
 /**
+ * L'equipe vient du seed : le contrat exige un identifiant UUID pour un
+ * teleconseiller, et les comptes du harnais en portent un lisible
+ * (`e2e-commercial`). L'ordre est celui de la liste, donc du tourniquet.
+ */
+const EQUIPE = ['Awa Fixture', 'Direction Fixture', 'Superviseur Fixture'] as const;
+const [COMPTE_TELECONSEIL, COMPTE_DIRECTION, COMPTE_SUPERVISION] = EQUIPE;
+
+/**
  * Trois comptes et deux jours : six cellules. Un seul compte ne prouverait pas
  * que le tourniquet tourne, un seul jour qu'il change de page. La supervision
  * et la direction appellent en plus de leur travail : une fiche par jour.
  */
-const EQUIPE = [teleconseiller.nom, direction.nom, superviseur.nom] as const;
 const FICHES_PAR_JOUR = 3;
 const ENCADREMENT = 1;
 const JOURS = 2;
@@ -43,7 +48,7 @@ const PLACES = (FICHES_PAR_JOUR + 2 * ENCADREMENT) * JOURS;
 const VIVIER = PLACES + 2;
 const PROSPECTS = FICHES_PAR_JOUR + ENCADREMENT;
 
-/** Plage reservee a ce parcours : le rang VIVIER nait apres la campagne. */
+/** Plage reservee a ce parcours ; le rang VIVIER nait apres la campagne. */
 const telephoneLot = (rang: number): string => `+221781090${String(rang).padStart(3, '0')}`;
 const TELEPHONES = Array.from({ length: VIVIER + 1 }, (_, rang) => telephoneLot(rang));
 
@@ -65,6 +70,20 @@ test.beforeAll(async () => {
   test.setTimeout(180_000);
   await nettoyer();
 
+  const equipe = await lire<{ fullName: string; role: string }>(
+    `SELECT "fullName", role::text AS role FROM users
+      WHERE "fullName" = ANY($1) AND "isActive" AND "deletedAt" IS NULL ORDER BY "fullName"`,
+    [[...EQUIPE]],
+  );
+  expect(
+    equipe.map((row) => `${row.fullName} ${row.role}`),
+    'comptes du seed absents ou desactives : la base est-elle amorcee ?',
+  ).toEqual([
+    `${COMPTE_TELECONSEIL} COMMERCIAL`,
+    `${COMPTE_DIRECTION} DIRECTION`,
+    `${COMPTE_SUPERVISION} SUPERVISEUR`,
+  ]);
+
   departementId = (
     await ligne<{ id: string }>(`SELECT id FROM departements WHERE name = $1`, [DEPARTEMENT])
   ).id;
@@ -73,7 +92,7 @@ test.beforeAll(async () => {
       `SELECT count(*) AS n FROM representants WHERE "departementId" = $1 AND "deletedAt" IS NULL`,
       [departementId],
     ),
-    `le departement ${DEPARTEMENT} doit etre vide : la cible tire alors les seules fiches du parcours`,
+    `le departement ${DEPARTEMENT} doit etre vide : la cible ne tire alors que les fiches du parcours`,
   ).toBe(0);
 
   for (let rang = 0; rang < VIVIER; rang += 1) {
@@ -131,7 +150,7 @@ async function ouvrirDialogue(page: Page): Promise<Locator> {
   return dialogue;
 }
 
-/** La bascule dit le geste restant : « Tout cocher » quand plus rien n’est coché. */
+/** La bascule dit le geste restant : « Tout cocher » quand plus rien n’est coche. */
 async function viderLEquipe(dialogue: Locator): Promise<void> {
   await expect(dialogue.getByRole('button', { name: /^Tout (co|déco)cher$/u })).toBeVisible();
   const decocher = dialogue.getByRole('button', { name: 'Tout décocher' });
@@ -139,8 +158,6 @@ async function viderLEquipe(dialogue: Locator): Promise<void> {
   await expect(dialogue.getByText('Cochez au moins un téléconseiller.')).toBeVisible();
 }
 
-// Aucun objectif nominatif : le contrat exige un UUID, et les comptes du
-// harnais portent des identifiants lisibles (`e2e-commercial`).
 async function cocherEquipe(dialogue: Locator, noms: readonly string[]): Promise<void> {
   for (const nom of noms) {
     await dialogue.getByRole('listitem').filter({ hasText: nom }).getByRole('checkbox').check();
@@ -156,7 +173,7 @@ async function creerDepuisLeDialogue(page: Page, dialogue: Locator, nom: string)
   await dialogue.getByRole('button', { name: 'Créer la campagne' }).click();
   const recue = await creation;
   expect(recue.status(), await recue.text()).toBe(201);
-  const cree = (await recue.json()) as { id: string; itemCount: number };
+  const cree = (await recue.json()) as { id: string };
   await page.waitForURL(`**/chues/campagnes/${cree.id}`);
   await expect(page.getByRole('heading', { name: nom, level: 2 })).toBeVisible();
   return cree.id;
@@ -198,13 +215,24 @@ function entreesZip(archive: Buffer): string[] {
   return noms;
 }
 
+const CLASSEUR = (): string => path.join(DOSSIER_FIXTURES, `campagne-${cle}.xlsx`);
+
+/**
+ * Deux listes de la meme equipe coexistent sur la campagne, et une liste
+ * refermee laisse ses options en place : l'option se prend dans la visible.
+ */
+async function choisirTeleconseiller(page: Page, liste: string, nom: string): Promise<void> {
+  await page.getByRole('combobox', { name: liste }).click();
+  await page.getByRole('option', { name: nom, exact: true }).filter({ visible: true }).click();
+}
+
 // Chaque test reprend la campagne ouverte par le precedent.
 test.describe.configure({ mode: 'serial' });
 
 test.describe('parcours 11, campagnes d’appels', () => {
   test.use({ storageState: administrateur.etat });
 
-  test('campagne d’appels representants : le serveur compte, refuse sans equipe, puis fige', async ({
+  test('campagne d’appels representants : le serveur compte, refuse sans equipe, puis repartit', async ({
     page,
   }) => {
     const dialogue = await ouvrirDialogue(page);
@@ -217,11 +245,18 @@ test.describe('parcours 11, campagnes d’appels', () => {
 
     await viderLEquipe(dialogue);
     const creer = dialogue.getByRole('button', { name: 'Créer la campagne' });
-    await expect(creer, 'une campagne sans destinataire n’a personne a qui donner ses fiches')
-      .toBeDisabled();
+    await expect(
+      creer,
+      'une campagne sans destinataire n’a personne a qui donner ses fiches',
+    ).toBeDisabled();
 
     await cocherEquipe(dialogue, EQUIPE);
     await dialogue.getByLabel('Nom de la campagne').fill(CAMPAGNE_REPRESENTANTS);
+    await expect(
+      dialogue.getByLabel(`Objectif quotidien de ${COMPTE_DIRECTION}`),
+      'la capacite proposee a la direction est le cinquieme de celle du teleconseil',
+    ).toHaveAttribute('placeholder', String(ENCADREMENT));
+
     const attendu = attendreApercu(page, JOURS, EQUIPE.length);
     await dialogue.getByLabel('Nombre de jours').fill(String(JOURS));
     const apercu = await attendu;
@@ -241,12 +276,12 @@ test.describe('parcours 11, campagnes d’appels', () => {
     campagneId = await creerDepuisLeDialogue(page, dialogue, CAMPAGNE_REPRESENTANTS);
 
     expect(await cellulesEnBase(campagneId)).toEqual([
-      `${teleconseiller.nom} jour 1 : ${String(FICHES_PAR_JOUR)}`,
-      `${teleconseiller.nom} jour 2 : ${String(FICHES_PAR_JOUR)}`,
-      `${direction.nom} jour 1 : ${String(ENCADREMENT)}`,
-      `${direction.nom} jour 2 : ${String(ENCADREMENT)}`,
-      `${superviseur.nom} jour 1 : ${String(ENCADREMENT)}`,
-      `${superviseur.nom} jour 2 : ${String(ENCADREMENT)}`,
+      `${COMPTE_TELECONSEIL} jour 1 : ${String(FICHES_PAR_JOUR)}`,
+      `${COMPTE_TELECONSEIL} jour 2 : ${String(FICHES_PAR_JOUR)}`,
+      `${COMPTE_DIRECTION} jour 1 : ${String(ENCADREMENT)}`,
+      `${COMPTE_DIRECTION} jour 2 : ${String(ENCADREMENT)}`,
+      `${COMPTE_SUPERVISION} jour 1 : ${String(ENCADREMENT)}`,
+      `${COMPTE_SUPERVISION} jour 2 : ${String(ENCADREMENT)}`,
     ]);
     expect(
       await compter(
@@ -260,10 +295,10 @@ test.describe('parcours 11, campagnes d’appels', () => {
     await expect(tableau.getByRole('rowheader')).toHaveCount(EQUIPE.length);
     await expect(
       page.getByText('dont 20 % pour la supervision et la direction'),
-      'la regle de ponderation est dite a l’ecran',
+      'la ponderation est dite a l’ecran',
     ).toBeVisible();
     for (const nom of EQUIPE) {
-      const attendues = nom === teleconseiller.nom ? FICHES_PAR_JOUR : ENCADREMENT;
+      const attendues = nom === COMPTE_TELECONSEIL ? FICHES_PAR_JOUR : ENCADREMENT;
       const rangee = tableau.getByRole('row').filter({ hasText: nom });
       for (let jour = 1; jour <= JOURS; jour += 1) {
         await expect(
@@ -286,14 +321,16 @@ test.describe('parcours 11, campagnes d’appels', () => {
 
     const [fichier] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('link', { name: `Programme de ${EQUIPE[0]}, jour 1` }).click(),
+      page.getByRole('link', { name: `Programme de ${COMPTE_TELECONSEIL}, jour 1` }).click(),
     ]);
-    expect(fichier.suggestedFilename()).toMatch(/^programme-.*jour-1\.pdf$/u);
+    expect(fichier.suggestedFilename()).toMatch(/^programme-.*-jour-1\.pdf$/u);
     const programme = await readFile(await fichier.path());
     // Un JSON d'erreur relaye sous l'extension `.pdf` passerait le nom.
     expect(programme.subarray(0, 4).toString('latin1'), 'ce n’est pas un PDF').toBe('%PDF');
-    expect(programme.byteLength, 'trois lignes numerotees pesent plus de deux kilo-octets')
-      .toBeGreaterThan(2_000);
+    expect(
+      programme.byteLength,
+      'trois lignes numerotees pesent plus de deux kilo-octets',
+    ).toBeGreaterThan(2_000);
 
     const archive = await telecharger(page, 'Tous les programmes, archive ZIP');
     expect(
@@ -305,11 +342,10 @@ test.describe('parcours 11, campagnes d’appels', () => {
       page.waitForEvent('download'),
       page.getByRole('link', { name: 'Classeur Excel de la campagne' }).click(),
     ]);
-    const chemin = path.join(DOSSIER_FIXTURES, `campagne-${cle}.xlsx`);
-    await classeur.saveAs(chemin);
+    await classeur.saveAs(CLASSEUR());
 
-    expect(await feuillesDuClasseur(chemin)).toEqual(['Répartition']);
-    const lignes = await contenuFeuille(chemin, 'Répartition');
+    expect(await feuillesDuClasseur(CLASSEUR())).toEqual(['Répartition']);
+    const lignes = await contenuFeuille(CLASSEUR(), 'Répartition');
     expect(lignes).toHaveLength(PLACES + 1);
     expect(lignes[0]?.slice(0, 6)).toEqual([
       'Téléconseiller',
@@ -319,25 +355,19 @@ test.describe('parcours 11, campagnes d’appels', () => {
       'Département',
       'IEF',
     ]);
-    expect(lignes[1]?.[0], 'le classeur suit l’ordre du tourniquet').toBe(EQUIPE[0]);
+    expect(lignes[1]?.[0], 'le classeur suit l’ordre du tourniquet').toBe(COMPTE_TELECONSEIL);
     expect(
-      lignes.filter((valeurs) => valeurs[0] === EQUIPE[0]),
+      lignes.filter((valeurs) => valeurs[0] === COMPTE_TELECONSEIL),
       'chaque teleconseiller imprime son bloc',
     ).toHaveLength(FICHES_PAR_JOUR * JOURS);
   });
 
-  test.fixme(
-    'le classeur nomme « Commercial » la colonne du proprietaire de la fiche',
-    async () => {
-      // `campagnes_export.go:36` reprend l'entete de la v1
-      // (`lots-export.service.ts:515`). Le mot est interdit a l'ecran ; l'entete
-      // attendue est « Téléconseiller », deja pris par la colonne d'affectation.
-      // Renommage a trancher par le proprietaire, il change un fichier livre.
-      expect((await contenuFeuille(path.join(DOSSIER_FIXTURES, `campagne-${cle}.xlsx`), 'Répartition'))[0]).not.toContain(
-        'Commercial',
-      );
-    },
-  );
+  test.fixme('le classeur nomme « Commercial » la colonne du proprietaire de la fiche', async () => {
+    // `campagnes_export.go:36` reprend l'entete de la v1
+    // (`lots-export.service.ts:515`). Le mot est interdit dans une chaine
+    // affichee ; « Téléconseiller » nomme deja la colonne d'affectation.
+    expect((await contenuFeuille(CLASSEUR(), 'Répartition'))[0]).not.toContain('Commercial');
+  });
 
   test('la campagne est figee : un representant cree apres elle n’y entre pas', async ({
     page,
@@ -361,7 +391,8 @@ test.describe('parcours 11, campagnes d’appels', () => {
     ).toBe(PLACES);
     expect(
       await compter(
-        `SELECT count(*) AS n FROM lot_export_items i JOIN representants r ON r.id = i."representantId"
+        `SELECT count(*) AS n FROM lot_export_items i
+           JOIN representants r ON r.id = i."representantId"
           WHERE i."lotId" = $1 AND r."phoneE164" = $2`,
         [campagneId, telephoneLot(VIVIER)],
       ),
@@ -376,25 +407,19 @@ test.describe('parcours 11, campagnes d’appels', () => {
     page,
   }) => {
     await page.goto(`/chues/campagnes/${campagneId}`);
-    await choisirDansListe(
-      page.getByRole('combobox', { name: 'Téléconseiller' }),
-      teleconseiller.nom,
-    );
+    await choisirTeleconseiller(page, 'Téléconseiller', COMPTE_TELECONSEIL);
 
     const deplacees = FICHES_PAR_JOUR * JOURS;
     const fiches = page.getByRole('table', { name: 'Fiches de la campagne' });
     await expect(fiches.getByRole('row')).toHaveCount(deplacees + 1);
     await fiches.getByRole('checkbox', { name: 'Cocher toutes les fiches non traitées' }).check();
-    await choisirDansListe(
-      page.getByRole('combobox', { name: 'Attribuer les fiches à' }),
-      direction.nom,
-    );
+    await choisirTeleconseiller(page, 'Attribuer les fiches à', COMPTE_DIRECTION);
     await page.getByRole('button', { name: 'Attribuer', exact: true }).click();
 
     const confirmation = page.getByRole('dialog');
     await expect(
       confirmation.getByRole('heading', {
-        name: `Attribuer ${String(deplacees)} fiches à ${direction.nom} ?`,
+        name: `Attribuer ${String(deplacees)} fiches à ${COMPTE_DIRECTION} ?`,
       }),
     ).toBeVisible();
     await confirmation.getByRole('button', { name: 'Attribuer', exact: true }).click();
@@ -402,23 +427,23 @@ test.describe('parcours 11, campagnes d’appels', () => {
     const recues = page.getByRole('dialog');
     await expect(
       recues.getByRole('heading', {
-        name: `${String(deplacees)} fiches attribuées à ${direction.nom}`,
+        name: `${String(deplacees)} fiches attribuées à ${COMPTE_DIRECTION}`,
       }),
     ).toBeVisible();
-    const complement = await telecharger(page, `Fiches reçues par ${direction.nom}`);
+    const complement = await telecharger(page, `Fiches reçues par ${COMPTE_DIRECTION}`);
     expect(complement.subarray(0, 4).toString('latin1'), 'le complement n’est pas un PDF').toBe(
       '%PDF',
     );
     await recues.getByRole('button', { name: 'Fermer' }).click();
 
     expect(await cellulesEnBase(campagneId), 'les fiches sont passees, aucune n’a disparu').toEqual([
-      `${direction.nom} jour 1 : ${String(ENCADREMENT + FICHES_PAR_JOUR)}`,
-      `${direction.nom} jour 2 : ${String(ENCADREMENT + FICHES_PAR_JOUR)}`,
-      `${superviseur.nom} jour 1 : ${String(ENCADREMENT)}`,
-      `${superviseur.nom} jour 2 : ${String(ENCADREMENT)}`,
+      `${COMPTE_DIRECTION} jour 1 : ${String(ENCADREMENT + FICHES_PAR_JOUR)}`,
+      `${COMPTE_DIRECTION} jour 2 : ${String(ENCADREMENT + FICHES_PAR_JOUR)}`,
+      `${COMPTE_SUPERVISION} jour 1 : ${String(ENCADREMENT)}`,
+      `${COMPTE_SUPERVISION} jour 2 : ${String(ENCADREMENT)}`,
     ]);
-    const trace = await ligne<{ fiches: number; deplacees: number; de: string; vers: string }>(
-      `SELECT r.fiches, array_length(r.positions, 1) AS deplacees,
+    const trace = await ligne<{ fiches: number; positions: number; de: string; vers: string }>(
+      `SELECT r.fiches, array_length(r.positions, 1) AS positions,
               f."fullName" AS de, t."fullName" AS vers
          FROM lot_export_reaffectations r
          JOIN users f ON f.id = r."fromAssigneeId" JOIN users t ON t.id = r."toAssigneeId"
@@ -427,16 +452,16 @@ test.describe('parcours 11, campagnes d’appels', () => {
     );
     expect(trace).toEqual({
       fiches: deplacees,
-      deplacees,
-      de: teleconseiller.nom,
-      vers: direction.nom,
+      positions: deplacees,
+      de: COMPTE_TELECONSEIL,
+      vers: COMPTE_DIRECTION,
     });
 
     await expect(
-      page.getByText(`${String(deplacees)} fiches de ${teleconseiller.nom} vers ${direction.nom}`),
+      page.getByText(`${String(deplacees)} fiches de ${COMPTE_TELECONSEIL} vers ${COMPTE_DIRECTION}`),
     ).toBeVisible();
     await expect(
-      page.getByRole('link', { name: `Programme de ${teleconseiller.nom}, jour 1` }),
+      page.getByRole('link', { name: `Programme de ${COMPTE_TELECONSEIL}, jour 1` }),
       'un compte sans fiche n’a plus de programme a imprimer',
     ).toHaveCount(0);
   });
@@ -448,7 +473,7 @@ test.describe('parcours 11, campagnes d’appels', () => {
 
     await viderLEquipe(dialogue);
     const attendu = attendreApercu(page, 1, 2);
-    await cocherEquipe(dialogue, [teleconseiller.nom, superviseur.nom]);
+    await cocherEquipe(dialogue, [COMPTE_TELECONSEIL, COMPTE_SUPERVISION]);
     const apercu = await attendu;
     expect(apercu.eligible, 'les prospects CHUES semes par le parcours').toBe(PROSPECTS);
     expect(apercu.retenues).toBe(PROSPECTS);
@@ -459,8 +484,8 @@ test.describe('parcours 11, campagnes d’appels', () => {
     campagneProspectsId = await creerDepuisLeDialogue(page, dialogue, CAMPAGNE_PROSPECTS);
 
     expect(await cellulesEnBase(campagneProspectsId)).toEqual([
-      `${teleconseiller.nom} jour 1 : ${String(OBJECTIF)}`,
-      `${superviseur.nom} jour 1 : ${String(OBJECTIF)}`,
+      `${COMPTE_TELECONSEIL} jour 1 : ${String(FICHES_PAR_JOUR)}`,
+      `${COMPTE_SUPERVISION} jour 1 : ${String(ENCADREMENT)}`,
     ]);
     expect(
       await compter(

@@ -1,11 +1,12 @@
 import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { Flux } from '@/components/coque/flux';
 import { SidebarShell } from '@/components/coque/sidebar-shell';
 import { Topbar } from '@/components/coque/topbar';
 import { EcranErreurPleinePage } from '@/components/etats-router';
-import { coqueOf } from '@/lib/nav';
+import { coqueOf, navTitle } from '@/lib/nav';
 
 export const Route = createFileRoute('/_panneau')({
   beforeLoad: async ({ context, location }) => {
@@ -20,6 +21,10 @@ export const Route = createFileRoute('/_panneau')({
 function Panneau() {
   const { user } = Route.useRouteContext();
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    document.title = `${navTitle(user.role, pathname)} · CPI GO`;
+  }, [user.role, pathname]);
 
   return (
     // `globals.css` accroche la palette du projet à cet attribut : sortir de

@@ -49,7 +49,7 @@ export function EspacesGrid({ role, retour }: { role: Role; retour?: string | un
             return (
               <Card
                 key={entry.id}
-                className="flex-row items-center gap-4 px-5 py-5 text-muted-foreground opacity-60"
+                className="flex-row items-center gap-4 px-5 py-5 text-muted-foreground"
               >
                 <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-muted">
                   <LockIcon className="size-5" aria-hidden="true" />

@@ -100,7 +100,7 @@ export async function effacerFiches(telephones: readonly string[]): Promise<void
   });
 }
 
-/** Les identifiants des tentatives de conversion, pour relire ce qui a ete ecrit. */
+/** Ce que les tentatives d'un prospect ont ecrit, colonne par colonne. */
 export async function tentativesDuProspect(
   client: Client,
   prospectId: string,
@@ -128,10 +128,7 @@ export function appelEnregistre(page: Page, nom: string) {
 /** Une liste deroulante Base UI : le declencheur s'ouvre, l'option se choisit. */
 export async function choisirDansListe(declencheur: Locator, option: string): Promise<void> {
   await declencheur.click();
-  await declencheur
-    .page()
-    .getByRole('option', { name: option, exact: true })
-    .click();
+  await declencheur.page().getByRole('option', { name: option, exact: true }).click();
 }
 
 /** La liste posee sous une question du script, que seule sa legende nomme. */

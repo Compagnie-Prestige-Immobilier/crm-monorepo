@@ -52,13 +52,13 @@ func (l *live) diffuser(ctx huma.Context) {
 	ctx.SetHeader("Cache-Control", "no-store")
 	ctx.SetHeader("X-Accel-Buffering", "no")
 	w := ctx.BodyWriter()
-	flusher, _ := w.(http.Flusher)
+	controle, _ := w.(http.ResponseWriter)
 	ecrire := func(ligne string) bool {
 		if _, err := fmt.Fprint(w, ligne); err != nil {
 			return false
 		}
-		if flusher != nil {
-			flusher.Flush()
+		if controle != nil {
+			_ = http.NewResponseController(controle).Flush()
 		}
 		return true
 	}

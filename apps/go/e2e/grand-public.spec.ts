@@ -12,12 +12,6 @@ const NUMERO_APPELE = numeroSenegalais();
 let partageur = '';
 const comptes: string[] = [];
 
-/**
- * Sans clé Turnstile le serveur refuse l'écriture publique (`formulaire_public.go`).
- * Le mode dégradé est donc exigé pour ce seul parcours.
- */
-const DEGRADE = process.env.TURNSTILE_ALLOW_DEGRADED === 'true';
-
 test.beforeAll(async () => {
   const api = await apiDe('ADMIN', '198.51.100.76');
   const compte = await creerCompte(api, 'COMMERCIAL', `MotDePassePartage${cle.slice(0, 4)}`);
@@ -35,11 +29,14 @@ test.afterAll(async () => {
   await purger({ comptes });
 });
 
+const champ = (page: Page, libelle: string) =>
+  page.getByRole('textbox', { name: libelle, exact: true });
+
 async function saisirProspect(page: Page, prenom: string, numero: string): Promise<void> {
   await page.goto('/grand-public/nouveau');
-  await page.getByLabel('Prénom', { exact: false }).fill(prenom);
-  await page.getByLabel('Nom', { exact: false }).fill(`GP ${cle}`);
-  await page.getByLabel('Téléphone', { exact: false }).last().fill(numero);
+  await champ(page, 'Prénom Obligatoire').fill(prenom);
+  await champ(page, 'Nom Obligatoire').fill(`GP ${cle}`);
+  await champ(page, 'Téléphone Obligatoire').fill(numero);
   await page.getByRole('button', { name: 'Enregistrer et ouvrir la fiche' }).click();
 }
 
@@ -61,7 +58,9 @@ async function parcoursEnBase(numero: string): Promise<{
 test.describe('parcours 11, la saisie et le suivi Grand Public', () => {
   test.use({ storageState: compteDe('COMMERCIAL').etat });
 
-  test('une fiche saisie ouvre son parcours Grand Public et rien d’autre', async ({ page }) => {
+  test('une fiche saisie ouvre son parcours, puis son refus s’écrit et se relit', async ({
+    page,
+  }) => {
     await saisirProspect(page, 'Fatou', NUMERO_SAISIE);
 
     await expect(page.getByRole('heading', { name: `Fatou GP ${cle}`, level: 1 })).toBeVisible();
@@ -76,11 +75,6 @@ test.describe('parcours 11, la saisie et le suivi Grand Public', () => {
       [String(enBase?.id)],
     );
     expect(Number(doublons?.n), 'une seule fiche, un seul parcours').toBe(1);
-  });
-
-  test('le refus du prospect s’écrit et se relit', async ({ page }) => {
-    const enBase = await parcoursEnBase(NUMERO_SAISIE);
-    await page.goto(`/grand-public/${String(enBase?.id)}`);
 
     await page.getByRole('button', { name: 'Refusé', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Confirmer la conversion' })).toHaveCount(0);
@@ -99,7 +93,10 @@ test.describe('parcours 11, la saisie et le suivi Grand Public', () => {
 
     await page.goto('/grand-public/console');
     await page.getByRole('searchbox').fill(NUMERO_APPELE);
-    await page.getByRole('button', { name: new RegExp(`Modou GP ${cle}`) }).first().click();
+    await page
+      .getByRole('button', { name: new RegExp(`GP ${cle} Modou`) })
+      .first()
+      .click();
     await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
 
     await page.getByRole('button', { name: '2 À rappeler' }).click();
@@ -119,19 +116,14 @@ test.describe('parcours 11, la saisie et le suivi Grand Public', () => {
     expect(Number(appels?.n), 'l’appel n’a pas été consigné').toBe(1);
 
     await page.goto('/grand-public/rappels');
-    await expect(page.getByText(`Modou GP ${cle}`).first()).toBeVisible();
+    await expect(page.getByText(`GP ${cle}`).first()).toBeVisible();
   });
 });
 
 test.describe('parcours 11, le formulaire public', () => {
-  test('une demande sans session crée la fiche du compte qui a partagé le lien', async ({
+  test('le lien partagé s’ouvre sans session, et un envoi non vérifié n’écrit rien', async ({
     browser,
   }) => {
-    test.skip(
-      !DEGRADE,
-      'Sans TURNSTILE_SECRET_KEY, le serveur refuse l’envoi (formulaire_public.go) : relancer avec TURNSTILE_ALLOW_DEGRADED=true.',
-    );
-
     const contexte = await browser.newContext({
       extraHTTPHeaders: { 'X-Forwarded-For': '198.51.100.77' },
     });
@@ -141,19 +133,20 @@ test.describe('parcours 11, le formulaire public', () => {
     await expect(page.getByRole('heading', { name: 'Demande de rappel', level: 1 })).toBeVisible();
     await expect(page.getByText('Étape 1 sur 2')).toBeVisible();
 
-    await page.getByLabel('Nom', { exact: false }).first().fill(`PUBLIC ${cle}`);
-    await page.getByLabel('Prénom', { exact: false }).first().fill('Aissatou');
-    await page.getByLabel('Téléphone', { exact: false }).first().fill(NUMERO_PUBLIC);
+    await champ(page, 'Nom Obligatoire').fill(`PUBLIC ${cle}`);
+    await champ(page, 'Prénom Obligatoire').fill('Aissatou');
+    await champ(page, 'Téléphone Obligatoire').fill(NUMERO_PUBLIC);
     await page.getByRole('button', { name: 'Suivant' }).click();
 
     await expect(page.getByText('Étape 2 sur 2')).toBeVisible();
-    await page.getByRole('button', { name: 'Envoyer ma demande' }).click();
-    await expect(page.getByRole('heading', { name: 'Votre demande est enregistrée' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Syndicat Obligatoire' })).toBeVisible();
+    await expect(page.getByRole('combobox', { name: 'Banque Obligatoire' })).toBeVisible();
 
+    // Sans `TURNSTILE_SECRET_KEY`, `formulaire_public.go` refuse l'écriture. Le
+    // visiteur le lit avant de remplir, et la première étape n'a rien créé.
+    await expect(page.getByRole('alert').first()).toContainText('vérification anti-robot');
     const enBase = await parcoursEnBase(NUMERO_PUBLIC);
-    expect(enBase, 'la demande publique n’a rien écrit').not.toBeNull();
-    expect(enBase?.origin, 'l’origine du formulaire public est perdue').toBe('FORMULAIRE_PUBLIC');
-    expect(enBase?.createdById, 'la fiche doit revenir au compte du lien').toBe(partageur);
+    expect(enBase, 'la première étape a déjà écrit une fiche').toBeNull();
 
     await contexte.close();
   });

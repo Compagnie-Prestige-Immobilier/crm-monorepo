@@ -249,3 +249,28 @@ func TestRouteInconnueEtChampInconnu(t *testing.T) {
 		t.Fatalf("code : %v", body["code"])
 	}
 }
+
+func TestFluxEnDirectArriveAvantLaFinDeLaRequete(t *testing.T) {
+	b := nouveauBanc(t, "CHARGE_CLIENTELE")
+	statut, body := b.connexion(b.email, "motdepasse")
+	b.attend(statut, http.StatusOK, "connexion", body)
+	ctx, annuler := context.WithTimeout(b.ctx, 3*time.Second)
+	defer annuler()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.ts.URL+"/api/v1/live", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	resp, err := b.client.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.Header.Get("Content-Type") != "text/event-stream" {
+		t.Fatalf("content-type : %q", resp.Header.Get("Content-Type"))
+	}
+	ligne := make([]byte, 16)
+	n, err := resp.Body.Read(ligne)
+	if err != nil || !bytes.HasPrefix(ligne[:n], []byte(": ouvert")) {
+		t.Fatalf("première ligne du flux : %q, %v", ligne[:n], err)
+	}
+}
