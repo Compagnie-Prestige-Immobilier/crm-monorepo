@@ -1,23 +1,31 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type EtatDump = components['schemas']['EtatDump'];
+import { getApiClient } from '@/lib/api/browser';
 
-export const URL_TELECHARGEMENT_DUMP = '/api/v1/admin/database-dump/download';
+export type DatabaseDump = components['schemas']['DatabaseDumpJobDto'];
 
-export async function fetchDump(): Promise<EtatDump> {
-  return unwrap(await apiClient.GET('/api/v1/admin/database-dump'));
+export async function fetchDatabaseDump(client: ApiClient = getApiClient()): Promise<DatabaseDump> {
+  return unwrap(await client.GET('/api/v1/admin/database-dump'));
 }
 
-export async function demanderDump(): Promise<EtatDump> {
-  return unwrap(await apiClient.POST('/api/v1/admin/database-dump'));
+export async function requestDatabaseDump(
+  client: ApiClient = getApiClient(),
+): Promise<DatabaseDump> {
+  return unwrap(await client.POST('/api/v1/admin/database-dump', {}));
 }
 
-export function dumpEnCours(dump: EtatDump | undefined): boolean {
+export const DATABASE_DUMP_DOWNLOAD_URL = '/api/v1/admin/database-dump/download';
+
+export function databaseDumpFileName(now = new Date()): string {
+  return `cpi-base-${now.toISOString().slice(0, 10)}.sql.gz`;
+}
+
+export function isDumpRunning(dump: DatabaseDump | undefined): boolean {
   return dump?.status === 'queued' || dump?.status === 'running';
 }
 
-export function libelleEtatDump(dump: EtatDump | undefined): string {
+export function dumpStatusLabel(dump: DatabaseDump | undefined): string {
   switch (dump?.status) {
     case 'queued':
     case 'running':
@@ -33,16 +41,24 @@ export function libelleEtatDump(dump: EtatDump | undefined): string {
   }
 }
 
-export function alerteAvisDump(dump: EtatDump | undefined): string | null {
-  const statut = dump?.noticeStatus;
-  if (statut !== 'NOT_CONFIGURED' && statut !== 'TRANSPORT_ERROR' && statut !== 'FAILED') {
-    return null;
+export function dumpNoticeWarning(dump: DatabaseDump | undefined): string | null {
+  switch (dump?.noticeStatus) {
+    case 'INBOX_ONLY':
+      return null;
+    case 'NOT_CONFIGURED':
+    case 'TRANSPORT_ERROR':
+    case 'FAILED':
+      return (
+        'L’export est prêt, mais l’avis de fin n’a pas pu être déposé dans la ' +
+        'cloche du panel. Ne comptez pas sur une alerte : téléchargez depuis cet écran.'
+      );
+    default:
+      return null;
   }
-  return 'L’avis de fin n’a pas pu être déposé dans la cloche. Téléchargez depuis cet écran plutôt que d’attendre une alerte.';
 }
 
-export function formatTailleDump(octets: number | null): string {
-  if (octets === null) return '';
-  if (octets < 1_024 * 1_024) return `${String(Math.ceil(octets / 1_024))} Ko`;
-  return `${(octets / (1_024 * 1_024)).toFixed(1)} Mo`;
+export function formatDumpSize(bytes: number | null): string {
+  if (bytes === null) return '';
+  if (bytes < 1_024 * 1_024) return `${String(Math.ceil(bytes / 1_024))} Ko`;
+  return `${(bytes / (1_024 * 1_024)).toFixed(1)} Mo`;
 }

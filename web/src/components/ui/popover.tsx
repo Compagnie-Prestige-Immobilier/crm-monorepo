@@ -1,3 +1,5 @@
+'use client';
+
 import { Popover as PopoverPrimitive } from '@base-ui/react/popover';
 import { createContext, useContext, useState, type ReactNode } from 'react';
 

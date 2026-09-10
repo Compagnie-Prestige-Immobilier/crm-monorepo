@@ -1,30 +1,32 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components, operations } from '@/api/schema';
-import { lireDate, lireEntier, lireEnum, lireTexte } from '@/lib/filtres-url';
+import type { ApiClient, components, operations } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type Visite = components['schemas']['Visite'];
-export type VisiteRef = components['schemas']['VisiteRef'];
-export type EntreeReferentielVisite = components['schemas']['EntreeReferentielVisite'];
-export type ReferentielsVisite = components['schemas']['ReferentielsVisiteOutputBody'];
-export type CreerVisite = components['schemas']['CreerVisiteInputBody'];
-export type CorrigerVisite = components['schemas']['CorrigerVisiteInputBody'];
-export type PageRegistre = components['schemas']['PageRegistre'];
+import { getApiClient } from '@/lib/api/browser';
+import { flattenPage } from '@/lib/api/query-params';
+import { readEnum, readIsoDate, readPositiveInt, readString } from '@/lib/search-params';
+import type { Paginated, SortDirection } from '@/lib/types';
 
-type RequeteVisites = NonNullable<operations['listVisites']['parameters']['query']>;
+export type Visite = components['schemas']['VisiteDto'];
+export type VisiteRef = components['schemas']['VisiteReferentielRefDto'];
+export type VisiteReferentielItem = components['schemas']['VisiteReferentielDto'];
+export type VisiteReferentiels = components['schemas']['VisiteReferentielsBundleDto'];
+export type CreateVisiteInput = components['schemas']['CreateVisiteDto'];
+export type UpdateVisiteInput = components['schemas']['UpdateVisiteDto'];
+type VisitesQuery = NonNullable<operations['listVisites']['parameters']['query']>;
 
-export const TRIS_VISITE = [
+export const VISITE_SORT_FIELDS = [
   'visitedAt',
   'visitorName',
   'entreprise',
   'direction',
   'destinataire',
   'objet',
-] as const;
+] as const satisfies readonly components['schemas']['VisiteSortField'][];
 
-export type TriVisite = (typeof TRIS_VISITE)[number];
+export type VisiteSortField = (typeof VISITE_SORT_FIELDS)[number];
 
-/** Les intitulés du classeur tenu depuis des années par l'accueil. On n'y touche pas. */
-export const COLONNES_VISITE = {
+/** Les intitulés du classeur Excel tenu depuis des années. On n'y touche pas. */
+export const VISITE_COLONNES = {
   date: 'DATE VISITE',
   time: 'HEURE VISITE',
   visitorName: 'PRENOM ET NOMS',
@@ -36,43 +38,56 @@ export const COLONNES_VISITE = {
   comment: 'COMMENTAIRES / NOTES',
 } as const;
 
-export const COLONNES_IMPRESSION = [
+const VISITE_PAGE_SIZE = 100;
+
+/** Le classeur, colonne à colonne, dans l'ordre où l'accueil le lit — et où il s'imprime. */
+export const IMPRESSION_COLONNES = [
   'N° REGISTRE',
-  COLONNES_VISITE.date,
-  COLONNES_VISITE.time,
-  COLONNES_VISITE.visitorName,
-  COLONNES_VISITE.phone,
-  COLONNES_VISITE.entreprise,
-  COLONNES_VISITE.direction,
-  COLONNES_VISITE.destinataire,
-  COLONNES_VISITE.objet,
-  COLONNES_VISITE.comment,
+  VISITE_COLONNES.date,
+  VISITE_COLONNES.time,
+  VISITE_COLONNES.visitorName,
+  VISITE_COLONNES.phone,
+  VISITE_COLONNES.entreprise,
+  VISITE_COLONNES.direction,
+  VISITE_COLONNES.destinataire,
+  VISITE_COLONNES.objet,
+  VISITE_COLONNES.comment,
 ] as const;
 
-export type ColonneImpression = (typeof COLONNES_IMPRESSION)[number];
+export type ImpressionColonne = (typeof IMPRESSION_COLONNES)[number];
 
 /** Sans elles, la feuille n'identifie plus ni le jour ni la personne : ce n'est plus un registre. */
-export const COLONNES_IMPRESSION_VERROUILLEES: readonly ColonneImpression[] = [
-  COLONNES_VISITE.date,
-  COLONNES_VISITE.visitorName,
+export const IMPRESSION_COLONNES_VERROUILLEES: readonly ImpressionColonne[] = [
+  VISITE_COLONNES.date,
+  VISITE_COLONNES.visitorName,
 ];
 
-export function basculerColonneImpression(
-  colonnes: ReadonlySet<ColonneImpression>,
-  colonne: ColonneImpression,
-): ReadonlySet<ColonneImpression> {
-  if (COLONNES_IMPRESSION_VERROUILLEES.includes(colonne)) return colonnes;
-  const suite = new Set(colonnes);
-  if (suite.has(colonne)) suite.delete(colonne);
-  else suite.add(colonne);
-  return suite;
+export const IMPRESSION_COLONNES_PAR_DEFAUT: ReadonlySet<ImpressionColonne> = new Set(
+  IMPRESSION_COLONNES,
+);
+
+export function impressionColonneVisible(
+  colonne: ImpressionColonne,
+  colonnesImprimees: ReadonlySet<ImpressionColonne>,
+): boolean {
+  return colonnesImprimees.has(colonne);
 }
 
-/** `search` exige deux caractères ; en dessous le serveur refuse la requête. */
-const RECHERCHE_MIN = 2;
-const TAILLE_PAGE = 100;
+export function toggleImpressionColonne(
+  colonnesImprimees: ReadonlySet<ImpressionColonne>,
+  colonne: ImpressionColonne,
+): ReadonlySet<ImpressionColonne> {
+  if (IMPRESSION_COLONNES_VERROUILLEES.includes(colonne)) return colonnesImprimees;
+  const next = new Set(colonnesImprimees);
+  if (next.has(colonne)) next.delete(colonne);
+  else next.add(colonne);
+  return next;
+}
 
-export interface FiltresVisite {
+/** `VisiteQueryDto.search` exige deux caractères ; en dessous l'API répond 400. */
+const SEARCH_MIN_LENGTH = 2;
+
+export interface VisiteFilters {
   search: string;
   entrepriseId: string | null;
   directionId: string | null;
@@ -83,11 +98,11 @@ export interface FiltresVisite {
   toutePeriode: boolean;
   page: number;
   pageSize: number;
-  sortBy: TriVisite;
-  sortDir: 'asc' | 'desc';
+  sortBy: VisiteSortField;
+  sortDir: SortDirection;
 }
 
-export const FILTRES_VISITE_VIDES: FiltresVisite = {
+export const EMPTY_VISITE_FILTERS: VisiteFilters = {
   search: '',
   entrepriseId: null,
   directionId: null,
@@ -97,172 +112,206 @@ export const FILTRES_VISITE_VIDES: FiltresVisite = {
   dateTo: null,
   toutePeriode: false,
   page: 1,
-  pageSize: TAILLE_PAGE,
+  pageSize: VISITE_PAGE_SIZE,
   sortBy: 'visitedAt',
   sortDir: 'desc',
 };
 
-export function lireFiltresVisite(params: URLSearchParams): FiltresVisite {
+export function parseVisiteFilters(params: URLSearchParams): VisiteFilters {
   return {
-    search: lireTexte(params, 'search') ?? '',
-    entrepriseId: lireTexte(params, 'entrepriseId'),
-    directionId: lireTexte(params, 'directionId'),
-    destinataireId: lireTexte(params, 'destinataireId'),
-    objetId: lireTexte(params, 'objetId'),
-    dateFrom: lireDate(params, 'dateFrom'),
-    dateTo: lireDate(params, 'dateTo'),
-    toutePeriode: lireTexte(params, 'periode') === 'tout',
-    page: lireEntier(params, 'page', 1),
-    pageSize: TAILLE_PAGE,
-    sortBy: lireEnum(params, 'sortBy', TRIS_VISITE) ?? 'visitedAt',
-    sortDir: lireTexte(params, 'sortDir') === 'asc' ? 'asc' : 'desc',
+    search: readString(params, 'search') ?? '',
+    entrepriseId: readString(params, 'entrepriseId'),
+    directionId: readString(params, 'directionId'),
+    destinataireId: readString(params, 'destinataireId'),
+    objetId: readString(params, 'objetId'),
+    dateFrom: readIsoDate(params, 'dateFrom'),
+    dateTo: readIsoDate(params, 'dateTo'),
+    toutePeriode: readString(params, 'periode') === 'tout',
+    page: readPositiveInt(params, 'page', 1),
+    pageSize: VISITE_PAGE_SIZE,
+    sortBy: readEnum(params, 'sortBy', VISITE_SORT_FIELDS) ?? EMPTY_VISITE_FILTERS.sortBy,
+    sortDir: readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc',
   };
 }
 
-export function ecrireFiltresVisite(filtres: FiltresVisite): URLSearchParams {
+export function serializeVisiteFilters(filters: VisiteFilters): URLSearchParams {
   const params = new URLSearchParams();
-  const poser = (cle: string, valeur: string | null): void => {
-    if (valeur !== null && valeur !== '') params.set(cle, valeur);
+  const put = (key: string, value: string | null): void => {
+    if (value !== null && value !== '') params.set(key, value);
   };
 
-  poser('search', filtres.search.trim());
-  poser('entrepriseId', filtres.entrepriseId);
-  poser('directionId', filtres.directionId);
-  poser('destinataireId', filtres.destinataireId);
-  poser('objetId', filtres.objetId);
-  poser('dateFrom', filtres.dateFrom);
-  poser('dateTo', filtres.dateTo);
-  if (filtres.toutePeriode) params.set('periode', 'tout');
-  if (filtres.page !== 1) params.set('page', String(filtres.page));
-  if (filtres.sortBy !== 'visitedAt') params.set('sortBy', filtres.sortBy);
-  if (filtres.sortDir !== 'desc') params.set('sortDir', filtres.sortDir);
+  put('search', filters.search.trim());
+  put('entrepriseId', filters.entrepriseId);
+  put('directionId', filters.directionId);
+  put('destinataireId', filters.destinataireId);
+  put('objetId', filters.objetId);
+  put('dateFrom', filters.dateFrom);
+  put('dateTo', filters.dateTo);
+  if (filters.toutePeriode) params.set('periode', 'tout');
+  if (filters.page !== 1) params.set('page', String(filters.page));
+  if (filters.sortBy !== EMPTY_VISITE_FILTERS.sortBy) put('sortBy', filters.sortBy);
+  if (filters.sortDir !== EMPTY_VISITE_FILTERS.sortDir) put('sortDir', filters.sortDir);
+
   return params;
 }
 
-export function compterFiltresVisite(filtres: FiltresVisite): number {
-  const poses = [
-    filtres.search.trim() !== '',
-    filtres.entrepriseId !== null,
-    filtres.directionId !== null,
-    filtres.destinataireId !== null,
-    filtres.objetId !== null,
-    filtres.dateFrom !== null || filtres.dateTo !== null || filtres.toutePeriode,
-  ];
-  return poses.filter(Boolean).length;
+export function visitesQueryKey(filters: VisiteFilters): readonly string[] {
+  return ['visites', serializeVisiteFilters(filters).toString()];
+}
+
+export const VISITE_REFERENTIELS_QUERY_KEY = ['visites', 'referentiels'] as const;
+
+export function countActiveVisiteFilters(filters: VisiteFilters): number {
+  let count = 0;
+  if (filters.search.trim() !== '') count += 1;
+  if (filters.entrepriseId !== null) count += 1;
+  if (filters.directionId !== null) count += 1;
+  if (filters.destinataireId !== null) count += 1;
+  if (filters.objetId !== null) count += 1;
+  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
+  else if (filters.toutePeriode) count += 1;
+  return count;
+}
+
+/** Sans date choisie ni registre entier demandé, le registre est celui du jour. */
+function visiteDateRange(
+  filters: VisiteFilters,
+  today: string,
+): { dateFrom: string | null; dateTo: string | null } {
+  if (filters.dateFrom !== null || filters.dateTo !== null) {
+    return { dateFrom: filters.dateFrom, dateTo: filters.dateTo };
+  }
+  if (filters.toutePeriode) return { dateFrom: null, dateTo: null };
+  return { dateFrom: today, dateTo: today };
+}
+
+function visitesQuery(filters: VisiteFilters, today: string): VisitesQuery {
+  const range = visiteDateRange(filters, today);
+  const query: VisitesQuery = {
+    page: filters.page,
+    pageSize: filters.pageSize,
+    sortBy: filters.sortBy,
+    sortOrder: filters.sortDir,
+  };
+
+  if (range.dateFrom !== null) query.from = range.dateFrom;
+  if (range.dateTo !== null) query.to = range.dateTo;
+  if (filters.entrepriseId !== null) query.entrepriseId = filters.entrepriseId;
+  if (filters.directionId !== null) query.directionId = filters.directionId;
+  if (filters.destinataireId !== null) query.destinataireId = filters.destinataireId;
+  if (filters.objetId !== null) query.objetId = filters.objetId;
+
+  const search = filters.search.trim();
+  if (search.length >= SEARCH_MIN_LENGTH) query.search = search;
+
+  return query;
 }
 
 /** Dakar est à UTC toute l'année : l'horloge du serveur et la sienne coïncident. */
-export function maintenantDakar(at: Date = new Date()): { date: string; time: string } {
-  const deux = (valeur: number): string => String(valeur).padStart(2, '0');
+export function dakarNow(at: Date = new Date()): { date: string; time: string } {
+  const pad = (value: number): string => String(value).padStart(2, '0');
   return {
-    date: `${String(at.getUTCFullYear())}-${deux(at.getUTCMonth() + 1)}-${deux(at.getUTCDate())}`,
-    time: `${deux(at.getUTCHours())}:${deux(at.getUTCMinutes())}`,
+    date: `${String(at.getUTCFullYear())}-${pad(at.getUTCMonth() + 1)}-${pad(at.getUTCDate())}`,
+    time: `${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())}`,
   };
 }
 
 /** La plus récente en haut : c'est l'ordre du classeur, et celui de la journée. */
-export function ordonnerVisites(items: readonly Visite[]): Visite[] {
+export function orderVisites(items: readonly Visite[]): Visite[] {
   return [...items].sort((a, b) =>
     `${b.date} ${b.time ?? ''}`.localeCompare(`${a.date} ${a.time ?? ''}`),
   );
 }
 
 /**
- * Ce que la correction envoie : les seuls champs touchés. Renvoyer une valeur
- * inchangée ferait rejeter la ligne dès qu'une entrée de référentiel a été
- * retirée depuis, alors qu'un tout autre champ était corrigé.
+ * Ce que la correction envoie : les seuls champs que la Directrice a touchés.
+ * Renvoyer une valeur inchangée ferait rejeter la ligne dès qu'une entrée de
+ * référentiel a été retirée depuis, alors qu'elle corrige un tout autre champ.
  */
-/** Vide et absent sont la même chose pour le serveur : les deux effacent le champ. */
-function ouNull(valeur: string | null | undefined): string | null {
-  if (valeur === undefined || valeur === null || valeur.trim() === '') return null;
-  return valeur;
-}
-
-function idOuNull(ref: VisiteRef | null | undefined): string | null {
-  return ref === undefined || ref === null ? null : ref.id;
-}
-
-export function correctionVisite(avant: Visite, apres: CreerVisite): CorrigerVisite {
-  const etatAvant: CorrigerVisite = {
-    time: ouNull(avant.time),
-    visitorName: avant.visitorName,
-    phone: ouNull(avant.phone),
-    entrepriseId: avant.entreprise.id,
-    objetId: avant.objet.id,
-    directionId: idOuNull(avant.direction),
-    destinataireId: idOuNull(avant.destinataire),
-    comment: ouNull(avant.comment),
-  };
-  const etatApres: CorrigerVisite = {
-    time: ouNull(apres.time),
-    visitorName: apres.visitorName,
-    phone: ouNull(apres.phone),
-    entrepriseId: apres.entrepriseId,
-    objetId: apres.objetId,
-    directionId: ouNull(apres.directionId),
-    destinataireId: ouNull(apres.destinataireId),
-    comment: ouNull(apres.comment),
+export function visiteCorrection(before: Visite, after: CreateVisiteInput): UpdateVisiteInput {
+  const patch: UpdateVisiteInput = {};
+  const poser = <K extends keyof UpdateVisiteInput>(
+    key: K,
+    avant: () => UpdateVisiteInput[K],
+    apres: () => UpdateVisiteInput[K],
+  ): void => {
+    const valeurAvant = avant();
+    const valeurApres = apres();
+    if (valeurAvant !== valeurApres) patch[key] = valeurApres;
   };
 
-  return Object.fromEntries(
-    Object.entries(etatApres).filter(
-      ([cle, valeur]) => etatAvant[cle as keyof CorrigerVisite] !== valeur,
-    ),
-  ) as CorrigerVisite;
+  poser(
+    'time',
+    () => before.time,
+    () => after.time ?? null,
+  );
+  poser(
+    'visitorName',
+    () => before.visitorName,
+    () => after.visitorName,
+  );
+  poser(
+    'phone',
+    () => before.phone ?? '',
+    () => after.phone ?? '',
+  );
+  poser(
+    'entrepriseId',
+    () => before.entreprise.id,
+    () => after.entrepriseId,
+  );
+  poser(
+    'objetId',
+    () => before.objet.id,
+    () => after.objetId,
+  );
+  poser(
+    'directionId',
+    () => before.direction?.id ?? null,
+    () => after.directionId ?? null,
+  );
+  poser(
+    'destinataireId',
+    () => before.destinataire?.id ?? null,
+    () => after.destinataireId ?? null,
+  );
+  poser(
+    'comment',
+    () => before.comment ?? '',
+    () => after.comment ?? '',
+  );
+
+  return patch;
 }
 
-/** Sans date choisie, une recherche parcourt tout le registre ; sinon c'est celui du jour. */
-function plageDe(
-  filtres: FiltresVisite,
-  aujourdhui: string,
-  recherche: string,
-): { from?: string; to?: string } {
-  if (filtres.dateFrom !== null || filtres.dateTo !== null) {
-    return {
-      ...(filtres.dateFrom === null ? {} : { from: filtres.dateFrom }),
-      ...(filtres.dateTo === null ? {} : { to: filtres.dateTo }),
-    };
-  }
-  if (filtres.toutePeriode || recherche.length >= RECHERCHE_MIN) return {};
-  return { from: aujourdhui, to: aujourdhui };
-}
-
-function requete(filtres: FiltresVisite, aujourdhui: string): RequeteVisites {
-  const recherche = filtres.search.trim();
-  return {
-    page: filtres.page,
-    pageSize: filtres.pageSize,
-    sortBy: filtres.sortBy,
-    sortOrder: filtres.sortDir,
-    ...plageDe(filtres, aujourdhui, recherche),
-    ...(filtres.entrepriseId === null ? {} : { entrepriseId: filtres.entrepriseId }),
-    ...(filtres.directionId === null ? {} : { directionId: filtres.directionId }),
-    ...(filtres.destinataireId === null ? {} : { destinataireId: filtres.destinataireId }),
-    ...(filtres.objetId === null ? {} : { objetId: filtres.objetId }),
-    ...(recherche.length < RECHERCHE_MIN ? {} : { search: recherche }),
-  };
+export async function fetchVisiteReferentiels(
+  client: ApiClient = getApiClient(),
+): Promise<VisiteReferentiels> {
+  return unwrap(await client.GET('/api/v1/visites/referentiels'));
 }
 
 export async function fetchVisites(
-  filtres: FiltresVisite,
-  aujourdhui: string,
-): Promise<{ items: Visite[]; meta: PageRegistre }> {
-  const page = unwrap(
-    await apiClient.GET('/api/v1/visites', { params: { query: requete(filtres, aujourdhui) } }),
-  );
-  return { items: page.items ?? [], meta: page.meta };
+  filters: VisiteFilters,
+  today: string,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<Visite>> {
+  const query = visitesQuery(filters, today);
+  return flattenPage(unwrap(await client.GET('/api/v1/visites', { params: { query } })));
 }
 
-export async function fetchReferentielsVisite(activeOnly = true): Promise<ReferentielsVisite> {
+export async function createVisite(
+  input: CreateVisiteInput,
+  client: ApiClient = getApiClient(),
+): Promise<Visite> {
+  return unwrap(await client.POST('/api/v1/visites', { body: input }));
+}
+
+export async function updateVisite(
+  id: string,
+  input: UpdateVisiteInput,
+  client: ApiClient = getApiClient(),
+): Promise<Visite> {
   return unwrap(
-    await apiClient.GET('/api/v1/visites/referentiels', { params: { query: { activeOnly } } }),
+    await client.PATCH('/api/v1/visites/{id}', { params: { path: { id } }, body: input }),
   );
-}
-
-export async function creerVisite(body: CreerVisite): Promise<Visite> {
-  return unwrap(await apiClient.POST('/api/v1/visites', { body }));
-}
-
-export async function corrigerVisite(id: string, body: CorrigerVisite): Promise<Visite> {
-  return unwrap(await apiClient.PATCH('/api/v1/visites/{id}', { params: { path: { id } }, body }));
 }

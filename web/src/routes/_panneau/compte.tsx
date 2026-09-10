@@ -1,13 +1,31 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { ChangePasswordCard } from '@/components/compte/change-password-card';
+import { Skeleton } from '@/components/ui/skeleton';
 
-/** Ouvert à tout compte connecté : chacun change son mot de passe. */
 export const Route = createFileRoute('/_panneau/compte')({
-  component: () => (
-    <div className="flex flex-col gap-6">
-      <h1 className="font-display text-h2 font-[800] tracking-[-0.02em]">Mon compte</h1>
+  component: ComptePage,
+  pendingComponent: Loading,
+});
+
+function Loading() {
+  return (
+    <div className="flex flex-col gap-6" role="status" aria-label="Chargement de l’écran">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-11 w-44" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-80 w-full rounded-lg" />
+    </div>
+  );
+}
+
+/** La page `(panel)/compte` de la v1. */
+function ComptePage() {
+  return (
+    <div className="flex max-w-4xl flex-col gap-6">
       <ChangePasswordCard />
     </div>
-  ),
-});
+  );
+}

@@ -5,9 +5,34 @@ import (
 	"cpi-go/db"
 	"crypto/sha256"
 	"encoding/hex"
+	"net/http"
 )
 
-const NomCookie = "__Host-cpi_session"
+// `__Host-` exige Secure : hors TLS (poste de développement, téléphone sur le
+// réseau local) le navigateur jetterait le cookie, donc un nom sans préfixe.
+const (
+	NomCookie      = "__Host-cpi_session"
+	NomCookieClair = "cpi_session"
+)
+
+// CleSecurise porte dans le contexte si la requête est arrivée en TLS, directement
+// ou derrière le proxy de confiance.
+type CleSecurise struct{}
+
+func ConnexionSecurisee(ctx context.Context) bool {
+	v, _ := ctx.Value(CleSecurise{}).(bool)
+	return v
+}
+
+// JetonSession lit le cookie de session sous l'un ou l'autre nom.
+func JetonSession(r *http.Request) string {
+	for _, nom := range []string{NomCookie, NomCookieClair} {
+		if c, err := r.Cookie(nom); err == nil && c.Value != "" {
+			return c.Value
+		}
+	}
+	return ""
+}
 
 type Utilisateur struct {
 	ID        string  `json:"id"`

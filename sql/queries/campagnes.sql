@@ -62,6 +62,11 @@ ORDER BY MIN(i."position"), i."day";
 -- name: LotJourMax :one
 SELECT COALESCE(MAX(i."day"), 1)::int FROM "lot_export_items" i WHERE i."lotId" = $1;
 
+-- name: LotFichesAttribuees :many
+SELECT DISTINCT i."representantId", i."prospectId"
+FROM "lot_export_items" i
+WHERE i."assigneeId" = $1;
+
 -- name: LotPositionsDeplacables :many
 SELECT i."position", i."assigneeId"
 FROM "lot_export_items" i

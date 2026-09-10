@@ -1,89 +1,41 @@
+'use client';
+
 import { zodResolver } from '@hookform/resolvers/zod';
+import { ApiError } from '@crm/api-client/query';
 import { useMutation } from '@tanstack/react-query';
 import { KeyRoundIcon, LoaderIcon } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
-import { z } from '@/lib/zod';
 
+import { Field } from '@/components/forms/field';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { changePassword } from '@/lib/data/auth';
-import { apiErrorCode, toastApiError } from '@/lib/mutation-feedback';
-
-const MIN_LENGTH = 8;
-const MAX_LENGTH = 24;
-
-const schema = z
-  .object({
-    currentPassword: z.string().min(1, 'Le mot de passe actuel est obligatoire.'),
-    newPassword: z
-      .string()
-      .min(MIN_LENGTH, `Le nouveau mot de passe compte au moins ${String(MIN_LENGTH)} caractères.`)
-      .max(MAX_LENGTH, `Le nouveau mot de passe compte au plus ${String(MAX_LENGTH)} caractères.`),
-    confirmation: z.string(),
-  })
-  .refine((values) => values.newPassword === values.confirmation, {
-    message: 'Les deux mots de passe diffèrent.',
-    path: ['confirmation'],
-  });
-
-type FormInput = z.infer<typeof schema>;
-
-function Field({
-  id,
-  label,
-  autoComplete,
-  error,
-  register,
-}: {
-  id: keyof FormInput;
-  label: string;
-  autoComplete: string;
-  error: string | undefined;
-  register: ReturnType<typeof useForm<FormInput>>['register'];
-}) {
-  return (
-    <div className="flex flex-col gap-2">
-      <Label htmlFor={id}>{label}</Label>
-      <Input
-        id={id}
-        type="password"
-        autoComplete={autoComplete}
-        aria-invalid={error !== undefined}
-        aria-describedby={error !== undefined ? `${id}-error` : undefined}
-        {...register(id)}
-      />
-      {error !== undefined ? (
-        <p id={`${id}-error`} role="alert" className="text-[0.75rem] text-destructive">
-          {error}
-        </p>
-      ) : null}
-    </div>
-  );
-}
+import { changeMyPassword } from '@/lib/data/auth';
+import { toastApiError } from '@/lib/mutation-feedback';
+import {
+  changePasswordSchema,
+  NEW_PASSWORD_MAX_LENGTH,
+  NEW_PASSWORD_MIN_LENGTH,
+  type ChangePasswordFormInput,
+} from '@/lib/schemas';
 
 export function ChangePasswordCard() {
-  const {
-    register,
-    handleSubmit,
-    reset,
-    setError,
-    formState: { errors, isSubmitting },
-  } = useForm<FormInput>({
-    resolver: zodResolver(schema),
+  const { register, handleSubmit, reset, setError, formState } = useForm<ChangePasswordFormInput>({
+    resolver: zodResolver(changePasswordSchema),
     defaultValues: { currentPassword: '', newPassword: '', confirmation: '' },
   });
 
   const mutation = useMutation({
-    mutationFn: (values: FormInput) => changePassword(values.currentPassword, values.newPassword),
+    mutationFn: (values: ChangePasswordFormInput) =>
+      changeMyPassword(values.currentPassword, values.newPassword),
     onSuccess: () => {
       reset({ currentPassword: '', newPassword: '', confirmation: '' });
       toast.success('Mot de passe changé.');
     },
     onError: (error) => {
-      if (apiErrorCode(error) === 'INVALID_CREDENTIALS') {
+      const code = error instanceof ApiError ? (error.body as { code?: string }).code : undefined;
+      if (code === 'INVALID_CURRENT_PASSWORD') {
         setError('currentPassword', { message: 'Le mot de passe actuel est incorrect.' });
         return;
       }
@@ -92,7 +44,7 @@ export function ChangePasswordCard() {
   });
 
   return (
-    <Card className="mx-auto max-w-md">
+    <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <KeyRoundIcon className="size-4" aria-hidden="true" />
@@ -103,7 +55,7 @@ export function ChangePasswordCard() {
       <CardContent>
         <form
           noValidate
-          className="flex flex-col gap-4"
+          className="flex max-w-sm flex-col gap-4"
           onSubmit={(event) => {
             void handleSubmit((values) => {
               mutation.mutate(values);
@@ -111,29 +63,49 @@ export function ChangePasswordCard() {
           }}
         >
           <Field
-            id="currentPassword"
             label="Mot de passe actuel"
-            autoComplete="current-password"
-            error={errors.currentPassword?.message}
-            register={register}
-          />
-          <Field
-            id="newPassword"
-            label="Nouveau mot de passe"
-            autoComplete="new-password"
-            error={errors.newPassword?.message}
-            register={register}
-          />
-          <Field
-            id="confirmation"
-            label="Confirmation"
-            autoComplete="new-password"
-            error={errors.confirmation?.message}
-            register={register}
-          />
+            required
+            error={formState.errors.currentPassword?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="password"
+                autoComplete="current-password"
+                {...register('currentPassword')}
+              />
+            )}
+          </Field>
 
-          <Button type="submit" className="self-start" disabled={isSubmitting}>
-            {isSubmitting ? (
+          <Field
+            label="Nouveau mot de passe"
+            required
+            description={`Entre ${String(NEW_PASSWORD_MIN_LENGTH)} et ${String(NEW_PASSWORD_MAX_LENGTH)} caractères.`}
+            error={formState.errors.newPassword?.message}
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="password"
+                autoComplete="new-password"
+                {...register('newPassword')}
+              />
+            )}
+          </Field>
+
+          <Field label="Confirmation" required error={formState.errors.confirmation?.message}>
+            {(props) => (
+              <Input
+                {...props}
+                type="password"
+                autoComplete="new-password"
+                {...register('confirmation')}
+              />
+            )}
+          </Field>
+
+          <Button type="submit" className="self-start" disabled={mutation.isPending}>
+            {mutation.isPending ? (
               <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
             ) : null}
             Changer le mot de passe

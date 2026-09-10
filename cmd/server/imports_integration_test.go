@@ -364,6 +364,91 @@ func TestImportEchuEstExpireEtSonClasseurDetruit(t *testing.T) {
 	}
 }
 
+// Numéros propres à la course : l'index d'unicité du téléphone est global, et
+// plusieurs exécutions partagent la base.
+func lignesRepresentantsDeCourse(departement string, nombre, doublon int) [][]string {
+	base := int(time.Now().UnixNano() % 3_000_000)
+	lignes := make([][]string, 0, nombre)
+	for index := range nombre {
+		rang := index
+		if index == doublon {
+			rang = 0
+		}
+		lignes = append(lignes, []string{
+			fmt.Sprintf("Représentant %04d", rang),
+			fmt.Sprintf("77%07d", 3_000_000+base+rang),
+			departement,
+		})
+	}
+	return lignes
+}
+
+func rapportImportRepresentants(b *banc, requete string, contenu []byte) map[string]any {
+	b.t.Helper()
+	statut, body := b.deposerClasseur("/api/v1/representants/import"+requete, "representants.xlsx", contenu)
+	b.attend(statut, http.StatusOK, "rapport d’import", body)
+	return body
+}
+
+func exigerApercuImport(b *banc, rapport map[string]any, departement string) {
+	b.t.Helper()
+	apercu, _ := rapport["preview"].([]any)
+	if len(apercu) != 3 {
+		b.t.Fatalf("aperçu : %v", rapport["preview"])
+	}
+	premiere := apercu[0].(map[string]any)
+	if numero, _ := premiere["phoneE164"].(string); numero == "" {
+		b.t.Fatalf("la ligne d’aperçu doit porter le numéro normalisé : %v", premiere)
+	}
+	exigerChampsJSON(b, premiere, map[string]string{
+		"departementName": departement, "relationStatus": "INCONNU", "whatsappStatus": "NON_DEMANDE",
+	}, "ligne d’aperçu")
+	erreurs, _ := rapport["errors"].([]any)
+	if len(erreurs) != 1 {
+		b.t.Fatalf("erreurs : %v", rapport["errors"])
+	}
+	exigerChampsJSON(b, erreurs[0].(map[string]any), map[string]string{"code": "DUPLICATE_IN_FILE"}, "erreur de doublon")
+}
+
+func TestImportRepresentantsRapportSynchrone(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.connecterImport()
+	identifiant, departement := b.departementImport()
+	contenu := classeurRepresentants(t, lignesRepresentantsDeCourse(departement, 4, 3))
+
+	simulation := rapportImportRepresentants(b, "", contenu)
+	exigerChampsJSON(b, simulation, map[string]string{
+		"dryRun": "true", "totalRows": "4", "valid": "3",
+		"duplicates": "1", "rejected": "1", "created": "0",
+	}, "simulation")
+	exigerApercuImport(b, simulation, departement)
+	if compte := b.compteRepresentants(identifiant); compte != 0 {
+		t.Fatalf("une simulation n’écrit rien : %d fiches", compte)
+	}
+
+	applique := rapportImportRepresentants(b, "?dryRun=false", contenu)
+	exigerChampsJSON(b, applique, map[string]string{"dryRun": "false", "created": "3", "valid": "3"}, "application")
+	if compte := b.compteRepresentants(identifiant); compte != 3 {
+		t.Fatalf("les trois fiches doivent être écrites : %d", compte)
+	}
+
+	rejoue := rapportImportRepresentants(b, "?dryRun=false&enrichir=true", contenu)
+	exigerChampsJSON(b, rejoue, map[string]string{
+		"created": "0", "valid": "0", "duplicates": "4", "enriched": "0",
+	}, "rejeu du même classeur")
+	if compte := b.compteRepresentants(identifiant); compte != 3 {
+		t.Fatalf("le rejeu ne doit rien ajouter : %d", compte)
+	}
+}
+
+func TestImportRepresentantsRapportInterditAuTeleconseiller(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	b.connecterImport()
+
+	statut, body := b.deposerClasseur("/api/v1/representants/import", "representants.xlsx", []byte("PK\x03\x04"))
+	b.attend(statut, http.StatusForbidden, "import par un téléconseiller", body)
+}
+
 func TestImportInterditAuTeleconseiller(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	t.Setenv("IMPORTS_DIR", t.TempDir())

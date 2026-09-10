@@ -81,6 +81,8 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
 		ctx := context.WithValue(r.Context(), cleRequete{}, id)
 		ctx = context.WithValue(ctx, CleAdresse{}, adresseClient(r, cfg.TrustProxy))
+		securisee := r.TLS != nil || (cfg.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
+		ctx = context.WithValue(ctx, CleSecurise{}, securisee)
 		rw := &reponse{ResponseWriter: w, statut: http.StatusOK}
 		r = r.WithContext(ctx)
 		defer func() {
@@ -121,12 +123,12 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 			mux.ServeHTTP(w, r)
 			return
 		}
-		cookie, err := r.Cookie(NomCookie)
-		if err != nil || cookie.Value == "" {
+		jeton := JetonSession(r)
+		if jeton == "" {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "UNAUTHENTICATED", "Connexion requise."))
 			return
 		}
-		u, err := utilisateurParSession(r.Context(), q, cookie.Value)
+		u, err := utilisateurParSession(r.Context(), q, jeton)
 		if err != nil {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
 			return

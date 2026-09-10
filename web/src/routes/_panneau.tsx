@@ -2,22 +2,33 @@ import { createFileRoute, Outlet, redirect, useLocation } from '@tanstack/react-
 import { useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
-import { Flux } from '@/components/coque/flux';
-import { SidebarShell } from '@/components/coque/sidebar-shell';
-import { Topbar } from '@/components/coque/topbar';
 import { EcranErreurPleinePage } from '@/components/etats-router';
-import { coqueOf, navTitle } from '@/lib/nav';
+import { CoqueShell } from '@/components/layout/coque-shell';
+import { navTitle } from '@/components/layout/nav-items';
+import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
+import { SidebarShell } from '@/components/layout/sidebar-shell';
+import { Topbar } from '@/components/layout/topbar';
+import { LiveStream } from '@/components/live/live-stream';
 
 export const Route = createFileRoute('/_panneau')({
   beforeLoad: async ({ context, location }) => {
     const user = await context.queryClient.ensureQueryData(meQueryOptions);
-    if (user === null) throw redirect({ to: '/connexion', search: { next: location.href } });
+    if (user === null) throw redirect({ to: '/connexion', search: { suite: location.href } });
     return { user };
   },
   component: Panneau,
   errorComponent: EcranErreurPleinePage,
 });
 
+function sidebarRepliee(): boolean {
+  try {
+    return document.cookie.split('; ').includes(`${SIDEBAR_COOKIE}=1`);
+  } catch {
+    return false;
+  }
+}
+
+/** Le layout `(panel)` de la v1 : coque, barre latérale, barre supérieure, contenu. */
 function Panneau() {
   const { user } = Route.useRouteContext();
   const { pathname } = useLocation();
@@ -27,18 +38,16 @@ function Panneau() {
   }, [user.role, pathname]);
 
   return (
-    // `globals.css` accroche la palette du projet à cet attribut : sortir de
-    // `/chues/*` le démonte avec la route, sans remise à zéro.
-    <div data-coque={coqueOf(pathname) ?? undefined} className="flex min-h-dvh">
-      <Flux />
-      <SidebarShell role={user.role} />
+    <CoqueShell>
+      <LiveStream />
+      <SidebarShell role={user.role} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar user={user} />
+        <Topbar user={user} demoEnabled={false} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           <Outlet />
         </main>
       </div>
-    </div>
+    </CoqueShell>
   );
 }

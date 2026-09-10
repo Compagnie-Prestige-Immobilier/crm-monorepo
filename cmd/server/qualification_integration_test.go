@@ -8,7 +8,9 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"fmt"
+	"mime/multipart"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"testing"
@@ -366,5 +368,244 @@ func TestQualificationBeatEcritUnCreneauDActivite(t *testing.T) {
 	}
 	if !vuApres.Equal(vuAvant) {
 		t.Fatalf("un battement sous les dix secondes ne s'écrit pas : %v puis %v", vuAvant, vuApres)
+	}
+}
+
+func qualificationLotMultipart(t *testing.T, champ string, contenu []byte) (typeContenu string, corps []byte) {
+	t.Helper()
+	var lot bytes.Buffer
+	formulaire := multipart.NewWriter(&lot)
+	partie, err := formulaire.CreateFormFile(champ, "note.webm")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := partie.Write(contenu); err != nil {
+		t.Fatal(err)
+	}
+	if err := formulaire.Close(); err != nil {
+		t.Fatal(err)
+	}
+	return formulaire.FormDataContentType(), lot.Bytes()
+}
+
+func TestQualificationAliasRecordingAccepteUnChampFile(t *testing.T) {
+	dossier := t.TempDir()
+	t.Setenv("NOTE_VOCALE_DIR", dossier)
+	auteur := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(auteur)
+	corps := qualificationCorpsTentative(prospect, nil)
+	attemptID, _ := corps["id"].(string)
+	t.Cleanup(func() { _, _ = auteur.pool.Exec(auteur.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, attemptID) })
+	statut, body := qualificationEnvoi(auteur, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	auteur.attend(statut, http.StatusOK, "tentative", body)
+
+	chemin := "/api/v1/phase2/call-attempts/" + attemptID + "/recording"
+	note := append([]byte{0x1a, 0x45, 0xdf, 0xa3}, bytes.Repeat([]byte{0x42}, 64)...)
+
+	typeContenu, lot := qualificationLotMultipart(t, "audio", note)
+	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, typeContenu, lot)
+	auteur.attend(statut, http.StatusBadRequest, "champ multipart inattendu", body)
+
+	typeContenu, lot = qualificationLotMultipart(t, "file", note)
+	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, typeContenu, lot)
+	auteur.attend(statut, http.StatusOK, "dépôt multipart par l'alias", body)
+	if body["attemptId"] != attemptID || body["bytes"] != float64(len(note)) {
+		t.Fatalf("corps du dépôt : %v", body)
+	}
+	info, err := os.Stat(filepath.Join(dossier, attemptID+qualification.NoteSuffixe))
+	if err != nil || info.Size() != int64(len(note)) {
+		t.Fatalf("seul l'audio du champ `file` doit être écrit : %v, %v", info, err)
+	}
+
+	statut, body = qualificationEnvoi(auteur, http.MethodGet, chemin, nil)
+	auteur.attend(statut, http.StatusOK, "lecture par l'alias", body)
+}
+
+func qualificationLotSync(operations ...map[string]any) map[string]any {
+	return map[string]any{
+		"clientBatchId":  uuid.Must(uuid.NewV7()).String(),
+		"payloadVersion": 1,
+		"operations":     operations,
+	}
+}
+
+func qualificationOperationSync(entite, op, entityID string, data map[string]any) map[string]any {
+	operation := map[string]any{
+		"opId": uuid.Must(uuid.NewV7()).String(), "seq": 0, "entity": entite, "op": op,
+		"entityId": entityID, "clientUpdatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	if data != nil {
+		operation["data"] = data
+	}
+	return operation
+}
+
+func qualificationResultatsSync(b *banc, lot map[string]any, quoi string) []any {
+	b.t.Helper()
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/sync/push", lot)
+	b.attend(statut, http.StatusOK, quoi, body)
+	if body["batchId"] != lot["clientBatchId"] || body["nextCursor"] != nil {
+		b.t.Fatalf("entête du lot : %v", body)
+	}
+	resultats, _ := body["results"].([]any)
+	return resultats
+}
+
+func TestSyncPushConsigneLaTentativeEtRendLesRefusDansLeCorps(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(b)
+	attemptID := uuid.Must(uuid.NewV7()).String()
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect) })
+	data := map[string]any{
+		"prospectId": prospect, "outcome": "UNREACHABLE",
+		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+
+	resultats := qualificationResultatsSync(b, qualificationLotSync(
+		qualificationOperationSync("call_attempt", "create", attemptID, data)), "premier lot")
+	premier, _ := resultats[0].(map[string]any)
+	if premier["status"] != "applied" || premier["entityId"] != attemptID || premier["errorCode"] != nil {
+		t.Fatalf("première opération : %v", premier)
+	}
+
+	resultats = qualificationResultatsSync(b, qualificationLotSync(
+		qualificationOperationSync("call_attempt", "create", attemptID, data)), "lot rejoué")
+	if rejeu, _ := resultats[0].(map[string]any); rejeu["status"] != "duplicate" {
+		t.Fatalf("le rejeu doit rendre duplicate : %v", resultats[0])
+	}
+
+	muet := map[string]any{
+		"prospectId": prospect, "outcome": "OTHER",
+		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	resultats = qualificationResultatsSync(b, qualificationLotSync(
+		qualificationOperationSync("call_attempt", "create", uuid.Must(uuid.NewV7()).String(), muet),
+		qualificationOperationSync("prospect", "update", uuid.Must(uuid.NewV7()).String(), nil),
+	), "lot refusé")
+	refus, _ := resultats[0].(map[string]any)
+	if refus["status"] != "rejected" || refus["errorCode"] != "PHASE2_COMMENT_REQUIRED" || refus["error"] == nil {
+		t.Fatalf("refus métier : %v", refus)
+	}
+	inconnue, _ := resultats[1].(map[string]any)
+	if inconnue["status"] != "rejected" || inconnue["errorCode"] != "UNSUPPORTED_OPERATION" {
+		t.Fatalf("opération non traitée : %v", inconnue)
+	}
+
+	if n := qualificationCompte(b, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1`, prospect); n != 1 {
+		t.Fatalf("%d tentatives écrites pour un seul appel consigné", n)
+	}
+}
+
+func TestQualificationAppelRepresentantRendLaSuggestionRecueillie(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	rep := qualificationRepresentant(b)
+	// Le numéro suggéré passe par la normalisation E.164 : il lui faut un
+	// préfixe mobile sénégalais réel, ce que `qualificationNumero` ne garantit pas.
+	numero := fmt.Sprintf("+22177%07d", time.Now().UnixNano()%10000000)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "representant_suggestions" WHERE "sourceRepresentantId" = $1`, rep)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "rep_call_attempts" WHERE "representantId" = $1`, rep)
+	})
+
+	corps := map[string]any{
+		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "outcome": "REFUSED",
+		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		"suggestedPhone":  numero, "suggestedName": "Fatou Sow", "suggestedNote": "une collègue",
+	}
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/rep-campaigns/attempts", corps)
+	b.attend(statut, http.StatusOK, "appel avec numéro suggéré", body)
+	suggestion, _ := body["suggestion"].(map[string]any)
+	if suggestion == nil {
+		t.Fatalf("la piste recueillie doit accompagner le verdict : %v", body)
+	}
+	if suggestion["suggestedPhoneE164"] != numero || suggestion["suggestedName"] != "Fatou Sow" ||
+		suggestion["status"] != "A_APPELER" || suggestion["suggestedById"] != b.userID ||
+		suggestion["sourceRepresentantId"] != rep || suggestion["suggestedByName"] != "Test Intégration" {
+		t.Fatalf("piste renvoyée : %v", suggestion)
+	}
+	if code, _ := suggestion["sourceRepresentantShortCode"].(string); len(code) != 6 {
+		t.Fatalf("code court du représentant source : %v", suggestion["sourceRepresentantShortCode"])
+	}
+
+	sans := map[string]any{
+		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "outcome": "UNREACHABLE",
+		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/rep-campaigns/attempts", sans)
+	b.attend(statut, http.StatusOK, "appel sans numéro suggéré", body)
+	if body["suggestion"] != nil {
+		t.Fatalf("sans numéro suggéré, la piste est nulle : %v", body)
+	}
+}
+
+func annuairePage(b *banc, requete string) (entrees []any, suivant string, encore bool) {
+	b.t.Helper()
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/phase2/directory"+requete, nil, nil)
+	b.attend(statut, http.StatusOK, "annuaire de phase 2", body)
+	entrees, _ = body["entries"].([]any)
+	suivant, _ = body["nextCursor"].(string)
+	encore, _ = body["hasMore"].(bool)
+	if body["serverTime"] == nil {
+		b.t.Fatalf("l’annuaire doit dater sa réponse : %v", body)
+	}
+	return entrees, suivant, encore
+}
+
+func exigerEntreeAnnuaire(b *banc, entree map[string]any) {
+	b.t.Helper()
+	if entree["enrollmentMethod"] != nil || entree["updatedAt"] == nil {
+		b.t.Fatalf("entrée d’annuaire : %v", entree)
+	}
+	if numero, _ := entree["phoneE164"].(string); numero == "" {
+		b.t.Fatalf("l’entrée doit porter le numéro : %v", entree)
+	}
+	exigerChampsJSON(b, entree, map[string]string{"phase2Status": "PENDING", "rev": "1"}, "entrée d’annuaire")
+}
+
+func annuaireRelever(b *banc, entrees []any, miennes map[string]bool, etrangere string) {
+	b.t.Helper()
+	for _, brute := range entrees {
+		entree := brute.(map[string]any)
+		identifiant := entree["prospectId"].(string)
+		if identifiant == etrangere {
+			b.t.Fatalf("l’annuaire sort de la portée du téléconseiller : %v", entree)
+		}
+		if _, mienne := miennes[identifiant]; mienne {
+			miennes[identifiant] = true
+		}
+	}
+}
+
+func TestAnnuairePhase2PagineDansLaPorteeDuTeleconseiller(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	miennes := map[string]bool{
+		qualificationProspect(b): false, qualificationProspect(b): false, qualificationProspect(b): false,
+	}
+	autre := autreCompte(b, "COMMERCIAL")
+	etrangere := qualificationProspect(autre)
+
+	entrees, curseur, encore := annuairePage(b, "?limit=2")
+	if len(entrees) != 2 || !encore || curseur == "" {
+		t.Fatalf("première page : %d entrées, hasMore %v, curseur %q", len(entrees), encore, curseur)
+	}
+	exigerEntreeAnnuaire(b, entrees[0].(map[string]any))
+
+	for range 5 {
+		annuaireRelever(b, entrees, miennes, etrangere)
+		if !encore {
+			break
+		}
+		entrees, curseur, encore = annuairePage(b, "?limit=2&since="+url.QueryEscape(curseur))
+	}
+	for identifiant, vue := range miennes {
+		if !vue {
+			t.Fatalf("la fiche %s manque à l’annuaire", identifiant)
+		}
+	}
+
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/phase2/directory?since=hier", nil, nil)
+	b.attend(statut, http.StatusBadRequest, "curseur illisible", body)
+	if body["code"] != "PHASE2_DIRECTORY_CURSOR_INVALID" {
+		t.Fatalf("code : %v", body["code"])
 	}
 }

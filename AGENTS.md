@@ -202,16 +202,18 @@ niveau maximum » :
    la quantite. Un ecran exemplaire fait moins de 300 lignes.
 5. Les idees differees se signalent en une ligne, jamais en code.
 
-Plafonds a respecter dans ce depot : un ecran ou un composant tient sous 300
-lignes ; un fichier Go sous 1 500 ; un module tient dans un fichier tant qu'il
+Plafonds a respecter dans ce depot : un ecran ou un composant NOUVEAU tient
+sous 300 lignes (le panneau v1 repris tel quel le 10 septembre 2026 garde ses
+fichiers, jusqu'a 1 728 lignes, sur ordre du proprietaire : on ne le reecrit
+pas) ; un fichier Go sous 1 500 ; un module tient dans un fichier tant qu'il
 n'a pas deux consommateurs reels ; une entite a UN chemin d'ecriture ; un
 tableau de bord a UN endpoint ; un test de parcours par metier, aucun test
 unitaire ; rien de genere n'est commite.
 
 Ces plafonds sont verifies par la CI et en local, pas seulement lus. Job `go`
 de `.github/workflows/ci.yml` : `tools/dev/plafonds.sh` (1 500 lignes par
-fichier Go, 300 par fichier `web/src`, aucun `db/`, `openapi.json`,
-`schema.d.ts`, `*.gen.ts` ni `dist/` suivi par git) puis `golangci-lint` avec
+fichier Go, 1 800 par fichier `web/src` tant que le panneau v1 y vit, aucun
+`db/`, `openapi.json`, `schema*.d.ts`, `*.gen.ts` ni `dist/` suivi par git) puis `golangci-lint` avec
 `.golangci.yml` : `depguard` refuse Gin, Echo, Fiber, GORM et Redis ;
 `gocyclo` 12, `gocognit` 15 (seuil Sonar), `nestif` 4, `dupl` 80 jetons ;
 `nolintlint` exige une raison ecrite et un linteur nomme ; `godox` refuse les
@@ -242,6 +244,10 @@ le detail ; gel des fonctionnalites sur `dev`
 avec une seule release v1 de maintenance nommee. Le 9 septembre la v1 (Nest,
 Next, Prisma, Flutter, clients generes) a ete purgee de ce depot et `apps/go`
 en est devenu la racine : `cmd/server`, `internal/`, `sql/`, `web/`, `e2e/`.
+Le 10 septembre le proprietaire a exige le panneau v1 a l'identique : `web/`
+est le code React de la v1 repris tel quel (composants, donnees, ecrans), avec
+des cales pour Next et le contrat v1 fige dans `web/contrat-v1.openapi.json` ;
+le binaire Go sert ce contrat. Aucune refonte d'ecran sans son accord ecrit.
 Pas de stockage local ni de sync dans le panneau : une perte de donnees hors
 ligne nous serait imputee. Toute proposition qui contredit ces decisions se
 signale en une ligne au proprietaire avant d'etre codee.

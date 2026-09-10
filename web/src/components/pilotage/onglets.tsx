@@ -1,8 +1,12 @@
-import { Link, useLocation } from '@tanstack/react-router';
+'use client';
+
+import Link from 'next/link';
+import { usePathname, useSearchParams } from 'next/navigation';
 
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { lien } from '@/lib/nav';
-import type { Projet, Role } from '@/lib/types';
+import type { Role } from '@/lib/types';
+
+type Coque = 'chues' | 'grand-public';
 
 interface Onglet {
   label: string;
@@ -12,8 +16,8 @@ interface Onglet {
   roles?: readonly Role[];
 }
 
-/** Le pilotage tient en un écran à onglets ; chaque onglet garde sa route. */
-const ONGLETS: Record<Projet, readonly Onglet[]> = {
+/** Le pilotage tient en un écran à onglets : chaque onglet garde sa route, les anciens liens vivent. */
+const ONGLETS: Record<Coque, readonly Onglet[]> = {
   chues: [
     { label: 'Tableau de bord', chemin: 'statistiques' },
     { label: 'Activité', chemin: 'supervision' },
@@ -31,16 +35,20 @@ const ONGLETS: Record<Projet, readonly Onglet[]> = {
   ],
 };
 
-export function OngletsPilotage({ projet, role }: { projet: Projet; role: Role }) {
-  const { pathname, search } = useLocation();
-  const volet = 'volet' in search ? String(search.volet) : undefined;
-  const onglets = ONGLETS[projet].filter(
+function hrefDe(coque: Coque, onglet: Onglet): string {
+  const base = `/${coque}/${onglet.chemin}`;
+  return onglet.volet === undefined ? base : `${base}?volet=${onglet.volet}`;
+}
+
+export function OngletsPilotage({ coque, role }: { coque: Coque; role: Role }) {
+  const pathname = usePathname();
+  const volet = useSearchParams().get('volet') ?? undefined;
+  const onglets = ONGLETS[coque].filter(
     (onglet) => onglet.roles === undefined || onglet.roles.includes(role),
   );
   const actif =
-    onglets.find(
-      (onglet) => pathname === `/${projet}/${onglet.chemin}` && onglet.volet === volet,
-    ) ?? onglets[0];
+    onglets.find((onglet) => pathname === `/${coque}/${onglet.chemin}` && onglet.volet === volet) ??
+    onglets[0];
 
   return (
     <Tabs value={actif?.label}>
@@ -50,15 +58,7 @@ export function OngletsPilotage({ projet, role }: { projet: Projet; role: Role }
             key={onglet.label}
             value={onglet.label}
             nativeButton={false}
-            render={
-              <Link
-                {...lien(
-                  onglet.volet === undefined
-                    ? `/${projet}/${onglet.chemin}`
-                    : `/${projet}/${onglet.chemin}?volet=${onglet.volet}`,
-                )}
-              />
-            }
+            render={<Link href={hrefDe(coque, onglet)} />}
           >
             {onglet.label}
           </TabsTrigger>

@@ -1,3 +1,5 @@
+'use client';
+
 import { Menu as DropdownMenuPrimitive } from '@base-ui/react/menu';
 
 import { cn } from '@/lib/utils';

@@ -17,8 +17,11 @@ function sombre(valeur: Theme): boolean {
   return globalThis.matchMedia('(prefers-color-scheme: dark)').matches;
 }
 
+// Les deux classes, comme next-themes en v1 : les feuilles et les tests lisent `html.light`.
 function appliquer(): void {
-  document.documentElement.classList.toggle('dark', sombre(theme));
+  const estSombre = sombre(theme);
+  document.documentElement.classList.toggle('dark', estSombre);
+  document.documentElement.classList.toggle('light', !estSombre);
 }
 
 function setTheme(valeur: Theme): void {

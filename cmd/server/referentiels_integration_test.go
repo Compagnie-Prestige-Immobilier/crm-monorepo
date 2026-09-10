@@ -157,6 +157,31 @@ func TestReferentielsColonnesPropresPersistees(t *testing.T) {
 	}
 }
 
+func TestReferentielsAliasFrancaisDuPanneauV1(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.referentielsConnexion("ADMIN")
+
+	b.referentielsLecture("/api/v1/referentiels/tranches-revenu")
+	b.referentielsLecture("/api/v1/referentiels/offres")
+
+	code := "OFFRE_" + b.referentielsJeton()
+	statut, body := b.referentielsEnvoi(http.MethodPost, "/api/v1/referentiels/offres",
+		map[string]any{"code": code, "label": "Offre " + code})
+	b.attend(statut, http.StatusCreated, "création par l'alias", body)
+	id, _ := body["id"].(string)
+	if id == "" {
+		t.Fatalf("identifiant absent : %v", body)
+	}
+	b.referentielsPurge("offers", id)
+
+	statut, body = b.referentielsEnvoi(http.MethodPatch, "/api/v1/referentiels/offres/"+id,
+		map[string]any{"label": "Offre révisée " + code})
+	b.attend(statut, http.StatusOK, "modification par l'alias", body)
+	if body["label"] != "Offre révisée "+code {
+		t.Fatalf("la modification n'a pas porté sur la table offers : %v", body)
+	}
+}
+
 func TestReferentielsBundleSertLesNeufListes(t *testing.T) {
 	b := nouveauBanc(t, "CHARGE_CLIENTELE")
 	b.referentielsConnexion("CHARGE_CLIENTELE")

@@ -13,12 +13,20 @@ export interface LiveState {
   readonly streamed?: boolean;
 }
 
-/** `false` et non `0` : TanStack Query traite `0` comme « aussi vite que possible ». */
+/** `false` et non `0`: TanStack Query traite `0` comme « aussi vite que possible ». */
 export function liveInterval(state: LiveState, nominalMs = LIVE_INTERVAL_MS): number | false {
   if (state.paused) return false;
   if (state.hidden) return false;
-  const base = state.streamed === true ? Math.max(nominalMs, LIVE_SLOW_INTERVAL_MS) : nominalMs;
+  const base = state.streamed ? Math.max(nominalMs, LIVE_SLOW_INTERVAL_MS) : nominalMs;
   return state.failing ? Math.max(base, LIVE_ERROR_INTERVAL_MS) : base;
+}
+
+export function shouldShowSkeleton(input: { isPending: boolean; hasData: boolean }): boolean {
+  return input.isPending && !input.hasData;
+}
+
+export function shouldShowError(input: { isError: boolean; hasData: boolean }): boolean {
+  return input.isError && !input.hasData;
 }
 
 export function liveLabel(state: LiveState): string {

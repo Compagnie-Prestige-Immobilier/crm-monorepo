@@ -3,15 +3,34 @@
 @import '@fontsource-variable/plus-jakarta-sans';
 @import '@fontsource-variable/bricolage-grotesque';
 
-/* `:is` et non `:where` : une utilitaire `dark:` doit l'emporter par la
-   specificite, pas par l'ordre du fichier genere. */
-@custom-variant dark (&:is(.dark, .dark *));
-
+/* Les polices venaient de next/font ; ici les mêmes variables, servies par fontsource. */
 :root {
-  --font-size: 16px;
   --font-plus-jakarta: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
   --font-bricolage: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+}
 
+/* ══════════════════════════════════════════════════════════════════════════
+   CPI GO : panneau d'administration
+   Tokens portés depuis docs/design.md. Ce fichier est la seule source de
+   couleur du panel : aucune valeur en dur dans un composant.
+   Règle §2.3 : l'or #C8921A ne sert JAMAIS de couleur de texte (2,77:1).
+   Pour du texte or, --accent-text (#856011) et lui seul.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* `:is` et non `:where` : `:where` a une spécificité nulle, si bien qu'une
+   utilitaire `dark:` ne l'emporterait sur son équivalent clair que par l'ordre
+   du fichier généré. `:is` la place franchement au-dessus. */
+@custom-variant dark (&:is(.dark, .dark *));
+
+/* ─── Mode clair (docs/design.md §2) ─────────────────────────────────────── */
+:root {
+  --font-size: 16px;
+
+  /* §2.1 Base */
+  /* Blanc franc. Le #FAF7F7 d'origine était un blanc TEINTÉ de rose : sur un
+     grand écran de travail, la teinte se voit et donne un plan de travail
+     coloré. Le bordeaux CPI vit dans la barre latérale, les actions et les
+     accents : pas sous les chiffres qu'on lit toute la journée. */
   --background: #ffffff;
   --foreground: #1c0810;
   --card: #fbfbfc;
@@ -21,13 +40,24 @@
   --border: rgba(99, 2, 16, 0.12);
   --input: transparent;
   --input-background: #f5ecee;
+  /* WCAG 1.4.11 : le CONTOUR d'un champ doit atteindre 3:1, car son
+     remplissage ne suffit pas à le délimiter : #F5ECEE sur #FAF7F7 ne fait que
+     1,09:1. L'ancienne bordure `--border` tombait à 1,27:1 : les champs
+     n'existaient visuellement pas. Ici 3,24:1 sur le fond, 3,45:1 sur `card`. */
   --input-border: #af7d84;
   --switch-background: #c4a0aa;
+  /* Voile des surfaces modales. Rôle absent de design.md ; ajouté ici plutôt
+     qu'en dur dans dialog/sheet (§1.2). Il reste sombre en thème sombre : un
+     voile clair sur fond sombre éclaircit l'écran au lieu de l'estomper. */
   --scrim: rgba(28, 8, 16, 0.55);
 
+  /* §2.2 Bordeaux CPI */
   --primary: #630210;
   --primary-hover: #7e0417;
   --primary-foreground: #ffffff;
+  /* Rôle SÉPARÉ de `--primary` : le bordeaux qui porte du blanc en aplat n'est
+     pas forcément lisible en TEXTE sur une surface. En clair les deux
+     coïncident ; en sombre ils divergent, et c'est tout l'objet du token. */
   --primary-text: #630210;
   --secondary: #f4f4f6;
   --secondary-foreground: #630210;
@@ -35,14 +65,20 @@
   --muted-foreground: #6b4a52;
   --ring: #630210;
 
-  /* L'or #C8921A ne sert JAMAIS de couleur de texte (2,77:1) : --accent-text. */
+  /* §2.3 Or CPI : surface décorative, jamais du texte */
   --accent: #c8921a;
+  /* Texte posé SUR une surface or : #1C0810 sur #C8921A = 6,95:1 */
   --accent-foreground: #1c0810;
+  /* Seule déclinaison autorisée pour du TEXTE et des icônes : 5,71:1 sur card */
   --accent-text: #856011;
+  /* Bordures et traits or : 3,85:1 sur blanc (seuil non textuel = 3:1) */
   --accent-border: #a87a15;
+  /* Or clair, réservé au texte posé sur bordeaux : 8,71:1 sur --primary */
   --accent-on-dark: #ffc65a;
+  /* Fond de statut « attention » (or 10 % aplati, pas d'alpha empilable) */
   --accent-surface: #faf4e8;
 
+  /* §2.4 Statuts */
   --success: #1a6b44;
   --success-foreground: #ffffff;
   --success-surface: #e8f0ec;
@@ -55,11 +91,19 @@
   --info: #a34462;
   --info-foreground: #ffffff;
   --info-surface: #f7eef1;
+
+  /* Statuts posés SUR UNE SURFACE SOMBRE : sidebar #3A010A, bordeaux #630210.
+     design.md mesure ses paires sur fond clair ; les quatre tokens ci-dessus
+     sont des teintes foncées et n'y survivent pas : `--destructive` #B91C1C
+     tombe à 2,10:1 sur bordeaux. On reprend les déclinaisons de §3, pour la
+     raison exacte qui les a fait exister, plutôt que d'inventer une teinte.
+     Ratios mesurés sur bordeaux et vérifiés par `lib/contrast.test.ts`. */
   --destructive-on-dark: #f87171;
   --success-on-dark: #4fbf8b;
   --warning-on-dark: #ffc65a;
   --info-on-dark: #e08ba6;
 
+  /* §2.5 Navigation */
   --sidebar: #3a010a;
   --sidebar-foreground: #dfc0c8;
   --sidebar-primary: #ffffff;
@@ -68,8 +112,13 @@
   --sidebar-accent-foreground: #ffffff;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #b05070;
+  /* Texte secondaire de la sidebar. Rôle EXPLICITE plutôt qu'`opacity-70` :
+     une opacité empilée sur une couleur déjà atténuée n'est mesurable dans
+     aucun tableau de tokens, et c'est exactement ce qui délavait le panel.
+     7,07:1 sur `#3A010A`, 7,22:1 sur le `#300710` du thème sombre. */
   --sidebar-muted-foreground: #c09aa4;
 
+  /* §2.6 Graphiques : au-delà de 5 séries on regroupe en « Autres » */
   --chart-1: #630210;
   --chart-2: #c8921a;
   --chart-3: #1a6b44;
@@ -78,6 +127,7 @@
   --chart-grid: rgba(99, 2, 16, 0.1);
   --chart-tick: #6b4a52;
 
+  /* §5 Rayons : base 0.25rem, échelle 6/8/12/16/20/24 */
   --radius: 0.25rem;
   --radius-xs: 6px;
   --radius-sm: 8px;
@@ -86,6 +136,7 @@
   --radius-xl: 20px;
   --radius-2xl: 24px;
 
+  /* §5 Élévation : ombres teintées prune, jamais du noir pur */
   --elev-xs: 0 1px 2px rgba(28, 8, 16, 0.04);
   --elev-sm: 0 1px 3px rgba(28, 8, 16, 0.05), 0 1px 2px rgba(28, 8, 16, 0.04);
   --elev-md: 0 4px 12px rgba(28, 8, 16, 0.06), 0 2px 6px rgba(28, 8, 16, 0.04);
@@ -93,18 +144,40 @@
   --elev-xl: 0 16px 48px rgba(28, 8, 16, 0.1), 0 8px 24px rgba(28, 8, 16, 0.06);
   --elev-hover: 0 6px 22px rgba(99, 2, 16, 0.1);
 
+  /* §6 États Material 3 : opacités du premier plan sur la surface */
+  --state-hover: 0.08;
+  --state-focus: 0.1;
+  --state-pressed: 0.12;
+  --state-selected: 0.12;
+  --state-dragged: 0.16;
+  --state-disabled-content: 0.38;
+  --state-disabled-container: 0.12;
+
+  /* §7 Mouvement */
   --dur-1: 150ms;
   --dur-2: 220ms;
   --dur-3: 300ms;
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
 
+  /* §4 Graisses */
   --font-weight-normal: 400;
   --font-weight-medium: 600;
   --font-weight-display: 700;
 }
 
+/* ─── Mode sombre (docs/design.md §3) ────────────────────────────────────────
+   Palette dérivée de la palette claire. Le bloc `.dark` shadcn d'origine
+   (gris neutre, --primary blanc) n'est délibérément PAS repris.
+   Réservé au panel web : le mobile est verrouillé en clair. */
 .dark {
+  /* SURFACES NEUTRES, PAS TEINTÉES.
+     Le fond était un prune #140206 : lisible sur une barre latérale, oppressant
+     sur 90 % de l'écran, où tout le plan de travail virait au rouge sombre.
+     La couleur de marque appartient à la navigation, aux actions et aux
+     accents : pas à la surface sur laquelle on lit des chiffres pendant huit
+     heures. Un gris très légèrement chaud garde la parenté avec le bordeaux
+     sans le teinter. */
   --background: #141315;
   --foreground: #f2eff0;
   --card: #1c1a1d;
@@ -114,24 +187,41 @@
   --border: rgba(255, 255, 255, 0.12);
   --input: transparent;
   --input-background: #232125;
+  /* RE-MESURÉ après le passage aux surfaces neutres : 4,07:1 sur `background`,
+     3,80:1 sur `card`. La valeur précédente (#7A5F66) avait été calibrée sur le
+     prune #140206 et retombait à 3,01:1 sur le nouveau `card` : un chiffre
+     mesuré sur une surface qui n'existe plus ne vaut rien. L'ancienne bordure
+     blanche à 10 % donnait 1,23:1, les champs n'avaient aucun bord. */
   --input-border: #877078;
   --switch-background: #4a2029;
   --scrim: rgba(0, 0, 0, 0.65);
+
+  /* MESURÉ SUR ÉCRAN, PAS SUR LE PAPIER.
+     L'ancien `--primary: #C4566B` + `--primary-foreground: #1C0810` donnait
+     4,48:1 sur le bouton « Se connecter » : sous AA, et visuellement un rose
+     pâle à texte sombre qui ne ressemble pas à CPI. On repasse à un bordeaux
+     franc qui porte du BLANC (7,25:1). */
   --primary: #a81e33;
   --primary-hover: #be2439;
   --primary-foreground: #ffffff;
+  /* Le même bordeaux en TEXTE sur une surface sombre ne ferait que ~1,7:1. Le
+     rôle texte bascule donc sur un rose clair : 7,62:1 sur `card`, 8,16:1 sur
+     `background` (mesuré sur les surfaces neutres actuelles). */
   --primary-text: #f0919f;
   --secondary: #232125;
   --secondary-foreground: #f5e6ea;
   --muted: #232125;
   --muted-foreground: #c4a0aa;
+  /* L'anneau de focus doit se voir SUR du sombre : #A81E33 y disparaîtrait. */
   --ring: #f0919f;
-  --accent: #c8921a;
+
+  --accent: #c8921a; /* surface inchangée */
   --accent-foreground: #1c0810;
-  --accent-text: #ffc65a;
+  --accent-text: #ffc65a; /* en sombre, c'est l'or clair qui passe */
   --accent-border: #c8921a;
   --accent-on-dark: #ffc65a;
   --accent-surface: #33260c;
+
   --success: #4fbf8b;
   --success-foreground: #0a1f16;
   --success-surface: #12291f;
@@ -144,6 +234,10 @@
   --info: #e08ba6;
   --info-foreground: #1c0810;
   --info-surface: #331923;
+
+  /* La sidebar garde son bordeaux profond : c'est l'identité, pas un thème.
+     Elle est REMONTÉE de #250408 à #300710 : trop proche du fond, le panneau de
+     marque de l'écran de connexion disparaissait purement et simplement. */
   --sidebar: #300710;
   --sidebar-foreground: #e8ccd3;
   --sidebar-primary: #ffffff;
@@ -153,6 +247,9 @@
   --sidebar-border: rgba(255, 255, 255, 0.12);
   --sidebar-ring: #f0919f;
   --sidebar-muted-foreground: #c09aa4;
+
+  /* Les teintes de graphiques sont éclaircies : les hex clairs perdent
+     leur lisibilité sur #140206. Les rôles restent identiques. */
   --chart-1: #d9647a;
   --chart-2: #ffc65a;
   --chart-3: #4fbf8b;
@@ -160,6 +257,7 @@
   --chart-5: #b79bff;
   --chart-grid: rgba(255, 255, 255, 0.1);
   --chart-tick: #c4a0aa;
+
   --elev-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
   --elev-sm: 0 1px 3px rgba(0, 0, 0, 0.36), 0 1px 2px rgba(0, 0, 0, 0.3);
   --elev-md: 0 4px 12px rgba(0, 0, 0, 0.4), 0 2px 6px rgba(0, 0, 0, 0.3);
@@ -168,6 +266,23 @@
   --elev-hover: 0 6px 22px rgba(0, 0, 0, 0.44);
 }
 
+/* ─── Coque « Projet CHUES » : identité UES, noir et bleu ────────────────────
+   Le bordeaux CPI reste la couleur d'Accueil, Grand Public et Admin. Entrer
+   dans `/chues/*` monte un conteneur `data-coque="chues"` qui redéfinit les
+   tokens de marque ; en sortir démonte le conteneur et rend la palette. Aucun
+   thème global n'est muté, donc rien à défaire, et deux onglets ouverts sur
+   deux projets ne se contaminent pas.
+
+   Le second sélecteur porte les mêmes tokens sur `html` TANT QUE la coque est
+   montée : les dialogues, popovers et menus de Base UI sont téléportés dans
+   `body`, hors du conteneur, et resteraient bordeaux au milieu d'un écran
+   bleu. C'est le DOM affiché qui commande, pas une classe posée par un effet.
+
+   Les deux blocs déclarent le MÊME jeu de tokens : `html:has(...)` bat `.dark`
+   en spécificité, si bien qu'un token oublié ici rendrait sa version claire
+   sur fond sombre.
+   Contrastes mesurés par `components/layout/coque-chues.test.ts`, qui lit ce
+   fichier. */
 [data-coque='chues'],
 html:has([data-coque='chues']) {
   --background: #ffffff;
@@ -181,6 +296,10 @@ html:has([data-coque='chues']) {
   --input-border: #7c8ca8;
   --switch-background: #9ba9c2;
   --scrim: rgba(6, 10, 20, 0.55);
+
+  /* Le bleu du logo CHUES, mesuré dessus. Couleur d'ACTION, jamais surface de
+     fond : à 9,6:1 sur blanc il porte du texte blanc, et une page entière de
+     cette saturation serait illisible. */
   --primary: #0201e9;
   --primary-hover: #0100b0;
   --primary-foreground: #ffffff;
@@ -190,16 +309,23 @@ html:has([data-coque='chues']) {
   --muted: #eceff5;
   --muted-foreground: #47546b;
   --ring: #0201e9;
+
+  /* L'or CPI n'a pas cours ici : le marqueur est le bleu du logo. */
   --accent: #0201e9;
   --accent-foreground: #ffffff;
   --accent-text: #0201e9;
   --accent-border: #0201e9;
+  /* Sur le noir de la barre latérale, le bleu du logo tombe à 2,0:1 : le seul
+     endroit où il cède la place à un bleu clair. */
   --accent-on-dark: #7fb4ff;
   --accent-surface: #ebebfe;
+
   --info: #1f63ce;
   --info-foreground: #ffffff;
   --info-surface: #eaf1fc;
   --info-on-dark: #7fb4ff;
+
+  /* Le noir massif du logo, pas un gris. */
   --sidebar: #0b0c10;
   --sidebar-foreground: #c6d2e6;
   --sidebar-primary: #ffffff;
@@ -209,10 +335,12 @@ html:has([data-coque='chues']) {
   --sidebar-border: rgba(255, 255, 255, 0.1);
   --sidebar-ring: #7fb4ff;
   --sidebar-muted-foreground: #a8b6ce;
+
   --chart-1: #0201e9;
   --chart-4: #2f6fd6;
   --chart-grid: rgba(15, 46, 107, 0.1);
   --chart-tick: #47546b;
+
   --elev-hover: 0 6px 22px rgba(15, 46, 107, 0.12);
 }
 
@@ -229,6 +357,10 @@ html.dark:has([data-coque='chues']) {
   --input-border: #808ea6;
   --switch-background: #2a3244;
   --scrim: rgba(0, 0, 0, 0.65);
+
+  /* Le bleu du logo reste la couleur d'action, blanc dessus. Le survol
+     s'ÉCLAIRCIT au lieu de s'assombrir : sur fond sombre, un cran plus noir ne
+     se voit pas. */
   --primary: #0201e9;
   --primary-hover: #3172da;
   --primary-foreground: #ffffff;
@@ -238,16 +370,19 @@ html.dark:has([data-coque='chues']) {
   --muted: #1e2128;
   --muted-foreground: #a9b6cb;
   --ring: #8db8ff;
+
   --accent: #2a6ad0;
   --accent-foreground: #ffffff;
   --accent-text: #8db8ff;
   --accent-border: #2a6ad0;
   --accent-on-dark: #8db8ff;
   --accent-surface: #142138;
+
   --info: #8db8ff;
   --info-foreground: #0a0f1a;
   --info-surface: #142138;
   --info-on-dark: #8db8ff;
+
   --sidebar: #08090c;
   --sidebar-foreground: #c6d2e6;
   --sidebar-primary: #ffffff;
@@ -257,13 +392,16 @@ html.dark:has([data-coque='chues']) {
   --sidebar-border: rgba(255, 255, 255, 0.12);
   --sidebar-ring: #8db8ff;
   --sidebar-muted-foreground: #a8b6ce;
+
   --chart-1: #6fa5ff;
   --chart-4: #8db8ff;
   --chart-grid: rgba(255, 255, 255, 0.1);
   --chart-tick: #a9b6cb;
+
   --elev-hover: 0 6px 22px rgba(0, 0, 0, 0.44);
 }
 
+/* ─── Exposition Tailwind v4 ─────────────────────────────────────────────── */
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
@@ -271,6 +409,7 @@ html.dark:has([data-coque='chues']) {
   --color-card-foreground: var(--card-foreground);
   --color-popover: var(--popover);
   --color-popover-foreground: var(--popover-foreground);
+
   --color-primary: var(--primary);
   --color-primary-hover: var(--primary-hover);
   --color-primary-foreground: var(--primary-foreground);
@@ -279,12 +418,14 @@ html.dark:has([data-coque='chues']) {
   --color-secondary-foreground: var(--secondary-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent-text: var(--accent-text);
   --color-accent-border: var(--accent-border);
   --color-accent-on-dark: var(--accent-on-dark);
   --color-accent-surface: var(--accent-surface);
+
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
   --color-success-surface: var(--success-surface);
@@ -297,10 +438,14 @@ html.dark:has([data-coque='chues']) {
   --color-info: var(--info);
   --color-info-foreground: var(--info-foreground);
   --color-info-surface: var(--info-surface);
+
+  /* `text-destructive-on-dark`, `text-success-on-dark`… : à employer dès qu'un
+     statut est posé sur la sidebar ou sur un aplat bordeaux. */
   --color-destructive-on-dark: var(--destructive-on-dark);
   --color-success-on-dark: var(--success-on-dark);
   --color-warning-on-dark: var(--warning-on-dark);
   --color-info-on-dark: var(--info-on-dark);
+
   --color-border: var(--border);
   --color-input: var(--input);
   --color-input-background: var(--input-background);
@@ -308,6 +453,7 @@ html.dark:has([data-coque='chues']) {
   --color-switch-background: var(--switch-background);
   --color-scrim: var(--scrim);
   --color-ring: var(--ring);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -317,6 +463,7 @@ html.dark:has([data-coque='chues']) {
   --color-sidebar-muted-foreground: var(--sidebar-muted-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
   --color-chart-1: var(--chart-1);
   --color-chart-2: var(--chart-2);
   --color-chart-3: var(--chart-3);
@@ -326,6 +473,7 @@ html.dark:has([data-coque='chues']) {
   --font-sans: var(--font-plus-jakarta), system-ui, sans-serif;
   --font-display: var(--font-bricolage), system-ui, sans-serif;
 
+  /* §4 Échelle typographique (racine 16 px) */
   --text-display: clamp(2rem, 4vw, 2.75rem);
   --text-display--line-height: 1.15;
   --text-display--letter-spacing: -0.02em;
@@ -351,24 +499,29 @@ html.dark:has([data-coque='chues']) {
   --text-label: 0.6875rem;
   --text-label--line-height: 1.35;
 
+  /* §5 Grille 4 pt */
   --spacing: 0.25rem;
+
+  /* §5 Rayons */
   --radius-xs: 6px;
   --radius-sm: 8px;
   --radius-md: 12px;
   --radius-lg: 16px;
   --radius-xl: 20px;
   --radius-2xl: 24px;
+
+  /* §5 Élévation */
   --shadow-elev-xs: var(--elev-xs);
   --shadow-elev-sm: var(--elev-sm);
   --shadow-elev-md: var(--elev-md);
   --shadow-elev-lg: var(--elev-lg);
   --shadow-elev-xl: var(--elev-xl);
   --shadow-elev-hover: var(--elev-hover);
+
+  /* §7 Mouvement */
   --ease-out-cpi: var(--ease-out);
   --ease-spring: var(--ease-spring);
   --animate-rise: rise var(--dur-2) var(--ease-out) backwards;
-  --animate-bell-swing: bell-swing 620ms var(--ease-out) 1;
-  --animate-badge-pulse: badge-pulse 1.6s var(--ease-out) 3;
 
   @keyframes rise {
     from {
@@ -380,6 +533,53 @@ html.dark:has([data-coque='chues']) {
       transform: none;
     }
   }
+
+  /* §7 : appel de la cloche de notification.
+     Deux mouvements distincts, et la distinction est le point :
+     l'oscillation se joue UNE fois, à l'arrivée d'une notification (un
+     événement) ; la pulsation de la pastille tourne tant qu'il reste du non-lu
+     (un état). Les fondre en une seule animation ferait soit rater l'arrivée,
+     soit agiter la barre en permanence, ce qui devient un décor qu'on ne voit
+     plus. Les deux ne sont posées qu'en `motion-safe:` par le composant, et le
+     bloc `prefers-reduced-motion` en bas de ce fichier les neutralise de toute
+     façon. Amplitude volontairement faible : 8 degrés se remarquent du coin de
+     l'œil sans attirer le regard hors de la tâche en cours. */
+  --animate-bell-swing: bell-swing 620ms var(--ease-out) 1;
+  /* BORNÉE à 4 cycles, jamais `infinite`.
+
+     WCAG 2.2.2 (Pause, Stop, Hide) : tout mouvement qui démarre seul et dure
+     plus de cinq secondes doit pouvoir être arrêté. Cette pastille tournait
+     `infinite` dans la barre supérieure, c'est-à-dire sur CHAQUE écran du
+     panel, sans aucune commande de pause : le contraire exact de la règle que
+     `live-indicator.tsx` énonce à voix haute (« La pastille ne clignote pas. Un
+     point qui pulse en permanence dans un coin de l'écran capte l'attention
+     toutes les secondes, pour une information qui ne change pas. »).
+
+     Quatre cycles suffisent : la pulsation sert à ATTIRER l'œil sur une
+     arrivée, et une fois l'œil attiré elle n'ajoute rien. Le CHIFFRE de la
+     pastille, lui, reste affiché tant qu'il reste du non-lu : c'est lui qui
+     porte l'information, pas le mouvement.
+
+     Le CALCUL, et pourquoi la durée d'un cycle change aussi : la règle fixe le
+     seuil à CINQ SECONDES au total, pas à un nombre de cycles. 3 × 2,4 s
+     ferait encore 7,2 s. On resserre donc le cycle à 1,6 s, ce qui donne
+     3 × 1,6 s = 4,8 s : sous le seuil, sans commande de pause à inventer pour
+     une pastille de seize pixels.
+
+     QUAND elle rejoue, exactement : au MONTAGE de la pastille, c'est-à-dire au
+     passage de zéro non-lu à un. Une arrivée suivante, alors que le compteur
+     est déjà à un ou plus, ne change que le chiffre : React réutilise le même
+     noeud, et une animation CSS ne redémarre pas parce que son contenu change.
+     Cette ligne a longtemps affirmé le contraire (« à chaque nouvelle
+     arrivée »), ce qui est faux.
+
+     C'est aussi le comportement qu'il faut GARDER, et la raison est le calcul
+     ci-dessus : forcer le rejeu à chaque arrivée (par une `key` sur le
+     compteur) rallongerait le mouvement de 4,8 s à chaque message pendant une
+     rafale, et ferait repasser la pastille au-dessus du seuil que ce bloc
+     entier existe pour tenir. Le chiffre, lui, se met bien à jour : c'est lui
+     qui porte l'information. */
+  --animate-badge-pulse: badge-pulse 1.6s var(--ease-out) 3;
 
   @keyframes bell-swing {
     0%,
@@ -442,6 +642,7 @@ html.dark:has([data-coque='chues']) {
     line-height: 1.15;
   }
 
+  /* §10 Accessibilité : anneau de focus visible partout, jamais supprimé. */
   :focus-visible {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
@@ -455,11 +656,23 @@ html.dark:has([data-coque='chues']) {
 }
 
 @layer utilities {
+  /* Cible tactile minimale §6 : 44 px. */
   .tap-target {
     min-block-size: 44px;
     min-inline-size: 44px;
   }
 
+  /* ── Identité « registre » ────────────────────────────────────────────────
+     Le panel tient un registre : des dossiers qui partent en banque, des
+     fiches qui font foi. Son vocabulaire visuel est celui d'un registre bien
+     composé : des filets nets, une colonne d'appui à gauche, des chiffres
+     alignés. L'or n'y remplit jamais une forme : il MARQUE. Un seul geste,
+     répété partout, plutôt que dix ornements.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /* Le marqueur. 3 px d'or à gauche : ouverture de section, élément de
+     navigation actif, ligne mise en avant. C'est un repère, pas un décor -
+     il répond toujours à « c'est ici que ça commence » ou « vous êtes ici ». */
   .rail {
     position: relative;
     padding-inline-start: 1rem;
@@ -475,6 +688,12 @@ html.dark:has([data-coque='chues']) {
     background: var(--accent);
   }
 
+  /* Surtitre de section. Il NOMME la zone, il ne la commente pas.
+     AUCUNE couleur ici : `.eyebrow` et `text-*` vivent dans la même couche
+     utilitaire, donc c'est l'ordre du fichier qui tranchait, pas l'intention.
+     Posée sur la sidebar, la règle écrasait `text-sidebar-muted-foreground` et
+     replaçait `--muted-foreground` (#6B4A52) sur le bordeaux : 2,29:1, mesuré
+     à l'écran. La couleur se déclare donc au point d'usage. */
   .eyebrow {
     font-size: var(--text-label);
     line-height: 1.35;
@@ -483,20 +702,27 @@ html.dark:has([data-coque='chues']) {
     letter-spacing: 0.09em;
   }
 
+  /* Tailwind's generated text utility can win over the semantic sidebar
+     token. Keep section labels readable on the burgundy navigation. */
   .eyebrow.text-sidebar-muted-foreground {
     color: var(--sidebar-muted-foreground);
   }
 
+  /* Chiffres alignés en colonne. Sans cela, un total qui passe de 9 à 10
+     décale toute la colonne d'un tableau à chaque rafraîchissement. */
   .figure {
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
 
+  /* Entrées échelonnées : `backwards` obligatoire (§7), sinon l'état
+     initial clignote sur la première frame. */
   .animate-rise {
     animation: rise var(--dur-2) var(--ease-out) backwards;
   }
 }
 
+/* §7 : les durées tombent à 0, la logique ne change pas. */
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -506,7 +732,6 @@ html.dark:has([data-coque='chues']) {
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
   }
-
   ::view-transition-group(*),
   ::view-transition-old(*),
   ::view-transition-new(*) {
@@ -514,6 +739,7 @@ html.dark:has([data-coque='chues']) {
   }
 }
 
+/* Barres de défilement discrètes, teintées prune. */
 @supports (scrollbar-width: thin) {
   .scrollbar-thin {
     scrollbar-width: thin;
@@ -521,6 +747,15 @@ html.dark:has([data-coque='chues']) {
   }
 }
 
+/*
+ * IMPRESSION DES TABLEAUX.
+ *
+ * `Table` enveloppe chaque tableau dans un conteneur `overflow-x: auto`, et
+ * aucun navigateur ne fragmente un contexte de défilement sur plusieurs
+ * pages : le registre s'arrêtait net au bas de la première feuille. On rend le
+ * conteneur transparent au découpage, on empêche une ligne d'être coupée en
+ * deux, et on répète l'en-tête sur chaque page.
+ */
 @media print {
   [data-slot='table-container'] {
     overflow: visible !important;

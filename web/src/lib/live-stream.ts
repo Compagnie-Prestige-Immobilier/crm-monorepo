@@ -1,10 +1,11 @@
 import { useSyncExternalStore } from 'react';
 
+import { API_PREFIX } from '@/lib/api/config';
 import { queryKeys } from '@/lib/query-keys';
 
-export const LIVE_STREAM_PATH = '/api/v1/live';
+export const LIVE_STREAM_PATH = `${API_PREFIX}/live`;
 
-/** Sujets du flux serveur et les requêtes qu'ils invalident. Miroir de `LIVE_TOPICS` côté Go. */
+/** Sujets du flux serveur et les requêtes qu'ils invalident. Miroir de `LIVE_TOPICS` côté API. */
 export const LIVE_TOPIC_KEYS = {
   notifications: [queryKeys.inboxRoot],
   imports: [queryKeys.importsRoot, ['visites', 'import']],
@@ -31,5 +32,9 @@ const subscribe = (listener: () => void): (() => void) => {
 };
 
 export function useLiveStreamConnected(): boolean {
-  return useSyncExternalStore(subscribe, () => connected);
+  return useSyncExternalStore(
+    subscribe,
+    () => connected,
+    () => false,
+  );
 }

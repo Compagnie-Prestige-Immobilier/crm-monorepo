@@ -1,10 +1,29 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { EnrolementView } from '@/components/admin/enrolement-view';
+import { EnrolementView } from '@/components/enrolement/enrolement-view';
+import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
-import { ADMIN_SEUL } from '@/lib/roles';
 
 export const Route = createFileRoute('/_panneau/admin/enrolement')({
-  beforeLoad: guardRoles(ADMIN_SEUL),
-  component: EnrolementView,
+  beforeLoad: guardRoles(['ADMIN']),
+  component: EnrolementPage,
+  pendingComponent: Loading,
 });
+
+function Loading() {
+  return (
+    <div className="flex flex-col gap-6" role="status" aria-label="Chargement de l’écran">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-11 w-44" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-80 w-full rounded-lg" />
+    </div>
+  );
+}
+
+/** La page `(panel)/admin/enrolement` de la v1. */
+function EnrolementPage() {
+  return <EnrolementView />;
+}

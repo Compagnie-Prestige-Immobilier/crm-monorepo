@@ -20,7 +20,13 @@ parcours de parité `parite-*`), rangée par domaine (`cmd/server`,
 `internal/<domaine>`, `internal/shared/{socle,database}`) puis la v1 (Nest,
 Next, Prisma, Flutter, clients générés, audits v1) a été retirée par `git rm`
 et `apps/go` est devenu la racine. `make setup && make build` suffit ;
-l'historique reste lisible avec `git log --follow`.
+l'historique reste lisible avec `git log --follow`. Le 10 septembre le
+propriétaire a jugé le panneau v2 trop éloigné de la v1 et exigé l'identique :
+`web/` est depuis le code React de la v1 repris tel quel (62 pages, 187
+composants, 45 modules de données), avec des cales pour Next et le contrat v1
+figé dans `web/contrat-v1.openapi.json`, que le binaire Go sert (177 des 231
+opérations v1 ; le reste est l'espace démo, le mobile et des analytics que le
+panneau n'appelait pas).
 
 ## 1. Pourquoi
 

@@ -1,103 +1,82 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
-import type { Role } from '@/lib/types';
+import type { ApiClient } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type Compte = components['schemas']['Compte'];
-export type CreerCompte = components['schemas']['CreerCompteInputBody'];
-export type ModifierCompte = components['schemas']['ModifierCompteInputBody'];
+import { getApiClient } from '@/lib/api/browser';
+import { flattenPage } from '@/lib/api/query-params';
+import type { CreateUserInput, Paginated, Role, UpdateUserInput, UserRow } from '@/lib/types';
+import type { UserFilters } from '@/lib/user-filters';
 
-export interface FiltresComptes {
-  search: string;
-  role: Role | null;
-  isActive: boolean | null;
-  page: number;
-  pageSize: number;
+export async function fetchUsers(
+  filters: UserFilters,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<UserRow>> {
+  const query: {
+    search?: string;
+    role?: Role;
+    isActive?: boolean;
+    page?: number;
+    pageSize?: number;
+  } = { page: filters.page, pageSize: filters.pageSize };
+
+  const search = filters.search.trim();
+  if (search !== '') query.search = search;
+  if (filters.role !== null) query.role = filters.role;
+  if (filters.isActive !== null) query.isActive = filters.isActive;
+
+  return flattenPage(unwrap(await client.GET('/api/v1/users', { params: { query } })));
 }
 
-export const FILTRES_COMPTES_VIDES: FiltresComptes = {
-  search: '',
-  role: null,
-  isActive: null,
-  page: 1,
-  pageSize: 25,
-};
+export async function createUser(
+  input: CreateUserInput,
+  client: ApiClient = getApiClient(),
+): Promise<UserRow> {
+  return unwrap(await client.POST('/api/v1/users', { body: input }));
+}
 
-/** Repreneurs possibles : le serveur n'accepte qu'un téléconseiller actif. */
-export const FILTRES_REPRENEURS: FiltresComptes = {
-  ...FILTRES_COMPTES_VIDES,
-  role: 'COMMERCIAL',
-  isActive: true,
-  pageSize: 200,
-};
-
-/** Politique du serveur, `PASSWORD_MIN_LENGTH` et `PASSWORD_MAX_LENGTH`. */
-export const MOT_DE_PASSE_MIN = 8;
-export const MOT_DE_PASSE_MAX = 24;
-
-export const ROLES_COMPTE: readonly Role[] = [
-  'ADMIN',
-  'COMMERCIAL',
-  'CHARGE_CLIENTELE',
-  'SUPERVISEUR',
-  'DIRECTION',
-  'BANQUE_FINANCE',
-  'ACCUEIL',
-];
-
-export async function fetchComptes(filtres: FiltresComptes): Promise<{
-  items: Compte[];
-  meta: components['schemas']['PageAdmin'];
-}> {
-  const search = filtres.search.trim();
-  const sortie = unwrap(
-    await apiClient.GET('/api/v1/users', {
-      params: {
-        query: {
-          page: filtres.page,
-          pageSize: filtres.pageSize,
-          ...(search === '' ? {} : { search }),
-          ...(filtres.role === null ? {} : { role: filtres.role }),
-          ...(filtres.isActive === null ? {} : { isActive: filtres.isActive ? 'true' : 'false' }),
-        },
-      },
-    }),
+export async function updateUser(
+  id: string,
+  patch: UpdateUserInput,
+  client: ApiClient = getApiClient(),
+): Promise<UserRow> {
+  return unwrap(
+    await client.PATCH('/api/v1/users/{id}', { params: { path: { id } }, body: patch }),
   );
-  return { items: sortie.items ?? [], meta: sortie.meta };
 }
 
-export async function creerCompte(body: CreerCompte): Promise<Compte> {
-  return unwrap(await apiClient.POST('/api/v1/users', { body }));
-}
-
-export async function modifierCompte(id: string, body: ModifierCompte): Promise<Compte> {
-  return unwrap(await apiClient.PATCH('/api/v1/users/{id}', { params: { path: { id } }, body }));
-}
-
-export async function activerCompte(
+export async function setUserActive(
   id: string,
   isActive: boolean,
   handoverToId?: string,
-): Promise<Compte> {
+  client: ApiClient = getApiClient(),
+): Promise<UserRow> {
   return unwrap(
-    await apiClient.PUT('/api/v1/users/{id}/active', {
+    await client.PUT('/api/v1/users/{id}/active', {
       params: { path: { id } },
       body: { isActive, ...(handoverToId === undefined ? {} : { handoverToId }) },
     }),
   );
 }
 
-export async function changerMotDePasse(id: string, password: string): Promise<void> {
+export async function resetUserPassword(
+  id: string,
+  password: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
   unwrap(
-    await apiClient.PUT('/api/v1/users/{id}/password', {
+    await client.PUT('/api/v1/users/{id}/password', {
       params: { path: { id } },
       body: { password },
     }),
   );
 }
 
-export async function supprimerCompte(id: string, handoverToId?: string): Promise<void> {
+export async function deleteUser(
+  id: string,
+  handoverToId?: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
   unwrap(
-    await apiClient.DELETE('/api/v1/users/{id}', {
+    await client.DELETE('/api/v1/users/{id}', {
       params: {
         path: { id },
         query: handoverToId === undefined ? {} : { handoverToId },

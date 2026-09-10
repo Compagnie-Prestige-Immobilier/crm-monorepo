@@ -9,6 +9,8 @@ import (
 	"io"
 	"io/fs"
 	"log/slog"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -84,6 +86,16 @@ func noteMonterRoutes(api huma.API, s *service) {
 		OperationID: "lireNoteVocale", Method: http.MethodGet,
 		Path: "/api/v1/phase2/call-attempts/{id}/note-vocale",
 	}, s.noteLire)
+	// Le panneau v1 nomme la note vocale « recording » ; mêmes handlers.
+	huma.Register(api, huma.Operation{
+		OperationID: "uploadCallRecording", Method: http.MethodPost,
+		Path:         "/api/v1/phase2/call-attempts/{id}/recording",
+		MaxBodyBytes: 2*noteConfig.maxOctets + 1,
+	}, s.noteDeposer)
+	huma.Register(api, huma.Operation{
+		OperationID: "getCallRecording", Method: http.MethodGet,
+		Path: "/api/v1/phase2/call-attempts/{id}/recording",
+	}, s.noteLire)
 	huma.Register(api, huma.Operation{
 		OperationID: "recordPresenceBeat", Method: http.MethodPost,
 		Path: "/api/v1/presence/beat", DefaultStatus: http.StatusNoContent,
@@ -145,8 +157,34 @@ func (s *service) noteAcces(ctx context.Context, attemptID string, depot bool) e
 }
 
 type NoteVocaleInput struct {
-	ID      string `path:"id" format:"uuid"`
-	RawBody []byte `contentType:"audio/webm"`
+	ID          string `path:"id" format:"uuid"`
+	TypeContenu string `header:"Content-Type"`
+	RawBody     []byte `contentType:"audio/webm"`
+}
+
+// Le panneau v1 poste la note dans un champ multipart `file` ; le panneau v2
+// envoie l'audio brut. Les deux corps arrivent dans `RawBody`.
+func noteAudio(typeContenu string, corps []byte) ([]byte, error) {
+	mediatype, params, _ := mime.ParseMediaType(typeContenu)
+	if mediatype != "multipart/form-data" {
+		return corps, nil
+	}
+	illisible := socle.Problem(http.StatusBadRequest, "NOTE_VOCALE_VIDE", "Cette note vocale est vide.")
+	lecteur := multipart.NewReader(bytes.NewReader(corps), params["boundary"])
+	for {
+		partie, err := lecteur.NextPart()
+		if err != nil {
+			return nil, illisible
+		}
+		if partie.FormName() != "file" {
+			continue
+		}
+		audio, err := io.ReadAll(partie)
+		if err != nil {
+			return nil, illisible
+		}
+		return audio, nil
+	}
 }
 
 type NoteVocaleOutput struct {
@@ -166,13 +204,17 @@ func (s *service) noteDeposer(ctx context.Context, in *NoteVocaleInput) (*NoteVo
 	if err := s.noteAcces(ctx, in.ID, true); err != nil {
 		return nil, err
 	}
-	if int64(len(in.RawBody)) > noteConfig.maxOctets {
+	audio, err := noteAudio(in.TypeContenu, in.RawBody)
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(audio)) > noteConfig.maxOctets {
 		return nil, socle.Problem(http.StatusBadRequest, "NOTE_VOCALE_TROP_LOURDE", "Cette note vocale dépasse la taille autorisée.")
 	}
-	if len(in.RawBody) == 0 {
+	if len(audio) == 0 {
 		return nil, socle.Problem(http.StatusBadRequest, "NOTE_VOCALE_VIDE", "Cette note vocale est vide.")
 	}
-	if _, connu := noteTypeAudio(in.RawBody); !connu {
+	if _, connu := noteTypeAudio(audio); !connu {
 		return nil, socle.Problem(http.StatusBadRequest, "NOTE_VOCALE_INVALIDE", "Une note vocale doit être un fichier audio webm, ogg ou mp4.")
 	}
 	racine, err := NoteRacine()
@@ -184,10 +226,10 @@ func (s *service) noteDeposer(ctx context.Context, in *NoteVocaleInput) (*NoteVo
 	if deja, err := racine.Stat(nom); err == nil {
 		return noteResultat(in.ID, deja.Size()), nil
 	}
-	if err := noteEcrire(racine, nom, in.RawBody); err != nil {
+	if err := noteEcrire(racine, nom, audio); err != nil {
 		return nil, err
 	}
-	return noteResultat(in.ID, int64(len(in.RawBody))), nil
+	return noteResultat(in.ID, int64(len(audio))), nil
 }
 
 // Écriture sous un nom temporaire exclusif puis `rename` : un dépôt interrompu
@@ -234,11 +276,11 @@ func (s *service) noteLire(ctx context.Context, in *QualificationIDInput) (*huma
 	}
 	entete := make([]byte, 12)
 	lus, _ := io.ReadFull(f, entete)
-	mime, _ := noteTypeAudio(entete[:lus])
+	typeAudio, _ := noteTypeAudio(entete[:lus])
 	return &huma.StreamResponse{Body: func(hc huma.Context) {
 		defer func() { _ = f.Close() }()
 		r, w := humago.Unwrap(hc)
-		w.Header().Set("Content-Type", mime)
+		w.Header().Set("Content-Type", typeAudio)
 		w.Header().Set("Cache-Control", "private, max-age=3600")
 		http.ServeContent(w, r, nom, info.ModTime(), f)
 	}}, nil

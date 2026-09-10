@@ -11,6 +11,7 @@ import (
 	"io"
 	"math/rand/v2"
 	"net/http"
+	"slices"
 	"strings"
 	"testing"
 
@@ -425,4 +426,41 @@ func TestCampagneReserveeALEncadrement(t *testing.T) {
 	lecteur.attend(statut, http.StatusForbidden, "suppression réservée à l'administrateur", body)
 	statut, body = b.appelCampagne(http.MethodDelete, "/api/v1/lots-export/"+b.lotID, nil)
 	b.attend(statut, http.StatusForbidden, "un superviseur ne supprime pas", body)
+}
+
+// Le panneau filtre ses listes sur les fiches du téléconseiller connecté ;
+// l'encadrement reçoit « tout » plutôt que la liste entière.
+func TestCampagneMesAttributions(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+
+	statut, body := b.appelCampagne(http.MethodGet, "/api/v1/lots-export/mes-attributions", nil)
+	b.attend(statut, http.StatusOK, "attributions de l'encadrement", body)
+	if !estVrai(body["tout"]) || len(body["representantIds"].([]any)) != 0 || len(body["prospectIds"].([]any)) != 0 {
+		t.Fatalf("l'encadrement n'est pas filtré : %v", body)
+	}
+
+	lecteur := &bancCampagne{banc: nouveauBanc(t, "COMMERCIAL"), lotID: b.lotID}
+	statut, body = lecteur.connexion(lecteur.email, "motdepasse")
+	lecteur.attend(statut, http.StatusOK, "connexion téléconseiller", body)
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "lot_export_items" SET "assigneeId" = $1 WHERE "lotId" = $2 AND "assigneeId" = $3`,
+		lecteur.userID, b.lotID, b.agentA); err != nil {
+		t.Fatal(err)
+	}
+
+	statut, body = lecteur.appelCampagne(http.MethodGet, "/api/v1/lots-export/mes-attributions", nil)
+	lecteur.attend(statut, http.StatusOK, "attributions du téléconseiller", body)
+	if estVrai(body["tout"]) || len(body["prospectIds"].([]any)) != 0 {
+		t.Fatalf("un téléconseiller ne reçoit que ses fiches : %v", body)
+	}
+	attribuees := body["representantIds"].([]any)
+	if len(attribuees) != len(b.positionsDe(lecteur.userID)) {
+		t.Fatalf("autant de fiches que de places tenues : %v", attribuees)
+	}
+	for _, fiche := range attribuees {
+		if !slices.Contains(b.fiches, fiche.(string)) {
+			t.Fatalf("fiche étrangère au lot : %v", fiche)
+		}
+	}
 }

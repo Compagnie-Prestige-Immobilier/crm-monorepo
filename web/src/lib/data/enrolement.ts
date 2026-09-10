@@ -1,121 +1,116 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
-import type { ProjetApi } from '@/lib/types';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type Inscription = components['schemas']['Inscription'];
-export type ReglagesEnrolement = components['schemas']['ReglagesOutputBody'];
-export type IndicateursEnrolement = components['schemas']['IndicateursOutputBody'];
-export type Tirage = components['schemas']['TirageOutputBody'];
-export type PageEnrolement = components['schemas']['PageAdmin'];
-export type BilanTirage = components['schemas']['BilanTirage'];
+import { getApiClient } from '@/lib/api/browser';
+
+type Schemas = components['schemas'];
+
+export type Projet = Schemas['Projet'];
+export type InscriptionsPage = Schemas['InscriptionsPageDto'];
+export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
+export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];
+export type Tirage = Schemas['TirageDto'];
+export type Suppression = Schemas['SuppressionDto'];
+
+/** L'onglet de l'écran, et le projet qu'il tire. Les deux ne se mélangent jamais. */
+export const ONGLETS_ENROLEMENT = ['chues', 'grand-public'] as const;
+export type OngletEnrolement = (typeof ONGLETS_ENROLEMENT)[number];
+
+export const projetDeLOnglet = (onglet: OngletEnrolement): Projet =>
+  onglet === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
 
 export interface FiltresInscriptions {
-  page: number;
-  pageSize: number;
-  search: string;
-  statut: string | null;
-  rapproche: boolean | null;
-  inclureDisparues: boolean;
-  dateFrom: string;
-  dateTo: string;
+  page?: number | undefined;
+  pageSize?: number | undefined;
+  statut?: string | undefined;
+  search?: string | undefined;
+  dateFrom?: string | undefined;
+  dateTo?: string | undefined;
+  rapproche?: boolean | undefined;
+  inclureDisparues?: boolean | undefined;
 }
 
-export const FILTRES_INSCRIPTIONS_VIDES: FiltresInscriptions = {
-  page: 1,
-  pageSize: 25,
-  search: '',
-  statut: null,
-  rapproche: null,
-  inclureDisparues: false,
-  dateFrom: '',
-  dateTo: '',
-};
-
-type Requete = Record<string, string | number | boolean>;
-
-function periode(filtres: FiltresInscriptions): Requete {
-  return {
-    ...(filtres.dateFrom === '' ? {} : { dateFrom: filtres.dateFrom }),
-    ...(filtres.dateTo === '' ? {} : { dateTo: filtres.dateTo }),
-  };
-}
+const query = (filtres: FiltresInscriptions): Record<string, string | number | boolean> =>
+  Object.fromEntries(
+    Object.entries(filtres).flatMap(([cle, valeur]) =>
+      valeur === undefined || valeur === '' ? [] : [[cle, valeur]],
+    ),
+  );
 
 export async function fetchInscriptions(
-  projet: ProjetApi,
+  projet: Projet,
   filtres: FiltresInscriptions,
-): Promise<{ items: Inscription[]; meta: components['schemas']['PageAdmin'] }> {
-  const search = filtres.search.trim();
-  const sortie = unwrap(
-    await apiClient.GET('/api/v1/enrolement/{projet}/inscriptions', {
-      params: {
-        path: { projet },
-        query: {
-          page: filtres.page,
-          pageSize: filtres.pageSize,
-          ...periode(filtres),
-          ...(search === '' ? {} : { search }),
-          ...(filtres.statut === null ? {} : { statut: filtres.statut }),
-          ...(filtres.rapproche === null
-            ? {}
-            : { rapproche: filtres.rapproche ? ('true' as const) : ('false' as const) }),
-          ...(filtres.inclureDisparues ? { inclureDisparues: 'true' as const } : {}),
-        },
-      },
+  client: ApiClient = getApiClient(),
+): Promise<InscriptionsPage> {
+  return unwrap(
+    await client.GET('/api/v1/enrolement/{projet}/inscriptions', {
+      params: { path: { projet }, query: query(filtres) },
     }),
   );
-  return { items: sortie.items ?? [], meta: sortie.meta };
 }
 
 export async function fetchIndicateursEnrolement(
-  projet: ProjetApi,
-  filtres: FiltresInscriptions,
-): Promise<IndicateursEnrolement> {
+  projet: Projet,
+  filtres: Pick<FiltresInscriptions, 'dateFrom' | 'dateTo'>,
+  client: ApiClient = getApiClient(),
+): Promise<EnrolementIndicateurs> {
   return unwrap(
-    await apiClient.GET('/api/v1/enrolement/{projet}/indicateurs', {
-      params: { path: { projet }, query: periode(filtres) },
+    await client.GET('/api/v1/enrolement/{projet}/indicateurs', {
+      params: { path: { projet }, query: query(filtres) },
     }),
   );
 }
 
-export async function fetchReglagesEnrolement(projet: ProjetApi): Promise<ReglagesEnrolement> {
+export async function fetchReglagesEnrolement(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<EnrolementReglages> {
   return unwrap(
-    await apiClient.GET('/api/v1/enrolement/{projet}/reglages', { params: { path: { projet } } }),
+    await client.GET('/api/v1/enrolement/{projet}/reglages', { params: { path: { projet } } }),
   );
 }
 
-export async function ecrireReglagesEnrolement(
-  projet: ProjetApi,
-  body: components['schemas']['EcrireReglagesInputBody'],
-): Promise<ReglagesEnrolement> {
+export async function saveReglagesEnrolement(
+  projet: Projet,
+  body: Schemas['UpdateEnrolementReglagesDto'],
+  client: ApiClient = getApiClient(),
+): Promise<EnrolementReglages> {
   return unwrap(
-    await apiClient.PUT('/api/v1/enrolement/{projet}/reglages', {
+    await client.PUT('/api/v1/enrolement/{projet}/reglages', {
       params: { path: { projet } },
       body,
     }),
   );
 }
 
-export async function tirerPlateforme(projet: ProjetApi): Promise<Tirage> {
+export async function purgerInscriptions(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<Suppression> {
   return unwrap(
-    await apiClient.POST('/api/v1/enrolement/{projet}/tirage', { params: { path: { projet } } }),
-  );
-}
-
-export async function viderInscriptions(projet: ProjetApi): Promise<{ supprimees: number }> {
-  return unwrap(
-    await apiClient.DELETE('/api/v1/enrolement/{projet}/inscriptions', {
+    await client.DELETE('/api/v1/enrolement/{projet}/inscriptions', {
       params: { path: { projet } },
     }),
   );
 }
 
-export async function retirerInscription(
-  projet: ProjetApi,
+export async function supprimerInscription(
+  projet: Projet,
   id: string,
-): Promise<{ supprimees: number }> {
+  client: ApiClient = getApiClient(),
+): Promise<Suppression> {
   return unwrap(
-    await apiClient.DELETE('/api/v1/enrolement/{projet}/inscriptions/{id}', {
+    await client.DELETE('/api/v1/enrolement/{projet}/inscriptions/{id}', {
       params: { path: { projet, id } },
     }),
+  );
+}
+
+export async function tirerPlateforme(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<Tirage> {
+  return unwrap(
+    await client.POST('/api/v1/enrolement/{projet}/tirage', { params: { path: { projet } } }),
   );
 }

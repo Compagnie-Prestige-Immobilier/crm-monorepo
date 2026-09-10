@@ -7,7 +7,14 @@
     "noEmit": true,
     "types": [],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@crm/api-client": ["./src/api/compat/index.ts"],
+      "@crm/api-client/query": ["./src/api/compat/query.ts"],
+      "next/link": ["./src/shims/next-link.tsx"],
+      "next/navigation": ["./src/shims/next-navigation.ts"],
+      "next/image": ["./src/shims/next-image.tsx"],
+      "next/script": ["./src/shims/next-script.tsx"],
+      "next-themes": ["./src/shims/next-themes.tsx"]
     }
   },
   "include": ["src"]

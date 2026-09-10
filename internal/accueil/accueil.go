@@ -48,18 +48,26 @@ const (
 	champCommentaire  = "commentaire"
 )
 
+var listesVisiteEcriture = []socle.Role{socle.Admin, socle.Direction}
+
 var Garde = map[string][]socle.Role{
-	"GET /api/v1/visites/referentiels":        socle.Tous,
-	"GET /api/v1/visites/statistiques":        socle.Registre,
-	"GET /api/v1/visites":                     socle.Registre,
-	"POST /api/v1/visites":                    socle.Registre,
-	"GET /api/v1/visites/{id}":                socle.Registre,
-	"PATCH /api/v1/visites/{id}":              socle.Registre,
-	"POST /api/v1/visites/import":             {socle.Admin, socle.Direction},
-	"GET /api/v1/visites/import/{id}":         {socle.Admin, socle.Direction},
-	"GET /api/v1/visites/import/{id}/revue":   {socle.Admin, socle.Direction},
-	"PATCH /api/v1/visites/import/{id}/revue": {socle.Admin, socle.Direction},
-	"POST /api/v1/visites/import/{id}/apply":  {socle.Admin, socle.Direction},
+	"GET /api/v1/visites/referentiels":                     socle.Tous,
+	"GET /api/v1/visites/referentiels/{kind}":              socle.Tous,
+	"GET /api/v1/visites/referentiels/usage":               listesVisiteEcriture,
+	"POST /api/v1/visites/referentiels/{kind}":             listesVisiteEcriture,
+	"PATCH /api/v1/visites/referentiels/{kind}/{id}":       listesVisiteEcriture,
+	"POST /api/v1/visites/referentiels/{kind}/{id}/active": listesVisiteEcriture,
+	"POST /api/v1/visites/referentiels/{kind}/reorder":     listesVisiteEcriture,
+	"GET /api/v1/visites/statistiques":                     socle.Registre,
+	"GET /api/v1/visites":                                  socle.Registre,
+	"POST /api/v1/visites":                                 socle.Registre,
+	"GET /api/v1/visites/{id}":                             socle.Registre,
+	"PATCH /api/v1/visites/{id}":                           socle.Registre,
+	"POST /api/v1/visites/import":                          {socle.Admin, socle.Direction},
+	"GET /api/v1/visites/import/{id}":                      {socle.Admin, socle.Direction},
+	"GET /api/v1/visites/import/{id}/revue":                {socle.Admin, socle.Direction},
+	"PATCH /api/v1/visites/import/{id}/revue":              {socle.Admin, socle.Direction},
+	"POST /api/v1/visites/import/{id}/apply":               {socle.Admin, socle.Direction},
 }
 
 func Monter(api huma.API, d *socle.Deps) {
@@ -88,6 +96,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "updateVisite", Method: http.MethodPatch, Path: "/api/v1/visites/{id}",
 		Summary: "Corrige une ligne du registre.",
 	}, s.corrigerVisite)
+	monterListesVisite(api, s)
 	monterAccueilImport(api, s)
 }
 

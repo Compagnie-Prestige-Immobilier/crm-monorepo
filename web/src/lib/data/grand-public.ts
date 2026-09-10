@@ -1,17 +1,29 @@
-import { z } from '@/lib/zod';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-import { ApiError, apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
-import type { PaymentMode, Prospect, ProspectQuery, ProspectType } from '@/lib/data/console';
+import { getApiClient } from '@/lib/api/browser';
+import { flattenPage, toFilterQuery, type ProspectQuery } from '@/lib/api/query-params';
+import { createProspect, type CreateProspectInput } from '@/lib/data/prospects';
+import { DEFAULT_PAGE_SIZE, EMPTY_FILTERS, PAGE_SIZE_OPTIONS } from '@/lib/filters';
+import {
+  readEnum,
+  readIsoDate,
+  readPositiveInt,
+  readString,
+  type RawSearchParams,
+} from '@/lib/search-params';
+import {
+  PROSPECT_STATUTS,
+  type Paginated,
+  type ProspectRow,
+  type ProspectStatut,
+} from '@/lib/types';
 
-type Schemas = components['schemas'];
+export type CanalProvenance = components['schemas']['CanalProvenanceDto'];
+export type ProspectType = components['schemas']['ProspectType'];
+type Projet = components['schemas']['Projet'];
 
-export type ProspectBody = Schemas['ProspectBody'];
-export type ProspectStatut = Prospect['statut'];
-export type Consentement = Schemas['ProspectConsentementInputBody']['consent'];
-export type ConversionBody = Schemas['ProspectConversionInputBody'];
-export type ModeEpargne = NonNullable<Prospect['modeEpargne']>;
-export type TypeContrat = NonNullable<Prospect['typeContrat']>;
+const GRAND_PUBLIC: Projet = 'GRAND_PUBLIC';
 
 export const PROSPECT_TYPES = [
   'FONCTIONNAIRE',
@@ -27,43 +39,6 @@ export const PROSPECT_TYPE_LABELS: Record<ProspectType, string> = {
   DIASPORA: 'Diaspora',
 };
 
-export const PROSPECT_STATUTS = ['NOUVEAU', 'CONTACTE', 'CONVERTI', 'PERDU'] as const;
-
-export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
-  NOUVEAU: 'Nouveau',
-  CONTACTE: 'Contacté',
-  CONVERTI: 'Converti',
-  PERDU: 'Perdu',
-};
-
-export const STATUT_VARIANT: Record<
-  ProspectStatut,
-  'secondary' | 'info' | 'success' | 'destructive'
-> = {
-  NOUVEAU: 'secondary',
-  CONTACTE: 'info',
-  CONVERTI: 'success',
-  PERDU: 'destructive',
-};
-
-export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
-  COMPTANT: 'Comptant',
-  ECHELONNE: 'Échelonné',
-};
-
-export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
-  TONTINE: 'Tontine',
-  MOBILE_MONEY: 'Mobile money',
-  BANQUE: 'Banque',
-  AUCUN: 'Aucun',
-};
-
-export const TYPE_CONTRAT_LABELS: Record<TypeContrat, string> = {
-  CDI: 'CDI',
-  CDD: 'CDD',
-  AUTRE: 'Autre',
-};
-
 /** Les durées que le métier pratique. Un choix fermé plutôt qu'une frappe libre. */
 export const DUREES_MOIS = [
   6, 12, 18, 24, 36, 48, 60, 72, 84, 96, 120, 144, 180, 240, 300,
@@ -75,83 +50,166 @@ export function formatDureeMois(mois: number): string {
   return `${String(ans)} an${ans > 1 ? 's' : ''} (${String(mois)} mois)`;
 }
 
-export function formatAnciennete(mois: number): string {
-  if (mois < 12) return `${String(mois)} mois`;
-  const ans = Math.floor(mois / 12);
-  const reste = mois % 12;
-  const debut = `${String(ans)} an${ans > 1 ? 's' : ''}`;
-  return reste === 0 ? debut : `${debut} et ${String(reste)} mois`;
+export interface GrandPublicFilters {
+  search: string;
+  type: ProspectType | null;
+  canalProvenanceId: string | null;
+  statut: ProspectStatut | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  page: number;
+  pageSize: number;
 }
 
-export interface PageProspects {
-  readonly items: Prospect[];
-  readonly total: number;
-  readonly page: number;
-  readonly pageCount: number;
-}
+export const EMPTY_GRAND_PUBLIC_FILTERS: GrandPublicFilters = {
+  search: '',
+  type: null,
+  canalProvenanceId: null,
+  statut: null,
+  dateFrom: null,
+  dateTo: null,
+  page: 1,
+  pageSize: DEFAULT_PAGE_SIZE,
+};
 
-export async function fetchPageProspects(query: ProspectQuery): Promise<PageProspects> {
-  const page = unwrap(await apiClient.GET('/api/v1/prospects', { params: { query } }));
+export function parseGrandPublicFilters(
+  params: RawSearchParams | URLSearchParams,
+): GrandPublicFilters {
+  const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
-    items: page.items ?? [],
-    total: page.meta.total,
-    page: page.meta.page,
-    pageCount: page.meta.pageCount,
+    search: readString(params, 'search') ?? '',
+    type: readEnum<ProspectType>(params, 'type', PROSPECT_TYPES),
+    canalProvenanceId: readString(params, 'canalProvenanceId'),
+    statut: readEnum<ProspectStatut>(params, 'statut', PROSPECT_STATUTS),
+    dateFrom: readIsoDate(params, 'dateFrom'),
+    dateTo: readIsoDate(params, 'dateTo'),
+    page: readPositiveInt(params, 'page', 1),
+    pageSize: (PAGE_SIZE_OPTIONS as readonly number[]).includes(pageSize)
+      ? pageSize
+      : DEFAULT_PAGE_SIZE,
   };
 }
 
-/** `projet` est posé ICI : oublié, la création tomberait dans le projet CHUES. */
-export async function creerProspect(body: ProspectBody): Promise<Prospect> {
+export function serializeGrandPublicFilters(filters: GrandPublicFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  const put = (key: string, value: string | null): void => {
+    if (value !== null && value !== '') params.set(key, value);
+  };
+
+  put('search', filters.search.trim());
+  put('type', filters.type);
+  put('canalProvenanceId', filters.canalProvenanceId);
+  put('statut', filters.statut);
+  put('dateFrom', filters.dateFrom);
+  put('dateTo', filters.dateTo);
+  if (filters.page !== 1) put('page', String(filters.page));
+  if (filters.pageSize !== DEFAULT_PAGE_SIZE) put('pageSize', String(filters.pageSize));
+
+  return params;
+}
+
+function grandPublicFiltersKey(filters: GrandPublicFilters): string {
+  return serializeGrandPublicFilters(filters).toString();
+}
+
+export function countGrandPublicFilters(filters: GrandPublicFilters): number {
+  let count = 0;
+  if (filters.search.trim() !== '') count += 1;
+  if (filters.type !== null) count += 1;
+  if (filters.canalProvenanceId !== null) count += 1;
+  if (filters.statut !== null) count += 1;
+  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
+  return count;
+}
+
+/**
+ * `projet` est posé ICI et non par l'appelant : oublié, la liste rendrait aussi
+ * les fiches CHUES. Les bornes de date passent par `toFilterQuery`, seul endroit
+ * qui sait que la journée métier se ferme à 23:59:59.999 heure de Dakar.
+ */
+function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
+  const base = toFilterQuery({
+    ...EMPTY_FILTERS,
+    search: filters.search,
+    statut: filters.statut,
+    dateFrom: filters.dateFrom,
+    dateTo: filters.dateTo,
+  });
+
+  return {
+    ...base,
+    projet: GRAND_PUBLIC,
+    ...(filters.type === null ? {} : { type: filters.type }),
+    ...(filters.canalProvenanceId === null ? {} : { canalProvenanceId: filters.canalProvenanceId }),
+    page: filters.page,
+    pageSize: filters.pageSize,
+    sortBy: 'clientCreatedAt',
+    sortOrder: 'desc',
+  };
+}
+
+export async function fetchGrandPublicProspects(
+  filters: GrandPublicFilters,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<ProspectRow>> {
+  const payload = unwrap(
+    await client.GET('/api/v1/prospects', { params: { query: toGrandPublicQuery(filters) } }),
+  );
+  return flattenPage(payload);
+}
+
+export async function fetchCanauxProvenance(
+  client: ApiClient = getApiClient(),
+): Promise<CanalProvenance[]> {
   return unwrap(
-    await apiClient.POST('/api/v1/prospects', { body: { ...body, projet: 'GRAND_PUBLIC' } }),
+    await client.GET('/api/v1/referentiels/canaux-provenance', {
+      params: { query: { activeOnly: false } },
+    }),
   );
 }
 
-export async function modifierProspect(id: string, body: ProspectBody): Promise<Prospect> {
-  return unwrap(
-    await apiClient.PATCH('/api/v1/prospects/{id}', { params: { path: { id } }, body }),
-  );
+/** Le contrat de création, moins le projet : il est posé ici et nulle part ailleurs. */
+export type GrandPublicProspectInput = Omit<CreateProspectInput, 'projet'>;
+
+export async function createGrandPublicProspect(
+  input: GrandPublicProspectInput,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return createProspect({ ...input, projet: GRAND_PUBLIC }, client);
 }
 
-export async function majConsentement(id: string, consent: Consentement): Promise<Prospect> {
+export async function updateGrandPublicConsent(
+  id: string,
+  consent: components['schemas']['GrandPublicConsent'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
   return unwrap(
-    await apiClient.PATCH('/api/v1/prospects/{id}/parcours/grand-public/consentement', {
+    await client.PATCH('/api/v1/prospects/{id}/parcours/grand-public/consentement', {
       params: { path: { id } },
       body: { consent },
     }),
   );
 }
 
-export async function confirmerConversion(id: string, body: ConversionBody): Promise<Prospect> {
+export async function confirmGrandPublicConversion(
+  id: string,
+  body: components['schemas']['ConfirmGrandPublicConversionDto'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
   return unwrap(
-    await apiClient.POST('/api/v1/prospects/{id}/parcours/grand-public/conversion', {
+    await client.POST('/api/v1/prospects/{id}/parcours/grand-public/conversion', {
       params: { path: { id } },
       body,
     }),
   );
 }
 
-const conflitSchema = z.object({
-  id: z.string().optional(),
-  nom: z.string().optional(),
-  prenom: z.string().optional(),
-  ownedByCommercialName: z.string(),
-  createdAt: z.string().optional(),
-});
-
-export type ConflitTelephone = z.infer<typeof conflitSchema>;
-
 /**
- * La fiche que le 409 nomme. Elle voyage dans `errors[0].value`, hors du
- * schéma OpenAPI : elle se relit donc à l'exécution, jamais par un cast.
+ * Sous la racine `prospects` : une création côté CHUES et une création ici
+ * touchent la même ressource, et une seule invalidation doit rafraîchir les deux.
  */
-export function conflitTelephone(error: unknown): ConflitTelephone | null {
-  if (!(error instanceof ApiError) || error.status !== 409) return null;
-  const payload = error.payload;
-  if (typeof payload !== 'object' || payload === null) return null;
-  const { code, errors } = payload as { code?: unknown; errors?: unknown };
-  if (code !== 'PROSPECT_PHONE_CONFLICT' || !Array.isArray(errors)) return null;
-  const value = (errors[0] as { value?: unknown } | undefined)?.value;
-  const lu = conflitSchema.safeParse(value);
-  return lu.success ? lu.data : null;
-}
+export const grandPublicKeys = {
+  prospects: (filters: GrandPublicFilters) =>
+    ['prospects', 'grand-public', grandPublicFiltersKey(filters)] as const,
+  canaux: ['referentiels', 'canaux-provenance'] as const,
+};

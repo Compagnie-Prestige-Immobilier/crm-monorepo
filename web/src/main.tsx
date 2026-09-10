@@ -7,13 +7,18 @@ import {
 } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { z } from 'zod';
 
 import { EcranErreur, EcranIntrouvable } from '@/components/etats-router';
+import { ExactAmountsProvider } from '@/components/money/exact-amounts';
 import { Toaster } from '@/components/ui/sonner';
 import { initTheme } from '@/lib/theme';
 import { routeTree } from '@/routeTree.gen';
 
 import './styles.css';
+
+// zod v4 sonde `Function("")` au chargement : la CSP du binaire le signalerait à chaque page.
+z.config({ jitless: true });
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,7 +40,7 @@ const router = createRouter({
   defaultNotFoundComponent: EcranIntrouvable,
   // Les critères sont des chaînes : le JSON par défaut lit « 6174e584 » comme Infinity.
   parseSearch: parseSearchWith((valeur) => valeur),
-  stringifySearch: stringifySearchWith(JSON.stringify),
+  stringifySearch: stringifySearchWith(String),
 });
 
 declare module '@tanstack/react-router' {
@@ -52,8 +57,10 @@ initTheme();
 createRoot(rootElement).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>
-      <RouterProvider router={router} />
-      <Toaster />
+      <ExactAmountsProvider>
+        <RouterProvider router={router} />
+        <Toaster />
+      </ExactAmountsProvider>
     </QueryClientProvider>
   </StrictMode>,
 );

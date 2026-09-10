@@ -1,22 +1,40 @@
-const nombres = new Intl.NumberFormat('fr-SN');
-const decimaux = new Intl.NumberFormat('fr-SN', {
+import { format, parseISO } from 'date-fns';
+import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
+
+const DAKAR_UTC_OFFSET = '+00:00';
+
+export function dakarLocalToIso(local: string): string | null {
+  const trimmed = local.trim();
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?$/u.test(trimmed)) return null;
+  const withSeconds = trimmed.length === 16 ? `${trimmed}:00` : trimmed;
+  const parsed = new Date(`${withSeconds}${DAKAR_UTC_OFFSET}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
+export function formatDakarDateTime(local: string): string | null {
+  const iso = dakarLocalToIso(local);
+  if (iso === null) return null;
+
+  const at = new Date(iso);
+  const pad = (value: number): string => String(value).padStart(2, '0');
+  return `${pad(at.getUTCDate())}/${pad(at.getUTCMonth() + 1)}/${String(at.getUTCFullYear())} à ${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())} (heure de Dakar)`;
+}
+import { fr } from 'date-fns/locale';
+
+import { RETIRED_SUFFIX } from '@/lib/types';
+
+const numberFormatter = new Intl.NumberFormat('fr-SN');
+const decimalFormatter = new Intl.NumberFormat('fr-SN', {
   minimumFractionDigits: 1,
   maximumFractionDigits: 1,
 });
-const jourCourt = new Intl.DateTimeFormat('fr-SN', { day: '2-digit', month: 'short' });
-const jourLong = new Intl.DateTimeFormat('fr-SN', {
-  day: '2-digit',
-  month: 'short',
-  year: 'numeric',
-});
-const heure = new Intl.DateTimeFormat('fr-SN', { hour: '2-digit', minute: '2-digit' });
 
 export function formatNumber(value: number): string {
-  return nombres.format(value);
+  return numberFormatter.format(value);
 }
 
 export function formatDecimal(value: number): string {
-  return decimaux.format(value);
+  return decimalFormatter.format(value);
 }
 
 export function formatRate(value: number): string {
@@ -28,39 +46,73 @@ export function formatRateOrNone(value: number | null): string {
 }
 
 export function formatDate(iso: string): string {
-  return jourLong.format(new Date(iso));
+  return format(parseISO(iso), 'dd MMM yyyy', { locale: fr });
 }
 
 export function formatDateTime(iso: string): string {
-  const at = new Date(iso);
-  return `${jourLong.format(at)} à ${heure.format(at)}`;
-}
-
-/** Un temps de traitement : sous la minute, les secondes suffisent. */
-export function formatDuree(secondes: number): string {
-  const minutes = Math.floor(secondes / 60);
-  const reste = Math.round(secondes % 60);
-  if (minutes === 0) return `${String(reste)} s`;
-  return `${String(minutes)} min ${String(reste).padStart(2, '0')}`;
+  return format(parseISO(iso), "dd MMM yyyy 'à' HH:mm", { locale: fr });
 }
 
 export function formatShortDate(iso: string): string {
-  return jourCourt.format(new Date(iso));
+  return format(parseISO(iso), 'dd MMM', { locale: fr });
+}
+
+const DEVICE_CALL_LABELS: Record<string, string> = {
+  sortant: 'Sortant',
+  entrant: 'Entrant',
+  manque: 'Manqué',
+  rejete: 'Rejeté',
+  bloque: 'Bloqué',
+  messagerie: 'Messagerie',
+  externe: 'Externe',
+  inconnu: 'Inconnu',
+};
+
+function formatCallDuration(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const reste = seconds % 60;
+  if (minutes === 0) return `${formatNumber(reste)} s`;
+  return `${formatNumber(minutes)} min ${String(reste).padStart(2, '0')}`;
+}
+
+/** Une ligne du journal d'appels : nature, durée, heure. */
+export function formatDetectedCall(call: {
+  deviceCallType?: string | null;
+  deviceCallDurationSeconds?: number | null;
+  deviceCallAt: string;
+}): string {
+  const duree = call.deviceCallDurationSeconds ?? null;
+  const parts = [DEVICE_CALL_LABELS[call.deviceCallType ?? ''] ?? 'Inconnu'];
+  if (duree !== null) parts.push(formatCallDuration(duree));
+  parts.push(format(parseISO(call.deviceCallAt), 'HH:mm', { locale: fr }));
+  return parts.join(' · ');
 }
 
 /**
- * Un E.164 sénégalais se lit par groupes de deux après l'indicatif ; tout autre
- * pays reste tel quel plutôt que d'être mal découpé.
+ * Ce que le journal d'appels du téléphone Android dit d'une tentative. Sans
+ * `deviceCallAt`, l'appel n'est que déclaré : aucune trace ne l'atteste.
  */
-export function formatPhone(e164: string): string {
-  const senegal = /^\+221(\d{2})(\d{3})(\d{2})(\d{2})$/u.exec(e164);
-  if (senegal === null) return e164;
-  return `+221 ${senegal[1] ?? ''} ${senegal[2] ?? ''} ${senegal[3] ?? ''} ${senegal[4] ?? ''}`;
+export function formatDeviceCall(attempt: {
+  deviceCallType?: string | null;
+  deviceCallDurationSeconds?: number | null;
+  deviceCallAt?: string | null;
+}): string {
+  const at = attempt.deviceCallAt ?? null;
+  if (at === null) return 'Téléphone : non confirmé';
+  return `Téléphone : ${formatDetectedCall({ ...attempt, deviceCallAt: at })}`;
 }
 
-/** Une somme en FCFA : le serveur rend une suite de chiffres, jamais un flottant. */
-export function formatXof(digits: string): string {
-  const propre = digits.trim().replace(/^0+(?=\d)/u, '');
-  if (!/^\d{1,18}$/u.test(propre)) return `${digits} FCFA`;
-  return `${formatNumber(Number(propre))} FCFA`;
+export function formatPhone(e164: string): string {
+  return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
+}
+
+export function initials(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean);
+  const first = parts[0]?.[0] ?? '?';
+  const last = parts.length > 1 ? (parts[parts.length - 1]?.[0] ?? '') : '';
+  return (first + last).toUpperCase();
+}
+
+export function withRetired(label: string, isActive: boolean): string {
+  return isActive ? label : `${label} ${RETIRED_SUFFIX}`;
 }
