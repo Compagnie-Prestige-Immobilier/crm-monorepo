@@ -14,6 +14,7 @@ USAGE
     python3 infra/dokploy/deploy.py deploy      # démarrage
     python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
     python3 infra/dokploy/deploy.py redeploy cpi-go   # le binaire Go v2 seul
+    BRANCH=v2 python3 infra/dokploy/deploy.py configure-go --sans-taches  # v2 sur son hôte d'essai, v1 intacte
     python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne hors du VPS
     python3 infra/dokploy/deploy.py status      # état courant
     python3 infra/dokploy/deploy.py all         # les trois premières d'affilée
@@ -1640,11 +1641,117 @@ def _print_backup_status(project: dict) -> None:
         info("corrigez avec : python3 infra/dokploy/deploy.py backup")
 
 
+def cmd_configure_go() -> None:
+    """Prépare et déploie le binaire Go SEUL, sur son hôte d'essai, à côté de la v1.
+
+    Rien n'est engendré ni réécrit sur la v1 : l'URL de la base et le mot de
+    passe d'amorçage sont relus depuis l'environnement de l'API en production,
+    la même base sert aux deux. `--sans-taches` coupe les sept tâches planifiées
+    du binaire : tant que la v1 tourne, deux planificateurs se disputeraient les
+    notifications dues et les jobs d'import.
+    """
+    sans_taches = "--sans-taches" in sys.argv[2:]
+    ids = load_ids()
+    ids.update({k: v for k, v in find_existing().items() if v})
+    if not ids.get("API_ID"):
+        fail("API v1 introuvable sur Dokploy : son DATABASE_URL est la référence.")
+        sys.exit(1)
+    if not ids.get("GO_ID"):
+        step(f"Application {GO_NAME}")
+        result = call(
+            "application.create",
+            {
+                "environmentId": ENVIRONMENT_ID,
+                "name": GO_NAME,
+                "appName": GO_NAME,
+                "description": "Binaire Go v2, API et panneau embarqué",
+            },
+        )
+        ids["GO_ID"] = (result or {}).get("applicationId", "")
+        ok(f"créée, {ids['GO_ID']}")
+    ids["SSH_KEY_ID"] = ensure_ssh_key(ids)
+    save_ids(ids)
+
+    api = call("application.one", {"applicationId": ids["API_ID"]}, method="GET") or {}
+    api_env = dict(
+        ligne.split("=", 1)
+        for ligne in (api.get("env") or "").splitlines()
+        if "=" in ligne and not ligne.startswith("#")
+    )
+    base = urllib.parse.urlsplit(api_env.get("DATABASE_URL", ""))
+    if not base.password or not base.hostname:
+        fail("DATABASE_URL de l'API illisible : impossible de partager la base.")
+        sys.exit(1)
+    secrets_ = {
+        "PG_PASSWORD": base.password,
+        "ADMIN_PASSWORD": api_env.get("SEED_ADMIN_PASSWORD", ""),
+    }
+    names = service_app_names(ids)
+    names["postgres"] = base.hostname
+
+    step(f"Source Git, {GIT_URL} @ {BRANCH}")
+    call(
+        "application.saveGitProvider",
+        {
+            "applicationId": ids["GO_ID"],
+            "customGitUrl": GIT_URL,
+            "customGitBranch": BRANCH,
+            "customGitBuildPath": "/",
+            "customGitSSHKeyId": ids["SSH_KEY_ID"],
+            "watchPaths": [],
+        },
+    )
+    call(
+        "application.saveBuildType",
+        {
+            "applicationId": ids["GO_ID"],
+            "buildType": "dockerfile",
+            "dockerfile": "Dockerfile",
+            "dockerContextPath": "/",
+            "dockerBuildStage": "",
+            "herokuVersion": "",
+            "railpackVersion": "",
+        },
+    )
+    ok("Dockerfile à la racine")
+
+    step("Volumes")
+    ensure_db_dump_mount(ids["GO_ID"])
+    ensure_volume_mount(ids["GO_ID"], NOTES_VOCALES_VOLUME, NOTES_VOCALES_MOUNT, "notes vocales")
+    ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
+
+    step("Variables d'environnement")
+    go_env = _go_env(secrets_, names)
+    if sans_taches:
+        go_env += "\nTACHES_PLANIFIEES=false"
+    call(
+        "application.saveEnvironment",
+        {
+            "applicationId": ids["GO_ID"],
+            "env": go_env,
+            "buildArgs": "",
+            "buildSecrets": "",
+            "createEnvFile": True,
+        },
+    )
+    ok(f"{len(go_env.splitlines())} variables, tâches planifiées {'coupées' if sans_taches else 'actives'}")
+
+    step("Domaine d'essai")
+    _attach_domain(ids["GO_ID"], GO_STAGING_DOMAIN, GO_PORT)
+
+    step(f"Construction et démarrage de {GO_NAME}")
+    call("application.deploy", {"applicationId": ids["GO_ID"]})
+    _attendre_application(ids["GO_ID"])
+    ok("construit et démarré, goose a appliqué ses migrations sur la base partagée")
+    info(f"DNS : {GO_STAGING_DOMAIN} doit pointer, proxifié, vers le VPS pour être joignable")
+
+
 # ─────────────────────────────────────────────────────────────────────────────
 
 COMMANDS = {
     "provision": cmd_provision,
     "configure": cmd_configure,
+    "configure-go": cmd_configure_go,
     "deploy": cmd_deploy,
     "redeploy": cmd_redeploy,
     "backup": cmd_backup,

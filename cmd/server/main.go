@@ -96,6 +96,13 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Hôte d'essai à côté de la v1 sur la même base : deux planificateurs se
+	// disputeraient notifications dues et jobs d'import.
+	if socle.Env("TACHES_PLANIFIEES", socle.Vrai) == socle.Faux {
+		slog.Warn("tâches planifiées désactivées", "variable", "TACHES_PLANIFIEES")
+		sched.Start()
+		return sched, nil
+	}
 	for _, t := range tachesDomaines(d) {
 		_, err := sched.NewJob(gocron.CronJob(t.Cron, false), gocron.NewTask(func() {
 			if err := t.Run(ctx); err != nil {
