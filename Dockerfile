@@ -3,6 +3,18 @@ ARG GO_VERSION=1.26
 ARG NODE_VERSION=24.18.0
 ARG PG_MAJOR=18
 
+# Le contrat OpenAPI et le code sqlc sont générés, jamais commités : un
+# checkout git n'a ni l'un ni l'autre, cette étape les produit pour les deux suivantes.
+FROM golang:${GO_VERSION}-bookworm AS contrat
+WORKDIR /src
+COPY go.mod go.sum ./
+RUN go mod download
+COPY . ./
+# `web/embed.go` exige un dossier `dist` : un fichier vide suffit pour écrire le contrat.
+RUN mkdir -p web/dist && touch web/dist/index.html \
+    && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate \
+    && go run ./cmd/server -openapi > /openapi.json
+
 FROM node:${NODE_VERSION}-bookworm-slim AS panneau
 RUN corepack enable
 WORKDIR /repo
@@ -10,17 +22,13 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY web/package.json web/
 RUN pnpm install --frozen-lockfile --filter @crm/panel
 COPY web web
-COPY tsconfig.base.json openapi.json ./
+COPY tsconfig.base.json ./
+COPY --from=contrat /openapi.json ./
 RUN pnpm --filter @crm/panel gen && pnpm --filter @crm/panel build
 
-FROM golang:${GO_VERSION}-bookworm AS binaire
-WORKDIR /src
-COPY go.mod go.sum ./
-RUN go mod download
-COPY . ./
+FROM contrat AS binaire
 COPY --from=panneau /repo/web/dist ./web/dist
-RUN go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate \
-    && CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /cpi-go ./cmd/server
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /cpi-go ./cmd/server
 
 # pg_dump 18 depuis PGDG : la version de Bookworm refuse un serveur 18.
 FROM debian:bookworm-slim AS runner
