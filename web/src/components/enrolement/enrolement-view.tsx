@@ -7,6 +7,9 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
+import { DetailInscription } from '@/components/enrolement/detail-inscription';
+import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
+import { SyntheseEnrolement } from '@/components/enrolement/synthese-enrolement';
 import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
@@ -50,6 +53,10 @@ import { formatDate, formatDateTime, formatNumber, formatRateOrNone } from '@/li
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+/** La synthèse compare les deux plateformes ; les onglets suivants en tirent une seule. */
+const SYNTHESE = 'synthese';
+const ONGLETS = [SYNTHESE, ...ONGLETS_ENROLEMENT] as const;
+
 const LIBELLE_ONGLET: Record<OngletEnrolement, string> = {
   chues: 'CHUES',
   'grand-public': 'Grand Public',
@@ -61,6 +68,9 @@ const SANS_PROSPECT = 'sans-prospect';
 const PRESENTES = 'presentes';
 const AVEC_DISPARUES = 'avec-disparues';
 
+const libelle = (valeur: (typeof ONGLETS)[number]): string =>
+  valeur === SYNTHESE ? 'Synthèse' : LIBELLE_ONGLET[valeur];
+
 const estOnglet = (valeur: string | null): valeur is OngletEnrolement =>
   (ONGLETS_ENROLEMENT as readonly string[]).includes(valeur ?? '');
 
@@ -69,15 +79,15 @@ export function EnrolementView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const onglet: OngletEnrolement = useMemo(() => {
+  const onglet: (typeof ONGLETS)[number] = useMemo(() => {
     const brut = searchParams.get('onglet');
-    return estOnglet(brut) ? brut : 'chues';
+    return estOnglet(brut) ? brut : SYNTHESE;
   }, [searchParams]);
 
   const changerOnglet = useCallback(
     (suivant: string) => {
       const params = new URLSearchParams();
-      if (suivant !== 'chues') params.set('onglet', suivant);
+      if (suivant !== SYNTHESE) params.set('onglet', suivant);
       const requete = params.toString();
       router.replace(requete === '' ? pathname : `${pathname}?${requete}`, { scroll: false });
     },
@@ -93,12 +103,16 @@ export function EnrolementView() {
 
       <Tabs value={onglet} onValueChange={changerOnglet}>
         <TabsList>
-          {ONGLETS_ENROLEMENT.map((valeur) => (
+          {ONGLETS.map((valeur) => (
             <TabsTrigger key={valeur} value={valeur}>
-              {LIBELLE_ONGLET[valeur]}
+              {libelle(valeur)}
             </TabsTrigger>
           ))}
         </TabsList>
+
+        <TabsContent value={SYNTHESE}>
+          <SyntheseEnrolement />
+        </TabsContent>
 
         {ONGLETS_ENROLEMENT.map((valeur) => (
           <TabsContent key={valeur} value={valeur}>
@@ -113,6 +127,7 @@ export function EnrolementView() {
 /** Un seul panneau, paramétré par le projet : les deux onglets partagent tout. */
 function PanneauProjet({ projet }: { projet: Projet }) {
   const [filtres, setFiltres] = useState<FiltresInscriptions>({ page: 1, pageSize: 25 });
+  const [detailId, setDetailId] = useState<string | null>(null);
 
   const indicateurs = useQuery({
     queryKey: queryKeys.enrolementIndicateurs(projet, {
@@ -147,6 +162,14 @@ function PanneauProjet({ projet }: { projet: Projet }) {
         <Tuiles indicateurs={indicateurs.data} />
       )}
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <EntonnoirCarte entonnoir={indicateurs.data?.entonnoir} />
+        <CourbeEnrolement
+          titre="Inscriptions par jour"
+          series={[{ nom: 'Inscriptions', points: indicateurs.data?.parJour ?? [] }]}
+        />
+      </div>
+
       {indicateurs.data === undefined ? null : <Repartitions indicateurs={indicateurs.data} />}
 
       <FiltresBarre filtres={filtres} onChange={setFiltres} indicateurs={indicateurs.data} />
@@ -154,13 +177,29 @@ function PanneauProjet({ projet }: { projet: Projet }) {
       <TableauInscriptions
         etat={inscriptions}
         projet={projet}
+        libelles={libellesStatuts(indicateurs.data)}
         page={filtres.page ?? 1}
         onPage={(page) => {
           setFiltres((courant) => ({ ...courant, page }));
         }}
+        onOuvrir={setDetailId}
+      />
+
+      <DetailInscription
+        projet={projet}
+        id={detailId}
+        libelles={libellesStatuts(indicateurs.data)}
+        onClose={() => {
+          setDetailId(null);
+        }}
       />
     </div>
   );
+}
+
+/** Les libellés de statut vivent côté serveur : la liste les reprend, elle ne les réinvente pas. */
+function libellesStatuts(indicateurs: EnrolementIndicateurs | undefined): Map<string, string> {
+  return new Map((indicateurs?.parEtape ?? []).map((ligne) => [ligne.id, ligne.label]));
 }
 
 function isActionDisabled(pending: boolean, configuree: boolean): boolean {
@@ -394,6 +433,8 @@ function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefine
 function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
   const blocs = [
     { titre: 'Par étape', lignes: indicateurs.parEtape },
+    { titre: 'Par agent de la plateforme', lignes: indicateurs.parAgentPlateforme },
+    { titre: 'Pièces du dossier', lignes: indicateurs.parPiece },
     { titre: 'Par téléconseiller', lignes: indicateurs.parTeleconseiller },
     { titre: 'Par campagne', lignes: indicateurs.parCampagne },
     { titre: 'Par méthode d’enrôlement', lignes: indicateurs.parMethode },
@@ -454,7 +495,7 @@ function FiltresBarre({
   onChange: (suivants: FiltresInscriptions) => void;
   indicateurs: EnrolementIndicateurs | undefined;
 }) {
-  const statuts = [...new Set((indicateurs?.parEtape ?? []).map((ligne) => ligne.id))];
+  const statuts = indicateurs?.parEtape ?? [];
 
   const poser = (partiel: Partial<FiltresInscriptions>): void => {
     onChange({ ...filtres, ...partiel, page: 1 });
@@ -484,8 +525,8 @@ function FiltresBarre({
           <SelectContent>
             <SelectItem value={TOUS}>Tous les statuts</SelectItem>
             {statuts.map((statut) => (
-              <SelectItem key={statut} value={statut}>
-                {statut}
+              <SelectItem key={statut.id} value={statut.id}>
+                {statut.label}
               </SelectItem>
             ))}
           </SelectContent>
@@ -596,11 +637,15 @@ function TableauInscriptions({
   projet,
   page,
   onPage,
+  onOuvrir,
+  libelles,
 }: {
   etat: EtatInscriptions;
   projet: Projet;
   page: number;
   onPage: (page: number) => void;
+  onOuvrir: (id: string) => void;
+  libelles: Map<string, string>;
 }) {
   const queryClient = useQueryClient();
   const [aRetirer, setARetirer] = useState<{ id: string; nom: string } | null>(null);
@@ -659,13 +704,21 @@ function TableauInscriptions({
           {etat.data.items.map((ligne) => (
             <TableRow key={ligne.id}>
               <TableCell className="font-[600]">
-                {ligne.prenom} {ligne.nom}
+                <button
+                  type="button"
+                  className="text-left underline-offset-4 hover:underline"
+                  onClick={() => {
+                    onOuvrir(ligne.id);
+                  }}
+                >
+                  {ligne.prenom} {ligne.nom}
+                </button>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {ligne.email ?? ligne.phoneE164 ?? '—'}
               </TableCell>
               <TableCell>
-                {ligne.statutDistant}
+                {libelles.get(ligne.statutDistant) ?? ligne.statutDistant}
                 {ligne.disparueLe === null ? null : (
                   <span className="ml-2 text-[0.75rem] text-muted-foreground">
                     retirée de la plateforme le {formatDate(ligne.disparueLe)}
