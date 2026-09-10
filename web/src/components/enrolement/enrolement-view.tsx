@@ -7,9 +7,22 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
+import { formatDelai } from '@/components/enrolement/delais-enrolement';
+import { DetailInscription } from '@/components/enrolement/detail-inscription';
+import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
+import { Pagination, StatutsBandeau, tonStatut } from '@/components/enrolement/liste-controles';
+import { SyntheseEnrolement } from '@/components/enrolement/synthese-enrolement';
 import { SearchField } from '@/components/filters/search-field';
+import {
+  AIDE_DELAIS,
+  AIDE_RAPPROCHEMENT,
+  AIDE_TAUX_RAPPROCHEMENT,
+  aideDelai,
+} from '@/components/enrolement/aides';
 import { QueryErrorState } from '@/components/query-error-state';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -50,16 +63,24 @@ import { formatDate, formatDateTime, formatNumber, formatRateOrNone } from '@/li
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
+/** La synthèse compare les deux plateformes ; les onglets suivants en tirent une seule. */
+const SYNTHESE = 'synthese';
+const ONGLETS = [SYNTHESE, ...ONGLETS_ENROLEMENT] as const;
+
 const LIBELLE_ONGLET: Record<OngletEnrolement, string> = {
   chues: 'CHUES',
   'grand-public': 'Grand Public',
 };
 
 const TOUS = 'tous';
+const PAGE_PAR_DEFAUT = 25;
 const RAPPROCHES = 'rapproches';
 const SANS_PROSPECT = 'sans-prospect';
 const PRESENTES = 'presentes';
 const AVEC_DISPARUES = 'avec-disparues';
+
+const libelle = (valeur: (typeof ONGLETS)[number]): string =>
+  valeur === SYNTHESE ? 'Synthèse' : LIBELLE_ONGLET[valeur];
 
 const estOnglet = (valeur: string | null): valeur is OngletEnrolement =>
   (ONGLETS_ENROLEMENT as readonly string[]).includes(valeur ?? '');
@@ -69,15 +90,15 @@ export function EnrolementView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const onglet: OngletEnrolement = useMemo(() => {
+  const onglet: (typeof ONGLETS)[number] = useMemo(() => {
     const brut = searchParams.get('onglet');
-    return estOnglet(brut) ? brut : 'chues';
+    return estOnglet(brut) ? brut : SYNTHESE;
   }, [searchParams]);
 
   const changerOnglet = useCallback(
     (suivant: string) => {
       const params = new URLSearchParams();
-      if (suivant !== 'chues') params.set('onglet', suivant);
+      if (suivant !== SYNTHESE) params.set('onglet', suivant);
       const requete = params.toString();
       router.replace(requete === '' ? pathname : `${pathname}?${requete}`, { scroll: false });
     },
@@ -93,12 +114,16 @@ export function EnrolementView() {
 
       <Tabs value={onglet} onValueChange={changerOnglet}>
         <TabsList>
-          {ONGLETS_ENROLEMENT.map((valeur) => (
+          {ONGLETS.map((valeur) => (
             <TabsTrigger key={valeur} value={valeur}>
-              {LIBELLE_ONGLET[valeur]}
+              {libelle(valeur)}
             </TabsTrigger>
           ))}
         </TabsList>
+
+        <TabsContent value={SYNTHESE}>
+          <SyntheseEnrolement />
+        </TabsContent>
 
         {ONGLETS_ENROLEMENT.map((valeur) => (
           <TabsContent key={valeur} value={valeur}>
@@ -112,7 +137,15 @@ export function EnrolementView() {
 
 /** Un seul panneau, paramétré par le projet : les deux onglets partagent tout. */
 function PanneauProjet({ projet }: { projet: Projet }) {
-  const [filtres, setFiltres] = useState<FiltresInscriptions>({ page: 1, pageSize: 25 });
+  const [filtres, setFiltres] = useState<FiltresInscriptions>({
+    page: 1,
+    pageSize: PAGE_PAR_DEFAUT,
+  });
+  const [detailId, setDetailId] = useState<string | null>(null);
+
+  const poserFiltre = (partiel: Partial<FiltresInscriptions>): void => {
+    setFiltres((courant) => ({ ...courant, ...partiel }));
+  };
 
   const indicateurs = useQuery({
     queryKey: queryKeys.enrolementIndicateurs(projet, {
@@ -147,20 +180,62 @@ function PanneauProjet({ projet }: { projet: Projet }) {
         <Tuiles indicateurs={indicateurs.data} />
       )}
 
+      <div className="grid gap-4 lg:grid-cols-2">
+        <EntonnoirCarte
+          entonnoir={indicateurs.data?.entonnoir}
+          actif={filtres.avancement}
+          onChoisir={(avancement) => {
+            poserFiltre({ avancement, page: 1 });
+          }}
+        />
+        <CourbeEnrolement
+          titre="Inscriptions par jour"
+          series={[{ nom: 'Inscriptions', points: indicateurs.data?.parJour ?? [] }]}
+        />
+      </div>
+
       {indicateurs.data === undefined ? null : <Repartitions indicateurs={indicateurs.data} />}
 
-      <FiltresBarre filtres={filtres} onChange={setFiltres} indicateurs={indicateurs.data} />
+      <StatutsBandeau
+        statuts={indicateurs.data?.parEtape ?? []}
+        total={indicateurs.data?.inscriptions}
+        actif={filtres.statut}
+        onChoisir={(statut) => {
+          poserFiltre({ statut, page: 1 });
+        }}
+      />
+
+      <FiltresBarre filtres={filtres} onChange={setFiltres} />
 
       <TableauInscriptions
         etat={inscriptions}
         projet={projet}
-        page={filtres.page ?? 1}
+        libelles={libellesStatuts(indicateurs.data)}
+        pageSize={filtres.pageSize ?? PAGE_PAR_DEFAUT}
         onPage={(page) => {
-          setFiltres((courant) => ({ ...courant, page }));
+          poserFiltre({ page });
+        }}
+        onPageSize={(pageSize) => {
+          poserFiltre({ pageSize, page: 1 });
+        }}
+        onOuvrir={setDetailId}
+      />
+
+      <DetailInscription
+        projet={projet}
+        id={detailId}
+        libelles={libellesStatuts(indicateurs.data)}
+        onClose={() => {
+          setDetailId(null);
         }}
       />
     </div>
   );
+}
+
+/** Les libellés de statut vivent côté serveur : la liste les reprend, elle ne les réinvente pas. */
+function libellesStatuts(indicateurs: EnrolementIndicateurs | undefined): Map<string, string> {
+  return new Map((indicateurs?.parEtape ?? []).map((ligne) => [ligne.id, ligne.label]));
 }
 
 function isActionDisabled(pending: boolean, configuree: boolean): boolean {
@@ -357,15 +432,25 @@ function CarteReglages({ projet }: { projet: Projet }) {
 
 function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefined }) {
   const tuiles = [
-    { label: 'Inscriptions', valeur: indicateurs && formatNumber(indicateurs.inscriptions) },
-    { label: 'Rapprochées', valeur: indicateurs && formatNumber(indicateurs.rapprochees) },
+    {
+      label: 'Inscriptions',
+      valeur: indicateurs && formatNumber(indicateurs.inscriptions),
+      aide: 'Les comptes lus sur la plateforme et déposés dans le CRM. Une inscription que la plateforme ne rend plus est marquée retirée et sort de tous les chiffres.',
+    },
+    {
+      label: 'Rapprochées',
+      valeur: indicateurs && formatNumber(indicateurs.rapprochees),
+      aide: AIDE_RAPPROCHEMENT,
+    },
     {
       label: 'Taux de rapprochement',
       valeur: indicateurs && formatRateOrNone(indicateurs.tauxRapprochement),
+      aide: AIDE_TAUX_RAPPROCHEMENT,
     },
     {
       label: 'Convertis puis inscrits',
       valeur: indicateurs && formatRateOrNone(indicateurs.tauxConversion),
+      aide: 'Part des prospects convertis de ce projet qui se retrouvent inscrits sur la plateforme. Se lit dans l’autre sens que le rapprochement : il part des prospects, pas des inscriptions, et ignore le filtre de période.',
     },
   ];
 
@@ -374,8 +459,9 @@ function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefine
       {tuiles.map((tuile) => (
         <Card key={tuile.label}>
           <CardContent>
-            <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            <p className="flex items-center gap-1 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
               {tuile.label}
+              <InfoPopover label={tuile.label} description={tuile.aide} />
             </p>
             {tuile.valeur === undefined ? (
               <Skeleton className="mt-2 h-8 w-20" />
@@ -393,7 +479,8 @@ function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefine
 
 function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
   const blocs = [
-    { titre: 'Par étape', lignes: indicateurs.parEtape },
+    { titre: 'Par agent de la plateforme', lignes: indicateurs.parAgentPlateforme },
+    { titre: 'Pièces du dossier', lignes: indicateurs.parPiece },
     { titre: 'Par téléconseiller', lignes: indicateurs.parTeleconseiller },
     { titre: 'Par campagne', lignes: indicateurs.parCampagne },
     { titre: 'Par méthode d’enrôlement', lignes: indicateurs.parMethode },
@@ -425,15 +512,21 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
       {delais.length === 0 ? null : (
         <Card>
           <CardContent className="flex flex-col gap-2">
-            <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-              Délais médians
+            <p className="flex items-center gap-1 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+              Délais de traitement
+              <InfoPopover label="Délais de traitement" description={AIDE_DELAIS} />
             </p>
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {delais.map((delai) => (
-                <li key={delai.leg} className="flex justify-between gap-4 text-[0.875rem]">
-                  <span className="truncate">{delai.label}</span>
-                  <span className="tabular-nums">
-                    {formatNumber(delai.medianDays ?? 0)} j · {formatNumber(delai.sample)} mesures
+                <li key={delai.leg} className="flex flex-col gap-0.5 text-[0.875rem]">
+                  <span className="inline-flex items-center gap-1">
+                    {delai.label}
+                    <InfoPopover label={delai.label} description={aideDelai(delai.leg)} />
+                  </span>
+                  <span className="tabular-nums text-muted-foreground">
+                    {formatDelai(delai.moyenneDays ?? 0)} en moyenne · la moitié en moins de{' '}
+                    {formatDelai(delai.medianDays ?? 0)} · sur {formatNumber(delai.sample)} dossier
+                    {delai.sample > 1 ? 's' : ''}
                   </span>
                 </li>
               ))}
@@ -448,14 +541,10 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
 function FiltresBarre({
   filtres,
   onChange,
-  indicateurs,
 }: {
   filtres: FiltresInscriptions;
   onChange: (suivants: FiltresInscriptions) => void;
-  indicateurs: EnrolementIndicateurs | undefined;
 }) {
-  const statuts = [...new Set((indicateurs?.parEtape ?? []).map((ligne) => ligne.id))];
-
   const poser = (partiel: Partial<FiltresInscriptions>): void => {
     onChange({ ...filtres, ...partiel, page: 1 });
   };
@@ -469,28 +558,6 @@ function FiltresBarre({
         }}
         placeholder="Nom, e-mail ou téléphone"
       />
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="statut-enrolement">Statut</Label>
-        <Select
-          value={filtres.statut ?? TOUS}
-          onValueChange={(valeur) => {
-            poser({ statut: valeur === TOUS || valeur === null ? undefined : valeur });
-          }}
-        >
-          <SelectTrigger id="statut-enrolement" size="sm" className="w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TOUS}>Tous les statuts</SelectItem>
-            {statuts.map((statut) => (
-              <SelectItem key={statut} value={statut}>
-                {statut}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="rapproche-enrolement">Rapprochement</Label>
@@ -594,13 +661,19 @@ interface EtatInscriptions {
 function TableauInscriptions({
   etat,
   projet,
-  page,
+  pageSize,
   onPage,
+  onPageSize,
+  onOuvrir,
+  libelles,
 }: {
   etat: EtatInscriptions;
   projet: Projet;
-  page: number;
+  pageSize: number;
   onPage: (page: number) => void;
+  onPageSize: (taille: number) => void;
+  onOuvrir: (id: string) => void;
+  libelles: Map<string, string>;
 }) {
   const queryClient = useQueryClient();
   const [aRetirer, setARetirer] = useState<{ id: string; nom: string } | null>(null);
@@ -651,7 +724,12 @@ function TableauInscriptions({
             <TableHead>Statut</TableHead>
             <TableHead>Étape</TableHead>
             <TableHead>Inscription</TableHead>
-            <TableHead>Prospect</TableHead>
+            <TableHead>
+              <span className="inline-flex items-center gap-1">
+                Prospect
+                <InfoPopover label="Rapprochement" description={AIDE_RAPPROCHEMENT} />
+              </span>
+            </TableHead>
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
@@ -659,13 +737,23 @@ function TableauInscriptions({
           {etat.data.items.map((ligne) => (
             <TableRow key={ligne.id}>
               <TableCell className="font-[600]">
-                {ligne.prenom} {ligne.nom}
+                <button
+                  type="button"
+                  className="text-left underline-offset-4 hover:underline"
+                  onClick={() => {
+                    onOuvrir(ligne.id);
+                  }}
+                >
+                  {ligne.prenom} {ligne.nom}
+                </button>
               </TableCell>
               <TableCell className="text-muted-foreground">
                 {ligne.email ?? ligne.phoneE164 ?? '—'}
               </TableCell>
               <TableCell>
-                {ligne.statutDistant}
+                <Badge variant={tonStatut(ligne.statutDistant)}>
+                  {libelles.get(ligne.statutDistant) ?? ligne.statutDistant}
+                </Badge>
                 {ligne.disparueLe === null ? null : (
                   <span className="ml-2 text-[0.75rem] text-muted-foreground">
                     retirée de la plateforme le {formatDate(ligne.disparueLe)}
@@ -709,34 +797,7 @@ function TableauInscriptions({
         }}
       />
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[0.8125rem] text-muted-foreground tabular-nums">
-          {formatNumber(meta.total)} inscriptions · page {formatNumber(meta.page)} sur{' '}
-          {formatNumber(Math.max(1, meta.pageCount))}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={page <= 1}
-            onClick={() => {
-              onPage(page - 1);
-            }}
-          >
-            Précédent
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={page >= meta.pageCount}
-            onClick={() => {
-              onPage(page + 1);
-            }}
-          >
-            Suivant
-          </Button>
-        </div>
-      </div>
+      <Pagination meta={meta} pageSize={pageSize} onPage={onPage} onPageSize={onPageSize} />
     </div>
   );
 }
