@@ -110,7 +110,7 @@ test('ACC-CNX-06 · une destination externe déguisée est ignorée', async ({ p
   await expect(page.getByRole('heading', { name: 'Choisissez un espace', level: 1 })).toBeVisible();
 
   const hors = visitees.filter(
-    (url) => url !== 'about:blank' && !url.startsWith('http://localhost:3000/'),
+    (url) => url !== 'about:blank' && !url.startsWith('http://localhost:4000/'),
   );
   expect(hors, 'le panel ne doit jamais servir de tremplin de redirection').toEqual([]);
 });

@@ -54,7 +54,7 @@ const SOURCES_EN_RESERVE = [
 
 async function effacerLaDisposition(): Promise<void> {
   const api = await request.newContext({
-    baseURL: process.env.E2E_WEB_URL ?? 'http://localhost:3000',
+    baseURL: process.env.E2E_WEB_URL ?? 'http://localhost:4000',
     storageState: 'v1/.auth/superviseur.json',
   });
   try {

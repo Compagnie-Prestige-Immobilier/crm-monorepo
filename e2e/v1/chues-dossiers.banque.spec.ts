@@ -17,7 +17,7 @@ import { adminApi } from './fixtures';
 test.use({ storageState: 'v1/.auth/banque.json' });
 test.describe.configure({ mode: 'serial' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 /** Un dossier bancaire ne se supprime pas : la référence porte l'horodatage. */
 const RUN = String(Date.now()).slice(-8);

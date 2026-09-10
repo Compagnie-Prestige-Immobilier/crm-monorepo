@@ -99,7 +99,7 @@ test('TRA-04 une session expirée renvoie à la connexion', async ({ browser }) 
   const page = await context.newPage();
 
   try {
-    await page.goto('http://localhost:3000/grand-public');
+    await page.goto('http://localhost:4000/grand-public');
     await expect(
       page.getByRole('main').getByRole('heading', { name: 'Prospects Grand Public', level: 1 }),
     ).toBeVisible();
@@ -112,7 +112,7 @@ test('TRA-04 une session expirée renvoie à la connexion', async ({ browser }) 
     // il n'est pas là. Le contexte de requête partage le pot à cookies de la
     // page, donc c'est bien la session du navigateur qui est éprouvée.
     const expiration = await context.request.get(
-      'http://localhost:3000/api/v1/notifications/mine',
+      'http://localhost:4000/api/v1/notifications/mine',
       { params: { pageSize: '20' } },
     );
     expect(expiration.status()).toBe(401);
