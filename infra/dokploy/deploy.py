@@ -631,6 +631,7 @@ def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
             "LOG_FORMAT=json",
             "SESSION_TTL_DAYS=30",
             "AUTH_LOGIN_RATE_LIMIT=10",
+            "API_GLOBAL_RATE_LIMIT=3000",
             # Traefik est en amont et réécrit X-Forwarded-For, même raison qu'en
             # v1 : sans cela toutes les requêtes semblent venir de Traefik et la
             # limitation de débit devient globale.

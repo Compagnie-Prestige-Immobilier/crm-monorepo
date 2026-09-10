@@ -14,6 +14,7 @@ type Config struct {
 	DatabaseURL string
 	SessionTTL  time.Duration
 	LoginRate   int
+	GlobalRate  int
 	TrustProxy  bool
 	PasswordMin int
 	PasswordMax int
@@ -62,6 +63,7 @@ func LireConfig() (*Config, error) {
 	}{
 		{"SESSION_TTL_DAYS", 30, &jours},
 		{"AUTH_LOGIN_RATE_LIMIT", 10, &cfg.LoginRate},
+		{"API_GLOBAL_RATE_LIMIT", 0, &cfg.GlobalRate},
 		{"PASSWORD_MIN_LENGTH", 8, &cfg.PasswordMin},
 		{"PASSWORD_MAX_LENGTH", 24, &cfg.PasswordMax},
 	}

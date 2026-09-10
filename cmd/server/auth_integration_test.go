@@ -215,6 +215,23 @@ func TestCookieDeSessionSuitLeTransport(t *testing.T) {
 	}
 }
 
+func TestLimiteurGlobalDeLApi(t *testing.T) {
+	t.Setenv("API_GLOBAL_RATE_LIMIT", "3")
+	b := nouveauBanc(t, "COMMERCIAL")
+	statuts := make([]int, 0, 4)
+	for range 4 {
+		statut, _ := b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
+		statuts = append(statuts, statut)
+	}
+	if statuts[0] != http.StatusUnauthorized || statuts[3] != http.StatusTooManyRequests {
+		t.Fatalf("trois requêtes passent, la quatrième est plafonnée : %v", statuts)
+	}
+	statut, _ := b.appel(http.MethodGet, "/connexion", nil, false)
+	if statut == http.StatusTooManyRequests {
+		t.Fatal("le panneau statique n'est pas plafonné")
+	}
+}
+
 func TestDeconnexionRevoqueSansSupprimer(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	statut, body := b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
