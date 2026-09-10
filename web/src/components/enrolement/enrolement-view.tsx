@@ -494,14 +494,16 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
         <Card>
           <CardContent className="flex flex-col gap-2">
             <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-              Délais médians
+              Délais de traitement
             </p>
-            <ul className="flex flex-col gap-1">
+            <ul className="flex flex-col gap-2">
               {delais.map((delai) => (
-                <li key={delai.leg} className="flex justify-between gap-4 text-[0.875rem]">
+                <li key={delai.leg} className="flex flex-col gap-0.5 text-[0.875rem]">
                   <span className="truncate">{delai.label}</span>
-                  <span className="tabular-nums">
-                    {formatNumber(delai.medianDays ?? 0)} j · {formatNumber(delai.sample)} mesures
+                  <span className="tabular-nums text-muted-foreground">
+                    moyenne {formatNumber(delai.moyenneDays ?? 0)} j · médiane{' '}
+                    {formatNumber(delai.medianDays ?? 0)} j · sur {formatNumber(delai.sample)}{' '}
+                    dossier{delai.sample > 1 ? 's' : ''}
                   </span>
                 </li>
               ))}

@@ -2,6 +2,7 @@
 
 import { useQueries } from '@tanstack/react-query';
 
+import { DelaisEnrolement } from '@/components/enrolement/delais-enrolement';
 import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -190,6 +191,8 @@ export function SyntheseEnrolement() {
       </div>
 
       <Comparaison indicateurs={donnees} />
+
+      <DelaisEnrolement colonnes={PROJETS} indicateurs={donnees} />
 
       <CourbeEnrolement
         titre="Inscriptions par jour"
