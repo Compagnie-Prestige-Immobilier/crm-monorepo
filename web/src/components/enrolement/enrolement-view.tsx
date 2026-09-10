@@ -523,7 +523,7 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
                     <InfoPopover label={delai.label} description={aideDelai(delai.leg)} />
                   </span>
                   <span className="tabular-nums text-muted-foreground">
-                    moyenne {formatNumber(delai.moyenneDays ?? 0)} j · médiane{' '}
+                    {formatNumber(delai.moyenneDays ?? 0)} j en moyenne · la moitié en moins de{' '}
                     {formatNumber(delai.medianDays ?? 0)} j · sur {formatNumber(delai.sample)}{' '}
                     dossier{delai.sample > 1 ? 's' : ''}
                   </span>
