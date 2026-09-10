@@ -92,6 +92,9 @@ type ListerInscriptionsInput struct {
 	DateTo           string `query:"dateTo" maxLength:"40"`
 	Rapproche        string `query:"rapproche" enum:"true,false"`
 	InclureDisparues string `query:"inclureDisparues" enum:"true,false"`
+	// Les étages de l'entonnoir : la plateforme ne les nomme pas, ils se
+	// déduisent de l'étape et des dates.
+	Avancement string `query:"avancement" enum:"ouvert,soumis,decide"`
 }
 
 type ListerInscriptionsOutput struct {
@@ -145,6 +148,7 @@ func (s *service) listerInscriptions(ctx context.Context, in *ListerInscriptions
 		Projet: db.Projet(in.Projet), InclureDisparues: in.InclureDisparues == socle.Vrai,
 		Statut: texteAdmin(in.Statut), Rapproche: booleenAdmin(in.Rapproche),
 		DateFrom: debut, DateTo: fin, Search: texteAdmin(in.Search),
+		Avancement: texteAdmin(in.Avancement),
 	}
 	total, err := s.Q.CountInscriptions(ctx, filtres)
 	if err != nil {
@@ -153,7 +157,8 @@ func (s *service) listerInscriptions(ctx context.Context, in *ListerInscriptions
 	rows, err := s.Q.ListInscriptions(ctx, db.ListInscriptionsParams{
 		Projet: filtres.Projet, InclureDisparues: filtres.InclureDisparues, Statut: filtres.Statut,
 		Rapproche: filtres.Rapproche, DateFrom: filtres.DateFrom, DateTo: filtres.DateTo,
-		Search: filtres.Search, PageSize: in.PageSize, PageOffset: (in.Page - 1) * in.PageSize,
+		Search: filtres.Search, Avancement: filtres.Avancement,
+		PageSize: in.PageSize, PageOffset: (in.Page - 1) * in.PageSize,
 	})
 	if err != nil {
 		return nil, err
@@ -710,29 +715,84 @@ func appelPlateforme(ctx context.Context, projet, url, jeton string, cible any) 
 	return resp.StatusCode, json.NewDecoder(resp.Body).Decode(cible)
 }
 
+// Les deux plateformes ont migre leurs identifiants d'un entier vers un UUID.
+// Un `json.Number` refuse la chaine, et le tirage rejetait alors chaque ligne
+// en silence : 200 lu, zero retenu, aucune erreur.
+type idDistant string
+
+func (id *idDistant) UnmarshalJSON(brut []byte) error {
+	var texte string
+	if json.Unmarshal(brut, &texte) == nil {
+		*id = idDistant(texte)
+		return nil
+	}
+	var nombre json.Number
+	if err := json.Unmarshal(brut, &nombre); err != nil {
+		return err
+	}
+	*id = idDistant(nombre.String())
+	return nil
+}
+
 type ligneChues struct {
-	ID        json.Number `json:"id"`
-	Email     *string     `json:"email"`
-	FirstName *string     `json:"firstName"`
-	LastName  *string     `json:"lastName"`
-	Phone     *string     `json:"phone"`
-	CreatedAt *float64    `json:"createdAt"`
-	Approved  bool        `json:"approved"`
+	ID        idDistant `json:"id"`
+	Email     *string   `json:"email"`
+	FirstName *string   `json:"firstName"`
+	LastName  *string   `json:"lastName"`
+	Phone     *string   `json:"phone"`
+	CreatedAt *float64  `json:"createdAt"`
+	Approved  bool      `json:"approved"`
 	Dossier   *struct {
 		Status      string   `json:"status"`
 		SubmittedAt *float64 `json:"submittedAt"`
 	} `json:"dossier"`
 }
 
-func lireChues(ctx context.Context, base, jeton string) ([]inscriptionDistante, error) {
+// `/clients` pagine par 25 : sans le parcours complet, les comptes des pages
+// suivantes seraient marqués disparus a chaque tirage.
+func pageChues(ctx context.Context, base, jeton string, page int) (lignes []json.RawMessage, dernierePage int, err error) {
 	var comptes struct {
 		Clients []json.RawMessage `json:"clients"`
+		Meta    *struct {
+			LastPage *int `json:"lastPage"`
+		} `json:"meta"`
 	}
-	if _, err := appelPlateforme(ctx, projetChues, base+"/clients", jeton, &comptes); err != nil {
-		return nil, err
+	url := base + "/clients?page=" + strconv.Itoa(page)
+	if _, err := appelPlateforme(ctx, projetChues, url, jeton, &comptes); err != nil {
+		return nil, page, err
 	}
-	// La décision vit sur la demande d'adhésion, que seul l'e-mail relie au
-	// compte. Une plateforme sans la permission rend 403 : le tirage continue.
+	dernierePage = page
+	if comptes.Meta != nil && comptes.Meta.LastPage != nil && len(comptes.Clients) > 0 {
+		dernierePage = *comptes.Meta.LastPage
+	}
+	return comptes.Clients, dernierePage, nil
+}
+
+func comptesChues(ctx context.Context, base, jeton string) ([]json.RawMessage, error) {
+	var clients []json.RawMessage
+	dernierePage := 1
+	for page := 1; page <= dernierePage && page <= pagesMax; page++ {
+		lues, derniere, err := pageChues(ctx, base, jeton, page)
+		if err != nil {
+			return nil, err
+		}
+		clients = append(clients, lues...)
+		dernierePage = derniere
+		if page >= dernierePage {
+			return clients, nil
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(pausePage):
+		}
+	}
+	return clients, nil
+}
+
+// La décision vit sur la demande d'adhésion, que seul l'e-mail relie au
+// compte. Une plateforme sans la permission rend 403 : le tirage continue.
+func decisionsChues(ctx context.Context, base, jeton string) (map[string]*time.Time, error) {
 	var adhesions struct {
 		Requests []struct {
 			Email     *string  `json:"email"`
@@ -752,39 +812,55 @@ func lireChues(ctx context.Context, base, jeton string) ([]inscriptionDistante, 
 			decisions[strings.ToLower(*courriel)] = dateDistanteEpoch(demande.DecidedAt)
 		}
 	}
+	return decisions, nil
+}
 
-	lignes := make([]inscriptionDistante, 0, len(comptes.Clients))
-	for _, brut := range comptes.Clients {
+func versInscriptionChues(ligne *ligneChues, brut json.RawMessage, decisions map[string]*time.Time) inscriptionDistante {
+	statutDistant := "compte-en-attente"
+	if ligne.Approved {
+		statutDistant = "compte-valide"
+	}
+	var soumise *time.Time
+	if ligne.Dossier != nil {
+		statutDistant = ligne.Dossier.Status
+		soumise = dateDistanteEpoch(ligne.Dossier.SubmittedAt)
+	}
+	courriel := texteDistant(ligne.Email)
+	var decidee *time.Time
+	if courriel != nil {
+		decidee = decisions[strings.ToLower(*courriel)]
+	}
+	return inscriptionDistante{
+		IdentifiantDistant: string(ligne.ID),
+		Nom:                valeurDistante(texteDistant(ligne.LastName)),
+		Prenom:             valeurDistante(texteDistant(ligne.FirstName)),
+		PhoneE164:          database.TelephoneOptionnel(ligne.Phone, "SN"),
+		Email:              courriel,
+		StatutDistant:      statutDistant,
+		InscriteLe:         dateDistanteEpoch(ligne.CreatedAt),
+		SoumiseLe:          soumise,
+		DecideeLe:          decidee,
+		ChargeUtile:        brut,
+	}
+}
+
+func lireChues(ctx context.Context, base, jeton string) ([]inscriptionDistante, error) {
+	clients, err := comptesChues(ctx, base, jeton)
+	if err != nil {
+		return nil, err
+	}
+	decisions, err := decisionsChues(ctx, base, jeton)
+	if err != nil {
+		return nil, err
+	}
+
+	lignes := make([]inscriptionDistante, 0, len(clients))
+	for _, brut := range clients {
 		var ligne ligneChues
-		if err := json.Unmarshal(brut, &ligne); err != nil {
-			continue
+		// Une ligne qui ne tient pas le contrat est ignorée, pas déposée à moitié.
+		if json.Unmarshal(brut, &ligne) == nil {
+			lignes = append(lignes, versInscriptionChues(&ligne, brut, decisions))
 		}
-		statutDistant := "compte-en-attente"
-		if ligne.Approved {
-			statutDistant = "compte-valide"
-		}
-		var soumise *time.Time
-		if ligne.Dossier != nil {
-			statutDistant = ligne.Dossier.Status
-			soumise = dateDistanteEpoch(ligne.Dossier.SubmittedAt)
-		}
-		courriel := texteDistant(ligne.Email)
-		var decidee *time.Time
-		if courriel != nil {
-			decidee = decisions[strings.ToLower(*courriel)]
-		}
-		lignes = append(lignes, inscriptionDistante{
-			IdentifiantDistant: ligne.ID.String(),
-			Nom:                valeurDistante(texteDistant(ligne.LastName)),
-			Prenom:             valeurDistante(texteDistant(ligne.FirstName)),
-			PhoneE164:          database.TelephoneOptionnel(ligne.Phone, "SN"),
-			Email:              courriel,
-			StatutDistant:      statutDistant,
-			InscriteLe:         dateDistanteEpoch(ligne.CreatedAt),
-			SoumiseLe:          soumise,
-			DecideeLe:          decidee,
-			ChargeUtile:        brut,
-		})
 	}
 	return lignes, nil
 }
@@ -797,7 +873,7 @@ func valeurDistante(v *string) string {
 }
 
 type ligneGrandPublicDistante struct {
-	ID              json.Number  `json:"id"`
+	ID              idDistant    `json:"id"`
 	Name            *string      `json:"name"`
 	Email           *string      `json:"email"`
 	Phone           *string      `json:"phone"`
@@ -891,7 +967,7 @@ func versInscriptionGrandPublic(ligne *ligneGrandPublicDistante, brut json.RawMe
 		soumise = dateDistanteTexte(ligne.Demande.SubmittedAt)
 	}
 	return inscriptionDistante{
-		IdentifiantDistant: ligne.ID.String(),
+		IdentifiantDistant: string(ligne.ID),
 		Nom:                nom,
 		Prenom:             prenom,
 		PhoneE164:          database.TelephoneOptionnel(ligne.Phone, "SN"),
@@ -916,27 +992,44 @@ type RepartitionEnrolement struct {
 }
 
 type DelaiMedian struct {
-	Leg        string   `json:"leg"`
-	Label      string   `json:"label"`
-	MedianDays *float64 `json:"medianDays"`
-	Sample     int      `json:"sample"`
+	Leg         string   `json:"leg"`
+	Label       string   `json:"label"`
+	MedianDays  *float64 `json:"medianDays"`
+	MoyenneDays *float64 `json:"moyenneDays"`
+	Sample      int      `json:"sample"`
 }
 
 type IndicateursOutput struct {
 	Body struct {
-		Projet            string                  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-		Inscriptions      int                     `json:"inscriptions"`
-		Rapprochees       int                     `json:"rapprochees"`
-		TauxConversion    *float64                `json:"tauxConversion"`
-		TauxRapprochement *float64                `json:"tauxRapprochement"`
-		ParJour           []SerieJour             `json:"parJour"`
-		ParEtape          []RepartitionEnrolement `json:"parEtape"`
-		Delais            []DelaiMedian           `json:"delais"`
-		ParTeleconseiller []RepartitionEnrolement `json:"parTeleconseiller"`
-		ParCampagne       []RepartitionEnrolement `json:"parCampagne"`
-		ParMethode        []RepartitionEnrolement `json:"parMethode"`
+		Projet             string                  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+		Inscriptions       int                     `json:"inscriptions"`
+		Rapprochees        int                     `json:"rapprochees"`
+		TauxConversion     *float64                `json:"tauxConversion"`
+		TauxRapprochement  *float64                `json:"tauxRapprochement"`
+		ParJour            []SerieJour             `json:"parJour"`
+		ParEtape           []RepartitionEnrolement `json:"parEtape"`
+		Delais             []DelaiMedian           `json:"delais"`
+		ParTeleconseiller  []RepartitionEnrolement `json:"parTeleconseiller"`
+		ParCampagne        []RepartitionEnrolement `json:"parCampagne"`
+		ParMethode         []RepartitionEnrolement `json:"parMethode"`
+		Entonnoir          EntonnoirEnrolement     `json:"entonnoir"`
+		ParAgentPlateforme []RepartitionEnrolement `json:"parAgentPlateforme"`
+		ParPiece           []RepartitionEnrolement `json:"parPiece"`
 	}
 }
+
+// Ce qui avance, en quatre nombres. Les deux plateformes nomment leurs etats
+// autrement : un compte sans dossier se reconnait au prefixe `compte-` cote
+// CHUES, a l'etape zero cote Grand Public.
+type EntonnoirEnrolement struct {
+	Inscriptions    int `json:"inscriptions"`
+	DossiersOuverts int `json:"dossiersOuverts"`
+	DossiersSoumis  int `json:"dossiersSoumis"`
+	DossiersDecides int `json:"dossiersDecides"`
+}
+
+const dossierOuvert = `(COALESCE(i."etapeDistante", 0) > 0` +
+	` OR (i."etapeDistante" IS NULL AND i."statutDistant" NOT LIKE 'compte-%'))`
 
 type IndicateursInput struct {
 	Projet   string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
@@ -994,8 +1087,22 @@ func (s *service) repartitionEnrolement(ctx context.Context, requete string, arg
 
 const etapesGrandPublic = "Étape 0 · Inscription,Étape 1 · Dossier constitué,Étape 2 · Dépôt en banque,Étape 3 · Accord bancaire,Étape 4 · Signature,Étape 5 · Terminé"
 
+// Les statuts que CHUES rend sont ceux de son moteur. La cellule de pilotage
+// lit du francais, pas le vocabulaire de la plateforme.
+var statutsChues = map[string]string{
+	"compte-en-attente": "Compte en attente",
+	"compte-valide":     "Compte validé",
+	"draft":             "Dossier en préparation",
+	"submitted":         "Dossier soumis",
+	"approved":          "Dossier accepté",
+	"rejected":          "Dossier refusé",
+}
+
 func libelleEtapeEnrolement(etape *int32, statut string) string {
 	if etape == nil {
+		if libelle, connu := statutsChues[statut]; connu {
+			return libelle
+		}
 		return statut
 	}
 	libelles := strings.Split(etapesGrandPublic, ",")
@@ -1016,10 +1123,15 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 
 	out := &IndicateursOutput{}
 	out.Body.Projet = in.Projet
-	if err := s.Pool.QueryRow(ctx, `SELECT COUNT(*)::int, COUNT(*) FILTER (WHERE i."prospectId" IS NOT NULL)::int`+depuis, args...).
-		Scan(&out.Body.Inscriptions, &out.Body.Rapprochees); err != nil {
+	if err := s.Pool.QueryRow(ctx, `SELECT COUNT(*)::int, COUNT(*) FILTER (WHERE i."prospectId" IS NOT NULL)::int,`+
+		` COUNT(*) FILTER (WHERE `+dossierOuvert+`)::int,`+
+		` COUNT(*) FILTER (WHERE i."soumiseLe" IS NOT NULL)::int,`+
+		` COUNT(*) FILTER (WHERE i."decideeLe" IS NOT NULL)::int`+depuis, args...).
+		Scan(&out.Body.Inscriptions, &out.Body.Rapprochees, &out.Body.Entonnoir.DossiersOuverts,
+			&out.Body.Entonnoir.DossiersSoumis, &out.Body.Entonnoir.DossiersDecides); err != nil {
 		return nil, err
 	}
+	out.Body.Entonnoir.Inscriptions = out.Body.Inscriptions
 	out.Body.TauxRapprochement = tauxEnrolement(out.Body.Rapprochees, out.Body.Inscriptions)
 
 	conversion, err := s.Q.ConversionEnrolement(ctx, db.Projet(in.Projet))
@@ -1051,9 +1163,29 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 		` WHERE i."projet" = $1::"Projet" AND l."projet" = $1::"Projet" AND `+filtres+` GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
 		return nil, err
 	}
+	if out.Body.ParAgentPlateforme, err = s.repartitionEnrolement(ctx, `SELECT `+agentPlateforme+`, `+agentPlateforme+
+		`, COUNT(*)::int`+depuis+` AND `+agentPlateforme+` IS NOT NULL GROUP BY 1 ORDER BY 3 DESC, 1 ASC`, args); err != nil {
+		return nil, err
+	}
+	if out.Body.ParPiece, err = s.repartitionEnrolement(ctx, requetePieces+filtres+
+		` AND jsonb_typeof(i."chargeUtile"->'requisDocs') = 'array' GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
+		return nil, err
+	}
 	out.Body.ParMethode, err = s.parMethodeEnrolement(ctx, filtres, args)
 	return out, err
 }
+
+// L'agent qui a saisi l'inscription n'a pas de colonne : les deux plateformes
+// le rendent, sous deux noms, et le tirage garde leur reponse telle quelle.
+const agentPlateforme = `COALESCE(i."chargeUtile"->'agent'->>'name', i."chargeUtile"->>'conseiller')`
+
+// Une piece par ligne, avec son etat : c'est ce qui dit sur quoi un dossier bloque.
+const requetePieces = `SELECT (piece->>'docId') || ':' || (piece->>'status'),` +
+	` COALESCE(piece->>'label', piece->>'docId') || ' · ' ||` +
+	` CASE piece->>'status' WHEN 'accepte' THEN 'acceptée' WHEN 'en-attente' THEN 'en attente'` +
+	` WHEN 'refuse' THEN 'refusée' ELSE piece->>'status' END, COUNT(*)::int` +
+	` FROM "inscriptions_plateforme" i, jsonb_array_elements(i."chargeUtile"->'requisDocs') AS piece` +
+	` WHERE i."projet" = $1::"Projet" AND `
 
 func (s *service) serieJoursEnrolement(ctx context.Context, depuis string, args []any) ([]SerieJour, error) {
 	rows, err := s.Pool.Query(ctx, `SELECT date_trunc('day', i."inscriteLe") AS jour, COUNT(*)::int`+depuis+
@@ -1089,29 +1221,32 @@ func (s *service) parEtapeEnrolement(ctx context.Context, depuis string, args []
 		if err := rows.Scan(&etape, &statut, &total); err != nil {
 			return nil, err
 		}
-		identifiant := statut
-		if etape != nil {
-			identifiant = strconv.FormatInt(int64(*etape), 10)
-		}
-		lignes = append(lignes, RepartitionEnrolement{ID: identifiant, Label: libelleEtapeEnrolement(etape, statut), Inscriptions: total})
+		// L'identifiant sert de valeur au filtre de la liste, qui compare
+		// `statutDistant` : un numéro d'étape n'y correspondrait jamais.
+		lignes = append(lignes, RepartitionEnrolement{ID: statut, Label: libelleEtapeEnrolement(etape, statut), Inscriptions: total})
 	}
 	return lignes, rows.Err()
 }
 
 // Médiane et non moyenne : un dossier oublié six mois déplacerait la moyenne de
 // plusieurs semaines.
-func medianeEnrolement(de, a string) string {
+// Médiane et moyenne du même écart : la médiane résiste à un dossier oublié
+// six mois, la moyenne dit ce que le dispositif coûte en jours cumulés.
+func delaiEnrolement(de, a string) string {
 	utilisable := de + " IS NOT NULL AND " + a + " IS NOT NULL AND " + a + " >= " + de
-	return `percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (` + a + ` - ` + de + `)) / 86400.0)` +
-		` FILTER (WHERE ` + utilisable + `)::float8, COUNT(*) FILTER (WHERE ` + utilisable + `)::int`
+	ecart := `EXTRACT(EPOCH FROM (` + a + ` - ` + de + `)) / 86400.0`
+	return `percentile_cont(0.5) WITHIN GROUP (ORDER BY ` + ecart + `)` +
+		` FILTER (WHERE ` + utilisable + `)::float8,` +
+		` AVG(` + ecart + `) FILTER (WHERE ` + utilisable + `)::float8,` +
+		` COUNT(*) FILTER (WHERE ` + utilisable + `)::int`
 }
 
 func (s *service) delaisEnrolement(ctx context.Context, depuis string, args []any) ([]DelaiMedian, error) {
-	var m1, m2 *float64
+	var m1, a1, m2, a2 *float64
 	var n1, n2 int
-	requete := "SELECT " + medianeEnrolement(`i."inscriteLe"`, `i."soumiseLe"`) + ", " +
-		medianeEnrolement(`i."soumiseLe"`, `i."decideeLe"`) + depuis
-	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&m1, &n1, &m2, &n2); err != nil {
+	requete := "SELECT " + delaiEnrolement(`i."inscriteLe"`, `i."soumiseLe"`) + ", " +
+		delaiEnrolement(`i."soumiseLe"`, `i."decideeLe"`) + depuis
+	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&m1, &a1, &n1, &m2, &a2, &n2); err != nil {
 		return nil, err
 	}
 	delais := []DelaiMedian{
@@ -1119,10 +1254,10 @@ func (s *service) delaisEnrolement(ctx context.Context, depuis string, args []an
 		{Leg: "SOUMISSION_TO_DECISION", Label: "Dossier soumis vers décision", Sample: n2},
 	}
 	if n1 > 0 {
-		delais[0].MedianDays = joursArrondis(m1)
+		delais[0].MedianDays, delais[0].MoyenneDays = joursArrondis(m1), joursArrondis(a1)
 	}
 	if n2 > 0 {
-		delais[1].MedianDays = joursArrondis(m2)
+		delais[1].MedianDays, delais[1].MoyenneDays = joursArrondis(m2), joursArrondis(a2)
 	}
 	return delais, nil
 }
