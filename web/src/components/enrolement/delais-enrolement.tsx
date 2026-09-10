@@ -1,5 +1,7 @@
 'use client';
 
+import { AIDE_DELAIS, aideDelai } from '@/components/enrolement/aides';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { Card, CardContent } from '@/components/ui/card';
 import type { EnrolementIndicateurs, Projet } from '@/lib/data/enrolement';
 import { formatNumber } from '@/lib/format';
@@ -36,13 +38,9 @@ function moyenneDe(delai: Delai | undefined): string {
   return `${formatNumber(delai.moyenneDays)} j · ${formatNumber(delai.sample)}`;
 }
 
-const LEGS: readonly { leg: string; label: string; note?: string }[] = [
+const LEGS: readonly { leg: string; label: string }[] = [
   { leg: 'INSCRIPTION_TO_SOUMISSION', label: 'Inscription vers dossier soumis' },
-  {
-    leg: 'SOUMISSION_TO_DECISION',
-    label: 'Dossier soumis vers décision',
-    note: 'Grand Public n’expose pas de date de décision, et côté CHUES la demande d’adhésion ne se relie à aucun compte : rien n’est mesurable aujourd’hui.',
-  },
+  { leg: 'SOUMISSION_TO_DECISION', label: 'Dossier soumis vers décision' },
 ];
 
 export function DelaisEnrolement({
@@ -55,8 +53,9 @@ export function DelaisEnrolement({
   return (
     <Card>
       <CardContent className="flex flex-col gap-3">
-        <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+        <p className="flex items-center gap-1 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
           Temps moyen de traitement
+          <InfoPopover label="Temps moyen de traitement" description={AIDE_DELAIS} />
         </p>
         <div className="overflow-x-auto">
           <table className="w-full min-w-[32rem] text-[0.875rem]">
@@ -77,12 +76,10 @@ export function DelaisEnrolement({
                 return (
                   <tr key={etape.leg} className="border-b border-border/60 last:border-b-0">
                     <td className="py-2">
-                      {etape.label}
-                      {etape.note === undefined ? null : (
-                        <span className="block text-[0.75rem] text-muted-foreground">
-                          {etape.note}
-                        </span>
-                      )}
+                      <span className="inline-flex items-center gap-1">
+                        {etape.label}
+                        <InfoPopover label={etape.label} description={aideDelai(etape.leg)} />
+                      </span>
                     </td>
                     {delais.map((delai, index) => (
                       <td

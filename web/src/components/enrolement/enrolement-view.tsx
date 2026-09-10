@@ -12,7 +12,12 @@ import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonn
 import { Pagination, StatutsBandeau, tonStatut } from '@/components/enrolement/liste-controles';
 import { SyntheseEnrolement } from '@/components/enrolement/synthese-enrolement';
 import { SearchField } from '@/components/filters/search-field';
-import { AIDE_RAPPROCHEMENT, AIDE_TAUX_RAPPROCHEMENT } from '@/components/enrolement/aides';
+import {
+  AIDE_DELAIS,
+  AIDE_RAPPROCHEMENT,
+  AIDE_TAUX_RAPPROCHEMENT,
+  aideDelai,
+} from '@/components/enrolement/aides';
 import { QueryErrorState } from '@/components/query-error-state';
 import { InfoPopover } from '@/components/stats/stat-info';
 import { Button } from '@/components/ui/button';
@@ -506,13 +511,17 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
       {delais.length === 0 ? null : (
         <Card>
           <CardContent className="flex flex-col gap-2">
-            <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            <p className="flex items-center gap-1 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
               Délais de traitement
+              <InfoPopover label="Délais de traitement" description={AIDE_DELAIS} />
             </p>
             <ul className="flex flex-col gap-2">
               {delais.map((delai) => (
                 <li key={delai.leg} className="flex flex-col gap-0.5 text-[0.875rem]">
-                  <span className="truncate">{delai.label}</span>
+                  <span className="inline-flex items-center gap-1">
+                    {delai.label}
+                    <InfoPopover label={delai.label} description={aideDelai(delai.leg)} />
+                  </span>
                   <span className="tabular-nums text-muted-foreground">
                     moyenne {formatNumber(delai.moyenneDays ?? 0)} j · médiane{' '}
                     {formatNumber(delai.medianDays ?? 0)} j · sur {formatNumber(delai.sample)}{' '}

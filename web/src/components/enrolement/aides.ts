@@ -8,3 +8,14 @@ export const AIDE_TAUX_RAPPROCHEMENT =
 
 export const AIDE_DECISION =
   'Grand Public n’expose aucune date de décision. Côté CHUES, la date vit sur la demande d’adhésion, que seul l’e-mail relie au compte, et aucun e-mail ne correspond aujourd’hui. Rien n’est mesurable tant que les plateformes n’exposent pas ce lien.';
+
+export const AIDE_DELAIS =
+  'Moyenne et médiane du même écart. La médiane est le cas ordinaire : un dossier oublié six mois ne la bouge pas. La moyenne, elle, le compte comme les autres. Un écart entre les deux signale qu’un cas traîne.\n\n« sur N dossiers » dit sur combien de dossiers le calcul repose. En dessous d’une dizaine, ces chiffres n’ont pas de valeur statistique.';
+
+export const AIDE_DELAI_SOUMISSION =
+  'Le temps qu’une personne met, après avoir créé son compte, à déposer son dossier.\n\nCe que ça mesure : la friction de la constitution du dossier. Attention, seuls les dossiers réellement soumis sont comptés. Ceux qui traînent encore n’entrent pas dans le calcul, donc un délai court peut cacher une majorité de dossiers jamais déposés : lisez-le avec l’entonnoir.';
+
+/** L'aide dépend du tronçon, que le serveur nomme dans `leg`. */
+export function aideDelai(leg: string): string {
+  return leg === 'SOUMISSION_TO_DECISION' ? AIDE_DECISION : AIDE_DELAI_SOUMISSION;
+}
