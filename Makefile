@@ -21,8 +21,9 @@ gen: ## sqlc, document OpenAPI, types du panneau
 	go run ./cmd/server -openapi > openapi.json
 	pnpm --dir web gen
 
-dev: db ## base créée et semée si besoin, API sur :4000 et Vite sur :5173, logs lisibles
-	@trap 'kill 0' INT TERM; \
+dev: db ## base créée et semée si besoin, .env chargé, API sur :4000 et Vite sur :5173
+	@set -a; [ -f .env ] && . ./.env; set +a; \
+	  trap 'kill 0' INT TERM; \
 	  pnpm --dir web dev & \
 	  go run ./cmd/server ; wait
 

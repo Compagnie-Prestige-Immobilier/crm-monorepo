@@ -148,6 +148,23 @@ type Limiteur struct {
 	parMin int
 }
 
+// LimiterApi plafonne les requêtes de l'API par adresse et par minute
+// (`API_GLOBAL_RATE_LIMIT`, 0 = sans plafond), comme la v1 le faisait.
+func LimiterApi(cfg *Config, next http.Handler) http.Handler {
+	if cfg.GlobalRate <= 0 {
+		return next
+	}
+	limiteur := NouveauLimiteur(cfg.GlobalRate)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		adresse, _ := r.Context().Value(CleAdresse{}).(string)
+		if strings.HasPrefix(r.URL.Path, "/api/") && !limiteur.Autorise(adresse) {
+			EcrireProblem(w, r, Problem(http.StatusTooManyRequests, "RATE_LIMITED", "Trop de requêtes. Réessayez dans une minute."))
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func NouveauLimiteur(parMinute int) *Limiteur {
 	return &Limiteur{parCle: map[string]*rate.Limiter{}, vus: map[string]time.Time{}, parMin: parMinute}
 }

@@ -86,7 +86,7 @@ func serveur(cfg *socle.Config, pool *pgxpool.Pool) (*http.Server, huma.API, *so
 	servirPanneau(mux)
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           socle.JournalEtRecuperation(mux, socle.GarderAcces(mux, d.Q), cfg),
+		Handler:           socle.JournalEtRecuperation(mux, socle.LimiterApi(cfg, socle.GarderAcces(mux, d.Q)), cfg),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,
