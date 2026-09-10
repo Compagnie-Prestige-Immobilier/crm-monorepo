@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
@@ -376,5 +377,50 @@ func TestBanqueRechercheInsensibleAuxAccents(t *testing.T) {
 	s.attend(statut, http.StatusOK, "autocomplétion sans accent", body)
 	if items := body["items"].([]any); len(items) == 0 {
 		t.Fatal("l'autocomplétion doit trouver le prospect désaccentué")
+	}
+}
+
+// La fiche d'une demande ne sort pas du portefeuille de l'agent qui l'a
+// déposée : l'arbitre la lit, l'agent d'une autre banque ne la devine pas.
+func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	t.Cleanup(func() {
+		banqueExec(s.banc, `DELETE FROM "client_creation_requests" WHERE "banqueId" = $1`, s.banqueID)
+	})
+
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", map[string]any{
+		"nom": "Sow", "prenom": "Fatou", "banqueId": s.banqueID,
+		"phone": fmt.Sprintf("77%07d", uuid.New().ID()%10000000),
+	})
+	s.attend(statut, http.StatusCreated, "dépôt de la demande", body)
+	demande := body["id"].(string)
+
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/client-requests/"+demande, nil)
+	s.attend(statut, http.StatusOK, "lecture de sa propre demande", body)
+	if body["nom"] != "Sow" || body["status"] != "PENDING" ||
+		body["banqueName"] != "Banque Test "+s.banqueID[:8] || body["requestedById"] != s.userID {
+		t.Fatalf("la fiche lue porte la banque, le statut et le demandeur : %v", body)
+	}
+	if body["createdProspectId"] != nil || body["reviewedAt"] != nil || body["reviewedByName"] != nil {
+		t.Fatalf("une demande en attente n'a pas d'arbitrage : %v", body)
+	}
+
+	autre := nouveauBanc(t, "BANQUE_FINANCE")
+	statut, body = autre.connexion(autre.email, "motdepasse")
+	autre.attend(statut, http.StatusOK, "connexion d'un autre agent bancaire", body)
+	statut, body = banqueJSON(autre, http.MethodGet, "/api/v1/client-requests/"+demande, nil)
+	autre.attend(statut, http.StatusNotFound, "demande déposée par une autre banque", body)
+	if body["code"] != "CLIENT_REQUEST_NOT_FOUND" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	arbitre := nouveauBanc(t, "ADMIN")
+	statut, body = arbitre.connexion(arbitre.email, "motdepasse")
+	arbitre.attend(statut, http.StatusOK, "connexion de l'arbitre", body)
+	statut, body = banqueJSON(arbitre, http.MethodGet, "/api/v1/client-requests/"+demande, nil)
+	arbitre.attend(statut, http.StatusOK, "l'arbitre lit toutes les demandes", body)
+	if body["id"] != demande {
+		t.Fatalf("fiche lue : %v", body)
 	}
 }

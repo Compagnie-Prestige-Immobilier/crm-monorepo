@@ -32,6 +32,8 @@ type SanteOutput struct {
 }
 
 func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool) (huma.API, error) {
+	// Le panneau itère sur les listes sans garde : le contrat promet `[]`, jamais `null`.
+	huma.DefaultArrayNullable = false
 	conf := huma.DefaultConfig("CPI GO", "2.0.0")
 	conf.DocsPath, conf.OpenAPIPath, conf.SchemasPath = "", "", ""
 	conf.CreateHooks = nil

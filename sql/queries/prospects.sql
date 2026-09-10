@@ -434,3 +434,35 @@ SELECT "id", "createdById", "statut", "phoneE164", "nom", "prenom", "whatsappSta
        "email", "profession", "professionId", "employeur", "etablissement", "incomeBandId", "type",
        "champsLibres"
 FROM "prospects" WHERE "phoneE164" = $1 AND "deletedAt" IS NULL LIMIT 1;
+
+-- name: ProspectPourSegment :one
+SELECT p."rev", p."banqueId", p."syndicatId",
+       b."shortName" AS banque_short_name, sy."sigle" AS syndicat_sigle
+FROM "prospects" p
+LEFT JOIN "banques" b ON b."id" = p."banqueId"
+LEFT JOIN "syndicats" sy ON sy."id" = p."syndicatId"
+WHERE p."id" = $1 AND p."deletedAt" IS NULL;
+
+-- name: BasculerSegmentProspect :execrows
+UPDATE "prospects"
+SET "banqueId" = @banque_id, "syndicatId" = @syndicat_id, "rev" = "rev" + 1
+WHERE "id" = @id AND "rev" = @rev AND "deletedAt" IS NULL;
+
+-- name: InsererSegmentChange :exec
+INSERT INTO "segment_changes" (
+  "id", "prospectId", "fromSegment", "toSegment", "fromBanqueId", "toBanqueId",
+  "fromSyndicatId", "toSyndicatId", "reason", "changedById", "source"
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);
+
+-- name: ListerSegmentChanges :many
+SELECT c.*, u."fullName" AS changed_by_name
+FROM "segment_changes" c
+JOIN "users" u ON u."id" = c."changedById"
+WHERE c."prospectId" = $1
+ORDER BY c."changedAt" DESC, c."id" DESC;
+
+-- name: BanqueSigleSegment :one
+SELECT "shortName" FROM "banques" WHERE "id" = $1;
+
+-- name: SyndicatSigleSegment :one
+SELECT "sigle" FROM "syndicats" WHERE "id" = $1;

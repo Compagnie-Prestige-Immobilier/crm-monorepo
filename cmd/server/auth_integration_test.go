@@ -153,6 +153,68 @@ func TestConnexionEcritUneSessionHacheeEtLastLogin(t *testing.T) {
 	}
 }
 
+func (b *banc) cookieDeConnexion(proto string) *http.Cookie {
+	b.t.Helper()
+	corps := bytes.NewBufferString(`{"identifier":"` + b.email + `","password":"motdepasse"}`)
+	req, err := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+"/api/v1/auth/login", corps)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", b.ts.URL)
+	if proto != "" {
+		req.Header.Set("X-Forwarded-Proto", proto)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK || len(resp.Cookies()) != 1 {
+		b.t.Fatalf("connexion : %d, cookies %v", resp.StatusCode, resp.Cookies())
+	}
+	return resp.Cookies()[0]
+}
+
+func TestCookieDeSessionSuitLeTransport(t *testing.T) {
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	b := nouveauBanc(t, "COMMERCIAL")
+
+	clair := b.cookieDeConnexion("")
+	if clair.Name != socle.NomCookieClair || clair.Secure {
+		t.Fatalf("en clair : %s secure=%v, attendu %s sans Secure", clair.Name, clair.Secure, socle.NomCookieClair)
+	}
+	securise := b.cookieDeConnexion("https")
+	if securise.Name != socle.NomCookie || !securise.Secure {
+		t.Fatalf("derrière le proxy TLS : %s secure=%v, attendu %s Secure", securise.Name, securise.Secure, socle.NomCookie)
+	}
+
+	// Les deux cookies ouvrent la même session, et la déconnexion efface celui qui a servi.
+	for _, c := range []*http.Cookie{clair, securise} {
+		req, _ := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+"/api/v1/auth/me", http.NoBody)
+		req.AddCookie(c)
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_ = resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			t.Fatalf("session refusée avec le cookie %s : %d", c.Name, resp.StatusCode)
+		}
+	}
+	req, _ := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+"/api/v1/auth/logout", http.NoBody)
+	req.Header.Set("Origin", b.ts.URL)
+	req.AddCookie(clair)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if len(resp.Cookies()) != 1 || resp.Cookies()[0].Name != socle.NomCookieClair || resp.Cookies()[0].MaxAge >= 0 {
+		t.Fatalf("la déconnexion doit effacer %s : %v", socle.NomCookieClair, resp.Cookies())
+	}
+}
+
 func TestDeconnexionRevoqueSansSupprimer(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	statut, body := b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
@@ -163,6 +225,12 @@ func TestDeconnexionRevoqueSansSupprimer(t *testing.T) {
 	b.attend(statut, http.StatusForbidden, "écriture sans Origin", body)
 	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
 	b.attend(statut, http.StatusOK, "me", body)
+	if body["user"] != nil || body["email"] != b.email || !vraiDe(body["isActive"]) || body["workspace"] != "public" {
+		t.Fatalf("le profil se lit à plat, sans enveloppe : %v", body)
+	}
+	if _, porte := body["lastLoginAt"]; !porte {
+		t.Fatalf("lastLoginAt doit figurer, même nul : %v", body)
+	}
 	statut, body = b.appel(http.MethodPost, "/api/v1/auth/logout", nil, true)
 	b.attend(statut, http.StatusNoContent, "déconnexion", body)
 	statut, body = b.appel(http.MethodGet, "/api/v1/auth/me", nil, false)
@@ -197,6 +265,24 @@ func TestChangementDeMotDePasseRevoqueLesAutresSessions(t *testing.T) {
 	autre.attend(statut, http.StatusUnauthorized, "ancien mot de passe refusé", body)
 	statut, body = autre.connexion(b.email, "nouveau-mdp-2026")
 	autre.attend(statut, http.StatusOK, "nouveau mot de passe accepté", body)
+}
+
+func TestAuthMotDePasseParPutRepondOk(t *testing.T) {
+	b := nouveauBanc(t, "CHARGE_CLIENTELE")
+	statut, body := b.connexion(b.email, "motdepasse")
+	b.attend(statut, http.StatusOK, "connexion", body)
+
+	statut, body = b.appel(http.MethodPut, "/api/v1/auth/me/password",
+		map[string]string{"currentPassword": "faux", "newPassword": "nouveau-mdp-2026"}, true)
+	b.attend(statut, http.StatusUnauthorized, "mot de passe actuel faux", body)
+	statut, body = b.appel(http.MethodPut, "/api/v1/auth/me/password",
+		map[string]string{"currentPassword": "motdepasse", "newPassword": "nouveau-mdp-2026"}, true)
+	b.attend(statut, http.StatusOK, "changement par PUT", body)
+	if !vraiDe(body["ok"]) {
+		t.Fatalf("corps : %v", body)
+	}
+	statut, body = b.connexion(b.email, "nouveau-mdp-2026")
+	b.attend(statut, http.StatusOK, "nouveau mot de passe accepté", body)
 }
 
 func TestCompteDesactiveCoupeALaRequeteSuivante(t *testing.T) {

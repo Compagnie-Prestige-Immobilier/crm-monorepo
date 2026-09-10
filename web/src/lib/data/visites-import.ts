@@ -1,94 +1,110 @@
-import { ApiError, apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
-import { apiErrorMessage } from '@/lib/utils';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type TravailRegistre = components['schemas']['ImportJobSortie'];
-export type ChangementRegistre = components['schemas']['ChangeImportSortie'];
-export type RapportRegistre = components['schemas']['RapportImport'];
+import { getApiClient } from '@/lib/api/browser';
+import { flattenPage } from '@/lib/api/query-params';
+import type { Paginated } from '@/lib/types';
 
-/** Aligné sur la limite du serveur : refuser ici évite un 413 sans message. */
-export const TAILLE_MAX_OCTETS = 25 * 1024 * 1024;
+type Schemas = components['schemas'];
 
-const PAGE_REVUE = 50;
+export type VisitesImportJob = Schemas['ImportJobDto'];
+export type VisitesImportChange = Schemas['VisiteImportChangeDto'];
 
-export async function deposerRegistre(fichier: File): Promise<TravailRegistre> {
-  const corps = new FormData();
-  corps.append('file', fichier);
+/** Aligné sur `IMPORTS_MAX_BYTES` de l'API : refuser ici évite un 413. */
+export const VISITES_IMPORT_MAX_BYTES = 25 * 1024 * 1024;
 
-  const reponse = await fetch('/api/v1/visites/import', {
-    method: 'POST',
-    body: corps,
-    credentials: 'same-origin',
-  });
-  const texte = await reponse.text();
-  const charge: unknown = texte === '' ? undefined : JSON.parse(texte);
+const VISITES_IMPORT_REVUE_PAGE_SIZE = 50;
 
-  if (!reponse.ok) {
-    throw new ApiError(
-      reponse.status,
-      charge,
-      apiErrorMessage(charge, 'Le classeur n’a pas pu être déposé.'),
-    );
-  }
-  return charge as TravailRegistre;
+export interface VisitesExportFilters {
+  from: string | null;
+  to: string | null;
+  entrepriseId: string | null;
+  directionId: string | null;
+  destinataireId: string | null;
+  objetId: string | null;
+  search: string;
 }
 
-export async function fetchTravailRegistre(id: string): Promise<TravailRegistre> {
-  return unwrap(await apiClient.GET('/api/v1/visites/import/{id}', { params: { path: { id } } }));
+export function buildVisitesExportUrl(filters: VisitesExportFilters): string {
+  const params = new URLSearchParams();
+  const put = (key: string, value: string | null): void => {
+    if (value !== null && value !== '') params.set(key, value);
+  };
+
+  put('from', filters.from);
+  put('to', filters.to);
+  put('entrepriseId', filters.entrepriseId);
+  put('directionId', filters.directionId);
+  put('destinataireId', filters.destinataireId);
+  put('objetId', filters.objetId);
+  put('search', filters.search.trim());
+
+  const rendered = params.toString();
+  return rendered === ''
+    ? '/api/v1/export/visites.xlsx'
+    : `/api/v1/export/visites.xlsx?${rendered}`;
 }
 
-export async function fetchRevueRegistre(
+export function visitesExportFileName(now = new Date()): string {
+  return `cpi-registre-visites-${now.toISOString().slice(0, 10)}.xlsx`;
+}
+
+export async function createVisitesImportJob(
+  file: File,
+  client: ApiClient = getApiClient(),
+): Promise<VisitesImportJob> {
+  const form = new FormData();
+  form.append('file', file);
+
+  return unwrap(
+    await client.POST('/api/v1/visites/import', {
+      body: { file: '' },
+      bodySerializer: () => form,
+    }),
+  );
+}
+
+export async function fetchVisitesImportJob(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<VisitesImportJob> {
+  return unwrap(await client.GET('/api/v1/visites/import/{id}', { params: { path: { id } } }));
+}
+
+export async function fetchVisitesImportRevue(
   id: string,
   page: number,
-  pageSize = PAGE_REVUE,
-): Promise<{ items: ChangementRegistre[]; meta: components['schemas']['PageRegistre'] }> {
-  const revue = unwrap(
-    await apiClient.GET('/api/v1/visites/import/{id}/revue', {
-      params: { path: { id }, query: { page, pageSize } },
-    }),
+  client: ApiClient = getApiClient(),
+  pageSize: number = VISITES_IMPORT_REVUE_PAGE_SIZE,
+): Promise<Paginated<VisitesImportChange>> {
+  return flattenPage(
+    unwrap(
+      await client.GET('/api/v1/visites/import/{id}/revue', {
+        params: { path: { id }, query: { page, pageSize } },
+      }),
+    ),
   );
-  return { items: revue.items ?? [], meta: revue.meta };
 }
 
-export async function choisirLignesRegistre(
+export async function setVisitesImportSelection(
   id: string,
-  ids: string[],
+  ids: readonly string[],
   selected: boolean,
+  client: ApiClient = getApiClient(),
 ): Promise<void> {
   unwrap(
-    await apiClient.PATCH('/api/v1/visites/import/{id}/revue', {
+    await client.PATCH('/api/v1/visites/import/{id}/revue', {
       params: { path: { id } },
-      body: { ids, selected },
+      body: { ids: [...ids], selected },
     }),
   );
 }
 
-export async function appliquerRegistre(id: string): Promise<TravailRegistre> {
+export async function applyVisitesImportJob(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<VisitesImportJob> {
   return unwrap(
-    await apiClient.POST('/api/v1/visites/import/{id}/apply', { params: { path: { id } } }),
+    await client.POST('/api/v1/visites/import/{id}/apply', { params: { path: { id } } }),
   );
-}
-
-/** Le serveur rend `report: null` tant que le classeur n'a pas été lu. */
-export function rapportDe(travail: TravailRegistre): RapportRegistre | null {
-  const rapport: unknown = travail.report;
-  return rapport === null || rapport === undefined ? null : (rapport as RapportRegistre);
-}
-
-/** Créations et corrections seules composent la revue : les lignes inchangées n'y figurent pas. */
-export function differences(travail: TravailRegistre): number {
-  return travail.createdRows + travail.updatedRows;
-}
-
-/** Mêmes conditions que le serveur, pour ne pas proposer un geste qui finirait en 409. */
-export function peutAppliquer(
-  travail: TravailRegistre | undefined,
-  choisies: number,
-  maintenant = Date.now(),
-): boolean {
-  if (travail === undefined || travail.status !== 'succeeded' || travail.mode !== 'DRY_RUN') {
-    return false;
-  }
-  if (new Date(travail.expiresAt).getTime() <= maintenant) return false;
-  return choisies > 0;
 }

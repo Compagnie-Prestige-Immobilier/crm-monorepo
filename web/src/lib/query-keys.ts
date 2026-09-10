@@ -1,28 +1,36 @@
-import type { Projet } from '@/lib/types';
+import { bankFiltersQueryKey, type BankCaseFilters } from '@/lib/bank-filters';
+import {
+  clientRequestFiltersQueryKey,
+  type ClientRequestFilters,
+} from '@/lib/client-request-filters';
+import { filtersQueryKey } from '@/lib/filters';
+import { representantFiltersQueryKey, type RepresentantFilters } from '@/lib/representant-filters';
+import { userFiltersQueryKey, type UserFilters } from '@/lib/user-filters';
+import type { Projet, ProspectFilters } from '@/lib/types';
 
-type Filtres = Record<string, unknown>;
-
-/** Clés de cache des listes, détails et tableaux de bord. Reprises de la v1. */
+/** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
   session: ['session'] as const,
   reference: ['reference'] as const,
 
   prospectsRoot: ['prospects'] as const,
-  prospects: (filtres: Filtres) => ['prospects', filtres] as const,
+  prospects: (filters: ProspectFilters) => ['prospects', filtersQueryKey(filters)] as const,
   prospect: (id: string) => ['prospects', 'detail', id] as const,
 
   dashboardRoot: ['dashboard'] as const,
-  dashboard: (filtres: Filtres) => ['dashboard', filtres] as const,
+  dashboard: (filters: ProspectFilters) => ['dashboard', filtersQueryKey(filters)] as const,
 
+  /** Dérivée des mêmes filtres que les compteurs du tableau de bord. */
   funnelRoot: ['funnel'] as const,
-  funnel: (filtres: Filtres) => ['funnel', filtres] as const,
+  funnel: (filters: ProspectFilters) => ['funnel', filtersQueryKey(filters)] as const,
 
   representantsRoot: ['representants'] as const,
-  representants: (filtres: Filtres) => ['representants', filtres] as const,
+  representants: (filters: RepresentantFilters) =>
+    ['representants', representantFiltersQueryKey(filters)] as const,
   representant: (id: string) => ['representants', 'detail', id] as const,
 
   commerciauxRoot: ['commerciaux'] as const,
-  commerciaux: (filtres: Filtres) => ['commerciaux', filtres] as const,
+  commerciaux: (filters: UserFilters) => ['commerciaux', userFiltersQueryKey(filters)] as const,
 
   referentielsRoot: ['referentiels'] as const,
   banques: ['referentiels', 'banques'] as const,
@@ -32,13 +40,15 @@ export const queryKeys = {
   iefs: ['referentiels', 'iefs'] as const,
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
-  /** Ce que la saisie propose : actifs seulement. */
+  /** Ce que la SAISIE propose : actifs seulement. */
   statutsQualification: ['referentiels', 'statutsQualification'] as const,
-  /** Ce que l'administration montre : tout, désactivés compris. */
+  /** Ce que l'ADMINISTRATION montre : tout, désactivés compris. */
   statutsQualificationAdmin: ['referentiels', 'statutsQualification', 'administration'] as const,
 
+  // ─── Registre des visites ─────────────────────────────────────────────────
   visitesRoot: ['visites'] as const,
   visiteReferentielsRoot: ['visites', 'referentiels'] as const,
+  /** Une liste entière, entrées retirées comprises : l'écran d'administration. */
   visiteReferentiel: (kind: string) => ['visites', 'referentiels', kind] as const,
   visiteReferentielUsage: ['visites', 'referentiels', 'usage'] as const,
   visitesStats: (du: string, au: string) => ['visites', 'stats', du, au] as const,
@@ -47,78 +57,93 @@ export const queryKeys = {
   visitesImportRevue: (id: string, page: number) =>
     ['visites', 'import', id, 'revue', page] as const,
 
+  // ─── Phase 2 ──────────────────────────────────────────────────────────────
   /** La fiche que l'appelant a en main : lue par la barre supérieure, écrite par les consoles. */
   ouvertureCourante: ['ouvertures', 'courante'] as const,
-
-  /** Écrans téléconseiller : rappels promis, numéros suggérés, fiches déjà appelées. */
-  callbacksRoot: ['callbacks'] as const,
-  callbacks: (scope: string, projet: string, appeleParId: string | null) =>
-    ['callbacks', scope, projet, appeleParId] as const,
-  suggestionsRoot: ['suggestions'] as const,
-  suggestions: (statut: string | null) => ['suggestions', statut ?? 'tous'] as const,
-  mesContacts: (quoi: string, projet: string, appeleParId: string) =>
-    ['mes-contacts', quoi, projet, appeleParId] as const,
-  representantsAQualifier: (filtres: Filtres) => ['representants', 'a-qualifier', filtres] as const,
-  representantsSuivi: (suivi: string, appeleParId: string | null) =>
-    ['representants', 'suivi', suivi, appeleParId] as const,
-  appelsRepresentant: (id: string) => ['representants', 'detail', id, 'appels'] as const,
   lotsExportRoot: ['lots-export'] as const,
-  lotsExport: (filtres: Filtres = {}) => ['lots-export', filtres] as const,
+  lotsExport: (filters: Record<string, unknown> = {}) => ['lots-export', filters] as const,
   lotsExportDetail: (id: string) => ['lots-export', 'detail', id] as const,
-  lotsExportApercu: (critere: Filtres) => ['lots-export', 'apercu', critere] as const,
-  lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
-  lotsExportFiches: (id: string, filtres: Filtres = {}) =>
-    ['lots-export', 'detail', id, 'fiches', filtres] as const,
+  lotsExportApercu: (critere: Record<string, unknown>) =>
+    ['lots-export', 'apercu', critere] as const,
   parametresChues: ['parametres-chues'] as const,
   parametresChuesJournal: ['parametres-chues', 'journal'] as const,
+  lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
+  lotsExportFiches: (id: string, filtres: Record<string, unknown> = {}) =>
+    ['lots-export', 'detail', id, 'fiches', filtres] as const,
 
+  // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,
-  bankCases: (filtres: Filtres) => ['bank-cases', filtres] as const,
+  bankCases: (filters: BankCaseFilters) => ['bank-cases', bankFiltersQueryKey(filters)] as const,
   bankCase: (id: string, projet: Projet) => ['bank-cases', 'detail', id, projet] as const,
   bankAnalyticsRoot: ['bank-analytics'] as const,
-  bankAnalytics: (filtres: Filtres) => ['bank-analytics', filtres] as const,
+  bankAnalytics: (filters: BankCaseFilters) =>
+    ['bank-analytics', bankFiltersQueryKey(filters)] as const,
   bankStagesRoot: ['bank-stages'] as const,
   bankStages: (includeInactive: boolean) => ['bank-stages', includeInactive] as const,
   bankRejectionReasons: ['bank-rejection-reasons'] as const,
 
+  // ─── Demandes de création de client (banque → admin) ──────────────────────
   clientRequestsRoot: ['client-requests'] as const,
-  clientRequests: (filtres: Filtres) => ['client-requests', filtres] as const,
+  clientRequests: (filters: ClientRequestFilters) =>
+    ['client-requests', clientRequestFiltersQueryKey(filters)] as const,
 
+  // ─── Notifications reçues (cloche de la barre supérieure) ─────────────────
   /** La racine invalide la cloche et ses pages ; `inbox` lit la cloche. */
   inboxRoot: ['inbox'] as const,
   inbox: ['inbox'] as const,
   inboxPage: (page: number, unreadOnly: boolean) => ['inbox', 'page', page, unreadOnly] as const,
 
+  // ─── Mode démonstration ───────────────────────────────────────────────────
+  demoStatus: ['demo-status'] as const,
+  /** Clé du sondage du bandeau, imbriquée pour partager l'invalidation. */
+  demoBanner: ['demo-status', 'banner'] as const,
+
+  // ─── Administration ───────────────────────────────────────────────────────
   champsConversionRoot: ['champs-conversion'] as const,
   champsConversion: (projet: Projet) => ['champs-conversion', projet] as const,
   purgeCatalog: ['purge-catalog'] as const,
   supervision: ['supervision'] as const,
 
-  /** Racine partagée : appliquer une simulation change le suivi et l'historique. */
+  /** Racine partagée : appliquer une simulation change la ligne du suivi ET de l'historique. */
   importsRoot: ['imports'] as const,
   importJobs: (page: number) => ['imports', 'page', page] as const,
   importJob: (id: string) => ['imports', 'detail', id] as const,
 
+  /** L'envoi survit à la navigation : sa mutation et sa progression vivent dans le cache, pas dans la carte. */
+  androidReleases: ['androidRelease', 'releases'] as const,
+  androidReleaseUpload: ['androidRelease', 'upload'] as const,
+  androidReleaseProgress: ['androidRelease', 'progress'] as const,
   /** Export intégral de la base : sondé pendant que `pg_dump` tourne. */
   databaseDump: ['database-dump'] as const,
 
+  // ─── Statistiques ─────────────────────────────────────────────────────────
   statsRoot: ['stats'] as const,
-  statsTeleconseil: (filtres: Filtres) => ['stats', 'teleconseil', filtres] as const,
+  statsTeleconseil: (filters: ProspectFilters) =>
+    ['stats', 'teleconseil', filtersQueryKey(filters)] as const,
   /** Des clés séparées évitent de coupler les volets lourds au rafraîchissement live. */
-  statsCampagnes: (filtres: Filtres) => ['stats', 'campagnes', filtres] as const,
-  statsDelais: (filtres: Filtres) => ['stats', 'delais', filtres] as const,
-  statsCohortes: (filtres: Filtres) => ['stats', 'cohortes', filtres] as const,
-  statsRepresentants: (filtres: Filtres) => ['stats', 'representants', filtres] as const,
-  statsQualite: (filtres: Filtres) => ['stats', 'qualite', filtres] as const,
-  statsRendement: (filtres: Filtres) => ['stats', 'rendement', filtres] as const,
-  statsProvenance: (filtres: Filtres) => ['stats', 'provenance', filtres] as const,
-  statsVieillissement: (filtres: Filtres) => ['stats', 'vieillissement', filtres] as const,
-  statsAmbassadeurs: (filtres: Filtres) => ['stats', 'ambassadeurs', filtres] as const,
+  statsCampagnes: (filters: ProspectFilters) =>
+    ['stats', 'campagnes', filtersQueryKey(filters)] as const,
+  statsDelais: (filters: ProspectFilters) => ['stats', 'delais', filtersQueryKey(filters)] as const,
+  statsCohortes: (filters: ProspectFilters) =>
+    ['stats', 'cohortes', filtersQueryKey(filters)] as const,
+  statsRepresentants: (filters: ProspectFilters) =>
+    ['stats', 'representants', filtersQueryKey(filters)] as const,
+  statsQualite: (filters: ProspectFilters) =>
+    ['stats', 'qualite', filtersQueryKey(filters)] as const,
+  statsRendement: (filters: ProspectFilters) =>
+    ['stats', 'rendement', filtersQueryKey(filters)] as const,
+  statsProvenance: (filters: ProspectFilters) =>
+    ['stats', 'provenance', filtersQueryKey(filters)] as const,
+  statsVieillissement: (filters: ProspectFilters) =>
+    ['stats', 'vieillissement', filtersQueryKey(filters)] as const,
+  statsAmbassadeurs: (filters: ProspectFilters) =>
+    ['stats', 'ambassadeurs', filtersQueryKey(filters)] as const,
 
+  // ─── Plateformes d'enrôlement ─────────────────────────────────────────────
   enrolementRoot: ['enrolement'] as const,
-  enrolementInscriptions: (projet: string, filtres: Filtres) =>
+  enrolementInscriptions: (projet: string, filtres: Record<string, unknown>) =>
     ['enrolement', 'inscriptions', projet, filtres] as const,
-  enrolementIndicateurs: (projet: string, filtres: Filtres) =>
+  enrolementIndicateurs: (projet: string, filtres: Record<string, unknown>) =>
     ['enrolement', 'indicateurs', projet, filtres] as const,
   enrolementReglages: (projet: string) => ['enrolement', 'reglages', projet] as const,
 };

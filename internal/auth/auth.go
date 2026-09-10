@@ -23,8 +23,27 @@ type service struct {
 	tentatives *socle.Limiteur
 }
 
-func cookieSession(jeton string, duree time.Duration) http.Cookie {
-	return http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: int(duree.Seconds())}
+// `maxAge` en secondes ; -1 efface le cookie (Max-Age=0), ce qu'une durée négative
+// convertie en secondes n'obtenait pas.
+func cookieSession(ctx context.Context, jeton string, maxAge int) http.Cookie {
+	c := http.Cookie{Name: socle.NomCookie, Value: jeton, Path: "/", HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode, MaxAge: maxAge} //nolint:gosec // G124 : hors TLS (poste de développement, téléphone sur le réseau local) un cookie Secure serait jeté par le navigateur ; choix du propriétaire du 10 septembre 2026
+	if !socle.ConnexionSecurisee(ctx) {
+		c.Name, c.Secure = socle.NomCookieClair, false
+	}
+	return c
+}
+
+// La session arrive sous l'un ou l'autre nom de cookie selon le transport.
+type CookieInput struct {
+	Session      string `cookie:"__Host-cpi_session"`
+	SessionClair string `cookie:"cpi_session"`
+}
+
+func (in *CookieInput) jeton() string {
+	if in.Session != "" {
+		return in.Session
+	}
+	return in.SessionClair
 }
 
 type LoginInput struct {
@@ -78,25 +97,28 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	if err := s.Q.TouchLastLogin(ctx, u.ID); err != nil {
 		return nil, err
 	}
-	out := &SessionOutput{SetCookie: cookieSession(jeton, s.Cfg.SessionTTL)}
+	out := &SessionOutput{SetCookie: cookieSession(ctx, jeton, int(s.Cfg.SessionTTL.Seconds()))}
 	out.Body.User = socle.Utilisateur{ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role), PhoneE164: u.PhoneE164}
 	return out, nil
 }
 
+// Le compte est forcément actif et l'espace toujours public : la session d'un
+// compte désactivé est coupée avant d'arriver ici, et la v2 n'a plus d'espace
+// de démonstration.
 type MeOutput struct {
 	Body struct {
-		User socle.Utilisateur `json:"user"`
+		socle.Utilisateur
+		IsActive    bool    `json:"isActive"`
+		Workspace   string  `json:"workspace" enum:"public"`
+		LastLoginAt *string `json:"lastLoginAt"`
 	}
 }
 
 func (*service) me(ctx context.Context, _ *struct{}) (*MeOutput, error) {
 	out := &MeOutput{}
-	out.Body.User = socle.UtilisateurCourant(ctx)
+	out.Body.Utilisateur = socle.UtilisateurCourant(ctx)
+	out.Body.IsActive, out.Body.Workspace = true, "public"
 	return out, nil
-}
-
-type CookieInput struct {
-	Session string `cookie:"__Host-cpi_session"`
 }
 
 type LogoutOutput struct {
@@ -104,15 +126,15 @@ type LogoutOutput struct {
 }
 
 func (s *service) logout(ctx context.Context, in *CookieInput) (*LogoutOutput, error) {
-	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.Session)); err != nil {
+	if err := s.Q.RevokeSession(ctx, socle.Empreinte(in.jeton())); err != nil {
 		return nil, err
 	}
-	return &LogoutOutput{SetCookie: cookieSession("", -1)}, nil
+	return &LogoutOutput{SetCookie: cookieSession(ctx, "", -1)}, nil
 }
 
 type PasswordInput struct {
-	Session string `cookie:"__Host-cpi_session"`
-	Body    struct {
+	CookieInput
+	Body struct {
 		CurrentPassword string `json:"currentPassword" minLength:"1" maxLength:"1024"`
 		NewPassword     string `json:"newPassword" minLength:"1" maxLength:"1024"`
 	}
@@ -129,7 +151,23 @@ func Monter(api huma.API, d *socle.Deps) error {
 	huma.Get(api, "/api/v1/auth/me", s.me)
 	huma.Register(api, huma.Operation{OperationID: "logout", Method: http.MethodPost, Path: "/api/v1/auth/logout", DefaultStatus: http.StatusNoContent}, s.logout)
 	huma.Register(api, huma.Operation{OperationID: "change-password", Method: http.MethodPost, Path: "/api/v1/auth/password", DefaultStatus: http.StatusNoContent}, s.changerMotDePasse)
+	huma.Register(api, huma.Operation{OperationID: "changeMyPassword", Method: http.MethodPut, Path: "/api/v1/auth/me/password"}, s.changerMotDePasseOk)
 	return nil
+}
+
+type OkOutput struct {
+	Body struct {
+		Ok bool `json:"ok"`
+	}
+}
+
+func (s *service) changerMotDePasseOk(ctx context.Context, in *PasswordInput) (*OkOutput, error) {
+	if _, err := s.changerMotDePasse(ctx, in); err != nil {
+		return nil, err
+	}
+	out := &OkOutput{}
+	out.Body.Ok = true
+	return out, nil
 }
 
 func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*struct{}, error) {
@@ -152,13 +190,14 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 	if err := s.Q.UpdatePassword(ctx, db.UpdatePasswordParams{ID: u.ID, PasswordHash: condensat}); err != nil {
 		return nil, err
 	}
-	return nil, s.Q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.Session)})
+	return nil, s.Q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.jeton())})
 }
 
 var Garde = map[string][]socle.Role{
-	"GET /health/ready":          {socle.Public},
-	"POST /api/v1/auth/login":    {socle.Public},
-	"POST /api/v1/auth/logout":   socle.Tous,
-	"GET /api/v1/auth/me":        socle.Tous,
-	"POST /api/v1/auth/password": socle.Tous,
+	"GET /health/ready":            {socle.Public},
+	"POST /api/v1/auth/login":      {socle.Public},
+	"POST /api/v1/auth/logout":     socle.Tous,
+	"GET /api/v1/auth/me":          socle.Tous,
+	"POST /api/v1/auth/password":   socle.Tous,
+	"PUT /api/v1/auth/me/password": socle.Tous,
 }

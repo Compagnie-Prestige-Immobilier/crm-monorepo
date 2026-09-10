@@ -51,6 +51,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/lots-export":                       campagnesEcriture,
 	"POST /api/v1/lots-export/apercu":                campagnesEcriture,
 	"GET /api/v1/lots-export":                        socle.Encadrement,
+	"GET /api/v1/lots-export/mes-attributions":       socle.Parcours,
 	"GET /api/v1/lots-export/{id}":                   socle.Encadrement,
 	"PATCH /api/v1/lots-export/{id}":                 campagnesEcriture,
 	"DELETE /api/v1/lots-export/{id}":                socle.AdminSeul,
@@ -1460,6 +1461,10 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "listLotsExport", Method: http.MethodGet, Path: "/api/v1/lots-export",
 	}, s.campagnesLister)
+	huma.Register(api, huma.Operation{
+		OperationID: "mesAttributions", Method: http.MethodGet,
+		Path: "/api/v1/lots-export/mes-attributions",
+	}, s.mesAttributions)
 	huma.Register(api, huma.Operation{
 		OperationID: "getLotExport", Method: http.MethodGet, Path: lotCheminID,
 	}, s.campagneDetail)

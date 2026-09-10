@@ -1,27 +1,12 @@
-import { Link } from '@tanstack/react-router';
-import { ArrowLeftIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { buttonVariants } from '@/components/ui/button';
-import { formatPhone } from '@/lib/format';
-import { lien } from '@/lib/nav';
-import { cn, initials } from '@/lib/utils';
+import { formatPhone, initials } from '@/lib/format';
 
 export interface ChiffreDeFiche {
   label: string;
   valeur: string;
   precision?: string | null;
-}
-
-/** `buttonVariants` et non `Button` : la primitive poserait `role="button"` sur le `<a>`. */
-export function LienRetour({ href, children }: { href: string; children: ReactNode }) {
-  return (
-    <Link {...lien(href)} className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}>
-      <ArrowLeftIcon aria-hidden="true" />
-      {children}
-    </Link>
-  );
 }
 
 /** L'en-tête commun des fiches : qui, son numéro, où il en est, et trois chiffres. */
@@ -70,8 +55,8 @@ export function FicheEnTete({
       <dl className="grid gap-3 border-t border-border pt-4 sm:grid-cols-3">
         {chiffres.map((chiffre) => (
           <div key={chiffre.label} className="min-w-0">
-            <dt className="text-[0.75rem] text-muted-foreground">{chiffre.label}</dt>
-            <dd className="font-display text-[1.25rem] font-[700] tabular-nums">
+            <dt className="eyebrow text-muted-foreground">{chiffre.label}</dt>
+            <dd className="font-display text-[1.25rem] font-[800] tracking-[-0.02em] tabular-nums">
               {chiffre.valeur}
             </dd>
             {chiffre.precision === null || chiffre.precision === undefined ? null : (

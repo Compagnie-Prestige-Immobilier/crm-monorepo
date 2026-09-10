@@ -308,7 +308,7 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 			champs: []referentielsChamp{cCodeLu, cLabelLu, cIndicatif, cPosition, cIsActive, cUpdatedAt},
 			rang:   referentielsTriPosition, lecture: socle.Tous,
 		},
-		"income-bands": {
+		NomIncomeBands: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 80, true),
 				cMinXof, cMaxXof, cPosition, cIsActive, cUpdatedAt,
@@ -500,7 +500,16 @@ func (l *referentielsListe) valeurs(e *ReferentielsEntree, creation bool) (cols 
 	return cols, args, nil
 }
 
+// Le panneau v1 nomme deux listes en français ; la table, elle, garde son nom.
+var referentielsAlias = map[string]string{
+	"tranches-revenu": NomIncomeBands,
+	"offres":          NomOffers,
+}
+
 func referentielsAutorisee(kind string, role socle.Role, ecriture bool) (*referentielsListe, error) {
+	if nom, alias := referentielsAlias[kind]; alias {
+		kind = nom
+	}
 	l, connue := referentielsListes[kind]
 	if !connue {
 		return nil, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Référentiel inconnu.")
@@ -725,7 +734,7 @@ func (s *service) referentielsBundle(ctx context.Context, in *ReferentielsBundle
 		{NomDepartements, &out.Body.Departements},
 		{NomRegions, &out.Body.Regions},
 		{NomProfessions, &out.Body.Professions},
-		{"income-bands", &out.Body.IncomeBands},
+		{NomIncomeBands, &out.Body.IncomeBands},
 		{NomOffers, &out.Body.Offers},
 		{NomEmployeurs, &out.Body.Employeurs},
 		{NomPays, &out.Body.Pays},
@@ -1285,6 +1294,7 @@ func Monter(api huma.API, d *socle.Deps) {
 // Tables de référence, nommées comme en base.
 const (
 	NomOffers       = "offers"
+	NomIncomeBands  = "income-bands"
 	NomProfessions  = "professions"
 	NomEmployeurs   = "employeurs"
 	NomPays         = "pays"

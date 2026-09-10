@@ -382,3 +382,24 @@ ON CONFLICT ("userId", "slot") DO UPDATE SET
     "agent_activity_slots"."lastSeenAt",
     EXCLUDED."lastSeenAt"
   );
+
+-- name: AnnuairePhase2 :many
+SELECT p."id", p."phoneE164", p."phase2Status", p."enrollmentMethod", p."rev", p."updatedAt"
+FROM "prospects" p
+WHERE p."deletedAt" IS NULL
+  AND (
+    sqlc.arg('scope_all')::boolean
+    OR p."createdById" = sqlc.arg('scope_user_id')::text
+    OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
+    OR EXISTS (
+      SELECT 1 FROM "lot_export_items" li
+      WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
+    )
+  )
+  AND (
+    sqlc.narg('depuis_at')::timestamp IS NULL
+    OR p."updatedAt" > sqlc.narg('depuis_at')::timestamp
+    OR (p."updatedAt" = sqlc.narg('depuis_at')::timestamp AND p."id" > sqlc.arg('depuis_id')::text)
+  )
+ORDER BY p."updatedAt" ASC, p."id" ASC
+LIMIT sqlc.arg('taille')::int;

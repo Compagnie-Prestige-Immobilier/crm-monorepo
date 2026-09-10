@@ -7,6 +7,7 @@ import (
 	"cpi-go/internal/prospects"
 	"cpi-go/internal/shared/database"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/cookiejar"
 	"testing"
@@ -42,6 +43,17 @@ func appelJSON(b *banc, method, chemin string, corps any, entetes map[string]str
 	var body map[string]any
 	_ = json.NewDecoder(resp.Body).Decode(&body)
 	return resp.StatusCode, body
+}
+
+// Comparaison par le rendu : un corps JSON décodé porte ses nombres en float64,
+// et chaque test réécrirait sinon la même cascade de conversions.
+func exigerChampsJSON(b *banc, vu map[string]any, attendus map[string]string, quoi string) {
+	b.t.Helper()
+	for cle, valeur := range attendus {
+		if fmt.Sprint(vu[cle]) != valeur {
+			b.t.Fatalf("%s : %s vaut %v, attendu %q", quoi, cle, vu[cle], valeur)
+		}
+	}
 }
 
 func connecte(b *banc) {
@@ -465,4 +477,94 @@ func TestProspectFormulairePublicCreeEtRapproche(t *testing.T) {
 	if fiches != 1 || nomFinal != "Gueye" {
 		t.Fatalf("le rapprochement ne duplique ni ne réécrit : %d fiches, nom %q", fiches, nomFinal)
 	}
+}
+
+// `shortName` et `sigle` sont uniques dans toute la base : CBAO et CHUES sont
+// repris s'ils existent déjà, et ne sont supprimés que par celui qui les crée.
+func referentielSegment(b *banc, table, colonne, valeur string) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	var retenu string
+	requete := `INSERT INTO "` + table + `" ("id","name","` + colonne + `","updatedAt") VALUES ($1,$2,$3,now())
+		ON CONFLICT ("` + colonne + `") DO UPDATE SET "updatedAt" = now() RETURNING "id"`
+	if err := b.pool.QueryRow(b.ctx, requete, id, "Test "+id[:8], valeur).Scan(&retenu); err != nil {
+		b.t.Fatal(err)
+	}
+	if retenu == id {
+		b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "`+table+`" WHERE "id" = $1`, id) })
+	}
+	return retenu
+}
+
+// Un numéro propre à la course : plusieurs exécutions simultanées partagent la
+// même base, et l'index d'unicité du téléphone est global.
+func numeroDeCourse(suffixe int) string {
+	return fmt.Sprintf("+22177%07d", (time.Now().UnixNano()+int64(suffixe))%10_000_000)
+}
+
+func exigerRefusSegment(b *banc, chemin string, corps map[string]any, attendu int, code string) {
+	b.t.Helper()
+	statut, body := appelJSON(b, http.MethodPatch, chemin, corps, nil)
+	b.attend(statut, attendu, "bascule refusée "+code, body)
+	if body["code"] != code {
+		b.t.Fatalf("code : %v", body["code"])
+	}
+}
+
+func TestProspectBasculeDeSegmentLaisseUneTrace(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	chues := referentielSegment(b, "syndicats", "sigle", "CHUES")
+	cbao := referentielSegment(b, "banques", "shortName", "CBAO")
+	autreBanque := referentielSegment(b, "banques", "shortName", "B"+uuid.NewString()[:8])
+
+	id := creerProspect(b, "Camara", numeroDeCourse(1))["id"].(string)
+	statut, body := appelJSON(b, http.MethodPatch, "/api/v1/prospects/"+id,
+		map[string]any{"banqueId": autreBanque, "syndicatId": chues}, nil)
+	b.attend(statut, http.StatusOK, "banque et syndicat de départ", body)
+	exigerChampsJSON(b, body, map[string]string{"segment": "BDD2"}, "segment de départ")
+	rev := body["rev"].(float64)
+
+	chemin := "/api/v1/prospects/" + id + "/segment"
+	statut, body = appelJSON(b, http.MethodPatch, chemin,
+		map[string]any{"banqueId": cbao, "reason": "Compte ouvert à la CBAO", "expectedRev": rev}, nil)
+	b.attend(statut, http.StatusOK, "bascule de segment", body)
+	exigerChampsJSON(b, body, map[string]string{"segment": "BDD1", "rev": fmt.Sprint(rev + 1)}, "fiche basculée")
+
+	exigerRefusSegment(b, chemin, map[string]any{"banqueId": cbao, "reason": "Deux fois le même geste"},
+		http.StatusUnprocessableEntity, "PROSPECT_SEGMENT_UNCHANGED")
+	exigerRefusSegment(b, chemin, map[string]any{"banqueId": autreBanque, "reason": "Révision périmée", "expectedRev": rev},
+		http.StatusConflict, "PROSPECT_REV_CONFLICT")
+	exigerRefusSegment(b, chemin, map[string]any{"banqueId": uuid.NewString(), "reason": "Banque inventée"},
+		http.StatusUnprocessableEntity, "PROSPECT_BANQUE_NOT_FOUND")
+
+	statut, body = appelJSON(b, http.MethodGet, "/api/v1/prospects/"+id+"/segment-history", nil, nil)
+	b.attend(statut, http.StatusOK, "historique des bascules", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("une seule bascule doit être tracée : %v", body["items"])
+	}
+	exigerChampsJSON(b, items[0].(map[string]any), map[string]string{
+		"fromSegment": "BDD2", "toSegment": "BDD1", "source": "WEB",
+		"reason": "Compte ouvert à la CBAO", "changedByName": "Test Intégration",
+		"fromBanqueId": autreBanque, "toBanqueId": cbao,
+		"fromSyndicatId": chues, "toSyndicatId": chues,
+	}, "trace de bascule")
+}
+
+func TestProspectBasculeDeSegmentRefuseeSansSegment(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	autre := autreCompte(b, "COMMERCIAL")
+	nettoyerProspects(b, b.userID, autre.userID)
+
+	id := creerProspect(b, "Sylla", numeroDeCourse(2))["id"].(string)
+	chemin := "/api/v1/prospects/" + id + "/segment"
+	exigerRefusSegment(b, chemin, map[string]any{"banqueId": uuid.NewString(), "reason": "Fiche sans segment"},
+		http.StatusUnprocessableEntity, "PROSPECT_SEGMENT_UNAVAILABLE")
+
+	statut, body := appelJSON(autre, http.MethodPatch, chemin,
+		map[string]any{"banqueId": uuid.NewString(), "reason": "Hors encadrement"}, nil)
+	autre.attend(statut, http.StatusForbidden, "bascule par un téléconseiller", body)
 }

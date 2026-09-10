@@ -1,20 +1,24 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type MotifIssue = components['schemas']['ReferentielsMotif'];
-export type CreerMotif = components['schemas']['ReferentielsCreerMotifInputBody'];
-export type ModifierMotif = components['schemas']['ReferentielsModifierMotifInputBody'];
-export type EffetMotif = MotifIssue['effect'];
+import { getApiClient } from '@/lib/api/browser';
 
-export const EFFETS_MOTIF: readonly EffetMotif[] = [
+type Schemas = components['schemas'];
+
+export type CallOutcomeEffect = Schemas['CallOutcomeEffect'];
+export type CallOutcomeReason = Schemas['CallOutcomeReasonDto'];
+export type CreateCallOutcomeReasonInput = Schemas['CreateCallOutcomeReasonDto'];
+export type UpdateCallOutcomeReasonInput = Schemas['UpdateCallOutcomeReasonDto'];
+
+export const CALL_OUTCOME_EFFECTS = [
   'CLOSE_METHOD',
   'CLOSE_REFUSED',
   'CLOSE_WRONG_NUMBER',
   'KEEP_OPEN',
   'SCHEDULE_CALLBACK',
-];
+] as const satisfies readonly CallOutcomeEffect[];
 
-export const LIBELLES_EFFET_MOTIF: Record<EffetMotif, string> = {
+export const CALL_OUTCOME_EFFECT_LABELS: Record<CallOutcomeEffect, string> = {
   CLOSE_METHOD: 'Clôt, méthode obtenue',
   CLOSE_REFUSED: 'Clôt, refus',
   CLOSE_WRONG_NUMBER: 'Clôt, faux numéro',
@@ -22,12 +26,16 @@ export const LIBELLES_EFFET_MOTIF: Record<EffetMotif, string> = {
   SCHEDULE_CALLBACK: 'Planifie un rappel daté',
 };
 
-/** Les rôles du design system que le panneau sait peindre. */
-export const COULEURS_MOTIF = ['success', 'info', 'warning', 'danger', 'neutral'] as const;
+/**
+ * Les rôles du design system que l'application de terrain sait peindre. Le
+ * serveur accepte n'importe quelle chaîne de 2 à 40 caractères, mais un rôle
+ * qu'aucun client ne connaît se rend en gris.
+ */
+export const CALL_OUTCOME_COLORS = ['success', 'info', 'warning', 'danger', 'neutral'] as const;
 
-export type CouleurMotif = (typeof COULEURS_MOTIF)[number];
+export type CallOutcomeColor = (typeof CALL_OUTCOME_COLORS)[number];
 
-export const LIBELLES_COULEUR: Record<CouleurMotif, string> = {
+export const CALL_OUTCOME_COLOR_LABELS: Record<CallOutcomeColor, string> = {
   success: 'Vert · réussite',
   info: 'Bleu · information',
   warning: 'Orange · vigilance',
@@ -35,24 +43,39 @@ export const LIBELLES_COULEUR: Record<CouleurMotif, string> = {
   neutral: 'Gris · neutre',
 };
 
-export async function fetchMotifsAdministration(): Promise<MotifIssue[]> {
-  const sortie = unwrap(await apiClient.GET('/api/v1/call-outcome-reasons/administration'));
-  return sortie.items ?? [];
+export async function fetchCallOutcomeReasons(
+  client: ApiClient = getApiClient(),
+): Promise<CallOutcomeReason[]> {
+  return unwrap(await client.GET('/api/v1/call-outcome-reasons/administration')).items;
 }
 
-export async function creerMotif(body: CreerMotif): Promise<MotifIssue> {
-  return unwrap(await apiClient.POST('/api/v1/call-outcome-reasons', { body }));
+export async function createCallOutcomeReason(
+  input: CreateCallOutcomeReasonInput,
+  client: ApiClient = getApiClient(),
+): Promise<CallOutcomeReason> {
+  return unwrap(await client.POST('/api/v1/call-outcome-reasons', { body: input }));
 }
 
-export async function modifierMotif(id: string, body: ModifierMotif): Promise<MotifIssue> {
+export async function updateCallOutcomeReason(
+  id: string,
+  patch: UpdateCallOutcomeReasonInput,
+  client: ApiClient = getApiClient(),
+): Promise<CallOutcomeReason> {
   return unwrap(
-    await apiClient.PATCH('/api/v1/call-outcome-reasons/{id}', { params: { path: { id } }, body }),
+    await client.PATCH('/api/v1/call-outcome-reasons/{id}', {
+      params: { path: { id } },
+      body: patch,
+    }),
   );
 }
 
-export async function activerMotif(id: string, isActive: boolean): Promise<MotifIssue> {
+export async function setCallOutcomeReasonActive(
+  id: string,
+  isActive: boolean,
+  client: ApiClient = getApiClient(),
+): Promise<CallOutcomeReason> {
   return unwrap(
-    await apiClient.POST('/api/v1/call-outcome-reasons/{id}/active', {
+    await client.POST('/api/v1/call-outcome-reasons/{id}/active', {
       params: { path: { id } },
       body: { isActive },
     }),

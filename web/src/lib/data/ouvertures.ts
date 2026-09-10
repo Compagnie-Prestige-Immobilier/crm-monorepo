@@ -1,32 +1,67 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
+import type { ApiClient } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
+
+import { getApiClient } from '@/lib/api/browser';
 import { uuidV7 } from '@/lib/data/console';
 
-export type OuvertureFiche = components['schemas']['QualificationOuvertureFicheDTO'];
+/**
+ * Miroirs de `OuvertureFicheDto` et `ComptageOuverturesJourDto`, tant que le
+ * client engendré ne connaît pas la route : sans eux, tout l'écran d'appel
+ * passerait en `any`.
+ */
+export interface OuvertureFiche {
+  id: string;
+  openedById: string;
+  openedByName: string;
+  representantId: string | null;
+  prospectId: string | null;
+  ficheNom: string;
+  openedAt: string;
+  firstInputAt: string | null;
+  closedAt: string | null;
+  dureeSecondes: number | null;
+  closingAttemptId: string | null;
+  draft: Record<string, unknown> | null;
+  releasedByName: string | null;
+  releasedAt: string | null;
+}
+
+export interface ComptageOuvertures {
+  openedById: string;
+  openedByName: string;
+  jour: string;
+  ouvertures: number;
+  qualifiees: number;
+  liberees: number;
+  dureeMoyenneSecondes: number | null;
+}
+
+export interface OuvrirFicheInput {
+  representantId?: string;
+  prospectId?: string;
+  draft?: Record<string, unknown>;
+}
 
 /**
  * L'identifiant est engendré ici : il sert de clé d'idempotence, et l'ouverture
  * existe sur l'appareil avant d'atteindre le serveur.
  */
-export async function ouvrirFiche(cible: {
-  representantId?: string;
-  prospectId?: string;
-}): Promise<OuvertureFiche> {
+export async function ouvrirFiche(
+  input: OuvrirFicheInput,
+  client: ApiClient = getApiClient(),
+): Promise<OuvertureFiche> {
   return unwrap(
-    await apiClient.POST('/api/v1/ouvertures', {
-      body: { id: uuidV7(), openedAt: new Date().toISOString(), ...cible },
+    await client.POST('/api/v1/ouvertures', {
+      body: { id: uuidV7(), openedAt: new Date().toISOString(), ...input },
     }),
-  );
+  ) as OuvertureFiche;
 }
 
-/**
- * La fiche que l'appelant a en main. Le corps est vide quand il n'en tient
- * aucune : `openapi-fetch` rend alors `data` indéfini sans qu'il y ait panne.
- */
-export async function fetchOuvertureCourante(): Promise<OuvertureFiche | null> {
-  const { data, error } = await apiClient.GET('/api/v1/ouvertures/courante');
-  if (error !== undefined || data === undefined) return null;
-  return data;
+/** La fiche que l'appelant a en main, nulle quand il n'en a aucune. */
+export async function fetchOuvertureCourante(
+  client: ApiClient = getApiClient(),
+): Promise<OuvertureFiche | null> {
+  return unwrap(await client.GET('/api/v1/ouvertures/courante')) as OuvertureFiche | null;
 }
 
 /**
@@ -37,14 +72,43 @@ export async function enregistrerBrouillon(
   id: string,
   draft: Record<string, unknown>,
   firstInputAt?: string,
+  client: ApiClient = getApiClient(),
 ): Promise<OuvertureFiche> {
   return unwrap(
-    await apiClient.PUT('/api/v1/ouvertures/{id}/brouillon', {
+    await client.PUT('/api/v1/ouvertures/{id}/brouillon', {
       params: { path: { id } },
       body: { draft, ...(firstInputAt === undefined ? {} : { firstInputAt }) },
       keepalive: true,
     }),
-  );
+  ) as OuvertureFiche;
+}
+
+/** Les fiches restées ouvertes : superviseur et administrateur seulement. */
+export async function fetchOuverturesOuvertes(
+  client: ApiClient = getApiClient(),
+): Promise<OuvertureFiche[]> {
+  return (unwrap(await client.GET('/api/v1/ouvertures/ouvertes')) as { items: OuvertureFiche[] })
+    .items;
+}
+
+export async function libererOuverture(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<OuvertureFiche> {
+  return unwrap(
+    await client.POST('/api/v1/ouvertures/{id}/liberation', { params: { path: { id } } }),
+  ) as OuvertureFiche;
+}
+
+export async function fetchComptageOuvertures(
+  query: { from?: string; to?: string; openedById?: string } = {},
+  client: ApiClient = getApiClient(),
+): Promise<ComptageOuvertures[]> {
+  return (
+    unwrap(await client.GET('/api/v1/ouvertures/comptage', { params: { query } })) as {
+      items: ComptageOuvertures[];
+    }
+  ).items;
 }
 
 export function secondesEcoulees(depuis: string, now: number): number {

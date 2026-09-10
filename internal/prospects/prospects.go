@@ -1436,6 +1436,8 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/prospects/merge":                                    {socle.Commercial, socle.ChargeClientele, socle.Admin},
 	"POST /api/v1/prospects/reassign":                                 {socle.Commercial, socle.ChargeClientele, socle.Admin},
 	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
+	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
+	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,
 	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin},
 	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin},
 	"GET /api/v1/champs-conversion/{projet}":                          socle.Tous,
@@ -1456,5 +1458,6 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "mergeProspects", Method: http.MethodPost, Path: "/api/v1/prospects/merge"}, s.prospectFusionner)
 	huma.Register(api, huma.Operation{OperationID: "reassignProspects", Method: http.MethodPost, Path: "/api/v1/prospects/reassign"}, s.prospectReaffecter)
 	huma.Register(api, huma.Operation{OperationID: "marquerProspectRevue", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/revue"}, s.prospectRevue)
+	prospectMonterSegment(api, s)
 	prospectMonterConversion(api, s)
 }

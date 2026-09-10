@@ -33,6 +33,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/rep-campaigns/attempts":                socle.Parcours,
 	"POST /api/v1/phase2/call-attempts":                  socle.Parcours,
 	"GET /api/v1/phase2/callbacks":                       socle.Parcours,
+	"GET /api/v1/phase2/directory":                       socle.Parcours,
 	"POST /api/v1/phase2/callbacks/{id}/cancel":          {socle.Admin, socle.Commercial, socle.ChargeClientele},
 	"POST /api/v1/ouvertures":                            socle.Parcours,
 	"GET /api/v1/ouvertures/courante":                    socle.Parcours,
@@ -44,6 +45,9 @@ var Garde = map[string][]socle.Role{
 	"PATCH /api/v1/suggestions/{id}":                     socle.Parcours,
 	"POST /api/v1/phase2/call-attempts/{id}/note-vocale": socle.Parcours,
 	"GET /api/v1/phase2/call-attempts/{id}/note-vocale":  socle.Parcours,
+	"POST /api/v1/phase2/call-attempts/{id}/recording":   socle.Parcours,
+	"GET /api/v1/phase2/call-attempts/{id}/recording":    socle.Parcours,
+	"POST /api/v1/sync/push":                             socle.Parcours,
 	"POST /api/v1/presence/beat":                         socle.Tous,
 }
 
@@ -66,6 +70,8 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("listSuggestions", http.MethodGet, "/api/v1/suggestions"), s.qualificationListerSuggestions)
 	huma.Register(api, qualificationRoute("updateSuggestionStatus", http.MethodPatch, "/api/v1/suggestions/{id}"), s.qualificationBasculerSuggestion)
 	noteMonterRoutes(api, s)
+	annuaireMonterRoutes(api, s)
+	syncMonterRoutes(api, s)
 }
 
 func qualificationTx(ctx context.Context, s *service, geste func(*db.Queries) error) error {
@@ -168,8 +174,9 @@ type QualificationRepAttemptInput struct{ Body QualificationRepAttemptBody }
 
 type QualificationRepAttemptOutput struct {
 	Body struct {
-		Status    string `json:"status" enum:"applied,duplicate"`
-		AttemptID string `json:"attemptId" format:"uuid"`
+		Status     string                      `json:"status" enum:"applied,duplicate"`
+		AttemptID  string                      `json:"attemptId" format:"uuid"`
+		Suggestion *QualificationSuggestionDTO `json:"suggestion"`
 	}
 }
 
@@ -311,6 +318,7 @@ func qualificationProchainRappel(callbackAt *time.Time, at time.Time, statut *db
 }
 
 type qualificationSuggestionRecue struct {
+	id        string
 	phoneE164 string
 	resolu    *string
 }
@@ -453,10 +461,31 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 	if err != nil {
 		return nil, err
 	}
-	if applique {
-		return qualificationRepResultat("applied", b.ID), nil
+	if !applique {
+		return qualificationRepResultat("duplicate", b.ID), nil
 	}
-	return qualificationRepResultat("duplicate", b.ID), nil
+	out := qualificationRepResultat("applied", b.ID)
+	if err := s.qualificationJoindreSuggestion(ctx, &appel, out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Le code court du représentant source et le nom du téléconseiller ne sont
+// assemblés que par la requête de liste : la piste écrite est relue par son id.
+func (s *service) qualificationJoindreSuggestion(ctx context.Context, a *qualificationAppelRep, out *QualificationRepAttemptOutput) error {
+	if a.suggestion == nil {
+		return nil
+	}
+	rows, err := s.Q.ListerSuggestions(ctx, db.ListerSuggestionsParams{
+		Tous: true, Agent: a.u.ID, ID: &a.suggestion.id, Lim: 1,
+	})
+	if err != nil || len(rows) == 0 {
+		return err
+	}
+	dto := qualificationSuggestionDTO(&rows[0])
+	out.Body.Suggestion = &dto
+	return nil
 }
 
 func (s *service) qualificationAppliquerRepAppel(ctx context.Context, q *db.Queries, a *qualificationAppelRep) (bool, error) {
@@ -494,6 +523,7 @@ func (*service) qualificationEcrireSuggestion(ctx context.Context, q *db.Queries
 	if err != nil {
 		return err
 	}
+	a.suggestion.id = id.String()
 	return q.InsererSuggestion(ctx, db.InsererSuggestionParams{
 		ID: id.String(), SourceRepresentantID: a.b.RepresentantID,
 		SuggestedName: qualificationRogne(a.b.SuggestedName), SuggestedPhoneE164: a.suggestion.phoneE164,
@@ -680,7 +710,9 @@ var qualificationMotifsSysteme = map[string]qualificationMotifIssue{
 }
 
 type QualificationCallAttemptBody struct {
-	ID                     string            `json:"id" format:"uuid"`
+	// L'identifiant vient du corps sur la route directe, de `entityId` sur
+	// /sync/push : il est donc contrôlé par la logique, pas par le schéma.
+	ID                     string            `json:"id,omitempty" format:"uuid"`
 	ProspectID             string            `json:"prospectId" format:"uuid"`
 	Outcome                string            `json:"outcome" enum:"METHOD_OBTAINED,UNREACHABLE,CALLBACK,REFUSED,WRONG_NUMBER,OTHER"`
 	ClientCreatedAt        time.Time         `json:"clientCreatedAt" format:"date-time"`
@@ -898,28 +930,45 @@ func qualificationDejaTraite(etat *QualificationProspectPhase2StateDTO) error {
 
 func (s *service) qualificationTentativeProspect(ctx context.Context, in *QualificationCallAttemptInput) (*QualificationCallAttemptOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	b := &in.Body
-	motif, err := s.qualificationMotifDeLIssue(ctx, b)
+	statut, etat, err := s.qualificationConsignerTentative(ctx, &u, &in.Body)
 	if err != nil {
-		return nil, err
-	}
-	tentative, err := qualificationNormaliserTentative(b, &motif)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.qualificationProspectAttribue(ctx, &u, b.ProspectID); err != nil {
 		return nil, err
 	}
 	out := &QualificationCallAttemptOutput{}
+	out.Body.Status, out.Body.AttemptID, out.Body.State = statut, in.Body.ID, etat
+	return out, nil
+}
+
+// Seul chemin d'écriture d'une tentative de phase 2 : la route directe et
+// /sync/push y passent tous deux.
+func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.Utilisateur, b *QualificationCallAttemptBody) (string, QualificationProspectPhase2StateDTO, error) {
+	var vide QualificationProspectPhase2StateDTO
+	if b.ID == "" {
+		return "", vide, socle.Problem(http.StatusUnprocessableEntity, "VALIDATION_FAILED",
+			"L’identifiant de la tentative est obligatoire.")
+	}
+	motif, err := s.qualificationMotifDeLIssue(ctx, b)
+	if err != nil {
+		return "", vide, err
+	}
+	tentative, err := qualificationNormaliserTentative(b, &motif)
+	if err != nil {
+		return "", vide, err
+	}
+	if err := s.qualificationProspectAttribue(ctx, u, b.ProspectID); err != nil {
+		return "", vide, err
+	}
+	var statut string
+	var etat QualificationProspectPhase2StateDTO
 	err = qualificationTx(ctx, s, func(q *db.Queries) error {
-		statut, etat, e := s.qualificationAppliquerTentative(ctx, q, &u, b, &tentative)
-		out.Body.Status, out.Body.AttemptID, out.Body.State = statut, b.ID, etat
+		var e error
+		statut, etat, e = s.qualificationAppliquerTentative(ctx, q, u, b, &tentative)
 		return e
 	})
 	if err != nil {
-		return nil, err
+		return "", vide, err
 	}
-	return out, nil
+	return statut, etat, nil
 }
 
 // Un téléconseiller n'appelle que ses campagnes ; l'encadrement n'est pas borné.

@@ -55,6 +55,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/imports/visites":                socle.AdminSeul,
 	"GET /api/v1/imports/{id}":                    socle.AdminSeul,
 	"POST /api/v1/imports/{id}/apply":             socle.AdminSeul,
+	"POST /api/v1/representants/import":           socle.AdminSeul,
 }
 
 type reglagesImport struct {
@@ -917,4 +918,5 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "applyImportJob", Method: http.MethodPost, Path: "/api/v1/imports/{id}/apply",
 		Summary: "Applique une simulation terminée : le même fichier est réécrit en base.",
 	}, s.appliquerImport)
+	representantsMonterRoutes(api, s)
 }

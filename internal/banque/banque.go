@@ -1124,8 +1124,8 @@ func banquePortefeuilleDemandes(u *socle.Utilisateur) *string {
 	return &u.ID
 }
 
-func (s *service) banqueDemande(ctx context.Context, id string) (DemandeClientBanque, error) {
-	rows, err := s.Q.ClientRequestList(ctx, db.ClientRequestListParams{ID: &id, Lignes: 1})
+func (s *service) banqueDemande(ctx context.Context, id string, portefeuille *string) (DemandeClientBanque, error) {
+	rows, err := s.Q.ClientRequestList(ctx, db.ClientRequestListParams{ID: &id, RequestedById: portefeuille, Lignes: 1})
 	if err != nil {
 		return DemandeClientBanque{}, err
 	}
@@ -1178,7 +1178,7 @@ func (s *service) banqueCreerDemande(ctx context.Context, in *CreationDemandeBan
 	if err != nil {
 		return nil, err
 	}
-	demande, err := s.banqueDemande(ctx, id.String())
+	demande, err := s.banqueDemande(ctx, id.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1282,7 +1282,7 @@ type ApprobationBanqueInput struct {
 }
 
 func (s *service) banqueDemandePendante(ctx context.Context, id string) (DemandeClientBanque, error) {
-	demande, err := s.banqueDemande(ctx, id)
+	demande, err := s.banqueDemande(ctx, id, nil)
 	if err != nil {
 		return demande, err
 	}
@@ -1343,7 +1343,7 @@ func (s *service) banqueApprouverDemande(ctx context.Context, in *ApprobationBan
 	if err := s.banqueEcrireApprobation(ctx, &u, &demande, in); err != nil {
 		return nil, err
 	}
-	arbitree, err := s.banqueDemande(ctx, in.ID)
+	arbitree, err := s.banqueDemande(ctx, in.ID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1419,7 +1419,7 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 		return nil, problemBanque(http.StatusConflict, banqueCodeDemandeArbitree, banqueMessageDemandeArbitree,
 			map[string]any{banqueCleStatut: string(db.ClientRequestStatusREJECTED)})
 	}
-	arbitree, err := s.banqueDemande(ctx, in.ID)
+	arbitree, err := s.banqueDemande(ctx, in.ID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -1444,6 +1444,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/bank-case-stages/{id}/active": socle.AdminSeul,
 	"POST /api/v1/client-requests":              socle.Banque,
 	"GET /api/v1/client-requests":               socle.Banque,
+	"GET /api/v1/client-requests/{id}":          socle.Banque,
 	"POST /api/v1/client-requests/{id}/approve": socle.AdminSeul,
 	"POST /api/v1/client-requests/{id}/reject":  socle.AdminSeul,
 }
@@ -1468,6 +1469,7 @@ func Monter(api huma.API, d *socle.Deps) {
 
 	posterBanque(api, "creer-demande-client", "/api/v1/client-requests", s.banqueCreerDemande)
 	huma.Get(api, "/api/v1/client-requests", s.banqueListerDemandes)
+	huma.Get(api, "/api/v1/client-requests/{id}", s.banqueLireDemande)
 	huma.Register(api, huma.Operation{
 		OperationID: "approuver-demande-client", Method: http.MethodPost,
 		Path: "/api/v1/client-requests/{id}/approve",

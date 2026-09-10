@@ -12,6 +12,7 @@
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
+    "date-fns": "catalog:",
     "exceljs": "catalog:",
     "oxlint": "catalog:",
     "pg": "catalog:",

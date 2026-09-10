@@ -1,61 +1,69 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components, paths } from '@/api/schema';
+import type { ApiClient, components, operations } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
+
+import { getApiClient } from '@/lib/api/browser';
+import type { ClientRequestFilters } from '@/lib/client-request-filters';
 
 type Schemas = components['schemas'];
 
-export type DemandeClient = Schemas['DemandeClientBanque'];
-export type StatutDemande = DemandeClient['status'];
-export type RequeteDemandes = NonNullable<
-  paths['/api/v1/client-requests']['get']['parameters']['query']
->;
+export type ClientRequest = Schemas['ClientRequestDto'];
+export type ClientRequestList = Schemas['ClientRequestListDto'];
+export type CreateClientRequestInput = Schemas['CreateClientRequestDto'];
+export type ApproveClientRequestInput = Schemas['ApproveClientRequestDto'];
 
-export interface PageDemandes {
-  items: DemandeClient[];
-  total: number;
-  page: number;
-  pageCount: number;
-  pageSize: number;
-  pendingCount: number;
+export async function fetchClientRequests(
+  filters: ClientRequestFilters,
+  client: ApiClient = getApiClient(),
+): Promise<ClientRequestList> {
+  const query: NonNullable<operations['listClientRequests']['parameters']['query']> = {
+    page: filters.page,
+    pageSize: filters.pageSize,
+  };
+  if (filters.status !== null) query.status = filters.status;
+  const search = filters.search.trim();
+  if (search !== '') query.search = search;
+  if (filters.banqueId !== null) query.banqueId = filters.banqueId;
+
+  return unwrap(await client.GET('/api/v1/client-requests', { params: { query } }));
 }
 
-export const LIBELLES_STATUT_DEMANDE: Record<StatutDemande, string> = {
-  PENDING: 'En attente',
-  APPROVED: 'Approuvée',
-  REJECTED: 'Refusée',
-};
-
-export async function fetchDemandes(query: RequeteDemandes): Promise<PageDemandes> {
-  const page = unwrap(await apiClient.GET('/api/v1/client-requests', { params: { query } }));
-  return { items: page.items ?? [], pendingCount: page.pendingCount, ...page.meta };
+export async function createClientRequest(
+  input: CreateClientRequestInput,
+  client: ApiClient = getApiClient(),
+): Promise<ClientRequest> {
+  return unwrap(await client.POST('/api/v1/client-requests', { body: input }));
 }
 
-export async function deposerDemande(body: {
-  nom: string;
-  prenom: string;
-  phone: string;
-  banqueId: string;
-  note?: string;
-}): Promise<DemandeClient> {
-  return unwrap(await apiClient.POST('/api/v1/client-requests', { body }));
-}
-
-export async function approuverDemande(
+export async function approveClientRequest(
   id: string,
-  body: { representantId: string; syndicatId: string },
-): Promise<DemandeClient> {
+  input: ApproveClientRequestInput,
+  client: ApiClient = getApiClient(),
+): Promise<ClientRequest> {
   return unwrap(
-    await apiClient.POST('/api/v1/client-requests/{id}/approve', {
+    await client.POST('/api/v1/client-requests/{id}/approve', {
       params: { path: { id } },
-      body,
+      body: input,
     }),
   );
 }
 
-export async function refuserDemande(id: string, reason: string): Promise<DemandeClient> {
+export async function rejectClientRequest(
+  id: string,
+  reason: string,
+  client: ApiClient = getApiClient(),
+): Promise<ClientRequest> {
   return unwrap(
-    await apiClient.POST('/api/v1/client-requests/{id}/reject', {
+    await client.POST('/api/v1/client-requests/{id}/reject', {
       params: { path: { id } },
       body: { reason },
     }),
   );
+}
+
+export function originLabelFor(origin: string | null, originLabel: string | null): string {
+  if (origin === null) return 'Tournée terrain';
+  if (origin === 'BANQUE') {
+    return originLabel === null ? 'Demande d’une banque' : `Demande de ${originLabel}`;
+  }
+  return originLabel ?? origin;
 }

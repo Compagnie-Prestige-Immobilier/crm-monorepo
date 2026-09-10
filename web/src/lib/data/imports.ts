@@ -1,22 +1,24 @@
-import { ApiError, apiClient, unwrap } from '@/api/client';
-import type { components } from '@/api/schema';
-import { apiErrorMessage } from '@/lib/utils';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type TravailImport = components['schemas']['ImportJobDTO'];
-export type RapportImport = components['schemas']['RapportImportDTO'];
-export type GenreImport = TravailImport['kind'];
+import { getApiClient } from '@/lib/api/browser';
 
-/** Ce qui se dépose depuis cet écran, dans l'ordre de la liste déroulante. */
-export const GENRES_DEPOSABLES = [
-  'PROSPECTS',
-  'PROSPECTS_GRAND_PUBLIC',
-  'REPRESENTANTS',
-  'VISITES',
-] as const;
+type Schemas = components['schemas'];
 
-export type GenreDeposable = (typeof GENRES_DEPOSABLES)[number];
+export type ImportJob = Schemas['ImportJobDto'];
+export type ImportJobReport = Schemas['ImportJobReportDto'];
+export type ImportKind = Schemas['ImportKind'];
 
-export const LIBELLES_GENRE: Readonly<Record<GenreImport, string>> = {
+export interface ImportJobPage {
+  items: ImportJob[];
+  total: number;
+  page: number;
+  pageCount: number;
+}
+
+const IMPORT_HISTORY_PAGE_SIZE = 10;
+
+export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
   REPRESENTANTS: 'Représentants',
   PROSPECTS: 'Prospects CHUES',
   PROSPECTS_GRAND_PUBLIC: 'Prospects Grand Public',
@@ -24,106 +26,98 @@ export const LIBELLES_GENRE: Readonly<Record<GenreImport, string>> = {
   VISITES_REGISTRE: 'Registre des visites',
 };
 
-export const CONSIGNES_GENRE: Readonly<Record<GenreDeposable, string>> = {
-  PROSPECTS:
-    'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le groupe. Ce fichier ne crée aucun représentant, importez-les d’abord.',
-  PROSPECTS_GRAND_PUBLIC:
-    'Seuls le nom et le téléphone sont exigés. Les colonnes sont retrouvées par le texte de leur en-tête, pas par leur rang.',
-  REPRESENTANTS:
-    'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.',
-  VISITES: 'Seuls les onglets « BDD VISITES » sont lus, avec l’en-tête en ligne 3.',
+/** Plafonds des adaptateurs d'import, annoncés avant le dépôt. */
+export const IMPORT_MAX_ROWS: Readonly<Record<ImportKind, number>> = {
+  REPRESENTANTS: 50_000,
+  PROSPECTS: 150_000,
+  PROSPECTS_GRAND_PUBLIC: 50_000,
+  VISITES: 20_000,
+  VISITES_REGISTRE: 20_000,
 };
 
-const CHEMINS_DEPOT: Readonly<Record<GenreDeposable, string>> = {
+export const IMPORT_TEMPLATES: Readonly<
+  Partial<Record<ImportKind, { url: string; fileName: string }>>
+> = {
+  REPRESENTANTS: {
+    url: '/api/v1/export/representants-modele.xlsx',
+    fileName: 'cpi-representants-modele.xlsx',
+  },
+  PROSPECTS: {
+    url: '/api/v1/export/prospects-modele.xlsx',
+    fileName: 'cpi-prospects-modele.xlsx',
+  },
+  PROSPECTS_GRAND_PUBLIC: {
+    url: '/api/v1/export/prospects-grand-public-modele.xlsx',
+    fileName: 'cpi-prospects-grand-public-modele.xlsx',
+  },
+};
+
+export async function fetchImportJobs(
+  page: number,
+  client: ApiClient = getApiClient(),
+): Promise<ImportJobPage> {
+  const result = unwrap(
+    await client.GET('/api/v1/imports', {
+      params: { query: { page, pageSize: IMPORT_HISTORY_PAGE_SIZE } },
+    }),
+  );
+  return {
+    items: result.items,
+    total: result.meta.total,
+    page: result.meta.page,
+    pageCount: result.meta.pageCount,
+  };
+}
+
+export async function fetchImportJob(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ImportJob> {
+  return unwrap(await client.GET('/api/v1/imports/{id}', { params: { path: { id } } }));
+}
+
+/** Remet le même travail en file, en mode APPLY. Écrit en base. */
+export async function applyImportJob(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ImportJob> {
+  return unwrap(await client.POST('/api/v1/imports/{id}/apply', { params: { path: { id } } }));
+}
+
+/** Ce qu'on peut déposer, dans l'ordre de la liste déroulante. */
+export const UPLOADABLE_IMPORT_KINDS = [
+  'PROSPECTS',
+  'PROSPECTS_GRAND_PUBLIC',
+  'REPRESENTANTS',
+  'VISITES',
+] as const satisfies readonly Exclude<ImportKind, 'VISITES_REGISTRE'>[];
+
+export type UploadableImportKind = (typeof UPLOADABLE_IMPORT_KINDS)[number];
+
+/** `VISITES_REGISTRE` n'y figure pas : son dépôt vit dans `visites-import.ts`, sur `/api/v1/visites/import`. */
+const UPLOAD_PATHS: Readonly<Record<Exclude<ImportKind, 'VISITES_REGISTRE'>, string>> = {
+  REPRESENTANTS: '/api/v1/imports/representants',
   PROSPECTS: '/api/v1/imports/prospects',
   PROSPECTS_GRAND_PUBLIC: '/api/v1/imports/prospects-grand-public',
-  REPRESENTANTS: '/api/v1/imports/representants',
   VISITES: '/api/v1/imports/visites',
 };
 
-/** Le serveur pose le `Content-Disposition` : un simple lien suffit. */
-export const MODELES_GENRE: Readonly<Partial<Record<GenreDeposable, string>>> = {
-  PROSPECTS: '/api/v1/export/prospects-modele.xlsx',
-  PROSPECTS_GRAND_PUBLIC: '/api/v1/export/prospects-grand-public-modele.xlsx',
-  REPRESENTANTS: '/api/v1/export/representants-modele.xlsx',
-};
+// Le contrat engendré représente un fichier multipart par `string`; FormData
+// conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
+export async function createImportJob(
+  kind: Exclude<ImportKind, 'VISITES_REGISTRE'>,
+  file: File,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+): Promise<ImportJob> {
+  const form = new FormData();
+  form.append('file', file);
 
-/** Aligné sur la limite du serveur : refuser ici évite un 413. */
-export const TAILLE_MAX_OCTETS = 25 * 1024 * 1024;
+  // Aucun `content-type` posé ici : le navigateur écrit la frontière multipart.
+  const response = await fetchImpl(UPLOAD_PATHS[kind], { method: 'POST', body: form });
+  const text = await response.text();
+  const body: unknown = text === '' ? undefined : JSON.parse(text);
 
-const PAGE_HISTORIQUE = 10;
-
-export async function fetchTravauxImport(page: number): Promise<{
-  items: TravailImport[];
-  meta: components['schemas']['MetaPageImports'];
-}> {
-  const sortie = unwrap(
-    await apiClient.GET('/api/v1/imports', {
-      params: { query: { page, pageSize: PAGE_HISTORIQUE } },
-    }),
+  return unwrap<ImportJob, unknown>(
+    response.ok ? { data: body as ImportJob, response } : { error: body ?? {}, response },
   );
-  return { items: sortie.items ?? [], meta: sortie.meta };
-}
-
-export async function fetchTravailImport(id: string): Promise<TravailImport> {
-  return unwrap(await apiClient.GET('/api/v1/imports/{id}', { params: { path: { id } } }));
-}
-
-export async function appliquerImport(id: string): Promise<TravailImport> {
-  return unwrap(await apiClient.POST('/api/v1/imports/{id}/apply', { params: { path: { id } } }));
-}
-
-/**
- * `FormData` brut : le contrat décrit le fichier par une chaîne, et seul le
- * navigateur sait écrire la frontière multipart.
- */
-export async function deposerClasseur(
-  genre: GenreDeposable,
-  fichier: File,
-): Promise<TravailImport> {
-  const corps = new FormData();
-  corps.append('file', fichier);
-
-  const reponse = await fetch(CHEMINS_DEPOT[genre], {
-    method: 'POST',
-    body: corps,
-    credentials: 'same-origin',
-  });
-  const texte = await reponse.text();
-  const charge: unknown = texte === '' ? undefined : JSON.parse(texte);
-
-  if (!reponse.ok) {
-    throw new ApiError(
-      reponse.status,
-      charge,
-      apiErrorMessage(charge, 'Le classeur n’a pas pu être déposé.'),
-    );
-  }
-  return charge as TravailImport;
-}
-
-/**
- * Le serveur rend `report: null` tant que le classeur n'a pas été lu, alors que
- * le contrat le déclare toujours présent (`imports.go:133`, pointeur non marqué
- * nullable).
- */
-export function rapportDe(travail: TravailImport): RapportImport | null {
-  const rapport: unknown = travail.report;
-  if (rapport === null || rapport === undefined) return null;
-  return rapport as RapportImport;
-}
-
-export function importEnCours(travail: TravailImport | undefined): boolean {
-  return travail?.status === 'queued' || travail?.status === 'running';
-}
-
-export function lignesEcrites(travail: TravailImport): number {
-  return travail.createdRows + travail.updatedRows;
-}
-
-/** Mêmes conditions que le serveur, pour ne pas proposer un geste qui finirait en 409. */
-export function peutAppliquer(travail: TravailImport, maintenant = Date.now()): boolean {
-  if (travail.status !== 'succeeded' || travail.mode !== 'DRY_RUN') return false;
-  if (new Date(travail.expiresAt).getTime() <= maintenant) return false;
-  return lignesEcrites(travail) > 0;
 }

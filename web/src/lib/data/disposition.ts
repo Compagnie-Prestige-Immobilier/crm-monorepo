@@ -1,33 +1,47 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components, operations } from '@/api/schema';
+import type { ApiClient, components } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
 
-export type EcranDisposition = operations['getDashboardLayout']['parameters']['path']['ecran'];
-export type DispositionWidgetApi = components['schemas']['DispositionWidget'];
-export type Marque = NonNullable<DispositionWidgetApi['marque']>;
-export type Taille = NonNullable<DispositionWidgetApi['taille']>;
-export type Presentation = NonNullable<DispositionWidgetApi['presentation']>;
-export type Preset = components['schemas']['DispositionOutputBody']['preset'];
+import { getApiClient } from '@/lib/api/browser';
+import type {
+  DashboardMarque,
+  DashboardPreset,
+  DashboardSource,
+  DashboardTaille,
+  DispositionPresentation,
+} from '@/components/accueil/tableau-de-bord/sources';
 
-export interface Widget {
+export type DashboardEcran = components['schemas']['DashboardEcran'];
+
+export interface DashboardWidget {
   id: string;
-  source: string;
-  marque?: Marque | undefined;
-  taille?: Taille | undefined;
-  presentation?: Presentation | undefined;
+  source: DashboardSource;
+  marque?: DashboardMarque | undefined;
+  taille?: DashboardTaille | undefined;
+  presentation?: DispositionPresentation | undefined;
 }
 
 export interface Disposition {
-  widgets: Widget[];
-  preset: Preset;
+  widgets: DashboardWidget[];
+  preset: DashboardPreset;
   source: 'utilisateur' | 'defaut' | 'usine';
   updatedAt: string | null;
 }
 
+function widgetId(source: DashboardSource, index: number): string {
+  return `${source}-${String(index)}`;
+}
+
 /**
- * Le seul point de sérialisation d'un widget : le serveur rejette la requête
- * entière au moindre champ étranger, une clé de rendu (`id`) comprise.
+ * Le seul point de sérialisation d'un widget vers l'API : `forbidNonWhitelisted`
+ * y rejette la requête entière au moindre champ étranger, une clé client (id)
+ * comprise.
  */
-function serializeWidget(widget: Widget): DispositionWidgetApi {
+export function serializeWidget(widget: DashboardWidget): {
+  source: DashboardSource;
+  marque?: DashboardMarque;
+  taille?: DashboardTaille;
+  presentation?: DispositionPresentation;
+} {
   return {
     source: widget.source,
     ...(widget.marque === undefined ? {} : { marque: widget.marque }),
@@ -37,48 +51,59 @@ function serializeWidget(widget: Widget): DispositionWidgetApi {
 }
 
 export function serializeDisposition(
-  widgets: readonly Widget[],
-  preset?: Preset,
-): { preset?: Preset; widgets: DispositionWidgetApi[] } {
+  widgets: readonly DashboardWidget[],
+  preset?: DashboardPreset,
+): { preset?: DashboardPreset; widgets: ReturnType<typeof serializeWidget>[] } {
   return {
     ...(preset === undefined ? {} : { preset }),
     widgets: widgets.map(serializeWidget),
   };
 }
 
-function enDisposition(corps: components['schemas']['DispositionOutputBody']): Disposition {
+function toDisposition(response: {
+  widgets: {
+    source: DashboardSource;
+    marque?: DashboardMarque;
+    taille?: DashboardTaille;
+    presentation?: DispositionPresentation;
+  }[];
+  preset: DashboardPreset;
+  source: 'utilisateur' | 'defaut' | 'usine';
+  updatedAt: string | null;
+}): Disposition {
   return {
-    widgets: (corps.widgets ?? []).map((widget, index) => ({
-      id: `${widget.source}-${String(index)}`,
-      source: widget.source,
-      ...(widget.marque === undefined ? {} : { marque: widget.marque }),
-      ...(widget.taille === undefined ? {} : { taille: widget.taille }),
-      ...(widget.presentation === undefined ? {} : { presentation: widget.presentation }),
+    widgets: response.widgets.map((widget, index) => ({
+      id: widgetId(widget.source, index),
+      ...widget,
     })),
-    preset: corps.preset,
-    source: corps.source,
-    updatedAt: corps.updatedAt,
+    preset: response.preset,
+    source: response.source,
+    updatedAt: response.updatedAt,
   };
 }
 
-export async function fetchDisposition(ecran: EcranDisposition): Promise<Disposition> {
-  return enDisposition(
+export async function fetchDisposition(
+  ecran: DashboardEcran,
+  client: ApiClient = getApiClient(),
+): Promise<Disposition> {
+  return toDisposition(
     unwrap(
-      await apiClient.GET('/api/v1/tableaux-de-bord/{ecran}/disposition', {
+      await client.GET('/api/v1/tableaux-de-bord/{ecran}/disposition', {
         params: { path: { ecran } },
       }),
     ),
   );
 }
 
-export async function enregistrerDisposition(
-  ecran: EcranDisposition,
-  widgets: readonly Widget[],
-  preset: Preset | undefined,
+export async function saveDisposition(
+  ecran: DashboardEcran,
+  widgets: readonly DashboardWidget[],
+  preset: DashboardPreset | undefined,
+  client: ApiClient = getApiClient(),
 ): Promise<Disposition> {
-  return enDisposition(
+  return toDisposition(
     unwrap(
-      await apiClient.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition', {
+      await client.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition', {
         params: { path: { ecran } },
         body: serializeDisposition(widgets, preset),
       }),
@@ -86,26 +111,30 @@ export async function enregistrerDisposition(
   );
 }
 
-export async function enregistrerDispositionParDefaut(
-  ecran: EcranDisposition,
-  widgets: readonly Widget[],
-  preset: Preset | undefined,
+export async function resetDisposition(
+  ecran: DashboardEcran,
+  client: ApiClient = getApiClient(),
 ): Promise<Disposition> {
-  return enDisposition(
-    unwrap(
-      await apiClient.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut', {
-        params: { path: { ecran } },
-        body: serializeDisposition(widgets, preset),
-      }),
-    ),
-  );
-}
-
-export async function reinitialiserDisposition(ecran: EcranDisposition): Promise<Disposition> {
   unwrap(
-    await apiClient.DELETE('/api/v1/tableaux-de-bord/{ecran}/disposition', {
+    await client.DELETE('/api/v1/tableaux-de-bord/{ecran}/disposition', {
       params: { path: { ecran } },
     }),
   );
-  return fetchDisposition(ecran);
+  return fetchDisposition(ecran, client);
+}
+
+export async function saveDefaultDisposition(
+  ecran: DashboardEcran,
+  widgets: readonly DashboardWidget[],
+  preset: DashboardPreset | undefined,
+  client: ApiClient = getApiClient(),
+): Promise<Disposition> {
+  return toDisposition(
+    unwrap(
+      await client.PUT('/api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut', {
+        params: { path: { ecran } },
+        body: serializeDisposition(widgets, preset),
+      }),
+    ),
+  );
 }

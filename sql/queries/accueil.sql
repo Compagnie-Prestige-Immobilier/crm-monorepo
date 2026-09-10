@@ -11,6 +11,18 @@ SELECT * FROM (
 WHERE NOT @active_only::boolean OR r."isActive"
 ORDER BY r."sortOrder", r."label";
 
+-- name: UsageReferentielsVisite :many
+SELECT 'entreprises'::text AS kind, "entrepriseId" AS "id", count(*)::int AS "total"
+FROM "visites" GROUP BY "entrepriseId"
+UNION ALL
+SELECT 'objets'::text, "objetId", count(*)::int FROM "visites" GROUP BY "objetId"
+UNION ALL
+SELECT 'directions'::text, "directionId", count(*)::int
+FROM "visites" WHERE "directionId" IS NOT NULL GROUP BY "directionId"
+UNION ALL
+SELECT 'destinataires'::text, "destinataireId", count(*)::int
+FROM "visites" WHERE "destinataireId" IS NOT NULL GROUP BY "destinataireId";
+
 -- name: ReferentielsVisiteChoisis :many
 SELECT 'entreprise'::text AS kind, "id", "isActive" FROM "visite_entreprises" WHERE "id" = sqlc.narg(entreprise_id)::text
 UNION ALL

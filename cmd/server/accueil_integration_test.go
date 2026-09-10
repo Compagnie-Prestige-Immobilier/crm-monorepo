@@ -466,3 +466,150 @@ func compteVisites(t *testing.T, br *bancRegistre) int {
 	}
 	return total
 }
+
+func estVrai(valeur any) bool {
+	vrai, _ := valeur.(bool)
+	return vrai
+}
+
+func (br *bancRegistre) objetsVisite(actifsSeulement bool) (ordre []string, parID map[string]map[string]any) {
+	br.t.Helper()
+	statut, body := appelRegistre(br.banc, http.MethodGet,
+		"/api/v1/visites/referentiels/objets?activeOnly="+strconv.FormatBool(actifsSeulement), nil)
+	br.attend(statut, http.StatusOK, "liste des objets de visite", body)
+	parID = map[string]map[string]any{}
+	for _, brut := range body["items"].([]any) {
+		entree := brut.(map[string]any)
+		id := entree["id"].(string)
+		ordre = append(ordre, id)
+		parID[id] = entree
+	}
+	return ordre, parID
+}
+
+// Une entrée reprise du classeur d'origine, que l'administration ne retire pas.
+func (br *bancRegistre) objetDuClasseur(code string) string {
+	br.t.Helper()
+	id := uuid.NewString()
+	if _, err := br.pool.Exec(br.ctx,
+		`INSERT INTO "visite_objets" ("id","code","label","isSystem","updatedAt") VALUES ($1,$2,$3,true,now())`,
+		id, code, "Objet du classeur "+code); err != nil {
+		br.t.Fatal(err)
+	}
+	br.t.Cleanup(func() { _, _ = br.pool.Exec(br.ctx, `DELETE FROM "visite_objets" WHERE "id" = $1`, id) })
+	return id
+}
+
+func usageVisite(t *testing.T, body map[string]any, kind, id string) (nombre float64, vu bool) {
+	t.Helper()
+	for _, brut := range body[kind].([]any) {
+		entree := brut.(map[string]any)
+		if entree["id"] == id {
+			return entree["count"].(float64), true
+		}
+	}
+	return 0, false
+}
+
+// Le code est figé et mis en majuscules, le libellé se corrige, et une entrée
+// retirée des listes de saisie reste visible de l'administration.
+func TestAccueilListesVisiteAdministrees(t *testing.T) {
+	br := nouveauBancRegistre(t, "ADMIN")
+	suffixe := strings.ToUpper(uuid.NewString()[:8])
+
+	statut, body := appelRegistre(br.banc, http.MethodPost, "/api/v1/visites/referentiels/objets",
+		map[string]any{"code": "remise_" + suffixe, "label": "Remise de dossier " + suffixe})
+	br.attend(statut, http.StatusCreated, "création d'une entrée", body)
+	entree, _ := body["id"].(string)
+	if entree == "" {
+		t.Fatalf("entrée sans identifiant : %v", body)
+	}
+	t.Cleanup(func() { _, _ = br.pool.Exec(br.ctx, `DELETE FROM "visite_objets" WHERE "id" = $1`, entree) })
+	if body["code"] != "REMISE_"+suffixe || !estVrai(body["isActive"]) ||
+		estVrai(body["isSystem"]) || body["sortOrder"] != float64(100) {
+		t.Fatalf("code en majuscules, entrée active et rangée par défaut : %v", body)
+	}
+
+	statut, body = appelRegistre(br.banc, http.MethodPost, "/api/v1/visites/referentiels/objets",
+		map[string]any{"code": "REMISE_" + suffixe, "label": "Autre libellé " + suffixe})
+	br.attend(statut, http.StatusConflict, "code déjà pris", body)
+	if body["code"] != "VISITE_REFERENTIEL_CODE_CONFLICT" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	statut, body = appelRegistre(br.banc, http.MethodPatch, "/api/v1/visites/referentiels/objets/"+entree,
+		map[string]any{"label": "Remise corrigée " + suffixe})
+	br.attend(statut, http.StatusOK, "renommage", body)
+	if body["label"] != "Remise corrigée "+suffixe || body["code"] != "REMISE_"+suffixe {
+		t.Fatalf("le libellé change, le code jamais : %v", body)
+	}
+
+	statut, body = appelRegistre(br.banc, http.MethodPatch,
+		"/api/v1/visites/referentiels/objets/"+uuid.NewString(), map[string]any{"label": "Entrée absente"})
+	br.attend(statut, http.StatusNotFound, "entrée inconnue", body)
+
+	statut, body = appelRegistre(br.banc, http.MethodPost,
+		"/api/v1/visites/referentiels/objets/"+entree+"/active", map[string]any{"isActive": false})
+	br.attend(statut, http.StatusCreated, "retrait des listes de saisie", body)
+	if estVrai(body["isActive"]) {
+		t.Fatalf("entrée retirée : %v", body)
+	}
+	if _, parID := br.objetsVisite(true); parID[entree] != nil {
+		t.Fatal("une entrée retirée ne revient pas dans les listes de saisie")
+	}
+	if _, parID := br.objetsVisite(false); parID[entree] == nil {
+		t.Fatal("une entrée retirée reste visible de l'administration")
+	}
+}
+
+// L'ordre d'affichage se réécrit d'un bloc, et l'entrée du classeur d'origine
+// ne sort jamais des listes.
+func TestAccueilListeVisiteReordonnee(t *testing.T) {
+	br := nouveauBancRegistre(t, "DIRECTION")
+	classeur := br.objetDuClasseur("SYS_" + strings.ToUpper(uuid.NewString()[:8]))
+
+	statut, body := appelRegistre(br.banc, http.MethodPost,
+		"/api/v1/visites/referentiels/objets/"+classeur+"/active", map[string]any{"isActive": false})
+	br.attend(statut, http.StatusBadRequest, "retrait d'une entrée du classeur", body)
+	if body["code"] != "VISITE_REFERENTIEL_SYSTEM_IMMUTABLE" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	statut, body = appelRegistre(br.banc, http.MethodPost, "/api/v1/visites/referentiels/objets/reorder",
+		map[string]any{"ids": []string{classeur, br.objet}})
+	br.attend(statut, http.StatusCreated, "réordonnancement", body)
+	ordre, parID := br.objetsVisite(false)
+	for rang, id := range []string{classeur, br.objet} {
+		if attendu := float64((rang + 1) * 10); parID[id]["sortOrder"] != attendu {
+			t.Fatalf("rang de %s : %v attendu %v", id, parID[id]["sortOrder"], attendu)
+		}
+	}
+	position := map[string]int{}
+	for rang, id := range ordre {
+		position[id] = rang
+	}
+	if position[classeur] > position[br.objet] {
+		t.Fatalf("la liste suit l'ordre demandé : %v", ordre)
+	}
+}
+
+func TestAccueilUsageListesVisite(t *testing.T) {
+	br := nouveauBancRegistre(t, "ADMIN")
+	br.creerVisite("2019-03-04", "11:08", "MOUHAMED FALL", "")
+	br.creerVisite("2019-03-05", "", "AMINATA SOW", "")
+
+	statut, body := appelRegistre(br.banc, http.MethodGet, "/api/v1/visites/referentiels/usage", nil)
+	br.attend(statut, http.StatusOK, "usage des listes", body)
+	for _, cas := range []struct{ kind, id string }{
+		{"entreprises", br.entreprise},
+		{"objets", br.objet},
+	} {
+		nombre, vu := usageVisite(t, body, cas.kind, cas.id)
+		if !vu || nombre != 2 {
+			t.Fatalf("%s : deux visites attendues, %v (vu : %t)", cas.kind, nombre, vu)
+		}
+	}
+	if _, vu := usageVisite(t, body, "directions", br.direction); vu {
+		t.Fatal("une direction que personne n'a visitée ne compte pas")
+	}
+}

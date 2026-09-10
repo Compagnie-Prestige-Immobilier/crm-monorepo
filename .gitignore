@@ -17,7 +17,9 @@ web/dist/*
 !web/dist/.gitkeep
 web/src/routeTree.gen.ts
 web/src/api/schema.d.ts
+web/src/api/schema-v1.d.ts
 e2e/.auth/
+e2e/v1/.auth/
 e2e/.roles.json
 e2e/fixtures/
 test-results/

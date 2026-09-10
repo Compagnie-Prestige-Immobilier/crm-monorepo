@@ -26,7 +26,7 @@ internal/shared/socle/ middleware, erreurs RFC 9457, garde des rôles, session, 
 internal/shared/database/ migrations goose, audit, argon2id, téléphone
 sql/                   schema.sql, queries/ (sqlc), migrations/ (embarquées)
 db/                    généré par sqlc, non commité
-web/  e2e/             panneau Vite embarqué, parcours Playwright
+web/  e2e/             panneau v1 repris tel quel (SPA Vite embarquée), parcours Playwright
 infra/dokploy/         deploy.py, pilotage de Dokploy
 ```
 

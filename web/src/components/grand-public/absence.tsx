@@ -1,6 +1,12 @@
-import type { ReactNode } from 'react';
+import { cn } from '@/lib/utils';
 
-/** Ce qui n'a pas été renseigné se lit comme tel, jamais comme une valeur vide. */
-export function Absent({ children = 'Non renseigné' }: { children?: ReactNode }) {
-  return <span className="text-muted-foreground italic">{children}</span>;
+/** Un tiret se lit comme une valeur. Le libellé dit LAQUELLE des absences c'est. */
+export function Absent({
+  children = 'Non renseigné',
+  className,
+}: {
+  children?: string;
+  className?: string | undefined;
+}) {
+  return <span className={cn('text-muted-foreground italic', className)}>{children}</span>;
 }

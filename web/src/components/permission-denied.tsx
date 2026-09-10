@@ -1,9 +1,9 @@
-import { Link } from '@tanstack/react-router';
 import { LockIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { buttonVariants } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { homePathForRole, lien } from '@/lib/nav';
+import { homePathForRole } from '@/components/layout/nav-items';
 import { ROLE_LABELS, type Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -30,9 +30,10 @@ export function PermissionDenied({
         {what} est réservé à un autre rôle. Rôle en cours :{' '}
         <strong className="font-[600] text-foreground">{ROLE_LABELS[role]}</strong>.
       </p>
-      {/* Un lien habillé en bouton : `Button` poserait `role="button"` sur le `<a>`. */}
+      {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
+          `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
       <Link
-        {...lien(homePathForRole(role))}
+        href={homePathForRole(role)}
         className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
       >
         Retour à l’accueil

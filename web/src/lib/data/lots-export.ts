@@ -1,79 +1,78 @@
-import { apiClient, unwrap } from '@/api/client';
-import type { components, operations } from '@/api/schema';
-import type { ProjetApi } from '@/lib/types';
+import type { ApiClient, components, operations } from '@crm/api-client';
+import { unwrap } from '@crm/api-client/query';
+
+import { getApiClient } from '@/lib/api/browser';
+import { flattenPage } from '@/lib/api/query-params';
+import type { Paginated, Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
-
-export type CampagneResume = Schemas['CampagneResume'];
-export type CampagneDetail = Schemas['CampagneDetail'];
-export type CampagneCreation = Schemas['CampagneCreationBody'];
-export type CampagneApercu = Schemas['CampagneApercuOutputBody'];
-export type CampagneFiche = Schemas['CampagneFiche'];
-export type CampagneCible = CampagneResume['cible'];
-export type CampagneFicheEtat = CampagneFiche['etat'];
-export type CampagnePerformance = CampagneDetail['performance'];
-export type CampagneReaffectation = NonNullable<CampagneDetail['reaffectations']>[number];
-export type CampagnesQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
-export type CampagneFichesQuery = NonNullable<
+export type LotExportSummary = Schemas['LotExportSummaryDto'];
+export type LotExportDetail = Schemas['LotExportDetailDto'];
+export type CreateLotExportInput = Schemas['CreateLotExportDto'];
+export type LotExportPreview = Schemas['LotExportPreviewDto'];
+export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
+export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
+export type LotExportFiche = Schemas['LotExportFicheDto'];
+export type LotExportFicheEtat = Schemas['LotExportFicheEtat'];
+export type UpdateLotExportInput = Schemas['UpdateLotExportDto'];
+export type LotExportFichesQuery = NonNullable<
   operations['listLotExportFiches']['parameters']['query']
 >;
 
-export interface Page<T> {
-  items: T[];
-  total: number;
-  page: number;
-  pageCount: number;
+/** Une campagne reste dans la coque de son projet ; un lot de représentants porte `CHUES`. */
+export function campagnesPath(projet: Projet): string {
+  return projet === 'GRAND_PUBLIC' ? '/grand-public/campagnes' : '/chues/campagnes';
 }
 
-function aplatir<T>(reponse: { items: T[] | null; meta: Schemas['CampagnePageMeta'] }): Page<T> {
-  return {
-    items: reponse.items ?? [],
-    total: reponse.meta.total,
-    page: reponse.meta.page,
-    pageCount: reponse.meta.pageCount,
-  };
+export async function fetchLotsExport(
+  query: LotExportQuery,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<LotExportSummary>> {
+  return flattenPage(unwrap(await client.GET('/api/v1/lots-export', { params: { query } })));
 }
 
-export async function fetchCampagnes(query: CampagnesQuery): Promise<Page<CampagneResume>> {
-  return aplatir(unwrap(await apiClient.GET('/api/v1/lots-export', { params: { query } })));
-}
-
-export async function fetchCampagne(id: string): Promise<CampagneDetail> {
-  return unwrap(await apiClient.GET('/api/v1/lots-export/{id}', { params: { path: { id } } }));
-}
-
-export async function creerCampagne(body: CampagneCreation): Promise<CampagneResume> {
-  return unwrap(await apiClient.POST('/api/v1/lots-export', { body }));
+export async function createLotExport(
+  body: CreateLotExportInput,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportSummary> {
+  return unwrap(await client.POST('/api/v1/lots-export', { body }));
 }
 
 /**
- * L'aperçu est un POST : les critères sont un objet imbriqué, qu'une chaîne de
- * requête plate ne sait pas porter.
+ * L'aperçu est un POST : en GET, l'analyseur de requête de Fastify est plat et
+ * `prospects[projet]=CHUES` lui arrive comme une clé littérale, que la
+ * validation rejette.
  */
-export async function apercuCampagne(body: CampagneCreation): Promise<CampagneApercu> {
-  return unwrap(await apiClient.POST('/api/v1/lots-export/apercu', { body }));
+export async function previewLotExport(
+  body: CreateLotExportInput,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportPreview> {
+  return unwrap(await client.POST('/api/v1/lots-export/apercu', { body }));
 }
 
-export async function modifierCampagne(
+export async function fetchLotExport(
   id: string,
-  body: Schemas['CampagneMajInputBody'],
-): Promise<CampagneResume> {
-  return unwrap(
-    await apiClient.PATCH('/api/v1/lots-export/{id}', { params: { path: { id } }, body }),
-  );
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
+  return unwrap(await client.GET('/api/v1/lots-export/{id}', { params: { path: { id } } }));
 }
 
-export async function supprimerCampagne(id: string): Promise<void> {
-  unwrap(await apiClient.DELETE('/api/v1/lots-export/{id}', { params: { path: { id } } }));
-}
-
-export async function fetchCampagneFiches(
+export async function updateLotExport(
   id: string,
-  query: CampagneFichesQuery,
-): Promise<Page<CampagneFiche>> {
-  return aplatir(
+  body: UpdateLotExportInput,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportSummary> {
+  return unwrap(await client.PATCH('/api/v1/lots-export/{id}', { params: { path: { id } }, body }));
+}
+
+export async function fetchLotExportFiches(
+  id: string,
+  query: LotExportFichesQuery,
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<LotExportFiche>> {
+  return flattenPage(
     unwrap(
-      await apiClient.GET('/api/v1/lots-export/{id}/fiches', { params: { path: { id }, query } }),
+      await client.GET('/api/v1/lots-export/{id}/fiches', { params: { path: { id }, query } }),
     ),
   );
 }
@@ -81,9 +80,10 @@ export async function fetchCampagneFiches(
 export async function reaffecterFiches(
   id: string,
   body: { positions: number[]; versTeleconseillerId: string },
-): Promise<CampagneDetail> {
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
   return unwrap(
-    await apiClient.POST('/api/v1/lots-export/{id}/reaffectation', {
+    await client.POST('/api/v1/lots-export/{id}/reaffectation', {
       params: { path: { id } },
       body,
     }),
@@ -93,51 +93,52 @@ export async function reaffecterFiches(
 export async function retirerTeleconseiller(
   id: string,
   teleconseillerId: string,
-): Promise<CampagneDetail> {
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
   return unwrap(
-    await apiClient.POST('/api/v1/lots-export/{id}/retrait', {
+    await client.POST('/api/v1/lots-export/{id}/retrait', {
       params: { path: { id } },
       body: { teleconseillerId },
     }),
   );
 }
 
-/** La couverture de la dernière campagne, telle que le tableau de bord la lit. */
+export async function deleteLotExport(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(await client.DELETE('/api/v1/lots-export/{id}', { params: { path: { id } } }));
+}
+
 export async function fetchDerniereCampagne(
-  projet: ProjetApi,
+  projet: Schemas['Projet'],
   teleconseillerId: string | null,
-): Promise<{ name: string; performance: CampagnePerformance } | null> {
-  const liste = await fetchCampagnes({ projet, page: 1, pageSize: 1 });
+  client: ApiClient = getApiClient(),
+): Promise<CampagnePerformance | null> {
+  const liste = await fetchLotsExport({ projet, page: 1, pageSize: 1 }, client);
   const resume = liste.items[0];
   if (resume === undefined) return null;
 
-  const campagne = await fetchCampagne(resume.id);
-  const performance = campagne.performance ?? [];
+  const campagne = await fetchLotExport(resume.id, client);
   return {
     name: campagne.name,
     performance:
       teleconseillerId === null
-        ? performance
-        : performance.filter((ligne) => ligne.teleconseillerId === teleconseillerId),
+        ? campagne.performance
+        : campagne.performance.filter((ligne) => ligne.teleconseillerId === teleconseillerId),
   };
 }
 
-const cheminLot = (id: string): string => `/api/v1/lots-export/${encodeURIComponent(id)}`;
-
-export function urlClasseurCampagne(id: string): string {
-  return `${cheminLot(id)}/export.xlsx`;
+export function lotExportUrl(id: string, format: 'xlsx' | 'zip'): string {
+  return `/api/v1/lots-export/${encodeURIComponent(id)}/${format === 'xlsx' ? 'export.xlsx' : 'programmes.zip'}`;
 }
 
-export function urlProgrammesCampagne(id: string): string {
-  return `${cheminLot(id)}/programmes.zip`;
-}
-
-export function urlProgramme(id: string, teleconseillerId: string, jour: number): string {
+export function lotProgrammeUrl(id: string, teleconseillerId: string, jour: number): string {
   const query = new URLSearchParams({ teleconseillerId, jour: String(jour) });
-  return `${cheminLot(id)}/programme.pdf?${query.toString()}`;
+  return `/api/v1/lots-export/${encodeURIComponent(id)}/programme.pdf?${query.toString()}`;
 }
 
-export function urlFichesRecues(
+export function lotFichesRecuesUrl(
   id: string,
   teleconseillerId: string,
   reaffectationId?: string,
@@ -146,5 +147,54 @@ export function urlFichesRecues(
     teleconseillerId,
     ...(reaffectationId === undefined ? {} : { reaffectationId }),
   });
-  return `${cheminLot(id)}/fiches-recues.pdf?${query.toString()}`;
+  return `/api/v1/lots-export/${encodeURIComponent(id)}/fiches-recues.pdf?${query.toString()}`;
+}
+
+export function lotFichesRecuesFileName(teleconseillerName: string): string {
+  const base = slug(teleconseillerName);
+  return `fiches-recues-${base === '' ? 'teleconseiller' : base}.pdf`;
+}
+
+function slug(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .replace(/[^a-zA-Z0-9]+/gu, '-')
+    .replace(/^-|-$/gu, '')
+    .toLowerCase();
+}
+
+export function lotExportFileName(name: string, format: 'xlsx' | 'zip'): string {
+  const base = slug(name);
+  return `campagne-${base === '' ? 'export' : base}.${format === 'xlsx' ? 'xlsx' : 'zip'}`;
+}
+
+export function lotProgrammeFileName(teleconseillerName: string, jour: number): string {
+  const base = slug(teleconseillerName);
+  return `programme-${base === '' ? 'teleconseiller' : base}-jour-${String(jour)}.pdf`;
+}
+
+export interface Teleconseiller {
+  id: string;
+  fullName: string;
+  role: 'COMMERCIAL' | 'SUPERVISEUR' | 'DIRECTION';
+}
+
+export async function fetchTeleconseillers(
+  client: ApiClient = getApiClient(),
+): Promise<Teleconseiller[]> {
+  const pages = await Promise.all(
+    (['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const).map((role) =>
+      client.GET('/api/v1/users', { params: { query: { role, isActive: true, pageSize: 50 } } }),
+    ),
+  );
+
+  return pages
+    .flatMap((page) => unwrap(page).items)
+    .map((user) => ({
+      id: user.id,
+      fullName: user.fullName,
+      role: user.role as Teleconseiller['role'],
+    }))
+    .sort((a, b) => a.fullName.localeCompare(b.fullName, 'fr'));
 }

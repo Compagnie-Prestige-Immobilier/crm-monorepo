@@ -1,65 +1,35 @@
 import { createFileRoute, redirect } from '@tanstack/react-router';
 
-import { NotificationsAdminView } from '@/components/notifications/notifications-admin-view';
+import { hasInbox, INBOX_PATH } from '@/components/layout/nav-items';
+import { NotificationsView } from '@/components/notifications/notifications-view';
+import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
-import {
-  ONGLETS_NOTIFICATIONS,
-  type NotificationCategory,
-  type NotificationStatus,
-  type OngletNotifications,
-} from '@/lib/data/notifications';
-import { ADMIN_SEUL, INBOX_ROLES } from '@/lib/roles';
-
-export interface RechercheNotifications {
-  onglet?: OngletNotifications;
-  statut?: NotificationStatus;
-  categorie?: NotificationCategory;
-  page?: number;
-}
-
-const STATUTS = new Set(['SCHEDULED', 'SENDING', 'SENT', 'CANCELLED']);
-const CATEGORIES = new Set(['ANNONCE', 'RAPPEL', 'CAMPAGNE', 'DOSSIER', 'SYSTEME']);
-
-function estOnglet(valeur: unknown): valeur is OngletNotifications {
-  return (
-    typeof valeur === 'string' && (ONGLETS_NOTIFICATIONS as readonly string[]).includes(valeur)
-  );
-}
-
-const gardeAdmin = guardRoles(ADMIN_SEUL);
 
 export const Route = createFileRoute('/_panneau/admin/notifications')({
-  validateSearch: (search: Record<string, unknown>): RechercheNotifications => {
-    const page = Number(search.page);
-    return {
-      ...(estOnglet(search.onglet) ? { onglet: search.onglet } : {}),
-      ...(typeof search.statut === 'string' && STATUTS.has(search.statut)
-        ? { statut: search.statut as NotificationStatus }
-        : {}),
-      ...(typeof search.categorie === 'string' && CATEGORIES.has(search.categorie)
-        ? { categorie: search.categorie as NotificationCategory }
-        : {}),
-      ...(Number.isInteger(page) && page > 1 ? { page } : {}),
-    };
+  beforeLoad: ({ context }) => {
+    if (context.user.role !== 'ADMIN' && hasInbox(context.user.role)) {
+      throw redirect({ href: INBOX_PATH });
+    }
+    guardRoles(['ADMIN'])({ context });
   },
-  // Des notifications déjà envoyées pointent ici : un rôle à boîte retrouve la sienne.
-  beforeLoad: (options) => {
-    const { role } = options.context.user;
-    if (role !== 'ADMIN' && INBOX_ROLES.includes(role)) throw redirect({ to: '/notifications' });
-    return gardeAdmin(options);
-  },
-  component: NotificationsAdminPage,
+  component: NotificationsPage,
+  pendingComponent: Loading,
 });
 
-function NotificationsAdminPage() {
-  const recherche = Route.useSearch();
-  const navigate = Route.useNavigate();
+function Loading() {
   return (
-    <NotificationsAdminView
-      recherche={recherche}
-      onRecherche={(suivante) => {
-        void navigate({ search: suivante, replace: true });
-      }}
-    />
+    <div className="flex flex-col gap-6" role="status" aria-label="Chargement de l’écran">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <Skeleton className="h-8 w-64" />
+        <Skeleton className="h-11 w-44" />
+      </div>
+      <Skeleton className="h-24 w-full rounded-lg" />
+      <Skeleton className="h-80 w-full rounded-lg" />
+    </div>
   );
+}
+
+/** La page `(panel)/admin/notifications` de la v1 : le composeur, et rien d'autre. */
+function NotificationsPage() {
+  return <NotificationsView isAdmin />;
 }
