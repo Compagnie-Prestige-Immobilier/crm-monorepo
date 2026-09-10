@@ -76,8 +76,11 @@ export function compteDe(role: RoleCompte): Compte {
   return compte;
 }
 
-export async function avecBase(travail: (client: Client) => Promise<void>): Promise<void> {
-  const client = new Client({ connectionString: DATABASE_URL });
+export async function avecBase(
+  travail: (client: Client) => Promise<void>,
+  url: string = DATABASE_URL,
+): Promise<void> {
+  const client = new Client({ connectionString: url });
   await client.connect();
   try {
     await travail(client);

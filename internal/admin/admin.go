@@ -1036,21 +1036,21 @@ func widgetsDe(liste ...string) []DispositionWidget {
 }
 
 var dispositionsUsine = map[string][]DispositionWidget{
-	ecranVisites: widgetsDe("total-visites", "moyenne-journaliere", "jour-le-plus-charge", "par-jour", "par-entreprise", "par-objet", "qualite-de-saisie"),
+	ecranVisites: widgetsDe("total-visites", "par-jour", "par-entreprise", "par-objet", "par-direction", "par-destinataire", "par-mois", "par-heure", "qualite-de-saisie"),
 	ecranChues: slices.Concat(
-		widgetsDe("taux-de-contact", "taux-de-joignabilite-representants", "taux-d-acceptation", "taux-de-qualification", "taux-de-rappel"),
+		widgetsDe("taux-de-contact", "taux-de-joignabilite-representants"),
 		[]DispositionWidget{
 			{Source: "taux-d-exploitation", Marque: marqueCamembert, Taille: taillePleine},
 			{Source: "repartition-statuts-qualification", Marque: marqueCamembert, Taille: taillePleine},
-			{Source: "par-teleconseiller"},
+			{Source: "par-teleconseiller", Marque: marqueTableau},
 			{Source: sourceFichesOuvertes, Taille: taillePleine},
 		},
-		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "rendement-par-departement"),
+		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "rendement-par-departement", "methodes-d-adhesion", "enrolement-par-jour"),
 	),
 	ecranGrandPublic: slices.Concat(
-		widgetsDe("taux-de-joignabilite", "taux-de-qualification", "prospects-notes", "adhesions", "par-teleconseiller"),
+		widgetsDe("taux-de-joignabilite", "taux-de-qualification"),
 		[]DispositionWidget{{Source: sourceFichesOuvertes, Taille: taillePleine}},
-		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion"),
+		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "par-banque", "enrolement-par-jour", "enrolement-par-etape"),
 	),
 }
 

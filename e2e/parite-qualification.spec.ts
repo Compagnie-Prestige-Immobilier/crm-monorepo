@@ -1,4 +1,4 @@
-import { readFileSync, rmSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { Client } from 'pg';
@@ -20,7 +20,6 @@ const compte = compteDe('COMMERCIAL');
 const CONSOLE = '/chues/console';
 const LISTE = '/chues/prospects';
 const telephones: string[] = [];
-const notesDeposees: string[] = [];
 
 /** Le patronyme sert la recherche, le prénom la liste, qui l'écrit en tête. */
 type Fiche = FicheSemee & { readonly prenom: string; readonly patronyme: string };
@@ -108,21 +107,10 @@ async function choisirPremiere(page: Page, libelle: RegExp): Promise<void> {
 const cocher = (page: Page, groupe: string, choix: string): Promise<void> =>
   page.getByRole('group', { name: groupe }).getByRole('radio', { name: choix }).check();
 
-// Le micro simulé se règle au lancement du navigateur : Playwright refuse cette
-// option dans un `describe`, elle vaut donc pour tout le fichier.
-test.use({
-  storageState: compte.etat,
-  permissions: ['microphone'],
-  launchOptions: {
-    args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream'],
-  },
-});
+test.use({ storageState: compte.etat });
 
 test.afterAll(async () => {
   await effacerFiches(telephones);
-  for (const attemptId of notesDeposees) {
-    rmSync(`${__dirname}/storage/notes-vocales/${attemptId}.audio`, { force: true });
-  }
 });
 
 test.describe('parcours 5, convertir un prospect', () => {
@@ -263,28 +251,6 @@ test.describe('parcours 5, convertir un prospect', () => {
     await page.goto('/chues/appels-representants');
     await expect(page.getByLabel('Qui avez-vous appelé ?')).toBeFocused();
   });
-
-  test('la note dictée après l’appel part avec la tentative et se réécoute', async ({ page }) => {
-    const fiche = await semerFiche('note');
-    await page.goto(CONSOLE);
-    await ouvrirDepuisAnnuaire(page, fiche);
-
-    await page.getByRole('button', { name: 'Note vocale' }).click();
-    // Une seconde pleine, attendue sur le chrono : un blob vide serait refusé.
-    await page.getByRole('button', { name: 'Arrêter (00:01)' }).click();
-    await expect(page.getByText(/^Note vocale de 00:0\d, envoyée avec l’appel\.$/u)).toBeVisible();
-
-    await page.keyboard.press('3');
-    await expect(enregistre(page, fiche.nom)).toBeVisible();
-    const appels = await lireAppels(fiche.id);
-    expect(appels).toHaveLength(1);
-    const attemptId = String(appels[0]?.id);
-    notesDeposees.push(attemptId);
-
-    const relue = await page.request.get(`/api/v1/phase2/call-attempts/${attemptId}/note-vocale`);
-    expect(relue.status(), 'la note dictée se réécoute depuis sa tentative').toBe(200);
-    expect(relue.headers()['content-type']).toContain('audio/');
-  });
 });
 
 test.describe('parcours 3, ce que le script du représentant exige', () => {
@@ -390,9 +356,10 @@ test.describe('parcours 7, la supervision ne touche pas aux fiches', () => {
     const gestes = page.getByRole('button', { name: /^Actions pour /u });
     await expect(gestes, 'la supervision ne modifie aucune fiche').toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Nouveau prospect' })).toHaveCount(0);
+    await page.getByRole('button', { name: 'Exporter' }).click();
     const [classeur] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('link', { name: 'Exporter la vue filtrée' }).click(),
+      page.getByRole('menuitem', { name: /^Exporter la vue filtrée/u }).click(),
     ]);
     // Un vrai classeur, pas un refus relayé sous une extension : signature ZIP « PK\x03\x04 ».
     expect([...readFileSync(await classeur.path()).subarray(0, 4)]).toEqual([0x50, 0x4b, 3, 4]);

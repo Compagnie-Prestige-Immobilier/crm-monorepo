@@ -12,6 +12,7 @@ import type {
   BankProspectSearchItem,
   BankRejectionReason,
   CreateBankCaseInput,
+  InscriptionAOuvrir,
   Paginated,
   Projet,
 } from '@/lib/types';
@@ -87,6 +88,15 @@ export async function createBankCase(
   client: ApiClient = getApiClient(),
 ): Promise<BankCase> {
   return unwrap(await client.POST('/api/v1/bank-cases', { body: input }));
+}
+
+/** Inscriptions validées sur la plateforme sans dossier bancaire : la seule porte d'ouverture. */
+export async function fetchInscriptionsAOuvrir(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<InscriptionAOuvrir[]> {
+  return unwrap(await client.GET('/api/v1/bank-cases/a-ouvrir', { params: { query: { projet } } }))
+    .items;
 }
 
 export interface TransitionInput {

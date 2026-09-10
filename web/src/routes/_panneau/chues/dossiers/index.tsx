@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { BankCasesSkeleton, BankCasesView } from '@/components/bank/bank-cases-view';
+import { BankCasesSkeleton } from '@/components/bank/bank-cases-view';
+import { BankDossiers } from '@/components/bank/bank-dossiers';
 import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
@@ -24,7 +25,6 @@ function Loading() {
   );
 }
 
-/** La page `(panel)/chues/dossiers` de la v1. */
 function DossiersPage() {
-  return <BankCasesView projet="CHUES" />;
+  return <BankDossiers projet="CHUES" />;
 }

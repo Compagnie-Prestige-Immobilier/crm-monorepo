@@ -424,8 +424,7 @@ export function WidgetGrid({
       <SortableContext items={widgets.map((widget) => widget.id)} strategy={rectSortingStrategy}>
         <div className="grid grid-flow-dense gap-4 sm:grid-cols-2 xl:grid-cols-4">{cards}</div>
       </SortableContext>
-      {/* Aperçu sans canevas : déplacer une carte contenant un graphique vivant
-          déclenche la boucle de redimensionnement de Chart.js. */}
+      {/* L'aperçu reste statique pendant le déplacement d'une carte. */}
       <DragOverlay>
         {activeId === null ? null : (
           <Card className="animate-rise p-4 shadow-elev-xl">

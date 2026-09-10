@@ -116,8 +116,6 @@ GO_PORT = 4000
 GO_STAGING_DOMAIN = setting("GO_STAGING_DOMAIN", "go-v2.cpi-chues.com")
 # Notes vocales de la consignation. Sans volume, un redéploiement pendant une
 # qualification emporte la note que l'historique continue d'annoncer.
-NOTES_VOCALES_MOUNT = "/repo/storage/notes-vocales"
-NOTES_VOCALES_VOLUME = "cpi-go-notes-vocales"
 # Fichiers d'import en cours de traitement, même raison : l'état du travail vit
 # en base et nomme un fichier sur le disque.
 IMPORTS_MOUNT = "/repo/storage/imports"
@@ -641,7 +639,6 @@ def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
             f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
             f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
             "DB_DUMP_ENABLED=true",
-            f"NOTE_VOCALE_DIR={NOTES_VOCALES_MOUNT}",
             f"IMPORTS_DIR={IMPORTS_MOUNT}",
             "SEED_ADMIN_EMAIL=admin@cpi.sn",
             "SEED_ADMIN_USERNAME=admin",
@@ -922,9 +919,6 @@ def cmd_configure() -> None:
     # `cpi-go-db-dumps` est le volume DÉJÀ en production sous l'API v1 : il est
     # monté sur les deux applications, et à la bascule seule la v2 l'écrit.
     ensure_db_dump_mount(ids["GO_ID"])
-    ensure_volume_mount(
-        ids["GO_ID"], NOTES_VOCALES_VOLUME, NOTES_VOCALES_MOUNT, "notes vocales"
-    )
     ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
 
     step("Variables d'environnement")
@@ -1718,7 +1712,6 @@ def cmd_configure_go() -> None:
 
     step("Volumes")
     ensure_db_dump_mount(ids["GO_ID"])
-    ensure_volume_mount(ids["GO_ID"], NOTES_VOCALES_VOLUME, NOTES_VOCALES_MOUNT, "notes vocales")
     ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
 
     step("Variables d'environnement")

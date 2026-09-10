@@ -290,7 +290,37 @@ export async function creerProspectEnrole(entree: {
 }
 
 /** Ordre topologique : ce qui référence part avant ce qui est référencé. */
+/** Une inscription validée sur la plateforme (décision datée), rapprochée ou non d'un prospect. */
+export async function creerInscriptionValidee(entree: {
+  nom: string;
+  prenom: string;
+  telephone: string;
+  prospectId: string | null;
+}): Promise<string> {
+  const id = identifiant();
+  await ecrire(
+    `INSERT INTO inscriptions_plateforme
+       (id, projet, "identifiantDistant", nom, prenom, "phoneE164", "statutDistant", "decideeLe",
+        "prospectId", "chargeUtile", "dernierTirageAt", "updatedAt")
+     VALUES ($1, 'CHUES', $2, $3, $4, $5, 'valide', now(), $6, '{}', now(), now())`,
+    [id, `e2e-${id}`, entree.nom, entree.prenom, entree.telephone, entree.prospectId],
+  );
+  return id;
+}
+
 export async function effacerBanque(banqueId: string): Promise<void> {
+  await ecrire(
+    `DELETE FROM courriels WHERE "objetId" IN (SELECT id FROM bank_cases WHERE "processingBankId" = $1)
+       OR "objetId" IN (SELECT i.id FROM inscriptions_plateforme i
+            JOIN prospects p ON p.id = i."prospectId" WHERE p."banqueId" = $1)`,
+    [banqueId],
+  );
+  await ecrire(
+    `DELETE FROM inscriptions_plateforme WHERE "prospectId" IN
+       (SELECT id FROM prospects WHERE "banqueId" = $1)
+       OR "phoneE164" IN (SELECT "phoneE164" FROM prospects WHERE "banqueId" = $1)`,
+    [banqueId],
+  );
   await ecrire(
     `DELETE FROM bank_case_transitions WHERE "caseId" IN
        (SELECT id FROM bank_cases WHERE "processingBankId" = $1)`,

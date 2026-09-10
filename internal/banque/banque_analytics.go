@@ -23,7 +23,8 @@ import (
 const colonnesDossier = `SELECT c."id", c."reference", c."referenceKey", c."prospectId", c."customerName",
 	c."customerPhoneE164", c."processingBankId", b."name", c."currentStageId", c."amountXof",
 	c."rejectionReasonId", c."rejectionDetail", c."rev", c."createdById", cu."fullName",
-	c."updatedById", uu."fullName", c."createdAt", c."updatedAt"`
+	c."updatedById", uu."fullName", c."createdAt", c."updatedAt", c."inscriptionId",
+	COALESCE(p."lastCallById", p."createdById"), su."fullName"`
 
 // `depuisDossier` est la source unique du filtrage, partagée avec les agrégats :
 // y ajouter une table changerait leurs comptages.
@@ -33,7 +34,9 @@ const depuisDossier = ` FROM "bank_cases" c
 const jointuresDossier = depuisDossier + `
 	INNER JOIN "banques" b ON b."id" = c."processingBankId"
 	INNER JOIN "users" cu ON cu."id" = c."createdById"
-	LEFT JOIN "users" uu ON uu."id" = c."updatedById"`
+	LEFT JOIN "users" uu ON uu."id" = c."updatedById"
+	INNER JOIN "prospects" p ON p."id" = c."prospectId"
+	LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")`
 
 func lireDossier(rows pgx.Rows, ref *referentielBanque) (DossierBanque, error) {
 	var d DossierBanque
@@ -43,7 +46,7 @@ func lireDossier(rows pgx.Rows, ref *referentielBanque) (DossierBanque, error) {
 	err := rows.Scan(&d.ID, &d.Reference, &d.ReferenceKey, &d.ProspectID, &d.CustomerName,
 		&d.CustomerPhoneE164, &d.ProcessingBankID, &d.ProcessingBankName, &etapeID, &montant,
 		&motifID, &d.RejectionDetail, &d.Rev, &d.CreatedByID, &d.CreatedByName,
-		&d.UpdatedByID, &d.UpdatedByName, &d.CreatedAt, &d.UpdatedAt)
+		&d.UpdatedByID, &d.UpdatedByName, &d.CreatedAt, &d.UpdatedAt, &d.InscriptionID, &d.SuiviParID, &d.SuiviParName)
 	if err != nil {
 		return d, err
 	}
@@ -436,6 +439,7 @@ type IndicateursBanqueOutput struct {
 		ByBank            []BanqueCompte      `json:"byBank"`
 		ByRejectionReason []MotifBanqueCompte `json:"byRejectionReason"`
 		ByAgent           []AgentBanqueCompte `json:"byAgent"`
+		Pilotage          PilotageBanque      `json:"pilotage"`
 	}
 }
 
@@ -498,7 +502,8 @@ func (s *service) indicateursBanque(ctx context.Context, in *IndicateursBanqueIn
 	}
 	corps.ByStage, corps.CreatedOverTime, corps.CashingsOverTime = etapes, creations, encaissements
 	corps.ByBank, corps.ByRejectionReason, corps.ByAgent = banques, motifs, agents
-	return out, nil
+	corps.Pilotage, err = s.pilotageBanque(ctx, &in.FiltreBanque, where, args)
+	return out, err
 }
 
 func (s *service) totauxBanque(ctx context.Context, where string, args []any, totaux *TotauxBanque) error {

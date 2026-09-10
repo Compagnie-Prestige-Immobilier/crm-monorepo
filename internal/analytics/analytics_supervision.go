@@ -77,8 +77,8 @@ type FiltreDeSupervision struct {
 	TimeTo       string `query:"timeTo" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$"`
 }
 
-func cleDeCacheSupervision(ctx context.Context, route string, f *FiltreDeSupervision) string {
-	return route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
+func (s *service) cleDeCacheSupervision(ctx context.Context, route string, f *FiltreDeSupervision) string {
+	return s.Cfg.Base + ":" + route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
 		f.ActFrom, f.ActTo, f.Granularity, f.Projet, f.CommercialID, f.TimeFrom, f.TimeTo,
 	}, "|")
 }
@@ -310,7 +310,7 @@ type StockOutput struct{ Body StockDesRepresentants }
 // « Injoignable » se lit sur le statut porté par la fiche, hors « Injoignable
 // définitif » qui ne repasse jamais (EB-06).
 func (s *service) stockDesRepresentants(ctx context.Context, _ *struct{}) (*StockOutput, error) {
-	cle := "supervision/representants:" + porteeDeCache(ctx)
+	cle := s.Cfg.Base + ":supervision/representants:" + porteeDeCache(ctx)
 	corps, err := avecCache(cle, ttlAnalyses, func() (StockDesRepresentants, error) {
 		compte, err := s.Q.StockRepresentants(ctx)
 		if err != nil {
@@ -453,7 +453,7 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 }
 
 func (s *service) rendementDesCampagnes(ctx context.Context, f *FiltreDeSupervision) (*CampagnesOutput, error) {
-	corps, err := avecCache(cleDeCacheSupervision(ctx, "supervision/campagnes", f), ttlSupervision, func() (RendementDesCampagnes, error) {
+	corps, err := avecCache(s.cleDeCacheSupervision(ctx, "supervision/campagnes", f), ttlSupervision, func() (RendementDesCampagnes, error) {
 		perimetre, err := nouveauPerimetreSupervision(f, s.Cfg.TimeZone)
 		if err != nil {
 			return RendementDesCampagnes{}, err

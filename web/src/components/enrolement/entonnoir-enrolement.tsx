@@ -1,10 +1,6 @@
 'use client';
 
-import { Line } from 'react-chartjs-2';
-
-import '@/components/dashboard/chart-setup';
-
-import { axisScales, baseOptions } from '@/components/dashboard/chart-options';
+import { ResponsiveLine } from '@nivo/line';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -170,9 +166,9 @@ export function CourbeEnrolement({
   series: readonly SerieCourbe[];
   titre: string;
 }) {
+  const jours = joursUnion(series);
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const jours = joursUnion(series);
 
   return (
     <Card>
@@ -184,28 +180,45 @@ export function CourbeEnrolement({
           {jours.length === 0 ? (
             <EmptyChart message="Aucune inscription datée sur la période retenue." />
           ) : (
-            <Line
-              options={{
-                ...baseOptions(theme, reducedMotion),
-                scales: axisScales(theme),
-                plugins: {
-                  ...baseOptions(theme, reducedMotion).plugins,
-                  legend: { display: series.length > 1, labels: { color: theme.tick } },
-                },
-              }}
-              data={{
-                labels: jours.map((jour) => formatShortDate(jour)),
-                datasets: series.map((serie, index) => ({
-                  label: serie.nom,
-                  data: jours.map(
-                    (jour) => serie.points.find((point) => point.jour === jour)?.inscriptions ?? 0,
-                  ),
-                  borderColor: seriesColor(theme, index),
-                  backgroundColor: seriesColor(theme, index),
-                  tension: 0.3,
-                  pointRadius: 2,
+            <ResponsiveLine
+              data={series.map((serie) => ({
+                id: serie.nom,
+                data: jours.map((jour) => ({
+                  x: formatShortDate(jour),
+                  y: serie.points.find((point) => point.jour === jour)?.inscriptions ?? 0,
                 })),
+              }))}
+              colors={series.map((_, index) => seriesColor(theme, index))}
+              margin={{ top: 12, right: 12, bottom: 34, left: 42 }}
+              lineWidth={2.5}
+              pointSize={5}
+              enableGridX={false}
+              axisBottom={{ tickSize: 0, tickPadding: 10 }}
+              axisLeft={{ tickSize: 0, tickPadding: 8 }}
+              legends={
+                series.length > 1
+                  ? [
+                      {
+                        anchor: 'top-right',
+                        direction: 'row',
+                        translateY: -12,
+                        itemWidth: 100,
+                        itemHeight: 16,
+                        symbolSize: 9,
+                      },
+                    ]
+                  : []
+              }
+              theme={{
+                text: { fill: theme.tick, fontSize: 11 },
+                axis: {
+                  domain: { line: { stroke: 'transparent' } },
+                  ticks: { line: { stroke: 'transparent' }, text: { fill: theme.tick } },
+                },
+                grid: { line: { stroke: theme.grid, strokeDasharray: '3 5' } },
               }}
+              animate={!reducedMotion}
+              useMesh={true}
             />
           )}
         </div>

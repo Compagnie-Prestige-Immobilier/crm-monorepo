@@ -2,13 +2,7 @@
 
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
-import {
-  BanknoteIcon,
-  ClockIcon,
-  FolderOpenIcon,
-  PercentIcon,
-  type LucideIcon,
-} from 'lucide-react';
+import { BanknoteIcon, ClockIcon, FolderOpenIcon, PercentIcon } from 'lucide-react';
 
 import {
   BankRankChart,
@@ -18,7 +12,8 @@ import {
   type ClickableSlice,
 } from '@/components/bank/bank-charts';
 import { BankExportMenu } from '@/components/bank/bank-export-menu';
-import type { ReactNode } from 'react';
+import { Kpi } from '@/components/bank/bank-kpi';
+import { BankPilotage } from '@/components/bank/bank-pilotage';
 
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -135,6 +130,8 @@ export function BankDashboardView({ projet }: { projet: Projet }) {
                   icon={ClockIcon}
                 />
               </div>
+
+              <BankPilotage pilotage={data.pilotage} />
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <ChartCard title="Dossiers par étape">
@@ -283,42 +280,6 @@ export function BankDashboardView({ projet }: { projet: Projet }) {
         })();
       })()}
     </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  hint,
-  icon: Icon,
-  index,
-}: {
-  label: string;
-  value: string;
-  hint: ReactNode;
-  icon: LucideIcon;
-  index: number;
-}) {
-  return (
-    <Card className="animate-rise" style={{ animationDelay: `${String(index * 60)}ms` }}>
-      <CardContent className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="truncate text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-            {label}
-          </p>
-          <p className="mt-1 font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
-            {value}
-          </p>
-          <p className="mt-2 text-[0.75rem] text-muted-foreground tabular-nums">{hint}</p>
-        </div>
-        <span
-          aria-hidden="true"
-          className="flex size-10 shrink-0 items-center justify-center rounded-md bg-secondary text-primary"
-        >
-          <Icon className="size-5" />
-        </span>
-      </CardContent>
-    </Card>
   );
 }
 

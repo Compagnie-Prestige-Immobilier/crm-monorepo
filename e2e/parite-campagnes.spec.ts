@@ -141,7 +141,7 @@ async function cellulesEnBase(lotId: string, parJour = true): Promise<string[]> 
 async function telecharger(page: Page, label: string): Promise<Buffer> {
   const [fichier] = await Promise.all([
     page.waitForEvent('download'),
-    page.getByRole('link', { name: label }).click(),
+    page.getByRole('button', { name: label }).click(),
   ]);
   return readFile(await fichier.path());
 }
@@ -245,7 +245,7 @@ test.describe('parcours 11, campagnes d’appels', () => {
 
     const [fichier] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('link', { name: `Programme de ${COMPTE_TELECONSEIL}, jour 1` }).click(),
+      page.getByRole('button', { name: `Programme de ${COMPTE_TELECONSEIL}, jour 1` }).click(),
     ]);
     expect(fichier.suggestedFilename()).toMatch(/^programme-.*-jour-1\.pdf$/u);
     const programme = await readFile(await fichier.path());
@@ -255,14 +255,14 @@ test.describe('parcours 11, campagnes d’appels', () => {
       2_000,
     );
 
-    const archive = await telecharger(page, 'Tous les programmes, archive ZIP');
+    const archive = await telecharger(page, 'Tous les programmes (ZIP)');
     expect(programmesDuZip(archive), 'un programme par teleconseiller et par jour').toBe(
       EQUIPE.length * JOURS,
     );
 
     const [classeur] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('link', { name: 'Classeur Excel de la campagne' }).click(),
+      page.getByRole('button', { name: 'Classeur Excel' }).click(),
     ]);
     await classeur.saveAs(CLASSEUR);
 
@@ -315,7 +315,7 @@ test.describe('parcours 11, campagnes d’appels', () => {
     // Le papier deja imprime ne porte pas ces fiches : un PDF de complement suit.
     const recues = page.getByRole('dialog');
     await expect(recues).toContainText(`${String(deplacees)} fiches attribuées`);
-    const complement = await telecharger(page, `Fiches reçues par ${COMPTE_DIRECTION}`);
+    const complement = await telecharger(page, 'Télécharger ses fiches reçues (PDF)');
     expect(complement.subarray(0, 4).toString('latin1'), 'ce n’est pas un PDF').toBe('%PDF');
     // Le pied du dialogue et sa croix portent le meme libelle.
     await recues.getByRole('button', { name: 'Fermer' }).first().click();

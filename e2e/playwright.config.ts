@@ -46,6 +46,9 @@ export default defineConfig({
     // en production : chaque parcours dispose de son propre budget de 10/min.
     env: {
       DATABASE_URL,
+      ...(process.env.DATABASE_URL_DEMO === undefined
+        ? {}
+        : { DATABASE_URL_DEMO: process.env.DATABASE_URL_DEMO }),
       PORT,
       LOG_FORMAT: 'text',
       API_TRUST_PROXY_HEADERS: 'true',

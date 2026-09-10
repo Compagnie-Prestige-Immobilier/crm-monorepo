@@ -1,20 +1,9 @@
-'use client';
+import { ResponsiveBar } from '@nivo/bar';
+import { ResponsiveLine } from '@nivo/line';
+import { ResponsivePie } from '@nivo/pie';
+import { ResponsiveRadar } from '@nivo/radar';
+import { ResponsiveScatterPlot } from '@nivo/scatterplot';
 
-import type { ChartData, ChartOptions, Plugin } from 'chart.js';
-import {
-  Bar,
-  Bubble,
-  Chart as MixedChart,
-  Doughnut,
-  Line,
-  PolarArea,
-  Radar,
-  Scatter,
-} from 'react-chartjs-2';
-
-import '@/components/dashboard/chart-setup';
-
-import { axisScales, baseOptions, radialScale } from '@/components/dashboard/chart-options';
 import type {
   CompositionLigne,
   DispositionPresentation,
@@ -24,7 +13,7 @@ import type {
 } from '@/components/accueil/tableau-de-bord/sources';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
 import { AnimatedNumber } from '@/components/live/animated-number';
-import { seriesBorderColor, seriesColor, useChartTheme, type ChartTheme } from '@/lib/chart-theme';
+import { seriesColor, useChartTheme } from '@/lib/chart-theme';
 import { formatNumber } from '@/lib/format';
 import type { NamedCount } from '@/lib/types';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
@@ -34,146 +23,104 @@ export interface ItemsChartProps {
   label?: string;
   presentation?: DispositionPresentation | undefined;
 }
+type NivoDatum = Record<string, string | number>;
 
-/**
- * `neutre` décline le bordeaux par luminosité, `categorielle` habille les
- * surfaces d'or par opacité — jamais le texte, `docs/design.md §2.3`.
- * `serie` retombe sur la palette CPI habituelle.
- */
 export function paletteFill(
-  theme: ChartTheme,
-  palette: DispositionPresentation['palette'],
+  theme: ReturnType<typeof useChartTheme>,
+  palette: DispositionPresentation['palette'] | undefined,
   index: number,
 ): string {
-  if (palette === 'neutre') {
-    const base = theme.series[0] ?? '#630210';
-    const niveau = Math.max(25, 85 - (index % 6) * 12);
-    return `color-mix(in srgb, ${base} ${String(niveau)}%, white)`;
-  }
-  if (palette === 'categorielle') {
-    const niveau = Math.max(35, 100 - (index % 5) * 15);
-    return `color-mix(in srgb, ${theme.accentBorder} ${String(niveau)}%, transparent)`;
-  }
+  if (palette === 'neutre')
+    return `color-mix(in srgb, ${theme.series[0] ?? '#0f766e'} ${String(Math.max(28, 82 - (index % 6) * 10))}%, white)`;
+  if (palette === 'categorielle')
+    return `color-mix(in srgb, ${theme.accentBorder} ${String(Math.max(38, 100 - (index % 5) * 14))}%, transparent)`;
   return seriesColor(theme, index);
 }
-
-function paletteBorder(
-  theme: ChartTheme,
-  palette: DispositionPresentation['palette'],
-  index: number,
-  repli: string,
-): string {
-  if (palette === 'neutre') return theme.series[0] ?? repli;
-  if (palette === 'categorielle') return theme.accentBorder;
-  return seriesBorderColor(theme, index, repli);
-}
-
-/**
- * Greffon local : Chart.js n'a pas d'étiquettes de données enregistrées ici,
- * et une dépendance de plus pour ça n'en vaut pas la peine. `disponible`
- * mesure l'espace par élément ; en dessous de 20 px l'étiquette déborderait
- * sur sa voisine, elle est sautée plutôt que dessinée illisible.
- */
-function valeursAffichees(theme: ChartTheme): Plugin<'bar' | 'line'> {
+function nivoTheme(theme: ReturnType<typeof useChartTheme>) {
   return {
-    id: 'valeurs-affichees',
-    afterDatasetsDraw(chart) {
-      const { ctx, chartArea } = chart;
-      const horizontal = chart.options.indexAxis === 'y';
-      ctx.save();
-      ctx.font = '11px system-ui, sans-serif';
-      ctx.fillStyle = theme.tick;
-      chart.data.datasets.forEach((dataset, datasetIndex) => {
-        const meta = chart.getDatasetMeta(datasetIndex);
-        if (meta.hidden || meta.data.length === 0) return;
-        const disponible = (horizontal ? chartArea.height : chartArea.width) / meta.data.length;
-        if (disponible < 20) return;
-        meta.data.forEach((element, index) => {
-          const value = dataset.data[index];
-          if (typeof value !== 'number') return;
-          const { x, y } = element.getProps(['x', 'y'], true) as { x: number; y: number };
-          if (horizontal) {
-            ctx.textAlign = 'left';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(formatNumber(value), x + 6, y);
-          } else {
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'bottom';
-            ctx.fillText(formatNumber(value), x, y - 6);
-          }
-        });
-      });
-      ctx.restore();
+    text: { fill: theme.tick, fontSize: 11, fontFamily: 'Plus Jakarta Sans, sans-serif' },
+    axis: {
+      domain: { line: { stroke: 'transparent' } },
+      ticks: { line: { stroke: 'transparent' }, text: { fill: theme.tick } },
+    },
+    grid: { line: { stroke: theme.grid, strokeDasharray: '3 5' } },
+    legends: { text: { fill: theme.tick } },
+    tooltip: {
+      container: {
+        background: theme.tooltipBackground,
+        color: theme.tooltipForeground,
+        border: `1px solid ${theme.border}`,
+        borderRadius: 8,
+      },
     },
   };
 }
-
-function valeursPlugins(theme: ChartTheme, actif: boolean | undefined): Plugin<'bar' | 'line'>[] {
-  return actif === true ? [valeursAffichees(theme)] : [];
+function Frame({ children }: { children: React.ReactNode }) {
+  return <div className="h-full min-h-40 w-full">{children}</div>;
+}
+function itemData(items: readonly NamedCount[]) {
+  return items.map((item) => ({ id: item.id, label: item.label, value: item.value }));
+}
+function clickIndex(items: readonly NamedCount[], value: unknown) {
+  return items.findIndex((item) => item.id === String(value) || item.label === String(value));
 }
 
-function itemsDataset(
-  theme: ChartTheme,
-  items: readonly NamedCount[],
-  palette: DispositionPresentation['palette'],
-) {
-  return {
-    data: items.map((item) => item.value),
-    backgroundColor: items.map((_, index) => paletteFill(theme, palette, index)),
-    borderColor: items.map((_, index) =>
-      paletteBorder(theme, palette, index, seriesColor(theme, index)),
-    ),
-    borderWidth: 1,
-    borderRadius: 6,
-    borderSkipped: false as const,
-  };
-}
-
-export function BarresVerticalesChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: axisScales(theme),
-  };
-  return (
-    <Bar
-      options={options}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          { label, ...itemsDataset(theme, items, presentation?.palette), maxBarThickness: 42 },
-        ],
-      }}
-    />
-  );
-}
-
-export function BarresHorizontalesChart({
+function Bars({
   items,
-  label = 'Visites',
+  horizontal,
   presentation,
-}: ItemsChartProps) {
+  onSelect,
+}: ItemsChartProps & { horizontal?: boolean; onSelect?: ((index: number) => void) | undefined }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    indexAxis: 'y',
-    scales: axisScales(theme, { horizontal: true }),
-  };
+  const clickProps =
+    onSelect === undefined
+      ? {}
+      : {
+          onClick: (datum: { indexValue: string | number }) =>
+            onSelect(clickIndex(items, datum.indexValue)),
+        };
   return (
-    <Bar
-      options={options}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          { label, ...itemsDataset(theme, items, presentation?.palette), barThickness: 18 },
-        ],
-      }}
-    />
+    <Frame>
+      <ResponsiveBar
+        data={itemData(items)}
+        keys={['value']}
+        indexBy="label"
+        layout={horizontal ? 'horizontal' : 'vertical'}
+        margin={{ top: 12, right: 12, bottom: 38, left: horizontal ? 116 : 42 }}
+        padding={0.28}
+        borderRadius={6}
+        colors={(datum) =>
+          paletteFill(
+            theme,
+            presentation?.palette,
+            Math.max(0, clickIndex(items, datum.indexValue)),
+          )
+        }
+        borderColor={{ from: 'color', modifiers: [['darker', 0.25]] }}
+        enableLabel={presentation?.valeurs === true}
+        labelTextColor="#fff"
+        enableGridX={horizontal === true}
+        enableGridY={horizontal !== true}
+        axisBottom={horizontal ? null : { tickSize: 0, tickPadding: 10 }}
+        axisLeft={horizontal ? { tickSize: 0, tickPadding: 8 } : { tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        {...clickProps}
+        tooltip={({ indexValue, value }) => (
+          <span>
+            {String(indexValue)}: {formatNumber(Number(value))}
+          </span>
+        )}
+      />
+    </Frame>
   );
+}
+export function BarresVerticalesChart({ items, presentation }: ItemsChartProps) {
+  return <Bars items={items} presentation={presentation} />;
+}
+export function BarresHorizontalesChart({ items, presentation }: ItemsChartProps) {
+  return <Bars items={items} presentation={presentation} horizontal />;
 }
 
 export function BarresGroupeesChart({
@@ -187,65 +134,122 @@ export function BarresGroupeesChart({
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? comparaison !== undefined;
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: axisScales(theme),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: { display: legende, position: 'top', labels: { color: theme.tick } },
-    },
-  };
-  const comparaisonParId = new Map((comparaison ?? []).map((item) => [item.id, item.value]));
+  const compare = new Map((comparaison ?? []).map((item) => [item.id, item.value]));
+  const data = items.map((item) => ({
+    label: item.label,
+    affichée: item.value,
+    comparaison: compare.get(item.id) ?? 0,
+  }));
   return (
-    <Bar
-      options={options}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            label: 'Période affichée',
-            data: items.map((item) => item.value),
-            backgroundColor: paletteFill(theme, presentation?.palette, 0),
-            borderRadius: 6,
-            maxBarThickness: 24,
-          },
-          ...(comparaison === undefined
+    <Frame>
+      <ResponsiveBar
+        data={data}
+        keys={comparaison === undefined ? ['affichée'] : ['affichée', 'comparaison']}
+        indexBy="label"
+        margin={{ top: 32, right: 12, bottom: 38, left: 42 }}
+        padding={0.28}
+        groupMode="grouped"
+        borderRadius={6}
+        colors={[
+          paletteFill(theme, presentation?.palette, 0),
+          paletteFill(theme, presentation?.palette, 1),
+        ]}
+        enableLabel={presentation?.valeurs === true}
+        labelTextColor="#fff"
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        legends={
+          presentation?.legende === false
             ? []
             : [
                 {
-                  label: 'Comparaison',
-                  data: items.map((item) => comparaisonParId.get(item.id) ?? 0),
-                  backgroundColor: paletteFill(theme, presentation?.palette, 1),
-                  borderRadius: 6,
-                  maxBarThickness: 24,
+                  anchor: 'top-right',
+                  direction: 'row',
+                  translateY: -24,
+                  itemWidth: 90,
+                  itemHeight: 16,
+                  symbolSize: 9,
+                  dataFrom: 'keys',
                 },
-              ]),
-        ],
-      }}
-    />
+              ]
+        }
+        axisBottom={{ tickSize: 0, tickPadding: 10 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+      />
+    </Frame>
   );
 }
-
-function compositionDatasets(
-  theme: ChartTheme,
-  lignes: readonly CompositionLigne[],
-  palette: DispositionPresentation['palette'],
-) {
-  const segmentIds = [
-    ...new Set(lignes.flatMap((ligne) => ligne.segments.map((segment) => segment.id))),
-  ];
-  return segmentIds.map((segmentId, index) => ({
-    label: lignes[0]?.segments.find((segment) => segment.id === segmentId)?.label ?? segmentId,
-    data: lignes.map(
-      (ligne) => ligne.segments.find((segment) => segment.id === segmentId)?.value ?? 0,
-    ),
-    backgroundColor: paletteFill(theme, palette, index),
-    borderRadius: 4,
-  }));
+function compositionData(lignes: readonly CompositionLigne[], percent: boolean) {
+  const ids = [...new Set(lignes.flatMap((ligne) => ligne.segments.map((segment) => segment.id)))];
+  return {
+    data: lignes.map((ligne) => {
+      const total = ligne.segments.reduce((sum, segment) => sum + segment.value, 0);
+      return ids.reduce<NivoDatum>(
+        (row, id) => {
+          const value = ligne.segments.find((segment) => segment.id === id)?.value ?? 0;
+          row[id] = percent && total > 0 ? Math.round((value / total) * 100) : value;
+          return row;
+        },
+        { ligne: ligne.ligne },
+      );
+    }),
+    keys: ids,
+  };
 }
-
+function Composition({
+  lignes,
+  presentation,
+  percent,
+}: {
+  lignes: readonly CompositionLigne[];
+  presentation?: DispositionPresentation | undefined;
+  percent?: boolean;
+}) {
+  const theme = useChartTheme();
+  const reducedMotion = usePrefersReducedMotion();
+  const built = compositionData(lignes, percent === true);
+  return (
+    <Frame>
+      <ResponsiveBar
+        data={built.data}
+        keys={built.keys}
+        indexBy="ligne"
+        layout="horizontal"
+        groupMode="stacked"
+        margin={{ top: 36, right: 12, bottom: 28, left: 104 }}
+        padding={0.28}
+        borderRadius={4}
+        colors={(datum) =>
+          paletteFill(
+            theme,
+            presentation?.palette,
+            Math.max(0, built.keys.indexOf(String(datum.id))),
+          )
+        }
+        enableLabel={false}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        legends={
+          presentation?.legende === false
+            ? []
+            : [
+                {
+                  anchor: 'top-left',
+                  direction: 'row',
+                  translateY: -28,
+                  itemWidth: 90,
+                  itemHeight: 16,
+                  symbolSize: 9,
+                  dataFrom: 'keys',
+                },
+              ]
+        }
+        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+      />
+    </Frame>
+  );
+}
 export function BarresEmpileesChart({
   lignes,
   presentation,
@@ -253,30 +257,8 @@ export function BarresEmpileesChart({
   lignes: readonly CompositionLigne[];
   presentation?: DispositionPresentation | undefined;
 }) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? true;
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    indexAxis: 'y',
-    scales: axisScales(theme, { horizontal: true, empile: true }),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: { display: legende, position: 'top', labels: { color: theme.tick } },
-    },
-  };
-  return (
-    <Bar
-      options={options}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: lignes.map((ligne) => ligne.ligne),
-        datasets: compositionDatasets(theme, lignes, presentation?.palette),
-      }}
-    />
-  );
+  return <Composition lignes={lignes} presentation={presentation} />;
 }
-
 export function Barres100Chart({
   lignes,
   presentation,
@@ -284,163 +266,128 @@ export function Barres100Chart({
   lignes: readonly CompositionLigne[];
   presentation?: DispositionPresentation | undefined;
 }) {
+  return <Composition lignes={lignes} presentation={presentation} percent />;
+}
+
+function LineSeries({
+  items,
+  label,
+  presentation,
+  stepped,
+  area,
+}: ItemsChartProps & { stepped?: boolean; area?: boolean }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? true;
-  const totaux = lignes.map((ligne) =>
-    ligne.segments.reduce((somme, segment) => somme + segment.value, 0),
-  );
-  const datasets = compositionDatasets(theme, lignes, presentation?.palette).map((dataset) => ({
-    ...dataset,
-    data: dataset.data.map((value, index) => {
-      const total = totaux[index] ?? 0;
-      return total === 0 ? 0 : Math.round((value / total) * 100);
-    }),
-  }));
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    indexAxis: 'y',
-    scales: axisScales(theme, { horizontal: true, empile: true, entier: false }),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: { display: legende, position: 'top', labels: { color: theme.tick } },
-      tooltip: {
-        ...baseOptions(theme, reducedMotion).plugins.tooltip,
-        callbacks: {
-          label: (context) => ` ${context.dataset.label ?? ''}: ${String(context.parsed.x)} %`,
-        },
-      },
-    },
-  };
   return (
-    <Bar
-      options={options}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{ labels: lignes.map((ligne) => ligne.ligne), datasets }}
-    />
+    <Frame>
+      <ResponsiveLine
+        data={[
+          { id: label ?? 'Visites', data: items.map((item) => ({ x: item.label, y: item.value })) },
+        ]}
+        colors={[paletteFill(theme, presentation?.palette, 0)]}
+        curve={stepped ? 'step' : 'monotoneX'}
+        enableArea={area === true}
+        areaOpacity={0.14}
+        lineWidth={2.5}
+        pointSize={presentation?.valeurs === true ? 7 : 0}
+        enableGridX={false}
+        margin={{ top: 14, right: 12, bottom: 34, left: 42 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        useMesh={true}
+      />
+    </Frame>
   );
 }
-
-function serieOptions(
-  theme: ChartTheme,
-  reducedMotion: boolean,
-  stepped: boolean,
-  fill: boolean,
-): ChartOptions<'line'> {
-  return {
-    ...baseOptions(theme, reducedMotion),
-    scales: axisScales(theme),
-    interaction: { mode: 'index', intersect: false },
-    elements: { point: { radius: 0, hitRadius: 12, hoverRadius: 4 }, line: { stepped, fill } },
-  };
+export function CourbeChart(props: ItemsChartProps) {
+  return <LineSeries {...props} />;
+}
+export function AireChart(props: ItemsChartProps) {
+  return <LineSeries {...props} area />;
+}
+export function EscalierChart(props: ItemsChartProps) {
+  return <LineSeries {...props} stepped />;
 }
 
-export function CourbeChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
+function Share({
+  items,
+  presentation,
+  onSelect,
+  donut,
+}: {
+  items: readonly NamedCount[];
+  presentation?: DispositionPresentation | undefined;
+  onSelect?: ((index: number) => void) | undefined;
+  donut: boolean;
+}) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const accent = paletteFill(theme, presentation?.palette, 0);
+  const clickProps =
+    onSelect === undefined
+      ? {}
+      : { onClick: (datum: { id: string | number }) => onSelect(clickIndex(items, datum.id)) };
+  if (items.length < 2) {
+    const item = items[0];
+    return (
+      <Frame>
+        <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+          <strong className="font-display text-3xl font-[700] text-foreground">
+            {formatNumber(item?.value ?? 0)}
+          </strong>
+          <span className="text-xs text-muted-foreground">{item?.label ?? 'Aucune donnée'}</span>
+        </div>
+      </Frame>
+    );
+  }
   return (
-    <Line
-      options={serieOptions(theme, reducedMotion, false, false)}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            label,
-            data: items.map((item) => item.value),
-            borderColor: accent,
-            borderWidth: 2,
-            tension: 0.3,
-          },
-        ],
-      }}
-    />
+    <Frame>
+      <ResponsivePie
+        data={itemData(items)}
+        value="value"
+        id="label"
+        innerRadius={donut ? 0.62 : 0}
+        padAngle={1.5}
+        cornerRadius={5}
+        colors={(datum) =>
+          paletteFill(theme, presentation?.palette, Math.max(0, clickIndex(items, datum.id)))
+        }
+        enableArcLinkLabels={false}
+        enableArcLabels={false}
+        margin={{
+          top: 10,
+          right: presentation?.legende === false ? 10 : 116,
+          bottom: 10,
+          left: 10,
+        }}
+        legends={
+          presentation?.legende === false
+            ? []
+            : [
+                {
+                  anchor: 'right',
+                  direction: 'column',
+                  translateX: 108,
+                  itemWidth: 100,
+                  itemHeight: 20,
+                  itemsSpacing: 4,
+                  symbolSize: 9,
+                },
+              ]
+        }
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        {...clickProps}
+        tooltip={({ datum }) => (
+          <span>
+            {datum.label}: {formatNumber(Number(datum.value))}
+          </span>
+        )}
+      />
+    </Frame>
   );
 }
-
-export function AireChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const accent = paletteFill(theme, presentation?.palette, 0);
-  return (
-    <Line
-      options={serieOptions(theme, reducedMotion, false, true)}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            label,
-            data: items.map((item) => item.value),
-            borderColor: accent,
-            backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
-            borderWidth: 2,
-            tension: 0.3,
-          },
-        ],
-      }}
-    />
-  );
-}
-
-export function EscalierChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const accent = paletteFill(theme, presentation?.palette, 0);
-  return (
-    <Line
-      options={serieOptions(theme, reducedMotion, true, false)}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          { label, data: items.map((item) => item.value), borderColor: accent, borderWidth: 2 },
-        ],
-      }}
-    />
-  );
-}
-
-function partageOptions(
-  theme: ChartTheme,
-  reducedMotion: boolean,
-  legende: boolean,
-  position: 'right' | 'top',
-  onSelect?: (index: number) => void,
-): ChartOptions<'doughnut'> {
-  const total = (items: readonly NamedCount[]) =>
-    items.reduce((somme, item) => somme + item.value, 0);
-  return {
-    ...baseOptions(theme, reducedMotion, onSelect),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: {
-        display: legende,
-        position,
-        labels: {
-          color: theme.tick,
-          boxWidth: 10,
-          boxHeight: 10,
-          usePointStyle: true,
-          font: { size: 11 },
-        },
-      },
-      tooltip: {
-        ...baseOptions(theme, reducedMotion).plugins.tooltip,
-        callbacks: {
-          label: (context) => {
-            const items = context.chart.data.datasets[0]?.data as number[];
-            const somme = total(items.map((value, id) => ({ id: String(id), label: '', value })));
-            const part = somme === 0 ? 0 : Math.round((context.parsed / somme) * 100);
-            return ` ${context.label}: ${formatNumber(context.parsed)} (${String(part)} %)`;
-          },
-        },
-      },
-    },
-  };
-}
-
 export function AnneauChart({
   items,
   presentation,
@@ -450,34 +397,8 @@ export function AnneauChart({
   presentation?: DispositionPresentation | undefined;
   onSelect?: ((index: number) => void) | undefined;
 }) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? true;
-  return (
-    <Doughnut
-      options={{
-        ...partageOptions(theme, reducedMotion, legende, 'right', onSelect),
-        cutout: '62%',
-      }}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            data: items.map((item) => item.value),
-            backgroundColor: items.map((_, index) =>
-              paletteFill(theme, presentation?.palette, index),
-            ),
-            borderColor: items.map((_, index) =>
-              paletteBorder(theme, presentation?.palette, index, theme.tooltipBackground),
-            ),
-            borderWidth: 2,
-          },
-        ],
-      }}
-    />
-  );
+  return <Share items={items} presentation={presentation} onSelect={onSelect} donut />;
 }
-
 export function CamembertChart({
   items,
   presentation,
@@ -487,110 +408,36 @@ export function CamembertChart({
   presentation?: DispositionPresentation | undefined;
   onSelect?: ((index: number) => void) | undefined;
 }) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? true;
-  return (
-    <Doughnut
-      options={{
-        ...partageOptions(theme, reducedMotion, legende, 'right', onSelect),
-        cutout: '0%',
-      }}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            data: items.map((item) => item.value),
-            backgroundColor: items.map((_, index) =>
-              paletteFill(theme, presentation?.palette, index),
-            ),
-            borderColor: items.map((_, index) =>
-              paletteBorder(theme, presentation?.palette, index, theme.tooltipBackground),
-            ),
-            borderWidth: 2,
-          },
-        ],
-      }}
-    />
-  );
+  return <Share items={items} presentation={presentation} onSelect={onSelect} donut={false} />;
+}
+export function AirePolaireChart({ items, presentation }: ItemsChartProps) {
+  return <Share items={items} presentation={presentation} donut={false} />;
 }
 
-export function AirePolaireChart({
-  items,
-  presentation,
-}: {
-  items: readonly NamedCount[];
-  presentation?: DispositionPresentation | undefined;
-}) {
+export function RadarChart({ items, presentation }: ItemsChartProps) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? false;
-  const options: ChartOptions<'polarArea'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: radialScale(theme),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: { display: legende, position: 'top', labels: { color: theme.tick } },
-    },
-  };
+  const data = items.map((item) => ({ axe: item.label, valeur: item.value }));
   return (
-    <PolarArea
-      options={options}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            data: items.map((item) => item.value),
-            backgroundColor: items.map((_, index) =>
-              presentation?.palette === undefined || presentation.palette === 'serie'
-                ? `color-mix(in srgb, ${seriesColor(theme, index)} 55%, transparent)`
-                : paletteFill(theme, presentation.palette, index),
-            ),
-            borderColor: items.map((_, index) =>
-              paletteBorder(theme, presentation?.palette, index, seriesColor(theme, index)),
-            ),
-            borderWidth: 1,
-          },
-        ],
-      }}
-    />
+    <Frame>
+      <ResponsiveRadar
+        data={data}
+        keys={['valeur']}
+        indexBy="axe"
+        margin={{ top: 30, right: 40, bottom: 30, left: 40 }}
+        borderWidth={2}
+        borderColor={paletteFill(theme, presentation?.palette, 0)}
+        dotSize={7}
+        dotColor={paletteFill(theme, presentation?.palette, 0)}
+        colors={[paletteFill(theme, presentation?.palette, 0)]}
+        fillOpacity={0.18}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+      />
+    </Frame>
   );
 }
-
-export function RadarChart({
-  items,
-  presentation,
-}: {
-  items: readonly NamedCount[];
-  presentation?: DispositionPresentation | undefined;
-}) {
-  const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const accent = paletteFill(theme, presentation?.palette, 0);
-  const options: ChartOptions<'radar'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: radialScale(theme),
-    plugins: { ...baseOptions(theme, reducedMotion).plugins, legend: { display: false } },
-  };
-  return (
-    <Radar
-      options={options}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            data: items.map((item) => item.value),
-            borderColor: accent,
-            backgroundColor: `color-mix(in srgb, ${accent} 20%, transparent)`,
-            borderWidth: 2,
-          },
-        ],
-      }}
-    />
-  );
-}
-
-function matriceCoordonnees(matrice: MatriceDatum) {
+function matrixPoints(matrice: MatriceDatum) {
   return matrice.cellules
     .filter((cellule) => cellule.value > 0)
     .map((cellule) => ({
@@ -599,7 +446,6 @@ function matriceCoordonnees(matrice: MatriceDatum) {
       value: cellule.value,
     }));
 }
-
 export function NuageChart({
   matrice,
   presentation,
@@ -608,36 +454,20 @@ export function NuageChart({
   presentation?: DispositionPresentation | undefined;
 }) {
   const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const options: ChartOptions<'scatter'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: {
-      x: {
-        ...axisScales(theme).x,
-        ticks: { ...axisScales(theme).x.ticks, callback: (v) => matrice.colonnes[Number(v)] ?? '' },
-      },
-      y: {
-        ...axisScales(theme).y,
-        ticks: { ...axisScales(theme).y.ticks, callback: (v) => matrice.lignes[Number(v)] ?? '' },
-      },
-    },
-  };
   return (
-    <Scatter
-      options={options}
-      data={{
-        datasets: [
-          {
-            label: 'Visites',
-            data: matriceCoordonnees(matrice),
-            backgroundColor: paletteFill(theme, presentation?.palette, 0),
-          },
-        ],
-      }}
-    />
+    <Frame>
+      <ResponsiveScatterPlot
+        data={[{ id: 'Visites', data: matrixPoints(matrice) }]}
+        colors={[paletteFill(theme, presentation?.palette, 0)]}
+        nodeSize={9}
+        margin={{ top: 12, right: 18, bottom: 34, left: 48 }}
+        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+      />
+    </Frame>
   );
 }
-
 export function BullesChart({
   matrice,
   presentation,
@@ -646,105 +476,61 @@ export function BullesChart({
   presentation?: DispositionPresentation | undefined;
 }) {
   const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const points = matriceCoordonnees(matrice);
-  const max = Math.max(1, ...points.map((point) => point.value));
-  const accent = paletteFill(theme, presentation?.palette, 0);
-  const options: ChartOptions<'bubble'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: {
-      x: {
-        ...axisScales(theme).x,
-        ticks: { ...axisScales(theme).x.ticks, callback: (v) => matrice.colonnes[Number(v)] ?? '' },
-      },
-      y: {
-        ...axisScales(theme).y,
-        ticks: { ...axisScales(theme).y.ticks, callback: (v) => matrice.lignes[Number(v)] ?? '' },
-      },
-    },
-  };
+  const max = Math.max(1, ...matrixPoints(matrice).map((point) => point.value));
   return (
-    <Bubble
-      options={options}
-      data={{
-        datasets: [
+    <Frame>
+      <ResponsiveScatterPlot
+        data={[
           {
-            label: 'Visites',
-            data: points.map((point) => ({
-              x: point.x,
-              y: point.y,
-              r: 4 + (point.value / max) * 16,
+            id: 'Visites',
+            data: matrixPoints(matrice).map((point) => ({
+              ...point,
+              size: 8 + (point.value / max) * 20,
             })),
-            backgroundColor: `color-mix(in srgb, ${accent} 55%, transparent)`,
-            borderColor: accent,
           },
-        ],
-      }}
-    />
+        ]}
+        colors={[paletteFill(theme, presentation?.palette, 0)]}
+        nodeSize={(node) => node.data.size as number}
+        margin={{ top: 12, right: 18, bottom: 34, left: 48 }}
+        theme={nivoTheme(theme)}
+      />
+    </Frame>
   );
 }
-
 export function MixteChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const legende = presentation?.legende ?? true;
-  const cumulatif = items.reduce<number[]>(
-    (suite, item) => [...suite, (suite.at(-1) ?? 0) + item.value],
+  const cumul = items.reduce<{ x: string; y: number }[]>(
+    (all, item) => [...all, { x: item.label, y: (all.at(-1)?.y ?? 0) + item.value }],
     [],
   );
-  const options: ChartOptions<'bar' | 'line'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: {
-      x: axisScales(theme).x,
-      y: { ...axisScales(theme).y, position: 'left' },
-      yCumul: {
-        position: 'right',
-        grid: { display: false },
-        border: { display: false },
-        ticks: { color: theme.tick },
-      },
-    },
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: { display: legende, position: 'top', labels: { color: theme.tick } },
-    },
-  };
-  const data: ChartData<'bar' | 'line', number[], string> = {
-    labels: items.map((item) => item.label),
-    datasets: [
-      {
-        type: 'bar' as const,
-        label,
-        data: items.map((item) => item.value),
-        backgroundColor: paletteFill(theme, presentation?.palette, 0),
-        borderRadius: 6,
-        maxBarThickness: 28,
-        yAxisID: 'y',
-        order: 2,
-      },
-      {
-        type: 'line' as const,
-        label: 'Cumul',
-        data: cumulatif,
-        borderColor: paletteBorder(theme, presentation?.palette, 1, seriesColor(theme, 1)),
-        borderWidth: 2,
-        pointRadius: 0,
-        tension: 0.3,
-        yAxisID: 'yCumul',
-        order: 1,
-      },
-    ],
-  };
   return (
-    <MixedChart
-      type="bar"
-      options={options}
-      data={data}
-      plugins={valeursPlugins(theme, presentation?.valeurs)}
-    />
+    <Frame>
+      <div className="grid h-full grid-rows-2 gap-2">
+        <ResponsiveBar
+          data={items.map((item) => ({ label: item.label, value: item.value }))}
+          keys={['value']}
+          indexBy="label"
+          margin={{ top: 10, right: 12, bottom: 26, left: 42 }}
+          padding={0.3}
+          borderRadius={6}
+          colors={[paletteFill(theme, presentation?.palette, 0)]}
+          enableLabel={presentation?.valeurs === true}
+          theme={nivoTheme(theme)}
+          animate={!reducedMotion}
+        />
+        <ResponsiveLine
+          data={[{ id: 'Cumul', data: cumul }]}
+          colors={[paletteFill(theme, presentation?.palette, 1)]}
+          pointSize={0}
+          enableGridX={false}
+          margin={{ top: 8, right: 12, bottom: 26, left: 42 }}
+          theme={nivoTheme(theme)}
+        />
+      </div>
+    </Frame>
   );
 }
-
 export function JaugeChart({
   valeur,
   max,
@@ -757,37 +543,26 @@ export function JaugeChart({
   presentation?: DispositionPresentation | undefined;
 }) {
   const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const borne = Math.max(max, valeur, 1);
-  const options: ChartOptions<'doughnut'> = {
-    ...baseOptions(theme, reducedMotion),
-    circumference: 180,
-    rotation: 270,
-    cutout: '70%',
-    plugins: { ...baseOptions(theme, reducedMotion).plugins, legend: { display: false } },
-  };
+  const percent = Math.min(1, Math.max(0, valeur / Math.max(max, valeur, 1)));
   return (
     <div className="relative flex h-full items-center justify-center">
-      <Doughnut
-        options={options}
-        data={{
-          labels: [libelle, 'Reste'],
-          datasets: [
-            {
-              data: [valeur, Math.max(0, borne - valeur)],
-              backgroundColor: [paletteFill(theme, presentation?.palette, 0), theme.grid],
-              borderWidth: 0,
-            },
-          ],
-        }}
-      />
+      <div className="h-32 w-64 overflow-hidden">
+        <div
+          className="h-64 w-64 rounded-full border-[22px] border-muted"
+          style={{
+            borderTopColor: paletteFill(theme, presentation?.palette, 0),
+            borderRightColor: paletteFill(theme, presentation?.palette, 0),
+            transform: `rotate(${45 + percent * 90}deg)`,
+          }}
+        />
+      </div>
       <p className="absolute bottom-2 font-display text-[1.5rem] font-[800] tabular-nums">
         {formatNumber(valeur)}
       </p>
+      <span className="sr-only">{libelle}</span>
     </div>
   );
 }
-
 export function CarteDeChaleurTable({
   matrice,
   caption,
@@ -796,26 +571,18 @@ export function CarteDeChaleurTable({
   caption: string;
 }) {
   const max = Math.max(1, ...matrice.cellules.map((cellule) => cellule.value));
-  const valeurDe = (ligne: string, colonne: string) =>
+  const valueAt = (ligne: string, colonne: string) =>
     matrice.cellules.find((cellule) => cellule.ligne === ligne && cellule.colonne === colonne)
       ?.value ?? 0;
-
   return (
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full border-collapse text-[0.75rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <th scope="col">
-              <span className="sr-only">Ligne</span>
-            </th>
+            <th />
             {matrice.colonnes.map((colonne) => (
-              <th
-                key={colonne}
-                scope="col"
-                className="px-1.5 py-1 text-center font-[600] whitespace-nowrap"
-              >
+              <th key={colonne} className="px-1.5 py-1 text-center font-[600]">
                 {colonne}
               </th>
             ))}
@@ -824,21 +591,18 @@ export function CarteDeChaleurTable({
         <tbody>
           {matrice.lignes.map((ligne) => (
             <tr key={ligne}>
-              <th scope="row" className="px-1.5 py-1 text-left font-[600] whitespace-nowrap">
-                {ligne}
-              </th>
+              <th className="px-1.5 py-1 text-left font-[600]">{ligne}</th>
               {matrice.colonnes.map((colonne) => {
-                const valeur = valeurDe(ligne, colonne);
-                const opacite = valeur === 0 ? 0 : 0.15 + (valeur / max) * 0.75;
+                const value = valueAt(ligne, colonne);
                 return (
                   <td
                     key={colonne}
                     className="px-1.5 py-1 text-center tabular-nums"
                     style={{
-                      backgroundColor: `color-mix(in srgb, var(--chart-1) ${String(opacite * 100)}%, transparent)`,
+                      backgroundColor: `color-mix(in srgb, var(--chart-1) ${String(value === 0 ? 0 : 15 + (value / max) * 75)}%, transparent)`,
                     }}
                   >
-                    {valeur === 0 ? '' : valeur}
+                    {value === 0 ? '' : value}
                   </td>
                 );
               })}
@@ -849,7 +613,6 @@ export function CarteDeChaleurTable({
     </div>
   );
 }
-
 export function TableauWidget({
   items,
   entete,
@@ -859,83 +622,54 @@ export function TableauWidget({
   entete: string;
   caption: string;
 }) {
-  const total = items.reduce((somme, item) => somme + item.value, 0);
+  const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="w-full text-[0.8125rem]">
         <caption className="sr-only">{caption}</caption>
-        <thead className="border-b border-border">
+        <thead>
           <tr>
-            <th scope="col" className="px-2 py-1.5 text-left font-[600]">
-              {entete}
-            </th>
-            <th scope="col" className="px-2 py-1.5 text-right font-[600]">
-              Visites
-            </th>
-            <th scope="col" className="px-2 py-1.5 text-right font-[600]">
-              Part
-            </th>
+            <th className="px-2 py-1.5 text-left">{entete}</th>
+            <th className="px-2 py-1.5 text-right">Visites</th>
+            <th className="px-2 py-1.5 text-right">Part</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody>
           {items.map((item) => (
             <tr key={item.id}>
-              <th scope="row" className="px-2 py-1.5 text-left font-[400]">
-                {item.label}
-              </th>
+              <th className="px-2 py-1.5 text-left font-[400]">{item.label}</th>
               <td className="px-2 py-1.5 text-right tabular-nums">{formatNumber(item.value)}</td>
               <td className="px-2 py-1.5 text-right tabular-nums">
                 {total === 0 ? '0 %' : `${String(Math.round((item.value / total) * 100))} %`}
               </td>
             </tr>
           ))}
-          {items.length === 0 ? (
-            <tr>
-              <td colSpan={3} className="px-2 py-6 text-center text-muted-foreground">
-                Aucune donnée sur la période.
-              </td>
-            </tr>
-          ) : null}
         </tbody>
       </table>
     </div>
   );
 }
-
-/**
- * Le tableau d'équipe : une ligne par personne, des colonnes d'unités
- * différentes. Les cellules arrivent déjà mises en forme, la source seule
- * sachant ce qui est un compte et ce qui est un pourcentage.
- */
 export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; caption: string }) {
-  if (donnee.lignes.length === 0) {
+  if (donnee.lignes.length === 0)
     return <EmptyChart message="Personne n’a travaillé sur la période." />;
-  }
-
   return (
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-tabindex -- zone défilable au clavier
     <div className="h-full overflow-auto" tabIndex={0}>
       <table className="min-w-[42rem] w-full text-[0.875rem]">
         <caption className="sr-only">{caption}</caption>
-        <thead className="sticky top-0 border-b border-border bg-card">
+        <thead>
           <tr>
-            <th scope="col" className="px-3 py-2 text-left font-[600]">
-              Téléconseiller
-            </th>
+            <th className="px-3 py-2 text-left">Téléconseiller</th>
             {donnee.colonnes.map((colonne) => (
-              <th key={colonne} scope="col" className="px-3 py-2 text-right font-[600]">
+              <th key={colonne} className="px-3 py-2 text-right">
                 {colonne}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-border">
+        <tbody>
           {donnee.lignes.map((ligne) => (
             <tr key={ligne.id}>
-              <th scope="row" className="px-3 py-2 text-left font-[400]">
-                {ligne.nom}
-              </th>
+              <th className="px-3 py-2 text-left font-[400]">{ligne.nom}</th>
               {ligne.cellules.map((cellule) => (
                 <td key={cellule.cle} className="px-3 py-2 text-right tabular-nums">
                   {cellule.texte}
@@ -944,25 +678,10 @@ export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; captio
             </tr>
           ))}
         </tbody>
-        {donnee.pied === undefined ? null : (
-          <tfoot className="sticky bottom-0 border-t border-border bg-card font-[600]">
-            <tr>
-              <th scope="row" className="px-3 py-2 text-left">
-                {donnee.pied.nom}
-              </th>
-              {donnee.pied.cellules.map((cellule) => (
-                <td key={cellule.cle} className="px-3 py-2 text-right tabular-nums">
-                  {cellule.texte}
-                </td>
-              ))}
-            </tr>
-          </tfoot>
-        )}
       </table>
     </div>
   );
 }
-
 export function TuileWidget({
   valeur,
   affichage,
@@ -991,7 +710,6 @@ export function TuileWidget({
     </div>
   );
 }
-
 export function TuileCourbeWidget({
   valeur,
   libelle,
@@ -1004,34 +722,21 @@ export function TuileCourbeWidget({
   presentation?: DispositionPresentation | undefined;
 }) {
   const theme = useChartTheme();
-  const reducedMotion = usePrefersReducedMotion();
-  const accent = paletteFill(theme, presentation?.palette, 0);
-  const options: ChartOptions<'line'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: { x: { display: false }, y: { display: false } },
-    elements: { point: { radius: 0 } },
-  };
   return (
     <div className="flex h-full flex-col justify-center gap-2">
       <p className="font-display text-[2.25rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
         <AnimatedNumber value={valeur} />
       </p>
       <div className="h-16">
-        <Line
-          options={options}
-          data={{
-            labels: serie.map((point) => point.label),
-            datasets: [
-              {
-                data: serie.map((point) => point.value),
-                borderColor: accent,
-                backgroundColor: `color-mix(in srgb, ${accent} 16%, transparent)`,
-                borderWidth: 2,
-                fill: true,
-                tension: 0.3,
-              },
-            ],
-          }}
+        <ResponsiveLine
+          data={[{ id: libelle, data: serie.map((point) => ({ x: point.label, y: point.value })) }]}
+          colors={[paletteFill(theme, presentation?.palette, 0)]}
+          enablePoints={false}
+          enableGridX={false}
+          enableGridY={false}
+          axisBottom={null}
+          axisLeft={null}
+          margin={{ top: 4, right: 0, bottom: 4, left: 0 }}
         />
       </div>
       <span className="sr-only">{libelle}</span>

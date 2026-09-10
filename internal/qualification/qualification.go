@@ -30,25 +30,21 @@ const (
 )
 
 var Garde = map[string][]socle.Role{
-	"POST /api/v1/rep-campaigns/attempts":                socle.Parcours,
-	"POST /api/v1/phase2/call-attempts":                  socle.Parcours,
-	"GET /api/v1/phase2/callbacks":                       socle.Parcours,
-	"GET /api/v1/phase2/directory":                       socle.Parcours,
-	"POST /api/v1/phase2/callbacks/{id}/cancel":          {socle.Admin, socle.Commercial, socle.ChargeClientele},
-	"POST /api/v1/ouvertures":                            socle.Parcours,
-	"GET /api/v1/ouvertures/courante":                    socle.Parcours,
-	"PUT /api/v1/ouvertures/{id}/brouillon":              socle.Parcours,
-	"GET /api/v1/ouvertures/ouvertes":                    {socle.Admin, socle.Superviseur},
-	"POST /api/v1/ouvertures/{id}/liberation":            {socle.Admin, socle.Superviseur},
-	"GET /api/v1/ouvertures/comptage":                    socle.Parcours,
-	"GET /api/v1/suggestions":                            socle.Parcours,
-	"PATCH /api/v1/suggestions/{id}":                     socle.Parcours,
-	"POST /api/v1/phase2/call-attempts/{id}/note-vocale": socle.Parcours,
-	"GET /api/v1/phase2/call-attempts/{id}/note-vocale":  socle.Parcours,
-	"POST /api/v1/phase2/call-attempts/{id}/recording":   socle.Parcours,
-	"GET /api/v1/phase2/call-attempts/{id}/recording":    socle.Parcours,
-	"POST /api/v1/sync/push":                             socle.Parcours,
-	"POST /api/v1/presence/beat":                         socle.Tous,
+	"POST /api/v1/rep-campaigns/attempts":       socle.Parcours,
+	"POST /api/v1/phase2/call-attempts":         socle.Parcours,
+	"GET /api/v1/phase2/callbacks":              socle.Parcours,
+	"GET /api/v1/phase2/directory":              socle.Parcours,
+	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele},
+	"POST /api/v1/ouvertures":                   socle.Parcours,
+	"GET /api/v1/ouvertures/courante":           socle.Parcours,
+	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.Parcours,
+	"GET /api/v1/ouvertures/ouvertes":           {socle.Admin, socle.Superviseur},
+	"POST /api/v1/ouvertures/{id}/liberation":   {socle.Admin, socle.Superviseur},
+	"GET /api/v1/ouvertures/comptage":           socle.Parcours,
+	"GET /api/v1/suggestions":                   socle.Parcours,
+	"PATCH /api/v1/suggestions/{id}":            socle.Parcours,
+	"POST /api/v1/sync/push":                    socle.Parcours,
+	"POST /api/v1/presence/beat":                socle.Tous,
 }
 
 func qualificationRoute(id, methode, chemin string) huma.Operation {
@@ -69,7 +65,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("compterOuvertures", http.MethodGet, "/api/v1/ouvertures/comptage"), s.qualificationComptage)
 	huma.Register(api, qualificationRoute("listSuggestions", http.MethodGet, "/api/v1/suggestions"), s.qualificationListerSuggestions)
 	huma.Register(api, qualificationRoute("updateSuggestionStatus", http.MethodPatch, "/api/v1/suggestions/{id}"), s.qualificationBasculerSuggestion)
-	noteMonterRoutes(api, s)
+	presenceMonterRoutes(api, s)
 	annuaireMonterRoutes(api, s)
 	syncMonterRoutes(api, s)
 }
@@ -464,7 +460,7 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 	if !applique {
 		return qualificationRepResultat("duplicate", b.ID), nil
 	}
-	out := qualificationRepResultat("applied", b.ID)
+	out := qualificationRepResultat(tentativeAppliquee, b.ID)
 	if err := s.qualificationJoindreSuggestion(ctx, &appel, out); err != nil {
 		return nil, err
 	}
@@ -939,6 +935,8 @@ func (s *service) qualificationTentativeProspect(ctx context.Context, in *Qualif
 	return out, nil
 }
 
+const tentativeAppliquee = "applied"
+
 // Seul chemin d'écriture d'une tentative de phase 2 : la route directe et
 // /sync/push y passent tous deux.
 func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.Utilisateur, b *QualificationCallAttemptBody) (string, QualificationProspectPhase2StateDTO, error) {
@@ -967,6 +965,9 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	})
 	if err != nil {
 		return "", vide, err
+	}
+	if statut == tentativeAppliquee && tentative.regle.phase2Status == exports.ExportCleMethodeObtenue {
+		s.signalerEnrolement(ctx, u, b.ProspectID)
 	}
 	return statut, etat, nil
 }
@@ -1040,7 +1041,7 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 		return "", vide, err
 	}
 	if !t.regle.clot {
-		return "applied", qualificationEtatPhase2(corrige.ID, corrige.Rev, corrige.UpdatedAt, &parcours), nil
+		return tentativeAppliquee, qualificationEtatPhase2(corrige.ID, corrige.Rev, corrige.UpdatedAt, &parcours), nil
 	}
 	return qualificationCloturerParcours(ctx, q, u, b, t, &corrige, &parcours)
 }
@@ -1216,5 +1217,5 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 	if err != nil {
 		return "", vide, err
 	}
-	return "applied", qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
+	return tentativeAppliquee, qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
 }
