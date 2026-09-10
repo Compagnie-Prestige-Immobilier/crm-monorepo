@@ -1,0 +1,241 @@
+'use client';
+
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import Link from 'next/link';
+
+import { QueryErrorState } from '@/components/query-error-state';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Skeleton } from '@/components/ui/skeleton';
+import { fetchInscriptionDetail, type InscriptionDetail, type Projet } from '@/lib/data/enrolement';
+import { formatDateTime, formatPhone } from '@/lib/format';
+import { queryKeys } from '@/lib/query-keys';
+
+const ABSENT = 'Non renseigné';
+
+function texte(valeur: string | null, format?: (v: string) => string): string {
+  if (valeur === null || valeur === '') return ABSENT;
+  return format === undefined ? valeur : format(valeur);
+}
+
+function ficheProspect(projet: Projet, id: string): string {
+  return projet === 'GRAND_PUBLIC' ? `/grand-public/${id}` : `/chues/prospects/${id}`;
+}
+
+function Ligne({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 border-b border-border/60 py-1.5 text-[0.875rem] last:border-b-0">
+      <span className="text-muted-foreground">{label}</span>
+      <span className="min-w-0 break-words text-right">{children}</span>
+    </div>
+  );
+}
+
+function Normalise({
+  detail,
+  libelles,
+}: {
+  detail: InscriptionDetail;
+  libelles: Map<string, string>;
+}) {
+  return (
+    <div className="flex flex-col">
+      <Ligne label="Identifiant sur la plateforme">{detail.identifiantDistant}</Ligne>
+      <Ligne label="Téléphone">
+        {detail.phoneE164 === null ? ABSENT : formatPhone(detail.phoneE164)}
+      </Ligne>
+      <Ligne label="Courriel">{texte(detail.email)}</Ligne>
+      <Ligne label="Statut">{libelles.get(detail.statutDistant) ?? detail.statutDistant}</Ligne>
+      <Ligne label="Étape">{detail.etapeDistante ?? ABSENT}</Ligne>
+      <Ligne label="Inscription">{texte(detail.inscriteLe, formatDateTime)}</Ligne>
+      <Ligne label="Dossier soumis">{texte(detail.soumiseLe, formatDateTime)}</Ligne>
+      <Ligne label="Décision">{texte(detail.decideeLe, formatDateTime)}</Ligne>
+      <Ligne label="Dernier tirage">{formatDateTime(detail.dernierTirageAt)}</Ligne>
+      <Ligne label="Prospect du CRM">
+        {detail.prospectId === null ? (
+          'Non rapproché'
+        ) : (
+          <Link
+            href={ficheProspect(detail.projet, detail.prospectId)}
+            className="underline underline-offset-4"
+          >
+            Ouvrir la fiche
+          </Link>
+        )}
+      </Ligne>
+      {detail.disparueLe === null ? null : (
+        <Ligne label="Retirée de la plateforme">{formatDateTime(detail.disparueLe)}</Ligne>
+      )}
+    </div>
+  );
+}
+
+function scalaire(valeur: unknown): string | null {
+  if (valeur === null) return ABSENT;
+  if (typeof valeur === 'string') return valeur === '' ? ABSENT : valeur;
+  if (typeof valeur === 'number') return String(valeur);
+  if (typeof valeur === 'boolean') return valeur ? 'Oui' : 'Non';
+  return null;
+}
+
+/**
+ * La plateforme Grand Public ne décrit pas sa réponse : la charge utile est le
+ * seul endroit du produit où ses champs deviennent lisibles, d'où l'affichage
+ * générique plutôt qu'une liste de champs attendus.
+ */
+function Piece({ piece }: { piece: PieceDossier }) {
+  const accepte = piece.status === 'accepte';
+  return (
+    <li className="flex items-center justify-between gap-3 py-1.5 text-[0.875rem]">
+      <span className="min-w-0 truncate">{piece.label ?? piece.docId}</span>
+      <span
+        className={
+          accepte
+            ? 'shrink-0 rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] text-accent-text'
+            : 'shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.75rem] text-muted-foreground'
+        }
+      >
+        {accepte ? 'Acceptée' : 'En attente'}
+      </span>
+    </li>
+  );
+}
+
+interface PieceDossier {
+  readonly docId?: string;
+  readonly label?: string;
+  readonly status?: string;
+}
+
+/** Le suivi du dossier : les pièces attendues et celles qui sont validées. */
+function pieces(valeur: unknown): PieceDossier[] | null {
+  if (!Array.isArray(valeur) || valeur.length === 0) return null;
+  const lignes = valeur as PieceDossier[];
+  return lignes.every((ligne) => typeof ligne?.status === 'string') ? lignes : null;
+}
+
+function ChargeUtile({ charge }: { charge: unknown }) {
+  if (typeof charge !== 'object' || charge === null) return null;
+  const entrees = Object.entries(charge as Record<string, unknown>).map(
+    ([cle, valeur]) => [cle, valeur, scalaire(valeur)] as const,
+  );
+  const scalaires = entrees.filter(([, , texte]) => texte !== null);
+  const composes = entrees.filter(([, , texte]) => texte === null);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col">
+        {scalaires.map(([cle, , texte]) => (
+          <Ligne key={cle} label={cle}>
+            {texte}
+          </Ligne>
+        ))}
+      </div>
+      {composes.map(([cle, valeur]) => {
+        const dossier = pieces(valeur);
+        if (dossier !== null) {
+          return (
+            <div key={cle} className="rounded-md border border-border/60 p-3">
+              <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+                Pièces du dossier
+              </p>
+              <ul className="mt-1 divide-y divide-border/60">
+                {dossier.map((piece, rang) => (
+                  <Piece key={piece.docId ?? rang} piece={piece} />
+                ))}
+              </ul>
+            </div>
+          );
+        }
+        return (
+          <details key={cle} className="rounded-md border border-border/60 p-3">
+            <summary className="cursor-pointer text-[0.875rem] font-[600]">{cle}</summary>
+            <pre className="mt-2 overflow-x-auto text-[0.75rem] leading-relaxed">
+              {JSON.stringify(valeur, null, 2)}
+            </pre>
+          </details>
+        );
+      })}
+    </div>
+  );
+}
+
+function Corps({
+  etat,
+  libelles,
+}: {
+  etat: UseQueryResult<InscriptionDetail>;
+  libelles: Map<string, string>;
+}) {
+  if (etat.isError) {
+    return (
+      <QueryErrorState
+        error={etat.error}
+        onRetry={() => void etat.refetch()}
+        fallback="Le détail de cette inscription n’a pas pu être chargé."
+      />
+    );
+  }
+  if (etat.data === undefined) return <Skeleton className="h-64 w-full rounded-md" />;
+
+  return (
+    <>
+      <Normalise detail={etat.data} libelles={libelles} />
+      <div className="flex flex-col gap-2">
+        <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+          Ce que la plateforme envoie
+        </p>
+        <ChargeUtile charge={etat.data.chargeUtile} />
+      </div>
+    </>
+  );
+}
+
+export function DetailInscription({
+  projet,
+  id,
+  libelles,
+  onClose,
+}: {
+  projet: Projet;
+  id: string | null;
+  libelles: Map<string, string>;
+  onClose: () => void;
+}) {
+  const detail = useQuery({
+    queryKey: queryKeys.enrolementInscription(projet, id ?? ''),
+    queryFn: () => fetchInscriptionDetail(projet, id ?? ''),
+    enabled: id !== null,
+  });
+
+  return (
+    <Sheet
+      open={id !== null}
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onClose();
+      }}
+    >
+      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
+        <SheetHeader>
+          <SheetTitle>
+            {detail.data === undefined
+              ? 'Inscription'
+              : `${detail.data.prenom} ${detail.data.nom}`.trim()}
+          </SheetTitle>
+          <SheetDescription>
+            Lecture seule. Rien de ce qui est affiché ici n’est écrit sur la plateforme.
+          </SheetDescription>
+        </SheetHeader>
+
+        <div className="flex flex-col gap-6 px-4 pb-6">
+          <Corps etat={detail} libelles={libelles} />
+        </div>
+      </SheetContent>
+    </Sheet>
+  );
+}

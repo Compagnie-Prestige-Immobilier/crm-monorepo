@@ -11,6 +11,7 @@ export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
 export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];
 export type Tirage = Schemas['TirageDto'];
 export type Suppression = Schemas['SuppressionDto'];
+export type InscriptionDetail = Schemas['InscriptionPlateformeDetailDto'];
 
 /** L'onglet de l'écran, et le projet qu'il tire. Les deux ne se mélangent jamais. */
 export const ONGLETS_ENROLEMENT = ['chues', 'grand-public'] as const;
@@ -45,6 +46,19 @@ export async function fetchInscriptions(
   return unwrap(
     await client.GET('/api/v1/enrolement/{projet}/inscriptions', {
       params: { path: { projet }, query: query(filtres) },
+    }),
+  );
+}
+
+/** Le détail porte la charge utile brute : le seul endroit où les champs que la plateforme envoie sans les décrire deviennent lisibles. */
+export async function fetchInscriptionDetail(
+  projet: Projet,
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<InscriptionDetail> {
+  return unwrap(
+    await client.GET('/api/v1/enrolement/{projet}/inscriptions/{id}', {
+      params: { path: { projet, id } },
     }),
   );
 }
