@@ -2,8 +2,14 @@
 
 import { useQueries } from '@tanstack/react-query';
 
+import {
+  AIDE_DECISION,
+  AIDE_RAPPROCHEMENT,
+  AIDE_TAUX_RAPPROCHEMENT,
+} from '@/components/enrolement/aides';
 import { DelaisEnrolement } from '@/components/enrolement/delais-enrolement';
 import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -101,13 +107,17 @@ function lignesComparees(
     {
       label: 'Dossiers décidés',
       valeurs: lire((i) => formatNumber(i.entonnoir.dossiersDecides)),
-      note: 'Grand Public n’expose pas de date de décision : sa colonne reste à zéro par construction.',
+      note: AIDE_DECISION,
     },
-    { label: 'Rapprochées à un prospect', valeurs: lire((i) => formatNumber(i.rapprochees)) },
+    {
+      label: 'Rapprochées à un prospect',
+      valeurs: lire((i) => formatNumber(i.rapprochees)),
+      note: AIDE_RAPPROCHEMENT,
+    },
     {
       label: 'Taux de rapprochement',
       valeurs: lire((i) => formatRateOrNone(i.tauxRapprochement)),
-      note: 'Part des inscriptions que le CRM connaissait déjà.',
+      note: AIDE_TAUX_RAPPROCHEMENT,
     },
   ];
 }
@@ -139,12 +149,12 @@ function Comparaison({
               {lignesComparees(indicateurs).map((ligne) => (
                 <tr key={ligne.label} className="border-b border-border/60 last:border-b-0">
                   <td className="py-2">
-                    {ligne.label}
-                    {ligne.note === undefined ? null : (
-                      <span className="block text-[0.75rem] text-muted-foreground">
-                        {ligne.note}
-                      </span>
-                    )}
+                    <span className="inline-flex items-center gap-1">
+                      {ligne.label}
+                      {ligne.note === undefined ? null : (
+                        <InfoPopover label={ligne.label} description={ligne.note} />
+                      )}
+                    </span>
                   </td>
                   {ligne.valeurs.map((valeur, index) => (
                     <td
