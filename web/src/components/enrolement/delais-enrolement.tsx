@@ -8,6 +8,20 @@ import { formatNumber } from '@/lib/format';
 
 const SANS_MESURE = 'Aucune mesure';
 
+const HEURES_PAR_JOUR = 24;
+const MINUTES_PAR_HEURE = 60;
+
+/**
+ * « 0,6 j » ne se lit pas : personne ne compte en fractions de journée. Sous
+ * une journée, l'écart se dit en heures, et sous une heure en minutes.
+ */
+export function formatDelai(jours: number): string {
+  if (jours >= 1) return `${formatNumber(Math.round(jours * 10) / 10)} j`;
+  const heures = jours * HEURES_PAR_JOUR;
+  if (heures >= 1) return `${formatNumber(Math.round(heures))} h`;
+  return `${formatNumber(Math.round(heures * MINUTES_PAR_HEURE))} min`;
+}
+
 type Delai = EnrolementIndicateurs['delais'][number];
 
 function delaiDe(indicateurs: EnrolementIndicateurs | undefined, leg: string): Delai | undefined {
@@ -30,12 +44,12 @@ function moyennePonderee(delais: readonly (Delai | undefined)[]): string {
     (total, delai) => total + (delai.moyenneDays ?? 0) * delai.sample,
     0,
   );
-  return `${formatNumber(Math.round((jours / dossiers) * 10) / 10)} j · ${formatNumber(dossiers)}`;
+  return `${formatDelai(jours / dossiers)} · ${formatNumber(dossiers)}`;
 }
 
 function moyenneDe(delai: Delai | undefined): string {
   if (delai === undefined || delai.moyenneDays === null || delai.sample === 0) return SANS_MESURE;
-  return `${formatNumber(delai.moyenneDays)} j · ${formatNumber(delai.sample)}`;
+  return `${formatDelai(delai.moyenneDays)} · ${formatNumber(delai.sample)}`;
 }
 
 const LEGS: readonly { leg: string; label: string }[] = [
@@ -99,7 +113,7 @@ export function DelaisEnrolement({
           </table>
         </div>
         <p className="text-[0.75rem] text-muted-foreground">
-          Délai moyen en jours, suivi du nombre de dossiers sur lesquels il est calculé.
+          Délai moyen, suivi du nombre de dossiers sur lesquels il est calculé.
         </p>
       </CardContent>
     </Card>
