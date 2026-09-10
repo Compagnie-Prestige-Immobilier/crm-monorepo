@@ -24,7 +24,7 @@ test.use({ storageState: 'v1/.auth/accueil.json' });
 test.describe.configure({ mode: 'serial' });
 
 const ROUTE = '/accueil/tableau-de-bord';
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 const DISPOSITION = '/api/v1/tableaux-de-bord/visites/disposition';
 
 interface Disposition {

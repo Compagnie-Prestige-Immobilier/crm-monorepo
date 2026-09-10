@@ -33,7 +33,7 @@ test.describe.configure({ mode: 'serial' });
 
 test.use({ storageState: 'v1/.auth/admin.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 /** Le préfixe du fichier (`E2E.md` §5.5) : réserve de représentants ET campagnes. */
 const PREFIXE = 'E2E-CHUES-LOT ';

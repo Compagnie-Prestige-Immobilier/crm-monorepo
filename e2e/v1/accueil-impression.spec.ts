@@ -13,7 +13,7 @@ import { expect, request, test, type Locator, type Page } from '@playwright/test
 
 test.use({ storageState: 'v1/.auth/accueil.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 const RUN = String(Date.now()).slice(-8);
 const PREFIXE = `E2E-ACC-IMP-${RUN}`;
 const NOM = `${PREFIXE} Awa Diop`;

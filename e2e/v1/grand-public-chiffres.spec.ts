@@ -20,7 +20,7 @@ import { expect, request, test, type APIRequestContext, type Page } from '@playw
 
 test.use({ storageState: 'v1/.auth/superviseur.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 const SUPERVISEUR_STATE = 'v1/.auth/superviseur.json';
 const ADMIN_STATE = 'v1/.auth/admin.json';
 const DIRECTION_STATE = 'v1/.auth/direction.json';

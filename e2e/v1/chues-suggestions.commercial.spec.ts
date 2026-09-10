@@ -21,7 +21,7 @@ import { adminApi } from './fixtures';
 test.describe.configure({ mode: 'serial' });
 test.use({ storageState: 'v1/.auth/commercial.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 const COMMERCIAL_STORAGE_STATE = 'v1/.auth/commercial.json';
 const COMMERCIAL2_STORAGE_STATE = 'v1/.auth/commercial2.json';
 

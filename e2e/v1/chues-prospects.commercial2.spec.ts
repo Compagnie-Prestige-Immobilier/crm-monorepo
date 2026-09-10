@@ -12,7 +12,7 @@ import { expect, request, test, type APIResponse } from '@playwright/test';
  */
 test.use({ storageState: 'v1/.auth/commercial2.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 const FICHE_AWA = { nom: 'E2E-CHUES-PRO Awa Un', phone: '+221781004401' } as const;
 

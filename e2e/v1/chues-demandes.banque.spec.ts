@@ -17,7 +17,7 @@ test.describe.configure({ mode: 'serial' });
 test.use({ storageState: 'v1/.auth/banque.json' });
 
 const RUN = String(Date.now()).slice(-8);
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 /**
  * Le dialogue de dépôt répartit le terme cherché entre « nom » et

@@ -9,7 +9,7 @@ import { expect, test } from '@playwright/test';
  * vider les cookies de la page partagée ferait tomber tout ce qui suit.
  */
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 test.describe('session ADMIN', () => {
   test.use({ storageState: 'v1/.auth/admin.json' });

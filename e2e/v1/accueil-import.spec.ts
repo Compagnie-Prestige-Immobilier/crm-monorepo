@@ -52,7 +52,7 @@ import { buildXlsx } from './xlsx';
 test.describe.configure({ mode: 'serial' });
 
 const SESSION = 'v1/.auth/direction.json';
-const WEB = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 test.use({ storageState: SESSION });
 

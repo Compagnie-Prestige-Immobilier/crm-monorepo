@@ -22,7 +22,7 @@ import { adminApi } from './fixtures';
 test.use({ storageState: 'v1/.auth/superviseur.json' });
 test.describe.configure({ mode: 'serial' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 const PREFIXE = 'E2E-CHUES-TAUX';
 

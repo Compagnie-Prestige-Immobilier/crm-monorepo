@@ -27,7 +27,7 @@ import { adminApi } from './fixtures';
  */
 test.use({ storageState: 'v1/.auth/commercial.json' });
 
-const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:3000';
+const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 const PREFIXE = 'E2E-CHUES-PRO ';
 
