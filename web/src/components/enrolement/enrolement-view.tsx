@@ -173,7 +173,13 @@ function PanneauProjet({ projet }: { projet: Projet }) {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <EntonnoirCarte entonnoir={indicateurs.data?.entonnoir} />
+        <EntonnoirCarte
+          entonnoir={indicateurs.data?.entonnoir}
+          actif={filtres.avancement}
+          onChoisir={(avancement) => {
+            poserFiltre({ avancement, page: 1 });
+          }}
+        />
         <CourbeEnrolement
           titre="Inscriptions par jour"
           series={[{ nom: 'Inscriptions', points: indicateurs.data?.parJour ?? [] }]}

@@ -92,6 +92,9 @@ type ListerInscriptionsInput struct {
 	DateTo           string `query:"dateTo" maxLength:"40"`
 	Rapproche        string `query:"rapproche" enum:"true,false"`
 	InclureDisparues string `query:"inclureDisparues" enum:"true,false"`
+	// Les étages de l'entonnoir : la plateforme ne les nomme pas, ils se
+	// déduisent de l'étape et des dates.
+	Avancement string `query:"avancement" enum:"ouvert,soumis,decide"`
 }
 
 type ListerInscriptionsOutput struct {
@@ -145,6 +148,7 @@ func (s *service) listerInscriptions(ctx context.Context, in *ListerInscriptions
 		Projet: db.Projet(in.Projet), InclureDisparues: in.InclureDisparues == socle.Vrai,
 		Statut: texteAdmin(in.Statut), Rapproche: booleenAdmin(in.Rapproche),
 		DateFrom: debut, DateTo: fin, Search: texteAdmin(in.Search),
+		Avancement: texteAdmin(in.Avancement),
 	}
 	total, err := s.Q.CountInscriptions(ctx, filtres)
 	if err != nil {
@@ -153,7 +157,8 @@ func (s *service) listerInscriptions(ctx context.Context, in *ListerInscriptions
 	rows, err := s.Q.ListInscriptions(ctx, db.ListInscriptionsParams{
 		Projet: filtres.Projet, InclureDisparues: filtres.InclureDisparues, Statut: filtres.Statut,
 		Rapproche: filtres.Rapproche, DateFrom: filtres.DateFrom, DateTo: filtres.DateTo,
-		Search: filtres.Search, PageSize: in.PageSize, PageOffset: (in.Page - 1) * in.PageSize,
+		Search: filtres.Search, Avancement: filtres.Avancement,
+		PageSize: in.PageSize, PageOffset: (in.Page - 1) * in.PageSize,
 	})
 	if err != nil {
 		return nil, err
