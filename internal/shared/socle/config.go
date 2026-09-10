@@ -4,13 +4,20 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
 
+const (
+	BasePublique  = "public"
+	NomCookieBase = "cpi_base"
+)
+
 type Config struct {
 	Port        string
+	Base        string
 	DatabaseURL string
 	SessionTTL  time.Duration
 	LoginRate   int
@@ -42,6 +49,7 @@ func EnvInt(nom string, defaut int) (int, error) {
 func LireConfig() (*Config, error) {
 	cfg := &Config{
 		Port:        Env("PORT", "4000"),
+		Base:        BasePublique,
 		DatabaseURL: os.Getenv("DATABASE_URL"),
 		TrustProxy:  Env("API_TRUST_PROXY_HEADERS", Faux) == Vrai,
 		LogFormat:   Env("LOG_FORMAT", "json"),
@@ -74,6 +82,23 @@ func LireConfig() (*Config, error) {
 	}
 	cfg.SessionTTL = time.Duration(jours) * 24 * time.Hour
 	return cfg, nil
+}
+
+// Une base de plus par variable `DATABASE_URL_<NOM>` à côté de `DATABASE_URL`,
+// la base publique ; le nom en minuscules est la valeur du cookie `cpi_base`.
+func Bases(cfg *Config) []*Config {
+	bases := []*Config{cfg}
+	for _, kv := range os.Environ() {
+		nom, url, _ := strings.Cut(kv, "=")
+		if !strings.HasPrefix(nom, "DATABASE_URL_") || url == "" {
+			continue
+		}
+		c := *cfg
+		c.Base, c.DatabaseURL = strings.ToLower(strings.TrimPrefix(nom, "DATABASE_URL_")), url
+		bases = append(bases, &c)
+	}
+	slices.SortFunc(bases[1:], func(a, b *Config) int { return strings.Compare(a.Base, b.Base) })
+	return bases
 }
 
 func Journal(cfg *Config) *slog.Logger {

@@ -263,8 +263,11 @@ function CarteReglages({ projet }: { projet: Projet }) {
   };
 
   const enregistrer = useMutation({
-    mutationFn: (body: { frequenceMinutes?: number; repriseDepuis?: string }) =>
-      saveReglagesEnrolement(projet, body),
+    mutationFn: (body: {
+      frequenceMinutes?: number;
+      repriseDepuis?: string;
+      statutsComplets?: string[];
+    }) => saveReglagesEnrolement(projet, body),
     onSuccess: async () => {
       toast.success('Réglages enregistrés.');
       await invalider();
@@ -364,6 +367,25 @@ function CarteReglages({ projet }: { projet: Projet }) {
                 defaultValue={repriseDefaultValue(donnees.repriseDepuis)}
                 onBlur={(event) => {
                   enregistrer.mutate({ repriseDepuis: event.target.value });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`complets-${projet}`}>Statuts « dossier complet »</Label>
+              <Input
+                id={`complets-${projet}`}
+                className="w-64"
+                placeholder="Vide : décision datée sur la plateforme"
+                defaultValue={donnees.statutsComplets.join(', ')}
+                onBlur={(event) => {
+                  const statuts = event.target.value
+                    .split(/[,;]+/u)
+                    .map((s) => s.trim())
+                    .filter((s) => s !== '');
+                  if (statuts.join(',') !== donnees.statutsComplets.join(',')) {
+                    enregistrer.mutate({ statutsComplets: statuts });
+                  }
                 }}
               />
             </div>

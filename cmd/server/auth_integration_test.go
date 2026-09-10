@@ -60,7 +60,7 @@ func nouveauBanc(t *testing.T, role string) *banc {
 	if err != nil {
 		t.Fatal(err)
 	}
-	srv, _, _, err := serveur(cfg, pool)
+	srv, _, err := serveur(cfg, pool)
 	if err != nil {
 		t.Fatal(err)
 	}

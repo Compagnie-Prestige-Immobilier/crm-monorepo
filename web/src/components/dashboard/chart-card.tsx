@@ -26,10 +26,7 @@ export function ChartCard({
   description?: string | undefined;
   children: ReactNode;
   className?: string | undefined;
-  /**
-   * Une carte pleine largeur mérite plus de hauteur qu'une demi-carte ; une
-   * tuile sans canvas n'a pas besoin de la zone réservée à Chart.js.
-   */
+  /** Une carte pleine largeur mérite plus de hauteur qu'une demi-carte. */
   hauteur?: keyof typeof HAUTEURS;
   actions?: ReactNode | undefined;
   info?: string | undefined;
@@ -50,8 +47,6 @@ export function ChartCard({
         </div>
         {actions}
       </CardHeader>
-      {/* Hauteur fixe : Chart.js mesure son conteneur, et un parent
-          auto-dimensionné produit une boucle de redimensionnement. */}
       <div
         ref={chartRegion}
         className={cn('px-5 pb-1', HAUTEURS[hauteur])}

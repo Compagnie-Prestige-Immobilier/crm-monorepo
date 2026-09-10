@@ -493,7 +493,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/dossiers/nouveau',
-        label: 'Nouveau dossier',
+        label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
         roles: ['ADMIN'],
@@ -525,7 +525,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/dossiers/nouveau',
-        label: 'Ouvrir un dossier',
+        label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
         roles: ['BANQUE_FINANCE'],
@@ -707,7 +707,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/dossiers/nouveau',
-        label: 'Nouveau dossier',
+        label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
         roles: ['ADMIN'],
@@ -744,7 +744,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/dossiers/nouveau',
-        label: 'Ouvrir un dossier',
+        label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
         roles: ['BANQUE_FINANCE'],

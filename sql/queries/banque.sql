@@ -52,7 +52,8 @@ WHERE (@includeInactive::boolean OR "isActive")
 ORDER BY "sortOrder" ASC, "label" ASC;
 
 -- name: BankCaseProspect :one
-SELECT "id", "nom", "prenom", "phoneE164", "banqueId", "phase2Status"
+SELECT "id", "nom", "prenom", "phoneE164", "banqueId", "phase2Status",
+       COALESCE("lastCallById", "createdById") AS "suiviParId"
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 
 -- name: BankBanqueExists :one
@@ -65,8 +66,8 @@ FROM "bank_cases" WHERE "referenceKey" = $1 AND "deletedAt" IS NULL LIMIT 1;
 -- name: BankCaseInsert :exec
 INSERT INTO "bank_cases"
   ("id", "reference", "referenceKey", "prospectId", "customerName", "customerPhoneE164",
-   "processingBankId", "currentStageId", "createdById", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, now());
+   "processingBankId", "currentStageId", "createdById", "inscriptionId", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, now());
 
 -- name: BankCaseEdit :execrows
 UPDATE "bank_cases"
@@ -180,3 +181,49 @@ WHERE "id" = $1 AND "status" = 'PENDING';
 UPDATE "client_creation_requests"
 SET "status" = 'REJECTED', "reviewedById" = $2, "reviewedAt" = $3, "rejectionNote" = $4
 WHERE "id" = $1 AND "status" = 'PENDING';
+
+-- name: BankReferenceSuivante :one
+INSERT INTO "references_bancaires" ("projet", "annee", "dernier") VALUES ($1, sqlc.arg('annee')::bigint, 1)
+ON CONFLICT ("projet", "annee") DO UPDATE SET "dernier" = "references_bancaires"."dernier" + 1
+RETURNING "dernier";
+
+-- name: BankInscriptionPourDossier :one
+SELECT i."id", i."projet", i."identifiantDistant", i."nom", i."prenom", i."phoneE164", i."email",
+       i."statutDistant", i."decideeLe", i."prospectId"
+FROM "inscriptions_plateforme" i
+WHERE i."id" = $1;
+
+-- name: BankCaseParInscription :one
+SELECT "id" FROM "bank_cases" WHERE "inscriptionId" = $1 AND "deletedAt" IS NULL LIMIT 1;
+
+-- name: BankInscriptionsCompletes :many
+SELECT i."id", i."projet", i."identifiantDistant", i."nom", i."prenom", i."phoneE164", i."email",
+       i."statutDistant", i."soumiseLe", i."decideeLe", i."prospectId", p."banqueId", b."name" AS "banqueName",
+       su."fullName" AS "suiviParName", i."completeSignaleeLe"
+FROM "inscriptions_plateforme" i
+LEFT JOIN "prospects" p ON p."id" = i."prospectId" AND p."deletedAt" IS NULL
+LEFT JOIN "banques" b ON b."id" = p."banqueId"
+LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
+WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
+  AND ((cardinality(sqlc.arg('statuts')::text[]) = 0 AND i."decideeLe" IS NOT NULL)
+       OR i."statutDistant" = ANY(sqlc.arg('statuts')::text[]))
+  AND (NOT sqlc.arg('a_signaler')::boolean OR i."completeSignaleeLe" IS NULL)
+  AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id" AND c."deletedAt" IS NULL)
+ORDER BY i."decideeLe" DESC NULLS LAST, i."soumiseLe" DESC NULLS LAST, i."id" DESC;
+
+-- name: BankInscriptionSignalee :exec
+UPDATE "inscriptions_plateforme" SET "completeSignaleeLe" = $2 WHERE "id" = $1;
+
+-- name: BankCaseSuivi :one
+SELECT c."id", c."reference", c."customerName", c."customerPhoneE164", c."amountXof", c."rejectionDetail",
+       b."name" AS "banqueName", s."label" AS "stageLabel", s."type" AS "stageType", c."createdAt",
+       COALESCE(p."lastCallById", p."createdById") AS "suiviParId", su."fullName" AS "suiviParName",
+       COALESCE((SELECT pj."projet"::text FROM "prospect_journeys" pj WHERE pj."prospectId" = c."prospectId" ORDER BY pj."createdAt" LIMIT 1), 'CHUES')::text AS "projet",
+       r."label" AS "rejectionLabel"
+FROM "bank_cases" c
+INNER JOIN "banques" b ON b."id" = c."processingBankId"
+INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
+INNER JOIN "prospects" p ON p."id" = c."prospectId"
+LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
+LEFT JOIN "bank_rejection_reasons" r ON r."id" = c."rejectionReasonId"
+WHERE c."id" = $1;

@@ -78,15 +78,14 @@ export function BankCasesView({ projet }: { projet: Projet }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Dossiers bancaires ouverts sur des clients dont la méthode d’enrôlement est obtenue.
+          Dossiers bancaires ouverts depuis les dossiers validés sur la plateforme.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <BankExportMenu filters={filters} />
           {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI
               poserait `role="button"` sur le `<a>`. */}
           <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
-            <PlusIcon aria-hidden="true" />
-            Nouveau dossier
+            <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
           </Link>
         </div>
       </div>
@@ -118,14 +117,13 @@ export function BankCasesView({ projet }: { projet: Projet }) {
                   }
                   description={
                     countActiveBankFilters(filters) === 0
-                      ? 'Ouvrez un dossier depuis « Nouveau dossier ».'
+                      ? 'Ouvrez un dossier depuis « À ouvrir (plateforme) ».'
                       : 'Élargissez la période ou retirez un critère.'
                   }
                   action={
                     countActiveBankFilters(filters) === 0 ? (
                       <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
-                        <PlusIcon aria-hidden="true" />
-                        Nouveau dossier
+                        <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
                       </Link>
                     ) : null
                   }

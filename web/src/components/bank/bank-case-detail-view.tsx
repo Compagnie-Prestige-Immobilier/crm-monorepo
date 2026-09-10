@@ -11,6 +11,7 @@ import {
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BankCourriels } from '@/components/bank/bank-courriels';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -136,14 +137,17 @@ function RejectionNotice({
   );
 }
 
+// Pas de rejet avant la prise en traitement : le serveur refuse, le bouton n'existe pas.
 function RejectButton({
   rejectedStage,
+  enTraitement,
   onReject,
 }: {
   rejectedStage: BankCaseStage | undefined;
+  enTraitement: boolean;
   onReject: () => void;
 }) {
-  if (rejectedStage === undefined || !rejectedStage.isActive) return null;
+  if (rejectedStage === undefined || !rejectedStage.isActive || !enTraitement) return null;
   return (
     <Button type="button" variant="destructive" onClick={onReject}>
       <CircleSlashIcon aria-hidden="true" />
@@ -156,6 +160,7 @@ function BankCaseActions({
   canAct,
   action,
   rejectedStage,
+  enTraitement,
   role,
   onAdvance,
   onReject,
@@ -163,6 +168,7 @@ function BankCaseActions({
   canAct: boolean;
   action: ReturnType<typeof primaryAction>;
   rejectedStage: BankCaseStage | undefined;
+  enTraitement: boolean;
   role: Role;
   onAdvance: () => void;
   onReject: () => void;
@@ -189,7 +195,7 @@ function BankCaseActions({
           et sans place privilégiée : il ne doit jamais être le bouton
           qu'on atteint par réflexe. */}
       <ActionPrincipale action={action} onAdvance={onAdvance} />
-      <RejectButton rejectedStage={rejectedStage} onReject={onReject} />
+      <RejectButton rejectedStage={rejectedStage} enTraitement={enTraitement} onReject={onReject} />
     </div>
   );
 }
@@ -230,6 +236,12 @@ function BankCaseSummaryCard({
             <dt className="text-muted-foreground">Dernière intervention</dt>
             <dd className="truncate font-[600]">{lastActor(bankCase)}</dd>
           </div>
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Suivi par</dt>
+            <dd className="truncate font-[600]">
+              {bankCase.suiviParName ?? 'Aucun téléconseiller'}
+            </dd>
+          </div>
         </dl>
 
         <RejectionNotice reason={bankCase.rejectionReason} detail={bankCase.rejectionDetail} />
@@ -239,6 +251,7 @@ function BankCaseSummaryCard({
           canAct={canAct}
           action={action}
           rejectedStage={rejectedStage}
+          enTraitement={!bankCase.currentStage.isInitial}
           role={role}
           onAdvance={onAdvance}
           onReject={onReject}
@@ -341,6 +354,11 @@ export function BankCaseDetailView({
           Historique du dossier
         </h2>
         <Timeline history={detail.data.history} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">Courriels</h2>
+        <BankCourriels objetType="bank_case" objetId={caseId} />
       </section>
 
       <AdvanceDialog
@@ -516,7 +534,7 @@ function AdvanceSubmitLabel({ pending, isCashing }: { pending: boolean; isCashin
   return isCashing ? 'Confirmer l’encaissement' : 'Confirmer';
 }
 
-function AdvanceDialog({
+export function AdvanceDialog({
   open,
   onOpenChange,
   caseId,
@@ -658,7 +676,7 @@ function canSubmitReject({
   );
 }
 
-function RejectDialog({
+export function RejectDialog({
   open,
   onOpenChange,
   caseId,

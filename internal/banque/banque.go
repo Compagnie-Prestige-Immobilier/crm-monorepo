@@ -1,7 +1,6 @@
 package banque
 
 import (
-	"cmp"
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/notifications"
@@ -26,6 +25,8 @@ const (
 	banqueEtapeOuverte   = "OPEN"
 	banqueEtapeEncaissee = "CASHED"
 	banqueEtapeRejetee   = "REJECTED"
+
+	banqueCleEtapeCourante = "currentStageId"
 
 	banqueRouteDemandes = "/demandes-clients"
 	banqueRouteDossiers = "/dossiers"
@@ -99,6 +100,9 @@ type DossierBanque struct {
 	UpdatedByName      *string      `json:"updatedByName"`
 	CreatedAt          time.Time    `json:"createdAt"`
 	UpdatedAt          time.Time    `json:"updatedAt"`
+	InscriptionID      *string      `json:"inscriptionId"`
+	SuiviParID         *string      `json:"suiviParId"`
+	SuiviParName       *string      `json:"suiviParName"`
 }
 
 type TransitionBanque struct {
@@ -379,60 +383,19 @@ func (s *service) banqueTraitement(ctx context.Context, heritee, choisie *string
 	return *banqueID, nil
 }
 
-type CreationDossierInput struct {
-	Body struct {
-		ProspectID       string  `json:"prospectId" format:"uuid"`
-		Reference        string  `json:"reference" minLength:"2" maxLength:"64"`
-		ProcessingBankID *string `json:"processingBankId,omitempty" format:"uuid"`
+// `isActive` : une étape initiale désactivée ne doit plus rien recevoir.
+func (s *service) etapeInitiale(ctx context.Context) (string, error) {
+	initiale, err := s.Q.BankStageInitial(ctx)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", socle.Problem(http.StatusConflict, "BANK_WORKFLOW_NO_INITIAL_STAGE",
+			"Le workflow bancaire n’a pas d’étape initiale ACTIVE : configuration incomplète.")
 	}
+	return initiale, err
 }
 
 // L'identité du client est COPIÉE ici et plus jamais réécrite : le dossier doit
 // refléter ce qui a été transmis à la banque ce jour-là.
-func (s *service) creerDossier(ctx context.Context, in *CreationDossierInput) (*DossierOutput, error) {
-	u := socle.UtilisateurCourant(ctx)
-	cle := banqueReferenceCle(in.Body.Reference)
-	if err := s.banqueConflitReference(ctx, cle); err != nil {
-		return nil, err
-	}
-	prospect, err := s.Q.BankCaseProspect(ctx, in.Body.ProspectID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "BANK_CASE_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
-	}
-	if err != nil {
-		return nil, err
-	}
-	if prospect.Phase2Status != db.Phase2StatusMETHODOBTAINED {
-		return nil, problemBanque(http.StatusUnprocessableEntity, "BANK_CASE_PROSPECT_NOT_ENROLLED",
-			"Un dossier bancaire ne peut être ouvert que sur un prospect dont la méthode d’enrôlement est obtenue. Statut phase 3 actuel : "+string(prospect.Phase2Status)+".",
-			map[string]any{"prospectId": prospect.ID, "phase2Status": string(prospect.Phase2Status)})
-	}
-	banqueID, err := s.banqueTraitement(ctx, prospect.BanqueId, in.Body.ProcessingBankID)
-	if err != nil {
-		return nil, err
-	}
-	// `isActive` : une étape initiale désactivée ne doit plus rien recevoir.
-	initiale, err := s.Q.BankStageInitial(ctx)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusConflict, "BANK_WORKFLOW_NO_INITIAL_STAGE",
-			"Le workflow bancaire n’a pas d’étape initiale ACTIVE : configuration incomplète.")
-	}
-	if err != nil {
-		return nil, err
-	}
-	id, err := s.ecrireDossier(ctx, u.ID, banqueID, initiale, &prospect, in.Body.Reference)
-	if err != nil {
-		return nil, err
-	}
-	ref, err := s.chargerReferentielBanque(ctx)
-	if err != nil {
-		return nil, err
-	}
-	dossier, err := s.dossier(ctx, id, "", ref)
-	return &DossierOutput{Body: dossier}, err
-}
-
-func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale string, prospect *db.BankCaseProspectRow, reference string) (string, error) {
+func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale string, prospect *db.BankCaseProspectRow, reference string, inscriptionID *string) (string, error) {
 	id, err := uuid.NewV7()
 	if err != nil {
 		return "", err
@@ -447,7 +410,7 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 		if err := q.BankCaseInsert(ctx, db.BankCaseInsertParams{
 			ID: id.String(), Reference: banqueReferenceAffichee(reference), ReferenceKey: banqueReferenceCle(reference),
 			ProspectId: prospect.ID, CustomerName: nom, CustomerPhoneE164: prospect.PhoneE164,
-			ProcessingBankId: banqueID, CurrentStageId: initiale, CreatedById: agentID,
+			ProcessingBankId: banqueID, CurrentStageId: initiale, CreatedById: agentID, InscriptionId: inscriptionID,
 		}); err != nil {
 			return err
 		}
@@ -468,7 +431,6 @@ type ModificationDossierInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
 		ExpectedRev      int32   `json:"expectedRev" minimum:"1"`
-		Reference        *string `json:"reference,omitempty" minLength:"2" maxLength:"64"`
 		ProcessingBankID *string `json:"processingBankId,omitempty" format:"uuid"`
 	}
 }
@@ -483,18 +445,10 @@ func (s *service) banqueRevConflit(ctx context.Context, id string, ref *referent
 		map[string]any{"currentRev": courant.Rev, "current": courant})
 }
 
-func (s *service) banqueChampsModifies(ctx context.Context, in *ModificationDossierInput, cleActuelle string) (db.BankCaseEditParams, error) {
+// La référence est générée à l'ouverture et ne se modifie plus : seule la
+// banque de traitement peut changer.
+func (s *service) banqueChampsModifies(ctx context.Context, in *ModificationDossierInput) (db.BankCaseEditParams, error) {
 	params := db.BankCaseEditParams{ID: in.ID, Expectedrev: in.Body.ExpectedRev}
-	if in.Body.Reference != nil {
-		cle := banqueReferenceCle(*in.Body.Reference)
-		if cle != cleActuelle {
-			if err := s.banqueConflitReference(ctx, cle); err != nil {
-				return params, err
-			}
-		}
-		affichee := banqueReferenceAffichee(*in.Body.Reference)
-		params.Reference, params.ReferenceKey = &affichee, &cle
-	}
 	if in.Body.ProcessingBankID == nil {
 		return params, nil
 	}
@@ -521,15 +475,12 @@ func (s *service) modifierDossier(ctx context.Context, in *ModificationDossierIn
 	if existant.IsTerminal {
 		return nil, terminalBanque(existant.CurrentStage.Label)
 	}
-	params, err := s.banqueChampsModifies(ctx, in, existant.ReferenceKey)
+	params, err := s.banqueChampsModifies(ctx, in)
 	if err != nil {
 		return nil, err
 	}
 	params.Updatedbyid = &u.ID
 	lignes, err := s.Q.BankCaseEdit(ctx, params)
-	if banqueConflitUnicite(err) && params.ReferenceKey != nil {
-		return nil, s.banqueReferenceDejaPrise(ctx, *params.ReferenceKey)
-	}
 	if err != nil {
 		return nil, err
 	}
@@ -625,83 +576,24 @@ func banquePlanTransition(cible *EtapeBanque, corps *CorpsTransitionBanque, code
 	return banquePlanOuverture(corps)
 }
 
-// Fondée sur la POSITION et non sur un chaînage stocké : réordonner le workflow
-// ne touche que les transitions futures. Une étape désactivée est sautée.
-func banqueEtapesOuvertes(etapes []EtapeBanque) []EtapeBanque {
-	ouvertes := make([]EtapeBanque, 0, len(etapes))
-	for i := range etapes {
-		if etapes[i].IsActive && etapes[i].Type == banqueEtapeOuverte {
-			ouvertes = append(ouvertes, etapes[i])
-		}
-	}
-	slices.SortFunc(ouvertes, func(a, b EtapeBanque) int {
-		if rang := cmp.Compare(a.Position, b.Position); rang != 0 {
-			return rang
-		}
-		return strings.Compare(a.ID, b.ID)
-	})
-	return ouvertes
-}
-
-func banqueSuivanteOuverte(ouvertes []EtapeBanque, courante *EtapeBanque) *EtapeBanque {
-	for i := range ouvertes {
-		if ouvertes[i].Position > courante.Position {
-			return &ouvertes[i]
-		}
-	}
-	return nil
-}
-
-func banqueEtapeNonSuivante(message string, attendue, courante *EtapeBanque) error {
-	charge := map[string]any{"currentStageId": courante.ID, "expectedStageId": nil}
-	if attendue != nil {
-		charge["expectedStageId"] = attendue.ID
-	}
-	return problemBanque(http.StatusUnprocessableEntity, banqueCodeEtapeNonSuivante, message, charge)
-}
-
-// L'encaissement ne se déclare qu'à la DERNIÈRE étape ouverte active.
-func banqueEncaissementAtteignable(ouvertes []EtapeBanque, courante *EtapeBanque) error {
-	libelle := "aucune"
-	var derniere *EtapeBanque
-	if len(ouvertes) > 0 {
-		derniere = &ouvertes[len(ouvertes)-1]
-		if derniere.ID == courante.ID {
-			return nil
-		}
-		libelle = derniere.Label
-	}
-	charge := map[string]any{"currentStageId": courante.ID, "expectedStageId": nil}
-	if derniere != nil {
-		charge["expectedStageId"] = derniere.ID
-	}
-	return problemBanque(http.StatusUnprocessableEntity, "BANK_STAGE_CASHED_NOT_LAST",
-		"L’encaissement ne se déclare qu’à la dernière étape ouverte du flux ("+libelle+").", charge)
-}
-
-func banqueAtteignable(etapes []EtapeBanque, courante, cible *EtapeBanque) error {
+// Depuis une étape ouverte, toute étape active se rejoint dans les deux sens :
+// l'ordre du flux guide, il n'enferme pas. Seul le rejet exige une prise en
+// traitement préalable ; l'encaissement et le rejet se confirment par leur
+// montant ou leur motif (banquePlanTransition).
+func banqueAtteignable(courante, cible *EtapeBanque) error {
 	if !cible.IsActive {
 		return banqueEtapeInactive(cible)
 	}
 	if cible.ID == courante.ID {
-		return banqueEtapeNonSuivante("Le dossier est déjà sur cette étape.", nil, courante)
+		return problemBanque(http.StatusUnprocessableEntity, banqueCodeEtapeNonSuivante,
+			"Le dossier est déjà sur cette étape.", map[string]any{banqueCleEtapeCourante: courante.ID})
 	}
-	// Une banque peut refuser à n'importe quel moment de l'instruction.
-	if cible.Type == banqueEtapeRejetee {
-		return nil
+	if cible.Type == banqueEtapeRejetee && courante.IsInitial {
+		return problemBanque(http.StatusUnprocessableEntity, "BANK_CASE_REJECT_BEFORE_PROCESSING",
+			"Un dossier encore à traiter ne se rejette pas : prenez-le d’abord en traitement.",
+			map[string]any{banqueCleEtapeCourante: courante.ID})
 	}
-	ouvertes := banqueEtapesOuvertes(etapes)
-	if cible.Type == banqueEtapeEncaissee {
-		return banqueEncaissementAtteignable(ouvertes, courante)
-	}
-	suivante := banqueSuivanteOuverte(ouvertes, courante)
-	if suivante != nil && suivante.ID == cible.ID {
-		return nil
-	}
-	if suivante == nil {
-		return banqueEtapeNonSuivante("« "+courante.Label+" » est la dernière étape ouverte du flux.", nil, courante)
-	}
-	return banqueEtapeNonSuivante("Depuis « "+courante.Label+" », la seule étape ouverte suivante est « "+suivante.Label+" ».", suivante, courante)
+	return nil
 }
 
 func banqueEtapeInactive(cible *EtapeBanque) error {
@@ -745,7 +637,7 @@ func (s *service) banqueAppliquerTransition(ctx context.Context, id string, corp
 	if !connue {
 		return nil, socle.Problem(http.StatusNotFound, banqueCodeEtapeIntrouvable, "Étape introuvable.")
 	}
-	if err := banqueVerifierCible(ref, &existant, &cible, justification != nil); err != nil {
+	if err := banqueVerifierCible(&existant, &cible, justification != nil); err != nil {
 		return nil, err
 	}
 	codeMotif, err := ref.motifActif(corps.RejectionReasonID)
@@ -759,12 +651,15 @@ func (s *service) banqueAppliquerTransition(ctx context.Context, id string, corp
 	if err := s.banqueEcrireTransition(ctx, &u, &existant, &cible, effet, corps, justification); err != nil {
 		return nil, err
 	}
+	if cible.Type != banqueEtapeOuverte && justification == nil {
+		s.signalerIssue(ctx, id, cible.Type)
+	}
 	return s.detailDossier(ctx, id, "")
 }
 
-func banqueVerifierCible(ref *referentielBanque, existant *DossierBanque, cible *EtapeBanque, correction bool) error {
+func banqueVerifierCible(existant *DossierBanque, cible *EtapeBanque, correction bool) error {
 	if !correction {
-		return banqueAtteignable(ref.etapes, &existant.CurrentStage, cible)
+		return banqueAtteignable(&existant.CurrentStage, cible)
 	}
 	if !cible.IsActive {
 		return banqueEtapeInactive(cible)
@@ -1430,6 +1325,7 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 var Garde = map[string][]socle.Role{
 	"GET /api/v1/bank-cases":                    socle.Banque,
 	"POST /api/v1/bank-cases":                   socle.Banque,
+	"GET /api/v1/bank-cases/a-ouvrir":           socle.Banque,
 	"GET /api/v1/bank-cases/analytics":          socle.Banque,
 	"GET /api/v1/bank-cases/prospect-search":    socle.Banque,
 	"GET /api/v1/bank-cases/rejection-reasons":  socle.Banque,
@@ -1453,6 +1349,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
 	huma.Get(api, "/api/v1/bank-cases", s.listerDossiers)
 	posterBanque(api, "creer-dossier-bancaire", "/api/v1/bank-cases", s.creerDossier)
+	huma.Get(api, "/api/v1/bank-cases/a-ouvrir", s.inscriptionsAOuvrir)
 	huma.Get(api, "/api/v1/bank-cases/analytics", s.indicateursBanque)
 	huma.Get(api, "/api/v1/bank-cases/prospect-search", s.banqueRechercherProspects)
 	huma.Get(api, "/api/v1/bank-cases/rejection-reasons", s.banqueListerMotifsRejet)

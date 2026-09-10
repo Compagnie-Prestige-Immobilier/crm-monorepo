@@ -310,6 +310,10 @@ export type BankCaseDetail = Schemas['BankCaseDetailDto'];
 export type BankCaseAnalytics = Schemas['BankCaseAnalyticsDto'];
 export type BankProspectSearchItem = Schemas['ProspectSearchItemDto'];
 export type CreateBankCaseInput = Schemas['CreateBankCaseDto'];
+export type InscriptionAOuvrir = Schemas['InscriptionAOuvrir'];
+export type PilotageBanque = Schemas['PilotageBanque'];
+export type Courriel = Schemas['CourrielDTO'];
+export type ReglagesCourriels = Schemas['ReglagesCourriels'];
 export type BankCaseSortField = Schemas['BankCaseSortField'];
 
 export const BANK_CASE_SORT_FIELDS = [

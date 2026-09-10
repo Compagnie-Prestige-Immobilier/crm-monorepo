@@ -26,6 +26,7 @@ jobs:
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
       TEST_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
+      DATABASE_URL_DEMO: postgresql://crm:crm@localhost:5432/crm_demo?sslmode=disable
     services:
       postgres:
         image: postgres:18.4
@@ -61,8 +62,11 @@ jobs:
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
 
-      - name: Schéma sur la base de test
-        run: PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f sql/schema.sql
+      - name: Schéma sur la base de test et sur la seconde base
+        run: |
+          PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f sql/schema.sql
+          PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -c 'CREATE DATABASE crm_demo'
+          PGPASSWORD=crm psql -h localhost -U crm -d crm_demo -v ON_ERROR_STOP=1 -q -f sql/schema.sql
       # `vet` prépare chaque requête sur la base réelle : une colonne absente
       # rougit ici, pas en production.
       - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 vet

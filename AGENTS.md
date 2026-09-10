@@ -1,5 +1,11 @@
 # Conventions pour les agents
 
+## Graphiques
+
+Tous les graphiques de l’application web utilisent Nivo. Ne pas réintroduire
+Chart.js ou `react-chartjs-2`; ajouter un module Nivo ciblé si un type de
+graphique manque.
+
 Ce fichier s'adresse aux assistants qui ecrivent du code ici. Il complete
 `docs/QUALITY.md`, qui s'adresse aux humains.
 
@@ -44,9 +50,7 @@ Un etat vide dit quoi faire ensuite, pas seulement que la liste est vide. Une
 erreur dit ce qui s'est passe et ce que le lecteur peut faire.
 
 Le vocabulaire est FIGE: `teleconseiller`, `Banque & Finance`, `campagne
-d'appels prospects`, `campagne d'appels representants`, `note vocale` (une
-note dictee apres l'appel, jamais « enregistrement d'appel » : l'audio d'un
-appel n'est pas capte et reste hors perimetre). Les mots `commercial` et ses
+d'appels prospects`, `campagne d'appels representants`. Les mots `commercial` et ses
 declinaisons sont interdits dans une chaine affichee.
 
 Pas de tiret cadratin. Il ne se saisit pas au clavier et se lit mal en

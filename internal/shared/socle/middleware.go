@@ -114,13 +114,15 @@ func origineAutorisee(r *http.Request) bool {
 // `__Host-` seul laisse passer un sous-domaine voisin (OWASP CSRF).
 func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !origineAutorisee(r) {
+		_, motif := mux.Handler(r)
+		roles, gardee := Garde[motif]
+		publique := gardee && Autorise(roles, Public)
+		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas d'origine.
+		if !publique && !origineAutorisee(r) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Origine refusée."))
 			return
 		}
-		_, motif := mux.Handler(r)
-		roles, gardee := Garde[motif]
-		if !gardee || Autorise(roles, Public) {
+		if !gardee || publique {
 			mux.ServeHTTP(w, r)
 			return
 		}

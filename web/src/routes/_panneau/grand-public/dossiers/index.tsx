@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { BankCasesView } from '@/components/bank/bank-cases-view';
-import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
+import { BankCasesSkeleton } from '@/components/bank/bank-cases-view';
+import { BankDossiers } from '@/components/bank/bank-dossiers';
+import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
@@ -14,17 +15,16 @@ export const Route = createFileRoute('/_panneau/grand-public/dossiers/')({
 function Loading() {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-end justify-between gap-3">
-        <Skeleton className="h-9 w-80" />
-        <Skeleton className="h-12 w-52" />
+      <div className="flex items-center justify-between gap-3">
+        <Skeleton className="h-4 w-96" />
+        <Skeleton className="h-11 w-56" />
       </div>
-      <Skeleton className="h-64 w-full rounded-lg" />
-      <GrandPublicTableSkeleton />
+      <BankFiltersBarSkeleton />
+      <BankCasesSkeleton />
     </div>
   );
 }
 
-/** La page `(panel)/grand-public/dossiers` de la v1. */
 function DossiersGrandPublicPage() {
-  return <BankCasesView projet="GRAND_PUBLIC" />;
+  return <BankDossiers projet="GRAND_PUBLIC" />;
 }

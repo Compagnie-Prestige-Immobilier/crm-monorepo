@@ -157,6 +157,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		Path: "/api/v1/notification-templates/{id}",
 	}, s.modifierGabaritNotification)
 	huma.Register(api, poste("renderNotificationTemplate", "/api/v1/notification-templates/{id}/render"), s.rendreGabaritNotification)
+	s.monterCourriels(api)
 }
 
 var Garde = map[string][]socle.Role{
@@ -1058,8 +1059,8 @@ func (s *service) envoyerVaguesNotifications(ctx context.Context, transport *bre
 	refuse := false
 	for _, vague := range notificationVagues(cibles, parID) {
 		messages := make([]MessageBrevo, 0, len(vague))
-		for _, lot := range vague {
-			messages = append(messages, lot.message)
+		for i := range vague {
+			messages = append(messages, vague[i].message)
 		}
 		envoi := transport.Envoyer(ctx, messages)
 		if envoi.Statut == brevoEnPanne {
@@ -1120,9 +1121,9 @@ func notificationVagues(cibles []notificationCibleEmail, parID map[string]db.Not
 	var ensemble [][]notificationLotEmail
 	var courante []notificationLotEmail
 	taille := 0
-	for _, lot := range lots {
-		courante = append(courante, lot)
-		taille += len(lot.lignes)
+	for i := range lots {
+		courante = append(courante, lots[i])
+		taille += len(lots[i].lignes)
 		if taille < notificationTailleVague {
 			continue
 		}
@@ -1142,8 +1143,8 @@ func notificationVerdictsVague(envoi envoiBrevo, vague []notificationLotEmail, a
 	}
 	refuse := envoi.Statut == brevoEnPanne
 	verdicts := map[string]notificationVerdict{}
-	for _, lot := range vague {
-		for _, ligne := range lot.lignes {
+	for i := range vague {
+		for _, ligne := range vague[i].lignes {
 			issue, connue := parEmail[ligne.email]
 			if issue.ok {
 				acceptees[ligne.ID] = true

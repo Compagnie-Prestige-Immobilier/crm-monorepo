@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -130,6 +131,7 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         <span className="hidden max-w-[10rem] truncate text-left text-[0.875rem] sm:block">
           {user.fullName}
         </span>
+        {user.workspace === 'public' ? null : <Badge variant="warning">{user.workspace}</Badge>}
         <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-60">

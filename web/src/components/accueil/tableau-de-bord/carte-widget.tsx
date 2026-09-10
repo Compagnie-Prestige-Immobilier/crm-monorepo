@@ -45,7 +45,7 @@ import { cn } from '@/lib/utils';
 import type { DashboardWidget } from '@/lib/data/visites-dashboard';
 
 /** Un widget dont la source a quitté le catalogue reste nommé, jamais anonyme. */
-/** Une tuile sans canvas n'a pas besoin de la zone réservée à Chart.js. */
+/** Une tuile sans graphique n'a pas besoin de la zone réservée au diagramme. */
 function hauteurDe(
   forme: Forme,
   marque: DashboardMarque | undefined,

@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/banque"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
@@ -262,6 +263,7 @@ type BilanTirage struct {
 type reglagesEnrolement struct {
 	FrequenceMinutes int          `json:"frequenceMinutes"`
 	RepriseDepuis    *string      `json:"repriseDepuis"`
+	StatutsComplets  []string     `json:"statutsComplets"`
 	DernierTirage    *BilanTirage `json:"dernierTirage"`
 }
 
@@ -270,13 +272,14 @@ type ReglagesOutput struct {
 		Projet           string       `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 		FrequenceMinutes int          `json:"frequenceMinutes"`
 		RepriseDepuis    *string      `json:"repriseDepuis"`
+		StatutsComplets  []string     `json:"statutsComplets"`
 		Configuree       bool         `json:"configuree"`
 		DernierTirage    *BilanTirage `json:"dernierTirage"`
 		UpdatedAt        *time.Time   `json:"updatedAt"`
 	}
 }
 
-func cleReglages(projet string) string { return "enrolement." + projet }
+func cleReglages(projet string) string { return socle.CleReglagesEnrolement(projet) }
 
 func plateformeConfiguree(projet string) (base, jeton string) {
 	if projet == projetChues {
@@ -297,6 +300,10 @@ func reglagesStockes(valeur string) reglagesEnrolement {
 		valeurs.FrequenceMinutes = stockees.FrequenceMinutes
 	}
 	valeurs.RepriseDepuis, valeurs.DernierTirage = stockees.RepriseDepuis, stockees.DernierTirage
+	valeurs.StatutsComplets = stockees.StatutsComplets
+	if valeurs.StatutsComplets == nil {
+		valeurs.StatutsComplets = []string{}
+	}
 	return valeurs
 }
 
@@ -327,6 +334,7 @@ func (s *service) reponseReglagesEnrolement(ctx context.Context, projet string) 
 	out.Body.Projet = projet
 	out.Body.FrequenceMinutes = valeurs.FrequenceMinutes
 	out.Body.RepriseDepuis = valeurs.RepriseDepuis
+	out.Body.StatutsComplets = valeurs.StatutsComplets
 	out.Body.Configuree = base != "" && jeton != ""
 	out.Body.DernierTirage = valeurs.DernierTirage
 	out.Body.UpdatedAt = quand
@@ -340,8 +348,9 @@ func (s *service) lireReglagesEnrolement(ctx context.Context, in *ProjetEnroleme
 type EcrireReglagesInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Body   struct {
-		FrequenceMinutes *int    `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
-		RepriseDepuis    *string `json:"repriseDepuis,omitempty" maxLength:"40"`
+		FrequenceMinutes *int      `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
+		RepriseDepuis    *string   `json:"repriseDepuis,omitempty" maxLength:"40"`
+		StatutsComplets  *[]string `json:"statutsComplets,omitempty" maxItems:"20"`
 	}
 }
 
@@ -372,6 +381,14 @@ func (s *service) ecrireReglagesEnrolement(ctx context.Context, in *EcrireReglag
 		valeurs.FrequenceMinutes = *in.Body.FrequenceMinutes
 	}
 	valeurs.RepriseDepuis = repriseNormalisee(in.Body.RepriseDepuis, valeurs.RepriseDepuis)
+	if in.Body.StatutsComplets != nil {
+		valeurs.StatutsComplets = make([]string, 0, len(*in.Body.StatutsComplets))
+		for _, statut := range *in.Body.StatutsComplets {
+			if propre := strings.TrimSpace(statut); propre != "" {
+				valeurs.StatutsComplets = append(valeurs.StatutsComplets, propre)
+			}
+		}
+	}
 	if err := s.ecrireReglagesTirage(ctx, in.Projet, valeurs, &acteur.ID); err != nil {
 		return nil, err
 	}
@@ -436,6 +453,8 @@ func (s *service) tirer(ctx context.Context, projet string) BilanTirage {
 		message := err.Error()
 		bilan.Erreur = &message
 		slog.Error("tirage d’enrôlement interrompu", "projet", projet, "err", message)
+	} else if _, err := banque.SignalerDossiersComplets(ctx, s.Deps, projet); err != nil {
+		slog.Error("tirage d’enrôlement : dossiers complets non signalés", "projet", projet, "err", err)
 	}
 	valeurs, _, lecture := s.reglagesTirage(ctx, projet)
 	if lecture == nil {

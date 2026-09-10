@@ -1,9 +1,6 @@
-import { existsSync, rmSync, statSync } from 'node:fs';
-import path from 'node:path';
+import { expect, test, type Page } from '@playwright/test';
 
-import { chromium, expect, test, type Page } from '@playwright/test';
-
-import { avecBase, BASE_URL, compteDe } from './comptes';
+import { avecBase, compteDe } from './comptes';
 import {
   choisirDansListe,
   effacerFiches,
@@ -16,15 +13,7 @@ import {
 const compte = compteDe('COMMERCIAL');
 const CONSOLE = '/chues/console';
 
-/** `NOTE_VOCALE_DIR` par defaut, relatif au repertoire d'ou le serveur est lance. */
-const NOTES = path.join(__dirname, 'storage', 'notes-vocales');
-
-const MICRO_FEINT = {
-  args: ['--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
-};
-
 const telephones: string[] = [];
-const fichiersNotes: string[] = [];
 
 async function semer(role: string): Promise<FicheSemee> {
   const suffixe = marque();
@@ -129,17 +118,14 @@ function rendezVousProchain(): string {
 
 // Un micro feint pour tout le fichier : `launchOptions` ne se change pas par
 // groupe, le cas « sans micro » ouvre donc son propre navigateur.
-test.use({ storageState: compte.etat, launchOptions: MICRO_FEINT });
+test.use({ storageState: compte.etat });
 
 test.afterAll(async () => {
-  for (const fichier of fichiersNotes) rmSync(fichier, { force: true });
   await effacerFiches(telephones);
 });
 
 test.describe('parcours 5, convertir un prospect', () => {
-  test('le dossier, le rendez-vous et la note vocale survivent a l’enregistrement', async ({
-    page,
-  }) => {
+  test('le dossier et le rendez-vous survivent a l’enregistrement', async ({ page }) => {
     const fiche = await semer('Conversion');
     const suffixe = marque();
     const profession = `Instituteur ${suffixe}`;
@@ -152,11 +138,6 @@ test.describe('parcours 5, convertir un prospect', () => {
     await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
     await page.getByLabel('Commentaire').fill(commentaire);
-
-    await page.getByRole('button', { name: 'Note vocale' }).click();
-    await expect(page.getByRole('button', { name: 'Arrêter (00:01)' })).toBeVisible();
-    await page.getByRole('button', { name: /^Arrêter/u }).click();
-    await expect(page.getByText('Note vocale de 00:01, envoyée avec l’appel.')).toBeVisible();
 
     await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
@@ -177,66 +158,11 @@ test.describe('parcours 5, convertir un prospect', () => {
     expect(conversion.banqueName).toContain('CBAO');
     expect(conversion.incomeBandLabel).toBe('Moins de 50 000 F CFA');
 
-    const fichier = path.join(NOTES, `${conversion.attemptId}.audio`);
-    fichiersNotes.push(fichier);
-    await expect
-      .poll(() => existsSync(fichier), { message: 'la note vocale est posee sur le disque' })
-      .toBe(true);
-    expect(statSync(fichier).size).toBeGreaterThan(0);
-
-    const relecture = await page.request.get(
-      `/api/v1/phase2/call-attempts/${conversion.attemptId}/note-vocale`,
-    );
-    expect(relecture.status()).toBe(200);
-    expect(relecture.headers()['content-type']).toContain('audio/');
-
     await page.goto(`/chues/prospects/${fiche.id}`);
     await expect(page.getByText('Méthode obtenue').first()).toBeVisible();
     await page.getByRole('list', { name: 'Histoire' }).getByText(commentaire).click();
     await expect(page.getByText(email)).toBeVisible();
     await expect(page.getByText(profession)).toBeVisible();
-
-    await page.getByRole('button', { name: 'Écouter la note vocale' }).click();
-    await expect(page.locator('audio')).toHaveAttribute(
-      'src',
-      `/api/v1/phase2/call-attempts/${conversion.attemptId}/note-vocale`,
-    );
-  });
-});
-
-test.describe('parcours 5, sans micro', () => {
-  test('le refus du micro est dit et rien n’est envoye', async () => {
-    const fiche = await semer('SansMicro');
-    // `args: []` efface le micro feint du fichier : Chromium se retrouve sans
-    // aucun peripherique audio, comme un poste qui n'en a pas.
-    const navigateur = await chromium.launch({ args: [] });
-    const contexte = await navigateur.newContext({
-      baseURL: BASE_URL,
-      storageState: compte.etat,
-    });
-    const page = await contexte.newPage();
-    const envois: string[] = [];
-    page.on('request', (requete) => {
-      if (requete.url().includes('/api/v1/phase2/call-attempts')) envois.push(requete.url());
-    });
-
-    try {
-      await ouvrirFiche(page, fiche);
-      await page.getByRole('button', { name: 'Note vocale' }).click();
-
-      await expect(
-        page.getByText('Le micro n’est pas accessible. La note vocale reste indisponible ici.'),
-      ).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Note vocale' })).toHaveCount(0);
-      expect(envois, 'aucune note vocale ne part sans enregistrement').toHaveLength(0);
-
-      // La fiche ne se quitte pas sans consignation : la rendre au suivant.
-      await issue(page, /Injoignable$/u).click();
-      await expect(consigne(page, fiche.nom)).toBeVisible();
-    } finally {
-      await contexte.close();
-      await navigateur.close();
-    }
   });
 });
 

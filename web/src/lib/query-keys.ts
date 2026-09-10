@@ -81,6 +81,12 @@ export const queryKeys = {
   bankStagesRoot: ['bank-stages'] as const,
   bankStages: (includeInactive: boolean) => ['bank-stages', includeInactive] as const,
   bankRejectionReasons: ['bank-rejection-reasons'] as const,
+  bankAOuvrir: (projet: Projet) => ['bank-a-ouvrir', projet] as const,
+  courrielsRoot: ['courriels'] as const,
+  courriels: (objetType: string, objetId: string) => ['courriels', objetType, objetId] as const,
+  courrielsJournal: (type: string, statut: string, page: number) =>
+    ['courriels', 'journal', type, statut, page] as const,
+  courrielsReglages: ['courriels', 'reglages'] as const,
 
   // ─── Demandes de création de client (banque → admin) ──────────────────────
   clientRequestsRoot: ['client-requests'] as const,

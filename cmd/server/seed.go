@@ -11,6 +11,7 @@ import (
 	"os"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -41,10 +42,17 @@ func semer(ctx context.Context, pool *pgxpool.Pool, _ *socle.Config) error {
 		seedSemerStatutsQualification,
 		seedSemerVisiteReferentiels,
 		seedSemerAdmin,
-		seedSemerFixtures,
 	}
 	for _, etape := range etapes {
 		if err := etape(ctx, q); err != nil {
+			return err
+		}
+	}
+	if err := seedSemerFixtures(ctx, q, tx); err != nil {
+		return err
+	}
+	if socle.Env("NODE_ENV", "") == "development" {
+		if err := seedFactory(ctx, tx); err != nil {
 			return err
 		}
 	}
@@ -285,7 +293,7 @@ func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
 // Jamais en production : le seed tourne à chaque démarrage du conteneur et ne
 // doit pas réactiver ou re-hacher les comptes fixtures. Une base qui les porte
 // déjà les voit fermés ; ils ne se suppriment pas, des fiches peuvent les citer.
-func seedSemerFixtures(ctx context.Context, q *db.Queries) error {
+func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx) error {
 	emails := make([]string, len(seedFixtureUsers))
 	for i, f := range seedFixtureUsers {
 		emails[i] = f.email
@@ -320,6 +328,85 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries) error {
 		}
 		crees += lignes
 	}
+	if err := seedInsererDonneesDemo(ctx, tx); err != nil {
+		return err
+	}
 	slog.Info("seed fixtures", "total", len(seedFixtureUsers), "créés", crees)
 	return nil
+}
+
+func seedInsererDonneesDemo(ctx context.Context, tx pgx.Tx) error {
+	_, err := tx.Exec(ctx, `
+	INSERT INTO "prospects" (
+		"id", "nom", "prenom", "phoneE164", "banqueId", "syndicatId", "createdById",
+		"clientCreatedAt", "updatedAt", "projet"
+	)
+	SELECT donnees.id, donnees.nom, donnees.prenom, donnees.phone, comptes.banque_id,
+		CASE WHEN donnees.est_chues THEN comptes.syndicat_id ELSE NULL END,
+		comptes.auteur, now(), now(), donnees.projet
+	FROM (VALUES
+		('00000000-0000-7000-0000-000000000101', 'Diop', 'Aminata', '+221770000101', 'CHUES'::"Projet", true),
+		('00000000-0000-7000-0000-000000000102', 'Ndiaye', 'Mamadou', '+221770000102', 'CHUES'::"Projet", true),
+		('00000000-0000-7000-0000-000000000103', 'Fall', 'Fatou', '+221770000103', 'GRAND_PUBLIC'::"Projet", false)
+	) AS donnees(id, nom, prenom, phone, projet, est_chues)
+	CROSS JOIN (
+		SELECT
+			(SELECT "id" FROM "users" WHERE "email" = 'fixture.awa@cpi.sn') AS auteur,
+			(SELECT "id" FROM "banques" WHERE "shortName" = 'CBAO') AS banque_id,
+			(SELECT "id" FROM "syndicats" WHERE "sigle" = 'CHUES') AS syndicat_id
+	) comptes
+	WHERE comptes.auteur IS NOT NULL
+	ON CONFLICT DO NOTHING;
+
+	UPDATE "prospects"
+	SET "phase2Status" = 'METHOD_OBTAINED',
+		"enrollmentMethod" = 'PLATFORM',
+		"enrollmentCapturedAt" = now(),
+		"enrollmentCapturedById" = (SELECT "id" FROM "users" WHERE "email" = 'fixture.awa@cpi.sn'),
+		"updatedAt" = now()
+	WHERE "id" IN (
+		'00000000-0000-7000-0000-000000000101',
+		'00000000-0000-7000-0000-000000000102',
+		'00000000-0000-7000-0000-000000000103'
+	);
+
+INSERT INTO "prospect_journeys" ("id", "prospectId", "projet", "updatedAt")
+SELECT
+	'00000000-0000-7000-0000-000000000201', "id", 'CHUES'::"Projet", now()
+FROM "prospects"
+WHERE "id" = '00000000-0000-7000-0000-000000000101'
+ON CONFLICT ("prospectId", "projet") DO NOTHING;
+
+INSERT INTO "prospect_journeys" ("id", "prospectId", "projet", "updatedAt")
+SELECT
+	'00000000-0000-7000-0000-000000000202', "id", 'CHUES'::"Projet", now()
+FROM "prospects"
+WHERE "id" = '00000000-0000-7000-0000-000000000102'
+ON CONFLICT ("prospectId", "projet") DO NOTHING;
+
+INSERT INTO "prospect_journeys" ("id", "prospectId", "projet", "updatedAt")
+SELECT
+	'00000000-0000-7000-0000-000000000203', "id", 'GRAND_PUBLIC'::"Projet", now()
+FROM "prospects"
+WHERE "id" = '00000000-0000-7000-0000-000000000103'
+ON CONFLICT ("prospectId", "projet") DO NOTHING;
+
+INSERT INTO "bank_cases" (
+	"id", "reference", "referenceKey", "prospectId", "customerName", "customerPhoneE164",
+	"processingBankId", "currentStageId", "createdById", "updatedAt"
+)
+SELECT
+	'00000000-0000-7000-0000-000000000301', 'DEMO-BANQUE-001', 'DEMO-BANQUE-001',
+	p."id", concat(p."prenom", ' ', p."nom"), p."phoneE164", comptes.banque_id,
+	(SELECT "id" FROM "bank_case_stages" WHERE "code" = 'A_TRAITER'), comptes.banque, now()
+FROM "prospects" p
+CROSS JOIN (SELECT
+	(SELECT "id" FROM "users" WHERE "email" = 'fixture.banque@cpi.sn') AS banque,
+	(SELECT "id" FROM "banques" WHERE "shortName" = 'CBAO') AS banque_id
+) comptes
+WHERE p."id" = '00000000-0000-7000-0000-000000000101'
+  AND comptes.banque IS NOT NULL
+	AND (SELECT "id" FROM "bank_case_stages" WHERE "code" = 'A_TRAITER') IS NOT NULL
+ON CONFLICT ("referenceKey") WHERE "deletedAt" IS NULL DO NOTHING`)
+	return err
 }
