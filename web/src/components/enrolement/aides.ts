@@ -10,7 +10,7 @@ export const AIDE_DECISION =
   'Grand Public n’expose aucune date de décision. Côté CHUES, la date vit sur la demande d’adhésion, que seul l’e-mail relie au compte, et aucun e-mail ne correspond aujourd’hui. Rien n’est mesurable tant que les plateformes n’exposent pas ce lien.';
 
 export const AIDE_DELAIS =
-  'Moyenne et médiane du même écart. La médiane est le cas ordinaire : un dossier oublié six mois ne la bouge pas. La moyenne, elle, le compte comme les autres. Un écart entre les deux signale qu’un cas traîne.\n\n« sur N dossiers » dit sur combien de dossiers le calcul repose. En dessous d’une dizaine, ces chiffres n’ont pas de valeur statistique.';
+  'Deux façons de résumer les mêmes dossiers.\n\nLa moyenne additionne tous les délais et divise par le nombre de dossiers. Un seul dossier oublié six mois la fait bondir, alors que tous les autres ont été rapides.\n\n« La moitié en moins de X » range les dossiers du plus rapide au plus lent et prend celui du milieu. Un cas extrême ne le déplace pas.\n\nQuand les deux chiffres s’éloignent, c’est qu’un dossier traîne loin derrière les autres.';
 
 export const AIDE_DELAI_SOUMISSION =
   'Le temps qu’une personne met, après avoir créé son compte, à déposer son dossier.\n\nCe que ça mesure : la friction de la constitution du dossier. Attention, seuls les dossiers réellement soumis sont comptés. Ceux qui traînent encore n’entrent pas dans le calcul, donc un délai court peut cacher une majorité de dossiers jamais déposés : lisez-le avec l’entonnoir.';

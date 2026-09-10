@@ -99,7 +99,7 @@ export function DelaisEnrolement({
           </table>
         </div>
         <p className="text-[0.75rem] text-muted-foreground">
-          Moyenne en jours, suivie du nombre de dossiers mesurés.
+          Délai moyen en jours, suivi du nombre de dossiers sur lesquels il est calculé.
         </p>
       </CardContent>
     </Card>
