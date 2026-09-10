@@ -12,7 +12,9 @@ import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonn
 import { Pagination, StatutsBandeau, tonStatut } from '@/components/enrolement/liste-controles';
 import { SyntheseEnrolement } from '@/components/enrolement/synthese-enrolement';
 import { SearchField } from '@/components/filters/search-field';
+import { AIDE_RAPPROCHEMENT, AIDE_TAUX_RAPPROCHEMENT } from '@/components/enrolement/aides';
 import { QueryErrorState } from '@/components/query-error-state';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -424,15 +426,25 @@ function CarteReglages({ projet }: { projet: Projet }) {
 
 function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefined }) {
   const tuiles = [
-    { label: 'Inscriptions', valeur: indicateurs && formatNumber(indicateurs.inscriptions) },
-    { label: 'Rapprochées', valeur: indicateurs && formatNumber(indicateurs.rapprochees) },
+    {
+      label: 'Inscriptions',
+      valeur: indicateurs && formatNumber(indicateurs.inscriptions),
+      aide: 'Les comptes lus sur la plateforme et déposés dans le CRM. Une inscription que la plateforme ne rend plus est marquée retirée et sort de tous les chiffres.',
+    },
+    {
+      label: 'Rapprochées',
+      valeur: indicateurs && formatNumber(indicateurs.rapprochees),
+      aide: AIDE_RAPPROCHEMENT,
+    },
     {
       label: 'Taux de rapprochement',
       valeur: indicateurs && formatRateOrNone(indicateurs.tauxRapprochement),
+      aide: AIDE_TAUX_RAPPROCHEMENT,
     },
     {
       label: 'Convertis puis inscrits',
       valeur: indicateurs && formatRateOrNone(indicateurs.tauxConversion),
+      aide: 'Part des prospects convertis de ce projet qui se retrouvent inscrits sur la plateforme. Se lit dans l’autre sens que le rapprochement : il part des prospects, pas des inscriptions, et ignore le filtre de période.',
     },
   ];
 
@@ -441,8 +453,9 @@ function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefine
       {tuiles.map((tuile) => (
         <Card key={tuile.label}>
           <CardContent>
-            <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            <p className="flex items-center gap-1 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
               {tuile.label}
+              <InfoPopover label={tuile.label} description={tuile.aide} />
             </p>
             {tuile.valeur === undefined ? (
               <Skeleton className="mt-2 h-8 w-20" />
@@ -701,7 +714,12 @@ function TableauInscriptions({
             <TableHead>Statut</TableHead>
             <TableHead>Étape</TableHead>
             <TableHead>Inscription</TableHead>
-            <TableHead>Prospect</TableHead>
+            <TableHead>
+              <span className="inline-flex items-center gap-1">
+                Prospect
+                <InfoPopover label="Rapprochement" description={AIDE_RAPPROCHEMENT} />
+              </span>
+            </TableHead>
             <TableHead className="w-12" />
           </TableRow>
         </TableHeader>
