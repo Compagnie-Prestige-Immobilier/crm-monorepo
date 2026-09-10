@@ -5,12 +5,12 @@ import Link from 'next/link';
 
 import { QueryErrorState } from '@/components/query-error-state';
 import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchInscriptionDetail, type InscriptionDetail, type Projet } from '@/lib/data/enrolement';
 import { formatDateTime, formatPhone } from '@/lib/format';
@@ -214,28 +214,28 @@ export function DetailInscription({
   });
 
   return (
-    <Sheet
+    <Dialog
       open={id !== null}
       onOpenChange={(ouvert) => {
         if (!ouvert) onClose();
       }}
     >
-      <SheetContent className="w-full overflow-y-auto sm:max-w-xl">
-        <SheetHeader>
-          <SheetTitle>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>
             {detail.data === undefined
               ? 'Inscription'
               : `${detail.data.prenom} ${detail.data.nom}`.trim()}
-          </SheetTitle>
-          <SheetDescription>
+          </DialogTitle>
+          <DialogDescription>
             Lecture seule. Rien de ce qui est affiché ici n’est écrit sur la plateforme.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="flex flex-col gap-6 px-4 pb-6">
+        <div className="flex flex-col gap-6">
           <Corps etat={detail} libelles={libelles} />
         </div>
-      </SheetContent>
-    </Sheet>
+      </DialogContent>
+    </Dialog>
   );
 }
