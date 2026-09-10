@@ -25,10 +25,10 @@ function Hub() {
       <LiveStream />
       <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
         <img
-          src="/brand/cpi-header.png"
+          src="/brand/cpi-header.webp"
           alt="CPI GO"
-          width={489}
-          height={200}
+          width={312}
+          height={128}
           className="h-8 w-auto"
         />
         <div className="flex-1" />

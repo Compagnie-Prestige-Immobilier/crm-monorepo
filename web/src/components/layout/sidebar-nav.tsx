@@ -94,10 +94,10 @@ export function SidebarNav({
               return (
                 <span className="flex items-center rounded-md bg-white px-3 py-1.5">
                   <Image
-                    src="/brand/chues-logo.png"
+                    src="/brand/chues-logo.webp"
                     alt="Projet CHUES"
-                    width={395}
-                    height={193}
+                    width={328}
+                    height={160}
                     priority
                     className="h-7 w-auto"
                   />
@@ -106,10 +106,10 @@ export function SidebarNav({
             }
             return (
               <Image
-                src={collapsed ? '/brand/icon-512.png' : '/brand/cpi-header.png'}
+                src={collapsed ? '/brand/icon-512.webp' : '/brand/cpi-header.webp'}
                 alt="CPI GO"
-                width={collapsed ? 512 : 489}
-                height={collapsed ? 512 : 200}
+                width={collapsed ? 72 : 312}
+                height={collapsed ? 72 : 128}
                 priority
                 className={cn('w-auto', collapsed ? 'size-9 rounded-sm' : 'h-8')}
               />

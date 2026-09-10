@@ -78,6 +78,7 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
 		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
 		ctx := context.WithValue(r.Context(), cleRequete{}, id)
 		ctx = context.WithValue(ctx, CleAdresse{}, adresseClient(r, cfg.TrustProxy))

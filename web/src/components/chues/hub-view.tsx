@@ -61,10 +61,10 @@ export function HubView({ prenom }: { prenom: string }) {
             remplacement identique le ferait annoncer deux fois. */}
         <h1 className="flex items-center gap-3 font-display text-h1 font-[800]">
           <Image
-            src="/brand/chues-logo.png"
+            src="/brand/chues-logo.webp"
             alt=""
-            width={395}
-            height={193}
+            width={328}
+            height={160}
             priority
             className="h-10 w-auto"
           />
