@@ -20,6 +20,9 @@ export type OngletEnrolement = (typeof ONGLETS_ENROLEMENT)[number];
 export const projetDeLOnglet = (onglet: OngletEnrolement): Projet =>
   onglet === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
 
+/** Les étages de l'entonnoir, tels que l'API les accepte. */
+export type Avancement = 'ouvert' | 'soumis' | 'decide';
+
 export interface FiltresInscriptions {
   page?: number | undefined;
   pageSize?: number | undefined;
@@ -29,6 +32,7 @@ export interface FiltresInscriptions {
   dateTo?: string | undefined;
   rapproche?: boolean | undefined;
   inclureDisparues?: boolean | undefined;
+  avancement?: Avancement | undefined;
 }
 
 const query = (filtres: FiltresInscriptions): Record<string, string | number | boolean> =>

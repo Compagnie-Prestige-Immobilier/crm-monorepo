@@ -45,7 +45,11 @@ function Normalise({
 }) {
   return (
     <div className="flex flex-col">
+      <Ligne label="Identifiant dans le CRM">{detail.id}</Ligne>
+      <Ligne label="Projet">{detail.projet}</Ligne>
       <Ligne label="Identifiant sur la plateforme">{detail.identifiantDistant}</Ligne>
+      <Ligne label="Nom">{texte(detail.nom)}</Ligne>
+      <Ligne label="Prénom">{texte(detail.prenom)}</Ligne>
       <Ligne label="Téléphone">
         {detail.phoneE164 === null ? ABSENT : formatPhone(detail.phoneE164)}
       </Ligne>
@@ -68,9 +72,7 @@ function Normalise({
           </Link>
         )}
       </Ligne>
-      {detail.disparueLe === null ? null : (
-        <Ligne label="Retirée de la plateforme">{formatDateTime(detail.disparueLe)}</Ligne>
-      )}
+      <Ligne label="Retirée de la plateforme">{texte(detail.disparueLe, formatDateTime)}</Ligne>
     </div>
   );
 }
@@ -84,41 +86,9 @@ function scalaire(valeur: unknown): string | null {
 }
 
 /**
- * La plateforme Grand Public ne décrit pas sa réponse : la charge utile est le
- * seul endroit du produit où ses champs deviennent lisibles, d'où l'affichage
- * générique plutôt qu'une liste de champs attendus.
+ * La plateforme Grand Public ne décrit pas sa réponse : rien n'est déduit ni
+ * reformulé ici, la charge utile est rendue telle qu'elle arrive.
  */
-function Piece({ piece }: { piece: PieceDossier }) {
-  const accepte = piece.status === 'accepte';
-  return (
-    <li className="flex items-center justify-between gap-3 py-1.5 text-[0.875rem]">
-      <span className="min-w-0 truncate">{piece.label ?? piece.docId}</span>
-      <span
-        className={
-          accepte
-            ? 'shrink-0 rounded-full bg-accent-surface px-2 py-0.5 text-[0.75rem] text-accent-text'
-            : 'shrink-0 rounded-full bg-muted px-2 py-0.5 text-[0.75rem] text-muted-foreground'
-        }
-      >
-        {accepte ? 'Acceptée' : 'En attente'}
-      </span>
-    </li>
-  );
-}
-
-interface PieceDossier {
-  readonly docId?: string;
-  readonly label?: string;
-  readonly status?: string;
-}
-
-/** Le suivi du dossier : les pièces attendues et celles qui sont validées. */
-function pieces(valeur: unknown): PieceDossier[] | null {
-  if (!Array.isArray(valeur) || valeur.length === 0) return null;
-  const lignes = valeur as PieceDossier[];
-  return lignes.every((ligne) => typeof ligne?.status === 'string') ? lignes : null;
-}
-
 function ChargeUtile({ charge }: { charge: unknown }) {
   if (typeof charge !== 'object' || charge === null) return null;
   const entrees = Object.entries(charge as Record<string, unknown>).map(
@@ -136,31 +106,14 @@ function ChargeUtile({ charge }: { charge: unknown }) {
           </Ligne>
         ))}
       </div>
-      {composes.map(([cle, valeur]) => {
-        const dossier = pieces(valeur);
-        if (dossier !== null) {
-          return (
-            <div key={cle} className="rounded-md border border-border/60 p-3">
-              <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-                Pièces du dossier
-              </p>
-              <ul className="mt-1 divide-y divide-border/60">
-                {dossier.map((piece, rang) => (
-                  <Piece key={piece.docId ?? rang} piece={piece} />
-                ))}
-              </ul>
-            </div>
-          );
-        }
-        return (
-          <details key={cle} className="rounded-md border border-border/60 p-3">
-            <summary className="cursor-pointer text-[0.875rem] font-[600]">{cle}</summary>
-            <pre className="mt-2 overflow-x-auto text-[0.75rem] leading-relaxed">
-              {JSON.stringify(valeur, null, 2)}
-            </pre>
-          </details>
-        );
-      })}
+      {composes.map(([cle, valeur]) => (
+        <details key={cle} open className="rounded-md border border-border/60 p-3">
+          <summary className="cursor-pointer text-[0.875rem] font-[600]">{cle}</summary>
+          <pre className="mt-2 overflow-x-auto text-[0.75rem] leading-relaxed">
+            {JSON.stringify(valeur, null, 2)}
+          </pre>
+        </details>
+      ))}
     </div>
   );
 }
