@@ -992,10 +992,11 @@ type RepartitionEnrolement struct {
 }
 
 type DelaiMedian struct {
-	Leg        string   `json:"leg"`
-	Label      string   `json:"label"`
-	MedianDays *float64 `json:"medianDays"`
-	Sample     int      `json:"sample"`
+	Leg         string   `json:"leg"`
+	Label       string   `json:"label"`
+	MedianDays  *float64 `json:"medianDays"`
+	MoyenneDays *float64 `json:"moyenneDays"`
+	Sample      int      `json:"sample"`
 }
 
 type IndicateursOutput struct {
@@ -1229,18 +1230,23 @@ func (s *service) parEtapeEnrolement(ctx context.Context, depuis string, args []
 
 // Médiane et non moyenne : un dossier oublié six mois déplacerait la moyenne de
 // plusieurs semaines.
-func medianeEnrolement(de, a string) string {
+// Médiane et moyenne du même écart : la médiane résiste à un dossier oublié
+// six mois, la moyenne dit ce que le dispositif coûte en jours cumulés.
+func delaiEnrolement(de, a string) string {
 	utilisable := de + " IS NOT NULL AND " + a + " IS NOT NULL AND " + a + " >= " + de
-	return `percentile_cont(0.5) WITHIN GROUP (ORDER BY EXTRACT(EPOCH FROM (` + a + ` - ` + de + `)) / 86400.0)` +
-		` FILTER (WHERE ` + utilisable + `)::float8, COUNT(*) FILTER (WHERE ` + utilisable + `)::int`
+	ecart := `EXTRACT(EPOCH FROM (` + a + ` - ` + de + `)) / 86400.0`
+	return `percentile_cont(0.5) WITHIN GROUP (ORDER BY ` + ecart + `)` +
+		` FILTER (WHERE ` + utilisable + `)::float8,` +
+		` AVG(` + ecart + `) FILTER (WHERE ` + utilisable + `)::float8,` +
+		` COUNT(*) FILTER (WHERE ` + utilisable + `)::int`
 }
 
 func (s *service) delaisEnrolement(ctx context.Context, depuis string, args []any) ([]DelaiMedian, error) {
-	var m1, m2 *float64
+	var m1, a1, m2, a2 *float64
 	var n1, n2 int
-	requete := "SELECT " + medianeEnrolement(`i."inscriteLe"`, `i."soumiseLe"`) + ", " +
-		medianeEnrolement(`i."soumiseLe"`, `i."decideeLe"`) + depuis
-	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&m1, &n1, &m2, &n2); err != nil {
+	requete := "SELECT " + delaiEnrolement(`i."inscriteLe"`, `i."soumiseLe"`) + ", " +
+		delaiEnrolement(`i."soumiseLe"`, `i."decideeLe"`) + depuis
+	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&m1, &a1, &n1, &m2, &a2, &n2); err != nil {
 		return nil, err
 	}
 	delais := []DelaiMedian{
@@ -1248,10 +1254,10 @@ func (s *service) delaisEnrolement(ctx context.Context, depuis string, args []an
 		{Leg: "SOUMISSION_TO_DECISION", Label: "Dossier soumis vers décision", Sample: n2},
 	}
 	if n1 > 0 {
-		delais[0].MedianDays = joursArrondis(m1)
+		delais[0].MedianDays, delais[0].MoyenneDays = joursArrondis(m1), joursArrondis(a1)
 	}
 	if n2 > 0 {
-		delais[1].MedianDays = joursArrondis(m2)
+		delais[1].MedianDays, delais[1].MoyenneDays = joursArrondis(m2), joursArrondis(a2)
 	}
 	return delais, nil
 }
