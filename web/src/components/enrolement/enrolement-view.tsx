@@ -9,10 +9,12 @@ import { toast } from 'sonner';
 import { EmptyState } from '@/components/empty-state';
 import { DetailInscription } from '@/components/enrolement/detail-inscription';
 import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
+import { Pagination, StatutsBandeau, tonStatut } from '@/components/enrolement/liste-controles';
 import { SyntheseEnrolement } from '@/components/enrolement/synthese-enrolement';
 import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -63,6 +65,7 @@ const LIBELLE_ONGLET: Record<OngletEnrolement, string> = {
 };
 
 const TOUS = 'tous';
+const PAGE_PAR_DEFAUT = 25;
 const RAPPROCHES = 'rapproches';
 const SANS_PROSPECT = 'sans-prospect';
 const PRESENTES = 'presentes';
@@ -126,8 +129,15 @@ export function EnrolementView() {
 
 /** Un seul panneau, paramétré par le projet : les deux onglets partagent tout. */
 function PanneauProjet({ projet }: { projet: Projet }) {
-  const [filtres, setFiltres] = useState<FiltresInscriptions>({ page: 1, pageSize: 25 });
+  const [filtres, setFiltres] = useState<FiltresInscriptions>({
+    page: 1,
+    pageSize: PAGE_PAR_DEFAUT,
+  });
   const [detailId, setDetailId] = useState<string | null>(null);
+
+  const poserFiltre = (partiel: Partial<FiltresInscriptions>): void => {
+    setFiltres((courant) => ({ ...courant, ...partiel }));
+  };
 
   const indicateurs = useQuery({
     queryKey: queryKeys.enrolementIndicateurs(projet, {
@@ -172,15 +182,27 @@ function PanneauProjet({ projet }: { projet: Projet }) {
 
       {indicateurs.data === undefined ? null : <Repartitions indicateurs={indicateurs.data} />}
 
-      <FiltresBarre filtres={filtres} onChange={setFiltres} indicateurs={indicateurs.data} />
+      <StatutsBandeau
+        statuts={indicateurs.data?.parEtape ?? []}
+        total={indicateurs.data?.inscriptions}
+        actif={filtres.statut}
+        onChoisir={(statut) => {
+          poserFiltre({ statut, page: 1 });
+        }}
+      />
+
+      <FiltresBarre filtres={filtres} onChange={setFiltres} />
 
       <TableauInscriptions
         etat={inscriptions}
         projet={projet}
         libelles={libellesStatuts(indicateurs.data)}
-        page={filtres.page ?? 1}
+        pageSize={filtres.pageSize ?? PAGE_PAR_DEFAUT}
         onPage={(page) => {
-          setFiltres((courant) => ({ ...courant, page }));
+          poserFiltre({ page });
+        }}
+        onPageSize={(pageSize) => {
+          poserFiltre({ pageSize, page: 1 });
         }}
         onOuvrir={setDetailId}
       />
@@ -432,7 +454,6 @@ function Tuiles({ indicateurs }: { indicateurs: EnrolementIndicateurs | undefine
 
 function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
   const blocs = [
-    { titre: 'Par étape', lignes: indicateurs.parEtape },
     { titre: 'Par agent de la plateforme', lignes: indicateurs.parAgentPlateforme },
     { titre: 'Pièces du dossier', lignes: indicateurs.parPiece },
     { titre: 'Par téléconseiller', lignes: indicateurs.parTeleconseiller },
@@ -489,14 +510,10 @@ function Repartitions({ indicateurs }: { indicateurs: EnrolementIndicateurs }) {
 function FiltresBarre({
   filtres,
   onChange,
-  indicateurs,
 }: {
   filtres: FiltresInscriptions;
   onChange: (suivants: FiltresInscriptions) => void;
-  indicateurs: EnrolementIndicateurs | undefined;
 }) {
-  const statuts = indicateurs?.parEtape ?? [];
-
   const poser = (partiel: Partial<FiltresInscriptions>): void => {
     onChange({ ...filtres, ...partiel, page: 1 });
   };
@@ -510,28 +527,6 @@ function FiltresBarre({
         }}
         placeholder="Nom, e-mail ou téléphone"
       />
-
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="statut-enrolement">Statut</Label>
-        <Select
-          value={filtres.statut ?? TOUS}
-          onValueChange={(valeur) => {
-            poser({ statut: valeur === TOUS || valeur === null ? undefined : valeur });
-          }}
-        >
-          <SelectTrigger id="statut-enrolement" size="sm" className="w-52">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value={TOUS}>Tous les statuts</SelectItem>
-            {statuts.map((statut) => (
-              <SelectItem key={statut.id} value={statut.id}>
-                {statut.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="rapproche-enrolement">Rapprochement</Label>
@@ -635,15 +630,17 @@ interface EtatInscriptions {
 function TableauInscriptions({
   etat,
   projet,
-  page,
+  pageSize,
   onPage,
+  onPageSize,
   onOuvrir,
   libelles,
 }: {
   etat: EtatInscriptions;
   projet: Projet;
-  page: number;
+  pageSize: number;
   onPage: (page: number) => void;
+  onPageSize: (taille: number) => void;
   onOuvrir: (id: string) => void;
   libelles: Map<string, string>;
 }) {
@@ -718,7 +715,9 @@ function TableauInscriptions({
                 {ligne.email ?? ligne.phoneE164 ?? '—'}
               </TableCell>
               <TableCell>
-                {libelles.get(ligne.statutDistant) ?? ligne.statutDistant}
+                <Badge variant={tonStatut(ligne.statutDistant)}>
+                  {libelles.get(ligne.statutDistant) ?? ligne.statutDistant}
+                </Badge>
                 {ligne.disparueLe === null ? null : (
                   <span className="ml-2 text-[0.75rem] text-muted-foreground">
                     retirée de la plateforme le {formatDate(ligne.disparueLe)}
@@ -762,34 +761,7 @@ function TableauInscriptions({
         }}
       />
 
-      <div className="flex items-center justify-between gap-3">
-        <p className="text-[0.8125rem] text-muted-foreground tabular-nums">
-          {formatNumber(meta.total)} inscriptions · page {formatNumber(meta.page)} sur{' '}
-          {formatNumber(Math.max(1, meta.pageCount))}
-        </p>
-        <div className="flex gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={page <= 1}
-            onClick={() => {
-              onPage(page - 1);
-            }}
-          >
-            Précédent
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            disabled={page >= meta.pageCount}
-            onClick={() => {
-              onPage(page + 1);
-            }}
-          >
-            Suivant
-          </Button>
-        </div>
-      </div>
+      <Pagination meta={meta} pageSize={pageSize} onPage={onPage} onPageSize={onPageSize} />
     </div>
   );
 }
