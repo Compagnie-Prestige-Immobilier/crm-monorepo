@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -62,13 +63,30 @@ func servirPanneau(mux *http.ServeMux) {
 			socle.EcrireProblem(w, r, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Route inconnue."))
 			return
 		}
-		if _, err := fs.Stat(dist, strings.TrimPrefix(r.URL.Path, "/")); err == nil && r.URL.Path != "/" {
+		chemin := strings.TrimPrefix(r.URL.Path, "/")
+		if _, err := fs.Stat(dist, chemin); err == nil && chemin != "" {
+			w.Header().Set("Cache-Control", cachePanneau(r.URL.Path))
 			fichiers.ServeHTTP(w, r)
 			return
 		}
+		if path.Ext(chemin) != "" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
 		r.URL.Path = "/"
 		fichiers.ServeHTTP(w, r)
 	})
+}
+
+func cachePanneau(chemin string) string {
+	switch {
+	case strings.HasPrefix(chemin, "/assets/"):
+		return "public, max-age=31536000, immutable"
+	case strings.HasPrefix(chemin, "/brand/"):
+		return "public, max-age=86400"
+	}
+	return "no-cache"
 }
 
 func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config) *socle.Deps {

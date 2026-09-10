@@ -7,7 +7,10 @@ import (
 	"context"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
+	"cpi-go/web"
 	"encoding/json"
+	"io"
+	"io/fs"
 	"net/http"
 	"net/http/cookiejar"
 	"net/http/httptest"
@@ -352,6 +355,43 @@ func TestRouteInconnueEtChampInconnu(t *testing.T) {
 	b.attend(statut, http.StatusUnprocessableEntity, "champ inconnu refusé", body)
 	if body["code"] != "VALIDATION_FAILED" {
 		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+func TestFichiersDuPanneau(t *testing.T) {
+	b := nouveauBanc(t, "CHARGE_CLIENTELE")
+	cas := []struct {
+		chemin, cache string
+		statut        int
+	}{
+		{"/robots.txt", "no-cache", http.StatusOK},
+		{"/chues/prospects", "no-cache", http.StatusOK},
+		{"/llms.txt", "", http.StatusNotFound},
+		{"/assets/inconnu.js", "", http.StatusNotFound},
+	}
+	if entrees, err := fs.ReadDir(web.Dist, "dist/assets"); err == nil && len(entrees) > 0 {
+		cas = append(cas, struct {
+			chemin, cache string
+			statut        int
+		}{"/assets/" + entrees[0].Name(), "public, max-age=31536000, immutable", http.StatusOK})
+	}
+	for _, c := range cas {
+		req, err := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+c.chemin, http.NoBody)
+		if err != nil {
+			t.Fatal(err)
+		}
+		resp, err := b.client.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		corps, _ := io.ReadAll(resp.Body)
+		_ = resp.Body.Close()
+		if resp.StatusCode != c.statut || resp.Header.Get("Cache-Control") != c.cache {
+			t.Fatalf("%s : %d %q reçus, %d %q attendus", c.chemin, resp.StatusCode, resp.Header.Get("Cache-Control"), c.statut, c.cache)
+		}
+		if c.chemin == "/robots.txt" && !bytes.Contains(corps, []byte("Disallow: /")) {
+			t.Fatalf("robots.txt : %q", corps)
+		}
 	}
 }
 

@@ -94,10 +94,10 @@ function EspacesPage() {
                 <CoqueArt coque={entry.id} />
                 {entry.id === 'chues' ? (
                   <Image
-                    src="/brand/chues-logo.png"
+                    src="/brand/chues-logo.webp"
                     alt=""
-                    width={395}
-                    height={193}
+                    width={328}
+                    height={160}
                     className="relative z-10 h-10 w-auto shrink-0 self-start object-contain"
                   />
                 ) : (
