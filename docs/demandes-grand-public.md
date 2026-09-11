@@ -1,366 +1,339 @@
 # Demandes Grand Public : plan de réalisation
 
-Demandes du prospect relevées le 10 septembre 2026, arbitrages du propriétaire
-du même jour (§4). Périmètre : la coque Grand Public. Deux points touchent
-CHUES et sont signalés comme tels.
+Demandes transmises par le prospect, relevées le 10 septembre 2026. Périmètre
+annoncé : la coque Grand Public. Deux points touchent CHUES et sont signalés
+comme tels.
 
-Chaque affirmation renvoie à un `chemin:ligne` du dépôt. Le chiffrage est en
-lignes ajoutées ou déplacées, hors tests.
+Chaque ligne renvoie à un `chemin:ligne` du dépôt. Le chiffrage est en lignes
+ajoutées ou déplacées, hors tests. Rien n'est codé avant l'arbitrage du §5.
 
-## 1. Ce que le dépôt sait déjà faire et que le panneau n'utilise pas
+## 1. Ce qui existe déjà
 
-C'est le fait le plus important du lot. Trois demandes sur treize portent sur
-des mécanismes déjà construits, déjà administrables, jamais branchés.
+Trois demandes portent sur des écrans qui sont en place. Les vérifier avant de
+construire évite de refaire ce que la v1 fournissait.
 
-### 1.1 Le référentiel des issues d'appel
+| Demande                                         | État                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Partie campagne sur Grand Public                | Existe. `web/src/routes/_panneau/grand-public/campagnes/index.tsx` sert `LotsExportView` avec `projet="GRAND_PUBLIC"`, exactement comme CHUES (`web/src/routes/_panneau/chues/campagnes/index.tsx`). L'onglet est déjà dans la barre de pilotage (`web/src/components/pilotage/onglets.tsx:33`). |
+| Affectation des prospects à des téléconseillers | Existe. `lot-create-dialog.tsx:68-73` propose la cible « Prospects Grand Public » ; la répartition écrit `lot_export_items."assigneeId"` (`sql/schema.sql:609-616`).                                                                                                                             |
+| Joignable / injoignable à la consignation       | Existent. `console-view.tsx:71-77` : Joignable, À rappeler, Injoignable, Mauvais numéro, Autre.                                                                                                                                                                                                  |
 
-La table `call_outcome_reasons` (`sql/schema.sql:437-449`) porte, pour chaque
-motif d'appel : un `effect`, un drapeau `requiresComment`, un
-`requiresCallback`, un `sortOrder`, une couleur, et surtout un
-**`countsAsReached`**, qui est exactement la distinction joignable /
-injoignable demandée.
+La conséquence pratique : la demande 1 est une **vérification**, pas un
+développement. Ce qui manque réellement est la demande 2.
 
-Autour d'elle, tout existe :
+## 2. Les demandes, une par une
 
-| Pièce                                | État                                                                                                                         |
-| ------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| Écran d'administration               | `/admin/referentiels/issues-appel`, `components/referentiels/call-outcome-reasons-view.tsx`                                  |
-| Cinq routes de gestion               | `internal/referentiels/referentiels.go:1287-1291`                                                                            |
-| Route de saisie, motifs actifs seuls | `GET /api/v1/call-outcome-reasons` (`referentiels.go:1099`)                                                                  |
-| Écriture de la tentative             | `POST /phase2/call-attempts` accepte déjà `reasonCode` (`qualification.go:719`)                                              |
-| Règles serveur                       | effet, commentaire exigé, rappel exigé, motif inactif, motif incohérent avec l'issue (`qualification.go:773-801`, `804-842`) |
-| Consommation par le panneau          | aucune                                                                                                                       |
+### D1. Ouvrir la partie campagne pour affecter des prospects (« same as CHUES »)
 
-L'écran d'appel affiche à la place cinq boutons écrits en dur
-(`console-view.tsx:71-77`) et n'envoie jamais `reasonCode`
-(`lib/data/console.ts:798`).
+Rien à écrire. À vérifier sur la copie de prod : qu'un ADMIN ou un SUPERVISEUR
+ouvre `/grand-public/campagnes`, crée un lot sur la cible « Prospects Grand
+Public », choisit ses téléconseillers et voit la répartition.
 
-Conséquence : les demandes D4 (joignable / injoignable), les cinq statuts et le
-faux numéro ne sont pas trois fonctionnalités à construire. C'est un seul
-branchement, et les libellés deviennent modifiables par l'ADMIN sans
-développeur.
+**Coût : 0.** Si la vérification échoue, la panne est à qualifier avant de
+planifier quoi que ce soit.
 
-### 1.2 La portée par campagne
+### D2. « Appeler un prospect » doit montrer les fiches que la campagne lui a confiées
 
-`sql/queries/prospects.sql:36-45` contient déjà la clause `EXISTS` sur
-`lot_export_items` qui rend à un téléconseiller les fiches qu'une campagne lui
-a confiées. Elle n'est simplement jamais restreinte pour lui. CHUES a le même
-SQL (`sql/queries/representants.sql:21-28`) et l'expose sous le nom
-`mesFiches` (`representants.go:226-232`).
+C'est la seule vraie fonctionnalité manquante du lot.
 
-### 1.3 Les paramètres de messagerie
+Aujourd'hui l'écran d'appel Grand Public liste « les vingt dernières fiches
+ajoutées au projet » (`console-view.tsx:98-105`, `annuaireFilters`), triées par
+date de création. Le téléconseiller y retrouve ses attributions mêlées à ses
+propres saisies, sans ordre utile.
 
-`ProspectParametresChues` (`prospects_conversion.go:509-522`) porte déjà quatre
-listes de destinataires et le couple objet / corps d'un accusé de réception,
-stockés dans `app_settings`, table clé-valeur (`sql/schema.sql:321-326`) : un
-paramètre de plus ne coûte aucune migration. L'envoi Brevo avec substitution de
-jetons existe et sert déjà le formulaire public
-(`formulaire_public.go:320-348`).
+CHUES a déjà exactement le mécanisme demandé, et il porte le nom que la demande
+emploie : `GET /api/v1/representants?mesFiches=true` rend « ses propres fiches
+et celles qu'une campagne lui a confiées »
+(`web/src/lib/data/representants.ts:147-152`). Le serveur le fait en désarmant
+la portée large (`internal/representants/representants.go:226-232`) au-dessus
+d'une clause `EXISTS` sur `lot_export_items`
+(`sql/queries/representants.sql:21-28`).
 
-### 1.4 La partie campagne Grand Public
+Le côté prospects a **déjà la même clause `EXISTS`**
+(`sql/queries/prospects.sql:36-45`) : elle est simplement toujours court-circuitée
+pour l'encadrement et jamais restreinte pour le téléconseiller.
 
-Elle existe : `routes/_panneau/grand-public/campagnes/index.tsx` sert
-`LotsExportView` avec `projet="GRAND_PUBLIC"`, comme CHUES, l'onglet est dans
-la barre de pilotage (`pilotage/onglets.tsx:33`) et le dialogue de création
-propose la cible « Prospects Grand Public » (`lot-create-dialog.tsx:68-73`).
+**Plus petit changement complet**, calqué sur CHUES :
 
-## 2. Les demandes
+1. `internal/prospects/prospects.go` : un champ `MesFiches bool` dans
+   `ProspectListInput` (~ligne 441) et un `if in.MesFiches { p.tout = false }`
+   dans le calcul de portée (~ligne 520). **~6 lignes. Aucun SQL, aucune
+   migration.**
+2. `web/src/components/console/console-view.tsx` : `annuaireFilters` passe
+   `mesFiches: true`, et le tri devient l'ordre de la campagne plutôt que la
+   date de création. **~5 lignes.**
+3. Les deux textes d'aide de l'écran (`console-view.tsx:226-230`) : ils
+   annoncent « les vingt dernières fiches ajoutées », ce qui devient faux.
+   **~2 lignes.**
 
-### D1. Ouvrir la partie campagne pour affecter des prospects
+**Coût : ~13 lignes, 3 fichiers, 0 migration.** Le parcours e2e
+`parite-qualification.spec.ts` couvre l'écran ; une assertion de plus y suffit.
 
-Rien à écrire (§1.4). À vérifier sur la copie de prod : un ADMIN ou un
-SUPERVISEUR ouvre `/grand-public/campagnes`, crée un lot sur « Prospects Grand
-Public », choisit ses téléconseillers, voit la répartition.
-
-**Coût : 0.**
-
-### D2. « Appeler un prospect » montre les fiches que la campagne lui a confiées
-
-L'écran d'appel liste aujourd'hui « les vingt dernières fiches ajoutées au
-projet » (`console-view.tsx:98-105`), triées par date de création : les
-attributions de campagne y sont noyées dans les saisies personnelles.
-
-Portage de `mesFiches` (§1.2), à l'identique de CHUES :
-
-1. `internal/prospects/prospects.go` : champ `MesFiches bool` dans
-   `ProspectListInput` (~ligne 441), et `p.tout = false` quand il est posé
-   (~ligne 520). **~6 lignes, aucun SQL, aucune migration.**
-2. `console-view.tsx` : `annuaireFilters` passe `mesFiches: true`, et le tri
-   suit la campagne au lieu de la date de création. **~5 lignes.**
-3. Les deux textes d'aide (`console-view.tsx:226-230`) annoncent « les vingt
-   dernières fiches ajoutées », ce qui devient faux. **~2 lignes.**
-
-**Coût : ~13 lignes, 3 fichiers, 0 migration.**
-
-Hors périmètre : écran « mes campagnes » séparé, compteur de reste à faire,
-file de travail priorisée.
+Hors périmètre : un écran « mes campagnes » séparé, un compteur de reste à
+faire, une file de travail. Aucun n'est demandé.
 
 ### D3. Nom, prénom et numéro sous forme de tableau
 
-L'annuaire est une liste de boutons empilés (`console-view.tsx:410-443`). Le
-remplacer par un tableau à trois colonnes (Nom et prénom · Numéro · Dernier
-appel), ligne entière cliquable, sur le patron de
-`components/prospects/prospects-table.tsx` sans son moteur de tri.
+L'annuaire d'appel est une liste de boutons empilés
+(`console-view.tsx:410-443`) : nom et prénom sur une ligne, puis numéro, banque
+et date du dernier appel en gris dessous.
 
-**Coût : ~40 lignes remplacées, 1 fichier.**
+**Plus petit changement complet** : remplacer le `<ol>` par un `<table>` à
+trois colonnes (Nom et prénom · Numéro · Dernier appel), la ligne entière
+restant cliquable. Le patron existe déjà dans le dépôt
+(`web/src/components/prospects/prospects-table.tsx`) ; on reprend sa structure,
+pas son moteur de tri, dont l'écran d'appel n'a pas besoin.
 
-Sous 768 px un tableau à trois colonnes ne tient pas au pouce ; le dépôt
-bascule ces cas en cartes (`plan.md` §3). Le tableau vaut donc pour le poste,
-l'affichage actuel reste sur téléphone.
+**Coût : ~40 lignes remplacées dans `console-view.tsx`, 1 fichier.**
 
-### D4. Joignable et injoignable, avec leurs sous-options
+À trancher au §5 : sous 768 px, un tableau à trois colonnes ne tient pas sur un
+téléphone. Le dépôt bascule ces cas en cartes
+(`plan.md` §3, patron `suggestions-view.tsx`). Le tableau vaudrait alors pour
+le poste, et l'affichage actuel resterait sur téléphone.
 
-Regroupe trois demandes de la première version du plan, les issues d'appel, les
-cinq statuts et le faux numéro : une seule construction les sert (§1.1).
+### D4. Joignable et injoignable à la consignation
 
-Cible retenue :
+Les deux issues existent (`console-view.tsx:71-77`), avec trois autres : À
+rappeler, Mauvais numéro, Autre.
 
-```
-Qui avez-vous eu au téléphone ?
+La demande ne dit pas s'il faut **retirer** les trois autres. Question au §4.
+Tant qu'elle n'est pas tranchée : **coût 0**.
 
-  [ 1  Joignable ]   [ 2  Injoignable ]
-         |                    |
-         v                    v
-   Intéressé            À rappeler   -> demande l'échéance
-   Pas intéressé        Faux numéro  -> clôt la fiche
-   Retraité             Autre        -> exige un commentaire
-   Hors cible
-   Décédé
-```
-
-Les deux boutons sont pilotés par `countsAsReached` ; les sous-options sont les
-lignes actives du référentiel, dans leur `sortOrder`. « Intéressé » porte
-l'effet `CLOSE_METHOD` et ouvre le dossier d'adhésion : le statut est donc
-choisi avant la profession, ce que la demande exige, sans champ supplémentaire.
-
-Travail :
-
-1. `lib/data/call-outcome-reasons.ts` : une lecture de la variante saisie
-   (`GET /api/v1/call-outcome-reasons`), à côté de la variante administration
-   déjà écrite (lignes 45-50). **~8 lignes.**
-2. `console-view.tsx` : `ISSUES` en dur (lignes 71-77) remplacé par les deux
-   boutons et leurs sous-options ; envoi de `reasonCode` ; table de
-   correspondance effet vers `outcome`, que le serveur vérifie
-   (`qualification.go:796`). Raccourcis clavier renumérotés (lignes 79-92).
-   **~70 lignes.**
-3. `lib/data/console.ts` : `reasonCode` dans le corps de la tentative
-   (ligne 798) et règles locales de validation alignées sur celles du
-   référentiel (lignes 638-657). **~15 lignes.**
-4. Vocabulaire « Faux numéro » : le serveur l'emploie déjà (`exports.go:70`),
-   le panneau dit « Mauvais numéro » à quatre endroits (`types.ts:215,250,271`,
-   `console-view.tsx:83`) et le serveur se contredit lui-même avec
-   `ExportLibelleMauvaisNumero`. **~6 lignes.**
-5. Saisie par l'ADMIN des huit motifs, dans l'écran existant. **0 ligne.**
-
-**Coût : ~99 lignes, 4 fichiers, 0 migration.**
-
-Ce que ce choix apporte en plus : l'ADMIN ajoute un motif, le renomme ou le
-retire sans développeur ni redéploiement.
-
-Point de vigilance : un référentiel sans aucun motif `countsAsReached`
-laisserait « Joignable » sans sous-option et bloquerait la consignation. Un
-repli sur les six motifs système (`qualification.go:703-710`) évite l'écran
-mort ; ces ~8 lignes sont comprises dans le chiffrage.
+Attention si la réponse est « ne garder que deux issues » : « À rappeler » est
+le seul chemin qui pose une échéance de rappel, et l'écran « Rappels promis »
+(`/grand-public/rappels`) se vide sans lui.
 
 ### D5. Envoyer un mail quand l'adhésion est faite
 
-Écran visé, confirmé : la fiche prospect Grand Public, bouton « Confirmer la
-conversion » (`grand-public/prospect-detail.tsx:485-547`), qui appelle
-`POST /api/v1/prospects/{id}/parcours/grand-public/conversion`
-(`prospects_conversion.go:63`).
+Deux écrans portent aujourd'hui le mot « conversion », et la demande ne dit pas
+lequel :
 
-Destinataire, confirmé : une adresse fixe, réglée dans les paramètres, à
-ajouter.
+- la **consignation d'appel** : issue « Joignable » puis dossier d'adhésion,
+  envoyée par `POST /phase2/call-attempts`
+  (`console-view.tsx:629-641`, `submitConversion`) ;
+- la **fiche prospect Grand Public**, bouton « Confirmer la conversion », qui
+  choisit une offre et un mode de paiement
+  (`grand-public/prospect-detail.tsx:485-547`) et appelle
+  `POST /api/v1/prospects/{id}/parcours/grand-public/conversion`
+  (`internal/prospects/prospects_conversion.go:63`).
 
-Travail, calqué sur l'envoi du formulaire public
-(`formulaire_public.go:320-348`) :
+Le second est celui que le vocabulaire de la demande désigne (« la page
+convertir prospect »).
 
-1. `ProspectParametresChues` : trois clés de plus, `destinatairesAdhesion`
-   (liste, comme les quatre existantes), `adhesionObjet` et `adhesionCorps`
-   avec leurs valeurs d'usine (`prospects_conversion.go:509-548`, `693-709`).
-   **~18 lignes, aucune migration**, `app_settings` étant clé-valeur.
-2. `settings/parametres-chues-card.tsx` : trois libellés et une entrée dans
-   `LISTES` (lignes 27-47). **~6 lignes.**
-3. `prospects_conversion.go` : après la transaction (ligne 99), composition et
-   envoi, avec les mêmes jetons que l'accusé de réception. **~35 lignes.**
+Le client Brevo existe et est déjà configuré (`internal/notifications/brevo.go`,
+`BREVO_*` dans `.env.example`). Sans clé, un envoi est marqué `NOT_CONFIGURED`
+et ne fait pas échouer l'appelant : le comportement dégradé est acquis.
 
-**Coût : ~59 lignes, 3 fichiers, 0 migration.**
+**Plus petit changement complet** : après la transaction de conversion
+(`prospects_conversion.go:99`), un appel `Envoyer` avec un corps figé.
+**~35 lignes dans `prospects_conversion.go`, plus l'injection du service
+Brevo.** Un gabarit modifiable par l'ADMIN coûterait ~120 lignes de plus et
+n'est pas demandé.
 
-Sans clé Brevo, l'envoi est marqué `NOT_CONFIGURED` et ne fait pas échouer la
-conversion (`brevo.go:103-108`) : le comportement dégradé est acquis, il n'y a
-rien à écrire pour lui.
+Deux inconnues bloquent l'écriture, au §4 : **à qui** part le mail, et **quel
+texte**.
 
-### D6. Bouton retour de la fiche prospect
+### D6. Statut sur « joignable », avant la profession
 
-Réponse du propriétaire : le retour doit mener à la racine des prospects, celle
-que la barre latérale ouvre.
+Valeurs demandées : intéressé, pas intéressé, retraité, hors cible, décédé.
 
-C'est déjà le cas dans les deux coques, et il n'y a qu'un bouton retour par
-fiche :
+Le dépôt a déjà le mécanisme : l'ADMIN ajoute des champs au formulaire
+d'adhésion depuis `/admin/champs-conversion`, dont des listes de valeurs
+(`web/src/lib/data/champs-conversion.ts:15-19`, type `LISTE`), par projet, avec
+caractère obligatoire. Les réponses sont stockées, exportées
+(`internal/exports/exports_prospects.go:466`) et relues dans le brouillon.
 
-| Coque        | Barre latérale                              | Bouton retour                                                         |
-| ------------ | ------------------------------------------- | --------------------------------------------------------------------- |
-| Grand Public | `/grand-public` (`nav-items.ts:618`)        | `/grand-public` (`grand-public/prospect-detail.tsx:371-377`)          |
-| CHUES        | `/chues/prospects` (`nav-items.ts:315,369`) | `/chues/prospects` (`prospects/prospect-detail-view.tsx:298,308,330`) |
+**Option A, zéro code.** L'ADMIN crée le champ « Statut » de type `LISTE` avec
+les cinq valeurs sur le projet GRAND_PUBLIC. Limite : les champs ajoutés sont
+rendus **après** tous les champs d'origine
+(`conversion-fields.tsx:436-451`). Le statut arriverait en fin de formulaire,
+pas avant la profession.
 
-**Coût : 0.** Avant d'écrire quoi que ce soit, il faut la reproduction : depuis
-quel écran la fiche était ouverte, et où le bouton a mené. Une piste plausible
-et non demandée : le retour perd les filtres posés sur la liste, ce qui donne
-l'impression d'atterrir ailleurs.
+**Option B, ~25 lignes.** Faire entrer les champs ajoutés dans la liste
+ordonnée `ordre` (`conversion-fields.tsx:427`), pour que l'ADMIN les place où
+il veut, profession comprise. Touche `conversion-fields.tsx`, le corps de
+`PUT /api/v1/champs-conversion/{projet}`
+(`prospects_conversion.go:415-439`, qui écarte aujourd'hui tout nom de champ
+inconnu) et l'écran de réglage.
 
-### D7. Paiement : ajouter « crédit immobilier »
+**Option C, ~90 lignes et une migration.** Un vrai champ `statut` sur la
+conversion, avec son type énuméré en base. Il gagne un filtre et une colonne de
+statistiques que les deux autres options n'offrent pas.
+
+Recommandation : **A d'abord**, en une manipulation, pour que le prospect voie
+les cinq valeurs à l'écran. B seulement s'il tient à la position avant la
+profession. C seulement s'il veut filtrer et compter sur ce statut, ce qu'il
+n'a pas demandé.
+
+### D7. « Fanée number »
+
+Illisible. Aucune fonctionnalité du dépôt ne s'en rapproche. Question au §4.
+**Non chiffré.**
+
+### D8. Bouton retour de la fiche prospect
+
+Sur Grand Public, le retour pointe déjà sur `/grand-public`
+(`grand-public/prospect-detail.tsx:371-377`), qui est à la fois l'accueil de la
+coque et la liste des prospects : les deux adresses de la demande sont la même
+page.
+
+La distinction existe en revanche sur **CHUES**, où le retour va sur
+`/chues/prospects` (`prospects/prospect-detail-view.tsx:298,308,330`) alors que
+l'accueil de la coque est `/chues`. C'est le point « à vérifier sur CHUES »
+annoncé.
+
+**Coût : 3 lignes sur CHUES, 1 fichier**, si la demande visait bien CHUES.
+Sinon 0. Question au §4.
+
+### D9. Paiement : ajouter « crédit immobilier »
 
 `PaymentMode` est un type énuméré Postgres à deux valeurs
-(`sql/schema.sql:154-157`). Le champ vit sur le formulaire d'ajout de prospect
-(`grand-public/prospect-form.tsx:447-464`), et pas seulement sur la conversion.
+(`sql/schema.sql:154-157` : `COMPTANT`, `ECHELONNE`). Il est porté jusqu'au
+panneau (`web/src/lib/types.ts:43-48`) et jusqu'aux deux écrans de paiement
+(`conversion-fields.tsx:37-40`, `grand-public/prospect-detail.tsx:503`).
 
-Sans durée, arbitrage du propriétaire : la contrainte
-`prospect_conversions_payment_check` (`sql/schema.sql:760`), qui n'autorise une
-durée que sur `ECHELONNE`, reste telle quelle et interdit d'elle-même la durée
-sur un crédit immobilier. Rien à modifier en base au-delà de l'énuméré.
+**Plus petit changement complet :**
 
-Travail :
+1. Migration goose `ALTER TYPE "PaymentMode" ADD VALUE 'CREDIT_IMMOBILIER'`,
+   en `-- +goose NO TRANSACTION`. **~8 lignes.**
+2. Les `enum:"COMPTANT,ECHELONNE"` des contrats Go
+   (`prospects_conversion.go:57` et les autres occurrences).
+3. `PAYMENT_MODES` et `PAYMENT_MODE_LABELS` (`web/src/lib/types.ts:43-48`), et
+   la liste `PAIEMENTS` de `conversion-fields.tsx:37-40`.
 
-1. Migration goose `ALTER TYPE "PaymentMode" ADD VALUE 'CREDIT_IMMOBILIER'`, en
-   `-- +goose NO TRANSACTION`. **~8 lignes.**
-2. Les `enum:"COMPTANT,ECHELONNE"` des contrats Go, dont
-   `prospects_conversion.go:57`.
-3. `types.ts:43-48`, puis les trois listes écrites en dur :
-   `prospect-form.tsx:459-460`, `grand-public/prospect-detail.tsx:509-510`,
-   `console/conversion-fields.tsx:37-40`. La quatrième se met à jour seule.
-4. Le champ « durée » ne s'affiche que sur `ECHELONNE`
-   (`prospect-form.tsx:486`, `conversion-fields.tsx:352`) : rien à faire.
+**Coût : ~20 lignes, 1 migration, 4 fichiers.**
 
-**Coût : ~25 lignes, 1 migration, 6 fichiers.**
+À trancher : la contrainte `prospect_conversions_payment_check`
+(`sql/schema.sql:760`) n'autorise une durée que sur `ECHELONNE`. Un crédit
+immobilier porte-t-il une durée ? Si oui, la contrainte change avec la
+migration. Question au §4.
 
-À signaler, non demandé : le formulaire public `/demande/{jeton}` dérive ses
-options de `PAYMENT_MODE_LABELS` (`demande/formulaire-demande.tsx:64`).
-« Crédit immobilier » y apparaîtra tout seul, devant des inconnus. Par défaut
-je l'en exclus (**2 lignes**) ; à dire si le contraire est voulu.
+### D10. Corriger « Enregistrer et ouvrir la fiche »
 
-### D8. Corriger « Enregistrer et ouvrir la fiche »
+Le défaut est réel et localisé. Le bouton appelle `submit(false)`
+(`grand-public/prospect-form.tsx:805-807`), qui aboutit à
+`router.push('/grand-public/<id>')`, **sauf** si le formulaire a reçu un
+`onSaved`, auquel cas ce rappel l'emporte et la navigation est abandonnée
+(`prospect-form.tsx:575-581`).
 
-Le défaut est localisé. Le bouton appelle `submit(false)`
-(`prospect-form.tsx:805-807`), qui mène à `router.push('/grand-public/<id>')`,
-sauf si le formulaire a reçu un `onSaved` : ce rappel l'emporte et la
-navigation est abandonnée (`prospect-form.tsx:575-581`).
+Or la boîte de dialogue de création passe justement
+`onSaved={() => setCreateOpen(false)}`
+(`grand-public/prospects-view.tsx:359`). Depuis la liste, le bouton
+**enregistre et referme la boîte, sans jamais ouvrir la fiche**. C'est très
+exactement ce que la demande décrit.
 
-Or la boîte de création lancée depuis la liste passe justement
-`onSaved={() => setCreateOpen(false)}` (`grand-public/prospects-view.tsx:359`).
-Depuis la liste, le bouton enregistre, referme la boîte, et n'ouvre jamais la
-fiche.
+**Plus petit changement complet** : distinguer les deux intentions. « suivant »
+garde `onSaved` ; « ouvrir la fiche » navigue toujours. Environ **10 lignes
+dans `prospect-form.tsx`**, aucun autre fichier.
 
-Correctif : rendre l'intention explicite. « suivant » garde `onSaved`, « ouvrir
-la fiche » navigue toujours.
+### D11. Ajouter « Enregistrer et quitter »
 
-**Coût : ~10 lignes, 1 fichier.**
+Le pied du formulaire porte deux boutons (`prospect-form.tsx:813-860`) :
+« Enregistrer et ouvrir la fiche » et « Enregistrer et suivant ». Il en faut un
+troisième, qui enregistre et revient à l'accueil des prospects.
 
-### D9. Ajouter « Enregistrer et quitter »
+Se greffe sur le correctif D10 : une fois l'intention explicite, la troisième
+n'est qu'une valeur de plus. **~12 lignes, 1 fichier.** À faire **avec** D10,
+jamais avant.
 
-Le pied du formulaire porte deux boutons (`prospect-form.tsx:813-860`). Il en
-faut un troisième, qui enregistre et revient à la racine des prospects.
+### D12. Ajouter un select : terrain, villa
 
-Se greffe sur D8 : une fois l'intention explicite, la troisième n'est qu'une
-valeur de plus. **~12 lignes, 1 fichier.** À faire avec D8, jamais avant.
+Deux lectures, et la demande ne tranche pas :
 
-### D10. Type de bien : terrain, villa
+- **une offre**, à côté de celles que la fiche prospect propose déjà
+  (`grand-public/prospect-detail.tsx:485`) : la table `offers`
+  (`sql/schema.sql:696-705`) est un référentiel administrable, avec `code`,
+  `label` et `position`. Ajouter « Terrain » et « Villa » est alors **zéro
+  ligne de code** : deux lignes saisies dans les listes de référence ;
+- **un champ de plus sur le formulaire d'adhésion**, à côté du statut de D6 :
+  même arbitrage que D6, options A / B / C.
 
-Emplacement retenu : le formulaire d'ajout de prospect, à côté du champ
-Paiement.
+Recommandation : trancher avec D6, et prendre la même option pour les deux.
+Question au §4.
 
-Aucune colonne ne convient (`sql/schema.sql:784-833`). Il faut donc la chaîne
-complète :
+### D13. Le formulaire d'ajout, identique à celui d'appel, sans préremplissage
 
-1. Migration : type énuméré `TypeBien` (`TERRAIN`, `VILLA`) et colonne
-   `prospects."typeBien"`, nullable. **~10 lignes.**
-2. `sql/queries/prospects.sql` : la colonne dans la lecture, la création et la
-   mise à jour.
-3. `internal/prospects/prospects.go` : entrée, sortie.
-4. `prospect-form.tsx` : le select, à côté de Paiement.
-5. Export : une colonne de plus dans le classeur prospects
-   (`internal/exports/exports_prospects.go`).
+Aujourd'hui les deux formulaires sont distincts :
 
-**Coût : ~45 lignes, 1 migration, 5 fichiers.**
-
-Variante à zéro ligne, écartée puisque le champ est voulu sur le formulaire
-d'ajout : un champ ajouté de type liste dans `/admin/champs-conversion`,
-qui n'apparaîtrait que sur le formulaire d'adhésion.
-
-### D11. Le formulaire d'ajout, identique à celui d'appel, sans préremplissage
-
-Aujourd'hui deux formulaires distincts :
-
-- ajout : `grand-public/prospect-form.tsx`, 1 218 lignes ;
-- adhésion pendant l'appel : `console/conversion-fields.tsx`, 656 lignes,
+- **ajout** : `grand-public/prospect-form.tsx`, 1 218 lignes, identité, canal
+  de provenance, profession, tranche de revenu, situation ;
+- **adhésion pendant l'appel** : `console/conversion-fields.tsx`, 656 lignes,
   piloté par les réglages de l'ADMIN, prérempli depuis la fiche appelée par
-  `conversionFrom` (`lib/data/console.ts:310-335`).
+  `conversionFrom` (`web/src/lib/data/console.ts:310-335`).
 
-Le préremplissage est déjà isolé dans cette seule fonction : « le même
-formulaire, sans le préremplissage » revient à appeler `ConversionFields` sur
-un brouillon vide.
+Le préremplissage est déjà isolé dans cette seule fonction : la demande
+« le même formulaire, sans le préremplissage » revient à appeler
+`ConversionFields` avec un brouillon vide.
 
-C'est la demande la plus lourde et la seule qui touche à une structure.
+C'est la demande **la plus lourde du lot** et la seule qui touche à une
+structure. Deux chemins :
 
 - **Minimal, ~60 lignes** : le formulaire d'ajout reçoit les champs ajoutés par
-  l'ADMIN (`useChampsConversion`) en plus des siens. Les mêmes questions des
-  deux côtés, sans rien réécrire.
+  l'ADMIN (`useChampsConversion`) en plus de ses champs actuels. Le
+  téléconseiller retrouve les mêmes questions des deux côtés, sans que rien ne
+  soit réécrit.
 - **Complet, ~250 lignes supprimées et ~120 réécrites** : `prospect-form.tsx`
-  cède la place à `ConversionFields` sur un brouillon vide. Un seul formulaire
+  est remplacé par `ConversionFields` sur un brouillon vide. Un seul formulaire
   vit, ce qui est le sens littéral de la demande, mais l'écran d'ajout perd ce
   que la conversion ne porte pas (canal de provenance, consentement) tant qu'on
   ne l'a pas remis.
 
-Recommandation : minimal, puis mesurer l'écart restant à l'écran. Le dépôt a
-déjà payé cher les réécritures menées avant d'avoir constaté le besoin
-(`CONSTAT.md`).
+Recommandation : **minimal**, et mesurer l'écart restant à l'écran avant
+d'aller plus loin. Le dépôt a déjà payé cher les réécritures menées avant
+d'avoir constaté le besoin (`CONSTAT.md`).
 
-## 3. Ce qui n'est construit dans aucune option
+## 3. Ce qui n'est fait dans aucune option
 
-Rien de ceci n'est demandé : file de travail priorisée, notification au
-téléconseiller quand une campagne lui affecte des fiches, historique des
-affectations à l'écran, statistiques par statut de qualification Grand Public,
-gabarit de mail modifiable par écran dédié, mode hors ligne.
+Rien de ceci n'est demandé, et rien n'est construit : file de travail
+priorisée, notification au téléconseiller quand une campagne lui affecte des
+fiches, historique des affectations à l'écran, statistiques par statut de
+qualification Grand Public, gabarit de mail modifiable, mode hors ligne.
 
-## 4. Arbitrages du propriétaire
+## 4. Questions à trancher avant de coder
 
-| #   | Question                        | Réponse                                                     |
-| --- | ------------------------------- | ----------------------------------------------------------- |
-| Q1  | Combien d'issues d'appel        | Joignable et Injoignable seulement, avec leurs sous-options |
-| Q2  | Destinataire du mail d'adhésion | Une adresse fixe, réglée dans les paramètres, à ajouter     |
-| Q3  | Quel écran envoie le mail       | La fiche prospect, bouton « Confirmer la conversion »       |
-| Q4  | « Fanée number »                | « Faux numéro »                                             |
-| Q5  | D'où viennent les sous-options  | Du référentiel administrable, pas du code                   |
-| Q5b | Où vit terrain / villa          | Sur le formulaire d'ajout de prospect                       |
-| Q6  | Où mène le bouton retour        | À la racine des prospects, comme la barre latérale          |
-| Q7  | Durée du crédit immobilier      | Aucune, pour l'instant                                      |
+Sept réponses manquent. Cinq bloquent, deux orientent seulement.
 
-Deux points restent à confirmer, sans bloquer :
+| #   | Question                                                                                                                                     | Bloque |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------- | ------ |
+| Q1  | D4 : garder les cinq issues, ou n'en garder que deux ? Deux issues vident l'écran « Rappels promis ».                                        | oui    |
+| Q2  | D5 : le mail part au prospect, au téléconseiller ou à une adresse fixe ? Et quel texte porte-t-il ?                                          | oui    |
+| Q3  | D5 : l'écran visé est bien « Confirmer la conversion » de la fiche prospect, et non le dossier d'adhésion de l'écran d'appel ?               | oui    |
+| Q4  | D7 : que veut dire « Fanée number » ?                                                                                                        | oui    |
+| Q5  | D6 et D12 : option A (zéro code, champ en fin de formulaire), B (~25 lignes, position libre) ou C (~90 lignes et une migration, filtrable) ? | oui    |
+| Q6  | D8 : la demande vise-t-elle CHUES ? Sur Grand Public, accueil et liste sont la même page.                                                    | non    |
+| Q7  | D9 : un crédit immobilier porte-t-il une durée, comme l'échelonné ?                                                                          | non    |
 
-- D6 : une reproduction du bouton retour, déjà conforme à la réponse Q6 dans
-  les deux coques.
-- D7 : « Crédit immobilier » doit-il apparaître sur le formulaire public ouvert
-  aux inconnus ? Par défaut, non.
+reponses questions : 
+Q1 garder uniquement joignable et injoignable avec leurs sous options,
+Q2 un mail fixe a configurer en parametre (a ajouter),
+Q3 la **fiche prospect Grand Public**, bouton « Confirmer la conversion », qui
+  choisit une offre et un mode de paiement,
+Q4 c'est fake number (faux numero),
+Q5 j'ai pas trop compris la question,
+Q6 quand on click sur le button retour ca doi nous ramener sur la page racine de prospetcs pareil que si on click sur prospect depuis la sidebar,
+Q7 pour l'instant on laisse ca sans durée , 
+
+
+
+
 
 ## 5. Ordre proposé
 
-Cinq lots, chacun livrable et vérifiable seul.
+Trois lots. Chacun se livre et se vérifie seul.
 
-| Lot                            | Contenu                                  | Lignes | Migration |
-| ------------------------------ | ---------------------------------------- | -----: | --------- |
-| 1. Écran d'appel et formulaire | D1 et D6 en vérification, D2, D3, D8, D9 |    ~75 | non       |
-| 2. Issues d'appel              | D4, vocabulaire « faux numéro » compris  |    ~99 | non       |
-| 3. Champs de la fiche          | D7, D10                                  |    ~70 | 2         |
-| 4. Mail d'adhésion             | D5                                       |    ~59 | non       |
-| 5. Formulaire unique           | D11, version minimale                    |    ~60 | non       |
+**Lot 1 : ce qui ne dépend d'aucune réponse. ~85 lignes, 6 fichiers.**
+D1 (vérification), D2, D3, D10, D11. Le lot rend l'écran d'appel utile et
+répare le bouton cassé.
 
-**Total : environ 363 lignes, deux migrations, une quinzaine de fichiers.**
+**Lot 2 : après Q5 et Q7. ~20 à 135 lignes selon l'option.**
+D6, D9, D12.
 
-Le lot 1 ne dépend d'aucune réponse et répare le bouton cassé : il se commence
-tout de suite. Le lot 2 exige que l'ADMIN saisisse les huit motifs avant la
-mise en ligne, sinon le repli sur les motifs système prend la main. Le lot 5
-vient en dernier : sa forme dépend de ce que les quatre autres auront changé à
-l'écran.
+**Lot 3 : après Q1 à Q4. ~35 à 100 lignes.**
+D4, D5, D7, D8.
 
-Parcours Playwright touchés : `parite-qualification.spec.ts`,
-`ajouter-prospect.spec.ts`, `convertir.spec.ts`, `parite-grand-public.spec.ts`.
-Chacun se casse avant d'être gardé, comme l'exige `AGENTS.md`.
+**D13 en dernier**, seul, une fois les lots 1 à 3 à l'écran : c'est la seule
+demande dont la forme dépend de ce que les autres auront changé.
+
+Total du chemin recommandé, options minimales retenues : **environ 200 lignes,
+une migration, une dizaine de fichiers.** La v1 aurait produit ce lot en
+plusieurs milliers.
