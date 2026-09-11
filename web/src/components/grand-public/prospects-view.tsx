@@ -24,7 +24,7 @@ import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { Absent } from '@/components/grand-public/absence';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
-import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
+import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -333,9 +333,17 @@ export function GrandPublicProspectsView({
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Nouveau prospect Grand Public</DialogTitle>
-            <DialogDescription>Le nom, le prénom et le téléphone suffisent.</DialogDescription>
+            <DialogDescription>Le nom et le téléphone suffisent.</DialogDescription>
           </DialogHeader>
-          <GrandPublicProspectForm embedded onSaved={() => setCreateOpen(false)} />
+          <NouveauProspect
+            embedded
+            onSaved={() => {
+              setCreateOpen(false);
+            }}
+            onAnnuler={() => {
+              setCreateOpen(false);
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>

@@ -307,6 +307,31 @@ export function lireBrouillonRep(draft: unknown): BrouillonRep {
 }
 
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
+/** Le dossier d'une fiche qui n'existe pas encore : tout reste à demander. */
+export function dossierVide(projet: Projet): ConversionDraft {
+  return {
+    projet,
+    nom: '',
+    prenom: '',
+    email: '',
+    profession: '',
+    type: null,
+    dureeEtablissementMois: '',
+    fonctionnaire: null,
+    syndicatId: '',
+    banqueId: '',
+    engagementEnCours: null,
+    incomeBandId: '',
+    paymentMode: null,
+    dureeSystemeMois: '',
+    memeWhatsapp: null,
+    whatsapp: '',
+    method: null,
+    rendezVousAt: '',
+    champsLibres: {},
+  };
+}
+
 export function conversionFrom(
   prospect: ProspectRow,
   method: EnrollmentMethod | null = null,

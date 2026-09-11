@@ -8,12 +8,12 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
-import { ConversionFields } from '@/components/console/conversion-fields';
+import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
-import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -104,7 +104,7 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
  * le serveur applique lui-même en l'absence de `reasonCode`. Sans lui, une
  * lecture en échec laisserait l'écran d'appel sans aucune issue.
  */
-const MOTIFS_SYSTEME: readonly MotifAppel[] = [
+export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'METHOD_OBTAINED', label: 'Méthode obtenue', effect: 'CLOSE_METHOD' },
   { code: 'REFUSED', label: 'Refus', effect: 'CLOSE_REFUSED' },
   { code: 'CALLBACK', label: CALL_OUTCOME_LABELS.CALLBACK, effect: 'SCHEDULE_CALLBACK' },
@@ -123,6 +123,22 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = MOTIFS_SYSTEME.filter(
 
 /** Après « Joignable », le statut qui dit le contraire n'a plus de sens. */
 const CODE_INJOIGNABLE = 'UNREACHABLE';
+
+/** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
+export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
+  catalogue.filter((item) => item.code !== CODE_INJOIGNABLE && item.effect !== 'CLOSE_METHOD');
+
+/**
+ * Le statut de l'adhésion : celui qu'on a choisi s'il en est un, sinon le
+ * premier du référentiel. CHUES garde ainsi le motif précis de son bouton.
+ */
+const statutAdhesion = (
+  motif: MotifAppel | null,
+  catalogue: readonly MotifAppel[],
+): MotifAppel | undefined =>
+  motif?.effect === 'CLOSE_METHOD'
+    ? motif
+    : catalogue.find((item) => item.effect === 'CLOSE_METHOD');
 
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
@@ -332,7 +348,7 @@ interface Ouverte {
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
 
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
-const brouillonDe = (
+export const brouillonDe = (
   comment: string,
   conversion: ConversionDraft | null,
 ): Record<string, unknown> => ({
@@ -519,19 +535,21 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
 }
 
 /** Le dossier d'adhésion, une fois la personne dite joignable. */
-function PanneauDossier({
+export function PanneauDossier({
   ouvert,
   prospect,
   conversion,
   errors,
+  telephone,
   disabled,
   formulaire,
   onChange,
 }: {
   ouvert: boolean;
-  prospect: ProspectRow;
+  prospect: FicheContactable;
   conversion: ConversionDraft | null;
   errors: ConversionErrors;
+  telephone?: SaisieTelephone | undefined;
   disabled: boolean;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
   onChange: (patch: Partial<ConversionDraft>) => void;
@@ -550,6 +568,7 @@ function PanneauDossier({
         draft={conversion}
         errors={errors}
         phoneE164={prospect.phoneE164}
+        telephone={telephone}
         disabled={disabled}
         reglages={formulaire.champs}
         libres={formulaire.libres}
@@ -833,9 +852,14 @@ export function Consignation({
       formulaire.libres,
     );
     setConversionErrors(problems);
-    if (Object.keys(problems).length > 0 || conversion.method === null || motif === null) return;
-    record(motif, conversion.method, null, conversion);
-  }, [conversion, formulaire, motif, record]);
+    const adhesion = statutAdhesion(motif, catalogue);
+    if (Object.keys(problems).length > 0 || conversion.method === null) return;
+    if (adhesion === undefined) {
+      toast.error('Le statut « Méthode obtenue » est désactivé dans les listes de référence.');
+      return;
+    }
+    record(adhesion, conversion.method, null, conversion);
+  }, [conversion, formulaire, motif, catalogue, record]);
 
   const startCallback = useCallback(() => {
     if (closed) return;
@@ -1001,7 +1025,7 @@ export function Consignation({
 
         {surStatut ? (
           <SelectStatut
-            catalogue={catalogue.filter((item) => item.code !== CODE_INJOIGNABLE)}
+            catalogue={statutsJoignables(catalogue)}
             motif={motif}
             disabled={send.isPending || closed}
             onChange={poserStatut}
@@ -1120,10 +1144,12 @@ export function Consignation({
 }
 
 /** Les quatre issues du dossier d'adhésion, une fois celui-ci rempli. */
-function PiedDossier({
+export function PiedDossier({
   ouvert,
   disabled,
   motifRefus,
+  raccourcis = true,
+  extra,
   onAdhesion,
   onRefus,
   onRappel,
@@ -1132,18 +1158,23 @@ function PiedDossier({
   ouvert: boolean;
   disabled: boolean;
   motifRefus: MotifAppel | undefined;
+  /** Faux : l'écran n'écoute pas le clavier, et les touches ne s'affichent pas. */
+  raccourcis?: boolean;
+  /** Les gestes propres à l'écran hôte, avant « Annuler ». */
+  extra?: ReactNode;
   onAdhesion: () => void;
   onRefus: (motif: MotifAppel) => void;
   onRappel: () => void;
   onAnnuler: () => void;
 }) {
   if (!ouvert) return null;
+  const touche = (libelle: string): ReactNode => (raccourcis ? <Kbd>{libelle}</Kbd> : null);
   return (
     <>
       <div className="flex flex-wrap gap-2">
         <Button onClick={onAdhesion} disabled={disabled}>
           Enregistrer l’adhésion
-          <Kbd>Entrée</Kbd>
+          {touche('Entrée')}
         </Button>
         {motifRefus === undefined ? null : (
           <Button
@@ -1158,11 +1189,12 @@ function PiedDossier({
         )}
         <Button variant="outline" disabled={disabled} onClick={onRappel}>
           À rappeler
-          <Kbd>{RAPPEL_KEY}</Kbd>
+          {touche(RAPPEL_KEY)}
         </Button>
+        {extra}
         <Button variant="ghost" disabled={disabled} onClick={onAnnuler}>
           Annuler
-          <Kbd>Échap</Kbd>
+          {touche('Échap')}
         </Button>
       </div>
       <p className="text-[0.8125rem] text-muted-foreground">
@@ -1254,7 +1286,7 @@ function PiedAppel({
 }
 
 /** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
-function PanneauEcheance({
+export function PanneauEcheance({
   slots,
   now,
   freeCallback,
@@ -1338,7 +1370,7 @@ function PanneauEcheance({
   );
 }
 
-function Commentaire({
+export function Commentaire({
   value,
   obligatoire,
   inputRef,
