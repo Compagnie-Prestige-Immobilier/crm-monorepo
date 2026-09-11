@@ -35,15 +35,11 @@ const PLAGE_MAX_JOURS = 400;
 
 export const PILLS: readonly { preset: PeriodePreset; label: string }[] = [
   { preset: 'aujourdhui', label: 'Aujourd’hui' },
-  { preset: 'hier', label: 'Hier' },
-  { preset: 'avant-hier', label: 'Avant-hier' },
   { preset: 'cette-semaine', label: 'Cette semaine' },
   { preset: 'ce-mois', label: 'Ce mois-ci' },
   { preset: 'mois-dernier', label: 'Mois dernier' },
   { preset: 'trois-mois', label: '3 derniers mois' },
-  { preset: 'douze-mois', label: '12 derniers mois' },
   { preset: 'cette-annee', label: 'Cette année' },
-  { preset: 'annee-derniere', label: 'Année dernière' },
 ];
 
 const iso = (date: Date): string => format(date, 'yyyy-MM-dd');

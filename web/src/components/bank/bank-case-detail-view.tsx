@@ -11,6 +11,8 @@ import {
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BankCourriels } from '@/components/bank/bank-courriels';
+import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -136,14 +138,17 @@ function RejectionNotice({
   );
 }
 
+// Pas de rejet avant la prise en traitement : le serveur refuse, le bouton n'existe pas.
 function RejectButton({
   rejectedStage,
+  enTraitement,
   onReject,
 }: {
   rejectedStage: BankCaseStage | undefined;
+  enTraitement: boolean;
   onReject: () => void;
 }) {
-  if (rejectedStage === undefined || !rejectedStage.isActive) return null;
+  if (rejectedStage === undefined || !rejectedStage.isActive || !enTraitement) return null;
   return (
     <Button type="button" variant="destructive" onClick={onReject}>
       <CircleSlashIcon aria-hidden="true" />
@@ -156,6 +161,7 @@ function BankCaseActions({
   canAct,
   action,
   rejectedStage,
+  enTraitement,
   role,
   onAdvance,
   onReject,
@@ -163,6 +169,7 @@ function BankCaseActions({
   canAct: boolean;
   action: ReturnType<typeof primaryAction>;
   rejectedStage: BankCaseStage | undefined;
+  enTraitement: boolean;
   role: Role;
   onAdvance: () => void;
   onReject: () => void;
@@ -189,7 +196,20 @@ function BankCaseActions({
           et sans place privilégiée : il ne doit jamais être le bouton
           qu'on atteint par réflexe. */}
       <ActionPrincipale action={action} onAdvance={onAdvance} />
-      <RejectButton rejectedStage={rejectedStage} onReject={onReject} />
+      <RejectButton rejectedStage={rejectedStage} enTraitement={enTraitement} onReject={onReject} />
+    </div>
+  );
+}
+
+/** Sans les justificatifs, la banque instruit un dossier qu'elle n'a pas lu. */
+function PiecesDeLaPlateforme({ bankCase }: { bankCase: BankCase }) {
+  if (bankCase.inscriptionId === null) return null;
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-4">
+      <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+        Pièces déposées sur la plateforme
+      </p>
+      <PiecesDeposees inscriptionId={bankCase.inscriptionId} />
     </div>
   );
 }
@@ -230,7 +250,15 @@ function BankCaseSummaryCard({
             <dt className="text-muted-foreground">Dernière intervention</dt>
             <dd className="truncate font-[600]">{lastActor(bankCase)}</dd>
           </div>
+          <div className="min-w-0">
+            <dt className="text-muted-foreground">Suivi par</dt>
+            <dd className="truncate font-[600]">
+              {bankCase.suiviParName ?? 'Aucun téléconseiller'}
+            </dd>
+          </div>
         </dl>
+
+        <PiecesDeLaPlateforme bankCase={bankCase} />
 
         <RejectionNotice reason={bankCase.rejectionReason} detail={bankCase.rejectionDetail} />
 
@@ -239,6 +267,7 @@ function BankCaseSummaryCard({
           canAct={canAct}
           action={action}
           rejectedStage={rejectedStage}
+          enTraitement={!bankCase.currentStage.isInitial}
           role={role}
           onAdvance={onAdvance}
           onReject={onReject}
@@ -341,6 +370,11 @@ export function BankCaseDetailView({
           Historique du dossier
         </h2>
         <Timeline history={detail.data.history} />
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">Courriels</h2>
+        <BankCourriels objetType="bank_case" objetId={caseId} />
       </section>
 
       <AdvanceDialog
@@ -516,7 +550,7 @@ function AdvanceSubmitLabel({ pending, isCashing }: { pending: boolean; isCashin
   return isCashing ? 'Confirmer l’encaissement' : 'Confirmer';
 }
 
-function AdvanceDialog({
+export function AdvanceDialog({
   open,
   onOpenChange,
   caseId,
@@ -658,7 +692,7 @@ function canSubmitReject({
   );
 }
 
-function RejectDialog({
+export function RejectDialog({
   open,
   onOpenChange,
   caseId,

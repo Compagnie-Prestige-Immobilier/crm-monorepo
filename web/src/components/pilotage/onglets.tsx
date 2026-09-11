@@ -26,6 +26,9 @@ const ONGLETS: Record<Coque, readonly Onglet[]> = {
     // La vue bancaire est le tableau de bord de l'agent bancaire ; l'ADMIN la
     // lit ici plutôt que dans une entrée de barre de plus.
     { label: 'Banque', chemin: 'banque', roles: ['ADMIN'] },
+    { label: 'Pôle déploiement', chemin: 'pole-deploiement', roles: ['ADMIN'] },
+    { label: 'Pôle enrôlement', chemin: 'pole-enrolement', roles: ['ADMIN'] },
+    { label: 'Pôle marketing', chemin: 'pole-marketing', roles: ['ADMIN'] },
   ],
   'grand-public': [
     { label: 'Tableau de bord', chemin: 'statistiques' },

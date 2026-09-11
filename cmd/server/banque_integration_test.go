@@ -4,10 +4,13 @@ package main
 
 import (
 	"bytes"
+	"cpi-go/internal/banque"
+	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"sync"
 	"testing"
@@ -25,6 +28,7 @@ type socleBanque struct {
 	motifAutre     string
 	motifIncomplet string
 	prospectID     string
+	inscriptionID  string
 	// Uniquement ce que le test a inséré : les lignes semées ne se suppriment pas.
 	etapesCreees []string
 	motifsCrees  []string
@@ -123,13 +127,19 @@ func nouveauBancBanque(t *testing.T, role string) *socleBanque {
 		("id","nom","prenom","phoneE164","banqueId","createdById","clientCreatedAt","updatedAt","phase2Status","enrollmentMethod")
 		VALUES ($1,'Diétou','Amadou',$2,$3,$4,now(),now(),'METHOD_OBTAINED','PLATFORM')`,
 		s.prospectID, "+2217"+s.prospectID[:8], s.banqueID, b.userID)
+	s.inscriptionID = s.inscription(&s.prospectID)
 
 	t.Cleanup(func() {
 		menage := []struct {
 			sql  string
 			args []any
 		}{
+			{`DELETE FROM "courriels" WHERE "objetId" IN (SELECT "id"::text FROM "bank_cases" WHERE "processingBankId" = $1)
+				OR "objetId" IN (SELECT "id" FROM "inscriptions_plateforme" WHERE "identifiantDistant" LIKE 'test-' || $1 || '%')`, []any{s.banqueID}},
+			{`DELETE FROM "notification_deliveries" WHERE "notificationId" IN (SELECT "id" FROM "notifications" WHERE "category" = 'DOSSIER' AND "body" LIKE '%' || $1 || '%')`, []any{"Banque Test " + s.banqueID[:8]}},
+			{`DELETE FROM "notifications" WHERE "category" = 'DOSSIER' AND "body" LIKE '%' || $1 || '%'`, []any{"Banque Test " + s.banqueID[:8]}},
 			{`DELETE FROM "bank_cases" WHERE "processingBankId" = $1`, []any{s.banqueID}},
+			{`DELETE FROM "inscriptions_plateforme" WHERE "identifiantDistant" LIKE 'test-' || $1 || '%'`, []any{s.banqueID}},
 			{`DELETE FROM "client_creation_requests" WHERE "banqueId" = $1`, []any{s.banqueID}},
 			{`DELETE FROM "prospects" WHERE "banqueId" = $1`, []any{s.banqueID}},
 			{`DELETE FROM "bank_case_stages" WHERE "id" = ANY($1)`, []any{s.etapesCreees}},
@@ -152,10 +162,22 @@ func (s *socleBanque) connecte() {
 	s.attend(statut, http.StatusOK, "connexion", body)
 }
 
-func (s *socleBanque) ouvrirDossier(reference string) (id string, rev float64) {
+// Une inscription validée sur la plateforme (décision datée), rapprochée ou non
+// d'un prospect : la seule porte d'entrée d'un dossier bancaire.
+func (s *socleBanque) inscription(prospectID *string) string {
+	s.t.Helper()
+	id := uuid.NewString()
+	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
+		("id","projet","identifiantDistant","nom","prenom","phoneE164","statutDistant","decideeLe","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$2,'Diétou','Amadou',$3,'valide',now(),$4,'{}',now(),now())`,
+		id, "test-"+s.banqueID+"-"+id[:8], "+2217"+s.prospectID[:8], prospectID)
+	return id
+}
+
+func (s *socleBanque) ouvrirDossier() (id string, rev float64) {
 	s.t.Helper()
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases",
-		map[string]any{"prospectId": s.prospectID, "reference": reference})
+		map[string]any{"inscriptionId": s.inscriptionID})
 	s.attend(statut, http.StatusCreated, "ouverture du dossier", body)
 	return body["id"].(string), body["rev"].(float64)
 }
@@ -204,7 +226,7 @@ func TestBanquePositionsDistinctesEnConcurrence(t *testing.T) {
 func TestBanqueAvancementEcritTransitionEtRev(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
-	id, rev := s.ouvrirDossier("DOS-" + uuid.NewString()[:8])
+	id, rev := s.ouvrirDossier()
 
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
 		map[string]any{"targetStageId": s.etude, "expectedRev": rev})
@@ -233,12 +255,43 @@ func TestBanqueAvancementEcritTransitionEtRev(t *testing.T) {
 	}
 }
 
+// Entre étapes ouvertes le déplacement est libre dans les deux sens ; seuls
+// l'encaissement et le rejet exigent une confirmation.
+func TestBanqueDeplacementLibreEntreEtapesOuvertes(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	id, rev := s.ouvrirDossier()
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev})
+	s.attend(statut, http.StatusCreated, "prise en traitement", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.depot, "expectedRev": rev + 1})
+	s.attend(statut, http.StatusCreated, "retour à l'étape initiale", body)
+	if body["bankCase"].(map[string]any)["currentStage"].(map[string]any)["id"] != s.depot {
+		t.Fatalf("étape après retour : %v", body["bankCase"])
+	}
+	if historique := body["history"].([]any); len(historique) != 3 {
+		t.Fatalf("chaque déplacement laisse une transition, %d écrites", len(historique))
+	}
+}
+
 func TestBanqueRejetExigeUnMotif(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
-	id, rev := s.ouvrirDossier("DOS-" + uuid.NewString()[:8])
+	id, rev := s.ouvrirDossier()
 
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.rejete, "expectedRev": rev, "rejectionReasonId": s.motifIncomplet})
+	s.attend(statut, http.StatusUnprocessableEntity, "rejet depuis l'étape initiale", body)
+	if body["code"] != "BANK_CASE_REJECT_BEFORE_PROCESSING" {
+		t.Fatalf("code : %v", body["code"])
+	}
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev})
+	s.attend(statut, http.StatusCreated, "prise en traitement", body)
+	rev++
+
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
 		map[string]any{"targetStageId": s.rejete, "expectedRev": rev})
 	s.attend(statut, http.StatusUnprocessableEntity, "rejet sans motif", body)
 	if body["code"] != "BANK_CASE_REJECTION_REASON_REQUIRED" {
@@ -327,19 +380,21 @@ func TestBanqueDemandeApprouveeCreeLeProspect(t *testing.T) {
 func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()
-	id, rev := s.ouvrirDossier("DOS-" + uuid.NewString()[:8])
+	id, rev := s.ouvrirDossier()
 
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
 		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev, "amountXof": "800000"})
-	s.attend(statut, http.StatusUnprocessableEntity, "encaissement depuis la première étape", body)
-	if body["code"] != "BANK_STAGE_CASHED_NOT_LAST" {
-		t.Fatalf("code : %v", body["code"])
-	}
+	s.attend(statut, http.StatusCreated, "encaissement depuis la première étape", body)
+	rev++
+
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev})
+	s.attend(statut, http.StatusConflict, "un dossier encaissé ne bouge plus sans correction", body)
 
 	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/corrections",
-		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev, "amountXof": "800000", "reason": "Encaissement constaté hors flux"})
+		map[string]any{"targetStageId": s.rejete, "expectedRev": rev, "rejectionReasonId": s.motifIncomplet, "reason": "Encaissement saisi par erreur"})
 	s.attend(statut, http.StatusCreated, "correction administrateur", body)
-	if montant := body["bankCase"].(map[string]any)["amountXof"]; montant != "800000" {
+	if montant := body["bankCase"].(map[string]any)["amountXof"]; montant != "0" {
 		t.Fatalf("montant corrigé : %v", montant)
 	}
 
@@ -352,7 +407,7 @@ func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 	}
 
 	statut, body = banqueJSON(s.banc, http.MethodPatch, "/api/v1/bank-cases/"+id,
-		map[string]any{"expectedRev": rev + 1, "reference": "DOS-AUTRE"})
+		map[string]any{"expectedRev": rev + 1, "processingBankId": s.banqueID})
 	s.attend(statut, http.StatusConflict, "modification d'un dossier terminal", body)
 	if body["code"] != "BANK_CASE_TERMINAL" {
 		t.Fatalf("code : %v", body["code"])
@@ -362,8 +417,7 @@ func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 func TestBanqueRechercheInsensibleAuxAccents(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
-	reference := "DOS-" + uuid.NewString()[:8]
-	s.ouvrirDossier(reference)
+	s.ouvrirDossier()
 
 	for _, terme := range []string{"dietou", "Diétou", "amadou dietou"} {
 		statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases?search="+url.QueryEscape(terme), nil)
@@ -422,5 +476,183 @@ func TestBanqueDemandeLueDansSonPortefeuille(t *testing.T) {
 	arbitre.attend(statut, http.StatusOK, "l'arbitre lit toutes les demandes", body)
 	if body["id"] != demande {
 		t.Fatalf("fiche lue : %v", body)
+	}
+}
+
+func banqueContientID(items any, id string) bool {
+	liste, _ := items.([]any)
+	for _, item := range liste {
+		if ligne, ok := item.(map[string]any); ok && ligne["id"] == id {
+			return true
+		}
+	}
+	return false
+}
+
+func banqueCompter(s *socleBanque, requete string, args ...any) int {
+	s.t.Helper()
+	var n int
+	if err := s.pool.QueryRow(s.ctx, requete, args...).Scan(&n); err != nil {
+		s.t.Fatal(err)
+	}
+	return n
+}
+
+func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
+	if !banqueContientID(body["items"], s.inscriptionID) {
+		t.Fatalf("l'inscription validée doit être proposée à l'ouverture : %v", body["items"])
+	}
+
+	id, _ := s.ouvrirDossier()
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/"+id, nil)
+	s.attend(statut, http.StatusOK, "lecture du dossier", body)
+	dossier := body["bankCase"].(map[string]any)
+	if ref, _ := dossier["reference"].(string); !regexp.MustCompile(`^CHUES-BF-\d{4}-\d{6}$`).MatchString(ref) {
+		t.Fatalf("référence générée attendue, %q reçue", ref)
+	}
+	if dossier["inscriptionId"] != s.inscriptionID || dossier["suiviParId"] != s.userID {
+		t.Fatalf("lien inscription et téléconseiller : %v", dossier)
+	}
+
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir après ouverture", body)
+	if banqueContientID(body["items"], s.inscriptionID) {
+		t.Fatal("une inscription déjà ouverte ne doit plus être proposée")
+	}
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases", map[string]any{"inscriptionId": s.inscriptionID})
+	s.attend(statut, http.StatusConflict, "second dossier sur la même inscription", body)
+	if body["code"] != "BANK_CASE_INSCRIPTION_ALREADY_OPEN" {
+		t.Fatalf("code : %v", body["code"])
+	}
+	sansProspect := s.inscription(nil)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases", map[string]any{"inscriptionId": sansProspect})
+	s.attend(statut, http.StatusUnprocessableEntity, "inscription sans prospect", body)
+	if body["code"] != "BANK_CASE_INSCRIPTION_SANS_PROSPECT" {
+		t.Fatalf("code : %v", body["code"])
+	}
+	statut, body = banqueJSON(s.banc, http.MethodPatch, "/api/v1/bank-cases/"+id,
+		map[string]any{"expectedRev": 1, "reference": "DOS-SAISIE"})
+	s.attend(statut, http.StatusUnprocessableEntity, "la référence ne se saisit plus", body)
+
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/analytics?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "indicateurs", body)
+	pilotage, _ := body["pilotage"].(map[string]any)
+	if pilotage == nil || pilotage["entonnoir"] == nil || pilotage["overdueDays"].(float64) != 7 {
+		t.Fatalf("pilotage : %v", body["pilotage"])
+	}
+}
+
+func TestBanqueDossierCompletSignaleEtCourrielTrace(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	banqueExec(s.banc, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('courriels.destinataires',
+		'{"banque":["banque@test.cpi"],"banqueCopies":["bpe@test.cpi"],"enrolement":[],"enrolementCopies":[]}',now())
+		ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`)
+	t.Cleanup(func() { banqueExec(s.banc, `DELETE FROM "app_settings" WHERE "key" = 'courriels.destinataires'`) })
+
+	s.signalerComplets()
+	s.signalerComplets()
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "inscriptions_plateforme" WHERE "id" = $1 AND "completeSignaleeLe" IS NOT NULL`, s.inscriptionID); n != 1 {
+		t.Fatal("l'inscription complète doit être marquée signalée")
+	}
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "objetType" = 'inscription' AND "objetId" = $1`, s.inscriptionID); n != 1 {
+		t.Fatalf("un seul courriel par inscription complète, %d écrits", n)
+	}
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "notification_deliveries" d INNER JOIN "notifications" n ON n."id" = d."notificationId"
+		WHERE d."userId" = $1 AND n."category" = 'DOSSIER' AND n."route" LIKE '%ouvrir=' || $2`, s.userID, s.inscriptionID); n != 1 {
+		t.Fatalf("la banque doit recevoir une notification in-app, %d livrées", n)
+	}
+
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/courriels/objet/inscription/"+s.inscriptionID, nil)
+	s.attend(statut, http.StatusOK, "courriels de l'inscription", body)
+	courriel := body["items"].([]any)[0].(map[string]any)
+	if courriel["type"] != "DOSSIER_COMPLET" || courriel["statut"] != "ECHEC" || courriel["erreur"] == nil {
+		t.Fatalf("sans transport Brevo, l'envoi est tracé en échec : %v", courriel)
+	}
+	if !strings.HasPrefix(courriel["sujet"].(string), "[CPI CHUES] Dossier complet : ") {
+		t.Fatalf("sujet : %v", courriel["sujet"])
+	}
+}
+
+func (s *socleBanque) signalerComplets() {
+	s.t.Helper()
+	cfg, err := socle.LireConfig()
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	if _, err := banque.SignalerDossiersComplets(s.ctx, nouveauDeps(s.pool, cfg), "CHUES"); err != nil {
+		s.t.Fatal(err)
+	}
+}
+
+func TestBanqueCourrielRenvoyeEtWebhookBrevo(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	s.signalerComplets()
+	courrielID := banqueLigne(s.banc, `SELECT "id" FROM "courriels" WHERE "objetType" = 'inscription' AND "objetId" = $1`, s.inscriptionID)
+
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
+	s.attend(statut, http.StatusOK, "renvoi", body)
+	if body["statut"] != "ECHEC" {
+		t.Fatalf("renvoi sans transport : %v", body["statut"])
+	}
+
+	t.Setenv("BREVO_WEBHOOK_SECRET", "secret-de-test")
+	messageID := "<" + uuid.NewString() + "@smtp-relay.mailin.fr>"
+	banqueExec(s.banc, `UPDATE "courriels" SET "messageId" = $2, "statut" = 'ENVOYE' WHERE "id" = $1`, courrielID, messageID)
+	evenement := map[string]any{"event": "delivered", "message-id": messageID}
+	statut = s.appelSansOrigine(http.MethodPost, "/api/v1/webhooks/brevo?secret=faux", evenement)
+	if statut != http.StatusNotFound {
+		t.Fatalf("mauvais secret : %d", statut)
+	}
+	statut = s.appelSansOrigine(http.MethodPost, "/api/v1/webhooks/brevo?secret=secret-de-test", evenement)
+	if statut != http.StatusNoContent && statut != http.StatusOK {
+		t.Fatalf("webhook Brevo : %d", statut)
+	}
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "id" = $1 AND "statut" = 'REMIS' AND "remisLe" IS NOT NULL`, courrielID); n != 1 {
+		t.Fatal("l'événement delivered doit marquer le courriel remis")
+	}
+}
+
+func (s *socleBanque) appelSansOrigine(method, chemin string, corps map[string]any) int {
+	s.t.Helper()
+	var buf bytes.Buffer
+	if err := json.NewEncoder(&buf).Encode(corps); err != nil {
+		s.t.Fatal(err)
+	}
+	req, err := http.NewRequestWithContext(s.ctx, method, s.ts.URL+chemin, &buf)
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		s.t.Fatal(err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	return resp.StatusCode
+}
+
+func TestBanqueEncaissementSignaleLeTeleconseiller(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	id, rev := s.ouvrirDossier()
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev})
+	s.attend(statut, http.StatusCreated, "prise en traitement", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": rev + 1, "amountXof": "500000"})
+	s.attend(statut, http.StatusCreated, "encaissement", body)
+
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "type" = 'DOSSIER_ENCAISSE' AND "objetId" = $1`, id); n != 1 {
+		t.Fatalf("un courriel d'encaissement tracé, %d trouvés", n)
+	}
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "notification_deliveries" d INNER JOIN "notifications" n ON n."id" = d."notificationId"
+		WHERE d."userId" = $1 AND n."title" LIKE 'Dossier bancaire encaissé%'`, s.userID); n != 1 {
+		t.Fatalf("le téléconseiller doit être notifié de l'encaissement, %d livraisons", n)
 	}
 }

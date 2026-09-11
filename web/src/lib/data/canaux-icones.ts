@@ -1,0 +1,35 @@
+import {
+  Building2Icon,
+  EarIcon,
+  FacebookIcon,
+  GlobeIcon,
+  InstagramIcon,
+  LinkedinIcon,
+  MessageCircleIcon,
+  Music2Icon,
+  PhoneIncomingIcon,
+  PlaneIcon,
+  RadioTowerIcon,
+  SignpostIcon,
+  StoreIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react';
+
+/** Un canal se reconnaît à son signe avant son nom : la liste se lit d'un coup d'œil. */
+export const CANAL_ICONES: Record<string, LucideIcon> = {
+  TIKTOK: Music2Icon,
+  FACEBOOK: FacebookIcon,
+  INSTAGRAM: InstagramIcon,
+  LINKEDIN: LinkedinIcon,
+  WHATSAPP: MessageCircleIcon,
+  SITE_WEB: GlobeIcon,
+  PARRAINAGE: UsersIcon,
+  BOUCHE_A_OREILLE: EarIcon,
+  SALON: StoreIcon,
+  AFFICHAGE: SignpostIcon,
+  RADIO_TV: RadioTowerIcon,
+  APPEL_ENTRANT: PhoneIncomingIcon,
+  VISITE_AGENCE: Building2Icon,
+  DIASPORA: PlaneIcon,
+};

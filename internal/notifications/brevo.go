@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"cpi-go/internal/shared/socle"
+	"encoding/base64"
 	"encoding/json"
 	"log/slog"
 	"net/http"
@@ -33,9 +34,16 @@ type DestinataireBrevo struct {
 
 type MessageBrevo struct {
 	Destinataires []DestinataireBrevo
+	Copies        []DestinataireBrevo
 	Sujet         string
 	HTML          string
 	Texte         string
+	PieceJointe   *PieceJointeBrevo
+}
+
+type PieceJointeBrevo struct {
+	Nom     string
+	Contenu []byte
 }
 
 type issueBrevo struct {
@@ -46,9 +54,10 @@ type issueBrevo struct {
 }
 
 type envoiBrevo struct {
-	Statut string
-	issues []issueBrevo
-	detail string
+	Statut    string
+	MessageID string
+	issues    []issueBrevo
+	detail    string
 }
 
 type brevo struct {
@@ -86,9 +95,11 @@ func (b *brevo) configure() bool { return b.raison == "" }
 type corpsBrevo struct {
 	Sender      map[string]string   `json:"sender"`
 	To          []map[string]string `json:"to"`
+	Cc          []map[string]string `json:"cc,omitempty"`
 	Subject     string              `json:"subject"`
 	HTMLContent string              `json:"htmlContent"`
 	TextContent string              `json:"textContent"`
+	Attachment  []map[string]string `json:"attachment,omitempty"`
 }
 
 type trancheBrevo struct {
@@ -96,6 +107,19 @@ type trancheBrevo struct {
 	ok            bool
 	code          string
 	transitoire   bool
+	messageID     string
+}
+
+func brevoAdresses(liste []DestinataireBrevo) []map[string]string {
+	adresses := make([]map[string]string, 0, len(liste))
+	for _, destinataire := range liste {
+		entree := map[string]string{"email": destinataire.Email}
+		if destinataire.Nom != "" {
+			entree["name"] = destinataire.Nom
+		}
+		adresses = append(adresses, entree)
+	}
+	return adresses
 }
 
 // Un refus de tranche n'emporte pas le lot : chaque tranche rend son propre
@@ -108,32 +132,44 @@ func (b *brevo) Envoyer(ctx context.Context, messages []MessageBrevo) envoiBrevo
 		return envoiBrevo{Statut: brevoNonConfigure, detail: b.raison}
 	}
 
-	var issues []issueBrevo
-	var premiereErreur string
-	tentees, remises := 0, 0
-	for _, message := range messages {
-		for _, tranche := range b.envoyerMessage(ctx, message) {
-			tentees++
-			if tranche.ok {
-				remises++
-			} else if premiereErreur == "" {
-				premiereErreur = tranche.code
-			}
-			for _, destinataire := range tranche.destinataires {
-				issues = append(issues, issueBrevo{
-					email: destinataire.Email, ok: tranche.ok,
-					code: tranche.code, transitoire: tranche.transitoire,
-				})
-			}
+	var bilan bilanBrevo
+	for i := range messages {
+		for _, tranche := range b.envoyerMessage(ctx, &messages[i]) {
+			bilan.ajouter(&tranche)
 		}
 	}
-	if tentees > 0 && remises == 0 {
-		return envoiBrevo{Statut: brevoEnPanne, issues: issues, detail: premiereErreur}
+	if bilan.tentees > 0 && bilan.remises == 0 {
+		return envoiBrevo{Statut: brevoEnPanne, issues: bilan.issues, detail: bilan.premiereErreur}
 	}
-	return envoiBrevo{Statut: BrevoEnvoye, issues: issues}
+	return envoiBrevo{Statut: BrevoEnvoye, MessageID: bilan.messageID, issues: bilan.issues}
 }
 
-func (b *brevo) envoyerMessage(ctx context.Context, message MessageBrevo) []trancheBrevo {
+type bilanBrevo struct {
+	issues           []issueBrevo
+	premiereErreur   string
+	messageID        string
+	tentees, remises int
+}
+
+func (bilan *bilanBrevo) ajouter(tranche *trancheBrevo) {
+	bilan.tentees++
+	if tranche.ok {
+		bilan.remises++
+		if bilan.messageID == "" {
+			bilan.messageID = tranche.messageID
+		}
+	} else if bilan.premiereErreur == "" {
+		bilan.premiereErreur = tranche.code
+	}
+	for _, destinataire := range tranche.destinataires {
+		bilan.issues = append(bilan.issues, issueBrevo{
+			email: destinataire.Email, ok: tranche.ok,
+			code: tranche.code, transitoire: tranche.transitoire,
+		})
+	}
+}
+
+func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []trancheBrevo {
 	tranches := brevoDecouper(message.Destinataires, brevoDestinatairesParAppel)
 	sorts := make([]trancheBrevo, len(tranches))
 	jetons := make(chan struct{}, brevoAppelsSimultanes)
@@ -151,23 +187,22 @@ func (b *brevo) envoyerMessage(ctx context.Context, message MessageBrevo) []tran
 	return sorts
 }
 
-func (b *brevo) envoyerTranche(ctx context.Context, message MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
+func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
 	sort := trancheBrevo{destinataires: tranche}
-	to := make([]map[string]string, 0, len(tranche))
-	for _, destinataire := range tranche {
-		entree := map[string]string{"email": destinataire.Email}
-		if destinataire.Nom != "" {
-			entree["name"] = destinataire.Nom
-		}
-		to = append(to, entree)
-	}
-	corps, err := json.Marshal(corpsBrevo{
+	charge := corpsBrevo{
 		Sender:      map[string]string{"email": b.expediteur, "name": b.nom},
-		To:          to,
+		To:          brevoAdresses(tranche),
+		Cc:          brevoAdresses(message.Copies),
 		Subject:     message.Sujet,
 		HTMLContent: message.HTML,
 		TextContent: message.Texte,
-	})
+	}
+	if message.PieceJointe != nil {
+		charge.Attachment = []map[string]string{{
+			"name": message.PieceJointe.Nom, "content": base64.StdEncoding.EncodeToString(message.PieceJointe.Contenu),
+		}}
+	}
+	corps, err := json.Marshal(charge)
 	if err != nil {
 		return brevoErreurReseau(sort, err)
 	}
@@ -189,6 +224,12 @@ func (b *brevo) envoyerTranche(ctx context.Context, message MessageBrevo, tranch
 	defer func() { _ = reponse.Body.Close() }()
 	if reponse.StatusCode < http.StatusMultipleChoices {
 		sort.ok = true
+		var accuse struct {
+			MessageID string `json:"messageId"`
+		}
+		if json.NewDecoder(reponse.Body).Decode(&accuse) == nil {
+			sort.messageID = accuse.MessageID
+		}
 		return sort
 	}
 	sort.code = brevoCodeErreur(reponse)

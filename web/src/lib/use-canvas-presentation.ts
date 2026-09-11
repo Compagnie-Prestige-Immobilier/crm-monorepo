@@ -1,11 +1,6 @@
 import { useEffect, type RefObject } from 'react';
 
-/**
- * Retire le rôle `img` du canevas de Chart.js, qui n'a pas de nom accessible.
- *
- * Un effet à passe unique ne suffit pas : le canevas n'apparaît qu'une fois les
- * données arrivées, donc après le montage. L'observateur couvre les deux ordres.
- */
+/** Retire le rôle image des canevas hérités afin que le SVG du diagramme porte le nom. */
 export function useCanvasPresentation(region: RefObject<HTMLElement | null>): void {
   useEffect(() => {
     const host = region.current;

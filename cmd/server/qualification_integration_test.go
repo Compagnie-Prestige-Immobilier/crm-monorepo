@@ -4,15 +4,10 @@ package main
 
 import (
 	"bytes"
-	"cpi-go/internal/qualification"
-	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"fmt"
-	"mime/multipart"
 	"net/http"
 	"net/url"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -284,61 +279,6 @@ func TestQualificationLaQualificationFermeLOuverture(t *testing.T) {
 	}
 }
 
-func TestQualificationNoteVocaleDeposeeLueEtBalayee(t *testing.T) {
-	dossier := t.TempDir()
-	t.Setenv("NOTE_VOCALE_DIR", dossier)
-	auteur := qualificationConnecte(t, "COMMERCIAL")
-	prospect := qualificationProspect(auteur)
-	corps := qualificationCorpsTentative(prospect, nil)
-	attemptID, _ := corps["id"].(string)
-	t.Cleanup(func() { _, _ = auteur.pool.Exec(auteur.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, attemptID) })
-	statut, body := qualificationEnvoi(auteur, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
-	auteur.attend(statut, http.StatusOK, "tentative", body)
-
-	chemin := "/api/v1/phase2/call-attempts/" + attemptID + "/note-vocale"
-	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, "audio/webm", []byte("ceci n'est pas un conteneur audio"))
-	auteur.attend(statut, http.StatusBadRequest, "contenu non audio", body)
-	if body["code"] != "NOTE_VOCALE_INVALIDE" {
-		t.Fatalf("code : %v", body["code"])
-	}
-
-	note := append([]byte{0x1a, 0x45, 0xdf, 0xa3}, bytes.Repeat([]byte{0x42}, 64)...)
-	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, "audio/webm", note)
-	auteur.attend(statut, http.StatusOK, "dépôt de la note", body)
-	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, "audio/webm", note)
-	auteur.attend(statut, http.StatusOK, "dépôt rejoué", body)
-
-	superviseur := qualificationConnecte(t, "SUPERVISEUR")
-	statut, body = qualificationEnvoi(superviseur, http.MethodGet, chemin, nil)
-	superviseur.attend(statut, http.StatusOK, "lecture par la supervision", body)
-
-	tiers := qualificationConnecte(t, "COMMERCIAL")
-	statut, body = qualificationEnvoi(tiers, http.MethodGet, chemin, nil)
-	tiers.attend(statut, http.StatusForbidden, "lecture par un autre téléconseiller", body)
-	if body["code"] != "NOTE_VOCALE_INTERDITE" {
-		t.Fatalf("code : %v", body["code"])
-	}
-
-	orpheline := filepath.Join(dossier, uuid.Must(uuid.NewV7()).String()+qualification.NoteSuffixe)
-	if err := os.WriteFile(orpheline, note, 0o600); err != nil {
-		t.Fatal(err)
-	}
-	cfg, err := socle.LireConfig()
-	if err != nil {
-		t.Fatal(err)
-	}
-	s := nouveauDeps(auteur.pool, cfg)
-	if err := qualification.BalayerNotesVocales(auteur.ctx, s); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := os.Stat(orpheline); !os.IsNotExist(err) {
-		t.Fatalf("la note sans tentative doit être retirée : %v", err)
-	}
-	if _, err := os.Stat(filepath.Join(dossier, attemptID+qualification.NoteSuffixe)); err != nil {
-		t.Fatalf("la note d'une tentative vivante doit rester : %v", err)
-	}
-}
-
 func TestQualificationBeatEcritUnCreneauDActivite(t *testing.T) {
 	b := qualificationConnecte(t, "CHARGE_CLIENTELE")
 	t.Cleanup(func() {
@@ -369,56 +309,6 @@ func TestQualificationBeatEcritUnCreneauDActivite(t *testing.T) {
 	if !vuApres.Equal(vuAvant) {
 		t.Fatalf("un battement sous les dix secondes ne s'écrit pas : %v puis %v", vuAvant, vuApres)
 	}
-}
-
-func qualificationLotMultipart(t *testing.T, champ string, contenu []byte) (typeContenu string, corps []byte) {
-	t.Helper()
-	var lot bytes.Buffer
-	formulaire := multipart.NewWriter(&lot)
-	partie, err := formulaire.CreateFormFile(champ, "note.webm")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if _, err := partie.Write(contenu); err != nil {
-		t.Fatal(err)
-	}
-	if err := formulaire.Close(); err != nil {
-		t.Fatal(err)
-	}
-	return formulaire.FormDataContentType(), lot.Bytes()
-}
-
-func TestQualificationAliasRecordingAccepteUnChampFile(t *testing.T) {
-	dossier := t.TempDir()
-	t.Setenv("NOTE_VOCALE_DIR", dossier)
-	auteur := qualificationConnecte(t, "COMMERCIAL")
-	prospect := qualificationProspect(auteur)
-	corps := qualificationCorpsTentative(prospect, nil)
-	attemptID, _ := corps["id"].(string)
-	t.Cleanup(func() { _, _ = auteur.pool.Exec(auteur.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, attemptID) })
-	statut, body := qualificationEnvoi(auteur, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
-	auteur.attend(statut, http.StatusOK, "tentative", body)
-
-	chemin := "/api/v1/phase2/call-attempts/" + attemptID + "/recording"
-	note := append([]byte{0x1a, 0x45, 0xdf, 0xa3}, bytes.Repeat([]byte{0x42}, 64)...)
-
-	typeContenu, lot := qualificationLotMultipart(t, "audio", note)
-	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, typeContenu, lot)
-	auteur.attend(statut, http.StatusBadRequest, "champ multipart inattendu", body)
-
-	typeContenu, lot = qualificationLotMultipart(t, "file", note)
-	statut, body = qualificationBrut(auteur, http.MethodPost, chemin, typeContenu, lot)
-	auteur.attend(statut, http.StatusOK, "dépôt multipart par l'alias", body)
-	if body["attemptId"] != attemptID || body["bytes"] != float64(len(note)) {
-		t.Fatalf("corps du dépôt : %v", body)
-	}
-	info, err := os.Stat(filepath.Join(dossier, attemptID+qualification.NoteSuffixe))
-	if err != nil || info.Size() != int64(len(note)) {
-		t.Fatalf("seul l'audio du champ `file` doit être écrit : %v, %v", info, err)
-	}
-
-	statut, body = qualificationEnvoi(auteur, http.MethodGet, chemin, nil)
-	auteur.attend(statut, http.StatusOK, "lecture par l'alias", body)
 }
 
 func qualificationLotSync(operations ...map[string]any) map[string]any {

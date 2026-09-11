@@ -18,6 +18,8 @@ export type ChiffresBanques = Schemas['NamedCountListDto'];
 export type ChiffresCampagne = CampagnePerformance | null;
 export type ChiffresCampagnes = Schemas['SupervisionCampagnesDto'];
 export type ChiffresRepresentants = Schemas['StockRepresentantsDto'];
+export type QualiteDeLaBase = Schemas['QualiteDeLaBase'];
+export type QualiteDuMarketing = Schemas['QualiteDuMarketing'];
 export type ChiffresEnrolement = Schemas['EnrolementIndicateursDto'];
 
 /** L'activité relue créneau par créneau, dans l'ordre des créneaux. */
@@ -107,6 +109,20 @@ export async function fetchChiffresRepresentants(
   client: ApiClient = getApiClient(),
 ): Promise<ChiffresRepresentants> {
   return unwrap(await client.GET('/api/v1/supervision/representants'));
+}
+
+/** La qualité de la base représentants ne se borne ni à une période ni à un projet. */
+export async function fetchQualiteDeLaBase(
+  client: ApiClient = getApiClient(),
+): Promise<QualiteDeLaBase> {
+  return unwrap(await client.GET('/api/v1/supervision/representants/qualite'));
+}
+
+/** La performance du marketing se lit sur toute la base, les deux projets confondus. */
+export async function fetchQualiteDuMarketing(
+  client: ApiClient = getApiClient(),
+): Promise<QualiteDuMarketing> {
+  return unwrap(await client.GET('/api/v1/supervision/prospects/marketing'));
 }
 
 export async function fetchChiffresEntonnoir(

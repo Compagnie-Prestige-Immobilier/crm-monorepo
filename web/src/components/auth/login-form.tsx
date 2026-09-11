@@ -13,6 +13,13 @@ import { homePathForRole } from '@/components/layout/nav-items';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { loginSchema, type LoginInput } from '@/lib/schemas';
 import { ROLE_LABELS, type Role, type SessionUser } from '@/lib/types';
 import { apiErrorMessage } from '@/lib/utils';
@@ -25,13 +32,49 @@ function roleOf(payload: unknown): Role {
   return typeof role === 'string' && role in ROLE_LABELS ? (role as Role) : 'ADMIN';
 }
 
+const COOKIE_BASE = 'cpi_base';
+const BASE_PUBLIQUE = 'public';
+
+function baseCourante(): string {
+  const valeur = document.cookie
+    .split('; ')
+    .find((cookie) => cookie.startsWith(`${COOKIE_BASE}=`))
+    ?.slice(COOKIE_BASE.length + 1);
+  return valeur === undefined || valeur === '' ? BASE_PUBLIQUE : valeur;
+}
+
+/** Le serveur lit ce cookie sur chaque requête et ne sert que les bases qu'il connaît. */
+function choisirBase(nom: string): void {
+  document.cookie = `${COOKIE_BASE}=${nom}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
 export function LoginForm({ next }: { next?: string | null }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [bases, setBases] = useState<string[] | null>(null);
+  const [base, setBase] = useState(baseCourante);
 
   useEffect(() => {
     resetSessionExpiryGuard();
+    async function chargerBases(): Promise<void> {
+      const response = await fetch('/api/v1/auth/bases', { credentials: 'same-origin' });
+      if (!response.ok) return;
+      const payload = (await response.json()) as { bases: string[] };
+      setBases(payload.bases);
+    }
+    // Une base autre que la publique se voit d'emblée : on sait où l'on se connecte.
+    if (baseCourante() !== BASE_PUBLIQUE) void chargerBases();
+    function surTouche(event: KeyboardEvent): void {
+      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toUpperCase() !== 'D')
+        return;
+      event.preventDefault();
+      void chargerBases();
+    }
+    window.addEventListener('keydown', surTouche);
+    return () => {
+      window.removeEventListener('keydown', surTouche);
+    };
   }, []);
 
   const {
@@ -126,6 +169,31 @@ export function LoginForm({ next }: { next?: string | null }) {
           </p>
         ) : null}
       </div>
+
+      {bases === null ? null : (
+        <div className="flex flex-col gap-2">
+          <Label htmlFor="base">Base</Label>
+          <Select
+            value={base}
+            onValueChange={(valeur) => {
+              if (valeur === null) return;
+              choisirBase(valeur);
+              setBase(valeur);
+            }}
+          >
+            <SelectTrigger id="base" aria-label="Base">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {bases.map((nom) => (
+                <SelectItem key={nom} value={nom}>
+                  {nom}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <Button type="submit" size="lg" disabled={isSubmitting} className="w-full">
         {isSubmitting ? (

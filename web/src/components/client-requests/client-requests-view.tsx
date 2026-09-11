@@ -56,7 +56,7 @@ function videDescription(activeFilterCount: number, canReview: boolean): string 
   if (canReview) {
     return 'Une demande arrivée ici attend votre approbation, ou un refus dont le motif est remonté à la banque.';
   }
-  return 'Ouvrez un dossier depuis « Nouveau dossier » : si le client est absent de la base, vous pourrez y demander sa création.';
+  return 'Depuis « À ouvrir (plateforme) », si le client est absent de la base, demandez sa création.';
 }
 
 export function ClientRequestsView({ role }: { role: Role }) {

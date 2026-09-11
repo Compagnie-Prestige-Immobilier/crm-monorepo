@@ -1,14 +1,10 @@
-'use client';
+import { ResponsiveBar } from '@nivo/bar';
+import { ResponsiveLine } from '@nivo/line';
+import { ResponsivePie } from '@nivo/pie';
 
-import type { ChartData, ChartOptions } from 'chart.js';
-import { Bar, Chart as MixedChart, Doughnut } from 'react-chartjs-2';
-
-import '@/components/dashboard/chart-setup';
-
-import { axisScales, baseOptions } from '@/components/dashboard/chart-options';
-import { seriesBorderColor, seriesColor, useChartTheme } from '@/lib/chart-theme';
+import { useChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
-import { formatXof, formatXofAxisTick, xofToChartNumber } from '@/lib/money';
+import { formatXof, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
 export interface ClickableSlice {
@@ -16,107 +12,114 @@ export interface ClickableSlice {
   value: number;
   onSelect?: (() => void) | undefined;
 }
+function colors(theme: ReturnType<typeof useChartTheme>) {
+  return theme.series.length > 0 ? theme.series : ['#0f766e'];
+}
+function nivoTheme(theme: ReturnType<typeof useChartTheme>) {
+  return {
+    text: { fill: theme.tick, fontSize: 11 },
+    axis: {
+      domain: { line: { stroke: 'transparent' } },
+      ticks: { line: { stroke: 'transparent' }, text: { fill: theme.tick } },
+    },
+    grid: { line: { stroke: theme.grid, strokeDasharray: '3 5' } },
+    tooltip: {
+      container: {
+        background: theme.tooltipBackground,
+        color: theme.tooltipForeground,
+        border: `1px solid ${theme.border}`,
+        borderRadius: 8,
+      },
+    },
+  };
+}
 
 export function BankRankChart({
   items,
-  label,
+  label: _label,
 }: {
   items: readonly ClickableSlice[];
   label: string;
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion, (index) => {
-      items[index]?.onSelect?.();
-    }),
-    indexAxis: 'y',
-    scales: axisScales(theme, { horizontal: true }),
-  };
-
   return (
-    <Bar
-      options={options}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            label,
-            data: items.map((item) => item.value),
-            backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            borderColor: items.map((_, index) =>
-              seriesBorderColor(theme, index, seriesColor(theme, index)),
-            ),
-            borderWidth: 1,
-            borderRadius: 6,
-            borderSkipped: false,
-            barThickness: 18,
-          },
-        ],
-      }}
-    />
+    <div className="h-full min-h-40">
+      <ResponsiveBar
+        data={items.map((item) => ({ label: item.label, value: item.value }))}
+        keys={['value']}
+        indexBy="label"
+        layout="horizontal"
+        margin={{ top: 10, right: 12, bottom: 24, left: 116 }}
+        padding={0.3}
+        borderRadius={6}
+        colors={(datum) => colors(theme)[datum.index % colors(theme).length] ?? '#0f766e'}
+        enableLabel={false}
+        enableGridX={true}
+        enableGridY={false}
+        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        onClick={(datum) =>
+          items.find((item) => item.label === String(datum.indexValue))?.onSelect?.()
+        }
+      />
+    </div>
   );
 }
-
 export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-  const total = items.reduce((sum, item) => sum + item.value, 0);
-
-  const options: ChartOptions<'doughnut'> = {
-    ...baseOptions(theme, reducedMotion, (index) => {
-      items[index]?.onSelect?.();
-    }),
-    cutout: '62%',
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      legend: {
-        display: true,
-        position: 'right',
-        labels: {
-          color: theme.tick,
-          boxWidth: 10,
-          boxHeight: 10,
-          usePointStyle: true,
-          pointStyle: 'circle',
-          font: { size: 11 },
-          padding: 12,
-        },
-      },
-      tooltip: {
-        ...baseOptions(theme, reducedMotion).plugins.tooltip,
-        callbacks: {
-          label: (context) => {
-            const value = context.parsed;
-            const share = total === 0 ? 0 : Math.round((value / total) * 100);
-            return ` ${context.label}: ${formatNumber(value)} (${String(share)} %)`;
-          },
-        },
-      },
-    },
-  };
-
+  if (items.length < 2) {
+    const item = items[0];
+    return (
+      <div className="flex h-full min-h-40 flex-col items-center justify-center gap-1 text-center">
+        <strong className="font-display text-3xl font-[700] text-foreground">
+          {formatNumber(item?.value ?? 0)}
+        </strong>
+        <span className="text-xs text-muted-foreground">{item?.label ?? 'Aucune donnée'}</span>
+      </div>
+    );
+  }
   return (
-    <Doughnut
-      options={options}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
+    <div className="h-full min-h-40">
+      <ResponsivePie
+        data={items.map((item) => ({ id: item.label, label: item.label, value: item.value }))}
+        value="value"
+        id="id"
+        innerRadius={0.62}
+        padAngle={1.5}
+        cornerRadius={5}
+        colors={(datum) =>
+          colors(theme)[
+            Math.max(
+              0,
+              items.findIndex((item) => item.label === String(datum.id)),
+            )
+          ] ?? '#0f766e'
+        }
+        enableArcLinkLabels={false}
+        enableArcLabels={false}
+        margin={{ top: 10, right: 118, bottom: 10, left: 10 }}
+        legends={[
           {
-            data: items.map((item) => item.value),
-            backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            borderColor: items.map((_, index) =>
-              seriesBorderColor(theme, index, theme.tooltipBackground),
-            ),
-            borderWidth: 2,
+            anchor: 'right',
+            direction: 'column',
+            translateX: 110,
+            itemWidth: 100,
+            itemHeight: 20,
+            itemsSpacing: 4,
+            symbolSize: 9,
           },
-        ],
-      }}
-    />
+        ]}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        onClick={(datum) => items.find((item) => item.label === String(datum.id))?.onSelect?.()}
+      />
+    </div>
   );
 }
-
 export function CashingsOverTimeChart({
   buckets,
 }: {
@@ -124,128 +127,60 @@ export function CashingsOverTimeChart({
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-
-  const options: ChartOptions<'bar' | 'line'> = {
-    ...baseOptions(theme, reducedMotion),
-    scales: {
-      x: {
-        grid: { display: false },
-        border: { color: theme.border },
-        ticks: { color: theme.tick, font: { size: 11 }, autoSkipPadding: 12 },
-      },
-      y: {
-        beginAtZero: true,
-        position: 'left',
-        grid: { color: theme.grid, drawTicks: false },
-        border: { display: false },
-        ticks: { color: theme.tick, font: { size: 11 }, precision: 0 },
-        title: { display: true, text: 'Nombre', color: theme.tick, font: { size: 11 } },
-      },
-      yAmount: {
-        beginAtZero: true,
-        position: 'right',
-        grid: { display: false },
-        border: { display: false },
-        ticks: {
-          color: theme.tick,
-          font: { size: 11 },
-          callback: (value) => formatXofAxisTick(Number(value)),
-        },
-        title: { display: true, text: 'FCFA', color: theme.tick, font: { size: 11 } },
-      },
-    },
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      tooltip: {
-        ...baseOptions(theme, reducedMotion).plugins.tooltip,
-        callbacks: {
-          label: (context) => {
-            if (context.datasetIndex === 1) {
-              const raw = buckets[context.dataIndex]?.amountXof ?? '0';
-              return ` Montant : ${formatXof(raw)}`;
-            }
-            return ` Encaissements : ${formatNumber(context.parsed.y ?? 0)}`;
-          },
-        },
-      },
-    },
-  };
-
-  const data: ChartData<'bar' | 'line', number[], string> = {
-    labels: buckets.map((point) => formatShortDate(point.bucket.slice(0, 10))),
-    datasets: [
-      {
-        type: 'bar' as const,
-        label: 'Encaissements',
-        data: buckets.map((point) => point.cases),
-        backgroundColor: seriesColor(theme, 0),
-        borderColor: seriesBorderColor(theme, 0, seriesColor(theme, 0)),
-        borderWidth: 1,
-        borderRadius: 6,
-        borderSkipped: false,
-        maxBarThickness: 28,
-        yAxisID: 'y',
-        order: 2,
-      },
-      {
-        type: 'line' as const,
-        label: 'Montant',
-        data: buckets.map((point) => xofToChartNumber(point.amountXof)),
-        borderColor: seriesBorderColor(theme, 1, seriesColor(theme, 1)),
-        backgroundColor: seriesColor(theme, 1),
-        borderWidth: 2,
-        tension: 0.3,
-        pointRadius: 0,
-        pointHitRadius: 12,
-        yAxisID: 'yAmount',
-        order: 1,
-      },
-    ],
-  };
-
-  return <MixedChart type="bar" options={options} data={data} />;
+  const data = buckets.map((point) => ({
+    x: formatShortDate(point.bucket.slice(0, 10)),
+    y: xofToChartNumber(point.amountXof),
+    cases: point.cases,
+    amount: formatXof(point.amountXof),
+  }));
+  return (
+    <div className="h-full min-h-40">
+      <ResponsiveLine
+        data={[{ id: 'Montant', data }]}
+        colors={[theme.series[1] ?? '#d97706']}
+        lineWidth={2.5}
+        pointSize={5}
+        enableGridX={false}
+        margin={{ top: 12, right: 12, bottom: 34, left: 48 }}
+        axisBottom={{ tickSize: 0, tickPadding: 10 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        useMesh={true}
+        tooltip={({ point }) => (
+          <span>
+            {String(point.data.xFormatted)}: {formatXof(String(point.data.y))}
+          </span>
+        )}
+      />
+    </div>
+  );
 }
-
 export function MeanDelayChart({ items }: { items: readonly { label: string; hours: number }[] }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
-
-  const options: ChartOptions<'bar'> = {
-    ...baseOptions(theme, reducedMotion),
-    indexAxis: 'y',
-    scales: axisScales(theme, { horizontal: true }),
-    plugins: {
-      ...baseOptions(theme, reducedMotion).plugins,
-      tooltip: {
-        ...baseOptions(theme, reducedMotion).plugins.tooltip,
-        callbacks: {
-          label: (context) =>
-            ` ${formatNumber(Math.round(context.parsed.x ?? 0))} h (${((context.parsed.x ?? 0) / 24).toFixed(1)} j)`,
-        },
-      },
-    },
-  };
-
   return (
-    <Bar
-      options={options}
-      data={{
-        labels: items.map((item) => item.label),
-        datasets: [
-          {
-            label: 'Heures',
-            data: items.map((item) => item.hours),
-            backgroundColor: items.map((_, index) => seriesColor(theme, index)),
-            borderColor: items.map((_, index) =>
-              seriesBorderColor(theme, index, seriesColor(theme, index)),
-            ),
-            borderWidth: 1,
-            borderRadius: 6,
-            borderSkipped: false,
-            barThickness: 18,
-          },
-        ],
-      }}
-    />
+    <div className="h-full min-h-40">
+      <ResponsiveBar
+        data={items.map((item) => ({ label: item.label, heures: item.hours }))}
+        keys={['heures']}
+        indexBy="label"
+        layout="horizontal"
+        margin={{ top: 10, right: 12, bottom: 24, left: 116 }}
+        padding={0.3}
+        borderRadius={6}
+        colors={[theme.series[0] ?? '#0f766e']}
+        enableLabel={false}
+        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        axisLeft={{ tickSize: 0, tickPadding: 8 }}
+        theme={nivoTheme(theme)}
+        animate={!reducedMotion}
+        tooltip={({ indexValue, value }) => (
+          <span>
+            {String(indexValue)}: {formatNumber(Math.round(Number(value)))} h
+          </span>
+        )}
+      />
+    </div>
   );
 }

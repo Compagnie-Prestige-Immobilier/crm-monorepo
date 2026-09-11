@@ -3,7 +3,6 @@ package prospects
 import (
 	"context"
 	"cpi-go/db"
-	"cpi-go/internal/qualification"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
@@ -636,7 +635,6 @@ type ProspectCallAttempt struct {
 	PerformedByName           string  `json:"performedByName"`
 	ClientCreatedAt           string  `json:"clientCreatedAt"`
 	DureeTraitementSecondes   *int32  `json:"dureeTraitementSecondes"`
-	HasNoteVocale             bool    `json:"hasNoteVocale"`
 }
 
 type ProspectCallAttemptsOutput struct {
@@ -662,19 +660,12 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 	if err != nil {
 		return nil, err
 	}
-	notes, err := qualification.NoteRacine()
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = notes.Close() }()
 	out := &ProspectCallAttemptsOutput{}
 	out.Body.Items = make([]ProspectCallAttempt, 0, len(lignes))
 	for i := range lignes {
 		l := &lignes[i]
-		_, statErr := notes.Stat(qualification.NoteNom(l.ID))
 		out.Body.Items = append(out.Body.Items, ProspectCallAttempt{
-			HasNoteVocale: statErr == nil,
-			ID:            l.ID, Outcome: string(l.Outcome), ReasonLabel: l.ReasonLabel, Method: prospectEnum(l.Method),
+			ID: l.ID, Outcome: string(l.Outcome), ReasonLabel: l.ReasonLabel, Method: prospectEnum(l.Method),
 			Comment: l.Comment, Email: l.Email, Fonctionnaire: l.Fonctionnaire,
 			EngagementEnCours: l.EngagementEnCours, DureeEtablissementMois: l.DureeEtablissementMois,
 			RendezVousAt: prospectISOPtr(l.RendezVousAt), DeviceCallType: l.DeviceCallType,

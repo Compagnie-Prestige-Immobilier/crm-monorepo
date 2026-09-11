@@ -4,6 +4,7 @@ import { compteDe, type RoleCompte } from './comptes';
 import {
   compter,
   creerBanque,
+  creerInscriptionValidee,
   creerProspectEnrole,
   ecrire,
   effacerBanque,
@@ -11,7 +12,7 @@ import {
   marque,
   numero,
 } from './donnees-admin';
-import { nationalDe, sansDebordementHorizontal } from './donnees-chues';
+import { sansDebordementHorizontal } from './donnees-chues';
 
 const banquier = compteDe('BANQUE_FINANCE');
 const administrateur = compteDe('ADMIN');
@@ -20,25 +21,21 @@ const cle = marque();
 const NOM_BANQUE = `Banque ${cle} parite`;
 const NOM_CLIENT = `Sow${cle}`;
 const NOM_DEMANDE = `Absent${cle}`;
-const REFERENCE = `PAR-${cle}`;
 const MOTIF_REFUS = `Numéro à revérifier avec l’agence. ${cle}`;
 const TELEPHONE_DEMANDE = '78 110 00 01';
 
 let banqueId = '';
 let dossierId = '';
-let telephoneEligible = '';
+let reference = '';
+let inscriptionAwa = '';
 let telephoneEnAttente = '';
 
-async function semerClient(prenom: string): Promise<string> {
+async function semerClient(prenom: string): Promise<{ id: string; telephone: string }> {
   const telephone = numero();
   const entree = { nom: NOM_CLIENT, prenom, telephone, banqueId, proprietaireId: banquier.id };
-  await creerProspectEnrole(entree);
-  return telephone;
+  const id = await creerProspectEnrole(entree);
+  return { id, telephone };
 }
-
-/** Le résultat de recherche porte aussi le téléphone et la banque : préfixe. */
-const resultat = (page: Page, prenom: string): Locator =>
-  page.getByRole('button', { name: new RegExp(`^${prenom} ${NOM_CLIENT}`, 'u') });
 
 const etatVide = (page: Page, titre: string): Locator =>
   page.getByRole('heading', { name: titre, level: 2 });
@@ -51,20 +48,21 @@ async function sansGesteDArbitrage(carte: Locator): Promise<void> {
   }
 }
 
-async function dossier(reference: string) {
-  return ligne<{ id: string; amountXof: string | null; code: string }>(
-    `SELECT c.id, c."amountXof", s.code
+async function dossierDInscription(inscriptionId: string) {
+  return ligne<{ id: string; reference: string; amountXof: string | null; code: string }>(
+    `SELECT c.id, c.reference, c."amountXof", s.code
        FROM bank_cases c JOIN bank_case_stages s ON s.id = c."currentStageId"
-      WHERE c.reference = $1`,
-    [reference],
+      WHERE c."inscriptionId" = $1`,
+    [inscriptionId],
   );
 }
 
 test.beforeAll(async () => {
   banqueId = await creerBanque(NOM_BANQUE);
-  telephoneEligible = await semerClient('Awa');
+  const awa = await semerClient('Awa');
   await semerClient('Bineta');
-  telephoneEnAttente = await semerClient('Coumba');
+  const coumba = await semerClient('Coumba');
+  telephoneEnAttente = coumba.telephone;
   // Une contrainte lie le statut à la méthode : la fiche encore en attente ne
   // se sème pas autrement, et c'est elle qui doit rester invisible.
   await ecrire(
@@ -72,10 +70,27 @@ test.beforeAll(async () => {
       WHERE "phoneE164" = $1`,
     [telephoneEnAttente],
   );
+  inscriptionAwa = await creerInscriptionValidee({
+    nom: NOM_CLIENT,
+    prenom: 'Awa',
+    telephone: awa.telephone,
+    prospectId: awa.id,
+  });
+  // Validée sur la plateforme mais sans prospect rapproché : la banque la voit, sans pouvoir l'ouvrir.
+  await creerInscriptionValidee({
+    nom: NOM_CLIENT,
+    prenom: 'Coumba',
+    telephone: numero(),
+    prospectId: null,
+  });
 });
 
 test.afterAll(async () => {
-  await ecrire(`DELETE FROM notifications WHERE body LIKE $1`, [`%${NOM_DEMANDE}%`]);
+  await ecrire(`DELETE FROM notifications WHERE body LIKE $1 OR body LIKE $2`, [
+    `%${NOM_DEMANDE}%`,
+    `%${NOM_BANQUE}%`,
+  ]);
+  await ecrire(`DELETE FROM inscriptions_plateforme WHERE nom = $1`, [NOM_CLIENT]);
   await effacerBanque(banqueId);
 });
 
@@ -96,6 +111,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
 
   test('les deux listes vides ne disent pas la même chose', async ({ page }) => {
     await page.goto('/chues/dossiers');
+    await page.getByRole('tab', { name: 'Liste' }).click();
     await expect(page.getByRole('heading', { name: 'Dossiers bancaires', level: 1 })).toBeVisible();
     // D'autres parcours ouvrent des dossiers en même temps : l'état « rien du tout » ne se voit
     // que si la base n'en a aucun ; l'état filtré, lui, se provoque toujours.
@@ -103,72 +119,75 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
       (await compter('SELECT count(*) AS n FROM bank_cases WHERE "deletedAt" IS NULL', [])) === 0
     ) {
       await expect(etatVide(page, 'Aucun dossier bancaire')).toBeVisible();
-      await expect(page.getByText('Ouvrez un dossier depuis « Nouveau dossier ».')).toBeVisible();
+      await expect(
+        page.getByText('Ouvrez un dossier depuis « À ouvrir (plateforme) ».'),
+      ).toBeVisible();
     }
 
     await page.getByLabel('Recherche').fill(`ZZZ-${cle}`);
     await expect(page).toHaveURL(new RegExp(`search=ZZZ-${cle}`, 'u'));
-    await expect(etatVide(page, 'Aucun dossier ne correspond à ces critères')).toBeVisible();
+    await expect(etatVide(page, 'Aucun dossier ne correspond à ces filtres')).toBeVisible();
     await expect(page.getByText('Élargissez la période ou retirez un critère.')).toBeVisible();
   });
 
-  test('seule une fiche en méthode obtenue s’ouvre, la référence exigée', async ({ page }) => {
+  test('un dossier complet de la plateforme s’ouvre en un clic, référence générée', async ({
+    page,
+  }) => {
     await page.goto('/chues/dossiers/nouveau');
-    const recherche = page.getByLabel('Rechercher un client');
+    const carte = page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` });
+    await expect(carte.getByText('Validé', { exact: true })).toBeVisible();
+    await carte.getByRole('button', { name: 'Ouvrir le dossier' }).click();
+    await expect(page.getByText(/^Dossier CHUES-BF-\d{4}-\d{6} ouvert\.$/u)).toBeVisible();
 
-    await recherche.fill(telephoneEnAttente);
-    await expect(page.getByText('Aucun client ne correspond.')).toBeVisible();
-    await expect(resultat(page, 'Coumba')).toHaveCount(0);
-
-    await recherche.fill(NOM_CLIENT);
-    await expect(resultat(page, 'Awa')).toBeVisible();
-    await recherche.fill(nationalDe(telephoneEligible));
-    await resultat(page, 'Awa').click();
-    await expect(page.getByText('Nom et téléphone sont copiés sur le dossier.')).toBeVisible();
-
-    const reference = page.getByLabel('Référence bancaire');
-    const ouvrir = page.getByRole('button', { name: 'Ouvrir le dossier' });
-    await expect(reference).toHaveValue('');
-    await expect(page.getByText('Deux caractères au minimum. Référence unique.')).toBeVisible();
-    await expect(ouvrir).toBeDisabled();
-    await reference.fill('A');
-    await expect(ouvrir).toBeDisabled();
-
-    await reference.fill(REFERENCE);
-    await ouvrir.click();
-    await expect(page.getByText(`Dossier ${REFERENCE} ouvert.`)).toBeVisible();
-
-    const ouvert = await dossier(REFERENCE);
+    const ouvert = await dossierDInscription(inscriptionAwa);
     dossierId = ouvert.id;
+    reference = ouvert.reference;
+    expect(reference).toMatch(/^CHUES-BF-\d{4}-\d{6}$/u);
     expect(ouvert.code).toBe('A_TRAITER');
     expect(ouvert.amountXof, 'un dossier en instruction ne porte aucun montant').toBeNull();
     await expect(page).toHaveURL(new RegExp(`${ouvert.id}$`, 'u'));
+    await expect(page.getByText('Suivi par', { exact: true })).toBeVisible();
+    // Pas de rejet avant la prise en traitement.
+    await expect(page.getByRole('button', { name: 'Rejeter le dossier' })).toHaveCount(0);
   });
 
-  test('une référence déjà prise renvoie au dossier existant', async ({ page }) => {
+  test('une inscription déjà ouverte disparaît, une sans prospect reste fermée', async ({
+    page,
+  }) => {
     await page.goto('/chues/dossiers/nouveau');
-    await page.getByLabel('Rechercher un client').fill(NOM_CLIENT);
-    await resultat(page, 'Bineta').click();
-    await page.getByLabel('Référence bancaire').fill(REFERENCE);
-    await page.getByRole('button', { name: 'Ouvrir le dossier' }).click();
-
-    const alerte = page.getByRole('alert').filter({ hasText: 'existe déjà' });
-    await expect(alerte).toContainText(`La référence « ${REFERENCE} » existe déjà.`);
-    await alerte.getByRole('link', { name: 'Ouvrir ce dossier' }).click();
-    await expect(page).toHaveURL(new RegExp(`${dossierId}$`, 'u'));
-
+    await expect(page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` })).toHaveCount(
+      0,
+    );
+    const orpheline = page.getByRole('listitem').filter({ hasText: `Coumba ${NOM_CLIENT}` });
+    await expect(orpheline.getByText('Prospect inconnu')).toBeVisible();
+    await expect(orpheline.getByRole('button', { name: 'Ouvrir le dossier' })).toBeDisabled();
     expect(
-      await compter(`SELECT count(*) AS n FROM bank_cases WHERE reference = $1`, [REFERENCE]),
-      'le doublon refusé ne doit rien écrire',
+      await compter(`SELECT count(*) AS n FROM bank_cases WHERE "inscriptionId" = $1`, [
+        inscriptionAwa,
+      ]),
+      'une inscription ouvre un seul dossier',
     ).toBe(1);
+  });
+
+  test('le tableau glisse le dossier vers l’étape suivante', async ({ page }) => {
+    await page.goto('/chues/dossiers');
+    await page.getByRole('tab', { name: 'Tableau' }).click();
+    const carte = page.getByRole('button', { name: new RegExp(reference, 'u') });
+    await expect(carte).toBeVisible();
+    const cible = page.getByRole('region', { name: 'En traitement banque' });
+    const cadre = await cible.boundingBox();
+    if (cadre === null) throw new Error('colonne cible introuvable');
+
+    await carte.hover();
+    await page.mouse.down();
+    await page.mouse.move(cadre.x + cadre.width / 2, cadre.y + 80, { steps: 12 });
+    await page.mouse.up();
+    await expect(page.getByText(`${reference} passé à « En traitement banque ».`)).toBeVisible();
+    expect((await dossierDInscription(inscriptionAwa)).code).toBe('EN_TRAITEMENT_BANQUE');
   });
 
   test('l’encaissement refuse un montant nul puis verrouille le dossier', async ({ page }) => {
     await page.goto(`/chues/dossiers/${dossierId}`);
-    await page.getByRole('button', { name: 'Passer à « En traitement banque »' }).click();
-    await page.getByRole('button', { name: 'Confirmer', exact: true }).click();
-    await expect(page.getByText('Dossier passé à l’étape suivante.')).toBeVisible();
-
     await page.getByRole('button', { name: 'Déclarer l’encaissement' }).click();
     const boite = page.getByRole('dialog');
     const montant = boite.getByLabel('Montant encaissé');
@@ -184,7 +203,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     await montant.fill('1200000');
     await expect(boite.getByRole('status')).toHaveText(/^1.200.000 FCFA$/u);
     await confirmer.click();
-    await expect(page.getByText('Encaissement enregistré.')).toBeVisible();
+    await expect(page.getByText('Dossier passé à « Encaissé ».')).toBeVisible();
 
     const verrou = page.getByText('Étape terminale. Dossier verrouillé.');
     await expect(verrou).toBeVisible();
@@ -197,31 +216,35 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     await expect(verrou).toBeVisible();
     const histoire = page.getByRole('list').filter({ hasText: 'Ouverture :' });
     await expect(histoire.getByRole('listitem')).toHaveCount(3);
+    // Le courriel d'issue est tracé même sans transport configuré.
+    await expect(page.getByRole('heading', { name: 'Courriels', level: 2 })).toBeVisible();
+    await expect(page.getByText('Dossier bancaire encaissé', { exact: true })).toBeVisible();
 
-    const encaisse = await dossier(REFERENCE);
+    const encaisse = await dossierDInscription(inscriptionAwa);
     expect(encaisse.code).toBe('ENCAISSE');
     expect(encaisse.amountXof).toBe('1200000');
   });
 
   test('les vues rapides vivent dans l’URL et survivent au rechargement', async ({ page }) => {
     await page.goto('/chues/dossiers');
+    await page.getByRole('tab', { name: 'Liste' }).click();
     const decompte = page.getByRole('status').filter({ hasText: 'Dossiers affichés' });
     const encaisses = page.getByRole('button', { name: 'Encaissés', exact: true });
 
     await encaisses.click();
     await expect(page).toHaveURL(/stageType=CASHED/u);
-    await expect(page.getByRole('cell', { name: REFERENCE, exact: true })).toBeVisible();
-    await expect(decompte).toContainText('1–1 sur 1');
+    await expect(page.getByRole('cell', { name: reference, exact: true })).toBeVisible();
+    await expect(decompte).toContainText(/sur \d+/u);
 
     await page.reload();
     await expect(page).toHaveURL(/stageType=CASHED/u);
     await expect(encaisses).toHaveAttribute('aria-pressed', 'true');
-    await expect(decompte).toContainText('1–1 sur 1');
+    await expect(decompte).toContainText(/sur \d+/u);
 
     await page.getByRole('button', { name: 'À traiter', exact: true }).click();
     await expect(page).toHaveURL(/stageId=/u);
     // D'autres parcours ont des dossiers à traiter : le nôtre, encaissé, n'y est pas.
-    await expect(page.getByRole('cell', { name: REFERENCE, exact: true })).toHaveCount(0);
+    await expect(page.getByRole('cell', { name: reference, exact: true })).toHaveCount(0);
   });
 
   test('la vue d’ensemble chiffre l’encaissement et nomme une période vide', async ({ page }) => {
@@ -233,11 +256,14 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     // Le tableau des montants désigne la banque par son nom court, pas son nom.
     await expect(page.getByRole('rowheader', { name: new RegExp(cle, 'u') })).toBeVisible();
 
-    await page.getByLabel('Créé à partir du').fill('2031-01-01');
+    // Le sélecteur de date du panneau v1 n'est pas un champ texte : la période vit dans l'URL.
+    await page.goto('/chues/banque?dateFrom=2031-01-01');
     await expect(page).toHaveURL(/dateFrom=2031-01-01/u);
-    await expect(page.getByText('Aucun dossier rejeté sur ces critères.')).toBeVisible();
-    await expect(page.getByText('Aucune activité d’agent sur ces critères.')).toBeVisible();
-    await expect(page.getByRole('cell', { name: 'Aucun dossier sur ces critères.' })).toBeVisible();
+    await expect(page.getByText('Aucun dossier rejeté sur la période filtrée.')).toBeVisible();
+    await expect(page.getByText('Aucune activité d’agent sur la période filtrée.')).toBeVisible();
+    await expect(
+      page.getByRole('cell', { name: 'Aucun dossier sur la période filtrée.' }),
+    ).toBeVisible();
     // Un montant nul se lit ; il ne se devine pas dans une case vide.
     await expect(page.getByText('0 FCFA', { exact: true }).first()).toBeVisible();
 
@@ -252,13 +278,13 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     await page.goto('/chues/dossiers/export');
     await expect(page.getByText('Classeur des dossiers bancaires', { exact: true })).toBeVisible();
     await expect(page.getByText('Aucun filtre : tous les dossiers.')).toBeVisible();
-    const lien = page.getByRole('link', { name: 'Télécharger le classeur des dossiers bancaires' });
-    await expect(lien).toHaveAttribute('href', /projet=CHUES/u);
+    // Le panneau v1 génère le classeur par requête, pas par lien : le bouton suffit.
+    await expect(page.getByRole('button', { name: 'Télécharger le classeur' })).toBeEnabled();
 
     await page.getByRole('button', { name: 'Rejetés', exact: true }).click();
     await expect(page.getByText('1 filtre appliqué.')).toBeVisible();
     // Le classeur part des critères de l'URL, jamais de la page affichée.
-    await expect(lien).toHaveAttribute('href', /stageType=REJECTED/u);
+    await expect(page).toHaveURL(/stageType=REJECTED/u);
   });
 });
 
@@ -326,14 +352,12 @@ test.describe('parité banque, les demandes de création de client', () => {
     await expect(valider).toHaveCount(0);
 
     await page.goto('/chues/dossiers/nouveau');
-    await page.getByLabel('Rechercher un client').fill(`Fatou ${NOM_DEMANDE}`);
-    await expect(page.getByText('Aucun client ne correspond.')).toBeVisible();
     await page.getByRole('button', { name: 'Demander la création du client' }).click();
 
     const depot = page.getByRole('dialog');
     const telephone = depot.getByLabel(/^Téléphone/u);
-    await expect(depot.getByLabel(/^Prénom/u)).toHaveValue('Fatou');
-    await expect(depot.getByLabel(/^Nom/u)).toHaveValue(NOM_DEMANDE);
+    await depot.getByLabel(/^Prénom/u).fill('Fatou');
+    await depot.getByLabel(/^Nom/u).fill(NOM_DEMANDE);
     await expect(telephone).toHaveValue('');
     await depot.getByRole('combobox', { name: 'Banque demandeuse' }).click();
     await page.getByRole('option', { name: NOM_BANQUE }).click();
@@ -379,12 +403,12 @@ test.describe('parité banque, les demandes de création de client', () => {
       await carteDemande(arbitre).getByRole('button', { name: 'Refuser' }).click();
 
       const boite = arbitre.getByRole('dialog');
-      const confirmer = boite.getByRole('button', { name: 'Refuser', exact: true });
+      const confirmer = boite.getByRole('button', { name: 'Refuser la demande' });
       await expect(confirmer, 'un refus muet renverrait la banque à son impasse').toBeDisabled();
       await boite.getByLabel(/^Motif du refus/u).fill(MOTIF_REFUS);
       await expect(confirmer).toBeEnabled();
       await confirmer.click();
-      const avis = arbitre.getByText('Demande refusée. Le motif est remonté à la banque.');
+      const avis = arbitre.getByText('Demande refusée. Le motif est remonté au demandeur.');
       await expect(avis).toBeVisible();
     } finally {
       await siege.close();

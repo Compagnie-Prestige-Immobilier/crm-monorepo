@@ -66,7 +66,11 @@ function required<T>(value: T | undefined, what: string): T {
 }
 
 export async function adminApi(): Promise<APIRequestContext> {
-  return request.newContext({ baseURL: WEB_URL, storageState: ADMIN_STORAGE_STATE });
+  return request.newContext({
+    baseURL: WEB_URL,
+    storageState: ADMIN_STORAGE_STATE,
+    extraHTTPHeaders: { Origin: WEB_URL },
+  });
 }
 
 /**

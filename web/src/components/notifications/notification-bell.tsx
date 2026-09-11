@@ -1,13 +1,21 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellIcon, CheckCheckIcon, CheckIcon, InboxIcon } from 'lucide-react';
+import {
+  BellIcon,
+  CheckCheckIcon,
+  CheckIcon,
+  InboxIcon,
+  Volume2Icon,
+  VolumeXIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useLive } from '@/components/live/use-live';
+import { useSignalArrivee } from '@/components/notifications/notification-signal';
 import { CATEGORY_LABELS } from '@/components/notifications/types';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -20,8 +28,6 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   bellLabel,
   fetchInbox,
-  hasNewArrival,
-  inboxSignature,
   markAllNotificationsRead,
   markNotificationRead,
   unreadBadgeLabel,
@@ -34,13 +40,46 @@ import { queryKeys } from '@/lib/query-keys';
 import { navigationRetenue } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
+// Le halo remplace la pulsation pendant dix secondes après une arrivée : un événement, pas un état.
+function Pastille({
+  unreadCount,
+  halo,
+  swinging,
+}: {
+  unreadCount: number;
+  halo: boolean;
+  swinging: boolean;
+}) {
+  if (unreadCount === 0) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className={cn(
+        halo ? 'motion-safe:animate-halo' : 'motion-safe:animate-badge-pulse',
+        swinging && 'motion-safe:animate-rebond',
+        'absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.625rem] font-[700] leading-4 text-destructive-foreground tabular-nums',
+      )}
+    >
+      {unreadBadgeLabel(unreadCount)}
+    </span>
+  );
+}
+
+function BoutonSon({ son, onClick }: { son: boolean; onClick: () => void }) {
+  return (
+    <Button type="button" variant="ghost" size="sm" aria-pressed={son} onClick={onClick}>
+      {son ? <Volume2Icon aria-hidden="true" /> : <VolumeXIcon aria-hidden="true" />}
+      {son ? 'Son activé' : 'Son coupé'}
+    </Button>
+  );
+}
+
 export function NotificationBell({ href }: { href: string }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const live = useLive({ topic: 'notifications' });
 
   const [open, setOpen] = useState(false);
-  const [swinging, setSwinging] = useState(false);
 
   const { data, isPending, isError } = useQuery({
     queryKey: queryKeys.inbox,
@@ -50,22 +89,7 @@ export function NotificationBell({ href }: { href: string }) {
   });
 
   const unreadCount = data?.unreadCount ?? 0;
-
-  const previous = useRef<{ topId: string | null; unreadCount: number } | null>(null);
-  useEffect(() => {
-    const next = inboxSignature(data);
-    const arrived = hasNewArrival(previous.current, next);
-    previous.current = next;
-    if (!arrived) return;
-
-    setSwinging(true);
-    const timer = setTimeout(() => {
-      setSwinging(false);
-    }, 700);
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [data]);
+  const { swinging, halo, son, basculerSon } = useSignalArrivee(data, activate);
 
   const markRead = useMutation({
     mutationFn: (notificationId: string) => markNotificationRead(notificationId),
@@ -116,14 +140,7 @@ export function NotificationBell({ href }: { href: string }) {
           className={cn('size-5', swinging && 'motion-safe:animate-bell-swing')}
           aria-hidden="true"
         />
-        {unreadCount > 0 ? (
-          <span
-            aria-hidden="true"
-            className="motion-safe:animate-badge-pulse absolute -top-0.5 -right-0.5 inline-flex min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[0.625rem] font-[700] leading-4 text-destructive-foreground tabular-nums"
-          >
-            {unreadBadgeLabel(unreadCount)}
-          </span>
-        ) : null}
+        <Pastille unreadCount={unreadCount} halo={halo} swinging={swinging} />
       </DropdownMenuTrigger>
 
       <DropdownMenuContent align="end" className="w-[22rem] max-w-[calc(100vw-2rem)] p-0">
@@ -215,6 +232,7 @@ export function NotificationBell({ href }: { href: string }) {
           >
             Tout voir
           </Link>
+          <BoutonSon son={son} onClick={basculerSon} />
           <Button
             type="button"
             variant="ghost"

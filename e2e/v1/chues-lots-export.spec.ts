@@ -898,6 +898,7 @@ test.describe('campagne réglée par un superviseur', () => {
     const awa = await request.newContext({
       baseURL: WEB_URL,
       storageState: 'v1/.auth/commercial.json',
+      extraHTTPHeaders: { Origin: WEB_URL },
     });
     try {
       await lire(

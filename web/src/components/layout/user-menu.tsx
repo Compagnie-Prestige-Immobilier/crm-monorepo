@@ -1,13 +1,11 @@
 'use client';
 
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   ChevronDownIcon,
   FlaskConicalIcon,
-  HeadsetIcon,
   KeyRoundIcon,
   LogOutIcon,
-  PhoneCallIcon,
   UserIcon,
 } from 'lucide-react';
 import Link from 'next/link';
@@ -17,6 +15,7 @@ import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -26,43 +25,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { fetchOuvertureCourante, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { initials } from '@/lib/format';
-import { queryKeys } from '@/lib/query-keys';
-import { peutTenirUneFiche, ROLE_LABELS, type SessionUser } from '@/lib/types';
-import { useVerrouFiches } from '@/lib/use-verrou-fiches';
-import { ficheTenue } from '@/lib/use-verrou-navigation';
-
-/**
- * EB-08 : la fiche tenue se libère par une qualification, ou par un superviseur.
- * Se déconnecter la laisserait verrouillée sur le serveur, hors de vue.
- */
-const SOUS_VERROU =
-  'Vous avez une fiche en main. Qualifiez-la, ou demandez à un superviseur de la libérer.';
-
-/** L'écran où la fiche se reprend : les deux consoles rouvrent seules ce que le serveur tient. */
-const ecranDe = (ouverture: OuvertureFiche) =>
-  ouverture.representantId === null
-    ? { href: '/chues/console', Icone: HeadsetIcon }
-    : { href: '/chues/appels-representants', Icone: PhoneCallIcon };
+import { ROLE_LABELS, type SessionUser } from '@/lib/types';
 
 export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [pending, setPending] = useState<'workspace' | 'logout' | null>(null);
 
-  // EB-08 : `ficheTenue()` ne connaît le verrou que si une console est à
-  // l'écran. Après un rechargement sur une page tierce, seul le serveur sait
-  // encore que la fiche est en main.
-  const ouverture = useQuery({
-    queryKey: queryKeys.ouvertureCourante,
-    queryFn: () => fetchOuvertureCourante(),
-    enabled: peutTenirUneFiche(user.role),
-    refetchOnWindowFocus: true,
-  });
-  const tenue = ouverture.data ?? null;
-  const verrouActif = useVerrouFiches();
-  const sousVerrou = (): boolean => verrouActif && (ficheTenue() || tenue !== null);
   let workspaceLabel = 'Ouvrir l’espace démo';
   if (user.workspace === 'demo') workspaceLabel = 'Quitter l’espace démo';
   if (pending === 'workspace') workspaceLabel = 'Changement d’espace…';
@@ -70,10 +40,6 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
   async function switchWorkspace(): Promise<void> {
     // L'écran resterait sur la fiche, mais son ouverture appartient à l'espace
     // qu'on vient de quitter : la qualification n'aurait plus où atterrir.
-    if (sousVerrou()) {
-      toast.error(SOUS_VERROU);
-      return;
-    }
     setPending('workspace');
     try {
       const workspace = user.workspace === 'demo' ? 'public' : 'demo';
@@ -92,10 +58,6 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
   }
 
   async function signOut(): Promise<void> {
-    if (sousVerrou()) {
-      toast.error(SOUS_VERROU);
-      return;
-    }
     setPending('logout');
     try {
       // L'API efface elle-même le cookie de session : pas de relais Next entre les deux.
@@ -130,6 +92,7 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         <span className="hidden max-w-[10rem] truncate text-left text-[0.875rem] sm:block">
           {user.fullName}
         </span>
+        {user.workspace === 'public' ? null : <Badge variant="warning">{user.workspace}</Badge>}
         <ChevronDownIcon className="size-4 opacity-60" aria-hidden="true" />
       </DropdownMenuTrigger>
       <DropdownMenuContent className="w-60">
@@ -144,7 +107,6 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
           <UserIcon aria-hidden="true" />
           {ROLE_LABELS[user.role]}
         </DropdownMenuItem>
-        {tenue === null ? null : <FicheEnMain ouverture={tenue} />}
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/compte" />}>
           <KeyRoundIcon aria-hidden="true" />
@@ -179,19 +141,5 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
-  );
-}
-
-/** Le retour vers la fiche tenue : la refuser sans dire où elle est ferait chercher. */
-function FicheEnMain({ ouverture }: { ouverture: OuvertureFiche }) {
-  const { href, Icone } = ecranDe(ouverture);
-  return (
-    <>
-      <DropdownMenuSeparator />
-      <DropdownMenuItem render={<Link href={href} />}>
-        <Icone aria-hidden="true" />
-        <span className="truncate">Reprendre la fiche de {ouverture.ficheNom}</span>
-      </DropdownMenuItem>
-    </>
   );
 }

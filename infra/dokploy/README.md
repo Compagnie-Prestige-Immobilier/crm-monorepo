@@ -78,10 +78,20 @@ de Dokploy, et l'un des deux ne monterait pas.
 
 `provision` et `configure` créent et règlent une **troisième** application,
 `cpi-go` (`Dockerfile` à la racine, port 4000, volumes `cpi-go-db-dumps`
-partagé avec la v1, `cpi-go-notes-vocales` et `cpi-go-imports`). Elle ne
+partagé avec la v1, et `cpi-go-imports`). Elle ne
 reçoit que l'hôte d'essai `go-v2.cpi-chues.com` : les deux domaines de
 production restent sur `cpi-go-api` et `cpi-go-web`. Ajoutez l'enregistrement A
 `go-v2` et couvrez ce nom par le certificat d'origine, sinon l'essai répond 526.
+
+Une seconde base (démo, client) se crée sur le conteneur Postgres existant,
+puis se déclare dans l'environnement Dokploy de `cpi-go` par
+`DATABASE_URL_<NOM>` ; la page de connexion la propose derrière `Ctrl+Shift+D` :
+
+```bash
+docker exec -i <postgres> psql -U crm -d crm -c 'CREATE DATABASE crm_demo'
+docker exec -i <postgres> psql -U crm -d crm_demo -v ON_ERROR_STOP=1 -q < sql/schema.sql
+docker exec -e DATABASE_URL=postgresql://crm:<mdp>@<postgres>:5432/crm_demo <cpi-go> /cpi-go -seed
+```
 
 ```bash
 python3 infra/dokploy/deploy.py redeploy cpi-go   # mise en scène sur go-v2

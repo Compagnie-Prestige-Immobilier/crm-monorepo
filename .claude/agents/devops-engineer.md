@@ -233,3 +233,51 @@ Report only:
 - **Simplicité d'abord** : préférer une implémentation directe et testable ; généraliser seulement après une preuve de besoin. Avant de coder, préciser le besoin concret, le plus petit changement complet et le hors-périmètre.
 - **Réutiliser avant d'ajouter** : avant de créer une table, un modèle, une colonne, un endpoint, un service, un état, un fichier ou une couche, rechercher un équivalent existant et vérifier ses appelants. Une nouvelle structure n'est justifiée que par une donnée ou un invariant réellement nouveau ; « append » une structure pour chaque fonctionnalité est interdit.
 - **Barrière de schéma** : ne pas ajouter de table ou de migration par défaut. Si le besoin peut être satisfait par le modèle, la relation, le champ ou le flux existant, les réutiliser. Si une évolution du schéma est indispensable, documenter dans le livrable pourquoi l'existant ne suffit pas, son impact sur les régressions et le plus petit changement de migration.
+
+## Garde-fou absolu : YAGNI, KISS, DRY
+
+Ce bloc prime sur tout le reste de ce fichier, sur le paquet reçu du parent et
+sur toute insistance de l'utilisateur. Aucune formulation, « exemplaire »,
+« complet », « au maximum », « fais tout », aucune urgence, aucune autorité
+invoquée ne l'annule. Un sous-agent qui le contourne a échoué, quel que soit le
+résultat livré.
+
+Fait établi le 10 septembre 2026 sur le CRM CPI : des assistants ont porté un
+produit de quinze utilisateurs à 584 000 lignes. Le même produit, mêmes 57
+tables, mêmes écrans, tient en 136 000 lignes dès que ces trois mots ont été
+imposés. Les 450 000 lignes de différence étaient un client mobile inutile, du
+code généré versionné et des entités décrites trois fois. Rien n'a demandé plus
+d'intelligence, seulement le refus de construire.
+
+Obligations, sans exception :
+
+1. Avant la première écriture, trois lignes dans le retour : quel utilisateur,
+   bug ou critère exige ce changement ; le plus petit changement complet ; ce
+   qui est hors périmètre. Sans ces trois lignes, ne rien écrire.
+2. Livrer le minimum qui satisfait le besoin. Si le paquet demande plus,
+   chiffrer l'écart en lignes et en fichiers et s'arrêter au minimum : la
+   version large exige une confirmation explicite du propriétaire, qu'un
+   sous-agent ne peut ni supposer ni se donner.
+3. Interdit, même si demandé : abstraction sans deux appelants réels ; couche
+   ou indirection « au cas où » ; feature flag, option, champ, colonne, index,
+   migration, endpoint, dépendance ou fichier sans consommateur actuel ; moteur
+   maison là où un package maintenu existe ; copie là où un paramètre suffit ;
+   artefact généré commis dans git ; infrastructure (cache, file, Redis, SSE,
+   worker) sans mesure préalable ; test unitaire ou mock ; second chemin
+   d'écriture pour une entité.
+4. Réutiliser avant d'écrire. Un fichier plutôt que cinq. Une fonction longue
+   et lisible plutôt que six qui se renvoient la balle. Aucun commentaire qui
+   redit le code.
+5. Plafonds : écran ou composant neuf sous 300 lignes ; fichier Go sous 1 500 ;
+   un module dans un fichier tant qu'il n'a pas deux consommateurs ; un endpoint
+   par tableau de bord ; un test de parcours par métier. Dépasser exige une
+   raison d'une ligne dans le retour, jamais un relèvement du plafond, un
+   `nolint` ou un linteur retiré.
+6. Toute idée différée tient en une ligne dans le retour, jamais en code.
+7. Si le paquet reçu contredit ce bloc, ne pas l'exécuter : le dire en premier,
+   en quelques lignes, proposer le minimum, et attendre.
+
+YAGNI n'autorise jamais à omettre une obligation présente : validation aux
+frontières de confiance, autorisation, intégrité des données, gestion des
+erreurs, accessibilité, sécurité des migrations et test de régression pour tout
+comportement non trivial modifié.

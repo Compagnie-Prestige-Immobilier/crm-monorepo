@@ -14,7 +14,7 @@ db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sèm
 	@psql "$(DB)" -Atc 'select 1' >/dev/null 2>&1 || { \
 	  createdb cpi_v2_dev && psql "$(DB)" -v ON_ERROR_STOP=1 -q -f sql/schema.sql; }
 	SEED_ADMIN_EMAIL=$${SEED_ADMIN_EMAIL:-admin@cpi.sn} SEED_ADMIN_USERNAME=$${SEED_ADMIN_USERNAME:-admin} \
-	SEED_ADMIN_PASSWORD=$${SEED_ADMIN_PASSWORD:-admin-local-2026} go run ./cmd/server -seed
+	NODE_ENV=development SEED_ADMIN_PASSWORD=$${SEED_ADMIN_PASSWORD:-admin-local-2026} go run ./cmd/server -seed
 
 gen: ## sqlc, document OpenAPI, types du panneau
 	$(SQLC) generate

@@ -43,7 +43,7 @@ RUN apt-get update \
     && rm -f /etc/apt/sources.list.d/pgdg.list /usr/share/keyrings/pgdg.gpg \
     && rm -rf /var/lib/apt/lists/*
 RUN useradd --uid 10001 --create-home cpi \
-    && mkdir -p /repo/storage/db-dumps /repo/storage/notes-vocales /repo/storage/imports \
+    && mkdir -p /repo/storage/db-dumps /repo/storage/imports \
     && chown -R cpi:cpi /repo/storage
 WORKDIR /repo
 COPY --from=binaire /cpi-go /cpi-go

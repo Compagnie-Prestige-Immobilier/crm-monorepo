@@ -12,6 +12,15 @@ make build   # panneau embarqué + binaire ./cpi-go
 make e2e     # build puis parcours Playwright contre le binaire et la base locale
 ```
 
+Plusieurs bases sur le même Postgres : `DATABASE_URL` est la base `public`,
+chaque `DATABASE_URL_<NOM>` en ajoute une, choisie sur la page de connexion par
+`Ctrl+Shift+D`. Une base de plus se crée comme la première :
+
+```
+createdb cpi_v2_demo && psql cpi_v2_demo -v ON_ERROR_STOP=1 -q -f sql/schema.sql
+DATABASE_URL=postgres://localhost:5432/cpi_v2_demo?sslmode=disable go run ./cmd/server -seed
+```
+
 Drapeaux du binaire : `-openapi` (contrat sur stdout), `-roles` (matrice des
 rôles), `-seed` (référentiels, admin `SEED_ADMIN_*`, comptes de démonstration
 hors production), `-healthcheck`. Le panneau (`web/`) est embarqué : un

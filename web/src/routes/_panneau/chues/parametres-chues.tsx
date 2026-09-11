@@ -1,5 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { CourrielsCard } from '@/components/settings/courriels-card';
 import { ParametresChuesCard } from '@/components/settings/parametres-chues-card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
@@ -30,6 +31,7 @@ function ParametresChuesPage() {
   return (
     <div className="flex max-w-4xl flex-col gap-6">
       <ParametresChuesCard peutToutRegler={user.role === 'ADMIN'} />
+      {user.role === 'ADMIN' ? <CourrielsCard /> : null}
     </div>
   );
 }

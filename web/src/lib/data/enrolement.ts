@@ -11,6 +11,7 @@ export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
 export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];
 export type Tirage = Schemas['TirageDto'];
 export type Suppression = Schemas['SuppressionDto'];
+export type InscriptionDetail = Schemas['InscriptionPlateformeDetailDto'];
 
 /** L'onglet de l'écran, et le projet qu'il tire. Les deux ne se mélangent jamais. */
 export const ONGLETS_ENROLEMENT = ['chues', 'grand-public'] as const;
@@ -18,6 +19,9 @@ export type OngletEnrolement = (typeof ONGLETS_ENROLEMENT)[number];
 
 export const projetDeLOnglet = (onglet: OngletEnrolement): Projet =>
   onglet === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
+
+/** Les étages de l'entonnoir, tels que l'API les accepte. */
+export type Avancement = 'ouvert' | 'soumis' | 'decide';
 
 export interface FiltresInscriptions {
   page?: number | undefined;
@@ -28,6 +32,7 @@ export interface FiltresInscriptions {
   dateTo?: string | undefined;
   rapproche?: boolean | undefined;
   inclureDisparues?: boolean | undefined;
+  avancement?: Avancement | undefined;
 }
 
 const query = (filtres: FiltresInscriptions): Record<string, string | number | boolean> =>
@@ -45,6 +50,19 @@ export async function fetchInscriptions(
   return unwrap(
     await client.GET('/api/v1/enrolement/{projet}/inscriptions', {
       params: { path: { projet }, query: query(filtres) },
+    }),
+  );
+}
+
+/** Le détail porte la charge utile brute : le seul endroit où les champs que la plateforme envoie sans les décrire deviennent lisibles. */
+export async function fetchInscriptionDetail(
+  projet: Projet,
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<InscriptionDetail> {
+  return unwrap(
+    await client.GET('/api/v1/enrolement/{projet}/inscriptions/{id}', {
+      params: { path: { projet, id } },
     }),
   );
 }

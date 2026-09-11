@@ -39,10 +39,10 @@ function ConnexionPage() {
       <section className="relative hidden flex-col justify-center overflow-hidden bg-sidebar px-12 py-12 text-sidebar-foreground lg:flex">
         <Facade />
         <img
-          src="/brand/cpi-header.png"
+          src="/brand/cpi-header.webp"
           alt="CPI"
-          width={489}
-          height={200}
+          width={312}
+          height={128}
           className="absolute left-12 top-12 h-12 w-auto self-start"
         />
         <div className="max-w-lg">

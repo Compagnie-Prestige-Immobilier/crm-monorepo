@@ -34,7 +34,9 @@ export function InfoPopover({ label, description }: { label: string; description
       <PopoverContent align="start" sideOffset={6} className="w-80 p-3" initialFocus={pinned}>
         <div className="flex flex-col gap-1">
           <p className="text-[0.8125rem] font-[700] text-foreground">{label}</p>
-          <p className="text-[0.8125rem] leading-[1.55] text-muted-foreground">{description}</p>
+          <p className="whitespace-pre-line text-[0.8125rem] leading-[1.55] text-muted-foreground">
+            {description}
+          </p>
         </div>
       </PopoverContent>
     </Popover>
