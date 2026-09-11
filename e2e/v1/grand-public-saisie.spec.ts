@@ -88,6 +88,13 @@ async function saisirIdentite(
   await telephone.fill(identite.national);
 }
 
+/** La saisie se fait en trois étapes : les gestes d'envoi vivent sur la dernière. */
+async function allerAuxRevenus(portee: Page | Locator): Promise<void> {
+  const continuer = portee.getByRole('button', { name: 'Continuer', exact: true });
+  await continuer.click();
+  await continuer.click();
+}
+
 async function uneSeuleFiche(phone: string): Promise<Fiche> {
   const fiches = await fichesSurLeNumero(phone);
   expect(fiches, `une seule fiche doit porter ${phone}`).toHaveLength(1);
@@ -97,6 +104,7 @@ async function uneSeuleFiche(phone: string): Promise<Fiche> {
 test('GP-13 sans statut, la fiche se crée seule, sans appel', async ({ page }) => {
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.seule });
+  await allerAuxRevenus(page);
 
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
@@ -113,11 +121,13 @@ test('GP-15 un numéro déjà pris est refusé en nommant la fiche existante', a
   // derrière GP-13, ce scénario sauterait dès que GP-13 rougit.
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.doublon });
+  await allerAuxRevenus(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
   await expect(page).toHaveURL(/\/grand-public$/u);
 
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.doublon });
+  await allerAuxRevenus(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(
@@ -140,6 +150,7 @@ test('GP-14 un formulaire vide ne part pas au serveur', async ({ page }) => {
   });
 
   await page.goto('/grand-public/nouveau');
+  await allerAuxRevenus(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(page.getByText('Le nom est obligatoire.')).toBeVisible();
@@ -151,6 +162,7 @@ test('GP-14 un formulaire vide ne part pas au serveur', async ({ page }) => {
 test('GP-16 « Il refuse » crée la fiche puis consigne le refus', async ({ page }) => {
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.refus });
+  await allerAuxRevenus(page);
 
   await page.getByRole('button', { name: 'Il refuse', exact: true }).click();
 
@@ -164,6 +176,7 @@ test('GP-16 « Il refuse » crée la fiche puis consigne le refus', async ({ pag
 test('GP-17 « À rappeler » crée la fiche et pose l’échéance choisie', async ({ page }) => {
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.rappel });
+  await allerAuxRevenus(page);
 
   await page.getByRole('button', { name: 'À rappeler', exact: true }).click();
   await page.getByRole('button', { name: /Dans 1 h/u }).click();
@@ -185,6 +198,7 @@ test('GP-18 la boîte de la liste rafraîchit le tableau sans rechargement', asy
   await expect(boite.getByText('Le nom et le téléphone suffisent.', { exact: true })).toBeVisible();
 
   await saisirIdentite(boite, { prenom: PREFIXE, ...TEMOINS.boite });
+  await allerAuxRevenus(boite);
   await boite.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(boite).toHaveCount(0);
@@ -203,6 +217,7 @@ test('GP-19 les accents et l’apostrophe traversent la saisie sans se déformer
   const prenom = `${PREFIXE} Ndèye-Awa`;
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom, ...TEMOINS.accents });
+  await allerAuxRevenus(page);
 
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
   await expect(page).toHaveURL(/\/grand-public$/u);
@@ -262,6 +277,8 @@ test.describe('GP-21 largeur 375 px', () => {
       cadrePrenom!.y,
       'sous 640 px la grille sm:grid-cols-2 doit passer en une colonne',
     ).toBeGreaterThan(cadreNom!.y);
+
+    await allerAuxRevenus(page);
 
     for (const libelle of [
       'Enregistrer l’adhésion',

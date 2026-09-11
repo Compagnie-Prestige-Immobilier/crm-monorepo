@@ -13,6 +13,7 @@ import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire'
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
+import { ETAPES_APPEL, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -43,6 +44,7 @@ import {
   validateConversion,
   type AttemptDraft,
   type CallbackSlot,
+  type ChampReglable,
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
@@ -335,8 +337,11 @@ function EnTeteAnnuaire({
 }) {
   let texteAide: string;
   if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
-  else if (projet === 'GRAND_PUBLIC') texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
-  else texteAide = 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
+  else if (projet === 'GRAND_PUBLIC')
+    texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
+  else
+    texteAide =
+      'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
 
   return (
     <>
@@ -568,6 +573,8 @@ export function PanneauDossier({
   telephone,
   disabled,
   formulaire,
+  seulement,
+  envoiLien = true,
   onChange,
 }: {
   ouvert: boolean;
@@ -577,6 +584,8 @@ export function PanneauDossier({
   telephone?: SaisieTelephone | undefined;
   disabled: boolean;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
+  seulement?: readonly ChampReglable[] | undefined;
+  envoiLien?: boolean | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   if (!ouvert || conversion === null) return null;
@@ -587,7 +596,7 @@ export function PanneauDossier({
         Joignable · son dossier, et la manière dont il adhère
       </p>
 
-      <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+      {envoiLien ? <EnvoiLienFormulaire prospect={prospect} email={conversion.email} /> : null}
 
       <ConversionFields
         draft={conversion}
@@ -597,6 +606,7 @@ export function PanneauDossier({
         disabled={disabled}
         reglages={formulaire.champs}
         libres={formulaire.libres}
+        seulement={seulement}
         onChange={onChange}
       />
     </>
@@ -788,6 +798,8 @@ export function Consignation({
   const [freeCallback, setFreeCallback] = useState('');
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Grand Public seul : l'appel se consigne en trois étapes, la console CHUES reste d'un bloc.
+  const [etapeAppel, setEtapeAppel] = useState(0);
 
   const formulaire = useChampsConversion(projet);
   const motifs = useQuery({
@@ -860,11 +872,12 @@ export function Consignation({
       const problem = validateAttempt(draft, Date.now(), choisi.requiresComment);
       if (problem !== null) {
         toast.error(problem);
+        if (statutParSelect && choisi.requiresComment) setEtapeAppel(2);
         return;
       }
       send.mutate(draft);
     },
-    [closed, send, comment, ouverture],
+    [closed, send, comment, ouverture, statutParSelect],
   );
 
   const ouvrirDossier = useCallback(() => {
@@ -884,13 +897,16 @@ export function Consignation({
     );
     setConversionErrors(problems);
     const adhesion = statutAdhesion(motif, catalogue);
-    if (Object.keys(problems).length > 0 || conversion.method === null) return;
+    if (Object.keys(problems).length > 0 || conversion.method === null) {
+      if (statutParSelect) setEtapeAppel(1);
+      return;
+    }
     if (adhesion === undefined) {
       toast.error('Le statut « Méthode obtenue » est désactivé dans les listes de référence.');
       return;
     }
     record(adhesion, conversion.method, null, conversion);
-  }, [conversion, formulaire, motif, catalogue, record]);
+  }, [conversion, formulaire, motif, catalogue, record, statutParSelect]);
 
   const startCallback = useCallback(() => {
     if (closed) return;
@@ -1043,6 +1059,133 @@ export function Consignation({
     },
   });
 
+  function corpsAppel(): React.ReactNode {
+    // Grand Public seul : Joignable, puis le dossier, puis l'issue. L'étape se
+    // choisit par indice, sans condition.
+    const tranches = [
+      <>
+        {surStatut ? (
+          <SelectStatut
+            catalogue={statutsDuGroupe(groupe, catalogue)}
+            motif={motif}
+            disabled={send.isPending || closed}
+            onChange={poserStatut}
+            onFerme={() => {
+              if (motif?.requiresComment) commentRef.current?.focus();
+            }}
+          />
+        ) : null}
+
+        <ChoixIssue
+          etape={etape}
+          groupe={groupe}
+          proposes={proposes}
+          motif={motif}
+          disabled={send.isPending}
+          onGroupe={choisirGroupe}
+          onMotif={choisir}
+        />
+      </>,
+      <>
+        <PanneauDossier
+          ouvert={etape === 'dossier'}
+          prospect={prospect}
+          conversion={conversion}
+          errors={conversionErrors}
+          disabled={send.isPending}
+          formulaire={formulaire}
+          onChange={(patch) => {
+            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+          }}
+        />
+
+        {conversion === null ? (
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Pas de dossier à remplir : poursuivez vers l’issue.
+          </p>
+        ) : null}
+      </>,
+      <>
+        {etape === 'echeance' && slots !== null ? (
+          <PanneauEcheance
+            slots={slots}
+            now={now}
+            freeCallback={freeCallback}
+            surDossier={conversion !== null}
+            disabled={send.isPending}
+            inputRef={callbackRef}
+            onChoisir={(at) => {
+              if (motif !== null) record(motif, null, at);
+            }}
+            onFreeCallback={setFreeCallback}
+            onValidate={validate}
+          />
+        ) : null}
+
+        {etape === null ? null : (
+          <Commentaire
+            value={comment}
+            obligatoirePour={commentaireExigePar(motif)}
+            inputRef={commentRef}
+            onChange={setComment}
+            onValidate={validate}
+          />
+        )}
+
+        <PiedAppel
+          etape={etape}
+          disabled={send.isPending}
+          statutPose={motif !== null}
+          onValidate={validate}
+          onAbandon={onAbandon}
+        />
+
+        <PiedDossier
+          ouvert={etape === 'dossier'}
+          disabled={send.isPending}
+          motifRefus={motifRefus}
+          onAdhesion={submitConversion}
+          onRefus={(refus) => {
+            setMotif(refus);
+            record(refus, null);
+          }}
+          onRappel={versLeRappel}
+          onAnnuler={() => {
+            setConversion(null);
+            setConversionErrors({});
+          }}
+        />
+      </>,
+    ];
+    return (
+      <section aria-label="Fiche courante" className="flex flex-col gap-4">
+        <EnTeteFiche
+          prospect={prospect}
+          nomComplet={nomComplet}
+          projet={projet}
+          closed={closed}
+          surDossier={etape === 'dossier'}
+        />
+
+        <EtapesProgression etapes={ETAPES_APPEL} courante={etapeAppel} onChoisir={setEtapeAppel} />
+
+        {tranches[etapeAppel]}
+
+        <PiedEtapes
+          courante={etapeAppel}
+          total={ETAPES_APPEL.length}
+          desactive={send.isPending}
+          onRetour={() => {
+            setEtapeAppel(etapeAppel - 1);
+          }}
+          onSuite={() => {
+            setEtapeAppel(etapeAppel + 1);
+          }}
+        />
+      </section>
+    );
+  }
+
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
@@ -1148,9 +1291,9 @@ export function Consignation({
         Revenir à la liste
       </Button>
 
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+      <ChronoDemarre demarre={departChrono} />
 
-      {corpsFiche()}
+      {statutParSelect ? corpsAppel() : corpsFiche()}
 
       <details
         open={helpOpen}
@@ -1237,6 +1380,12 @@ export function PiedDossier({
       </p>
     </>
   );
+}
+
+/** Le chronomètre ne tourne qu'une fois la saisie commencée. */
+function ChronoDemarre({ demarre }: { demarre: string | null }) {
+  if (demarre === null) return null;
+  return <Chrono firstInputAt={demarre} />;
 }
 
 /** L'identité de la fiche : qui on appelle, son numéro, et ce qu'on en sait. */
