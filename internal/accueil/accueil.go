@@ -183,8 +183,8 @@ func (s *service) referentielsVisite(ctx context.Context, in *ReferentielsVisite
 }
 
 type FiltresVisites struct {
-	From           string `query:"from" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
-	To             string `query:"to" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
+	From           string `query:"from" pattern:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"`
+	To             string `query:"to" pattern:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$"`
 	EntrepriseID   string `query:"entrepriseId" format:"uuid"`
 	DirectionID    string `query:"directionId" format:"uuid"`
 	DestinataireID string `query:"destinataireId" format:"uuid"`
@@ -635,8 +635,8 @@ func normaliserNomVisiteur(nom string) string {
 }
 
 type StatsVisitesInput struct {
-	From string `query:"from" pattern:"^\\d{4}-\\d{2}-\\d{2}$" required:"true"`
-	To   string `query:"to" pattern:"^\\d{4}-\\d{2}-\\d{2}$" required:"true"`
+	From string `query:"from" pattern:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$" required:"true"`
+	To   string `query:"to" pattern:"^[0-9]{4}-[0-9]{2}-[0-9]{2}$" required:"true"`
 }
 
 type StatBucket struct {

@@ -11,6 +11,7 @@ import type { Projet, ProspectFilters } from '@/lib/types';
 /** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
   session: ['session'] as const,
+  piecesDeposees: (inscriptionId: string) => ['pieces-deposees', inscriptionId] as const,
   reference: ['reference'] as const,
 
   prospectsRoot: ['prospects'] as const,

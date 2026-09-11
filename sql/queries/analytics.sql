@@ -88,3 +88,117 @@ VALUES ('supervision.creneaux', $1, $2, now())
 ON CONFLICT (key) DO UPDATE
   SET value = EXCLUDED.value, "updatedById" = EXCLUDED."updatedById", "updatedAt" = now()
 RETURNING "updatedAt";
+
+-- name: QualiteBaseRepresentants :one
+-- La base est eprouvee des qu'un appel a eu lieu : avant cela une fiche ne dit
+-- rien de sa valeur. « Joint » se lit sur l'effet du statut du referentiel,
+-- « productif » sur les prospects que le representant a reellement apportes.
+SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE r."lastCallAt" IS NOT NULL)::int AS eprouves,
+  COUNT(*) FILTER (
+    WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+  )::int AS joints,
+  COUNT(*) FILTER (WHERE apport.prospects > 0)::int AS productifs,
+  COALESCE(SUM(apport.prospects), 0)::int AS prospects_apportes
+FROM "representants" r
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
+LEFT JOIN LATERAL (
+  SELECT COUNT(*)::int AS prospects
+  FROM "prospects" p
+  WHERE p."representantId" = r."id" AND p."deletedAt" IS NULL
+) apport ON TRUE
+WHERE r."deletedAt" IS NULL;
+
+-- name: RepresentantsParStatut :many
+SELECT
+  COALESCE(sq."code", 'NON_QUALIFIE')::text AS code,
+  COALESCE(sq."label", 'Non qualifié')::text AS label,
+  COALESCE(sq."effect"::text, '')::text AS effect,
+  COUNT(*)::int AS count
+FROM "representants" r
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
+WHERE r."deletedAt" IS NULL
+GROUP BY 1, 2, 3, sq."sortOrder"
+ORDER BY sq."sortOrder" NULLS FIRST;
+
+-- name: QualiteParDepartement :many
+SELECT
+  d."id",
+  d."name" AS label,
+  COUNT(r."id")::int AS fiches,
+  COUNT(r."id") FILTER (
+    WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+  )::int AS joints,
+  COALESCE(SUM(apport.prospects), 0)::int AS prospects
+FROM "departements" d
+JOIN "representants" r ON r."departementId" = d."id" AND r."deletedAt" IS NULL
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
+LEFT JOIN LATERAL (
+  SELECT COUNT(*)::int AS prospects
+  FROM "prospects" p
+  WHERE p."representantId" = r."id" AND p."deletedAt" IS NULL
+) apport ON TRUE
+GROUP BY d."id", d."name"
+ORDER BY fiches DESC, label ASC;
+
+-- name: ChampsRenseignesRepresentants :one
+SELECT
+  COUNT(*) FILTER (WHERE NULLIF(BTRIM(r."prenom"), '') IS NOT NULL)::int AS prenom,
+  COUNT(*) FILTER (WHERE NULLIF(BTRIM(r."etablissement"), '') IS NOT NULL)::int AS etablissement,
+  COUNT(*) FILTER (WHERE NULLIF(BTRIM(r."profession"), '') IS NOT NULL)::int AS profession,
+  COUNT(*) FILTER (WHERE NULLIF(BTRIM(r."syndicat"), '') IS NOT NULL)::int AS syndicat,
+  COUNT(*) FILTER (WHERE r."iefId" IS NOT NULL)::int AS ief,
+  COUNT(*) FILTER (WHERE r."whatsappStatus" <> 'NON_DEMANDE')::int AS whatsapp
+FROM "representants" r
+WHERE r."deletedAt" IS NULL;
+
+-- name: QualiteMarketing :one
+-- Ce que valent les prospects qu'un canal nous amene : ils repondent, et ils
+-- se convertissent. « Joint » exclut les deux issues qui ferment sans reponse.
+SELECT
+  COUNT(*)::int AS total,
+  COUNT(*) FILTER (WHERE p."canalProvenanceId" IS NOT NULL)::int AS avec_canal,
+  COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS eprouves,
+  COUNT(*) FILTER (
+    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
+  )::int AS joints,
+  COUNT(*) FILTER (WHERE p."statut" = 'CONVERTI')::int AS convertis
+FROM "prospects" p
+WHERE p."deletedAt" IS NULL;
+
+-- name: MarketingParCanal :many
+SELECT
+  c."id",
+  c."code",
+  c."label",
+  COUNT(p."id")::int AS prospects,
+  COUNT(p."id") FILTER (
+    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
+  )::int AS joints,
+  COUNT(p."id") FILTER (WHERE p."statut" = 'CONVERTI')::int AS convertis
+FROM "canaux_provenance" c
+JOIN "prospects" p ON p."canalProvenanceId" = c."id" AND p."deletedAt" IS NULL
+GROUP BY c."id", c."code", c."label", c."position"
+ORDER BY prospects DESC, c."position";
+
+-- name: ProspectsParMotifDAppel :many
+-- Le motif que le teleconseiller a choisi au dernier appel, tel qu'il est
+-- defini dans les listes de reference. Une fiche jamais appelee n'a pas de
+-- motif : elle n'a pas encore ete eprouvee.
+SELECT
+  COALESCE(r."label", 'Jamais appelé')::text AS label,
+  COALESCE(r."effect"::text, '')::text AS effect,
+  COUNT(*)::int AS count
+FROM "prospects" p
+LEFT JOIN LATERAL (
+  SELECT c."reasonId"
+  FROM "call_attempts" c
+  WHERE c."prospectId" = p."id"
+  ORDER BY c."createdAt" DESC
+  LIMIT 1
+) dernier ON TRUE
+LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
+WHERE p."deletedAt" IS NULL
+GROUP BY 1, 2, r."sortOrder"
+ORDER BY count DESC;

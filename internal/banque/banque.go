@@ -1323,31 +1323,35 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 }
 
 var Garde = map[string][]socle.Role{
-	"GET /api/v1/bank-cases":                    socle.Banque,
-	"POST /api/v1/bank-cases":                   socle.Banque,
-	"GET /api/v1/bank-cases/a-ouvrir":           socle.Banque,
-	"GET /api/v1/bank-cases/analytics":          socle.Banque,
-	"GET /api/v1/bank-cases/prospect-search":    socle.Banque,
-	"GET /api/v1/bank-cases/rejection-reasons":  socle.Banque,
-	"GET /api/v1/bank-cases/{id}":               socle.Banque,
-	"PATCH /api/v1/bank-cases/{id}":             socle.Banque,
-	"POST /api/v1/bank-cases/{id}/transitions":  socle.Banque,
-	"POST /api/v1/bank-cases/{id}/corrections":  socle.AdminSeul,
-	"GET /api/v1/bank-case-stages":              socle.Banque,
-	"POST /api/v1/bank-case-stages":             socle.AdminSeul,
-	"POST /api/v1/bank-case-stages/reorder":     socle.AdminSeul,
-	"PATCH /api/v1/bank-case-stages/{id}":       socle.AdminSeul,
-	"POST /api/v1/bank-case-stages/{id}/active": socle.AdminSeul,
-	"POST /api/v1/client-requests":              socle.Banque,
-	"GET /api/v1/client-requests":               socle.Banque,
-	"GET /api/v1/client-requests/{id}":          socle.Banque,
-	"POST /api/v1/client-requests/{id}/approve": socle.AdminSeul,
-	"POST /api/v1/client-requests/{id}/reject":  socle.AdminSeul,
+	"GET /api/v1/bank-cases":                        socle.Banque,
+	"POST /api/v1/bank-cases":                       socle.Banque,
+	"GET /api/v1/bank-cases/a-ouvrir":               socle.Banque,
+	"GET /api/v1/bank-cases/analytics":              socle.Banque,
+	"GET /api/v1/bank-cases/prospect-search":        socle.Banque,
+	"GET /api/v1/bank-cases/rejection-reasons":      socle.Banque,
+	"GET /api/v1/bank-cases/{id}":                   socle.Banque,
+	"GET /api/v1/bank-inscriptions/{id}/pieces":     socle.Banque,
+	"GET /api/v1/bank-inscriptions/{id}/piece":      socle.Banque,
+	"GET /api/v1/bank-inscriptions/{id}/pieces.zip": socle.Banque,
+	"PATCH /api/v1/bank-cases/{id}":                 socle.Banque,
+	"POST /api/v1/bank-cases/{id}/transitions":      socle.Banque,
+	"POST /api/v1/bank-cases/{id}/corrections":      socle.AdminSeul,
+	"GET /api/v1/bank-case-stages":                  socle.Banque,
+	"POST /api/v1/bank-case-stages":                 socle.AdminSeul,
+	"POST /api/v1/bank-case-stages/reorder":         socle.AdminSeul,
+	"PATCH /api/v1/bank-case-stages/{id}":           socle.AdminSeul,
+	"POST /api/v1/bank-case-stages/{id}/active":     socle.AdminSeul,
+	"POST /api/v1/client-requests":                  socle.Banque,
+	"GET /api/v1/client-requests":                   socle.Banque,
+	"GET /api/v1/client-requests/{id}":              socle.Banque,
+	"POST /api/v1/client-requests/{id}/approve":     socle.AdminSeul,
+	"POST /api/v1/client-requests/{id}/reject":      socle.AdminSeul,
 }
 
 func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
 	huma.Get(api, "/api/v1/bank-cases", s.listerDossiers)
+	monterPieces(api, s)
 	posterBanque(api, "creer-dossier-bancaire", "/api/v1/bank-cases", s.creerDossier)
 	huma.Get(api, "/api/v1/bank-cases/a-ouvrir", s.inscriptionsAOuvrir)
 	huma.Get(api, "/api/v1/bank-cases/analytics", s.indicateursBanque)

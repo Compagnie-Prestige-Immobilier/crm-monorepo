@@ -227,3 +227,8 @@ INNER JOIN "prospects" p ON p."id" = c."prospectId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 LEFT JOIN "bank_rejection_reasons" r ON r."id" = c."rejectionReasonId"
 WHERE c."id" = $1;
+
+-- name: BankInscriptionPourPieces :one
+SELECT i."projet", i."identifiantDistant", i."chargeUtile"
+FROM "inscriptions_plateforme" i
+WHERE i."id" = $1;

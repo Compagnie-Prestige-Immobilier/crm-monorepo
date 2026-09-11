@@ -439,6 +439,35 @@ const SECTIONS: readonly NavSection[] = [
         onglet: '/chues/statistiques',
       },
       {
+        // Onglet « Pôle déploiement » du pilotage : la qualité de la base que
+        // les représentants nous remettent, pas une entrée de plus.
+        href: '/chues/pole-deploiement',
+        label: 'Pôle déploiement',
+        icon: UsersRoundIcon,
+        description: 'Véracité de la base représentants',
+        roles: ['ADMIN'],
+        hidden: true,
+        onglet: '/chues/statistiques',
+      },
+      {
+        href: '/chues/pole-enrolement',
+        label: 'Pôle enrôlement',
+        icon: PlugZapIcon,
+        description: 'Inscriptions CHUES et Grand Public',
+        roles: ['ADMIN'],
+        hidden: true,
+        onglet: '/chues/statistiques',
+      },
+      {
+        href: '/chues/pole-marketing',
+        label: 'Pôle marketing',
+        icon: MegaphoneIcon,
+        description: 'Qualité des prospects par canal de provenance',
+        roles: ['ADMIN'],
+        hidden: true,
+        onglet: '/chues/statistiques',
+      },
+      {
         // L'arbitrage des demandes déposées par les banques. Sans entrée de
         // menu, l'écran n'était atteignable qu'en tapant son URL, et la
         // demande d'une banque restait en attente indéfiniment.
