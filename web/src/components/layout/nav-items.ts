@@ -592,7 +592,7 @@ const SECTIONS: readonly NavSection[] = [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
         href: '/grand-public',
-        label: 'Grand Public',
+        label: 'Prospects',
         icon: UsersIcon,
         description: 'Créer, retrouver et suivre les prospects',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],

@@ -171,12 +171,12 @@ ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectGrandPublic :batchexec
 INSERT INTO "prospects" (
-  "id", "projet", "nom", "prenom", "phoneE164", "profession", "syndicatId", "banqueId",
+  "id", "projet", "nom", "prenom", "phoneE164", "email", "statut", "profession", "syndicatId", "banqueId",
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
   "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
   "createdById", "clientCreatedAt", "updatedAt"
-) VALUES (@id, 'GRAND_PUBLIC', @nom, @prenom, @phone_e164, sqlc.narg('profession'),
+) VALUES (@id, 'GRAND_PUBLIC', @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
           sqlc.narg('employeur'), sqlc.narg('type_contrat'), sqlc.narg('anciennete_mois'),

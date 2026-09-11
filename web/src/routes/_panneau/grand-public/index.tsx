@@ -34,9 +34,11 @@ function GrandPublicPage() {
   // Le superviseur travaille les fiches Grand Public ; seule la DIRECTION y lit.
   return (
     <GrandPublicProspectsView
+      viewerId={user.id}
       canCreate={user.role !== 'DIRECTION'}
       canExport={canExportProspects(user.role)}
       campaignScoped={user.role === 'COMMERCIAL'}
+      canFilterOrigine={user.role === 'COMMERCIAL' || user.role === 'CHARGE_CLIENTELE'}
     />
   );
 }

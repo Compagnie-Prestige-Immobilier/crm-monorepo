@@ -157,7 +157,7 @@ type Prospect struct {
 	ID                       string            `json:"id"`
 	Nom                      string            `json:"nom"`
 	Prenom                   string            `json:"prenom"`
-	PhoneE164                string            `json:"phoneE164"`
+	PhoneE164                *string           `json:"phoneE164"`
 	Rev                      int32             `json:"rev"`
 	Statut                   string            `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Projet                   string            `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
@@ -245,9 +245,9 @@ func prospectSegment(sigle, banqueCourte *string) *string {
 	return prospectPtr("BDD4")
 }
 
-func prospectNumeroWhatsapp(statut db.WhatsappStatus, whatsappE164 *string, phoneE164 string) *string {
+func prospectNumeroWhatsapp(statut db.WhatsappStatus, whatsappE164, phoneE164 *string) *string {
 	if statut == db.WhatsappStatusMEMENUMERO {
-		return &phoneE164
+		return phoneE164
 	}
 	if statut == db.WhatsappStatusAUTRENUMERO {
 		return whatsappE164
@@ -782,7 +782,7 @@ type ProspectConflictExisting struct {
 // unique partiel l'est ; l'identité civile d'une fiche d'autrui ne sort pas,
 // sinon ce 409 devient un annuaire interrogeable numéro par numéro.
 func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisateur, phoneE164 string, saufID *string) error {
-	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: phoneE164, SaufID: saufID})
+	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: &phoneE164, SaufID: saufID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -928,7 +928,7 @@ func (s *service) prospectInserer(ctx context.Context, u *socle.Utilisateur, id,
 	}
 	arg := db.InsertProspectParams{
 		ID: id, Nom: prospectDeref(prospectRogner(corps.Nom)), Prenom: prospectDeref(prospectRogner(corps.Prenom)),
-		PhoneE164: phoneE164, CreatedById: u.ID, ClientCreatedAt: saisieAt,
+		PhoneE164: &phoneE164, CreatedById: u.ID, ClientCreatedAt: saisieAt,
 		Statut: prospectStatutOuNouveau(corps.Statut), Projet: projet,
 		BanqueId: corps.BanqueID.valeur, SyndicatId: corps.SyndicatID.valeur,
 		RepresentantId: corps.RepresentantID, Type: prospectTypeEnum[db.ProspectType](prospectDeref(corps.Type)),
@@ -946,7 +946,7 @@ func (s *service) prospectInserer(ctx context.Context, u *socle.Utilisateur, id,
 		WhatsappStatus: db.WhatsappStatusNONDEMANDE,
 	}
 	statutWhatsapp, numero := prospectWhatsapp(
-		prospectWhatsappSaisi{numeroFourni: corps.WhatsappE164.fourni, numero: whatsapp}, nil, phoneE164)
+		prospectWhatsappSaisi{numeroFourni: corps.WhatsappE164.fourni, numero: whatsapp}, nil, &phoneE164)
 	if statutWhatsapp != nil {
 		arg.WhatsappStatus, arg.WhatsappE164 = *statutWhatsapp, numero
 	}
@@ -986,7 +986,7 @@ func prospectInstant(brut *string) (time.Time, error) {
 // du projet demandé, et la personne garde une seule fiche.
 func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, phoneE164 string, projet db.Projet, corps *ProspectBody) (*ProspectOutput, error) {
 	var aucune *ProspectOutput
-	existant, err := s.Q.ProspectRattachable(ctx, db.ProspectRattachableParams{Projet: projet, PhoneE164: phoneE164})
+	existant, err := s.Q.ProspectRattachable(ctx, db.ProspectRattachableParams{Projet: projet, PhoneE164: &phoneE164})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return aucune, nil
 	}
@@ -1062,7 +1062,7 @@ func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInpu
 }
 
 func (s *service) prospectMajAutorisee(ctx context.Context, u *socle.Utilisateur, existant *db.ProspectVivantRow, corps *ProspectBody, phoneE164 *string) error {
-	if phoneE164 != nil && *phoneE164 != existant.PhoneE164 {
+	if phoneE164 != nil && *phoneE164 != prospectDeref(existant.PhoneE164) {
 		if err := s.prospectTelephoneLibre(ctx, u, *phoneE164, &existant.ID); err != nil {
 			return err
 		}
@@ -1196,7 +1196,7 @@ func (s *service) prospectMajWhatsapp(maj *prospectMaj, corps *ProspectBody, exi
 	}
 	courant := existant.PhoneE164
 	if phoneE164 != nil {
-		courant = *phoneE164
+		courant = phoneE164
 	}
 	statut, retenu := prospectWhatsapp(
 		prospectWhatsappSaisi{numeroFourni: true, numero: numero}, existant.WhatsappE164, courant)
@@ -1217,7 +1217,7 @@ type prospectWhatsappSaisi struct {
 // NE LÈVE JAMAIS : des fiches portent un numéro WhatsApp saisi bien avant que le
 // statut n'existe. Le statut se déduit alors du numéro, et AUTRE_NUMERO sans
 // numéro retombe sur AUCUN pour tenir le CHECK de la table.
-func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant *string, phoneE164 string) (statut *db.WhatsappStatus, numero *string) {
+func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant, phoneE164 *string) (statut *db.WhatsappStatus, numero *string) {
 	if saisi.statut == nil && !saisi.numeroFourni {
 		return nil, nil
 	}
@@ -1238,11 +1238,11 @@ func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant *string, phoneE16
 	return statut, numero
 }
 
-func prospectDeduireWhatsapp(numero *string, phoneE164 string) db.WhatsappStatus {
+func prospectDeduireWhatsapp(numero, phoneE164 *string) db.WhatsappStatus {
 	if numero == nil {
 		return db.WhatsappStatusNONDEMANDE
 	}
-	if *numero == phoneE164 {
+	if *numero == prospectDeref(phoneE164) {
 		return db.WhatsappStatusMEMENUMERO
 	}
 	return db.WhatsappStatusAUTRENUMERO
@@ -1264,7 +1264,7 @@ func (s *service) prospectSupprimer(ctx context.Context, in *ProspectIDInput) (*
 	}
 	avant := map[string]string{
 		prospectChampNom: existant.Nom, socle.ProspectChampPrenom: existant.Prenom,
-		socle.ProspectChampPhone: existant.PhoneE164,
+		socle.ProspectChampPhone: prospectDeref(existant.PhoneE164),
 	}
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		if err := q.SoftDeleteProspect(ctx, in.ID); err != nil {

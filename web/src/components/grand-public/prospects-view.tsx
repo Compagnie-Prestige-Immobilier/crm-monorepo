@@ -23,6 +23,7 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { Absent } from '@/components/grand-public/absence';
+import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -142,17 +143,24 @@ function filtresLabel(activeCount: number): string {
 }
 
 export function GrandPublicProspectsView({
+  viewerId,
   canCreate,
   canExport,
   campaignScoped,
+  canFilterOrigine,
 }: {
+  /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
+  viewerId: string;
   canCreate: boolean;
   canExport?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
+  /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
+  canFilterOrigine?: boolean;
 }) {
   const canExporter = Boolean(canExport);
   const scopedParCampagnes = Boolean(campaignScoped);
+  const origineFiltrable = Boolean(canFilterOrigine);
   const { filters, setFilters, resetFilters } = useUrlFilters(FILTERS_ADAPTER);
   const telechargement = useFileDownload();
 
@@ -171,7 +179,7 @@ export function GrandPublicProspectsView({
 
   const list = useQuery({
     queryKey: grandPublicKeys.prospects(filters),
-    queryFn: () => fetchGrandPublicProspects(filters),
+    queryFn: () => fetchGrandPublicProspects(filters, viewerId),
     placeholderData: (previous) => previous,
   });
 
@@ -195,51 +203,14 @@ export function GrandPublicProspectsView({
             Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.
           </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/grand-public/rappels"
-            className={buttonVariants({ variant: 'outline', size: 'lg' })}
-          >
-            <ClockIcon aria-hidden="true" />
-            Voir les rappels
-          </Link>
-          {canExporter ? (
-            <Button
-              variant="outline"
-              size="lg"
-              disabled={telechargement.pending}
-              onClick={() => {
-                void telechargement.download({
-                  url: buildGrandPublicExportUrl(filters),
-                  fileName: grandPublicExportFileName(),
-                  failureMessage: 'L’export a échoué.',
-                });
-              }}
-            >
-              {telechargement.pending ? (
-                <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <FileSpreadsheetIcon aria-hidden="true" />
-              )}
-              Exporter
-            </Button>
-          ) : null}
-          {canCreate ? (
-            <>
-              <Link
-                href="/grand-public/console"
-                className={buttonVariants({ variant: 'outline', size: 'lg' })}
-              >
-                <PhoneCallIcon aria-hidden="true" />
-                Appeler les prospects
-              </Link>
-              <Button size="lg" onClick={() => setCreateOpen(true)}>
-                <PlusIcon aria-hidden="true" />
-                Nouveau prospect
-              </Button>
-            </>
-          ) : null}
-        </div>
+        <ActionsEnTete
+          filters={filters}
+          viewerId={viewerId}
+          canExporter={canExporter}
+          canCreate={canCreate}
+          telechargement={telechargement}
+          onCreate={() => setCreateOpen(true)}
+        />
       </div>
 
       <section
@@ -272,6 +243,14 @@ export function GrandPublicProspectsView({
 
         {filtersOpen ? (
           <div className="mt-5 flex flex-col gap-5 border-t border-border pt-5">
+            {origineFiltrable ? (
+              <FiltreOrigine
+                value={filters.origine}
+                onChange={(origine) => {
+                  setFilters({ origine });
+                }}
+              />
+            ) : null}
             <FilterCombobox
               label="Canal de provenance"
               placeholder="Tous les canaux"
@@ -359,6 +338,74 @@ export function GrandPublicProspectsView({
           <GrandPublicProspectForm embedded onSaved={() => setCreateOpen(false)} />
         </DialogContent>
       </Dialog>
+    </div>
+  );
+}
+
+/**
+ * L'export ne connaît pas l'attribution de campagne : sous ce critère le
+ * classeur serait plus large que la liste, et le bouton s'efface.
+ */
+function ActionsEnTete({
+  filters,
+  viewerId,
+  canExporter,
+  canCreate,
+  telechargement,
+  onCreate,
+}: {
+  filters: GrandPublicFilters;
+  viewerId: string;
+  canExporter: boolean;
+  canCreate: boolean;
+  telechargement: ReturnType<typeof useFileDownload>;
+  onCreate: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Link
+        href="/grand-public/rappels"
+        className={buttonVariants({ variant: 'outline', size: 'lg' })}
+      >
+        <ClockIcon aria-hidden="true" />
+        Voir les rappels
+      </Link>
+      {canExporter && filters.origine !== 'CAMPAGNE' ? (
+        <Button
+          variant="outline"
+          size="lg"
+          disabled={telechargement.pending}
+          onClick={() => {
+            void telechargement.download({
+              url: buildGrandPublicExportUrl(filters, viewerId),
+              fileName: grandPublicExportFileName(),
+              failureMessage: 'L’export a échoué.',
+            });
+          }}
+        >
+          {telechargement.pending ? (
+            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <FileSpreadsheetIcon aria-hidden="true" />
+          )}
+          Exporter
+        </Button>
+      ) : null}
+      {canCreate ? (
+        <>
+          <Link
+            href="/grand-public/console"
+            className={buttonVariants({ variant: 'outline', size: 'lg' })}
+          >
+            <PhoneCallIcon aria-hidden="true" />
+            Appeler les prospects
+          </Link>
+          <Button size="lg" onClick={onCreate}>
+            <PlusIcon aria-hidden="true" />
+            Nouveau prospect
+          </Button>
+        </>
+      ) : null}
     </div>
   );
 }
@@ -549,7 +596,7 @@ function Row({ prospect }: { prospect: ProspectRow }) {
     <TableRow>
       <TableCell>
         <Link
-          href={`/grand-public/${prospect.id}`}
+          href={`/grand-public/appel/${prospect.id}`}
           className="block min-w-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           <span className="block truncate font-[600] underline-offset-2 hover:underline">

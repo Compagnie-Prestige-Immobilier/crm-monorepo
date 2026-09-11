@@ -2,6 +2,7 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { fetchMesAttributions } from '@/lib/data/attributions';
 import { flattenPage, toFilterQuery, type ProspectQuery } from '@/lib/api/query-params';
 import { createProspect, type CreateProspectInput } from '@/lib/data/prospects';
 import { DEFAULT_PAGE_SIZE, EMPTY_FILTERS, PAGE_SIZE_OPTIONS } from '@/lib/filters';
@@ -50,8 +51,23 @@ export function formatDureeMois(mois: number): string {
   return `${String(ans)} an${ans > 1 ? 's' : ''} (${String(mois)} mois)`;
 }
 
+/**
+ * D'où la fiche vient pour CELUI QUI LA LIT : de sa propre saisie, ou d'une
+ * campagne qui la lui a confiée. `TOUS` ne distingue pas.
+ */
+export const ORIGINES_FICHE = ['TOUS', 'MOI', 'CAMPAGNE'] as const;
+
+export type OrigineFiche = (typeof ORIGINES_FICHE)[number];
+
+export const ORIGINE_FICHE_LABELS: Record<OrigineFiche, string> = {
+  TOUS: 'Toutes',
+  MOI: 'Ajoutés par moi',
+  CAMPAGNE: 'Issus d’une campagne',
+};
+
 export interface GrandPublicFilters {
   search: string;
+  origine: OrigineFiche;
   type: ProspectType | null;
   canalProvenanceId: string | null;
   statut: ProspectStatut | null;
@@ -63,6 +79,7 @@ export interface GrandPublicFilters {
 
 export const EMPTY_GRAND_PUBLIC_FILTERS: GrandPublicFilters = {
   search: '',
+  origine: 'TOUS',
   type: null,
   canalProvenanceId: null,
   statut: null,
@@ -78,6 +95,7 @@ export function parseGrandPublicFilters(
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
     search: readString(params, 'search') ?? '',
+    origine: readEnum<OrigineFiche>(params, 'origine', ORIGINES_FICHE) ?? 'TOUS',
     type: readEnum<ProspectType>(params, 'type', PROSPECT_TYPES),
     canalProvenanceId: readString(params, 'canalProvenanceId'),
     statut: readEnum<ProspectStatut>(params, 'statut', PROSPECT_STATUTS),
@@ -97,6 +115,7 @@ export function serializeGrandPublicFilters(filters: GrandPublicFilters): URLSea
   };
 
   put('search', filters.search.trim());
+  if (filters.origine !== 'TOUS') put('origine', filters.origine);
   put('type', filters.type);
   put('canalProvenanceId', filters.canalProvenanceId);
   put('statut', filters.statut);
@@ -115,6 +134,7 @@ function grandPublicFiltersKey(filters: GrandPublicFilters): string {
 export function countGrandPublicFilters(filters: GrandPublicFilters): number {
   let count = 0;
   if (filters.search.trim() !== '') count += 1;
+  if (filters.origine !== 'TOUS') count += 1;
   if (filters.type !== null) count += 1;
   if (filters.canalProvenanceId !== null) count += 1;
   if (filters.statut !== null) count += 1;
@@ -127,7 +147,7 @@ export function countGrandPublicFilters(filters: GrandPublicFilters): number {
  * les fiches CHUES. Les bornes de date passent par `toFilterQuery`, seul endroit
  * qui sait que la journée métier se ferme à 23:59:59.999 heure de Dakar.
  */
-function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
+function toGrandPublicQuery(filters: GrandPublicFilters, viewerId: string): ProspectQuery {
   const base = toFilterQuery({
     ...EMPTY_FILTERS,
     search: filters.search,
@@ -141,6 +161,7 @@ function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
     projet: GRAND_PUBLIC,
     ...(filters.type === null ? {} : { type: filters.type }),
     ...(filters.canalProvenanceId === null ? {} : { canalProvenanceId: filters.canalProvenanceId }),
+    ...(filters.origine === 'MOI' ? { commercialId: viewerId } : {}),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: 'clientCreatedAt',
@@ -148,12 +169,58 @@ function toGrandPublicQuery(filters: GrandPublicFilters): ProspectQuery {
   };
 }
 
+/**
+ * Le balayage que « Issus d'une campagne » demande. L'API ne sait pas filtrer
+ * sur l'attribution : on lit le portefeuille par tranches et on garde les
+ * fiches attribuées. La borne évite qu'un gros portefeuille tienne l'écran.
+ */
+const CAMPAGNE_TRANCHE = 200;
+const CAMPAGNE_TRANCHES_MAX = 10;
+
+async function fetchProspectsDeCampagne(
+  filters: GrandPublicFilters,
+  client: ApiClient,
+): Promise<Paginated<ProspectRow>> {
+  const { prospectIds, tout } = await fetchMesAttributions(client);
+  // Rien n'est confié à l'encadrement : le critère ne le concerne pas, et lui
+  // rendre une liste vide lui ferait croire que ses campagnes sont vides.
+  if (tout) return fetchGrandPublicProspects({ ...filters, origine: 'TOUS' }, '', client);
+  const attribues = new Set(prospectIds);
+  const retenus: ProspectRow[] = [];
+
+  for (let tranche = 1; tranche <= CAMPAGNE_TRANCHES_MAX; tranche += 1) {
+    const query = toGrandPublicQuery({ ...filters, origine: 'TOUS' }, '');
+    const payload = unwrap(
+      await client.GET('/api/v1/prospects', {
+        params: {
+          query: { ...query, mesFiches: true, page: tranche, pageSize: CAMPAGNE_TRANCHE },
+        },
+      }),
+    );
+    retenus.push(...payload.items.filter((prospect) => attribues.has(prospect.id)));
+    if (tranche >= payload.meta.pageCount) break;
+  }
+
+  const debut = (filters.page - 1) * filters.pageSize;
+  return {
+    items: retenus.slice(debut, debut + filters.pageSize),
+    total: retenus.length,
+    page: filters.page,
+    pageSize: filters.pageSize,
+    pageCount: Math.max(1, Math.ceil(retenus.length / filters.pageSize)),
+  };
+}
+
 export async function fetchGrandPublicProspects(
   filters: GrandPublicFilters,
+  viewerId: string,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
+  if (filters.origine === 'CAMPAGNE') return fetchProspectsDeCampagne(filters, client);
   const payload = unwrap(
-    await client.GET('/api/v1/prospects', { params: { query: toGrandPublicQuery(filters) } }),
+    await client.GET('/api/v1/prospects', {
+      params: { query: toGrandPublicQuery(filters, viewerId) },
+    }),
   );
   return flattenPage(payload);
 }

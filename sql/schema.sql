@@ -1490,7 +1490,6 @@ CREATE INDEX "ouvertures_fiche_representantId_openedAt_idx" ON public.ouvertures
 
 CREATE INDEX "ouvertures_fiche_updatedAt_id_idx" ON public.ouvertures_fiche USING btree ("updatedAt", id);
 
-CREATE UNIQUE INDEX ouvertures_fiche_verrou_unique ON public.ouvertures_fiche USING btree ("openedById") WHERE ("closedAt" IS NULL);
 
 CREATE UNIQUE INDEX pays_code_key ON public.pays USING btree (code);
 

@@ -51,7 +51,7 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 			". Le prospect est transmis à l’équipe enrôlement.",
 		Lignes: [][2]string{
 			{"Client", client},
-			{"Téléphone", r.PhoneE164},
+			{"Téléphone", texteOuNonRenseigne(r.PhoneE164)},
 			{"Courriel", texteOuNonRenseigne(r.Email)},
 			{"Banque", texteOuNonRenseigne(r.BanqueName)},
 			{"Méthode d’enrôlement", methode},

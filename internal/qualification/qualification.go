@@ -1144,14 +1144,14 @@ func qualificationWhatsappProspect(b *QualificationCallAttemptBody, courant *db.
 	return &pose, true, saisi, nil
 }
 
-func qualificationDeduireWhatsapp(statut, numero *string, phoneE164 string) string {
+func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 	if statut != nil {
 		return *statut
 	}
 	if numero == nil {
 		return "NON_DEMANDE"
 	}
-	if *numero == phoneE164 {
+	if phoneE164 != nil && *numero == *phoneE164 {
 		return "MEME_NUMERO"
 	}
 	return qualificationAutreNumero

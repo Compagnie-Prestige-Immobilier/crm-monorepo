@@ -707,8 +707,19 @@ type colonneImport struct {
 }
 
 type dispositionFeuilleImport struct {
+	// Nul : le premier onglet, quel que soit son nom. Un classeur exporté d'un
+	// outil tiers s'appelle « Sheet1 », et le renommer n'est pas au programme.
 	motif       *regexp.Regexp
 	ligneEntete int
+}
+
+// Les données commencent SOUS l'en-tête. Sans disposition, les colonnes se lisent
+// à leur rang et le modèle réserve ses deux premières lignes au titre.
+func premiereLigneDonneesImport(disposition *dispositionFeuilleImport) int {
+	if disposition == nil {
+		return PremiereLigneImport
+	}
+	return disposition.ligneEntete + 1
 }
 
 type classeurImport struct {
@@ -757,7 +768,7 @@ func lignesDeclareesImport(fichier *excelize.File, feuille string) *int32 {
 
 func (c *classeurImport) parcourir(sur func(ligne int, cellules map[string]string) error) error {
 	feuilles := c.fichier.GetSheetList()
-	if c.adaptateur.feuilles == nil {
+	if c.adaptateur.feuilles == nil || c.adaptateur.feuilles.motif == nil {
 		return c.parcourirFeuille(feuilles[0], false, sur)
 	}
 	apparies := 0
@@ -784,12 +795,13 @@ func (c *classeurImport) parcourirFeuille(nom string, nomme bool, sur func(int, 
 	defer func() { _ = lignes.Close() }()
 
 	disposition := c.adaptateur.feuilles
+	premiere := premiereLigneDonneesImport(disposition)
 	var rangs []int
 	numero := 0
 	for lignes.Next() {
 		numero++
 		entete := disposition != nil && numero == disposition.ligneEntete
-		if !entete && numero < PremiereLigneImport {
+		if !entete && numero < premiere {
 			continue
 		}
 		cellules, err := lignes.Columns(excelize.Options{RawCellValue: true})

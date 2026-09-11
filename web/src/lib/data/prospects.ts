@@ -3,6 +3,8 @@ import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage, toProspectQuery, type ProspectQuery } from '@/lib/api/query-params';
+import { fetchMesAttributions } from '@/lib/data/attributions';
+import type { OrigineFiche } from '@/lib/data/grand-public';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
@@ -36,9 +38,15 @@ const A_QUALIFIER_PAGE_SIZE = 20;
  * vaut pour tous les rôles, encadrement compris.
  */
 export async function fetchProspectsAQualifier(
-  criteres: { projet: Projet; search: string },
+  criteres: {
+    projet: Projet;
+    search: string;
+    origine?: OrigineFiche | undefined;
+    viewerId?: string | undefined;
+  },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
+  const origine = criteres.origine ?? 'TOUS';
   const query: ProspectQuery = {
     mesFiches: true,
     projet: criteres.projet,
@@ -47,8 +55,19 @@ export async function fetchProspectsAQualifier(
     sortOrder: 'asc',
     page: 1,
     pageSize: A_QUALIFIER_PAGE_SIZE,
+    ...(origine === 'MOI' && criteres.viewerId !== undefined
+      ? { commercialId: criteres.viewerId }
+      : {}),
   };
-  return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
+  const page = flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
+  if (origine !== 'CAMPAGNE') return page;
+
+  // L'API ne filtre pas sur l'attribution : la page servie est celle du
+  // portefeuille, on n'en garde que les fiches qu'une campagne a confiées.
+  const { prospectIds } = await fetchMesAttributions(client);
+  const attribues = new Set(prospectIds);
+  const items = page.items.filter((prospect) => attribues.has(prospect.id));
+  return { ...page, items, total: items.length, pageCount: 1 };
 }
 
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */

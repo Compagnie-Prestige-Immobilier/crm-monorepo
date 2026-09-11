@@ -299,6 +299,8 @@ var seedCanauxProvenance = []seedCanalProvenance{
 	{"TIKTOK", "TikTok", 10},
 	{"FACEBOOK", "Facebook", 20},
 	{"INSTAGRAM", "Instagram", 30},
+	{"FACEBOOK_INSTAGRAM", "Facebook / Instagram", 35},
+	{"MESSENGER", "Messenger", 45},
 	{"LINKEDIN", "LinkedIn", 40},
 	{"WHATSAPP", "WhatsApp", 50},
 	{"SITE_WEB", "Site web", 60},

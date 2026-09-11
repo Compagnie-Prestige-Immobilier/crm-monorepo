@@ -381,6 +381,7 @@ ON CONFLICT ("userId", "slot") DO UPDATE SET
 SELECT p."id", p."phoneE164", p."phase2Status", p."enrollmentMethod", p."rev", p."updatedAt"
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
+  AND p."phoneE164" IS NOT NULL
   AND (
     sqlc.arg('scope_all')::boolean
     OR p."createdById" = sqlc.arg('scope_user_id')::text

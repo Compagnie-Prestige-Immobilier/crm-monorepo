@@ -284,13 +284,13 @@ type RechercheProspectBanqueInput struct {
 }
 
 type ProspectBanque struct {
-	ID         string `json:"id"`
-	Nom        string `json:"nom"`
-	Prenom     string `json:"prenom"`
-	FullName   string `json:"fullName"`
-	PhoneE164  string `json:"phoneE164"`
-	BanqueID   string `json:"banqueId"`
-	BanqueName string `json:"banqueName"`
+	ID         string  `json:"id"`
+	Nom        string  `json:"nom"`
+	Prenom     string  `json:"prenom"`
+	FullName   string  `json:"fullName"`
+	PhoneE164  *string `json:"phoneE164"`
+	BanqueID   string  `json:"banqueId"`
+	BanqueName string  `json:"banqueName"`
 }
 
 type RechercheProspectBanqueOutput struct {

@@ -132,7 +132,7 @@ func (s *service) prospectAviserAdhesion(ctx context.Context, u *socle.Utilisate
 		offre = prospectAbsent
 	}
 	jetons := map[string]string{
-		"prenomNom": item.Prenom + " " + item.Nom, "telephone": item.PhoneE164,
+		"prenomNom": item.Prenom + " " + item.Nom, "telephone": prospectDeref(item.PhoneE164),
 		"date": formulaireDateLongue(quand.In(s.Cfg.TimeZone)), "offre": offre,
 		"paiement":       prospectLibellePaiement(corps.PaymentMode),
 		"montant":        prospectLibelleMontant(corps.AmountXof),

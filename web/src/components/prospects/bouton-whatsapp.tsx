@@ -30,6 +30,7 @@ export function BoutonWhatsApp({ prospect }: { prospect: ProspectRow }) {
   if (parametres.data === undefined || moi.data === undefined) return null;
 
   const numero = prospect.whatsappNumber ?? prospect.phoneE164;
+  if (numero === null) return null;
   const texte = texteDuMessage(parametres.data.messageWhatsapp, {
     prenom: prospect.prenom,
     teleconseiller: moi.data.fullName,

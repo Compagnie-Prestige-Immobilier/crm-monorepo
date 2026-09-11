@@ -10,7 +10,9 @@ import { toast } from 'sonner';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
+import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
+import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -44,12 +46,7 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import {
-  enregistrerBrouillon,
-  fetchOuvertureCourante,
-  ouvrirFiche,
-  type OuvertureFiche,
-} from '@/lib/data/ouvertures';
+import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import {
   EFFET_ISSUE,
   estJoignable,
@@ -61,6 +58,7 @@ import {
   type ChampLibre,
   type ReglageChamp,
 } from '@/lib/data/champs-conversion';
+import type { OrigineFiche } from '@/lib/data/grand-public';
 import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -73,8 +71,6 @@ import {
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useVerrouFiches } from '@/lib/use-verrou-fiches';
-import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
@@ -117,25 +113,55 @@ const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'OTHER', label: 'Autre', effect: 'KEEP_OPEN', requiresComment: true },
 ].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
+/**
+ * Grand Public : l'injoignabilité ne passe plus par le référentiel. Ses motifs
+ * sont ceux de CHUES, figés, pour que l'ADMIN ne puisse pas vider l'écran.
+ */
+const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = MOTIFS_SYSTEME.filter(
+  (motif) => !estJoignable(motif),
+);
+
+/** Après « Joignable », le statut qui dit le contraire n'a plus de sens. */
+const CODE_INJOIGNABLE = 'UNREACHABLE';
+
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
 const nouveauHref = (projet: Projet): string =>
   projet === 'GRAND_PUBLIC' ? '/grand-public/nouveau' : '/chues/prospects/nouveau';
+
+/** Grand Public consigne l'appel sur son propre écran, le même que depuis la liste des fiches. */
+const appelHref = (projet: Projet, id: string): string | null =>
+  projet === 'GRAND_PUBLIC' ? `/grand-public/appel/${id}` : null;
+
+const CLASSE_CHOIX = cn(
+  'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
+  'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+);
 
 /**
  * Étape 3 : convertir un prospect. L'écran ouvre sur la recherche, la fiche
  * choisie reçoit l'appel, puis on revient à la liste. `?fiche=<id>` (depuis
  * les rappels) ouvre directement la fiche visée.
  */
-export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
+export function ConsoleView({
+  projet = 'CHUES',
+  viewerId,
+  origineFiltrable = false,
+}: {
+  projet?: Projet;
+  /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
+  viewerId?: string | undefined;
+  /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
+  origineFiltrable?: boolean | undefined;
+}) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const verrouActif = useVerrouFiches();
 
   const [ouverte, setOuverte] = useState<Ouverte | null>(null);
   const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
+  const [origine, setOrigine] = useState<OrigineFiche>('TOUS');
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
@@ -150,8 +176,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
-    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', projet, cherche] as const,
-    queryFn: () => fetchProspectsAQualifier({ projet, search: cherche }),
+    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', projet, cherche, origine] as const,
+    queryFn: () => fetchProspectsAQualifier({ projet, search: cherche, origine, viewerId }),
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
@@ -161,22 +187,6 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     setVise(null);
     setDemandee(null);
   }, []);
-
-  const reprendre = useCallback((prise: Ouverte) => {
-    setVise(null);
-    setDemandee(null);
-    setOuverte(prise);
-  }, []);
-
-  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
-  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
-  // est toujours tenue.
-  const repriseFaite = useRef(false);
-  useEffect(() => {
-    if (repriseFaite.current) return;
-    repriseFaite.current = true;
-    void reprendreOuverte(reprendre);
-  }, [reprendre]);
 
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
@@ -191,7 +201,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
       queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
     },
     onError: (error) => {
-      void reprendreOuverte(reprendre, error);
+      toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
@@ -202,7 +212,6 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
         projet={projet}
-        verrouActif={verrouActif}
         onAbandon={revenir}
         onEnregistre={(nom) => {
           setConfirme(nom);
@@ -221,28 +230,15 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
 
   return (
     <div className="flex w-full flex-col gap-5">
-      {demandee !== null && parLien.isError ? (
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-        >
-          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
-        </p>
-      ) : null}
-
-      {confirme === null ? null : (
-        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
-          Appel enregistré pour {confirme}.
-        </p>
-      )}
-
-      <ChampAnnuaire value={search} onChange={setSearch} />
-
-      <p className="text-[0.8125rem] text-muted-foreground">
-        {cherche === ''
-          ? 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.'
-          : 'Choisissez qui vous venez d’appeler.'}
-      </p>
+      <EnTeteAnnuaire
+        lienEnEchec={demandee !== null && parLien.isError}
+        confirme={confirme}
+        cherche={cherche}
+        search={search}
+        origine={origineFiltrable ? origine : null}
+        onSearch={setSearch}
+        onOrigine={setOrigine}
+      />
 
       <ListeAnnuaire
         annuaire={annuaire}
@@ -263,7 +259,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
           setDemandee(null);
         }}
         title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
-        description={descriptionOuverture(verrouActif)}
+        description={null}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -275,17 +271,65 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   );
 }
 
-/** La fiche et l'ouverture qui la verrouille. Nulle quand la fiche est close. */
+/**
+ * Ce qui précède la liste : l'avis d'un lien mort, la confirmation du dernier
+ * appel, la recherche et la provenance.
+ */
+function EnTeteAnnuaire({
+  lienEnEchec,
+  confirme,
+  cherche,
+  search,
+  origine,
+  onSearch,
+  onOrigine,
+}: {
+  lienEnEchec: boolean;
+  confirme: string | null;
+  cherche: string;
+  search: string;
+  /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
+  origine: OrigineFiche | null;
+  onSearch: (value: string) => void;
+  onOrigine: (value: OrigineFiche) => void;
+}) {
+  return (
+    <>
+      {lienEnEchec ? (
+        <p
+          role="alert"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
+        </p>
+      ) : null}
+
+      {confirme === null ? null : (
+        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
+          Appel enregistré pour {confirme}.
+        </p>
+      )}
+
+      <ChampAnnuaire value={search} onChange={onSearch} />
+
+      {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
+
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {cherche === ''
+          ? 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.'
+          : 'Choisissez qui vous venez d’appeler.'}
+      </p>
+    </>
+  );
+}
+
+/** La fiche et l'ouverture qui la mesure. Nulle quand la fiche est close. */
 interface Ouverte {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
-
-/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
-const descriptionOuverture = (verrouActif: boolean): string | null =>
-  verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
 
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
 const brouillonDe = (
@@ -339,10 +383,6 @@ function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
   return prospect.phase2Status !== 'PENDING' || refusee;
 }
 
-function ficheVerrouillee(ouverture: OuvertureFiche | null, closed: boolean): boolean {
-  return ouverture !== null && !closed;
-}
-
 function saisieCommencee(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
@@ -350,35 +390,6 @@ function saisieCommencee(
   comment: string,
 ): boolean {
   return conversion !== null || slots !== null || motif !== null || comment !== '';
-}
-
-/**
- * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
- * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
- * est tenue, que le serveur ne nomme pas.
- */
-async function reprendreOuverte(
-  reprendre: (prise: Ouverte) => void,
-  refus: unknown = null,
-): Promise<void> {
-  const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null) {
-    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
-    return;
-  }
-  if (courante.prospectId === null) {
-    toast.error(
-      `Vous avez ${courante.ficheNom} en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.`,
-    );
-    return;
-  }
-  const prospect = await fetchProspect(courante.prospectId).catch(() => null);
-  if (prospect === null) {
-    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
-    return;
-  }
-  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
-  reprendre({ prospect, ouverture: courante });
 }
 
 function ListeAnnuaire({
@@ -431,37 +442,51 @@ function ListeAnnuaire({
         </TableRow>
       </TableHeader>
       <TableBody>
-        {annuaire.data.items.map((row) => (
-          <TableRow key={row.id}>
-            <TableCell>
-              <button
-                type="button"
-                onClick={() => {
-                  onChoisir(row);
-                }}
-                className={cn(
-                  'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
-                  'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+        {annuaire.data.items.map((row) => {
+          const href = appelHref(projet, row.id);
+          return (
+            <TableRow key={row.id}>
+              <TableCell>
+                {href === null ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChoisir(row);
+                    }}
+                    className={CLASSE_CHOIX}
+                  >
+                    <NomProspect row={row} />
+                  </button>
+                ) : (
+                  <Link href={href} className={CLASSE_CHOIX}>
+                    <NomProspect row={row} />
+                  </Link>
                 )}
-              >
-                <span className="truncate">
-                  {row.nom} {row.prenom}
-                </span>
-                {row.phase2Status === 'PENDING' ? null : (
-                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[0.75rem] font-[400] text-muted-foreground">
-                    {PHASE2_STATUS_LABELS[row.phase2Status]}
-                  </span>
-                )}
-              </button>
-            </TableCell>
-            <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
-            <TableCell className="whitespace-nowrap text-muted-foreground">
-              {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
-            </TableCell>
-          </TableRow>
-        ))}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
+              </TableCell>
+            </TableRow>
+          );
+        })}
       </TableBody>
     </Table>
+  );
+}
+
+function NomProspect({ row }: { row: ProspectRow }) {
+  return (
+    <>
+      <span className="truncate">
+        {row.nom} {row.prenom}
+      </span>
+      {row.phase2Status === 'PENDING' ? null : (
+        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[0.75rem] font-[400] text-muted-foreground">
+          {PHASE2_STATUS_LABELS[row.phase2Status]}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -642,36 +667,56 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
  * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
  */
-type Etape = 'issues' | 'motifs' | 'dossier' | 'echeance' | null;
+type Etape = 'issues' | 'motifs' | 'statut' | 'dossier' | 'echeance' | null;
 
 function etapeCourante(
   closed: boolean,
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
   groupe: Groupe | null,
+  surStatut: boolean,
 ): Etape {
   if (closed) return null;
   if (slots !== null) return 'echeance';
   if (conversion !== null) return 'dossier';
+  if (surStatut) return 'statut';
   return groupe === null ? 'issues' : 'motifs';
+}
+
+/** Grand Public : « Joignable » mène au select de statut et à son dossier. */
+const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
+  statutParSelect && groupe === 'joignable';
+
+/** Les motifs du groupe ouvert ; Grand Public fige ceux de l'injoignabilité. */
+function motifsDuGroupe(
+  catalogue: readonly MotifAppel[],
+  groupe: Groupe | null,
+  statutParSelect: boolean,
+): readonly MotifAppel[] {
+  if (statutParSelect && groupe === 'injoignable') return MOTIFS_INJOIGNABLE;
+  return catalogue.filter((item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe);
 }
 
 /**
  * La consignation d'un appel, en deux temps : d'abord si la personne était
  * joignable, puis, si oui, son dossier et la manière dont elle adhère.
  */
-function Consignation({
+export function Consignation({
   prospect,
   ouverture,
   projet,
-  verrouActif,
+  statutParSelect = false,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
-  verrouActif: boolean;
+  /**
+   * Vrai : « Joignable » ouvre le dossier et son select de statut,
+   * « Injoignable » les motifs figés. Faux : les motifs du référentiel.
+   */
+  statutParSelect?: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -681,7 +726,11 @@ function Consignation({
 
   const [repris] = useState(() => lireBrouillon(ouverture?.draft));
   const [comment, setComment] = useState(repris.comment);
-  const [groupe, setGroupe] = useState<Groupe | null>(null);
+  // Un brouillon repris vient d'un appel où la personne répondait : la question
+  // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
+  const [groupe, setGroupe] = useState<Groupe | null>(
+    repris.conversion === null ? null : 'joignable',
+  );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
@@ -701,7 +750,6 @@ function Consignation({
   const nomComplet = nomDe(prospect);
   const closed = estFicheClose(prospect, refusee);
   const [now] = useState(() => Date.now());
-  const verrouille = verrouActif && ficheVerrouillee(ouverture, closed);
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -807,6 +855,26 @@ function Consignation({
     [closed, send.isPending, ouvrirDossier, startCallback, record],
   );
 
+  /**
+   * Le même choix, mais qui ne consigne rien : dans un select, la valeur se
+   * survole avant de se poser, et l'appel partirait sur un statut effleuré.
+   */
+  const poserStatut = useCallback(
+    (choisi: MotifAppel) => {
+      if (closed || send.isPending) return;
+      setMotif(choisi);
+      if (choisi.effect === 'CLOSE_METHOD') {
+        ouvrirDossier();
+        return;
+      }
+      setConversion(null);
+      setConversionErrors({});
+      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      else setSlots(null);
+    },
+    [closed, send.isPending, ouvrirDossier, startCallback],
+  );
+
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
   // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
@@ -826,14 +894,9 @@ function Consignation({
     if (motif !== null) record(motif, null);
   }, [conversion, submitConversion, slots, freeCallback, motif, record]);
 
-  const etape = etapeCourante(closed, conversion, slots, groupe);
+  const surStatut = surJoignable(groupe, statutParSelect);
+  const etape = etapeCourante(closed, conversion, slots, groupe, surStatut);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
-
-  const retenu = useCallback(() => {
-    toast.error('Consignez l’appel avant de quitter cette fiche.');
-  }, []);
-
-  useVerrouNavigation(verrouille, retenu);
 
   const annuler = useCallback(() => {
     // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
@@ -843,10 +906,7 @@ function Consignation({
       return;
     }
     if (!saisieEnCours) {
-      // EB-08 : la fiche ouverte ne se quitte pas sans issue. Seul l'envoi la
-      // referme, et le chronomètre s'arrête avec elle.
-      if (verrouille) retenu();
-      else onAbandon();
+      onAbandon();
       return;
     }
     setGroupe(null);
@@ -855,11 +915,14 @@ function Consignation({
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [slots, saisieEnCours, verrouille, retenu, onAbandon]);
+  }, [slots, saisieEnCours, onAbandon]);
 
-  const proposes = catalogue.filter(
-    (item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe,
-  );
+  const choisirGroupe = (choisi: Groupe): void => {
+    setGroupe(choisi);
+    if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
+  };
+
+  const proposes = motifsDuGroupe(catalogue, groupe, statutParSelect);
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
   const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
 
@@ -867,7 +930,7 @@ function Consignation({
     GROUPES.map((item) => [
       item.touche,
       () => {
-        setGroupe(item.cle);
+        choisirGroupe(item.cle);
       },
     ]),
   );
@@ -901,6 +964,7 @@ function Consignation({
   };
 
   let digitShortcuts = etape === 'motifs' ? motifShortcuts : groupeShortcuts;
+  if (etape === 'statut') digitShortcuts = {};
   if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: versLeRappel };
   if (etape === 'echeance') digitShortcuts = slotShortcuts;
 
@@ -912,12 +976,10 @@ function Consignation({
       copyPhone(prospect.phoneE164);
     },
     n: () => {
-      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
     r: () => {
-      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
     },
@@ -929,37 +991,21 @@ function Consignation({
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
+        <EnTeteFiche
+          prospect={prospect}
+          nomComplet={nomComplet}
+          projet={projet}
+          closed={closed}
+          surDossier={etape === 'dossier'}
+        />
 
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-            {formatPhone(prospect.phoneE164)}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              copyPhone(prospect.phoneE164);
-            }}
-          >
-            <CopyIcon aria-hidden="true" />
-            Copier
-            <Kbd>C</Kbd>
-          </Button>
-          {etape === 'dossier' ? null : <BoutonWhatsApp prospect={prospect} />}
-        </div>
-
-        <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
-        <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
-
-        {closed ? (
-          <div
-            role="status"
-            className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-          >
-            Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
-            consigner ici.
-          </div>
+        {surStatut ? (
+          <SelectStatut
+            catalogue={catalogue.filter((item) => item.code !== CODE_INJOIGNABLE)}
+            motif={motif}
+            disabled={send.isPending || closed}
+            onChange={poserStatut}
+          />
         ) : null}
 
         <PanneauDossier
@@ -980,7 +1026,7 @@ function Consignation({
           proposes={proposes}
           motif={motif}
           disabled={send.isPending}
-          onGroupe={setGroupe}
+          onGroupe={choisirGroupe}
           onMotif={choisir}
         />
 
@@ -1010,58 +1056,38 @@ function Consignation({
           />
         )}
 
-        {etape !== 'dossier' ? null : (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={submitConversion} disabled={send.isPending}>
-                Enregistrer l’adhésion
-                <Kbd>Entrée</Kbd>
-              </Button>
-              {motifRefus === undefined ? null : (
-                <Button
-                  variant="outline"
-                  disabled={send.isPending}
-                  onClick={() => {
-                    setMotif(motifRefus);
-                    record(motifRefus, null);
-                  }}
-                >
-                  Il refuse
-                </Button>
-              )}
-              <Button variant="outline" disabled={send.isPending} onClick={versLeRappel}>
-                À rappeler
-                <Kbd>{RAPPEL_KEY}</Kbd>
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={send.isPending}
-                onClick={() => {
-                  setConversion(null);
-                  setConversionErrors({});
-                }}
-              >
-                Annuler
-                <Kbd>Échap</Kbd>
-              </Button>
-            </div>
-            <p className="text-[0.8125rem] text-muted-foreground">
-              « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
-            </p>
-          </>
-        )}
+        <PiedAppel
+          etape={statutParSelect ? etape : null}
+          disabled={send.isPending}
+          onValidate={validate}
+          onAbandon={onAbandon}
+        />
+
+        <PiedDossier
+          ouvert={etape === 'dossier'}
+          disabled={send.isPending}
+          motifRefus={motifRefus}
+          onAdhesion={submitConversion}
+          onRefus={(refus) => {
+            setMotif(refus);
+            record(refus, null);
+          }}
+          onRappel={versLeRappel}
+          onAnnuler={() => {
+            setConversion(null);
+            setConversionErrors({});
+          }}
+        />
       </section>
     );
   }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      {verrouille ? null : (
-        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
-      )}
+      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+        <ArrowLeftIcon aria-hidden="true" />
+        Revenir à la liste
+      </Button>
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
@@ -1078,7 +1104,7 @@ function Consignation({
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
           {KEYBOARD_MAP.filter(
-            ([keys]) => (projet === 'CHUES' && !verrouille) || (keys !== 'N' && keys !== 'R'),
+            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
           ).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">
@@ -1089,6 +1115,140 @@ function Consignation({
           ))}
         </dl>
       </details>
+    </div>
+  );
+}
+
+/** Les quatre issues du dossier d'adhésion, une fois celui-ci rempli. */
+function PiedDossier({
+  ouvert,
+  disabled,
+  motifRefus,
+  onAdhesion,
+  onRefus,
+  onRappel,
+  onAnnuler,
+}: {
+  ouvert: boolean;
+  disabled: boolean;
+  motifRefus: MotifAppel | undefined;
+  onAdhesion: () => void;
+  onRefus: (motif: MotifAppel) => void;
+  onRappel: () => void;
+  onAnnuler: () => void;
+}) {
+  if (!ouvert) return null;
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onAdhesion} disabled={disabled}>
+          Enregistrer l’adhésion
+          <Kbd>Entrée</Kbd>
+        </Button>
+        {motifRefus === undefined ? null : (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => {
+              onRefus(motifRefus);
+            }}
+          >
+            Il refuse
+          </Button>
+        )}
+        <Button variant="outline" disabled={disabled} onClick={onRappel}>
+          À rappeler
+          <Kbd>{RAPPEL_KEY}</Kbd>
+        </Button>
+        <Button variant="ghost" disabled={disabled} onClick={onAnnuler}>
+          Annuler
+          <Kbd>Échap</Kbd>
+        </Button>
+      </div>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
+      </p>
+    </>
+  );
+}
+
+/** L'identité de la fiche : qui on appelle, son numéro, et ce qu'on en sait. */
+function EnTeteFiche({
+  prospect,
+  nomComplet,
+  projet,
+  closed,
+  surDossier,
+}: {
+  prospect: ProspectRow;
+  nomComplet: string;
+  projet: Projet;
+  closed: boolean;
+  surDossier: boolean;
+}) {
+  return (
+    <>
+      <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+          {formatPhone(prospect.phoneE164)}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            copyPhone(prospect.phoneE164);
+          }}
+        >
+          <CopyIcon aria-hidden="true" />
+          Copier
+          <Kbd>C</Kbd>
+        </Button>
+        {surDossier ? null : <BoutonWhatsApp prospect={prospect} />}
+      </div>
+
+      <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
+
+      {closed ? (
+        <div
+          role="status"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
+          consigner ici.
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Le pied des statuts qui n'ouvrent pas de dossier : eux n'ont pas les quatre
+ * boutons de l'adhésion, mais l'appel se consigne quand même.
+ */
+function PiedAppel({
+  etape,
+  disabled,
+  onValidate,
+  onAbandon,
+}: {
+  etape: Etape;
+  disabled: boolean;
+  onValidate: () => void;
+  onAbandon: () => void;
+}) {
+  if (etape !== 'statut' && etape !== 'echeance') return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button onClick={onValidate} disabled={disabled}>
+        Enregistrer l’appel
+        <Kbd>Entrée</Kbd>
+      </Button>
+      <Button variant="outline" disabled={disabled} onClick={onAbandon}>
+        Revenir à la liste
+      </Button>
     </div>
   );
 }
