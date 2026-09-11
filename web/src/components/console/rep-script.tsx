@@ -41,10 +41,9 @@ import {
   repRelationSettled,
   type RepAnswer,
 } from '@/lib/data/console';
-import { fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import { ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
-  fetchRepresentant,
   fetchRepresentantCallAttempts,
   fetchRepresentantsAQualifier,
   type ScriptedRepresentant,
@@ -69,8 +68,6 @@ import {
 } from '@/lib/representant-filters';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useVerrouFiches } from '@/lib/use-verrou-fiches';
-import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 /** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
@@ -168,10 +165,6 @@ function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
 }
 
 /** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
-function descriptionOuverture(verrouActif: boolean): string | null {
-  return verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
-}
-
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -189,7 +182,6 @@ function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null
  */
 export function RepScript() {
   const queryClient = useQueryClient();
-  const verrouActif = useVerrouFiches();
 
   const [choisi, setChoisi] = useState<Ouverte | null>(null);
   const [aConfirmer, setAConfirmer] = useState<ScriptedRepresentant | null>(null);
@@ -209,21 +201,6 @@ export function RepScript() {
   const liste = annuaire.data?.items ?? [];
   const pageCount = annuaire.data?.pageCount ?? 1;
 
-  const reprendre = useCallback((ouverte: Ouverte) => {
-    setAConfirmer(null);
-    setChoisi(ouverte);
-  }, []);
-
-  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
-  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
-  // est toujours tenue.
-  const repriseFaite = useRef(false);
-  useEffect(() => {
-    if (repriseFaite.current) return;
-    repriseFaite.current = true;
-    void reprendreOuverte(reprendre);
-  }, [reprendre]);
-
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
       representant: row,
@@ -236,7 +213,7 @@ export function RepScript() {
       queryClient.setQueryData(queryKeys.ouvertureCourante, ouverte.ouverture);
     },
     onError: (error) => {
-      void reprendreOuverte(reprendre, error);
+      toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
@@ -256,7 +233,6 @@ export function RepScript() {
         key={choisi.ouverture.id}
         representant={choisi.representant}
         ouverture={choisi.ouverture}
-        verrouActif={verrouActif}
         onAbandon={() => {
           setChoisi(null);
         }}
@@ -314,7 +290,7 @@ export function RepScript() {
         open={aConfirmer !== null}
         onOpenChange={fermerConfirmation}
         title={titreOuverture(aConfirmer)}
-        description={descriptionOuverture(verrouActif)}
+        description={null}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -326,39 +302,10 @@ export function RepScript() {
   );
 }
 
-/** La fiche ouverte et l'ouverture qui la verrouille : les deux vont ensemble. */
+/** La fiche ouverte et l'ouverture qui la mesure : les deux vont ensemble. */
 interface Ouverte {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
-}
-
-/**
- * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
- * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
- * est tenue, que le serveur ne nomme pas.
- */
-async function reprendreOuverte(
-  ouvrir: (ouverte: Ouverte) => void,
-  refus: unknown = null,
-): Promise<void> {
-  const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null) {
-    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
-    return;
-  }
-  if (courante.representantId === null) {
-    toast.error(
-      `Vous avez ${courante.ficheNom} en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.`,
-    );
-    return;
-  }
-  const representant = await fetchRepresentant(courante.representantId).catch(() => null);
-  if (representant === null) {
-    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
-    return;
-  }
-  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
-  ouvrir({ representant, ouverture: courante });
 }
 
 function ResultatsAnnuaire({
@@ -1192,13 +1139,11 @@ function reponseDe(etat: EtatReponse): RepAnswer {
 function Qualification({
   representant,
   ouverture,
-  verrouActif,
   onAbandon,
   onEnregistre,
 }: {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
-  verrouActif: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -1354,22 +1299,13 @@ function Qualification({
     if (valeur === 'INJOIGNABLE') setRappelAt(null);
   }
 
-  const retenu = useCallback(() => {
-    toast.error('Posez un statut de qualification avant de quitter cette fiche.');
-  }, []);
-
-  useVerrouNavigation(verrouActif, retenu);
-
   const reculer = useCallback(() => {
     setEtape((courante) => {
       if (courante === 2) return 1;
-      // EB-08 : verrou actif, la fiche ouverte ne se quitte pas sans statut. Seul
-      // « Enregistrer » la referme, et le chronomètre s'arrête avec elle.
-      if (verrouActif) retenu();
-      else onAbandon();
+      onAbandon();
       return 1;
     });
-  }, [retenu, verrouActif, onAbandon]);
+  }, [onAbandon]);
 
   useShortcuts(
     {
@@ -1484,7 +1420,7 @@ function Qualification({
         </Button>
       ) : null}
 
-      {etape === 1 && !verrouActif ? (
+      {etape === 1 ? (
         <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
           <ArrowLeftIcon aria-hidden="true" />
           Revenir à la liste

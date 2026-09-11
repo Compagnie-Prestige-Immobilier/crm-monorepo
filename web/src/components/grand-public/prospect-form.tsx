@@ -157,7 +157,7 @@ const DEPART_VIDE: Depart = {
 };
 
 function departDepuis(prospect: ProspectRow): Depart {
-  const principal = fromE164(prospect.phoneE164);
+  const principal = fromE164(prospect.phoneE164 ?? '');
   const whatsapp = prospect.whatsappE164;
   return {
     prenom: prospect.prenom,
@@ -231,7 +231,7 @@ function modifiablesDepuis(prospect: ProspectRow): Modifiables {
   return {
     nom: prospect.nom,
     prenom: prospect.prenom,
-    phone: prospect.phoneE164,
+    phone: prospect.phoneE164 ?? '',
     type: prospect.type,
     paymentMode: prospect.paymentMode,
     dureeSystemeMois: prospect.dureeSystemeMois,

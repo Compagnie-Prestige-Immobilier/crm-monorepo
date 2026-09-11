@@ -122,7 +122,7 @@ type CampagneResume struct {
 
 type CampagneTentative struct {
 	ID                     string  `json:"id"`
-	PhoneE164              string  `json:"phoneE164"`
+	PhoneE164              *string `json:"phoneE164"`
 	ShortCode              string  `json:"shortCode"`
 	Outcome                string  `json:"outcome"`
 	Method                 *string `json:"method"`
@@ -1004,7 +1004,7 @@ func (s *service) lotTentativesRecentes(ctx context.Context, row *db.LotParIdRow
 		tentatives := make([]CampagneTentative, 0, len(lignes))
 		for _, ligne := range lignes {
 			tentatives = append(tentatives, CampagneTentative{
-				ID: ligne.ID, PhoneE164: ligne.PhoneE164, Outcome: ligne.Outcome,
+				ID: ligne.ID, PhoneE164: &ligne.PhoneE164, Outcome: ligne.Outcome,
 				Comment: ligne.Comment, PerformedByName: ligne.PerformedByName,
 				CreatedAt: lotISO(ligne.CreatedAt),
 			})

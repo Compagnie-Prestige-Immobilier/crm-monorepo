@@ -26,5 +26,13 @@ function Loading() {
 
 /** La page `(panel)/grand-public/console` de la v1. */
 function GrandPublicConsolePage() {
-  return <ConsoleView projet="GRAND_PUBLIC" />;
+  const { user } = Route.useRouteContext();
+
+  return (
+    <ConsoleView
+      projet="GRAND_PUBLIC"
+      viewerId={user.id}
+      origineFiltrable={user.role === 'COMMERCIAL' || user.role === 'CHARGE_CLIENTELE'}
+    />
+  );
 }

@@ -254,7 +254,7 @@ export function ProspectEditDialog({
     reset({
       nom: prospect.nom,
       prenom: prospect.prenom,
-      phone: prospect.phoneE164,
+      phone: prospect.phoneE164 ?? '',
       banqueId: prospect.banqueId ?? '',
       syndicatId: prospect.syndicatId ?? '',
       representantId: prospect.representantId ?? '',

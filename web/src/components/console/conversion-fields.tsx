@@ -73,7 +73,7 @@ export function ConversionFields({
 }: {
   draft: ConversionDraft;
   errors: ConversionErrors;
-  phoneE164: string;
+  phoneE164: string | null;
   disabled: boolean;
   reglages: readonly ReglageChamp[];
   libres: readonly ChampLibre[];
@@ -427,7 +427,11 @@ export function ConversionFields({
       ) : null,
   };
 
-  const ordre = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
+  // Grand Public pose déjà la question dans « Situation », qui a son option
+  // fonctionnaire : la reposer en oui / non ferait deux réponses pour une.
+  const ordre = (
+    reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds)
+  ).filter((champ) => complet || champ !== 'fonctionnaire');
 
   return (
     <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>

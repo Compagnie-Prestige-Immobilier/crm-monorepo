@@ -54,7 +54,7 @@ type QualificationRappelDTO struct {
 	ProspectID     string  `json:"prospectId" format:"uuid"`
 	ShortCode      string  `json:"shortCode"`
 	ProspectName   string  `json:"prospectName"`
-	PhoneE164      string  `json:"phoneE164"`
+	PhoneE164      *string `json:"phoneE164"`
 	ScheduledAt    string  `json:"scheduledAt" format:"date-time"`
 	Comment        *string `json:"comment"`
 	AssignedToID   string  `json:"assignedToId" format:"uuid"`
@@ -63,9 +63,10 @@ type QualificationRappelDTO struct {
 }
 
 type qualificationRappelLigne struct {
-	ID, ProspectID, Prenom, Nom, Phone, AssigneID, AssigneNom string
-	Comment                                                   *string
-	Quand                                                     time.Time
+	ID, ProspectID, Prenom, Nom, AssigneID, AssigneNom string
+	Phone                                              *string
+	Comment                                            *string
+	Quand                                              time.Time
 }
 
 func qualificationRappelDTO(l *qualificationRappelLigne, maintenant time.Time) QualificationRappelDTO {
