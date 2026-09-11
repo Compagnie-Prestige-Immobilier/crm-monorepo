@@ -45,6 +45,7 @@ var (
 	balayageImportsEnCours    atomic.Bool
 	espacesRepetesImport      = regexp.MustCompile(`\s+`)
 	finDimensionFeuilleImport = regexp.MustCompile(`(\d+)$`)
+	scientifiqueImport        = regexp.MustCompile(`^\d(?:\.\d+)?[eE]\+?\d+$`)
 )
 
 var Garde = map[string][]socle.Role{
@@ -707,8 +708,20 @@ type colonneImport struct {
 }
 
 type dispositionFeuilleImport struct {
-	motif       *regexp.Regexp
-	ligneEntete int
+	motif                *regexp.Regexp
+	ligneEntete          int
+	premiereDonnee       int
+	repliPremiereFeuille bool
+	exemples             []string
+}
+
+// Sans disposition, l'en-tête et la ligne d'exemple du modèle sont sautés par
+// leur position.
+func (d *dispositionFeuilleImport) premiereLigne() int {
+	if d == nil || d.premiereDonnee == 0 {
+		return PremiereLigneImport
+	}
+	return d.premiereDonnee
 }
 
 type classeurImport struct {
@@ -771,6 +784,9 @@ func (c *classeurImport) parcourir(sur func(ligne int, cellules map[string]strin
 		}
 	}
 	if apparies == 0 {
+		if c.adaptateur.feuilles.repliPremiereFeuille {
+			return c.parcourirFeuille(feuilles[0], true, sur)
+		}
 		return classeurImportError{"Aucun onglet de ce classeur ne porte de données à importer. Onglets trouvés : " + strings.Join(feuilles, ", ") + "."}
 	}
 	return nil
@@ -784,12 +800,13 @@ func (c *classeurImport) parcourirFeuille(nom string, nomme bool, sur func(int, 
 	defer func() { _ = lignes.Close() }()
 
 	disposition := c.adaptateur.feuilles
+	premiere := disposition.premiereLigne()
 	var rangs []int
 	numero := 0
 	for lignes.Next() {
 		numero++
 		entete := disposition != nil && numero == disposition.ligneEntete
-		if !entete && numero < PremiereLigneImport {
+		if !entete && numero < premiere {
 			continue
 		}
 		cellules, err := lignes.Columns(excelize.Options{RawCellValue: true})
@@ -817,10 +834,31 @@ func (c *classeurImport) projeterEtLivrer(cellules []string, rangs []int, nom st
 		return classeurImportError{fmt.Sprintf("L’onglet « %s » n’a pas de ligne %d : ses colonnes sont introuvables.", nom, disposition.ligneEntete)}
 	}
 	projetees := projeterLigneImport(cellules, c.adaptateur.colonnes, rangs, nomme, nom)
-	if ligneVideImport(projetees) {
+	if ligneVideImport(projetees) || ligneExempleImport(projetees, c.adaptateur.colonnes, disposition, rangs) {
 		return nil
 	}
 	return sur(numero, projetees)
+}
+
+// La ligne d'exemple du modèle porte les valeurs que le modèle a écrites : elle
+// se reconnaît, au lieu d'être sautée par sa position.
+func ligneExempleImport(projetees map[string]string, colonnes []colonneImport,
+	d *dispositionFeuilleImport, rangs []int,
+) bool {
+	if d == nil || d.exemples == nil {
+		return false
+	}
+	comparees := 0
+	for i, colonne := range colonnes {
+		if d.exemples[i] == "" || (len(rangs) > i && rangs[i] == 0) {
+			continue
+		}
+		if projetees[colonne.entete] != d.exemples[i] {
+			return false
+		}
+		comparees++
+	}
+	return comparees > 0
 }
 
 // Les colonnes sont retrouvées par leur en-tête, ONGLET PAR ONGLET : le classeur
@@ -865,11 +903,24 @@ func projeterLigneImport(cellules []string, colonnes []colonneImport, rangs []in
 		}
 		valeur := ""
 		if rang > 0 && rang <= len(cellules) {
-			valeur = strings.TrimSpace(cellules[rang-1])
+			valeur = entierLisibleImport(strings.TrimSpace(cellules[rang-1]))
 		}
 		projetees[colonne.entete] = valeur
 	}
 	return projetees
+}
+
+// Un numéro saisi comme un nombre revient en notation scientifique : la feuille
+// affiche « 221772663841 », le classeur stocke « 2.21772663841E11 ».
+func entierLisibleImport(valeur string) string {
+	if !scientifiqueImport.MatchString(valeur) {
+		return valeur
+	}
+	nombre, err := strconv.ParseFloat(valeur, 64)
+	if err != nil || nombre != math.Trunc(nombre) || math.Abs(nombre) >= 1e18 {
+		return valeur
+	}
+	return strconv.FormatInt(int64(nombre), 10)
 }
 
 func ligneVideImport(cellules map[string]string) bool {

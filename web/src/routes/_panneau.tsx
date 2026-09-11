@@ -4,6 +4,7 @@ import { useEffect } from 'react';
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
 import { CoqueShell } from '@/components/layout/coque-shell';
+import { DemoBanner } from '@/components/layout/demo-banner';
 import { navTitle } from '@/components/layout/nav-items';
 import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
 import { SidebarShell } from '@/components/layout/sidebar-shell';
@@ -43,6 +44,7 @@ function Panneau() {
       <SidebarShell role={user.role} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">
+        <DemoBanner user={user} />
         <Topbar user={user} demoEnabled={false} />
         <main id="contenu-principal" className="flex-1 p-4 md:p-6">
           <Outlet />

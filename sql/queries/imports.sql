@@ -130,9 +130,13 @@ WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
 -- name: ImportProspectsConnus :many
 SELECT "phoneE164", "representantId", "projet",
-       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp"
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
 FROM "prospects" p
 WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
+
+-- name: ImportReglesProvenance :many
+SELECT "value" FROM "app_settings" WHERE "key" = 'imports.provenances';
 
 -- name: ImportProspectsParTelephone :many
 SELECT "id", "phoneE164" FROM "prospects"
@@ -174,20 +178,21 @@ INSERT INTO "prospects" (
   "id", "projet", "nom", "prenom", "phoneE164", "profession", "syndicatId", "banqueId",
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
-  "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
+  "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164", "email",
   "createdById", "clientCreatedAt", "updatedAt"
-) VALUES (@id, 'GRAND_PUBLIC', @nom, @prenom, @phone_e164, sqlc.narg('profession'),
+) VALUES (@id, @projet, @nom, @prenom, @phone_e164, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
           sqlc.narg('employeur'), sqlc.narg('type_contrat'), sqlc.narg('anciennete_mois'),
           sqlc.narg('lieu_activite'), sqlc.narg('mode_epargne'), sqlc.narg('pays_residence_id'),
           sqlc.narg('ville_residence'), @whatsapp_status, sqlc.narg('whatsapp_e164'),
-          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'), @created_by_id, @client_created_at, now())
+          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'), sqlc.narg('email'),
+          @created_by_id, @client_created_at, now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectJourney :batchexec
 INSERT INTO "prospect_journeys" ("id", "prospectId", "projet", "consent", "consentAt", "updatedAt")
-VALUES (@id, @prospect_id, 'GRAND_PUBLIC', 'INTERESSE', @consent_at, now())
+VALUES (@id, @prospect_id, @projet, 'INTERESSE', @consent_at, now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportVisite :batchexec

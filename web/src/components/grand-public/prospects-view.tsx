@@ -23,6 +23,7 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { Absent } from '@/components/grand-public/absence';
+import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -577,7 +578,7 @@ function Row({ prospect }: { prospect: ProspectRow }) {
         {prospect.canalProvenanceLabel === null ? (
           <Absent />
         ) : (
-          <span className="truncate">{prospect.canalProvenanceLabel}</span>
+          <CanalProvenance label={prospect.canalProvenanceLabel} />
         )}
       </TableCell>
       <TableCell>
