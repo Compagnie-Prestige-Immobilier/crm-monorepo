@@ -42,6 +42,7 @@ import {
   CALL_OUTCOME_LABELS,
   MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   TYPE_CONTRAT_LABELS,
@@ -507,8 +508,11 @@ export function GrandPublicProspectDetail({
                   <SelectValue placeholder="Non renseigné" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="COMPTANT">Comptant</SelectItem>
-                  <SelectItem value="ECHELONNE">Échelonné</SelectItem>
+                  {PAYMENT_MODES.map((mode) => (
+                    <SelectItem key={mode} value={mode}>
+                      {PAYMENT_MODE_LABELS[mode]}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>

@@ -626,6 +626,8 @@ export function conversionErrorFor(
 
 export interface AttemptDraft {
   readonly outcome: CallOutcome;
+  /** Le motif choisi au référentiel. C'est lui qui commande `outcome`, jamais l'inverse. */
+  readonly reasonCode: string;
   readonly method: EnrollmentMethod | null;
   readonly comment: string;
   readonly callbackAt?: string | null;
@@ -652,9 +654,9 @@ function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null 
   return null;
 }
 
-function commentAttemptErreur(draft: AttemptDraft): string | null {
+function commentAttemptErreur(draft: AttemptDraft, exigeCommentaire: boolean): string | null {
   const comment = draft.comment.trim();
-  if (draft.outcome === 'OTHER' && comment === '') return 'L’issue « Autre » exige un commentaire.';
+  if (exigeCommentaire && comment === '') return 'Ce motif exige un commentaire.';
   if (comment.length > COMMENT_MAX_LENGTH) {
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
@@ -662,12 +664,16 @@ function commentAttemptErreur(draft: AttemptDraft): string | null {
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
-export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
+export function validateAttempt(
+  draft: AttemptDraft,
+  now: number = Date.now(),
+  exigeCommentaire = false,
+): string | null {
   const methodeErr = methodeAttemptErreur(draft);
   if (methodeErr !== null) return methodeErr;
   const callbackErr = callbackAttemptErreur(draft, now);
   if (callbackErr !== null) return callbackErr;
-  const commentErr = commentAttemptErreur(draft);
+  const commentErr = commentAttemptErreur(draft, exigeCommentaire);
   if (commentErr !== null) return commentErr;
   if (draft.conversion !== undefined) {
     const problems = validateConversion(draft.conversion, now);
@@ -796,6 +802,7 @@ function buildAttemptBatch(input: AttemptInput): SyncPushBody {
         data: {
           prospectId: input.prospectId,
           outcome: input.draft.outcome,
+          reasonCode: input.draft.reasonCode,
           ...(input.draft.method === null ? {} : { method: input.draft.method }),
           ...(comment === '' ? {} : { comment }),
           ...(callbackAt === null ? {} : { callbackAt }),

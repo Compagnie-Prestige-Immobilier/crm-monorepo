@@ -286,7 +286,7 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{string(db.CallOutcomeCALLBACK), "À rappeler", "info", db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20},
 	{"UNREACHABLE", "Injoignable", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 30},
 	{"REFUSED", "Refus", "danger", db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 40},
-	{"WRONG_NUMBER", "Mauvais numéro", "danger", db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50},
+	{"WRONG_NUMBER", "Faux numéro", "danger", db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50},
 	{string(db.CallOutcomeOTHER), seedLibelleAutre, "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 60},
 }
 

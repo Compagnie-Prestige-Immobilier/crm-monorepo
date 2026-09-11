@@ -153,7 +153,8 @@ CREATE TYPE public."OperationResult" AS ENUM (
 
 CREATE TYPE public."PaymentMode" AS ENUM (
     'COMPTANT',
-    'ECHELONNE'
+    'ECHELONNE',
+    'CREDIT_IMMOBILIER'
 );
 
 CREATE TYPE public."Phase2Status" AS ENUM (
@@ -179,6 +180,11 @@ CREATE TYPE public."ProspectStatut" AS ENUM (
     'CONTACTE',
     'CONVERTI',
     'PERDU'
+);
+
+CREATE TYPE public."TypeBien" AS ENUM (
+    'TERRAIN',
+    'VILLA'
 );
 
 CREATE TYPE public."ProspectType" AS ENUM (
@@ -831,6 +837,7 @@ CREATE TABLE public.prospects (
     "champsLibres" jsonb,
     "aRevoirAt" timestamp(3) without time zone,
     email text,
+    "typeBien" public."TypeBien",
     CONSTRAINT prospects_enrollment_method_matches_status CHECK (((("phase2Status" = 'METHOD_OBTAINED'::public."Phase2Status") AND ("enrollmentMethod" IS NOT NULL)) OR (("phase2Status" <> 'METHOD_OBTAINED'::public."Phase2Status") AND ("enrollmentMethod" IS NULL)))),
     CONSTRAINT prospects_origin_known CHECK (((origin IS NULL) OR (origin = ANY (ARRAY['BANQUE'::text, 'FORMULAIRE_PUBLIC'::text])))),
     CONSTRAINT prospects_whatsapp_number_matches_status CHECK (((("whatsappStatus" = 'AUTRE_NUMERO'::public."WhatsappStatus") AND ("whatsappE164" IS NOT NULL)) OR (("whatsappStatus" <> 'AUTRE_NUMERO'::public."WhatsappStatus") AND ("whatsappE164" IS NULL))))

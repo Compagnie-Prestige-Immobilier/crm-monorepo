@@ -27,7 +27,7 @@ const PILOTAGE: readonly RoleCompte[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
 const BANQUE: readonly RoleCompte[] = ['ADMIN', 'BANQUE_FINANCE'];
 const TELECONSEIL: readonly RoleCompte[] = ['COMMERCIAL', 'CHARGE_CLIENTELE'];
 const APPELANTS: readonly RoleCompte[] = ['ADMIN', ...TELECONSEIL, 'SUPERVISEUR', 'DIRECTION'];
-const SAISIE_GRAND_PUBLIC: readonly RoleCompte[] = ['ADMIN', ...TELECONSEIL];
+const SAISIE_GRAND_PUBLIC: readonly RoleCompte[] = ['ADMIN', ...TELECONSEIL, 'SUPERVISEUR'];
 const ACCUEIL_LECTURE: readonly RoleCompte[] = ['ADMIN', 'DIRECTION', 'ACCUEIL'];
 const ACCUEIL_ADMINISTRATION: readonly RoleCompte[] = ['ADMIN', 'DIRECTION'];
 

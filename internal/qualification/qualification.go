@@ -736,7 +736,7 @@ type QualificationCallAttemptBody struct {
 	SyndicatID             *string           `json:"syndicatId,omitempty" format:"uuid"`
 	Type                   *string           `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	IncomeBandID           *string           `json:"incomeBandId,omitempty" format:"uuid"`
-	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE"`
+	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
 	DureeSystemeMois       *int32            `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300"`
 	ChampsLibres           map[string]string `json:"champsLibres,omitempty"`
 }

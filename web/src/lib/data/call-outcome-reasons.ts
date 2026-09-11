@@ -2,6 +2,8 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
+import type { CallOutcome } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
@@ -48,6 +50,46 @@ export async function fetchCallOutcomeReasons(
 ): Promise<CallOutcomeReason[]> {
   return unwrap(await client.GET('/api/v1/call-outcome-reasons/administration')).items;
 }
+
+/** Ce que l'écran d'appel lit d'un motif ; le reste ne sert qu'à l'administration. */
+export interface MotifAppel {
+  readonly code: string;
+  readonly label: string;
+  readonly effect: CallOutcomeEffect;
+  readonly requiresComment: boolean;
+}
+
+/** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
+export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Promise<MotifAppel[]> {
+  const items = unwrap(
+    await client.GET('/api/v1/call-outcome-reasons', {
+      params: { query: { payloadVersion: PANEL_PAYLOAD_VERSION } },
+    }),
+  ).items;
+  return items.map((motif) => ({
+    code: motif.code,
+    label: motif.label,
+    effect: motif.effect,
+    requiresComment: motif.requiresComment,
+  }));
+}
+
+/**
+ * L'effet commande tout : le groupe où le motif s'affiche et l'issue envoyée.
+ * Le serveur refuse une issue qui ne correspond pas à l'effet du motif.
+ */
+export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
+  CLOSE_METHOD: 'METHOD_OBTAINED',
+  CLOSE_REFUSED: 'REFUSED',
+  CLOSE_WRONG_NUMBER: 'WRONG_NUMBER',
+  SCHEDULE_CALLBACK: 'CALLBACK',
+  KEEP_OPEN: 'UNREACHABLE',
+};
+
+/** Joignable : on a parlé à la personne, qu'elle adhère ou qu'elle refuse. */
+const EFFETS_JOIGNABLE: readonly CallOutcomeEffect[] = ['CLOSE_METHOD', 'CLOSE_REFUSED'];
+
+export const estJoignable = (motif: MotifAppel): boolean => EFFETS_JOIGNABLE.includes(motif.effect);
 
 export async function createCallOutcomeReason(
   input: CreateCallOutcomeReasonInput,

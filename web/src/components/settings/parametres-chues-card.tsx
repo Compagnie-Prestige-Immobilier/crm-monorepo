@@ -32,6 +32,9 @@ const LIBELLES: Record<string, string> = {
   messageWhatsapp: 'Message WhatsApp',
   accuseReceptionObjet: 'Accusé de réception, objet',
   accuseReceptionCorps: 'Accusé de réception, corps',
+  adhesionObjet: 'Avis d’adhésion, objet',
+  adhesionCorps: 'Avis d’adhésion, corps',
+  destinatairesAdhesion: 'Avis d’adhésion, destinataires',
   destinatairesEnrolement: 'Cellule enrôlement',
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
@@ -44,6 +47,7 @@ const LISTES = [
   'destinatairesBpe',
   'destinatairesSupervision',
   'destinatairesDirection',
+  'destinatairesAdhesion',
 ] as const;
 
 /** Une adresse par ligne : c'est ainsi qu'on les copie depuis un annuaire. */
@@ -119,22 +123,25 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
           <CardTitle>Messages envoyés aux prospects</CardTitle>
           <p className="mt-1 text-[0.875rem] text-muted-foreground">
             Les mots entre accolades sont remplacés à l’envoi : {'{prenom}'}, {'{lien}'}, {'{date}'}
-            , {'{informations}'}.
+            , {'{informations}'}. L’avis d’adhésion connaît en plus {'{prenomNom}'}, {'{telephone}'}
+            , {'{offre}'}, {'{paiement}'}, {'{montant}'} et {'{teleconseiller}'}.
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Field label={LIBELLES.accuseReceptionObjet ?? ''}>
-            {(props) => (
-              <Input
-                {...props}
-                value={valeur('accuseReceptionObjet')}
-                onChange={(event) => {
-                  saisir('accuseReceptionObjet', event.target.value);
-                }}
-              />
-            )}
-          </Field>
-          {(['messageWhatsapp', 'accuseReceptionCorps'] as const).map((cle) => (
+          {(['accuseReceptionObjet', 'adhesionObjet'] as const).map((cle) => (
+            <Field key={cle} label={LIBELLES[cle] ?? cle}>
+              {(props) => (
+                <Input
+                  {...props}
+                  value={valeur(cle)}
+                  onChange={(event) => {
+                    saisir(cle, event.target.value);
+                  }}
+                />
+              )}
+            </Field>
+          ))}
+          {(['messageWhatsapp', 'accuseReceptionCorps', 'adhesionCorps'] as const).map((cle) => (
             <Field key={cle} label={LIBELLES[cle] ?? cle}>
               {(props) => (
                 <Textarea

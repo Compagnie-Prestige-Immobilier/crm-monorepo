@@ -328,13 +328,13 @@ const ECRANS: readonly Ecran[] = [
     route: '/grand-public/console',
     titre: 'Appeler les prospects · CPI GO',
     familles: PROSPECTS,
-    autorises: ['ADMIN', 'COMMERCIAL'],
+    autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
   },
   {
     route: '/grand-public/nouveau',
     titre: 'Nouveau prospect Grand Public · CPI GO',
     familles: PROSPECTS,
-    autorises: ['ADMIN', 'COMMERCIAL'],
+    autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR'],
   },
   {
     route: '/grand-public/rappels',

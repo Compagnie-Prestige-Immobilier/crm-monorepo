@@ -5,6 +5,7 @@ type Schemas = components['schemas'];
 export type Role = Schemas['Role'];
 export type ProspectStatut = Schemas['ProspectStatut'];
 export type ProspectType = Schemas['ProspectType'];
+export type TypeBien = Schemas['TypeBien'];
 export type PaymentMode = Schemas['PaymentMode'];
 
 export type Region = Schemas['RegionDto'];
@@ -40,11 +41,23 @@ export const MODE_EPARGNE_LABELS: Record<ModeEpargne, string> = {
   AUCUN: 'Aucune',
 };
 
-export const PAYMENT_MODES = ['COMPTANT', 'ECHELONNE'] as const satisfies readonly PaymentMode[];
+export const PAYMENT_MODES = [
+  'COMPTANT',
+  'ECHELONNE',
+  'CREDIT_IMMOBILIER',
+] as const satisfies readonly PaymentMode[];
 
 export const PAYMENT_MODE_LABELS: Record<PaymentMode, string> = {
   COMPTANT: 'Comptant',
   ECHELONNE: 'Échelonné',
+  CREDIT_IMMOBILIER: 'Crédit immobilier',
+};
+
+export const TYPES_BIEN = ['TERRAIN', 'VILLA'] as const satisfies readonly TypeBien[];
+
+export const TYPE_BIEN_LABELS: Record<TypeBien, string> = {
+  TERRAIN: 'Terrain',
+  VILLA: 'Villa',
 };
 
 export type SessionUser = Schemas['AuthUserDto'];
@@ -212,7 +225,7 @@ export const PHASE2_STATUS_LABELS: Record<Phase2Status, string> = {
   PENDING: 'En attente',
   METHOD_OBTAINED: 'Méthode obtenue',
   REFUSED: 'Refus',
-  WRONG_NUMBER: 'Mauvais numéro',
+  WRONG_NUMBER: 'Faux numéro',
 };
 
 export const ENROLLMENT_METHODS = [
@@ -247,7 +260,7 @@ export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
   UNREACHABLE: 'Injoignable',
   CALLBACK: 'À rappeler',
   REFUSED: 'Refus',
-  WRONG_NUMBER: 'Mauvais numéro',
+  WRONG_NUMBER: 'Faux numéro',
   OTHER: 'Autre',
 };
 
@@ -268,7 +281,7 @@ export const REP_CALL_OUTCOME_LABELS: Record<RepCallOutcome, string> = {
   UNREACHABLE: 'Injoignable',
   CALLBACK: 'À rappeler',
   REFUSED: 'Refus',
-  WRONG_NUMBER: 'Mauvais numéro',
+  WRONG_NUMBER: 'Faux numéro',
   OTHER: 'Autre',
 };
 

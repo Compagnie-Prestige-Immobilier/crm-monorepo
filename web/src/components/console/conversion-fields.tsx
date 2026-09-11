@@ -3,6 +3,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { ChampAjoute } from '@/components/forms/champ-ajoute';
 import { Field } from '@/components/forms/field';
 import { Liste } from '@/components/forms/liste';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import { valeursProposees, type ChampLibre, type ReglageChamp } from '@/lib/data/champs-conversion';
+import type { ChampLibre, ReglageChamp } from '@/lib/data/champs-conversion';
 import {
   DUREES_MOIS,
   formatDureeMois,
@@ -26,6 +27,8 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   ENROLLMENT_METHOD_LABELS,
   ENROLLMENT_METHOD_ORDER,
+  PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
   type EnrollmentMethod,
   type PaymentMode,
   type ProspectType,
@@ -34,10 +37,10 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
-  { value: 'COMPTANT', label: 'Comptant' },
-  { value: 'ECHELONNE', label: 'Échelonné' },
-];
+const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = PAYMENT_MODES.map((mode) => ({
+  value: mode,
+  label: PAYMENT_MODE_LABELS[mode],
+}));
 
 const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
 
@@ -483,50 +486,6 @@ function visibleParDefaut(champ: string, complet: boolean): boolean {
     return !complet;
   }
   return true;
-}
-
-function ChampAjoute({
-  champ,
-  value,
-  error,
-  onChange,
-}: {
-  champ: ChampLibre;
-  value: string;
-  error: string | undefined;
-  onChange: (valeur: string) => void;
-}) {
-  if (champ.type === 'TEXTE') {
-    return (
-      <Field label={champ.libelle} required={champ.obligatoire} error={error}>
-        {(props) => (
-          <Input
-            {...props}
-            value={value}
-            onChange={(event) => {
-              onChange(event.target.value);
-            }}
-          />
-        )}
-      </Field>
-    );
-  }
-
-  const items = valeursProposees(champ).map((option) => ({ value: option, label: option }));
-  return (
-    <Field label={champ.libelle} required={champ.obligatoire} error={error}>
-      {(props) => (
-        <Liste
-          id={props.id}
-          describedBy={props['aria-describedby']}
-          items={items}
-          value={value}
-          placeholder="Choisir une valeur"
-          onChange={onChange}
-        />
-      )}
-    </Field>
-  );
 }
 
 function MethodChoice({

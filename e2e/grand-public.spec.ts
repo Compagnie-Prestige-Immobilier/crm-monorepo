@@ -106,7 +106,8 @@ test.describe('parcours 11, la saisie et le suivi Grand Public', () => {
       .click();
     await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
 
-    await page.getByRole('button', { name: '2 À rappeler' }).click();
+    await page.getByRole('button', { name: '2 Injoignable' }).click();
+    await page.getByRole('button', { name: '1 À rappeler' }).click();
     await page.getByRole('button', { name: /^3 Demain 9 h/ }).click();
     await expect(
       page.getByRole('status').filter({ hasText: 'Appel enregistré pour' }),

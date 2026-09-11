@@ -69,7 +69,7 @@ var lotLibellesIssueAppel = map[string]string{
 	string(db.CallOutcomeUNREACHABLE): exports.ExportLibelleInjoignable,
 	lotIssueCallback:                  exports.ExportLibelleARappeler,
 	exports.ExportCleRefus:            exports.ExportLibelleRefus,
-	exports.ExportCleMauvaisNumero:    exports.ExportLibelleMauvaisNumero,
+	exports.ExportCleMauvaisNumero:    exports.ExportLibelleFauxNumero,
 	string(db.CallOutcomeOTHER):       lotLibelleAutre,
 }
 

@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
@@ -17,6 +17,14 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import {
   ALREADY_COMPLETED,
@@ -42,18 +50,25 @@ import {
   ouvrirFiche,
   type OuvertureFiche,
 } from '@/lib/data/ouvertures';
-import { useChampsConversion } from '@/lib/data/champs-conversion';
-import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
-import { EMPTY_FILTERS } from '@/lib/filters';
+import {
+  EFFET_ISSUE,
+  estJoignable,
+  fetchMotifsAppel,
+  type MotifAppel,
+} from '@/lib/data/call-outcome-reasons';
+import {
+  useChampsConversion,
+  type ChampLibre,
+  type ReglageChamp,
+} from '@/lib/data/champs-conversion';
+import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
-  type CallOutcome,
   type EnrollmentMethod,
-  type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
@@ -67,23 +82,19 @@ type Projet = 'CHUES' | 'GRAND_PUBLIC';
 /** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
 const RAPPEL_KEY = '2';
 
-/** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
-const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
-  { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
-  { key: RAPPEL_KEY, label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
-  { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
-  { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
-  { key: '5', label: 'Autre', outcome: 'OTHER' },
-];
+const GROUPES = [
+  { cle: 'joignable', touche: '1', label: 'Joignable' },
+  { cle: 'injoignable', touche: '2', label: 'Injoignable' },
+] as const;
+
+type Groupe = (typeof GROUPES)[number]['cle'];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1', 'Joignable : ouvre le dossier et l’adhésion'],
-  ['2', 'À rappeler, puis échéance'],
-  ['3', 'Injoignable'],
-  ['4', 'Mauvais numéro'],
-  ['5', 'Autre, puis commentaire'],
-  ['1 … 6', 'Échéance proposée, après 2'],
-  ['0', 'Saisir une autre échéance, après 2'],
+  ['1', 'Joignable, puis son motif'],
+  ['2', 'Injoignable, puis son motif'],
+  ['1 … 9', 'Motif, une fois le groupe choisi'],
+  ['1 … 6', 'Échéance proposée, après un motif de rappel'],
+  ['0', 'Saisir une autre échéance'],
   ['Entrée', 'Valider'],
   ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
@@ -92,17 +103,21 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['?', 'Afficher cette carte'],
 ];
 
-const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
+/**
+ * Le repli quand le référentiel ne répond pas : les six motifs système, ceux que
+ * le serveur applique lui-même en l'absence de `reasonCode`. Sans lui, une
+ * lecture en échec laisserait l'écran d'appel sans aucune issue.
+ */
+const MOTIFS_SYSTEME: readonly MotifAppel[] = [
+  { code: 'METHOD_OBTAINED', label: 'Méthode obtenue', effect: 'CLOSE_METHOD' },
+  { code: 'REFUSED', label: 'Refus', effect: 'CLOSE_REFUSED' },
+  { code: 'CALLBACK', label: CALL_OUTCOME_LABELS.CALLBACK, effect: 'SCHEDULE_CALLBACK' },
+  { code: 'WRONG_NUMBER', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, effect: 'CLOSE_WRONG_NUMBER' },
+  { code: 'UNREACHABLE', label: CALL_OUTCOME_LABELS.UNREACHABLE, effect: 'KEEP_OPEN' },
+  { code: 'OTHER', label: 'Autre', effect: 'KEEP_OPEN', requiresComment: true },
+].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
-/** Sans recherche : les vingt dernières fiches ajoutées au projet. */
-const annuaireFilters = (projet: Projet, search: string): ProspectFilters => ({
-  ...EMPTY_FILTERS,
-  projet,
-  search,
-  pageSize: 20,
-  sortBy: 'clientCreatedAt',
-  sortDir: 'desc',
-});
+const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
 const nouveauHref = (projet: Projet): string =>
   projet === 'GRAND_PUBLIC' ? '/grand-public/nouveau' : '/chues/prospects/nouveau';
@@ -135,8 +150,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
-    queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
-    queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
+    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', projet, cherche] as const,
+    queryFn: () => fetchProspectsAQualifier({ projet, search: cherche }),
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
@@ -225,7 +240,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
 
       <p className="text-[0.8125rem] text-muted-foreground">
         {cherche === ''
-          ? 'Les vingt dernières fiches ajoutées. Cherchez un nom ou un numéro pour en voir d’autres.'
+          ? 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.'
           : 'Choisissez qui vous venez d’appeler.'}
       </p>
 
@@ -331,10 +346,10 @@ function ficheVerrouillee(ouverture: OuvertureFiche | null, closed: boolean): bo
 function saisieCommencee(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
-  draftOutcome: CallOutcome | null,
+  motif: MotifAppel | null,
   comment: string,
 ): boolean {
-  return conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
+  return conversion !== null || slots !== null || motif !== null || comment !== '';
 }
 
 /**
@@ -372,7 +387,7 @@ function ListeAnnuaire({
   projet,
   onChoisir,
 }: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspects>>>;
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   projet: Projet;
   onChoisir: (row: ProspectRow) => void;
@@ -396,7 +411,7 @@ function ListeAnnuaire({
       <div className="flex flex-col gap-3">
         <p className="text-[0.9375rem]">
           {cherche === ''
-            ? 'Aucun prospect pour l’instant.'
+            ? 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.'
             : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
         </p>
         <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
@@ -407,40 +422,46 @@ function ListeAnnuaire({
   }
 
   return (
-    <ol className="flex flex-col gap-2">
-      {annuaire.data.items.map((row) => (
-        <li key={row.id}>
-          <button
-            type="button"
-            onClick={() => {
-              onChoisir(row);
-            }}
-            className={cn(
-              'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-              'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-            )}
-          >
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-[0.9375rem] font-[600]">
-                {row.nom} {row.prenom}
-              </span>
-              <span className="text-[0.8125rem] text-muted-foreground">
-                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                {row.banqueName === null ? '' : ` · ${row.banqueName}`}
-                {row.lastAttemptAt === null
-                  ? ' · jamais appelé'
-                  : ` · dernier appel ${formatDateTime(row.lastAttemptAt)}`}
-              </span>
-            </span>
-            {row.phase2Status === 'PENDING' ? null : (
-              <span className="rounded-full border border-border px-2 py-0.5 text-[0.75rem] text-muted-foreground">
-                {PHASE2_STATUS_LABELS[row.phase2Status]}
-              </span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ol>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nom et prénom</TableHead>
+          <TableHead>Numéro</TableHead>
+          <TableHead>Dernier appel</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {annuaire.data.items.map((row) => (
+          <TableRow key={row.id}>
+            <TableCell>
+              <button
+                type="button"
+                onClick={() => {
+                  onChoisir(row);
+                }}
+                className={cn(
+                  'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
+                  'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                )}
+              >
+                <span className="truncate">
+                  {row.nom} {row.prenom}
+                </span>
+                {row.phase2Status === 'PENDING' ? null : (
+                  <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[0.75rem] font-[400] text-muted-foreground">
+                    {PHASE2_STATUS_LABELS[row.phase2Status]}
+                  </span>
+                )}
+              </button>
+            </TableCell>
+            <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
+            <TableCell className="whitespace-nowrap text-muted-foreground">
+              {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
+            </TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
   );
 }
 
@@ -472,6 +493,127 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
+/** Le dossier d'adhésion, une fois la personne dite joignable. */
+function PanneauDossier({
+  ouvert,
+  prospect,
+  conversion,
+  errors,
+  disabled,
+  formulaire,
+  onChange,
+}: {
+  ouvert: boolean;
+  prospect: ProspectRow;
+  conversion: ConversionDraft | null;
+  errors: ConversionErrors;
+  disabled: boolean;
+  formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
+  onChange: (patch: Partial<ConversionDraft>) => void;
+}) {
+  if (!ouvert || conversion === null) return null;
+
+  return (
+    <>
+      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+        Joignable · son dossier, et la manière dont il adhère
+      </p>
+
+      <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+
+      <ConversionFields
+        draft={conversion}
+        errors={errors}
+        phoneE164={prospect.phoneE164}
+        disabled={disabled}
+        reglages={formulaire.champs}
+        libres={formulaire.libres}
+        onChange={onChange}
+      />
+    </>
+  );
+}
+
+/** Les deux boutons, puis les motifs du groupe ouvert. */
+function ChoixIssue({
+  etape,
+  groupe,
+  proposes,
+  motif,
+  disabled,
+  onGroupe,
+  onMotif,
+}: {
+  etape: Etape;
+  groupe: Groupe | null;
+  proposes: readonly MotifAppel[];
+  motif: MotifAppel | null;
+  disabled: boolean;
+  onGroupe: (groupe: Groupe) => void;
+  onMotif: (motif: MotifAppel) => void;
+}) {
+  if (etape === 'issues') {
+    return (
+      <fieldset className="flex flex-col gap-2" disabled={disabled}>
+        <LegendeIssue>Avez-vous eu la personne au téléphone ?</LegendeIssue>
+        <div className="flex flex-wrap gap-2">
+          {GROUPES.map((item) => (
+            <Button
+              key={item.cle}
+              variant="outline"
+              onClick={() => {
+                onGroupe(item.cle);
+              }}
+            >
+              <Kbd>{item.touche}</Kbd>
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+    );
+  }
+
+  if (etape !== 'motifs') return null;
+
+  return (
+    <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
+      <LegendeIssue>
+        {groupe === 'joignable' ? 'Joignable · que dit la personne ?' : 'Injoignable · pourquoi ?'}
+      </LegendeIssue>
+      {proposes.length === 0 ? (
+        <p role="alert" className="text-[0.875rem] text-warning">
+          Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de
+          référence.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {proposes.map((item, rang) => (
+            <Button
+              key={item.code}
+              variant={motif?.code === item.code ? 'default' : 'outline'}
+              onClick={() => {
+                onMotif(item);
+              }}
+            >
+              {rang < 9 ? <Kbd>{String(rang + 1)}</Kbd> : null}
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+function LegendeIssue({ children }: { children: ReactNode }) {
+  return (
+    <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+      {children}
+    </legend>
+  );
+}
+
 function ListeSkeleton() {
   return (
     <div className="flex flex-col gap-2">
@@ -500,17 +642,18 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
  * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
  */
-type Etape = 'issues' | 'dossier' | 'echeance' | null;
+type Etape = 'issues' | 'motifs' | 'dossier' | 'echeance' | null;
 
 function etapeCourante(
   closed: boolean,
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
+  groupe: Groupe | null,
 ): Etape {
   if (closed) return null;
   if (slots !== null) return 'echeance';
   if (conversion !== null) return 'dossier';
-  return 'issues';
+  return groupe === null ? 'issues' : 'motifs';
 }
 
 /**
@@ -538,7 +681,8 @@ function Consignation({
 
   const [repris] = useState(() => lireBrouillon(ouverture?.draft));
   const [comment, setComment] = useState(repris.comment);
-  const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
+  const [groupe, setGroupe] = useState<Groupe | null>(null);
+  const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
@@ -547,6 +691,12 @@ function Consignation({
   const [helpOpen, setHelpOpen] = useState(false);
 
   const formulaire = useChampsConversion(projet);
+  const motifs = useQuery({
+    queryKey: queryKeys.motifsAppel,
+    queryFn: () => fetchMotifsAppel(),
+    staleTime: 300_000,
+  });
+  const catalogue = motifs.data ?? MOTIFS_SYSTEME;
 
   const nomComplet = nomDe(prospect);
   const closed = estFicheClose(prospect, refusee);
@@ -594,21 +744,22 @@ function Consignation({
 
   const record = useCallback(
     (
-      outcome: CallOutcome,
+      choisi: MotifAppel,
       method: EnrollmentMethod | null,
       callbackAt: string | null = null,
       renseignements?: ConversionDraft,
     ) => {
       if (closed || send.isPending) return;
       const draft: AttemptDraft = {
-        outcome,
+        outcome: EFFET_ISSUE[choisi.effect],
+        reasonCode: choisi.code,
         method,
         comment,
         callbackAt,
         ...(renseignements === undefined ? {} : { conversion: renseignements }),
         ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
       };
-      const problem = validateAttempt(draft);
+      const problem = validateAttempt(draft, Date.now(), choisi.requiresComment);
       if (problem !== null) {
         toast.error(problem);
         return;
@@ -620,7 +771,6 @@ function Consignation({
 
   const ouvrirDossier = useCallback(() => {
     if (closed || send.isPending) return;
-    setDraftOutcome(null);
     setSlots(null);
     setConversionErrors({});
     setConversion(conversionFrom(prospect));
@@ -635,31 +785,26 @@ function Consignation({
       formulaire.libres,
     );
     setConversionErrors(problems);
-    if (Object.keys(problems).length > 0 || conversion.method === null) return;
-    record('METHOD_OBTAINED', conversion.method, null, conversion);
-  }, [conversion, formulaire, record]);
-
-  const startOther = useCallback(() => {
-    if (closed) return;
-    setDraftOutcome('OTHER');
-    commentRef.current?.focus();
-  }, [closed]);
+    if (Object.keys(problems).length > 0 || conversion.method === null || motif === null) return;
+    record(motif, conversion.method, null, conversion);
+  }, [conversion, formulaire, motif, record]);
 
   const startCallback = useCallback(() => {
     if (closed) return;
-    setDraftOutcome(null);
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
   }, [closed]);
 
   const choisir = useCallback(
-    (outcome: CallOutcome | 'JOIGNABLE') => {
-      if (outcome === 'JOIGNABLE') ouvrirDossier();
-      else if (outcome === 'CALLBACK') startCallback();
-      else if (outcome === 'OTHER') startOther();
-      else record(outcome, null);
+    (choisi: MotifAppel) => {
+      if (closed || send.isPending) return;
+      setMotif(choisi);
+      if (choisi.effect === 'CLOSE_METHOD') ouvrirDossier();
+      else if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      else if (choisi.requiresComment) commentRef.current?.focus();
+      else record(choisi, null);
     },
-    [ouvrirDossier, startCallback, startOther, record],
+    [closed, send.isPending, ouvrirDossier, startCallback, record],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -671,18 +816,18 @@ function Consignation({
         toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
         return;
       }
-      record('CALLBACK', null, iso);
+      if (motif !== null) record(motif, null, iso);
       return;
     }
     if (conversion !== null) {
       submitConversion();
       return;
     }
-    if (draftOutcome !== null) record(draftOutcome, null);
-  }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
+    if (motif !== null) record(motif, null);
+  }, [conversion, submitConversion, slots, freeCallback, motif, record]);
 
-  const etape = etapeCourante(closed, conversion, slots);
-  const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
+  const etape = etapeCourante(closed, conversion, slots, groupe);
+  const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
   const retenu = useCallback(() => {
     toast.error('Consignez l’appel avant de quitter cette fiche.');
@@ -704,18 +849,34 @@ function Consignation({
       else onAbandon();
       return;
     }
-    setDraftOutcome(null);
+    setGroupe(null);
+    setMotif(null);
     setComment('');
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
   }, [slots, saisieEnCours, verrouille, retenu, onAbandon]);
 
-  const issueShortcuts: Record<string, () => void> = Object.fromEntries(
-    ISSUES.map((issue) => [
-      issue.key,
+  const proposes = catalogue.filter(
+    (item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe,
+  );
+  const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
+  const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
+
+  const groupeShortcuts: Record<string, () => void> = Object.fromEntries(
+    GROUPES.map((item) => [
+      item.touche,
       () => {
-        choisir(issue.outcome);
+        setGroupe(item.cle);
+      },
+    ]),
+  );
+
+  const motifShortcuts: Record<string, () => void> = Object.fromEntries(
+    proposes.slice(0, 9).map((item, rang) => [
+      String(rang + 1),
+      () => {
+        choisir(item);
       },
     ]),
   );
@@ -724,7 +885,7 @@ function Consignation({
     (slots ?? []).map((slot) => [
       slot.key,
       () => {
-        record('CALLBACK', null, slot.at);
+        if (motif !== null) record(motif, null, slot.at);
       },
     ]),
   );
@@ -732,8 +893,15 @@ function Consignation({
     callbackRef.current?.focus();
   };
 
-  let digitShortcuts = issueShortcuts;
-  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: startCallback };
+  // EB-10 : le rappel reste atteignable au clavier une fois le dossier ouvert.
+  const versLeRappel = (): void => {
+    if (motifRappel === undefined) return;
+    setMotif(motifRappel);
+    startCallback();
+  };
+
+  let digitShortcuts = etape === 'motifs' ? motifShortcuts : groupeShortcuts;
+  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: versLeRappel };
   if (etape === 'echeance') digitShortcuts = slotShortcuts;
 
   useShortcuts({
@@ -794,51 +962,27 @@ function Consignation({
           </div>
         ) : null}
 
-        {etape !== 'dossier' || conversion === null ? null : (
-          <>
-            <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-              Joignable · son dossier, et la manière dont il adhère
-            </p>
+        <PanneauDossier
+          ouvert={etape === 'dossier'}
+          prospect={prospect}
+          conversion={conversion}
+          errors={conversionErrors}
+          disabled={send.isPending}
+          formulaire={formulaire}
+          onChange={(patch) => {
+            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+          }}
+        />
 
-            <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
-
-            <ConversionFields
-              draft={conversion}
-              errors={conversionErrors}
-              phoneE164={prospect.phoneE164}
-              disabled={send.isPending}
-              reglages={formulaire.champs}
-              libres={formulaire.libres}
-              onChange={(patch) => {
-                setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-              }}
-            />
-          </>
-        )}
-
-        {etape !== 'issues' ? null : (
-          <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-            <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-              Comment s’est passé l’appel ?
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {ISSUES.map((issue) => (
-                <Button
-                  key={issue.key}
-                  variant={
-                    issue.outcome === 'OTHER' && draftOutcome === 'OTHER' ? 'default' : 'outline'
-                  }
-                  onClick={() => {
-                    choisir(issue.outcome);
-                  }}
-                >
-                  <Kbd>{issue.key}</Kbd>
-                  {issue.label}
-                </Button>
-              ))}
-            </div>
-          </fieldset>
-        )}
+        <ChoixIssue
+          etape={etape}
+          groupe={groupe}
+          proposes={proposes}
+          motif={motif}
+          disabled={send.isPending}
+          onGroupe={setGroupe}
+          onMotif={choisir}
+        />
 
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
@@ -849,7 +993,7 @@ function Consignation({
             disabled={send.isPending}
             inputRef={callbackRef}
             onChoisir={(at) => {
-              record('CALLBACK', null, at);
+              if (motif !== null) record(motif, null, at);
             }}
             onFreeCallback={setFreeCallback}
             onValidate={validate}
@@ -859,7 +1003,7 @@ function Consignation({
         {etape === null ? null : (
           <Commentaire
             value={comment}
-            obligatoire={draftOutcome === 'OTHER'}
+            obligatoire={motif?.requiresComment ?? false}
             inputRef={commentRef}
             onChange={setComment}
             onValidate={validate}
@@ -873,16 +1017,19 @@ function Consignation({
                 Enregistrer l’adhésion
                 <Kbd>Entrée</Kbd>
               </Button>
-              <Button
-                variant="outline"
-                disabled={send.isPending}
-                onClick={() => {
-                  record('REFUSED', null);
-                }}
-              >
-                Il refuse
-              </Button>
-              <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
+              {motifRefus === undefined ? null : (
+                <Button
+                  variant="outline"
+                  disabled={send.isPending}
+                  onClick={() => {
+                    setMotif(motifRefus);
+                    record(motifRefus, null);
+                  }}
+                >
+                  Il refuse
+                </Button>
+              )}
+              <Button variant="outline" disabled={send.isPending} onClick={versLeRappel}>
                 À rappeler
                 <Kbd>{RAPPEL_KEY}</Kbd>
               </Button>
