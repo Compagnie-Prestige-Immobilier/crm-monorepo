@@ -45,6 +45,7 @@ func monterEnrolement(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{OperationID: "getEnrolementIndicateurs", Method: http.MethodGet, Path: base + "/indicateurs"}, s.lireIndicateurs)
 	huma.Register(api, huma.Operation{OperationID: "getEnrolementReglages", Method: http.MethodGet, Path: base + "/reglages"}, s.lireReglagesEnrolement)
 	huma.Register(api, huma.Operation{OperationID: "putEnrolementReglages", Method: http.MethodPut, Path: base + "/reglages"}, s.ecrireReglagesEnrolement)
+	monterWebhookEnrolement(api, s)
 	huma.Register(api, huma.Operation{OperationID: "postEnrolementTirage", Method: http.MethodPost, Path: base + "/tirage", DefaultStatus: http.StatusCreated}, s.tirageManuel)
 	huma.Register(api, huma.Operation{OperationID: "purgeEnrolementInscriptions", Method: http.MethodDelete, Path: base + "/inscriptions"}, s.purgerInscriptions)
 	huma.Register(api, huma.Operation{OperationID: "deleteEnrolementInscription", Method: http.MethodDelete, Path: base + "/inscriptions/{id}"}, s.supprimerInscription)
@@ -281,13 +282,6 @@ type ReglagesOutput struct {
 
 func cleReglages(projet string) string { return socle.CleReglagesEnrolement(projet) }
 
-func plateformeConfiguree(projet string) (base, jeton string) {
-	if projet == projetChues {
-		return strings.TrimSpace(socle.Env("PLATEFORME_CHUES_URL", "")), strings.TrimSpace(socle.Env("PLATEFORME_CHUES_TOKEN", ""))
-	}
-	return strings.TrimSpace(socle.Env("PLATEFORME_GRAND_PUBLIC_URL", "")), strings.TrimSpace(socle.Env("PLATEFORME_GRAND_PUBLIC_TOKEN", ""))
-}
-
 // Un réglage illisible ou hors bornes retombe sur l'usine plutôt que
 // d'arrêter l'écran.
 func reglagesStockes(valeur string) reglagesEnrolement {
@@ -329,7 +323,7 @@ func (s *service) reponseReglagesEnrolement(ctx context.Context, projet string) 
 	if err != nil {
 		return nil, err
 	}
-	base, jeton := plateformeConfiguree(projet)
+	base, jeton := socle.PlateformeConfiguree(projet)
 	out := &ReglagesOutput{}
 	out.Body.Projet = projet
 	out.Body.FrequenceMinutes = valeurs.FrequenceMinutes
@@ -421,7 +415,7 @@ func (s *service) tirageManuel(ctx context.Context, in *ProjetEnrolementInput) (
 // Chaque minute : ne fait rien tant qu'aucune plateforme n'est configurée.
 func (s *service) tirerEnrolement(ctx context.Context) error {
 	for _, projet := range []string{projetChues, socle.ProjetGrandPublic} {
-		base, jeton := plateformeConfiguree(projet)
+		base, jeton := socle.PlateformeConfiguree(projet)
 		if base == "" || jeton == "" {
 			continue
 		}
@@ -468,7 +462,7 @@ func (s *service) tirer(ctx context.Context, projet string) BilanTirage {
 
 func (s *service) executerTirage(ctx context.Context, projet string) (BilanTirage, error) {
 	var bilan BilanTirage
-	base, jeton := plateformeConfiguree(projet)
+	base, jeton := socle.PlateformeConfiguree(projet)
 	if base == "" || jeton == "" {
 		return bilan, fmt.Errorf("aucune URL ni jeton pour la plateforme %s", projet)
 	}

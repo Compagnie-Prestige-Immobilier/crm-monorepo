@@ -194,16 +194,6 @@ export function SyntheseEnrolement() {
 
   return (
     <div className="flex flex-col gap-6 pt-2">
-      <div className="grid gap-4 lg:grid-cols-2">
-        {PROJETS.map((entree, index) => (
-          <Sante key={entree.projet} nom={entree.nom} reglages={reglages[index]?.data} />
-        ))}
-      </div>
-
-      <Comparaison indicateurs={donnees} />
-
-      <DelaisEnrolement colonnes={PROJETS} indicateurs={donnees} />
-
       <CourbeEnrolement
         titre="Inscriptions par jour"
         series={PROJETS.map((entree, index) => ({
@@ -221,6 +211,16 @@ export function SyntheseEnrolement() {
           />
         ))}
       </div>
+
+      <div className="grid gap-4 lg:grid-cols-2">
+        {PROJETS.map((entree, index) => (
+          <Sante key={entree.projet} nom={entree.nom} reglages={reglages[index]?.data} />
+        ))}
+      </div>
+
+      <Comparaison indicateurs={donnees} />
+
+      <DelaisEnrolement colonnes={PROJETS} indicateurs={donnees} />
     </div>
   );
 }

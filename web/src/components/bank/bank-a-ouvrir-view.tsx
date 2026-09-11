@@ -1,12 +1,13 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { FolderPlusIcon, InboxIcon, UserPlusIcon } from 'lucide-react';
+import { FolderOpenIcon, FolderPlusIcon, InboxIcon, UserPlusIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { ClientRequestDialog } from '@/components/bank/client-request-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -50,6 +51,7 @@ export function BankAOuvrirView({ projet }: { projet: Projet }) {
   const surbrillance = useSearchParams().get('ouvrir');
   const [aOuvrir, setAOuvrir] = useState<InscriptionAOuvrir | null>(null);
   const [demande, setDemande] = useState(false);
+  const [pieces, setPieces] = useState<InscriptionAOuvrir | null>(null);
   const base = bankBasePath(projet);
 
   const inscriptions = useQuery({
@@ -139,6 +141,9 @@ export function BankAOuvrirView({ projet }: { projet: Projet }) {
                 ouverture.mutate({ inscriptionId: inscription.id });
               }}
               pending={ouverture.isPending && ouverture.variables?.inscriptionId === inscription.id}
+              onLirePieces={() => {
+                setPieces(inscription);
+              }}
             />
           ))}
         </ul>
@@ -155,8 +160,43 @@ export function BankAOuvrirView({ projet }: { projet: Projet }) {
           ouverture.mutate({ inscriptionId: aOuvrir.id, processingBankId });
         }}
       />
+      <PiecesDialog
+        inscription={pieces}
+        onClose={() => {
+          setPieces(null);
+        }}
+      />
       <ClientRequestDialog open={demande} onOpenChange={setDemande} initialTerm="" />
     </div>
+  );
+}
+
+/** Lire les pièces sans quitter la liste : la décision d'ouvrir se prend ici. */
+function PiecesDialog({
+  inscription,
+  onClose,
+}: {
+  inscription: InscriptionAOuvrir | null;
+  onClose: () => void;
+}) {
+  if (inscription === null) return null;
+  return (
+    <Dialog
+      open={true}
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>Pièces de {nomClient(inscription)}</DialogTitle>
+          <DialogDescription>
+            Les justificatifs déposés sur la plateforme, avant d’ouvrir le dossier.
+          </DialogDescription>
+        </DialogHeader>
+        <PiecesDeposees inscriptionId={inscription.id} />
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -165,11 +205,13 @@ function CarteInscription({
   surbrillance,
   pending,
   onOuvrir,
+  onLirePieces,
 }: {
   inscription: InscriptionAOuvrir;
   surbrillance: boolean;
   pending: boolean;
   onOuvrir: () => void;
+  onLirePieces: () => void;
 }) {
   const sansProspect = inscription.prospectId === null;
   return (
@@ -222,15 +264,16 @@ function CarteInscription({
               prospect, le prochain tirage le rapprochera.
             </p>
           ) : null}
-          <Button
-            type="button"
-            className="mt-auto"
-            disabled={sansProspect || pending}
-            onClick={onOuvrir}
-          >
-            <FolderPlusIcon aria-hidden="true" />
-            Ouvrir le dossier
-          </Button>
+          <div className="mt-auto flex flex-wrap gap-2">
+            <Button type="button" disabled={sansProspect || pending} onClick={onOuvrir}>
+              <FolderPlusIcon aria-hidden="true" />
+              Ouvrir le dossier
+            </Button>
+            <Button type="button" variant="outline" onClick={onLirePieces}>
+              <FolderOpenIcon aria-hidden="true" />
+              Lire les pièces
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </li>

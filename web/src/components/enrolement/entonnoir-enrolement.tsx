@@ -2,12 +2,19 @@
 
 import { ResponsiveLine } from '@nivo/line';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { InfoPopover } from '@/components/stats/stat-info';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { seriesColor, useChartTheme } from '@/lib/chart-theme';
 import type { Avancement, EnrolementIndicateurs } from '@/lib/data/enrolement';
 import { formatNumber, formatShortDate } from '@/lib/format';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
+
+const AIDE_ENTONNOIR =
+  'La chute entre deux étages est l’information cherchée : elle dit où les inscrits s’arrêtent, ce que le total seul ne montre pas.';
+
+const AIDE_COURBE =
+  'Les inscriptions lues sur chaque plateforme, à leur date. Les jours sans inscription restent visibles : ils font le rythme.';
 
 type Entonnoir = EnrolementIndicateurs['entonnoir'];
 type SerieJour = EnrolementIndicateurs['parJour'];
@@ -91,9 +98,15 @@ export function EntonnoirCarte({
   return (
     <Card>
       <CardContent className="flex flex-col gap-4">
-        <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-          {titre ?? 'Avancement des dossiers'}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="flex items-center gap-1.5 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            {titre ?? 'Avancement des dossiers'}
+            <InfoPopover label={titre ?? 'Avancement des dossiers'} description={AIDE_ENTONNOIR} />
+          </p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Ce qui reste à chaque étage, de la création du compte à la décision.
+          </p>
+        </div>
         {total === 0 ? (
           <p className="text-[0.875rem] text-muted-foreground">
             Aucune inscription sur la période retenue.
@@ -173,9 +186,15 @@ export function CourbeEnrolement({
   return (
     <Card>
       <CardContent className="flex flex-col gap-3">
-        <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
-          {titre}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="flex items-center gap-1.5 text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            {titre}
+            <InfoPopover label={titre} description={AIDE_COURBE} />
+          </p>
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Une courbe par plateforme, jour par jour.
+          </p>
+        </div>
         <div className="h-56">
           {jours.length === 0 ? (
             <EmptyChart message="Aucune inscription datée sur la période retenue." />

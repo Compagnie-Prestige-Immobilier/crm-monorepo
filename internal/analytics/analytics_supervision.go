@@ -520,6 +520,8 @@ func assemblerLesCampagnes(lignes []ligneDeCampagne) RendementDesCampagnes {
 
 func monterSupervision(api huma.API, s *service) {
 	routeDeLecture(api, "getSupervisionRepresentants", "/api/v1/supervision/representants", s.stockDesRepresentants)
+	monterQualiteDeLaBase(api, s)
+	monterQualiteDuMarketing(api, s)
 	routeDeLecture(api, "getSupervisionCampagnes", "/api/v1/supervision/campagnes", s.rendementDesCampagnes)
 	routeDeLecture(api, "getSupervisionActivite", "/api/v1/supervision/activite", s.activiteDesTeleconseillers)
 	routeDeLecture(api, "getSupervisionCreneaux", "/api/v1/supervision/creneaux", s.creneauxDeTravail)

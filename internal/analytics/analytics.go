@@ -814,18 +814,20 @@ func (s *service) rendementParDepartement(ctx context.Context, f *FiltreDesAnaly
 }
 
 var Garde = map[string][]socle.Role{
-	"GET /api/v1/analytics/funnel":               socle.Parcours,
-	"GET /api/v1/analytics/delays":               socle.Parcours,
-	"GET /api/v1/analytics/departement-yield":    socle.Parcours,
-	"GET /api/v1/analytics/by-enrollment-method": socle.Parcours,
-	"GET /api/v1/analytics/by-banque":            socle.Parcours,
-	"GET /api/v1/analytics/by-departement":       socle.Parcours,
-	"GET /api/v1/analytics/by-syndicat":          socle.Parcours,
-	"GET /api/v1/supervision/representants":      socle.Encadrement,
-	"GET /api/v1/supervision/campagnes":          socle.Encadrement,
-	"GET /api/v1/supervision/activite":           socle.Encadrement,
-	"GET /api/v1/supervision/creneaux":           socle.Encadrement,
-	"PUT /api/v1/supervision/creneaux":           socle.Encadrement,
+	"GET /api/v1/analytics/funnel":                  socle.Parcours,
+	"GET /api/v1/analytics/delays":                  socle.Parcours,
+	"GET /api/v1/analytics/departement-yield":       socle.Parcours,
+	"GET /api/v1/analytics/by-enrollment-method":    socle.Parcours,
+	"GET /api/v1/analytics/by-banque":               socle.Parcours,
+	"GET /api/v1/analytics/by-departement":          socle.Parcours,
+	"GET /api/v1/analytics/by-syndicat":             socle.Parcours,
+	"GET /api/v1/supervision/representants":         socle.Encadrement,
+	"GET /api/v1/supervision/representants/qualite": socle.Encadrement,
+	"GET /api/v1/supervision/prospects/marketing":   socle.Encadrement,
+	"GET /api/v1/supervision/campagnes":             socle.Encadrement,
+	"GET /api/v1/supervision/activite":              socle.Encadrement,
+	"GET /api/v1/supervision/creneaux":              socle.Encadrement,
+	"PUT /api/v1/supervision/creneaux":              socle.Encadrement,
 }
 
 func routeDeLecture[I, O any](api huma.API, id, chemin string, handler func(context.Context, *I) (*O, error)) {

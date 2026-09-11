@@ -12,6 +12,7 @@ import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { BankCourriels } from '@/components/bank/bank-courriels';
+import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { QueryErrorState } from '@/components/query-error-state';
@@ -200,6 +201,19 @@ function BankCaseActions({
   );
 }
 
+/** Sans les justificatifs, la banque instruit un dossier qu'elle n'a pas lu. */
+function PiecesDeLaPlateforme({ bankCase }: { bankCase: BankCase }) {
+  if (bankCase.inscriptionId === null) return null;
+  return (
+    <div className="flex flex-col gap-3 border-t border-border pt-4">
+      <p className="text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+        Pièces déposées sur la plateforme
+      </p>
+      <PiecesDeposees inscriptionId={bankCase.inscriptionId} />
+    </div>
+  );
+}
+
 function BankCaseSummaryCard({
   bankCase,
   canAct,
@@ -243,6 +257,8 @@ function BankCaseSummaryCard({
             </dd>
           </div>
         </dl>
+
+        <PiecesDeLaPlateforme bankCase={bankCase} />
 
         <RejectionNotice reason={bankCase.rejectionReason} detail={bankCase.rejectionDetail} />
 

@@ -83,6 +83,12 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   ).toBeVisible();
 }
 
+/** « Dans 1 h » promis avant minuit tombe demain : l'onglet suit l'échéance, pas l'heure du test. */
+function ongletDe(echeance: Date): string {
+  const jour = (d: Date) => d.toISOString().slice(0, 10);
+  return jour(echeance) === jour(new Date()) ? 'Aujourd’hui' : 'Cette semaine';
+}
+
 test.use({ storageState: compte.etat });
 
 test.afterAll(async () => {
@@ -110,7 +116,7 @@ test.describe('parcours 6, rappels promis', () => {
     );
     await expect(ligne).toHaveCount(0);
 
-    await page.getByRole('tab', { name: 'Aujourd’hui' }).click();
+    await page.getByRole('tab', { name: ongletDe(promis.scheduledAt) }).click();
     await expect(ligne).toBeVisible();
     await expect(ligne.getByRole('link', { name: 'Consigner l’appel' })).toBeVisible();
 
@@ -131,11 +137,12 @@ test.describe('parcours 6 en 390 px', () => {
 
     await promettreUnRappel(page, fiche);
 
+    const promis = await lireRappel(fiche.id);
     await page.goto(RAPPELS);
-    await page.getByRole('tab', { name: 'Aujourd’hui' }).click();
+    await page.getByRole('tab', { name: ongletDe(promis.scheduledAt) }).click();
     await expect(ligneRappel(page, fiche.phoneE164)).toBeVisible();
     await sansDebordementHorizontal(page);
 
-    expect((await lireRappel(fiche.id)).status).toBe('PENDING');
+    expect(promis.status).toBe('PENDING');
   });
 });
