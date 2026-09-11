@@ -14,11 +14,14 @@ make e2e     # build puis parcours Playwright contre le binaire et la base local
 
 Plusieurs bases sur le même Postgres : `DATABASE_URL` est la base `public`,
 chaque `DATABASE_URL_<NOM>` en ajoute une, choisie sur la page de connexion par
-`Ctrl+Shift+D`. Une base de plus se crée comme la première :
+`⌘/Ctrl+Shift+D` ou `⌘/Ctrl+Shift+N`. Une base de démonstration se crée comme
+la première, puis reçoit les mêmes référentiels, profils et données de dev :
 
 ```
 createdb cpi_v2_demo && psql cpi_v2_demo -v ON_ERROR_STOP=1 -q -f sql/schema.sql
-DATABASE_URL=postgres://localhost:5432/cpi_v2_demo?sslmode=disable go run ./cmd/server -seed
+DATABASE_URL=postgres://localhost:5432/cpi_v2_dev?sslmode=disable \
+DATABASE_URL_DEMO=postgres://localhost:5432/cpi_v2_demo?sslmode=disable \
+NODE_ENV=development go run ./cmd/server -seed
 ```
 
 Drapeaux du binaire : `-openapi` (contrat sur stdout), `-roles` (matrice des

@@ -357,7 +357,9 @@ async function reprendreOuverte(
     toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
     return;
   }
-  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`);
+  // Un identifiant fixe : la reprise au montage et le refus d'ouverture disent la
+  // même chose, et sonner remplace au lieu d'empiler.
+  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`, { id: 'reprise-fiche' });
   ouvrir({ representant, ouverture: courante });
 }
 

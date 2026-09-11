@@ -112,6 +112,10 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 }
 
 func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOutput, error) {
+	adresse, _ := ctx.Value(socle.CleAdresse{}).(string)
+	if !s.tentatives.Autorise(adresse) {
+		return nil, socle.Problem(http.StatusTooManyRequests, "RATE_LIMITED", "Trop de tentatives. Réessayez dans une minute.")
+	}
 	if s.Cfg.Base == socle.BasePublique {
 		return nil, socle.Problem(http.StatusForbidden, "DEMO_BASE_REQUIRED", "Sélectionnez une base de démonstration.")
 	}
