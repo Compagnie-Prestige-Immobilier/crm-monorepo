@@ -912,7 +912,8 @@ func (s *service) exportModeleGrandPublic(ctx context.Context, _ *struct{}) (*hu
 			"Seuls le Nom et le Téléphone sont exigés. Une cellule vide n’est pas une erreur : c’est une information qu’on n’a pas encore, et la ligne est écrite quand même.",
 			"Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.",
 			"« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.",
-			"Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import."),
+			"Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import.",
+			"Un export de campagne garde ses propres colonnes : une colonne « Nom complet » remplace Prénom et Nom, son dernier mot faisant le nom de famille, et une colonne « Email » est reprise sur la fiche. Une page d’atterrissage ou un nom de campagne en colonne de provenance est traduit par les règles de provenance."),
 	})
 }
 
@@ -947,6 +948,16 @@ func (s *service) exportListesGrandPublic(ctx context.Context) ([]exportListeMod
 		{14, "Modes d’épargne", []string{exportLibelleTontine, "Mobile money", exportEnteteBanque, exportLibelleAucun}},
 		{15, "Pays", pays},
 	}, nil
+}
+
+// L'import Grand Public reconnaît la ligne d'exemple du modèle pour la sauter :
+// les deux listes doivent rester dans le même ordre.
+func ExemplesGrandPublic() []string {
+	exemples := make([]string, len(exportColonnesGrandPublic))
+	for i, colonne := range exportColonnesGrandPublic {
+		exemples[i] = colonne.exemple
+	}
+	return exemples
 }
 
 var exportColonnesGrandPublic = []exportColonneModele{

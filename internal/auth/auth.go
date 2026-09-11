@@ -54,6 +54,26 @@ type LoginInput struct {
 	}
 }
 
+type DemoLoginInput struct {
+	UserAgent string `header:"User-Agent"`
+	Body      struct {
+		Role string `json:"role" minLength:"1" maxLength:"32"`
+	}
+}
+
+var demoProfiles = map[string]struct {
+	email string
+	role  db.Role
+}{
+	"ADMIN":            {email: "admin@cpi.sn", role: db.RoleADMIN},
+	"COMMERCIAL":       {email: "fixture.awa@cpi.sn", role: db.RoleCOMMERCIAL},
+	"BANQUE_FINANCE":   {email: "fixture.banque@cpi.sn", role: db.RoleBANQUEFINANCE},
+	"SUPERVISEUR":      {email: "fixture.superviseur@cpi.sn", role: db.RoleSUPERVISEUR},
+	"DIRECTION":        {email: "fixture.direction@cpi.sn", role: db.RoleDIRECTION},
+	"ACCUEIL":          {email: "fixture.accueil@cpi.sn", role: db.RoleACCUEIL},
+	"CHARGE_CLIENTELE": {email: "fixture.clientele@cpi.sn", role: db.RoleCHARGECLIENTELE},
+}
+
 // Le compte est forcément actif : la session d'un compte désactivé est coupée
 // avant d'arriver ici. `workspace` nomme la base qui sert cette session.
 type CompteConnecte struct {
@@ -88,6 +108,31 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	if !u.IsActive {
 		return nil, socle.Problem(http.StatusUnauthorized, "ACCOUNT_DISABLED", "Ce compte est désactivé. Contactez un administrateur.")
 	}
+	return s.ouvrirSession(ctx, in.UserAgent, u)
+}
+
+func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOutput, error) {
+	if s.Cfg.Base == socle.BasePublique {
+		return nil, socle.Problem(http.StatusForbidden, "DEMO_BASE_REQUIRED", "Sélectionnez une base de démonstration.")
+	}
+	profil, ok := demoProfiles[in.Body.Role]
+	if !ok {
+		return nil, socle.Problem(http.StatusBadRequest, "UNKNOWN_DEMO_PROFILE", "Profil de démonstration inconnu.")
+	}
+	u, err := s.Q.UserForLogin(ctx, profil.email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusServiceUnavailable, "DEMO_NOT_SEEDED", "Cette base de démonstration n'est pas encore amorcée.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !u.IsActive || u.Role != profil.role {
+		return nil, socle.Problem(http.StatusServiceUnavailable, "DEMO_NOT_AVAILABLE", "Ce profil de démonstration n'est pas disponible.")
+	}
+	return s.ouvrirSession(ctx, in.UserAgent, u)
+}
+
+func (s *service) ouvrirSession(ctx context.Context, userAgent string, u db.UserForLoginRow) (*SessionOutput, error) {
 	brut := make([]byte, 32)
 	if _, err := rand.Read(brut); err != nil {
 		return nil, err
@@ -99,7 +144,7 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	}
 	if err := s.Q.InsertSession(ctx, db.InsertSessionParams{
 		ID: id.String(), UserId: u.ID, TokenHash: socle.Empreinte(jeton),
-		ExpiresAt: time.Now().Add(s.Cfg.SessionTTL), UserAgent: &in.UserAgent,
+		ExpiresAt: time.Now().Add(s.Cfg.SessionTTL), UserAgent: stringPtr(userAgent),
 	}); err != nil {
 		return nil, err
 	}
@@ -110,6 +155,8 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	out.Body.User = s.compte(&socle.Utilisateur{ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role), PhoneE164: u.PhoneE164})
 	return out, nil
 }
+
+func stringPtr(value string) *string { return &value }
 
 func (s *service) compte(u *socle.Utilisateur) CompteConnecte {
 	return CompteConnecte{Utilisateur: *u, IsActive: true, Workspace: s.Cfg.Base}
@@ -161,6 +208,7 @@ func Monter(api huma.API, d *socle.Deps) error {
 	}
 	s := &service{Deps: d, leurre: leurre, tentatives: socle.NouveauLimiteur(d.Cfg.LoginRate)}
 	huma.Post(api, "/api/v1/auth/login", s.login)
+	huma.Post(api, "/api/v1/auth/demo-login", s.demoLogin)
 	huma.Get(api, "/api/v1/auth/me", s.me)
 	huma.Get(api, "/api/v1/auth/bases", s.bases)
 	huma.Register(api, huma.Operation{OperationID: "logout", Method: http.MethodPost, Path: "/api/v1/auth/logout", DefaultStatus: http.StatusNoContent}, s.logout)
@@ -210,6 +258,7 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 var Garde = map[string][]socle.Role{
 	"GET /health/ready":            {socle.Public},
 	"POST /api/v1/auth/login":      {socle.Public},
+	"POST /api/v1/auth/demo-login": {socle.Public},
 	"GET /api/v1/auth/bases":       {socle.Public},
 	"POST /api/v1/auth/logout":     socle.Tous,
 	"GET /api/v1/auth/me":          socle.Tous,

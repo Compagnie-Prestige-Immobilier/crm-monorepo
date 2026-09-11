@@ -95,7 +95,7 @@ test.describe('parcours 1, seconde base', () => {
     await page.getByRole('button', { name: 'Se connecter' }).click();
     await expect(page.getByRole('alert')).toHaveText('Identifiants invalides.');
 
-    await page.keyboard.press('Control+Shift+D');
+    await page.keyboard.press('Control+Shift+N');
     await page.getByRole('combobox', { name: 'Base' }).click();
     await page.getByRole('option', { name: 'demo' }).click();
     await page.getByRole('button', { name: 'Se connecter' }).click();

@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
 
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
+import { DemoBanner } from '@/components/layout/demo-banner';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
 import { UserMenu } from '@/components/layout/user-menu';
 import { LiveStream } from '@/components/live/live-stream';
@@ -23,6 +24,7 @@ function Hub() {
   return (
     <div className="flex min-h-dvh flex-col">
       <LiveStream />
+      <DemoBanner user={user} />
       <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
         <img
           src="/brand/cpi-header.webp"
