@@ -5,6 +5,7 @@ import (
 	"cpi-go/db"
 	"cpi-go/internal/exports"
 	"cpi-go/internal/shared/database"
+	"encoding/json"
 	"fmt"
 	"regexp"
 	"strconv"
@@ -889,6 +890,7 @@ type ligneGrandPublicImport struct {
 type etatGrandPublicImport struct {
 	region                       string
 	vus                          map[string]int
+	emails                       map[string]int
 	banques, syndicats           map[string]string
 	banqueLabels, syndicatLabels []string
 	canaux                       map[string]string
@@ -922,7 +924,7 @@ func preparerGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImp
 		return nil, err
 	}
 	etat := &etatGrandPublicImport{
-		region: c.region, vus: map[string]int{},
+		region: c.region, vus: map[string]int{}, emails: map[string]int{},
 		banques: banques.index, banqueLabels: banques.libelles,
 		syndicats: syndicats.index, syndicatLabels: syndicats.libelles,
 		canaux: map[string]string{}, employeurs: map[string]string{}, pays: map[string]string{},
@@ -952,8 +954,12 @@ func reglesProvenanceImport(ctx context.Context, q *db.Queries, canaux map[strin
 	if err != nil || len(valeurs) == 0 {
 		return nil, err
 	}
+	var lignes []string
+	if err := json.Unmarshal([]byte(valeurs[0]), &lignes); err != nil {
+		return nil, classeurImportError{"Les règles de provenance de Paramètres CHUES sont illisibles."}
+	}
 	var regles []regleProvenanceImport
-	for _, brute := range strings.Split(valeurs[0], "\n") {
+	for _, brute := range lignes {
 		parts := strings.Split(brute, "|")
 		if strings.TrimSpace(brute) == "" {
 			continue
@@ -1225,22 +1231,9 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		},
 		enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_DOUBLON_DANS_LE_FICHIER")
 
-	telephones := make([]string, 0, len(uniques))
-	for _, valeur := range uniques {
-		telephones = append(telephones, valeur.(ligneGrandPublicImport).telephone)
-	}
-	deja := map[string]map[db.Projet]bool{}
-	for _, lot := range lotsImport(telephones) {
-		connus, err := q.ImportProspectsConnus(ctx, lot)
-		if err != nil {
-			return bilanTrancheImport{}, err
-		}
-		for _, ligne := range connus {
-			deja[ligne.PhoneE164] = map[db.Projet]bool{
-				db.ProjetGRANDPUBLIC: ligne.ParcoursGp || ligne.Projet == db.ProjetGRANDPUBLIC,
-				db.ProjetCHUES:       ligne.ParcoursChues || ligne.Projet == db.ProjetCHUES,
-			}
-		}
+	deja, dejaEmail, err := dejaEnBaseGrandPublicImport(ctx, q, uniques)
+	if err != nil {
+		return bilanTrancheImport{}, err
 	}
 
 	var retenues []ligneGrandPublicImport
@@ -1249,6 +1242,10 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		if deja[ligne.telephone][ligne.projet] {
 			erreurs = append(erreurs, *refusImport(ligne.numero, enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_DEJA_EN_BASE",
 				fmt.Sprintf("Ce prospect %s existe déjà en base.", libelleProjetImport(ligne.projet))))
+			continue
+		}
+		if refus := doublonEmailGrandPublicImport(&ligne, etat, dejaEmail); refus != nil {
+			erreurs = append(erreurs, *refus)
 			continue
 		}
 		retenues = append(retenues, ligne)
@@ -1261,6 +1258,69 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		return bilanTrancheImport{}, err
 	}
 	return bilanTrancheImport{crees: crees, ignorees: len(retenues) - crees, erreurs: erreurs}, nil
+}
+
+// Téléphone et courriel repèrent la même personne : la plateforme rapproche ses
+// inscriptions par l'un puis par l'autre.
+func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []any,
+) (telephones, emails map[string]map[db.Projet]bool, err error) {
+	telephones, emails = map[string]map[db.Projet]bool{}, map[string]map[db.Projet]bool{}
+	clesTelephone := make([]string, 0, len(uniques))
+	clesEmail := make([]string, 0, len(uniques))
+	for _, valeur := range uniques {
+		ligne := valeur.(ligneGrandPublicImport)
+		clesTelephone = append(clesTelephone, ligne.telephone)
+		if ligne.email != nil {
+			clesEmail = append(clesEmail, *ligne.email)
+		}
+	}
+	for _, lot := range lotsImport(clesTelephone) {
+		connus, err := q.ImportProspectsConnus(ctx, lot)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, ligne := range connus {
+			telephones[ligne.PhoneE164] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
+		}
+	}
+	for _, lot := range lotsImport(clesEmail) {
+		connus, err := q.ImportProspectsConnusParEmail(ctx, lot)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, ligne := range connus {
+			emails[ligne.Email] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
+		}
+	}
+	return telephones, emails, nil
+}
+
+func projetsPortesImport(projet db.Projet, parcoursGp, parcoursChues bool) map[db.Projet]bool {
+	return map[db.Projet]bool{
+		db.ProjetGRANDPUBLIC: parcoursGp || projet == db.ProjetGRANDPUBLIC,
+		db.ProjetCHUES:       parcoursChues || projet == db.ProjetCHUES,
+	}
+}
+
+// Deux numéros pour une seule adresse, c'est la même personne qui a rempli deux
+// fois le formulaire : la seconde ligne est signalée, jamais écrite.
+func doublonEmailGrandPublicImport(ligne *ligneGrandPublicImport, etat *etatGrandPublicImport,
+	connus map[string]map[db.Projet]bool,
+) *erreurLigneImport {
+	if ligne.email == nil {
+		return nil
+	}
+	colonne := enteteGrandPublicImport(19)
+	if precedente, deja := etat.emails[*ligne.email]; deja {
+		return refusImport(ligne.numero, colonne, "PROSPECT_GP_IMPORT_EMAIL_DOUBLON_FICHIER",
+			fmt.Sprintf("Cette adresse figure déjà à la ligne %d du fichier.", precedente))
+	}
+	etat.emails[*ligne.email] = ligne.numero
+	if connus[*ligne.email][ligne.projet] {
+		return refusImport(ligne.numero, colonne, "PROSPECT_GP_IMPORT_EMAIL_DEJA_EN_BASE",
+			fmt.Sprintf("Cette adresse porte déjà un prospect %s en base.", libelleProjetImport(ligne.projet)))
+	}
+	return nil
 }
 
 func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,

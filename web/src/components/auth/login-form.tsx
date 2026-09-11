@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { AlertCircleIcon, LoaderIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 
 import { meQueryOptions } from '@/api/auth';
 import { resetSessionExpiryGuard } from '@/lib/api/session-expiry';
@@ -55,6 +55,86 @@ function baseCourante(): string {
 /** Le serveur lit ce cookie sur chaque requête et ne sert que les bases qu'il connaît. */
 function choisirBase(nom: string): void {
   document.cookie = `${COOKIE_BASE}=${nom}; path=/; max-age=31536000; SameSite=Lax`;
+}
+
+function CredentialsFields({
+  register,
+  errors,
+}: {
+  register: UseFormRegister<LoginInput>;
+  errors: FieldErrors<LoginInput>;
+}) {
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="identifier">E-mail ou identifiant</Label>
+        <Input
+          id="identifier"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-invalid={errors.identifier !== undefined}
+          aria-describedby={errors.identifier !== undefined ? 'identifier-error' : undefined}
+          {...register('identifier')}
+        />
+        {errors.identifier !== undefined ? (
+          <p id="identifier-error" role="alert" className="text-[0.75rem] text-destructive">
+            {errors.identifier.message}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Mot de passe</Label>
+        <Input
+          id="password"
+          type="password"
+          autoComplete="current-password"
+          aria-invalid={errors.password !== undefined}
+          aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
+          {...register('password')}
+        />
+        {errors.password !== undefined ? (
+          <p id="password-error" role="alert" className="text-[0.75rem] text-destructive">
+            {errors.password.message}
+          </p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function DemoProfileField({
+  role,
+  onChange,
+}: {
+  role: Role;
+  onChange: (role: Role) => void;
+}) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="demo-role">Profil démo</Label>
+      <Select
+        value={role}
+        onValueChange={(value) => {
+          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role)) onChange(value as Role);
+        }}
+        items={DEMO_ROLES.map((demoRole) => ({ value: demoRole, label: ROLE_LABELS[demoRole] }))}
+      >
+        <SelectTrigger id="demo-role" aria-label="Profil démo">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {DEMO_ROLES.map((demoRole) => (
+            <SelectItem key={demoRole} value={demoRole}>
+              {ROLE_LABELS[demoRole]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
 }
 
 export function LoginForm({ next }: { next?: string | null }) {
@@ -181,67 +261,9 @@ export function LoginForm({ next }: { next?: string | null }) {
       ) : null}
 
       {base === BASE_PUBLIQUE ? (
-        <>
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="identifier">E-mail ou identifiant</Label>
-            <Input
-              id="identifier"
-              type="text"
-              autoComplete="username"
-              autoCapitalize="none"
-              spellCheck={false}
-              aria-invalid={errors.identifier !== undefined}
-              aria-describedby={errors.identifier !== undefined ? 'identifier-error' : undefined}
-              {...register('identifier')}
-            />
-            {errors.identifier !== undefined ? (
-              <p id="identifier-error" role="alert" className="text-[0.75rem] text-destructive">
-                {errors.identifier.message}
-              </p>
-            ) : null}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <Label htmlFor="password">Mot de passe</Label>
-            <Input
-              id="password"
-              type="password"
-              autoComplete="current-password"
-              aria-invalid={errors.password !== undefined}
-              aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
-              {...register('password')}
-            />
-            {errors.password !== undefined ? (
-              <p id="password-error" role="alert" className="text-[0.75rem] text-destructive">
-                {errors.password.message}
-              </p>
-            ) : null}
-          </div>
-        </>
+        <CredentialsFields register={register} errors={errors} />
       ) : (
-        <div className="flex flex-col gap-2">
-          <Label htmlFor="demo-role">Profil démo</Label>
-          <Select
-            value={demoRole}
-            onValueChange={(value) => {
-              if (typeof value === 'string' && DEMO_ROLES.includes(value as Role)) {
-                setDemoRole(value as Role);
-              }
-            }}
-            items={DEMO_ROLES.map((role) => ({ value: role, label: ROLE_LABELS[role] }))}
-          >
-            <SelectTrigger id="demo-role" aria-label="Profil démo">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {DEMO_ROLES.map((role) => (
-                <SelectItem key={role} value={role}>
-                  {ROLE_LABELS[role]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        <DemoProfileField role={demoRole} onChange={setDemoRole} />
       )}
 
       {bases === null ? null : (

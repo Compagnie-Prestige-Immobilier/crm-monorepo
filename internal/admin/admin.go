@@ -1179,13 +1179,19 @@ func reponseDisposition(d Disposition, source string, updatedAt *time.Time) *Dis
 
 func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*DispositionOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
+	rendre := func(d Disposition, source string, updatedAt *time.Time) *DispositionOutput {
+		if u.Role != socle.Admin {
+			d = sansEnrolement(d)
+		}
+		return reponseDisposition(d, source, updatedAt)
+	}
 	sienne, err := s.Q.GetDashboardLayout(ctx, db.GetDashboardLayoutParams{UserId: u.ID, Ecran: in.Ecran})
 	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
 	if err == nil {
 		if d, ok := lireDispositionStockee(in.Ecran, sienne.Layout, true); ok {
-			return reponseDisposition(d, "utilisateur", &sienne.UpdatedAt), nil
+			return rendre(d, "utilisateur", &sienne.UpdatedAt), nil
 		}
 	}
 	defaut, err := s.Q.GetSetting(ctx, CleDispositionDefaut(in.Ecran))
@@ -1194,10 +1200,20 @@ func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*D
 	}
 	if err == nil {
 		if d, ok := lireDispositionStockee(in.Ecran, []byte(defaut.Value), false); ok {
-			return reponseDisposition(d, "defaut", &defaut.UpdatedAt), nil
+			return rendre(d, "defaut", &defaut.UpdatedAt), nil
 		}
 	}
-	return reponseDisposition(dispositionUsine(in.Ecran, u.Role == socle.Admin || u.Role == socle.Direction), "usine", nil), nil
+	montants := u.Role == socle.Admin || u.Role == socle.Direction
+	return rendre(dispositionUsine(in.Ecran, montants), "usine", nil), nil
+}
+
+// L'enrôlement ne sort pas de la cellule pilotage : son API refuse les autres
+// rôles, et la carte resterait vide, sans moyen de la retirer de l'écran.
+func sansEnrolement(d Disposition) Disposition {
+	d.Widgets = slices.DeleteFunc(slices.Clone(d.Widgets), func(w DispositionWidget) bool {
+		return slices.Contains(sourcesEnrolement, w.Source)
+	})
+	return d
 }
 
 func dispositionAEcrire(ecran, preset string, widgets []DispositionWidget) (Disposition, []byte, error) {

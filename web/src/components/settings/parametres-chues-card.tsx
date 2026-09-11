@@ -34,6 +34,7 @@ const LIBELLES: Record<string, string> = {
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
   destinatairesDirection: 'Direction',
+  codificationProvenances: 'Règles de provenance',
 };
 
 const LISTES = [
@@ -43,6 +44,8 @@ const LISTES = [
   'destinatairesDirection',
 ] as const;
 
+const CODIFICATION = 'codificationProvenances';
+
 /** Une adresse par ligne : c'est ainsi qu'on les copie depuis un annuaire. */
 const enLignes = (adresses: readonly string[]): string => adresses.join('\n');
 const enListe = (saisie: string): string[] =>
@@ -50,6 +53,14 @@ const enListe = (saisie: string): string[] =>
     .split(/[\n,;]/)
     .map((part) => part.trim())
     .filter((part) => part !== '');
+
+// Une règle porte des virgules et des points-virgules dans ses libellés : seul le
+// retour à la ligne la sépare de la suivante.
+const enRegles = (saisie: string): string[] =>
+  saisie
+    .split('\n')
+    .map((ligne) => ligne.trim())
+    .filter((ligne) => ligne !== '');
 
 export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolean }) {
   const queryClient = useQueryClient();
@@ -100,6 +111,10 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     const corps: Record<string, unknown> = {};
     for (const [cle, texte] of Object.entries(brouillon)) {
       if (texte === undefined) continue;
+      if (cle === CODIFICATION) {
+        corps[cle] = enRegles(texte);
+        continue;
+      }
       corps[cle] = (LISTES as readonly string[]).includes(cle) ? enListe(texte) : texte;
     }
     enregistrement.mutate(corps);
@@ -147,6 +162,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
       </Card>
 
       {peutToutRegler ? <CarteDestinataires valeur={valeur} saisir={saisir} /> : null}
+      {peutToutRegler ? <CarteCodification valeur={valeur} saisir={saisir} /> : null}
 
       <div className="flex items-center justify-end gap-3">
         {enregistrement.isError ? (
@@ -235,6 +251,37 @@ function CarteDestinataires({ valeur, saisir }: ChampsProps) {
             )}
           </Field>
         ))}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CarteCodification({ valeur, saisir }: ChampsProps) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Provenances des classeurs importés</CardTitle>
+        <p className="mt-1 text-[0.875rem] text-muted-foreground">
+          Une règle par ligne : motif, canal, projet, séparés par une barre verticale. Le motif est
+          cherché dans la colonne de provenance du classeur. Ajoutez une ligne quand une campagne
+          nouvelle apparaît, sinon l’import refuse ses lignes.
+        </p>
+      </CardHeader>
+      <CardContent>
+        <Field label={LIBELLES[CODIFICATION] ?? CODIFICATION}>
+          {(props) => (
+            <Textarea
+              {...props}
+              rows={6}
+              spellCheck={false}
+              placeholder="Meta CPI GRAND PUBLIC | Meta (Facebook et Instagram) | GRAND_PUBLIC"
+              value={valeur(CODIFICATION)}
+              onChange={(event) => {
+                saisir(CODIFICATION, event.target.value);
+              }}
+            />
+          )}
+        </Field>
       </CardContent>
     </Card>
   );

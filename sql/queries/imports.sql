@@ -135,8 +135,18 @@ SELECT "phoneE164", "representantId", "projet",
 FROM "prospects" p
 WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
+-- Réglée dans Paramètres CHUES, d'où le préfixe : une liste JSON de règles.
 -- name: ImportReglesProvenance :many
-SELECT "value" FROM "app_settings" WHERE "key" = 'imports.provenances';
+SELECT "value" FROM "app_settings" WHERE "key" = 'chues.codificationProvenances';
+
+-- Le courriel se compare sans casse : la plateforme et les campagnes ne
+-- s'accordent pas sur les majuscules.
+-- name: ImportProspectsConnusParEmail :many
+SELECT lower("email") AS "email", "projet",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
+FROM "prospects" p
+WHERE lower("email") = ANY(@emails::text[]) AND "deletedAt" IS NULL;
 
 -- name: ImportProspectsParTelephone :many
 SELECT "id", "phoneE164" FROM "prospects"
