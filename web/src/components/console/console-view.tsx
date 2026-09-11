@@ -48,7 +48,8 @@ import {
 } from '@/lib/data/console';
 import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import {
-  EFFET_ISSUE,
+  commentaireExigePar,
+  issueDuMotif,
   estJoignable,
   fetchMotifsAppel,
   type MotifAppel,
@@ -114,19 +115,38 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
 ].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
 /**
- * Grand Public : l'injoignabilité ne passe plus par le référentiel. Ses motifs
- * sont ceux de CHUES, figés, pour que l'ADMIN ne puisse pas vider l'écran.
+ * Grand Public : « Injoignable » propose les statuts non aboutis de CHUES, figés
+ * ici pour que l'ADMIN ne puisse pas vider l'écran. Le référentiel porte les
+ * mêmes codes en entrées système : sans elles, le serveur refuserait l'appel.
  */
-const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = MOTIFS_SYSTEME.filter(
-  (motif) => !estJoignable(motif),
-);
+const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
+  { code: 'PAS_DE_REPONSE', label: 'Pas de réponse' },
+  { code: 'NUMERO_OCCUPE', label: 'Occupé' },
+  { code: 'MESSAGERIE', label: 'Messagerie' },
+  { code: 'TELEPHONE_INDISPONIBLE', label: 'Téléphone indisponible' },
+  { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' },
+  { code: 'AUTRE_NON_JOINT', label: 'Autre', requiresComment: true },
+].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
 
-/** Après « Joignable », le statut qui dit le contraire n'a plus de sens. */
-const CODE_INJOIGNABLE = 'UNREACHABLE';
+/** Après « Joignable », les statuts qui disent le contraire n'ont plus de sens. */
+const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
+  'UNREACHABLE',
+  ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
+]);
+
+/** Les statuts propres à l'écran Grand Public : la console CHUES garde ses motifs. */
+const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
+  'INTERESSE',
+  'HORS_CIBLE',
+  ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
+]);
 
 /** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
-  catalogue.filter((item) => item.code !== CODE_INJOIGNABLE && item.effect !== 'CLOSE_METHOD');
+  catalogue.filter((item) => !CODES_INJOIGNABLE.has(item.code) && item.effect !== 'CLOSE_METHOD');
+
+const statutsDuGroupe = (groupe: Groupe | null, catalogue: readonly MotifAppel[]) =>
+  groupe === 'injoignable' ? MOTIFS_INJOIGNABLE : statutsJoignables(catalogue);
 
 /**
  * Le statut de l'adhésion : celui qu'on a choisi s'il en est un, sinon le
@@ -177,7 +197,8 @@ export function ConsoleView({
   const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
-  const [origine, setOrigine] = useState<OrigineFiche>('TOUS');
+  const origineInitiale: OrigineFiche = projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+  const [origine, setOrigine] = useState<OrigineFiche>(origineInitiale);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
@@ -251,6 +272,7 @@ export function ConsoleView({
         confirme={confirme}
         cherche={cherche}
         search={search}
+        projet={projet}
         origine={origineFiltrable ? origine : null}
         onSearch={setSearch}
         onOrigine={setOrigine}
@@ -296,6 +318,7 @@ function EnTeteAnnuaire({
   confirme,
   cherche,
   search,
+  projet,
   origine,
   onSearch,
   onOrigine,
@@ -304,11 +327,17 @@ function EnTeteAnnuaire({
   confirme: string | null;
   cherche: string;
   search: string;
+  projet: Projet;
   /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
   origine: OrigineFiche | null;
   onSearch: (value: string) => void;
   onOrigine: (value: OrigineFiche) => void;
 }) {
+  let texteAide: string;
+  if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
+  else if (projet === 'GRAND_PUBLIC') texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
+  else texteAide = 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
+
   return (
     <>
       {lienEnEchec ? (
@@ -330,11 +359,7 @@ function EnTeteAnnuaire({
 
       {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
 
-      <p className="text-[0.8125rem] text-muted-foreground">
-        {cherche === ''
-          ? 'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.'
-          : 'Choisissez qui vous venez d’appeler.'}
-      </p>
+      <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
     </>
   );
 }
@@ -702,18 +727,24 @@ function etapeCourante(
   return groupe === null ? 'issues' : 'motifs';
 }
 
-/** Grand Public : « Joignable » mène au select de statut et à son dossier. */
+/** Grand Public : chaque réponse à « joignable ? » ouvre son select de statut. */
+const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
+  statutParSelect && groupe !== null;
+
+/** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
 const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe === 'joignable';
 
-/** Les motifs du groupe ouvert ; Grand Public fige ceux de l'injoignabilité. */
+/** Les boutons de motif de la console CHUES, pour le groupe ouvert. */
 function motifsDuGroupe(
   catalogue: readonly MotifAppel[],
   groupe: Groupe | null,
-  statutParSelect: boolean,
 ): readonly MotifAppel[] {
-  if (statutParSelect && groupe === 'injoignable') return MOTIFS_INJOIGNABLE;
-  return catalogue.filter((item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe);
+  return catalogue.filter(
+    (item) =>
+      !CODES_GRAND_PUBLIC.has(item.code) &&
+      (estJoignable(item) ? 'joignable' : 'injoignable') === groupe,
+  );
 }
 
 /**
@@ -818,7 +849,7 @@ export function Consignation({
     ) => {
       if (closed || send.isPending) return;
       const draft: AttemptDraft = {
-        outcome: EFFET_ISSUE[choisi.effect],
+        outcome: issueDuMotif(choisi),
         reasonCode: choisi.code,
         method,
         comment,
@@ -918,7 +949,7 @@ export function Consignation({
     if (motif !== null) record(motif, null);
   }, [conversion, submitConversion, slots, freeCallback, motif, record]);
 
-  const surStatut = surJoignable(groupe, statutParSelect);
+  const surStatut = surSelect(groupe, statutParSelect);
   const etape = etapeCourante(closed, conversion, slots, groupe, surStatut);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
@@ -946,7 +977,7 @@ export function Consignation({
     if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
   };
 
-  const proposes = motifsDuGroupe(catalogue, groupe, statutParSelect);
+  const proposes = motifsDuGroupe(catalogue, groupe);
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
   const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
 
@@ -1025,10 +1056,13 @@ export function Consignation({
 
         {surStatut ? (
           <SelectStatut
-            catalogue={statutsJoignables(catalogue)}
+            catalogue={statutsDuGroupe(groupe, catalogue)}
             motif={motif}
             disabled={send.isPending || closed}
             onChange={poserStatut}
+            onFerme={() => {
+              if (motif?.requiresComment) commentRef.current?.focus();
+            }}
           />
         ) : null}
 
@@ -1073,7 +1107,7 @@ export function Consignation({
         {etape === null ? null : (
           <Commentaire
             value={comment}
-            obligatoire={motif?.requiresComment ?? false}
+            obligatoirePour={commentaireExigePar(motif)}
             inputRef={commentRef}
             onChange={setComment}
             onValidate={validate}
@@ -1083,6 +1117,7 @@ export function Consignation({
         <PiedAppel
           etape={statutParSelect ? etape : null}
           disabled={send.isPending}
+          statutPose={motif !== null}
           onValidate={validate}
           onAbandon={onAbandon}
         />
@@ -1263,18 +1298,21 @@ function EnTeteFiche({
 function PiedAppel({
   etape,
   disabled,
+  statutPose,
   onValidate,
   onAbandon,
 }: {
   etape: Etape;
   disabled: boolean;
+  /** Sans statut, l'appel n'a rien à dire : le bouton attend qu'on en choisisse un. */
+  statutPose: boolean;
   onValidate: () => void;
   onAbandon: () => void;
 }) {
   if (etape !== 'statut' && etape !== 'echeance') return null;
   return (
     <div className="flex flex-wrap gap-2">
-      <Button onClick={onValidate} disabled={disabled}>
+      <Button onClick={onValidate} disabled={disabled || !statutPose}>
         Enregistrer l’appel
         <Kbd>Entrée</Kbd>
       </Button>
@@ -1372,13 +1410,14 @@ export function PanneauEcheance({
 
 export function Commentaire({
   value,
-  obligatoire,
+  obligatoirePour,
   inputRef,
   onChange,
   onValidate,
 }: {
   value: string;
-  obligatoire: boolean;
+  /** Le statut qui réclame le commentaire, nul quand il reste facultatif. */
+  obligatoirePour: string | null;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (value: string) => void;
   onValidate: () => void;
@@ -1387,7 +1426,7 @@ export function Commentaire({
     <div className="flex flex-col gap-1.5">
       <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
         Commentaire
-        {obligatoire ? ' (obligatoire pour Autre)' : ''}
+        {obligatoirePour === null ? '' : ` (obligatoire pour ${obligatoirePour})`}
       </label>
       <Textarea
         id="console-comment"

@@ -21,6 +21,7 @@ export function SelectStatut({
   obligatoire = true,
   placeholder = 'Choisir un statut',
   onChange,
+  onFerme,
 }: {
   catalogue: readonly MotifAppel[];
   motif: MotifAppel | null;
@@ -29,6 +30,11 @@ export function SelectStatut({
   obligatoire?: boolean;
   placeholder?: string;
   onChange: (motif: MotifAppel) => void;
+  /**
+   * Une fois la liste refermée. Avant, le focus qu'on poserait ailleurs serait
+   * aussitôt rendu au déclencheur par le select.
+   */
+  onFerme?: (() => void) | undefined;
 }) {
   // `items` n'est pas décoratif : sans lui, le déclencheur affiche la VALEUR,
   // donc le code du motif, au lieu du libellé de la ligne choisie.
@@ -44,6 +50,9 @@ export function SelectStatut({
           onValueChange={(code) => {
             const choisi = catalogue.find((item) => item.code === code);
             if (choisi !== undefined) onChange(choisi);
+          }}
+          onOpenChangeComplete={(ouvert) => {
+            if (!ouvert) onFerme?.();
           }}
         >
           <SelectTrigger {...props} className="max-w-md">

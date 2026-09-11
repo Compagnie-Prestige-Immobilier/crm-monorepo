@@ -14,6 +14,9 @@ cpi-go
 openapi.json
 storage/
 web/dist/*
+apps/api
+apps/web
+packages/*
 !web/dist/.gitkeep
 web/src/routeTree.gen.ts
 web/src/api/schema.d.ts

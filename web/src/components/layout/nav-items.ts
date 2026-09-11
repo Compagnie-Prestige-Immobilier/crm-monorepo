@@ -591,10 +591,10 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
-        href: '/grand-public',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Créer, retrouver et suivre les prospects',
+        href: '/grand-public/console',
+        label: 'Appeler les prospects',
+        icon: PhoneCallIcon,
+        description: 'Les fiches de campagne à appeler',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
@@ -609,6 +609,22 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées',
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public',
+        label: 'Prospects',
+        icon: UsersIcon,
+        description: 'Créer, retrouver et suivre les prospects',
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        secondary: true,
+      },
+      {
+        href: '/grand-public/nouveau',
+        label: 'Nouveau prospect',
+        icon: PlusCircleIcon,
+        description: 'Créer une fiche',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },

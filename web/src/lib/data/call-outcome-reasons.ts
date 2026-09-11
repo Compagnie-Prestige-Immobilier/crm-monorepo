@@ -86,6 +86,21 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
   KEEP_OPEN: 'UNREACHABLE',
 };
 
+/**
+ * KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien. Envoyé en
+ * UNREACHABLE, « Intéressé » s'afficherait « Injoignable » et sortirait des
+ * appels aboutis, que les chiffres comptent par issue. OTHER exige un
+ * commentaire en base : son motif le réclame donc aussi.
+ */
+const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = { INTERESSE: 'OTHER' };
+
+export const issueDuMotif = (motif: Pick<MotifAppel, 'code' | 'effect'>): CallOutcome =>
+  ISSUE_DU_CODE[motif.code] ?? EFFET_ISSUE[motif.effect];
+
+/** Le libellé du statut qui réclame un commentaire, nul quand aucun ne le réclame. */
+export const commentaireExigePar = (motif: MotifAppel | null): string | null =>
+  motif?.requiresComment === true ? motif.label : null;
+
 /** Joignable : on a parlé à la personne, qu'elle adhère ou qu'elle refuse. */
 const EFFETS_JOIGNABLE: readonly CallOutcomeEffect[] = ['CLOSE_METHOD', 'CLOSE_REFUSED'];
 
