@@ -9,7 +9,6 @@ import {
   FileSpreadsheetIcon,
   InboxIcon,
   LoaderIcon,
-  PhoneCallIcon,
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
@@ -207,9 +206,7 @@ export function GrandPublicProspectsView({
           filters={filters}
           viewerId={viewerId}
           canExporter={canExporter}
-          canCreate={canCreate}
           telechargement={telechargement}
-          onCreate={() => setCreateOpen(true)}
         />
       </div>
 
@@ -358,16 +355,12 @@ function ActionsEnTete({
   filters,
   viewerId,
   canExporter,
-  canCreate,
   telechargement,
-  onCreate,
 }: {
   filters: GrandPublicFilters;
   viewerId: string;
   canExporter: boolean;
-  canCreate: boolean;
   telechargement: ReturnType<typeof useFileDownload>;
-  onCreate: () => void;
 }) {
   return (
     <div className="flex flex-wrap gap-2">
@@ -398,21 +391,6 @@ function ActionsEnTete({
           )}
           Exporter
         </Button>
-      ) : null}
-      {canCreate ? (
-        <>
-          <Link
-            href="/grand-public/console"
-            className={buttonVariants({ variant: 'outline', size: 'lg' })}
-          >
-            <PhoneCallIcon aria-hidden="true" />
-            Appeler les prospects
-          </Link>
-          <Button size="lg" onClick={onCreate}>
-            <PlusIcon aria-hidden="true" />
-            Nouveau prospect
-          </Button>
-        </>
       ) : null}
     </div>
   );
