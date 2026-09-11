@@ -58,6 +58,46 @@ const COORDONNEES: Partial<
   WHATSAPP: { libelle: 'Numéro WhatsApp CHUES', cle: 'whatsappChuesE164' },
 };
 
+export interface SaisieTelephone {
+  value: string;
+  error: string | undefined;
+  onChange: (value: string) => void;
+}
+
+/** Sur un appel le numéro est celui qu'on vient de composer ; à l'ajout, il se tape. */
+function ChampTelephone({
+  phoneE164,
+  telephone,
+}: {
+  phoneE164: string | null;
+  telephone: SaisieTelephone | undefined;
+}) {
+  if (telephone === undefined) {
+    return (
+      <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
+        {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
+      </Field>
+    );
+  }
+  return (
+    <Field label="Téléphone" required error={telephone.error}>
+      {(props) => (
+        <Input
+          {...props}
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="77 123 45 67"
+          value={telephone.value}
+          onChange={(event) => {
+            telephone.onChange(event.target.value);
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
 /**
  * L'ordre, la visibilité et le caractère obligatoire viennent de
  * `reglages` : sans réglage chargé, le formulaire reste celui du projet.
@@ -66,6 +106,7 @@ export function ConversionFields({
   draft,
   errors,
   phoneE164,
+  telephone,
   disabled,
   reglages,
   libres,
@@ -74,6 +115,8 @@ export function ConversionFields({
   draft: ConversionDraft;
   errors: ConversionErrors;
   phoneE164: string | null;
+  /** Présent : la fiche n'existe pas encore, son numéro se saisit ici. */
+  telephone?: SaisieTelephone | undefined;
   disabled: boolean;
   reglages: readonly ReglageChamp[];
   libres: readonly ChampLibre[];
@@ -138,11 +181,7 @@ export function ConversionFields({
         )}
       </Field>
     ),
-    phoneE164: (
-      <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
-        {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
-      </Field>
-    ),
+    phoneE164: <ChampTelephone phoneE164={phoneE164} telephone={telephone} />,
     whatsappStatus: (
       <ChoixOuiNon
         label="Ce numéro est-il un numéro WhatsApp ?"

@@ -13,8 +13,14 @@ import type { ProspectRow } from '@/lib/types';
 
 const STALE_TIME = 300_000;
 
+/** Ce que le message et le lien lisent d'une fiche, qu'elle existe déjà ou non. */
+export type FicheContactable = Pick<
+  ProspectRow,
+  'prenom' | 'phoneE164' | 'whatsappStatus' | 'whatsappNumber'
+>;
+
 /** EB-26 : WhatsApp s'ouvre sur le numéro du prospect, message déjà écrit. */
-export function BoutonWhatsApp({ prospect }: { prospect: ProspectRow }) {
+export function BoutonWhatsApp({ prospect }: { prospect: FicheContactable }) {
   const parametres = useQuery({
     queryKey: queryKeys.parametresChues,
     queryFn: () => fetchParametresChues(),

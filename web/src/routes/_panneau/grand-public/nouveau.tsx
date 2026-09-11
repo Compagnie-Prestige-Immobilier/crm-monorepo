@@ -1,6 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
+import { useRouter } from 'next/navigation';
 
-import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
+import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
@@ -26,5 +27,10 @@ function Loading() {
 
 /** La page `(panel)/grand-public/nouveau` de la v1. */
 function NouveauGrandPublicPage() {
-  return <GrandPublicProspectForm />;
+  const router = useRouter();
+  const retour = (): void => {
+    router.push('/grand-public');
+  };
+
+  return <NouveauProspect onSaved={retour} onAnnuler={retour} />;
 }

@@ -18,11 +18,16 @@ export function SelectStatut({
   catalogue,
   motif,
   disabled,
+  obligatoire = true,
+  placeholder = 'Choisir un statut',
   onChange,
 }: {
   catalogue: readonly MotifAppel[];
   motif: MotifAppel | null;
   disabled: boolean;
+  /** Faux à l'ajout : sans statut, la fiche se crée sans appel. */
+  obligatoire?: boolean;
+  placeholder?: string;
   onChange: (motif: MotifAppel) => void;
 }) {
   // `items` n'est pas décoratif : sans lui, le déclencheur affiche la VALEUR,
@@ -30,7 +35,7 @@ export function SelectStatut({
   const items = catalogue.map((item) => ({ value: item.code, label: item.label }));
 
   return (
-    <Field label="Statut de qualification" required>
+    <Field label="Statut de qualification" required={obligatoire}>
       {(props) => (
         <Select
           items={items}
@@ -42,7 +47,7 @@ export function SelectStatut({
           }}
         >
           <SelectTrigger {...props} className="max-w-md">
-            <SelectValue placeholder="Choisir un statut" />
+            <SelectValue placeholder={placeholder} />
           </SelectTrigger>
           <SelectContent>
             {items.map((item) => (
