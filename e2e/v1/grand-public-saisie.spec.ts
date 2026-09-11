@@ -219,7 +219,7 @@ test('GP-18 la boîte de la liste rafraîchit le tableau sans rechargement', asy
   await dansLaBoite.prenom.fill(PREFIXE);
   await dansLaBoite.nom.fill(TEMOINS.boite.nom);
   await dansLaBoite.telephone.fill(TEMOINS.boite.national);
-  await boite.getByRole('button', { name: 'Enregistrer et ouvrir la fiche' }).click();
+  await boite.getByRole('button', { name: 'Enregistrer et quitter' }).click();
 
   await expect(boite).toHaveCount(0);
   await expect(page).toHaveURL(/\/grand-public$/);
@@ -299,7 +299,11 @@ test.describe('GP-21 largeur 375 px', () => {
       'sous 640 px la grille sm:grid-cols-2 doit passer en une colonne',
     ).toBeGreaterThan(cadrePrenom!.y);
 
-    for (const libelle of ['Enregistrer et ouvrir la fiche', 'Enregistrer et suivant']) {
+    for (const libelle of [
+      'Enregistrer et quitter',
+      'Enregistrer et ouvrir la fiche',
+      'Enregistrer et suivant',
+    ]) {
       const bouton = page.getByRole('button', { name: libelle });
       await expect(bouton).toBeVisible();
       const cadre = await bouton.boundingBox();

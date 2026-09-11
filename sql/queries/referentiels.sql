@@ -80,3 +80,6 @@ RETURNING *;
 
 -- name: SetCallOutcomeReasonActive :one
 UPDATE "call_outcome_reasons" SET "isActive" = $2 WHERE "id" = $1 RETURNING *;
+
+-- name: OffreParID :one
+SELECT "label" FROM "offers" WHERE "id" = $1;

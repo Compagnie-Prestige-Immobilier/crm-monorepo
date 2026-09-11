@@ -15,6 +15,7 @@ import {
   fromE164,
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
+import { ChampAjoute } from '@/components/forms/champ-ajoute';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -45,14 +46,20 @@ import {
 import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
+import { useChampsConversion, type ChampLibre } from '@/lib/data/champs-conversion';
 import { queryKeys } from '@/lib/query-keys';
 import {
   MODE_EPARGNE_LABELS,
+  PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
+  TYPE_BIEN_LABELS,
   TYPE_CONTRAT_LABELS,
+  TYPES_BIEN,
   type ModeEpargne,
   type PaymentMode,
   type ProspectRow,
   type ReferenceData,
+  type TypeBien,
   type TypeContrat,
   type UpdateProspectInput,
 } from '@/lib/types';
@@ -128,6 +135,8 @@ interface Depart {
   situation: Situation;
   dureeMois: number | null;
   canalId: string | null;
+  typeBien: TypeBien | null;
+  champsLibres: Record<string, string>;
 }
 
 const DEPART_VIDE: Depart = {
@@ -143,6 +152,8 @@ const DEPART_VIDE: Depart = {
   situation: SITUATION_VIDE,
   dureeMois: null,
   canalId: null,
+  typeBien: null,
+  champsLibres: {},
 };
 
 function departDepuis(prospect: ProspectRow): Depart {
@@ -161,6 +172,8 @@ function departDepuis(prospect: ProspectRow): Depart {
     situation: situationDepuis(prospect),
     dureeMois: prospect.dureeSystemeMois,
     canalId: prospect.canalProvenanceId,
+    typeBien: prospect.typeBien,
+    champsLibres: { ...prospect.champsLibres },
   };
 }
 
@@ -194,6 +207,8 @@ interface Modifiables {
   type: ProspectType | null;
   paymentMode: PaymentMode | null;
   dureeSystemeMois: number | null;
+  typeBien: TypeBien | null;
+  champsLibres: Record<string, string>;
   professionId: string | null;
   incomeBandId: string | null;
   canalProvenanceId: string | null;
@@ -220,6 +235,8 @@ function modifiablesDepuis(prospect: ProspectRow): Modifiables {
     type: prospect.type,
     paymentMode: prospect.paymentMode,
     dureeSystemeMois: prospect.dureeSystemeMois,
+    typeBien: prospect.typeBien,
+    champsLibres: { ...prospect.champsLibres },
     professionId: prospect.professionId,
     incomeBandId: prospect.incomeBandId,
     canalProvenanceId: prospect.canalProvenanceId,
@@ -243,18 +260,57 @@ function modifiablesDepuis(prospect: ProspectRow): Modifiables {
 function pourCreation(valeurs: Modifiables): GrandPublicProspectInput {
   const input: Record<string, unknown> = {};
   for (const [cle, valeur] of Object.entries(valeurs)) {
+    if (cle === 'champsLibres') continue;
     if (valeur !== null) input[cle] = valeur;
   }
+  if (Object.keys(valeurs.champsLibres).length > 0) input.champsLibres = valeurs.champsLibres;
   return input as GrandPublicProspectInput;
 }
 
 /** L'API ne sait pas vider ces trois colonnes : un champ repassé à vide n'y touche pas. */
 const NON_EFFACABLES = new Set(['type', 'paymentMode', 'dureeSystemeMois']);
 
+/** L'identité : les trois seuls champs que ce formulaire exige lui-même. */
+function identiteManquante(saisie: {
+  prenom: string;
+  nom: string;
+  phone: string;
+  e164: string | null;
+}): Errors {
+  const found: Errors = {};
+  if (saisie.prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
+  if (saisie.nom.trim() === '') found.nom = 'Le nom est obligatoire.';
+  if (saisie.phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
+  else if (saisie.e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
+  return found;
+}
+
+/** Les champs ajoutés que l'administrateur a rendus obligatoires et qui sont vides. */
+function libresManquants(
+  libres: readonly ChampLibre[],
+  reponses: Record<string, string>,
+): Record<string, string> {
+  const manquants: Record<string, string> = {};
+  for (const champ of libres) {
+    if (champ.obligatoire && (reponses[champ.id] ?? '').trim() === '') {
+      manquants[champ.id] = `« ${champ.libelle} » est obligatoire.`;
+    }
+  }
+  return manquants;
+}
+
+/** Les réponses aux champs ajoutés sont un objet : l'égalité se lit sur le contenu. */
+const memesReponses = (a: Record<string, string>, b: Record<string, string>): boolean =>
+  JSON.stringify(a) === JSON.stringify(b);
+
 /** `null` VIDE la colonne, l'absence la laisse : seuls les champs changés partent. */
 function pourModification(avant: Modifiables, apres: Modifiables): UpdateProspectInput {
   const patch: Record<string, unknown> = {};
+  if (!memesReponses(avant.champsLibres, apres.champsLibres)) {
+    patch.champsLibres = apres.champsLibres;
+  }
   for (const [cle, valeur] of Object.entries(apres)) {
+    if (cle === 'champsLibres') continue;
     if (valeur === avant[cle as keyof Modifiables]) continue;
     if (valeur === null && NON_EFFACABLES.has(cle)) continue;
     patch[cle] = valeur;
@@ -262,8 +318,11 @@ function pourModification(avant: Modifiables, apres: Modifiables): UpdateProspec
   return patch as UpdateProspectInput;
 }
 
+/** Ce que le téléconseiller a demandé en enregistrant : la suite du geste. */
+type Suite = 'suivant' | 'fiche' | 'quitter';
+
 type Envoi =
-  | { mode: 'creation'; input: GrandPublicProspectInput; andNext: boolean }
+  | { mode: 'creation'; input: GrandPublicProspectInput; suite: Suite }
   | { mode: 'modification'; id: string; patch: UpdateProspectInput };
 
 const montre = (type: ProspectType | null, champ: Champ): boolean =>
@@ -456,8 +515,11 @@ function MontantsFields({
             <SelectValue placeholder="Choisir un mode" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="COMPTANT">Comptant</SelectItem>
-            <SelectItem value="ECHELONNE">Échelonné</SelectItem>
+            {PAYMENT_MODES.map((mode) => (
+              <SelectItem key={mode} value={mode}>
+                {PAYMENT_MODE_LABELS[mode]}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -535,6 +597,9 @@ export function GrandPublicProspectForm({
   const [situation, setSituation] = useState(depart.situation);
   const [dureeMois, setDureeMois] = useState(depart.dureeMois);
   const [canalId, setCanalId] = useState(depart.canalId);
+  const [typeBien, setTypeBien] = useState(depart.typeBien);
+  const [champsLibres, setChampsLibres] = useState(depart.champsLibres);
+  const [errorsLibres, setErrorsLibres] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Errors>({});
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
@@ -544,6 +609,8 @@ export function GrandPublicProspectForm({
     queryFn: () => fetchReferenceData(),
     staleTime: 5 * 60_000,
   });
+
+  const formulaire = useChampsConversion('GRAND_PUBLIC');
 
   const canaux = useQuery({
     queryKey: grandPublicKeys.canaux,
@@ -572,12 +639,11 @@ export function GrandPublicProspectForm({
       setSaved((previous) => [...previous, `${prospect.prenom} ${prospect.nom}`]);
       toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
 
-      if (!variables.andNext) {
-        if (onSaved !== undefined) {
-          onSaved(prospect);
-          return;
-        }
-        router.push(`/grand-public/${prospect.id}`);
+      if (variables.suite !== 'suivant') {
+        // La boîte de création se referme, PUIS l'écran demandé s'ouvre : s'arrêter
+        // à `onSaved` laissait « ouvrir la fiche » n'ouvrir rien.
+        onSaved?.(prospect);
+        router.push(variables.suite === 'fiche' ? `/grand-public/${prospect.id}` : '/grand-public');
         return;
       }
 
@@ -603,18 +669,15 @@ export function GrandPublicProspectForm({
     },
   });
 
-  function submit(andNext: boolean): void {
+  function submit(suite: Suite): void {
     if (save.isPending) return;
 
     const e164 = toInternationalE164(phone, callingCode);
-    const found: Errors = {};
-    if (prenom.trim() === '') found.prenom = 'Le prénom est obligatoire.';
-    if (nom.trim() === '') found.nom = 'Le nom est obligatoire.';
-    if (phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
-    else if (e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
-
+    const found = identiteManquante({ prenom, nom, phone, e164 });
+    const manquants = libresManquants(formulaire.libres, champsLibres);
+    setErrorsLibres(manquants);
     setErrors(found);
-    if (e164 === null || Object.keys(found).length > 0) return;
+    if (e164 === null || Object.keys(found).length > 0 || Object.keys(manquants).length > 0) return;
 
     setConflict(null);
     const vide = (texte: string): string | null => (texte.trim() === '' ? null : texte.trim());
@@ -625,6 +688,8 @@ export function GrandPublicProspectForm({
       type,
       paymentMode,
       dureeSystemeMois: paymentMode === 'ECHELONNE' ? dureeMois : null,
+      typeBien,
+      champsLibres,
       professionId,
       incomeBandId,
       canalProvenanceId: canalId,
@@ -653,7 +718,7 @@ export function GrandPublicProspectForm({
       return;
     }
 
-    save.mutate({ mode: 'creation', input: pourCreation(valeurs), andNext });
+    save.mutate({ mode: 'creation', input: pourCreation(valeurs), suite });
   }
 
   const searchHref = searchHrefPourConflit(phone, callingCode);
@@ -666,12 +731,12 @@ export function GrandPublicProspectForm({
       className="mx-auto flex w-full max-w-2xl flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
-        submit(true);
+        submit('suivant');
       }}
       onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => {
         if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
         event.preventDefault();
-        submit(true);
+        submit('suivant');
       }}
     >
       <IntroHeader embedded={embedded} />
@@ -798,13 +863,45 @@ export function GrandPublicProspectForm({
         canaux={canaux.data}
       />
 
+      {formulaire.libres.map((champ) => (
+        <ChampAjoute
+          key={champ.id}
+          champ={champ}
+          value={champsLibres[champ.id] ?? ''}
+          error={errorsLibres[champ.id]}
+          onChange={(valeur) => {
+            setChampsLibres((precedent) => ({ ...precedent, [champ.id]: valeur }));
+          }}
+        />
+      ))}
+
+      <Field label="Type de bien">
+        {(props) => (
+          <Select
+            value={orEmptyString(typeBien)}
+            onValueChange={(valeur) => {
+              setTypeBien(valeur === '' ? null : (valeur as TypeBien));
+            }}
+          >
+            <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
+              <SelectValue placeholder="Non renseigné" />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPES_BIEN.map((valeur) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {TYPE_BIEN_LABELS[valeur]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+
       <PiedDeFormulaire
         modification={initial !== undefined}
         saved={saved}
         pending={save.isPending}
-        onOuvrirLaFiche={() => {
-          submit(false);
-        }}
+        onSuite={submit}
       />
     </form>
   );
@@ -814,12 +911,12 @@ function PiedDeFormulaire({
   modification,
   saved,
   pending,
-  onOuvrirLaFiche,
+  onSuite,
 }: {
   modification: boolean;
   saved: readonly string[];
   pending: boolean;
-  onOuvrirLaFiche: () => void;
+  onSuite: (suite: Suite) => void;
 }) {
   const last = saved.at(-1);
   const plural = saved.length > 1 ? 's' : '';
@@ -838,7 +935,20 @@ function PiedDeFormulaire({
             variant="outline"
             size="lg"
             disabled={pending}
-            onClick={onOuvrirLaFiche}
+            onClick={() => {
+              onSuite('quitter');
+            }}
+          >
+            Enregistrer et quitter
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            disabled={pending}
+            onClick={() => {
+              onSuite('fiche');
+            }}
           >
             Enregistrer et ouvrir la fiche
           </Button>

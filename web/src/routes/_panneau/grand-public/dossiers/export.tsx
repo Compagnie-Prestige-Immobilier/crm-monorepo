@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/dossiers/export')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR']),
   component: ExportDossiersGrandPublicPage,
   pendingComponent: Loading,
 });

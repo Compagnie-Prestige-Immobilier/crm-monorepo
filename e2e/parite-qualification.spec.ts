@@ -131,7 +131,9 @@ test.describe('parcours 5, convertir un prospect', () => {
   }) => {
     const fiche = await semerFiche('injoignable');
     await page.goto(CONSOLE);
-    await expect(page.getByText('Les vingt dernières fiches ajoutées.')).toBeVisible();
+    await expect(
+      page.getByText('Vos fiches et celles que vos campagnes vous ont confiées.'),
+    ).toBeVisible();
     await expect(page.getByRole('heading', { level: 2 }), 'personne n’est choisi').toHaveCount(0);
 
     // Dicte comme au telephone : la recherche compare les chiffres, pas la chaine.
@@ -211,6 +213,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     await ouvrirDepuisAnnuaire(page, fiche);
 
     await page.keyboard.press('1');
+    await page.keyboard.press('1');
     await page.getByRole('spinbutton', { name: /^Durée dans la fonction/u }).fill('48');
     await cocher(page, 'Fonctionnaire', 'Oui');
     await page.getByLabel('Commentaire', { exact: true }).fill(motif);
@@ -252,7 +255,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     await expect(
       ficheCourante(page).getByRole('status').filter({ hasText: 'Fiche déjà close (refus)' }),
     ).toBeVisible();
-    const issues = page.getByRole('group', { name: 'Comment s’est passé l’appel ?' });
+    const issues = page.getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' });
     await expect(issues, 'une fiche close n’offre plus d’issue').toHaveCount(0);
     expect(await lireAppels(fiche.id)).toHaveLength(2);
   });

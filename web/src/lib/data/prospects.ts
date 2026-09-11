@@ -2,7 +2,7 @@ import type { ApiClient, components } from '@crm/api-client';
 import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import { flattenPage, toProspectQuery } from '@/lib/api/query-params';
+import { flattenPage, toProspectQuery, type ProspectQuery } from '@/lib/api/query-params';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
@@ -24,6 +24,31 @@ export async function fetchProspects(
     await client.GET('/api/v1/prospects', { params: { query: toProspectQuery(filters) } }),
   );
   return flattenPage(payload);
+}
+
+/** L'annuaire de l'écran d'appel : une page tient sous le pouce. */
+const A_QUALIFIER_PAGE_SIZE = 20;
+
+/**
+ * Ce que l'écran d'appel a le droit d'appeler : ses propres fiches et celles
+ * qu'une campagne lui a confiées. Ne passe pas par `ProspectFilters` : ce n'est
+ * pas un critère que l'utilisateur pose, c'est la portée de l'écran, et elle
+ * vaut pour tous les rôles, encadrement compris.
+ */
+export async function fetchProspectsAQualifier(
+  criteres: { projet: Projet; search: string },
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<ProspectRow>> {
+  const query: ProspectQuery = {
+    mesFiches: true,
+    projet: criteres.projet,
+    search: criteres.search,
+    sortBy: 'nom',
+    sortOrder: 'asc',
+    page: 1,
+    pageSize: A_QUALIFIER_PAGE_SIZE,
+  };
+  return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
 }
 
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
