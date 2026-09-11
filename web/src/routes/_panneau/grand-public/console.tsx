@@ -29,10 +29,6 @@ function GrandPublicConsolePage() {
   const { user } = Route.useRouteContext();
 
   return (
-    <ConsoleView
-      projet="GRAND_PUBLIC"
-      viewerId={user.id}
-      origineFiltrable={user.role === 'COMMERCIAL' || user.role === 'CHARGE_CLIENTELE'}
-    />
+    <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} />
   );
 }

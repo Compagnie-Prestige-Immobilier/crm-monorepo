@@ -19,7 +19,12 @@ import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
-import { EFFET_ISSUE, fetchMotifsAppel, type MotifAppel } from '@/lib/data/call-outcome-reasons';
+import {
+  commentaireExigePar,
+  fetchMotifsAppel,
+  issueDuMotif,
+  type MotifAppel,
+} from '@/lib/data/call-outcome-reasons';
 import { useChampsConversion } from '@/lib/data/champs-conversion';
 import {
   AttemptRefused,
@@ -105,9 +110,9 @@ function erreurTelephone(saisi: string, e164: string | null): string | undefined
   return e164 === null ? 'Numéro invalide.' : undefined;
 }
 
-/** « Il refuse » a son bouton ; les autres statuts du select non. */
-const sansBouton = (motif: MotifAppel | null): boolean =>
-  motif !== null && motif.effect !== 'CLOSE_REFUSED';
+/** « Il refuse » a son bouton ; les autres statuts du select, « Hors cible » compris, non. */
+const sansBouton = (motif: MotifAppel | null, refus: MotifAppel | undefined): boolean =>
+  motif !== null && motif.code !== refus?.code;
 
 /** « À rappeler » garde le dossier : l'ouverture le porte jusqu'au prochain appel. */
 async function consignerSur(
@@ -265,7 +270,7 @@ export function NouveauProspect({
     if (erreurTel !== undefined || Object.keys(problemes).length > 0) return;
     if (conversion.method === null) return;
     verifierPuisEnvoyer(choisi, {
-      outcome: EFFET_ISSUE[choisi.effect],
+      outcome: issueDuMotif(choisi),
       reasonCode: choisi.code,
       method: conversion.method,
       comment,
@@ -277,7 +282,7 @@ export function NouveauProspect({
   function consigner(choisi: MotifAppel, callbackAt: string | null = null): void {
     if (identiteBloquee()) return;
     verifierPuisEnvoyer(choisi, {
-      outcome: EFFET_ISSUE[choisi.effect],
+      outcome: issueDuMotif(choisi),
       reasonCode: choisi.code,
       method: null,
       comment,
@@ -364,6 +369,9 @@ export function NouveauProspect({
           obligatoire={false}
           placeholder="Sans appel"
           onChange={poser}
+          onFerme={() => {
+            if (motif?.requiresComment) commentRef.current?.focus();
+          }}
         />
 
         <PanneauDossier
@@ -404,7 +412,7 @@ export function NouveauProspect({
 
         <Commentaire
           value={comment}
-          obligatoire={motif?.requiresComment ?? false}
+          obligatoirePour={commentaireExigePar(motif)}
           inputRef={commentRef}
           onChange={setComment}
           onValidate={valider}
@@ -417,7 +425,7 @@ export function NouveauProspect({
           raccourcis={false}
           extra={
             <>
-              {sansBouton(motif) ? (
+              {sansBouton(motif, motifRefus) ? (
                 <Button variant="outline" disabled={pending} onClick={valider}>
                   Enregistrer l’appel
                 </Button>
