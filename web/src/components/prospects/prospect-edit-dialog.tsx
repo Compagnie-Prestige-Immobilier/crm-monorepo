@@ -126,11 +126,12 @@ function identityPatch(
     !memeChoix(values.representantId, prospect.representantId) ||
     values.statut !== prospect.statut;
   if (!changed) return null;
+  // L'API attend un UUID ou rien : une fiche sans représentant ne doit pas envoyer "".
   return {
     nom: values.nom,
     prenom: values.prenom,
     phone: values.phone,
-    representantId: values.representantId,
+    ...(values.representantId === '' ? {} : { representantId: values.representantId }),
     statut: values.statut,
   };
 }

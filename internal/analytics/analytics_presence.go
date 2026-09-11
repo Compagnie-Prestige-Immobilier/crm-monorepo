@@ -1035,7 +1035,7 @@ func instantISOouNul(valeur *time.Time) *string {
 }
 
 func (s *service) activiteDesTeleconseillers(ctx context.Context, f *FiltreDeSupervision) (*ActiviteOutput, error) {
-	corps, err := avecCache(cleDeCacheSupervision(ctx, "supervision/activite", f), ttlSupervision, func() (ActiviteDesTeleconseillers, error) {
+	corps, err := avecCache(s.cleDeCacheSupervision(ctx, "supervision/activite", f), ttlSupervision, func() (ActiviteDesTeleconseillers, error) {
 		return s.calculerLActivite(ctx, f)
 	})
 	if err != nil {

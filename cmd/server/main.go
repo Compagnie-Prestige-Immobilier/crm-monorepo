@@ -15,6 +15,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path"
 	"strings"
 	"syscall"
 	"time"
@@ -66,35 +67,88 @@ func servirPanneau(mux *http.ServeMux) {
 			socle.EcrireProblem(w, r, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Route inconnue."))
 			return
 		}
-		if _, err := fs.Stat(dist, strings.TrimPrefix(r.URL.Path, "/")); err == nil && r.URL.Path != "/" {
+		chemin := strings.TrimPrefix(r.URL.Path, "/")
+		if _, err := fs.Stat(dist, chemin); err == nil && chemin != "" {
+			w.Header().Set("Cache-Control", cachePanneau(r.URL.Path))
 			fichiers.ServeHTTP(w, r)
 			return
 		}
+		if path.Ext(chemin) != "" {
+			http.NotFound(w, r)
+			return
+		}
+		w.Header().Set("Cache-Control", "no-cache")
 		r.URL.Path = "/"
 		fichiers.ServeHTTP(w, r)
 	})
 }
 
-func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config) *socle.Deps {
-	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive()}
+func cachePanneau(chemin string) string {
+	switch {
+	case strings.HasPrefix(chemin, "/assets/"):
+		return "public, max-age=31536000, immutable"
+	case strings.HasPrefix(chemin, "/brand/"):
+		return "public, max-age=86400"
+	}
+	return "no-cache"
 }
 
-func serveur(cfg *socle.Config, pool *pgxpool.Pool) (*http.Server, huma.API, *socle.Deps, error) {
+func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config) *socle.Deps {
+	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive(), Bases: []string{cfg.Base}}
+}
+
+// Une instance par base : ses requêtes, son bus SSE, ses routes montées sur
+// son propre mux. Le code métier ne sait pas qu'il en existe d'autres.
+type instance struct {
+	mux  *http.ServeMux
+	api  huma.API
+	deps *socle.Deps
+}
+
+func instancier(cfg *socle.Config, pool *pgxpool.Pool, bases []string) (*instance, error) {
 	socle.InstallerErreurs()
 	mux := http.NewServeMux()
 	d := nouveauDeps(pool, cfg)
+	d.Bases = bases
 	api, err := nouvelleAPI(mux, d, pool)
 	if err != nil {
-		return nil, nil, nil, err
+		return nil, err
 	}
 	servirPanneau(mux)
+	return &instance{mux: mux, api: api, deps: d}, nil
+}
+
+// Le cookie `cpi_base` choisit l'instance ; absent ou inconnu, la base
+// publique. Un seul journal et un seul limiteur, une garde par base.
+func assembler(cfg *socle.Config, instances map[string]*instance) *http.Server {
+	gardes := make(map[string]http.Handler, len(instances))
+	for nom, i := range instances {
+		gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q)
+	}
+	repartir := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		garde := gardes[socle.BasePublique]
+		if c, err := r.Cookie(socle.NomCookieBase); err == nil {
+			if g, ok := gardes[c.Value]; ok {
+				garde = g
+			}
+		}
+		garde.ServeHTTP(w, r)
+	})
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           socle.JournalEtRecuperation(mux, socle.LimiterApi(cfg, socle.GarderAcces(mux, d.Q)), cfg),
+		Handler:           socle.JournalEtRecuperation(instances[socle.BasePublique].mux, socle.LimiterApi(cfg, repartir), cfg),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,
-	}, api, d, nil
+	}
+}
+
+func serveur(cfg *socle.Config, pool *pgxpool.Pool) (*http.Server, huma.API, error) {
+	i, err := instancier(cfg, pool, []string{cfg.Base})
+	if err != nil {
+		return nil, nil, err
+	}
+	return assembler(cfg, map[string]*instance{cfg.Base: i}), i.api, nil
 }
 
 func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
@@ -105,14 +159,14 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 	// Hôte d'essai à côté de la v1 sur la même base : deux planificateurs se
 	// disputeraient notifications dues et jobs d'import.
 	if socle.Env("TACHES_PLANIFIEES", socle.Vrai) == socle.Faux {
-		slog.Warn("tâches planifiées désactivées", "variable", "TACHES_PLANIFIEES")
+		slog.Warn("tâches planifiées désactivées", "variable", "TACHES_PLANIFIEES", "base", d.Cfg.Base)
 		sched.Start()
 		return sched, nil
 	}
 	for _, t := range tachesDomaines(d) {
 		_, err := sched.NewJob(gocron.CronJob(t.Cron, false), gocron.NewTask(func() {
 			if err := t.Run(ctx); err != nil {
-				slog.Error("tâche", "nom", t.Nom, "err", err)
+				slog.Error("tâche", "nom", t.Nom, "base", d.Cfg.Base, "err", err)
 			}
 		}), gocron.WithName(t.Nom), gocron.WithSingletonMode(gocron.LimitModeReschedule))
 		if err != nil {
@@ -140,7 +194,7 @@ func sonder(ctx context.Context, port string) error {
 }
 
 func ecrireOpenAPI(cfg *socle.Config) error {
-	_, api, _, err := serveur(cfg, nil)
+	_, api, err := serveur(cfg, nil)
 	if err != nil {
 		return err
 	}
@@ -153,7 +207,7 @@ func ecrireOpenAPI(cfg *socle.Config) error {
 }
 
 func ecrireRoles(cfg *socle.Config) error {
-	if _, _, _, err := serveur(cfg, nil); err != nil {
+	if _, _, err := serveur(cfg, nil); err != nil {
 		return err
 	}
 	doc, err := json.MarshalIndent(socle.Garde, "", "  ")
@@ -162,6 +216,26 @@ func ecrireRoles(cfg *socle.Config) error {
 	}
 	fmt.Println(string(doc))
 	return nil
+}
+
+func ouvrirBase(ctx context.Context, url string) (*pgxpool.Pool, error) {
+	poolCfg, err := pgxpool.ParseConfig(url)
+	if err != nil {
+		return nil, err
+	}
+	// Les listes joignent jusqu'à quatorze tables : au-delà de douze le planificateur
+	// génétique replanifie chaque appel (82 ms mesurés pour 0,7 ms d'exécution).
+	poolCfg.ConnConfig.RuntimeParams["join_collapse_limit"] = "1"
+	poolCfg.ConnConfig.RuntimeParams["from_collapse_limit"] = "1"
+	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
+	if err != nil {
+		return nil, err
+	}
+	if err := database.Migrer(ctx, pool); err != nil {
+		pool.Close()
+		return nil, fmt.Errorf("migrations : %w", err)
+	}
+	return pool, nil
 }
 
 func run(ctx context.Context, openapi, roles, sonde, seed bool) error {
@@ -182,41 +256,51 @@ func run(ctx context.Context, openapi, roles, sonde, seed bool) error {
 	if cfg.DatabaseURL == "" {
 		return errors.New("DATABASE_URL manquante")
 	}
-	poolCfg, err := pgxpool.ParseConfig(cfg.DatabaseURL)
-	if err != nil {
-		return err
-	}
-	// Les listes joignent jusqu'à quatorze tables : au-delà de douze le planificateur
-	// génétique replanifie chaque appel (82 ms mesurés pour 0,7 ms d'exécution).
-	poolCfg.ConnConfig.RuntimeParams["join_collapse_limit"] = "1"
-	poolCfg.ConnConfig.RuntimeParams["from_collapse_limit"] = "1"
-	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
-	if err != nil {
-		return err
-	}
-	defer pool.Close()
-	if err := database.Migrer(ctx, pool); err != nil {
-		return fmt.Errorf("migrations : %w", err)
-	}
 	if seed {
+		pool, err := ouvrirBase(ctx, cfg.DatabaseURL)
+		if err != nil {
+			return err
+		}
+		defer pool.Close()
 		return semer(ctx, pool, cfg)
 	}
-	return servir(ctx, cfg, pool)
+	return servir(ctx, cfg)
 }
 
-func servir(ctx context.Context, cfg *socle.Config, pool *pgxpool.Pool) error {
-	srv, _, d, err := serveur(cfg, pool)
-	if err != nil {
-		return err
+func servir(ctx context.Context, cfg *socle.Config) error {
+	bases := socle.Bases(cfg)
+	noms := make([]string, 0, len(bases))
+	for _, b := range bases {
+		noms = append(noms, b.Base)
 	}
-	sched, err := planifier(ctx, d)
-	if err != nil {
-		return err
+	instances := make(map[string]*instance, len(bases))
+	var fermer []func()
+	defer func() {
+		for i := len(fermer) - 1; i >= 0; i-- {
+			fermer[i]()
+		}
+	}()
+	for _, base := range bases {
+		pool, err := ouvrirBase(ctx, base.DatabaseURL)
+		if err != nil {
+			return fmt.Errorf("base %s : %w", base.Base, err)
+		}
+		fermer = append(fermer, pool.Close)
+		i, err := instancier(base, pool, noms)
+		if err != nil {
+			return err
+		}
+		sched, err := planifier(ctx, i.deps)
+		if err != nil {
+			return err
+		}
+		fermer = append(fermer, func() { _ = sched.Shutdown() })
+		instances[base.Base] = i
 	}
-	defer func() { _ = sched.Shutdown() }()
+	srv := assembler(cfg, instances)
 	erreurs := make(chan error, 1)
 	go func() {
-		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port)
+		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port, "bases", noms)
 		erreurs <- srv.ListenAndServe()
 	}()
 	select {

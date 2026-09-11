@@ -126,6 +126,12 @@ SELECT COUNT(*)::int FROM "inscriptions_plateforme" i
 WHERE i."projet" = sqlc.arg('projet')::"Projet"
   AND (sqlc.arg('inclure_disparues')::boolean OR i."disparueLe" IS NULL)
   AND (sqlc.narg('statut')::text IS NULL OR i."statutDistant" = sqlc.narg('statut')::text)
+  AND (sqlc.narg('avancement')::text IS NULL
+       OR (sqlc.narg('avancement')::text = 'ouvert'
+           AND (COALESCE(i."etapeDistante", 0) > 0
+                OR (i."etapeDistante" IS NULL AND i."statutDistant" NOT LIKE 'compte-%')))
+       OR (sqlc.narg('avancement')::text = 'soumis' AND i."soumiseLe" IS NOT NULL)
+       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL))
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))
@@ -145,6 +151,12 @@ FROM "inscriptions_plateforme" i
 WHERE i."projet" = sqlc.arg('projet')::"Projet"
   AND (sqlc.arg('inclure_disparues')::boolean OR i."disparueLe" IS NULL)
   AND (sqlc.narg('statut')::text IS NULL OR i."statutDistant" = sqlc.narg('statut')::text)
+  AND (sqlc.narg('avancement')::text IS NULL
+       OR (sqlc.narg('avancement')::text = 'ouvert'
+           AND (COALESCE(i."etapeDistante", 0) > 0
+                OR (i."etapeDistante" IS NULL AND i."statutDistant" NOT LIKE 'compte-%')))
+       OR (sqlc.narg('avancement')::text = 'soumis' AND i."soumiseLe" IS NOT NULL)
+       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL))
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))

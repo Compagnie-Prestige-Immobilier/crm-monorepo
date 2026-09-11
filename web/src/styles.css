@@ -336,8 +336,11 @@ html:has([data-coque='chues']) {
   --sidebar-ring: #7fb4ff;
   --sidebar-muted-foreground: #a8b6ce;
 
-  --chart-1: #0201e9;
-  --chart-4: #2f6fd6;
+  --chart-1: #005f73;
+  --chart-2: #9b2226;
+  --chart-3: #0a6c4d;
+  --chart-4: #6a3d9a;
+  --chart-5: #8a5a00;
   --chart-grid: rgba(15, 46, 107, 0.1);
   --chart-tick: #47546b;
 
@@ -394,7 +397,10 @@ html.dark:has([data-coque='chues']) {
   --sidebar-muted-foreground: #a8b6ce;
 
   --chart-1: #6fa5ff;
-  --chart-4: #8db8ff;
+  --chart-2: #ff8a8a;
+  --chart-3: #67d5aa;
+  --chart-4: #b79bff;
+  --chart-5: #ffc65a;
   --chart-grid: rgba(255, 255, 255, 0.1);
   --chart-tick: #a9b6cb;
 
@@ -545,6 +551,9 @@ html.dark:has([data-coque='chues']) {
      façon. Amplitude volontairement faible : 8 degrés se remarquent du coin de
      l'œil sans attirer le regard hors de la tâche en cours. */
   --animate-bell-swing: bell-swing 620ms var(--ease-out) 1;
+  --animate-secousse: secousse 420ms var(--ease-out) 1;
+  --animate-halo: halo 1.25s ease-out 8;
+  --animate-rebond: rebond 700ms var(--ease-out) 1;
   /* BORNÉE à 4 cycles, jamais `infinite`.
 
      WCAG 2.2.2 (Pause, Stop, Hide) : tout mouvement qui démarre seul et dure
@@ -609,6 +618,41 @@ html.dark:has([data-coque='chues']) {
     50% {
       opacity: 0.7;
       transform: scale(1.14);
+    }
+  }
+
+  @keyframes secousse {
+    0%,
+    100% {
+      transform: translateX(0);
+    }
+    25% {
+      transform: translateX(-6px);
+    }
+    75% {
+      transform: translateX(6px);
+    }
+  }
+
+  @keyframes halo {
+    0% {
+      box-shadow: 0 0 0 0 color-mix(in oklab, var(--primary) 55%, transparent);
+    }
+    100% {
+      box-shadow: 0 0 0 14px color-mix(in oklab, var(--primary) 0%, transparent);
+    }
+  }
+
+  @keyframes rebond {
+    0%,
+    100% {
+      transform: scale(1);
+    }
+    30% {
+      transform: scale(1.45);
+    }
+    60% {
+      transform: scale(0.92);
     }
   }
 }

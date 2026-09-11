@@ -288,8 +288,8 @@ func (s *service) perimetreDesProspects(ctx context.Context, f *FiltreDesAnalyse
 	return strings.Join(conditions, etSQL), nil
 }
 
-func cleDeCacheDesAnalyses(ctx context.Context, route string, f *FiltreDesAnalyses) string {
-	return route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
+func (s *service) cleDeCacheDesAnalyses(ctx context.Context, route string, f *FiltreDesAnalyses) string {
+	return s.Cfg.Base + ":" + route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
 		f.Search, f.RepresentantID, f.BanqueID, f.SyndicatID, f.DepartementID, f.CommercialID,
 		f.Projet, f.Type, f.CanalProvenanceID, f.Statut, f.Segment, f.Phase2Status,
 		f.EnrollmentMethod, f.AppelePar, f.EnrollmentCapturedByID, f.Origin,
@@ -345,7 +345,7 @@ type ligneDeRepartition struct {
 }
 
 func (s *service) repartitionParAxe(ctx context.Context, route string, axe axeDeRepartition, f *FiltreDesAnalyses) (*RepartitionOutput, error) {
-	corps, err := avecCache(cleDeCacheDesAnalyses(ctx, route, f), ttlAnalyses, func() (RepartitionDesProspects, error) {
+	corps, err := avecCache(s.cleDeCacheDesAnalyses(ctx, route, f), ttlAnalyses, func() (RepartitionDesProspects, error) {
 		p := &parametresSQL{}
 		perimetre, err := s.perimetreDesProspects(ctx, f, p)
 		if err != nil {
@@ -414,7 +414,7 @@ type ligneDeMethodeEnrolement struct {
 
 // `null` n'est pas une méthode : `total` est celui des seuls porteurs, pas de la population.
 func (s *service) prospectsParMethodeEnrolement(ctx context.Context, f *FiltreDesAnalyses) (*MethodesEnrolementOutput, error) {
-	corps, err := avecCache(cleDeCacheDesAnalyses(ctx, "by-enrollment-method", f), ttlAnalyses, func() (RepartitionParMethodeEnrolement, error) {
+	corps, err := avecCache(s.cleDeCacheDesAnalyses(ctx, "by-enrollment-method", f), ttlAnalyses, func() (RepartitionParMethodeEnrolement, error) {
 		p := &parametresSQL{}
 		perimetre, err := s.perimetreDesProspects(ctx, f, p)
 		if err != nil {
@@ -541,7 +541,7 @@ const sqlFinanceAgregats = `
 	FROM portee`
 
 func (s *service) entonnoirDesConversions(ctx context.Context, f *FiltreDesAnalyses) (*EntonnoirOutput, error) {
-	corps, err := avecCache(cleDeCacheDesAnalyses(ctx, "funnel", f), ttlAnalyses, func() (EntonnoirDesConversions, error) {
+	corps, err := avecCache(s.cleDeCacheDesAnalyses(ctx, "funnel", f), ttlAnalyses, func() (EntonnoirDesConversions, error) {
 		p := &parametresSQL{}
 		perimetre, err := s.perimetreDesProspects(ctx, f, p)
 		if err != nil {
@@ -664,7 +664,7 @@ func medianeEtNeuviemeDecile(depuis, vers, suffixe string) string {
 }
 
 func (s *service) delaisDeLaChaine(ctx context.Context, f *FiltreDesAnalyses) (*DelaisOutput, error) {
-	corps, err := avecCache(cleDeCacheDesAnalyses(ctx, "delays", f), ttlAnalyses, func() (DelaisDeLaChaine, error) {
+	corps, err := avecCache(s.cleDeCacheDesAnalyses(ctx, "delays", f), ttlAnalyses, func() (DelaisDeLaChaine, error) {
 		p := &parametresSQL{}
 		perimetre, err := s.perimetreDesProspects(ctx, f, p)
 		if err != nil {
@@ -778,7 +778,7 @@ const sqlRendementAgregats = `
 	ORDER BY encaisses DESC, prospects DESC, label ASC`
 
 func (s *service) rendementParDepartement(ctx context.Context, f *FiltreDesAnalyses) (*RendementOutput, error) {
-	corps, err := avecCache(cleDeCacheDesAnalyses(ctx, "departement-yield", f), ttlAnalyses, func() (RendementParDepartement, error) {
+	corps, err := avecCache(s.cleDeCacheDesAnalyses(ctx, "departement-yield", f), ttlAnalyses, func() (RendementParDepartement, error) {
 		p := &parametresSQL{}
 		perimetre, err := s.perimetreDesProspects(ctx, f, p)
 		if err != nil {
@@ -814,18 +814,20 @@ func (s *service) rendementParDepartement(ctx context.Context, f *FiltreDesAnaly
 }
 
 var Garde = map[string][]socle.Role{
-	"GET /api/v1/analytics/funnel":               socle.Parcours,
-	"GET /api/v1/analytics/delays":               socle.Parcours,
-	"GET /api/v1/analytics/departement-yield":    socle.Parcours,
-	"GET /api/v1/analytics/by-enrollment-method": socle.Parcours,
-	"GET /api/v1/analytics/by-banque":            socle.Parcours,
-	"GET /api/v1/analytics/by-departement":       socle.Parcours,
-	"GET /api/v1/analytics/by-syndicat":          socle.Parcours,
-	"GET /api/v1/supervision/representants":      socle.Encadrement,
-	"GET /api/v1/supervision/campagnes":          socle.Encadrement,
-	"GET /api/v1/supervision/activite":           socle.Encadrement,
-	"GET /api/v1/supervision/creneaux":           socle.Encadrement,
-	"PUT /api/v1/supervision/creneaux":           socle.Encadrement,
+	"GET /api/v1/analytics/funnel":                  socle.Parcours,
+	"GET /api/v1/analytics/delays":                  socle.Parcours,
+	"GET /api/v1/analytics/departement-yield":       socle.Parcours,
+	"GET /api/v1/analytics/by-enrollment-method":    socle.Parcours,
+	"GET /api/v1/analytics/by-banque":               socle.Parcours,
+	"GET /api/v1/analytics/by-departement":          socle.Parcours,
+	"GET /api/v1/analytics/by-syndicat":             socle.Parcours,
+	"GET /api/v1/supervision/representants":         socle.Encadrement,
+	"GET /api/v1/supervision/representants/qualite": socle.Encadrement,
+	"GET /api/v1/supervision/prospects/marketing":   socle.Encadrement,
+	"GET /api/v1/supervision/campagnes":             socle.Encadrement,
+	"GET /api/v1/supervision/activite":              socle.Encadrement,
+	"GET /api/v1/supervision/creneaux":              socle.Encadrement,
+	"PUT /api/v1/supervision/creneaux":              socle.Encadrement,
 }
 
 func routeDeLecture[I, O any](api huma.API, id, chemin string, handler func(context.Context, *I) (*O, error)) {

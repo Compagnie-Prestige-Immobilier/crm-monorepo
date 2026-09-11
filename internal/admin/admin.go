@@ -72,6 +72,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"POST /api/v1/enrolement/{projet}/tirage":                     socle.AdminSeul,
+	"POST /api/v1/webhooks/enrolement/{secret}/{projet}":          {socle.Public},
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"DELETE /api/v1/tableaux-de-bord/{ecran}/disposition":         rolesChiffres,
@@ -1036,21 +1037,21 @@ func widgetsDe(liste ...string) []DispositionWidget {
 }
 
 var dispositionsUsine = map[string][]DispositionWidget{
-	ecranVisites: widgetsDe("total-visites", "moyenne-journaliere", "jour-le-plus-charge", "par-jour", "par-entreprise", "par-objet", "qualite-de-saisie"),
+	ecranVisites: widgetsDe("total-visites", "moyenne-journaliere", "jour-le-plus-charge", "par-jour", "par-entreprise", "par-objet", "par-direction", "par-destinataire", "par-mois", "par-heure", "qualite-de-saisie"),
 	ecranChues: slices.Concat(
-		widgetsDe("taux-de-contact", "taux-de-joignabilite-representants", "taux-d-acceptation", "taux-de-qualification", "taux-de-rappel"),
+		widgetsDe("taux-de-contact", "taux-de-joignabilite-representants", "taux-d-acceptation", "taux-de-qualification"),
 		[]DispositionWidget{
 			{Source: "taux-d-exploitation", Marque: marqueCamembert, Taille: taillePleine},
 			{Source: "repartition-statuts-qualification", Marque: marqueCamembert, Taille: taillePleine},
-			{Source: "par-teleconseiller"},
+			{Source: "par-teleconseiller", Marque: marqueTableau},
 			{Source: sourceFichesOuvertes, Taille: taillePleine},
 		},
-		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "rendement-par-departement"),
+		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "rendement-par-departement", "methodes-d-adhesion", "enrolement-par-jour"),
 	),
 	ecranGrandPublic: slices.Concat(
-		widgetsDe("taux-de-joignabilite", "taux-de-qualification", "prospects-notes", "adhesions", "par-teleconseiller"),
+		widgetsDe("taux-de-joignabilite", "taux-de-qualification", "prospects-notes", "adhesions"),
 		[]DispositionWidget{{Source: sourceFichesOuvertes, Taille: taillePleine}},
-		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion"),
+		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "par-banque", "enrolement-par-jour", "enrolement-par-etape"),
 	),
 }
 

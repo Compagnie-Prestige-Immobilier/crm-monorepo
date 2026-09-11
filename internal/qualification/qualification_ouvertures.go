@@ -323,21 +323,7 @@ func (s *service) qualificationBrouillonDeDepart(ctx context.Context, u *socle.U
 
 func qualificationCreerOuverture(ctx context.Context, q *db.Queries, u *socle.Utilisateur, in *QualificationOuvrirFicheInput, brouillon []byte) (QualificationOuvertureFicheDTO, error) {
 	b := &in.Body
-	verrou, err := q.VerrouFiches(ctx)
-	if err != nil {
-		return QualificationOuvertureFicheDTO{}, err
-	}
-	// Verrou coupé par l'administrateur : la fiche précédente redevient close,
-	// sans rappel programmé ni libération tracée.
-	if !verrou {
-		at := time.Now().UTC()
-		if err := q.FermerAutreOuverture(ctx, db.FermerAutreOuvertureParams{
-			At: &at, OpenedByID: u.ID, RepresentantID: b.RepresentantID, ProspectID: b.ProspectID,
-		}); err != nil {
-			return QualificationOuvertureFicheDTO{}, err
-		}
-	}
-	err = q.CreerOuverture(ctx, db.CreerOuvertureParams{
+	err := q.CreerOuverture(ctx, db.CreerOuvertureParams{
 		ID: b.ID, OpenedByID: u.ID, RepresentantID: b.RepresentantID, ProspectID: b.ProspectID,
 		OpenedAt: b.OpenedAt.UTC(), Draft: brouillon,
 	})

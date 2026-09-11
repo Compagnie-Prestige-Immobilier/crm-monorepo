@@ -49,6 +49,7 @@ func gardesDomaines() []map[string][]socle.Role {
 		referentiels.Garde,
 		representants.Garde,
 		notifications.Garde,
+		notifications.GardeCourriels,
 		imports.Garde,
 		admin.Garde,
 		analytics.Garde,
@@ -64,7 +65,7 @@ func gardesDomaines() []map[string][]socle.Role {
 
 func tachesDomaines(d *socle.Deps) []socle.Tache {
 	taches := []socle.Tache{{Nom: "cpi.sessions.purge", Cron: "0 4 * * *", Run: d.Q.PurgeExpiredSessions}}
-	for _, t := range [][]socle.Tache{notifications.Taches(d), imports.Taches(d), admin.Taches(d), qualification.Taches(d)} {
+	for _, t := range [][]socle.Tache{notifications.Taches(d), imports.Taches(d), admin.Taches(d)} {
 		taches = append(taches, t...)
 	}
 	return taches

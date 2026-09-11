@@ -336,12 +336,6 @@ WHERE "id" = @id AND "deletedAt" IS NULL
   AND "status" = CAST(@depuis AS text)::"SuggestionStatus"
   AND (@tous::bool OR "suggestedById" = @agent);
 
--- name: AuteurDeLaTentative :one
-SELECT "performedById" FROM "call_attempts" WHERE "id" = $1;
-
--- name: TentativesVivantes :many
-SELECT "id" FROM "call_attempts" WHERE "id" = ANY(@ids::text[]);
-
 -- name: BattementAgent :exec
 INSERT INTO "agent_heartbeats" ("userId", "lastPullAt") VALUES (@user_id, @at)
 ON CONFLICT ("userId") DO UPDATE SET "lastPullAt" = EXCLUDED."lastPullAt";
@@ -403,3 +397,12 @@ WHERE p."deletedAt" IS NULL
   )
 ORDER BY p."updatedAt" ASC, p."id" ASC
 LIMIT sqlc.arg('taille')::int;
+
+-- name: ProspectPourCourrielEnrolement :one
+SELECT p."id", p."nom", p."prenom", p."phoneE164", p."email", p."projet"::text AS "projet",
+       b."name" AS "banqueName", su."fullName" AS "suiviParName",
+       p."enrollmentMethod"::text AS "methode", p."enrollmentCapturedAt"
+FROM "prospects" p
+LEFT JOIN "banques" b ON b."id" = p."banqueId"
+LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
+WHERE p."id" = $1;

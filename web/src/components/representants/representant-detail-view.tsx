@@ -215,7 +215,7 @@ function evenementBascule(change: RepresentantRelationChange): EvenementHistoriq
   };
 }
 
-const CHAMP_LABELS: Record<string, string> = {
+export const CHAMP_LABELS: Record<string, string> = {
   fullName: 'Nom complet',
   prenom: 'Prénom',
   phoneE164: 'Téléphone',

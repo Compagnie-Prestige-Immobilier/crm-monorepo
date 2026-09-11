@@ -11,6 +11,7 @@ import type { Projet, ProspectFilters } from '@/lib/types';
 /** Clés de cache des listes, détails et tableaux de bord associés. */
 export const queryKeys = {
   session: ['session'] as const,
+  piecesDeposees: (inscriptionId: string) => ['pieces-deposees', inscriptionId] as const,
   reference: ['reference'] as const,
 
   prospectsRoot: ['prospects'] as const,
@@ -82,6 +83,12 @@ export const queryKeys = {
   bankStagesRoot: ['bank-stages'] as const,
   bankStages: (includeInactive: boolean) => ['bank-stages', includeInactive] as const,
   bankRejectionReasons: ['bank-rejection-reasons'] as const,
+  bankAOuvrir: (projet: Projet) => ['bank-a-ouvrir', projet] as const,
+  courrielsRoot: ['courriels'] as const,
+  courriels: (objetType: string, objetId: string) => ['courriels', objetType, objetId] as const,
+  courrielsJournal: (type: string, statut: string, page: number) =>
+    ['courriels', 'journal', type, statut, page] as const,
+  courrielsReglages: ['courriels', 'reglages'] as const,
 
   // ─── Demandes de création de client (banque → admin) ──────────────────────
   clientRequestsRoot: ['client-requests'] as const,
@@ -147,4 +154,6 @@ export const queryKeys = {
   enrolementIndicateurs: (projet: string, filtres: Record<string, unknown>) =>
     ['enrolement', 'indicateurs', projet, filtres] as const,
   enrolementReglages: (projet: string) => ['enrolement', 'reglages', projet] as const,
+  enrolementInscription: (projet: string, id: string) =>
+    ['enrolement', 'inscription', projet, id] as const,
 };

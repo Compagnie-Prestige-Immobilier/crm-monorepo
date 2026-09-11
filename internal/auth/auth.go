@@ -54,10 +54,19 @@ type LoginInput struct {
 	}
 }
 
+// Le compte est forcément actif : la session d'un compte désactivé est coupée
+// avant d'arriver ici. `workspace` nomme la base qui sert cette session.
+type CompteConnecte struct {
+	socle.Utilisateur
+	IsActive    bool    `json:"isActive"`
+	Workspace   string  `json:"workspace"`
+	LastLoginAt *string `json:"lastLoginAt"`
+}
+
 type SessionOutput struct {
 	SetCookie http.Cookie `header:"Set-Cookie"`
 	Body      struct {
-		User socle.Utilisateur `json:"user"`
+		User CompteConnecte `json:"user"`
 	}
 }
 
@@ -98,26 +107,30 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 		return nil, err
 	}
 	out := &SessionOutput{SetCookie: cookieSession(ctx, jeton, int(s.Cfg.SessionTTL.Seconds()))}
-	out.Body.User = socle.Utilisateur{ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role), PhoneE164: u.PhoneE164}
+	out.Body.User = s.compte(&socle.Utilisateur{ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role), PhoneE164: u.PhoneE164})
 	return out, nil
 }
 
-// Le compte est forcément actif et l'espace toujours public : la session d'un
-// compte désactivé est coupée avant d'arriver ici, et la v2 n'a plus d'espace
-// de démonstration.
-type MeOutput struct {
+func (s *service) compte(u *socle.Utilisateur) CompteConnecte {
+	return CompteConnecte{Utilisateur: *u, IsActive: true, Workspace: s.Cfg.Base}
+}
+
+type MeOutput struct{ Body CompteConnecte }
+
+func (s *service) me(ctx context.Context, _ *struct{}) (*MeOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	return &MeOutput{Body: s.compte(&u)}, nil
+}
+
+type BasesOutput struct {
 	Body struct {
-		socle.Utilisateur
-		IsActive    bool    `json:"isActive"`
-		Workspace   string  `json:"workspace" enum:"public"`
-		LastLoginAt *string `json:"lastLoginAt"`
+		Bases []string `json:"bases"`
 	}
 }
 
-func (*service) me(ctx context.Context, _ *struct{}) (*MeOutput, error) {
-	out := &MeOutput{}
-	out.Body.Utilisateur = socle.UtilisateurCourant(ctx)
-	out.Body.IsActive, out.Body.Workspace = true, "public"
+func (s *service) bases(context.Context, *struct{}) (*BasesOutput, error) {
+	out := &BasesOutput{}
+	out.Body.Bases = s.Bases
 	return out, nil
 }
 
@@ -149,6 +162,7 @@ func Monter(api huma.API, d *socle.Deps) error {
 	s := &service{Deps: d, leurre: leurre, tentatives: socle.NouveauLimiteur(d.Cfg.LoginRate)}
 	huma.Post(api, "/api/v1/auth/login", s.login)
 	huma.Get(api, "/api/v1/auth/me", s.me)
+	huma.Get(api, "/api/v1/auth/bases", s.bases)
 	huma.Register(api, huma.Operation{OperationID: "logout", Method: http.MethodPost, Path: "/api/v1/auth/logout", DefaultStatus: http.StatusNoContent}, s.logout)
 	huma.Register(api, huma.Operation{OperationID: "change-password", Method: http.MethodPost, Path: "/api/v1/auth/password", DefaultStatus: http.StatusNoContent}, s.changerMotDePasse)
 	huma.Register(api, huma.Operation{OperationID: "changeMyPassword", Method: http.MethodPut, Path: "/api/v1/auth/me/password"}, s.changerMotDePasseOk)
@@ -196,6 +210,7 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 var Garde = map[string][]socle.Role{
 	"GET /health/ready":            {socle.Public},
 	"POST /api/v1/auth/login":      {socle.Public},
+	"GET /api/v1/auth/bases":       {socle.Public},
 	"POST /api/v1/auth/logout":     socle.Tous,
 	"GET /api/v1/auth/me":          socle.Tous,
 	"POST /api/v1/auth/password":   socle.Tous,

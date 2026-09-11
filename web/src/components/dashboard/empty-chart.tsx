@@ -1,8 +1,7 @@
 /**
  * Ce qu'une carte de graphique montre quand sa série est vide.
  *
- * Sans lui, Chart.js dessine des axes nus, ce qui se lit comme un chargement
- * qui n'aboutit pas plutôt que comme une absence de données.
+ * Sans lui, une carte vide ressemble à un chargement qui n'aboutit pas.
  */
 export function EmptyChart({ message }: { message: string }) {
   return (

@@ -1,7 +1,7 @@
 version: '2'
 sql:
   - engine: postgresql
-    schema: sql/schema.sql
+    schema: [sql/schema.sql, sql/migrations]
     queries: sql/queries
     database:
       uri: ${TEST_DATABASE_URL}

@@ -78,7 +78,11 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
-		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'none'")
+		w.Header().Set("Cross-Origin-Opener-Policy", "same-origin")
+		// `frame-ancestors 'self'` et non `'none'` : la visionneuse de pièces
+		// affiche un PDF du panneau dans une iframe du panneau, et le lecteur PDF
+		// de Chrome ouvre lui-même un cadre fils soumis à cette directive.
+		w.Header().Set("Content-Security-Policy", "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; frame-src 'self' https://challenges.cloudflare.com; connect-src 'self' https://challenges.cloudflare.com; object-src 'none'; base-uri 'none'; frame-ancestors 'self'")
 		ctx := context.WithValue(r.Context(), cleRequete{}, id)
 		ctx = context.WithValue(ctx, CleAdresse{}, adresseClient(r, cfg.TrustProxy))
 		securisee := r.TLS != nil || (cfg.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
@@ -113,13 +117,15 @@ func origineAutorisee(r *http.Request) bool {
 // `__Host-` seul laisse passer un sous-domaine voisin (OWASP CSRF).
 func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if !origineAutorisee(r) {
+		_, motif := mux.Handler(r)
+		roles, gardee := Garde[motif]
+		publique := gardee && Autorise(roles, Public)
+		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas d'origine.
+		if !publique && !origineAutorisee(r) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Origine refusée."))
 			return
 		}
-		_, motif := mux.Handler(r)
-		roles, gardee := Garde[motif]
-		if !gardee || Autorise(roles, Public) {
+		if !gardee || publique {
 			mux.ServeHTTP(w, r)
 			return
 		}
