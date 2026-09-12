@@ -520,9 +520,14 @@ func (s *service) chercherRepresentant(ctx context.Context, in *RepresentantLook
 	}
 	dto := representantDto(&rows[0])
 	out.Body.Found = true
-	out.Body.Representant = &dto
 	out.Body.OwnedByCommercialID = &dto.CreatedByID
 	out.Body.OwnedByCommercialName = &dto.CreatedByName
+	// La recherche reste globale, sinon le doublon d'un collègue échappe au
+	// contrôle. La fiche elle-même ne part qu'à qui a le droit de la lire : le
+	// nom du propriétaire suffit à dire « ce numéro est déjà pris ».
+	if u := socle.UtilisateurCourant(ctx); representantLitTout(u.Role, false) || dto.CreatedByID == u.ID {
+		out.Body.Representant = &dto
+	}
 	return out, nil
 }
 
@@ -947,15 +952,13 @@ type RepresentantRelationHistoryOutput struct {
 	}
 }
 
+// Vérifier la seule existence donnait à tout téléconseiller l'accès aux
+// sous-ressources d'un représentant d'un collègue, dont `fiche-history` qui rend
+// le nom et le téléphone de la fiche. La portée du lecteur s'applique ici.
 func (s *service) exigerRepresentant(ctx context.Context, id string) error {
-	existe, err := s.Q.RepresentantExiste(ctx, id)
-	if err != nil {
-		return err
-	}
-	if !existe {
-		return representantIntrouvable()
-	}
-	return nil
+	u := socle.UtilisateurCourant(ctx)
+	_, err := representantFicheLue(ctx, s.Q, id, representantLitTout(u.Role, false), u.ID)
+	return err
 }
 
 // Lecture GLOBALE délibérée : une trace suit toujours la fiche, déjà résolue

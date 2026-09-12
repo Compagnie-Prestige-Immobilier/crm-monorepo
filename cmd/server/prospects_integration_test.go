@@ -376,7 +376,7 @@ func TestProspectFormulairePublicRefuseSansCleTurnstile(t *testing.T) {
 	}
 
 	demande := map[string]any{"nom": "Robot", "prenom": "Test", "phone": numeroSenegalais(18)}
-	statut, body = appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+b.userID, demande, visiteur)
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), demande, visiteur)
 	b.attend(statut, http.StatusServiceUnavailable, "envoi sans clé Turnstile", body)
 	if body["code"] != "CAPTCHA_INDISPONIBLE" {
 		t.Fatalf("code : %v", body["code"])
@@ -436,6 +436,18 @@ func TestProspectFormulairePublicJetonEtCadence(t *testing.T) {
 	}
 }
 
+// Le lien public porte un jeton propre au compte, régénérable, et non plus
+// l'identifiant du compte qui ne se révoquait qu'en fermant le compte.
+func jetonFormulaire(b *banc) string {
+	b.t.Helper()
+	var jeton string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "formulaireJeton" FROM "users" WHERE "id" = $1`, b.userID).Scan(&jeton); err != nil {
+		b.t.Fatal(err)
+	}
+	return jeton
+}
+
 func TestProspectFormulairePublicCreeEtRapproche(t *testing.T) {
 	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
 	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
@@ -446,7 +458,7 @@ func TestProspectFormulairePublicCreeEtRapproche(t *testing.T) {
 	telephone := numeroSenegalais(21)
 
 	demande := map[string]any{"nom": "Gueye", "prenom": "Fatou", "phone": telephone}
-	statut, body := appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+b.userID, demande, visiteur)
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), demande, visiteur)
 	b.attend(statut, http.StatusCreated, "demande publique", body)
 
 	var id, nom string
@@ -464,7 +476,7 @@ func TestProspectFormulairePublicCreeEtRapproche(t *testing.T) {
 	// Le même numéro revient : la fiche n'est pas dupliquée et son identité, déjà
 	// renseignée, n'est pas réécrite par une saisie non vérifiée.
 	seconde := map[string]any{"nom": "Usurpateur", "prenom": "Faux", "phone": telephone}
-	statut, body = appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+b.userID, seconde, visiteur)
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), seconde, visiteur)
 	b.attend(statut, http.StatusCreated, "second envoi du même numéro", body)
 
 	var fiches int

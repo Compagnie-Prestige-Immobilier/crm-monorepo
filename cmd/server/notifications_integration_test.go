@@ -496,7 +496,7 @@ func TestNotificationAvisDepotFormulairePublic(t *testing.T) {
 	banque, syndicat, revenu := b.notificationReferentiels()
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "createdById" = $1`, b.userID) })
 
-	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/formulaire-public/"+b.userID, map[string]any{
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), map[string]any{
 		"nom": "Sow", "prenom": "Fatou", "phone": notificationNumeroDeTest(),
 		"profession": "Enseignante", "dureeEtablissementMois": 24, "fonctionnaire": true,
 		"syndicatId": syndicat, "banqueId": banque, "engagementEnCours": false, "incomeBandId": revenu,

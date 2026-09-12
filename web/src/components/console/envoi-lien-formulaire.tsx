@@ -6,6 +6,7 @@ import { MailIcon } from 'lucide-react';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { buttonVariants } from '@/components/ui/button';
 import { fetchSessionUser } from '@/lib/data/auth';
+import { monLienFormulaireQuery } from '@/lib/data/lien-formulaire';
 import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { formatPhone } from '@/lib/format';
 import { lienFormulairePublic, texteDuMessage } from '@/lib/formulaire-public';
@@ -31,14 +32,16 @@ export function EnvoiLienFormulaire({ prospect, email }: { prospect: ProspectRow
     queryFn: () => fetchSessionUser(),
     staleTime: STALE_TIME,
   });
+  const lien = useQuery(monLienFormulaireQuery());
 
-  if (parametres.data === undefined || moi.data === undefined) return null;
+  if (parametres.data === undefined || moi.data === undefined || lien.data === undefined)
+    return null;
 
   const texte = texteDuMessage(parametres.data.messageWhatsapp, {
     prenom: prospect.prenom,
     teleconseiller: moi.data.fullName,
     telephoneTeleconseiller: formatPhone(moi.data.phoneE164 ?? ''),
-    lien: lienFormulairePublic(moi.data.id),
+    lien: lienFormulairePublic(lien.data.jeton),
   });
   const destinataire = encodeURIComponent(email.trim());
   const corps = `subject=${encodeURIComponent(OBJET)}&body=${encodeURIComponent(texte)}`;

@@ -5,6 +5,7 @@ import { MessageCircleIcon } from 'lucide-react';
 
 import { buttonVariants } from '@/components/ui/button';
 import { fetchSessionUser } from '@/lib/data/auth';
+import { monLienFormulaireQuery } from '@/lib/data/lien-formulaire';
 import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { formatPhone } from '@/lib/format';
 import { lienFormulairePublic, texteDuMessage } from '@/lib/formulaire-public';
@@ -25,16 +26,18 @@ export function BoutonWhatsApp({ prospect }: { prospect: ProspectRow }) {
     queryFn: () => fetchSessionUser(),
     staleTime: STALE_TIME,
   });
+  const lien = useQuery(monLienFormulaireQuery());
 
   if (prospect.whatsappStatus === 'AUCUN') return null;
-  if (parametres.data === undefined || moi.data === undefined) return null;
+  if (parametres.data === undefined || moi.data === undefined || lien.data === undefined)
+    return null;
 
   const numero = prospect.whatsappNumber ?? prospect.phoneE164;
   const texte = texteDuMessage(parametres.data.messageWhatsapp, {
     prenom: prospect.prenom,
     teleconseiller: moi.data.fullName,
     telephoneTeleconseiller: formatPhone(moi.data.phoneE164 ?? ''),
-    lien: lienFormulairePublic(moi.data.id),
+    lien: lienFormulairePublic(lien.data.jeton),
   });
 
   return (
