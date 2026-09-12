@@ -11,6 +11,7 @@ import {
 import { useEffect, useState } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
+import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -52,12 +53,23 @@ export function PiecesDeposees({ inscriptionId }: { inscriptionId: string }) {
   });
 
   if (pieces.isPending) return <Skeleton className="h-32 w-full rounded-lg" />;
-  if (pieces.isError || pieces.data.length === 0) {
+  if (pieces.isError) {
+    return (
+      <QueryErrorState
+        error={pieces.error}
+        fallback="Les pièces n’ont pas pu être lues sur la plateforme."
+        onRetry={() => {
+          void pieces.refetch();
+        }}
+      />
+    );
+  }
+  if (pieces.data.length === 0) {
     return (
       <EmptyState
         icon={FolderArchiveIcon}
         title="Aucune pièce déposée"
-        description="Le client n’a encore rien déposé sur la plateforme, ou la plateforme est injoignable."
+        description="Le client n’a encore rien déposé sur la plateforme."
       />
     );
   }

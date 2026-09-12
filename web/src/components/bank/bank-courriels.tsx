@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { MailIcon, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
+import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,7 +69,18 @@ export function BankCourriels({
   });
 
   if (courriels.isPending) return <Skeleton className="h-24 rounded-lg" />;
-  if (courriels.isError || courriels.data.length === 0) {
+  if (courriels.isError) {
+    return (
+      <QueryErrorState
+        error={courriels.error}
+        fallback="Les courriels de ce dossier n’ont pas pu être lus."
+        onRetry={() => {
+          void courriels.refetch();
+        }}
+      />
+    );
+  }
+  if (courriels.data.length === 0) {
     return (
       <Card>
         <CardContent className="flex items-center gap-3 text-[0.875rem] text-muted-foreground">
