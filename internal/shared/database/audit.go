@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/db"
 	"encoding/json"
+	"log/slog"
 
 	"github.com/google/uuid"
 )
@@ -26,5 +27,13 @@ func Auditer(ctx context.Context, q *db.Queries, userID, action, entite, entiteI
 			return err
 		}
 	}
-	return q.InsertAuditLog(ctx, p)
+	// La trace en base se lit dans l'écran Exploitation, pas dans le terminal
+	// pendant un incident. La ligne nomme le geste, sa cible et son auteur ; les
+	// états avant et après restent en base, ils n'ont rien à faire dans un flux.
+	if err := q.InsertAuditLog(ctx, p); err != nil {
+		slog.Error("trace d’audit non écrite", "action", action, "entite", entite, "entiteId", entiteID, "userId", userID, "err", err)
+		return err
+	}
+	slog.Info("écriture", "action", action, "entite", entite, "entiteId", entiteID, "userId", userID)
+	return nil
 }

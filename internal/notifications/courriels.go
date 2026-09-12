@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"html"
+	"log/slog"
 	"net/http"
 	"net/mail"
 	"strings"
@@ -195,9 +196,13 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 	return err
 }
 
+// Un envoi refusé ne se lisait que dans la colonne `erreur` du journal, écran
+// Exploitation ouvert. C'est ainsi qu'une clé Brevo invalide a pu refuser tous
+// les courriels d'une journée sans qu'une ligne le dise.
 func expedierCourriel(ctx context.Context, message *MessageBrevo) (statut string, messageID, erreur *string, envoyeLe *time.Time) {
 	if len(message.Destinataires) == 0 {
 		detail := "Aucun destinataire configuré dans les réglages des courriels."
+		slog.Error("courriel non expédié", "sujet", message.Sujet, "cause", detail)
 		return CourrielEchec, nil, &detail, nil
 	}
 	transport := ConfigurerBrevo()
@@ -207,6 +212,9 @@ func expedierCourriel(ctx context.Context, message *MessageBrevo) (statut string
 		if detail == "" {
 			detail = envoi.Statut
 		}
+		slog.Error("courriel non expédié", "sujet", message.Sujet,
+			"destinataires", len(message.Destinataires), "copies", len(message.Copies),
+			"statut", envoi.Statut, "cause", detail)
 		return CourrielEchec, nil, &detail, nil
 	}
 	maintenant := time.Now()
@@ -214,6 +222,9 @@ func expedierCourriel(ctx context.Context, message *MessageBrevo) (statut string
 	if envoi.MessageID != "" {
 		id = &envoi.MessageID
 	}
+	slog.Info("courriel expédié", "sujet", message.Sujet,
+		"destinataires", len(message.Destinataires), "copies", len(message.Copies),
+		"messageId", envoi.MessageID)
 	return CourrielEnvoye, id, nil, &maintenant
 }
 

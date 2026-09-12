@@ -186,9 +186,19 @@ func tracerPassage(ctx context.Context, d *socle.Deps, t socle.Tache) {
 		slog.Warn("passage de tâche non ouvert", "nom", t.Nom, "base", d.Cfg.Base, "err", errOuverture)
 	}
 	echec := executerTache(ctx, d, t)
-	if echec != nil {
-		slog.Error("tâche", "nom", t.Nom, "base", d.Cfg.Base, "err", echec)
+	// Un passage réussi ne laissait que sa ligne en base. Les trois tâches à la
+	// minute restent en DEBUG : en INFO elles rendraient le terminal illisible,
+	// comme le faisait le sondage du panneau.
+	champs := []any{"nom", t.Nom, "base", d.Cfg.Base, "ms", time.Since(debut).Milliseconds()}
+	niveau := slog.LevelInfo
+	switch {
+	case echec != nil:
+		niveau = slog.LevelError
+		champs = append(champs, "err", echec)
+	case t.Cron == socle.ChaqueMinute:
+		niveau = slog.LevelDebug
 	}
+	slog.Log(ctx, niveau, "tâche", champs...)
 	if errOuverture != nil {
 		return
 	}
