@@ -10,7 +10,7 @@ LINT = go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2
 setup: db gen ## base locale, dépendances, code généré, en une commande
 	pnpm --dir web install
 
-db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sème référentiels et admin
+db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sème référentiels, comptes et 60 jours de données de développement
 	@psql "$(DB)" -Atc 'select 1' >/dev/null 2>&1 || { \
 	  createdb cpi_v2_dev && psql "$(DB)" -v ON_ERROR_STOP=1 -q -f sql/schema.sql; }
 	SEED_ADMIN_EMAIL=$${SEED_ADMIN_EMAIL:-admin@cpi.sn} SEED_ADMIN_USERNAME=$${SEED_ADMIN_USERNAME:-admin} \

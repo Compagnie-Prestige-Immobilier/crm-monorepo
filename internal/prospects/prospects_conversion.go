@@ -520,6 +520,14 @@ type ProspectParametresChues struct {
 	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
 	VerrouFiches             bool     `json:"verrouFiches"`
+	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
+	TextesUsine ProspectTextesUsine `json:"textesUsine"`
+}
+
+type ProspectTextesUsine struct {
+	MessageWhatsapp      string `json:"messageWhatsapp"`
+	AccuseReceptionObjet string `json:"accuseReceptionObjet"`
+	AccuseReceptionCorps string `json:"accuseReceptionCorps"`
 }
 
 // Les deux textes viennent mot pour mot de l'expression de besoins ; les liens,
@@ -669,6 +677,11 @@ func (s *service) prospectLireParametres(ctx context.Context) (ProspectParametre
 		if brut, present := stockees[prospectCleParametre(cle)]; present {
 			parametres.poser(cle, brut)
 		}
+	}
+	parametres.TextesUsine = ProspectTextesUsine{
+		MessageWhatsapp:      prospectParametresUsine.MessageWhatsapp,
+		AccuseReceptionObjet: prospectParametresUsine.AccuseReceptionObjet,
+		AccuseReceptionCorps: prospectParametresUsine.AccuseReceptionCorps,
 	}
 	return parametres, nil
 }

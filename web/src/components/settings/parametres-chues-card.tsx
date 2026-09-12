@@ -5,6 +5,7 @@ import { LoaderIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { ChampTexteVariables } from '@/components/forms/champ-texte-variables';
 import { Field } from '@/components/forms/field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
@@ -37,6 +38,31 @@ const LIBELLES: Record<string, string> = {
   codificationProvenances: 'Règles de provenance',
 };
 
+/** Derrière le « i » de chaque réglage : ce qu'il change, et où. */
+const INFOS: Record<string, string> = {
+  plateformeChuesUrl:
+    'Le lien de la plateforme CHUES, affiché en lecture seule dans le formulaire de conversion et posé dans le message WhatsApp par {lien}.',
+  plateformeGrandPublicUrl:
+    'Le lien de la plateforme Grand Public, même usage que celui de CHUES pour les prospects Grand Public.',
+  emailChues:
+    'L’adresse de contact donnée aux prospects dans l’accusé de réception, par {emailChues}.',
+  whatsappChuesE164:
+    'Le numéro WhatsApp donné aux prospects dans l’accusé de réception, par {whatsappChues}.',
+  messageWhatsapp:
+    'Le message prérempli quand un téléconseiller ouvre WhatsApp depuis une fiche ou la console.',
+  accuseReceptionObjet:
+    'L’objet du courriel envoyé au prospect qui dépose une demande par le formulaire public.',
+  accuseReceptionCorps:
+    'Le corps de ce courriel d’accusé de réception, envoyé à l’adresse saisie dans le formulaire.',
+  destinatairesEnrolement:
+    'Reçoit une copie de chaque demande déposée par le formulaire public, pour la cellule enrôlement.',
+  destinatairesBpe: 'Reçoit une copie de chaque demande déposée, pour la cellule BPE.',
+  destinatairesSupervision: 'Reçoit une copie de chaque demande déposée, pour les superviseurs.',
+  destinatairesDirection: 'Reçoit une copie de chaque demande déposée, pour la direction.',
+  codificationProvenances:
+    'Traduit la colonne de provenance d’un classeur importé en canal et projet. Une campagne absente d’ici fait refuser ses lignes.',
+};
+
 const LISTES = [
   'destinatairesEnrolement',
   'destinatairesBpe',
@@ -45,6 +71,25 @@ const LISTES = [
 ] as const;
 
 const CODIFICATION = 'codificationProvenances';
+
+/** Les mots que chaque texte accepte : ceux que le code remplace à l'envoi. */
+const TEXTES: {
+  cle: 'messageWhatsapp' | 'accuseReceptionObjet' | 'accuseReceptionCorps';
+  variables: readonly string[];
+  lignes: number;
+}[] = [
+  {
+    cle: 'messageWhatsapp',
+    variables: ['prenom', 'lien', 'teleconseiller', 'telephoneTeleconseiller'],
+    lignes: 4,
+  },
+  { cle: 'accuseReceptionObjet', variables: ['prenomNom', 'date'], lignes: 1 },
+  {
+    cle: 'accuseReceptionCorps',
+    variables: ['prenomNom', 'date', 'informations', 'telephone', 'emailChues', 'whatsappChues'],
+    lignes: 6,
+  },
+];
 
 /** Une adresse par ligne : c'est ainsi qu'on les copie depuis un annuaire. */
 const enLignes = (adresses: readonly string[]): string => adresses.join('\n');
@@ -128,35 +173,23 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
         <CardHeader>
           <CardTitle>Messages envoyés aux prospects</CardTitle>
           <p className="mt-1 text-[0.875rem] text-muted-foreground">
-            Les mots entre accolades sont remplacés à l’envoi : {'{prenom}'}, {'{lien}'}, {'{date}'}
-            , {'{informations}'}.
+            Les mots entre accolades sont remplacés à l’envoi : un clic les pose dans le texte.
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
-          <Field label={LIBELLES.accuseReceptionObjet ?? ''}>
-            {(props) => (
-              <Input
-                {...props}
-                value={valeur('accuseReceptionObjet')}
-                onChange={(event) => {
-                  saisir('accuseReceptionObjet', event.target.value);
-                }}
-              />
-            )}
-          </Field>
-          {(['messageWhatsapp', 'accuseReceptionCorps'] as const).map((cle) => (
-            <Field key={cle} label={LIBELLES[cle] ?? cle}>
-              {(props) => (
-                <Textarea
-                  {...props}
-                  rows={cle === 'messageWhatsapp' ? 4 : 6}
-                  value={valeur(cle)}
-                  onChange={(event) => {
-                    saisir(cle, event.target.value);
-                  }}
-                />
-              )}
-            </Field>
+          {TEXTES.map((texte) => (
+            <ChampTexteVariables
+              key={texte.cle}
+              label={LIBELLES[texte.cle] ?? texte.cle}
+              info={INFOS[texte.cle]}
+              valeur={valeur(texte.cle)}
+              usine={lus.textesUsine[texte.cle]}
+              variables={texte.variables}
+              lignes={texte.lignes}
+              onChange={(saisie) => {
+                saisir(texte.cle, saisie);
+              }}
+            />
           ))}
         </CardContent>
       </Card>
@@ -183,7 +216,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
-type CleTexte = Exclude<keyof ParametresChues, 'verrouFiches'>;
+type CleTexte = Exclude<keyof ParametresChues, 'verrouFiches' | 'textesUsine'>;
 
 type ChampsProps = {
   valeur: (cle: CleTexte) => string;
@@ -209,7 +242,7 @@ function CartePlateformes({ valeur, saisir }: ChampsProps) {
             'whatsappChuesE164',
           ] as const
         ).map((cle) => (
-          <Field key={cle} label={LIBELLES[cle] ?? cle}>
+          <Field key={cle} label={LIBELLES[cle] ?? cle} info={INFOS[cle]}>
             {(props) => (
               <Input
                 {...props}
@@ -238,7 +271,7 @@ function CarteDestinataires({ valeur, saisir }: ChampsProps) {
       </CardHeader>
       <CardContent className="grid gap-4 sm:grid-cols-2">
         {LISTES.map((cle) => (
-          <Field key={cle} label={LIBELLES[cle] ?? cle}>
+          <Field key={cle} label={LIBELLES[cle] ?? cle} info={INFOS[cle]}>
             {(props) => (
               <Textarea
                 {...props}
@@ -268,7 +301,7 @@ function CarteCodification({ valeur, saisir }: ChampsProps) {
         </p>
       </CardHeader>
       <CardContent>
-        <Field label={LIBELLES[CODIFICATION] ?? CODIFICATION}>
+        <Field label={LIBELLES[CODIFICATION] ?? CODIFICATION} info={INFOS[CODIFICATION]}>
           {(props) => (
             <Textarea
               {...props}

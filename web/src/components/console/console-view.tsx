@@ -19,7 +19,6 @@ import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
-  ALREADY_COMPLETED,
   AttemptRefused,
   callbackKeys,
   callbackSlots,
@@ -176,7 +175,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
       queryClient.setQueryData(queryKeys.ouvertureCourante, prise.ouverture);
     },
     onError: (error) => {
-      void reprendreOuverte(reprendre, error);
+      toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
@@ -235,8 +234,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         projet={projet}
         onChoisir={(row) => {
           setConfirme(null);
-          if (aQualifier(row)) setVise(row);
-          else setOuverte({ prospect: row, ouverture: null });
+          setVise(row);
         }}
       />
 
@@ -281,8 +279,6 @@ const brouillonDe = (
   ...(conversion === null ? {} : { conversion }),
 });
 
-const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
-
 function fichePendante(
   demandee: string | null,
   data: ProspectRow | null | undefined,
@@ -300,16 +296,7 @@ function deriverFiches(
   ouverte: Ouverte | null,
   venuDesRappels: ProspectRow | null,
 ): FichesDerivees {
-  const aConfirmer =
-    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
-  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
-  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
-  const consultee =
-    ouverte ??
-    (venuDesRappels !== null && !aQualifier(venuDesRappels)
-      ? { prospect: venuDesRappels, ouverture: null }
-      : null);
-  return { aConfirmer, consultee };
+  return { aConfirmer: vise ?? venuDesRappels, consultee: ouverte };
 }
 
 function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | null): boolean {
@@ -318,14 +305,6 @@ function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | 
 
 function chargementParLien(demandee: string | null, isPending: boolean): boolean {
   return demandee !== null && isPending;
-}
-
-function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
-  return prospect.phase2Status !== 'PENDING' || refusee;
-}
-
-function ficheVerrouillee(ouverture: OuvertureFiche | null, closed: boolean): boolean {
-  return ouverture !== null && !closed;
 }
 
 function saisieCommencee(
@@ -338,32 +317,14 @@ function saisieCommencee(
 }
 
 /**
- * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
- * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
- * est tenue, que le serveur ne nomme pas.
+ * La fiche que le serveur tient encore pour cette console, remise à l'écran
+ * telle quelle : au montage, elle répare un rechargement.
  */
-async function reprendreOuverte(
-  reprendre: (prise: Ouverte) => void,
-  refus: unknown = null,
-): Promise<void> {
-  const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null) {
-    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
-    return;
-  }
-  if (courante.prospectId === null) {
-    toast.error(
-      `Vous avez ${courante.ficheNom} en main sur « Qualifier un représentant ». Qualifiez-la avant d’ouvrir une fiche ici.`,
-    );
-    return;
-  }
+async function reprendreOuverte(reprendre: (prise: Ouverte) => void): Promise<void> {
+  const courante = await fetchOuvertureCourante('prospect').catch(() => null);
+  if (courante === null || courante.prospectId === null) return;
   const prospect = await fetchProspect(courante.prospectId).catch(() => null);
-  if (prospect === null) {
-    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
-    return;
-  }
-  // Un identifiant fixe : la reprise au montage et le refus d'ouverture disent la
-  // même chose, et sonner remplace au lieu d'empiler.
+  if (prospect === null) return;
   toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`, { id: 'reprise-fiche' });
   reprendre({ prospect, ouverture: courante });
 }
@@ -502,14 +463,12 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
  * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
  */
-type Etape = 'issues' | 'dossier' | 'echeance' | null;
+type Etape = 'issues' | 'dossier' | 'echeance';
 
 function etapeCourante(
-  closed: boolean,
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
 ): Etape {
-  if (closed) return null;
   if (slots !== null) return 'echeance';
   if (conversion !== null) return 'dossier';
   return 'issues';
@@ -545,15 +504,13 @@ function Consignation({
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
-  const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const formulaire = useChampsConversion(projet);
 
   const nomComplet = nomDe(prospect);
-  const closed = estFicheClose(prospect, refusee);
   const [now] = useState(() => Date.now());
-  const verrouille = verrouActif && ficheVerrouillee(ouverture, closed);
+  const verrouille = verrouActif && ouverture !== null;
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -579,11 +536,6 @@ function Consignation({
       onEnregistre(nomComplet);
     },
     onError: (error) => {
-      if (error instanceof AttemptRefused && error.code === ALREADY_COMPLETED) {
-        setRefusee(true);
-        toast.error(error.message);
-        return;
-      }
       if (error instanceof AttemptRefused) {
         const refused = conversionErrorFor(error.code);
         if (refused !== null) setConversionErrors({ [refused.field]: refused.message });
@@ -601,7 +553,7 @@ function Consignation({
       callbackAt: string | null = null,
       renseignements?: ConversionDraft,
     ) => {
-      if (closed || send.isPending) return;
+      if (send.isPending) return;
       const draft: AttemptDraft = {
         outcome,
         method,
@@ -617,16 +569,16 @@ function Consignation({
       }
       send.mutate(draft);
     },
-    [closed, send, comment, ouverture],
+    [send, comment, ouverture],
   );
 
   const ouvrirDossier = useCallback(() => {
-    if (closed || send.isPending) return;
+    if (send.isPending) return;
     setDraftOutcome(null);
     setSlots(null);
     setConversionErrors({});
     setConversion(conversionFrom(prospect));
-  }, [closed, send.isPending, prospect]);
+  }, [send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
     if (conversion === null) return;
@@ -642,17 +594,15 @@ function Consignation({
   }, [conversion, formulaire, record]);
 
   const startOther = useCallback(() => {
-    if (closed) return;
     setDraftOutcome('OTHER');
     commentRef.current?.focus();
-  }, [closed]);
+  }, []);
 
   const startCallback = useCallback(() => {
-    if (closed) return;
     setDraftOutcome(null);
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
-  }, [closed]);
+  }, []);
 
   const choisir = useCallback(
     (outcome: CallOutcome | 'JOIGNABLE') => {
@@ -683,7 +633,7 @@ function Consignation({
     if (draftOutcome !== null) record(draftOutcome, null);
   }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
 
-  const etape = etapeCourante(closed, conversion, slots);
+  const etape = etapeCourante(conversion, slots);
   const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
 
   const retenu = useCallback(() => {
@@ -786,15 +736,12 @@ function Consignation({
         <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
         <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
 
-        {closed ? (
-          <div
-            role="status"
-            className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-          >
-            Fiche déjà close ({PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}). Rien à
-            consigner ici.
-          </div>
-        ) : null}
+        {prospect.phase2Status === 'PENDING' ? null : (
+          <p role="status" className="text-[0.8125rem] text-muted-foreground">
+            Déjà classée : {PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}. Une issue
+            qui classe remplace celle-ci.
+          </p>
+        )}
 
         {etape !== 'dossier' || conversion === null ? null : (
           <>
@@ -858,15 +805,13 @@ function Consignation({
           />
         )}
 
-        {etape === null ? null : (
-          <Commentaire
-            value={comment}
-            obligatoire={draftOutcome === 'OTHER'}
-            inputRef={commentRef}
-            onChange={setComment}
-            onValidate={validate}
-          />
-        )}
+        <Commentaire
+          value={comment}
+          obligatoire={draftOutcome === 'OTHER'}
+          inputRef={commentRef}
+          onChange={setComment}
+          onValidate={validate}
+        />
 
         {etape !== 'dossier' ? null : (
           <>

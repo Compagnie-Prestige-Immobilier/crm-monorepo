@@ -1,6 +1,6 @@
 -- name: LotParId :one
 SELECT l."id", l."name", l."cible", l."projet", l."filters", l."itemCount",
-       l."createdById", l."createdAt", u."fullName" AS "createdByName"
+       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
 WHERE l."id" = $1;
@@ -17,7 +17,7 @@ WHERE (sqlc.narg('search')::text IS NULL OR l."name" ILIKE '%' || sqlc.narg('sea
 
 -- name: ListerLots :many
 SELECT l."id", l."name", l."cible", l."projet", l."filters", l."itemCount",
-       l."createdById", l."createdAt", u."fullName" AS "createdByName"
+       l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
 WHERE (sqlc.narg('search')::text IS NULL OR l."name" ILIKE '%' || sqlc.narg('search')::text || '%')
@@ -39,6 +39,20 @@ VALUES ($1, $2, $3, $4, $5, $6);
 
 -- name: RenommerLot :exec
 UPDATE "lots_export" SET "name" = $2 WHERE "id" = $1;
+
+-- name: PauserLot :exec
+UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
+
+-- Les fiches créées par chaque import, pour le projet de la campagne à monter.
+-- name: ImportsAvecFiches :many
+SELECT j."id", j."fileName", j."createdAt", j."finishedAt", COUNT(*)::int AS fiches
+FROM "import_jobs" j
+JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
+WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj
+              WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.arg('projet')::"Projet")
+GROUP BY j."id"
+ORDER BY j."finishedAt" DESC, j."id" DESC
+LIMIT 100;
 
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;
@@ -65,6 +79,7 @@ SELECT COALESCE(MAX(i."day"), 1)::int FROM "lot_export_items" i WHERE i."lotId" 
 -- name: LotFichesAttribuees :many
 SELECT DISTINCT i."representantId", i."prospectId"
 FROM "lot_export_items" i
+JOIN "lots_export" l ON l."id" = i."lotId" AND l."pausedAt" IS NULL
 WHERE i."assigneeId" = $1;
 
 -- name: LotPositionsDeplacables :many
@@ -334,6 +349,7 @@ WHERE p."deletedAt" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
+  AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)
@@ -348,6 +364,7 @@ WHERE p."deletedAt" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
+  AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)

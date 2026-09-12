@@ -191,41 +191,29 @@ func texteOuTiret(v *string) string {
 	return *v
 }
 
-func dateOuTiret(t *time.Time, tz *time.Location) string {
-	if t == nil {
-		return "non renseignée"
-	}
-	return t.In(tz).Format(formatDateMail)
-}
-
 // Appelé après chaque tirage : chaque inscription devenue complète est marquée
-// avant d'être signalée, pour qu'une panne de courriel ne la resignale pas.
+// avant d'être signalée, pour qu'une panne ne la resignale pas. Le courriel,
+// lui, part de la plateforme : ici, seule la notification in-app.
 func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string) (int, error) {
 	s := &service{d}
 	lignes, err := s.inscriptionsCompletes(ctx, projet, true)
 	if err != nil || len(lignes) == 0 {
 		return 0, err
 	}
-	reglages, err := notifications.LireReglagesCourriels(ctx, d)
-	if err != nil {
-		return 0, err
-	}
-	base := socle.Env("PUBLIC_WEB_URL", "")
 	maintenant := time.Now()
 	for i := range lignes {
 		r := &lignes[i]
 		if err := s.Q.BankInscriptionSignalee(ctx, db.BankInscriptionSignaleeParams{ID: r.ID, CompleteSignaleeLe: &maintenant}); err != nil {
 			return i, err
 		}
-		s.signalerComplet(ctx, r, &reglages, base)
+		s.notifierComplet(ctx, r)
 	}
 	return len(lignes), nil
 }
 
-func (s *service) signalerComplet(ctx context.Context, r *db.BankInscriptionsCompletesRow, reglages *notifications.ReglagesCourriels, base string) {
-	projet := string(r.Projet)
+func (s *service) notifierComplet(ctx context.Context, r *db.BankInscriptionsCompletesRow) {
 	client := strings.TrimSpace(r.Prenom + " " + r.Nom)
-	chemin := "/" + coqueDe(projet) + "/dossiers?ouvrir=" + r.ID
+	chemin := "/" + coqueDe(string(r.Projet)) + "/dossiers?ouvrir=" + r.ID
 	_, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
 		Title: "Dossier complet sur la plateforme", Category: "DOSSIER", Route: chemin,
 		Body:     client + ", banque " + texteOuTiret(r.BanqueName) + ". Le dossier bancaire peut être ouvert.",
@@ -234,40 +222,10 @@ func (s *service) signalerComplet(ctx context.Context, r *db.BankInscriptionsCom
 	if err != nil {
 		slog.Warn("dossier complet : notification in-app non créée", "inscription", r.ID, "err", err)
 	}
-	prospectCRM := "non rapproché"
-	if r.ProspectId != nil {
-		prospectCRM = "rapproché"
-	}
-	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
-		Type:          notifications.CourrielDossierComplet,
-		Sujet:         "[" + libelleProjet(projet) + "] Dossier complet : " + client + ", plateforme " + r.IdentifiantDistant,
-		Destinataires: reglages.Banque, Copies: reglages.BanqueCopies,
-		ObjetType: objetInscription, ObjetID: r.ID,
-		Titre: "Dossier complet sur la plateforme " + libelleProjet(projet),
-		Intro: "Le dossier de " + client + " a été validé sur la plateforme " + libelleProjet(projet) +
-			" le " + dateOuTiret(r.DecideeLe, s.Cfg.TimeZone) + ". Il peut être ouvert à la banque.",
-		Lignes: [][2]string{
-			{"Client", client},
-			{"Téléphone", texteOuTiret(r.PhoneE164)},
-			{"Courriel", texteOuTiret(r.Email)},
-			{"Identifiant plateforme", r.IdentifiantDistant},
-			{"Statut plateforme", r.StatutDistant},
-			{"Soumis le", dateOuTiret(r.SoumiseLe, s.Cfg.TimeZone)},
-			{"Validé le", dateOuTiret(r.DecideeLe, s.Cfg.TimeZone)},
-			{"Banque", texteOuTiret(r.BanqueName)},
-			{"Téléconseiller", texteOuTiret(r.SuiviParName)},
-			{"Prospect CRM", prospectCRM},
-		},
-		Lien: base + chemin, LibelleLien: "Ouvrir le dossier bancaire dans CPI GO",
-		NomPieceJointe: "dossier-complet-" + r.IdentifiantDistant + ".pdf",
-	})
-	if err != nil {
-		slog.Error("dossier complet : courriel non tracé", "inscription", r.ID, "err", err)
-	}
 }
 
-// Encaissement ou rejet : copie aux adresses de la banque configurées côté
-// admin, et notification au téléconseiller qui a suivi le prospect.
+// Encaissement ou rejet : courriel aux adresses réglées côté admin, et
+// notification au téléconseiller qui a suivi le prospect.
 func (s *service) signalerIssue(ctx context.Context, id, typeEtape string) {
 	r, err := s.Q.BankCaseSuivi(ctx, id)
 	if err != nil {
@@ -280,13 +238,21 @@ func (s *service) signalerIssue(ctx context.Context, id, typeEtape string) {
 		return
 	}
 	issue, typeCourriel, detail := "encaissé", notifications.CourrielDossierEncaisse, "Montant encaissé"
+	reglage, aide := &reglages.Encaissement, notifications.AideEncaissement()
 	valeur := texteOuTiret(banqueMontantChaine(r.AmountXof)) + " XOF"
+	valeurs := map[string]string{
+		notifications.VariableReference: r.Reference, notifications.VariableClient: r.CustomerName,
+		notifications.VariableBanque: r.BanqueName, notifications.VariableTeleconseiller: texteOuTiret(r.SuiviParName),
+		notifications.VariableProjet: libelleProjet(r.Projet), "montant": valeur, "motif": "",
+	}
 	if typeEtape == banqueEtapeRejetee {
 		issue, typeCourriel, detail = "rejeté", notifications.CourrielDossierRejete, "Motif du rejet"
+		reglage, aide = &reglages.Refus, notifications.AideRefus()
 		valeur = texteOuTiret(r.RejectionLabel)
 		if r.RejectionDetail != nil {
 			valeur += " : " + *r.RejectionDetail
 		}
+		valeurs["motif"] = valeur
 	}
 	chemin := "/" + coqueDe(r.Projet) + "/dossiers/" + r.ID
 	if _, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
@@ -299,10 +265,10 @@ func (s *service) signalerIssue(ctx context.Context, id, typeEtape string) {
 	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          typeCourriel,
 		Sujet:         "[" + libelleProjet(r.Projet) + "] Dossier bancaire " + issue + " : " + r.Reference,
-		Destinataires: reglages.BanqueCopies,
-		ObjetType:     objetDossier, ObjetID: r.ID,
+		Destinataires: reglage.Destinataires, Copies: reglage.Copies,
+		ObjetType: objetDossier, ObjetID: r.ID,
 		Titre: "Dossier bancaire " + issue,
-		Intro: "Le dossier " + r.Reference + " de " + r.CustomerName + " a été " + issue + " par " + r.BanqueName + ".",
+		Intro: notifications.IntroCourriel(reglage, aide, valeurs),
 		Lignes: [][2]string{
 			{"Référence", r.Reference},
 			{"Client", r.CustomerName},

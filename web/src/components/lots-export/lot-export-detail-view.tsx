@@ -8,7 +8,9 @@ import {
   FileDownIcon,
   FileSpreadsheetIcon,
   LoaderIcon,
+  PauseIcon,
   PencilIcon,
+  PlayIcon,
   UserMinusIcon,
   XIcon,
 } from 'lucide-react';
@@ -87,6 +89,7 @@ function LotSummary({
   jours,
   createdAt,
   createdByName,
+  pausedAt,
 }: {
   id: string;
   peutRegler: boolean;
@@ -97,6 +100,7 @@ function LotSummary({
   jours: number;
   createdAt: string;
   createdByName: string;
+  pausedAt: string | null;
 }) {
   return (
     <div className="max-w-2xl">
@@ -106,6 +110,12 @@ function LotSummary({
       ) : (
         <h2 className="font-display text-h2 font-[800]">{name}</h2>
       )}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {pausedAt === null ? null : (
+          <Badge variant="warning">En pause depuis le {formatDate(pausedAt)}</Badge>
+        )}
+        {peutRegler ? <BoutonPause id={id} enPause={pausedAt !== null} /> : null}
+      </div>
       <p className="mt-1 text-[0.9375rem] text-muted-foreground">
         {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
         {itemCount > 1 ? 's' : ''} réparties entre{' '}
@@ -510,6 +520,7 @@ export function LotExportDetailView({
           jours={distribution.jours}
           createdAt={createdAt}
           createdByName={createdByName}
+          pausedAt={lot.data.pausedAt}
         />
         <LotDownloads id={id} name={name} telechargement={telechargement} />
       </div>
@@ -540,6 +551,40 @@ export function LotExportDetailView({
         recentAttempts={lot.data.recentAttempts}
       />
     </div>
+  );
+}
+
+/** En pause, les fiches sortent des consoles des téléconseillers jusqu'à la reprise. */
+function BoutonPause({ id, enPause }: { id: string; enPause: boolean }) {
+  const queryClient = useQueryClient();
+  const bascule = useMutation({
+    mutationFn: () => updateLotExport(id, { enPause: !enPause }),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
+      toast.success(enPause ? 'Campagne reprise.' : 'Campagne mise en pause.');
+    },
+    onError: (erreur) => {
+      toast.error(apiErrorText(erreur, 'La campagne n’a pas changé d’état.'));
+    },
+  });
+
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      size="sm"
+      disabled={bascule.isPending}
+      onClick={() => {
+        bascule.mutate();
+      }}
+    >
+      {enPause ? (
+        <PlayIcon className="size-4" aria-hidden="true" />
+      ) : (
+        <PauseIcon className="size-4" aria-hidden="true" />
+      )}
+      {enPause ? 'Reprendre' : 'Mettre en pause'}
+    </Button>
   );
 }
 

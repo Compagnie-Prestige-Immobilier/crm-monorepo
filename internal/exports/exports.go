@@ -913,7 +913,7 @@ func (s *service) exportModeleGrandPublic(ctx context.Context, _ *struct{}) (*hu
 			"Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.",
 			"« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.",
 			"Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import.",
-			"Un export de campagne garde ses propres colonnes : une colonne « Nom complet » remplace Prénom et Nom, son dernier mot faisant le nom de famille, et une colonne « Email » est reprise sur la fiche. Une page d’atterrissage ou un nom de campagne en colonne de provenance est traduit par les règles de provenance."),
+			"Un export de campagne garde ses propres colonnes : une colonne « Nom complet » remplace Prénom et Nom, son dernier mot faisant le nom de famille, une colonne « Email » est reprise sur la fiche, et une colonne « Date » devient la date de saisie du lead. Une page d’atterrissage ou un nom de campagne en colonne de provenance est traduit par les règles de provenance."),
 	})
 }
 

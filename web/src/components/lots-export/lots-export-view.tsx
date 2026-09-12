@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { LotCreateDialog } from '@/components/lots-export/lot-create-dialog';
 import { QueryErrorState } from '@/components/query-error-state';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -201,13 +202,14 @@ export function LotsExportView({
               <li key={lot.id}>
                 <article className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-                    <h2 className="font-display text-[1.0625rem] font-[700]">
+                    <h2 className="flex flex-wrap items-center gap-2 font-display text-[1.0625rem] font-[700]">
                       <Link
                         href={`${campagnesPath(projet)}/${lot.id}`}
                         className="hover:underline focus-visible:underline"
                       >
                         {lot.name}
                       </Link>
+                      {lot.pausedAt === null ? null : <Badge variant="warning">En pause</Badge>}
                     </h2>
                     <div className="flex items-center gap-2">
                       <p className="text-[0.8125rem] text-muted-foreground">

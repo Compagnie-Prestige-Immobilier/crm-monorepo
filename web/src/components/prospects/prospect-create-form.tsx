@@ -371,7 +371,7 @@ export function ProspectCreateForm({
   return (
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
-      className="flex w-full flex-col gap-5"
+      className="mx-auto flex w-full max-w-2xl flex-col gap-5"
       onSubmit={(event) => {
         event.preventDefault();
         submit(true);

@@ -15,6 +15,7 @@ export type LotExportQuery = NonNullable<operations['listLotsExport']['parameter
 export type LotExportFiche = Schemas['LotExportFicheDto'];
 export type LotExportFicheEtat = Schemas['LotExportFicheEtat'];
 export type UpdateLotExportInput = Schemas['UpdateLotExportDto'];
+export type LotExportImport = Schemas['LotExportImportDto'];
 export type LotExportFichesQuery = NonNullable<
   operations['listLotExportFiches']['parameters']['query']
 >;
@@ -36,6 +37,15 @@ export async function createLotExport(
   client: ApiClient = getApiClient(),
 ): Promise<LotExportSummary> {
   return unwrap(await client.POST('/api/v1/lots-export', { body }));
+}
+
+/** Les imports qui ont créé des fiches du projet : les sources d'une campagne « fiches importées ». */
+export async function fetchLotExportImports(
+  projet: Projet,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportImport[]> {
+  return unwrap(await client.GET('/api/v1/lots-export/imports', { params: { query: { projet } } }))
+    .items;
 }
 
 /**

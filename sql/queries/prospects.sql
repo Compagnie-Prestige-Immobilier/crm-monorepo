@@ -40,6 +40,7 @@ WHERE p."deletedAt" IS NULL
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
   )
@@ -123,6 +124,7 @@ WHERE p."deletedAt" IS NULL
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
   )

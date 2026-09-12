@@ -14,6 +14,7 @@ import {
   ListChecksIcon,
   ListIcon,
   ListOrderedIcon,
+  MailIcon,
   MegaphoneIcon,
   PhoneCallIcon,
   PhoneForwardedIcon,
@@ -824,6 +825,13 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
+        href: '/admin/courriels',
+        label: 'Courriels',
+        icon: MailIcon,
+        description: 'Destinataires et textes des envois automatiques',
+        roles: ['ADMIN'],
+      },
+      {
         // Le suivi de l'enrôlement, tenu par la cellule pilotage et
         // performance. Elle est le seul usage du rôle ADMIN, et rien de ce que
         // rendent les plateformes n'est lisible ailleurs dans l'application.
@@ -847,6 +855,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Champs de la conversion',
         icon: ListChecksIcon,
         description: 'Ordre, visibilité et champs ajoutés',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
+      {
+        href: '/admin/exploitation',
+        label: 'Exploitation',
+        icon: ActivityIcon,
+        description: 'Trafic, erreurs, tâches planifiées, courriels et journal',
         roles: ['ADMIN'],
         secondary: true,
       },

@@ -824,8 +824,6 @@ export function newAttemptInput(
   };
 }
 
-export const ALREADY_COMPLETED = 'PHASE2_ALREADY_COMPLETED';
-
 export class AttemptRefused extends Error {
   readonly code: string;
 

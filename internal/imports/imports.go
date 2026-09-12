@@ -227,38 +227,44 @@ func (s *service) deposerImport(kind db.ImportKind) func(context.Context, *Depot
 		}
 		defer func() { _ = fichier.Close() }()
 
-		reglages := reglagesImports()
-		identifiant, err := uuid.NewV7()
+		job, err := s.creerTravailImport(ctx, kind, socle.UtilisateurCourant(ctx).ID, fichier.Filename, fichier)
 		if err != nil {
-			return nil, err
-		}
-		if err := os.MkdirAll(reglages.dir, 0o750); err != nil {
-			return nil, err
-		}
-		chemin := filepath.Join(reglages.dir, identifiant.String()+".xlsx")
-		octets, err := ecrireClasseurImport(chemin, fichier, reglages.maxOctets)
-		if err != nil {
-			_ = os.Remove(chemin)
-			return nil, err
-		}
-
-		nom := fichier.Filename
-		if nom == "" {
-			nom = "import.xlsx"
-		}
-		job, err := s.Q.InsertImportJob(ctx, db.InsertImportJobParams{
-			ID: identifiant.String(), Kind: kind, RequestedByID: socle.UtilisateurCourant(ctx).ID,
-			FileName: tronquerImport(nom, 255), FileBytes: entier32Import(octets), StoragePath: chemin,
-			ExpiresAt: time.Now().Add(reglages.ttl),
-		})
-		if err != nil {
-			_ = os.Remove(chemin)
 			return nil, err
 		}
 		s.Live.Emettre("imports")
 		go s.executerImport(context.WithoutCancel(ctx), job.ID)
 		return &ImportJobOutput{Status: http.StatusCreated, Body: versImportJobDTO(&job)}, nil
 	}
+}
+
+func (s *service) creerTravailImport(ctx context.Context, kind db.ImportKind, demandeur, nom string, source io.Reader) (db.ImportJob, error) {
+	reglages := reglagesImports()
+	identifiant, err := uuid.NewV7()
+	if err != nil {
+		return db.ImportJob{}, err
+	}
+	if err := os.MkdirAll(reglages.dir, 0o750); err != nil {
+		return db.ImportJob{}, err
+	}
+	chemin := filepath.Join(reglages.dir, identifiant.String()+".xlsx")
+	octets, err := ecrireClasseurImport(chemin, source, reglages.maxOctets)
+	if err != nil {
+		_ = os.Remove(chemin)
+		return db.ImportJob{}, err
+	}
+	if nom == "" {
+		nom = "import.xlsx"
+	}
+	job, err := s.Q.InsertImportJob(ctx, db.InsertImportJobParams{
+		ID: identifiant.String(), Kind: kind, RequestedByID: demandeur,
+		FileName: tronquerImport(nom, 255), FileBytes: entier32Import(octets), StoragePath: chemin,
+		ExpiresAt: time.Now().Add(reglages.ttl),
+	})
+	if err != nil {
+		_ = os.Remove(chemin)
+		return db.ImportJob{}, err
+	}
+	return job, nil
 }
 
 // Le type est établi par le CONTENU : `import-file.store.ts:37` ne testait rien.
@@ -708,11 +714,11 @@ type colonneImport struct {
 }
 
 type dispositionFeuilleImport struct {
-	motif                *regexp.Regexp
-	ligneEntete          int
-	premiereDonnee       int
-	repliPremiereFeuille bool
-	exemples             []string
+	motif                 *regexp.Regexp
+	ligneEntete           int
+	premiereDonnee        int
+	repliFeuillesRemplies bool
+	exemples              []string
 }
 
 // Sans disposition, l'en-tête et la ligne d'exemple du modèle sont sautés par
@@ -784,12 +790,48 @@ func (c *classeurImport) parcourir(sur func(ligne int, cellules map[string]strin
 		}
 	}
 	if apparies == 0 {
-		if c.adaptateur.feuilles.repliPremiereFeuille {
-			return c.parcourirFeuille(feuilles[0], true, sur)
+		if c.adaptateur.feuilles.repliFeuillesRemplies {
+			return c.parcourirFeuillesRemplies(feuilles, sur)
 		}
 		return classeurImportError{"Aucun onglet de ce classeur ne porte de données à importer. Onglets trouvés : " + strings.Join(feuilles, ", ") + "."}
 	}
 	return nil
+}
+
+// Un export de campagne n'a pas d'onglet nommé : tous ceux qui portent quelque
+// chose sont lus, une feuille ajoutée par le marketing comprise.
+func (c *classeurImport) parcourirFeuillesRemplies(feuilles []string, sur func(int, map[string]string) error) error {
+	for _, nom := range feuilles {
+		if c.feuilleVide(nom) {
+			continue
+		}
+		if err := c.parcourirFeuille(nom, true, sur); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// Une feuille sans en-tête est vide, pas fautive : Excel en laisse souvent une.
+func (c *classeurImport) feuilleVide(nom string) bool {
+	lignes, err := c.fichier.Rows(nom)
+	if err != nil {
+		return false
+	}
+	defer func() { _ = lignes.Close() }()
+	for numero := 1; lignes.Next(); numero++ {
+		cellules, err := lignes.Columns(excelize.Options{RawCellValue: true})
+		if err != nil {
+			return false
+		}
+		if strings.TrimSpace(strings.Join(cellules, "")) != "" {
+			return false
+		}
+		if numero >= c.adaptateur.feuilles.ligneEntete {
+			return true
+		}
+	}
+	return true
 }
 
 func (c *classeurImport) parcourirFeuille(nom string, nomme bool, sur func(int, map[string]string) error) error {
