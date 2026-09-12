@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -184,7 +185,7 @@ func tracerPassage(ctx context.Context, d *socle.Deps, t socle.Tache) {
 	if errOuverture != nil {
 		slog.Warn("passage de tâche non ouvert", "nom", t.Nom, "base", d.Cfg.Base, "err", errOuverture)
 	}
-	echec := t.Run(ctx)
+	echec := executerTache(ctx, d, t)
 	if echec != nil {
 		slog.Error("tâche", "nom", t.Nom, "base", d.Cfg.Base, "err", echec)
 	}
@@ -199,6 +200,21 @@ func tracerPassage(ctx context.Context, d *socle.Deps, t socle.Tache) {
 	if err := d.Q.CronRunFin(ctx, fin); err != nil {
 		slog.Warn("passage de tâche non clos", "nom", t.Nom, "base", d.Cfg.Base, "err", err)
 	}
+}
+
+// gocron ne récupère pas : une panique dans une tâche emporterait le processus,
+// et les six autres tâches avec lui. Elle devient une erreur de passage.
+func executerTache(ctx context.Context, d *socle.Deps, t socle.Tache) (echec error) {
+	defer func() {
+		panique := recover()
+		if panique == nil {
+			return
+		}
+		echec = fmt.Errorf("panique : %v", panique)
+		slog.Error("tâche en panique", "nom", t.Nom, "base", d.Cfg.Base,
+			"panic", panique, "pile", string(debug.Stack()))
+	}()
+	return t.Run(ctx)
 }
 
 func sonder(ctx context.Context, port string) error {
