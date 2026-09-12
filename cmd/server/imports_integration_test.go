@@ -564,7 +564,7 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	if err := b.pool.QueryRow(b.ctx, `SELECT "sujet" FROM "courriels" WHERE "type" = 'IMPORT_LEADS' AND "objetId" = $1`, *travail).Scan(&sujet); err != nil {
 		t.Fatalf("le bilan du relevé doit partir en courriel : %v", err)
 	}
-	if !strings.HasPrefix(sujet, "[Leads] Relevé appliqué : ") {
+	if !strings.HasPrefix(sujet, "[Leads] Relevé des leads importé : ") {
 		t.Fatalf("sujet : %s", sujet)
 	}
 
