@@ -54,7 +54,13 @@ const (
 	banqueCleMontant   = "amountXof"
 	banqueCleStatut    = "status"
 	banqueCleReference = "reference"
-	banqueCleBanque    = "processingBankId"
+	banqueCleCode      = "code"
+	banqueCleLabel     = "label"
+	banqueCleCouleur   = "color"
+	banqueCleActif     = "isActive"
+
+	banqueFamilleEtapes = "bank-case-stages"
+	banqueCleBanque     = "processingBankId"
 
 	banqueMessageDemandeIntrouvable = "Demande de création introuvable."
 	messageDossierIntrouvable       = "Dossier bancaire introuvable."
@@ -840,7 +846,14 @@ func (s *service) banqueCreerEtape(ctx context.Context, in *CreationEtapeBanqueI
 			ID: id.String(), Code: code, Label: strings.TrimSpace(in.Body.Label),
 			Color: strings.TrimSpace(in.Body.Color), Position: position,
 		})
-		return err
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, socle.UtilisateurCourant(ctx).ID, "referentiel.create",
+			banqueFamilleEtapes, id.String(), nil, map[string]any{
+				banqueCleCode: creee.Code, banqueCleLabel: creee.Label,
+				banqueCleCouleur: creee.Color, "position": creee.Position,
+			})
 	})
 	if banqueConflitUnicite(err) {
 		return nil, banqueConflitCodeEtape(code, "", "")
@@ -886,13 +899,29 @@ type ModificationEtapeBanqueInput struct {
 // Ni le code, ni le type, ni le drapeau initial : une étape déjà inscrite dans
 // l'historique d'un dossier clos ne change pas de nature rétroactivement.
 func (s *service) banqueModifierEtape(ctx context.Context, in *ModificationEtapeBanqueInput) (*EtapeBanqueOutput, error) {
-	if _, err := s.Q.BankStageByID(ctx, in.ID); err != nil {
+	etape, err := s.Q.BankStageByID(ctx, in.ID)
+	if err != nil {
 		return nil, banqueEtapeIntrouvable(err)
 	}
-	modifiee, err := s.Q.BankStageRename(ctx, db.BankStageRenameParams{
-		ID: in.ID, Label: banqueTexteNettoye(in.Body.Label), Color: banqueTexteNettoye(in.Body.Color),
-	})
-	if err != nil {
+	auteur := socle.UtilisateurCourant(ctx).ID
+	var modifiee db.BankCaseStage
+	if err := s.transactionBanque(ctx, func(q *db.Queries) error {
+		ecrite, err := q.BankStageRename(ctx, db.BankStageRenameParams{
+			ID: in.ID, Label: banqueTexteNettoye(in.Body.Label), Color: banqueTexteNettoye(in.Body.Color),
+		})
+		if err != nil {
+			return err
+		}
+		modifiee = ecrite
+		avant, apres := map[string]any{}, map[string]any{}
+		if in.Body.Label != nil {
+			avant[banqueCleLabel], apres[banqueCleLabel] = etape.Label, ecrite.Label
+		}
+		if in.Body.Color != nil {
+			avant[banqueCleCouleur], apres[banqueCleCouleur] = etape.Color, ecrite.Color
+		}
+		return database.Auditer(ctx, q, auteur, "referentiel.update", banqueFamilleEtapes, in.ID, avant, apres)
+	}); err != nil {
 		return nil, err
 	}
 	return &EtapeBanqueOutput{Body: banqueEtapeDTO(&modifiee)}, nil
@@ -996,8 +1025,19 @@ func (s *service) banqueActiverEtape(ctx context.Context, in *ActivationEtapeBan
 			return nil, err
 		}
 	}
-	modifiee, err := s.Q.BankStageSetActive(ctx, db.BankStageSetActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
-	if err != nil {
+	auteur := socle.UtilisateurCourant(ctx).ID
+	var modifiee db.BankCaseStage
+	// Désactiver une étape change le sens de tous les dossiers qui l'ont
+	// traversée : la bascule et sa trace tiennent ou tombent ensemble.
+	if err := s.transactionBanque(ctx, func(q *db.Queries) error {
+		ecrite, err := q.BankStageSetActive(ctx, db.BankStageSetActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
+		if err != nil {
+			return err
+		}
+		modifiee = ecrite
+		return database.Auditer(ctx, q, auteur, "referentiel.active", banqueFamilleEtapes, in.ID,
+			map[string]any{banqueCleActif: etape.IsActive}, map[string]any{banqueCleActif: ecrite.IsActive})
+	}); err != nil {
 		return nil, err
 	}
 	return &EtapeBanqueOutput{Body: banqueEtapeDTO(&modifiee)}, nil
