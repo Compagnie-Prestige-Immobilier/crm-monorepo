@@ -58,9 +58,6 @@ export function EnvoiLienFormulaire({ prospect, email }: { prospect: ProspectRow
           Envoyer par e-mail
         </a>
       </div>
-      <p className="text-[0.8125rem] text-muted-foreground">
-        Sa réponse revient sur votre compte, en fiche à part.
-      </p>
     </fieldset>
   );
 }

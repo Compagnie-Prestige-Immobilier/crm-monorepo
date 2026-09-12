@@ -70,16 +70,19 @@ export function HubView({ prenom }: { prenom: string }) {
           />
           Projet CHUES
         </h1>
-        <p className="text-[0.9375rem] text-muted-foreground">
-          Bonjour {prenom}. Trois étapes, dans l’ordre, puis ce qui revient.
-        </p>
-        <Button variant="outline" onClick={() => setNouveauRepresentant(true)}>
-          Ajouter un représentant
-        </Button>
+        <div className="flex w-full flex-wrap items-center justify-between gap-3">
+          <p className="text-[0.9375rem] text-muted-foreground">
+            Bonjour {prenom}. Quatre étapes dans l’ordre du parcours d’appel, puis ce qui revient.
+          </p>
+          <Button variant="outline" size="sm" onClick={() => setNouveauRepresentant(true)}>
+            Ajouter un représentant
+          </Button>
+        </div>
       </div>
 
       <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Etape
+          numero="01"
           titre="Qualifier un représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
           chiffre={
@@ -94,6 +97,7 @@ export function HubView({ prenom }: { prenom: string }) {
         />
 
         <Etape
+          numero="02"
           titre="Ajouter un prospect"
           explication="Le représentant a donné des noms : on les note un par un."
           chiffre={
@@ -108,6 +112,7 @@ export function HubView({ prenom }: { prenom: string }) {
         />
 
         <Etape
+          numero="03"
           titre="Convertir un prospect"
           explication="Chaque prospect est rappelé jusqu’à son adhésion."
           chiffre={
@@ -118,12 +123,11 @@ export function HubView({ prenom }: { prenom: string }) {
               legende="pas encore convertis"
             />
           }
-          action={<Geste href="/chues/console" label="Convertir un prospect" />}
+          action={<Geste href="/chues/console" label="Convertir un prospect" primary />}
         />
 
-        {/* Le nombre de rappels dus ne disait rien accolé aux prospects en
-            attente. Sa propre tuile lui donne son échéance et son geste. */}
         <Etape
+          numero="04"
           titre="À rappeler"
           explication="Les rappels promis et ceux que le référentiel a reprogrammés."
           chiffre={
@@ -132,11 +136,7 @@ export function HubView({ prenom }: { prenom: string }) {
               failed={rappels.isError}
               valeur={rappels.data?.items.length}
               legende="dus aujourd’hui"
-              suite={
-                retards.isPending || retards.isError
-                  ? null
-                  : ` · ${formatNumber(enRetard)} en retard`
-              }
+              enRetard={enRetard}
             />
           }
           action={<Geste href="/chues/rappels" label="Voir les rappels" />}
@@ -153,22 +153,29 @@ export function HubView({ prenom }: { prenom: string }) {
 }
 
 function Etape({
+  numero,
   titre,
   explication,
   chiffre,
   action,
 }: {
+  numero: string;
   titre: string;
   explication: string;
   chiffre: ReactNode;
   action: ReactNode;
 }) {
   return (
-    <li className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm">
+    <li className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm transition-all hover:border-primary/40">
+      <div className="flex items-center justify-between">
+        <span className="font-display text-xs font-[800] tracking-wider text-muted-foreground/60 uppercase">
+          Étape {numero}
+        </span>
+      </div>
       <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">{titre}</h2>
       <p className="text-[0.875rem] text-muted-foreground">{explication}</p>
       {chiffre}
-      <div className="mt-auto pt-1">{action}</div>
+      <div className="mt-auto pt-2">{action}</div>
     </li>
   );
 }
@@ -183,24 +190,33 @@ function Chiffre({
   failed,
   valeur,
   legende,
-  suite = null,
+  enRetard = 0,
 }: {
   pending: boolean;
   failed: boolean;
   valeur: number | undefined;
   legende: string;
-  suite?: string | null;
+  enRetard?: number;
 }) {
   if (pending) return <Skeleton className="h-7 w-20" />;
 
   return (
-    <p className="text-[0.875rem] text-muted-foreground">
-      <span aria-live="polite" className="font-display text-[1.5rem] font-[700] tabular-nums">
-        {failed || valeur === undefined ? '–' : formatNumber(valeur)}
-      </span>{' '}
-      {legende}
-      {suite}
-    </p>
+    <div className="flex flex-col gap-1">
+      <p className="text-[0.875rem] text-muted-foreground">
+        <span
+          aria-live="polite"
+          className="font-display text-[1.5rem] font-[700] tabular-nums text-foreground"
+        >
+          {failed || valeur === undefined ? '–' : formatNumber(valeur)}
+        </span>{' '}
+        {legende}
+      </p>
+      {enRetard > 0 && (
+        <span className="inline-flex w-fit items-center rounded-full bg-destructive/10 px-2 py-0.5 text-xs font-semibold text-destructive">
+          {formatNumber(enRetard)} en retard
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -209,9 +225,23 @@ function Chiffre({
  * `role="button"` sur le `<a>`, et l'ouverture dans un nouvel onglet, la
  * prélecture et le menu contextuel disparaîtraient avec.
  */
-function Geste({ href, label }: { href: string; label: string }) {
+function Geste({
+  href,
+  label,
+  primary = false,
+}: {
+  href: string;
+  label: string;
+  primary?: boolean;
+}) {
   return (
-    <Link href={href} className={buttonVariants({ variant: 'outline' })}>
+    <Link
+      href={href}
+      className={buttonVariants({
+        variant: primary ? 'default' : 'outline',
+        className: 'w-full justify-center text-center',
+      })}
+    >
       {label}
     </Link>
   );

@@ -65,12 +65,14 @@ export function FilterCombobox({
 
   return (
     <div className={cn('flex min-w-0 flex-col gap-1.5', className)}>
-      <Label id={labelId} htmlFor={triggerId}>
-        {label}
-        {required ? (
-          <span className="text-[0.8125rem] font-[500] text-destructive">Obligatoire</span>
-        ) : null}
-      </Label>
+      {label ? (
+        <Label id={labelId} htmlFor={triggerId}>
+          {label}
+          {required ? (
+            <span className="text-[0.8125rem] font-[500] text-destructive">Obligatoire</span>
+          ) : null}
+        </Label>
+      ) : null}
 
       <div className="relative">
         <Popover open={open} onOpenChange={ouvrir}>

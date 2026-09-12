@@ -2,14 +2,16 @@
 
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Building2Icon,
+  CalendarCheck2Icon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardListIcon,
+  FileTextIcon,
   PencilIcon,
   PlusIcon,
   PrinterIcon,
   RotateCcwIcon,
-  SearchIcon,
 } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
@@ -298,6 +300,93 @@ function RegistreCorps({
   );
 }
 
+function computeKPIs(visites: readonly Visite[], total: number, jourSeul: boolean) {
+  const countVisites = jourSeul ? total : visites.length;
+
+  const entrepriseSet = new Set(visites.map((v) => v.entreprise.id));
+  const countEntreprises = entrepriseSet.size;
+
+  const objetCounts = new Map<string, number>();
+  visites.forEach((v) => {
+    const label = v.objet.label;
+    objetCounts.set(label, (objetCounts.get(label) ?? 0) + 1);
+  });
+
+  let topObjet = '–';
+  let topObjetCount = 0;
+  objetCounts.forEach((count, label) => {
+    if (count > topObjetCount) {
+      topObjetCount = count;
+      topObjet = label;
+    }
+  });
+
+  return { countVisites, countEntreprises, topObjet, topObjetCount };
+}
+
+function VisitesKpiCards({
+  countVisites,
+  countEntreprises,
+  topObjet,
+  topObjetCount,
+  jourSeul,
+}: {
+  countVisites: number;
+  countEntreprises: number;
+  topObjet: string;
+  topObjetCount: number;
+  jourSeul: boolean;
+}) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-3 print:hidden">
+      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <CalendarCheck2Icon className="size-5" aria-hidden="true" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[0.8125rem] font-[500] text-muted-foreground">
+            {jourSeul ? 'Visites aujourd’hui' : 'Visites au registre'}
+          </span>
+          <span className="font-display text-[1.25rem] font-[700] tabular-nums tracking-[-0.02em]">
+            {formatNumber(countVisites)}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+          <Building2Icon className="size-5" aria-hidden="true" />
+        </div>
+        <div className="flex flex-col">
+          <span className="text-[0.8125rem] font-[500] text-muted-foreground">
+            Entreprises & Organismes
+          </span>
+          <span className="font-display text-[1.25rem] font-[700] tabular-nums tracking-[-0.02em]">
+            {formatNumber(countEntreprises)}
+          </span>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+        <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+          <FileTextIcon className="size-5" aria-hidden="true" />
+        </div>
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-[0.8125rem] font-[500] text-muted-foreground">
+            Motif le plus fréquent
+          </span>
+          <span
+            className="truncate font-display text-[0.9375rem] font-[700] tracking-[-0.01em]"
+            title={topObjet}
+          >
+            {topObjet} {topObjetCount > 0 ? `(${topObjetCount})` : ''}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export function RegistreView() {
   const queryClient = useQueryClient();
   const { filters, setFilters, resetFilters } = useUrlFilters(ADAPTER);
@@ -306,11 +395,7 @@ export function RegistreView() {
   const [today] = useState(() => dakarNow().date);
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
-  // Déplié d'emblée SI un critère est déjà posé : sinon le registre paraîtrait
-  // amputé sans qu'on voie pourquoi.
-  const [rechercheOuverte, setRechercheOuverte] = useState(
-    () => countActiveVisiteFilters(filters) > 0,
-  );
+
   const [impressionOuverte, setImpressionOuverte] = useState(false);
   const [orientation, setOrientation] = useState<'landscape' | 'portrait'>('landscape');
   const [colonnesImprimees, setColonnesImprimees] = useState<ReadonlySet<ImpressionColonne>>(
@@ -343,6 +428,7 @@ export function RegistreView() {
   );
   const chips = buildVisiteAdvancedChips(filters, referentiels.data);
   const jourSeul = estJourSeul(filters, chips.length);
+  const kpis = computeKPIs(visites, total, jourSeul);
 
   function rafraichir(): void {
     void queryClient.invalidateQueries({ queryKey: ['visites'] });
@@ -369,167 +455,165 @@ export function RegistreView() {
     <div className="flex flex-col gap-4">
       <style media="print">{`@page { size: ${orientation}; margin: 10mm; }`}</style>
 
+      <VisitesKpiCards
+        countVisites={kpis.countVisites}
+        countEntreprises={kpis.countEntreprises}
+        topObjet={kpis.topObjet}
+        topObjetCount={kpis.topObjetCount}
+        jourSeul={jourSeul}
+      />
+
       <section
-        aria-label="Rechercher dans le registre"
+        aria-label="Actions et filtres du registre"
         className="flex flex-col gap-3 rounded-lg border border-border bg-card p-3 shadow-elev-sm print:hidden"
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              setAjoutOuvert(true);
-            }}
-          >
-            <PlusIcon aria-hidden="true" />
-            Ajouter une visite
-          </Button>
-
-          <fieldset className="flex items-center gap-2">
-            <legend className="sr-only">Période</legend>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
-              size="sm"
-              variant={jourSeul ? 'secondary' : 'outline'}
-              aria-pressed={jourSeul}
               onClick={() => {
-                setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
+                setAjoutOuvert(true);
               }}
             >
-              Aujourd’hui
+              <PlusIcon aria-hidden="true" />
+              Ajouter une visite
             </Button>
+
+            <fieldset className="flex items-center gap-1.5 rounded-lg bg-muted p-1">
+              <legend className="sr-only">Période</legend>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-3 py-1 text-[0.875rem] font-[600] transition-colors',
+                  jourSeul
+                    ? 'bg-card text-foreground shadow-elev-xs'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                aria-pressed={jourSeul}
+                onClick={() => {
+                  setFilters({ toutePeriode: false, dateFrom: null, dateTo: null });
+                }}
+              >
+                Aujourd’hui
+              </button>
+              <button
+                type="button"
+                className={cn(
+                  'rounded-md px-3 py-1 text-[0.875rem] font-[600] transition-colors',
+                  filters.toutePeriode
+                    ? 'bg-card text-foreground shadow-elev-xs'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+                aria-pressed={filters.toutePeriode}
+                onClick={() => {
+                  setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+                }}
+              >
+                Tout le registre
+              </button>
+            </fieldset>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <SearchField
+              value={searchDraft}
+              onChange={setSearchDraft}
+              placeholder="Nom ou n° de registre…"
+              className="w-full sm:w-64"
+            />
             <Button
               type="button"
-              size="sm"
-              variant={filters.toutePeriode ? 'secondary' : 'outline'}
-              aria-pressed={filters.toutePeriode}
+              variant="outline"
+              disabled={visites.length === 0}
               onClick={() => {
-                setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
+                setImpressionOuverte(true);
               }}
             >
-              Tout le registre
+              <PrinterIcon aria-hidden="true" />
+              Imprimer
             </Button>
-          </fieldset>
-
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            className="sm:ml-auto"
-            aria-expanded={rechercheOuverte}
-            aria-controls="filtres-registre"
-            onClick={() => {
-              setRechercheOuverte((current) => !current);
-            }}
-          >
-            <SearchIcon aria-hidden="true" />
-            Rechercher et filtrer
-          </Button>
+          </div>
         </div>
 
-        {rechercheOuverte ? (
-          <div id="filtres-registre" className="flex flex-col gap-3 border-t border-border pt-3">
-            <div className="flex flex-wrap items-end gap-3">
-              <SearchField
-                value={searchDraft}
-                onChange={setSearchDraft}
-                placeholder="Nom ou n° de registre…"
-              />
-
-              <DatePicker
-                id={duId}
-                label="Du"
-                value={filters.dateFrom}
-                max={filters.dateTo}
-                onChange={(value) => {
-                  setFilters({ dateFrom: value });
-                }}
-              />
-              <DatePicker
-                id={auId}
-                label="Au"
-                value={filters.dateTo}
-                min={filters.dateFrom}
-                onChange={(value) => {
-                  setFilters({ dateTo: value });
-                }}
-              />
-            </div>
-
-            <AdvancedPanel
-              module="registre"
-              chips={chips}
-              onRemove={removeAdvanced}
-              onClearAll={clearAdvanced}
-              actions={
-                countActiveVisiteFilters(filters) > 0 ? (
-                  <Button type="button" variant="outline" onClick={resetFilters}>
-                    <RotateCcwIcon aria-hidden="true" />
-                    Retirer les filtres
-                  </Button>
-                ) : null
-              }
-            >
-              <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2">
-                <FilterCombobox
-                  label={VISITE_COLONNES.entreprise}
-                  placeholder="Toutes"
-                  options={optionsReferentiel(referentiels.data, 'entreprises')}
-                  value={filters.entrepriseId}
-                  onChange={(value) => {
-                    setFilters({ entrepriseId: value });
-                  }}
-                />
-                <FilterCombobox
-                  label={VISITE_COLONNES.direction}
-                  placeholder="Toutes"
-                  options={optionsReferentiel(referentiels.data, 'directions')}
-                  value={filters.directionId}
-                  onChange={(value) => {
-                    setFilters({ directionId: value });
-                  }}
-                />
-                <FilterCombobox
-                  label={VISITE_COLONNES.destinataire}
-                  placeholder="Tous"
-                  options={optionsReferentiel(referentiels.data, 'destinataires')}
-                  value={filters.destinataireId}
-                  onChange={(value) => {
-                    setFilters({ destinataireId: value });
-                  }}
-                />
-                <FilterCombobox
-                  label={VISITE_COLONNES.objet}
-                  placeholder="Tous"
-                  options={optionsReferentiel(referentiels.data, 'objets')}
-                  value={filters.objetId}
-                  onChange={(value) => {
-                    setFilters({ objetId: value });
-                  }}
-                />
-              </div>
-            </AdvancedPanel>
+        <AdvancedPanel
+          module="registre"
+          startCollapsed={true}
+          chips={chips}
+          onRemove={removeAdvanced}
+          onClearAll={clearAdvanced}
+          actions={
+            countActiveVisiteFilters(filters) > 0 ? (
+              <Button type="button" variant="outline" onClick={resetFilters}>
+                <RotateCcwIcon aria-hidden="true" />
+                Retirer les filtres
+              </Button>
+            ) : null
+          }
+        >
+          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <DatePicker
+              id={duId}
+              label="Du"
+              value={filters.dateFrom}
+              max={filters.dateTo}
+              onChange={(value) => {
+                setFilters({ dateFrom: value });
+              }}
+            />
+            <DatePicker
+              id={auId}
+              label="Au"
+              value={filters.dateTo}
+              min={filters.dateFrom}
+              onChange={(value) => {
+                setFilters({ dateTo: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.entreprise}
+              placeholder="Toutes"
+              options={optionsReferentiel(referentiels.data, 'entreprises')}
+              value={filters.entrepriseId}
+              onChange={(value) => {
+                setFilters({ entrepriseId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.direction}
+              placeholder="Toutes"
+              options={optionsReferentiel(referentiels.data, 'directions')}
+              value={filters.directionId}
+              onChange={(value) => {
+                setFilters({ directionId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.destinataire}
+              placeholder="Tous"
+              options={optionsReferentiel(referentiels.data, 'destinataires')}
+              value={filters.destinataireId}
+              onChange={(value) => {
+                setFilters({ destinataireId: value });
+              }}
+            />
+            <FilterCombobox
+              label={VISITE_COLONNES.objet}
+              placeholder="Tous"
+              options={optionsReferentiel(referentiels.data, 'objets')}
+              value={filters.objetId}
+              onChange={(value) => {
+                setFilters({ objetId: value });
+              }}
+            />
           </div>
-        ) : null}
+        </AdvancedPanel>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-          {formatNumber(total)} visite{total > 1 ? 's' : ''}{' '}
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-display text-[1.125rem] font-[700] tracking-[-0.01em]">
+          <span className="tabular-nums">{formatNumber(total)}</span> visite{total > 1 ? 's' : ''}{' '}
           {jourSeul ? 'aujourd’hui' : 'au registre'}
         </h2>
-        <Button
-          type="button"
-          variant="outline"
-          className="print:hidden"
-          disabled={visites.length === 0}
-          onClick={() => {
-            setImpressionOuverte(true);
-          }}
-        >
-          <PrinterIcon aria-hidden="true" />
-          Imprimer
-        </Button>
       </div>
 
       {/* SUR LE PAPIER, dire ce que la feuille contient. La pagination de
@@ -650,35 +734,72 @@ function LigneVisite({
 
   return (
     <TableRow>
-      <TableCell className={cn('font-[600] whitespace-nowrap', printClassName('N° REGISTRE'))}>
+      <TableCell
+        className={cn(
+          'whitespace-nowrap font-mono text-[0.8125rem] font-[600]',
+          printClassName('N° REGISTRE'),
+        )}
+      >
         {visite.reference}
       </TableCell>
-      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.date))}>
+      <TableCell
+        className={cn(
+          'whitespace-nowrap text-[0.8125rem] tabular-nums',
+          printClassName(VISITE_COLONNES.date),
+        )}
+      >
         {formatDate(visite.date)}
       </TableCell>
-      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.time))}>
+      <TableCell
+        className={cn(
+          'whitespace-nowrap text-[0.8125rem] tabular-nums text-muted-foreground',
+          printClassName(VISITE_COLONNES.time),
+        )}
+      >
         {visite.time ?? ''}
       </TableCell>
-      <TableCell className={cn('font-[600]', printClassName(VISITE_COLONNES.visitorName))}>
+      <TableCell
+        className={cn(
+          'whitespace-nowrap text-[0.875rem] font-[600]',
+          printClassName(VISITE_COLONNES.visitorName),
+        )}
+      >
         {visite.visitorName}
       </TableCell>
-      <TableCell className={cn('whitespace-nowrap', printClassName(VISITE_COLONNES.phone))}>
+      <TableCell
+        className={cn(
+          'whitespace-nowrap font-mono text-[0.8125rem] font-semibold text-foreground/80 tabular-nums',
+          printClassName(VISITE_COLONNES.phone),
+        )}
+      >
         {visite.phone ?? ''}
       </TableCell>
-      <TableCell className={printClassName(VISITE_COLONNES.entreprise)}>
+      <TableCell className={cn('text-[0.8125rem]', printClassName(VISITE_COLONNES.entreprise))}>
         {visite.entreprise.label}
       </TableCell>
-      <TableCell className={printClassName(VISITE_COLONNES.direction)}>
+      <TableCell className={cn('text-[0.8125rem]', printClassName(VISITE_COLONNES.direction))}>
         {visite.direction?.label ?? ''}
       </TableCell>
-      <TableCell className={printClassName(VISITE_COLONNES.destinataire)}>
+      <TableCell className={cn('text-[0.8125rem]', printClassName(VISITE_COLONNES.destinataire))}>
         {visite.destinataire?.label ?? ''}
       </TableCell>
-      <TableCell className={printClassName(VISITE_COLONNES.objet)}>{visite.objet.label}</TableCell>
-      <TableCell className={cn('max-w-[20rem]', printClassName(VISITE_COLONNES.comment))}>
+      <TableCell
+        className={cn(
+          'min-w-[14rem] text-[0.8125rem] font-[500]',
+          printClassName(VISITE_COLONNES.objet),
+        )}
+      >
+        {visite.objet.label}
+      </TableCell>
+      <TableCell
+        className={cn(
+          'max-w-[20rem] text-[0.8125rem] text-muted-foreground',
+          printClassName(VISITE_COLONNES.comment),
+        )}
+      >
         {visite.comment ?? ''}
       </TableCell>
-      <TableCell className="print:hidden">
+      <TableCell className="text-right print:hidden">
         <Button
           type="button"
           variant="outline"

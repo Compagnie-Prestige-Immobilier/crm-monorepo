@@ -84,7 +84,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
               {row.original.prenom} {row.original.nom}
             </Link>
           </p>
-          <p className="truncate text-[0.75rem] text-muted-foreground">
+          <p className="truncate font-mono text-[0.8125rem] font-semibold tabular-nums text-foreground/80">
             {formatPhone(row.original.phoneE164)}
           </p>
         </div>

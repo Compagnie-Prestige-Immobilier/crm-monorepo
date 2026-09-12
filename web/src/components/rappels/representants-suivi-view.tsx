@@ -93,15 +93,10 @@ export function RepresentantsSuiviView({
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-            Représentants à reprendre
-          </h2>
-          <p className="text-[0.875rem] text-muted-foreground">
-            Les rappels promis pendant la qualification, ceux que le référentiel a reprogrammés, et
-            les numéros restés sans réponse.
-          </p>
-        </div>
+        <p className="text-[0.875rem] text-muted-foreground">
+          Les rappels promis pendant la qualification, ceux que le référentiel a reprogrammés, et
+          les numéros restés sans réponse.
+        </p>
 
         {canFilter ? (
           <FilterCombobox

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { RappelsView } from '@/components/rappels/rappels-view';
 import { RepresentantsSuiviView } from '@/components/rappels/representants-suivi-view';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/chues/rappels')({
@@ -30,9 +31,17 @@ function RappelsPage() {
   const canFilter = user.role !== 'COMMERCIAL';
 
   return (
-    <div className="flex flex-col gap-10">
-      <RepresentantsSuiviView userId={user.id} canFilter={canFilter} />
-      <RappelsView canFilter={canFilter} />
-    </div>
+    <Tabs defaultValue="representants">
+      <TabsList>
+        <TabsTrigger value="representants">Représentants</TabsTrigger>
+        <TabsTrigger value="prospects">Prospects</TabsTrigger>
+      </TabsList>
+      <TabsContent value="representants">
+        <RepresentantsSuiviView userId={user.id} canFilter={canFilter} />
+      </TabsContent>
+      <TabsContent value="prospects">
+        <RappelsView canFilter={canFilter} />
+      </TabsContent>
+    </Tabs>
   );
 }

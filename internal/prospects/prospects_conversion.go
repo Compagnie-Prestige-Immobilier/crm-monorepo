@@ -519,7 +519,6 @@ type ProspectParametresChues struct {
 	DestinatairesSupervision []string `json:"destinatairesSupervision"`
 	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
-	VerrouFiches             bool     `json:"verrouFiches"`
 	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
 	TextesUsine ProspectTextesUsine `json:"textesUsine"`
 }
@@ -546,7 +545,6 @@ var prospectParametresUsine = ProspectParametresChues{
 	DestinatairesSupervision: []string{},
 	DestinatairesDirection:   []string{},
 	CodificationProvenances:  []string{},
-	VerrouFiches:             true,
 }
 
 const (
@@ -562,7 +560,6 @@ const (
 	prospectCleSupervision   = "destinatairesSupervision"
 	prospectCleDirection     = "destinatairesDirection"
 	prospectCleCodification  = "codificationProvenances"
-	prospectCleVerrouFiches  = "verrouFiches"
 	prospectPrefixeParametre = "chues."
 )
 
@@ -575,7 +572,7 @@ var prospectClesParametres = []string{
 	prospectCleLienChues, prospectCleLienGP, prospectCleEmail, prospectCleWhatsapp,
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
 	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleCodification, prospectCleVerrouFiches,
+	prospectCleDirection, prospectCleCodification,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -588,13 +585,6 @@ func prospectClesStockees() []string {
 		cles = append(cles, prospectCleParametre(cle))
 	}
 	return cles
-}
-
-func prospectBool(v bool) string {
-	if v {
-		return socle.Vrai
-	}
-	return socle.Faux
 }
 
 // Une liste voyage en JSON, un booléen en 'true'/'false'. Une valeur illisible
@@ -644,9 +634,6 @@ func (p *ProspectParametresChues) poser(cle, brut string) {
 		*cible = prospectListeDe(brut)
 		return
 	}
-	if cle == prospectCleVerrouFiches {
-		p.VerrouFiches = brut != "false"
-	}
 }
 
 func (p *ProspectParametresChues) valeur(cle string) string {
@@ -655,9 +642,6 @@ func (p *ProspectParametresChues) valeur(cle string) string {
 	}
 	if liste, connu := p.listes()[cle]; connu {
 		return prospectJSONListe(*liste)
-	}
-	if cle == prospectCleVerrouFiches {
-		return prospectBool(p.VerrouFiches)
 	}
 	return ""
 }
@@ -714,7 +698,6 @@ type ProspectMajParametresInput struct {
 		DestinatairesSupervision *[]string `json:"destinatairesSupervision,omitempty" maxItems:"50" required:"false"`
 		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
 		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
-		VerrouFiches             *bool     `json:"verrouFiches,omitempty" required:"false"`
 	}
 }
 
@@ -740,9 +723,6 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		if valeur != nil {
 			demandees[cle] = prospectJSONListe(*valeur)
 		}
-	}
-	if in.Body.VerrouFiches != nil {
-		demandees[prospectCleVerrouFiches] = prospectBool(*in.Body.VerrouFiches)
 	}
 	return demandees
 }

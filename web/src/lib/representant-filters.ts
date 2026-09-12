@@ -148,12 +148,26 @@ export function representantFiltersQueryKey(filters: RepresentantFilters): strin
   return serializeRepresentantFilters(filters).toString();
 }
 
-const REPRESENTANT_ADVANCED_FILTER_KEYS = ['dateFrom', 'dateTo', 'hasProspects'] as const;
+const REPRESENTANT_ADVANCED_FILTER_KEYS = [
+  'relationStatus',
+  'statutQualificationId',
+  'departementId',
+  'iefId',
+  'commercialId',
+  'dateFrom',
+  'dateTo',
+  'hasProspects',
+] as const;
 
 export type RepresentantAdvancedFilterKey = (typeof REPRESENTANT_ADVANCED_FILTER_KEYS)[number];
 
 export function clearRepresentantAdvancedFilters(): Partial<RepresentantFilters> {
   return {
+    relationStatus: null,
+    statutQualificationId: null,
+    departementId: null,
+    iefId: null,
+    commercialId: null,
     dateFrom: null,
     dateTo: null,
     hasProspects: null,

@@ -18,7 +18,7 @@ import (
 
 const (
 	exportTypeMimeXlsx            = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-	exportCouleurBordeaux         = "FF630210"
+	exportCouleurBordeaux         = "630210"
 	exportTaillePage              = 1000
 	exportNomFeuilleRepresentants = "Représentants"
 )
@@ -203,15 +203,15 @@ func exportNouveauClasseur() (*exportClasseur, error) {
 		format string
 	}{
 		{&c.entete, &excelize.Style{
-			Font:      &excelize.Font{Bold: true, Color: "FFFFFFFF", Size: 11},
+			Font:      &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
 			Fill:      excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{exportCouleurBordeaux}},
 			Alignment: &excelize.Alignment{Vertical: "center", Horizontal: "left"},
 		}, ""},
 		{&c.section, &excelize.Style{Font: &excelize.Font{Bold: true, Color: exportCouleurBordeaux}}, ""},
-		{&c.rappel, &excelize.Style{Font: &excelize.Font{Italic: true, Color: "FF6B6B6B", Size: 10}}, ""},
+		{&c.rappel, &excelize.Style{Font: &excelize.Font{Italic: true, Color: "6B6B6B", Size: 10}}, ""},
 		{&c.exemple, &excelize.Style{
-			Font: &excelize.Font{Italic: true, Color: "FF9A9A9A"},
-			Fill: excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{"FFF3F3F3"}},
+			Font: &excelize.Font{Italic: true, Color: "9A9A9A"},
+			Fill: excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{"F3F3F3"}},
 		}, ""},
 		{&c.date, nil, "dd/mm/yyyy hh:mm"},
 		{&c.jour, nil, "dd/mm/yyyy"},

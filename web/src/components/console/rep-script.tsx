@@ -69,8 +69,6 @@ import {
 } from '@/lib/representant-filters';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useVerrouFiches } from '@/lib/use-verrou-fiches';
-import { useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 /** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
@@ -167,11 +165,6 @@ function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
   return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
 }
 
-/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
-function descriptionOuverture(verrouActif: boolean): string | null {
-  return verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
-}
-
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -189,7 +182,6 @@ function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null
  */
 export function RepScript() {
   const queryClient = useQueryClient();
-  const verrouActif = useVerrouFiches();
 
   const [choisi, setChoisi] = useState<Ouverte | null>(null);
   const [aConfirmer, setAConfirmer] = useState<ScriptedRepresentant | null>(null);
@@ -214,9 +206,8 @@ export function RepScript() {
     setChoisi(ouverte);
   }, []);
 
-  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
-  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
-  // est toujours tenue.
+  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
+  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
   const repriseFaite = useRef(false);
   useEffect(() => {
     if (repriseFaite.current) return;
@@ -256,7 +247,6 @@ export function RepScript() {
         key={choisi.ouverture.id}
         representant={choisi.representant}
         ouverture={choisi.ouverture}
-        verrouActif={verrouActif}
         onAbandon={() => {
           setChoisi(null);
         }}
@@ -314,7 +304,7 @@ export function RepScript() {
         open={aConfirmer !== null}
         onOpenChange={fermerConfirmation}
         title={titreOuverture(aConfirmer)}
-        description={descriptionOuverture(verrouActif)}
+        description={null}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -341,7 +331,6 @@ async function reprendreOuverte(ouvrir: (ouverte: Ouverte) => void): Promise<voi
   if (courante === null || courante.representantId === null) return;
   const representant = await fetchRepresentant(courante.representantId).catch(() => null);
   if (representant === null) return;
-  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`, { id: 'reprise-fiche' });
   ouvrir({ representant, ouverture: courante });
 }
 
@@ -402,10 +391,12 @@ function ResultatsAnnuaire({
               'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             )}
           >
-            <span className="flex min-w-0 flex-col">
+            <span className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
               <span className="text-[0.8125rem] text-muted-foreground">
-                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {formatPhone(row.phoneE164)}
+                </span>
                 {row.departementName === null ? '' : ` · ${row.departementName}`}
               </span>
             </span>
@@ -597,7 +588,7 @@ function QuestionsJoignable(props: QuestionsJoignableProps) {
       <Question titre="Sur quel syndicat ? (facultatif)" anime>
         <FilterCombobox
           className="max-w-80"
-          label="Syndicat (facultatif)"
+          label=""
           placeholder="Choisir un syndicat"
           value={props.syndicatId}
           options={props.syndicatOptions}
@@ -726,8 +717,12 @@ function ChoixStatut({
 }) {
   return (
     <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-      <label htmlFor="rep-statut" className="text-[1rem] font-[600]">
-        Statut de qualification
+      <label
+        htmlFor="rep-statut"
+        className="text-[1rem] font-[600] flex items-center justify-between"
+      >
+        <span>Statut de qualification</span>
+        <span className="text-[0.75rem] font-normal text-destructive">* obligatoire</span>
       </label>
       {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
           VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
@@ -1178,13 +1173,11 @@ function reponseDe(etat: EtatReponse): RepAnswer {
 function Qualification({
   representant,
   ouverture,
-  verrouActif,
   onAbandon,
   onEnregistre,
 }: {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
-  verrouActif: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -1340,22 +1333,13 @@ function Qualification({
     if (valeur === 'INJOIGNABLE') setRappelAt(null);
   }
 
-  const retenu = useCallback(() => {
-    toast.error('Posez un statut de qualification avant de quitter cette fiche.');
-  }, []);
-
-  useVerrouNavigation(verrouActif, retenu);
-
   const reculer = useCallback(() => {
     setEtape((courante) => {
       if (courante === 2) return 1;
-      // EB-08 : verrou actif, la fiche ouverte ne se quitte pas sans statut. Seul
-      // « Enregistrer » la referme, et le chronomètre s'arrête avec elle.
-      if (verrouActif) retenu();
-      else onAbandon();
+      onAbandon();
       return 1;
     });
-  }, [retenu, verrouActif, onAbandon]);
+  }, [onAbandon]);
 
   useShortcuts(
     {
@@ -1470,7 +1454,7 @@ function Qualification({
         </Button>
       ) : null}
 
-      {etape === 1 && !verrouActif ? (
+      {etape === 1 ? (
         <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
           <ArrowLeftIcon aria-hidden="true" />
           Revenir à la liste

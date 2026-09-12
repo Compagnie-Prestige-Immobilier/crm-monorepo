@@ -69,7 +69,7 @@ export function ProspectsView({
         </div>
       </div>
 
-      <FiltersBar startCollapsed={simplified} />
+      <FiltersBar />
       <ProspectsTable
         canAdminister={canAdminister}
         readOnly={readOnly}

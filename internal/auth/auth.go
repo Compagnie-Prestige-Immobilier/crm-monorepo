@@ -108,7 +108,7 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	if !u.IsActive {
 		return nil, socle.Problem(http.StatusUnauthorized, "ACCOUNT_DISABLED", "Ce compte est désactivé. Contactez un administrateur.")
 	}
-	return s.ouvrirSession(ctx, in.UserAgent, u)
+	return s.ouvrirSession(ctx, in.UserAgent, &u)
 }
 
 func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOutput, error) {
@@ -133,10 +133,10 @@ func (s *service) demoLogin(ctx context.Context, in *DemoLoginInput) (*SessionOu
 	if !u.IsActive || u.Role != profil.role {
 		return nil, socle.Problem(http.StatusServiceUnavailable, "DEMO_NOT_AVAILABLE", "Ce profil de démonstration n'est pas disponible.")
 	}
-	return s.ouvrirSession(ctx, in.UserAgent, u)
+	return s.ouvrirSession(ctx, in.UserAgent, &u)
 }
 
-func (s *service) ouvrirSession(ctx context.Context, userAgent string, u db.UserForLoginRow) (*SessionOutput, error) {
+func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.UserForLoginRow) (*SessionOutput, error) {
 	brut := make([]byte, 32)
 	if _, err := rand.Read(brut); err != nil {
 		return nil, err

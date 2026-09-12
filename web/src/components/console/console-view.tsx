@@ -57,8 +57,6 @@ import {
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
-import { useVerrouFiches } from '@/lib/use-verrou-fiches';
-import { navigationRetenue, useVerrouNavigation } from '@/lib/use-verrou-navigation';
 import { cn } from '@/lib/utils';
 
 type Projet = 'CHUES' | 'GRAND_PUBLIC';
@@ -66,23 +64,14 @@ type Projet = 'CHUES' | 'GRAND_PUBLIC';
 /** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
 const RAPPEL_KEY = '2';
 
-/** Ce que l'appel a donné, avant tout : la personne était-elle joignable. */
 const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
   { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
-  { key: RAPPEL_KEY, label: CALL_OUTCOME_LABELS.CALLBACK, outcome: 'CALLBACK' },
-  { key: '3', label: CALL_OUTCOME_LABELS.UNREACHABLE, outcome: 'UNREACHABLE' },
-  { key: '4', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, outcome: 'WRONG_NUMBER' },
-  { key: '5', label: 'Autre', outcome: 'OTHER' },
+  { key: '2', label: 'Injoignable', outcome: 'UNREACHABLE' },
 ];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1', 'Joignable : ouvre le dossier et l’adhésion'],
-  ['2', 'À rappeler, puis échéance'],
-  ['3', 'Injoignable'],
-  ['4', 'Mauvais numéro'],
-  ['5', 'Autre, puis commentaire'],
-  ['1 … 6', 'Échéance proposée, après 2'],
-  ['0', 'Saisir une autre échéance, après 2'],
+  ['2', 'Injoignable : enregistre l’appel sans réponse'],
   ['Entrée', 'Valider'],
   ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
@@ -114,7 +103,6 @@ const nouveauHref = (projet: Projet): string =>
 export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
-  const verrouActif = useVerrouFiches();
 
   const [ouverte, setOuverte] = useState<Ouverte | null>(null);
   const [vise, setVise] = useState<ProspectRow | null>(null);
@@ -152,9 +140,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     setOuverte(prise);
   }, []);
 
-  // EB-08 : le verrou vit sur le serveur, l'écran non. Sans cette reprise, un
-  // rechargement laisse le téléconseiller devant l'annuaire alors que sa fiche
-  // est toujours tenue.
+  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
+  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
   const repriseFaite = useRef(false);
   useEffect(() => {
     if (repriseFaite.current) return;
@@ -186,7 +173,6 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
         projet={projet}
-        verrouActif={verrouActif}
         onAbandon={revenir}
         onEnregistre={(nom) => {
           setConfirme(nom);
@@ -246,7 +232,7 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
           setDemandee(null);
         }}
         title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
-        description={descriptionOuverture(verrouActif)}
+        description={null}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -258,17 +244,13 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   );
 }
 
-/** La fiche et l'ouverture qui la verrouille. Nulle quand la fiche est close. */
+/** La fiche et l'ouverture qui la chronomètre. */
 interface Ouverte {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
 }
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
-
-/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
-const descriptionOuverture = (verrouActif: boolean): string | null =>
-  verrouActif ? 'Vous ne pourrez pas la quitter sans la qualifier.' : null;
 
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
 const brouillonDe = (
@@ -325,7 +307,6 @@ async function reprendreOuverte(reprendre: (prise: Ouverte) => void): Promise<vo
   if (courante === null || courante.prospectId === null) return;
   const prospect = await fetchProspect(courante.prospectId).catch(() => null);
   if (prospect === null) return;
-  toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`, { id: 'reprise-fiche' });
   reprendre({ prospect, ouverture: courante });
 }
 
@@ -482,14 +463,12 @@ function Consignation({
   prospect,
   ouverture,
   projet,
-  verrouActif,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
-  verrouActif: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -510,7 +489,6 @@ function Consignation({
 
   const nomComplet = nomDe(prospect);
   const [now] = useState(() => Date.now());
-  const verrouille = verrouActif && ouverture !== null;
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
 
@@ -606,12 +584,23 @@ function Consignation({
 
   const choisir = useCallback(
     (outcome: CallOutcome | 'JOIGNABLE') => {
-      if (outcome === 'JOIGNABLE') ouvrirDossier();
-      else if (outcome === 'CALLBACK') startCallback();
-      else if (outcome === 'OTHER') startOther();
-      else record(outcome, null);
+      if (outcome === 'JOIGNABLE') {
+        setDraftOutcome(null);
+        if (conversion === null) ouvrirDossier();
+      } else if (outcome === 'UNREACHABLE') {
+        setConversion(null);
+        setConversionErrors({});
+        setSlots(null);
+        setDraftOutcome('UNREACHABLE');
+      } else if (outcome === 'CALLBACK') {
+        startCallback();
+      } else if (outcome === 'OTHER') {
+        startOther();
+      } else {
+        record(outcome, null);
+      }
     },
-    [ouvrirDossier, startCallback, startOther, record],
+    [conversion, ouvrirDossier, startCallback, startOther, record],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -636,12 +625,6 @@ function Consignation({
   const etape = etapeCourante(conversion, slots);
   const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
 
-  const retenu = useCallback(() => {
-    toast.error('Consignez l’appel avant de quitter cette fiche.');
-  }, []);
-
-  useVerrouNavigation(verrouille, retenu);
-
   const annuler = useCallback(() => {
     // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
     // perdrait ce qu'EB-10 demande justement de garder.
@@ -650,10 +633,7 @@ function Consignation({
       return;
     }
     if (!saisieEnCours) {
-      // EB-08 : la fiche ouverte ne se quitte pas sans issue. Seul l'envoi la
-      // referme, et le chronomètre s'arrête avec elle.
-      if (verrouille) retenu();
-      else onAbandon();
+      onAbandon();
       return;
     }
     setDraftOutcome(null);
@@ -661,7 +641,7 @@ function Consignation({
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [slots, saisieEnCours, verrouille, retenu, onAbandon]);
+  }, [slots, saisieEnCours, onAbandon]);
 
   const issueShortcuts: Record<string, () => void> = Object.fromEntries(
     ISSUES.map((issue) => [
@@ -696,12 +676,10 @@ function Consignation({
       copyPhone(prospect.phoneE164);
     },
     n: () => {
-      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
     r: () => {
-      if (navigationRetenue()) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
     },
@@ -713,42 +691,124 @@ function Consignation({
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-            {formatPhone(prospect.phoneE164)}
-          </span>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              copyPhone(prospect.phoneE164);
-            }}
-          >
-            <CopyIcon aria-hidden="true" />
-            Copier
-            <Kbd>C</Kbd>
-          </Button>
-          {etape === 'dossier' ? null : <BoutonWhatsApp prospect={prospect} />}
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-3">
+              <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+                {nomComplet}
+              </h2>
+              <span className="select-all font-mono text-[1.25rem] font-[700] tracking-tight tabular-nums text-foreground">
+                {formatPhone(prospect.phoneE164)}
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  copyPhone(prospect.phoneE164);
+                }}
+              >
+                <CopyIcon aria-hidden="true" />
+                Copier
+                <Kbd>C</Kbd>
+              </Button>
+              <BoutonWhatsApp prospect={prospect} />
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+              <span>{rattachements(prospect, projet)}</span>
+              <span>·</span>
+              <span>{resumeDernierAppel(prospect)}</span>
+            </div>
+          </div>
+          {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
         </div>
 
-        <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
-        <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
+        <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
+          <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+            Comment s’est passé l’appel ?
+          </legend>
+          <div className="flex flex-wrap items-center gap-3">
+            <Button
+              type="button"
+              size="lg"
+              variant={conversion !== null ? 'default' : 'outline'}
+              className="min-w-36 justify-center gap-2 font-semibold"
+              onClick={() => {
+                choisir('JOIGNABLE');
+              }}
+            >
+              <Kbd>1</Kbd>
+              Joignable
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              variant={
+                draftOutcome === 'UNREACHABLE' ||
+                draftOutcome === 'WRONG_NUMBER' ||
+                draftOutcome === 'OTHER'
+                  ? 'default'
+                  : 'outline'
+              }
+              className="min-w-36 justify-center gap-2 font-semibold"
+              onClick={() => {
+                choisir('UNREACHABLE');
+              }}
+            >
+              <Kbd>2</Kbd>
+              Injoignable
+            </Button>
+          </div>
+        </fieldset>
 
-        {prospect.phase2Status === 'PENDING' ? null : (
-          <p role="status" className="text-[0.8125rem] text-muted-foreground">
-            Déjà classée : {PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}. Une issue
-            qui classe remplace celle-ci.
-          </p>
+        {draftOutcome !== 'UNREACHABLE' &&
+        draftOutcome !== 'WRONG_NUMBER' &&
+        draftOutcome !== 'OTHER' ? null : (
+          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+              Motif de non-joignabilité
+            </span>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant={draftOutcome === 'UNREACHABLE' ? 'default' : 'outline'}
+                onClick={() => setDraftOutcome('UNREACHABLE')}
+              >
+                Ne répond pas
+              </Button>
+              <Button
+                type="button"
+                variant={draftOutcome === 'WRONG_NUMBER' ? 'default' : 'outline'}
+                onClick={() => setDraftOutcome('WRONG_NUMBER')}
+              >
+                Mauvais numéro
+              </Button>
+              <Button
+                type="button"
+                variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
+                onClick={() => {
+                  setDraftOutcome('OTHER');
+                  commentRef.current?.focus();
+                }}
+              >
+                Autre
+              </Button>
+            </div>
+            <div className="flex flex-wrap gap-2 pt-2">
+              <Button onClick={validate} disabled={send.isPending}>
+                Enregistrer l’issue (
+                {draftOutcome === 'WRONG_NUMBER'
+                  ? 'Mauvais numéro'
+                  : draftOutcome === 'OTHER'
+                    ? 'Autre'
+                    : 'Ne répond pas'}
+                )<Kbd>Entrée</Kbd>
+              </Button>
+            </div>
+          </div>
         )}
 
-        {etape !== 'dossier' || conversion === null ? null : (
+        {conversion === null ? null : (
           <>
-            <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-              Joignable · son dossier, et la manière dont il adhère
-            </p>
-
             <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
 
             <ConversionFields
@@ -763,30 +823,6 @@ function Consignation({
               }}
             />
           </>
-        )}
-
-        {etape !== 'issues' ? null : (
-          <fieldset className="flex flex-col gap-2" disabled={send.isPending}>
-            <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-              Comment s’est passé l’appel ?
-            </legend>
-            <div className="flex flex-wrap gap-2">
-              {ISSUES.map((issue) => (
-                <Button
-                  key={issue.key}
-                  variant={
-                    issue.outcome === 'OTHER' && draftOutcome === 'OTHER' ? 'default' : 'outline'
-                  }
-                  onClick={() => {
-                    choisir(issue.outcome);
-                  }}
-                >
-                  <Kbd>{issue.key}</Kbd>
-                  {issue.label}
-                </Button>
-              ))}
-            </div>
-          </fieldset>
         )}
 
         {etape !== 'echeance' || slots === null ? null : (
@@ -813,55 +849,57 @@ function Consignation({
           onValidate={validate}
         />
 
-        {etape !== 'dossier' ? null : (
-          <>
-            <div className="flex flex-wrap gap-2">
-              <Button onClick={submitConversion} disabled={send.isPending}>
-                Enregistrer l’adhésion
-                <Kbd>Entrée</Kbd>
-              </Button>
-              <Button
-                variant="outline"
-                disabled={send.isPending}
-                onClick={() => {
-                  record('REFUSED', null);
-                }}
-              >
-                Il refuse
-              </Button>
-              <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
-                À rappeler
-                <Kbd>{RAPPEL_KEY}</Kbd>
-              </Button>
-              <Button
-                variant="ghost"
-                disabled={send.isPending}
-                onClick={() => {
-                  setConversion(null);
-                  setConversionErrors({});
-                }}
-              >
-                Annuler
-                <Kbd>Échap</Kbd>
-              </Button>
-            </div>
-            <p className="text-[0.8125rem] text-muted-foreground">
-              « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
-            </p>
-          </>
+        {draftOutcome !== 'UNREACHABLE' ? null : (
+          <div className="flex flex-wrap gap-2">
+            <Button onClick={validate} disabled={send.isPending}>
+              Enregistrer l’appel injoignable
+              <Kbd>Entrée</Kbd>
+            </Button>
+          </div>
+        )}
+
+        {conversion === null ? null : (
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Button onClick={submitConversion} disabled={send.isPending}>
+              Enregistrer l’adhésion
+              <Kbd>Entrée</Kbd>
+            </Button>
+            <Button
+              variant="outline"
+              disabled={send.isPending}
+              onClick={() => {
+                record('REFUSED', null);
+              }}
+            >
+              Il refuse
+            </Button>
+            <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
+              À rappeler
+              <Kbd>{RAPPEL_KEY}</Kbd>
+            </Button>
+            <Button
+              variant="ghost"
+              disabled={send.isPending}
+              onClick={() => {
+                setConversion(null);
+                setConversionErrors({});
+              }}
+            >
+              Annuler
+              <Kbd>Échap</Kbd>
+            </Button>
+          </div>
         )}
       </section>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      {verrouille ? null : (
-        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
-      )}
+    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+        <ArrowLeftIcon aria-hidden="true" />
+        Revenir à la liste
+      </Button>
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
@@ -878,7 +916,7 @@ function Consignation({
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
           {KEYBOARD_MAP.filter(
-            ([keys]) => (projet === 'CHUES' && !verrouille) || (keys !== 'N' && keys !== 'R'),
+            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
           ).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">

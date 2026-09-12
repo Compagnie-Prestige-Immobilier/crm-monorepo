@@ -15,23 +15,25 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`DELETE FROM "lots_export" WHERE "id"='dev-lot-001'`,
 		`INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt","createdAt","updatedAt","relationStatus","prenom","etablissement","contacte","lastCallAt","lastCallById","lastCallOutcome","statutQualificationId")
 		SELECT '0199f100-0000-7000-8000-'||lpad(g::text,12,'0'),
-		  (ARRAY['Aminata Diop','Moussa Fall','Fatou Ndiaye','Ibrahima Sow'])[1+(g-1)%4],
-		  '+221780990'||lpad(g::text,3,'0'),d.id,u.id,jour+ecoule*.2,jour+ecoule*.2,now(),
-		  COALESCE(sq."relationStatus",'CONTACTE'),split_part((ARRAY['Aminata Diop','Moussa Fall','Fatou Ndiaye','Ibrahima Sow'])[1+(g-1)%4],' ',1),
+		  prenoms.p||' '||(ARRAY['Diop','Fall','Ndiaye','Sow','Diallo','Sarr','Ba','Gueye','Faye','Thiam','Kane'])[1+(g-1)%11],
+		  '+2217'||(ARRAY['7','8','6','0'])[1+(g-1)%4]||((g*7919)%9000000+1000000)::text,d.id,u.id,jour+ecoule*.2,jour+ecoule*.2,now(),
+		  COALESCE(sq."relationStatus",'CONTACTE'),prenoms.p,
 		  'École de '||d.name,sq.effect <> 'UNREACHABLE',jour+ecoule*.3,u.id,
 		  (ARRAY['REACHED','REFUSED','CALLBACK','UNREACHABLE']::"RepCallOutcome"[])[1+(g-1)/60],sq.id
 		FROM generate_series(1,240) g
+		CROSS JOIN LATERAL (SELECT (ARRAY['Aminata','Moussa','Fatou','Ibrahima','Awa','Cheikh','Mariama','Ousmane','Khady','Abdou','Ndèye','Pape'])[1+(g-1)%12] AS p) prenoms
 		CROSS JOIN LATERAL (SELECT date_trunc('day',now())-make_interval(days=>(g-1)%60) AS jour,now()-date_trunc('day',now()) AS ecoule) dates
 		JOIN "users" u ON u.email=CASE WHEN ((g-1)/60+(g-1)%60)%2=0 THEN 'fixture.awa@cpi.sn' ELSE 'fixture.fatou@cpi.sn' END
 		JOIN (SELECT id,name,row_number() OVER (ORDER BY code) AS rang FROM "departements" WHERE code IN ('DK-DAK','TH-THI','SL-STL','TH-MBO')) d ON d.rang=1+(g-1)%4
 		JOIN "statuts_qualification" sq ON sq.code=(ARRAY['ACCEPTE','REFUSE','A_RAPPELER','PAS_DE_REPONSE'])[1+(g-1)/60]
-		ON CONFLICT (id) DO UPDATE SET "phoneE164"=EXCLUDED."phoneE164","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
+		ON CONFLICT (id) DO UPDATE SET "phoneE164"=EXCLUDED."phoneE164","fullName"=EXCLUDED."fullName","prenom"=EXCLUDED."prenom","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
 		  "lastCallAt"=EXCLUDED."lastCallAt","lastCallById"=EXCLUDED."lastCallById","lastCallOutcome"=EXCLUDED."lastCallOutcome",
 		  "statutQualificationId"=EXCLUDED."statutQualificationId","relationStatus"=EXCLUDED."relationStatus","departementId"=EXCLUDED."departementId"`,
 		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","banqueId","syndicatId","representantId","createdById","clientCreatedAt","createdAt","updatedAt","projet","statut","type","professionId","incomeBandId","employeurId","canalProvenanceId","paysResidenceId","villeResidence","email","phase2Status","enrollmentMethod","enrollmentCapturedAt","enrollmentCapturedById","lastCallAt","lastCallById","lastCallOutcome")
 		SELECT '0199f100-0000-7001-8000-'||lpad(g::text,12,'0'),
-		  (ARRAY['Diop','Ndiaye','Fall','Sow','Diallo','Sarr'])[1+(g-1)%6],(ARRAY['Aminata','Mamadou','Fatou','Ibrahima'])[1+(g-1)%4],
-		  '+221780991'||lpad(g::text,3,'0'),b.id,sy.id,'0199f100-0000-7000-8000-'||lpad((1+(g-1)%240)::text,12,'0'),
+		  (ARRAY['Diop','Ndiaye','Fall','Sow','Diallo','Sarr','Ba','Gueye','Faye','Thiam','Kane','Mbaye','Cissé'])[1+(g-1)%13],
+		  (ARRAY['Aminata','Mamadou','Fatou','Ibrahima','Awa','Cheikh','Mariama','Ousmane','Khady','Abdou','Ndèye','Pape'])[1+(g-1)%12],
+		  '+2217'||(ARRAY['7','8','6','0'])[1+(g-1)%4]||((g*104729+51)%9000000+1000000)::text,b.id,sy.id,'0199f100-0000-7000-8000-'||lpad((1+(g-1)%240)::text,12,'0'),
 		  u.id,jour+ecoule*.4,jour+ecoule*.4,now(),CASE WHEN ((g-1)/60)%2=0 THEN 'CHUES'::"Projet" ELSE 'GRAND_PUBLIC'::"Projet" END,
 		  CASE WHEN g<=240 THEN 'CONVERTI'::"ProspectStatut" ELSE 'CONTACTE'::"ProspectStatut" END,'FONCTIONNAIRE'::"ProspectType",
 		  (SELECT id FROM "professions" WHERE "isTeaching" ORDER BY code LIMIT 1),(SELECT id FROM "income_bands" ORDER BY "position" LIMIT 1),
@@ -154,7 +156,8 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`INSERT INTO "segment_changes" ("id","prospectId","fromSegment","toSegment","fromBanqueId","toBanqueId","fromSyndicatId","toSyndicatId","reason","changedById","source") SELECT '0199f100-0000-7018-8000-000000000001',p."id",'BDD1'::"BddSegment",'BDD2'::"BddSegment",b."id",b."id",s."id",s."id",'Répartition initiale',u."id",'WEB'::"ChangeSource" FROM "banques" b CROSS JOIN "syndicats" s CROSS JOIN "users" u CROSS JOIN "prospects" p WHERE u."email"='fixture.superviseur@cpi.sn' ORDER BY p."id" LIMIT 1 ON CONFLICT DO NOTHING`,
 		`INSERT INTO "representant_comments" ("id","representantId","authorId","body","clientCreatedAt") SELECT '0199f100-0000-7019-8000-000000000001',(SELECT "id" FROM "representants" WHERE "id"='0199f100-0000-7000-8000-000000000001'),"id",'Contact établi pendant la démonstration.',now() FROM "users" WHERE "email"='fixture.awa@cpi.sn' ON CONFLICT DO NOTHING`,
 		`INSERT INTO "representant_relation_changes" ("id","representantId","fromStatus","toStatus","reason","changedById","source") SELECT '0199f100-0000-701a-8000-000000000001',(SELECT "id" FROM "representants" WHERE "id"='0199f100-0000-7000-8000-000000000001'),'INCONNU'::"RepresentantRelation",'AMBASSADEUR'::"RepresentantRelation",'Qualification initiale',"id",'WEB'::"ChangeSource" FROM "users" WHERE "email"='fixture.superviseur@cpi.sn' ON CONFLICT DO NOTHING`,
-		`INSERT INTO "representant_suggestions" ("id","sourceRepresentantId","suggestedName","suggestedPhoneE164","note","suggestedById","sourceAttemptId","clientCreatedAt") SELECT '0199f100-0000-701b-8000-000000000001',(SELECT "id" FROM "representants" WHERE "id"='0199f100-0000-7000-8000-000000000001'),'Moussa Fall','+221770009002','Recommandation de démonstration',u."id",'0199f100-0000-7004-8000-000000000001',now() FROM "users" u WHERE u."email"='fixture.awa@cpi.sn' ON CONFLICT DO NOTHING`,
+		`DELETE FROM "representant_suggestions" WHERE "note"='Recommandation de démonstration' AND "id"<>'0199f100-0000-701b-8000-000000000001'`,
+		`INSERT INTO "representant_suggestions" ("id","sourceRepresentantId","suggestedName","suggestedPhoneE164","note","suggestedById","sourceAttemptId","clientCreatedAt") SELECT '0199f100-0000-701b-8000-000000000001',(SELECT "id" FROM "representants" WHERE "id"='0199f100-0000-7000-8000-000000000001'),'Moussa Fall','+221776439021','Recommandation de démonstration',u."id",'0199f100-0000-7004-8000-000000000001',now() FROM "users" u WHERE u."email"='fixture.awa@cpi.sn' ON CONFLICT (id) DO UPDATE SET "suggestedPhoneE164"=EXCLUDED."suggestedPhoneE164"`,
 		`INSERT INTO "lot_export_reaffectations" ("id","lotId","toAssigneeId","fiches","performedById","positions") SELECT '0199f100-0000-701c-8000-000000000001','0199f100-0000-700d-8000-000000000001',u."id",1,u."id",ARRAY[1] FROM "users" u WHERE u."email"='fixture.fatou@cpi.sn' ON CONFLICT DO NOTHING`,
 		`INSERT INTO "visite_import_changes" ("id","importJobId","sheet","rowNumber","kind","reference","visiteId","label","fields") SELECT '0199f100-0000-701d-8000-000000000001','0199f100-0000-700c-8000-000000000001','Visites',2,'CREATE'::"VisiteImportChangeKind",'DEV-VISITE-001','0199f100-0000-7007-8000-000000000001','Visite de démonstration','{}'::jsonb ON CONFLICT DO NOTHING`,
 	}

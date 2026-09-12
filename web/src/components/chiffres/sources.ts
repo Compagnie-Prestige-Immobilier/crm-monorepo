@@ -500,7 +500,8 @@ const SOURCES_CHIFFRES = {
     label: 'Taux de qualification',
     forme: 'scalaire',
     jeu: 'ouvertures',
-    description: 'Fiches qualifiées ÷ fiches ouvertes. L’écart avec 100 % : les sorties forcées.',
+    description:
+      'Ouvertures closes par un appel consigné ÷ ouvertures. Une fiche rouverte compte à chaque ouverture ; l’écart avec 100 % : les sorties forcées.',
     groupe: 'Fiches',
     extraire: ({ ouvertures }) => {
       if (ouvertures === undefined) return null;
@@ -508,8 +509,8 @@ const SOURCES_CHIFFRES = {
       const qualifiees = sommeOuvertures(ouvertures, 'qualifiees');
       return scalaireTaux(
         part(qualifiees, ouvertes),
-        `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} fiches ouvertes`,
-        'Aucune fiche ouverte sur la période',
+        `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} ouvertures`,
+        'Aucune ouverture sur la période',
       );
     },
   },
