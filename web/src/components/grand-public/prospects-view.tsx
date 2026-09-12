@@ -3,8 +3,6 @@
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
   ChevronDownIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
   ClockIcon,
   FileSpreadsheetIcon,
   InboxIcon,
@@ -25,6 +23,7 @@ import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
+import { Pagination } from '@/components/pagination';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -36,13 +35,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -67,7 +59,7 @@ import {
   type ProspectType,
 } from '@/lib/data/grand-public';
 import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
-import { formatDate, formatNumber, formatPhone, withRetired } from '@/lib/format';
+import { formatDate, formatPhone, withRetired } from '@/lib/format';
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
@@ -182,6 +174,7 @@ export function GrandPublicProspectsView({
     queryKey: grandPublicKeys.prospects(filters),
     queryFn: () => fetchGrandPublicProspects(filters, viewerId),
     placeholderData: (previous) => previous,
+    refetchOnWindowFocus: true,
   });
 
   const canalOptions = (canaux.data ?? []).map((canal) => ({
@@ -329,6 +322,7 @@ export function GrandPublicProspectsView({
         canCreate={canCreate}
         campaignScoped={scopedParCampagnes}
         onCreate={() => setCreateOpen(true)}
+        onClear={resetFilters}
       />
 
       <Dialog
@@ -419,6 +413,7 @@ function ProspectsTable({
   canCreate,
   campaignScoped,
   onCreate,
+  onClear,
 }: {
   list: UseQueryResult<Paginated<ProspectRow>>;
   filters: GrandPublicFilters;
@@ -427,6 +422,7 @@ function ProspectsTable({
   canCreate: boolean;
   campaignScoped: boolean;
   onCreate: () => void;
+  onClear: () => void;
 }) {
   if (list.isPending) return <GrandPublicTableSkeleton />;
 
@@ -443,8 +439,6 @@ function ProspectsTable({
   }
 
   const { items, total, page, pageCount } = list.data;
-  const first = total === 0 ? 0 : (page - 1) * filters.pageSize + 1;
-  const last = Math.min(page * filters.pageSize, total);
 
   return (
     <div className="flex flex-col gap-3">
@@ -477,6 +471,7 @@ function ProspectsTable({
                     canCreate={canCreate}
                     campaignScoped={campaignScoped}
                     onCreate={onCreate}
+                    onClear={onClear}
                   />
                 </TableCell>
               </TableRow>
@@ -487,66 +482,15 @@ function ProspectsTable({
         </Table>
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-[0.8125rem] text-muted-foreground" role="status">
-          <span className="sr-only">Prospects affichés&nbsp;: </span>
-          {total === 0
-            ? 'Aucun résultat'
-            : `${formatNumber(first)}–${formatNumber(last)} sur ${formatNumber(total)}`}
-        </p>
-
-        <div className="flex items-center gap-3">
-          <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
-            <span className="hidden sm:inline">Lignes</span>
-            <Select
-              value={String(filters.pageSize)}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ pageSize: Number(value), page: 1 });
-              }}
-            >
-              <SelectTrigger size="sm" className="w-20" aria-label="Lignes par page">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PAGE_SIZE_OPTIONS.map((size) => (
-                  <SelectItem key={size} value={String(size)}>
-                    {size}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </label>
-
-          <div className="flex items-center gap-1">
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page précédente"
-              disabled={page <= 1}
-              onClick={() => {
-                setFilters({ page: page - 1 });
-              }}
-            >
-              <ChevronLeftIcon className="size-4" aria-hidden="true" />
-            </Button>
-            <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-              {page} / {pageCount}
-            </span>
-            <Button
-              variant="outline"
-              size="icon"
-              aria-label="Page suivante"
-              disabled={page >= pageCount}
-              onClick={() => {
-                setFilters({ page: page + 1 });
-              }}
-            >
-              <ChevronRightIcon className="size-4" aria-hidden="true" />
-            </Button>
-          </div>
-        </div>
-      </div>
+      <Pagination
+        libelle="Prospects affichés"
+        page={page}
+        pageCount={pageCount}
+        pageSize={filters.pageSize}
+        total={total}
+        pageSizeOptions={PAGE_SIZE_OPTIONS}
+        onChange={setFilters}
+      />
     </div>
   );
 }
@@ -562,11 +506,13 @@ function EmptyState({
   canCreate,
   campaignScoped,
   onCreate,
+  onClear,
 }: {
   hasFilters: boolean;
   canCreate: boolean;
   campaignScoped: boolean;
   onCreate: () => void;
+  onClear: () => void;
 }) {
   return (
     <div className="flex flex-col items-center gap-2 text-center">
@@ -579,6 +525,12 @@ function EmptyState({
       <p className="text-[0.8125rem] text-muted-foreground">
         {detailVide(hasFilters, campaignScoped)}
       </p>
+      {hasFilters ? (
+        <Button variant="outline" className="mt-2" onClick={onClear}>
+          <RotateCcwIcon aria-hidden="true" />
+          Effacer les filtres
+        </Button>
+      ) : null}
       {!hasFilters && canCreate ? (
         <Button className="mt-2" onClick={onCreate}>
           <PlusIcon aria-hidden="true" />
@@ -656,17 +608,19 @@ function Row({ prospect }: { prospect: ProspectRow }) {
   );
 }
 
+const COLONNES_TABLEAU = Array.from({ length: 9 }, (_, index) => index);
+
 export function GrandPublicTableSkeleton() {
   return (
     <div className="overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm">
       <div className="flex h-11 items-center gap-4 border-b border-border px-3">
-        {[0, 1, 2, 3, 4, 5].map((index) => (
+        {COLONNES_TABLEAU.map((index) => (
           <Skeleton key={index} className="h-3 flex-1" />
         ))}
       </div>
       {Array.from({ length: 8 }, (_, index) => index).map((index) => (
         <div key={index} className="flex items-center gap-4 border-b border-border px-3 py-3">
-          {[0, 1, 2, 3, 4, 5].map((cell) => (
+          {COLONNES_TABLEAU.map((cell) => (
             <Skeleton key={cell} className="h-4 flex-1" />
           ))}
         </div>

@@ -519,10 +519,21 @@ function FichesOuvertes({ range }: { range: ActivityRange }) {
   const comptage = useQuery({
     queryKey: ['ouvertures', 'comptage', range.from, range.to] as const,
     queryFn: () => fetchComptageOuvertures({ from: range.from, to: range.to }),
+    placeholderData: keepPreviousData,
   });
 
   if (comptage.isPending) return <Skeleton className="h-40 w-full" />;
-  if (comptage.isError) return null;
+  if (comptage.isError) {
+    return (
+      <QueryErrorState
+        error={comptage.error}
+        onRetry={() => {
+          void comptage.refetch();
+        }}
+        fallback="Les fiches ouvertes de la période n’ont pas pu être lues."
+      />
+    );
+  }
 
   return (
     <Card>
@@ -708,6 +719,7 @@ function ShiftComparison({
   const [draft, setDraft] = useState<UpdateWorkShifts | null>(null);
 
   const save = useMutation({
+    meta: { erreurAffichee: true },
     mutationFn: (body: UpdateWorkShifts) => updateWorkShifts(body),
     onSuccess: async (next: WorkShifts) => {
       queryClient.setQueryData(['supervision', 'creneaux'], next);

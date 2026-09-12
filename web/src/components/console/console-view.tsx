@@ -13,6 +13,7 @@ import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire'
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
+import { LienTelephone } from '@/components/lien-telephone';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -303,6 +304,9 @@ export function ConsoleView({
         annuaire={annuaire}
         cherche={cherche}
         projet={projet}
+        onEffacer={() => {
+          setSearch('');
+        }}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -462,11 +466,13 @@ function ListeAnnuaire({
   annuaire,
   cherche,
   projet,
+  onEffacer,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   projet: Projet;
+  onEffacer: () => void;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -491,9 +497,16 @@ function ListeAnnuaire({
             ? 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.'
             : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
         </p>
-        <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
-          Ajouter un prospect
-        </Link>
+        <div className="flex flex-wrap gap-2">
+          {cherche === '' ? null : (
+            <Button variant="outline" onClick={onEffacer}>
+              Effacer la recherche
+            </Button>
+          )}
+          <Link href={nouveauHref(projet)} className={buttonVariants()}>
+            Ajouter un prospect
+          </Link>
+        </div>
       </div>
     );
   }
@@ -529,7 +542,9 @@ function ListeAnnuaire({
                   </Link>
                 )}
               </TableCell>
-              <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
+              <TableCell className="whitespace-nowrap">
+                <LienTelephone phoneE164={row.phoneE164} />
+              </TableCell>
               <TableCell className="whitespace-nowrap text-muted-foreground">
                 {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
               </TableCell>
@@ -1217,6 +1232,7 @@ export function Consignation({
       {corpsFiche()}
 
       <details
+        className="pointer-coarse:hidden"
         open={helpOpen}
         onToggle={(event) => {
           setHelpOpen(event.currentTarget.open);

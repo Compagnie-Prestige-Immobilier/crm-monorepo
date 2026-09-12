@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { LienTelephone } from '@/components/lien-telephone';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { Badge } from '@/components/ui/badge';
@@ -25,7 +26,7 @@ import { callbackKeys } from '@/lib/data/console';
 import { fetchProspectsAppeles } from '@/lib/data/prospects';
 import { SUIVI_PAGE_SIZE, fetchRepresentantsAppeles } from '@/lib/data/representants';
 import { fetchUsers } from '@/lib/data/users';
-import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import {
   CALL_OUTCOME_LABELS,
@@ -259,7 +260,9 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
                 {representant.fullName}
               </Link>
             </TableCell>
-            <TableCell className="tabular-nums">{formatPhone(representant.phoneE164)}</TableCell>
+            <TableCell className="tabular-nums">
+              <LienTelephone phoneE164={representant.phoneE164} />
+            </TableCell>
             <TableCell>
               <Quand at={representant.lastCallAt} />
             </TableCell>
@@ -302,7 +305,9 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
                 {prospect.prenom} {prospect.nom}
               </Link>
             </TableCell>
-            <TableCell className="tabular-nums">{formatPhone(prospect.phoneE164)}</TableCell>
+            <TableCell className="tabular-nums">
+              <LienTelephone phoneE164={prospect.phoneE164} />
+            </TableCell>
             <TableCell>
               <Quand at={prospect.lastCallAt} />
             </TableCell>

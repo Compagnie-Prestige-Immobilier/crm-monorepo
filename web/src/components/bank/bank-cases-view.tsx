@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChevronLeftIcon, ChevronRightIcon, FolderOpenIcon, PlusIcon } from 'lucide-react';
+import { FolderOpenIcon, PlusIcon, RotateCcwIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 
@@ -10,16 +10,11 @@ import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { EmptyState } from '@/components/empty-state';
+import { LienTelephone } from '@/components/lien-telephone';
+import { Pagination } from '@/components/pagination';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
@@ -32,7 +27,7 @@ import {
 } from '@/components/ui/table';
 import { BANK_PAGE_SIZE_OPTIONS, bankBasePath, countActiveBankFilters } from '@/lib/bank-filters';
 import { fetchBankCases } from '@/lib/data/bank-cases';
-import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { formatDateTime } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import {
@@ -55,7 +50,7 @@ function isSortField(id: string): id is BankCaseSortField {
 }
 
 export function BankCasesView({ projet }: { projet: Projet }) {
-  const { filters, setFilters } = useBankFilters(projet);
+  const { filters, setFilters, resetFilters } = useBankFilters(projet);
   const router = useRouter();
   const base = bankBasePath(projet);
 
@@ -125,7 +120,12 @@ export function BankCasesView({ projet }: { projet: Projet }) {
                       <Link href={`${base}/dossiers/nouveau`} className={buttonVariants()}>
                         <PlusIcon aria-hidden="true" />À ouvrir (plateforme)
                       </Link>
-                    ) : null
+                    ) : (
+                      <Button variant="outline" onClick={resetFilters}>
+                        <RotateCcwIcon aria-hidden="true" />
+                        Effacer les filtres
+                      </Button>
+                    )
                   }
                 />
               );
@@ -198,7 +198,7 @@ export function BankCasesView({ projet }: { projet: Projet }) {
                             <div className="min-w-0">
                               <p className="truncate">{bankCase.customerName}</p>
                               <p className="truncate text-[0.75rem] text-muted-foreground tabular-nums">
-                                {formatPhone(bankCase.customerPhoneE164)}
+                                <LienTelephone phoneE164={bankCase.customerPhoneE164} />
                               </p>
                             </div>
                           </TableCell>
@@ -233,68 +233,15 @@ export function BankCasesView({ projet }: { projet: Projet }) {
                   </Table>
                 </div>
 
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <p className="text-[0.8125rem] text-muted-foreground" role="status">
-                    <span className="sr-only">Dossiers affichés&nbsp;: </span>
-                    {data.total === 0
-                      ? 'Aucun résultat'
-                      : `${formatNumber((data.page - 1) * filters.pageSize + 1)}–${formatNumber(
-                          Math.min(data.page * filters.pageSize, data.total),
-                        )} sur ${formatNumber(data.total)}`}
-                  </p>
-
-                  <div className="flex items-center gap-3">
-                    <label className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
-                      <span className="hidden sm:inline">Lignes</span>
-                      <Select
-                        value={String(filters.pageSize)}
-                        onValueChange={(value) => {
-                          if (value === null) return;
-                          setFilters({ pageSize: Number(value), page: 1 });
-                        }}
-                      >
-                        <SelectTrigger size="sm" className="w-20">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {BANK_PAGE_SIZE_OPTIONS.map((size) => (
-                            <SelectItem key={size} value={String(size)}>
-                              {size}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </label>
-
-                    <div className="flex items-center gap-1">
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Page précédente"
-                        disabled={data.page <= 1}
-                        onClick={() => {
-                          setFilters({ page: data.page - 1 });
-                        }}
-                      >
-                        <ChevronLeftIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                      <span className="min-w-20 text-center text-[0.8125rem] tabular-nums">
-                        {data.page} / {data.pageCount}
-                      </span>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        aria-label="Page suivante"
-                        disabled={data.page >= data.pageCount}
-                        onClick={() => {
-                          setFilters({ page: data.page + 1 });
-                        }}
-                      >
-                        <ChevronRightIcon className="size-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
+                <Pagination
+                  libelle="Dossiers affichés"
+                  page={data.page}
+                  pageCount={data.pageCount}
+                  pageSize={filters.pageSize}
+                  total={data.total}
+                  pageSizeOptions={BANK_PAGE_SIZE_OPTIONS}
+                  onChange={setFilters}
+                />
               </>
             );
           })();
@@ -340,7 +287,7 @@ function BankCaseCard({ bankCase, base }: { bankCase: BankCase; base: string }) 
         <div>
           <p className="truncate font-[600]">{bankCase.customerName}</p>
           <p className="truncate text-[0.8125rem] text-muted-foreground tabular-nums">
-            {formatPhone(bankCase.customerPhoneE164)}
+            <LienTelephone phoneE164={bankCase.customerPhoneE164} />
           </p>
         </div>
 

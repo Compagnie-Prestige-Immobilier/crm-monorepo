@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { LienTelephone } from '@/components/lien-telephone';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -36,6 +37,7 @@ import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import { cn } from '@/lib/utils';
 
 const SCOPES: readonly { value: CallbackScope; label: string }[] = [
   { value: 'overdue', label: 'En retard' },
@@ -82,11 +84,15 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const overdue = useQuery({
     queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
     queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet),
+    placeholderData: (previous) => previous,
+    refetchOnWindowFocus: true,
   });
 
   const list = useQuery({
     queryKey: [...callbackKeys.list(scope, assignedToId), projet],
     queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet),
+    placeholderData: (previous) => previous,
+    refetchOnWindowFocus: true,
   });
 
   const teleconseillers = useQuery({
@@ -137,7 +143,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 />
               );
             return (
-              <Table>
+              <Table className={cn(list.isPlaceholderData && 'opacity-80')}>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Prospect</TableHead>
@@ -154,7 +160,9 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                   {list.data.items.map((callback) => (
                     <TableRow key={callback.id}>
                       <TableCell>
-                        <span className="font-[600]">{formatPhone(callback.phoneE164)}</span>
+                        <span className="font-[600]">
+                          <LienTelephone phoneE164={callback.phoneE164} />
+                        </span>
                         <span className="block text-[0.75rem] text-muted-foreground">
                           Fiche {callback.shortCode}
                         </span>

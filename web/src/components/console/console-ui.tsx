@@ -7,7 +7,7 @@ import { formatChrono, secondesEcoulees } from '@/lib/data/ouvertures';
 
 export function Kbd({ children }: { children: ReactNode }) {
   return (
-    <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.75rem] font-[600] text-muted-foreground">
+    <kbd className="rounded-sm border border-border bg-muted px-1.5 py-0.5 font-mono text-[0.75rem] font-[600] text-muted-foreground pointer-coarse:hidden">
       {children}
     </kbd>
   );

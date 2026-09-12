@@ -1,7 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BoxesIcon, ChevronLeftIcon, ChevronRightIcon, PlusIcon, Trash2Icon } from 'lucide-react';
+import {
+  BoxesIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PlusIcon,
+  RotateCcwIcon,
+  Trash2Icon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
@@ -193,6 +200,21 @@ export function LotsExportView({
                   ? 'Élargissez la recherche ou changez la cible.'
                   : 'Créez-en une pour répartir des fiches.'}
               </p>
+              {filtre ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="mt-2"
+                  onClick={() => {
+                    setRecherche('');
+                    setCible(TOUTES);
+                    setPage(1);
+                  }}
+                >
+                  <RotateCcwIcon aria-hidden="true" />
+                  Effacer les filtres
+                </Button>
+              ) : null}
             </div>
           );
 

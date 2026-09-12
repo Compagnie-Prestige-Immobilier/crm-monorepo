@@ -7,6 +7,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { useFileDownload } from '@/components/exports/download-button';
+import { LienTelephone } from '@/components/lien-telephone';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
@@ -44,9 +45,9 @@ import {
   type LotExportFiche,
   type LotExportFicheEtat,
 } from '@/lib/data/lots-export';
-import { formatPhone } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { cn } from '@/lib/utils';
 
 const TOUS = 'TOUS';
 const PAGE_SIZE = 50;
@@ -59,6 +60,9 @@ const ETAT_LABELS: Record<LotExportFicheEtat, string> = {
 
 /** Une fiche traitée ne se déplace pas : le travail resterait au compteur d'un autre. */
 const deplacable = (fiche: LotExportFiche): boolean => fiche.etat === 'NON_TRAITEE';
+
+const filtreActif = (teleconseillerId: string, etat: string): boolean =>
+  teleconseillerId !== TOUS || etat !== TOUS;
 
 function buildFiltres(page: number, teleconseillerId: string, etat: string) {
   return {
@@ -97,6 +101,7 @@ export function LotExportFiches({
   const fiches = useQuery({
     queryKey: queryKeys.lotsExportFiches(lot.id, filtres),
     queryFn: () => fetchLotExportFiches(lot.id, filtres),
+    placeholderData: (previous) => previous,
   });
 
   const telechargerRecues = (trace: LotExportDetail['reaffectations'][number]) =>
@@ -225,9 +230,17 @@ export function LotExportFiches({
           isPending={fiches.isPending}
           isSuccess={fiches.isSuccess}
           vide={lignes.length === 0}
+          filtre={filtreActif(teleconseillerId, etat)}
+          onEffacer={() => {
+            changerLeFiltre(() => {
+              setTeleconseillerId(TOUS);
+              setEtat(TOUS);
+            });
+          }}
         />
 
         <TableFiches
+          enAttente={fiches.isPlaceholderData}
           peutReaffecter={peutReaffecter}
           cible={lot.cible}
           lignes={lignes}
@@ -318,23 +331,35 @@ function EtatChargement({
   isPending,
   isSuccess,
   vide,
+  filtre,
+  onEffacer,
 }: {
   isPending: boolean;
   isSuccess: boolean;
   vide: boolean;
+  filtre: boolean;
+  onEffacer: () => void;
 }) {
   if (isPending) return <Skeleton className="h-64 rounded-lg" />;
   if (isSuccess && vide) {
     return (
-      <p className="text-[0.875rem] text-muted-foreground">
-        Aucune fiche ne correspond à ces filtres.
-      </p>
+      <div className="flex flex-wrap items-center gap-3">
+        <p className="text-[0.875rem] text-muted-foreground">
+          Aucune fiche ne correspond à ces filtres.
+        </p>
+        {filtre ? (
+          <Button type="button" variant="outline" size="sm" onClick={onEffacer}>
+            Effacer les filtres
+          </Button>
+        ) : null}
+      </div>
     );
   }
   return null;
 }
 
 function TableFiches({
+  enAttente,
   peutReaffecter,
   cible,
   lignes,
@@ -343,6 +368,7 @@ function TableFiches({
   onCocherTout,
   onCocherUne,
 }: {
+  enAttente: boolean;
   peutReaffecter: boolean;
   cible: LotExportDetail['cible'];
   lignes: readonly LotExportFiche[];
@@ -354,7 +380,7 @@ function TableFiches({
   if (lignes.length === 0) return null;
 
   return (
-    <Table aria-label="Fiches de la campagne">
+    <Table aria-label="Fiches de la campagne" className={cn(enAttente && 'opacity-80')}>
       <TableHeader>
         <TableRow>
           {peutReaffecter ? (
@@ -477,7 +503,9 @@ function LigneFiche({
           </Link>
         )}
       </th>
-      <TableCell className="tabular-nums">{formatPhone(fiche.phoneE164)}</TableCell>
+      <TableCell className="tabular-nums">
+        <LienTelephone phoneE164={fiche.phoneE164} />
+      </TableCell>
       <TableCell>{fiche.teleconseillerName}</TableCell>
       <TableCell className="tabular-nums">{fiche.jour}</TableCell>
       <TableCell>
