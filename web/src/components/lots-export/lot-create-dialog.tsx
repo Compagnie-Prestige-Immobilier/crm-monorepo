@@ -527,12 +527,18 @@ function EtatTeleconseillers({
   return null;
 }
 
+type Coches = Readonly<Record<string, boolean>>;
+
+/** Supervision et direction appellent en plus de leur travail : cochées à la main seulement. */
+const estCoche = (compte: Teleconseiller, coches: Coches): boolean =>
+  coches[compte.id] ?? compte.role === 'COMMERCIAL';
+
 function ChampTeleconseillers({
   comptes,
   chargement,
   isError,
   erreur,
-  decoches,
+  coches,
   onChange,
   objectifs,
   onObjectif,
@@ -542,15 +548,15 @@ function ChampTeleconseillers({
   chargement: boolean;
   isError: boolean;
   erreur: unknown;
-  decoches: readonly string[];
-  onChange: (decoches: readonly string[]) => void;
+  coches: Coches;
+  onChange: (coches: Coches) => void;
   objectifs: Readonly<Record<string, string>>;
   onObjectif: (id: string, saisie: string) => void;
   defaut: number;
 }) {
   const aide = useId();
   const liste = comptes ?? [];
-  const toutCoche = liste.some((compte) => !decoches.includes(compte.id));
+  const toutCoche = liste.some((compte) => estCoche(compte, coches));
 
   return (
     <fieldset className="flex flex-col gap-2">
@@ -566,7 +572,7 @@ function ChampTeleconseillers({
             variant="link"
             size="sm"
             onClick={() => {
-              onChange(toutCoche ? liste.map((compte) => compte.id) : []);
+              onChange(Object.fromEntries(liste.map((compte) => [compte.id, !toutCoche])));
             }}
           >
             {toutCoche ? 'Tout décocher' : 'Tout cocher'}
@@ -584,7 +590,7 @@ function ChampTeleconseillers({
       {liste.length === 0 ? null : (
         <ul className="flex max-h-56 flex-col gap-1 overflow-y-auto rounded-md border border-border p-1 scrollbar-thin">
           {liste.map((compte) => {
-            const coche = !decoches.includes(compte.id);
+            const coche = estCoche(compte, coches);
             return (
               <li key={compte.id}>
                 <label
@@ -600,11 +606,7 @@ function ChampTeleconseillers({
                     aria-describedby={aide}
                     className="size-4 shrink-0 accent-primary"
                     onChange={() => {
-                      onChange(
-                        coche
-                          ? [...decoches, compte.id]
-                          : decoches.filter((id) => id !== compte.id),
-                      );
+                      onChange({ ...coches, [compte.id]: !coche });
                     }}
                   />
                   <span className="min-w-0 flex-1 truncate">{compte.fullName}</span>
@@ -645,18 +647,23 @@ function capaciteDeDefaut(role: Teleconseiller['role'], fichesParJour: number): 
 }
 
 function ApercuLot({
+  id,
   apercu,
   stable,
   equipe,
   jours,
 }: {
+  id: string;
   apercu: UseQueryResult<LotExportPreview>;
   stable: boolean;
   equipe: number;
   jours: number;
 }) {
   return (
-    <output className="block rounded-md border border-border bg-secondary/50 px-4 py-3 text-[0.9375rem]">
+    <output
+      id={id}
+      className="block rounded-md border border-border bg-secondary/50 px-4 py-3 text-[0.9375rem]"
+    >
       {(() => {
         if (equipe === 0) return 'Cochez au moins un téléconseiller.';
         if (apercu.isError)
@@ -783,9 +790,11 @@ function FormulaireDeLot({
   const [maintenant] = useState(() => new Date().toISOString());
   const cibles = CIBLES.filter((cible) => cible.projet === projet);
   const [choix, setChoix] = useState<Choix>(() => choixInitial(cibles[0]?.cle ?? 'chues'));
-  // On retient les comptes DÉCOCHÉS : la liste arrive après le premier rendu, et
-  // tout garder coché par défaut se lit alors sans effet de synchronisation.
-  const [decoches, setDecoches] = useState<readonly string[]>([]);
+  // Seuls les choix faits à la main sont retenus : la liste arrive après le premier
+  // rendu, et le défaut par rôle se lit alors sans effet de synchronisation.
+  const [coches, setCoches] = useState<Coches>({});
+  const apercuId = useId();
+  const aideNomId = useId();
   const [fichesParJourSaisi, setFichesParJourSaisi] = useState(String(FICHES_PAR_JOUR_DEFAUT));
   const [joursSaisi, setJoursSaisi] = useState(String(JOURS_DEFAUT));
   const [objectifsSaisis, setObjectifsSaisis] = useState<Readonly<Record<string, string>>>({});
@@ -799,7 +808,7 @@ function FormulaireDeLot({
     staleTime: 5 * 60_000,
   });
 
-  const equipe = orEmpty(teleconseillers.data).filter((compte) => !decoches.includes(compte.id));
+  const equipe = orEmpty(teleconseillers.data).filter((compte) => estCoche(compte, coches));
   const fichesParJour = entierBorne(fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
   const jours = entierBorne(joursSaisi, JOURS_DEFAUT, 1, 10);
   const objectifs = objectifsRetenus(equipe, objectifsSaisis);
@@ -895,8 +904,8 @@ function FormulaireDeLot({
         chargement={teleconseillers.isPending}
         isError={teleconseillers.isError}
         erreur={teleconseillers.error}
-        decoches={decoches}
-        onChange={setDecoches}
+        coches={coches}
+        onChange={setCoches}
         objectifs={objectifsSaisis}
         defaut={fichesParJour}
         onObjectif={(id, saisie) => {
@@ -958,17 +967,29 @@ function FormulaireDeLot({
         </Field>
       </div>
 
-      <ApercuLot apercu={apercu} stable={critereStable} equipe={equipe.length} jours={jours} />
+      <ApercuLot
+        id={apercuId}
+        apercu={apercu}
+        stable={critereStable}
+        equipe={equipe.length}
+        jours={jours}
+      />
 
       <ErreurCreation isError={creation.isError} error={creation.error} />
 
       <DialogFooter>
+        {nom.length < 3 ? (
+          <p id={aideNomId} className="text-[0.8125rem] text-muted-foreground sm:self-center">
+            Donnez à la campagne un nom d’au moins 3 caractères.
+          </p>
+        ) : null}
         <Button type="button" variant="ghost" onClick={onAnnule}>
           Annuler
         </Button>
         <Button
           type="button"
           disabled={!pretACreer}
+          aria-describedby={pretACreer ? undefined : `${apercuId} ${aideNomId}`}
           onClick={() => {
             creation.mutate();
           }}

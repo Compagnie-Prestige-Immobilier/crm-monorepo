@@ -15,6 +15,7 @@ import { BankCourriels } from '@/components/bank/bank-courriels';
 import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { DetailBackLink } from '@/components/detail-back-link';
+import { Field } from '@/components/forms/field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -489,52 +490,48 @@ function advanceDialogDescription(isCashing: boolean): string {
 
 function AdvanceAmountField({
   isCashing,
-  amountId,
   amount,
   onChange,
 }: {
   isCashing: boolean;
-  amountId: string;
   amount: string | null;
   onChange: (value: string | null) => void;
 }) {
   if (!isCashing) return null;
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={amountId}>
-        Montant encaissé
-        <span className="text-destructive" aria-label="obligatoire">
-          *
-        </span>
-      </Label>
-      <Input
-        id={amountId}
-        inputMode="numeric"
-        autoComplete="off"
-        // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-        autoFocus
-        value={amount ?? ''}
-        placeholder="1200000"
-        aria-describedby={`${amountId}-apercu`}
-        onChange={(event) => {
-          onChange(parseMoneyInput(event.target.value));
-        }}
-      />
-      {/* Aperçu formaté EN DIRECT : « 1200000 » et « 12000000 » se
-          distinguent mal à la lecture, et un zéro de trop est une
-          erreur qu'on ne rattrape pas après validation. */}
-      <p
-        id={`${amountId}-apercu`}
-        role="status"
-        className="text-[0.9375rem] font-[600] tabular-nums"
-      >
-        {amount === null ? (
-          <span className="font-[400] text-muted-foreground">Montant strictement positif.</span>
-        ) : (
-          formatXof(amount)
-        )}
-      </p>
-    </div>
+    <Field label="Montant encaissé" required>
+      {(props) => (
+        <>
+          <Input
+            {...props}
+            inputMode="numeric"
+            autoComplete="off"
+            // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
+            autoFocus
+            value={amount ?? ''}
+            placeholder="1200000"
+            aria-describedby={`${props.id}-apercu`}
+            onChange={(event) => {
+              onChange(parseMoneyInput(event.target.value));
+            }}
+          />
+          {/* Aperçu formaté EN DIRECT : « 1200000 » et « 12000000 » se
+              distinguent mal à la lecture, et un zéro de trop est une
+              erreur qu'on ne rattrape pas après validation. */}
+          <p
+            id={`${props.id}-apercu`}
+            role="status"
+            className="text-[0.9375rem] font-[600] tabular-nums"
+          >
+            {amount === null ? (
+              <span className="font-[400] text-muted-foreground">Montant strictement positif.</span>
+            ) : (
+              formatXof(amount)
+            )}
+          </p>
+        </>
+      )}
+    </Field>
   );
 }
 
@@ -567,7 +564,6 @@ export function AdvanceDialog({
   isCashing: boolean;
   onDone: () => void;
 }) {
-  const amountId = useId();
   const commentId = useId();
   const [amount, setAmount] = useState<string | null>(null);
   const [comment, setComment] = useState('');
@@ -616,12 +612,7 @@ export function AdvanceDialog({
         </DialogHeader>
 
         <div className="flex flex-col gap-4">
-          <AdvanceAmountField
-            isCashing={isCashing}
-            amountId={amountId}
-            amount={amount}
-            onChange={setAmount}
-          />
+          <AdvanceAmountField isCashing={isCashing} amount={amount} onChange={setAmount} />
 
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={commentId}>Commentaire (facultatif)</Label>
@@ -671,25 +662,14 @@ function isDetailRequired(
   return selected?.code === OTHER_REASON_CODE;
 }
 
-function canSubmitReject({
-  targetStageId,
-  reasonIdValue,
-  detailRequired,
-  detail,
-  pending,
-}: {
-  targetStageId: string | null;
-  reasonIdValue: string | null;
-  detailRequired: boolean;
-  detail: string;
-  pending: boolean;
-}): boolean {
-  return (
-    targetStageId !== null &&
-    reasonIdValue !== null &&
-    (!detailRequired || detail.trim() !== '') &&
-    !pending
-  );
+function raisonRejetImpossible(
+  reasonIdValue: string | null,
+  detailRequired: boolean,
+  detail: string,
+): string | null {
+  if (reasonIdValue === null) return 'Choisissez un motif de rejet.';
+  if (detailRequired && detail.trim() === '') return 'Précisez le motif.';
+  return null;
 }
 
 export function RejectDialog({
@@ -707,8 +687,7 @@ export function RejectDialog({
   targetStageId: string | null;
   onDone: () => void;
 }) {
-  const reasonId = useId();
-  const detailId = useId();
+  const aideId = useId();
   const commentId = useId();
 
   const [reasonIdValue, setReasonIdValue] = useState<string | null>(null);
@@ -755,13 +734,9 @@ export function RejectDialog({
     setComment('');
   }
 
-  const canSubmit = canSubmitReject({
-    targetStageId,
-    reasonIdValue,
-    detailRequired,
-    detail,
-    pending: reject.isPending,
-  });
+  const raison = raisonRejetImpossible(reasonIdValue, detailRequired, detail);
+  const canSubmit = targetStageId !== null && raison === null && !reject.isPending;
+  const aideVisible = targetStageId !== null && raison !== null;
 
   return (
     <Dialog
@@ -791,62 +766,50 @@ export function RejectDialog({
           </p>
         ) : (
           <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-1.5">
-              <Label htmlFor={reasonId}>
-                Motif de rejet
-                <span className="text-destructive" aria-label="obligatoire">
-                  *
-                </span>
-              </Label>
-              {/* `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
-                  pas le texte de l'item — ici, l'identifiant du motif. */}
-              <Select
-                items={reasonList.map((reason) => ({
-                  value: reason.id,
-                  label: reason.label,
-                }))}
-                value={reasonIdValue ?? ''}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setReasonIdValue(value);
-                }}
-              >
-                <SelectTrigger id={reasonId} className="w-full">
-                  <SelectValue placeholder="Choisir un motif" />
-                </SelectTrigger>
-                <SelectContent>
-                  {reasonList.map((reason) => (
-                    <SelectItem key={reason.id} value={reason.id}>
-                      {reason.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <Field label="Motif de rejet" required>
+              {(props) => (
+                // `items` : `Select.Value` de Base UI affiche la VALEUR choisie,
+                // pas le texte de l'item, ici l'identifiant du motif.
+                <Select
+                  items={reasonList.map((reason) => ({
+                    value: reason.id,
+                    label: reason.label,
+                  }))}
+                  value={reasonIdValue ?? ''}
+                  onValueChange={(value) => {
+                    if (value === null) return;
+                    setReasonIdValue(value);
+                  }}
+                >
+                  <SelectTrigger id={props.id} className="w-full">
+                    <SelectValue placeholder="Choisir un motif" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {reasonList.map((reason) => (
+                      <SelectItem key={reason.id} value={reason.id}>
+                        {reason.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
 
             {detailRequired ? (
-              <div className="flex flex-col gap-1.5">
-                <Label htmlFor={detailId}>
-                  Précision
-                  <span className="text-destructive" aria-label="obligatoire">
-                    *
-                  </span>
-                </Label>
-                <Textarea
-                  id={detailId}
-                  value={detail}
-                  maxLength={2000}
-                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
-                  autoFocus
-                  aria-describedby={`${detailId}-aide`}
-                  onChange={(event) => {
-                    setDetail(event.target.value);
-                  }}
-                />
-                <p id={`${detailId}-aide`} className="text-[0.75rem] text-muted-foreground">
-                  Obligatoire pour ce motif.
-                </p>
-              </div>
+              <Field label="Précision" required>
+                {(props) => (
+                  <Textarea
+                    {...props}
+                    value={detail}
+                    maxLength={2000}
+                    // oxlint-disable-next-line jsx-a11y/no-autofocus -- champ unique du dialogue
+                    autoFocus
+                    onChange={(event) => {
+                      setDetail(event.target.value);
+                    }}
+                  />
+                )}
+              </Field>
             ) : null}
 
             <div className="flex flex-col gap-1.5">
@@ -864,6 +827,11 @@ export function RejectDialog({
         )}
 
         <DialogFooter>
+          {aideVisible ? (
+            <p id={aideId} className="text-[0.8125rem] text-muted-foreground sm:self-center">
+              {raison}
+            </p>
+          ) : null}
           <Button
             type="button"
             variant="ghost"
@@ -878,6 +846,7 @@ export function RejectDialog({
             type="button"
             variant="destructive"
             disabled={!canSubmit}
+            aria-describedby={aideVisible ? aideId : undefined}
             onClick={() => {
               reject.mutate();
             }}

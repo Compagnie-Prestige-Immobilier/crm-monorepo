@@ -280,17 +280,30 @@ function CarteInscription({
   );
 }
 
-function ChoixBanqueDialog({
-  inscription,
-  pending,
-  onClose,
-  onConfirm,
-}: {
+interface ChoixBanqueProps {
   inscription: InscriptionAOuvrir | null;
   pending: boolean;
   onClose: () => void;
   onConfirm: (banqueId: string) => void;
-}) {
+}
+
+function ChoixBanqueDialog(props: ChoixBanqueProps) {
+  return (
+    <Dialog
+      open={props.inscription !== null}
+      onOpenChange={(open) => {
+        if (!open && !props.pending) props.onClose();
+      }}
+    >
+      <DialogContent className="sm:max-w-md">
+        <ChoixBanque {...props} />
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Démonté à la fermeture de la boîte : chaque client repart sans banque choisie. */
+function ChoixBanque({ inscription, pending, onClose, onConfirm }: ChoixBanqueProps) {
   const champId = useId();
   const [banqueId, setBanqueId] = useState<string | null>(null);
   const banques = useQuery({
@@ -300,55 +313,48 @@ function ChoixBanqueDialog({
   });
 
   return (
-    <Dialog
-      open={inscription !== null}
-      onOpenChange={(open) => {
-        if (!open && !pending) onClose();
-      }}
-    >
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle>Banque de traitement</DialogTitle>
-          <DialogDescription>
-            {inscription === null ? '' : nomClient(inscription)} n’a pas de banque renseignée.
-            Choisissez celle qui traitera le dossier.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor={champId}>Banque</Label>
-          <Select
-            value={banqueId ?? ''}
-            onValueChange={(valeur) => setBanqueId(valeur === '' ? null : valeur)}
-          >
-            <SelectTrigger id={champId} className="w-full">
-              <SelectValue placeholder="Choisir une banque" />
-            </SelectTrigger>
-            <SelectContent>
-              {(banques.data ?? []).map((banque) => (
-                <SelectItem key={banque.id} value={banque.id}>
-                  {withRetired(banque.shortName, banque.isActive)}, {banque.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-        <DialogFooter>
-          <Button type="button" variant="outline" disabled={pending} onClick={onClose}>
-            Annuler
-          </Button>
-          <Button
-            type="button"
-            disabled={banqueId === null}
-            pending={pending}
-            onClick={() => {
-              if (banqueId !== null) onConfirm(banqueId);
-            }}
-          >
-            Ouvrir le dossier
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+    <>
+      <DialogHeader>
+        <DialogTitle>Banque de traitement</DialogTitle>
+        <DialogDescription>
+          {inscription === null ? '' : nomClient(inscription)} n’a pas de banque renseignée.
+          Choisissez celle qui traitera le dossier.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor={champId}>Banque</Label>
+        <Select
+          value={banqueId ?? ''}
+          onValueChange={(valeur) => setBanqueId(valeur === '' ? null : valeur)}
+        >
+          <SelectTrigger id={champId} className="w-full">
+            <SelectValue placeholder="Choisir une banque" />
+          </SelectTrigger>
+          <SelectContent>
+            {(banques.data ?? []).map((banque) => (
+              <SelectItem key={banque.id} value={banque.id}>
+                {withRetired(banque.shortName, banque.isActive)}, {banque.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="ghost" disabled={pending} onClick={onClose}>
+          Annuler
+        </Button>
+        <Button
+          type="button"
+          disabled={banqueId === null}
+          pending={pending}
+          onClick={() => {
+            if (banqueId !== null) onConfirm(banqueId);
+          }}
+        >
+          Ouvrir le dossier
+        </Button>
+      </DialogFooter>
+    </>
   );
 }
 
