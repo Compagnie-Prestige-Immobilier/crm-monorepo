@@ -175,6 +175,8 @@ Chaque lot se livre seul. Le lot 1 ne dépend d'aucun autre.
 
 Le lot 1 est livré sur `feat/amelioration-ux` : `ux-grand-public-lot1.md`.
 Le lot 2 aussi, sauf la pagination des campagnes : `ux-grand-public-lot2.md`.
+Le lot 3 aussi, avec l'appel et l'ajout en étapes accordés le 12 septembre :
+`ux-grand-public-lot3.md`.
 
 ## 9. Demande l'accord écrit du propriétaire (refonte d'écran)
 
