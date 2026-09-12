@@ -19,9 +19,9 @@ export interface ImportJobPage {
 const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
+  PROSPECTS_GRAND_PUBLIC: 'Leads Marketing (SharePoint / Adhésions)',
+  PROSPECTS: 'Prospects CHUES (Terrain)',
   REPRESENTANTS: 'Représentants',
-  PROSPECTS: 'Prospects CHUES',
-  PROSPECTS_GRAND_PUBLIC: 'Prospects Grand Public',
   VISITES: 'Visites',
   VISITES_REGISTRE: 'Registre des visites',
 };

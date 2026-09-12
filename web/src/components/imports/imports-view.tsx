@@ -78,10 +78,10 @@ const KIND_OPTIONS: readonly { value: UploadableImportKind; label: string }[] =
   UPLOADABLE_IMPORT_KINDS.map((value) => ({ value, label: IMPORT_KIND_LABELS[value] }));
 
 const IMPORT_HINTS: Readonly<Record<ImportKind, string>> = {
-  PROSPECTS:
-    'Banque et Syndicat se choisissent dans les listes déroulantes du modèle : leur croisement détermine le groupe (BDD1 à BDD4). Ce fichier ne crée aucun représentant, importez-les d’abord.',
   PROSPECTS_GRAND_PUBLIC:
-    'Seuls le nom et le téléphone sont exigés : profession, syndicat, banque, durée du système et canal de provenance peuvent rester vides. Les colonnes sont retrouvées par le texte de leur en-tête, pas par leur rang.',
+    'Classeur des leads marketing (SharePoint, adhésions en ligne, pub Meta/TikTok). Lit tous les onglets (Feuille 1, etc.), adapte les colonnes (Nom complet, Email, Provenance, Téléphone) et route automatiquement chaque prospect vers CHUES ou Grand Public.',
+  PROSPECTS:
+    'Fiches prospects terrain rattachées aux représentants. Lit tous les onglets du fichier et croise banques, syndicats et représentants.',
   REPRESENTANTS:
     'Département et IEF se choisissent dans les listes déroulantes du modèle, tirées des référentiels du jour.',
   VISITES: 'Seuls les onglets « BDD VISITES » sont lus, avec l’en-tête en ligne 3.',
@@ -629,6 +629,16 @@ function JobActions({
   const showEmptyHint =
     job.status === 'succeeded' && job.mode === 'DRY_RUN' && job.createdRows === 0;
 
+  let hintText = '';
+  if (showEmptyHint) {
+    if (job.errorRows === 0 && job.skippedRows > 0) {
+      hintText = `Toutes les fiches (${formatNumber(job.skippedRows)}) sont déjà présentes en base de données. Aucun doublon n’a été créé.`;
+    } else {
+      hintText =
+        'Aucune nouvelle fiche à créer : les données sont soit déjà en base, soit à corriger.';
+    }
+  }
+
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
@@ -639,16 +649,14 @@ function JobActions({
           </Button>
         ) : null}
         {running ? null : (
-          <Button type="button" variant="ghost" disabled={applying} onClick={onReset}>
+          <Button type="button" variant="outline" disabled={applying} onClick={onReset}>
             Déposer un autre fichier
           </Button>
         )}
       </div>
 
       {showEmptyHint ? (
-        <p className="text-[0.875rem] text-muted-foreground">
-          Aucune ligne à créer : tout le fichier est soit déjà en base, soit refusé.
-        </p>
+        <p className="text-[0.875rem] font-[500] text-muted-foreground">{hintText}</p>
       ) : null}
     </>
   );

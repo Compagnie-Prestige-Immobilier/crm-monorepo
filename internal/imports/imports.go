@@ -527,7 +527,7 @@ func (c *courseImport) consommerLigne(ctx context.Context, numero int, cellules 
 	if refus != nil {
 		c.totaux.refusees++
 		c.totaux.erreurs = bornerErreursImport(c.totaux.erreurs, []erreurLigneImport{*refus})
-	} else {
+	} else if valeur != nil {
 		c.tampon = append(c.tampon, valeur)
 	}
 	c.consommees++
