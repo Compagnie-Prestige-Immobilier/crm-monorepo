@@ -40,23 +40,37 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 	if r.EnrollmentCapturedAt != nil {
 		obtenuLe = *r.EnrollmentCapturedAt
 	}
+	// Un rendez-vous se prépare, un enrôlement à distance se suit : le courriel
+	// change de titre et dit la date quand il y en a une.
+	titre, objet, rendezVous := "Enrôlement à distance", "Prospect transmis à l’enrôlement : ", "sans rendez-vous"
+	if methodesRendezVous[r.Methode] {
+		titre, objet = "Rendez-vous d’enrôlement", "Rendez-vous d’enrôlement : "
+		rendezVous = "date à fixer"
+	}
+	if r.RendezVousAt != nil {
+		rendezVous = r.RendezVousAt.In(s.Cfg.TimeZone).Format(formatDateEnrolement)
+	}
 	chemin := "/" + coque + "/prospects/" + r.ID
 	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          notifications.CourrielProspectEnrolement,
-		Sujet:         "[" + projet + "] Prospect transmis à l’enrôlement : " + client,
-		Destinataires: reglages.Enrolement, Copies: reglages.EnrolementCopies,
+		Sujet:         "[" + projet + "] " + objet + client,
+		Destinataires: reglages.Enrolement.Destinataires, Copies: reglages.Enrolement.Copies,
 		ObjetType: "prospect", ObjetID: r.ID,
-		Titre: "Prospect transmis à l’enrôlement",
-		Intro: u.FullName + " a obtenu la méthode d’enrôlement « " + methode + " » pour " + client +
-			". Le prospect est transmis à l’équipe enrôlement.",
+		Titre: titre,
+		Intro: notifications.IntroCourriel(&reglages.Enrolement, notifications.AideEnrolement(), map[string]string{
+			notifications.VariableClient: client, "telephone": r.PhoneE164, "methode": methode, "rendezVous": rendezVous,
+			notifications.VariableTeleconseiller: u.FullName, notifications.VariableBanque: texteOuNonRenseigne(r.BanqueName),
+			notifications.VariableProjet: projet,
+		}),
 		Lignes: [][2]string{
 			{"Client", client},
 			{"Téléphone", r.PhoneE164},
 			{"Courriel", texteOuNonRenseigne(r.Email)},
 			{"Banque", texteOuNonRenseigne(r.BanqueName)},
 			{"Méthode d’enrôlement", methode},
+			{"Rendez-vous", rendezVous},
 			{"Téléconseiller", u.FullName},
-			{"Obtenue le", obtenuLe.In(s.Cfg.TimeZone).Format("02/01/2006 à 15:04")},
+			{"Obtenue le", obtenuLe.In(s.Cfg.TimeZone).Format(formatDateEnrolement)},
 		},
 		Lien: socle.Env("PUBLIC_WEB_URL", "") + chemin, LibelleLien: "Voir le prospect dans CPI GO",
 		NomPieceJointe: "prospect-enrolement-" + r.ID + ".pdf",
@@ -65,6 +79,10 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 		slog.Error("prospect enrôlé : courriel non tracé", "prospect", prospectID, "err", err)
 	}
 }
+
+const formatDateEnrolement = "02/01/2006 à 15:04"
+
+var methodesRendezVous = map[string]bool{"APPOINTMENT": true, "PHYSICAL": true, "RDV_CPI": true}
 
 func texteOuNonRenseigne(v *string) string {
 	if v == nil || strings.TrimSpace(*v) == "" {

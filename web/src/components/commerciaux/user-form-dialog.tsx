@@ -55,7 +55,7 @@ function errorMessage(error?: { message?: string }): string | undefined {
 
 const ROLE_HINTS: Record<Role, string> = {
   ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
-  COMMERCIAL: 'Saisit les prospects depuis l’application mobile.',
+  COMMERCIAL: 'Saisit les prospects et passe les appels depuis sa console.',
   BANQUE_FINANCE: 'Accède aux dossiers bancaires, pas aux prospects.',
   SUPERVISEUR: 'Passe lui-même les trois appels et suit le travail de son équipe.',
   DIRECTION: 'Passe les trois appels, lit tout le téléconseil et tient le registre des visites.',

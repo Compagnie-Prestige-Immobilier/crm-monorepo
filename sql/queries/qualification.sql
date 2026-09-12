@@ -8,6 +8,7 @@ WHERE r."id" = @id AND r."deletedAt" IS NULL
   AND (@tous::bool
        OR r."createdById" = @agent
        OR EXISTS (SELECT 1 FROM "lot_export_items" li
+                  JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                   WHERE li."representantId" = r."id" AND li."assigneeId" = @agent));
 
 -- name: RepresentantExisteAilleurs :one
@@ -104,6 +105,7 @@ SELECT EXISTS (
   WHERE p."id" = @id AND p."deletedAt" IS NULL
     AND (p."createdById" = @agent
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
+                    JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)));
 
 -- name: ProspectOuvrable :one
@@ -113,6 +115,7 @@ SELECT EXISTS (
     AND (@tous::bool
          OR p."createdById" = @agent
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
+                    JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
          OR (@converti_visible::bool AND p."statut" = 'CONVERTI')));
 
@@ -181,12 +184,12 @@ ON CONFLICT DO NOTHING;
 UPDATE "scheduled_callbacks" SET "status" = 'DONE', "closedAttemptId" = @attempt_id
 WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
 
--- name: CloreParcours :execrows
+-- name: CloreParcours :exec
 UPDATE "prospect_journeys" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
   "enrollmentMethod" = CAST(sqlc.narg('method') AS text)::"EnrollmentMethod",
   "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by
-WHERE "id" = @id AND "phase2Status" = 'PENDING';
+WHERE "id" = @id;
 
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
@@ -239,6 +242,8 @@ WHERE (CAST(sqlc.narg('id') AS text) IS NULL OR o."id" = CAST(sqlc.narg('id') AS
   AND (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
        OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
   AND (NOT @ouvertes_seulement::bool OR o."closedAt" IS NULL)
+  AND (sqlc.narg('cible')::text IS NULL
+       OR (sqlc.narg('cible')::text = 'prospect') = (o."prospectId" IS NOT NULL))
 ORDER BY o."openedAt" ASC, o."id" ASC;
 
 -- name: VerrouFiches :one
@@ -387,6 +392,7 @@ WHERE p."deletedAt" IS NULL
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
   )
@@ -401,7 +407,10 @@ LIMIT sqlc.arg('taille')::int;
 -- name: ProspectPourCourrielEnrolement :one
 SELECT p."id", p."nom", p."prenom", p."phoneE164", p."email", p."projet"::text AS "projet",
        b."name" AS "banqueName", su."fullName" AS "suiviParName",
-       p."enrollmentMethod"::text AS "methode", p."enrollmentCapturedAt"
+       p."enrollmentMethod"::text AS "methode", p."enrollmentCapturedAt",
+       (SELECT a."rendezVousAt" FROM "call_attempts" a
+         WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
+         ORDER BY a."createdAt" DESC LIMIT 1) AS "rendezVousAt"
 FROM "prospects" p
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")

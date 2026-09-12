@@ -115,8 +115,7 @@ function messageVide(
   }
   return {
     titre: 'Aucun représentant enregistré.',
-    detail:
-      'Les fiches sont saisies en tournée depuis le mobile, ou créées ici, une par une ou par import d’un classeur.',
+    detail: 'Les fiches se créent ici, une par une ou par import d’un classeur.',
   };
 }
 
@@ -302,8 +301,8 @@ export function RepresentantsView({
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Personnes qui remettent les listes de prospects. Les fiches naissent en tournée, sur
-          l’application mobile ; la saisie et l’import ci-contre couvrent les exceptions.
+          Personnes qui remettent les listes de prospects. Les fiches se saisissent ici ou
+          s’importent d’un classeur.
         </p>
 
         <div className="flex flex-wrap items-center gap-2">

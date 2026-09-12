@@ -3,6 +3,7 @@ import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
 import { ResponsiveRadar } from '@nivo/radar';
 import { ResponsiveScatterPlot } from '@nivo/scatterplot';
+import { BasicTooltip } from '@nivo/tooltip';
 
 import type {
   CompositionLigne,
@@ -107,10 +108,13 @@ function Bars({
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
         {...clickProps}
-        tooltip={({ indexValue, value }) => (
-          <span>
-            {String(indexValue)}: {formatNumber(Number(value))}
-          </span>
+        tooltip={({ indexValue, value, color }) => (
+          <BasicTooltip
+            id={String(indexValue)}
+            value={formatNumber(Number(value))}
+            color={color}
+            enableChip
+          />
         )}
       />
     </Frame>
@@ -380,9 +384,12 @@ function Share({
         animate={!reducedMotion}
         {...clickProps}
         tooltip={({ datum }) => (
-          <span>
-            {datum.label}: {formatNumber(Number(datum.value))}
-          </span>
+          <BasicTooltip
+            id={datum.label}
+            value={formatNumber(Number(datum.value))}
+            color={datum.color}
+            enableChip
+          />
         )}
       />
     </Frame>

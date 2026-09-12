@@ -204,15 +204,18 @@ func TestQualificationRappelPlanifieEtListe(t *testing.T) {
 	}
 }
 
-func TestQualificationUneSeuleFicheOuverteALaFois(t *testing.T) {
+// Sans verrou depuis le 10 septembre 2026 : plusieurs fiches restent en main,
+// et chaque console reprend la plus récente des siennes.
+func TestQualificationPlusieursFichesEnMainUneParConsole(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	premier, second := qualificationRepresentant(b), qualificationRepresentant(b)
+	prospect := qualificationProspect(b)
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "openedById" = $1`, b.userID) })
 
 	ouvrir := map[string]any{
 		"id":             uuid.Must(uuid.NewV7()).String(),
 		"representantId": premier,
-		"openedAt":       time.Now().UTC().Format(time.RFC3339Nano),
+		"openedAt":       time.Now().UTC().Add(-2 * time.Minute).Format(time.RFC3339Nano),
 	}
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", ouvrir)
 	b.attend(statut, http.StatusOK, "première ouverture", body)
@@ -226,16 +229,31 @@ func TestQualificationUneSeuleFicheOuverteALaFois(t *testing.T) {
 	autre := map[string]any{
 		"id":             uuid.Must(uuid.NewV7()).String(),
 		"representantId": second,
-		"openedAt":       time.Now().UTC().Format(time.RFC3339Nano),
+		"openedAt":       time.Now().UTC().Add(-time.Minute).Format(time.RFC3339Nano),
 	}
 	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", autre)
-	b.attend(statut, http.StatusConflict, "seconde fiche ouverte", body)
-	if body["code"] != "OUVERTURE_FICHE_DEJA_OUVERTE" {
-		t.Fatalf("code : %v", body["code"])
+	b.attend(statut, http.StatusOK, "seconde fiche, sans verrou", body)
+	surProspect := map[string]any{
+		"id":         uuid.Must(uuid.NewV7()).String(),
+		"prospectId": prospect,
+		"openedAt":   time.Now().UTC().Format(time.RFC3339Nano),
 	}
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", surProspect)
+	b.attend(statut, http.StatusOK, "fiche prospect en plus", body)
 	if n := qualificationCompte(b,
-		`SELECT count(*) FROM "ouvertures_fiche" WHERE "openedById" = $1 AND "closedAt" IS NULL`, b.userID); n != 1 {
-		t.Fatalf("%d fiches ouvertes en même temps", n)
+		`SELECT count(*) FROM "ouvertures_fiche" WHERE "openedById" = $1 AND "closedAt" IS NULL`, b.userID); n != 3 {
+		t.Fatalf("%d fiches ouvertes, attendu 3", n)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/courante?cible=representant", nil)
+	b.attend(statut, http.StatusOK, "fiche courante des représentants", body)
+	if body["id"] != autre["id"] {
+		t.Fatalf("la console des représentants reprend la plus récente des siennes : %v", body)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/ouvertures/courante?cible=prospect", nil)
+	b.attend(statut, http.StatusOK, "fiche courante des prospects", body)
+	if body["id"] != surProspect["id"] {
+		t.Fatalf("la console des prospects reprend la sienne : %v", body)
 	}
 }
 

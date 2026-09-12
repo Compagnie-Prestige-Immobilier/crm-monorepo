@@ -28,7 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { dakarLocalToIso, formatDakarDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { cn } from '@/lib/utils';
-import { AndroidPreview } from './android-preview';
+import { ApercuNotification } from './apercu-notification';
 import {
   EMPTY_AUDIENCE,
   KNOWN_ROUTES,
@@ -42,17 +42,14 @@ import {
 import {
   createNotification,
   fetchAudiencePreview,
-  fetchTemplates,
   notificationKeys,
 } from '@/lib/data/notifications';
-import { renderNotification } from './template';
 import {
   AUDIENCE_LABELS,
   CATEGORY_LABELS,
   ROLE_LABELS,
   type AudiencePreview,
   type NotificationCategory,
-  type NotificationTemplate,
   type Role,
 } from './types';
 
@@ -93,42 +90,16 @@ function echeanceDe(
   return { iso, issue: null };
 }
 
-/**
- * Les bornes portent sur le texte RENDU, pas sur le gabarit : c'est lui qui
- * part, et une variable substituée rallonge. Un dépassement renvoyait
- * l'assistant à l'étape 1 sans qu'aucun champ ne soit marqué.
- */
-function problemeDeTexte(saisi: string, rendu: string, max: number, label: string): string | null {
+function problemeDeTexte(saisi: string, max: number, label: string): string | null {
   if (saisi.trim() === '') return `${label} est obligatoire.`;
-  if (rendu.length > max) {
-    return `${label} rendu fait ${String(rendu.length)} caractères, ${String(max)} au maximum.`;
+  if (saisi.length > max) {
+    return `${label} fait ${String(saisi.length)} caractères, ${String(max)} au maximum.`;
   }
   return null;
 }
 
-// Une variable non renseignée partait EN CLAIR : le destinataire recevait
-// « Bonjour {{prenom}} ». L'avertissement ne retenait rien.
-function problemeDeVariables(missing: readonly string[]): string | null {
-  if (missing.length === 0) return null;
-  return `Renseignez ${missing.join(', ')} : la notification partirait avec le marqueur en clair.`;
-}
-
 function premierBlocage(issues: readonly (string | null)[]): string | null {
   return issues.find((issue) => issue !== null) ?? null;
-}
-
-type TemplatesData = { items: NotificationTemplate[] } | undefined;
-
-function findTemplate(data: TemplatesData, id: string): NotificationTemplate | undefined {
-  return data?.items.find((item) => item.id === id);
-}
-
-function templateItemsOf(data: TemplatesData): { id: string; name: string }[] {
-  return data?.items ?? [];
-}
-
-function templateVariablesOf(template: NotificationTemplate | undefined): readonly string[] {
-  return template?.variables ?? [];
 }
 
 function previewEnabled(open: boolean, step: Step, audienceIssue: string | null): boolean {
@@ -155,78 +126,11 @@ function EnTeteComposer({ step }: { step: Step }) {
     <DialogHeader>
       <DialogTitle>{redaction ? 'Nouvelle notification' : 'Confirmer l’envoi'}</DialogTitle>
       <DialogDescription>
-        {redaction ? 'Envoi push aux destinataires choisis.' : 'L’envoi est irréversible.'}
+        {redaction
+          ? 'Remise par courriel et dans la boîte de réception des destinataires choisis.'
+          : 'L’envoi est irréversible.'}
       </DialogDescription>
     </DialogHeader>
-  );
-}
-
-function ChampGabarit({
-  items,
-  value,
-  onApply,
-}: {
-  items: readonly { id: string; name: string }[];
-  value: string;
-  onApply: (id: string) => void;
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <Field label="Gabarit" description="Facultatif.">
-      {(props) => (
-        <Select
-          items={items.map((item) => ({ value: item.id, label: item.name }))}
-          value={value}
-          onValueChange={(chosen) => {
-            if (chosen === null) return;
-            onApply(chosen);
-          }}
-        >
-          <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-            <SelectValue placeholder="Aucun gabarit" />
-          </SelectTrigger>
-          <SelectContent>
-            {items.map((item) => (
-              <SelectItem key={item.id} value={item.id}>
-                {item.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      )}
-    </Field>
-  );
-}
-
-function ChampsVariables({
-  noms,
-  variables,
-  onChange,
-}: {
-  noms: readonly string[];
-  variables: Record<string, string>;
-  onChange: Dispatch<SetStateAction<Record<string, string>>>;
-}) {
-  if (noms.length === 0) return null;
-
-  return (
-    <fieldset className="flex flex-col gap-3 rounded-[var(--radius-md)] border border-border bg-secondary/40 p-3">
-      <legend className="px-1 text-[0.75rem] font-[600]">Variables</legend>
-      {noms.map((name) => (
-        <Field key={name} label={name}>
-          {(props) => (
-            <Input
-              {...props}
-              value={variables[name] ?? ''}
-              onChange={(event) => {
-                onChange((current) => ({ ...current, [name]: event.target.value }));
-              }}
-            />
-          )}
-        </Field>
-      ))}
-    </fieldset>
   );
 }
 
@@ -432,8 +336,6 @@ export function NotificationComposer({
   const [selection, setSelection] = useState<AudienceSelection>(EMPTY_AUDIENCE);
   const [when, setWhen] = useState<When>('now');
   const [scheduledFor, setScheduledFor] = useState('');
-  const [templateId, setTemplateId] = useState<string>('');
-  const [variables, setVariables] = useState<Record<string, string>>({});
 
   useEffect(() => {
     if (open) return;
@@ -441,32 +343,18 @@ export function NotificationComposer({
     setStep('redaction');
   }, [open]);
 
-  const templates = useQuery({
-    queryKey: notificationKeys.templates(false),
-    queryFn: () => fetchTemplates(false),
-    enabled: open,
-    staleTime: 60_000,
-  });
-
-  const template = findTemplate(templates.data, templateId);
-
-  const rendered = useMemo(
-    () => renderNotification(title, body, variables),
-    [title, body, variables],
-  );
+  const rendered = useMemo(() => ({ title: title.trim(), body: body.trim() }), [title, body]);
 
   const audienceIssue = audienceProblem(selection);
   const routeIssue = routeProblem(route);
   const { iso: scheduledIso, issue: scheduleIssue } = echeanceDe(when, scheduledFor);
 
-  const titleIssue = problemeDeTexte(title, rendered.title, TITLE_MAX, 'Le titre');
-  const bodyIssue = problemeDeTexte(body, rendered.body, BODY_MAX, 'Le message');
-  const missingIssue = problemeDeVariables(rendered.missing);
+  const titleIssue = problemeDeTexte(title, TITLE_MAX, 'Le titre');
+  const bodyIssue = problemeDeTexte(body, BODY_MAX, 'Le message');
 
   const blocking = premierBlocage([
     titleIssue,
     bodyIssue,
-    missingIssue,
     audienceIssue,
     routeIssue,
     scheduleIssue,
@@ -493,7 +381,6 @@ export function NotificationComposer({
           ? {}
           : { audienceUserIds: selection.audienceUserIds }),
         ...(when === 'later' && scheduledIso !== null ? { scheduledFor: scheduledIso } : {}),
-        ...(templateId === '' ? {} : { templateId }),
       }),
     onSuccess: (created) => {
       void queryClient.invalidateQueries({ queryKey: notificationKeys.root });
@@ -502,7 +389,7 @@ export function NotificationComposer({
         toast.success('Notification programmée. Annulable jusqu’au départ.');
       } else if (created.transportStatus === 'NOT_CONFIGURED') {
         toast.warning(
-          `Enregistrée pour ${String(created.counts.total)} destinataire(s), et lisible dans l’application. Aucun e-mail remis : le service d’envoi n’est pas configuré.`,
+          `Enregistrée pour ${String(created.counts.total)} destinataire(s), lisible dans leur boîte de réception. Aucun courriel remis : le service d’envoi n’est pas configuré.`,
           { duration: 12_000 },
         );
       } else if (created.counts.failed > 0) {
@@ -520,25 +407,12 @@ export function NotificationComposer({
       setSelection(EMPTY_AUDIENCE);
       setWhen('now');
       setScheduledFor('');
-      setTemplateId('');
-      setVariables({});
     },
     onError: (error) => {
       toastApiError(error, 'L’envoi a échoué.');
       setStep('redaction');
     },
   });
-
-  const applyTemplate = (id: string): void => {
-    setTemplateId(id);
-    const chosen = templates.data?.items.find((item) => item.id === id);
-    if (!chosen) return;
-    setTitle(chosen.titleTemplate);
-    setBody(chosen.bodyTemplate);
-    setCategory(chosen.category);
-    setRoute(chosen.route ?? '');
-    setVariables(Object.fromEntries(chosen.variables.map((name) => [name, ''])));
-  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -548,31 +422,10 @@ export function NotificationComposer({
         {step === 'redaction' ? (
           <div className="grid gap-5 md:grid-cols-[minmax(0,1fr)_18rem]">
             <div className="flex min-w-0 flex-col gap-4">
-              <ChampGabarit
-                items={templateItemsOf(templates.data)}
-                value={templateId}
-                onApply={applyTemplate}
-              />
-
-              <ChampsVariables
-                noms={templateVariablesOf(template)}
-                variables={variables}
-                onChange={setVariables}
-              />
-
-              {/* HORS du bloc de gabarit : un marqueur tapé à la main dans le
-                  titre bloque l'envoi lui aussi, et rien ne le disait. */}
-              {missingIssue === null ? null : (
-                <p role="alert" className="text-[0.75rem] text-destructive">
-                  Variable(s) non renseignée(s) : {rendered.missing.join(', ')}. L’envoi reste
-                  bloqué tant qu’elles le sont.
-                </p>
-              )}
-
               <Field
                 label="Titre"
                 required
-                description={`${String(rendered.title.length)} / ${String(TITLE_MAX)} caractères une fois les variables remplacées`}
+                description={`${String(title.length)} / ${String(TITLE_MAX)} caractères`}
                 error={requiredFieldIssue(title, titleIssue)}
               >
                 {(props) => (
@@ -589,7 +442,7 @@ export function NotificationComposer({
               <Field
                 label="Message"
                 required
-                description={`${String(rendered.body.length)} / ${String(BODY_MAX)} caractères une fois les variables remplacées`}
+                description={`${String(body.length)} / ${String(BODY_MAX)} caractères`}
                 error={requiredFieldIssue(body, bodyIssue)}
               >
                 {(props) => (
@@ -696,7 +549,7 @@ export function NotificationComposer({
                 défiler un formulaire plus haut que l'écran. Un aperçu qu'il
                 faut aller chercher n'est pas relu. */}
             <div className="md:sticky md:top-0 md:self-start">
-              <AndroidPreview title={rendered.title} body={rendered.body} route={route} />
+              <ApercuNotification title={rendered.title} body={rendered.body} route={route} />
             </div>
           </div>
         ) : (
@@ -803,12 +656,6 @@ function ConfirmationStep({
           })()}
         </div>
 
-        {/* L'avertissement « Aucun push ne sera remis » a disparu avec le push
-            lui-même : `AudiencePreviewDto` ne porte plus ni `transportConfigured`
-            ni `transportReason`, et tout compte visé lit la notification dans
-            l'application. Le bloc ne testait donc plus que des `undefined`, et
-            s'affichait à chaque envoi. */}
-
         <dl className="grid gap-2 text-[0.875rem]">
           <div className="flex gap-2">
             <dt className="w-28 shrink-0 text-muted-foreground">Titre</dt>
@@ -853,7 +700,7 @@ function ConfirmationStep({
       </div>
 
       <div className="md:sticky md:top-0 md:self-start">
-        <AndroidPreview title={title} body={body} route={route} />
+        <ApercuNotification title={title} body={body} route={route} />
       </div>
     </div>
   );

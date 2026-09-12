@@ -86,7 +86,7 @@ export function DeactivateUserDialog({
       }}
       confirmLabel="Désactiver le compte"
       title={user === null ? '' : `Désactiver le compte de ${user.fullName} ?`}
-      description="Sa connexion à l’application mobile est fermée immédiatement. Aucune saisie n’est supprimée."
+      description="Sa connexion au panneau est fermée immédiatement. Aucune saisie n’est supprimée."
     >
       {user === null ? null : (
         <div className="flex flex-col gap-3">

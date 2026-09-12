@@ -30,7 +30,7 @@ var adaptateursImport = map[db.ImportKind]adaptateurImport{
 		maxLignes: 50_000, colonnes: colonnesGrandPublicImport,
 		feuilles: &dispositionFeuilleImport{
 			motif: regexp.MustCompile(`(?i)prospect`), ligneEntete: 1,
-			premiereDonnee: 2, repliPremiereFeuille: true, exemples: exemplesGrandPublicImport(),
+			premiereDonnee: 2, repliFeuillesRemplies: true, exemples: exemplesGrandPublicImport(),
 		},
 		preparer: preparerGrandPublicImport, lire: lireGrandPublicImport, ecrire: ecrireGrandPublicImport,
 	},
@@ -425,6 +425,30 @@ func atoiImport(valeur string) int {
 	return n
 }
 
+// Le rang brut d'une cellule date Excel, compté depuis le 30 décembre 1899.
+func dateRangExcelImport(brut string) (time.Time, bool) {
+	rang, err := strconv.Atoi(strings.TrimSpace(brut))
+	if err != nil || rang < 61 || rang > 2_958_465 {
+		return time.Time{}, false
+	}
+	return time.Date(1899, time.December, 30, 0, 0, 0, 0, time.UTC).AddDate(0, 0, rang), true
+}
+
+func lireDateLeadImport(brut string, numero int) (*time.Time, *erreurLigneImport) {
+	texte := strings.TrimSpace(brut)
+	if texte == "" {
+		return nil, nil
+	}
+	if date, ok := dateRangExcelImport(texte); ok {
+		return &date, nil
+	}
+	if date, ok := lireDateAppelImport(texte); ok {
+		return &date, nil
+	}
+	return nil, refusImport(numero, enteteGrandPublicImport(21), "PROSPECT_GP_IMPORT_DATE_ILLISIBLE",
+		fmt.Sprintf("« %s » n’est pas une date. Écrivez 10/09/2026, ou laissez vide.", brut))
+}
+
 func ecrireRepresentantsImport(ctx context.Context, q *db.Queries, c contexteImport, lignes []any, brut any) (bilanTrancheImport, error) {
 	etat := brut.(*etatRepresentantsImport)
 	uniques, ignorees, erreurs := doublonsDansLeFichierImport(lignes, etat.vus,
@@ -799,7 +823,7 @@ func persisterProspectsImport(ctx context.Context, q *db.Queries, c contexteImpo
 			ID: identifiants[i], Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
 			BanqueID: &ligne.banqueID, SyndicatID: &ligne.syndicatID, RepresentantID: &ligne.representantID,
 			CreatedByID: c.demandeur, Phase2Status: phase2DepuisMethodeImport(ligne.methode),
-			EnrollmentMethod: ligne.methode, ClientCreatedAt: maintenant,
+			EnrollmentMethod: ligne.methode, ClientCreatedAt: maintenant, ImportJobID: &c.jobID,
 		}
 		// La contrainte `prospects_enrollment_method_matches_status` décide : les
 		// deux colonnes se déduisent l'une de l'autre.
@@ -846,14 +870,15 @@ var colonnesGrandPublicImport = []colonneImport{
 	{entete: "Téléphone du relais", alias: []string{"Téléphone relais", "Contact du relais"}},
 	{entete: "Email", alias: []string{"E-mail", "Courriel", "Adresse e-mail"}},
 	{entete: "Nom complet", alias: []string{"Nom et prénom", "Prénom et nom", "Nom du prospect"}},
+	{entete: "Date", alias: []string{"Date du lead", "Date de création", "Créé le", "CREATED_TIME"}},
 }
 
 func enteteGrandPublicImport(rang int) string { return colonnesGrandPublicImport[rang].entete }
 
-// Les deux dernières colonnes n'existent pas dans le modèle : elles n'ont pas
+// Les trois dernières colonnes n'existent pas dans le modèle : elles n'ont pas
 // d'exemple à reconnaître.
 func exemplesGrandPublicImport() []string {
-	return append(exports.ExemplesGrandPublic(), "", "")
+	return append(exports.ExemplesGrandPublic(), "", "", "")
 }
 
 var (
@@ -878,6 +903,7 @@ type ligneGrandPublicImport struct {
 	nom, prenom, telephone                                 string
 	projet                                                 db.Projet
 	email                                                  *string
+	dateLead                                               *time.Time
 	profession, syndicatID, banqueID, canalID              *string
 	typeProspect                                           *db.ProspectType
 	dureeSystemeMois, ancienneteMois                       *int32
@@ -1082,9 +1108,14 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 	if refus != nil {
 		return nil, refus
 	}
+	dateLead, refus := lireDateLeadImport(cellules[enteteGrandPublicImport(21)], numero)
+	if refus != nil {
+		return nil, refus
+	}
 	ligne := ligneGrandPublicImport{
 		numero: numero, nom: nom, prenom: prenom, telephone: telephone, projet: projet,
 		email:      emailGrandPublicImport(cellules[enteteGrandPublicImport(19)]),
+		dateLead:   dateLead,
 		profession: couperImport(cellules[enteteGrandPublicImport(3)], 120),
 		syndicatID: syndicatID, banqueID: banqueID, canalID: canalID,
 		typeProspect: typeProspect, dureeSystemeMois: duree,
@@ -1338,8 +1369,12 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			continue
 		}
 		statut, numero := whatsappGrandPublicImport(ligne.whatsapp, ligne.telephone)
+		saisieLe := maintenant
+		if ligne.dateLead != nil {
+			saisieLe = *ligne.dateLead
+		}
 		fiches = append(fiches, db.InsertImportProspectGrandPublicParams{
-			ID: identifiantImport(), Projet: ligne.projet, Email: ligne.email,
+			ID: identifiantImport(), Projet: ligne.projet, Email: ligne.email, ImportJobID: &c.jobID,
 			Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
 			Profession: ligne.profession, SyndicatID: ligne.syndicatID, BanqueID: ligne.banqueID,
 			Type: ligne.typeProspect, DureeSystemeMois: ligne.dureeSystemeMois, CanalProvenanceID: ligne.canalID,
@@ -1347,7 +1382,7 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			AncienneteMois: ligne.ancienneteMois, LieuActivite: ligne.lieuActivite, ModeEpargne: ligne.modeEpargne,
 			PaysResidenceID: ligne.paysID, VilleResidence: ligne.villeResidence,
 			WhatsappStatus: statut, WhatsappE164: numero, RelaisNom: ligne.relaisNom,
-			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur, ClientCreatedAt: maintenant,
+			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur, ClientCreatedAt: saisieLe,
 		})
 	}
 	if len(fiches) > 0 {

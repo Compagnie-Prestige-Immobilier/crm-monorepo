@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -219,12 +218,11 @@ func lireDateFeuilleImport(brut string) (string, bool) {
 	if dateIsoImport.MatchString(brut) {
 		return brut[:10], true
 	}
-	rang, err := strconv.Atoi(brut)
-	if err != nil || rang < 61 || rang > 2_958_465 {
+	date, ok := dateRangExcelImport(brut)
+	if !ok {
 		return "", false
 	}
-	origine := time.Date(1899, time.December, 30, 0, 0, 0, 0, time.UTC)
-	return origine.AddDate(0, 0, rang).Format("2006-01-02"), true
+	return date.Format("2006-01-02"), true
 }
 
 // `11H08`, `11h45`, `12H` et `15` se lisent. `17H5` ne se devine pas.

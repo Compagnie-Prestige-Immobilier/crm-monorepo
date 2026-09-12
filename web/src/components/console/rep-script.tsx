@@ -236,7 +236,7 @@ export function RepScript() {
       queryClient.setQueryData(queryKeys.ouvertureCourante, ouverte.ouverture);
     },
     onError: (error) => {
-      void reprendreOuverte(reprendre, error);
+      toastApiError(error, 'La fiche n’a pas pu être ouverte.');
     },
   });
 
@@ -333,32 +333,14 @@ interface Ouverte {
 }
 
 /**
- * La fiche que le serveur tient encore, remise à l'écran telle quelle : au
- * montage elle répare un rechargement, sur refus d'ouverture elle dit laquelle
- * est tenue, que le serveur ne nomme pas.
+ * La fiche que le serveur tient encore pour cette console, remise à l'écran
+ * telle quelle : au montage, elle répare un rechargement.
  */
-async function reprendreOuverte(
-  ouvrir: (ouverte: Ouverte) => void,
-  refus: unknown = null,
-): Promise<void> {
-  const courante = await fetchOuvertureCourante().catch(() => null);
-  if (courante === null) {
-    if (refus !== null) toastApiError(refus, 'La fiche n’a pas pu être ouverte.');
-    return;
-  }
-  if (courante.representantId === null) {
-    toast.error(
-      `Vous avez ${courante.ficheNom} en main sur « Convertir un prospect ». Consignez l’appel avant d’ouvrir une fiche ici.`,
-    );
-    return;
-  }
+async function reprendreOuverte(ouvrir: (ouverte: Ouverte) => void): Promise<void> {
+  const courante = await fetchOuvertureCourante('representant').catch(() => null);
+  if (courante === null || courante.representantId === null) return;
   const representant = await fetchRepresentant(courante.representantId).catch(() => null);
-  if (representant === null) {
-    toast.error(`Vous avez déjà ${courante.ficheNom} en main. Qualifiez-la avant d’en ouvrir une.`);
-    return;
-  }
-  // Un identifiant fixe : la reprise au montage et le refus d'ouverture disent la
-  // même chose, et sonner remplace au lieu d'empiler.
+  if (representant === null) return;
   toast.info(`Vous aviez déjà ${courante.ficheNom} en main : la voici.`, { id: 'reprise-fiche' });
   ouvrir({ representant, ouverture: courante });
 }
@@ -802,14 +784,16 @@ interface EtapeQuestionsProps {
 /** La première étape : les questions, dans l'ordre où l'appel les pose. */
 function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
   return (
-    <div className="flex flex-col gap-5">
-      <Question titre="Comment s’est passé l’appel ?">
-        <Choix
-          options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
-          value={props.resultat}
-          onChange={props.onResultat}
-        />
-      </Question>
+    <div className="grid max-w-5xl gap-x-8 gap-y-5 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <Question titre="Comment s’est passé l’appel ?">
+          <Choix
+            options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
+            value={props.resultat}
+            onChange={props.onResultat}
+          />
+        </Question>
+      </div>
 
       {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
 
@@ -843,7 +827,7 @@ function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
           titre={props.motifObligatoire ? 'Pourquoi ?' : 'Quelque chose à ajouter ? (facultatif)'}
           anime
         >
-          <div className="flex flex-col gap-1.5">
+          <div className="flex max-w-96 flex-col gap-1.5">
             <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
               {props.motifObligatoire ? 'Motif' : 'Commentaire'}
             </label>
@@ -862,7 +846,7 @@ function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
         </Question>
       )}
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 md:col-span-2">
         <Button className="self-start" disabled={props.manque !== null} onClick={props.onContinuer}>
           Continuer
         </Button>

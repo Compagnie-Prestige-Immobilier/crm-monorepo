@@ -917,13 +917,6 @@ func qualificationEtatPhase2(id string, rev int32, updatedAt time.Time, j *db.Pa
 	return etat
 }
 
-func qualificationDejaTraite(etat *QualificationProspectPhase2StateDTO) error {
-	p := socle.Problem(http.StatusConflict, "PHASE2_ALREADY_COMPLETED",
-		"Ce prospect a déjà été traité par un autre appel. Votre saisie est conservée localement comme conflit ; seul un administrateur peut corriger le dossier.")
-	p.Errors = []*huma.ErrorDetail{{Location: "body.prospectId", Message: "état courant du prospect", Value: *etat}}
-	return p
-}
-
 func (s *service) qualificationTentativeProspect(ctx context.Context, in *QualificationCallAttemptInput) (*QualificationCallAttemptOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	statut, etat, err := s.qualificationConsignerTentative(ctx, &u, &in.Body)
@@ -1006,10 +999,6 @@ func qualificationPreVol(ctx context.Context, q *db.Queries, b *QualificationCal
 	if b.ExpectedRev != nil && *b.ExpectedRev != prospect.Rev {
 		return prospect, parcours, false, socle.Problem(http.StatusConflict, "REV_CONFLICT",
 			"Cette fiche a changé depuis votre dernière lecture. Rechargez-la avant de réessayer.")
-	}
-	if parcours.Phase2Status != db.Phase2StatusPENDING {
-		etat := qualificationEtatPhase2(prospect.ID, prospect.Rev, prospect.UpdatedAt, &parcours)
-		return prospect, parcours, false, qualificationDejaTraite(&etat)
 	}
 	revenu := b.IncomeBandID
 	if revenu == nil {
@@ -1184,22 +1173,14 @@ func qualificationFermerOuvertureProspect(ctx context.Context, q *db.Queries, u 
 	})
 }
 
+// Une fiche déjà classée se reclasse : la dernière issue l'emporte.
 func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative, prospect *db.CorrigerProspectParTentativeRow, parcours *db.ParcoursDuProspectRow) (string, QualificationProspectPhase2StateDTO, error) {
 	var vide QualificationProspectPhase2StateDTO
 	at := time.Now().UTC()
-	n, err := q.CloreParcours(ctx, db.CloreParcoursParams{
+	if err := q.CloreParcours(ctx, db.CloreParcoursParams{
 		Phase2Status: t.regle.phase2Status, Method: b.Method, At: &at, By: &u.ID, ID: parcours.ID,
-	})
-	if err != nil {
+	}); err != nil {
 		return "", vide, err
-	}
-	if n == 0 {
-		relu, e := q.ParcoursDuProspect(ctx, db.ParcoursDuProspectParams{ProspectID: b.ProspectID, Projet: string(prospect.Projet)})
-		if e != nil {
-			return "", vide, e
-		}
-		etat := qualificationEtatPhase2(prospect.ID, prospect.Rev, prospect.UpdatedAt, &relu)
-		return "", vide, qualificationDejaTraite(&etat)
 	}
 	if err := q.CloreProspectParTentative(ctx, db.CloreProspectParTentativeParams{
 		Phase2Status: t.regle.phase2Status, Method: b.Method, At: &at, By: &u.ID, ID: prospect.ID,

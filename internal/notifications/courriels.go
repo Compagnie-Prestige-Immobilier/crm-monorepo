@@ -22,6 +22,7 @@ const (
 	CourrielDossierEncaisse    = "DOSSIER_ENCAISSE"
 	CourrielDossierRejete      = "DOSSIER_REJETE"
 	CourrielProspectEnrolement = "PROSPECT_ENROLEMENT"
+	CourrielImportLeads        = "IMPORT_LEADS"
 
 	CourrielEnvoye = "ENVOYE"
 	CourrielRemis  = "REMIS"
@@ -48,12 +49,90 @@ type Courriel struct {
 	NomPieceJointe string
 }
 
-type ReglagesCourriels struct {
-	Banque           []string `json:"banque" maxItems:"20"`
-	BanqueCopies     []string `json:"banqueCopies" maxItems:"20"`
-	Enrolement       []string `json:"enrolement" maxItems:"20"`
-	EnrolementCopies []string `json:"enrolementCopies" maxItems:"20"`
+// Un courriel se règle en entier : à qui, en copie, et le texte d'introduction.
+// L'intro vide envoie le texte d'origine.
+type ReglageCourriel struct {
+	Destinataires []string `json:"destinataires" maxItems:"20"`
+	Copies        []string `json:"copies" maxItems:"20"`
+	Intro         string   `json:"intro" maxLength:"1000"`
 }
+
+type ReglagesCourriels struct {
+	Enrolement   ReglageCourriel `json:"enrolement"`
+	Encaissement ReglageCourriel `json:"encaissement"`
+	Refus        ReglageCourriel `json:"refus"`
+	ImportLeads  ReglageCourriel `json:"importLeads"`
+}
+
+// Ce que l'écran montre à côté de chaque texte : les mots remplacés à l'envoi
+// et le texte d'origine, pour le rétablir d'un clic.
+type AideCourriel struct {
+	IntroUsine string   `json:"introUsine"`
+	Variables  []string `json:"variables"`
+}
+
+type AidesCourriels struct {
+	Enrolement   AideCourriel `json:"enrolement"`
+	Encaissement AideCourriel `json:"encaissement"`
+	Refus        AideCourriel `json:"refus"`
+	ImportLeads  AideCourriel `json:"importLeads"`
+}
+
+type ReglagesCourrielsDTO struct {
+	Enrolement   ReglageCourriel `json:"enrolement"`
+	Encaissement ReglageCourriel `json:"encaissement"`
+	Refus        ReglageCourriel `json:"refus"`
+	ImportLeads  ReglageCourriel `json:"importLeads"`
+	Aide         AidesCourriels  `json:"aide"`
+}
+
+// Les mots communs aux trois courriels ; chacun ajoute les siens.
+const (
+	VariableClient         = "client"
+	VariableBanque         = "banque"
+	VariableTeleconseiller = "teleconseiller"
+	VariableProjet         = "projet"
+	VariableReference      = "reference"
+)
+
+var aidesCourriels = AidesCourriels{
+	Enrolement: AideCourriel{
+		IntroUsine: "{teleconseiller} a obtenu la méthode d’enrôlement « {methode} » pour {client}. " +
+			"Rendez-vous : {rendezVous}. Le prospect est transmis à l’équipe enrôlement.",
+		Variables: []string{VariableClient, "telephone", "methode", "rendezVous", VariableTeleconseiller, VariableBanque, VariableProjet},
+	},
+	Encaissement: AideCourriel{
+		IntroUsine: "Le dossier {reference} de {client} a été encaissé par {banque} : {montant}.",
+		Variables:  []string{VariableReference, VariableClient, VariableBanque, "montant", VariableTeleconseiller, VariableProjet},
+	},
+	Refus: AideCourriel{
+		IntroUsine: "Le dossier {reference} de {client} a été rejeté par {banque}. Motif : {motif}.",
+		Variables:  []string{VariableReference, VariableClient, VariableBanque, "motif", VariableTeleconseiller, VariableProjet},
+	},
+	ImportLeads: AideCourriel{
+		IntroUsine: "Le classeur des leads « {fichier} » a été relevé le {date} : {lues} lignes lues, " +
+			"{creees} fiches créées, {refusees} lignes refusées.",
+		Variables: []string{"fichier", "date", "lues", "creees", "refusees"},
+	},
+}
+
+// Le texte réglé, ou celui d'origine s'il est vide, avec ses mots remplacés.
+func IntroCourriel(reglage *ReglageCourriel, aide *AideCourriel, valeurs map[string]string) string {
+	texte := strings.TrimSpace(reglage.Intro)
+	if texte == "" {
+		texte = aide.IntroUsine
+	}
+	paires := make([]string, 0, 2*len(valeurs))
+	for cle, valeur := range valeurs {
+		paires = append(paires, "{"+cle+"}", valeur)
+	}
+	return strings.NewReplacer(paires...).Replace(texte)
+}
+
+func AideEnrolement() *AideCourriel   { return &aidesCourriels.Enrolement }
+func AideEncaissement() *AideCourriel { return &aidesCourriels.Encaissement }
+func AideRefus() *AideCourriel        { return &aidesCourriels.Refus }
+func AideImportLeads() *AideCourriel  { return &aidesCourriels.ImportLeads }
 
 type CourrielDTO struct {
 	ID             string     `json:"id"`
@@ -209,7 +288,7 @@ func (s *service) courrielsParObjet(ctx context.Context, in *CourrielsObjetInput
 }
 
 type CourrielsJournalInput struct {
-	Type     string `query:"type" enum:"DOSSIER_COMPLET,DOSSIER_ENCAISSE,DOSSIER_REJETE,PROSPECT_ENROLEMENT"`
+	Type     string `query:"type" enum:"DOSSIER_COMPLET,DOSSIER_ENCAISSE,DOSSIER_REJETE,PROSPECT_ENROLEMENT,IMPORT_LEADS"`
 	Statut   string `query:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC"`
 	Page     int    `query:"page" minimum:"1" default:"1"`
 	PageSize int    `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
@@ -276,11 +355,18 @@ func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*C
 }
 
 type ReglagesCourrielsOutput struct {
-	Body ReglagesCourriels
+	Body ReglagesCourrielsDTO
 }
 
 type ReglagesCourrielsInput struct {
 	Body ReglagesCourriels
+}
+
+func courrielsReglagesDTO(r *ReglagesCourriels) ReglagesCourrielsDTO {
+	return ReglagesCourrielsDTO{
+		Enrolement: r.Enrolement, Encaissement: r.Encaissement, Refus: r.Refus, ImportLeads: r.ImportLeads,
+		Aide: aidesCourriels,
+	}
 }
 
 func (s *service) lireReglagesCourriels(ctx context.Context, _ *struct{}) (*ReglagesCourrielsOutput, error) {
@@ -288,13 +374,14 @@ func (s *service) lireReglagesCourriels(ctx context.Context, _ *struct{}) (*Regl
 	if err != nil {
 		return nil, err
 	}
-	return &ReglagesCourrielsOutput{Body: courrielsReglagesPropres(&r)}, nil
+	propres := courrielsReglagesPropres(&r)
+	return &ReglagesCourrielsOutput{Body: courrielsReglagesDTO(&propres)}, nil
 }
 
 func (s *service) ecrireReglagesCourriels(ctx context.Context, in *ReglagesCourrielsInput) (*ReglagesCourrielsOutput, error) {
 	r := courrielsReglagesPropres(&in.Body)
-	for _, liste := range [][]string{r.Banque, r.BanqueCopies, r.Enrolement, r.EnrolementCopies} {
-		for _, adresse := range liste {
+	for _, reglage := range []ReglageCourriel{r.Enrolement, r.Encaissement, r.Refus, r.ImportLeads} {
+		for _, adresse := range append(append([]string{}, reglage.Destinataires...), reglage.Copies...) {
 			if _, err := mail.ParseAddress(adresse); err != nil {
 				return nil, socle.Problem(http.StatusUnprocessableEntity, "COURRIEL_ADRESSE_INVALIDE",
 					"Adresse invalide : "+adresse)
@@ -309,7 +396,7 @@ func (s *service) ecrireReglagesCourriels(ctx context.Context, in *ReglagesCourr
 	if _, err := s.Q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleReglagesCourriels, Value: string(valeur), UpdatedById: &u.ID}); err != nil {
 		return nil, err
 	}
-	return &ReglagesCourrielsOutput{Body: r}, nil
+	return &ReglagesCourrielsOutput{Body: courrielsReglagesDTO(&r)}, nil
 }
 
 func adressesPropres(liste []string) []string {
@@ -322,10 +409,19 @@ func adressesPropres(liste []string) []string {
 	return propres
 }
 
+func reglageCourrielPropre(r *ReglageCourriel) ReglageCourriel {
+	return ReglageCourriel{
+		Destinataires: adressesPropres(r.Destinataires), Copies: adressesPropres(r.Copies),
+		Intro: strings.TrimSpace(r.Intro),
+	}
+}
+
 func courrielsReglagesPropres(r *ReglagesCourriels) ReglagesCourriels {
 	return ReglagesCourriels{
-		Banque: adressesPropres(r.Banque), BanqueCopies: adressesPropres(r.BanqueCopies),
-		Enrolement: adressesPropres(r.Enrolement), EnrolementCopies: adressesPropres(r.EnrolementCopies),
+		Enrolement:   reglageCourrielPropre(&r.Enrolement),
+		Encaissement: reglageCourrielPropre(&r.Encaissement),
+		Refus:        reglageCourrielPropre(&r.Refus),
+		ImportLeads:  reglageCourrielPropre(&r.ImportLeads),
 	}
 }
 

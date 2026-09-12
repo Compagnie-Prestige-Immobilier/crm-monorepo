@@ -342,15 +342,25 @@ type QualificationOuvertureCouranteOutput struct {
 	Body *QualificationOuvertureFicheDTO
 }
 
-func (s *service) qualificationOuvertureCourante(ctx context.Context, _ *struct{}) (*QualificationOuvertureCouranteOutput, error) {
+type QualificationOuvertureCouranteInput struct {
+	Cible string `query:"cible" enum:"representant,prospect"`
+}
+
+// Sans verrou, plusieurs fiches restent ouvertes : chaque console demande la
+// sienne, et reprend la plus récente.
+func (s *service) qualificationOuvertureCourante(ctx context.Context, in *QualificationOuvertureCouranteInput) (*QualificationOuvertureCouranteOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	rows, err := s.Q.ListerOuvertures(ctx, db.ListerOuverturesParams{OpenedByID: &u.ID, OuvertesSeulement: true})
+	var cible *string
+	if in.Cible != "" {
+		cible = &in.Cible
+	}
+	rows, err := s.Q.ListerOuvertures(ctx, db.ListerOuverturesParams{OpenedByID: &u.ID, OuvertesSeulement: true, Cible: cible})
 	if err != nil {
 		return nil, err
 	}
 	out := &QualificationOuvertureCouranteOutput{}
 	if len(rows) > 0 {
-		dto := qualificationOuvertureDTO(&rows[0])
+		dto := qualificationOuvertureDTO(&rows[len(rows)-1])
 		out.Body = &dto
 	}
 	return out, nil

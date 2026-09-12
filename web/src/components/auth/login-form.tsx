@@ -105,20 +105,15 @@ function CredentialsFields({
   );
 }
 
-function DemoProfileField({
-  role,
-  onChange,
-}: {
-  role: Role;
-  onChange: (role: Role) => void;
-}) {
+function DemoProfileField({ role, onChange }: { role: Role; onChange: (role: Role) => void }) {
   return (
     <div className="flex flex-col gap-2">
       <Label htmlFor="demo-role">Profil démo</Label>
       <Select
         value={role}
         onValueChange={(value) => {
-          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role)) onChange(value as Role);
+          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role))
+            onChange(value as Role);
         }}
         items={DEMO_ROLES.map((demoRole) => ({ value: demoRole, label: ROLE_LABELS[demoRole] }))}
       >

@@ -8,6 +8,7 @@ ailleurs dans `docs/`.
 | `plan.md` | Arbitrages du propriétaire (7 et 8 septembre 2026), cible, phases, checklist de parité, runbook du jour J |
 | `architecture.md` et `diagrammes/*.puml` | Cinq diagrammes PlantUML C4 : contexte, conteneurs, composants, déploiement, calendrier de 16 jours ouvrés |
 | `risques.md` | Registre des risques, gravité, phase de traitement, état |
+| `unifier-le-contrat-openapi.md` | Tâche à faire : supprimer le contrat v1 figé et typer le panneau depuis l'OpenAPI du Go. Procédure pas à pas, pièges, critères de fin |
 | `audits/api.md` | Inventaire des 233 routes, crons, variables, règles métier, contrat de sync |
 | `audits/web.md` | Inventaire des 62 pages, formulaires, exports, tableaux de bord, 80 specs |
 | `audits/mobile.md` | Inventaire des 26 écrans, tables Drift, moteur de sync, téléphonie native. Historique : le mobile est abandonné (`plan.md` §2.2) |

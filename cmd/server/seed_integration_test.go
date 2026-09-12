@@ -6,10 +6,13 @@ import (
 	"context"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
+	"net/http"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
@@ -171,5 +174,63 @@ func TestSeedAdminMotDePasseTropCourtRefuse(t *testing.T) {
 	}
 	if n != 0 {
 		t.Fatalf("le refus doit annuler toute la transaction, %d compte(s) créé(s)", n)
+	}
+}
+
+func TestSeedFactoryTableauxDeBord(t *testing.T) {
+	t.Setenv("NODE_ENV", "development")
+	b := nouveauBanc(t, "ADMIN")
+	seedTestCompteAdmin(t, b.ctx, b.pool, uuid.NewString())
+	statut, body := b.connexion(b.email, "motdepasse")
+	b.attend(statut, http.StatusOK, "connexion", body)
+
+	for passage := range 2 {
+		if err := semer(b.ctx, b.pool, nil); err != nil {
+			t.Fatal(err)
+		}
+		analyticsViderCache()
+		jour := time.Now().UTC().Format(time.DateOnly)
+		for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
+			seedVerifierTableau(b, projet, jour)
+		}
+		for table, attendu := range map[string]int{
+			"prospects": 480, "representants": 240, "call_attempts": 480,
+			"rep_call_attempts": 240, "visites": 180, "ouvertures_fiche": 480,
+		} {
+			var nombre int
+			if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM `+pgx.Identifier{table}.Sanitize()+` WHERE id LIKE '0199f100-%'`).Scan(&nombre); err != nil {
+				t.Fatal(err)
+			}
+			if nombre != attendu {
+				t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
+			}
+		}
+	}
+}
+
+func seedVerifierTableau(b *banc, projet, jour string) {
+	b.t.Helper()
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite?projet="+projet+"&actFrom="+jour+"T00:00:00Z&actTo="+jour+"T23:59:59Z", nil, false)
+	b.attend(statut, http.StatusOK, "activité "+projet, body)
+	totaux := analyticsObjet(b, "totaux", body["totals"])
+	for _, champ := range []string{"calls", "methodObtained", "callback", "unreachable", "avgCallSeconds"} {
+		if analyticsNombre(b, totaux[champ], champ) <= 0 {
+			b.t.Fatalf("%s aujourd’hui : %s vide", projet, champ)
+		}
+	}
+	if projet == "CHUES" && analyticsNombre(b, totaux["repFichesAcceptees"], "représentants qualifiés") <= 0 {
+		b.t.Fatal("aucun représentant qualifié aujourd’hui")
+	}
+	statut, body = b.appel(http.MethodGet, "/api/v1/analytics/funnel?projet="+projet+"&dateFrom="+jour+"&dateTo="+jour, nil, false)
+	b.attend(statut, http.StatusOK, "entonnoir "+projet, body)
+	for _, etape := range analyticsListe(b, "étapes", body["etapes"], 4) {
+		if analyticsNombre(b, analyticsObjet(b, "étape", etape)["count"], "effectif") <= 0 {
+			b.t.Fatalf("%s : étape vide aujourd’hui : %v", projet, etape)
+		}
+	}
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/campagnes?projet="+projet+"&actFrom="+jour+"T00:00:00Z&actTo="+jour+"T23:59:59Z", nil, false)
+	b.attend(statut, http.StatusOK, "campagnes "+projet, body)
+	if analyticsNombre(b, analyticsObjet(b, "campagnes", body["totals"])["appelees"], "fiches appelées") <= 0 {
+		b.t.Fatalf("%s : aucune fiche appelée dans les campagnes d’aujourd’hui", projet)
 	}
 }

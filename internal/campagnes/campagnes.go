@@ -52,6 +52,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/lots-export/apercu":                campagnesEcriture,
 	"GET /api/v1/lots-export":                        socle.Encadrement,
 	"GET /api/v1/lots-export/mes-attributions":       socle.Parcours,
+	"GET /api/v1/lots-export/imports":                campagnesEcriture,
 	"GET /api/v1/lots-export/{id}":                   socle.Encadrement,
 	"PATCH /api/v1/lots-export/{id}":                 campagnesEcriture,
 	"DELETE /api/v1/lots-export/{id}":                socle.AdminSeul,
@@ -83,6 +84,7 @@ type CampagneCritereProspects struct {
 	Projet         string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Type           string `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	Segment        string `json:"segment,omitempty" enum:"BDD1,BDD2,BDD3,BDD4"`
+	ImportJobID    string `json:"importJobId,omitempty" format:"uuid"`
 	IncludeDeleted bool   `json:"includeDeleted,omitempty"`
 }
 
@@ -107,17 +109,18 @@ type CampagneCreationBody struct {
 }
 
 type CampagneResume struct {
-	ID             string `json:"id"`
-	Name           string `json:"name"`
-	Cible          string `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
-	Projet         string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-	ScopeLabel     string `json:"scopeLabel"`
-	ItemCount      int    `json:"itemCount"`
-	CreatedByID    string `json:"createdById"`
-	CreatedByName  string `json:"createdByName"`
-	CreatedAt      string `json:"createdAt"`
-	CallsSince     int    `json:"callsSince"`
-	FichesAppelees int    `json:"fichesAppelees"`
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Cible          string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
+	Projet         string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	ScopeLabel     string  `json:"scopeLabel"`
+	ItemCount      int     `json:"itemCount"`
+	CreatedByID    string  `json:"createdById"`
+	CreatedByName  string  `json:"createdByName"`
+	CreatedAt      string  `json:"createdAt"`
+	PausedAt       *string `json:"pausedAt"`
+	CallsSince     int     `json:"callsSince"`
+	FichesAppelees int     `json:"fichesAppelees"`
 }
 
 type CampagneTentative struct {
@@ -213,6 +216,7 @@ type lotFiltres struct {
 	Projet         string          `json:"projet,omitempty"`
 	Type           string          `json:"type,omitempty"`
 	Segment        string          `json:"segment,omitempty"`
+	ImportJobID    string          `json:"importJobId,omitempty"`
 	IncludeDeleted *bool           `json:"includeDeleted,omitempty"`
 	Distribution   lotDistribution `json:"distribution"`
 }
@@ -296,6 +300,9 @@ func lotScopeLabel(cible string, f *lotFiltres) string {
 		return "Contacts recommandés"
 	case lotCibleRepresentants:
 		return lotScopeLabelRepresentants(f)
+	}
+	if f.ImportJobID != "" {
+		return lotSiVide(f.Projet, "Tous projets") + ", fiches importées"
 	}
 	if f.Segment != "" {
 		return lotSiVide(f.Projet, "Tous projets") + ", segment " + f.Segment
@@ -403,6 +410,7 @@ func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
 			Projet:         body.Prospects.Projet,
 			Type:           body.Prospects.Type,
 			Segment:        body.Prospects.Segment,
+			ImportJobID:    body.Prospects.ImportJobID,
 			IncludeDeleted: &inclure,
 		}
 	}
@@ -453,11 +461,12 @@ func lotProspectsCible(f *lotFiltres) db.CompterProspectsCibleParams {
 		typeProspect = &valeur
 	}
 	return db.CompterProspectsCibleParams{
-		Projet:     projet,
-		Type:       typeProspect,
-		ParSegment: f.Segment != "",
-		Chues:      f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
-		Cbao:       f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
+		Projet:      projet,
+		Type:        typeProspect,
+		ImportJobID: lotPointeurTexte(f.ImportJobID),
+		ParSegment:  f.Segment != "",
+		Chues:       f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
+		Cbao:        f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
 	}
 }
 
@@ -628,7 +637,7 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 	}
 	p := lotProspectsCible(f)
 	return q.TirerProspectsCible(ctx, db.TirerProspectsCibleParams{
-		Projet: p.Projet, Type: p.Type, ParSegment: p.ParSegment,
+		Projet: p.Projet, Type: p.Type, ImportJobID: p.ImportJobID, ParSegment: p.ParSegment,
 		Chues: p.Chues, Cbao: p.Cbao, Places: lotInt32(places),
 	})
 }
@@ -715,12 +724,20 @@ func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneR
 		ScopeLabel: lotScopeLabel(string(row.Cible), lotLireFiltres(row.Filters)),
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
-		CallsSince: calls, FichesAppelees: fiches,
+		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches,
 	}, nil
 }
 
 func lotISO(t time.Time) string {
 	return t.UTC().Format("2006-01-02T15:04:05.000Z")
+}
+
+func lotISOPtr(t *time.Time) *string {
+	if t == nil {
+		return nil
+	}
+	iso := lotISO(*t)
+	return &iso
 }
 
 func (s *service) lot(ctx context.Context, id string) (*db.LotParIdRow, error) {
@@ -1121,52 +1138,6 @@ func (s *service) lotPositionsTraitees(ctx context.Context, row *db.LotParIdRow)
 	return traitees, err
 }
 
-type CampagneMajInput struct {
-	ID   string `path:"id" format:"uuid"`
-	Body struct {
-		Name      *string            `json:"name,omitempty" minLength:"3" maxLength:"120"`
-		Objectifs []CampagneObjectif `json:"objectifs,omitempty"`
-	}
-}
-
-// Ni le nom ni les objectifs ne redistribuent : les fiches sont déjà dans les
-// mains, et un objectif est le dénominateur du taux de contact.
-func (s *service) campagneMaj(ctx context.Context, in *CampagneMajInput) (*CampagneOutput, error) {
-	row, err := s.lot(ctx, in.ID)
-	if err != nil {
-		return nil, err
-	}
-	if in.Body.Name != nil {
-		if err := s.Q.RenommerLot(ctx, db.RenommerLotParams{ID: in.ID, Name: strings.TrimSpace(*in.Body.Name)}); err != nil {
-			return nil, err
-		}
-	}
-	if in.Body.Objectifs != nil {
-		filtres := lotLireFiltres(row.Filters)
-		filtres.Distribution.Objectifs = lotObjectifsDe(in.Body.Objectifs)
-		if err := s.lotEcrireFiltres(ctx, s.Q, in.ID, filtres); err != nil {
-			return nil, err
-		}
-	}
-	row, err = s.lot(ctx, in.ID)
-	if err != nil {
-		return nil, err
-	}
-	resume, err := s.lotResume(ctx, row)
-	if err != nil {
-		return nil, err
-	}
-	return &CampagneOutput{Body: resume}, nil
-}
-
-func (*service) lotEcrireFiltres(ctx context.Context, q *db.Queries, id string, filtres *lotFiltres) error {
-	brut, err := json.Marshal(filtres)
-	if err != nil {
-		return err
-	}
-	return q.EcrireFiltresLot(ctx, db.EcrireFiltresLotParams{ID: id, Filters: brut})
-}
-
 type CampagneReaffecterInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
@@ -1465,6 +1436,10 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "mesAttributions", Method: http.MethodGet,
 		Path: "/api/v1/lots-export/mes-attributions",
 	}, s.mesAttributions)
+	huma.Register(api, huma.Operation{
+		OperationID: "listLotExportImports", Method: http.MethodGet,
+		Path: "/api/v1/lots-export/imports",
+	}, s.campagneImports)
 	huma.Register(api, huma.Operation{
 		OperationID: "getLotExport", Method: http.MethodGet, Path: lotCheminID,
 	}, s.campagneDetail)
