@@ -110,7 +110,6 @@ export function ConversionFields({
   disabled,
   reglages,
   libres,
-  seulement,
   onChange,
 }: {
   draft: ConversionDraft;
@@ -121,8 +120,6 @@ export function ConversionFields({
   disabled: boolean;
   reglages: readonly ReglageChamp[];
   libres: readonly ChampLibre[];
-  /** Posé : seuls ces champs se rendent, pour découper la saisie en étapes. */
-  seulement?: readonly ChampReglable[] | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
@@ -471,12 +468,9 @@ export function ConversionFields({
 
   // Grand Public pose déjà la question dans « Situation », qui a son option
   // fonctionnaire : la reposer en oui / non ferait deux réponses pour une.
-  const base = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
-  const { ordre, libresVus } = restreindreEtapes(
-    base.filter((champ) => complet || champ !== 'fonctionnaire'),
-    libres,
-    seulement,
-  );
+  const ordre = (
+    reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds)
+  ).filter((champ) => complet || champ !== 'fonctionnaire');
 
   return (
     <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
@@ -490,7 +484,7 @@ export function ConversionFields({
         ) : null,
       )}
 
-      {libresVus.map((champ) => (
+      {libres.map((champ) => (
         <ChampAjoute
           key={champ.id}
           champ={champ}
@@ -503,19 +497,6 @@ export function ConversionFields({
       ))}
     </fieldset>
   );
-}
-
-/** Posé : seuls ces champs se rendent, les champs ajoutés suivant la tranche des revenus. */
-function restreindreEtapes(
-  ordre: string[],
-  libres: readonly ChampLibre[],
-  seulement: readonly ChampReglable[] | undefined,
-): { ordre: string[]; libresVus: readonly ChampLibre[] } {
-  if (seulement === undefined) return { ordre, libresVus: libres };
-  return {
-    ordre: ordre.filter((champ) => seulement.includes(champ as ChampReglable)),
-    libresVus: seulement.includes('paymentMode') ? libres : [],
-  };
 }
 
 /** EB-24 : ce que le téléconseiller dicte au prospect, selon la méthode choisie. */

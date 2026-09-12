@@ -17,7 +17,6 @@ import {
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
-import { ETAPES_SAISIE, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
 import {
@@ -39,7 +38,6 @@ import {
   validateConversion,
   type AttemptDraft,
   type CallbackSlot,
-  type ChampReglable,
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
@@ -112,32 +110,6 @@ function erreurTelephone(saisi: string, e164: string | null): string | undefined
   return e164 === null ? 'Numéro invalide.' : undefined;
 }
 
-/** Le dossier découpé en trois tranches, dans l'ordre des étapes. */
-const TRANCHES: readonly (readonly ChampReglable[])[] = [
-  ['nom', 'prenom', 'phoneE164', 'whatsappStatus', 'whatsappE164', 'email'],
-  ['profession', 'dureeEtablissementMois', 'type', 'syndicatId', 'banqueId', 'engagementEnCours'],
-  ['incomeBandId', 'paymentMode', 'dureeSystemeMois', 'method', 'rendezVousAt'],
-];
-
-const ERREURS_IDENTITE: readonly (keyof ConversionErrors)[] = ['nom', 'prenom', 'email'];
-
-const ERREURS_SITUATION: readonly (keyof ConversionErrors)[] = [
-  'profession',
-  'dureeEtablissementMois',
-  'fonctionnaire',
-  'type',
-  'syndicatId',
-  'banqueId',
-  'engagementEnCours',
-];
-
-/** Un envoi refusé rouvre l'étape qui porte la première erreur : elle est invisible d'ici. */
-function etapePourErreurs(problemes: ConversionErrors): number {
-  if (ERREURS_IDENTITE.some((cle) => problemes[cle] !== undefined)) return 0;
-  if (ERREURS_SITUATION.some((cle) => problemes[cle] !== undefined)) return 1;
-  return 2;
-}
-
 /** « Il refuse » a son bouton ; les autres statuts du select, « Hors cible » compris, non. */
 const sansBouton = (motif: MotifAppel | null, refus: MotifAppel | undefined): boolean =>
   motif !== null && motif.code !== refus?.code;
@@ -199,7 +171,6 @@ export function NouveauProspect({
   const cree = useRef<ProspectRow | null>(null);
 
   const [conversion, setConversion] = useState<ConversionDraft>(() => dossierVide('GRAND_PUBLIC'));
-  const [etape, setEtape] = useState(0);
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<ConversionErrors>({});
@@ -270,7 +241,7 @@ export function NouveauProspect({
     });
   }
 
-  /** Le numéro et l'identité, que toute saisie exige. Un refus rouvre son étape. */
+  /** Le numéro et l'identité, que toute saisie exige. */
   function identiteBloquee(): boolean {
     const erreurTel = erreurTelephone(phone, e164);
     const identite = erreursIdentite(
@@ -278,9 +249,7 @@ export function NouveauProspect({
     );
     setPhoneError(erreurTel);
     setErrors(identite);
-    const bloque = erreurTel !== undefined || Object.keys(identite).length > 0;
-    if (bloque) setEtape(erreurTel === undefined ? etapePourErreurs(identite) : 0);
-    return bloque;
+    return erreurTel !== undefined || Object.keys(identite).length > 0;
   }
 
   function creerSeulement(): void {
@@ -298,10 +267,7 @@ export function NouveauProspect({
     const erreurTel = erreurTelephone(phone, e164);
     setErrors(problemes);
     setPhoneError(erreurTel);
-    if (erreurTel !== undefined || Object.keys(problemes).length > 0) {
-      setEtape(erreurTel === undefined ? etapePourErreurs(problemes) : 0);
-      return;
-    }
+    if (erreurTel !== undefined || Object.keys(problemes).length > 0) return;
     if (conversion.method === null) return;
     verifierPuisEnvoyer(choisi, {
       outcome: issueDuMotif(choisi),
@@ -395,124 +361,95 @@ export function NouveauProspect({
         </>
       )}
 
-      <EtapesProgression etapes={ETAPES_SAISIE} courante={etape} onChoisir={setEtape} />
-
-      <section
-        aria-label={`Nouveau prospect, étape ${etape + 1} : ${ETAPES_SAISIE[etape] ?? ''}`}
-        className="flex flex-col gap-4"
-      >
-        {etape === 0 ? (
-          <SelectStatut
-            catalogue={statutsJoignables(catalogue)}
-            motif={motif}
-            disabled={pending}
-            obligatoire={false}
-            placeholder="Sans appel"
-            onChange={poser}
-            onFerme={() => {
-              if (motif?.requiresComment) commentRef.current?.focus();
-            }}
-          />
-        ) : null}
+      <section aria-label="Nouveau prospect" className="flex flex-col gap-4">
+        <SelectStatut
+          catalogue={statutsJoignables(catalogue)}
+          motif={motif}
+          disabled={pending}
+          obligatoire={false}
+          placeholder="Sans appel"
+          onChange={poser}
+          onFerme={() => {
+            if (motif?.requiresComment) commentRef.current?.focus();
+          }}
+        />
 
         <PanneauDossier
           ouvert
           prospect={fiche}
           conversion={conversion}
           errors={errors}
-          telephone={
-            etape === 0
-              ? {
-                  value: phone,
-                  error: phoneError,
-                  onChange: (valeur) => {
-                    setPhone(valeur);
-                    setPhoneError(undefined);
-                  },
-                }
-              : undefined
-          }
+          telephone={{
+            value: phone,
+            error: phoneError,
+            onChange: (valeur) => {
+              setPhone(valeur);
+              setPhoneError(undefined);
+            },
+          }}
           disabled={pending}
           formulaire={formulaire}
-          seulement={TRANCHES[etape]}
-          envoiLien={etape === 0}
           onChange={(patch) => {
             setConversion((dossier) => ({ ...dossier, ...patch }));
           }}
         />
 
-        {etape === 2 ? (
-          <>
-            {slots === null ? null : (
-              <PanneauEcheance
-                slots={slots}
-                now={now}
-                freeCallback={freeCallback}
-                surDossier
-                disabled={pending}
-                inputRef={callbackRef}
-                onChoisir={(at) => {
-                  if (motif !== null) consigner(motif, at);
-                }}
-                onFreeCallback={setFreeCallback}
-                onValidate={valider}
-              />
-            )}
+        {slots === null ? null : (
+          <PanneauEcheance
+            slots={slots}
+            now={now}
+            freeCallback={freeCallback}
+            surDossier
+            disabled={pending}
+            inputRef={callbackRef}
+            onChoisir={(at) => {
+              if (motif !== null) consigner(motif, at);
+            }}
+            onFreeCallback={setFreeCallback}
+            onValidate={valider}
+          />
+        )}
 
-            <Commentaire
-              value={comment}
-              obligatoirePour={commentaireExigePar(motif)}
-              inputRef={commentRef}
-              onChange={setComment}
-              onValidate={valider}
-            />
+        <Commentaire
+          value={comment}
+          obligatoirePour={commentaireExigePar(motif)}
+          inputRef={commentRef}
+          onChange={setComment}
+          onValidate={valider}
+        />
 
-            <PiedDossier
-              ouvert
-              disabled={pending}
-              motifRefus={motifRefus}
-              raccourcis={false}
-              extra={
-                <>
-                  {sansBouton(motif, motifRefus) ? (
-                    <Button variant="outline" disabled={pending} onClick={valider}>
-                      Enregistrer l’appel
-                    </Button>
-                  ) : null}
-                  <Button variant="outline" disabled={pending} onClick={creerSeulement}>
-                    Enregistrer sans appel
-                  </Button>
-                </>
-              }
-              onAdhesion={() => {
-                if (motifAdhesion === undefined) {
-                  toast.error(
-                    'Le statut « Méthode obtenue » est désactivé dans les listes de référence.',
-                  );
-                  return;
-                }
-                adherer(motifAdhesion);
-              }}
-              onRefus={(refus) => {
-                setMotif(refus);
-                consigner(refus);
-              }}
-              onRappel={rappeler}
-              onAnnuler={onAnnuler}
-            />
-          </>
-        ) : null}
-
-        <PiedEtapes
-          courante={etape}
-          total={ETAPES_SAISIE.length}
-          desactive={pending}
-          onRetour={() => {
-            setEtape(etape - 1);
+        <PiedDossier
+          ouvert
+          disabled={pending}
+          motifRefus={motifRefus}
+          raccourcis={false}
+          extra={
+            <>
+              {sansBouton(motif, motifRefus) ? (
+                <Button variant="outline" disabled={pending} onClick={valider}>
+                  Enregistrer l’appel
+                </Button>
+              ) : null}
+              <Button variant="outline" disabled={pending} onClick={creerSeulement}>
+                Enregistrer sans appel
+              </Button>
+            </>
+          }
+          onAdhesion={() => {
+            if (motifAdhesion === undefined) {
+              toast.error(
+                'Le statut « Méthode obtenue » est désactivé dans les listes de référence.',
+              );
+              return;
+            }
+            adherer(motifAdhesion);
           }}
-          onSuite={() => {
-            setEtape(etape + 1);
+          onRefus={(refus) => {
+            setMotif(refus);
+            consigner(refus);
           }}
+          onRappel={rappeler}
+          onAnnuler={onAnnuler}
         />
       </section>
     </div>

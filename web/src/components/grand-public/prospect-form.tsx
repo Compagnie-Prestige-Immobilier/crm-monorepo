@@ -9,7 +9,6 @@ import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { Field } from '@/components/forms/field';
-import { ETAPES_SAISIE, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import {
   InternationalPhoneField,
   callingCountriesFrom,
@@ -602,7 +601,6 @@ export function GrandPublicProspectForm({
   const [champsLibres, setChampsLibres] = useState(depart.champsLibres);
   const [errorsLibres, setErrorsLibres] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Errors>({});
-  const [etape, setEtape] = useState(0);
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
 
@@ -679,10 +677,7 @@ export function GrandPublicProspectForm({
     const manquants = libresManquants(formulaire.libres, champsLibres);
     setErrorsLibres(manquants);
     setErrors(found);
-    if (e164 === null || Object.keys(found).length > 0 || Object.keys(manquants).length > 0) {
-      if (e164 === null || Object.keys(found).length > 0) setEtape(0);
-      return;
-    }
+    if (e164 === null || Object.keys(found).length > 0 || Object.keys(manquants).length > 0) return;
 
     setConflict(null);
     const vide = (texte: string): string | null => (texte.trim() === '' ? null : texte.trim());
@@ -746,193 +741,167 @@ export function GrandPublicProspectForm({
     >
       <IntroHeader embedded={embedded} />
 
-      <EtapesProgression etapes={ETAPES_SAISIE} courante={etape} onChoisir={setEtape} />
-
-      {etape === 0 ? (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Prénom" required error={errors.prenom}>
-              {(props) => (
-                <Input
-                  {...props}
-                  ref={prenomRef}
-                  value={prenom}
-                  maxLength={120}
-                  autoComplete="off"
-                  // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
-                  autoFocus
-                  onChange={(event) => {
-                    setPrenom(event.target.value);
-                  }}
-                />
-              )}
-            </Field>
-
-            <Field label="Nom" required error={errors.nom}>
-              {(props) => (
-                <Input
-                  {...props}
-                  value={nom}
-                  maxLength={120}
-                  autoComplete="off"
-                  onChange={(event) => {
-                    setNom(event.target.value);
-                  }}
-                />
-              )}
-            </Field>
-          </div>
-
-          <InternationalPhoneField
-            value={phone}
-            callingCode={callingCode}
-            error={errors.phone}
-            countries={countriesPourTelephone(type, paysCountries)}
-            onCallingCodeChange={setCallingCode}
-            onChange={(value) => {
-              setPhone(value);
-              setConflict(null);
-            }}
-          />
-
-          <PhoneConflictCard conflict={conflict} searchHref={searchHref} />
-        </>
-      ) : null}
-
-      {etape === 1 ? (
-        <>
-          <fieldset className="flex flex-col gap-2">
-            <legend className="mb-2 text-[0.875rem] font-[600] text-foreground">Situation</legend>
-            <div className="flex flex-wrap gap-2">
-              {PROSPECT_TYPES.map((option) => {
-                const active = type === option;
-                return (
-                  <Button
-                    key={option}
-                    type="button"
-                    size="lg"
-                    variant={active ? 'default' : 'outline'}
-                    aria-pressed={active}
-                    onClick={() => {
-                      const next = active ? null : option;
-                      setType(next);
-                      setErrors({});
-                      setSituation((previous) => pourSituation(next, previous));
-                      // L'indicatif venait du pays de résidence : hors diaspora, il
-                      // repart du Sénégal plutôt que de suivre une fiche abandonnée.
-                      if (type === 'DIASPORA' && next !== 'DIASPORA') {
-                        setCallingCode('221');
-                        setWhatsappCode('221');
-                      }
-                    }}
-                  >
-                    {PROSPECT_TYPE_LABELS[option]}
-                  </Button>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <ProfessionField
-            type={type}
-            professionId={professionId}
-            reference={reference.data}
-            onChange={(value, isTeaching) => {
-              setProfessionId(value);
-              if (!isTeaching) setSituation((previous) => ({ ...previous, syndicatId: null }));
-            }}
-          />
-
-          <ChampsSituation
-            type={type}
-            valeurs={situation}
-            reference={reference.data}
-            enseignante={enseignante}
-            paysCountries={paysCountries}
-            whatsappCode={whatsappCode}
-            onWhatsappCode={setWhatsappCode}
-            onIndicatifResidence={(indicatif) => {
-              setCallingCode(indicatif);
-              setWhatsappCode(indicatif);
-            }}
-            onPatch={(patch) => {
-              setSituation((previous) => ({ ...previous, ...patch }));
-            }}
-          />
-        </>
-      ) : null}
-
-      {etape === 2 ? (
-        <>
-          <MontantsFields
-            incomeBandId={incomeBandId}
-            onIncomeBandChange={setIncomeBandId}
-            paymentMode={paymentMode}
-            onPaymentModeChange={(mode) => {
-              setPaymentMode(mode);
-              if (mode !== 'ECHELONNE') setDureeMois(null);
-            }}
-            dureeMois={dureeMois}
-            onDureeChange={setDureeMois}
-            canalId={canalId}
-            onCanalChange={setCanalId}
-            reference={reference.data}
-            canaux={canaux.data}
-          />
-
-          {formulaire.libres.map((champ) => (
-            <ChampAjoute
-              key={champ.id}
-              champ={champ}
-              value={champsLibres[champ.id] ?? ''}
-              error={errorsLibres[champ.id]}
-              onChange={(valeur) => {
-                setChampsLibres((precedent) => ({ ...precedent, [champ.id]: valeur }));
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Prénom" required error={errors.prenom}>
+          {(props) => (
+            <Input
+              {...props}
+              ref={prenomRef}
+              value={prenom}
+              maxLength={120}
+              autoComplete="off"
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
+              autoFocus
+              onChange={(event) => {
+                setPrenom(event.target.value);
               }}
             />
-          ))}
+          )}
+        </Field>
 
-          <Field label="Type de bien">
-            {(props) => (
-              <Select
-                value={orEmptyString(typeBien)}
-                onValueChange={(valeur) => {
-                  setTypeBien(valeur === '' ? null : (valeur as TypeBien));
+        <Field label="Nom" required error={errors.nom}>
+          {(props) => (
+            <Input
+              {...props}
+              value={nom}
+              maxLength={120}
+              autoComplete="off"
+              onChange={(event) => {
+                setNom(event.target.value);
+              }}
+            />
+          )}
+        </Field>
+      </div>
+
+      <InternationalPhoneField
+        value={phone}
+        callingCode={callingCode}
+        error={errors.phone}
+        countries={countriesPourTelephone(type, paysCountries)}
+        onCallingCodeChange={setCallingCode}
+        onChange={(value) => {
+          setPhone(value);
+          setConflict(null);
+        }}
+      />
+
+      <PhoneConflictCard conflict={conflict} searchHref={searchHref} />
+
+      <fieldset className="flex flex-col gap-2">
+        <legend className="mb-2 text-[0.875rem] font-[600] text-foreground">Situation</legend>
+        <div className="flex flex-wrap gap-2">
+          {PROSPECT_TYPES.map((option) => {
+            const active = type === option;
+            return (
+              <Button
+                key={option}
+                type="button"
+                size="lg"
+                variant={active ? 'default' : 'outline'}
+                aria-pressed={active}
+                onClick={() => {
+                  const next = active ? null : option;
+                  setType(next);
+                  setErrors({});
+                  setSituation((previous) => pourSituation(next, previous));
+                  // L'indicatif venait du pays de résidence : hors diaspora, il
+                  // repart du Sénégal plutôt que de suivre une fiche abandonnée.
+                  if (type === 'DIASPORA' && next !== 'DIASPORA') {
+                    setCallingCode('221');
+                    setWhatsappCode('221');
+                  }
                 }}
               >
-                <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-                  <SelectValue placeholder="Non renseigné" />
-                </SelectTrigger>
-                <SelectContent>
-                  {TYPES_BIEN.map((valeur) => (
-                    <SelectItem key={valeur} value={valeur}>
-                      {TYPE_BIEN_LABELS[valeur]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </Field>
+                {PROSPECT_TYPE_LABELS[option]}
+              </Button>
+            );
+          })}
+        </div>
+      </fieldset>
 
-          <PiedDeFormulaire
-            modification={initial !== undefined}
-            saved={saved}
-            pending={save.isPending}
-            onSuite={submit}
-          />
-        </>
-      ) : null}
+      <ProfessionField
+        type={type}
+        professionId={professionId}
+        reference={reference.data}
+        onChange={(value, isTeaching) => {
+          setProfessionId(value);
+          if (!isTeaching) setSituation((previous) => ({ ...previous, syndicatId: null }));
+        }}
+      />
 
-      <PiedEtapes
-        courante={etape}
-        total={ETAPES_SAISIE.length}
-        desactive={save.isPending}
-        onRetour={() => {
-          setEtape(etape - 1);
+      <ChampsSituation
+        type={type}
+        valeurs={situation}
+        reference={reference.data}
+        enseignante={enseignante}
+        paysCountries={paysCountries}
+        whatsappCode={whatsappCode}
+        onWhatsappCode={setWhatsappCode}
+        onIndicatifResidence={(indicatif) => {
+          setCallingCode(indicatif);
+          setWhatsappCode(indicatif);
         }}
-        onSuite={() => {
-          setEtape(etape + 1);
+        onPatch={(patch) => {
+          setSituation((previous) => ({ ...previous, ...patch }));
         }}
+      />
+
+      <MontantsFields
+        incomeBandId={incomeBandId}
+        onIncomeBandChange={setIncomeBandId}
+        paymentMode={paymentMode}
+        onPaymentModeChange={(mode) => {
+          setPaymentMode(mode);
+          if (mode !== 'ECHELONNE') setDureeMois(null);
+        }}
+        dureeMois={dureeMois}
+        onDureeChange={setDureeMois}
+        canalId={canalId}
+        onCanalChange={setCanalId}
+        reference={reference.data}
+        canaux={canaux.data}
+      />
+
+      {formulaire.libres.map((champ) => (
+        <ChampAjoute
+          key={champ.id}
+          champ={champ}
+          value={champsLibres[champ.id] ?? ''}
+          error={errorsLibres[champ.id]}
+          onChange={(valeur) => {
+            setChampsLibres((precedent) => ({ ...precedent, [champ.id]: valeur }));
+          }}
+        />
+      ))}
+
+      <Field label="Type de bien">
+        {(props) => (
+          <Select
+            value={orEmptyString(typeBien)}
+            onValueChange={(valeur) => {
+              setTypeBien(valeur === '' ? null : (valeur as TypeBien));
+            }}
+          >
+            <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
+              <SelectValue placeholder="Non renseigné" />
+            </SelectTrigger>
+            <SelectContent>
+              {TYPES_BIEN.map((valeur) => (
+                <SelectItem key={valeur} value={valeur}>
+                  {TYPE_BIEN_LABELS[valeur]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </Field>
+
+      <PiedDeFormulaire
+        modification={initial !== undefined}
+        saved={saved}
+        pending={save.isPending}
+        onSuite={submit}
       />
     </form>
   );
