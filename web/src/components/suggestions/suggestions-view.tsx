@@ -1,7 +1,17 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, LinkIcon, PhoneForwardedIcon, UserPlusIcon, XIcon } from 'lucide-react';
+import {
+  AlertTriangleIcon,
+  CheckIcon,
+  CheckSquareIcon,
+  InfoIcon,
+  LinkIcon,
+  PhoneForwardedIcon,
+  Trash2Icon,
+  UserPlusIcon,
+  XIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -38,10 +48,35 @@ const STATUS_VARIANTS = {
   ABANDONNE: 'outline',
 } as const;
 
+export function isSuspiciousSuggestion(suggestion: Suggestion): boolean {
+  const digits = suggestion.suggestedPhoneE164.replace(/\D/g, '');
+  if (/(.)\1{6,}/.test(digits)) return true;
+  if (digits.includes('123456') || digits.includes('012345') || digits.includes('987654'))
+    return true;
+
+  const note = (suggestion.note ?? '').toLowerCase();
+  const name = (suggestion.suggestedName ?? '').toLowerCase();
+  const text = `${note} ${name}`;
+
+  const keywords = ['faux', 'bidon', "n'existe pas", 'invalide', 'test', '0000', 'injoignable', 'erreur', 'mauvais'];
+  if (keywords.some((k) => text.includes(k))) return true;
+
+  if (
+    (suggestion.suggestedName === null || suggestion.suggestedName.trim() === '') &&
+    (suggestion.note === null || suggestion.note.trim() === '')
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
 export function SuggestionsView() {
   const queryClient = useQueryClient();
   const [status, setStatus] = useState<SuggestionStatus | null>(null);
   const [creatingFrom, setCreatingFrom] = useState<Suggestion | null>(null);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [activeParrainId, setActiveParrainId] = useState<string | null>(null);
 
   const { data, isPending, isError, error, refetch } = useQuery({
     queryKey: suggestionsQueryKey(status),
@@ -60,12 +95,34 @@ export function SuggestionsView() {
     },
   });
 
+  const decideBatch = useMutation({
+    mutationFn: async (variables: { ids: string[]; status: SuggestionStatus }) => {
+      await Promise.all(
+        variables.ids.map((id) => setSuggestionStatus(id, variables.status)),
+      );
+      return variables;
+    },
+    onSuccess: (variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['suggestions'] });
+      setSelectedIds([]);
+      toast.success(
+        `${variables.ids.length} numéros passés en « ${SUGGESTION_STATUS_LABELS[variables.status]} ».`,
+      );
+    },
+    onError: () => {
+      toast.error('La mise à jour en lot a échoué.');
+    },
+  });
+
   const items = orderSuggestions(data?.items ?? []);
   const counts = suggestionCountsByPhone(items);
   const total = data?.total ?? 0;
 
-  // Identité stable : le dialogue réinitialise ses champs à chaque changement
-  // de cette valeur, et effacerait la saisie en cours si elle était recréée.
+  const suspiciousItems = useMemo(
+    () => items.filter((item) => item.status === 'A_APPELER' && isSuspiciousSuggestion(item)),
+    [items],
+  );
+
   const prefill = useMemo(
     () =>
       creatingFrom === null
@@ -78,27 +135,101 @@ export function SuggestionsView() {
     [creatingFrom],
   );
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const selectAll = () => {
+    if (selectedIds.length === items.length) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(items.map((item) => item.id));
+    }
+  };
+
+  const handlePurgeSuspicious = () => {
+    const ids = suspiciousItems.map((item) => item.id);
+    if (ids.length === 0) {
+      toast.info('Aucun numéro suspect à purger.');
+      return;
+    }
+    decideBatch.mutate({ ids, status: 'ABANDONNE' });
+  };
+
   return (
     <div className="flex flex-col gap-6">
-      <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-        Numéros donnés par un représentant qui décline, pour qu’un collègue soit appelé à sa place.
-      </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
+          Numéros recommandés par un représentant qui décline. Les fiches suspectes ou invalides sont automatiquement détectées pour vous éviter de perdre du temps.
+        </p>
 
-      <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
-        {FILTERS.map((filter) => (
+        {suspiciousItems.length > 0 ? (
           <Button
-            key={filter.label}
             type="button"
+            variant="destructive"
             size="sm"
-            variant={filter.value === status ? 'default' : 'outline'}
-            aria-pressed={filter.value === status}
-            onClick={() => {
-              setStatus(filter.value);
-            }}
+            disabled={decideBatch.isPending}
+            onClick={handlePurgeSuspicious}
+            className="gap-2 shadow-sm"
           >
-            {filter.label}
+            <Trash2Icon className="size-4" aria-hidden="true" />
+            Purger les {suspiciousItems.length} numéros suspects
           </Button>
-        ))}
+        ) : null}
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer par statut">
+          {FILTERS.map((filter) => (
+            <Button
+              key={filter.label}
+              type="button"
+              size="sm"
+              variant={filter.value === status ? 'default' : 'outline'}
+              aria-pressed={filter.value === status}
+              onClick={() => {
+                setStatus(filter.value);
+              }}
+            >
+              {filter.label}
+            </Button>
+          ))}
+        </div>
+
+        {items.length > 0 ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <Button type="button" size="sm" variant="ghost" onClick={selectAll} className="gap-1.5 text-[0.8125rem]">
+              <CheckSquareIcon className="size-3.5" aria-hidden="true" />
+              {selectedIds.length === items.length ? 'Tout décocher' : 'Tout cocher'}
+            </Button>
+            {selectedIds.length > 0 ? (
+              <>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={decideBatch.isPending}
+                  onClick={() => decideBatch.mutate({ ids: selectedIds, status: 'APPELE' })}
+                >
+                  <CheckIcon className="size-3.5" aria-hidden="true" />
+                  Marquer appelés ({selectedIds.length})
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={decideBatch.isPending}
+                  onClick={() => decideBatch.mutate({ ids: selectedIds, status: 'ABANDONNE' })}
+                >
+                  <XIcon className="size-3.5" aria-hidden="true" />
+                  Abandonner ({selectedIds.length})
+                </Button>
+              </>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       {(() => {
@@ -145,7 +276,13 @@ export function SuggestionsView() {
                       <SuggestionCard
                         suggestion={suggestion}
                         sameNumberCount={counts.get(suggestion.suggestedPhoneE164) ?? 1}
-                        pending={decide.isPending}
+                        pending={decide.isPending || decideBatch.isPending}
+                        isSelected={selectedIds.includes(suggestion.id)}
+                        onToggleSelect={() => toggleSelect(suggestion.id)}
+                        isParrainOpen={activeParrainId === suggestion.id}
+                        onToggleParrain={() =>
+                          setActiveParrainId(activeParrainId === suggestion.id ? null : suggestion.id)
+                        }
                         onDecide={(next) => {
                           decide.mutate({ id: suggestion.id, status: next });
                         }}
@@ -178,27 +315,53 @@ function SuggestionCard({
   suggestion,
   sameNumberCount,
   pending,
+  isSelected,
+  onToggleSelect,
+  isParrainOpen,
+  onToggleParrain,
   onDecide,
   onCreate,
 }: {
   suggestion: Suggestion;
   sameNumberCount: number;
   pending: boolean;
+  isSelected: boolean;
+  onToggleSelect: () => void;
+  isParrainOpen: boolean;
+  onToggleParrain: () => void;
   onDecide: (status: SuggestionStatus) => void;
   onCreate: () => void;
 }) {
   const known = suggestion.resolvedRepresentantId;
+  const isSuspicious = isSuspiciousSuggestion(suggestion);
 
   return (
-    <article className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+    <article className={`flex flex-col gap-3 rounded-lg border p-4 shadow-elev-sm transition-colors ${
+      isSelected ? 'border-primary/60 bg-accent/30' : isSuspicious ? 'border-destructive/40 bg-destructive-surface/20' : 'border-border bg-card'
+    }`}>
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-display text-[1.0625rem] font-[700] tabular-nums">
-            {formatPhone(suggestion.suggestedPhoneE164)}
-          </p>
-          <p className="truncate text-[0.8125rem] text-muted-foreground">
-            {suggestion.suggestedName ?? 'Nom non donné'}
-          </p>
+        <div className="flex items-start gap-3 min-w-0">
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={onToggleSelect}
+            aria-label={`Sélectionner ${suggestion.suggestedPhoneE164}`}
+            className="mt-1 size-4 rounded border-border accent-primary cursor-pointer"
+          />
+          <div className="min-w-0">
+            <p className="font-display text-[1.0625rem] font-[700] tabular-nums flex items-center gap-2">
+              {formatPhone(suggestion.suggestedPhoneE164)}
+              {isSuspicious ? (
+                <Badge variant="destructive" className="text-[0.7rem] px-1.5 py-0.5 gap-1 font-normal">
+                  <AlertTriangleIcon className="size-3" aria-hidden="true" />
+                  Faux numéro suspect
+                </Badge>
+              ) : null}
+            </p>
+            <p className="truncate text-[0.8125rem] text-muted-foreground">
+              {suggestion.suggestedName ?? 'Nom non donné'}
+            </p>
+          </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {sameNumberCount > 1 ? (
@@ -217,17 +380,60 @@ function SuggestionCard({
       </div>
 
       {suggestion.note === null || suggestion.note === '' ? null : (
-        <p className="max-w-prose text-[0.875rem]">{suggestion.note}</p>
+        <p className="max-w-prose text-[0.875rem] bg-muted/40 p-2 rounded border border-border/50">{suggestion.note}</p>
       )}
 
-      <p className="text-[0.75rem] text-muted-foreground">
-        Donné par le représentant{' '}
-        <span className="font-[600] tabular-nums">{suggestion.sourceRepresentantShortCode}</span> ·
-        recueilli par {suggestion.suggestedByName} ·{' '}
+      {/* Bulle d'Information / Popover Parrain UX */}
+      <div className="relative text-[0.75rem] text-muted-foreground">
+        <span>Donné par le représentant </span>
+        <button
+          type="button"
+          onClick={onToggleParrain}
+          className="inline-flex items-center gap-1 font-[600] text-foreground underline decoration-dashed underline-offset-4 hover:text-primary transition-colors cursor-pointer"
+        >
+          {suggestion.sourceRepresentantShortCode}
+          <InfoIcon className="size-3 text-muted-foreground" aria-hidden="true" />
+        </button>
+        <span> · recueilli par {suggestion.suggestedByName} · </span>
         <time dateTime={suggestion.clientCreatedAt}>
           {formatDateTime(suggestion.clientCreatedAt)}
         </time>
-      </p>
+
+        {isParrainOpen ? (
+          <div className="absolute left-0 top-6 z-20 w-80 rounded-lg border border-border bg-card p-3 shadow-lg flex flex-col gap-2 text-[0.8125rem] text-foreground animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-border pb-1.5 font-[600]">
+              <span className="flex items-center gap-1.5">
+                👤 Représentant Parrain ({suggestion.sourceRepresentantShortCode})
+              </span>
+              <button
+                type="button"
+                onClick={onToggleParrain}
+                className="text-muted-foreground hover:text-foreground text-[0.75rem]"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
+              <p><strong className="text-foreground">Code court :</strong> {suggestion.sourceRepresentantShortCode}</p>
+              <p><strong className="text-foreground">Recueilli par :</strong> {suggestion.suggestedByName}</p>
+              <p><strong className="text-foreground">Date :</strong> {formatDateTime(suggestion.clientCreatedAt)}</p>
+              {suggestion.note ? (
+                <p className="mt-1 text-foreground bg-muted/60 p-2 rounded text-[0.75rem]">
+                  💬 <em>"{suggestion.note}"</em>
+                </p>
+              ) : null}
+            </div>
+            {suggestion.sourceRepresentantId ? (
+              <Link
+                href={`/chues/representants/${suggestion.sourceRepresentantId}`}
+                className="mt-1 text-center text-[0.75rem] font-[600] text-primary hover:underline"
+              >
+                Consulter la fiche complète du parrain →
+              </Link>
+            ) : null}
+          </div>
+        ) : null}
+      </div>
 
       <div className="flex flex-wrap gap-2">
         {suggestion.status === 'A_APPELER' ? (
@@ -276,3 +482,4 @@ function SuggestionCard({
     </article>
   );
 }
+
