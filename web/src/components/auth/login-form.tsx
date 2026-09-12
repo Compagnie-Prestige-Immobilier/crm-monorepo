@@ -2,7 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircleIcon, LoaderIcon } from 'lucide-react';
+import { AlertCircleIcon, EyeIcon, EyeOffIcon, LoaderIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
@@ -64,6 +64,8 @@ function CredentialsFields({
   register: UseFormRegister<LoginInput>;
   errors: FieldErrors<LoginInput>;
 }) {
+  const [showPassword, setShowPassword] = useState(false);
+
   return (
     <>
       <div className="flex flex-col gap-2">
@@ -87,14 +89,31 @@ function CredentialsFields({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="password">Mot de passe</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={errors.password !== undefined}
-          aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
-          {...register('password')}
-        />
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            className="pr-10"
+            aria-invalid={errors.password !== undefined}
+            aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
+            {...register('password')}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setShowPassword((précédent) => !précédent);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          >
+            {showPassword ? (
+              <EyeOffIcon className="size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <EyeIcon className="size-4 shrink-0" aria-hidden="true" />
+            )}
+          </button>
+        </div>
         {errors.password !== undefined ? (
           <p id="password-error" role="alert" className="text-[0.75rem] text-destructive">
             {errors.password.message}

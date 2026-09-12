@@ -606,6 +606,17 @@ def _plateformes_env() -> list[str]:
     return lignes
 
 
+def _leads_env() -> list[str]:
+    """Classeur Leads du marketing, relevé toutes les quinze minutes.
+
+    Même règle que Brevo : le lien de partage ne vit que dans la variable
+    d'environnement de l'opérateur. Absent, la ligne disparaît et la tâche ne
+    fait rien au lieu d'échouer à chaque quart d'heure.
+    """
+    lien = os.environ.get("IMPORT_LEADS_URL", "").strip()
+    return [f"IMPORT_LEADS_URL={lien}"] if lien else []
+
+
 def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
     """Environnement du binaire v2, audits/go-securite.md §5.
 
@@ -647,6 +658,7 @@ def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
             *_brevo_env(),
             *_turnstile_env(),
             *_plateformes_env(),
+            *_leads_env(),
         ]
     )
 
@@ -768,13 +780,21 @@ def _attach_domain(application_id: str, host: str, port: int) -> None:
 
 
 def _detach_domain(application_id: str, host: str) -> None:
-    """Retire un hôte d'une application. Muet si l'hôte n'y est pas."""
+    """Retire un hôte d'une application, TOUTES ses entrées.
+
+    Un hôte peut être inscrit deux fois sur la même application. N'en retirer
+    qu'une laisse un routeur Traefik vers un conteneur arrêté, donc un 502 sur
+    l'hôte qu'on croyait libéré (bascule du 12 septembre 2026).
+    """
     rows = call("domain.byApplicationId", {"applicationId": application_id}, method="GET") or []
+    retires = 0
     for row in rows:
         if row.get("host") == host:
             call("domain.delete", {"domainId": row.get("domainId", "")})
-            ok(f"{host} détaché")
-            return
+            retires += 1
+    if retires:
+        ok(f"{host} détaché, {retires} entrée(s)")
+        return
     info(f"{host} n'était pas rattaché à cette application")
 
 

@@ -828,6 +828,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/supervision/activite":              socle.Encadrement,
 	"GET /api/v1/supervision/creneaux":              socle.Encadrement,
 	"PUT /api/v1/supervision/creneaux":              socle.Encadrement,
+	"GET /api/v1/supervision/objectifs":             socle.Encadrement,
 }
 
 func routeDeLecture[I, O any](api huma.API, id, chemin string, handler func(context.Context, *I) (*O, error)) {
@@ -846,4 +847,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	routeDeLecture(api, "getProspectsByDepartement", "/api/v1/analytics/by-departement", s.prospectsParDepartement)
 	routeDeLecture(api, "getProspectsBySyndicat", "/api/v1/analytics/by-syndicat", s.prospectsParSyndicat)
 	monterSupervision(api, s)
+	monterQualiteDeLaBase(api, s)
+	monterQualiteDuMarketing(api, s)
+	monterObjectifs(api, s)
 }
