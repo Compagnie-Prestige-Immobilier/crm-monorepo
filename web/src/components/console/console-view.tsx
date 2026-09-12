@@ -1205,11 +1205,13 @@ export function Consignation({
     },
     n: () => {
       const rep = prospect.representantId;
-      if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
+      if (projet === 'CHUES' && rep) {
+        router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
+      }
     },
     r: () => {
       const rep = prospect.representantId;
-      if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
+      if (projet === 'CHUES' && rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
     },
     '?': () => {
       setHelpOpen((open) => !open);
@@ -1410,7 +1412,7 @@ export function Consignation({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Button variant="ghost" className="self-start px-0" onClick={quitter}>
+      <Button variant="ghost" className="w-fit -ml-2" onClick={quitter}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste
       </Button>

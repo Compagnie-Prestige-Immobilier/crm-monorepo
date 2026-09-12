@@ -2,7 +2,6 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  ArrowLeftIcon,
   CheckIcon,
   FileArchiveIcon,
   FileDownIcon,
@@ -14,10 +13,10 @@ import {
   UserMinusIcon,
   XIcon,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { DetailBackLink } from '@/components/detail-back-link';
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -501,13 +500,7 @@ export function LotExportDetailView({
 
   return (
     <div className="flex flex-col gap-6">
-      <Link
-        href={campagnesPath(projet)}
-        className="inline-flex w-fit items-center gap-1.5 text-[0.875rem] text-muted-foreground hover:underline focus-visible:underline"
-      >
-        <ArrowLeftIcon className="size-4" aria-hidden="true" />
-        Toutes les campagnes
-      </Link>
+      <DetailBackLink href={campagnesPath(projet)}>Toutes les campagnes</DetailBackLink>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <LotSummary

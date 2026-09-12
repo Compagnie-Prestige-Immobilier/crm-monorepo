@@ -516,7 +516,7 @@ export function NouveauProspect({
     <div ref={racineRef} className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {embedded ? null : (
         <>
-          <Button variant="ghost" className="self-start px-0" onClick={garde.demanderFermeture}>
+          <Button variant="ghost" className="w-fit -ml-2" onClick={garde.demanderFermeture}>
             <ArrowLeftIcon aria-hidden="true" />
             Revenir à la liste
           </Button>
