@@ -46,3 +46,21 @@ CREATE TRIGGER set_updated_at BEFORE INSERT OR UPDATE ON public.visite_direction
 CREATE TRIGGER set_updated_at BEFORE INSERT OR UPDATE ON public.visite_entreprises FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_updated_at BEFORE INSERT OR UPDATE ON public.visite_objets FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
 CREATE TRIGGER set_updated_at BEFORE INSERT OR UPDATE ON public.visites FOR EACH ROW EXECUTE FUNCTION public.set_updated_at();
+
+-- +goose Down
+-- Énumérer les porteurs plutôt que recopier 37 DROP : d'autres migrations
+-- posent le même trigger sur leurs tables, et la liste ne se maintient pas.
+-- +goose StatementBegin
+DO $$
+DECLARE t record;
+BEGIN
+  FOR t IN SELECT c.relname FROM pg_trigger g JOIN pg_class c ON c.oid = g.tgrelid
+           JOIN pg_namespace n ON n.oid = c.relnamespace
+           WHERE g.tgname = 'set_updated_at' AND n.nspname = 'public' AND NOT g.tgisinternal
+  LOOP
+    EXECUTE format('DROP TRIGGER set_updated_at ON public.%I', t.relname);
+  END LOOP;
+END;
+$$;
+-- +goose StatementEnd
+DROP FUNCTION IF EXISTS public.set_updated_at();

@@ -27,6 +27,22 @@ SELECT COUNT(*)::int FROM "courriels"
 WHERE (sqlc.narg('type')::text IS NULL OR "type" = sqlc.narg('type')::text)
   AND (sqlc.narg('statut')::text IS NULL OR "statut" = sqlc.narg('statut')::text);
 
+-- name: CourrielsARejouer :many
+SELECT * FROM "courriels"
+WHERE "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
+  AND "createdAt" > now() - interval '7 days'
+ORDER BY "createdAt"
+LIMIT @prendre::bigint;
+
+-- name: CourrielRejeuEnregistre :exec
+UPDATE "courriels" SET "statut" = $2, "messageId" = $3, "erreur" = $4, "envoyeLe" = $5,
+  "tentatives" = "tentatives" + 1
+WHERE "id" = $1;
+
+-- name: PurgeCourrielsPiecesJointes :exec
+UPDATE "courriels" SET "pieceJointe" = NULL
+WHERE "pieceJointe" IS NOT NULL AND "createdAt" < now() - interval '180 days';
+
 -- name: CourrielRenvoye :exec
 UPDATE "courriels" SET "statut" = $2, "messageId" = $3, "erreur" = $4, "envoyeLe" = $5,
   "remisLe" = NULL, "ouvertLe" = NULL

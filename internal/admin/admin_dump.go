@@ -460,6 +460,9 @@ func (s *service) consommerDump(ctx context.Context, t *travailDump, acteurID, n
 func balayerOrphelins(garder string) {
 	entrees, err := os.ReadDir(repertoireDump())
 	if err != nil {
+		// Un volume plein ou démonté se manifeste d'abord ici : sans la ligne, le
+		// balayage cesse sans que rien ne le dise et les dumps s'accumulent.
+		slog.Warn("export de la base : répertoire illisible", "repertoire", repertoireDump(), "err", err)
 		return
 	}
 	for _, entree := range entrees {

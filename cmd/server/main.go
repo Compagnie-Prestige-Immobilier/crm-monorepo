@@ -49,6 +49,14 @@ func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool) (huma.AP
 		out.Body.Status = "ok"
 		return out, nil
 	})
+	// La sonde du conteneur ne doit pas toucher la base : sur `ready`, une base
+	// momentanément injoignable fait tuer un processus qui va bien, et le
+	// redémarrage ne répare rien tant que la base est absente.
+	huma.Get(api, "/health/live", func(context.Context, *struct{}) (*SanteOutput, error) {
+		out := &SanteOutput{}
+		out.Body.Status = "ok"
+		return out, nil
+	})
 	if err := monterDomaines(api, d); err != nil {
 		return nil, err
 	}
@@ -228,7 +236,7 @@ func executerTache(ctx context.Context, d *socle.Deps, t socle.Tache) (echec err
 }
 
 func sonder(ctx context.Context, port string) error {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+port+"/health/ready", http.NoBody)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://127.0.0.1:"+port+"/health/live", http.NoBody)
 	if err != nil {
 		return err
 	}
@@ -277,11 +285,17 @@ func ouvrirBase(ctx context.Context, url string) (*pgxpool.Pool, error) {
 	// génétique replanifie chaque appel (82 ms mesurés pour 0,7 ms d'exécution).
 	poolCfg.ConnConfig.RuntimeParams["join_collapse_limit"] = "1"
 	poolCfg.ConnConfig.RuntimeParams["from_collapse_limit"] = "1"
+	// Par défaut pgx plafonne à `max(4, NumCPU)`, soit 4 connexions sur le
+	// conteneur de production : un export global en tient une pendant 120 s.
+	poolCfg.MaxConns, poolCfg.MinConns, poolCfg.MaxConnLifetime = 10, 2, 30*time.Minute
 	pool, err := pgxpool.NewWithConfig(ctx, poolCfg)
 	if err != nil {
 		return nil, err
 	}
 	if err := database.Migrer(ctx, pool); err != nil {
+		// Le processus sort en 1 sans écouter : sans cette ligne, la boucle de
+		// redémarrage est muette et rien ne dit quelle migration bloque.
+		slog.Error("migrations", "err", err)
 		pool.Close()
 		return nil, fmt.Errorf("migrations : %w", err)
 	}
@@ -357,6 +371,9 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 	// vident dans la base publique, celle du mux qui porte le middleware.
 	go socle.ViderMetriquesChaqueMinute(ctx, instances[socle.BasePublique].deps.Q)
 	srv := assembler(cfg, instances)
+	for _, i := range instances {
+		srv.RegisterOnShutdown(i.deps.Live.Fermer)
+	}
 	erreurs := make(chan error, 1)
 	go func() {
 		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port, "bases", noms)

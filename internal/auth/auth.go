@@ -276,6 +276,7 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 
 var Garde = map[string][]socle.Role{
 	"GET /health/ready":            {socle.Public},
+	"GET /health/live":             {socle.Public},
 	"POST /api/v1/auth/login":      {socle.Public},
 	"POST /api/v1/auth/demo-login": {socle.Public},
 	"GET /api/v1/auth/bases":       {socle.Public},

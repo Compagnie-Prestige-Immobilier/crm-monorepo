@@ -679,12 +679,16 @@ func (s *service) balayerImports(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
+	// Un échec avalé laissait `cron_runs.ok` à vrai : tous les imports pouvaient
+	// échouer et l'écran Exploitation restait vert.
+	var echecs []error
 	for _, id := range candidats {
 		if err := s.courirImport(ctx, id); err != nil {
 			slog.Warn("import", "job", id, "err", err)
+			echecs = append(echecs, fmt.Errorf("job %s : %w", id, err))
 		}
 	}
-	return nil
+	return errors.Join(echecs...)
 }
 
 // La ligne d'abord, le fichier ensuite : l'inverse laisse un travail vivant sans

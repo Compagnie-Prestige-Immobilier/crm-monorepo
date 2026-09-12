@@ -196,6 +196,37 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 	return err
 }
 
+const (
+	tentativesCourrielMax = 3
+	courrielsParRejeu     = 20
+)
+
+// Un refus de Brevo perdait le courriel : le statut passait à ECHEC et personne
+// ne le reprenait. Trois tentatives, puis la ligne reste en échec pour l'alerte.
+func (s *service) rejouerCourrielsEnEchec(ctx context.Context) error {
+	lignes, err := s.Q.CourrielsARejouer(ctx, db.CourrielsARejouerParams{
+		TentativesMax: tentativesCourrielMax, Prendre: courrielsParRejeu,
+	})
+	if err != nil || len(lignes) == 0 {
+		return err
+	}
+	var echecs []error
+	for i := range lignes {
+		l := &lignes[i]
+		statut, messageID, erreur, envoyeLe := expedierCourriel(ctx, &MessageBrevo{
+			Destinataires: courrielAdresses(l.Destinataires), Copies: courrielAdresses(l.Copies),
+			Sujet: l.Sujet, HTML: l.Html, Texte: l.Texte, PieceJointe: courrielPiece(l.NomPieceJointe, l.PieceJointe),
+		})
+		if err := s.Q.CourrielRejeuEnregistre(ctx, db.CourrielRejeuEnregistreParams{
+			ID: l.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
+		}); err != nil {
+			echecs = append(echecs, err)
+		}
+	}
+	s.Live.Emettre(sujetCourriels)
+	return errors.Join(echecs...)
+}
+
 // Un envoi refusé ne se lisait que dans la colonne `erreur` du journal, écran
 // Exploitation ouvert. C'est ainsi qu'une clé Brevo invalide a pu refuser tous
 // les courriels d'une journée sans qu'une ligne le dise.
