@@ -213,7 +213,7 @@ func SignalerDossiersComplets(ctx context.Context, d *socle.Deps, projet string)
 
 func (s *service) notifierComplet(ctx context.Context, r *db.BankInscriptionsCompletesRow) {
 	client := strings.TrimSpace(r.Prenom + " " + r.Nom)
-	chemin := "/" + coqueDe(string(r.Projet)) + "/dossiers?ouvrir=" + r.ID
+	chemin := "/" + coqueDe(string(r.Projet)) + "/dossiers/nouveau?ouvrir=" + r.ID
 	_, err := notifications.Composer(ctx, s.Deps, "", &notifications.CreationNotification{
 		Title: "Dossier complet sur la plateforme", Category: "DOSSIER", Route: chemin,
 		Body:     client + ", banque " + texteOuTiret(r.BanqueName) + ". Le dossier bancaire peut être ouvert.",
