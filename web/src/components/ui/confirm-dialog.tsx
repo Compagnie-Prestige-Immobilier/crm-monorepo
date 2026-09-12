@@ -1,6 +1,5 @@
 'use client';
 
-import { LoaderIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -66,8 +65,7 @@ export function ConfirmDialog({
           >
             {cancelLabel}
           </Button>
-          <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>
-            {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
+          <Button type="button" variant={confirmVariant} pending={pending} onClick={onConfirm}>
             {confirmLabel}
           </Button>
         </DialogFooter>

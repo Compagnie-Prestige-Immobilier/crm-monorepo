@@ -265,7 +265,7 @@ function CarteInscription({
             </p>
           ) : null}
           <div className="mt-auto flex flex-wrap gap-2">
-            <Button type="button" disabled={sansProspect || pending} onClick={onOuvrir}>
+            <Button type="button" disabled={sansProspect} pending={pending} onClick={onOuvrir}>
               <FolderPlusIcon aria-hidden="true" />
               Ouvrir le dossier
             </Button>
@@ -338,7 +338,8 @@ function ChoixBanqueDialog({
           </Button>
           <Button
             type="button"
-            disabled={banqueId === null || pending}
+            disabled={banqueId === null}
+            pending={pending}
             onClick={() => {
               if (banqueId !== null) onConfirm(banqueId);
             }}

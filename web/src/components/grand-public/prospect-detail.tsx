@@ -566,7 +566,8 @@ export function GrandPublicProspectDetail({
             </Button>
             <Button
               onClick={() => conversion.mutate()}
-              disabled={offerId === null || conversion.isPending}
+              disabled={offerId === null}
+              pending={conversion.isPending}
             >
               Confirmer
             </Button>

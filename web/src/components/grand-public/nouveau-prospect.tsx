@@ -17,6 +17,7 @@ import {
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
+import { usePremiereErreur } from '@/components/forms/premiere-erreur';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
 import { useGardeSaisie } from '@/components/ui/confirm-dialog';
@@ -115,6 +116,10 @@ function erreurTelephone(saisi: string, e164: string | null): string | undefined
 const sansBouton = (motif: MotifAppel | null, refus: MotifAppel | undefined): boolean =>
   motif !== null && motif.code !== refus?.code;
 
+/** Seul le bouton qui a lancé l'envoi, avec ou sans appel, affiche l'attente. */
+const envoiEnCours = (pending: boolean, envoi: Envoi | undefined, avecAppel: boolean): boolean =>
+  pending && envoi !== undefined && (envoi.appel !== null) === avecAppel;
+
 /** « À rappeler » garde le dossier : l'ouverture le porte jusqu'au prochain appel. */
 async function consignerSur(
   prospectId: string,
@@ -174,6 +179,8 @@ export function NouveauProspect({
   // Créée mais l'appel refusé : la reprise ne doit pas la créer une seconde fois.
   const cree = useRef<ProspectRow | null>(null);
   const garde = useGardeSaisie(onAnnuler);
+  const racineRef = useRef<HTMLDivElement>(null);
+  const signalerEchec = usePremiereErreur(racineRef);
 
   const [vierge] = useState<ConversionDraft>(() => dossierVide('GRAND_PUBLIC'));
   const [conversion, setConversion] = useState<ConversionDraft>(vierge);
@@ -224,11 +231,15 @@ export function NouveauProspect({
       const existant = prospectPhoneConflict(error);
       if (existant !== null) {
         setPhoneError(`Ce numéro est déjà enregistré pour ${existant.prenom} ${existant.nom}.`);
+        signalerEchec();
         return;
       }
       if (error instanceof AttemptRefused) {
         const refuse = conversionErrorFor(error.code);
-        if (refuse !== null) setErrors({ [refuse.field]: refuse.message });
+        if (refuse !== null) {
+          setErrors({ [refuse.field]: refuse.message });
+          signalerEchec();
+        }
         toast.error(error.message, {
           description: 'La fiche est créée. Corrigez puis enregistrez pour consigner l’appel.',
         });
@@ -255,7 +266,9 @@ export function NouveauProspect({
     );
     setPhoneError(erreurTel);
     setErrors(identite);
-    return erreurTel !== undefined || Object.keys(identite).length > 0;
+    const bloquee = erreurTel !== undefined || Object.keys(identite).length > 0;
+    if (bloquee) signalerEchec();
+    return bloquee;
   }
 
   function creerSeulement(): void {
@@ -273,7 +286,10 @@ export function NouveauProspect({
     const erreurTel = erreurTelephone(phone, e164);
     setErrors(problemes);
     setPhoneError(erreurTel);
-    if (erreurTel !== undefined || Object.keys(problemes).length > 0) return;
+    if (erreurTel !== undefined || Object.keys(problemes).length > 0) {
+      signalerEchec();
+      return;
+    }
     if (conversion.method === null) return;
     verifierPuisEnvoyer(choisi, {
       outcome: issueDuMotif(choisi),
@@ -363,7 +379,7 @@ export function NouveauProspect({
   const pending = save.isPending;
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div ref={racineRef} className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {embedded ? null : (
         <>
           <Button variant="ghost" className="self-start px-0" onClick={garde.demanderFermeture}>
@@ -441,11 +457,21 @@ export function NouveauProspect({
           extra={
             <>
               {sansBouton(motif, motifRefus) ? (
-                <Button variant="outline" disabled={pending} onClick={valider}>
+                <Button
+                  variant="outline"
+                  disabled={pending}
+                  pending={envoiEnCours(pending, save.variables, true)}
+                  onClick={valider}
+                >
                   Enregistrer l’appel
                 </Button>
               ) : null}
-              <Button variant="outline" disabled={pending} onClick={creerSeulement}>
+              <Button
+                variant="outline"
+                disabled={pending}
+                pending={envoiEnCours(pending, save.variables, false)}
+                onClick={creerSeulement}
+              >
                 Enregistrer sans appel
               </Button>
             </>

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
+import { AlertTriangleIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
@@ -16,6 +16,8 @@ import {
   toInternationalE164,
 } from '@/components/forms/international-phone-field';
 import { ChampAjoute } from '@/components/forms/champ-ajoute';
+import { Liste } from '@/components/forms/liste';
+import { usePremiereErreur } from '@/components/forms/premiere-erreur';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -621,6 +623,8 @@ export function GrandPublicProspectForm({
   const router = useRouter();
   const queryClient = useQueryClient();
   const prenomRef = useRef<HTMLInputElement>(null);
+  const formRef = useRef<HTMLFormElement>(null);
+  const signalerEchec = usePremiereErreur(formRef);
 
   const [depart] = useState(() => (initial === undefined ? DEPART_VIDE : departDepuis(initial)));
   const [prenom, setPrenom] = useState(depart.prenom);
@@ -739,7 +743,10 @@ export function GrandPublicProspectForm({
     const manquants = libresManquants(formulaire.libres, champsLibres);
     setErrorsLibres(manquants);
     setErrors(found);
-    if (e164 === null || Object.keys(found).length > 0 || Object.keys(manquants).length > 0) return;
+    if (e164 === null || Object.keys(found).length > 0 || Object.keys(manquants).length > 0) {
+      signalerEchec();
+      return;
+    }
 
     setConflict(null);
     const vide = (texte: string): string | null => (texte.trim() === '' ? null : texte.trim());
@@ -790,6 +797,7 @@ export function GrandPublicProspectForm({
   return (
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
+      ref={formRef}
       className="mx-auto flex w-full max-w-2xl flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
@@ -940,23 +948,17 @@ export function GrandPublicProspectForm({
 
       <Field label="Type de bien">
         {(props) => (
-          <Select
+          <Liste
+            id={props.id}
+            describedBy={props['aria-describedby']}
+            effacable
+            items={TYPES_BIEN.map((valeur) => ({ value: valeur, label: TYPE_BIEN_LABELS[valeur] }))}
             value={orEmptyString(typeBien)}
-            onValueChange={(valeur) => {
+            placeholder="Non renseigné"
+            onChange={(valeur) => {
               setTypeBien(valeur === '' ? null : (valeur as TypeBien));
             }}
-          >
-            <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-              <SelectValue placeholder="Non renseigné" />
-            </SelectTrigger>
-            <SelectContent>
-              {TYPES_BIEN.map((valeur) => (
-                <SelectItem key={valeur} value={valeur}>
-                  {TYPE_BIEN_LABELS[valeur]}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          />
         )}
       </Field>
 
@@ -1017,15 +1019,8 @@ function PiedDeFormulaire({
           </Button>
         </>
       )}
-      <Button type="submit" size="lg" disabled={pending}>
-        {pending ? (
-          <>
-            <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
-            Enregistrement…
-          </>
-        ) : (
-          libelleEnvoi(modification)
-        )}
+      <Button type="submit" size="lg" pending={pending}>
+        {libelleEnvoi(modification)}
       </Button>
     </div>
   );
@@ -1051,26 +1046,21 @@ interface ChampSituationProps {
 function ContratField({ type, valeurs, onPatch }: ChampSituationProps) {
   if (!montre(type, 'contrat')) return null;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor="gp-contrat">Type de contrat</Label>
-      <Select
-        value={orEmptyString(valeurs.typeContrat)}
-        onValueChange={(value) => {
-          onPatch({ typeContrat: value === '' || value === null ? null : (value as TypeContrat) });
-        }}
-      >
-        <SelectTrigger id="gp-contrat">
-          <SelectValue placeholder="Choisir un contrat" />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(TYPE_CONTRAT_LABELS).map(([valeur, libelle]) => (
-            <SelectItem key={valeur} value={valeur}>
-              {libelle}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Field label="Type de contrat">
+      {(props) => (
+        <Liste
+          id={props.id}
+          describedBy={props['aria-describedby']}
+          effacable
+          items={Object.entries(TYPE_CONTRAT_LABELS).map(([value, label]) => ({ value, label }))}
+          value={orEmptyString(valeurs.typeContrat)}
+          placeholder="Choisir un contrat"
+          onChange={(value) => {
+            onPatch({ typeContrat: value === '' ? null : (value as TypeContrat) });
+          }}
+        />
+      )}
+    </Field>
   );
 }
 
@@ -1165,26 +1155,21 @@ function LieuField({ type, valeurs, onPatch }: ChampSituationProps) {
 function EpargneField({ type, valeurs, onPatch }: ChampSituationProps) {
   if (!montre(type, 'epargne')) return null;
   return (
-    <div className="flex min-w-0 flex-col gap-1.5">
-      <Label htmlFor="gp-epargne">Mode d’épargne</Label>
-      <Select
-        value={orEmptyString(valeurs.modeEpargne)}
-        onValueChange={(value) => {
-          onPatch({ modeEpargne: value === '' || value === null ? null : (value as ModeEpargne) });
-        }}
-      >
-        <SelectTrigger id="gp-epargne">
-          <SelectValue placeholder="Choisir un mode" />
-        </SelectTrigger>
-        <SelectContent>
-          {Object.entries(MODE_EPARGNE_LABELS).map(([valeur, libelle]) => (
-            <SelectItem key={valeur} value={valeur}>
-              {libelle}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
+    <Field label="Mode d’épargne">
+      {(props) => (
+        <Liste
+          id={props.id}
+          describedBy={props['aria-describedby']}
+          effacable
+          items={Object.entries(MODE_EPARGNE_LABELS).map(([value, label]) => ({ value, label }))}
+          value={orEmptyString(valeurs.modeEpargne)}
+          placeholder="Choisir un mode"
+          onChange={(value) => {
+            onPatch({ modeEpargne: value === '' ? null : (value as ModeEpargne) });
+          }}
+        />
+      )}
+    </Field>
   );
 }
 

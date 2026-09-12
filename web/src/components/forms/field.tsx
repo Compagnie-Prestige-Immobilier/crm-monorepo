@@ -5,6 +5,8 @@ import { useId, type ReactNode } from 'react';
 import { InfoBulle } from '@/components/forms/info-bulle';
 import { Label } from '@/components/ui/label';
 
+export const idErreurDe = (id: string): string => `${id}-error`;
+
 export function Field({
   label,
   error,
@@ -26,7 +28,7 @@ export function Field({
   }) => ReactNode;
 }) {
   const id = useId();
-  const errorId = `${id}-error`;
+  const errorId = idErreurDe(id);
   const descriptionId = `${id}-description`;
 
   const describedBy =

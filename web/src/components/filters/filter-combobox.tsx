@@ -34,6 +34,7 @@ export function FilterCombobox({
   onCreate,
   filterOptions = true,
   onBlur,
+  error,
 }: {
   label: string;
   placeholder: string;
@@ -46,11 +47,13 @@ export function FilterCombobox({
   onCreate?: ((search: string) => void) | undefined;
   filterOptions?: boolean | undefined;
   onBlur?: (() => void) | undefined;
+  error?: string | undefined;
 }) {
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const triggerId = useId();
   const labelId = useId();
+  const errorId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
 
   const ouvrir = (next: boolean): void => {
@@ -88,7 +91,13 @@ export function FilterCombobox({
                 aria-labelledby={`${labelId} ${triggerId}`}
                 aria-haspopup="listbox"
                 aria-required={required || undefined}
-                className={cn('h-11 w-full justify-between gap-2 font-[400]', hasValue && 'pr-24')}
+                aria-invalid={error !== undefined}
+                aria-describedby={error === undefined ? undefined : errorId}
+                className={cn(
+                  'h-11 w-full justify-between gap-2 font-[400]',
+                  'aria-invalid:border-destructive aria-invalid:outline-destructive',
+                  hasValue && 'pr-24',
+                )}
               />
             }
           >
@@ -159,7 +168,17 @@ export function FilterCombobox({
           </button>
         ) : null}
       </div>
+      <MessageErreur id={errorId} message={error} />
     </div>
+  );
+}
+
+function MessageErreur({ id, message }: { id: string; message: string | undefined }) {
+  if (message === undefined) return null;
+  return (
+    <p id={id} role="alert" className="text-[0.75rem] text-destructive">
+      {message}
+    </p>
   );
 }
 
