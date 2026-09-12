@@ -110,8 +110,7 @@ func lotsImport(valeurs []string) [][]string {
 // La SECONDE occurrence est rejetée, jamais la première : c'est celle du haut du
 // fichier que l'utilisateur reconnaît.
 func doublonsDansLeFichierImport(lignes []any, vus map[string]int, cle func(any) (string, int),
-	_, _ string,
-) (uniques []any, ignorees int, erreurs []erreurLigneImport) {
+) (uniques []any, ignorees int) {
 	for _, ligne := range lignes {
 		telephone, numero := cle(ligne)
 		if _, deja := vus[telephone]; deja {
@@ -121,7 +120,7 @@ func doublonsDansLeFichierImport(lignes []any, vus map[string]int, cle func(any)
 		vus[telephone] = numero
 		uniques = append(uniques, ligne)
 	}
-	return uniques, ignorees, nil
+	return uniques, ignorees
 }
 
 func identifiantImport() string {
@@ -453,11 +452,10 @@ func lireDateLeadImport(brut string, numero int) (*time.Time, *erreurLigneImport
 
 func ecrireRepresentantsImport(ctx context.Context, q *db.Queries, c contexteImport, lignes []any, brut any) (bilanTrancheImport, error) {
 	etat := brut.(*etatRepresentantsImport)
-	uniques, ignorees, erreurs := doublonsDansLeFichierImport(lignes, etat.vus,
+	uniques, ignorees := doublonsDansLeFichierImport(lignes, etat.vus,
 		func(v any) (string, int) {
 			return v.(ligneRepresentantImport).telephone, v.(ligneRepresentantImport).numero
-		},
-		EnteteRepresentantImport(1), "DUPLICATE_IN_FILE")
+		})
 
 	connus := map[string]bool{}
 	for _, lot := range lotsImport(telephonesRepresentantsImport(uniques)) {
@@ -483,13 +481,13 @@ func ecrireRepresentantsImport(ctx context.Context, q *db.Queries, c contexteImp
 	// `created` en simulation compte les fiches qui SERAIENT créées : c'est la
 	// réponse à « combien de fiches vais-je obtenir ».
 	if !c.appliquer || len(retenues) == 0 {
-		return bilanTrancheImport{crees: boolIntImport(!c.appliquer) * len(retenues), ignorees: ignorees, erreurs: erreurs}, nil
+		return bilanTrancheImport{crees: boolIntImport(!c.appliquer) * len(retenues), ignorees: ignorees}, nil
 	}
 	ecrits, refus, err := persisterRepresentantsImport(ctx, q, c, retenues)
 	if err != nil {
 		return bilanTrancheImport{}, err
 	}
-	return bilanTrancheImport{crees: ecrits, ignorees: ignorees + len(retenues) - ecrits, erreurs: append(erreurs, refus...)}, nil
+	return bilanTrancheImport{crees: ecrits, ignorees: ignorees + len(retenues) - ecrits, erreurs: refus}, nil
 }
 
 func telephonesRepresentantsImport(lignes []any) []string {
@@ -753,9 +751,8 @@ func ecrireProspectsImport(ctx context.Context, q *db.Queries, c contexteImport,
 		return bilanTrancheImport{}, nil
 	}
 	etat := brut.(*etatProspectsImport)
-	uniques, ignoreesDoublons, _ := doublonsDansLeFichierImport(lignes, etat.vus,
-		func(v any) (string, int) { return v.(ligneProspectImport).telephone, v.(ligneProspectImport).numero },
-		enteteProspectImport(2), "PROSPECT_IMPORT_DUPLICATE_IN_FILE")
+	uniques, ignoreesDoublons := doublonsDansLeFichierImport(lignes, etat.vus,
+		func(v any) (string, int) { return v.(ligneProspectImport).telephone, v.(ligneProspectImport).numero })
 
 	porteurs, err := porteursProspectsImport(ctx, q, uniques)
 	if err != nil {
@@ -1295,11 +1292,10 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		return bilanTrancheImport{}, nil
 	}
 	etat := brut.(*etatGrandPublicImport)
-	uniques, ignoreesDoublons, _ := doublonsDansLeFichierImport(lignes, etat.vus,
+	uniques, ignoreesDoublons := doublonsDansLeFichierImport(lignes, etat.vus,
 		func(v any) (string, int) {
 			return v.(ligneGrandPublicImport).telephone, v.(ligneGrandPublicImport).numero
-		},
-		enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_DOUBLON_DANS_LE_FICHIER")
+		})
 
 	deja, dejaEmail, err := dejaEnBaseGrandPublicImport(ctx, q, uniques)
 	if err != nil {
