@@ -105,10 +105,16 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
 }
 
 /** La touche du raccourci entre dans le nom du bouton, sauf en 390 px. */
-function issue(page: Page, libelle: RegExp) {
-  return page
-    .getByRole('group', { name: 'Comment s’est passé l’appel ?' })
-    .getByRole('button', { name: libelle });
+/** Deux temps depuis le référentiel : le groupe, puis son motif. */
+async function issue(page: Page, groupeLibelle: string, motif: RegExp): Promise<void> {
+  await page
+    .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
+    .getByRole('button', { name: new RegExp(`${groupeLibelle}$`, 'u') })
+    .click();
+  await page
+    .getByRole('group', { name: new RegExp(`^${groupeLibelle} ·`, 'u') })
+    .getByRole('button', { name: motif })
+    .click();
 }
 
 /**
@@ -176,7 +182,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     const rendezVous = rendezVousProchain();
 
     await ouvrirFiche(page, fiche);
-    await issue(page, /(^|\s)Joignable$/u).click();
+    await issue(page, 'Joignable', /Méthode obtenue$/u);
     await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
     await page.getByLabel('Commentaire').fill(commentaire);
@@ -281,7 +287,7 @@ test.describe('parcours 5 en 390 px', () => {
 
     await ouvrirFiche(page, fiche);
     await sansDebordementHorizontal(page);
-    await issue(page, /(^|\s)Joignable$/u).click();
+    await issue(page, 'Joignable', /Méthode obtenue$/u);
 
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,

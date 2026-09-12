@@ -102,7 +102,11 @@ export function formatDeviceCall(attempt: {
   return `Téléphone : ${formatDetectedCall({ ...attempt, deviceCallAt: at })}`;
 }
 
-export function formatPhone(e164: string): string {
+/** Un lead venu d’un réseau social n’a parfois que son nom : le libellé dit laquelle des absences c’est. */
+export const SANS_NUMERO = 'Sans numéro';
+
+export function formatPhone(e164: string | null | undefined): string {
+  if (e164 === null || e164 === undefined || e164 === '') return SANS_NUMERO;
   return parsePhoneNumberFromString(e164)?.formatInternational() ?? e164;
 }
 

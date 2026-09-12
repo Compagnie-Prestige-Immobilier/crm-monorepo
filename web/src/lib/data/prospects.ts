@@ -2,7 +2,9 @@ import type { ApiClient, components } from '@crm/api-client';
 import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import { flattenPage, toProspectQuery } from '@/lib/api/query-params';
+import { flattenPage, toProspectQuery, type ProspectQuery } from '@/lib/api/query-params';
+import { fetchMesAttributions } from '@/lib/data/attributions';
+import type { OrigineFiche } from '@/lib/data/grand-public';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
@@ -24,6 +26,48 @@ export async function fetchProspects(
     await client.GET('/api/v1/prospects', { params: { query: toProspectQuery(filters) } }),
   );
   return flattenPage(payload);
+}
+
+/** L'annuaire de l'écran d'appel : une page tient sous le pouce. */
+const A_QUALIFIER_PAGE_SIZE = 20;
+
+/**
+ * Ce que l'écran d'appel a le droit d'appeler : ses propres fiches et celles
+ * qu'une campagne lui a confiées. Ne passe pas par `ProspectFilters` : ce n'est
+ * pas un critère que l'utilisateur pose, c'est la portée de l'écran, et elle
+ * vaut pour tous les rôles, encadrement compris.
+ */
+export async function fetchProspectsAQualifier(
+  criteres: {
+    projet: Projet;
+    search: string;
+    origine?: OrigineFiche | undefined;
+    viewerId?: string | undefined;
+  },
+  client: ApiClient = getApiClient(),
+): Promise<Paginated<ProspectRow>> {
+  const origine = criteres.origine ?? 'TOUS';
+  const query: ProspectQuery = {
+    mesFiches: true,
+    projet: criteres.projet,
+    search: criteres.search,
+    sortBy: 'nom',
+    sortOrder: 'asc',
+    page: 1,
+    pageSize: A_QUALIFIER_PAGE_SIZE,
+    ...(origine === 'MOI' && criteres.viewerId !== undefined
+      ? { commercialId: criteres.viewerId }
+      : {}),
+  };
+  const page = flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
+  if (origine !== 'CAMPAGNE') return page;
+
+  // L'API ne filtre pas sur l'attribution : la page servie est celle du
+  // portefeuille, on n'en garde que les fiches qu'une campagne a confiées.
+  const { prospectIds } = await fetchMesAttributions(client);
+  const attribues = new Set(prospectIds);
+  const items = page.items.filter((prospect) => attribues.has(prospect.id));
+  return { ...page, items, total: items.length, pageCount: 1 };
 }
 
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */

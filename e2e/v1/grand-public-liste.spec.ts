@@ -327,7 +327,7 @@ test.describe('GP-11 largeur 375 px', () => {
   });
 });
 
-test('GP-12 le nom d’une ligne ouvre la fiche correspondante', async ({ page }) => {
+test('GP-12 le nom d’une ligne ouvre l’appel du prospect', async ({ page }) => {
   await page.goto('/grand-public');
   await chercher(page, PREMIER.phone);
 
@@ -336,12 +336,11 @@ test('GP-12 le nom d’une ligne ouvre la fiche correspondante', async ({ page }
     .getByRole('link', { name: `${PREFIXE} ${PREMIER.nom} +221 78 100 20 01` })
     .click();
 
-  await page.waitForURL(/\/grand-public\/[0-9a-f-]{36}$/);
+  await page.waitForURL(/\/grand-public\/appel\/[0-9a-f-]{36}$/);
   await expect(
     page.getByRole('main').getByRole('heading', { name: `${PREFIXE} ${PREMIER.nom}`, level: 1 }),
   ).toBeVisible();
-  await expect(page.getByRole('link', { name: '+221 78 100 20 01' })).toHaveAttribute(
-    'href',
-    `tel:${PREMIER.phone}`,
-  );
+
+  await page.getByRole('button', { name: 'Joignable', exact: true }).click();
+  await expect(page.getByRole('combobox', { name: /Statut de qualification/ })).toBeVisible();
 });

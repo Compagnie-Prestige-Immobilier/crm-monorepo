@@ -46,7 +46,7 @@ import {
   PROSPECT_TYPE_LABELS,
   PROSPECT_TYPES,
 } from '@/lib/data/grand-public';
-import { PAYMENT_MODE_LABELS } from '@/lib/types';
+import { PAYMENT_MODE_LABELS, PAYMENT_MODES } from '@/lib/types';
 import { apiErrorMessage, cn } from '@/lib/utils';
 
 const TURNSTILE_SCRIPT = 'https://challenges.cloudflare.com/turnstile/v0/api.js';
@@ -61,9 +61,13 @@ const SITUATIONS: readonly OptionListe[] = PROSPECT_TYPES.map((valeur) => ({
   label: PROSPECT_TYPE_LABELS[valeur],
 }));
 
-const PAIEMENTS: readonly OptionListe[] = Object.entries(PAYMENT_MODE_LABELS).map(
-  ([value, label]) => ({ value, label }),
-);
+/**
+ * Le crédit immobilier ne s'offre pas ici : le formulaire est ouvert à des
+ * inconnus et son contrat ne l'accepte pas.
+ */
+const PAIEMENTS: readonly OptionListe[] = PAYMENT_MODES.filter(
+  (mode) => mode !== 'CREDIT_IMMOBILIER',
+).map((mode) => ({ value: mode, label: PAYMENT_MODE_LABELS[mode] }));
 
 const DUREES: readonly OptionListe[] = DUREES_MOIS.map((mois) => ({
   value: String(mois),

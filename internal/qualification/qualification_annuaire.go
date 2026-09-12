@@ -42,6 +42,14 @@ type AnnuaireOutput struct {
 
 // Curseur keyset sur (updatedAt, id) : une pagination par décalage reverrait ou
 // sauterait des fiches dès qu'une seule est modifiée pendant le parcours.
+// `AnnuairePhase2` écarte les fiches sans numéro : la valeur lue n'est jamais nulle.
+func qualificationNumero(valeur *string) string {
+	if valeur == nil {
+		return ""
+	}
+	return *valeur
+}
+
 func annuaireCurseur(at time.Time, id string) string {
 	return qualificationISO(at) + "|" + id
 }
@@ -100,7 +108,7 @@ func (s *service) qualificationAnnuaire(ctx context.Context, in *AnnuaireInput) 
 			methode = &nom
 		}
 		out.Body.Entries = append(out.Body.Entries, AnnuaireEntree{
-			ProspectID: l.ID, PhoneE164: l.PhoneE164, Phase2Status: string(l.Phase2Status),
+			ProspectID: l.ID, PhoneE164: qualificationNumero(l.PhoneE164), Phase2Status: string(l.Phase2Status),
 			EnrollmentMethod: methode, Rev: l.Rev, UpdatedAt: qualificationISO(l.UpdatedAt),
 		})
 	}

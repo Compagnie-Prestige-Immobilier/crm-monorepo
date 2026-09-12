@@ -276,18 +276,27 @@ type seedCallOutcomeReason struct {
 	code, label, color                                 string
 	effect                                             db.CallOutcomeEffect
 	requiresComment, requiresCallback, countsAsReached bool
-	sortOrder                                          int32
+	sortOrder, minPayloadVersion                       int32
 }
 
-// Les codes reprennent CallOutcome à l'identique, minPayloadVersion vaut 1 : les
-// téléphones déjà déployés savent émettre ces six seuls motifs.
+// Les six premiers reprennent CallOutcome à l'identique, en version 1 : les
+// téléphones déjà déployés ne savent émettre qu'eux. Les suivants servent
+// l'écran d'appel Grand Public, qui les fige.
 var seedCallOutcomeReasons = []seedCallOutcomeReason{
-	{"METHOD_OBTAINED", "Méthode obtenue", "success", db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 10},
-	{string(db.CallOutcomeCALLBACK), "À rappeler", "info", db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20},
-	{"UNREACHABLE", "Injoignable", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 30},
-	{"REFUSED", "Refus", "danger", db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 40},
-	{"WRONG_NUMBER", "Mauvais numéro", "danger", db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50},
-	{string(db.CallOutcomeOTHER), seedLibelleAutre, "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 60},
+	{"METHOD_OBTAINED", "Méthode obtenue", "success", db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 10, 1},
+	{string(db.CallOutcomeCALLBACK), "À rappeler", "info", db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20, 1},
+	{"UNREACHABLE", "Injoignable", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 30, 1},
+	{"REFUSED", "Refus", "danger", db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 40, 1},
+	{"WRONG_NUMBER", "Faux numéro", "danger", db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50, 1},
+	{string(db.CallOutcomeOTHER), seedLibelleAutre, "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 60, 1},
+	{"PAS_DE_REPONSE", "Pas de réponse", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 31, 8},
+	{"NUMERO_OCCUPE", "Occupé", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 32, 8},
+	{"MESSAGERIE", "Messagerie", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 33, 8},
+	{"TELEPHONE_INDISPONIBLE", "Téléphone indisponible", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 34, 8},
+	{"INJOIGNABLE_DEFINITIF", "Injoignable définitif", "warning", db.CallOutcomeEffectKEEPOPEN, false, false, false, 35, 8},
+	{"AUTRE_NON_JOINT", "Autre non joint", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, false, 36, 8},
+	{"HORS_CIBLE", "Hors cible", "danger", db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 45, 8},
+	{"INTERESSE", "Intéressé", "success", db.CallOutcomeEffectKEEPOPEN, true, false, true, 15, 8},
 }
 
 type seedCanalProvenance struct {
@@ -300,6 +309,8 @@ var seedCanauxProvenance = []seedCanalProvenance{
 	{"FACEBOOK", "Facebook", 20},
 	{"META", "Meta (Facebook et Instagram)", 25},
 	{"INSTAGRAM", "Instagram", 30},
+	{"FACEBOOK_INSTAGRAM", "Facebook / Instagram", 35},
+	{"MESSENGER", "Messenger", 45},
 	{"LINKEDIN", "LinkedIn", 40},
 	{"WHATSAPP", "WhatsApp", 50},
 	{"SITE_WEB", "Site web", 60},

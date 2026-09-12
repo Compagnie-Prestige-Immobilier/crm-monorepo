@@ -46,6 +46,15 @@ var adaptateursImport = map[db.ImportKind]adaptateurImport{
 
 // ------------------------------------------------------------------ communs
 
+// Les lectures de dédoublonnage filtrent sur une liste de numéros : la colonne
+// est nullable, la valeur lue ne l'est jamais.
+func telephoneConnuImport(valeur *string) string {
+	if valeur == nil {
+		return ""
+	}
+	return *valeur
+}
+
 // « SAINT-LOUIS », « Saint Louis » et « saint  louis » tombent sur la même clé.
 func cleImport(valeur string) string {
 	var sortie strings.Builder
@@ -113,6 +122,11 @@ func doublonsDansLeFichierImport(lignes []any, vus map[string]int, cle func(any)
 ) (uniques []any, ignorees int) {
 	for _, ligne := range lignes {
 		telephone, numero := cle(ligne)
+		// Sans clé, pas de doublon possible : la fiche n'a rien à quoi se comparer.
+		if telephone == "" {
+			uniques = append(uniques, ligne)
+			continue
+		}
 		if _, deja := vus[telephone]; deja {
 			ignorees++
 			continue
@@ -139,6 +153,11 @@ type entreeReferentielImport struct {
 const (
 	enteteTelephoneImport     = "Téléphone"
 	enteteWhatsappImport      = "WhatsApp"
+	enteteCreeLeImport        = "Créé"
+	enteteCourrielImport      = "Adresse e-mail"
+	enteteEtapeImport         = "Étape"
+	libelleAEvaluerImport     = "À évaluer"
+	libelleQualifieImport     = "Qualifié"
 	libelleAucunImport        = "Aucun"
 	libelleAutreImport        = "Autre"
 	libelleBanqueImport       = "Banque"
@@ -798,7 +817,7 @@ func porteursProspectsImport(ctx context.Context, q *db.Queries, uniques []any) 
 			if ligne.RepresentantId != nil {
 				porteur = *ligne.RepresentantId
 			}
-			porteurs[ligne.PhoneE164] = porteur
+			porteurs[telephoneConnuImport(ligne.PhoneE164)] = porteur
 		}
 	}
 	return porteurs, nil
@@ -815,7 +834,7 @@ func persisterProspectsImport(ctx context.Context, q *db.Queries, c contexteImpo
 		ligne := &retenues[i]
 		identifiants[i] = identifiantImport()
 		fiches[i] = db.InsertImportProspectParams{
-			ID: identifiants[i], Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
+			ID: identifiants[i], Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: &ligne.telephone,
 			BanqueID: couperImport(ligne.banqueID, 36), SyndicatID: couperImport(ligne.syndicatID, 36), RepresentantID: couperImport(ligne.representantID, 36),
 			CreatedByID: c.demandeur, Phase2Status: phase2DepuisMethodeImport(ligne.methode),
 			EnrollmentMethod: ligne.methode, ClientCreatedAt: maintenant, ImportJobID: &c.jobID,
@@ -844,15 +863,14 @@ func phase2DepuisMethodeImport(methode *db.EnrollmentMethod) db.Phase2Status {
 
 var colonnesGrandPublicImport = []colonneImport{
 	{entete: exports.ExportEntetePrenom, alias: []string{"Prénoms"}},
-	// Pas « requise » : « Nom complet » la remplace, et le refus se dit ligne à ligne.
-	{entete: exports.ExportEnteteNom, alias: []string{"Nom de famille", "Noms"}},
-	{entete: enteteTelephoneImport, alias: []string{"Tel", "Numéro", "Numéro de téléphone", "Contact"}, requise: true},
+	{entete: exports.ExportEnteteNom, alias: []string{"Nom de famille", "Noms", "Nom complet"}},
+	{entete: enteteTelephoneImport, alias: []string{"Tel", "Numéro", "Numéro de téléphone", "Contact"}},
 	{entete: exports.ExportEnteteProfession, alias: []string{"Métier", "Activité", "Poste", "JOB_TITLE"}},
 	{entete: exports.ExportEnteteSyndicat},
 	{entete: "Banque de domiciliation", alias: []string{libelleBanqueImport, "Domiciliation"}},
 	{entete: "Fonctionnaire (oui/non)", alias: []string{"Fonctionnaire"}},
 	{entete: "Durée système", alias: []string{"Durée du système", "Durée système de paiement", "Durée (mois)"}},
-	{entete: exports.ExportEnteteCanalProvenance, alias: []string{"Canal", "Provenance", "Source"}},
+	{entete: exports.ExportEnteteCanalProvenance, alias: []string{"Provenance", "Canal", "Source"}},
 	{entete: exports.FormulaireLibelleEmployeur, alias: []string{"Ministère", "Entreprise", "Employeur / Entreprise", "COMPANY_NAME"}},
 	{entete: exports.ExportEnteteTypeContrat, alias: []string{"Contrat"}},
 	{entete: exports.ExportEnteteAnciennete, alias: []string{"Ancienneté", "Ancienneté chez l’employeur"}},
@@ -863,17 +881,18 @@ var colonnesGrandPublicImport = []colonneImport{
 	{entete: enteteWhatsappImport, alias: []string{"Numéro WhatsApp", "WhatsApp (international)"}},
 	{entete: "Nom du relais", alias: []string{"Relais", "Personne relais"}},
 	{entete: "Téléphone du relais", alias: []string{"Téléphone relais", "Contact du relais"}},
-	{entete: "Email", alias: []string{"E-mail", "Courriel", "Adresse e-mail"}},
+	{entete: enteteCourrielImport, alias: []string{"E-mail", "Email", "Courriel", "Adresse e-mail"}},
 	{entete: "Nom complet", alias: []string{"Nom et prénom", "Prénom et nom", "Nom du prospect"}},
-	{entete: "Date", alias: []string{"Date du lead", "Date de création", "Créé le", "CREATED_TIME"}},
+	{entete: enteteCreeLeImport, alias: []string{"Date du lead", "Date de création", "Créé le", "Date", "CREATED_TIME"}},
+	{entete: enteteEtapeImport, alias: []string{"Statut"}},
 }
 
 func enteteGrandPublicImport(rang int) string { return colonnesGrandPublicImport[rang].entete }
 
-// Les trois dernières colonnes n'existent pas dans le modèle : elles n'ont pas
+// Les quatre dernières colonnes n'existent pas dans le modèle : elles n'ont pas
 // d'exemple à reconnaître.
 func exemplesGrandPublicImport() []string {
-	return append(exports.ExemplesGrandPublic(), "", "", "")
+	return append(exports.ExemplesGrandPublic(), "", "", "", "")
 }
 
 var (
@@ -890,15 +909,24 @@ var (
 	choixContratImport = []string{libelleCDIImport, libelleCDDImport, libelleAutreImport}
 	choixEpargneImport = []string{"Tontine", "Mobile money", libelleBanqueImport, libelleAucunImport}
 	moisImport         = regexp.MustCompile(`(?i)^(\d{1,4})(?:\s*mois)?$`)
+	etapesImport       = tableLibellesImport(map[string]string{
+		libelleAEvaluerImport: string(db.ProspectStatutNOUVEAU), "Nouveau": string(db.ProspectStatutNOUVEAU),
+		libelleQualifieImport: string(db.ProspectStatutCONTACTE), "Contacté": string(db.ProspectStatutCONTACTE),
+		"Converti": string(db.ProspectStatutCONVERTI), "Perdu": string(db.ProspectStatutPERDU),
+	})
+	choixEtapeImport = []string{libelleAEvaluerImport, libelleQualifieImport, "Converti", "Perdu"}
+	// Les exports Meta datent au format américain, en 12 heures.
+	formatsCreeLeImport = []string{"01/02/2006 3:04pm", "01/02/2006 15:04", "02/01/2006 15:04", "2006-01-02 15:04", "2006-01-02"}
 	emailImport        = regexp.MustCompile(`[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,}`)
 )
 
 type ligneGrandPublicImport struct {
 	numero                                                 int
-	nom, prenom, telephone                                 string
+	nom, prenom                                            string
+	telephone, email                                       *string
 	projet                                                 db.Projet
-	email                                                  *string
-	dateLead                                               *time.Time
+	creeLe                                                 *time.Time
+	statut                                                 db.ProspectStatut
 	profession, syndicatID, banqueID, canalID              *string
 	typeProspect                                           *db.ProspectType
 	dureeSystemeMois, ancienneteMois                       *int32
@@ -1103,26 +1131,21 @@ func indexerLibellesImport(index map[string]string, identifiant string, libelles
 	}
 }
 
-// Seuls le nom et le téléphone sont exigés : une cellule vide est une
-// information qu'on n'a pas encore, jamais un refus.
+// AUCUNE colonne n'est exigée : un lead Messenger ne donne qu'un nom, et une
+// cellule vide est une information qu'on n'a pas encore. Seule une valeur
+// écrite mais inexploitable refuse la ligne.
 func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (any, *erreurLigneImport) {
 	etat := brut.(*etatGrandPublicImport)
-	nom, prenom := nomGrandPublicImport(cellules)
-	brutTelephone := strings.TrimSpace(cellules[enteteGrandPublicImport(2)])
-	if nom == "" && brutTelephone == "" {
+	nom, prenom, telephone, refus := identiteGrandPublicImport(cellules, numero, etat)
+	if refus != nil {
+		return nil, refus
+	}
+	if nom == "" && telephone == nil {
 		return nil, nil
 	}
-	if nom == "" {
-		return nil, refusImport(numero, enteteGrandPublicImport(1), "PROSPECT_GP_IMPORT_NOM_ABSENT",
-			"Le nom est obligatoire : une colonne « Nom », ou une colonne « Nom complet » dont le dernier mot est le nom de famille.")
-	}
-	telephone, err := database.NormaliserTelephone(brutTelephone, etat.region)
-	if err != nil {
-		message := fmt.Sprintf("Numéro de téléphone inexploitable : « %s ».", brutTelephone)
-		if brutTelephone == "" {
-			message = "Le téléphone est obligatoire : c’est lui qui repère les doublons."
-		}
-		return nil, refusImport(numero, enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_TELEPHONE_ILLISIBLE", message)
+	creeLe, statut, refus := datesGrandPublicImport(cellules, numero)
+	if refus != nil {
+		return nil, refus
 	}
 	banqueID, refus := referentielFacultatifImport(cellules[enteteGrandPublicImport(5)], etat.banques, cleReferentielImport, numero,
 		enteteGrandPublicImport(5), "PROSPECT_GP_IMPORT_BANQUE_INCONNUE", "Banque inconnue", etat.banqueLabels)
@@ -1144,14 +1167,10 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 	if refus != nil {
 		return nil, refus
 	}
-	dateLead, refus := lireDateLeadImport(cellules[enteteGrandPublicImport(21)], numero)
-	if refus != nil {
-		return nil, refus
-	}
 	ligne := ligneGrandPublicImport{
-		numero: numero, nom: nom, prenom: prenom, telephone: telephone, projet: projet,
-		email:      emailGrandPublicImport(cellules[enteteGrandPublicImport(19)]),
-		dateLead:   dateLead,
+		numero: numero, nom: nom, prenom: prenom,
+		telephone: telephone, email: emailGrandPublicImport(cellules[enteteGrandPublicImport(19)]),
+		creeLe: creeLe, statut: statut, projet: projet,
 		profession: couperImport(cellules[enteteGrandPublicImport(3)], 120),
 		syndicatID: syndicatID, banqueID: banqueID, canalID: canalID,
 		typeProspect: typeProspect, dureeSystemeMois: duree,
@@ -1160,6 +1179,42 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 		return nil, refus
 	}
 	return ligne, nil
+}
+
+// Un lead Messenger ne donne qu'un nom, sans numéro : les deux se valident
+// séparément, et une ligne vide des deux côtés n'est pas une erreur.
+func identiteGrandPublicImport(cellules map[string]string, numero int, etat *etatGrandPublicImport,
+) (nom, prenom string, telephone *string, refus *erreurLigneImport) {
+	nom, prenom = nomGrandPublicImport(cellules)
+	telephone, refus = telephoneFacultatifImport(cellules[enteteGrandPublicImport(2)], etat.region, numero,
+		enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_TELEPHONE_ILLISIBLE",
+		"Numéro de téléphone inexploitable : « %s ». Laissez la cellule vide si vous ne l'avez pas.")
+	if refus != nil {
+		return "", "", nil, refus
+	}
+	if nom == "" && telephone != nil {
+		return "", "", nil, refusImport(numero, enteteGrandPublicImport(1), "PROSPECT_GP_IMPORT_NOM_ABSENT",
+			"Le nom est obligatoire : une colonne « Nom », ou une colonne « Nom complet » dont le dernier mot est le nom de famille.")
+	}
+	return nom, prenom, telephone, nil
+}
+
+// Les exports Meta datent au rang Excel ou en américain 12 heures, les autres
+// en jour/mois/année : les deux parseurs se relaient sur la même colonne.
+func datesGrandPublicImport(cellules map[string]string, numero int,
+) (creeLe *time.Time, statut db.ProspectStatut, refus *erreurLigneImport) {
+	creeLe, refusDate := lireDateLeadImport(cellules[enteteGrandPublicImport(21)], numero)
+	if refusDate != nil {
+		creeLe, refusDate = dateCreationGrandPublicImport(cellules[enteteGrandPublicImport(21)], numero)
+		if refusDate != nil {
+			return nil, "", refusDate
+		}
+	}
+	statut, refus = etapeGrandPublicImport(cellules[enteteGrandPublicImport(22)], numero)
+	if refus != nil {
+		return nil, "", refus
+	}
+	return creeLe, statut, nil
 }
 
 // Seul le pays refuse la ligne : l'employeur retombe en texte libre, ce que la
@@ -1220,6 +1275,34 @@ func completerSituationGrandPublicImport(ligne *ligneGrandPublicImport, cellules
 	ligne.relaisNom = couperImport(cellules[enteteGrandPublicImport(17)], 160)
 	ligne.relaisTel = relais
 	return nil
+}
+
+// Vide : la fiche prend l'heure de l'import. Les exports Meta écrivent le mois
+// en premier, ce qu'aucun autre classeur d'ici ne fait.
+func dateCreationGrandPublicImport(brut string, numero int) (*time.Time, *erreurLigneImport) {
+	if brut == "" {
+		return nil, nil
+	}
+	for _, format := range formatsCreeLeImport {
+		quand, err := time.ParseInLocation(format, brut, time.UTC)
+		if err == nil && !quand.After(time.Now()) {
+			return &quand, nil
+		}
+	}
+	return nil, refusImport(numero, enteteCreeLeImport, "PROSPECT_GP_IMPORT_DATE_ILLISIBLE",
+		fmt.Sprintf("Date de création illisible ou à venir : « %s ». Écrivez 05/12/2026 9:42am, ou laissez vide.", brut))
+}
+
+func etapeGrandPublicImport(brut string, numero int) (db.ProspectStatut, *erreurLigneImport) {
+	if brut == "" {
+		return db.ProspectStatutNOUVEAU, nil
+	}
+	valeur, connu := etapesImport[cleImport(brut)]
+	if !connu {
+		return db.ProspectStatutNOUVEAU, refusImport(numero, enteteEtapeImport, "PROSPECT_GP_IMPORT_ETAPE_INCONNUE",
+			fmt.Sprintf("Étape inconnue : « %s ». Valeurs admises : %s, ou cellule vide.", brut, valeursAdmisesImport(choixEtapeImport)))
+	}
+	return db.ProspectStatut(valeur), nil
 }
 
 func referentielFacultatifImport(brut string, index map[string]string, cle func(string) string,
@@ -1294,7 +1377,8 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 	etat := brut.(*etatGrandPublicImport)
 	uniques, ignoreesDoublons := doublonsDansLeFichierImport(lignes, etat.vus,
 		func(v any) (string, int) {
-			return v.(ligneGrandPublicImport).telephone, v.(ligneGrandPublicImport).numero
+			ligne := v.(ligneGrandPublicImport)
+			return telephoneConnuImport(ligne.telephone), ligne.numero
 		})
 
 	deja, dejaEmail, err := dejaEnBaseGrandPublicImport(ctx, q, uniques)
@@ -1307,7 +1391,7 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 	ignoreesBase := 0
 	for _, valeur := range uniques {
 		ligne := valeur.(ligneGrandPublicImport)
-		if deja[ligne.telephone][ligne.projet] {
+		if ligne.telephone != nil && deja[telephoneConnuImport(ligne.telephone)][ligne.projet] {
 			ignoreesBase++
 			continue
 		}
@@ -1338,7 +1422,9 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 	clesEmail := make([]string, 0, len(uniques))
 	for _, valeur := range uniques {
 		ligne := valeur.(ligneGrandPublicImport)
-		clesTelephone = append(clesTelephone, ligne.telephone)
+		if ligne.telephone != nil {
+			clesTelephone = append(clesTelephone, *ligne.telephone)
+		}
 		if ligne.email != nil {
 			clesEmail = append(clesEmail, *ligne.email)
 		}
@@ -1349,7 +1435,7 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 			return nil, nil, err
 		}
 		for _, ligne := range connus {
-			telephones[ligne.PhoneE164] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
+			telephones[telephoneConnuImport(ligne.PhoneE164)] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
 		}
 	}
 	for _, lot := range lotsImport(clesEmail) {
@@ -1392,35 +1478,40 @@ func doublonEmailGrandPublicImport(ligne *ligneGrandPublicImport, etat *etatGran
 	return nil
 }
 
+// Les fiches créées ici portent un identifiant que NOUS tenons : le relire par
+// téléphone laisserait de côté celles qui n'en ont pas.
 func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,
 	retenues []ligneGrandPublicImport, connus map[string]map[db.Projet]bool,
 ) (int, error) {
 	maintenant := time.Now()
 	var fiches []db.InsertImportProspectGrandPublicParams
-	telephones := make([]string, 0, len(retenues))
+	var fichesID, telephonesConnus []string
 	projets := make(map[string]db.Projet, len(retenues))
+	idProjets := make(map[string]db.Projet, len(retenues))
 	for i := range retenues {
 		ligne := &retenues[i]
-		telephones = append(telephones, ligne.telephone)
-		projets[ligne.telephone] = ligne.projet
-		if _, existe := connus[ligne.telephone]; existe {
-			continue
+		if ligne.telephone != nil {
+			projets[*ligne.telephone] = ligne.projet
+			if _, existe := connus[*ligne.telephone]; existe {
+				telephonesConnus = append(telephonesConnus, *ligne.telephone)
+				continue
+			}
 		}
+		identifiant := identifiantImport()
+		fichesID = append(fichesID, identifiant)
+		idProjets[identifiant] = ligne.projet
 		statut, numero := whatsappGrandPublicImport(ligne.whatsapp, ligne.telephone)
-		saisieLe := maintenant
-		if ligne.dateLead != nil {
-			saisieLe = *ligne.dateLead
-		}
 		fiches = append(fiches, db.InsertImportProspectGrandPublicParams{
-			ID: identifiantImport(), Projet: ligne.projet, Email: ligne.email, ImportJobID: &c.jobID,
-			Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
+			ID: identifiant, Projet: ligne.projet, Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
+			Email: ligne.email, Statut: ligne.statut,
 			Profession: ligne.profession, SyndicatID: ligne.syndicatID, BanqueID: ligne.banqueID,
 			Type: ligne.typeProspect, DureeSystemeMois: ligne.dureeSystemeMois, CanalProvenanceID: ligne.canalID,
 			EmployeurID: ligne.employeurID, Employeur: ligne.employeur, TypeContrat: ligne.typeContrat,
 			AncienneteMois: ligne.ancienneteMois, LieuActivite: ligne.lieuActivite, ModeEpargne: ligne.modeEpargne,
 			PaysResidenceID: ligne.paysID, VilleResidence: ligne.villeResidence,
 			WhatsappStatus: statut, WhatsappE164: numero, RelaisNom: ligne.relaisNom,
-			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur, ClientCreatedAt: saisieLe,
+			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur,
+			ClientCreatedAt: dateOuMaintenantImport(ligne.creeLe, maintenant), ImportJobID: &c.jobID,
 		})
 	}
 	if len(fiches) > 0 {
@@ -1428,21 +1519,12 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			return 0, err
 		}
 	}
-	prospects, err := q.ImportProspectsParTelephone(ctx, telephones)
+	parcours, identifiants, err := parcoursGrandPublicImport(ctx, q, fichesID, telephonesConnus, projets, idProjets, maintenant)
 	if err != nil {
 		return 0, err
 	}
-	if len(prospects) == 0 {
+	if len(parcours) == 0 {
 		return 0, nil
-	}
-	parcours := make([]db.InsertImportProspectJourneyParams, len(prospects))
-	identifiants := make([]string, len(prospects))
-	for i, prospect := range prospects {
-		identifiants[i] = identifiantImport()
-		parcours[i] = db.InsertImportProspectJourneyParams{
-			ID: identifiants[i], ProspectID: prospect.ID,
-			Projet: projets[prospect.PhoneE164], ConsentAt: &maintenant,
-		}
 	}
 	if err := executerLotImport(q.InsertImportProspectJourney(ctx, parcours).Exec); err != nil {
 		return 0, err
@@ -1451,12 +1533,47 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 	return int(ecrits), err
 }
 
+// Les parcours des fiches créées portent leur projet, ceux des fiches déjà en
+// base celui de la ligne qui les a retrouvées par téléphone.
+func parcoursGrandPublicImport(ctx context.Context, q *db.Queries, fichesID, telephonesConnus []string,
+	projets, idProjets map[string]db.Projet, maintenant time.Time,
+) (parcours []db.InsertImportProspectJourneyParams, identifiants []string, err error) {
+	for _, prospectID := range fichesID {
+		identifiant := identifiantImport()
+		identifiants = append(identifiants, identifiant)
+		parcours = append(parcours, db.InsertImportProspectJourneyParams{ID: identifiant, ProspectID: prospectID, Projet: idProjets[prospectID], ConsentAt: &maintenant})
+	}
+	for _, lot := range lotsImport(telephonesConnus) {
+		existants, err := q.ImportProspectsParTelephone(ctx, lot)
+		if err != nil {
+			return nil, nil, err
+		}
+		for _, prospect := range existants {
+			projet, connu := projets[telephoneConnuImport(prospect.PhoneE164)]
+			if !connu {
+				continue
+			}
+			identifiant := identifiantImport()
+			identifiants = append(identifiants, identifiant)
+			parcours = append(parcours, db.InsertImportProspectJourneyParams{ID: identifiant, ProspectID: prospect.ID, Projet: projet, ConsentAt: &maintenant})
+		}
+	}
+	return parcours, identifiants, nil
+}
+
+func dateOuMaintenantImport(quand *time.Time, defaut time.Time) time.Time {
+	if quand == nil {
+		return defaut
+	}
+	return *quand
+}
+
 // EB-23 : le statut se déduit du numéro, et le CHECK reste tenu.
-func whatsappGrandPublicImport(numero *string, telephone string) (statut db.WhatsappStatus, whatsapp *string) {
+func whatsappGrandPublicImport(numero, telephone *string) (statut db.WhatsappStatus, whatsapp *string) {
 	switch {
 	case numero == nil:
 		return db.WhatsappStatusNONDEMANDE, nil
-	case *numero == telephone:
+	case telephone != nil && *numero == *telephone:
 		return db.WhatsappStatusMEMENUMERO, nil
 	}
 	return db.WhatsappStatusAUTRENUMERO, numero

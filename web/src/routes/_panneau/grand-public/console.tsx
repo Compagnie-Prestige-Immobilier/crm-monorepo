@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/console')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR']),
   component: GrandPublicConsolePage,
   pendingComponent: Loading,
 });
@@ -26,5 +26,9 @@ function Loading() {
 
 /** La page `(panel)/grand-public/console` de la v1. */
 function GrandPublicConsolePage() {
-  return <ConsoleView projet="GRAND_PUBLIC" />;
+  const { user } = Route.useRouteContext();
+
+  return (
+    <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} />
+  );
 }

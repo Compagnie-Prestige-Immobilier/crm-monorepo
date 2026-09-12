@@ -13,7 +13,11 @@ export function Kbd({ children }: { children: ReactNode }) {
   );
 }
 
-export function copyPhone(phoneE164: string): void {
+export function copyPhone(phoneE164: string | null): void {
+  if (phoneE164 === null || phoneE164 === '') {
+    toast.error('Cette fiche n’a pas de numéro.');
+    return;
+  }
   if (!('clipboard' in navigator)) {
     toast.error('Copie indisponible dans ce navigateur.');
     return;

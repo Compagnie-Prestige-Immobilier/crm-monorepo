@@ -307,6 +307,31 @@ export function lireBrouillonRep(draft: unknown): BrouillonRep {
 }
 
 /** Le formulaire s'ouvre déjà rempli de ce que la fiche sait : on ne redemande rien. */
+/** Le dossier d'une fiche qui n'existe pas encore : tout reste à demander. */
+export function dossierVide(projet: Projet): ConversionDraft {
+  return {
+    projet,
+    nom: '',
+    prenom: '',
+    email: '',
+    profession: '',
+    type: null,
+    dureeEtablissementMois: '',
+    fonctionnaire: null,
+    syndicatId: '',
+    banqueId: '',
+    engagementEnCours: null,
+    incomeBandId: '',
+    paymentMode: null,
+    dureeSystemeMois: '',
+    memeWhatsapp: null,
+    whatsapp: '',
+    method: null,
+    rendezVousAt: '',
+    champsLibres: {},
+  };
+}
+
 export function conversionFrom(
   prospect: ProspectRow,
   method: EnrollmentMethod | null = null,
@@ -626,6 +651,8 @@ export function conversionErrorFor(
 
 export interface AttemptDraft {
   readonly outcome: CallOutcome;
+  /** Le motif choisi au référentiel. C'est lui qui commande `outcome`, jamais l'inverse. */
+  readonly reasonCode: string;
   readonly method: EnrollmentMethod | null;
   readonly comment: string;
   readonly callbackAt?: string | null;
@@ -652,9 +679,9 @@ function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null 
   return null;
 }
 
-function commentAttemptErreur(draft: AttemptDraft): string | null {
+function commentAttemptErreur(draft: AttemptDraft, exigeCommentaire: boolean): string | null {
   const comment = draft.comment.trim();
-  if (draft.outcome === 'OTHER' && comment === '') return 'L’issue « Autre » exige un commentaire.';
+  if (exigeCommentaire && comment === '') return 'Ce motif exige un commentaire.';
   if (comment.length > COMMENT_MAX_LENGTH) {
     return `Le commentaire dépasse ${String(COMMENT_MAX_LENGTH)} caractères.`;
   }
@@ -662,12 +689,16 @@ function commentAttemptErreur(draft: AttemptDraft): string | null {
 }
 
 /** Miroir de `apps/api/src/modules/phase2/attempt-rules.ts` : un écart sort en 400 sec. */
-export function validateAttempt(draft: AttemptDraft, now: number = Date.now()): string | null {
+export function validateAttempt(
+  draft: AttemptDraft,
+  now: number = Date.now(),
+  exigeCommentaire = false,
+): string | null {
   const methodeErr = methodeAttemptErreur(draft);
   if (methodeErr !== null) return methodeErr;
   const callbackErr = callbackAttemptErreur(draft, now);
   if (callbackErr !== null) return callbackErr;
-  const commentErr = commentAttemptErreur(draft);
+  const commentErr = commentAttemptErreur(draft, exigeCommentaire);
   if (commentErr !== null) return commentErr;
   if (draft.conversion !== undefined) {
     const problems = validateConversion(draft.conversion, now);
@@ -796,6 +827,7 @@ function buildAttemptBatch(input: AttemptInput): SyncPushBody {
         data: {
           prospectId: input.prospectId,
           outcome: input.draft.outcome,
+          reasonCode: input.draft.reasonCode,
           ...(input.draft.method === null ? {} : { method: input.draft.method }),
           ...(comment === '' ? {} : { comment }),
           ...(callbackAt === null ? {} : { callbackAt }),
@@ -833,6 +865,9 @@ export class AttemptRefused extends Error {
     this.code = code;
   }
 }
+
+/** La fiche s'est fermée entre l'ouverture et la consigne : l'écran se fige. */
+export const ALREADY_COMPLETED = 'PHASE2_ALREADY_COMPLETED';
 
 /**
  * Aucune route HTTP ne consigne un appel de phase 2 : le lot de synchronisation

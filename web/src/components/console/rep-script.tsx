@@ -165,6 +165,7 @@ function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
   return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
 }
 
+
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -214,6 +215,7 @@ export function RepScript() {
     repriseFaite.current = true;
     void reprendreOuverte(reprendre);
   }, [reprendre]);
+
 
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
@@ -316,7 +318,7 @@ export function RepScript() {
   );
 }
 
-/** La fiche ouverte et l'ouverture qui la verrouille : les deux vont ensemble. */
+/** La fiche ouverte et l'ouverture qui la mesure : les deux vont ensemble. */
 interface Ouverte {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
@@ -333,6 +335,7 @@ async function reprendreOuverte(ouvrir: (ouverte: Ouverte) => void): Promise<voi
   if (representant === null) return;
   ouvrir({ representant, ouverture: courante });
 }
+
 
 function ResultatsAnnuaire({
   annuaire,

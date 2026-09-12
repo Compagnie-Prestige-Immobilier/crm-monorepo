@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"reflect"
 	"slices"
-	"strconv"
 	"strings"
 	"time"
 
@@ -49,6 +48,8 @@ const (
 	prospectChampEngagement         = "engagementEnCours"
 	prospectChampRevenu             = "incomeBandId"
 	prospectChampPaiement           = "paymentMode"
+	prospectChampTypeBien           = "typeBien"
+	prospectChampChampsLibres       = "champsLibres"
 	prospectChampDureeSysteme       = "dureeSystemeMois"
 	prospectChampMethode            = "method"
 	prospectChampRendezVous         = "rendezVousAt"
@@ -156,7 +157,7 @@ type Prospect struct {
 	ID                       string            `json:"id"`
 	Nom                      string            `json:"nom"`
 	Prenom                   string            `json:"prenom"`
-	PhoneE164                string            `json:"phoneE164"`
+	PhoneE164                *string           `json:"phoneE164"`
 	Rev                      int32             `json:"rev"`
 	Statut                   string            `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Projet                   string            `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
@@ -177,7 +178,8 @@ type Prospect struct {
 	ProfessionIsTeaching     *bool             `json:"professionIsTeaching"`
 	IncomeBandID             *string           `json:"incomeBandId"`
 	IncomeBandLabel          *string           `json:"incomeBandLabel"`
-	PaymentMode              *string           `json:"paymentMode" enum:"COMPTANT,ECHELONNE"`
+	PaymentMode              *string           `json:"paymentMode" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
+	TypeBien                 *string           `json:"typeBien" enum:"TERRAIN,VILLA"`
 	EmployeurID              *string           `json:"employeurId"`
 	Employeur                *string           `json:"employeur"`
 	TypeContrat              *string           `json:"typeContrat" enum:"CDI,CDD,AUTRE"`
@@ -243,9 +245,9 @@ func prospectSegment(sigle, banqueCourte *string) *string {
 	return prospectPtr("BDD4")
 }
 
-func prospectNumeroWhatsapp(statut db.WhatsappStatus, whatsappE164 *string, phoneE164 string) *string {
+func prospectNumeroWhatsapp(statut db.WhatsappStatus, whatsappE164, phoneE164 *string) *string {
 	if statut == db.WhatsappStatusMEMENUMERO {
-		return &phoneE164
+		return phoneE164
 	}
 	if statut == db.WhatsappStatusAUTRENUMERO {
 		return whatsappE164
@@ -291,7 +293,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		Profession: prospectPremier(l.ProfessionLabel, p.Profession), ProfessionID: p.ProfessionId,
 		ProfessionIsTeaching: l.ProfessionIsTeaching,
 		IncomeBandID:         p.IncomeBandId, IncomeBandLabel: l.IncomeBandLabel,
-		PaymentMode: prospectEnum(p.PaymentMode),
+		PaymentMode: prospectEnum(p.PaymentMode), TypeBien: prospectEnum(p.TypeBien),
 		EmployeurID: p.EmployeurId, Employeur: prospectPremier(l.EmployeurLabel, p.Employeur),
 		TypeContrat: prospectEnum(p.TypeContrat), AncienneteMois: p.AncienneteMois,
 		LieuActivite: p.LieuActivite, ModeEpargne: prospectEnum(p.ModeEpargne),
@@ -451,6 +453,7 @@ type ProspectListInput struct {
 	DateFrom               string `query:"dateFrom"`
 	DateTo                 string `query:"dateTo"`
 	Revue                  string `query:"revue" enum:"true,false"`
+	MesFiches              bool   `query:"mesFiches"`
 	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
@@ -516,6 +519,11 @@ func prospectRechercheTelephone(recherche, region string) *string {
 
 func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (db.ListProspectsParams, error) {
 	p := prospectPorteeDe(u)
+	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
+	// compose que les numéros qui lui reviennent.
+	if in.MesFiches {
+		p.tout, p.converti = false, false
+	}
 	arg := db.ListProspectsParams{
 		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
@@ -679,7 +687,9 @@ type ProspectBody struct {
 	Projet            *string                   `json:"projet,omitempty" enum:"CHUES,GRAND_PUBLIC" required:"false"`
 	Type              *string                   `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA" required:"false"`
 	Profession        *string                   `json:"profession,omitempty" maxLength:"120" required:"false"`
-	PaymentMode       *string                   `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE" required:"false"`
+	PaymentMode       *string                   `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER" required:"false"`
+	TypeBien          *string                   `json:"typeBien,omitempty" enum:"TERRAIN,VILLA" required:"false"`
+	ChampsLibres      map[string]string         `json:"champsLibres,omitempty" required:"false"`
 	DureeSystemeMois  *int32                    `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300" required:"false"`
 	Statut            *string                   `json:"statut,omitempty" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU" required:"false"`
 	ClientCreatedAt   *string                   `json:"clientCreatedAt,omitempty" format:"date-time" required:"false"`
@@ -772,7 +782,7 @@ type ProspectConflictExisting struct {
 // unique partiel l'est ; l'identité civile d'une fiche d'autrui ne sort pas,
 // sinon ce 409 devient un annuaire interrogeable numéro par numéro.
 func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisateur, phoneE164 string, saufID *string) error {
-	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: phoneE164, SaufID: saufID})
+	clash, err := s.Q.ProspectDoublonTelephone(ctx, db.ProspectDoublonTelephoneParams{PhoneE164: &phoneE164, SaufID: saufID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil
 	}
@@ -885,6 +895,24 @@ func (s *service) prospectAvantCreation(ctx context.Context, u *socle.Utilisateu
 	return phoneE164, id, s.prospectRepresentantUtilisable(ctx, corps.RepresentantID)
 }
 
+// Les reponses aux champs ajoutes, filtrees sur les champs declares pour le
+// projet. Une cle inconnue tombe, une reponse vide ne s'ecrit pas.
+func (s *service) prospectLibresRetenus(ctx context.Context, projet db.Projet, envoyes map[string]string) ([]byte, error) {
+	if len(envoyes) == 0 {
+		return nil, nil
+	}
+	reglages, err := s.prospectReglages(ctx, projet)
+	if err != nil {
+		return nil, err
+	}
+	retenus := map[string]string{}
+	formulaireLibresRetenus(&reglages, envoyes, retenus)
+	if len(retenus) == 0 {
+		return nil, nil
+	}
+	return formulaireChampsLibresJSON(retenus)
+}
+
 func (s *service) prospectInserer(ctx context.Context, u *socle.Utilisateur, id, phoneE164 string, projet db.Projet, corps *ProspectBody) error {
 	saisieAt, err := prospectInstant(corps.ClientCreatedAt)
 	if err != nil {
@@ -900,13 +928,14 @@ func (s *service) prospectInserer(ctx context.Context, u *socle.Utilisateur, id,
 	}
 	arg := db.InsertProspectParams{
 		ID: id, Nom: prospectDeref(prospectRogner(corps.Nom)), Prenom: prospectDeref(prospectRogner(corps.Prenom)),
-		PhoneE164: phoneE164, CreatedById: u.ID, ClientCreatedAt: saisieAt,
+		PhoneE164: &phoneE164, CreatedById: u.ID, ClientCreatedAt: saisieAt,
 		Statut: prospectStatutOuNouveau(corps.Statut), Projet: projet,
 		BanqueId: corps.BanqueID.valeur, SyndicatId: corps.SyndicatID.valeur,
 		RepresentantId: corps.RepresentantID, Type: prospectTypeEnum[db.ProspectType](prospectDeref(corps.Type)),
 		Profession: prospectRogner(corps.Profession), ProfessionId: corps.ProfessionID.valeur,
 		Etablissement: prospectRogner(corps.Etablissement.valeur), IncomeBandId: corps.IncomeBandID.valeur,
 		PaymentMode:      prospectTypeEnum[db.PaymentMode](prospectDeref(corps.PaymentMode)),
+		TypeBien:         prospectTypeEnum[db.TypeBien](prospectDeref(corps.TypeBien)),
 		DureeSystemeMois: corps.DureeSystemeMois, CanalProvenanceId: corps.CanalProvenanceID.valeur,
 		EmployeurId: corps.EmployeurID.valeur, Employeur: prospectRogner(corps.Employeur.valeur),
 		TypeContrat:    prospectTypeEnum[db.TypeContrat](prospectDeref(corps.TypeContrat.valeur)),
@@ -917,10 +946,15 @@ func (s *service) prospectInserer(ctx context.Context, u *socle.Utilisateur, id,
 		WhatsappStatus: db.WhatsappStatusNONDEMANDE,
 	}
 	statutWhatsapp, numero := prospectWhatsapp(
-		prospectWhatsappSaisi{numeroFourni: corps.WhatsappE164.fourni, numero: whatsapp}, nil, phoneE164)
+		prospectWhatsappSaisi{numeroFourni: corps.WhatsappE164.fourni, numero: whatsapp}, nil, &phoneE164)
 	if statutWhatsapp != nil {
 		arg.WhatsappStatus, arg.WhatsappE164 = *statutWhatsapp, numero
 	}
+	libres, err := s.prospectLibresRetenus(ctx, projet, corps.ChampsLibres)
+	if err != nil {
+		return err
+	}
+	arg.ChampsLibres = libres
 	consent, consentAt := prospectConsentementDefaut(projet)
 	journeyID, err := uuid.NewV7()
 	if err != nil {
@@ -952,7 +986,7 @@ func prospectInstant(brut *string) (time.Time, error) {
 // du projet demandé, et la personne garde une seule fiche.
 func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, phoneE164 string, projet db.Projet, corps *ProspectBody) (*ProspectOutput, error) {
 	var aucune *ProspectOutput
-	existant, err := s.Q.ProspectRattachable(ctx, db.ProspectRattachableParams{Projet: projet, PhoneE164: phoneE164})
+	existant, err := s.Q.ProspectRattachable(ctx, db.ProspectRattachableParams{Projet: projet, PhoneE164: &phoneE164})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return aucune, nil
 	}
@@ -972,6 +1006,7 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 	prospectPoser(maj, "professionId", corps.ProfessionID.valeur)
 	prospectPoser(maj, prospectChampRevenu, corps.IncomeBandID.valeur)
 	prospectPoserEnum[db.PaymentMode](maj, prospectChampPaiement, corps.PaymentMode)
+	prospectPoserEnum[db.TypeBien](maj, prospectChampTypeBien, corps.TypeBien)
 	prospectPoser(maj, "canalProvenanceId", corps.CanalProvenanceID.valeur)
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		if err := q.InsertJourney(ctx, db.InsertJourneyParams{
@@ -990,61 +1025,6 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 		return aucune, err
 	}
 	return &ProspectOutput{Body: *item}, nil
-}
-
-// Une colonne par appel, une valeur par paramètre : la liste des colonnes vient
-// du code, jamais de la requête.
-type prospectMaj struct {
-	colonnes []string
-	args     []any
-}
-
-func prospectNouvelleMaj() *prospectMaj {
-	return &prospectMaj{colonnes: []string{`"rev" = "rev" + 1`}}
-}
-
-func (m *prospectMaj) set(colonne string, valeur any) {
-	m.args = append(m.args, valeur)
-	m.colonnes = append(m.colonnes, `"`+colonne+`" = $`+strconv.Itoa(len(m.args)))
-}
-
-func (m *prospectMaj) appliquer(ctx context.Context, base db.DBTX, id string) error {
-	m.args = append(m.args, id)
-	requete := `UPDATE "prospects" SET ` + strings.Join(m.colonnes, ", ") +
-		` WHERE "id" = $` + strconv.Itoa(len(m.args))
-	_, err := base.Exec(ctx, requete, m.args...)
-	return err
-}
-
-func prospectPoser[T any](m *prospectMaj, colonne string, v *T) {
-	if v != nil {
-		m.set(colonne, *v)
-	}
-}
-
-// Postgres refuse une chaîne nue sur une colonne d'énumération : la valeur part
-// avec son type Go, et un effacement part en NULL non typé.
-func prospectPoserEnum[T ~string](m *prospectMaj, colonne string, v *string) {
-	if v != nil {
-		m.set(colonne, T(*v))
-	}
-}
-
-func prospectPoserOptionnel(m *prospectMaj, colonne string, v prospectOptionnel[string]) {
-	if v.fourni {
-		m.set(colonne, v.valeur)
-	}
-}
-
-func prospectPoserOptionnelEnum[T ~string](m *prospectMaj, colonne string, v prospectOptionnel[string]) {
-	if !v.fourni {
-		return
-	}
-	if v.valeur == nil {
-		m.set(colonne, nil)
-		return
-	}
-	m.set(colonne, T(*v.valeur))
 }
 
 func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInput) (*ProspectOutput, error) {
@@ -1066,6 +1046,9 @@ func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInpu
 	}
 	maj := prospectNouvelleMaj()
 	if err := s.prospectMajColonnes(maj, corps, &existant, phoneE164); err != nil {
+		return nil, err
+	}
+	if err := s.prospectMajLibres(ctx, maj, &existant, corps.ChampsLibres); err != nil {
 		return nil, err
 	}
 	// Même transaction : la fiche et sa trace, sinon le journal décrirait une
@@ -1092,7 +1075,7 @@ func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInpu
 }
 
 func (s *service) prospectMajAutorisee(ctx context.Context, u *socle.Utilisateur, existant *db.ProspectVivantRow, corps *ProspectBody, phoneE164 *string) error {
-	if phoneE164 != nil && *phoneE164 != existant.PhoneE164 {
+	if phoneE164 != nil && *phoneE164 != prospectDeref(existant.PhoneE164) {
 		if err := s.prospectTelephoneLibre(ctx, u, *phoneE164, &existant.ID); err != nil {
 			return err
 		}
@@ -1154,6 +1137,20 @@ func (s *service) prospectMajJourney(ctx context.Context, id string, corps *Pros
 	})
 }
 
+// Les reponses envoyees remplacent celles de la fiche, jamais partiellement :
+// un champ retire du reglage disparait aussi de la fiche.
+func (s *service) prospectMajLibres(ctx context.Context, maj *prospectMaj, existant *db.ProspectVivantRow, envoyes map[string]string) error {
+	if envoyes == nil {
+		return nil
+	}
+	libres, err := s.prospectLibresRetenus(ctx, existant.Projet, envoyes)
+	if err != nil {
+		return err
+	}
+	maj.set(prospectChampChampsLibres, libres)
+	return nil
+}
+
 func (s *service) prospectMajColonnes(maj *prospectMaj, corps *ProspectBody, existant *db.ProspectVivantRow, phoneE164 *string) error {
 	prospectPoser(maj, prospectChampNom, prospectRogner(corps.Nom))
 	prospectPoser(maj, socle.ProspectChampPrenom, prospectRogner(corps.Prenom))
@@ -1164,6 +1161,7 @@ func (s *service) prospectMajColonnes(maj *prospectMaj, corps *ProspectBody, exi
 	prospectPoserEnum[db.Projet](maj, "projet", corps.Projet)
 	prospectPoserEnum[db.ProspectType](maj, prospectChampType, corps.Type)
 	prospectPoserEnum[db.PaymentMode](maj, prospectChampPaiement, corps.PaymentMode)
+	prospectPoserEnum[db.TypeBien](maj, prospectChampTypeBien, corps.TypeBien)
 	prospectPoserEnum[db.ProspectStatut](maj, "statut", corps.Statut)
 	prospectPoserOptionnel(maj, prospectChampBanque, corps.BanqueID)
 	prospectPoserOptionnel(maj, prospectChampSyndicat, corps.SyndicatID)
@@ -1211,7 +1209,7 @@ func (s *service) prospectMajWhatsapp(maj *prospectMaj, corps *ProspectBody, exi
 	}
 	courant := existant.PhoneE164
 	if phoneE164 != nil {
-		courant = *phoneE164
+		courant = phoneE164
 	}
 	statut, retenu := prospectWhatsapp(
 		prospectWhatsappSaisi{numeroFourni: true, numero: numero}, existant.WhatsappE164, courant)
@@ -1232,7 +1230,7 @@ type prospectWhatsappSaisi struct {
 // NE LÈVE JAMAIS : des fiches portent un numéro WhatsApp saisi bien avant que le
 // statut n'existe. Le statut se déduit alors du numéro, et AUTRE_NUMERO sans
 // numéro retombe sur AUCUN pour tenir le CHECK de la table.
-func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant *string, phoneE164 string) (statut *db.WhatsappStatus, numero *string) {
+func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant, phoneE164 *string) (statut *db.WhatsappStatus, numero *string) {
 	if saisi.statut == nil && !saisi.numeroFourni {
 		return nil, nil
 	}
@@ -1253,11 +1251,11 @@ func prospectWhatsapp(saisi prospectWhatsappSaisi, e164Courant *string, phoneE16
 	return statut, numero
 }
 
-func prospectDeduireWhatsapp(numero *string, phoneE164 string) db.WhatsappStatus {
+func prospectDeduireWhatsapp(numero, phoneE164 *string) db.WhatsappStatus {
 	if numero == nil {
 		return db.WhatsappStatusNONDEMANDE
 	}
-	if *numero == phoneE164 {
+	if *numero == prospectDeref(phoneE164) {
 		return db.WhatsappStatusMEMENUMERO
 	}
 	return db.WhatsappStatusAUTRENUMERO
@@ -1287,7 +1285,7 @@ func (s *service) prospectSupprimer(ctx context.Context, in *ProspectIDInput) (*
 	}
 	avant := map[string]string{
 		prospectChampNom: existant.Nom, socle.ProspectChampPrenom: existant.Prenom,
-		socle.ProspectChampPhone: existant.PhoneE164,
+		socle.ProspectChampPhone: prospectDeref(existant.PhoneE164),
 	}
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
 		if err := q.SoftDeleteProspect(ctx, in.ID); err != nil {
@@ -1449,8 +1447,8 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
 	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
 	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,
-	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin},
-	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin},
+	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
+	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
 	"GET /api/v1/champs-conversion/{projet}":                          socle.Tous,
 	"PUT /api/v1/champs-conversion/{projet}":                          socle.AdminSeul,
 	"GET /api/v1/parametres-chues":                                    socle.Parcours,

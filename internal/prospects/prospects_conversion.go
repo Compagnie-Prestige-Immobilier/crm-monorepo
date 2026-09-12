@@ -4,12 +4,15 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/exports"
+	"cpi-go/internal/notifications"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 
@@ -58,14 +61,16 @@ func (s *service) prospectConsentement(ctx context.Context, in *ProspectConsente
 	return &ProspectOutput{Body: *item}, nil
 }
 
+type ProspectConversionBody struct {
+	OfferID        string  `json:"offerId" format:"uuid"`
+	PaymentMode    *string `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER" required:"false"`
+	AmountXof      *int32  `json:"amountXof,omitempty" minimum:"0" maximum:"2147483647" required:"false"`
+	DurationMonths *int32  `json:"durationMonths,omitempty" minimum:"1" maximum:"300" required:"false"`
+}
+
 type ProspectConversionInput struct {
-	ID   string `path:"id" format:"uuid"`
-	Body struct {
-		OfferID        string  `json:"offerId" format:"uuid"`
-		PaymentMode    *string `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE" required:"false"`
-		AmountXof      *int32  `json:"amountXof,omitempty" minimum:"0" maximum:"2147483647" required:"false"`
-		DurationMonths *int32  `json:"durationMonths,omitempty" minimum:"1" maximum:"300" required:"false"`
-	}
+	ID   string                 `path:"id" format:"uuid"`
+	Body ProspectConversionBody `json:"body"`
 }
 
 func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionInput) (*ProspectOutput, error) {
@@ -112,7 +117,71 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	if err != nil {
 		return nil, err
 	}
+	// L'avis part après la transaction : une messagerie en panne ne doit pas
+	// défaire une adhésion déjà acquise.
+	s.prospectAviserAdhesion(ctx, &u, item, &corps, maintenant)
 	return &ProspectOutput{Body: *item}, nil
+}
+
+// L'avis d'adhésion aux adresses réglées par l'administrateur. Sans destinataire
+// ou sans clé Brevo, rien ne part et la conversion reste enregistrée.
+func (s *service) prospectAviserAdhesion(ctx context.Context, u *socle.Utilisateur, item *Prospect, corps *ProspectConversionBody, quand time.Time) {
+	parametres, err := s.prospectLireParametres(ctx)
+	if err != nil {
+		slog.WarnContext(ctx, "avis d'adhésion non composé", "prospectId", item.ID, "err", err)
+		return
+	}
+	destinataires := prospectDestinataires(parametres.DestinatairesAdhesion)
+	if len(destinataires) == 0 {
+		return
+	}
+	offre, err := s.Q.OffreParID(ctx, corps.OfferID)
+	if err != nil {
+		offre = prospectAbsent
+	}
+	jetons := map[string]string{
+		"prenomNom": item.Prenom + " " + item.Nom, "telephone": prospectDeref(item.PhoneE164),
+		"date": formulaireDateLongue(quand.In(s.Cfg.TimeZone)), "offre": offre,
+		"paiement":       prospectLibellePaiement(corps.PaymentMode),
+		"montant":        prospectLibelleMontant(corps.AmountXof),
+		"teleconseiller": u.FullName,
+	}
+	texte := formulaireRemplacerJetons(parametres.AdhesionCorps, jetons)
+	transport := notifications.ConfigurerBrevo()
+	envoi := transport.Envoyer(ctx, []notifications.MessageBrevo{{
+		Destinataires: destinataires,
+		Sujet:         formulaireRemplacerJetons(parametres.AdhesionObjet, jetons),
+		Texte:         texte, HTML: formulaireEnHtml(texte),
+	}})
+	if envoi.Statut != notifications.BrevoEnvoye {
+		slog.WarnContext(ctx, "avis d'adhésion non remis", "prospectId", item.ID, "statut", envoi.Statut)
+	}
+}
+
+const prospectAbsent = "non renseigné"
+
+func prospectDestinataires(adresses []string) []notifications.DestinataireBrevo {
+	var liste []notifications.DestinataireBrevo
+	for _, adresse := range adresses {
+		if propre := strings.TrimSpace(adresse); propre != "" {
+			liste = append(liste, notifications.DestinataireBrevo{Email: propre})
+		}
+	}
+	return liste
+}
+
+func prospectLibellePaiement(mode *string) string {
+	if mode == nil || *mode == "" {
+		return prospectAbsent
+	}
+	return exports.LibellePaiement(*mode)
+}
+
+func prospectLibelleMontant(montant *int32) string {
+	if montant == nil {
+		return prospectAbsent
+	}
+	return strconv.FormatInt(int64(*montant), 10) + " F CFA"
 }
 
 // Avancement d'un parcours : la fusion garde toujours le plus avancé des deux.
@@ -536,10 +605,14 @@ type ProspectParametresChues struct {
 	MessageWhatsapp          string   `json:"messageWhatsapp"`
 	AccuseReceptionObjet     string   `json:"accuseReceptionObjet"`
 	AccuseReceptionCorps     string   `json:"accuseReceptionCorps"`
+	AdhesionObjet            string   `json:"adhesionObjet"`
+	AdhesionCorps            string   `json:"adhesionCorps"`
 	DestinatairesEnrolement  []string `json:"destinatairesEnrolement"`
 	DestinatairesBpe         []string `json:"destinatairesBpe"`
 	DestinatairesSupervision []string `json:"destinatairesSupervision"`
 	DestinatairesDirection   []string `json:"destinatairesDirection"`
+	DestinatairesAdhesion    []string `json:"destinatairesAdhesion"`
+	VerrouFiches             bool     `json:"verrouFiches"`
 	CodificationProvenances  []string `json:"codificationProvenances"`
 	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
 	TextesUsine ProspectTextesUsine `json:"textesUsine"`
@@ -562,10 +635,16 @@ var prospectParametresUsine = ProspectParametresChues{
 	AccuseReceptionCorps: "Bonjour {prenomNom}, nous avons bien reçu votre demande du {date}. " +
 		"Récapitulatif : {informations}. Un chargé de clientèle CPI vous contactera au {telephone}. " +
 		"Pour toute question : {emailChues} ou {whatsappChues}. CPI.",
+	AdhesionObjet: "Nouvelle adhésion Grand Public : {prenomNom}",
+	AdhesionCorps: "Bonjour, {prenomNom} ({telephone}) a adhéré le {date}. " +
+		"Offre : {offre}. Paiement : {paiement}. Montant : {montant}. " +
+		"Conversion enregistrée par {teleconseiller}. CPI.",
 	DestinatairesEnrolement:  []string{},
 	DestinatairesBpe:         []string{},
 	DestinatairesSupervision: []string{},
 	DestinatairesDirection:   []string{},
+	DestinatairesAdhesion:    []string{},
+	VerrouFiches:             true,
 	CodificationProvenances:  []string{},
 }
 
@@ -577,10 +656,14 @@ const (
 	prospectCleMessage       = "messageWhatsapp"
 	prospectCleAccuseObjet   = "accuseReceptionObjet"
 	prospectCleAccuseCorps   = "accuseReceptionCorps"
+	prospectCleAdhesionObjet = "adhesionObjet"
+	prospectCleAdhesionCorps = "adhesionCorps"
+	prospectCleAdhesionDest  = "destinatairesAdhesion"
 	prospectCleEnrolement    = "destinatairesEnrolement"
 	prospectCleBpe           = "destinatairesBpe"
 	prospectCleSupervision   = "destinatairesSupervision"
 	prospectCleDirection     = "destinatairesDirection"
+	prospectCleVerrouFiches  = "verrouFiches"
 	prospectCleCodification  = "codificationProvenances"
 	prospectPrefixeParametre = "chues."
 )
@@ -593,8 +676,9 @@ var prospectTextesPartages = []string{prospectCleMessage, prospectCleAccuseObjet
 var prospectClesParametres = []string{
 	prospectCleLienChues, prospectCleLienGP, prospectCleEmail, prospectCleWhatsapp,
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
+	prospectCleAdhesionObjet, prospectCleAdhesionCorps,
 	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleCodification,
+	prospectCleDirection, prospectCleAdhesionDest, prospectCleVerrouFiches, prospectCleCodification,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -611,6 +695,13 @@ func prospectClesStockees() []string {
 
 // Une liste voyage en JSON, un booléen en 'true'/'false'. Une valeur illisible
 // retombe sur l'usine plutôt que de faire échouer l'écran entier.
+func prospectBool(v bool) string {
+	if v {
+		return socle.Vrai
+	}
+	return socle.Faux
+}
+
 func prospectListeDe(brut string) []string {
 	liste := []string{}
 	if err := json.Unmarshal([]byte(brut), &liste); err != nil {
@@ -635,7 +726,8 @@ func (p *ProspectParametresChues) textes() map[string]*string {
 		prospectCleLienChues: &p.PlateformeChuesUrl, prospectCleLienGP: &p.PlateformeGrandPublicUrl,
 		prospectCleEmail: &p.EmailChues, prospectCleWhatsapp: &p.WhatsappChuesE164,
 		prospectCleMessage: &p.MessageWhatsapp, prospectCleAccuseObjet: &p.AccuseReceptionObjet,
-		prospectCleAccuseCorps: &p.AccuseReceptionCorps,
+		prospectCleAccuseCorps:   &p.AccuseReceptionCorps,
+		prospectCleAdhesionObjet: &p.AdhesionObjet, prospectCleAdhesionCorps: &p.AdhesionCorps,
 	}
 }
 
@@ -643,6 +735,7 @@ func (p *ProspectParametresChues) listes() map[string]*[]string {
 	return map[string]*[]string{
 		prospectCleEnrolement: &p.DestinatairesEnrolement, prospectCleBpe: &p.DestinatairesBpe,
 		prospectCleSupervision: &p.DestinatairesSupervision, prospectCleDirection: &p.DestinatairesDirection,
+		prospectCleAdhesionDest: &p.DestinatairesAdhesion,
 		prospectCleCodification: &p.CodificationProvenances,
 	}
 }
@@ -656,6 +749,9 @@ func (p *ProspectParametresChues) poser(cle, brut string) {
 		*cible = prospectListeDe(brut)
 		return
 	}
+	if cle == prospectCleVerrouFiches {
+		p.VerrouFiches = brut != "false"
+	}
 }
 
 func (p *ProspectParametresChues) valeur(cle string) string {
@@ -664,6 +760,9 @@ func (p *ProspectParametresChues) valeur(cle string) string {
 	}
 	if liste, connu := p.listes()[cle]; connu {
 		return prospectJSONListe(*liste)
+	}
+	if cle == prospectCleVerrouFiches {
+		return prospectBool(p.VerrouFiches)
 	}
 	return ""
 }
@@ -715,10 +814,14 @@ type ProspectMajParametresInput struct {
 		MessageWhatsapp          *string   `json:"messageWhatsapp,omitempty" maxLength:"1000" required:"false"`
 		AccuseReceptionObjet     *string   `json:"accuseReceptionObjet,omitempty" maxLength:"200" required:"false"`
 		AccuseReceptionCorps     *string   `json:"accuseReceptionCorps,omitempty" maxLength:"4000" required:"false"`
+		AdhesionObjet            *string   `json:"adhesionObjet,omitempty" maxLength:"200" required:"false"`
+		AdhesionCorps            *string   `json:"adhesionCorps,omitempty" maxLength:"4000" required:"false"`
 		DestinatairesEnrolement  *[]string `json:"destinatairesEnrolement,omitempty" maxItems:"50" required:"false"`
 		DestinatairesBpe         *[]string `json:"destinatairesBpe,omitempty" maxItems:"50" required:"false"`
 		DestinatairesSupervision *[]string `json:"destinatairesSupervision,omitempty" maxItems:"50" required:"false"`
 		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
+		DestinatairesAdhesion    *[]string `json:"destinatairesAdhesion,omitempty" maxItems:"50" required:"false"`
+		VerrouFiches             *bool     `json:"verrouFiches,omitempty" required:"false"`
 		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
 	}
 }
@@ -729,7 +832,8 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		prospectCleLienChues: in.Body.PlateformeChuesUrl, prospectCleLienGP: in.Body.PlateformeGrandPublicUrl,
 		prospectCleEmail: in.Body.EmailChues, prospectCleWhatsapp: in.Body.WhatsappChuesE164,
 		prospectCleMessage: in.Body.MessageWhatsapp, prospectCleAccuseObjet: in.Body.AccuseReceptionObjet,
-		prospectCleAccuseCorps: in.Body.AccuseReceptionCorps,
+		prospectCleAccuseCorps:   in.Body.AccuseReceptionCorps,
+		prospectCleAdhesionObjet: in.Body.AdhesionObjet, prospectCleAdhesionCorps: in.Body.AdhesionCorps,
 	}
 	for cle, valeur := range textes {
 		if valeur != nil {
@@ -739,12 +843,16 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 	listes := map[string]*[]string{
 		prospectCleEnrolement: in.Body.DestinatairesEnrolement, prospectCleBpe: in.Body.DestinatairesBpe,
 		prospectCleSupervision: in.Body.DestinatairesSupervision, prospectCleDirection: in.Body.DestinatairesDirection,
+		prospectCleAdhesionDest: in.Body.DestinatairesAdhesion,
 		prospectCleCodification: in.Body.CodificationProvenances,
 	}
 	for cle, valeur := range listes {
 		if valeur != nil {
 			demandees[cle] = prospectJSONListe(*valeur)
 		}
+	}
+	if in.Body.VerrouFiches != nil {
+		demandees[prospectCleVerrouFiches] = prospectBool(*in.Body.VerrouFiches)
 	}
 	return demandees
 }

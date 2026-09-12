@@ -31,6 +31,9 @@ const LIBELLES: Record<string, string> = {
   messageWhatsapp: 'Message WhatsApp',
   accuseReceptionObjet: 'Accusé de réception, objet',
   accuseReceptionCorps: 'Accusé de réception, corps',
+  adhesionObjet: 'Avis d’adhésion, objet',
+  adhesionCorps: 'Avis d’adhésion, corps',
+  destinatairesAdhesion: 'Avis d’adhésion, destinataires',
   destinatairesEnrolement: 'Cellule enrôlement',
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
@@ -68,6 +71,7 @@ const LISTES = [
   'destinatairesBpe',
   'destinatairesSupervision',
   'destinatairesDirection',
+  'destinatairesAdhesion',
 ] as const;
 
 const CODIFICATION = 'codificationProvenances';
@@ -216,7 +220,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
-type CleTexte = Exclude<keyof ParametresChues, 'textesUsine'>;
+type CleTexte = Exclude<keyof ParametresChues, 'textesUsine' | 'verrouFiches'>;
 
 type ChampsProps = {
   valeur: (cle: CleTexte) => string;

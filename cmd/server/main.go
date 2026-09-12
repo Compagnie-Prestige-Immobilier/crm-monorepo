@@ -20,6 +20,10 @@ import (
 	"strings"
 	"syscall"
 	"time"
+	// Le fuseau horaire métier est un nom IANA. Sans cette base embarquée, le
+	// binaire refuse de démarrer partout où l'hôte n'a pas `tzdata` : Windows,
+	// et toute image de base qui ne l'installe pas.
+	_ "time/tzdata"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"

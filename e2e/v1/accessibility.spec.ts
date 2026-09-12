@@ -51,7 +51,11 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/chues/campagnes/representants', 'Tableau de bord', 'Requête refusée'],
   // `ConsoleView` a été vidé : plus de file d'appels ni de carte clavier, un
   // titre de page et un lien vers l'annuaire.
-  ['/chues/console', 'Convertir un prospect', 'Les vingt dernières fiches ajoutées.'],
+  [
+    '/chues/console',
+    'Convertir un prospect',
+    'Vos fiches et celles que vos campagnes vous ont confiées.',
+  ],
   // `RepScript` s'ouvre désormais sur un ANNUAIRE cherchable ; la carte clavier
   // n'apparaît qu'une fois un représentant choisi.
   ['/chues/appels-representants', 'Qualifier un représentant', null],

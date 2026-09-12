@@ -188,7 +188,7 @@ WHERE p."deletedAt" IS NULL
 SELECT "id", "createdById", "statut", "phoneE164", "nom", "prenom", "whatsappStatus", "whatsappE164",
        "paymentMode", "dureeSystemeMois", "representantId", "clientCreatedAt", "banqueId", "syndicatId",
        "email", "profession", "professionId", "employeur", "etablissement", "incomeBandId", "type",
-       "champsLibres"
+       "champsLibres", "projet"
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 
 -- name: ProspectProprietaire :one
@@ -225,7 +225,7 @@ INSERT INTO "prospects" (
   "canalProvenanceId", "employeurId", "employeur", "typeContrat", "ancienneteMois",
   "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence", "relaisNom",
   "relaisPhoneE164", "whatsappStatus", "whatsappE164", "email", "origin", "aRevoirAt",
-  "champsLibres"
+  "champsLibres", "typeBien"
 ) VALUES (
   $1, $2, $3, $4, $5, $6, now(),
   $7, $8, $9, $10, $11, $12, $13,
@@ -233,7 +233,7 @@ INSERT INTO "prospects" (
   $19, $20, $21, $22, $23,
   $24, $25, $26, $27, $28,
   $29, $30, $31, $32, $33, $34,
-  $35
+  $35, $36
 );
 
 -- name: SoftDeleteProspect :exec

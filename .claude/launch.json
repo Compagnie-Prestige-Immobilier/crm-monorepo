@@ -1,0 +1,21 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "cpi-api",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": [
+        "-NoProfile",
+        "-Command",
+        "$env:DATABASE_URL='postgres://cpi:cpi@localhost:5434/cpi_v2_dev?sslmode=disable'; $env:PORT='4000'; $env:LOG_FORMAT='text'; go run ./cmd/server"
+      ],
+      "port": 4000
+    },
+    {
+      "name": "cpi-web",
+      "runtimeExecutable": "powershell",
+      "runtimeArgs": ["-NoProfile", "-Command", "Set-Location web; npx vite"],
+      "port": 5173
+    }
+  ]
+}
