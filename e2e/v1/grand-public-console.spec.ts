@@ -12,7 +12,7 @@ const CHAMP = 'Quel prospect avez-vous appelé ?';
 test('GP-29 · la console Grand Public ouvre sur la recherche, sans file', async ({ page }) => {
   await page.goto('/grand-public/console');
 
-  await expect(page).toHaveTitle(/^Appeler les prospects · CPI GO$/u);
+  await expect(page).toHaveTitle(/^Appeler les prospects · Projet Grand Public · CPI GO$/u);
   await expect(page.getByLabel(CHAMP)).toBeFocused();
   await expect(page.getByRole('heading', { level: 2 })).toHaveCount(0);
   await expect(page.getByRole('region', { name: 'Fiche courante' })).toHaveCount(0);

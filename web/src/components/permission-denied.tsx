@@ -36,7 +36,7 @@ export function PermissionDenied({
         href={homePathForRole(role)}
         className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
       >
-        Retour à l’accueil
+        Tous les espaces
       </Link>
     </Card>
   );

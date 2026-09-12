@@ -48,7 +48,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
    * l'API refuse l'identifiant et l'écran dit « Requête refusée ». La ligne
    * reste : c'est cet écran-là que le terrain voit, et c'est lui qu'on audite.
    */
-  ['/chues/campagnes/representants', 'Tableau de bord', 'Requête refusée'],
+  ['/chues/campagnes/representants', 'Campagnes', 'Requête refusée'],
   // `ConsoleView` a été vidé : plus de file d'appels ni de carte clavier, un
   // titre de page et un lien vers l'annuaire.
   [
@@ -69,7 +69,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   ['/chues/representants', 'Représentants', null],
   ['/chues/representants/import', 'Importer des représentants', 'Partir du modèle'],
   ['/admin/commerciaux', 'Utilisateurs', null],
-  ['/chues/supervision', 'Tableau de bord', 'Activité'],
+  ['/chues/supervision', 'Activité', 'Activité'],
   ['/admin/referentiels', 'Listes de référence', null],
   ['/admin/imports', 'Importer un fichier Excel', 'Déposer un classeur'],
   ['/admin/parametres', 'Paramètres', null],
@@ -77,7 +77,7 @@ const PANEL_ROUTES: readonly (readonly [path: string, heading: string, marker: s
   // onglet « Boîte de réception » : c'est le composeur qu'on audite.
   ['/admin/notifications', 'Envoyer une notification', 'Boîte de réception'],
   // Pour l'ADMIN, `/chues/banque` est l'onglet « Banque » du tableau de bord.
-  ['/chues/banque', 'Tableau de bord', 'Banque'],
+  ['/chues/banque', 'Banque', 'Banque'],
 ];
 
 async function analyze(page: Page, where: string): Promise<void> {

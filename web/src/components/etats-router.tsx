@@ -44,6 +44,7 @@ export function EcranErreurPleinePage(props: { error: unknown; reset: () => void
 
 export function EcranIntrouvable() {
   const { data: user } = useQuery(meQueryOptions);
+  const connecte = user !== null && user !== undefined;
 
   return (
     <Card
@@ -63,10 +64,10 @@ export function EcranIntrouvable() {
         Cette adresse ne mène à aucun écran. Elle a pu être déplacée.
       </p>
       <Link
-        to={user === null || user === undefined ? '/connexion' : '/espaces'}
+        to={connecte ? '/espaces' : '/connexion'}
         className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
       >
-        Retour à l’accueil
+        {connecte ? 'Tous les espaces' : 'Se connecter'}
       </Link>
     </Card>
   );

@@ -110,7 +110,7 @@ test.afterAll(async () => {
 test('GP-34 · l’écran des chiffres Grand Public se charge', async ({ page }) => {
   await ouvrirEcran(page);
 
-  await expect(page).toHaveTitle(/^Tableau de bord Grand Public · CPI GO$/u);
+  await expect(page).toHaveTitle(/^Tableau de bord · Projet Grand Public · CPI GO$/u);
   await expect(page.getByRole('button', { name: 'Composer l’écran' })).toBeVisible();
   // Le libellé du tableau de bord des VISITES n'a rien à faire ici (§1.9).
   await expect(page.getByRole('button', { name: 'Organiser les graphiques' })).toHaveCount(0);

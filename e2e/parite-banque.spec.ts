@@ -323,7 +323,7 @@ async function attendreRefus(page: Page, ecran: Ecran, libelle: string): Promise
   await expect(refus).toContainText(
     `Cet écran est réservé à un autre rôle. Rôle en cours : ${libelle}.`,
   );
-  const retour = refus.getByRole('link', { name: 'Retour à l’accueil' });
+  const retour = refus.getByRole('link', { name: 'Tous les espaces' });
   await expect(retour).toHaveAttribute('href', '/espaces');
   expect(chargees, `${route} a chargé des données métier pour ${libelle}`).toEqual([]);
 }

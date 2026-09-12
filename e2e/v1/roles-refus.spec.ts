@@ -85,7 +85,7 @@ const ECRANS: readonly Ecran[] = [
   // ─── Espace Accueil ─────────────────────────────────────────────────────
   {
     route: '/accueil',
-    titre: 'Registre des visites · CPI GO',
+    titre: 'Registre des visites · Accueil · CPI GO',
     familles: VISITES,
     autorises: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
     // Le refus de `/accueil` appartient à ROL-28 (`roles-trous.spec.ts`).
@@ -126,7 +126,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/admin/imports',
-    titre: 'Importer un fichier Excel · CPI GO',
+    titre: 'Importer un fichier Excel · Admin · CPI GO',
     familles: ['/api/v1/imports'],
     autorises: ['ADMIN'],
   },
@@ -141,13 +141,13 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/admin/enrolement',
-    titre: 'Plateformes d’enrôlement · CPI GO',
+    titre: 'Plateformes d’enrôlement · Admin · CPI GO',
     familles: ['/api/v1/enrolement'],
     autorises: ['ADMIN'],
   },
   {
     route: '/admin/parametres',
-    titre: 'Paramètres · CPI GO',
+    titre: 'Paramètres · Admin · CPI GO',
     familles: ['/api/v1/admin/'],
     autorises: ['ADMIN'],
   },
@@ -174,7 +174,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/appels-representants',
-    titre: 'Qualifier un représentant · CPI GO',
+    titre: 'Qualifier un représentant · Projet CHUES · CPI GO',
     familles: [...REPRESENTANTS, '/api/v1/rep-campaigns'],
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
@@ -200,7 +200,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/console',
-    titre: 'Convertir un prospect · CPI GO',
+    titre: 'Convertir un prospect · Projet CHUES · CPI GO',
     familles: PROSPECTS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
@@ -212,7 +212,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/dossiers',
-    titre: 'Dossiers bancaires · CPI GO',
+    titre: 'Dossiers bancaires · Projet CHUES · CPI GO',
     familles: DOSSIERS,
     autorises: ['ADMIN', 'BANQUE_FINANCE'],
   },
@@ -242,25 +242,25 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/prospects',
-    titre: 'Prospects · CPI GO',
+    titre: 'Prospects · Projet CHUES · CPI GO',
     familles: PROSPECTS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     route: '/chues/prospects/nouveau',
-    titre: 'Ajouter un prospect · CPI GO',
+    titre: 'Ajouter un prospect · Projet CHUES · CPI GO',
     familles: PROSPECTS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     route: '/chues/rappels',
-    titre: 'Rappels · CPI GO',
+    titre: 'Rappels · Projet CHUES · CPI GO',
     familles: RAPPELS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     route: '/chues/representants',
-    titre: 'Représentants · CPI GO',
+    titre: 'Représentants · Projet CHUES · CPI GO',
     familles: REPRESENTANTS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
@@ -278,7 +278,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/statistiques',
-    titre: 'Tableau de bord · CPI GO',
+    titre: 'Tableau de bord · Projet CHUES · CPI GO',
     familles: CHIFFRES,
     autorises: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
   },
@@ -296,7 +296,7 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/chues/tableau-de-bord',
-    titre: 'Tableau de bord · CPI GO',
+    titre: 'Tableau de bord · Projet CHUES · CPI GO',
     familles: CHIFFRES,
     autorises: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
     // `permanentRedirect` vers `/chues/statistiques` : le refus, s'il y en a
@@ -307,7 +307,7 @@ const ECRANS: readonly Ecran[] = [
   // ─── Espace Projet Grand Public ─────────────────────────────────────────
   {
     route: '/grand-public',
-    titre: 'Prospects Grand Public · CPI GO',
+    titre: 'Prospects · Projet Grand Public · CPI GO',
     familles: PROSPECTS,
     autorises: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL'],
   },
@@ -322,7 +322,6 @@ const ECRANS: readonly Ecran[] = [
     titre: 'Campagne d’appels Grand Public · CPI GO',
     familles: ['/api/v1/lots-export'],
     autorises: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
-    renvoyes: ['COMMERCIAL', 'ACCUEIL', 'BANQUE_FINANCE'],
   },
   {
     route: '/grand-public/console',
@@ -338,19 +337,19 @@ const ECRANS: readonly Ecran[] = [
   },
   {
     route: '/grand-public/rappels',
-    titre: 'Rappels · CPI GO',
+    titre: 'Rappels · Projet Grand Public · CPI GO',
     familles: RAPPELS,
     autorises: ['ADMIN', 'COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     route: '/grand-public/statistiques',
-    titre: 'Tableau de bord Grand Public · CPI GO',
+    titre: 'Tableau de bord · Projet Grand Public · CPI GO',
     familles: CHIFFRES,
     autorises: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     route: '/grand-public/tableau-de-bord',
-    titre: 'Tableau de bord Grand Public · CPI GO',
+    titre: 'Tableau de bord · Projet Grand Public · CPI GO',
     familles: CHIFFRES,
     autorises: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
     sansRefus: true,
@@ -482,7 +481,7 @@ async function eprouverLeRefus(page: Page, role: Role, ecrans: readonly Ecran[])
       `${url} : le refus devrait nommer le rôle en cours`,
     ).toContainText(LIBELLE_DU_ROLE[role]);
     await expect(
-      page.getByRole('link', { name: 'Retour à l’accueil', exact: true }),
+      page.getByRole('link', { name: 'Tous les espaces', exact: true }),
       `${url} : le refus devrait offrir une sortie vers le hub`,
     ).toHaveAttribute('href', '/espaces');
 

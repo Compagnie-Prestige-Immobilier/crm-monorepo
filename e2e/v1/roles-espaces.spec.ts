@@ -51,7 +51,7 @@ const CHIFFRES_CHUES: Destination = {
   url: /\/chues\/statistiques$/,
   repere: async (page) => {
     await expect(page.getByRole('button', { name: 'Composer l’écran' })).toBeVisible();
-    await expect(page).toHaveTitle('Tableau de bord · CPI GO');
+    await expect(page).toHaveTitle('Tableau de bord · Projet CHUES · CPI GO');
   },
 };
 
@@ -60,7 +60,7 @@ const CHIFFRES_GRAND_PUBLIC: Destination = {
   url: /\/grand-public\/statistiques$/,
   repere: async (page) => {
     await expect(page.getByRole('button', { name: 'Composer l’écran' })).toBeVisible();
-    await expect(page).toHaveTitle('Tableau de bord Grand Public · CPI GO');
+    await expect(page).toHaveTitle('Tableau de bord · Projet Grand Public · CPI GO');
   },
 };
 

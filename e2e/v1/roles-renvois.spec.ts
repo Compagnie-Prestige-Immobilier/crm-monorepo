@@ -143,11 +143,7 @@ test.describe('ROL-27', () => {
 
   const LOT = '00000000-0000-4000-8000-000000000000';
 
-  for (const route of [
-    '/chues/campagnes',
-    `/chues/campagnes/${LOT}`,
-    `/grand-public/campagnes/${LOT}`,
-  ]) {
+  for (const route of ['/chues/campagnes', `/chues/campagnes/${LOT}`]) {
     test(`ROL-27 · ${route} renvoie un téléconseiller vers /chues`, async ({ page }) => {
       await page.goto(route);
 

@@ -28,7 +28,7 @@ test.describe('étape 2 de la qualification d’un représentant', () => {
   test('aucune violation axe sur la deuxième étape du script représentant', async ({ page }) => {
     await page.emulateMedia({ colorScheme: 'light' });
     await page.goto('/chues/appels-representants');
-    await expect(page).toHaveTitle('Qualifier un représentant · CPI GO');
+    await expect(page).toHaveTitle('Qualifier un représentant · Projet CHUES · CPI GO');
     await expect(page.getByText('Choisissez qui vous venez d’appeler.')).toBeVisible();
 
     // Une relation DÉJÀ TRANCHÉE ouvre d'abord une boîte d'avertissement et non
@@ -70,7 +70,7 @@ test.describe('mode composition des chiffres CHUES', () => {
       response.url().includes('/api/v1/supervision/activite'),
     );
     await page.goto('/chues/statistiques');
-    await expect(page).toHaveTitle('Tableau de bord · CPI GO');
+    await expect(page).toHaveTitle('Tableau de bord · Projet CHUES · CPI GO');
     await disposition;
     await activite;
 

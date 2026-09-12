@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
 import { COQUE_ICONS, CoqueArt } from '@/components/espaces/coque-icons';
-import { coqueHomePath, coquesForRole } from '@/components/layout/nav-items';
+import { coqueHomePath, coquesForRole, dernierEcran } from '@/components/layout/nav-items';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -87,7 +87,7 @@ function EspacesPage() {
           return (
             <li key={entry.id} className="h-full">
               <Link
-                href={coqueHomePath(user.role, entry.id)}
+                href={dernierEcran(user.id, entry.id) ?? coqueHomePath(user.role, entry.id)}
                 style={{ animationDelay: `${String(index * 40)}ms` }}
                 className="animate-rise relative flex h-full min-h-[14rem] flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-elev-sm transition-shadow duration-(--dur-2) ease-(--ease-out-cpi) hover:shadow-elev-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >

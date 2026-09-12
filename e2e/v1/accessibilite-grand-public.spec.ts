@@ -25,7 +25,7 @@ const ROUTES: readonly {
 }[] = [
   {
     chemin: '/grand-public',
-    titre: 'Prospects Grand Public · CPI GO',
+    titre: 'Prospects · Projet Grand Public · CPI GO',
     repere: (page) =>
       page.getByText(
         'Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.',
@@ -47,13 +47,13 @@ const ROUTES: readonly {
   },
   {
     chemin: '/grand-public/rappels',
-    titre: 'Rappels · CPI GO',
+    titre: 'Rappels · Projet Grand Public · CPI GO',
     // L'onglet porte un compte quand des rappels sont en retard.
     repere: (page) => page.getByRole('tab', { name: /^En retard/ }),
   },
   {
     chemin: '/grand-public/statistiques',
-    titre: 'Tableau de bord Grand Public · CPI GO',
+    titre: 'Tableau de bord · Projet Grand Public · CPI GO',
     repere: (page) => page.getByRole('button', { name: 'Composer l’écran' }),
   },
   {

@@ -504,7 +504,9 @@ test('CHU-DOSD-07 · une transition concurrente est refusée proprement', async 
 test('CHU-DOS-02 · un agent bancaire voit la liste', async ({ page }) => {
   await page.goto('/chues/dossiers');
 
-  await expect(page).toHaveTitle('Dossiers bancaires · CPI GO', { timeout: 30_000 });
+  await expect(page).toHaveTitle('Dossiers bancaires · Projet CHUES · CPI GO', {
+    timeout: 30_000,
+  });
   await expect(page.getByRole('heading', { name: 'Dossiers bancaires', level: 1 })).toBeVisible();
   await expect(page.getByRole('status').filter({ hasText: 'Dossiers affichés' })).toBeVisible({
     timeout: 30_000,

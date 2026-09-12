@@ -4,7 +4,7 @@ import { ChevronDownIcon, LayoutGridIcon } from 'lucide-react';
 import Image from 'next/image';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import {
   COQUES,
@@ -34,6 +34,21 @@ function persistMoreOpen(open: boolean): void {
   } catch {}
 }
 
+/** Calculé dès le premier rendu : le tiroir mobile remonte la barre à chaque ouverture. */
+function usePlusOuvert(repliActif: boolean): [boolean, (open: boolean) => void] {
+  const [moreOpen, setMoreOpen] = useState(() => repliActif || readMoreOpen());
+  const [repliActifVu, setRepliActifVu] = useState(repliActif);
+  if (repliActif !== repliActifVu) {
+    setRepliActifVu(repliActif);
+    setMoreOpen(repliActif || readMoreOpen());
+  }
+  const changer = (open: boolean): void => {
+    setMoreOpen(open);
+    persistMoreOpen(open);
+  };
+  return [moreOpen, changer];
+}
+
 export function SidebarNav({
   role,
   onNavigate = () => undefined,
@@ -57,13 +72,7 @@ export function SidebarNav({
     section.items.some((item) => item.secondary === true && isNavItemActive(role, pathname, item)),
   );
 
-  // Fermé au premier rendu, serveur comme client : la préférence est relue
-  // ensuite, comme le repli des filtres avancés.
-  const [moreOpen, setMoreOpen] = useState(false);
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- préférence relue après hydratation
-    setMoreOpen(repliActif || readMoreOpen());
-  }, [repliActif]);
+  const [moreOpen, changerMoreOpen] = usePlusOuvert(repliActif);
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -169,10 +178,7 @@ export function SidebarNav({
                 pathname={pathname}
                 collapsed={collapsed}
                 open={moreOpen}
-                onOpenChange={(next) => {
-                  setMoreOpen(next);
-                  persistMoreOpen(next);
-                }}
+                onOpenChange={changerMoreOpen}
                 onNavigate={onNavigate}
               />
             </div>
@@ -273,14 +279,15 @@ function Replis({
   }
 
   return (
-    <details
-      className="mt-1"
-      open={open}
-      onToggle={(event) => {
-        onOpenChange(event.currentTarget.open);
-      }}
-    >
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-md px-3 text-[0.875rem] font-[600] text-sidebar-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring">
+    <details className="mt-1" open={open}>
+      {/* Pas `onToggle` : il part aussi à l'ouverture par le code, qui n'est pas une préférence. */}
+      <summary
+        onClick={(event) => {
+          event.preventDefault();
+          onOpenChange(!open);
+        }}
+        className="flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-md px-3 text-[0.875rem] font-[600] text-sidebar-muted-foreground transition-colors duration-150 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
+      >
         <ChevronDownIcon
           aria-hidden="true"
           className={cn(

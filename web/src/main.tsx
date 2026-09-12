@@ -45,6 +45,7 @@ const router = createRouter({
   routeTree,
   context: { queryClient },
   defaultPreload: 'intent',
+  scrollRestoration: true,
   defaultErrorComponent: EcranErreur,
   defaultNotFoundComponent: EcranIntrouvable,
   // Les critères sont des chaînes : le JSON par défaut lit « 6174e584 » comme Infinity.

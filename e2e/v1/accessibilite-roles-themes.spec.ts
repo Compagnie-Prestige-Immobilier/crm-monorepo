@@ -63,12 +63,12 @@ const ECRANS_SOMBRES: readonly { chemin: string; titre: string; repere: string }
   { chemin: '/chues', titre: 'Projet CHUES · CPI GO', repere: 'Trois étapes, dans l’ordre' },
   {
     chemin: '/grand-public',
-    titre: 'Prospects Grand Public · CPI GO',
+    titre: 'Prospects · Projet Grand Public · CPI GO',
     repere: 'Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.',
   },
   {
     chemin: '/admin/parametres',
-    titre: 'Paramètres · CPI GO',
+    titre: 'Paramètres · Admin · CPI GO',
     repere: 'Ces actions portent sur les données de tous les utilisateurs.',
   },
 ];
@@ -102,17 +102,17 @@ test.describe('TRA-17 · thème sombre', () => {
 const ECRANS_MOBILES: readonly { chemin: string; titre: string; repere: string }[] = [
   {
     chemin: '/grand-public',
-    titre: 'Prospects Grand Public · CPI GO',
+    titre: 'Prospects · Projet Grand Public · CPI GO',
     repere: 'Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.',
   },
   {
     chemin: '/admin/parametres',
-    titre: 'Paramètres · CPI GO',
+    titre: 'Paramètres · Admin · CPI GO',
     repere: 'Ces actions portent sur les données de tous les utilisateurs.',
   },
   {
     chemin: '/grand-public/statistiques',
-    titre: 'Tableau de bord Grand Public · CPI GO',
+    titre: 'Tableau de bord · Projet Grand Public · CPI GO',
     repere: 'Composer l’écran',
   },
 ];

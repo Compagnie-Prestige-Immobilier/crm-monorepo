@@ -55,7 +55,7 @@ export function SidebarShell({
           aria-controls="navigation-laterale"
           aria-label={collapsed ? 'Déployer la navigation' : 'Réduire la navigation'}
           title={collapsed ? 'Déployer la navigation' : 'Réduire la navigation'}
-          className="absolute top-1/2 -right-3 z-40 flex size-6 -translate-y-1/2 items-center justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elev-sm transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
+          className="absolute top-1/2 -right-3 z-40 flex size-6 -translate-y-1/2 items-center before:absolute before:top-1/2 before:left-1/2 before:size-11 before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:content-[''] justify-center rounded-full border border-sidebar-border bg-sidebar text-sidebar-foreground shadow-elev-sm transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-sidebar-ring"
         >
           {collapsed ? (
             <PanelLeftOpenIcon className="size-3.5" aria-hidden="true" />

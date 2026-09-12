@@ -30,11 +30,15 @@ test('TRA-11 le tiroir de navigation s’ouvre, navigue et se referme', async ({
 });
 
 const ROUTES = [
-  { chemin: '/grand-public', titre: 'Prospects Grand Public · CPI GO', barre: 'Prospects' },
-  { chemin: '/admin/parametres', titre: 'Paramètres · CPI GO', barre: 'Paramètres' },
+  {
+    chemin: '/grand-public',
+    titre: 'Prospects · Projet Grand Public · CPI GO',
+    barre: 'Prospects',
+  },
+  { chemin: '/admin/parametres', titre: 'Paramètres · Admin · CPI GO', barre: 'Paramètres' },
   {
     chemin: '/grand-public/statistiques',
-    titre: 'Tableau de bord Grand Public · CPI GO',
+    titre: 'Tableau de bord · Projet Grand Public · CPI GO',
     barre: 'Tableau de bord',
   },
 ] as const;

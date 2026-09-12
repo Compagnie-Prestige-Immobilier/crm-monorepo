@@ -277,9 +277,9 @@ const SECTIONS: readonly NavSection[] = [
         roles: TERRAIN,
       },
       {
-        // Onglets Activité et Présence du pilotage : même titre que le tableau de bord.
+        // Onglets Activité et Présence du pilotage.
         href: '/chues/supervision',
-        label: 'Tableau de bord',
+        label: 'Activité',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ENCADREMENT,
@@ -322,7 +322,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ENCADREMENT,
@@ -382,7 +382,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN'],
@@ -398,7 +398,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/supervision',
-        label: 'Tableau de bord',
+        label: 'Activité',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN'],
@@ -432,7 +432,7 @@ const SECTIONS: readonly NavSection[] = [
       {
         // Onglet « Banque » du pilotage : un tableau de bord, pas une entrée de plus.
         href: '/chues/banque',
-        label: 'Tableau de bord',
+        label: 'Banque',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
@@ -654,7 +654,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/supervision',
-        label: 'Tableau de bord',
+        label: 'Activité',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
@@ -686,7 +686,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes',
         icon: MegaphoneIcon,
         description: 'Fiches exportées pour le terrain',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
@@ -705,7 +705,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/banque',
-        label: 'Tableau de bord',
+        label: 'Banque',
         icon: ChartColumnIcon,
         description: 'Encaissements, rejets et délais',
         roles: ['ADMIN'],
@@ -928,13 +928,40 @@ export function navTitle(role: Role, pathname: string): string {
   return matchNavItem(role, pathname)?.label ?? 'CPI GO';
 }
 
+const DERNIERE_COQUE = 'cpi_derniere_coque';
+
+function lireSession(cle: string): string | null {
+  try {
+    return sessionStorage.getItem(cle);
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Coque à afficher dans la barre latérale d'un écran hors coque : la première
- * ouverte au rôle. Sans elle, la boîte de réception n'offrirait aucun chemin
- * de retour.
+ * Coque à afficher dans la barre latérale d'un écran hors coque : la dernière
+ * ouverte dans l'onglet si le rôle y a accès, sinon la première ouverte au
+ * rôle. Sans elle, la boîte de réception n'offrirait aucun chemin de retour.
  */
 export function fallbackCoque(role: Role): Coque | null {
-  return COQUES.find((entry) => entry.roles.includes(role))?.id ?? null;
+  const ouvertes = COQUES.filter((entry) => entry.roles.includes(role));
+  const derniere = lireSession(DERNIERE_COQUE);
+  return (ouvertes.find((entry) => entry.id === derniere) ?? ouvertes[0])?.id ?? null;
+}
+
+/** Rangé par compte : sur un téléphone partagé, la tuile ne rouvre pas l'écran du précédent. */
+export function retenirEcran(userId: string, pathname: string, search: string): void {
+  const coque = coqueOf(pathname);
+  if (coque === null) return;
+  try {
+    sessionStorage.setItem(DERNIERE_COQUE, coque);
+    sessionStorage.setItem(`cpi_dernier_ecran:${userId}:${coque}`, `${pathname}${search}`);
+  } catch {}
+}
+
+export function dernierEcran(userId: string, coque: Coque): string | null {
+  const chemin = lireSession(`cpi_dernier_ecran:${userId}:${coque}`);
+  return chemin !== null && coqueOf(chemin.split('?')[0] ?? '') === coque ? chemin : null;
 }
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */

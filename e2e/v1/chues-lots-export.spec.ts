@@ -395,9 +395,8 @@ async function telecharger(page: Page, nomDuBouton: string): Promise<Buffer> {
 test('CHU-LOT-01 · la route rend la liste des lots, et dit à quoi elle sert', async ({ page }) => {
   await page.goto('/chues/campagnes');
 
-  await expect(page).toHaveTitle('Campagnes · CPI GO');
-  // Les campagnes sont un onglet du tableau de bord : le titre de l'écran est celui du pilotage.
-  await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
+  await expect(page).toHaveTitle('Campagnes · Projet CHUES · CPI GO');
+  await expect(page.getByRole('heading', { name: 'Campagnes', level: 1 })).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Campagnes' })).toHaveAttribute(
     'aria-selected',
     'true',

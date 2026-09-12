@@ -96,7 +96,7 @@ async function chercher(page: Page, terme: string): Promise<void> {
 test('GP-01 la liste rend sa page, pas seulement la coque du panel', async ({ page }) => {
   await page.goto('/grand-public');
 
-  await expect(page).toHaveTitle(/Prospects Grand Public/);
+  await expect(page).toHaveTitle(/Prospects · Projet Grand Public/);
   await expect(
     page.getByText(
       'Les particuliers démarchés hors syndicat. Les fiches CHUES ne figurent pas ici.',
@@ -255,7 +255,7 @@ test.describe('GP-09 rôle lecteur : SUPERVISEUR', () => {
   test('GP-09 SUPERVISEUR lit la liste sans se voir proposer la création', async ({ page }) => {
     await page.goto('/grand-public');
 
-    await expect(page).toHaveTitle(/Prospects Grand Public/);
+    await expect(page).toHaveTitle(/Prospects · Projet Grand Public/);
     await expect(
       page.getByRole('main').getByRole('heading', { name: 'Prospects Grand Public', level: 1 }),
     ).toBeVisible();
@@ -270,7 +270,7 @@ test.describe('GP-09 rôle lecteur : DIRECTION', () => {
   test('GP-09 DIRECTION lit la liste sans se voir proposer la création', async ({ page }) => {
     await page.goto('/grand-public');
 
-    await expect(page).toHaveTitle(/Prospects Grand Public/);
+    await expect(page).toHaveTitle(/Prospects · Projet Grand Public/);
     await expect(
       page.getByRole('main').getByRole('heading', { name: 'Prospects Grand Public', level: 1 }),
     ).toBeVisible();

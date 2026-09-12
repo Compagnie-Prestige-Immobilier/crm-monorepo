@@ -254,7 +254,7 @@ test.describe('session ACCUEIL', () => {
       await expect(refus).toContainText(quoi);
       await expect(refus).toContainText('Rôle en cours :');
       await expect(refus).toContainText('Accueil');
-      await expect(refus.getByRole('link', { name: 'Retour à l’accueil' })).toHaveAttribute(
+      await expect(refus.getByRole('link', { name: 'Tous les espaces' })).toHaveAttribute(
         'href',
         '/espaces',
       );

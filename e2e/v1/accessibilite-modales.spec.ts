@@ -93,7 +93,7 @@ test.describe('mode composition des chiffres Grand Public', () => {
       response.url().includes('/api/v1/supervision/activite'),
     );
     await page.goto('/grand-public/statistiques');
-    await expect(page).toHaveTitle('Tableau de bord Grand Public · CPI GO');
+    await expect(page).toHaveTitle('Tableau de bord · Projet Grand Public · CPI GO');
     await disposition;
     await activite;
 
