@@ -2,7 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { OngletsPilotage } from '@/components/pilotage/onglets';
-import { ActivityView } from '@/components/supervision/activity-view';
+import { SupervisionTabs } from '@/components/supervision/supervision-tabs';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
@@ -32,7 +32,7 @@ function SupervisionGrandPublicPage() {
   return (
     <div className="flex flex-col gap-6">
       <OngletsPilotage coque="grand-public" role={user.role} />
-      <ActivityView projet="GRAND_PUBLIC" />
+      <SupervisionTabs projet="GRAND_PUBLIC" role={user.role} />
     </div>
   );
 }

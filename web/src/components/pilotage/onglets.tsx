@@ -33,6 +33,7 @@ const ONGLETS: Record<Coque, readonly Onglet[]> = {
   'grand-public': [
     { label: 'Tableau de bord', chemin: 'statistiques' },
     { label: 'Activité', chemin: 'supervision' },
+    { label: 'Présence', chemin: 'supervision', volet: 'comptes' },
     { label: 'Campagnes', chemin: 'campagnes' },
     { label: 'Banque', chemin: 'banque', roles: ['ADMIN'] },
   ],
@@ -55,7 +56,7 @@ export function OngletsPilotage({ coque, role }: { coque: Coque; role: Role }) {
 
   return (
     <Tabs value={actif?.label}>
-      <TabsList aria-label="Pilotage" className="max-w-full overflow-x-auto">
+      <TabsList aria-label="Pilotage" className="max-w-full justify-start overflow-x-auto">
         {onglets.map((onglet) => (
           <TabsTrigger
             key={onglet.label}
