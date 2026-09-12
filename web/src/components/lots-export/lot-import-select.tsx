@@ -5,13 +5,14 @@ import { useQuery } from '@tanstack/react-query';
 import { Field } from '@/components/forms/field';
 import { Liste } from '@/components/forms/liste';
 import { fetchLotExportImports, type LotExportImport } from '@/lib/data/lots-export';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import type { Projet } from '@/lib/types';
 
-/** Le nom d'un lot importé, tel que le superviseur le retrouve : projet et jour. */
+// Le relevé tourne tous les quarts d'heure : sans l'heure, trois imports du même
+// jour portent le même nom et le superviseur ne peut plus les distinguer.
 export function etiquetteImport(projet: Projet, importedAt: string): string {
-  return `Import ${projet === 'CHUES' ? 'CHUES' : 'GP'} du ${formatDate(importedAt)}`;
+  return `Import ${projet === 'CHUES' ? 'CHUES' : 'GP'} du ${formatDateTime(importedAt)}`;
 }
 
 function libelle(projet: Projet, lot: LotExportImport): string {
