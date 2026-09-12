@@ -94,7 +94,9 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 				slog.Error("panique", "requestId", id, "panic", p)
 				EcrireProblem(rw, r, Problem(http.StatusInternalServerError, "INTERNAL_ERROR", "Une erreur interne est survenue."))
 			}
-			slog.Info("http", "requestId", id, "method", r.Method, "pattern", motif, "status", rw.statut, "ms", time.Since(debut).Milliseconds())
+			ms := time.Since(debut).Milliseconds()
+			slog.Info("http", "requestId", id, "method", r.Method, "pattern", motif, "status", rw.statut, "ms", ms)
+			compterRequete(motif, rw.statut, ms)
 		}()
 		next.ServeHTTP(rw, r)
 	})

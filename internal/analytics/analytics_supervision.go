@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
@@ -280,10 +281,21 @@ func (s *service) enregistrerCreneauxDeTravail(ctx context.Context, in *MajCrene
 		return nil, err
 	}
 	auteur := socle.UtilisateurCourant(ctx).ID
-	quand, err := s.Q.EnregistrerCreneauxTravail(ctx, db.EnregistrerCreneauxTravailParams{
-		Value: string(valeur), UpdatedById: &auteur,
-	})
-	if err != nil {
+	// Les créneaux servent de dénominateur aux notes de rendement : les
+	// déplacer change tous les taux affichés, d'où la trace.
+	avant := s.creneauxOuValeursParDefaut(ctx)
+	var quand time.Time
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		ecrit, err := q.EnregistrerCreneauxTravail(ctx, db.EnregistrerCreneauxTravailParams{
+			Value: string(valeur), UpdatedById: &auteur,
+		})
+		if err != nil {
+			return err
+		}
+		quand = ecrit
+		return database.Auditer(ctx, q, auteur, "supervision.creneaux", "supervision", "creneaux", avant, shifts)
+	}); err != nil {
 		return nil, err
 	}
 	iso := quand.UTC().Format(time.RFC3339Nano)

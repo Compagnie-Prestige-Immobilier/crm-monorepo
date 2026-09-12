@@ -59,6 +59,8 @@ var Garde = map[string][]socle.Role{
 	"PUT /api/v1/users/{id}/password":                             socle.AdminSeul,
 	"DELETE /api/v1/users/{id}":                                   socle.AdminSeul,
 	"GET /api/v1/admin/supervision":                               socle.Encadrement,
+	"GET /api/v1/admin/exploitation":                              socle.AdminSeul,
+	"GET /api/v1/admin/journal":                                   socle.AdminSeul,
 	"GET /api/v1/admin/purge":                                     socle.AdminSeul,
 	"POST /api/v1/admin/purge":                                    socle.AdminSeul,
 	"GET /api/v1/admin/database-dump":                             socle.AdminSeul,
@@ -100,6 +102,7 @@ func Monter(api huma.API, d *socle.Deps) {
 
 	monterDump(api, s)
 	monterEnrolement(api, s)
+	monterExploitation(api, s)
 }
 
 func (s *service) txAdmin(ctx context.Context, geste func(pgx.Tx, *db.Queries) error) error {
@@ -1265,10 +1268,20 @@ func (s *service) ecrireDispositionParDefaut(ctx context.Context, in *EcrireDisp
 	if err != nil {
 		return nil, err
 	}
-	ecrite, err := s.Q.UpsertSetting(ctx, db.UpsertSettingParams{
-		Key: CleDispositionDefaut(in.Ecran), Value: string(brut), UpdatedById: &u.ID,
-	})
-	if err != nil {
+	var ecrite time.Time
+	// La disposition par défaut s'impose à tous ceux qui n'en ont pas posé une :
+	// elle part avec sa trace, dans la même transaction.
+	if err := s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		quand, err := q.UpsertSetting(ctx, db.UpsertSettingParams{
+			Key: CleDispositionDefaut(in.Ecran), Value: string(brut), UpdatedById: &u.ID,
+		})
+		if err != nil {
+			return err
+		}
+		ecrite = quand
+		return database.Auditer(ctx, q, u.ID, "dashboard.default_layout", "dashboard", in.Ecran, nil,
+			json.RawMessage(brut))
+	}); err != nil {
 		return nil, err
 	}
 	return reponseDisposition(d, "defaut", &ecrite), nil

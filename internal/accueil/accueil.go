@@ -440,8 +440,10 @@ func (s *service) corrigerVisite(ctx context.Context, in *CorrigerVisiteInput) (
 		VisitorName: existante.VisitorName, Phone: existante.Phone, PhoneE164: existante.PhoneE164,
 		EntrepriseId: existante.EntrepriseId, ObjetId: existante.ObjetId,
 		DirectionId: existante.DirectionId, DestinataireId: existante.DestinataireId,
-		Comment: corps.Comment.ou(existante.Comment),
+		Comment: existante.Comment,
 	}
+	avant := params
+	params.Comment = corps.Comment.ou(existante.Comment)
 	if corps.Time.fourni {
 		params.TimeKnown = corps.Time.valeur != nil
 		params.VisitedAt = s.instantVisite(s.jourDe(existante.VisitedAt), corps.Time.valeur)
@@ -456,7 +458,16 @@ func (s *service) corrigerVisite(ctx context.Context, in *CorrigerVisiteInput) (
 	corps.DirectionID.poserOption(&params.DirectionId)
 	corps.DestinataireID.poserOption(&params.DestinataireId)
 
-	if err := s.Q.MettreAJourVisite(ctx, params); err != nil {
+	// Même transaction : une ligne du registre ne se corrige pas sans trace, et
+	// une trace ne se pose pas sur une correction annulée.
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if err := q.MettreAJourVisite(ctx, params); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, socle.UtilisateurCourant(ctx).ID, "visite.correction", "visite", in.ID,
+			champsVisiteJournal(&avant), champsVisiteJournal(&params))
+	}); err != nil {
 		return nil, err
 	}
 	row, err := s.visite(ctx, in.ID)
@@ -464,6 +475,14 @@ func (s *service) corrigerVisite(ctx context.Context, in *CorrigerVisiteInput) (
 		return nil, err
 	}
 	return &VisiteOutput{Body: s.versVisite(&row)}, nil
+}
+
+func champsVisiteJournal(p *db.MettreAJourVisiteParams) map[string]any {
+	return map[string]any{
+		"visitedAt": p.VisitedAt, "timeKnown": p.TimeKnown, "visitorName": p.VisitorName,
+		"phone": p.Phone, "entrepriseId": p.EntrepriseId, "objetId": p.ObjetId,
+		"directionId": p.DirectionId, "destinataireId": p.DestinataireId, "comment": p.Comment,
+	}
 }
 
 func (s *service) visite(ctx context.Context, id string) (db.VisiteParIdRow, error) {

@@ -190,7 +190,7 @@ func (b *brevo) envoyerMessage(ctx context.Context, message *MessageBrevo) []tra
 func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranche []DestinataireBrevo) trancheBrevo {
 	sort := trancheBrevo{destinataires: tranche}
 	charge := corpsBrevo{
-		Sender:      map[string]string{"email": b.expediteur, "name": b.nom},
+		Sender:      map[string]string{"email": b.expediteur, notificationCleNom: b.nom},
 		To:          brevoAdresses(tranche),
 		Cc:          brevoAdresses(message.Copies),
 		Subject:     message.Sujet,
