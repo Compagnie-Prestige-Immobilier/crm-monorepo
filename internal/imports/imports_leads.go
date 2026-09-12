@@ -118,30 +118,39 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 		"refusees": strconv.Itoa(int(job.ErrorRows)),
 	}
 
-	estSucces := job.Status == db.ImportStatusSucceeded && job.Mode == db.ImportModeAPPLY && job.ErrorRows == 0
+	// Une ligne sans téléphone suffit à faire monter ErrorRows, et le classeur du
+	// marketing en porte toujours une : exiger zéro anomalie titrait « Échec » un
+	// relevé qui avait créé 167 fiches, et le privait de ses destinataires.
+	estSucces := job.Status == db.ImportStatusSucceeded && job.Mode == db.ImportModeAPPLY
 
 	if estSucces {
+		intro := "Le classeur des leads a été importé avec succès et est maintenant disponible pour le lancement d’une campagne."
+		if job.ErrorRows > 0 {
+			intro = fmt.Sprintf("Le classeur des leads a été importé et est disponible pour le lancement d’une campagne. %s ligne(s) ont été refusées, le détail est dans l’écran Imports.", valeurs["refusees"])
+		}
 		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 			Type:          notifications.CourrielImportLeads,
-			Sujet:         "[Leads] Relevé des leads importé avec succès : " + job.FileName,
+			Sujet:         "[Leads] Relevé des leads importé : " + job.FileName,
 			Destinataires: reglages.ImportLeads.Destinataires,
 			Copies:        reglages.ImportLeads.Copies,
 			ObjetType:     "import",
 			ObjetID:       job.ID,
 			Titre:         "Relevé des leads",
-			Intro:         "Le classeur des leads a été importé avec succès et est maintenant disponible pour le lancement d’une campagne.",
+			Intro:         intro,
 			Lignes: [][2]string{
 				{"Fichier", job.FileName},
 				{libelleChampDate, dateStr},
 				{"Leads lus", valeurs["lues"]},
 				{"Leads créés", valeurs["creees"]},
+				{"Leads refusés", valeurs["refusees"]},
 			},
 			Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
 			LibelleLien: "Voir le détail dans CPI GO",
 		})
 	}
 
-	// Échec ou import partiel : notification envoyée uniquement aux personnes en Cc
+	// Rien n'a été appliqué : seules les personnes en Cc sont prévenues, ce sont
+	// elles qui corrigent le classeur.
 	raisonErreur := "Simulation refusée ou anomalies détectées sur le fichier."
 	if job.FailureMsg != nil && *job.FailureMsg != "" {
 		raisonErreur = *job.FailureMsg
