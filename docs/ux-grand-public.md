@@ -179,6 +179,8 @@ Le lot 3 aussi, avec l'appel et l'ajout en étapes accordés le 12 septembre :
 `ux-grand-public-lot3.md`.
 Le lot 4 aussi, sauf « Espaces » dans la barre supérieure sur téléphone :
 `ux-grand-public-lot4.md`.
+Le lot 5 aussi, sauf la tuile « En retard » et la sélection de toutes les fiches
+d'une campagne : `ux-grand-public-lot5.md`.
 
 ## 9. Demande l'accord écrit du propriétaire (refonte d'écran)
 
