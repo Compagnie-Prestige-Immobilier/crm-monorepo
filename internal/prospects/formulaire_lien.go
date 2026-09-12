@@ -39,11 +39,9 @@ func (s *service) regenererMonLienFormulaire(ctx context.Context, _ *struct{}) (
 	return lienFormulaireSortie(jeton), nil
 }
 
-func lienFormulaireSortie(jeton *string) *LienFormulaireOutput {
+func lienFormulaireSortie(jeton string) *LienFormulaireOutput {
 	out := &LienFormulaireOutput{}
-	if jeton != nil {
-		out.Body.Jeton = *jeton
-	}
+	out.Body.Jeton = jeton
 	return out
 }
 

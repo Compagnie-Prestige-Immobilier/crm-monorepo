@@ -126,7 +126,9 @@ jobs:
           curl -sSfL -o /tmp/osv-scanner \
             "https://github.com/google/osv-scanner/releases/download/v${VERSION}/osv-scanner_linux_amd64"
           chmod +x /tmp/osv-scanner
-          /tmp/osv-scanner scan source --lockfile=pnpm-lock.yaml --lockfile=go.sum
+          # `go.sum` n'a pas d'extracteur : le scan rendait zéro paquet Go et
+          # sortait 0, donc aucune vulnérabilité Go n'a jamais été signalée.
+          /tmp/osv-scanner scan source --lockfile=pnpm-lock.yaml --lockfile=go.mod
       - name: pnpm audit
         run: pnpm audit --audit-level=high --prod
 

@@ -219,11 +219,19 @@ rclone ls cpi:cpi-go-sauvegardes/ | sort -k2
 
 # 3. Le conteneur de la base, dont le nom porte le suffixe engendré par Dokploy.
 PG=$(docker ps --filter name=cpi-go-postgres --format '{{.ID}}' | head -1)
-API=$(docker ps --filter name=cpi-go-api --format '{{.ID}}' | head -1)
+# `cpi-go`, le binaire v2, et NON `cpi-go-api` : l'API v1 a été supprimée à la
+# bascule du 12 septembre 2026. Un filtre qui ne trouve rien laisse `$APP` vide,
+# `docker stop` échoue sans bloquer le script, et l'on restaure --clean avec
+# l'application en écriture sur la base qu'on démonte.
+#    Le `grep -v` est indispensable : `name=cpi-go` attrape aussi le conteneur
+#    `cpi-go-postgres`, et l'on arrêterait la base au lieu de l'application.
+APP=$(docker ps --filter name=cpi-go --format '{{.ID}} {{.Names}}' \
+  | grep -v postgres | head -1 | cut -d' ' -f1)
+test -n "$APP" || { echo 'conteneur cpi-go introuvable, ARRET'; exit 1; }
 
-# 4. Arrêter l'API AVANT de restaurer : --clean supprime les objets un par un,
-#    et une requête qui arrive au milieu lit une base à moitié démontée.
-docker stop "$API"
+# 4. Arrêter l'application AVANT de restaurer : --clean supprime les objets un
+#    par un, et une requête qui arrive au milieu lit une base à moitié démontée.
+docker stop "$APP"
 
 # 5. Restaurer. --clean --if-exists remplace le contenu existant ; -O ignore les
 #    propriétaires, qui n'existent pas dans un conteneur neuf.
@@ -234,7 +242,7 @@ rclone cat 'cpi:cpi-go-sauvegardes/<clé>' \
   | gunzip \
   | docker exec -i "$PG" pg_restore -U crm -d crm -O --clean --if-exists
 
-docker start "$API"
+docker start "$APP"
 ```
 
 `pg_restore` signale des avertissements sur les objets absents même avec

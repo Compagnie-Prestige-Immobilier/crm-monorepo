@@ -247,7 +247,7 @@ func (s *service) formulaireRecevoir(ctx context.Context, in *FormulaireDemandeI
 	// Le lien porte le compte qui l'a partagé, et c'est lui qui devient auteur :
 	// `createdById` est obligatoire, et un compte tiré au hasard rendrait la
 	// fiche invisible au téléconseiller qui a démarché.
-	agentID, err := s.Q.AgentParJeton(ctx, &in.Jeton)
+	agentID, err := s.Q.AgentParJeton(ctx, in.Jeton)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "LIEN_INVALIDE", formulaireLienMort)
 	}
