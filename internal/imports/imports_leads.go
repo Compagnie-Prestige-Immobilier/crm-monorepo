@@ -31,6 +31,7 @@ const (
 	cleEmpreinteLeads = "imports.leadsEmpreinte"
 	nomLeadsParDefaut = "leads-marketing.xlsx"
 	delaiReleveLeads  = 2 * time.Minute
+	libelleChampDate  = "Date"
 )
 
 var releveLeadsEnCours atomic.Bool
@@ -110,30 +111,64 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 	if job.TotalRows != nil {
 		lues = *job.TotalRows
 	}
+	dateStr := time.Now().In(s.Cfg.TimeZone).Format("02/01/2006 à 15:04")
 	valeurs := map[string]string{
-		"fichier": job.FileName, "date": time.Now().In(s.Cfg.TimeZone).Format("02/01/2006 à 15:04"),
+		"fichier": job.FileName, "date": dateStr,
 		"lues": strconv.Itoa(int(lues)), "creees": strconv.Itoa(int(job.CreatedRows)),
 		"refusees": strconv.Itoa(int(job.ErrorRows)),
 	}
-	issue := "appliqué"
-	if job.Status != db.ImportStatusSucceeded || job.Mode != db.ImportModeAPPLY {
-		issue = "refusé"
+
+	estSucces := job.Status == db.ImportStatusSucceeded && job.Mode == db.ImportModeAPPLY && job.ErrorRows == 0
+
+	if estSucces {
+		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
+			Type:          notifications.CourrielImportLeads,
+			Sujet:         "[Leads] Relevé des leads importé avec succès : " + job.FileName,
+			Destinataires: reglages.ImportLeads.Destinataires,
+			Copies:        reglages.ImportLeads.Copies,
+			ObjetType:     "import",
+			ObjetID:       job.ID,
+			Titre:         "Relevé des leads",
+			Intro:         "Le classeur des leads a été importé avec succès et est maintenant disponible pour le lancement d’une campagne.",
+			Lignes: [][2]string{
+				{"Fichier", job.FileName},
+				{libelleChampDate, dateStr},
+				{"Leads lus", valeurs["lues"]},
+				{"Leads créés", valeurs["creees"]},
+			},
+			Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
+			LibelleLien: "Voir le détail dans CPI GO",
+		})
 	}
+
+	// Échec ou import partiel : notification envoyée uniquement aux personnes en Cc
+	raisonErreur := "Simulation refusée ou anomalies détectées sur le fichier."
+	if job.FailureMsg != nil && *job.FailureMsg != "" {
+		raisonErreur = *job.FailureMsg
+	} else if job.ErrorRows > 0 {
+		raisonErreur = fmt.Sprintf("%d ligne(s) d'anomalie détectée(s) dans le classeur.", job.ErrorRows)
+	}
+
 	return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          notifications.CourrielImportLeads,
-		Sujet:         "[Leads] Relevé " + issue + " : " + job.FileName,
-		Destinataires: reglages.ImportLeads.Destinataires, Copies: reglages.ImportLeads.Copies,
-		ObjetType: "import", ObjetID: job.ID,
-		Titre: "Relevé des leads " + issue,
-		Intro: notifications.IntroCourriel(&reglages.ImportLeads, notifications.AideImportLeads(), valeurs),
+		Sujet:         "[Leads] Échec du relevé des leads : " + job.FileName,
+		Destinataires: reglages.ImportLeads.Copies, // Envoi uniquement aux personnes en Cc
+		Copies:        nil,
+		ObjetType:     "import",
+		ObjetID:       job.ID,
+		Titre:         "Échec du relevé des leads",
+		Intro: fmt.Sprintf("Le traitement du fichier %s du %s n’a pas permis d’importer correctement le classeur des leads. Aucune campagne ne doit pouvoir être lancée à partir de ce fichier tant que l’import n’a pas été effectué avec succès.",
+			job.FileName, dateStr),
 		Lignes: [][2]string{
 			{"Fichier", job.FileName},
-			{"Lignes lues", valeurs["lues"]},
-			{"Fiches créées", valeurs["creees"]},
-			{"Lignes refusées", valeurs["refusees"]},
-			{"Issue", issue},
+			{libelleChampDate, dateStr},
+			{"Leads lus", valeurs["lues"]},
+			{"Leads créés", valeurs["creees"]},
+			{"Statut", "Échec / Refusé"},
+			{"Erreur", raisonErreur},
 		},
-		Lien: socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports", LibelleLien: "Voir le détail dans CPI GO",
+		Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
+		LibelleLien: "Consulter l'échec dans CPI GO",
 	})
 }
 
