@@ -4,11 +4,21 @@ package main
 
 import (
 	"cpi-go/internal/analytics"
+	"fmt"
 	"net/http"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
 )
+
+// Deux caracteres d'uuid ne donnaient que 256 telephones : la contrainte
+// d'unicite sautait environ une execution sur neuf.
+var compteurTelephoneAnalytics atomic.Int64
+
+func telephoneAnalytics() string {
+	return fmt.Sprintf("+22178%07d", compteurTelephoneAnalytics.Add(1))
+}
 
 const (
 	jourAnalytics    = "2026-03-15"
@@ -76,7 +86,7 @@ func analyticsProspect(b *banc, jeu *jeuAnalytics, proprietaire, quand string, m
 		 "clientCreatedAt","updatedAt","phase2Status","enrollmentMethod","enrollmentCapturedAt")
 		VALUES ($1,'Nom','Prenom',$2,$3,$4,$5,$6,$7::timestamp,now(),
 		        $8::"Phase2Status",$9::"EnrollmentMethod",$10::timestamp)`,
-		id, "+2217800000"+uuid.NewString()[:2], jeu.banque, jeu.syndicat, jeu.representant,
+		id, telephoneAnalytics(), jeu.banque, jeu.syndicat, jeu.representant,
 		proprietaire, quand, phase, enrolement, capture)
 	jeu.prospects = append(jeu.prospects, id)
 	return id
