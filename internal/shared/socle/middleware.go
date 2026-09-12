@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -37,6 +38,8 @@ func noterAuteur(ctx context.Context, u *Utilisateur) {
 		a.id, a.role = u.ID, u.Role
 	}
 }
+
+const cheminImports = "/api/v1/imports"
 
 var idRequeteValide = regexp.MustCompile(`^[\w-]{1,64}$`)
 
@@ -106,6 +109,12 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		auteur := &auteurRequete{}
 		ctx = context.WithValue(ctx, cleAuteur{}, auteur)
 		rw := &reponse{ResponseWriter: w, statut: http.StatusOK}
+		// `ReadTimeout` couvre le corps entier : 30 s ne suffisent pas à
+		// téléverser un classeur proche de la limite depuis une liaison
+		// sénégalaise, et la requête est coupée sans message utile.
+		if strings.HasPrefix(r.URL.Path, cheminImports) {
+			_ = http.NewResponseController(w).SetReadDeadline(time.Now().Add(10 * time.Minute))
+		}
 		r = r.WithContext(ctx)
 		defer func() {
 			if p := recover(); p != nil {
@@ -131,6 +140,7 @@ var routesDeSondage = map[string]bool{
 	"GET /api/v1/notifications/mine": true,
 	routeSessionCourante:             true,
 	"GET /health/ready":              true,
+	"GET /health/live":               true,
 }
 
 func niveauRequete(motif string, statut int) slog.Level {
@@ -173,7 +183,13 @@ func origineAutorisee(r *http.Request) bool {
 	if origine == "" {
 		origine = r.Header.Get("Referer")
 	}
-	return strings.HasPrefix(origine, "https://"+r.Host) || strings.HasPrefix(origine, "http://"+r.Host)
+	// Comparer l'hôte parsé, pas un préfixe : `go-admin.cpi-chues.com.attaquant.tld`
+	// passait le test du préfixe.
+	u, err := url.Parse(origine)
+	if err != nil || u.Host == "" {
+		return false
+	}
+	return u.Host == r.Host && (u.Scheme == "https" || u.Scheme == "http")
 }
 
 // Une seule couche pour l'origine, la session et le rôle. Le motif apparié

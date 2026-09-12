@@ -16,10 +16,20 @@ import (
 type Live struct {
 	mu      sync.Mutex
 	abonnes map[chan string]struct{}
+	arret   chan struct{}
+	uneFois sync.Once
 }
 
 func NouveauLive() *Live {
-	return &Live{abonnes: map[chan string]struct{}{}}
+	return &Live{abonnes: map[chan string]struct{}{}, arret: make(chan struct{})}
+}
+
+// `Shutdown` attend la fin des requêtes en cours, or un flux reste ouvert
+// quatorze minutes : sans ce signal, tout redéploiement avec un onglet ouvert
+// atteignait le délai de 30 s et sortait en erreur, rendant illisible le seul
+// message qui doit signaler un vrai plantage.
+func (l *Live) Fermer() {
+	l.uneFois.Do(func() { close(l.arret) })
 }
 
 func (l *Live) Emettre(sujet string) {
@@ -73,6 +83,8 @@ func (l *Live) diffuser(ctx huma.Context) {
 		var ligne string
 		select {
 		case <-ctx.Context().Done():
+			return
+		case <-l.arret:
 			return
 		case <-fin.C:
 			return

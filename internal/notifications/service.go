@@ -12,6 +12,8 @@ func Taches(d *socle.Deps) []socle.Tache {
 	s := &service{d}
 	return []socle.Tache{
 		{Nom: "cpi.notifications.due", Cron: socle.ChaqueMinute, Run: s.expedierNotificationsDues},
+		{Nom: "cpi.courriels.rejeu", Cron: "*/5 * * * *", Run: s.rejouerCourrielsEnEchec},
+		{Nom: "cpi.exploitation.alerte", Cron: cronNotifications("ALERTE_INCIDENTS_AT", "07:00"), Run: s.alerterIncidents},
 		{Nom: "cpi.notifications.reminders", Cron: cronNotifications("NOTIFICATIONS_REMINDERS_AT", "08:00"), Run: s.rappelsQuotidiens},
 		{Nom: "cpi.notifications.daily-report", Cron: cronNotifications("NOTIFICATIONS_DAILY_REPORT_AT", "17:00"), Run: s.compteRenduQuotidien},
 	}

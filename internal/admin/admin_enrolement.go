@@ -474,6 +474,7 @@ func (s *service) tirageManuel(ctx context.Context, in *ProjetEnrolementInput) (
 
 // Chaque minute : ne fait rien tant qu'aucune plateforme n'est configurée.
 func (s *service) tirerEnrolement(ctx context.Context) error {
+	var echecs []error
 	for _, projet := range []string{projetChues, socle.ProjetGrandPublic} {
 		base, jeton := socle.PlateformeConfiguree(projet)
 		if base == "" || jeton == "" {
@@ -487,9 +488,16 @@ func (s *service) tirerEnrolement(ctx context.Context) error {
 			time.Since(valeurs.DernierTirage.TermineLe) < time.Duration(valeurs.FrequenceMinutes)*time.Minute {
 			continue
 		}
-		s.tirer(ctx, projet)
+		// Le bilan était jeté : un 401 de la plateforme ou une panne réseau
+		// comptaient comme un passage réussi.
+		avecDelai, annuler := context.WithTimeout(ctx, webhookTirageDelai)
+		bilan := s.tirer(avecDelai, projet)
+		annuler()
+		if bilan.Erreur != nil {
+			echecs = append(echecs, fmt.Errorf("%s : %s", projet, *bilan.Erreur))
+		}
 	}
-	return nil
+	return errors.Join(echecs...)
 }
 
 func (s *service) tirer(ctx context.Context, projet string) BilanTirage {

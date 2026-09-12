@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"cpi-go/internal/accueil"
 	"cpi-go/internal/admin"
 	"cpi-go/internal/analytics"
@@ -15,6 +16,7 @@ import (
 	"cpi-go/internal/referentiels"
 	"cpi-go/internal/representants"
 	"cpi-go/internal/shared/socle"
+	"errors"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -64,7 +66,13 @@ func gardesDomaines() []map[string][]socle.Role {
 }
 
 func tachesDomaines(d *socle.Deps) []socle.Tache {
-	taches := []socle.Tache{{Nom: "cpi.sessions.purge", Cron: "0 4 * * *", Run: d.Q.PurgeExpiredSessions}}
+	taches := []socle.Tache{{Nom: "cpi.sessions.purge", Cron: "0 4 * * *", Run: func(ctx context.Context) error {
+		// `cron_runs` gagne environ 4 600 lignes par jour et `metriques_http`
+		// une ligne par route, par heure et par classe : sans échéance, les deux
+		// tables d'exploitation finissent par peser plus que le métier.
+		return errors.Join(d.Q.PurgeExpiredSessions(ctx), d.Q.PurgeCronRuns(ctx),
+			d.Q.PurgeMetriquesHttp(ctx), d.Q.PurgeCourrielsPiecesJointes(ctx))
+	}}}
 	for _, t := range [][]socle.Tache{notifications.Taches(d), imports.Taches(d), admin.Taches(d)} {
 		taches = append(taches, t...)
 	}
