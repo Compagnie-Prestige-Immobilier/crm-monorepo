@@ -41,9 +41,10 @@ import {
   repRelationSettled,
   type RepAnswer,
 } from '@/lib/data/console';
-import { ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import { fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
+  fetchRepresentant,
   fetchRepresentantCallAttempts,
   fetchRepresentantsAQualifier,
   type ScriptedRepresentant,
@@ -164,7 +165,7 @@ function titreOuverture(aConfirmer: ScriptedRepresentant | null): string {
   return `Ouvrir la fiche de ${aConfirmer === null ? '' : aConfirmer.fullName} ?`;
 }
 
-/** Coupé, le serveur referme l'ancienne ouverture de lui-même : la promesse ne tient plus. */
+
 function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null): boolean {
   return cherche !== '' || relation !== null;
 }
@@ -200,6 +201,21 @@ export function RepScript() {
 
   const liste = annuaire.data?.items ?? [];
   const pageCount = annuaire.data?.pageCount ?? 1;
+
+  const reprendre = useCallback((ouverte: Ouverte) => {
+    setAConfirmer(null);
+    setChoisi(ouverte);
+  }, []);
+
+  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
+  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
+  const repriseFaite = useRef(false);
+  useEffect(() => {
+    if (repriseFaite.current) return;
+    repriseFaite.current = true;
+    void reprendreOuverte(reprendre);
+  }, [reprendre]);
+
 
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
@@ -308,6 +324,19 @@ interface Ouverte {
   ouverture: OuvertureFiche;
 }
 
+/**
+ * La fiche que le serveur tient encore pour cette console, remise à l'écran
+ * telle quelle : au montage, elle répare un rechargement.
+ */
+async function reprendreOuverte(ouvrir: (ouverte: Ouverte) => void): Promise<void> {
+  const courante = await fetchOuvertureCourante('representant').catch(() => null);
+  if (courante === null || courante.representantId === null) return;
+  const representant = await fetchRepresentant(courante.representantId).catch(() => null);
+  if (representant === null) return;
+  ouvrir({ representant, ouverture: courante });
+}
+
+
 function ResultatsAnnuaire({
   annuaire,
   liste,
@@ -365,10 +394,12 @@ function ResultatsAnnuaire({
               'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
             )}
           >
-            <span className="flex min-w-0 flex-col">
+            <span className="flex min-w-0 flex-col gap-0.5">
               <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
               <span className="text-[0.8125rem] text-muted-foreground">
-                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
+                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                  {formatPhone(row.phoneE164)}
+                </span>
                 {row.departementName === null ? '' : ` · ${row.departementName}`}
               </span>
             </span>
@@ -560,7 +591,7 @@ function QuestionsJoignable(props: QuestionsJoignableProps) {
       <Question titre="Sur quel syndicat ? (facultatif)" anime>
         <FilterCombobox
           className="max-w-80"
-          label="Syndicat (facultatif)"
+          label=""
           placeholder="Choisir un syndicat"
           value={props.syndicatId}
           options={props.syndicatOptions}
@@ -689,8 +720,12 @@ function ChoixStatut({
 }) {
   return (
     <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-      <label htmlFor="rep-statut" className="text-[1rem] font-[600]">
-        Statut de qualification
+      <label
+        htmlFor="rep-statut"
+        className="text-[1rem] font-[600] flex items-center justify-between"
+      >
+        <span>Statut de qualification</span>
+        <span className="text-[0.75rem] font-normal text-destructive">* obligatoire</span>
       </label>
       {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
           VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
@@ -747,14 +782,16 @@ interface EtapeQuestionsProps {
 /** La première étape : les questions, dans l'ordre où l'appel les pose. */
 function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
   return (
-    <div className="flex flex-col gap-5">
-      <Question titre="Comment s’est passé l’appel ?">
-        <Choix
-          options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
-          value={props.resultat}
-          onChange={props.onResultat}
-        />
-      </Question>
+    <div className="grid max-w-5xl gap-x-8 gap-y-5 md:grid-cols-2">
+      <div className="md:col-span-2">
+        <Question titre="Comment s’est passé l’appel ?">
+          <Choix
+            options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
+            value={props.resultat}
+            onChange={props.onResultat}
+          />
+        </Question>
+      </div>
 
       {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
 
@@ -788,7 +825,7 @@ function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
           titre={props.motifObligatoire ? 'Pourquoi ?' : 'Quelque chose à ajouter ? (facultatif)'}
           anime
         >
-          <div className="flex flex-col gap-1.5">
+          <div className="flex max-w-96 flex-col gap-1.5">
             <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
               {props.motifObligatoire ? 'Motif' : 'Commentaire'}
             </label>
@@ -807,7 +844,7 @@ function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
         </Question>
       )}
 
-      <div className="flex flex-col gap-1.5">
+      <div className="flex flex-col gap-1.5 md:col-span-2">
         <Button className="self-start" disabled={props.manque !== null} onClick={props.onContinuer}>
           Continuer
         </Button>

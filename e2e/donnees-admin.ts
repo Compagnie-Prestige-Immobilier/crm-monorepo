@@ -123,12 +123,15 @@ export async function creerStatutQualification(
   await statut.getByRole('button', { name: 'Enregistrer' }).click();
 }
 
-/** La simulation d'abord, puis l'écriture : le bouton porte le nombre de lignes. */
+/**
+ * La simulation d'abord, puis l'écriture : le bouton porte le nombre de lignes.
+ * L'historique replié porte les mêmes états : seul le premier est le travail en cours.
+ */
 export async function appliquerImport(page: Page, bouton: string, ecrites: string): Promise<void> {
-  await expect(page.getByText('Simulation terminée')).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText('Simulation terminée').first()).toBeVisible({ timeout: 30_000 });
   await page.getByRole('button', { name: bouton }).click();
   await page.getByRole('dialog').getByRole('button', { name: bouton }).click();
-  await expect(page.getByText(ecrites)).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByText(ecrites).first()).toBeVisible({ timeout: 30_000 });
 }
 
 export interface DossierLu {

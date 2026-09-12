@@ -65,5 +65,7 @@ export default defineConfig({
     outDir: 'dist',
     // La CSP n'autorise pas `font-src data:` : chaque police reste un fichier.
     assetsInlineLimit: 0,
+    // Les gros morceaux (exceljs, écran exploitation) sont déjà chargés à la demande.
+    chunkSizeWarningLimit: 1000,
   },
 });

@@ -57,11 +57,18 @@ export async function ouvrirFiche(
   ) as OuvertureFiche;
 }
 
-/** La fiche que l'appelant a en main, nulle quand il n'en a aucune. */
+export type CibleOuverture = 'representant' | 'prospect';
+
+/** La fiche que l'appelant a en main, dans une console ou dans l'autre ; nulle sans fiche. */
 export async function fetchOuvertureCourante(
+  cible?: CibleOuverture,
   client: ApiClient = getApiClient(),
 ): Promise<OuvertureFiche | null> {
-  return unwrap(await client.GET('/api/v1/ouvertures/courante')) as OuvertureFiche | null;
+  return unwrap(
+    await client.GET('/api/v1/ouvertures/courante', {
+      params: { query: cible === undefined ? {} : { cible } },
+    }),
+  ) as OuvertureFiche | null;
 }
 
 /**

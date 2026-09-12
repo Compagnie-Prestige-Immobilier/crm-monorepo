@@ -109,8 +109,8 @@ repartir(...)), cfg)` : un journal, un limiteur, N gardes.
 ### Panneau (~55 lignes)
 
 - `web/src/components/auth/login-form.tsx`
-  - `Ctrl+Shift+D` affiche un `Select` (`components/ui/select.tsx`) « Base »
-    alimenté par `GET /api/v1/auth/bases` ; le changement écrit
+  - `⌘/Ctrl+Shift+D` ou `⌘/Ctrl+Shift+N` affiche un `Select`
+    (`components/ui/select.tsx`) « Base » alimenté par `GET /api/v1/auth/bases` ; le changement écrit
     `document.cookie = "cpi_base=<nom>; path=/; max-age=31536000; SameSite=Lax"`.
   - Si le cookie vaut déjà autre chose que `public`, le sélecteur est visible
     d'emblée : on voit sur quelle base on va se connecter.

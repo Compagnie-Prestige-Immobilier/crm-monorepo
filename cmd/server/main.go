@@ -257,12 +257,18 @@ func run(ctx context.Context, openapi, roles, sonde, seed bool) error {
 		return errors.New("DATABASE_URL manquante")
 	}
 	if seed {
-		pool, err := ouvrirBase(ctx, cfg.DatabaseURL)
-		if err != nil {
-			return err
+		for _, base := range socle.Bases(cfg) {
+			pool, err := ouvrirBase(ctx, base.DatabaseURL)
+			if err != nil {
+				return fmt.Errorf("base %s : %w", base.Base, err)
+			}
+			err = semer(ctx, pool, base)
+			pool.Close()
+			if err != nil {
+				return fmt.Errorf("base %s : %w", base.Base, err)
+			}
 		}
-		defer pool.Close()
-		return semer(ctx, pool, cfg)
+		return nil
 	}
 	return servir(ctx, cfg)
 }

@@ -2,8 +2,46 @@ package campagnes
 
 import (
 	"context"
+	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
 )
+
+type CampagneImportsInput struct {
+	Projet string `query:"projet" enum:"CHUES,GRAND_PUBLIC" required:"true"`
+}
+
+type CampagneImport struct {
+	ID         string `json:"id"`
+	FileName   string `json:"fileName"`
+	ImportedAt string `json:"importedAt"`
+	Fiches     int    `json:"fiches"`
+}
+
+type CampagneImportsOutput struct {
+	Body struct {
+		Items []CampagneImport `json:"items"`
+	}
+}
+
+// Les imports qui ont créé des fiches du projet : la source « fiches importées » d'une campagne.
+func (s *service) campagneImports(ctx context.Context, in *CampagneImportsInput) (*CampagneImportsOutput, error) {
+	rows, err := s.Q.ImportsAvecFiches(ctx, db.Projet(in.Projet))
+	if err != nil {
+		return nil, err
+	}
+	out := &CampagneImportsOutput{}
+	out.Body.Items = make([]CampagneImport, 0, len(rows))
+	for i := range rows {
+		importeLe := rows[i].CreatedAt
+		if rows[i].FinishedAt != nil {
+			importeLe = *rows[i].FinishedAt
+		}
+		out.Body.Items = append(out.Body.Items, CampagneImport{
+			ID: rows[i].ID, FileName: rows[i].FileName, ImportedAt: lotISO(importeLe), Fiches: int(rows[i].Fiches),
+		})
+	}
+	return out, nil
+}
 
 type MesAttributionsOutput struct {
 	Body struct {

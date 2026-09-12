@@ -120,14 +120,9 @@ export function MesContactsView({
   return (
     <section className="flex flex-col gap-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <div className="flex flex-col gap-1">
-          <h1 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-            Mes contacts
-          </h1>
-          <p className="text-[0.875rem] text-muted-foreground">
-            Les personnes appelées, de l’appel le plus récent au plus ancien.
-          </p>
-        </div>
+        <p className="text-[0.875rem] text-muted-foreground">
+          Les personnes appelées, de l’appel le plus récent au plus ancien.
+        </p>
 
         {canFilter ? (
           <FilterCombobox

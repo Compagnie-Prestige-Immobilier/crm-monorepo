@@ -119,7 +119,7 @@ export function ProspectReassignDialog({
           />
           <p className="text-[0.75rem] text-muted-foreground">
             Le représentant détermine le département. Le téléconseiller propriétaire voit le
-            prospect dans l’application mobile.
+            prospect dans sa console.
           </p>
         </div>
 

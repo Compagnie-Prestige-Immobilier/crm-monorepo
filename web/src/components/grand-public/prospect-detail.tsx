@@ -7,6 +7,7 @@ import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
+import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
@@ -424,7 +425,11 @@ export function GrandPublicProspectDetail({
             <Ligne label="Paiement">{paiementLigne(prospect)}</Ligne>
             <LignesSituation prospect={prospect} />
             <Ligne label="Canal de provenance">
-              <Texte value={prospect.canalProvenanceLabel} absent="Non renseigné" />
+              {prospect.canalProvenanceLabel === null ? (
+                <Texte value={null} absent="Non renseigné" />
+              ) : (
+                <CanalProvenance label={prospect.canalProvenanceLabel} />
+              )}
             </Ligne>
             <Ligne label="Durée du système">{dureeSystemeLigne(prospect)}</Ligne>
           </dl>

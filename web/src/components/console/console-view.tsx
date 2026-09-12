@@ -46,7 +46,7 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import { enregistrerBrouillon, fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import {
   commentaireExigePar,
   issueDuMotif,
@@ -92,6 +92,7 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1 … 9', 'Motif, une fois le groupe choisi'],
   ['1 … 6', 'Échéance proposée, après un motif de rappel'],
   ['0', 'Saisir une autre échéance'],
+
   ['Entrée', 'Valider'],
   ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
@@ -225,6 +226,22 @@ export function ConsoleView({
     setDemandee(null);
   }, []);
 
+  const reprendre = useCallback((prise: Ouverte) => {
+    setVise(null);
+    setDemandee(null);
+    setOuverte(prise);
+  }, []);
+
+  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
+  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
+  const repriseFaite = useRef(false);
+  useEffect(() => {
+    if (repriseFaite.current) return;
+    repriseFaite.current = true;
+    void reprendreOuverte(reprendre);
+  }, [reprendre]);
+
+
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
       prospect: row,
@@ -284,8 +301,7 @@ export function ConsoleView({
         projet={projet}
         onChoisir={(row) => {
           setConfirme(null);
-          if (aQualifier(row)) setVise(row);
-          else setOuverte({ prospect: row, ouverture: null });
+          setVise(row);
         }}
       />
 
@@ -368,6 +384,7 @@ function EnTeteAnnuaire({
 }
 
 /** La fiche et l'ouverture qui la mesure. Nulle quand la fiche est close. */
+
 interface Ouverte {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
@@ -383,8 +400,6 @@ export const brouillonDe = (
   comment,
   ...(conversion === null ? {} : { conversion }),
 });
-
-const aQualifier = (prospect: ProspectRow): boolean => prospect.phase2Status === 'PENDING';
 
 function fichePendante(
   demandee: string | null,
@@ -403,16 +418,7 @@ function deriverFiches(
   ouverte: Ouverte | null,
   venuDesRappels: ProspectRow | null,
 ): FichesDerivees {
-  const aConfirmer =
-    vise ?? (venuDesRappels !== null && aQualifier(venuDesRappels) ? venuDesRappels : null);
-  // Une fiche close ne peut plus recevoir de statut : l'ouvrir sous verrou y
-  // enfermerait le téléconseiller. Elle se consulte, elle ne se compte pas.
-  const consultee =
-    ouverte ??
-    (venuDesRappels !== null && !aQualifier(venuDesRappels)
-      ? { prospect: venuDesRappels, ouverture: null }
-      : null);
-  return { aConfirmer, consultee };
+  return { aConfirmer: vise ?? venuDesRappels, consultee: ouverte };
 }
 
 function pasDeFicheOuverte(consultee: Ouverte | null, aConfirmer: ProspectRow | null): boolean {
@@ -427,6 +433,7 @@ function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
   return prospect.phase2Status !== 'PENDING' || refusee;
 }
 
+
 function saisieCommencee(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
@@ -434,6 +441,19 @@ function saisieCommencee(
   comment: string,
 ): boolean {
   return conversion !== null || slots !== null || motif !== null || comment !== '';
+
+}
+
+/**
+ * La fiche que le serveur tient encore pour cette console, remise à l'écran
+ * telle quelle : au montage, elle répare un rechargement.
+ */
+async function reprendreOuverte(reprendre: (prise: Ouverte) => void): Promise<void> {
+  const courante = await fetchOuvertureCourante('prospect').catch(() => null);
+  if (courante === null || courante.prospectId === null) return;
+  const prospect = await fetchProspect(courante.prospectId).catch(() => null);
+  if (prospect === null) return;
+  reprendre({ prospect, ouverture: courante });
 }
 
 function ListeAnnuaire({
@@ -716,6 +736,7 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  */
 type Etape = 'issues' | 'motifs' | 'statut' | 'dossier' | 'echeance' | null;
 
+
 function etapeCourante(
   closed: boolean,
   conversion: ConversionDraft | null,
@@ -759,6 +780,7 @@ export function Consignation({
   ouverture,
   projet,
   statutParSelect = false,
+
   onAbandon,
   onEnregistre,
 }: {
@@ -770,6 +792,7 @@ export function Consignation({
    * « Injoignable » les motifs figés. Faux : les motifs du référentiel.
    */
   statutParSelect?: boolean;
+
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -850,7 +873,7 @@ export function Consignation({
       callbackAt: string | null = null,
       renseignements?: ConversionDraft,
     ) => {
-      if (closed || send.isPending) return;
+      if (send.isPending) return;
       const draft: AttemptDraft = {
         outcome: issueDuMotif(choisi),
         reasonCode: choisi.code,
@@ -867,11 +890,12 @@ export function Consignation({
       }
       send.mutate(draft);
     },
-    [closed, send, comment, ouverture],
+    [send, comment, ouverture],
   );
 
   const ouvrirDossier = useCallback(() => {
     if (closed || send.isPending) return;
+
     setSlots(null);
     setConversionErrors({});
     setConversion(conversionFrom(prospect));
@@ -897,6 +921,7 @@ export function Consignation({
 
   const startCallback = useCallback(() => {
     if (closed) return;
+
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
   }, [closed]);
@@ -931,6 +956,7 @@ export function Consignation({
       else setSlots(null);
     },
     [closed, send.isPending, ouvrirDossier, startCallback],
+
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -955,6 +981,7 @@ export function Consignation({
   const surStatut = surSelect(groupe, statutParSelect);
   const etape = etapeCourante(closed, conversion, slots, groupe, surStatut);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
+
 
   const annuler = useCallback(() => {
     // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
@@ -1091,6 +1118,7 @@ export function Consignation({
           onMotif={choisir}
         />
 
+
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
             slots={slots}
@@ -1140,12 +1168,14 @@ export function Consignation({
             setConversionErrors({});
           }}
         />
+
       </section>
     );
   }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+
       <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste

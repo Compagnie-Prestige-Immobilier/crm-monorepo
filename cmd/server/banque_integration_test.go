@@ -546,36 +546,53 @@ func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
 	}
 }
 
-func TestBanqueDossierCompletSignaleEtCourrielTrace(t *testing.T) {
+// La plateforme envoie elle-même le courriel du dossier complet : ici, la
+// notification in-app à la banque, une fois, et aucun courriel.
+func TestBanqueDossierCompletSignaleSansCourriel(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
-	banqueExec(s.banc, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('courriels.destinataires',
-		'{"banque":["banque@test.cpi"],"banqueCopies":["bpe@test.cpi"],"enrolement":[],"enrolementCopies":[]}',now())
-		ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`)
-	t.Cleanup(func() { banqueExec(s.banc, `DELETE FROM "app_settings" WHERE "key" = 'courriels.destinataires'`) })
 
 	s.signalerComplets()
 	s.signalerComplets()
 	if n := banqueCompter(s, `SELECT count(*)::int FROM "inscriptions_plateforme" WHERE "id" = $1 AND "completeSignaleeLe" IS NOT NULL`, s.inscriptionID); n != 1 {
 		t.Fatal("l'inscription complète doit être marquée signalée")
 	}
-	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "objetType" = 'inscription' AND "objetId" = $1`, s.inscriptionID); n != 1 {
-		t.Fatalf("un seul courriel par inscription complète, %d écrits", n)
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "objetType" = 'inscription' AND "objetId" = $1`, s.inscriptionID); n != 0 {
+		t.Fatalf("aucun courriel ne part du CRM pour un dossier complet, %d écrits", n)
 	}
 	if n := banqueCompter(s, `SELECT count(*)::int FROM "notification_deliveries" d INNER JOIN "notifications" n ON n."id" = d."notificationId"
 		WHERE d."userId" = $1 AND n."category" = 'DOSSIER' AND n."route" LIKE '%ouvrir=' || $2`, s.userID, s.inscriptionID); n != 1 {
 		t.Fatalf("la banque doit recevoir une notification in-app, %d livrées", n)
 	}
+}
 
-	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/courriels/objet/inscription/"+s.inscriptionID, nil)
-	s.attend(statut, http.StatusOK, "courriels de l'inscription", body)
-	courriel := body["items"].([]any)[0].(map[string]any)
-	if courriel["type"] != "DOSSIER_COMPLET" || courriel["statut"] != "ECHEC" || courriel["erreur"] == nil {
-		t.Fatalf("sans transport Brevo, l'envoi est tracé en échec : %v", courriel)
+// Les réglages par courriel : destinataires, copies et texte, avec l'aide qui
+// nomme les variables et le texte d'origine.
+func TestBanqueReglagesCourrielsParType(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	t.Cleanup(func() { banqueExec(s.banc, `DELETE FROM "app_settings" WHERE "key" = 'courriels.destinataires'`) })
+
+	corps := map[string]any{
+		"enrolement":   map[string]any{"destinataires": []string{"Enrolement@Test.cpi"}, "copies": []string{}, "intro": " Bonjour {client} "},
+		"encaissement": map[string]any{"destinataires": []string{}, "copies": []string{"bpe@test.cpi"}, "intro": ""},
+		"refus":        map[string]any{"destinataires": []string{}, "copies": []string{}, "intro": ""},
+		"importLeads":  map[string]any{"destinataires": []string{}, "copies": []string{}, "intro": ""},
 	}
-	if !strings.HasPrefix(courriel["sujet"].(string), "[CPI CHUES] Dossier complet : ") {
-		t.Fatalf("sujet : %v", courriel["sujet"])
+	statut, body := banqueJSON(s.banc, http.MethodPut, "/api/v1/courriels/reglages", corps)
+	s.attend(statut, http.StatusOK, "réglages écrits", body)
+	enrolement := body["enrolement"].(map[string]any)
+	if enrolement["destinataires"].([]any)[0] != "enrolement@test.cpi" || enrolement["intro"] != "Bonjour {client}" {
+		t.Fatalf("adresses en minuscules et texte épuré : %v", enrolement)
 	}
+	aide := body["aide"].(map[string]any)["refus"].(map[string]any)
+	if aide["introUsine"] == "" || len(aide["variables"].([]any)) == 0 {
+		t.Fatalf("l'aide nomme le texte d'origine et les variables : %v", aide)
+	}
+
+	corps["refus"] = map[string]any{"destinataires": []string{"pas une adresse"}, "copies": []string{}, "intro": ""}
+	statut, body = banqueJSON(s.banc, http.MethodPut, "/api/v1/courriels/reglages", corps)
+	s.attend(statut, http.StatusUnprocessableEntity, "adresse invalide", body)
 }
 
 func (s *socleBanque) signalerComplets() {
@@ -592,8 +609,11 @@ func (s *socleBanque) signalerComplets() {
 func TestBanqueCourrielRenvoyeEtWebhookBrevo(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
-	s.signalerComplets()
-	courrielID := banqueLigne(s.banc, `SELECT "id" FROM "courriels" WHERE "objetType" = 'inscription' AND "objetId" = $1`, s.inscriptionID)
+	courrielID := uuid.NewString()
+	banqueExec(s.banc, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte","statut","updatedAt")
+		VALUES ($1,'DOSSIER_ENCAISSE','Dossier bancaire encaissé','{banque@test.cpi}','{}','inscription',$2,'<p>x</p>','x','ECHEC',now())`,
+		courrielID, s.inscriptionID)
+	t.Cleanup(func() { banqueExec(s.banc, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
 
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
 	s.attend(statut, http.StatusOK, "renvoi", body)

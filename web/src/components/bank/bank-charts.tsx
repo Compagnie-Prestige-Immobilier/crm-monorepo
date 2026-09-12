@@ -1,6 +1,7 @@
 import { ResponsiveBar } from '@nivo/bar';
 import { ResponsiveLine } from '@nivo/line';
 import { ResponsivePie } from '@nivo/pie';
+import { BasicTooltip } from '@nivo/tooltip';
 
 import { useChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
@@ -148,9 +149,12 @@ export function CashingsOverTimeChart({
         animate={!reducedMotion}
         useMesh={true}
         tooltip={({ point }) => (
-          <span>
-            {String(point.data.xFormatted)}: {formatXof(String(point.data.y))}
-          </span>
+          <BasicTooltip
+            id={String(point.data.xFormatted)}
+            value={formatXof(String(point.data.y))}
+            color={point.color}
+            enableChip
+          />
         )}
       />
     </div>
@@ -175,10 +179,13 @@ export function MeanDelayChart({ items }: { items: readonly { label: string; hou
         axisLeft={{ tickSize: 0, tickPadding: 8 }}
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
-        tooltip={({ indexValue, value }) => (
-          <span>
-            {String(indexValue)}: {formatNumber(Math.round(Number(value)))} h
-          </span>
+        tooltip={({ indexValue, value, color }) => (
+          <BasicTooltip
+            id={String(indexValue)}
+            value={`${formatNumber(Math.round(Number(value)))} h`}
+            color={color}
+            enableChip
+          />
         )}
       />
     </div>

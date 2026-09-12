@@ -8,6 +8,11 @@ RETURNING *;
 -- name: ImportJobByID :one
 SELECT * FROM "import_jobs" WHERE "id" = $1;
 
+-- Le relevé automatique n'a pas d'appelant : l'administrateur le plus ancien porte ses imports.
+-- name: ImportDemandeurSysteme :one
+SELECT "id" FROM "users" WHERE "role" = 'ADMIN' AND "isActive"
+ORDER BY "createdAt" ASC, "id" ASC LIMIT 1;
+
 -- name: ListImportJobs :many
 SELECT * FROM "import_jobs"
 WHERE (sqlc.narg('kind')::"ImportKind" IS NULL OR "kind" = sqlc.narg('kind')::"ImportKind")
@@ -130,9 +135,23 @@ WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
 -- name: ImportProspectsConnus :many
 SELECT "phoneE164", "representantId", "projet",
-       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp"
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
 FROM "prospects" p
 WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
+
+-- Réglée dans Paramètres CHUES, d'où le préfixe : une liste JSON de règles.
+-- name: ImportReglesProvenance :many
+SELECT "value" FROM "app_settings" WHERE "key" = 'chues.codificationProvenances';
+
+-- Le courriel se compare sans casse : la plateforme et les campagnes ne
+-- s'accordent pas sur les majuscules.
+-- name: ImportProspectsConnusParEmail :many
+SELECT lower("email") AS "email", "projet",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
+       EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
+FROM "prospects" p
+WHERE lower("email") = ANY(@emails::text[]) AND "deletedAt" IS NULL;
 
 -- name: ImportProspectsParTelephone :many
 SELECT "id", "phoneE164" FROM "prospects"
@@ -163,10 +182,10 @@ ON CONFLICT DO NOTHING;
 INSERT INTO "prospects" (
   "id", "nom", "prenom", "phoneE164", "banqueId", "syndicatId", "representantId", "createdById",
   "phase2Status", "enrollmentMethod", "enrollmentCapturedAt", "enrollmentCapturedById",
-  "clientCreatedAt", "updatedAt"
+  "clientCreatedAt", "importJobId", "updatedAt"
 ) VALUES (@id, @nom, @prenom, @phone_e164, @banque_id, @syndicat_id, @representant_id, @created_by_id,
           @phase2_status, sqlc.narg('enrollment_method'), sqlc.narg('enrollment_captured_at'),
-          sqlc.narg('enrollment_captured_by_id'), @client_created_at, now())
+          sqlc.narg('enrollment_captured_by_id'), @client_created_at, @import_job_id, now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectGrandPublic :batchexec
@@ -175,19 +194,20 @@ INSERT INTO "prospects" (
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
   "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
-  "createdById", "clientCreatedAt", "updatedAt"
-) VALUES (@id, 'GRAND_PUBLIC', @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
+  "createdById", "clientCreatedAt", "importJobId", "updatedAt"
+) VALUES (@id, @projet, @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
           sqlc.narg('employeur'), sqlc.narg('type_contrat'), sqlc.narg('anciennete_mois'),
           sqlc.narg('lieu_activite'), sqlc.narg('mode_epargne'), sqlc.narg('pays_residence_id'),
           sqlc.narg('ville_residence'), @whatsapp_status, sqlc.narg('whatsapp_e164'),
-          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'), @created_by_id, @client_created_at, now())
+          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'),
+          @created_by_id, @client_created_at, @import_job_id, now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectJourney :batchexec
 INSERT INTO "prospect_journeys" ("id", "prospectId", "projet", "consent", "consentAt", "updatedAt")
-VALUES (@id, @prospect_id, 'GRAND_PUBLIC', 'INTERESSE', @consent_at, now())
+VALUES (@id, @prospect_id, @projet, 'INTERESSE', @consent_at, now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportVisite :batchexec

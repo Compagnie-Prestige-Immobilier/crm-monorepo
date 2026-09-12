@@ -63,7 +63,6 @@ import {
   notificationKeys,
 } from '@/lib/data/notifications';
 import { NotificationComposer } from './notification-composer';
-import { TemplateManager } from './template-manager';
 import {
   CATEGORY_LABELS,
   DELIVERY_LABELS,
@@ -249,9 +248,6 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
             <AdminOnly isAdmin={isAdmin}>
               <TabsTrigger value="historique">Historique</TabsTrigger>
             </AdminOnly>
-            <AdminOnly isAdmin={isAdmin}>
-              <TabsTrigger value="gabarits">Gabarits</TabsTrigger>
-            </AdminOnly>
           </TabsList>
           <AdminOnly isAdmin={isAdmin}>
             <Button
@@ -315,12 +311,6 @@ export function NotificationsView({ isAdmin }: { isAdmin: boolean }) {
             />
           </TabsContent>
         </AdminOnly>
-
-        <AdminOnly isAdmin={isAdmin}>
-          <TabsContent value="gabarits" className="mt-4">
-            <TemplateManager />
-          </TabsContent>
-        </AdminOnly>
       </Tabs>
 
       <AdminOnly isAdmin={isAdmin}>
@@ -378,12 +368,12 @@ function HistoriqueRow({
       <TableCell className="max-w-xs">
         <button
           type="button"
-          className="min-h-11 text-left"
+          className="block min-h-11 w-full max-w-xs text-left"
           onClick={() => {
             onDetail(row.id);
           }}
         >
-          <span className="block font-[600]">{row.title}</span>
+          <span className="block truncate font-[600]">{row.title}</span>
           <span className="block truncate text-[0.8125rem] text-muted-foreground">{row.body}</span>
         </button>
       </TableCell>
@@ -397,7 +387,7 @@ function HistoriqueRow({
         <Badge variant={STATUS_VARIANT[row.status]}>{STATUS_LABELS[row.status]}</Badge>
         {row.transportStatus === 'NOT_CONFIGURED' ? (
           <Badge variant="warning" className="mt-1 block w-fit">
-            Aucun push remis
+            Aucun courriel remis
           </Badge>
         ) : null}
       </TableCell>
@@ -512,7 +502,7 @@ function HistoriqueEnvois({
         }
         description={
           activeFilterCount === 0
-            ? 'Un envoi part en push vers les destinataires choisis, et reste dans leur boîte de réception.'
+            ? 'Un envoi part par courriel aux destinataires choisis, et reste dans leur boîte de réception.'
             : 'Changez d’état ou de catégorie.'
         }
         action={

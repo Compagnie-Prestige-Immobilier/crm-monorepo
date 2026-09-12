@@ -23,6 +23,7 @@ WHERE r."deletedAt" IS NULL
     OR r."createdById" = sqlc.arg('owner_id')::text
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."representantId" = r."id" AND li."assigneeId" = sqlc.arg('owner_id')::text
     )
   )
@@ -85,6 +86,7 @@ WHERE r."deletedAt" IS NULL
     OR r."createdById" = sqlc.arg('owner_id')::text
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."representantId" = r."id" AND li."assigneeId" = sqlc.arg('owner_id')::text
     )
   )

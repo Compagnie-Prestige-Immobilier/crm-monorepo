@@ -345,9 +345,9 @@ func seedInsererDonneesDemo(ctx context.Context, tx pgx.Tx) error {
 		CASE WHEN donnees.est_chues THEN comptes.syndicat_id ELSE NULL END,
 		comptes.auteur, now(), now(), donnees.projet
 	FROM (VALUES
-		('00000000-0000-7000-0000-000000000101', 'Diop', 'Aminata', '+221770000101', 'CHUES'::"Projet", true),
-		('00000000-0000-7000-0000-000000000102', 'Ndiaye', 'Mamadou', '+221770000102', 'CHUES'::"Projet", true),
-		('00000000-0000-7000-0000-000000000103', 'Fall', 'Fatou', '+221770000103', 'GRAND_PUBLIC'::"Projet", false)
+		('00000000-0000-7000-0000-000000000101', 'Diop', 'Aminata', '+221775824913', 'CHUES'::"Projet", true),
+		('00000000-0000-7000-0000-000000000102', 'Ndiaye', 'Mamadou', '+221769316420', 'CHUES'::"Projet", true),
+		('00000000-0000-7000-0000-000000000103', 'Fall', 'Fatou', '+221781437805', 'GRAND_PUBLIC'::"Projet", false)
 	) AS donnees(id, nom, prenom, phone, projet, est_chues)
 	CROSS JOIN (
 		SELECT
@@ -356,7 +356,7 @@ func seedInsererDonneesDemo(ctx context.Context, tx pgx.Tx) error {
 			(SELECT "id" FROM "syndicats" WHERE "sigle" = 'CHUES') AS syndicat_id
 	) comptes
 	WHERE comptes.auteur IS NOT NULL
-	ON CONFLICT DO NOTHING;
+	ON CONFLICT (id) DO UPDATE SET "phoneE164" = EXCLUDED."phoneE164";
 
 	UPDATE "prospects"
 	SET "phase2Status" = 'METHOD_OBTAINED',

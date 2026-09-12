@@ -19,9 +19,9 @@ export interface ImportJobPage {
 const IMPORT_HISTORY_PAGE_SIZE = 10;
 
 export const IMPORT_KIND_LABELS: Readonly<Record<ImportKind, string>> = {
+  PROSPECTS_GRAND_PUBLIC: 'Leads Marketing (SharePoint / Adhésions)',
+  PROSPECTS: 'Prospects CHUES (Terrain)',
   REPRESENTANTS: 'Représentants',
-  PROSPECTS: 'Prospects CHUES',
-  PROSPECTS_GRAND_PUBLIC: 'Prospects Grand Public',
   VISITES: 'Visites',
   VISITES_REGISTRE: 'Registre des visites',
 };
@@ -86,8 +86,8 @@ export async function applyImportJob(
 
 /** Ce qu'on peut déposer, dans l'ordre de la liste déroulante. */
 export const UPLOADABLE_IMPORT_KINDS = [
-  'PROSPECTS',
   'PROSPECTS_GRAND_PUBLIC',
+  'PROSPECTS',
   'REPRESENTANTS',
   'VISITES',
 ] as const satisfies readonly Exclude<ImportKind, 'VISITES_REGISTRE'>[];

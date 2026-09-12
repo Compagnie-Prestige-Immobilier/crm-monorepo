@@ -5,8 +5,10 @@ import {
   choisirDansListe,
   effacerFiches,
   marque,
+  ouvrirFicheDepuisAnnuaire,
   sansDebordementHorizontal,
   semerProspect,
+  semerRepresentant,
   type FicheSemee,
 } from './donnees-chues';
 
@@ -68,6 +70,32 @@ async function lireConversion(prospectId: string): Promise<ConversionEnBase> {
   return lu;
 }
 
+interface Classement {
+  tentatives: number;
+  phase2Status: string;
+  enrollmentMethod: string | null;
+  parcoursStatut: string;
+}
+
+async function lireClassement(prospectId: string): Promise<Classement> {
+  let lu: Classement | null = null;
+  await avecBase(async (client) => {
+    const { rows } = await client.query<Classement>(
+      `SELECT (SELECT count(*)::int FROM call_attempts a WHERE a."prospectId" = p.id) AS tentatives,
+              p."phase2Status"::text AS "phase2Status",
+              p."enrollmentMethod"::text AS "enrollmentMethod",
+              j."phase2Status"::text AS "parcoursStatut"
+         FROM prospects p
+         JOIN prospect_journeys j ON j."prospectId" = p.id
+        WHERE p.id = $1`,
+      [prospectId],
+    );
+    lu = rows[0] ?? null;
+  });
+  if (lu === null) throw new Error('fiche introuvable');
+  return lu;
+}
+
 async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(CONSOLE);
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
@@ -87,6 +115,20 @@ async function issue(page: Page, groupeLibelle: string, motif: RegExp): Promise<
     .getByRole('group', { name: new RegExp(`^${groupeLibelle} ·`, 'u') })
     .getByRole('button', { name: motif })
     .click();
+}
+
+/**
+ * Une fiche rouverte reprend le brouillon de sa dernière ouverture : quand le
+ * dossier est resté rempli, Échap le referme et rend les issues.
+ */
+async function revenirAuxIssues(page: Page): Promise<void> {
+  // La fiche est rendue quand son bouton de copie l'est : avant, Échap
+  // fermerait le dialogue d'ouverture et non le dossier.
+  await expect(page.getByRole('button', { name: /^Copier/u })).toBeVisible();
+  const issues = page.getByRole('group', { name: 'Comment s’est passé l’appel ?' });
+  if (await issues.isVisible()) return;
+  await page.keyboard.press('Escape');
+  await expect(issues).toBeVisible();
 }
 
 const consigne = (page: Page, nom: string) =>
@@ -169,6 +211,70 @@ test.describe('parcours 5, convertir un prospect', () => {
     await page.getByRole('list', { name: 'Histoire' }).getByText(commentaire).click();
     await expect(page.getByText(email)).toBeVisible();
     await expect(page.getByText(profession)).toBeVisible();
+  });
+
+  test('une fiche deja classee accepte un nouvel appel, la derniere issue l’emporte', async ({
+    page,
+  }) => {
+    const fiche = await semer('Reclassement');
+    const suffixe = marque();
+
+    await ouvrirFiche(page, fiche);
+    await issue(page, /(^|\s)Joignable$/u).click();
+    await remplirDossier(page, {
+      profession: `Greffier ${suffixe}`,
+      email: `omar.${suffixe}@ecole.sn`,
+      methode: 'Mail',
+    });
+    await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
+    await expect(consigne(page, fiche.nom)).toBeVisible();
+
+    await ouvrirFiche(page, fiche);
+    await expect(
+      page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
+    ).toBeVisible();
+    await revenirAuxIssues(page);
+    await issue(page, /Injoignable$/u).click();
+    await expect(consigne(page, fiche.nom)).toBeVisible();
+    expect(await lireClassement(fiche.id)).toMatchObject({
+      tentatives: 2,
+      phase2Status: 'METHOD_OBTAINED',
+    });
+
+    await ouvrirFiche(page, fiche);
+    await revenirAuxIssues(page);
+    await issue(page, /Mauvais numéro$/u).click();
+    await expect(consigne(page, fiche.nom)).toBeVisible();
+    expect(await lireClassement(fiche.id)).toMatchObject({
+      tentatives: 3,
+      phase2Status: 'WRONG_NUMBER',
+      enrollmentMethod: null,
+      parcoursStatut: 'WRONG_NUMBER',
+    });
+  });
+
+  test('une fiche ouverte n’empeche pas d’en ouvrir une autre ailleurs', async ({ page }) => {
+    const fiche = await semer('EnMain');
+    let representant: FicheSemee | null = null;
+    await avecBase(async (client) => {
+      representant = await semerRepresentant(client, `Rep ${marque()}`, compte.id);
+    });
+    if (representant === null) throw new Error('representant non seme');
+    telephones.push((representant as FicheSemee).phoneE164);
+
+    await ouvrirFiche(page, fiche);
+    await page.goto('/chues/appels-representants');
+    await ouvrirFicheDepuisAnnuaire(page, representant);
+    await expect(page.getByText(/en main/u)).toHaveCount(0);
+
+    // Les deux ouvertures restent : le parcours suivant les reprendrait au montage.
+    const representantId = (representant as FicheSemee).id;
+    await avecBase(async (client) => {
+      await client.query(
+        'DELETE FROM ouvertures_fiche WHERE "prospectId" = $1 OR "representantId" = $2',
+        [fiche.id, representantId],
+      );
+    });
   });
 });
 

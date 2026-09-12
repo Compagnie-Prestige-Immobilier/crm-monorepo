@@ -214,8 +214,7 @@ export function CommerciauxView({ currentUserId }: { currentUserId: string }) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Comptes de connexion à l’application mobile. Désactiver ferme l’accès, sans rien
-          supprimer.
+          Comptes de connexion au panneau. Désactiver ferme l’accès, sans rien supprimer.
         </p>
         <Button
           onClick={() => {

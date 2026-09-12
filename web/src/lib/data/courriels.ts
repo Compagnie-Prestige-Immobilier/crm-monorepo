@@ -2,17 +2,28 @@ import type { ApiClient } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import type { components } from '@crm/api-client';
+
 import type { Courriel, Paginated, ReglagesCourriels } from '@/lib/types';
+
+export type ReglagesCourrielsLus = components['schemas']['ReglagesCourrielsDTO'];
+export type ReglageCourriel = components['schemas']['ReglageCourriel'];
+export type TypeReglageCourriel = keyof ReglagesCourriels;
 
 export type ObjetCourriel = 'bank_case' | 'inscription' | 'prospect';
 export type TypeCourriel =
-  'DOSSIER_COMPLET' | 'DOSSIER_ENCAISSE' | 'DOSSIER_REJETE' | 'PROSPECT_ENROLEMENT';
+  | 'DOSSIER_COMPLET'
+  | 'DOSSIER_ENCAISSE'
+  | 'DOSSIER_REJETE'
+  | 'PROSPECT_ENROLEMENT'
+  | 'IMPORT_LEADS';
 
 export const COURRIEL_TYPE_LABELS: Record<string, string> = {
   DOSSIER_COMPLET: 'Dossier complet sur la plateforme',
   DOSSIER_ENCAISSE: 'Dossier bancaire encaissé',
   DOSSIER_REJETE: 'Dossier bancaire rejeté',
-  PROSPECT_ENROLEMENT: 'Prospect transmis à l’enrôlement',
+  PROSPECT_ENROLEMENT: 'Enrôlement',
+  IMPORT_LEADS: 'Relevé des leads',
 };
 
 export const COURRIEL_STATUT_LABELS: Record<Courriel['statut'], string> = {
@@ -62,13 +73,13 @@ export async function resendCourriel(
 
 export async function fetchReglagesCourriels(
   client: ApiClient = getApiClient(),
-): Promise<ReglagesCourriels> {
+): Promise<ReglagesCourrielsLus> {
   return unwrap(await client.GET('/api/v1/courriels/reglages'));
 }
 
 export async function saveReglagesCourriels(
   body: ReglagesCourriels,
   client: ApiClient = getApiClient(),
-): Promise<ReglagesCourriels> {
+): Promise<ReglagesCourrielsLus> {
   return unwrap(await client.PUT('/api/v1/courriels/reglages', { body }));
 }

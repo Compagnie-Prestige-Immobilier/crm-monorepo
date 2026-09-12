@@ -18,7 +18,7 @@ import (
 
 const (
 	exportTypeMimeXlsx            = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-	exportCouleurBordeaux         = "FF630210"
+	exportCouleurBordeaux         = "630210"
 	exportTaillePage              = 1000
 	exportNomFeuilleRepresentants = "Représentants"
 )
@@ -208,15 +208,15 @@ func exportNouveauClasseur() (*exportClasseur, error) {
 		format string
 	}{
 		{&c.entete, &excelize.Style{
-			Font:      &excelize.Font{Bold: true, Color: "FFFFFFFF", Size: 11},
+			Font:      &excelize.Font{Bold: true, Color: "FFFFFF", Size: 11},
 			Fill:      excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{exportCouleurBordeaux}},
 			Alignment: &excelize.Alignment{Vertical: "center", Horizontal: "left"},
 		}, ""},
 		{&c.section, &excelize.Style{Font: &excelize.Font{Bold: true, Color: exportCouleurBordeaux}}, ""},
-		{&c.rappel, &excelize.Style{Font: &excelize.Font{Italic: true, Color: "FF6B6B6B", Size: 10}}, ""},
+		{&c.rappel, &excelize.Style{Font: &excelize.Font{Italic: true, Color: "6B6B6B", Size: 10}}, ""},
 		{&c.exemple, &excelize.Style{
-			Font: &excelize.Font{Italic: true, Color: "FF9A9A9A"},
-			Fill: excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{"FFF3F3F3"}},
+			Font: &excelize.Font{Italic: true, Color: "9A9A9A"},
+			Fill: excelize.Fill{Type: ExportTypeRemplissage, Pattern: 1, Color: []string{"F3F3F3"}},
 		}, ""},
 		{&c.date, nil, "dd/mm/yyyy hh:mm"},
 		{&c.jour, nil, "dd/mm/yyyy"},
@@ -917,7 +917,8 @@ func (s *service) exportModeleGrandPublic(ctx context.Context, _ *struct{}) (*hu
 			"Seuls le Nom et le Téléphone sont exigés. Une cellule vide n’est pas une erreur : c’est une information qu’on n’a pas encore, et la ligne est écrite quand même.",
 			"Le téléphone est la clé de déduplication, tous projets confondus : un numéro déjà porté par une fiche, CHUES comprise, est signalé et non écrit.",
 			"« Fonctionnaire » à « oui » range la fiche en FONCTIONNAIRE. À « non », le type reste VIDE : le fichier ne dit pas s’il s’agit du secteur privé, de l’informel ou de la diaspora, et rien ne se devine ici.",
-			"Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import."),
+			"Les dix dernières colonnes décrivent la situation. Un employeur hors liste est conservé en clair ; un pays de résidence hors liste refuse la ligne, car il désigne une entrée de référentiel qui ne se crée pas à l’import.",
+			"Un export de campagne garde ses propres colonnes : une colonne « Nom complet » remplace Prénom et Nom, son dernier mot faisant le nom de famille, une colonne « Email » est reprise sur la fiche, et une colonne « Date » devient la date de saisie du lead. Une page d’atterrissage ou un nom de campagne en colonne de provenance est traduit par les règles de provenance."),
 	})
 }
 
@@ -952,6 +953,16 @@ func (s *service) exportListesGrandPublic(ctx context.Context) ([]exportListeMod
 		{14, "Modes d’épargne", []string{exportLibelleTontine, "Mobile money", exportEnteteBanque, exportLibelleAucun}},
 		{15, "Pays", pays},
 	}, nil
+}
+
+// L'import Grand Public reconnaît la ligne d'exemple du modèle pour la sauter :
+// les deux listes doivent rester dans le même ordre.
+func ExemplesGrandPublic() []string {
+	exemples := make([]string, len(exportColonnesGrandPublic))
+	for i, colonne := range exportColonnesGrandPublic {
+		exemples[i] = colonne.exemple
+	}
+	return exemples
 }
 
 var exportColonnesGrandPublic = []exportColonneModele{

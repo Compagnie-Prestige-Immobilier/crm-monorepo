@@ -591,6 +591,15 @@ type ProspectParametresChues struct {
 	DestinatairesDirection   []string `json:"destinatairesDirection"`
 	DestinatairesAdhesion    []string `json:"destinatairesAdhesion"`
 	VerrouFiches             bool     `json:"verrouFiches"`
+	CodificationProvenances  []string `json:"codificationProvenances"`
+	// Les textes d'origine, pour les rétablir d'un clic depuis l'écran.
+	TextesUsine ProspectTextesUsine `json:"textesUsine"`
+}
+
+type ProspectTextesUsine struct {
+	MessageWhatsapp      string `json:"messageWhatsapp"`
+	AccuseReceptionObjet string `json:"accuseReceptionObjet"`
+	AccuseReceptionCorps string `json:"accuseReceptionCorps"`
 }
 
 // Les deux textes viennent mot pour mot de l'expression de besoins ; les liens,
@@ -614,6 +623,7 @@ var prospectParametresUsine = ProspectParametresChues{
 	DestinatairesDirection:   []string{},
 	DestinatairesAdhesion:    []string{},
 	VerrouFiches:             true,
+	CodificationProvenances:  []string{},
 }
 
 const (
@@ -632,6 +642,7 @@ const (
 	prospectCleSupervision   = "destinatairesSupervision"
 	prospectCleDirection     = "destinatairesDirection"
 	prospectCleVerrouFiches  = "verrouFiches"
+	prospectCleCodification  = "codificationProvenances"
 	prospectPrefixeParametre = "chues."
 )
 
@@ -645,7 +656,7 @@ var prospectClesParametres = []string{
 	prospectCleMessage, prospectCleAccuseObjet, prospectCleAccuseCorps,
 	prospectCleAdhesionObjet, prospectCleAdhesionCorps,
 	prospectCleEnrolement, prospectCleBpe, prospectCleSupervision,
-	prospectCleDirection, prospectCleAdhesionDest, prospectCleVerrouFiches,
+	prospectCleDirection, prospectCleAdhesionDest, prospectCleVerrouFiches, prospectCleCodification,
 }
 
 // `app_settings` est partagée : le préfixe évite qu'un réglage CHUES en écrase
@@ -660,6 +671,8 @@ func prospectClesStockees() []string {
 	return cles
 }
 
+// Une liste voyage en JSON, un booléen en 'true'/'false'. Une valeur illisible
+// retombe sur l'usine plutôt que de faire échouer l'écran entier.
 func prospectBool(v bool) string {
 	if v {
 		return socle.Vrai
@@ -667,8 +680,6 @@ func prospectBool(v bool) string {
 	return socle.Faux
 }
 
-// Une liste voyage en JSON, un booléen en 'true'/'false'. Une valeur illisible
-// retombe sur l'usine plutôt que de faire échouer l'écran entier.
 func prospectListeDe(brut string) []string {
 	liste := []string{}
 	if err := json.Unmarshal([]byte(brut), &liste); err != nil {
@@ -703,6 +714,7 @@ func (p *ProspectParametresChues) listes() map[string]*[]string {
 		prospectCleEnrolement: &p.DestinatairesEnrolement, prospectCleBpe: &p.DestinatairesBpe,
 		prospectCleSupervision: &p.DestinatairesSupervision, prospectCleDirection: &p.DestinatairesDirection,
 		prospectCleAdhesionDest: &p.DestinatairesAdhesion,
+		prospectCleCodification: &p.CodificationProvenances,
 	}
 }
 
@@ -749,6 +761,11 @@ func (s *service) prospectLireParametres(ctx context.Context) (ProspectParametre
 			parametres.poser(cle, brut)
 		}
 	}
+	parametres.TextesUsine = ProspectTextesUsine{
+		MessageWhatsapp:      prospectParametresUsine.MessageWhatsapp,
+		AccuseReceptionObjet: prospectParametresUsine.AccuseReceptionObjet,
+		AccuseReceptionCorps: prospectParametresUsine.AccuseReceptionCorps,
+	}
 	return parametres, nil
 }
 
@@ -783,6 +800,7 @@ type ProspectMajParametresInput struct {
 		DestinatairesDirection   *[]string `json:"destinatairesDirection,omitempty" maxItems:"50" required:"false"`
 		DestinatairesAdhesion    *[]string `json:"destinatairesAdhesion,omitempty" maxItems:"50" required:"false"`
 		VerrouFiches             *bool     `json:"verrouFiches,omitempty" required:"false"`
+		CodificationProvenances  *[]string `json:"codificationProvenances,omitempty" maxItems:"100" required:"false"`
 	}
 }
 
@@ -804,6 +822,7 @@ func (in *ProspectMajParametresInput) demandees() map[string]string {
 		prospectCleEnrolement: in.Body.DestinatairesEnrolement, prospectCleBpe: in.Body.DestinatairesBpe,
 		prospectCleSupervision: in.Body.DestinatairesSupervision, prospectCleDirection: in.Body.DestinatairesDirection,
 		prospectCleAdhesionDest: in.Body.DestinatairesAdhesion,
+		prospectCleCodification: in.Body.CodificationProvenances,
 	}
 	for cle, valeur := range listes {
 		if valeur != nil {

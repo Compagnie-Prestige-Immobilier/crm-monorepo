@@ -129,7 +129,7 @@ export function RepresentantsFiltersBar() {
   }, [setFilters]);
 
   const activeCount = countActiveRepresentantFilters(filters);
-  const chips = buildChips(filters);
+  const chips = buildChips(filters, reference, statuts);
 
   return (
     <section
@@ -144,7 +144,7 @@ export function RepresentantsFiltersBar() {
           placeholder="Nom ou téléphone…"
         />
 
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
           <Label htmlFor={relationId}>Qualification</Label>
           <Select
             items={RELATION_ITEMS}
@@ -168,101 +168,12 @@ export function RepresentantsFiltersBar() {
             </SelectContent>
           </Select>
         </div>
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <Label htmlFor={statutId}>Statut de qualification</Label>
-          <Select
-            items={statutItems}
-            value={filters.statutQualificationId ?? 'tous'}
-            onValueChange={(value) => {
-              if (value === null) return;
-              setFilters({ statutQualificationId: value === 'tous' ? null : value });
-            }}
-          >
-            <SelectTrigger id={statutId} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {statutItems.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <FilterCombobox
-            label="Région"
-            placeholder="Toutes les régions"
-            value={regionId}
-            options={regionsDe(reference).map((region) => ({
-              value: region.id,
-              label: region.name,
-            }))}
-            onChange={(value) => {
-              setRegionDraft(value);
-              if (filters.departementId === null && filters.iefId === null) return;
-              setFilters({ departementId: null, iefId: null });
-            }}
-          />
-        </div>
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <FilterCombobox
-            label="Département"
-            placeholder="Tous les départements"
-            value={filters.departementId}
-            options={departements
-              .filter((departement) => regionId === null || departement.regionId === regionId)
-              .map((departement) => ({
-                value: departement.id,
-                label: departement.name,
-                hint: departement.regionName,
-              }))}
-            onChange={(value) => {
-              setFilters({ departementId: value, iefId: null });
-            }}
-          />
-        </div>
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <FilterCombobox
-            label="IEF"
-            placeholder="Toutes les IEF"
-            value={filters.iefId}
-            options={iefsDe(reference)
-              .filter((ief) =>
-                filters.departementId === null ? true : ief.departementId === filters.departementId,
-              )
-              .map((ief) => ({
-                value: ief.id,
-                label: ief.name,
-                hint: ief.departementName,
-              }))}
-            onChange={(value) => {
-              setFilters({ iefId: value });
-            }}
-          />
-        </div>
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          <FilterCombobox
-            label="Téléconseiller"
-            placeholder="Tous les téléconseillers"
-            value={filters.commercialId}
-            options={commerciauxDe(reference)}
-            onChange={(value) => {
-              setFilters({ commercialId: value });
-            }}
-          />
-        </div>
       </div>
 
       {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
       <AdvancedPanel
         module="representants"
+        startCollapsed={true}
         chips={chips}
         onRemove={removeAdvanced}
         onClearAll={clearAdvanced}
@@ -276,6 +187,98 @@ export function RepresentantsFiltersBar() {
         }
       >
         <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor={statutId}>Statut de qualification</Label>
+            <Select
+              items={statutItems}
+              value={filters.statutQualificationId ?? 'tous'}
+              onValueChange={(value) => {
+                if (value === null) return;
+                setFilters({ statutQualificationId: value === 'tous' ? null : value });
+              }}
+            >
+              <SelectTrigger id={statutId} className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {statutItems.map((item) => (
+                  <SelectItem key={item.value} value={item.value}>
+                    {item.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <FilterCombobox
+              label="Région"
+              placeholder="Toutes les régions"
+              value={regionId}
+              options={regionsDe(reference).map((region) => ({
+                value: region.id,
+                label: region.name,
+              }))}
+              onChange={(value) => {
+                setRegionDraft(value);
+                if (filters.departementId === null && filters.iefId === null) return;
+                setFilters({ departementId: null, iefId: null });
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <FilterCombobox
+              label="Département"
+              placeholder="Tous les départements"
+              value={filters.departementId}
+              options={departements
+                .filter((departement) => regionId === null || departement.regionId === regionId)
+                .map((departement) => ({
+                  value: departement.id,
+                  label: departement.name,
+                  hint: departement.regionName,
+                }))}
+              onChange={(value) => {
+                setFilters({ departementId: value, iefId: null });
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <FilterCombobox
+              label="IEF"
+              placeholder="Toutes les IEF"
+              value={filters.iefId}
+              options={iefsDe(reference)
+                .filter((ief) =>
+                  filters.departementId === null
+                    ? true
+                    : ief.departementId === filters.departementId,
+                )
+                .map((ief) => ({
+                  value: ief.id,
+                  label: ief.name,
+                  hint: ief.departementName,
+                }))}
+              onChange={(value) => {
+                setFilters({ iefId: value });
+              }}
+            />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <FilterCombobox
+              label="Téléconseiller"
+              placeholder="Tous les téléconseillers"
+              value={filters.commercialId}
+              options={commerciauxDe(reference)}
+              onChange={(value) => {
+                setFilters({ commercialId: value });
+              }}
+            />
+          </div>
+
           <DatePicker
             id="representants-date-from"
             label="Saisi à partir du"
@@ -382,9 +385,50 @@ function presenceFromValue(value: string): boolean | null {
 
 function buildChips(
   filters: RepresentantFilters,
+  reference: Referentiels,
+  statuts: readonly { id: string; label: string }[] | undefined,
 ): AdvancedChipItem<RepresentantAdvancedFilterKey>[] {
   const chips: AdvancedChipItem<RepresentantAdvancedFilterKey>[] = [];
 
+  if (filters.relationStatus !== null) {
+    chips.push({
+      key: 'relationStatus',
+      field: 'Qualification',
+      value: REPRESENTANT_RELATION_LABELS[filters.relationStatus],
+    });
+  }
+  if (filters.statutQualificationId !== null) {
+    const statut = statuts?.find((s) => s.id === filters.statutQualificationId);
+    chips.push({
+      key: 'statutQualificationId',
+      field: 'Statut de qualification',
+      value: statut?.label ?? 'Sélectionné',
+    });
+  }
+  if (filters.departementId !== null) {
+    const dep = reference?.departements.find((d) => d.id === filters.departementId);
+    chips.push({
+      key: 'departementId',
+      field: 'Département',
+      value: dep?.name ?? 'Sélectionné',
+    });
+  }
+  if (filters.iefId !== null) {
+    const ief = reference?.iefs.find((i) => i.id === filters.iefId);
+    chips.push({
+      key: 'iefId',
+      field: 'IEF',
+      value: ief?.name ?? 'Sélectionné',
+    });
+  }
+  if (filters.commercialId !== null) {
+    const com = reference?.commerciaux.find((c) => c.value === filters.commercialId);
+    chips.push({
+      key: 'commercialId',
+      field: 'Téléconseiller',
+      value: com?.label ?? 'Sélectionné',
+    });
+  }
   if (filters.dateFrom !== null) {
     chips.push({
       key: 'dateFrom',

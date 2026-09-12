@@ -10,8 +10,11 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 	"time"
 
@@ -458,4 +461,117 @@ func TestImportInterditAuTeleconseiller(t *testing.T) {
 	b.attend(statut, http.StatusForbidden, "dépôt par un téléconseiller", body)
 	statut, body = b.appel(http.MethodGet, "/api/v1/imports", nil, false)
 	b.attend(statut, http.StatusForbidden, "liste par un téléconseiller", body)
+}
+
+// La forme d'un export de campagne : en-tête en ligne 1, données dès la ligne 2.
+func classeurLeads(t *testing.T, telephone string) []byte {
+	t.Helper()
+	fichier := excelize.NewFile()
+	feuille := fichier.GetSheetName(0)
+	lignes := [][]string{
+		{"Date", "Nom complet", "Email", "Téléphone", "Canal"},
+		{"10/09/2026", "Fatou Relevée", "fatou." + telephone[4:] + "@example.sn", telephone, "https://monespace.cpi.sn/"},
+	}
+	for rang, ligne := range lignes {
+		for index, valeur := range ligne {
+			cellule, _ := excelize.CoordinatesToCellName(index+1, rang+1)
+			_ = fichier.SetCellValue(feuille, cellule, valeur)
+		}
+	}
+	var buf bytes.Buffer
+	if err := fichier.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+// Le lien SharePoint, joué en local : une redirection qui pose un cookie, puis
+// le classeur, comme le vrai. Le nom du classeur est propre au test : le vrai
+// relevé écrit dans la même base.
+func (b *banc) lienDesLeads(classeur []byte, nomFichier string) string {
+	b.t.Helper()
+	source := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/partage" {
+			http.SetCookie(w, &http.Cookie{Name: "FedAuth", Value: "jeton"})
+			http.Redirect(w, r, "/sites/CPI/"+url.PathEscape(nomFichier)+"?ga=1", http.StatusFound)
+			return
+		}
+		if c, err := r.Cookie("FedAuth"); err != nil || c.Value != "jeton" {
+			http.Error(w, "connexion requise", http.StatusForbidden)
+			return
+		}
+		w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+		_, _ = w.Write(classeur)
+	}))
+	b.t.Cleanup(source.Close)
+	return source.URL + "/partage?e=abc"
+}
+
+func (b *banc) ficheDuLead(telephone string) (projet, canal string, travail *string) {
+	b.t.Helper()
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT p."projet"::text, COALESCE(c."label", ''), p."importJobId"
+		   FROM "prospects" p LEFT JOIN "canaux_provenance" c ON c."id" = p."canalProvenanceId"
+		  WHERE p."phoneE164" = $1`, telephone).Scan(&projet, &canal, &travail); err != nil {
+		b.t.Fatalf("la fiche du lead doit exister : %v", err)
+	}
+	return projet, canal, travail
+}
+
+func (b *banc) travauxDuClasseur(nom string) int {
+	b.t.Helper()
+	var travaux int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "import_jobs" WHERE "fileName" = $1`, nom).Scan(&travaux); err != nil {
+		b.t.Fatal(err)
+	}
+	return travaux
+}
+
+func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	telephone := fmt.Sprintf("+22177%07d", time.Now().UnixNano()%10_000_000)
+	nomClasseurLeads := "Leads test " + telephone[6:] + ".xlsx"
+	t.Setenv("IMPORT_LEADS_URL", b.lienDesLeads(classeurLeads(t, telephone), nomClasseurLeads))
+	// L'empreinte est un réglage unique : celle du vrai relevé est remise après.
+	var empreinteAvant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`).Scan(&empreinteAvant)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = $1)`, telephone)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, telephone)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "fileName" = $1`, nomClasseurLeads)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`)
+		if empreinteAvant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('imports.leadsEmpreinte', $1, now())`, *empreinteAvant)
+		}
+	})
+	moteur := serviceDesImports(b)
+
+	if err := imports.ReleverLeads(b.ctx, moteur); err != nil {
+		t.Fatal(err)
+	}
+	projet, canal, travail := b.ficheDuLead(telephone)
+	if projet != "GRAND_PUBLIC" || canal != "Site web" || travail == nil {
+		t.Fatalf("fiche %s, canal %q, import %v", projet, canal, travail)
+	}
+	if statut, creees, _ := b.etatTravailImport(*travail); statut != "succeeded" || creees != 1 {
+		t.Fatalf("travail %s, %d créée(s)", statut, creees)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" = $1`, *travail)
+	})
+	var sujet string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "sujet" FROM "courriels" WHERE "type" = 'IMPORT_LEADS' AND "objetId" = $1`, *travail).Scan(&sujet); err != nil {
+		t.Fatalf("le bilan du relevé doit partir en courriel : %v", err)
+	}
+	if !strings.HasPrefix(sujet, "[Leads] Relevé appliqué : ") {
+		t.Fatalf("sujet : %s", sujet)
+	}
+
+	if err := imports.ReleverLeads(b.ctx, moteur); err != nil {
+		t.Fatal(err)
+	}
+	if travaux := b.travauxDuClasseur(nomClasseurLeads); travaux != 1 {
+		t.Fatalf("un classeur inchangé ne se rejoue pas : %d travaux", travaux)
+	}
 }

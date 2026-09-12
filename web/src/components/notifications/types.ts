@@ -12,11 +12,8 @@ export type NotificationRow = Schemas['NotificationDto'];
 export type NotificationList = Schemas['NotificationListDto'];
 export type NotificationDetail = Schemas['NotificationDetailDto'];
 export type AudiencePreview = Schemas['AudiencePreviewDto'];
-export type NotificationTemplate = Schemas['NotificationTemplateDto'];
 
 export type CreateNotificationInput = Schemas['CreateNotificationDto'];
-export type CreateTemplateInput = Schemas['CreateNotificationTemplateDto'];
-export type UpdateTemplateInput = Schemas['UpdateNotificationTemplateDto'];
 
 /**
  * `CAMPAGNE` n'est plus proposé nulle part : plus rien n'en produit depuis le

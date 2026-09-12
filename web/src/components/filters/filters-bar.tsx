@@ -66,7 +66,7 @@ function revueValue(revue: boolean | null): string | null {
   return revue ? 'oui' : 'non';
 }
 
-export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolean }) {
+export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean }) {
   const { filters, setFilters, resetFilters } = useProspectFilters();
 
   const {
@@ -136,7 +136,7 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
           placeholder="Nom, téléphone, représentant…"
         />
 
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
+        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
           {/* Le seul critère de liste resté visible : c'est celui qu'on change
               à chaque session, quand on regarde le travail d'une personne. */}
           <FilterCombobox
@@ -149,25 +149,6 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
             }}
           />
         </div>
-
-        <DatePicker
-          id="prospects-date-from"
-          label="Saisi à partir du"
-          value={filters.dateFrom}
-          max={filters.dateTo}
-          onChange={(dateFrom) => {
-            setFilters({ dateFrom });
-          }}
-        />
-        <DatePicker
-          id="prospects-date-to"
-          label="Jusqu’au"
-          value={filters.dateTo}
-          min={filters.dateFrom}
-          onChange={(dateTo) => {
-            setFilters({ dateTo });
-          }}
-        />
       </div>
 
       {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
@@ -187,6 +168,24 @@ export function FiltersBar({ startCollapsed = false }: { startCollapsed?: boolea
         }
       >
         <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+          <DatePicker
+            id="prospects-date-from"
+            label="Saisi à partir du"
+            value={filters.dateFrom}
+            max={filters.dateTo}
+            onChange={(dateFrom) => {
+              setFilters({ dateFrom });
+            }}
+          />
+          <DatePicker
+            id="prospects-date-to"
+            label="Jusqu’au"
+            value={filters.dateTo}
+            min={filters.dateFrom}
+            onChange={(dateTo) => {
+              setFilters({ dateTo });
+            }}
+          />
           <FilterCombobox
             label="Représentant"
             placeholder="Tous les représentants"

@@ -13,7 +13,7 @@ function AccueilLayout() {
   const { user } = Route.useRouteContext();
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
       <VisitesTabs role={user.role} />
       <Outlet />
     </div>

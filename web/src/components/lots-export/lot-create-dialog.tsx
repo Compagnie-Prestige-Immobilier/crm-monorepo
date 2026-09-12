@@ -7,6 +7,7 @@ import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
+import { ChampImport, etiquetteImport } from '@/components/lots-export/lot-import-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -32,6 +33,7 @@ import {
   fetchTeleconseillers,
   previewLotExport,
   type CreateLotExportInput,
+  type LotExportImport,
   type LotExportPreview,
   type Teleconseiller,
 } from '@/lib/data/lots-export';
@@ -66,10 +68,22 @@ const CIBLES = [
     aide: 'Un seul segment, de BDD1 à BDD4.',
   },
   {
+    cle: 'import-chues',
+    projet: 'CHUES',
+    titre: 'Fiches importées',
+    aide: 'Les fiches CHUES d’un classeur importé, choisi par sa date.',
+  },
+  {
     cle: 'grand-public',
     projet: 'GRAND_PUBLIC',
     titre: 'Prospects Grand Public',
     aide: 'Les fiches hors CHUES, tous types ou un seul.',
+  },
+  {
+    cle: 'import-grand-public',
+    projet: 'GRAND_PUBLIC',
+    titre: 'Fiches importées',
+    aide: 'Les fiches Grand Public d’un classeur importé, choisi par sa date.',
   },
   {
     cle: 'representants',
@@ -110,6 +124,13 @@ const TETE: Record<CleRepresentants, string> = {
 
 const surRepresentants = (cle: CleCible): cle is CleRepresentants => cle in CIBLE_API;
 
+type CleImport = 'import-chues' | 'import-grand-public';
+
+const surImport = (cle: CleCible): cle is CleImport => cle.startsWith('import-');
+
+const projetDe = (cle: CleCible): Projet =>
+  CIBLES.find((cible) => cible.cle === cle)?.projet ?? 'CHUES';
+
 /** Valeur de liste déroulante qui veut dire « ne pas filtrer ». */
 const TOUS = 'TOUS';
 
@@ -126,6 +147,7 @@ interface Choix {
   departementId: string;
   iefId: string;
   nonQualifies: boolean;
+  importe: LotExportImport | null;
 }
 
 const choixInitial = (cle: CleCible): Choix => ({
@@ -135,6 +157,7 @@ const choixInitial = (cle: CleCible): Choix => ({
   departementId: TOUS,
   iefId: TOUS,
   nonQualifies: true,
+  importe: null,
 });
 
 /** Ce qui n'est pas un entier valable n'est pas envoyé : le serveur retombe sur le défaut. */
@@ -209,6 +232,20 @@ function critereRepresentants(
   };
 }
 
+function critereImport(projet: Projet, importe: LotExportImport | null): Critere {
+  return {
+    corps: {
+      cible: 'PROSPECTS',
+      prospects: {
+        ...PROSPECTS_VIVANTS,
+        projet,
+        ...(importe === null ? {} : { importJobId: importe.id }),
+      },
+    },
+    etiquette: importe === null ? 'Fiches importées' : etiquetteImport(projet, importe.importedAt),
+  };
+}
+
 /**
  * Les critères envoyés à l'API, et l'étiquette qui les dit en français. Cette
  * étiquette devient le nom du lot : le formulaire n'en demande aucun.
@@ -220,6 +257,8 @@ function critereDuChoix(
 ): Critere {
   if (surRepresentants(choix.cle))
     return critereRepresentants(choix.cle, choix, nomDepartement, nomIef);
+
+  if (surImport(choix.cle)) return critereImport(projetDe(choix.cle), choix.importe);
 
   if (choix.cle === 'grand-public') {
     return {
@@ -356,6 +395,17 @@ function ChampsCritere({
           </Select>
         )}
       </Field>
+    );
+
+  if (surImport(choix.cle))
+    return (
+      <ChampImport
+        projet={projetDe(choix.cle)}
+        valeur={choix.importe?.id ?? ''}
+        onChange={(importe) => {
+          onChange({ ...choix, importe });
+        }}
+      />
     );
 
   if (!surRepresentants(choix.cle)) return null;
@@ -784,6 +834,7 @@ function FormulaireDeLot({
     choix.departementId,
     choix.iefId,
     String(choix.nonQualifies),
+    choix.importe?.id ?? '',
     distribution.teleconseillerIds.join(','),
     fichesParJour,
     jours,
@@ -794,11 +845,12 @@ function FormulaireDeLot({
   const cleDifferee = useDebouncedValue(cleCritere, 250);
   const critereStable = cleDifferee === cleCritere;
   const equipeChoisie = equipe.length > 0;
+  const sourceChoisie = !surImport(choix.cle) || choix.importe !== null;
 
   const apercu = useQuery({
     queryKey: queryKeys.lotsExportApercu({ cle: cleCritere }),
     queryFn: () => previewLotExport({ ...corps, name: etiquette, distribution }),
-    enabled: critereStable && equipeChoisie,
+    enabled: critereStable && equipeChoisie && sourceChoisie,
   });
 
   const eligible = eligibleDe(apercu);

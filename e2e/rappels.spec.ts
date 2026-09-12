@@ -93,6 +93,12 @@ function ongletDe(echeance: Date): string {
   return jour(echeance) === jour(new Date()) ? 'Aujourd’hui' : 'Cette semaine';
 }
 
+/** L'écran ouvre sur les représentants : les rappels de prospects sont l'autre onglet. */
+async function ouvrirRappelsProspects(page: Page): Promise<void> {
+  await page.goto(RAPPELS);
+  await page.getByRole('tab', { name: 'Prospects', exact: true }).click();
+}
+
 test.use({ storageState: compte.etat });
 
 test.afterAll(async () => {
@@ -112,7 +118,7 @@ test.describe('parcours 6, rappels promis', () => {
     // « Dans 1 h » : l'echeance est devant nous, elle n'est donc pas en retard.
     expect(promis.scheduledAt.getTime()).toBeGreaterThan(Date.now());
 
-    await page.goto(RAPPELS);
+    await ouvrirRappelsProspects(page);
     const ligne = ligneRappel(page, fiche.phoneE164);
     await expect(page.getByRole('tab', { name: /En retard/u })).toHaveAttribute(
       'aria-selected',
@@ -142,7 +148,7 @@ test.describe('parcours 6 en 390 px', () => {
     await promettreUnRappel(page, fiche);
 
     const promis = await lireRappel(fiche.id);
-    await page.goto(RAPPELS);
+    await ouvrirRappelsProspects(page);
     await page.getByRole('tab', { name: ongletDe(promis.scheduledAt) }).click();
     await expect(ligneRappel(page, fiche.phoneE164)).toBeVisible();
     await sansDebordementHorizontal(page);

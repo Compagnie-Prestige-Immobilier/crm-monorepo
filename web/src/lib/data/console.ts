@@ -856,8 +856,6 @@ export function newAttemptInput(
   };
 }
 
-export const ALREADY_COMPLETED = 'PHASE2_ALREADY_COMPLETED';
-
 export class AttemptRefused extends Error {
   readonly code: string;
 
@@ -867,6 +865,9 @@ export class AttemptRefused extends Error {
     this.code = code;
   }
 }
+
+/** La fiche s'est fermée entre l'ouverture et la consigne : l'écran se fige. */
+export const ALREADY_COMPLETED = 'PHASE2_ALREADY_COMPLETED';
 
 /**
  * Aucune route HTTP ne consigne un appel de phase 2 : le lot de synchronisation

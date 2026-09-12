@@ -2,10 +2,10 @@
 
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useQueryClient } from '@tanstack/react-query';
-import { AlertCircleIcon, LoaderIcon } from 'lucide-react';
+import { AlertCircleIcon, EyeIcon, EyeOffIcon, LoaderIcon } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState, type FormEvent } from 'react';
+import { useForm, type FieldErrors, type UseFormRegister } from 'react-hook-form';
 
 import { meQueryOptions } from '@/api/auth';
 import { resetSessionExpiryGuard } from '@/lib/api/session-expiry';
@@ -34,6 +34,15 @@ function roleOf(payload: unknown): Role {
 
 const COOKIE_BASE = 'cpi_base';
 const BASE_PUBLIQUE = 'public';
+const DEMO_ROLES = [
+  'ADMIN',
+  'SUPERVISEUR',
+  'COMMERCIAL',
+  'BANQUE_FINANCE',
+  'DIRECTION',
+  'ACCUEIL',
+  'CHARGE_CLIENTELE',
+] as const satisfies readonly Role[];
 
 function baseCourante(): string {
   const valeur = document.cookie
@@ -48,12 +57,107 @@ function choisirBase(nom: string): void {
   document.cookie = `${COOKIE_BASE}=${nom}; path=/; max-age=31536000; SameSite=Lax`;
 }
 
+function CredentialsFields({
+  register,
+  errors,
+}: {
+  register: UseFormRegister<LoginInput>;
+  errors: FieldErrors<LoginInput>;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+
+  return (
+    <>
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="identifier">E-mail ou identifiant</Label>
+        <Input
+          id="identifier"
+          type="text"
+          autoComplete="username"
+          autoCapitalize="none"
+          spellCheck={false}
+          aria-invalid={errors.identifier !== undefined}
+          aria-describedby={errors.identifier !== undefined ? 'identifier-error' : undefined}
+          {...register('identifier')}
+        />
+        {errors.identifier !== undefined ? (
+          <p id="identifier-error" role="alert" className="text-[0.75rem] text-destructive">
+            {errors.identifier.message}
+          </p>
+        ) : null}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Label htmlFor="password">Mot de passe</Label>
+        <div className="relative">
+          <Input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            autoComplete="current-password"
+            className="pr-10"
+            aria-invalid={errors.password !== undefined}
+            aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
+            {...register('password')}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setShowPassword((précédent) => !précédent);
+            }}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 rounded-sm"
+            aria-label={showPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+          >
+            {showPassword ? (
+              <EyeOffIcon className="size-4 shrink-0" aria-hidden="true" />
+            ) : (
+              <EyeIcon className="size-4 shrink-0" aria-hidden="true" />
+            )}
+          </button>
+        </div>
+        {errors.password !== undefined ? (
+          <p id="password-error" role="alert" className="text-[0.75rem] text-destructive">
+            {errors.password.message}
+          </p>
+        ) : null}
+      </div>
+    </>
+  );
+}
+
+function DemoProfileField({ role, onChange }: { role: Role; onChange: (role: Role) => void }) {
+  return (
+    <div className="flex flex-col gap-2">
+      <Label htmlFor="demo-role">Profil démo</Label>
+      <Select
+        value={role}
+        onValueChange={(value) => {
+          if (typeof value === 'string' && DEMO_ROLES.includes(value as Role))
+            onChange(value as Role);
+        }}
+        items={DEMO_ROLES.map((demoRole) => ({ value: demoRole, label: ROLE_LABELS[demoRole] }))}
+      >
+        <SelectTrigger id="demo-role" aria-label="Profil démo">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          {DEMO_ROLES.map((demoRole) => (
+            <SelectItem key={demoRole} value={demoRole}>
+              {ROLE_LABELS[demoRole]}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 export function LoginForm({ next }: { next?: string | null }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [serverError, setServerError] = useState<string | null>(null);
   const [bases, setBases] = useState<string[] | null>(null);
   const [base, setBase] = useState(baseCourante);
+  const [demoRole, setDemoRole] = useState<Role>('ADMIN');
 
   useEffect(() => {
     resetSessionExpiryGuard();
@@ -66,7 +170,11 @@ export function LoginForm({ next }: { next?: string | null }) {
     // Une base autre que la publique se voit d'emblée : on sait où l'on se connecte.
     if (baseCourante() !== BASE_PUBLIQUE) void chargerBases();
     function surTouche(event: KeyboardEvent): void {
-      if (!(event.ctrlKey || event.metaKey) || !event.shiftKey || event.key.toUpperCase() !== 'D')
+      if (
+        !(event.ctrlKey || event.metaKey) ||
+        !event.shiftKey ||
+        !['D', 'N'].includes(event.key.toUpperCase())
+      )
         return;
       event.preventDefault();
       void chargerBases();
@@ -114,12 +222,44 @@ export function LoginForm({ next }: { next?: string | null }) {
     }
   }
 
+  async function onDemoSubmit(): Promise<void> {
+    setServerError(null);
+    try {
+      const response = await fetch('/api/v1/auth/demo-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'same-origin',
+        body: JSON.stringify({ role: demoRole }),
+      });
+
+      if (!response.ok) {
+        const payload: unknown = await response.json().catch(() => null);
+        setServerError(apiErrorMessage(payload, 'La base de démonstration est indisponible.'));
+        return;
+      }
+
+      const payload: unknown = await response.json().catch(() => null);
+      queryClient.setQueryData(
+        meQueryOptions.queryKey,
+        ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
+      );
+      router.replace(next != null && next !== '' ? next : homePathForRole(demoRole));
+    } catch {
+      setServerError('Le serveur est injoignable. Vérifiez votre connexion.');
+    }
+  }
+
   return (
     <form
       noValidate
       // Avant hydratation, un envoi natif partirait en GET avec le mot de passe dans l'URL.
       method="post"
-      onSubmit={(event) => {
+      onSubmit={(event: FormEvent<HTMLFormElement>) => {
+        if (base !== BASE_PUBLIQUE) {
+          event.preventDefault();
+          void onDemoSubmit();
+          return;
+        }
         void handleSubmit(onSubmit)(event);
       }}
       className="flex flex-col gap-5"
@@ -134,41 +274,11 @@ export function LoginForm({ next }: { next?: string | null }) {
         </p>
       ) : null}
 
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="identifier">E-mail ou identifiant</Label>
-        <Input
-          id="identifier"
-          type="text"
-          autoComplete="username"
-          autoCapitalize="none"
-          spellCheck={false}
-          aria-invalid={errors.identifier !== undefined}
-          aria-describedby={errors.identifier !== undefined ? 'identifier-error' : undefined}
-          {...register('identifier')}
-        />
-        {errors.identifier !== undefined ? (
-          <p id="identifier-error" role="alert" className="text-[0.75rem] text-destructive">
-            {errors.identifier.message}
-          </p>
-        ) : null}
-      </div>
-
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="password">Mot de passe</Label>
-        <Input
-          id="password"
-          type="password"
-          autoComplete="current-password"
-          aria-invalid={errors.password !== undefined}
-          aria-describedby={errors.password !== undefined ? 'password-error' : undefined}
-          {...register('password')}
-        />
-        {errors.password !== undefined ? (
-          <p id="password-error" role="alert" className="text-[0.75rem] text-destructive">
-            {errors.password.message}
-          </p>
-        ) : null}
-      </div>
+      {base === BASE_PUBLIQUE ? (
+        <CredentialsFields register={register} errors={errors} />
+      ) : (
+        <DemoProfileField role={demoRole} onChange={setDemoRole} />
+      )}
 
       {bases === null ? null : (
         <div className="flex flex-col gap-2">

@@ -307,6 +307,7 @@ type seedCanalProvenance struct {
 var seedCanauxProvenance = []seedCanalProvenance{
 	{"TIKTOK", "TikTok", 10},
 	{"FACEBOOK", "Facebook", 20},
+	{"META", "Meta (Facebook et Instagram)", 25},
 	{"INSTAGRAM", "Instagram", 30},
 	{"FACEBOOK_INSTAGRAM", "Facebook / Instagram", 35},
 	{"MESSENGER", "Messenger", 45},

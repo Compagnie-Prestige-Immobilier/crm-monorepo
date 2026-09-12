@@ -24,7 +24,7 @@ export function copyPhone(phoneE164: string | null): void {
   }
   navigator.clipboard.writeText(phoneE164).then(
     () => {
-      toast.success('Numéro copié.');
+      toast.success(`Numéro ${phoneE164} copié.`);
     },
     () => {
       toast.error('Copie refusée par le navigateur.');
