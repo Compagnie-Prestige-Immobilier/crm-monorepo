@@ -115,7 +115,7 @@ test('CHU-CHF-06 · la plage libre écrit ses deux bornes dans l’URL et les r�
 
   await page.getByRole('button', { name: 'Plage libre' }).click();
 
-  await page.getByRole('button', { name: 'Du', exact: true }).click();
+  await page.getByRole('button', { name: /^Du(, |$)/u }).click();
   await page.getByRole('combobox', { name: 'Mois affiché' }).click();
   await page.getByRole('option', { name: 'février' }).click();
   await page
@@ -126,7 +126,7 @@ test('CHU-CHF-06 · la plage libre écrit ses deux bornes dans l’URL et les r�
   // second avant que le premier ne soit démonté viole le mode strict.
   await expect(page.getByRole('grid', { name: 'Du' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Au', exact: true }).click();
+  await page.getByRole('button', { name: /^Au(, |$)/u }).click();
   await page.getByRole('combobox', { name: 'Mois affiché' }).click();
   await page.getByRole('option', { name: 'février' }).click();
   await page
@@ -143,16 +143,16 @@ test('CHU-CHF-06 · la plage libre écrit ses deux bornes dans l’URL et les r�
    * `<input type="date">` : il n'y a ni `min` ni `max` à lire sur un champ, la
    * contrainte se voit sur les jours hors bornes, qui sont désactivés.
    */
-  await page.getByRole('button', { name: 'Du', exact: true }).click();
+  await page.getByRole('button', { name: /^Du(, |$)/u }).click();
   await expect(
     page.getByRole('grid', { name: 'Du' }).getByRole('gridcell', { name: '01 mars 2026' }),
   ).toBeDisabled();
   // Le déclencheur referme son propre calendrier ; « Échap » refermerait aussi
   // la plage libre qui le porte.
-  await page.getByRole('button', { name: 'Du', exact: true }).click();
+  await page.getByRole('button', { name: /^Du(, |$)/u }).click();
   await expect(page.getByRole('grid', { name: 'Du' })).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Au', exact: true }).click();
+  await page.getByRole('button', { name: /^Au(, |$)/u }).click();
   await expect(
     page.getByRole('grid', { name: 'Au' }).getByRole('gridcell', { name: '31 janvier 2026' }),
   ).toBeDisabled();

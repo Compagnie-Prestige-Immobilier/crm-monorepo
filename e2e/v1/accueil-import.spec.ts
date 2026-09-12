@@ -292,12 +292,12 @@ test('ACC-XLS-02 · l’export filtré produit un vrai classeur', async ({ page 
 
   // Le calendrier refermé RESTE dans le document : viser sa grille par son nom
   // accessible, sans quoi « Du » et « Au » offrent deux fois le même bouton.
-  await page.getByRole('button', { name: 'Du', exact: true }).click();
+  await page.getByRole('button', { name: /^Du(, |$)/u }).click();
   await page
     .getByRole('grid', { name: 'Du', exact: true })
     .getByRole('gridcell', { name: JOUR_CALENDRIER, exact: true })
     .click();
-  await page.getByRole('button', { name: 'Au', exact: true }).click();
+  await page.getByRole('button', { name: /^Au(, |$)/u }).click();
   await page
     .getByRole('grid', { name: 'Au', exact: true })
     .getByRole('gridcell', { name: JOUR_CALENDRIER, exact: true })

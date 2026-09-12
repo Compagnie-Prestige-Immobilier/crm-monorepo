@@ -295,7 +295,7 @@ test('ACC-REG-07 la date effacée est signalée', async () => {
   page.on('request', espion);
 
   const formulaire = await ouvrirSaisie();
-  await formulaire.getByRole('button', { name: 'DATE VISITE', exact: true }).click();
+  await formulaire.getByRole('button', { name: /^DATE VISITE(, |$)/u }).click();
   await page.getByRole('button', { name: 'Effacer', exact: true }).click();
 
   await formulaire.getByRole('textbox', { name: /^PRENOM ET NOMS/u }).fill(`${PREFIXE} Sans date`);
@@ -455,7 +455,7 @@ test('ACC-REG-14 corriger une visite : la date est montrée, jamais modifiable',
   const correction = page.getByRole('form', { name: 'Corriger la visite' });
   await expect(correction).toHaveCount(1);
   await expect(
-    correction.getByRole('button', { name: 'DATE VISITE', exact: true }),
+    correction.getByRole('button', { name: /^DATE VISITE(, |$)/u }),
     'l’API refuse de déplacer une ligne d’un jour à l’autre : la date ne se propose pas',
   ).toHaveCount(0);
   await expect(correction.getByRole('button', { name: 'Enregistrer la correction' })).toBeVisible();

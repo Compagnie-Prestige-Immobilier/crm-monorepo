@@ -56,7 +56,7 @@ interface EtatJour {
 
 function classesJour(etat: EtatJour): string {
   return cn(
-    'flex h-9 items-center justify-center rounded-md text-sm transition-colors',
+    'flex h-11 items-center justify-center rounded-md text-sm transition-colors',
     'hover:bg-accent focus-visible:outline-2 focus-visible:outline-ring',
     etat.horsMois && 'text-muted-foreground/50',
     etat.inRange && 'bg-primary/10 text-foreground',
@@ -66,6 +66,9 @@ function classesJour(etat: EtatJour): string {
     etat.disabled && 'pointer-events-none opacity-30',
   );
 }
+
+const nomDuDeclencheur = (label: string, selected: Date | null): string =>
+  selected === null ? label : `${label}, ${format(selected, 'dd/MM/yyyy')}`;
 
 function horsPlage(day: Date, minDate: Date | null, maxDate: Date | null): boolean {
   if (minDate !== null && day < minDate) return true;
@@ -166,7 +169,7 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
               id={id}
               type="button"
               variant="outline"
-              aria-label={label}
+              aria-label={nomDuDeclencheur(label, selected)}
               aria-haspopup="dialog"
               className={cn(
                 'h-11 min-w-40 justify-between gap-3 rounded-md px-3 font-normal',
@@ -178,7 +181,7 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
           <span>{selected ? format(selected, 'dd MMM yyyy', { locale: fr }) : 'dd-mm-yyyy'}</span>
           <CalendarDaysIcon aria-hidden="true" className="size-4 shrink-0" />
         </PopoverTrigger>
-        <PopoverContent className="w-[19rem] p-3" align="start">
+        <PopoverContent className="w-[20.75rem] max-w-[calc(100vw-1rem)] p-3" align="start">
           <div className="flex items-center justify-between gap-2">
             <div className="flex min-w-0 items-center gap-1">
               <Select
@@ -267,7 +270,7 @@ export function DatePicker({ id, label, value, min, max, onChange }: DatePickerP
               ))}
             </div>
             {weeks.map((week) => (
-              <div key={week[0]?.toISOString()} className="grid grid-cols-7 gap-1" role="row">
+              <div key={week[0]?.toISOString()} className="grid grid-cols-7" role="row">
                 {week.map((day) => (
                   <JourCellule
                     key={day.toISOString()}
