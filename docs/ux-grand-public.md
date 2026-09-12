@@ -174,6 +174,7 @@ chacune cassée une fois sur l'ancien code avant d'être gardée :
 Chaque lot se livre seul. Le lot 1 ne dépend d'aucun autre.
 
 Le lot 1 est livré sur `feat/amelioration-ux` : `ux-grand-public-lot1.md`.
+Le lot 2 aussi, sauf la pagination des campagnes : `ux-grand-public-lot2.md`.
 
 ## 9. Demande l'accord écrit du propriétaire (refonte d'écran)
 
