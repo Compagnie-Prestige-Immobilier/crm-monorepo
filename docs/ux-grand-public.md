@@ -177,6 +177,8 @@ Le lot 1 est livré sur `feat/amelioration-ux` : `ux-grand-public-lot1.md`.
 Le lot 2 aussi, sauf la pagination des campagnes : `ux-grand-public-lot2.md`.
 Le lot 3 aussi, avec l'appel et l'ajout en étapes accordés le 12 septembre :
 `ux-grand-public-lot3.md`.
+Le lot 4 aussi, sauf « Espaces » dans la barre supérieure sur téléphone :
+`ux-grand-public-lot4.md`.
 
 ## 9. Demande l'accord écrit du propriétaire (refonte d'écran)
 
