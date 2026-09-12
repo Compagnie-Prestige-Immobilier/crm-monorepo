@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"regexp"
+	"runtime/debug"
 	"strings"
 	"sync"
 	"time"
@@ -20,7 +21,22 @@ type (
 	cleRequete     struct{}
 	CleAdresse     struct{}
 	cleUtilisateur struct{}
+	cleAuteur      struct{}
 )
+
+// La garde d'accès résout la session APRÈS la journalisation, dans un contexte
+// fils que l'appelant ne voit pas. Ce porteur redescend l'identité pour que la
+// ligne dise qui a agi, sans quoi un journal d'incident ne nomme personne.
+type auteurRequete struct {
+	id   string
+	role Role
+}
+
+func noterAuteur(ctx context.Context, u *Utilisateur) {
+	if a, ok := ctx.Value(cleAuteur{}).(*auteurRequete); ok {
+		a.id, a.role = u.ID, u.Role
+	}
+}
 
 var idRequeteValide = regexp.MustCompile(`^[\w-]{1,64}$`)
 
@@ -87,19 +103,66 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 		ctx = context.WithValue(ctx, CleAdresse{}, adresseClient(r, cfg.TrustProxy))
 		securisee := r.TLS != nil || (cfg.TrustProxy && r.Header.Get("X-Forwarded-Proto") == "https")
 		ctx = context.WithValue(ctx, CleSecurise{}, securisee)
+		auteur := &auteurRequete{}
+		ctx = context.WithValue(ctx, cleAuteur{}, auteur)
 		rw := &reponse{ResponseWriter: w, statut: http.StatusOK}
 		r = r.WithContext(ctx)
 		defer func() {
 			if p := recover(); p != nil {
-				slog.Error("panique", "requestId", id, "panic", p)
+				// Sans la pile, une panique en production ne se corrige pas : le
+				// message seul ne dit ni le fichier ni la ligne.
+				slog.Error("panique", "requestId", id, "method", r.Method, "chemin", r.URL.Path,
+					"panic", p, "pile", string(debug.Stack()))
 				EcrireProblem(rw, r, Problem(http.StatusInternalServerError, "INTERNAL_ERROR", "Une erreur interne est survenue."))
 			}
 			ms := time.Since(debut).Milliseconds()
-			slog.Info("http", "requestId", id, "method", r.Method, "pattern", motif, "status", rw.statut, "ms", ms)
+			journaliserRequete(r, motif, auteur, rw.statut, ms, id)
 			compterRequete(motif, rw.statut, ms)
 		}()
 		next.ServeHTTP(rw, r)
 	})
+}
+
+// Le panneau sonde ces routes en boucle, une par minute et par onglet ouvert,
+// et le flux reste ouvert des heures. À INFO elles noyaient tout le reste ; un
+// échec sur l'une d'elles remonte quand même, parce que le niveau suit l'issue.
+var routesDeSondage = map[string]bool{
+	"GET /api/v1/live":               true,
+	"GET /api/v1/notifications/mine": true,
+	routeSessionCourante:             true,
+	"GET /health/ready":              true,
+}
+
+func niveauRequete(motif string, statut int) slog.Level {
+	switch {
+	case statut >= http.StatusInternalServerError:
+		return slog.LevelError
+	case statut >= http.StatusBadRequest:
+		return slog.LevelWarn
+	case routesDeSondage[motif]:
+		return slog.LevelDebug
+	}
+	return slog.LevelInfo
+}
+
+func journaliserRequete(r *http.Request, motif string, auteur *auteurRequete, statut int, ms int64, id string) {
+	niveau := niveauRequete(motif, statut)
+	if !slog.Default().Enabled(r.Context(), niveau) {
+		return
+	}
+	champs := []any{
+		"requestId", id, "method", r.Method, "pattern", motif, "chemin", r.URL.Path,
+		"status", statut, "ms", ms,
+	}
+	if auteur.id != "" {
+		champs = append(champs, "userId", auteur.id, "role", string(auteur.role))
+	} else {
+		champs = append(champs, "userId", "anonyme")
+	}
+	if adresse, _ := r.Context().Value(CleAdresse{}).(string); adresse != "" && statut >= http.StatusBadRequest {
+		champs = append(champs, "adresse", adresse)
+	}
+	slog.Log(r.Context(), niveau, "http", champs...)
 }
 
 func origineAutorisee(r *http.Request) bool {
@@ -145,6 +208,7 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Accès refusé."))
 			return
 		}
+		noterAuteur(r.Context(), &u)
 		mux.ServeHTTP(w, r.WithContext(context.WithValue(r.Context(), cleUtilisateur{}, u)))
 	})
 }

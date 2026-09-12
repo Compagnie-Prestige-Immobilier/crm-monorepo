@@ -9,6 +9,7 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"time"
 
@@ -102,12 +103,17 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return nil, err
 	}
+	// Une connexion n'etait journalisee nulle part : ni qui entre, ni qui
+	// s'acharne. C'est la premiere chose qu'on cherche apres un incident.
 	if !database.VerifierMotDePasse(in.Body.Password, condensat) || err != nil {
+		slog.Warn("connexion refusée", "identifiant", in.Body.Identifier, "adresse", adresse, "cause", "identifiants")
 		return nil, socle.Problem(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Identifiants invalides.")
 	}
 	if !u.IsActive {
+		slog.Warn("connexion refusée", "identifiant", in.Body.Identifier, "adresse", adresse, "cause", "compte désactivé")
 		return nil, socle.Problem(http.StatusUnauthorized, "ACCOUNT_DISABLED", "Ce compte est désactivé. Contactez un administrateur.")
 	}
+	slog.Info("connexion", "userId", u.ID, "username", u.Username, "role", u.Role, "adresse", adresse)
 	return s.ouvrirSession(ctx, in.UserAgent, &u)
 }
 
