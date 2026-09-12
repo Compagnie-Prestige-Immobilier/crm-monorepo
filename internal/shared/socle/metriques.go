@@ -14,6 +14,10 @@ import (
 const (
 	classeSessionExpiree = 9
 	routeSessionCourante = "GET /api/v1/auth/me"
+	// Le flux reste ouvert tant que l'onglet vit : sa duree n'est pas une
+	// latence. Comptee, elle donnait 104 s de moyenne sur cette route et tirait
+	// la latence moyenne de l'ecran Exploitation a six secondes.
+	routeFluxLive = "GET /api/v1/live"
 )
 
 var plafondsSeaux = [5]int64{50, 200, 500, 1000, 3000}
@@ -54,6 +58,9 @@ func classeDuStatut(route string, statut int) int16 {
 }
 
 func compterRequete(route string, statut int, ms int64) {
+	if route == routeFluxLive {
+		return
+	}
 	cle := cleMetrique{heure: time.Now().Truncate(time.Hour), route: route, classe: classeDuStatut(route, statut)}
 	verrouMetriques.Lock()
 	defer verrouMetriques.Unlock()
