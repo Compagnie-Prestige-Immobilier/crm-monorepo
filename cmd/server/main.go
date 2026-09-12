@@ -152,6 +152,11 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 	if err != nil {
 		return nil, err
 	}
+	taches := tachesDomaines(d)
+	d.Planifications = make(map[string]string, len(taches))
+	for _, t := range taches {
+		d.Planifications[t.Nom] = t.Cron
+	}
 	// Hôte d'essai à côté de la v1 sur la même base : deux planificateurs se
 	// disputeraient notifications dues et jobs d'import.
 	if socle.Env("TACHES_PLANIFIEES", socle.Vrai) == socle.Faux {
@@ -159,7 +164,7 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 		sched.Start()
 		return sched, nil
 	}
-	for _, t := range tachesDomaines(d) {
+	for _, t := range taches {
 		_, err := sched.NewJob(gocron.CronJob(t.Cron, false), gocron.NewTask(func() {
 			tracerPassage(ctx, d, t)
 		}), gocron.WithName(t.Nom), gocron.WithSingletonMode(gocron.LimitModeReschedule))

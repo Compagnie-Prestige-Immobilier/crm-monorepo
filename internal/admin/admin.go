@@ -59,6 +59,8 @@ var Garde = map[string][]socle.Role{
 	"PUT /api/v1/users/{id}/password":                             socle.AdminSeul,
 	"DELETE /api/v1/users/{id}":                                   socle.AdminSeul,
 	"GET /api/v1/admin/supervision":                               socle.Encadrement,
+	"GET /api/v1/admin/exploitation":                              socle.AdminSeul,
+	"GET /api/v1/admin/journal":                                   socle.AdminSeul,
 	"GET /api/v1/admin/purge":                                     socle.AdminSeul,
 	"POST /api/v1/admin/purge":                                    socle.AdminSeul,
 	"GET /api/v1/admin/database-dump":                             socle.AdminSeul,
@@ -100,6 +102,7 @@ func Monter(api huma.API, d *socle.Deps) {
 
 	monterDump(api, s)
 	monterEnrolement(api, s)
+	monterExploitation(api, s)
 }
 
 func (s *service) txAdmin(ctx context.Context, geste func(pgx.Tx, *db.Queries) error) error {
