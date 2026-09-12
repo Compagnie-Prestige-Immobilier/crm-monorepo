@@ -46,7 +46,12 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import { enregistrerBrouillon, fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import {
+  enregistrerBrouillon,
+  fetchOuvertureCourante,
+  ouvrirFiche,
+  type OuvertureFiche,
+} from '@/lib/data/ouvertures';
 import {
   commentaireExigePar,
   issueDuMotif,
@@ -241,7 +246,6 @@ export function ConsoleView({
     void reprendreOuverte(reprendre);
   }, [reprendre]);
 
-
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
       prospect: row,
@@ -433,7 +437,6 @@ function estFicheClose(prospect: ProspectRow, refusee: boolean): boolean {
   return prospect.phase2Status !== 'PENDING' || refusee;
 }
 
-
 function saisieCommencee(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
@@ -441,7 +444,6 @@ function saisieCommencee(
   comment: string,
 ): boolean {
   return conversion !== null || slots !== null || motif !== null || comment !== '';
-
 }
 
 /**
@@ -736,7 +738,6 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  */
 type Etape = 'issues' | 'motifs' | 'statut' | 'dossier' | 'echeance' | null;
 
-
 function etapeCourante(
   closed: boolean,
   conversion: ConversionDraft | null,
@@ -960,7 +961,6 @@ export function Consignation({
       setSlots(null);
     },
     [closed, send.isPending, ouvrirDossier, startCallback],
-
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -1139,7 +1139,6 @@ export function Consignation({
           onMotif={choisir}
         />
 
-
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
             slots={slots}
@@ -1189,14 +1188,12 @@ export function Consignation({
             setConversionErrors({});
           }}
         />
-
       </section>
     );
   }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-
       <Button variant="ghost" className="self-start px-0" onClick={quitter}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste
