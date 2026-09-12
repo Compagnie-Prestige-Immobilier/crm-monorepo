@@ -40,6 +40,9 @@ export function apiErrorText(error: unknown, fallback: string): string {
   return reason === '' ? (REPLI_PAR_STATUT[error.status] ?? fallback) : reason;
 }
 
+/** Plus du double des 4 s d'un succès : une erreur se lit jusqu'au bout avant d'agir. */
+const DUREE_ERREUR_MS = 10_000;
+
 export function toastApiError(error: unknown, fallback: string): void {
-  toast.error(apiErrorText(error, fallback));
+  toast.error(apiErrorText(error, fallback), { duration: DUREE_ERREUR_MS });
 }

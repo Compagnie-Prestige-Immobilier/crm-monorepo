@@ -859,6 +859,7 @@ function FormulaireDeLot({
   const nom = nomRetenu(nomSaisi, nomPropose);
 
   const creation = useMutation({
+    meta: { erreurAffichee: true },
     mutationFn: () => createLotExport({ ...corps, distribution, name: nom }),
     onSuccess: (lot) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });

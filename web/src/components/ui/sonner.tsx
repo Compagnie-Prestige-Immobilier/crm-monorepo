@@ -12,6 +12,8 @@ function Toaster(props: ToasterProps) {
       theme={theme as 'system' | 'light' | 'dark'}
       className="toaster group"
       position="bottom-right"
+      closeButton
+      toastOptions={{ closeButtonAriaLabel: 'Fermer' }}
       style={
         {
           '--normal-bg': 'var(--popover)',

@@ -1,4 +1,4 @@
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { MutationCache, QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   createRouter,
   parseSearchWith,
@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { EcranErreur, EcranIntrouvable } from '@/components/etats-router';
 import { ExactAmountsProvider } from '@/components/money/exact-amounts';
 import { Toaster } from '@/components/ui/sonner';
+import { toastApiError } from '@/lib/mutation-feedback';
 import { initTheme } from '@/lib/theme';
 import { routeTree } from '@/routeTree.gen';
 
@@ -21,6 +22,14 @@ import './styles.css';
 z.config({ jitless: true });
 
 const queryClient = new QueryClient({
+  mutationCache: new MutationCache({
+    // Une mutation qui a son `onError`, ou qui affiche l'erreur dans son formulaire, l'annonce déjà.
+    onError: (error, _variables, _resultat, mutation) => {
+      if (mutation.options.onError !== undefined) return;
+      if (mutation.meta?.erreurAffichee === true) return;
+      toastApiError(error, 'L’action n’a pas abouti. Réessayez.');
+    },
+  }),
   defaultOptions: {
     queries: {
       staleTime: 30_000,
