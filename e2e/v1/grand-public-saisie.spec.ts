@@ -88,6 +88,13 @@ async function saisirIdentite(
   await telephone.fill(identite.national);
 }
 
+/** La saisie tient en trois étapes : les gestes d'envoi sont sur « Adhésion ». */
+async function allerAAdhesion(portee: Page | Locator): Promise<void> {
+  const continuer = portee.getByRole('button', { name: 'Continuer', exact: true });
+  await continuer.click();
+  await continuer.click();
+}
+
 async function uneSeuleFiche(phone: string): Promise<Fiche> {
   const fiches = await fichesSurLeNumero(phone);
   expect(fiches, `une seule fiche doit porter ${phone}`).toHaveLength(1);
@@ -98,6 +105,7 @@ test('GP-13 sans statut, la fiche se crée seule, sans appel', async ({ page }) 
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.seule });
 
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(page.getByText(`${PREFIXE} ${TEMOINS.seule.nom} enregistré.`)).toBeVisible();
@@ -113,11 +121,13 @@ test('GP-15 un numéro déjà pris est refusé en nommant la fiche existante', a
   // derrière GP-13, ce scénario sauterait dès que GP-13 rougit.
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.doublon });
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
   await expect(page).toHaveURL(/\/grand-public$/u);
 
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.doublon });
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(
@@ -140,10 +150,11 @@ test('GP-14 un formulaire vide ne part pas au serveur', async ({ page }) => {
   });
 
   await page.goto('/grand-public/nouveau');
-  await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
+  await page.getByRole('button', { name: 'Continuer', exact: true }).click();
 
   await expect(page.getByText('Le nom est obligatoire.')).toBeVisible();
   await expect(page.getByText('Le numéro est obligatoire.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enregistrer sans appel' })).toHaveCount(0);
 
   expect(envois, 'aucune création ne doit partir sans nom ni téléphone').toEqual([]);
 });
@@ -152,6 +163,7 @@ test('GP-16 « Il refuse » crée la fiche puis consigne le refus', async ({ pag
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.refus });
 
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'Il refuse', exact: true }).click();
 
   await expect(
@@ -165,6 +177,7 @@ test('GP-17 « À rappeler » crée la fiche et pose l’échéance choisie', as
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.rappel });
 
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'À rappeler', exact: true }).click();
   await page.getByRole('button', { name: /Dans 1 h/u }).click();
 
@@ -185,6 +198,7 @@ test('GP-18 la boîte de la liste rafraîchit le tableau sans rechargement', asy
   await expect(boite.getByText('Le nom et le téléphone suffisent.', { exact: true })).toBeVisible();
 
   await saisirIdentite(boite, { prenom: PREFIXE, ...TEMOINS.boite });
+  await allerAAdhesion(boite);
   await boite.getByRole('button', { name: 'Enregistrer sans appel' }).click();
 
   await expect(boite).toHaveCount(0);
@@ -204,6 +218,7 @@ test('GP-19 les accents et l’apostrophe traversent la saisie sans se déformer
   await page.goto('/grand-public/nouveau');
   await saisirIdentite(page, { prenom, ...TEMOINS.accents });
 
+  await allerAAdhesion(page);
   await page.getByRole('button', { name: 'Enregistrer sans appel' }).click();
   await expect(page).toHaveURL(/\/grand-public$/u);
 
@@ -262,6 +277,9 @@ test.describe('GP-21 largeur 375 px', () => {
       cadrePrenom!.y,
       'sous 640 px la grille sm:grid-cols-2 doit passer en une colonne',
     ).toBeGreaterThan(cadreNom!.y);
+
+    await saisirIdentite(page, { prenom: PREFIXE, ...TEMOINS.seule });
+    await allerAAdhesion(page);
 
     for (const libelle of [
       'Enregistrer l’adhésion',

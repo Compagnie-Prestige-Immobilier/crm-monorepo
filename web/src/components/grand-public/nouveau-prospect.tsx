@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -18,6 +18,15 @@ import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
 import { usePremiereErreur } from '@/components/forms/premiere-erreur';
+import {
+  ETAPES_DOSSIER,
+  EtapesProgression,
+  etapesValides,
+  filtrerErreurs,
+  PiedEtapes,
+  premiereEtapeEnErreur,
+  sansObligationHorsIdentite,
+} from '@/components/grand-public/etapes';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
 import { useGardeSaisie } from '@/components/ui/confirm-dialog';
@@ -112,6 +121,10 @@ function erreurTelephone(saisi: string, e164: string | null): string | undefined
   return e164 === null ? 'Numéro invalide.' : undefined;
 }
 
+/** Sans numéro valide, l'identité n'est pas finie : aucune étape suivante ne s'ouvre. */
+const etapeAtteignable = (erreurTel: string | undefined, problemes: ConversionErrors): number =>
+  erreurTel === undefined ? etapesValides(problemes) : 0;
+
 /** « Il refuse » a son bouton ; les autres statuts du select, « Hors cible » compris, non. */
 const sansBouton = (motif: MotifAppel | null, refus: MotifAppel | undefined): boolean =>
   motif !== null && motif.code !== refus?.code;
@@ -191,6 +204,7 @@ export function NouveauProspect({
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
   const [comment, setComment] = useState('');
+  const [etape, setEtape] = useState(0);
   const [now] = useState(maintenant);
 
   const formulaire = useChampsConversion('GRAND_PUBLIC');
@@ -231,15 +245,13 @@ export function NouveauProspect({
       const existant = prospectPhoneConflict(error);
       if (existant !== null) {
         setPhoneError(`Ce numéro est déjà enregistré pour ${existant.prenom} ${existant.nom}.`);
+        setEtape(0);
         signalerEchec();
         return;
       }
       if (error instanceof AttemptRefused) {
         const refuse = conversionErrorFor(error.code);
-        if (refuse !== null) {
-          setErrors({ [refuse.field]: refuse.message });
-          signalerEchec();
-        }
+        if (refuse !== null) bloquer({ [refuse.field]: refuse.message }, undefined);
         toast.error(error.message, {
           description: 'La fiche est créée. Corrigez puis enregistrez pour consigner l’appel.',
         });
@@ -258,17 +270,50 @@ export function NouveauProspect({
     });
   }
 
+  /** Montre les erreurs et ouvre l'étape de la première : sa saisie est invisible d'ailleurs. */
+  function bloquer(problemes: ConversionErrors, erreurTel: string | undefined): boolean {
+    setErrors(problemes);
+    setPhoneError(erreurTel);
+    const premiere = erreurTel === undefined ? premiereEtapeEnErreur(problemes) : 'Identité';
+    if (premiere === null) return false;
+    setEtape(ETAPES_DOSSIER.indexOf(premiere));
+    signalerEchec();
+    return true;
+  }
+
   /** Le numéro et l'identité, que toute saisie exige. */
   function identiteBloquee(): boolean {
-    const erreurTel = erreurTelephone(phone, e164);
-    const identite = erreursIdentite(
-      validateConversion(conversion, maintenant(), formulaire.champs, formulaire.libres),
+    return bloquer(
+      erreursIdentite(
+        validateConversion(conversion, maintenant(), formulaire.champs, formulaire.libres),
+      ),
+      erreurTelephone(phone, e164),
     );
-    setPhoneError(erreurTel);
-    setErrors(identite);
-    const bloquee = erreurTel !== undefined || Object.keys(identite).length > 0;
-    if (bloquee) signalerEchec();
-    return bloquee;
+  }
+
+  /** « Continuer » ne juge que l'étape affichée ; l'enregistrement juge tout. */
+  function continuer(): void {
+    const courante = ETAPES_DOSSIER[etape];
+    const erreurTel = etape === 0 ? erreurTelephone(phone, e164) : undefined;
+    const probleme = filtrerErreurs(
+      validateConversion(
+        conversion,
+        maintenant(),
+        sansObligationHorsIdentite(formulaire.champs),
+        formulaire.libres,
+      ),
+      (etapeErreur) => etapeErreur === courante,
+    );
+    setErrors((avant) => ({
+      ...filtrerErreurs(avant, (etapeErreur) => etapeErreur !== courante),
+      ...probleme,
+    }));
+    if (etape === 0) setPhoneError(erreurTel);
+    if (erreurTel !== undefined || Object.keys(probleme).length > 0) {
+      signalerEchec();
+      return;
+    }
+    setEtape(etape + 1);
   }
 
   function creerSeulement(): void {
@@ -283,13 +328,7 @@ export function NouveauProspect({
       formulaire.champs,
       formulaire.libres,
     );
-    const erreurTel = erreurTelephone(phone, e164);
-    setErrors(problemes);
-    setPhoneError(erreurTel);
-    if (erreurTel !== undefined || Object.keys(problemes).length > 0) {
-      signalerEchec();
-      return;
-    }
+    if (bloquer(problemes, erreurTelephone(phone, e164))) return;
     if (conversion.method === null) return;
     verifierPuisEnvoyer(choisi, {
       outcome: issueDuMotif(choisi),
@@ -377,22 +416,19 @@ export function NouveauProspect({
   }, [modifie, onModifie]);
 
   const pending = save.isPending;
+  const atteignable = etapeAtteignable(
+    erreurTelephone(phone, e164),
+    validateConversion(
+      conversion,
+      now,
+      sansObligationHorsIdentite(formulaire.champs),
+      formulaire.libres,
+    ),
+  );
 
-  return (
-    <div ref={racineRef} className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      {embedded ? null : (
-        <>
-          <Button variant="ghost" className="self-start px-0" onClick={garde.demanderFermeture}>
-            <ArrowLeftIcon aria-hidden="true" />
-            Revenir à la liste
-          </Button>
-          <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
-            Nouveau prospect Grand Public
-          </h1>
-        </>
-      )}
-
-      <section aria-label="Nouveau prospect" className="flex flex-col gap-4">
+  function derniereEtape(): ReactNode {
+    return (
+      <>
         <SelectStatut
           catalogue={statutsJoignables(catalogue)}
           motif={motif}
@@ -402,26 +438,6 @@ export function NouveauProspect({
           onChange={poser}
           onFerme={() => {
             if (motif?.requiresComment) commentRef.current?.focus();
-          }}
-        />
-
-        <PanneauDossier
-          ouvert
-          prospect={fiche}
-          conversion={conversion}
-          errors={errors}
-          telephone={{
-            value: phone,
-            error: phoneError,
-            onChange: (valeur) => {
-              setPhone(valeur);
-              setPhoneError(undefined);
-            },
-          }}
-          disabled={pending}
-          formulaire={formulaire}
-          onChange={(patch) => {
-            setConversion((dossier) => ({ ...dossier, ...patch }));
           }}
         />
 
@@ -491,6 +507,64 @@ export function NouveauProspect({
           }}
           onRappel={rappeler}
           onAnnuler={garde.demanderFermeture}
+        />
+      </>
+    );
+  }
+
+  return (
+    <div ref={racineRef} className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      {embedded ? null : (
+        <>
+          <Button variant="ghost" className="self-start px-0" onClick={garde.demanderFermeture}>
+            <ArrowLeftIcon aria-hidden="true" />
+            Revenir à la liste
+          </Button>
+          <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
+            Nouveau prospect Grand Public
+          </h1>
+        </>
+      )}
+
+      <EtapesProgression
+        etapes={ETAPES_DOSSIER}
+        courante={etape}
+        atteignable={atteignable}
+        onChoisir={setEtape}
+      />
+
+      <section aria-label="Nouveau prospect" className="flex flex-col gap-4">
+        <PanneauDossier
+          ouvert
+          prospect={fiche}
+          conversion={conversion}
+          errors={errors}
+          telephone={{
+            value: phone,
+            error: phoneError,
+            onChange: (valeur) => {
+              setPhone(valeur);
+              setPhoneError(undefined);
+            },
+          }}
+          disabled={pending}
+          formulaire={formulaire}
+          etape={ETAPES_DOSSIER[etape]}
+          onChange={(patch) => {
+            setConversion((dossier) => ({ ...dossier, ...patch }));
+          }}
+        />
+
+        {etape === ETAPES_DOSSIER.length - 1 ? derniereEtape() : null}
+
+        <PiedEtapes
+          courante={etape}
+          total={ETAPES_DOSSIER.length}
+          disabled={pending}
+          onRetour={() => {
+            setEtape(etape - 1);
+          }}
+          onContinuer={continuer}
         />
       </section>
       {garde.confirmation}

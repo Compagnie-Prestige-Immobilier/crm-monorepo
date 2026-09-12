@@ -11,7 +11,17 @@ import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { SelectStatut } from '@/components/console/select-statut';
-import { useShortcuts } from '@/components/console/use-shortcuts';
+import { useShortcuts, type ShortcutMap } from '@/components/console/use-shortcuts';
+import { usePremiereErreur } from '@/components/forms/premiere-erreur';
+import {
+  ETAPES_DOSSIER,
+  EtapesProgression,
+  etapesValides,
+  filtrerErreurs,
+  PiedEtapes,
+  premiereEtapeEnErreur,
+  type EtapeDossier,
+} from '@/components/grand-public/etapes';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { LienTelephone } from '@/components/lien-telephone';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
@@ -106,6 +116,24 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['R', 'Fiche du représentant'],
   ['?', 'Afficher cette carte'],
 ];
+
+const CARTE_GRAND_PUBLIC: readonly (readonly [string, string])[] = [
+  ['1', 'Joignable'],
+  ['2', 'Injoignable, ou « À rappeler » une fois le dossier ouvert'],
+  ['1 … 6', 'Échéance proposée, après un statut de rappel'],
+  ['0', 'Saisir une autre échéance'],
+  ['Entrée', 'Continuer, sinon enregistrer'],
+  ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
+  ['C', 'Copier le numéro'],
+  ['?', 'Afficher cette carte'],
+];
+
+const ETAPES_APPEL: readonly string[] = ['Réponse', ...ETAPES_DOSSIER];
+
+const carteClavier = (projet: Projet, statutParSelect: boolean) =>
+  statutParSelect
+    ? CARTE_GRAND_PUBLIC
+    : KEYBOARD_MAP.filter(([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'));
 
 /**
  * Le repli quand le référentiel ne répond pas : les six motifs système, ceux que
@@ -608,6 +636,7 @@ export function PanneauDossier({
   telephone,
   disabled,
   formulaire,
+  etape,
   onChange,
 }: {
   ouvert: boolean;
@@ -617,17 +646,23 @@ export function PanneauDossier({
   telephone?: SaisieTelephone | undefined;
   disabled: boolean;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
+  /** Présente : la saisie est découpée, l'étape affichée tient lieu de titre. */
+  etape?: EtapeDossier | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   if (!ouvert || conversion === null) return null;
 
   return (
     <>
-      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-        Joignable · son dossier, et la manière dont il adhère
-      </p>
+      {etape === undefined ? (
+        <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+          Joignable · son dossier, et la manière dont il adhère
+        </p>
+      ) : null}
 
-      <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+      {etape === undefined || etape === 'Identité' ? (
+        <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
+      ) : null}
 
       <ConversionFields
         draft={conversion}
@@ -637,6 +672,7 @@ export function PanneauDossier({
         disabled={disabled}
         reglages={formulaire.champs}
         libres={formulaire.libres}
+        etape={etape}
         onChange={onChange}
       />
     </>
@@ -775,6 +811,23 @@ const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
 const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe === 'joignable';
 
+/** Grand Public, sur « Réponse » : le dossier ouvert n'y prend pas « 2 », qui vaut sur ses étapes. */
+function chiffresDeLEtape(
+  etape: Etape,
+  surReponse: boolean,
+  jeux: { groupes: ShortcutMap; motifs: ShortcutMap; slots: ShortcutMap; rappel: ShortcutMap },
+): ShortcutMap {
+  if (etape === 'motifs') return jeux.motifs;
+  if (etape === 'statut') return {};
+  if (etape === 'echeance') return jeux.slots;
+  if (etape !== 'dossier') return jeux.groupes;
+  return surReponse ? {} : jeux.rappel;
+}
+
+/** Entrée passe à l'étape suivante tant que le dossier ouvert en a une. */
+const entreeContinue = (statutParSelect: boolean, etape: Etape, rang: number): boolean =>
+  statutParSelect && etape === 'dossier' && rang < ETAPES_APPEL.length - 1;
+
 /** Les boutons de motif de la console CHUES, pour le groupe ouvert. */
 function motifsDuGroupe(
   catalogue: readonly MotifAppel[],
@@ -830,6 +883,10 @@ export function Consignation({
   const [freeCallback, setFreeCallback] = useState('');
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  // Grand Public seul : le rang affiché dans ETAPES_APPEL.
+  const [etapeAppel, setEtapeAppel] = useState(0);
+  const racineRef = useRef<HTMLElement>(null);
+  const signalerEchec = usePremiereErreur(racineRef);
 
   const formulaire = useChampsConversion(projet);
   const motifs = useQuery({
@@ -844,6 +901,17 @@ export function Consignation({
   const [now] = useState(() => Date.now());
 
   const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
+
+  /** Grand Public : l'étape de la première erreur s'ouvre, sa saisie est invisible d'ailleurs. */
+  const montrerErreurs = useCallback(
+    (problemes: ConversionErrors): void => {
+      const premiere = premiereEtapeEnErreur(problemes);
+      if (!statutParSelect || premiere === null) return;
+      setEtapeAppel(ETAPES_DOSSIER.indexOf(premiere) + 1);
+      signalerEchec();
+    },
+    [statutParSelect, signalerEchec],
+  );
 
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
@@ -874,7 +942,11 @@ export function Consignation({
       }
       if (error instanceof AttemptRefused) {
         const refused = conversionErrorFor(error.code);
-        if (refused !== null) setConversionErrors({ [refused.field]: refused.message });
+        if (refused !== null) {
+          const erreur = { [refused.field]: refused.message };
+          setConversionErrors(erreur);
+          montrerErreurs(erreur);
+        }
         toast.error(error.message);
         return;
       }
@@ -927,13 +999,16 @@ export function Consignation({
     );
     setConversionErrors(problems);
     const adhesion = statutAdhesion(motif, catalogue);
-    if (Object.keys(problems).length > 0 || conversion.method === null) return;
+    if (Object.keys(problems).length > 0 || conversion.method === null) {
+      montrerErreurs(problems);
+      return;
+    }
     if (adhesion === undefined) {
       toast.error('Le statut « Méthode obtenue » est désactivé dans les listes de référence.');
       return;
     }
     record(adhesion, conversion.method, null, conversion);
-  }, [conversion, formulaire, motif, catalogue, record]);
+  }, [conversion, formulaire, motif, catalogue, record, montrerErreurs]);
 
   const startCallback = useCallback(() => {
     if (closed) return;
@@ -974,6 +1049,7 @@ export function Consignation({
       setConversion(null);
       setConversionErrors({});
       setSlots(null);
+      setEtapeAppel(0);
     },
     [closed, send.isPending, ouvrirDossier, startCallback],
   );
@@ -1019,6 +1095,7 @@ export function Consignation({
       return;
     }
     const avant = { groupe, motif, comment, conversion };
+    setEtapeAppel(0);
     setGroupe(null);
     setMotif(null);
     setComment('');
@@ -1080,18 +1157,48 @@ export function Consignation({
   // EB-10 : le rappel reste atteignable au clavier une fois le dossier ouvert.
   const versLeRappel = (): void => {
     if (motifRappel === undefined) return;
+    setEtapeAppel(ETAPES_APPEL.length - 1);
     setMotif(motifRappel);
     startCallback();
   };
 
-  let digitShortcuts = etape === 'motifs' ? motifShortcuts : groupeShortcuts;
-  if (etape === 'statut') digitShortcuts = {};
-  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: versLeRappel };
-  if (etape === 'echeance') digitShortcuts = slotShortcuts;
+  const allerA = (rang: number): void => {
+    setSlots(null);
+    setEtapeAppel(rang);
+  };
+
+  const continuer = (): void => {
+    const etapeDossier = ETAPES_DOSSIER[etapeAppel - 1];
+    if (conversion === null) return;
+    if (etapeDossier === undefined) {
+      allerA(1);
+      return;
+    }
+    const probleme = filtrerErreurs(
+      validateConversion(conversion, Date.now(), formulaire.champs, formulaire.libres),
+      (etapeErreur) => etapeErreur === etapeDossier,
+    );
+    setConversionErrors((avant) => ({
+      ...filtrerErreurs(avant, (etapeErreur) => etapeErreur !== etapeDossier),
+      ...probleme,
+    }));
+    if (Object.keys(probleme).length > 0) {
+      signalerEchec();
+      return;
+    }
+    allerA(etapeAppel + 1);
+  };
+
+  const digitShortcuts = chiffresDeLEtape(etape, statutParSelect && etapeAppel === 0, {
+    groupes: groupeShortcuts,
+    motifs: motifShortcuts,
+    slots: slotShortcuts,
+    rappel: { [RAPPEL_KEY]: versLeRappel },
+  });
 
   useShortcuts({
     ...digitShortcuts,
-    Enter: validate,
+    Enter: entreeContinue(statutParSelect, etape, etapeAppel) ? continuer : validate,
     Escape: annuler,
     c: () => {
       copyPhone(prospect.phoneE164);
@@ -1109,51 +1216,91 @@ export function Consignation({
     },
   });
 
-  function corpsFiche(): React.ReactNode {
+  const enTete = (surDossier: boolean): ReactNode => (
+    <EnTeteFiche
+      prospect={prospect}
+      nomComplet={nomComplet}
+      projet={projet}
+      closed={closed}
+      surDossier={surDossier}
+    />
+  );
+
+  const selectStatut = (): ReactNode => (
+    <SelectStatut
+      catalogue={statutsDuGroupe(groupe, catalogue)}
+      motif={motif}
+      disabled={send.isPending || closed}
+      onChange={poserStatut}
+      onFerme={() => {
+        if (motif?.requiresComment) commentRef.current?.focus();
+      }}
+    />
+  );
+
+  const panneauDossier = (etapeDossier?: EtapeDossier): ReactNode => (
+    <PanneauDossier
+      ouvert={etape === 'dossier'}
+      prospect={prospect}
+      conversion={conversion}
+      errors={conversionErrors}
+      disabled={send.isPending}
+      formulaire={formulaire}
+      etape={etapeDossier}
+      onChange={(patch) => {
+        setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+      }}
+    />
+  );
+
+  const choixIssue = (): ReactNode => (
+    <ChoixIssue
+      etape={etape}
+      groupe={groupe}
+      proposes={proposes}
+      motif={motif}
+      disabled={send.isPending}
+      onGroupe={choisirGroupe}
+      onMotif={choisir}
+    />
+  );
+
+  const piedDossier = (): ReactNode => (
+    <PiedDossier
+      ouvert={etape === 'dossier'}
+      disabled={send.isPending}
+      motifRefus={motifRefus}
+      onAdhesion={submitConversion}
+      onRefus={(refus) => {
+        setMotif(refus);
+        record(refus, null);
+      }}
+      onRappel={versLeRappel}
+      onAnnuler={() => {
+        setConversion(null);
+        setConversionErrors({});
+        setEtapeAppel(0);
+      }}
+    />
+  );
+
+  const piedEtapes = (): ReactNode => (
+    <PiedEtapes
+      courante={etapeAppel}
+      total={ETAPES_APPEL.length}
+      disabled={send.isPending}
+      raccourcis
+      onRetour={() => {
+        allerA(etapeAppel - 1);
+      }}
+      onContinuer={continuer}
+    />
+  );
+
+  /** L'échéance, le commentaire et « Enregistrer l'appel » : un appel qui se consigne sans dossier. */
+  function finAppel(): ReactNode {
     return (
-      <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <EnTeteFiche
-          prospect={prospect}
-          nomComplet={nomComplet}
-          projet={projet}
-          closed={closed}
-          surDossier={etape === 'dossier'}
-        />
-
-        {surStatut ? (
-          <SelectStatut
-            catalogue={statutsDuGroupe(groupe, catalogue)}
-            motif={motif}
-            disabled={send.isPending || closed}
-            onChange={poserStatut}
-            onFerme={() => {
-              if (motif?.requiresComment) commentRef.current?.focus();
-            }}
-          />
-        ) : null}
-
-        <PanneauDossier
-          ouvert={etape === 'dossier'}
-          prospect={prospect}
-          conversion={conversion}
-          errors={conversionErrors}
-          disabled={send.isPending}
-          formulaire={formulaire}
-          onChange={(patch) => {
-            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-          }}
-        />
-
-        <ChoixIssue
-          etape={etape}
-          groupe={groupe}
-          proposes={proposes}
-          motif={motif}
-          disabled={send.isPending}
-          onGroupe={choisirGroupe}
-          onMotif={choisir}
-        />
-
+      <>
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
             slots={slots}
@@ -1187,22 +1334,76 @@ export function Consignation({
           onValidate={validate}
           onAbandon={quitter}
         />
+      </>
+    );
+  }
 
-        <PiedDossier
-          ouvert={etape === 'dossier'}
-          disabled={send.isPending}
-          motifRefus={motifRefus}
-          onAdhesion={submitConversion}
-          onRefus={(refus) => {
-            setMotif(refus);
-            record(refus, null);
-          }}
-          onRappel={versLeRappel}
-          onAnnuler={() => {
-            setConversion(null);
-            setConversionErrors({});
-          }}
-        />
+  function corpsFiche(): ReactNode {
+    return (
+      <section aria-label="Fiche courante" className="flex flex-col gap-4">
+        {enTete(etape === 'dossier')}
+        {surStatut ? selectStatut() : null}
+        {panneauDossier()}
+        {choixIssue()}
+        {finAppel()}
+        {piedDossier()}
+      </section>
+    );
+  }
+
+  /** Grand Public : sans dossier ouvert, l'appel se consigne dès « Réponse ». */
+  function etapeReponse(): ReactNode {
+    return (
+      <>
+        {surStatut ? (
+          <>
+            <p className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+              {GROUPES.find((item) => item.cle === groupe)?.label}
+            </p>
+            {selectStatut()}
+          </>
+        ) : null}
+        {choixIssue()}
+        {etape === 'dossier' ? piedEtapes() : finAppel()}
+      </>
+    );
+  }
+
+  function etapeDuDossier(etapeDossier: EtapeDossier): ReactNode {
+    return (
+      <>
+        {panneauDossier(etapeDossier)}
+        {etapeDossier === 'Adhésion' ? (
+          <>
+            {finAppel()}
+            {piedDossier()}
+          </>
+        ) : null}
+        {piedEtapes()}
+      </>
+    );
+  }
+
+  function corpsAppel(): ReactNode {
+    const etapeDossier = ETAPES_DOSSIER[etapeAppel - 1];
+    const atteignable =
+      conversion === null
+        ? 0
+        : 1 +
+          etapesValides(validateConversion(conversion, now, formulaire.champs, formulaire.libres));
+    return (
+      <section ref={racineRef} aria-label="Fiche courante" className="flex flex-col gap-4">
+        {/* Sur « Identité », le WhatsApp de l'envoi du lien remplace celui de l'en-tête. */}
+        {enTete(etape === 'dossier' && etapeDossier === 'Identité')}
+        {closed ? null : (
+          <EtapesProgression
+            etapes={ETAPES_APPEL}
+            courante={etapeAppel}
+            atteignable={atteignable}
+            onChoisir={allerA}
+          />
+        )}
+        {etapeDossier === undefined ? etapeReponse() : etapeDuDossier(etapeDossier)}
       </section>
     );
   }
@@ -1229,7 +1430,7 @@ export function Consignation({
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
-      {corpsFiche()}
+      {statutParSelect ? corpsAppel() : corpsFiche()}
 
       <details
         className="pointer-coarse:hidden"
@@ -1242,9 +1443,7 @@ export function Consignation({
           Carte clavier <Kbd>?</Kbd>
         </summary>
         <dl className="mt-2 flex flex-col gap-1 text-[0.8125rem]">
-          {KEYBOARD_MAP.filter(
-            ([keys]) => projet === 'CHUES' || (keys !== 'N' && keys !== 'R'),
-          ).map(([keys, what]) => (
+          {carteClavier(projet, statutParSelect).map(([keys, what]) => (
             <div key={keys} className="flex items-baseline gap-2">
               <dt className="w-24 shrink-0">
                 <Kbd>{keys}</Kbd>

@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ChampAjoute } from '@/components/forms/champ-ajoute';
 import { Field } from '@/components/forms/field';
 import { Liste } from '@/components/forms/liste';
+import { ETAPE_DU_CHAMP, type EtapeDossier } from '@/components/grand-public/etapes';
 import { Input } from '@/components/ui/input';
 import {
   reglesChamps,
@@ -110,6 +111,7 @@ export function ConversionFields({
   disabled,
   reglages,
   libres,
+  etape,
   onChange,
 }: {
   draft: ConversionDraft;
@@ -120,6 +122,8 @@ export function ConversionFields({
   disabled: boolean;
   reglages: readonly ReglageChamp[];
   libres: readonly ChampLibre[];
+  /** Présente : seuls les champs de cette étape se rendent, dans l'ordre réglé. */
+  etape?: EtapeDossier | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
@@ -470,7 +474,7 @@ export function ConversionFields({
   // fonctionnaire : la reposer en oui / non ferait deux réponses pour une.
   const ordre = (
     reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds)
-  ).filter((champ) => complet || champ !== 'fonctionnaire');
+  ).filter((champ) => (complet || champ !== 'fonctionnaire') && dansLEtape(champ, etape));
 
   return (
     <fieldset className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" disabled={disabled}>
@@ -484,7 +488,7 @@ export function ConversionFields({
         ) : null,
       )}
 
-      {libres.map((champ) => (
+      {libresDeLEtape(libres, etape).map((champ) => (
         <ChampAjoute
           key={champ.id}
           champ={champ}
@@ -522,6 +526,15 @@ function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
     </p>
   );
 }
+
+const dansLEtape = (champ: string, etape: EtapeDossier | undefined): boolean =>
+  etape === undefined || ETAPE_DU_CHAMP[champ as ChampReglable] === etape;
+
+/** Les champs ajoutés par l'administrateur vont avec l'adhésion. */
+const libresDeLEtape = (
+  libres: readonly ChampLibre[],
+  etape: EtapeDossier | undefined,
+): readonly ChampLibre[] => (etape === undefined || etape === 'Adhésion' ? libres : []);
 
 /** Situation et mode de paiement n'existent pas sur CHUES : le prospect y est enseignant. */
 function visibleParDefaut(champ: string, complet: boolean): boolean {
