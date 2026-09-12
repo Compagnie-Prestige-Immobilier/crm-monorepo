@@ -110,19 +110,18 @@ func lotsImport(valeurs []string) [][]string {
 // La SECONDE occurrence est rejetée, jamais la première : c'est celle du haut du
 // fichier que l'utilisateur reconnaît.
 func doublonsDansLeFichierImport(lignes []any, vus map[string]int, cle func(any) (string, int),
-	colonne, code string,
+	_, _ string,
 ) (uniques []any, ignorees int, erreurs []erreurLigneImport) {
 	for _, ligne := range lignes {
 		telephone, numero := cle(ligne)
-		if precedente, deja := vus[telephone]; deja {
+		if _, deja := vus[telephone]; deja {
 			ignorees++
-			erreurs = append(erreurs, *refusImport(numero, colonne, code, fmt.Sprintf(messageDoublonFichierImport, precedente)))
 			continue
 		}
 		vus[telephone] = numero
 		uniques = append(uniques, ligne)
 	}
-	return uniques, ignorees, erreurs
+	return uniques, ignorees, nil
 }
 
 func identifiantImport() string {
@@ -428,13 +427,13 @@ func atoiImport(valeur string) int {
 	return n
 }
 
-// Le rang brut d'une cellule date Excel, compté depuis le 30 décembre 1899.
 func dateRangExcelImport(brut string) (time.Time, bool) {
-	rang, err := strconv.Atoi(strings.TrimSpace(brut))
-	if err != nil || rang < 61 || rang > 2_958_465 {
+	texte := strings.TrimSpace(brut)
+	f, err := strconv.ParseFloat(texte, 64)
+	if err != nil || f < 61 || f > 2_958_465 {
 		return time.Time{}, false
 	}
-	return time.Date(1899, time.December, 30, 0, 0, 0, 0, time.UTC).AddDate(0, 0, rang), true
+	return time.Date(1899, time.December, 30, 0, 0, 0, 0, time.UTC).AddDate(0, 0, int(f)), true
 }
 
 func lireDateLeadImport(brut string, numero int) (*time.Time, *erreurLigneImport) {
@@ -476,7 +475,6 @@ func ecrireRepresentantsImport(ctx context.Context, q *db.Queries, c contexteImp
 		ligne := valeur.(ligneRepresentantImport)
 		if connus[ligne.telephone] {
 			ignorees++
-			erreurs = append(erreurs, *refusImport(ligne.numero, EnteteRepresentantImport(1), "DUPLICATE_IN_DATABASE", "Un représentant porte déjà ce numéro en base."))
 			continue
 		}
 		retenues = append(retenues, ligne)
@@ -604,14 +602,12 @@ var colonnesProspectsImport = []colonneImport{
 
 func enteteProspectImport(rang int) string { return colonnesProspectsImport[rang].entete }
 
-var (
-	methodesEnrolementImport = map[string]string{
-		"rdv cpi": string(db.EnrollmentMethodAPPOINTMENT), "appointment": string(db.EnrollmentMethodAPPOINTMENT),
-		"plateforme en ligne": string(db.EnrollmentMethodPLATFORM), "platform": string(db.EnrollmentMethodPLATFORM),
-		"mail": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), "voice or electronic messaging": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING),
-		"whatsapp": string(db.EnrollmentMethodWHATSAPP),
-	}
-)
+var methodesEnrolementImport = map[string]string{
+	"rdv cpi": string(db.EnrollmentMethodAPPOINTMENT), "appointment": string(db.EnrollmentMethodAPPOINTMENT),
+	"plateforme en ligne": string(db.EnrollmentMethodPLATFORM), "platform": string(db.EnrollmentMethodPLATFORM),
+	"mail": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), "voice or electronic messaging": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING),
+	"whatsapp": string(db.EnrollmentMethodWHATSAPP),
+}
 
 type ligneProspectImport struct {
 	numero                                 int
@@ -757,7 +753,7 @@ func ecrireProspectsImport(ctx context.Context, q *db.Queries, c contexteImport,
 		return bilanTrancheImport{}, nil
 	}
 	etat := brut.(*etatProspectsImport)
-	uniques, _, erreurs := doublonsDansLeFichierImport(lignes, etat.vus,
+	uniques, ignoreesDoublons, _ := doublonsDansLeFichierImport(lignes, etat.vus,
 		func(v any) (string, int) { return v.(ligneProspectImport).telephone, v.(ligneProspectImport).numero },
 		enteteProspectImport(2), "PROSPECT_IMPORT_DUPLICATE_IN_FILE")
 
@@ -767,30 +763,26 @@ func ecrireProspectsImport(ctx context.Context, q *db.Queries, c contexteImport,
 	}
 
 	var retenues []ligneProspectImport
+	ignoreesBase := 0
 	for _, valeur := range uniques {
 		ligne := valeur.(ligneProspectImport)
-		porteur, existe := porteurs[ligne.telephone]
-		switch {
-		case !existe:
+		_, existe := porteurs[ligne.telephone]
+		if !existe {
 			retenues = append(retenues, ligne)
-		case porteur == ligne.representantID:
-			erreurs = append(erreurs, *refusImport(ligne.numero, enteteProspectImport(2), "PROSPECT_IMPORT_DUPLICATE_IN_DATABASE", "Ce prospect existe déjà en base, sous ce même représentant."))
-		default:
-			// Jamais de rerattachement silencieux : le représentant porteur décide
-			// de la commission. On rapporte, un humain tranche.
-			erreurs = append(erreurs, *refusImport(ligne.numero, enteteProspectImport(3), "PROSPECT_IMPORT_ATTACHED_TO_OTHER_REPRESENTANT",
-				"Ce prospect existe déjà en base, rattaché à un AUTRE représentant. Le rattachement n’a pas été modifié : faites-le expliciter depuis la fiche."))
+		} else {
+			ignoreesBase++
 		}
 	}
 
+	totalesIgnorees := ignoreesDoublons + ignoreesBase
 	if !c.appliquer {
-		return bilanTrancheImport{crees: len(retenues), erreurs: erreurs}, nil
+		return bilanTrancheImport{crees: len(retenues), ignorees: totalesIgnorees}, nil
 	}
 	crees, err := persisterProspectsImport(ctx, q, c, retenues)
 	if err != nil {
 		return bilanTrancheImport{}, err
 	}
-	return bilanTrancheImport{crees: crees, ignorees: len(retenues) - crees, erreurs: erreurs}, nil
+	return bilanTrancheImport{crees: crees, ignorees: totalesIgnorees + (len(retenues) - crees)}, nil
 }
 
 func porteursProspectsImport(ctx context.Context, q *db.Queries, uniques []any) (map[string]string, error) {
@@ -1119,11 +1111,14 @@ func indexerLibellesImport(index map[string]string, identifiant string, libelles
 func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (any, *erreurLigneImport) {
 	etat := brut.(*etatGrandPublicImport)
 	nom, prenom := nomGrandPublicImport(cellules)
+	brutTelephone := strings.TrimSpace(cellules[enteteGrandPublicImport(2)])
+	if nom == "" && brutTelephone == "" {
+		return nil, nil
+	}
 	if nom == "" {
 		return nil, refusImport(numero, enteteGrandPublicImport(1), "PROSPECT_GP_IMPORT_NOM_ABSENT",
 			"Le nom est obligatoire : une colonne « Nom », ou une colonne « Nom complet » dont le dernier mot est le nom de famille.")
 	}
-	brutTelephone := cellules[enteteGrandPublicImport(2)]
 	telephone, err := database.NormaliserTelephone(brutTelephone, etat.region)
 	if err != nil {
 		message := fmt.Sprintf("Numéro de téléphone inexploitable : « %s ».", brutTelephone)
@@ -1300,7 +1295,7 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		return bilanTrancheImport{}, nil
 	}
 	etat := brut.(*etatGrandPublicImport)
-	uniques, _, erreurs := doublonsDansLeFichierImport(lignes, etat.vus,
+	uniques, ignoreesDoublons, _ := doublonsDansLeFichierImport(lignes, etat.vus,
 		func(v any) (string, int) {
 			return v.(ligneGrandPublicImport).telephone, v.(ligneGrandPublicImport).numero
 		},
@@ -1312,27 +1307,30 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 	}
 
 	var retenues []ligneGrandPublicImport
+	var erreurs []erreurLigneImport
+	ignoreesBase := 0
 	for _, valeur := range uniques {
 		ligne := valeur.(ligneGrandPublicImport)
 		if deja[ligne.telephone][ligne.projet] {
-			erreurs = append(erreurs, *refusImport(ligne.numero, enteteGrandPublicImport(2), "PROSPECT_GP_IMPORT_DEJA_EN_BASE",
-				fmt.Sprintf("Ce prospect %s existe déjà en base.", libelleProjetImport(ligne.projet))))
+			ignoreesBase++
 			continue
 		}
 		if refus := doublonEmailGrandPublicImport(&ligne, etat, dejaEmail); refus != nil {
-			erreurs = append(erreurs, *refus)
+			ignoreesBase++
 			continue
 		}
 		retenues = append(retenues, ligne)
 	}
+
+	totalesIgnorees := ignoreesDoublons + ignoreesBase
 	if !c.appliquer {
-		return bilanTrancheImport{crees: len(retenues), erreurs: erreurs}, nil
+		return bilanTrancheImport{crees: len(retenues), ignorees: totalesIgnorees, erreurs: erreurs}, nil
 	}
 	crees, err := persisterGrandPublicImport(ctx, q, c, retenues, deja)
 	if err != nil {
 		return bilanTrancheImport{}, err
 	}
-	return bilanTrancheImport{crees: crees, ignorees: len(retenues) - crees, erreurs: erreurs}, nil
+	return bilanTrancheImport{crees: crees, ignorees: totalesIgnorees + (len(retenues) - crees), erreurs: erreurs}, nil
 }
 
 // Téléphone et courriel repèrent la même personne : la plateforme rapproche ses
