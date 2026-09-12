@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
@@ -393,7 +394,17 @@ func (s *service) ecrireReglagesCourriels(ctx context.Context, in *ReglagesCourr
 		return nil, err
 	}
 	u := socle.UtilisateurCourant(ctx)
-	if _, err := s.Q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleReglagesCourriels, Value: string(valeur), UpdatedById: &u.ID}); err != nil {
+	avant, err := LireReglagesCourriels(ctx, s.Deps)
+	if err != nil {
+		return nil, err
+	}
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if _, err := q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleReglagesCourriels, Value: string(valeur), UpdatedById: &u.ID}); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "courriels.reglages", "courriels", cleReglagesCourriels, avant, r)
+	}); err != nil {
 		return nil, err
 	}
 	return &ReglagesCourrielsOutput{Body: courrielsReglagesDTO(&r)}, nil

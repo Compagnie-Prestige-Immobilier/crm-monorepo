@@ -50,9 +50,11 @@ const (
 	banqueCodeDemandeAttente     = "CLIENT_REQUEST_ALREADY_PENDING"
 	codeDemandeBanque            = "CLIENT_REQUEST_BANQUE_NOT_FOUND"
 
-	banqueCleEtape   = "stageId"
-	banqueCleMontant = "amountXof"
-	banqueCleStatut  = "status"
+	banqueCleEtape     = "stageId"
+	banqueCleMontant   = "amountXof"
+	banqueCleStatut    = "status"
+	banqueCleReference = "reference"
+	banqueCleBanque    = "processingBankId"
 
 	banqueMessageDemandeIntrouvable = "Demande de création introuvable."
 	messageDossierIntrouvable       = "Dossier bancaire introuvable."
@@ -350,7 +352,7 @@ func (s *service) banqueConflitReference(ctx context.Context, cle string) error 
 	return problemBanque(http.StatusConflict, banqueCodeReferenceConflit,
 		"La référence « "+rival.Reference+" » est déjà portée par un autre dossier.",
 		map[string]any{"existing": map[string]any{
-			"id": rival.ID, "reference": rival.Reference, "referenceKey": rival.ReferenceKey,
+			"id": rival.ID, banqueCleReference: rival.Reference, "referenceKey": rival.ReferenceKey,
 			"customerName": rival.CustomerName, socle.ChampCreeLe: rival.CreatedAt,
 		}})
 }
@@ -416,10 +418,17 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 		}
 		// L'ouverture est elle-même une transition, sans quoi la timeline ne dirait
 		// pas qui a ouvert le dossier ni quand.
-		return q.BankTransitionInsert(ctx, db.BankTransitionInsertParams{
+		if err := q.BankTransitionInsert(ctx, db.BankTransitionInsertParams{
 			ID: transitionID.String(), CaseId: id.String(), ToStageId: initiale, PerformedById: agentID,
 			ClientAt: &instant,
-		})
+		}); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, agentID, "bank_case.create", "bank_case", id.String(), nil,
+			map[string]any{
+				banqueCleReference: banqueReferenceAffichee(reference), "prospectId": prospect.ID,
+				banqueCleBanque: banqueID, "inscriptionId": inscriptionID,
+			})
 	})
 	if banqueConflitUnicite(err) {
 		return "", s.banqueReferenceDejaPrise(ctx, banqueReferenceCle(reference))
@@ -480,12 +489,23 @@ func (s *service) modifierDossier(ctx context.Context, in *ModificationDossierIn
 		return nil, err
 	}
 	params.Updatedbyid = &u.ID
-	lignes, err := s.Q.BankCaseEdit(ctx, params)
-	if err != nil {
-		return nil, err
+	banqueCible := existant.ProcessingBankID
+	if params.ProcessingBankId != nil {
+		banqueCible = *params.ProcessingBankId
 	}
-	if lignes == 0 {
-		return nil, s.banqueRevConflit(ctx, in.ID, ref)
+	if err := s.transactionBanque(ctx, func(q *db.Queries) error {
+		lignes, err := q.BankCaseEdit(ctx, params)
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return s.banqueRevConflit(ctx, in.ID, ref)
+		}
+		return database.Auditer(ctx, q, u.ID, "bank_case.update", "bank_case", in.ID,
+			map[string]any{banqueCleReference: existant.Reference, banqueCleBanque: existant.ProcessingBankID},
+			map[string]any{banqueCleReference: existant.Reference, banqueCleBanque: banqueCible})
+	}); err != nil {
+		return nil, err
 	}
 	dossier, err := s.dossier(ctx, in.ID, "", ref)
 	return &DossierOutput{Body: dossier}, err
@@ -1284,7 +1304,12 @@ func (s *service) banqueEcrireApprobation(ctx context.Context, u *socle.Utilisat
 			return problemBanque(http.StatusConflict, banqueCodeDemandeArbitree, banqueMessageDemandeArbitree,
 				map[string]any{banqueCleStatut: string(db.ClientRequestStatusAPPROVED)})
 		}
-		return nil
+		return database.Auditer(ctx, q, u.ID, "client_request.approve", "client_request", demande.ID,
+			map[string]any{banqueCleStatut: string(db.ClientRequestStatusPENDING), "phoneE164": demande.PhoneE164},
+			map[string]any{
+				banqueCleStatut: string(db.ClientRequestStatusAPPROVED), "prospectId": nouveau,
+				"banqueId": *banqueID, "syndicatId": in.Body.SyndicatID, "representantId": in.Body.RepresentantID,
+			})
 	})
 }
 
@@ -1304,15 +1329,22 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 	}
 	motif := strings.TrimSpace(in.Body.Reason)
 	maintenant := time.Now()
-	lignes, err := s.Q.ClientRequestReject(ctx, db.ClientRequestRejectParams{
-		ID: in.ID, ReviewedById: &u.ID, ReviewedAt: &maintenant, RejectionNote: &motif,
-	})
-	if err != nil {
+	if err := s.transactionBanque(ctx, func(q *db.Queries) error {
+		lignes, err := q.ClientRequestReject(ctx, db.ClientRequestRejectParams{
+			ID: in.ID, ReviewedById: &u.ID, ReviewedAt: &maintenant, RejectionNote: &motif,
+		})
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return problemBanque(http.StatusConflict, banqueCodeDemandeArbitree, banqueMessageDemandeArbitree,
+				map[string]any{banqueCleStatut: string(db.ClientRequestStatusREJECTED)})
+		}
+		return database.Auditer(ctx, q, u.ID, "client_request.reject", "client_request", in.ID,
+			map[string]any{banqueCleStatut: string(db.ClientRequestStatusPENDING)},
+			map[string]any{banqueCleStatut: string(db.ClientRequestStatusREJECTED), "motif": motif})
+	}); err != nil {
 		return nil, err
-	}
-	if lignes == 0 {
-		return nil, problemBanque(http.StatusConflict, banqueCodeDemandeArbitree, banqueMessageDemandeArbitree,
-			map[string]any{banqueCleStatut: string(db.ClientRequestStatusREJECTED)})
 	}
 	arbitree, err := s.banqueDemande(ctx, in.ID, nil)
 	if err != nil {

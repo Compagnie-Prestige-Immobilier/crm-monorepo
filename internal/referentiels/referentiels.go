@@ -5,6 +5,7 @@ import (
 	"cpi-go/db"
 	"cpi-go/internal/exports"
 	"cpi-go/internal/representants"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"net/http"
@@ -623,8 +624,15 @@ func (s *service) referentielsCreer(ctx context.Context, in *ReferentielsCreerIn
 		b.WriteString(strconv.Itoa(i + 2))
 	}
 	b.WriteString(")")
-	if _, err := s.Pool.Exec(ctx, b.String(), append([]any{id.String()}, args...)...); err != nil {
-		return nil, l.erreurEcriture(err)
+	auteur := socle.UtilisateurCourant(ctx).ID
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, b.String(), append([]any{id.String()}, args...)...); err != nil {
+			return l.erreurEcriture(err)
+		}
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, "referentiel.create", in.Kind, id.String(),
+			nil, referentielsValeursJournal(cols, args))
+	}); err != nil {
+		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
 	return s.referentielsItem(ctx, l, id.String())
@@ -693,15 +701,52 @@ func (s *service) referentielsModifier(ctx context.Context, in *ReferentielsModi
 	}
 	b.WriteString(` WHERE "id" = $`)
 	b.WriteString(strconv.Itoa(len(cols) + 1))
-	tag, err := s.Pool.Exec(ctx, b.String(), append(args, in.ID)...)
-	if err != nil {
-		return nil, l.erreurEcriture(err)
-	}
-	if tag.RowsAffected() == 0 {
-		return nil, l.introuvableErreur()
+	auteur := socle.UtilisateurCourant(ctx).ID
+	// Désactiver une entrée change le sens des données pour tout le monde : la
+	// trace porte l'état des seules colonnes écrites, avant et après.
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		avant, err := referentielsEtatJournal(ctx, tx, l, in.ID, cols)
+		if err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, b.String(), append(args, in.ID)...)
+		if err != nil {
+			return l.erreurEcriture(err)
+		}
+		if tag.RowsAffected() == 0 {
+			return l.introuvableErreur()
+		}
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, "referentiel.update", in.Kind, in.ID,
+			avant, referentielsValeursJournal(cols, args))
+	}); err != nil {
+		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
 	return s.referentielsItem(ctx, l, in.ID)
+}
+
+func referentielsValeursJournal(cols []string, args []any) map[string]any {
+	valeurs := make(map[string]any, len(cols))
+	for i, col := range cols {
+		valeurs[col] = args[i]
+	}
+	return valeurs
+}
+
+func referentielsEtatJournal(ctx context.Context, tx pgx.Tx, l *referentielsListe, id string, cols []string) (map[string]any, error) {
+	var ligne map[string]any
+	err := tx.QueryRow(ctx, `SELECT to_jsonb(t) FROM "`+l.table+`" t WHERE t."id" = $1`, id).Scan(&ligne)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, l.introuvableErreur()
+	}
+	if err != nil {
+		return nil, err
+	}
+	avant := make(map[string]any, len(cols))
+	for _, col := range cols {
+		avant[col] = ligne[col]
+	}
+	return avant, nil
 }
 
 type ReferentielsBundleInput struct {
