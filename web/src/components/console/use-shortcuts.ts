@@ -11,6 +11,13 @@ function isTextEntry(target: EventTarget | null): boolean {
   return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT';
 }
 
+const ACTIVABLE =
+  'button, a[href], [role="button"], [role="combobox"], [role="option"], [role="tab"], [role="menuitem"]';
+
+function isActivable(target: EventTarget | null): boolean {
+  return target instanceof Element && target.closest(ACTIVABLE) !== null;
+}
+
 function chordOf(event: KeyboardEvent): string {
   const key = event.key === ' ' ? 'Space' : event.key;
   if (event.ctrlKey || event.metaKey) return `mod+${key.toLowerCase()}`;
@@ -35,7 +42,13 @@ export function useShortcuts(shortcuts: ShortcutMap, enabled = true): void {
       if (event.altKey) return;
 
       const chord = chordOf(event);
-      if (chord !== 'Escape' && isTextEntry(event.target)) return;
+      if (isTextEntry(event.target)) {
+        // Échap quitte le champ sans rien effacer : une saisie ne se perd pas d'une touche.
+        if (chord === 'Escape' && event.target instanceof HTMLElement) event.target.blur();
+        return;
+      }
+      // Entrée sur un bouton ou une option l'active ; elle ne valide pas l'écran à sa place.
+      if (chord === 'Enter' && isActivable(event.target)) return;
 
       const handler = latest.current[chord];
       if (handler === undefined) return;

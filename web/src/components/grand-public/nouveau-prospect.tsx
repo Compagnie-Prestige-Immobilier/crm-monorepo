@@ -2,7 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon } from 'lucide-react';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -19,6 +19,7 @@ import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
+import { useGardeSaisie } from '@/components/ui/confirm-dialog';
 import {
   commentaireExigePar,
   fetchMotifsAppel,
@@ -159,18 +160,23 @@ export function NouveauProspect({
   embedded = false,
   onSaved,
   onAnnuler,
+  onModifie,
 }: {
   embedded?: boolean;
   onSaved: (prospect: ProspectRow) => void;
   onAnnuler: () => void;
+  /** La boîte qui l'héberge se referme aussi par Échap ou un clic à côté : elle doit savoir. */
+  onModifie?: (modifie: boolean) => void;
 }) {
   const queryClient = useQueryClient();
   const commentRef = useRef<HTMLTextAreaElement>(null);
   const callbackRef = useRef<HTMLInputElement>(null);
   // Créée mais l'appel refusé : la reprise ne doit pas la créer une seconde fois.
   const cree = useRef<ProspectRow | null>(null);
+  const garde = useGardeSaisie(onAnnuler);
 
-  const [conversion, setConversion] = useState<ConversionDraft>(() => dossierVide('GRAND_PUBLIC'));
+  const [vierge] = useState<ConversionDraft>(() => dossierVide('GRAND_PUBLIC'));
+  const [conversion, setConversion] = useState<ConversionDraft>(vierge);
   const [phone, setPhone] = useState('');
   const [phoneError, setPhoneError] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<ConversionErrors>({});
@@ -345,13 +351,22 @@ export function NouveauProspect({
     },
   );
 
+  const modifie =
+    phone.trim() !== '' ||
+    comment.trim() !== '' ||
+    motif !== null ||
+    JSON.stringify(conversion) !== JSON.stringify(vierge);
+  useEffect(() => {
+    onModifie?.(modifie);
+  }, [modifie, onModifie]);
+
   const pending = save.isPending;
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       {embedded ? null : (
         <>
-          <Button variant="ghost" className="self-start px-0" onClick={onAnnuler}>
+          <Button variant="ghost" className="self-start px-0" onClick={garde.demanderFermeture}>
             <ArrowLeftIcon aria-hidden="true" />
             Revenir à la liste
           </Button>
@@ -449,9 +464,10 @@ export function NouveauProspect({
             consigner(refus);
           }}
           onRappel={rappeler}
-          onAnnuler={onAnnuler}
+          onAnnuler={garde.demanderFermeture}
         />
       </section>
+      {garde.confirmation}
     </div>
   );
 }

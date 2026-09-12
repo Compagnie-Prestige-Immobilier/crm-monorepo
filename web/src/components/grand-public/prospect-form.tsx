@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon, LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -64,7 +64,9 @@ import {
   type UpdateProspectInput,
 } from '@/lib/types';
 
-type Errors = Partial<Record<'prenom' | 'nom' | 'phone', string>>;
+type Errors = Partial<
+  Record<'prenom' | 'nom' | 'phone' | 'whatsapp' | 'relaisPhone' | 'anciennete', string>
+>;
 
 type Champ =
   | 'employeur'
@@ -282,6 +284,39 @@ function identiteManquante(saisie: {
   if (saisie.nom.trim() === '') found.nom = 'Le nom est obligatoire.';
   if (saisie.phone.trim() === '') found.phone = 'Le numéro est obligatoire.';
   else if (saisie.e164 === null) found.phone = 'Numéro invalide pour le pays choisi.';
+  return found;
+}
+
+/** Illisibles, ces trois valeurs partiraient vides et effaceraient ce que la fiche porte déjà. */
+function situationInvalide(
+  type: ProspectType | null,
+  situation: Situation,
+  whatsappCode: string,
+): Errors {
+  const found: Errors = {};
+  const saisi = (texte: string): boolean => texte.trim() !== '';
+  if (
+    montre(type, 'whatsapp') &&
+    saisi(situation.whatsapp) &&
+    toInternationalE164(situation.whatsapp, whatsappCode) === null
+  ) {
+    found.whatsapp = 'Numéro WhatsApp invalide pour le pays choisi.';
+  }
+  if (
+    montre(type, 'relais') &&
+    saisi(situation.relaisPhone) &&
+    toInternationalE164(situation.relaisPhone, '221') === null
+  ) {
+    found.relaisPhone =
+      'Numéro invalide : saisissez un numéro sénégalais, par exemple 77 123 45 67.';
+  }
+  if (
+    montre(type, 'anciennete') &&
+    saisi(situation.ancienneteMois) &&
+    anciennete(situation.ancienneteMois) === null
+  ) {
+    found.anciennete = 'Saisissez un nombre entier de mois, entre 0 et 840.';
+  }
   return found;
 }
 
@@ -574,11 +609,14 @@ export function GrandPublicProspectForm({
   embedded = false,
   initial,
   onSaved,
+  onModifie,
 }: {
   embedded?: boolean;
   /** Présent : le formulaire MODIFIE cette fiche au lieu d'en créer une. */
   initial?: ProspectRow;
   onSaved?: (prospect: ProspectRow) => void;
+  /** La boîte qui l'héberge se referme aussi par Échap ou un clic à côté : elle doit savoir. */
+  onModifie?: (modifie: boolean) => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -603,6 +641,27 @@ export function GrandPublicProspectForm({
   const [errors, setErrors] = useState<Errors>({});
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
   const [saved, setSaved] = useState<string[]>([]);
+
+  const courant: Depart = {
+    prenom,
+    nom,
+    phone,
+    callingCode,
+    whatsappCode,
+    professionId,
+    incomeBandId,
+    paymentMode,
+    type,
+    situation,
+    dureeMois,
+    canalId,
+    typeBien,
+    champsLibres,
+  };
+  const modifie = JSON.stringify(courant) !== JSON.stringify(depart);
+  useEffect(() => {
+    onModifie?.(modifie);
+  }, [modifie, onModifie]);
 
   const reference = useQuery({
     queryKey: queryKeys.reference,
@@ -673,7 +732,10 @@ export function GrandPublicProspectForm({
     if (save.isPending) return;
 
     const e164 = toInternationalE164(phone, callingCode);
-    const found = identiteManquante({ prenom, nom, phone, e164 });
+    const found = {
+      ...identiteManquante({ prenom, nom, phone, e164 }),
+      ...situationInvalide(type, situation, whatsappCode),
+    };
     const manquants = libresManquants(formulaire.libres, champsLibres);
     setErrorsLibres(manquants);
     setErrors(found);
@@ -837,6 +899,7 @@ export function GrandPublicProspectForm({
         enseignante={enseignante}
         paysCountries={paysCountries}
         whatsappCode={whatsappCode}
+        errors={errors}
         onWhatsappCode={setWhatsappCode}
         onIndicatifResidence={(indicatif) => {
           setCallingCode(indicatif);
@@ -1055,10 +1118,15 @@ function SyndicatField({
   );
 }
 
-function AncienneteField({ type, valeurs, onPatch }: ChampSituationProps) {
+function AncienneteField({
+  type,
+  valeurs,
+  error,
+  onPatch,
+}: ChampSituationProps & { error: string | undefined }) {
   if (!montre(type, 'anciennete')) return null;
   return (
-    <Field label="Ancienneté (mois)" description="Chez l’employeur actuel.">
+    <Field label="Ancienneté (mois)" description="Chez l’employeur actuel." error={error}>
       {(props) => (
         <Input
           {...props}
@@ -1166,11 +1234,13 @@ function WhatsappField({
   valeurs,
   paysCountries,
   whatsappCode,
+  error,
   onWhatsappCode,
   onPatch,
 }: ChampSituationProps & {
   paysCountries: readonly { code: string; label: string }[];
   whatsappCode: string;
+  error: string | undefined;
   onWhatsappCode: (value: string) => void;
 }) {
   if (!montre(type, 'whatsapp')) return null;
@@ -1184,6 +1254,7 @@ function WhatsappField({
       countries={paysCountries}
       value={valeurs.whatsapp}
       callingCode={whatsappCode}
+      error={error}
       onCallingCodeChange={onWhatsappCode}
       onChange={(whatsapp) => {
         onPatch({ whatsapp });
@@ -1192,7 +1263,12 @@ function WhatsappField({
   );
 }
 
-function RelaisField({ type, valeurs, onPatch }: ChampSituationProps) {
+function RelaisField({
+  type,
+  valeurs,
+  error,
+  onPatch,
+}: ChampSituationProps & { error: string | undefined }) {
   if (!montre(type, 'relais')) return null;
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -1208,7 +1284,7 @@ function RelaisField({ type, valeurs, onPatch }: ChampSituationProps) {
           />
         )}
       </Field>
-      <Field label="Téléphone du relais">
+      <Field label="Téléphone du relais" error={error}>
         {(props) => (
           <Input
             {...props}
@@ -1233,6 +1309,7 @@ function ChampsSituation({
   enseignante,
   paysCountries,
   whatsappCode,
+  errors,
   onWhatsappCode,
   onIndicatifResidence,
   onPatch,
@@ -1243,6 +1320,7 @@ function ChampsSituation({
   enseignante: boolean;
   paysCountries: readonly { code: string; label: string }[];
   whatsappCode: string;
+  errors: Errors;
   onWhatsappCode: (value: string) => void;
   onIndicatifResidence: (indicatif: string) => void;
   onPatch: (patch: Partial<Situation>) => void;
@@ -1261,7 +1339,13 @@ function ChampsSituation({
         reference={reference}
         onPatch={onPatch}
       />
-      <AncienneteField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <AncienneteField
+        type={type}
+        valeurs={valeurs}
+        reference={reference}
+        error={errors.anciennete}
+        onPatch={onPatch}
+      />
       <LieuField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
       <EpargneField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
       <PaysField
@@ -1277,10 +1361,17 @@ function ChampsSituation({
         reference={reference}
         paysCountries={paysCountries}
         whatsappCode={whatsappCode}
+        error={errors.whatsapp}
         onWhatsappCode={onWhatsappCode}
         onPatch={onPatch}
       />
-      <RelaisField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />
+      <RelaisField
+        type={type}
+        valeurs={valeurs}
+        reference={reference}
+        error={errors.relaisPhone}
+        onPatch={onPatch}
+      />
     </div>
   );
 }

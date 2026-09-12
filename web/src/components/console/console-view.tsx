@@ -168,7 +168,7 @@ const nouveauHref = (projet: Projet): string =>
 
 /** Grand Public consigne l'appel sur son propre écran, le même que depuis la liste des fiches. */
 const appelHref = (projet: Projet, id: string): string | null =>
-  projet === 'GRAND_PUBLIC' ? `/grand-public/appel/${id}` : null;
+  projet === 'GRAND_PUBLIC' ? `/grand-public/appel/${id}?retour=console` : null;
 
 const CLASSE_CHOIX = cn(
   'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
@@ -950,10 +950,14 @@ export function Consignation({
         ouvrirDossier();
         return;
       }
+      // Comme « À rappeler » : le dossier rempli attend le prochain appel.
+      if (choisi.effect === 'SCHEDULE_CALLBACK') {
+        startCallback();
+        return;
+      }
       setConversion(null);
       setConversionErrors({});
-      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
-      else setSlots(null);
+      setSlots(null);
     },
     [closed, send.isPending, ouvrirDossier, startCallback],
 
@@ -981,7 +985,12 @@ export function Consignation({
   const surStatut = surSelect(groupe, statutParSelect);
   const etape = etapeCourante(closed, conversion, slots, groupe, surStatut);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
+  const [quitterOuvert, setQuitterOuvert] = useState(false);
 
+  const quitter = (): void => {
+    if (saisieEnCours) setQuitterOuvert(true);
+    else onAbandon();
+  };
 
   const annuler = useCallback(() => {
     // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
@@ -994,13 +1003,25 @@ export function Consignation({
       onAbandon();
       return;
     }
+    const avant = { groupe, motif, comment, conversion };
     setGroupe(null);
     setMotif(null);
     setComment('');
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
-  }, [slots, saisieEnCours, onAbandon]);
+    toast('Saisie effacée.', {
+      action: {
+        label: 'Rétablir',
+        onClick: () => {
+          setGroupe(avant.groupe);
+          setMotif(avant.motif);
+          setComment(avant.comment);
+          setConversion(avant.conversion);
+        },
+      },
+    });
+  }, [slots, saisieEnCours, onAbandon, groupe, motif, comment, conversion]);
 
   const choisirGroupe = (choisi: Groupe): void => {
     setGroupe(choisi);
@@ -1150,7 +1171,7 @@ export function Consignation({
           disabled={send.isPending}
           statutPose={motif !== null}
           onValidate={validate}
-          onAbandon={onAbandon}
+          onAbandon={quitter}
         />
 
         <PiedDossier
@@ -1176,10 +1197,23 @@ export function Consignation({
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
 
-      <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+      <Button variant="ghost" className="self-start px-0" onClick={quitter}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste
       </Button>
+
+      <ConfirmDialog
+        open={quitterOuvert}
+        onOpenChange={setQuitterOuvert}
+        title="Quitter sans enregistrer l’appel ?"
+        description="L’appel ne sera pas consigné."
+        confirmLabel="Quitter"
+        cancelLabel="Rester sur l’appel"
+        onConfirm={() => {
+          setQuitterOuvert(false);
+          onAbandon();
+        }}
+      />
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
 
@@ -1455,6 +1489,8 @@ export function Commentaire({
   onChange: (value: string) => void;
   onValidate: () => void;
 }) {
+  // Un clavier de téléphone n'a pas Maj+Entrée : Entrée y passe à la ligne.
+  const tactile = window.matchMedia('(pointer: coarse)').matches;
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
@@ -1469,11 +1505,11 @@ export function Commentaire({
           onChange(event.target.value);
         }}
         onKeyDown={(event) => {
-          if (event.key !== 'Enter' || event.shiftKey) return;
+          if (tactile || event.key !== 'Enter' || event.shiftKey) return;
           event.preventDefault();
           onValidate();
         }}
-        placeholder="Entrée valide, Maj+Entrée passe à la ligne."
+        placeholder={tactile ? undefined : 'Entrée valide, Maj+Entrée passe à la ligne.'}
       />
     </div>
   );

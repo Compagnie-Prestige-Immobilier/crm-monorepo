@@ -1,7 +1,7 @@
 'use client';
 
 import { LoaderIcon } from 'lucide-react';
-import type { ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -19,6 +19,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
+  cancelLabel = 'Annuler',
   confirmVariant = 'destructive',
   pending = false,
   children,
@@ -29,6 +30,8 @@ export function ConfirmDialog({
   title: ReactNode;
   description: ReactNode;
   confirmLabel: string;
+  /** À nommer quand le geste confirmé est lui-même une annulation. */
+  cancelLabel?: string;
   /** Rouge par défaut : la plupart des confirmations d'ici détruisent quelque chose. */
   confirmVariant?: 'default' | 'destructive';
   pending?: boolean;
@@ -61,7 +64,7 @@ export function ConfirmDialog({
               onOpenChange(false);
             }}
           >
-            Annuler
+            {cancelLabel}
           </Button>
           <Button type="button" variant={confirmVariant} disabled={pending} onClick={onConfirm}>
             {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
@@ -71,4 +74,41 @@ export function ConfirmDialog({
       </DialogContent>
     </Dialog>
   );
+}
+
+/**
+ * Une boîte de saisie qui ne se referme pas sur une saisie en cours sans le
+ * demander. `confirmation` se rend DANS la boîte gardée : imbriquée, elle ne
+ * compte pas comme un clic à l'extérieur.
+ */
+export function useGardeSaisie(fermer: () => void): {
+  signalerModifie: (modifie: boolean) => void;
+  demanderFermeture: () => void;
+  confirmation: ReactNode;
+} {
+  const [modifie, setModifie] = useState(false);
+  const [confirmer, setConfirmer] = useState(false);
+
+  return {
+    signalerModifie: setModifie,
+    demanderFermeture: () => {
+      if (modifie) setConfirmer(true);
+      else fermer();
+    },
+    confirmation: (
+      <ConfirmDialog
+        open={confirmer}
+        onOpenChange={setConfirmer}
+        title="Abandonner la saisie ?"
+        description="Ce qui a été saisi sera perdu."
+        confirmLabel="Abandonner la saisie"
+        cancelLabel="Continuer la saisie"
+        onConfirm={() => {
+          setConfirmer(false);
+          setModifie(false);
+          fermer();
+        }}
+      />
+    ),
+  };
 }

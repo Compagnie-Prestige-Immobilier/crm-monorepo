@@ -1,8 +1,9 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useRef } from 'react';
+import { toast } from 'sonner';
 
 import { Consignation } from '@/components/console/console-view';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -20,9 +21,11 @@ import type { ProspectRow } from '@/lib/types';
 export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const origine = useSearchParams().get('retour');
 
   const retour = (): void => {
-    router.push('/grand-public');
+    const ecranDOrigine = origine === 'console' || origine === 'rappels';
+    router.push(ecranDOrigine ? `/grand-public/${origine}` : '/grand-public');
   };
 
   const ouvrir = useMutation({
@@ -51,10 +54,11 @@ export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
       projet="GRAND_PUBLIC"
       statutParSelect
       onAbandon={retour}
-      onEnregistre={() => {
+      onEnregistre={(nom) => {
         queryClient.setQueryData(queryKeys.ouvertureCourante, null);
         void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
         void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+        toast.success(`Appel enregistré pour ${nom}.`);
         retour();
       }}
     />

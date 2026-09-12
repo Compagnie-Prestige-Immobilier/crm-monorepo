@@ -13,6 +13,7 @@ import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useGardeSaisie } from '@/components/ui/confirm-dialog';
 import {
   PROSPECT_TYPE_LABELS,
   confirmGrandPublicConversion,
@@ -186,6 +187,9 @@ function ModifierLaFiche({
   onEnregistre: (prospect: ProspectRow) => void;
 }) {
   const [ouverte, setOuverte] = useState(false);
+  const garde = useGardeSaisie(() => {
+    setOuverte(false);
+  });
   if (!canEdit) return null;
 
   return (
@@ -199,7 +203,13 @@ function ModifierLaFiche({
         <PencilIcon aria-hidden="true" />
         Modifier
       </Button>
-      <Dialog open={ouverte} onOpenChange={setOuverte}>
+      <Dialog
+        open={ouverte}
+        onOpenChange={(ouvrir) => {
+          if (ouvrir) setOuverte(true);
+          else garde.demanderFermeture();
+        }}
+      >
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>
@@ -214,12 +224,15 @@ function ModifierLaFiche({
             <GrandPublicProspectForm
               embedded
               initial={prospect}
+              onModifie={garde.signalerModifie}
               onSaved={(saved) => {
+                garde.signalerModifie(false);
                 onEnregistre(saved);
                 setOuverte(false);
               }}
             />
           ) : null}
+          {garde.confirmation}
         </DialogContent>
       </Dialog>
     </>

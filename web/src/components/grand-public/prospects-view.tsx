@@ -28,6 +28,7 @@ import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { useGardeSaisie } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -191,6 +192,9 @@ export function GrandPublicProspectsView({
   const activeCount = countGrandPublicFilters(filters);
   const [filtersOpen, setFiltersOpen] = useState(activeCount > 0);
   const [createOpen, setCreateOpen] = useState(false);
+  const gardeCreation = useGardeSaisie(() => {
+    setCreateOpen(false);
+  });
 
   return (
     <div className="flex flex-col gap-6">
@@ -327,7 +331,13 @@ export function GrandPublicProspectsView({
         onCreate={() => setCreateOpen(true)}
       />
 
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
+      <Dialog
+        open={createOpen}
+        onOpenChange={(ouvrir) => {
+          if (ouvrir) setCreateOpen(true);
+          else gardeCreation.demanderFermeture();
+        }}
+      >
         <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Nouveau prospect Grand Public</DialogTitle>
@@ -335,13 +345,17 @@ export function GrandPublicProspectsView({
           </DialogHeader>
           <NouveauProspect
             embedded
+            onModifie={gardeCreation.signalerModifie}
             onSaved={() => {
+              gardeCreation.signalerModifie(false);
               setCreateOpen(false);
             }}
             onAnnuler={() => {
+              gardeCreation.signalerModifie(false);
               setCreateOpen(false);
             }}
           />
+          {gardeCreation.confirmation}
         </DialogContent>
       </Dialog>
     </div>
