@@ -327,13 +327,13 @@ test.describe('GP-11 largeur 375 px', () => {
   });
 });
 
-test('GP-12 le nom d’une ligne ouvre l’appel du prospect', async ({ page }) => {
+test('GP-12 « Appeler » sur une ligne ouvre l’appel du prospect', async ({ page }) => {
   await page.goto('/grand-public');
   await chercher(page, PREMIER.phone);
 
   await page
     .getByRole('table')
-    .getByRole('link', { name: `${PREFIXE} ${PREMIER.nom} +221 78 100 20 01` })
+    .getByRole('link', { name: `Appeler ${PREFIXE} ${PREMIER.nom}` })
     .click();
 
   await page.waitForURL(/\/grand-public\/appel\/[0-9a-f-]{36}$/);

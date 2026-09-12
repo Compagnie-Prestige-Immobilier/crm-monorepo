@@ -177,13 +177,18 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(ligneGp).toHaveCount(1);
     await expect(page.getByRole('row').filter({ hasText: `CHUES ${cle}` })).toHaveCount(0);
 
-    await ligneGp.getByRole('link').first().click();
-    await expect(page).toHaveURL(new RegExp(`/grand-public/appel/${prospectGrandPublic}$`));
-    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
+    await expect(ligneGp.getByRole('link', { name: `Appeler Ousmane GP ${cle}` })).toHaveAttribute(
+      'href',
+      `/grand-public/appel/${prospectGrandPublic}`,
+    );
 
-    await page.goto(`/grand-public/${prospectGrandPublic}`);
+    await ligneGp.getByRole('link').first().click();
+    await expect(page).toHaveURL(new RegExp(`/grand-public/${prospectGrandPublic}$`));
     await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
+    await expect(
+      page.getByRole('main').getByRole('link', { name: 'Prospects Grand Public' }),
+    ).toHaveAttribute('href', /^\/grand-public\?.*search=/);
   });
 });
 

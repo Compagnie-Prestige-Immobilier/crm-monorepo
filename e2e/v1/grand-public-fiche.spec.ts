@@ -198,6 +198,9 @@ test('GP-22 la fiche complète rend ses trois cartes et le statut de la liste', 
     page.getByRole('main').getByText(statutListe, { exact: true }),
     'le badge de la fiche doit porter le statut annoncé par la liste',
   ).toBeVisible();
+  await expect(
+    page.getByRole('main').getByRole('link', { name: 'Appeler', exact: true }),
+  ).toHaveAttribute('href', `/grand-public/appel/${identifiants.complete}`);
   await expect(page.getByRole('link', { name: 'Prospects Grand Public' })).toHaveAttribute(
     'href',
     '/grand-public',

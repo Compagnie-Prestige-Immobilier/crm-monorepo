@@ -7,6 +7,7 @@ import {
   FileSpreadsheetIcon,
   InboxIcon,
   LoaderIcon,
+  PhoneIcon,
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
@@ -133,6 +134,26 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 
 function filtresLabel(activeCount: number): string {
   return activeCount > 0 ? `Filtres (${String(activeCount)})` : 'Filtres';
+}
+
+const CLE_RECHERCHE_LISTE = 'grand-public:recherche';
+
+function memoriserRechercheListe(): void {
+  try {
+    sessionStorage.setItem(CLE_RECHERCHE_LISTE, window.location.search);
+  } catch {
+    // Stockage refusé : le retour de la fiche mènera à la liste sans critères.
+  }
+}
+
+/** La liste telle que l'utilisateur l'a quittée pour ouvrir une fiche. */
+export function lienRetourListe(): string {
+  try {
+    const recherche = sessionStorage.getItem(CLE_RECHERCHE_LISTE) ?? '';
+    return recherche.startsWith('?') ? `/grand-public${recherche}` : '/grand-public';
+  } catch {
+    return '/grand-public';
+  }
 }
 
 export function GrandPublicProspectsView({
@@ -419,6 +440,7 @@ function ProspectsTable({
   filters: GrandPublicFilters;
   setFilters: (patch: Partial<GrandPublicFilters>) => void;
   hasFilters: boolean;
+  /** Mêmes rôles que la garde de `/grand-public/appel/$id` : la ligne propose aussi l'appel. */
   canCreate: boolean;
   campaignScoped: boolean;
   onCreate: () => void;
@@ -476,7 +498,9 @@ function ProspectsTable({
                 </TableCell>
               </TableRow>
             ) : (
-              items.map((prospect) => <Row key={prospect.id} prospect={prospect} />)
+              items.map((prospect) => (
+                <Row key={prospect.id} prospect={prospect} peutAppeler={canCreate} />
+              ))
             )}
           </TableBody>
         </Table>
@@ -541,24 +565,37 @@ function EmptyState({
   );
 }
 
-function Row({ prospect }: { prospect: ProspectRow }) {
+function Row({ prospect, peutAppeler }: { prospect: ProspectRow; peutAppeler: boolean }) {
   const name = `${prospect.prenom} ${prospect.nom}`.trim();
   const statut = statutForProjet(prospect, 'GRAND_PUBLIC');
 
   return (
     <TableRow>
       <TableCell>
-        <Link
-          href={`/grand-public/appel/${prospect.id}`}
-          className="block min-w-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-        >
-          <span className="block truncate font-[600] underline-offset-2 hover:underline">
-            {name}
-          </span>
-          <span className="block truncate text-[0.75rem] text-muted-foreground tabular-nums">
-            {formatPhone(prospect.phoneE164)}
-          </span>
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href={`/grand-public/${prospect.id}`}
+            onClick={memoriserRechercheListe}
+            className="block min-w-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+          >
+            <span className="block truncate font-[600] underline-offset-2 hover:underline">
+              {name}
+            </span>
+            <span className="block truncate text-[0.75rem] text-muted-foreground tabular-nums">
+              {formatPhone(prospect.phoneE164)}
+            </span>
+          </Link>
+          {peutAppeler ? (
+            <Link
+              href={`/grand-public/appel/${prospect.id}`}
+              aria-label={`Appeler ${name}`}
+              className={cn(buttonVariants({ variant: 'outline', size: 'sm' }), 'shrink-0')}
+            >
+              <PhoneIcon aria-hidden="true" />
+              Appeler
+            </Link>
+          ) : null}
+        </div>
       </TableCell>
       <TableCell>
         <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>

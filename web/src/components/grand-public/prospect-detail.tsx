@@ -1,14 +1,17 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, PencilIcon, PhoneIcon } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { PencilIcon, PhoneIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useId, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
+import { DetailBackLink } from '@/components/detail-back-link';
 import { Field } from '@/components/forms/field';
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
+import { lienRetourListe } from '@/components/grand-public/prospects-view';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
@@ -54,6 +57,7 @@ import {
   type ProspectStatut,
   type Offer,
   type PaymentMode,
+  type Role,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -285,6 +289,25 @@ function ActionsConsentement({
   );
 }
 
+const ROLES_APPEL: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'];
+
+/** Mêmes rôles que la garde de `/grand-public/appel/$id`. */
+function LienAppeler({ prospectId }: { prospectId: string }) {
+  const { data: moi } = useQuery(meQueryOptions);
+  const role = moi?.role;
+  if (role === undefined || !ROLES_APPEL.includes(role)) return null;
+
+  return (
+    <Link
+      href={`/grand-public/appel/${prospectId}`}
+      className={buttonVariants({ variant: 'outline' })}
+    >
+      <PhoneIcon aria-hidden="true" />
+      Appeler
+    </Link>
+  );
+}
+
 function DernierAppel({ prospect }: { prospect: ProspectRow }) {
   if (prospect.lastOutcome === null) return <Absent>Jamais appelé</Absent>;
 
@@ -320,6 +343,7 @@ export function GrandPublicProspectDetail({
   const queryClient = useQueryClient();
   const [prospect, setProspect] = useState(initialProspect);
   const [conversionOpen, setConversionOpen] = useState(false);
+  const [retourListe] = useState(lienRetourListe);
   const journey = prospect.journeys?.find((item) => item.projet === 'GRAND_PUBLIC');
 
   const refresh = (saved: ProspectRow) => {
@@ -363,13 +387,7 @@ export function GrandPublicProspectDetail({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Link
-        href="/grand-public"
-        className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
-      >
-        <ArrowLeftIcon aria-hidden="true" />
-        Prospects Grand Public
-      </Link>
+      <DetailBackLink href={retourListe}>Prospects Grand Public</DetailBackLink>
 
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0">
@@ -386,6 +404,7 @@ export function GrandPublicProspectDetail({
           <Badge variant={STATUT_VARIANT[journey.statut]} className="text-[0.8125rem]">
             {PROSPECT_STATUT_LABELS[journey.statut]}
           </Badge>
+          <LienAppeler prospectId={prospect.id} />
           <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
           <ActionsConsentement
             canEdit={canEdit}
