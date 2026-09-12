@@ -253,10 +253,19 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Q.UpdatePassword(ctx, db.UpdatePasswordParams{ID: u.ID, PasswordHash: condensat}); err != nil {
-		return nil, err
-	}
-	return nil, s.Q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.jeton())})
+	// Le condensat, la révocation des autres sessions et la trace dans la même
+	// transaction. La trace ne porte aucune valeur : un mot de passe, même
+	// ancien, ne s'écrit pas dans le journal.
+	return nil, pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if err := q.UpdatePassword(ctx, db.UpdatePasswordParams{ID: u.ID, PasswordHash: condensat}); err != nil {
+			return err
+		}
+		if err := q.RevokeOtherSessions(ctx, db.RevokeOtherSessionsParams{UserId: u.ID, TokenHash: socle.Empreinte(in.jeton())}); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "user.password_change", "user", u.ID, nil, nil)
+	})
 }
 
 var Garde = map[string][]socle.Role{

@@ -16,6 +16,7 @@ import (
 	"os"
 	"os/signal"
 	"path"
+	"runtime/debug"
 	"strings"
 	"syscall"
 	"time"
@@ -152,6 +153,11 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 	if err != nil {
 		return nil, err
 	}
+	taches := tachesDomaines(d)
+	d.Planifications = make(map[string]string, len(taches))
+	for _, t := range taches {
+		d.Planifications[t.Nom] = t.Cron
+	}
 	// Hôte d'essai à côté de la v1 sur la même base : deux planificateurs se
 	// disputeraient notifications dues et jobs d'import.
 	if socle.Env("TACHES_PLANIFIEES", socle.Vrai) == socle.Faux {
@@ -159,11 +165,9 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 		sched.Start()
 		return sched, nil
 	}
-	for _, t := range tachesDomaines(d) {
+	for _, t := range taches {
 		_, err := sched.NewJob(gocron.CronJob(t.Cron, false), gocron.NewTask(func() {
-			if err := t.Run(ctx); err != nil {
-				slog.Error("tâche", "nom", t.Nom, "base", d.Cfg.Base, "err", err)
-			}
+			tracerPassage(ctx, d, t)
 		}), gocron.WithName(t.Nom), gocron.WithSingletonMode(gocron.LimitModeReschedule))
 		if err != nil {
 			return nil, fmt.Errorf("tâche %s : %w", t.Nom, err)
@@ -171,6 +175,46 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 	}
 	sched.Start()
 	return sched, nil
+}
+
+// La ligne est ouverte avant de lancer la tâche : une tâche bloquée ou coupée
+// par un redémarrage laisse une ligne sans `fin`, pas le silence d'avant.
+func tracerPassage(ctx context.Context, d *socle.Deps, t socle.Tache) {
+	debut := time.Now()
+	id, errOuverture := d.Q.CronRunDebut(ctx, db.CronRunDebutParams{Nom: t.Nom, Debut: debut})
+	if errOuverture != nil {
+		slog.Warn("passage de tâche non ouvert", "nom", t.Nom, "base", d.Cfg.Base, "err", errOuverture)
+	}
+	echec := executerTache(ctx, d, t)
+	if echec != nil {
+		slog.Error("tâche", "nom", t.Nom, "base", d.Cfg.Base, "err", echec)
+	}
+	if errOuverture != nil {
+		return
+	}
+	fin := db.CronRunFinParams{ID: id, Fin: time.Now(), DureeMs: time.Since(debut).Milliseconds(), Ok: echec == nil}
+	if echec != nil {
+		message := echec.Error()
+		fin.Erreur = &message
+	}
+	if err := d.Q.CronRunFin(ctx, fin); err != nil {
+		slog.Warn("passage de tâche non clos", "nom", t.Nom, "base", d.Cfg.Base, "err", err)
+	}
+}
+
+// gocron ne récupère pas : une panique dans une tâche emporterait le processus,
+// et les six autres tâches avec lui. Elle devient une erreur de passage.
+func executerTache(ctx context.Context, d *socle.Deps, t socle.Tache) (echec error) {
+	defer func() {
+		panique := recover()
+		if panique == nil {
+			return
+		}
+		echec = fmt.Errorf("panique : %v", panique)
+		slog.Error("tâche en panique", "nom", t.Nom, "base", d.Cfg.Base,
+			"panic", panique, "pile", string(debug.Stack()))
+	}()
+	return t.Run(ctx)
 }
 
 func sonder(ctx context.Context, port string) error {
@@ -299,6 +343,9 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 		fermer = append(fermer, func() { _ = sched.Shutdown() })
 		instances[base.Base] = i
 	}
+	// Un seul journal de requêtes pour toutes les bases : ses compteurs se
+	// vident dans la base publique, celle du mux qui porte le middleware.
+	go socle.ViderMetriquesChaqueMinute(ctx, instances[socle.BasePublique].deps.Q)
 	srv := assembler(cfg, instances)
 	erreurs := make(chan error, 1)
 	go func() {

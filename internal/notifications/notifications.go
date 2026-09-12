@@ -3,6 +3,7 @@ package notifications
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"log/slog"
@@ -23,6 +24,7 @@ const (
 	notificationDelaiAbandon   = 24 * time.Hour
 	notificationTailleVague    = brevoDestinatairesParAppel * brevoAppelsSimultanes
 
+	notificationCleNom            = "name"
 	notificationErreurAReessayer  = "EMAIL_RETRY"
 	notificationErreurBoiteSeule  = "INBOX_ONLY"
 	notificationVerdictRemis      = "sent"
@@ -294,6 +296,15 @@ func notificationNomDejaPris(err error, nom string) error {
 	return err
 }
 
+// Un gabarit part vers tous les destinataires d'une campagne : le journal garde
+// le texte, pas seulement le fait qu'il a changé.
+func notificationGabaritJournal(g *db.NotificationTemplateRow) map[string]any {
+	return map[string]any{
+		notificationCleNom: g.Name, "category": g.Category, "isActive": g.IsActive,
+		"titleTemplate": g.TitleTemplate, "bodyTemplate": g.BodyTemplate, "route": g.Route,
+	}
+}
+
 func (s *service) creerGabaritNotification(ctx context.Context, in *NotificationCreerGabaritInput) (*NotificationGabaritOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	id, err := uuid.NewV7()
@@ -301,18 +312,26 @@ func (s *service) creerGabaritNotification(ctx context.Context, in *Notification
 		return nil, err
 	}
 	nom := strings.TrimSpace(in.Body.Name)
-	row, err := s.Q.InsertNotificationTemplate(ctx, db.InsertNotificationTemplateParams{
-		ID: id.String(), Name: nom,
-		Category:      db.NotificationCategory(notificationSiVide(in.Body.Category, notificationCategorieDefaut)),
-		TitleTemplate: in.Body.TitleTemplate, BodyTemplate: in.Body.BodyTemplate,
-		Route:       notificationTexteOuNil(in.Body.Route),
-		Variables:   notificationVariablesGabarit(in.Body.TitleTemplate, in.Body.BodyTemplate),
-		CreatedByID: notificationTexteOuNil(u.ID),
-	})
-	if err != nil {
-		return nil, notificationNomDejaPris(err, nom)
+	var gabarit db.NotificationTemplateRow
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		row, err := q.InsertNotificationTemplate(ctx, db.InsertNotificationTemplateParams{
+			ID: id.String(), Name: nom,
+			Category:      db.NotificationCategory(notificationSiVide(in.Body.Category, notificationCategorieDefaut)),
+			TitleTemplate: in.Body.TitleTemplate, BodyTemplate: in.Body.BodyTemplate,
+			Route:       notificationTexteOuNil(in.Body.Route),
+			Variables:   notificationVariablesGabarit(in.Body.TitleTemplate, in.Body.BodyTemplate),
+			CreatedByID: notificationTexteOuNil(u.ID),
+		})
+		if err != nil {
+			return notificationNomDejaPris(err, nom)
+		}
+		gabarit = db.NotificationTemplateRow(row)
+		return database.Auditer(ctx, q, u.ID, "notification_template.create", "notification_template",
+			id.String(), nil, notificationGabaritJournal(&gabarit))
+	}); err != nil {
+		return nil, err
 	}
-	gabarit := db.NotificationTemplateRow(row)
 	return &NotificationGabaritOutput{Body: notificationVersGabarit(&gabarit)}, nil
 }
 
@@ -360,11 +379,20 @@ func (s *service) modifierGabaritNotification(ctx context.Context, in *Notificat
 	}
 	params.Variables = notificationVariablesGabarit(params.TitleTemplate, params.BodyTemplate)
 
-	row, err := s.Q.UpdateNotificationTemplate(ctx, params)
-	if err != nil {
-		return nil, notificationNomDejaPris(err, params.Name)
+	avant := courant
+	var gabarit db.NotificationTemplateRow
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		row, err := q.UpdateNotificationTemplate(ctx, params)
+		if err != nil {
+			return notificationNomDejaPris(err, params.Name)
+		}
+		gabarit = db.NotificationTemplateRow(row)
+		return database.Auditer(ctx, q, socle.UtilisateurCourant(ctx).ID, "notification_template.update",
+			"notification_template", in.ID, notificationGabaritJournal(&avant), notificationGabaritJournal(&gabarit))
+	}); err != nil {
+		return nil, err
 	}
-	gabarit := db.NotificationTemplateRow(row)
 	return &NotificationModifierGabaritOutput{Body: notificationVersGabarit(&gabarit)}, nil
 }
 

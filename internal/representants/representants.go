@@ -1280,14 +1280,32 @@ type RepresentantOkOutput struct {
 
 // Suppression douce, réservée à l'ADMIN : l'auteur ne se dédit pas.
 func (s *service) supprimerCommentaireRepresentant(ctx context.Context, in *RepresentantCommentDeleteInput) (*RepresentantOkOutput, error) {
-	supprimes, err := s.Q.SoftDeleteRepresentantComment(ctx, db.SoftDeleteRepresentantCommentParams{
-		ID: in.CommentID, RepresentantID: in.ID,
+	u := socle.UtilisateurCourant(ctx)
+	commentaire, err := s.Q.RepresentantCommentParId(ctx, in.CommentID)
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	// Le texte effacé part dans la trace : sans lui, le journal dirait qu'un
+	// commentaire a disparu sans dire lequel.
+	avant := map[string]any{
+		"commentaireId": in.CommentID, "auteurId": commentaire.AuthorId,
+		"texte": commentaire.Body, "saisiLe": commentaire.ClientCreatedAt,
+	}
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		supprimes, err := q.SoftDeleteRepresentantComment(ctx, db.SoftDeleteRepresentantCommentParams{
+			ID: in.CommentID, RepresentantID: in.ID,
+		})
+		if err != nil {
+			return err
+		}
+		if supprimes != 1 {
+			return socle.Problem(http.StatusNotFound, "REPRESENTANT_COMMENT_NOT_FOUND", "Commentaire introuvable.")
+		}
+		return database.Auditer(ctx, q, u.ID, "representant.comment_delete", representantEntite, in.ID, avant, nil)
 	})
 	if err != nil {
 		return nil, err
-	}
-	if supprimes != 1 {
-		return nil, socle.Problem(http.StatusNotFound, "REPRESENTANT_COMMENT_NOT_FOUND", "Commentaire introuvable.")
 	}
 	out := &RepresentantOkOutput{}
 	out.Body.OK = true
@@ -1325,24 +1343,29 @@ func (s *service) supprimerRepresentant(ctx context.Context, in *RepresentantDel
 		return nil, p
 	}
 
-	tx, err := s.Pool.Begin(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback(ctx) }()
-	q := s.Q.WithTx(tx)
-	if err := q.SoftDeleteProspectsDuRepresentant(ctx, &in.ID); err != nil {
-		return nil, err
-	}
-	if _, err := q.SoftDeleteRepresentant(ctx, in.ID); err != nil {
-		return nil, err
-	}
-	if err := tx.Commit(ctx); err != nil {
+	if err := s.representantEffacer(ctx, u.ID, in.ID, &existant, prospects); err != nil {
 		return nil, err
 	}
 	out := &RepresentantOkOutput{}
 	out.Body.OK = true
 	return out, nil
+}
+
+// La fiche, ses prospects et la trace dans la même transaction : l'état
+// supprimé n'est plus lisible ailleurs qu'au journal.
+func (s *service) representantEffacer(ctx context.Context, auteur, id string, existant *db.Representant, prospects int32) error {
+	avant := representantSnapshot(existant)
+	avant["prospectsSupprimes"] = prospects
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if err := q.SoftDeleteProspectsDuRepresentant(ctx, &id); err != nil {
+			return err
+		}
+		if _, err := q.SoftDeleteRepresentant(ctx, id); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, auteur, "representant.delete", representantEntite, id, avant, nil)
+	})
 }
 
 var Garde = map[string][]socle.Role{

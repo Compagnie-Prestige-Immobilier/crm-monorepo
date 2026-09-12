@@ -3,9 +3,14 @@ package campagnes
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
+	"cpi-go/internal/shared/socle"
 	"encoding/json"
+	"maps"
 	"strings"
 	"time"
+
+	"github.com/jackc/pgx/v5"
 )
 
 type CampagneMajInput struct {
@@ -19,13 +24,33 @@ type CampagneMajInput struct {
 
 // En pause, les fiches du lot sortent des consoles de ses téléconseillers ;
 // la reprise les y ramène telles quelles.
-func (s *service) lotPauser(ctx context.Context, id string, enPause bool) error {
+func lotPauser(ctx context.Context, q *db.Queries, id string, enPause bool) error {
 	var at *time.Time
 	if enPause {
 		maintenant := time.Now().UTC()
 		at = &maintenant
 	}
-	return s.Q.PauserLot(ctx, db.PauserLotParams{ID: id, At: at})
+	return q.PauserLot(ctx, db.PauserLotParams{ID: id, At: at})
+}
+
+// Le nom, les objectifs et la pause : ce que la trace doit permettre de
+// retrouver, sans recopier les filtres du lot.
+func lotChangements(row *db.LotParIdRow, in *CampagneMajInput) (avant, apres map[string]any) {
+	avant = map[string]any{
+		lotCleNom: row.Name, "objectifs": lotLireFiltres(row.Filters).Distribution.Objectifs,
+		"enPause": row.PausedAt != nil,
+	}
+	apres = maps.Clone(avant)
+	if in.Body.Name != nil {
+		apres[lotCleNom] = strings.TrimSpace(*in.Body.Name)
+	}
+	if in.Body.Objectifs != nil {
+		apres["objectifs"] = lotObjectifsDe(in.Body.Objectifs)
+	}
+	if in.Body.EnPause != nil {
+		apres["enPause"] = *in.Body.EnPause
+	}
+	return avant, apres
 }
 
 // Ni le nom ni les objectifs ne redistribuent : les fiches sont déjà dans les
@@ -35,22 +60,16 @@ func (s *service) campagneMaj(ctx context.Context, in *CampagneMajInput) (*Campa
 	if err != nil {
 		return nil, err
 	}
-	if in.Body.Name != nil {
-		if err := s.Q.RenommerLot(ctx, db.RenommerLotParams{ID: in.ID, Name: strings.TrimSpace(*in.Body.Name)}); err != nil {
-			return nil, err
+	avant, apres := lotChangements(row, in)
+	auteur := socle.UtilisateurCourant(ctx).ID
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if err := s.lotEcrireChangements(ctx, q, row, in); err != nil {
+			return err
 		}
-	}
-	if in.Body.Objectifs != nil {
-		filtres := lotLireFiltres(row.Filters)
-		filtres.Distribution.Objectifs = lotObjectifsDe(in.Body.Objectifs)
-		if err := s.lotEcrireFiltres(ctx, s.Q, in.ID, filtres); err != nil {
-			return nil, err
-		}
-	}
-	if in.Body.EnPause != nil {
-		if err := s.lotPauser(ctx, in.ID, *in.Body.EnPause); err != nil {
-			return nil, err
-		}
+		return database.Auditer(ctx, q, auteur, "lot_export.update", "lot_export", in.ID, avant, apres)
+	}); err != nil {
+		return nil, err
 	}
 	row, err = s.lot(ctx, in.ID)
 	if err != nil {
@@ -61,6 +80,25 @@ func (s *service) campagneMaj(ctx context.Context, in *CampagneMajInput) (*Campa
 		return nil, err
 	}
 	return &CampagneOutput{Body: resume}, nil
+}
+
+func (s *service) lotEcrireChangements(ctx context.Context, q *db.Queries, row *db.LotParIdRow, in *CampagneMajInput) error {
+	if in.Body.Name != nil {
+		if err := q.RenommerLot(ctx, db.RenommerLotParams{ID: in.ID, Name: strings.TrimSpace(*in.Body.Name)}); err != nil {
+			return err
+		}
+	}
+	if in.Body.Objectifs != nil {
+		filtres := lotLireFiltres(row.Filters)
+		filtres.Distribution.Objectifs = lotObjectifsDe(in.Body.Objectifs)
+		if err := s.lotEcrireFiltres(ctx, q, in.ID, filtres); err != nil {
+			return err
+		}
+	}
+	if in.Body.EnPause == nil {
+		return nil
+	}
+	return lotPauser(ctx, q, in.ID, *in.Body.EnPause)
 }
 
 func (*service) lotEcrireFiltres(ctx context.Context, q *db.Queries, id string, filtres *lotFiltres) error {

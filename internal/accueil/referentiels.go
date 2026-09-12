@@ -2,6 +2,8 @@ package accueil
 
 import (
 	"context"
+	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"net/http"
@@ -12,6 +14,7 @@ import (
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
@@ -21,9 +24,15 @@ const (
 	codeListeVisiteLabelPris   = "VISITE_REFERENTIEL_LABEL_CONFLICT"
 	codeListeVisiteSysteme     = "VISITE_REFERENTIEL_SYSTEM_IMMUTABLE"
 
-	colonnesListeVisite = `"id", "code", "label", "isActive", "isSystem", "sortOrder", "updatedAt"`
-	cheminListeVisite   = "/api/v1/visites/referentiels/{kind}"
-	cheminEntreeVisite  = "/api/v1/visites/referentiels/{kind}/{id}"
+	colonnesListeVisite   = `"id", "code", "label", "isActive", "isSystem", "sortOrder", "updatedAt"`
+	familleListeVisite    = "visites-"
+	rangListeVisiteDefaut = 100
+	cleListeCode          = "code"
+	cleListeLabel         = "label"
+	cleListeRang          = "sortOrder"
+	cleListeActif         = "isActive"
+	cheminListeVisite     = "/api/v1/visites/referentiels/{kind}"
+	cheminEntreeVisite    = "/api/v1/visites/referentiels/{kind}/{id}"
 )
 
 // Le `kind` de l'URL n'est qu'une clé d'ici : aucun nom de table ne vient du
@@ -66,6 +75,34 @@ func monterListesVisite(api huma.API, s *service) {
 	}, s.reordonnerListeVisite)
 }
 
+// Ces quatre listes alimentent la saisie de tout le registre : l'écriture et sa
+// trace tiennent ou tombent ensemble.
+func (s *service) ecrireEntreeVisite(ctx context.Context, action, kind, id string,
+	avant, apres any, requete string, args ...any,
+) (*EntreeVisiteOutput, error) {
+	auteur := socle.UtilisateurCourant(ctx).ID
+	var out *EntreeVisiteOutput
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		entree, err := s.entreeListeVisite(ctx, tx, requete, args...)
+		if err != nil {
+			return conflitListeVisite(err)
+		}
+		out = entree
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, action, familleListeVisite+kind, id, avant, apres)
+	})
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func rangListeVisite(fourni *int32) int32 {
+	if fourni == nil {
+		return rangListeVisiteDefaut
+	}
+	return *fourni
+}
+
 func tableListeVisite(kind string) (string, error) {
 	table, connue := tablesListeVisite[kind]
 	if !connue {
@@ -78,8 +115,8 @@ func selectionListeVisite(table, suite string) string {
 	return `SELECT ` + colonnesListeVisite + ` FROM "` + table + `" ` + suite
 }
 
-func (s *service) entreesListeVisite(ctx context.Context, requete string, args ...any) ([]EntreeReferentielVisite, error) {
-	rows, err := s.Pool.Query(ctx, requete, args...)
+func (*service) entreesListeVisite(ctx context.Context, base db.DBTX, requete string, args ...any) ([]EntreeReferentielVisite, error) {
+	rows, err := base.Query(ctx, requete, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,8 +134,8 @@ func (s *service) entreesListeVisite(ctx context.Context, requete string, args .
 	return entrees, rows.Err()
 }
 
-func (s *service) entreeListeVisite(ctx context.Context, requete string, args ...any) (*EntreeVisiteOutput, error) {
-	entrees, err := s.entreesListeVisite(ctx, requete, args...)
+func (s *service) entreeListeVisite(ctx context.Context, base db.DBTX, requete string, args ...any) (*EntreeVisiteOutput, error) {
+	entrees, err := s.entreesListeVisite(ctx, base, requete, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -149,7 +186,7 @@ type EntreeVisiteOutput struct {
 }
 
 func (s *service) listeVisiteOrdonnee(ctx context.Context, table string, actifsSeulement bool) (*ListeVisiteOutput, error) {
-	entrees, err := s.entreesListeVisite(ctx,
+	entrees, err := s.entreesListeVisite(ctx, s.Pool,
 		selectionListeVisite(table, `WHERE NOT $1::boolean OR "isActive" ORDER BY "sortOrder", "label"`), actifsSeulement)
 	if err != nil {
 		return nil, err
@@ -194,13 +231,12 @@ func (s *service) creerEntreeVisite(ctx context.Context, in *CreationEntreeVisit
 	if err != nil {
 		return nil, err
 	}
-	out, err := s.entreeListeVisite(ctx, `INSERT INTO "`+table+
-		`" ("id","code","label","sortOrder") VALUES ($1,$2,$3,COALESCE($4::int,100)) RETURNING `+colonnesListeVisite,
-		id.String(), code, label, in.Body.SortOrder)
-	if err != nil {
-		return nil, conflitListeVisite(err)
-	}
-	return out, nil
+	rang := rangListeVisite(in.Body.SortOrder)
+	return s.ecrireEntreeVisite(ctx, "referentiel.create", in.Kind, id.String(),
+		nil, map[string]any{cleListeCode: code, cleListeLabel: label, cleListeRang: rang},
+		`INSERT INTO "`+table+
+			`" ("id","code","label","sortOrder") VALUES ($1,$2,$3,$4) RETURNING `+colonnesListeVisite,
+		id.String(), code, label, rang)
 }
 
 type ModificationEntreeVisiteInput struct {
@@ -225,13 +261,21 @@ func (s *service) modifierEntreeVisite(ctx context.Context, in *ModificationEntr
 		}
 		label = &propre
 	}
-	out, err := s.entreeListeVisite(ctx, `UPDATE "`+table+`" SET "label" = COALESCE($2::text,"label"),
+	actuelle, err := s.entreeListeVisite(ctx, s.Pool, selectionListeVisite(table, `WHERE "id" = $1`), in.ID)
+	if err != nil {
+		return nil, err
+	}
+	avant, apres := map[string]any{}, map[string]any{}
+	if label != nil {
+		avant[cleListeLabel], apres[cleListeLabel] = actuelle.Body.Label, *label
+	}
+	if in.Body.SortOrder != nil {
+		avant[cleListeRang], apres[cleListeRang] = actuelle.Body.SortOrder, *in.Body.SortOrder
+	}
+	return s.ecrireEntreeVisite(ctx, "referentiel.update", in.Kind, in.ID, avant, apres,
+		`UPDATE "`+table+`" SET "label" = COALESCE($2::text,"label"),
 		"sortOrder" = COALESCE($3::int,"sortOrder") WHERE "id" = $1 RETURNING `+colonnesListeVisite,
 		in.ID, label, in.Body.SortOrder)
-	if err != nil {
-		return nil, conflitListeVisite(err)
-	}
-	return out, nil
 }
 
 type ActivationEntreeVisiteInput struct {
@@ -249,7 +293,7 @@ func (s *service) activerEntreeVisite(ctx context.Context, in *ActivationEntreeV
 	if err != nil {
 		return nil, err
 	}
-	actuelle, err := s.entreeListeVisite(ctx, selectionListeVisite(table, `WHERE "id" = $1`), in.ID)
+	actuelle, err := s.entreeListeVisite(ctx, s.Pool, selectionListeVisite(table, `WHERE "id" = $1`), in.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -257,7 +301,9 @@ func (s *service) activerEntreeVisite(ctx context.Context, in *ActivationEntreeV
 		return nil, socle.Problem(http.StatusBadRequest, codeListeVisiteSysteme,
 			"Cette entrée vient du classeur d’origine : elle ne se retire pas des listes.")
 	}
-	return s.entreeListeVisite(ctx, `UPDATE "`+table+`" SET "isActive" = $2 WHERE "id" = $1 RETURNING `+colonnesListeVisite,
+	return s.ecrireEntreeVisite(ctx, "referentiel.active", in.Kind, in.ID,
+		map[string]any{cleListeActif: actuelle.Body.IsActive}, map[string]any{cleListeActif: in.Body.IsActive},
+		`UPDATE "`+table+`" SET "isActive" = $2 WHERE "id" = $1 RETURNING `+colonnesListeVisite,
 		in.ID, in.Body.IsActive)
 }
 

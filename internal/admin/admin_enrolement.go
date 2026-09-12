@@ -228,7 +228,19 @@ type SuppressionInscriptionsOutput struct {
 // Vider le miroir n'a aucune conséquence sur la plateforme : le tirage suivant
 // relit tout. Vider puis tirer vérifie ce que le CRM montre.
 func (s *service) purgerInscriptions(ctx context.Context, in *ProjetEnrolementInput) (*SuppressionInscriptionsOutput, error) {
-	n, err := s.Q.PurgerInscriptions(ctx, db.Projet(in.Projet))
+	acteur := socle.UtilisateurCourant(ctx)
+	var n int64
+	// Le miroir purgé se COMPTE : recopier chaque inscription rendrait le
+	// journal illisible, et le tirage suivant les relit toutes.
+	err := s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		supprimees, err := q.PurgerInscriptions(ctx, db.Projet(in.Projet))
+		if err != nil {
+			return err
+		}
+		n = supprimees
+		return database.Auditer(ctx, q, acteur.ID, "enrolement.purge", "enrolement", in.Projet,
+			map[string]any{"projet": in.Projet, "supprimees": supprimees}, nil)
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -238,12 +250,33 @@ func (s *service) purgerInscriptions(ctx context.Context, in *ProjetEnrolementIn
 }
 
 func (s *service) supprimerInscription(ctx context.Context, in *InscriptionInput) (*SuppressionInscriptionsOutput, error) {
-	n, err := s.Q.SupprimerInscription(ctx, db.SupprimerInscriptionParams{ID: in.ID, Projet: db.Projet(in.Projet)})
+	acteur := socle.UtilisateurCourant(ctx)
+	existante, err := s.Q.GetInscription(ctx, db.GetInscriptionParams{ID: in.ID, Projet: db.Projet(in.Projet)})
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, inscriptionIntrouvable()
+	}
 	if err != nil {
 		return nil, err
 	}
-	if n == 0 {
-		return nil, inscriptionIntrouvable()
+	avant := map[string]any{
+		"projet": in.Projet, "identifiantDistant": existante.IdentifiantDistant,
+		"nom": existante.Nom, "prenom": existante.Prenom, "phoneE164": existante.PhoneE164,
+		"statutDistant": existante.StatutDistant, "prospectId": existante.ProspectId,
+	}
+	var n int64
+	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		supprimees, err := q.SupprimerInscription(ctx, db.SupprimerInscriptionParams{ID: in.ID, Projet: db.Projet(in.Projet)})
+		if err != nil {
+			return err
+		}
+		if supprimees == 0 {
+			return inscriptionIntrouvable()
+		}
+		n = supprimees
+		return database.Auditer(ctx, q, acteur.ID, "enrolement.inscription_delete", "inscription", in.ID, avant, nil)
+	})
+	if err != nil {
+		return nil, err
 	}
 	out := &SuppressionInscriptionsOutput{}
 	out.Body.Supprimees = n
@@ -309,12 +342,12 @@ func (s *service) reglagesTirage(ctx context.Context, projet string) (reglagesEn
 	return reglagesStockes(ligne.Value), &ligne.UpdatedAt, nil
 }
 
-func (s *service) ecrireReglagesTirage(ctx context.Context, projet string, valeurs reglagesEnrolement, acteurID *string) error {
+func ecrireReglagesTirage(ctx context.Context, q *db.Queries, projet string, valeurs reglagesEnrolement, acteurID *string) error {
 	brut, err := json.Marshal(valeurs)
 	if err != nil {
 		return err
 	}
-	_, err = s.Q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleReglages(projet), Value: string(brut), UpdatedById: acteurID})
+	_, err = q.UpsertSetting(ctx, db.UpsertSettingParams{Key: cleReglages(projet), Value: string(brut), UpdatedById: acteurID})
 	return err
 }
 
@@ -365,12 +398,22 @@ func repriseNormalisee(valeur, courant *string) *string {
 	return courant
 }
 
+// Le dernier bilan de tirage vit dans la même clé : la trace ne garde que ce
+// qu'un humain a réglé.
+func reglagesJournal(r *reglagesEnrolement) map[string]any {
+	return map[string]any{
+		"frequenceMinutes": r.FrequenceMinutes, "repriseDepuis": r.RepriseDepuis,
+		"statutsComplets": r.StatutsComplets,
+	}
+}
+
 func (s *service) ecrireReglagesEnrolement(ctx context.Context, in *EcrireReglagesInput) (*ReglagesOutput, error) {
 	acteur := socle.UtilisateurCourant(ctx)
 	valeurs, _, err := s.reglagesTirage(ctx, in.Projet)
 	if err != nil {
 		return nil, err
 	}
+	avant := valeurs
 	if in.Body.FrequenceMinutes != nil {
 		valeurs.FrequenceMinutes = *in.Body.FrequenceMinutes
 	}
@@ -383,7 +426,13 @@ func (s *service) ecrireReglagesEnrolement(ctx context.Context, in *EcrireReglag
 			}
 		}
 	}
-	if err := s.ecrireReglagesTirage(ctx, in.Projet, valeurs, &acteur.ID); err != nil {
+	if err := s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		if err := ecrireReglagesTirage(ctx, q, in.Projet, valeurs, &acteur.ID); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur.ID, "enrolement.reglages", "enrolement", in.Projet,
+			reglagesJournal(&avant), reglagesJournal(&valeurs))
+	}); err != nil {
 		return nil, err
 	}
 	return s.reponseReglagesEnrolement(ctx, in.Projet)
@@ -403,7 +452,18 @@ type TirageOutput struct {
 }
 
 func (s *service) tirageManuel(ctx context.Context, in *ProjetEnrolementInput) (*TirageOutput, error) {
+	acteur := socle.UtilisateurCourant(ctx)
 	bilan := s.tirer(ctx, in.Projet)
+	// Le tirage écrit page par page, dans autant de transactions : sa trace ne
+	// peut que suivre le bilan, une fois la lecture de la plateforme terminée.
+	if err := database.Auditer(ctx, s.Q, acteur.ID, "enrolement.tirage", "enrolement", in.Projet, nil,
+		map[string]any{
+			"dureeMs": bilan.DureeMs, "lus": bilan.Lus, "crees": bilan.Crees,
+			"misAJour": bilan.MisAJour, "rapproches": bilan.Rapproches,
+			"disparues": bilan.Disparues, "erreur": bilan.Erreur,
+		}); err != nil {
+		return nil, err
+	}
 	out := &TirageOutput{}
 	out.Body.Projet = in.Projet
 	out.Body.DureeMs, out.Body.Lus, out.Body.Crees = bilan.DureeMs, bilan.Lus, bilan.Crees
@@ -453,7 +513,7 @@ func (s *service) tirer(ctx context.Context, projet string) BilanTirage {
 	valeurs, _, lecture := s.reglagesTirage(ctx, projet)
 	if lecture == nil {
 		valeurs.DernierTirage = &bilan
-		if err := s.ecrireReglagesTirage(ctx, projet, valeurs, nil); err != nil {
+		if err := ecrireReglagesTirage(ctx, s.Q, projet, valeurs, nil); err != nil {
 			slog.Error("tirage d’enrôlement : compte rendu non écrit", "projet", projet, "err", err)
 		}
 	}
