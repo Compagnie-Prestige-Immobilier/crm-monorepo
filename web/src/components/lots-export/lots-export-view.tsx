@@ -200,8 +200,8 @@ export function LotsExportView({
           <ul className="flex flex-col gap-3">
             {lots.data.items.map((lot) => (
               <li key={lot.id}>
-                <article className="flex flex-col gap-2 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
-                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+                <article className="flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm transition-all hover:border-primary/40">
+                  <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-2">
                     <h2 className="flex flex-wrap items-center gap-2 font-display text-[1.0625rem] font-[700]">
                       <Link
                         href={`${campagnesPath(projet)}/${lot.id}`}
@@ -230,11 +230,18 @@ export function LotsExportView({
                       ) : null}
                     </div>
                   </div>
-                  <p className="text-[0.875rem]">
-                    {lot.scopeLabel} ·{' '}
-                    <span className="tabular-nums">{formatNumber(lot.itemCount)}</span> fiche
-                    {lot.itemCount > 1 ? 's' : ''}
-                  </p>
+                  <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
+                    <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+                      {lot.scopeLabel}
+                    </span>
+                    <span className="text-muted-foreground">·</span>
+                    <span className="font-semibold tabular-nums text-foreground">
+                      {formatNumber(lot.itemCount)}
+                    </span>{' '}
+                    <span className="text-muted-foreground">
+                      fiche{lot.itemCount > 1 ? 's' : ''}
+                    </span>
+                  </div>
                   <p className="text-[0.8125rem] text-muted-foreground">
                     {lot.callsSince === 0
                       ? 'Aucun appel consigné depuis la création.'

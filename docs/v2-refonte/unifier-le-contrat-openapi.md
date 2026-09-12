@@ -36,9 +36,9 @@ réparer les 92 noms et les 28 routes mortes que le compilateur signale.
 ## Avant de commencer
 
 ```
-git branch --show-current          # doit être v2, jamais prod
-make gen                           # engendre openapi.json et les deux schema*.d.ts
-node tools/dev/contrat-ecarts.cjs  # les deux tables d'écarts, à jour
+git branch --show-current   # doit être v2, jamais prod
+make gen                    # engendre openapi.json et les deux schema*.d.ts
+pnpm contrat:ecarts         # les deux tables d'écarts, à jour
 ```
 
 `openapi.json`, `web/src/api/schema.d.ts` et `web/src/api/schema-v1.d.ts` sont
@@ -47,7 +47,7 @@ dans `.gitignore` : ils n'existent qu'après `make gen`. Ne jamais les commiter,
 
 ## Étape 1 : les routes mortes
 
-`node tools/dev/contrat-ecarts.cjs routes` liste les routes du contrat figé
+`pnpm contrat:ecarts routes` liste les routes du contrat figé
 sans route de même forme côté Go. Une route de cette liste peut rester VIVANTE :
 le Go déclare `/api/v1/referentiels/{kind}` là où le contrat figé écrit
 `/api/v1/referentiels/banques`, et le routeur Go fait correspondre les deux à
@@ -101,7 +101,7 @@ d'erreurs : c'est la liste de travail des étapes suivantes, et elle est exacte.
 
 ## Étape 3 : renommer les types
 
-`node tools/dev/contrat-ecarts.cjs schemas` donne la table des noms. Les alias
+`pnpm contrat:ecarts schemas` donne la table des noms. Les alias
 de types vivent dans seize fichiers seulement :
 
 ```

@@ -24,6 +24,9 @@ var adaptateursImport = map[db.ImportKind]adaptateurImport{
 	},
 	db.ImportKindPROSPECTS: {
 		maxLignes: 150_000, colonnes: colonnesProspectsImport,
+		feuilles: &dispositionFeuilleImport{
+			ligneEntete: 1, premiereDonnee: 2, repliFeuillesRemplies: true,
+		},
 		preparer: preparerProspectsImport, lire: lireProspectImport, ecrire: ecrireProspectsImport,
 	},
 	db.ImportKindPROSPECTSGRANDPUBLIC: {
@@ -590,12 +593,12 @@ func executerLotImport(exec func(func(int, error))) error {
 // ---------------------------------------------------------------- prospects
 
 var colonnesProspectsImport = []colonneImport{
-	{entete: exports.ExportEnteteNom, requise: true},
-	{entete: exports.ExportEntetePrenom, requise: true},
-	{entete: enteteTelephoneImport, requise: true},
-	{entete: "Téléphone du représentant", requise: true},
-	{entete: libelleBanqueImport, requise: true},
-	{entete: exports.ExportEnteteSyndicat, requise: true},
+	{entete: exports.ExportEnteteNom, alias: []string{"Nom de famille", "Noms", "Nom complet", "Nom et prénom", "Prénom et nom", "Nom du prospect"}},
+	{entete: exports.ExportEntetePrenom, alias: []string{"Prénoms"}},
+	{entete: enteteTelephoneImport, alias: []string{"Tel", "Numéro", "Numéro de téléphone", "Contact"}, requise: true},
+	{entete: "Téléphone du représentant", alias: []string{"Téléphone représentant", "Contact représentant", "Relais", "Téléphone du relais"}},
+	{entete: libelleBanqueImport, alias: []string{"Banque de domiciliation", "Domiciliation"}},
+	{entete: exports.ExportEnteteSyndicat},
 	{entete: exports.ExportEnteteMethodeEnrolement},
 }
 
@@ -608,7 +611,6 @@ var (
 		"mail": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), "voice or electronic messaging": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING),
 		"whatsapp": string(db.EnrollmentMethodWHATSAPP),
 	}
-	libellesEnrolementImport = []string{"RDV CPI", "Plateforme en ligne", "Mail", exports.ExportEnteteWhatsapp}
 )
 
 type ligneProspectImport struct {
@@ -692,57 +694,61 @@ func ajouterReferentielImport(index map[string]string, libelle, identifiant, col
 	return nil
 }
 
+func lireRepresentantProspectImport(brut string, etat *etatProspectsImport) string {
+	if brut == "" {
+		return ""
+	}
+	tel, err := database.NormaliserTelephone(brut, etat.region)
+	if err != nil {
+		return ""
+	}
+	return etat.representants[tel]
+}
+
+func lireBanqueProspectImport(brut string, etat *etatProspectsImport) string {
+	if brut == "" {
+		return ""
+	}
+	return etat.banques[cleReferentielImport(brut)]
+}
+
+func lireSyndicatProspectImport(brut string, etat *etatProspectsImport) string {
+	if brut == "" {
+		return ""
+	}
+	return etat.syndicats[cleReferentielImport(brut)]
+}
+
+func lireMethodeProspectImport(brut string) *db.EnrollmentMethod {
+	if brut == "" {
+		return nil
+	}
+	if valeur, connu := methodesEnrolementImport[cleImport(brut)]; connu {
+		return pointeurImport(db.EnrollmentMethod(valeur))
+	}
+	return nil
+}
+
 func lireProspectImport(cellules map[string]string, numero int, brut any) (any, *erreurLigneImport) {
 	etat := brut.(*etatProspectsImport)
-	nom := cellules[enteteProspectImport(0)]
-	if nom == "" {
-		return nil, refusImport(numero, enteteProspectImport(0), "PROSPECT_IMPORT_NOM_REQUIRED", "Le nom de famille est obligatoire, dans sa propre colonne.")
+	nom, prenom := cellules[enteteProspectImport(0)], cellules[enteteProspectImport(1)]
+	if nom == "" && prenom == "" {
+		nom, prenom = nomGrandPublicImport(cellules)
 	}
-	prenom := cellules[enteteProspectImport(1)]
-	if prenom == "" {
-		return nil, refusImport(numero, enteteProspectImport(1), "PROSPECT_IMPORT_PRENOM_REQUIRED", "Le prénom est obligatoire, dans sa propre colonne.")
+	if nom == "" {
+		return nil, refusImport(numero, enteteProspectImport(0), "PROSPECT_IMPORT_NOM_REQUIRED", "Le nom de famille est obligatoire.")
 	}
 	brutTelephone := cellules[enteteProspectImport(2)]
 	telephone, err := database.NormaliserTelephone(brutTelephone, etat.region)
 	if err != nil {
 		return nil, refusImport(numero, enteteProspectImport(2), "PROSPECT_IMPORT_PHONE_INVALID", fmt.Sprintf("Numéro de téléphone inexploitable : « %s ».", brutTelephone))
 	}
-	brutRepresentant := cellules[enteteProspectImport(3)]
-	telephoneRepresentant, err := database.NormaliserTelephone(brutRepresentant, etat.region)
-	if err != nil {
-		return nil, refusImport(numero, enteteProspectImport(3), "PROSPECT_IMPORT_REPRESENTANT_PHONE_INVALID", fmt.Sprintf("Numéro du représentant inexploitable : « %s ».", brutRepresentant))
-	}
-	representantID, connu := etat.representants[telephoneRepresentant]
-	if !connu {
-		return nil, refusImport(numero, enteteProspectImport(3), "PROSPECT_IMPORT_REPRESENTANT_UNKNOWN",
-			fmt.Sprintf("Aucun représentant actif ne porte le numéro %s. Cet import ne crée pas de représentant : importez-le d’abord.", telephoneRepresentant))
-	}
-	// Rapprochement EXACT : le croisement banque/syndicat est le segment BDD, et
-	// un rapprochement flou le change sans que rien ne le dise.
-	brutBanque := cellules[enteteProspectImport(4)]
-	banqueID, connu := etat.banques[cleReferentielImport(brutBanque)]
-	if !connu {
-		return nil, refusImport(numero, enteteProspectImport(4), "PROSPECT_IMPORT_BANQUE_UNKNOWN",
-			fmt.Sprintf("Banque inconnue : « %s ». Valeurs admises : %s.", brutBanque, valeursAdmisesImport(etat.banqueLabels)))
-	}
-	brutSyndicat := cellules[enteteProspectImport(5)]
-	syndicatID, connu := etat.syndicats[cleReferentielImport(brutSyndicat)]
-	if !connu {
-		return nil, refusImport(numero, enteteProspectImport(5), "PROSPECT_IMPORT_SYNDICAT_UNKNOWN",
-			fmt.Sprintf("Syndicat inconnu : « %s ». Valeurs admises : %s.", brutSyndicat, valeursAdmisesImport(etat.syndicatLabels)))
-	}
-	var methode *db.EnrollmentMethod
-	if brutMethode := cellules[enteteProspectImport(6)]; brutMethode != "" {
-		valeur, connu := methodesEnrolementImport[cleImport(brutMethode)]
-		if !connu {
-			return nil, refusImport(numero, enteteProspectImport(6), "PROSPECT_IMPORT_ENROLLMENT_METHOD_UNKNOWN",
-				fmt.Sprintf("Méthode d’enrôlement inconnue : « %s ». Valeurs admises : %s, ou cellule vide.", brutMethode, valeursAdmisesImport(libellesEnrolementImport)))
-		}
-		methode = pointeurImport(db.EnrollmentMethod(valeur))
-	}
 	return ligneProspectImport{
 		numero: numero, nom: nom, prenom: prenom, telephone: telephone,
-		representantID: representantID, banqueID: banqueID, syndicatID: syndicatID, methode: methode,
+		representantID: lireRepresentantProspectImport(cellules[enteteProspectImport(3)], etat),
+		banqueID:       lireBanqueProspectImport(cellules[enteteProspectImport(4)], etat),
+		syndicatID:     lireSyndicatProspectImport(cellules[enteteProspectImport(5)], etat),
+		methode:        lireMethodeProspectImport(cellules[enteteProspectImport(6)]),
 	}, nil
 }
 
@@ -821,7 +827,7 @@ func persisterProspectsImport(ctx context.Context, q *db.Queries, c contexteImpo
 		identifiants[i] = identifiantImport()
 		fiches[i] = db.InsertImportProspectParams{
 			ID: identifiants[i], Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: ligne.telephone,
-			BanqueID: &ligne.banqueID, SyndicatID: &ligne.syndicatID, RepresentantID: &ligne.representantID,
+			BanqueID: couperImport(ligne.banqueID, 36), SyndicatID: couperImport(ligne.syndicatID, 36), RepresentantID: couperImport(ligne.representantID, 36),
 			CreatedByID: c.demandeur, Phase2Status: phase2DepuisMethodeImport(ligne.methode),
 			EnrollmentMethod: ligne.methode, ClientCreatedAt: maintenant, ImportJobID: &c.jobID,
 		}
@@ -1008,22 +1014,63 @@ func reglesProvenanceImport(ctx context.Context, q *db.Queries, canaux map[strin
 
 // Le canal nomme le réseau, la règle nomme la campagne : elle seule sait à quel
 // projet le prospect répondait.
-func provenanceGrandPublicImport(brut string, numero int, etat *etatGrandPublicImport) (*string, db.Projet, *erreurLigneImport) {
-	if brut == "" {
-		return nil, db.ProjetGRANDPUBLIC, nil
-	}
-	cle := cleImport(brut)
+func provenanceExacteGrandPublic(cle string, etat *etatGrandPublicImport) (*string, db.Projet, bool) {
 	if identifiant, connu := etat.canaux[cle]; connu {
-		return &identifiant, db.ProjetGRANDPUBLIC, nil
+		return &identifiant, db.ProjetGRANDPUBLIC, true
 	}
 	for i := range etat.regles {
 		if etat.regles[i].motif != "" && strings.Contains(cle, etat.regles[i].motif) {
-			return &etat.regles[i].canalID, etat.regles[i].projet, nil
+			return &etat.regles[i].canalID, etat.regles[i].projet, true
 		}
 	}
-	return nil, db.ProjetGRANDPUBLIC, refusImport(numero, enteteGrandPublicImport(8), "PROSPECT_GP_IMPORT_CANAL_INCONNU",
-		fmt.Sprintf("Provenance inconnue : « %s ». Canaux admis : %s. Une page d’atterrissage ou une campagne se déclare dans les règles de provenance.",
-			brut, valeursAdmisesImport(etat.canalLabels)))
+	return nil, db.ProjetGRANDPUBLIC, false
+}
+
+func canalParKeywordGrandPublic(cle string, canaux map[string]string) *string {
+	for cCle, cID := range canaux {
+		if strings.Contains(cle, cCle) || strings.Contains(cCle, cle) {
+			return &cID
+		}
+	}
+	return nil
+}
+
+func cibleFamilleGrandPublic(cle string) string {
+	switch {
+	case strings.Contains(cle, "pay") || strings.Contains(cle, "ad") || strings.Contains(cle, "meta") || strings.Contains(cle, "pub") || strings.Contains(cle, "sponsor"):
+		return "meta"
+	case strings.Contains(cle, "organique") || strings.Contains(cle, "site") || strings.Contains(cle, "web") || strings.Contains(cle, "page") || strings.Contains(cle, "adhesion"):
+		return "site"
+	default:
+		return ""
+	}
+}
+
+func canalParFamilleGrandPublic(cle string, canaux map[string]string) *string {
+	cible := cibleFamilleGrandPublic(cle)
+	if cible == "" {
+		return nil
+	}
+	for cCle, cID := range canaux {
+		if strings.Contains(cCle, cible) {
+			return &cID
+		}
+	}
+	return nil
+}
+
+func provenanceGrandPublicImport(brut string, etat *etatGrandPublicImport) (*string, db.Projet) {
+	if brut == "" {
+		return nil, db.ProjetGRANDPUBLIC
+	}
+	cle := cleImport(brut)
+	if id, projet, ok := provenanceExacteGrandPublic(cle, etat); ok {
+		return id, projet
+	}
+	if id := canalParKeywordGrandPublic(cle, etat.canaux); id != nil {
+		return id, db.ProjetGRANDPUBLIC
+	}
+	return canalParFamilleGrandPublic(cle, etat.canaux), db.ProjetGRANDPUBLIC
 }
 
 func libelleProjetImport(projet db.Projet) string {
@@ -1095,10 +1142,7 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 	if refus != nil {
 		return nil, refus
 	}
-	canalID, projet, refus := provenanceGrandPublicImport(cellules[enteteGrandPublicImport(8)], numero, etat)
-	if refus != nil {
-		return nil, refus
-	}
+	canalID, projet := provenanceGrandPublicImport(cellules[enteteGrandPublicImport(8)], etat)
 	typeProspect, refus := lireFonctionnaireImport(cellules[enteteGrandPublicImport(6)], numero)
 	if refus != nil {
 		return nil, refus

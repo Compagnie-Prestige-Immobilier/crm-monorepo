@@ -216,7 +216,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
   );
 }
 
-type CleTexte = Exclude<keyof ParametresChues, 'verrouFiches' | 'textesUsine'>;
+type CleTexte = Exclude<keyof ParametresChues, 'textesUsine'>;
 
 type ChampsProps = {
   valeur: (cle: CleTexte) => string;

@@ -427,7 +427,7 @@ export function ConversionFields({
   const ordre = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
 
   return (
-    <fieldset className="grid gap-4 sm:grid-cols-2" disabled={disabled}>
+    <fieldset className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" disabled={disabled}>
       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
         Phase 3 · Conversion
       </legend>

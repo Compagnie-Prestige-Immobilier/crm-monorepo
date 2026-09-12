@@ -410,7 +410,7 @@ func (s *service) lotEcrireClasseur(ctx context.Context, row *db.LotParIdRow, so
 	}
 	styleEntete, err := classeur.NewStyle(&excelize.Style{
 		Font: &excelize.Font{Bold: true, Color: "FFFFFF"},
-		Fill: excelize.Fill{Type: exports.ExportTypeRemplissage, Pattern: 1, Color: []string{"FF630210"}},
+		Fill: excelize.Fill{Type: exports.ExportTypeRemplissage, Pattern: 1, Color: []string{"630210"}},
 	})
 	if err != nil {
 		return err

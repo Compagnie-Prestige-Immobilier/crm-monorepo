@@ -247,7 +247,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     });
   });
 
-  test('une fiche en main n’empeche pas d’ouvrir un representant', async ({ page }) => {
+  test('une fiche ouverte n’empeche pas d’en ouvrir une autre ailleurs', async ({ page }) => {
     const fiche = await semer('EnMain');
     let representant: FicheSemee | null = null;
     await avecBase(async (client) => {
@@ -259,9 +259,9 @@ test.describe('parcours 5, convertir un prospect', () => {
     await ouvrirFiche(page, fiche);
     await page.goto('/chues/appels-representants');
     await ouvrirFicheDepuisAnnuaire(page, representant);
-    await expect(page.getByText(/en main sur/u)).toHaveCount(0);
+    await expect(page.getByText(/en main/u)).toHaveCount(0);
 
-    // Les deux fiches restent en main : le parcours suivant les reprendrait au montage.
+    // Les deux ouvertures restent : le parcours suivant les reprendrait au montage.
     const representantId = (representant as FicheSemee).id;
     await avecBase(async (client) => {
       await client.query(

@@ -86,8 +86,8 @@ export async function applyImportJob(
 
 /** Ce qu'on peut déposer, dans l'ordre de la liste déroulante. */
 export const UPLOADABLE_IMPORT_KINDS = [
-  'PROSPECTS',
   'PROSPECTS_GRAND_PUBLIC',
+  'PROSPECTS',
   'REPRESENTANTS',
   'VISITES',
 ] as const satisfies readonly Exclude<ImportKind, 'VISITES_REGISTRE'>[];

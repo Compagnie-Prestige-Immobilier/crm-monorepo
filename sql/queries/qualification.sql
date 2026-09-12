@@ -246,10 +246,6 @@ WHERE (CAST(sqlc.narg('id') AS text) IS NULL OR o."id" = CAST(sqlc.narg('id') AS
        OR (sqlc.narg('cible')::text = 'prospect') = (o."prospectId" IS NOT NULL))
 ORDER BY o."openedAt" ASC, o."id" ASC;
 
--- name: VerrouFiches :one
-SELECT COALESCE(
-  (SELECT "value" FROM "app_settings" WHERE "key" = 'chues.verrouFiches'), 'true') = 'true';
-
 -- name: CreerOuverture :exec
 INSERT INTO "ouvertures_fiche"
   ("id", "openedById", "representantId", "prospectId", "openedAt", "draft")
