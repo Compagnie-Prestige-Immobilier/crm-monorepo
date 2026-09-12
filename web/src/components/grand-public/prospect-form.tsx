@@ -644,7 +644,7 @@ export function GrandPublicProspectForm({
     onSuccess: (prospect) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
-      toast.success('Fiche modifiée.');
+      toast.success(`Fiche de ${prospect.prenom} ${prospect.nom} modifiée.`);
       // La fiche est rendue par le serveur : sans cela, revenir dessus
       // afficherait encore l'état d'avant.
       router.refresh();

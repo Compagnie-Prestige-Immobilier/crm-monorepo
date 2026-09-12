@@ -23,6 +23,7 @@ import {
 import { Fragment, useState } from 'react';
 
 import { DatePicker } from '@/components/filters/date-picker';
+import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { AnimatedNumber } from '@/components/live/animated-number';
 import { QueryErrorState } from '@/components/query-error-state';
 import {
@@ -88,6 +89,7 @@ import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { readEnum, readIsoDate, readString } from '@/lib/search-params';
 import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -108,20 +110,77 @@ const TUILES: Record<ActivityFamille, { key: ActivityKey; icon: LucideIcon }[]> 
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
+type FiltresActivite = {
+  famille: ActivityFamille | null;
+  preset: PeriodPreset;
+  du: string | null;
+  au: string | null;
+  granularity: SupervisionGranularity;
+  tri: string | null;
+  sens: SortDirection | null;
+};
+
+const FILTRES_VIDES: FiltresActivite = {
+  famille: null,
+  preset: 'today',
+  du: null,
+  au: null,
+  granularity: 'day',
+  tri: null,
+  sens: null,
+};
+
+const ADAPTATEUR: UrlFilterAdapter<FiltresActivite> = {
+  parse: (params) => ({
+    famille: readEnum(params, 'famille', ['representants', 'prospects']),
+    preset: readEnum(params, 'periode', ['week', 'last7', 'custom']) ?? 'today',
+    du: readIsoDate(params, 'du'),
+    au: readIsoDate(params, 'au'),
+    granularity: readEnum(params, 'granularite', ['week']) ?? 'day',
+    tri: readString(params, 'tri'),
+    sens: readEnum(params, 'sens', ['asc', 'desc']),
+  }),
+  serialize: (filtres) => {
+    const params = new URLSearchParams();
+    const valeurs: [string, string | null][] = [
+      ['famille', filtres.famille],
+      ['periode', filtres.preset === 'today' ? null : filtres.preset],
+      ['du', filtres.preset === 'custom' ? filtres.du : null],
+      ['au', filtres.preset === 'custom' ? filtres.au : null],
+      ['granularite', filtres.granularity === 'day' ? null : filtres.granularity],
+      ['tri', filtres.tri],
+      ['sens', filtres.sens],
+    ];
+    for (const [cle, valeur] of valeurs) if (valeur !== null) params.set(cle, valeur);
+    return params;
+  },
+  cleared: () => FILTRES_VIDES,
+};
+
+function plageDe(filtres: FiltresActivite): ActivityRange {
+  if (filtres.preset !== 'custom') return presetRange(filtres.preset);
+  const today = dakarToday();
+  return { from: filtres.du ?? today, to: filtres.au ?? today };
+}
+
+function cleDeTri(tri: string | null, colonnes: ActivityColumn[]): ActivitySortKey {
+  if (tri === 'name') return 'name';
+  return colonnes.find((colonne) => colonne.key === tri)?.key ?? colonnes[0]?.key ?? 'name';
+}
+
 export function ActivityView({ projet }: { projet: Projet }) {
   const familles = famillesDuProjet(projet);
-  const [famille, setFamille] = useState<ActivityFamille>(familles[0] ?? 'prospects');
+  const { filters, setFilters } = useUrlFilters(ADAPTATEUR);
+  const famille =
+    familles.find((candidate) => candidate === filters.famille) ?? familles[0] ?? 'prospects';
   const colonnes = ACTIVITY_COLUMNS[famille];
-  const [preset, setPreset] = useState<PeriodPreset>('today');
-  const [range, setRange] = useState<ActivityRange>(() => presetRange('today'));
-  const [granularity, setGranularity] = useState<SupervisionGranularity>('day');
-  const [sortKey, setSortKey] = useState<ActivitySortKey>(colonnes[0]?.key ?? 'name');
-  const [sortDir, setSortDir] = useState<SortDirection>('desc');
+  const { preset, granularity } = filters;
+  const range = plageDe(filters);
+  const sortKey = cleDeTri(filters.tri, colonnes);
+  const sortDir = filters.sens ?? 'desc';
 
   function selectFamille(next: ActivityFamille): void {
-    setFamille(next);
-    setSortKey(ACTIVITY_COLUMNS[next][0]?.key ?? 'name');
-    setSortDir('desc');
+    setFilters({ famille: next === familles[0] ? null : next, tri: null, sens: null });
   }
 
   const { data, isPending, isError, error, refetch } = useQuery({
@@ -131,21 +190,25 @@ export function ActivityView({ projet }: { projet: Projet }) {
   });
 
   function selectPreset(next: Exclude<PeriodPreset, 'custom'>): void {
-    setPreset(next);
-    setRange(presetRange(next));
+    setFilters({ preset: next, du: null, au: null });
   }
 
   function toggleSort(key: ActivitySortKey): void {
-    if (key === sortKey) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-      return;
-    }
-    setSortKey(key);
-    setSortDir(key === 'name' ? 'asc' : 'desc');
+    const sens = key === sortKey ? inverse(sortDir) : premierSens(key);
+    const parDefaut = key === colonnes[0]?.key && sens === 'desc';
+    setFilters(parDefaut ? { tri: null, sens: null } : { tri: key, sens });
   }
 
   function selectCustomPreset(): void {
-    setPreset('custom');
+    setFilters({ preset: 'custom', du: range.from, au: range.to });
+  }
+
+  function setRange(next: ActivityRange): void {
+    setFilters({ du: next.from, au: next.to });
+  }
+
+  function setGranularity(next: SupervisionGranularity): void {
+    setFilters({ granularity: next });
   }
 
   function handleExport(): void {
@@ -1098,6 +1161,14 @@ function ActivitySkeleton() {
       </Card>
     </div>
   );
+}
+
+function inverse(sens: SortDirection): SortDirection {
+  return sens === 'asc' ? 'desc' : 'asc';
+}
+
+function premierSens(key: ActivitySortKey): SortDirection {
+  return key === 'name' ? 'asc' : 'desc';
 }
 
 function ariaSort(active: boolean, direction: SortDirection): 'ascending' | 'descending' | 'none' {

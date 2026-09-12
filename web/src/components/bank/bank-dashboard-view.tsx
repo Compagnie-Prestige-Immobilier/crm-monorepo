@@ -131,7 +131,7 @@ export function BankDashboardView({ projet }: { projet: Projet }) {
                 />
               </div>
 
-              <BankPilotage pilotage={data.pilotage} />
+              <BankPilotage pilotage={data.pilotage} projet={projet} />
 
               <div className="grid gap-4 xl:grid-cols-2">
                 <ChartCard title="Dossiers par étape">

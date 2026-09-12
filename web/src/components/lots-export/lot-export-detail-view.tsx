@@ -113,7 +113,7 @@ function LotSummary({
         {pausedAt === null ? null : (
           <Badge variant="warning">En pause depuis le {formatDate(pausedAt)}</Badge>
         )}
-        {peutRegler ? <BoutonPause id={id} enPause={pausedAt !== null} /> : null}
+        {peutRegler ? <BoutonPause id={id} name={name} enPause={pausedAt !== null} /> : null}
       </div>
       <p className="mt-1 text-[0.9375rem] text-muted-foreground">
         {scopeLabel} · <span className="tabular-nums">{formatNumber(itemCount)}</span> fiche
@@ -548,13 +548,17 @@ export function LotExportDetailView({
 }
 
 /** En pause, les fiches sortent des consoles des téléconseillers jusqu'à la reprise. */
-function BoutonPause({ id, enPause }: { id: string; enPause: boolean }) {
+function BoutonPause({ id, name, enPause }: { id: string; name: string; enPause: boolean }) {
   const queryClient = useQueryClient();
+  const [confirmation, setConfirmation] = useState(false);
   const bascule = useMutation({
     mutationFn: () => updateLotExport(id, { enPause: !enPause }),
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
-      toast.success(enPause ? 'Campagne reprise.' : 'Campagne mise en pause.');
+      setConfirmation(false);
+      toast.success(
+        enPause ? `Campagne « ${name} » reprise.` : `Campagne « ${name} » mise en pause.`,
+      );
     },
     onError: (erreur) => {
       toast.error(apiErrorText(erreur, 'La campagne n’a pas changé d’état.'));
@@ -562,22 +566,37 @@ function BoutonPause({ id, enPause }: { id: string; enPause: boolean }) {
   });
 
   return (
-    <Button
-      type="button"
-      variant="outline"
-      size="sm"
-      disabled={bascule.isPending}
-      onClick={() => {
-        bascule.mutate();
-      }}
-    >
-      {enPause ? (
-        <PlayIcon className="size-4" aria-hidden="true" />
-      ) : (
-        <PauseIcon className="size-4" aria-hidden="true" />
-      )}
-      {enPause ? 'Reprendre' : 'Mettre en pause'}
-    </Button>
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={bascule.isPending}
+        onClick={() => {
+          if (enPause) bascule.mutate();
+          else setConfirmation(true);
+        }}
+      >
+        {enPause ? (
+          <PlayIcon className="size-4" aria-hidden="true" />
+        ) : (
+          <PauseIcon className="size-4" aria-hidden="true" />
+        )}
+        {enPause ? 'Reprendre' : 'Mettre en pause'}
+      </Button>
+      <ConfirmDialog
+        open={confirmation}
+        onOpenChange={setConfirmation}
+        title={`Mettre en pause « ${name} » ?`}
+        description="Ses fiches sortent de la console de tous les téléconseillers jusqu’à la reprise."
+        confirmLabel="Mettre en pause"
+        confirmVariant="default"
+        pending={bascule.isPending}
+        onConfirm={() => {
+          bascule.mutate();
+        }}
+      />
+    </>
   );
 }
 
@@ -588,10 +607,11 @@ function NomModifiable({ id, name }: { id: string; name: string }) {
 
   const renommage = useMutation({
     mutationFn: (nouveau: string) => updateLotExport(id, { name: nouveau }),
-    onSuccess: () => {
+    onSuccess: (_resume, nouveau) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
       setSaisie(null);
+      toast.success(`Campagne renommée « ${nouveau} ».`);
     },
     onError: (erreur) => {
       toast.error(apiErrorText(erreur, 'Le nom n’a pas pu être changé.'));
@@ -618,7 +638,13 @@ function NomModifiable({ id, name }: { id: string; name: string }) {
 
   const valide = saisie.trim().length >= 3;
   return (
-    <div className="flex items-center gap-2">
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (valide && !renommage.isPending) renommage.mutate(saisie.trim());
+      }}
+    >
       <Input
         maxLength={120}
         aria-label="Nom de la campagne"
@@ -626,15 +652,15 @@ function NomModifiable({ id, name }: { id: string; name: string }) {
         onChange={(event) => {
           setSaisie(event.target.value);
         }}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape') setSaisie(null);
+        }}
       />
       <Button
-        type="button"
+        type="submit"
         size="icon"
         aria-label="Enregistrer le nom"
         disabled={!valide || renommage.isPending}
-        onClick={() => {
-          renommage.mutate(saisie.trim());
-        }}
       >
         {renommage.isPending ? (
           <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
@@ -653,7 +679,7 @@ function NomModifiable({ id, name }: { id: string; name: string }) {
       >
         <XIcon className="size-4" aria-hidden="true" />
       </Button>
-    </div>
+    </form>
   );
 }
 
@@ -687,7 +713,9 @@ function ChampObjectif({
     onSuccess: (_summary, valeur) => {
       setSaisie(String(valeur));
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportDetail(id) });
-      toast.success('Objectif enregistré.');
+      toast.success(
+        `Objectif de ${ligne.teleconseillerName} enregistré : ${String(valeur)} fiches par jour.`,
+      );
     },
     onError: (erreur) => {
       setSaisie(String(ligne.objectif));

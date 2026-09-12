@@ -12,6 +12,8 @@ import {
   EnteteColonne,
   teinteDe,
 } from '@/components/bank/bank-kanban-carte';
+import { QueryErrorState } from '@/components/query-error-state';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   KanbanBoard,
   KanbanCard,
@@ -49,13 +51,13 @@ type Colonne = { id: string; name: string; etape: BankCaseStage | null };
 type Boite =
   | { genre: 'avance'; dossier: BankCase; cible: BankCaseStage; encaissement: boolean }
   | { genre: 'rejet'; dossier: BankCase; cible: BankCaseStage }
+  | { genre: 'recul'; dossier: BankCase; cible: BankCaseStage }
   | null;
 
 type Decision =
   { genre: 'refus'; message: string } | { genre: 'direct' } | { genre: 'boite'; boite: Boite };
 
-// Entre étapes ouvertes, le geste est libre dans les deux sens ; seuls l'encaissement
-// et le rejet demandent une confirmation, comme le serveur.
+// Avancer entre étapes ouvertes est immédiat ; reculer, encaisser et rejeter se confirment.
 function decider(dossier: BankCase, cible: BankCaseStage): Decision {
   if (cible.type === 'REJECTED') {
     if (dossier.currentStage.isInitial) {
@@ -68,6 +70,9 @@ function decider(dossier: BankCase, cible: BankCaseStage): Decision {
   }
   if (cible.type === 'CASHED') {
     return { genre: 'boite', boite: { genre: 'avance', dossier, cible, encaissement: true } };
+  }
+  if (cible.position < dossier.currentStage.position) {
+    return { genre: 'boite', boite: { genre: 'recul', dossier, cible } };
   }
   return { genre: 'direct' };
 }
@@ -107,8 +112,20 @@ export function BankKanban({ projet }: { projet: Projet }) {
     queryFn: () => fetchInscriptionsAOuvrir(projet),
   });
 
+  if (dossiers.isError || etapes.isError || aOuvrir.isError) {
+    return (
+      <QueryErrorState
+        error={dossiers.error ?? etapes.error ?? aOuvrir.error}
+        onRetry={() => {
+          void dossiers.refetch();
+          void etapes.refetch();
+          void aOuvrir.refetch();
+        }}
+        fallback="Le tableau des dossiers n’a pas pu être chargé."
+      />
+    );
+  }
   if (dossiers.isPending || etapes.isPending) return <BankKanbanSkeleton />;
-  if (dossiers.isError || etapes.isError) return null;
 
   return (
     <div className="flex flex-col gap-3">
@@ -235,7 +252,15 @@ function Tableau({
           <ColonneKanban key={colonne.id} colonne={colonne} cartes={cartes} base={base} />
         )}
       </KanbanProvider>
-      <BoitesKanban boite={boite} fermer={fermer} invalider={invalider} />
+      <BoitesKanban
+        boite={boite}
+        fermer={fermer}
+        invalider={invalider}
+        pending={avancer.isPending}
+        reculer={(dossier, cible) => {
+          avancer.mutate({ dossier, cible }, { onSettled: () => setBoite(null) });
+        }}
+      />
     </>
   );
 }
@@ -307,12 +332,33 @@ function BoitesKanban({
   boite,
   fermer,
   invalider,
+  pending,
+  reculer,
 }: {
   boite: Boite;
   fermer: (ouverte: boolean) => void;
   invalider: () => void;
+  pending: boolean;
+  reculer: (dossier: BankCase, cible: BankCaseStage) => void;
 }) {
   if (boite === null) return null;
+  if (boite.genre === 'recul') {
+    const { dossier, cible } = boite;
+    return (
+      <ConfirmDialog
+        open
+        onOpenChange={fermer}
+        title={`Ramener ${dossier.reference} de « ${dossier.currentStage.label} » à « ${cible.label} » ?`}
+        description="Le dossier revient à une étape déjà franchie. Le retour reste dans son historique."
+        confirmLabel="Ramener le dossier"
+        confirmVariant="default"
+        pending={pending}
+        onConfirm={() => {
+          reculer(dossier, cible);
+        }}
+      />
+    );
+  }
   return (
     <>
       <AdvanceDialog

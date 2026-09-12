@@ -9,6 +9,7 @@ import {
 } from '@tanstack/react-query';
 import Link from 'next/link';
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
@@ -340,11 +341,15 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
   const setDefaultMutation = useMutation({
     mutationFn: (widgets: DashboardWidget[]) =>
       saveDefaultDisposition(ecran, widgets, dispositionQuery.data?.preset, undefined),
+    onSuccess: () => {
+      toast.success('Disposition par défaut enregistrée.');
+    },
   });
 
   const resetMutation = useMutation({
     mutationFn: () => resetDisposition(ecran),
     onSuccess: async () => {
+      toast.success('Écran par défaut rétabli.');
       await queryClient.invalidateQueries({ queryKey: queryKeys.disposition(ecran) });
     },
   });

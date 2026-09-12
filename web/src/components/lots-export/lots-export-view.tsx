@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { LotCreateDialog } from '@/components/lots-export/lot-create-dialog';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -37,8 +38,9 @@ import {
 import { formatDate, formatNumber } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
+import { readEnum, readPositiveInt, readString } from '@/lib/search-params';
 import type { Projet } from '@/lib/types';
-import { useDebouncedValue } from '@/lib/use-debounced-value';
+import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const TOUTES = 'TOUTES';
 
@@ -50,16 +52,31 @@ const CIBLE_OPTIONS = [
   { value: 'REPRESENTANTS', label: 'Représentants' },
 ] as const;
 
-function requeteLots(
-  page: number,
-  recherche: string,
-  cible: FiltreCible,
-  projet: Projet,
-): LotExportQuery {
+type FiltresCampagnes = { search: string; cible: FiltreCible; page: number };
+
+const FILTRES_VIDES: FiltresCampagnes = { search: '', cible: TOUTES, page: 1 };
+
+const ADAPTATEUR: UrlFilterAdapter<FiltresCampagnes> = {
+  parse: (params) => ({
+    search: readString(params, 'search') ?? '',
+    cible: readEnum(params, 'cible', ['PROSPECTS', 'REPRESENTANTS']) ?? TOUTES,
+    page: readPositiveInt(params, 'page', 1),
+  }),
+  serialize: ({ search, cible, page }) => {
+    const params = new URLSearchParams();
+    if (search.trim() !== '') params.set('search', search.trim());
+    if (cible !== TOUTES) params.set('cible', cible);
+    if (page !== 1) params.set('page', String(page));
+    return params;
+  },
+  cleared: () => FILTRES_VIDES,
+};
+
+function requeteLots({ search, cible, page }: FiltresCampagnes, projet: Projet): LotExportQuery {
   return {
     page,
     projet,
-    ...(recherche.trim() === '' ? {} : { search: recherche.trim() }),
+    ...(search.trim() === '' ? {} : { search: search.trim() }),
     ...(cible === TOUTES ? {} : { cible }),
   };
 }
@@ -73,17 +90,22 @@ export function LotsExportView({
   canDelete: boolean;
   projet: Projet;
 }) {
-  const [recherche, setRecherche] = useState('');
-  const [cible, setCible] = useState<FiltreCible>(TOUTES);
-  const [page, setPage] = useState(1);
+  const { filters, setFilters, resetFilters } = useUrlFilters(ADAPTATEUR);
+  const { page, cible } = filters;
+  const { draft: recherche, setDraft: setRecherche } = useDebouncedSearch(
+    filters.search,
+    (search) => {
+      setFilters({ search });
+    },
+  );
   const [creationOuverte, setCreationOuverte] = useState(false);
   const [aSupprimer, setASupprimer] = useState<{ id: string; name: string } | null>(null);
 
   const queryClient = useQueryClient();
   const suppression = useMutation({
-    mutationFn: (id: string) => deleteLotExport(id),
-    onSuccess: async () => {
-      toast.success('Campagne supprimée.');
+    mutationFn: (lot: { id: string; name: string }) => deleteLotExport(lot.id),
+    onSuccess: async (_reponse, lot) => {
+      toast.success(`Campagne « ${lot.name} » supprimée.`);
       setASupprimer(null);
       await queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
     },
@@ -92,8 +114,7 @@ export function LotsExportView({
     },
   });
 
-  const rechercheDifferee = useDebouncedValue(recherche);
-  const requete = requeteLots(page, rechercheDifferee, cible, projet);
+  const requete = requeteLots(filters, projet);
 
   const lots = useQuery({
     queryKey: queryKeys.lotsExport(requete),
@@ -101,7 +122,7 @@ export function LotsExportView({
     placeholderData: (precedent) => precedent,
   });
 
-  const filtre = rechercheDifferee.trim() !== '' || cible !== TOUTES;
+  const filtre = filters.search.trim() !== '' || cible !== TOUTES;
 
   return (
     <div className="flex flex-col gap-6">
@@ -132,7 +153,6 @@ export function LotsExportView({
             placeholder="Nom de la campagne"
             onChange={(event) => {
               setRecherche(event.target.value);
-              setPage(1);
             }}
           />
         </div>
@@ -145,9 +165,7 @@ export function LotsExportView({
               items={[...CIBLE_OPTIONS]}
               value={cible}
               onValueChange={(value) => {
-                if (value === null) return;
-                setCible(value);
-                setPage(1);
+                if (value !== null) setFilters({ cible: value });
               }}
             >
               <SelectTrigger id="lots-cible" className="min-w-52">
@@ -201,16 +219,7 @@ export function LotsExportView({
                   : 'Créez-en une pour répartir des fiches.'}
               </p>
               {filtre ? (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="mt-2"
-                  onClick={() => {
-                    setRecherche('');
-                    setCible(TOUTES);
-                    setPage(1);
-                  }}
-                >
+                <Button type="button" variant="outline" className="mt-2" onClick={resetFilters}>
                   <RotateCcwIcon aria-hidden="true" />
                   Effacer les filtres
                 </Button>
@@ -284,7 +293,7 @@ export function LotsExportView({
             aria-label="Page précédente"
             disabled={page <= 1}
             onClick={() => {
-              setPage(page - 1);
+              setFilters({ page: page - 1 });
             }}
           >
             <ChevronLeftIcon className="size-4" aria-hidden="true" />
@@ -298,7 +307,7 @@ export function LotsExportView({
             aria-label="Page suivante"
             disabled={page >= lots.data.pageCount}
             onClick={() => {
-              setPage(page + 1);
+              setFilters({ page: page + 1 });
             }}
           >
             <ChevronRightIcon className="size-4" aria-hidden="true" />
@@ -320,7 +329,7 @@ export function LotsExportView({
         confirmLabel="Supprimer"
         pending={suppression.isPending}
         onConfirm={() => {
-          if (aSupprimer) suppression.mutate(aSupprimer.id);
+          if (aSupprimer) suppression.mutate(aSupprimer);
         }}
       />
     </div>

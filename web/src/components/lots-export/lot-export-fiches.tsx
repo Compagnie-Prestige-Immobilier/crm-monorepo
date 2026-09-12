@@ -123,13 +123,7 @@ export function LotExportFiches({
       setCochees([]);
       setConfirmation(false);
       setRecues(nouvelles);
-      const premiere = nouvelles[0];
-      toast.success(
-        'Fiches attribuées.',
-        premiere
-          ? { action: { label: 'Télécharger', onClick: () => void telechargerRecues(premiere) } }
-          : {},
-      );
+      toast.success('Fiches attribuées.');
     },
     onError: (erreur) => {
       toast.error(apiErrorText(erreur, 'Les fiches n’ont pas pu être attribuées.'));
@@ -147,7 +141,6 @@ export function LotExportFiches({
   const changerLeFiltre = (appliquer: () => void) => {
     appliquer();
     setPage(1);
-    setCochees([]);
   };
 
   return (
@@ -202,6 +195,9 @@ export function LotExportFiches({
           onAttribuer={() => {
             setConfirmation(true);
           }}
+          onVider={() => {
+            setCochees([]);
+          }}
         />
 
         <ConfirmDialog
@@ -247,7 +243,12 @@ export function LotExportFiches({
           cochables={cochables}
           cochees={cochees}
           onCocherTout={(toutes) => {
-            setCochees(toutes ? cochables.map((fiche) => fiche.position) : []);
+            const dePage = cochables.map((fiche) => fiche.position);
+            setCochees((courantes) =>
+              toutes
+                ? [...new Set([...courantes, ...dePage])]
+                : courantes.filter((position) => !dePage.includes(position)),
+            );
           }}
           onCocherUne={(position, coche) => {
             setCochees((courantes) =>
@@ -256,15 +257,7 @@ export function LotExportFiches({
           }}
         />
 
-        <Pagination
-          page={page}
-          pageCount={pageCount}
-          total={total}
-          onPage={(suivante) => {
-            setPage(suivante);
-            setCochees([]);
-          }}
-        />
+        <Pagination page={page} pageCount={pageCount} total={total} onPage={setPage} />
       </CardContent>
     </Card>
   );
@@ -378,6 +371,7 @@ function TableFiches({
   onCocherUne: (position: number, coche: boolean) => void;
 }) {
   if (lignes.length === 0) return null;
+  const cocheesIci = cochables.filter((fiche) => cochees.includes(fiche.position)).length;
 
   return (
     <Table aria-label="Fiches de la campagne" className={cn(enAttente && 'opacity-80')}>
@@ -389,7 +383,12 @@ function TableFiches({
                 type="checkbox"
                 className="size-4 accent-primary"
                 aria-label="Cocher toutes les fiches non traitées de la page"
-                checked={cochables.length > 0 && cochees.length === cochables.length}
+                ref={(caseACocher) => {
+                  if (caseACocher !== null) {
+                    caseACocher.indeterminate = cocheesIci > 0 && cocheesIci < cochables.length;
+                  }
+                }}
+                checked={cochables.length > 0 && cocheesIci === cochables.length}
                 disabled={cochables.length === 0}
                 onChange={(event) => {
                   onCocherTout(event.target.checked);
@@ -526,6 +525,7 @@ function BandeauReaffectation({
   pending,
   onVers,
   onAttribuer,
+  onVider,
 }: {
   visible: boolean;
   equipe: LotExportDetail['repartition'];
@@ -534,6 +534,7 @@ function BandeauReaffectation({
   pending: boolean;
   onVers: (id: string) => void;
   onAttribuer: () => void;
+  onVider: () => void;
 }) {
   if (!visible || nombre === 0) return null;
   const items = equipe.map((ligne) => ({
@@ -566,6 +567,9 @@ function BandeauReaffectation({
       <Button type="button" disabled={vers === TOUS || pending} onClick={onAttribuer}>
         {pending ? <LoaderIcon className="size-4 animate-spin" aria-hidden="true" /> : null}
         Attribuer
+      </Button>
+      <Button type="button" variant="ghost" disabled={pending} onClick={onVider}>
+        Vider la sélection
       </Button>
     </div>
   );

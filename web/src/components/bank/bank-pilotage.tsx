@@ -1,20 +1,22 @@
 'use client';
 
 import { AlertTriangleIcon, HourglassIcon, InboxIcon, TimerIcon } from 'lucide-react';
+import Link from 'next/link';
 
 import { Kpi } from '@/components/bank/bank-kpi';
 import { MoneyText } from '@/components/money/exact-amounts';
 import { ChartCard } from '@/components/dashboard/chart-card';
 import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { bankBasePath } from '@/lib/bank-filters';
 import { formatDecimal, formatNumber } from '@/lib/format';
-import type { PilotageBanque } from '@/lib/types';
+import type { PilotageBanque, Projet } from '@/lib/types';
 
 function jours(heures: number | null): string {
   return heures === null ? '–' : `${formatDecimal(heures / 24)} j`;
 }
 
 /** L'entonnoir plateforme, les délais par étape et qui a suivi les dossiers encaissés. */
-export function BankPilotage({ pilotage }: { pilotage: PilotageBanque }) {
+export function BankPilotage({ pilotage, projet }: { pilotage: PilotageBanque; projet: Projet }) {
   const e = pilotage.entonnoir;
   const etapes = [
     { label: 'Inscrits', valeur: e.inscrits },
@@ -42,13 +44,19 @@ export function BankPilotage({ pilotage }: { pilotage: PilotageBanque }) {
           hint={`Ouverts depuis plus de ${String(pilotage.overdueDays)} jours`}
           icon={AlertTriangleIcon}
         />
-        <Kpi
-          index={6}
-          label="Complets non ouverts"
-          value={formatNumber(pilotage.completsNonOuverts)}
-          hint={`${formatNumber(pilotage.completsNonOuverts48h)} attendent depuis plus de 48 h`}
-          icon={InboxIcon}
-        />
+        <Link
+          href={`${bankBasePath(projet)}/dossiers/nouveau`}
+          aria-label={`Complets non ouverts : ${formatNumber(pilotage.completsNonOuverts)}. Voir les dossiers à ouvrir`}
+          className="rounded-lg hover:*:border-primary/40 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+        >
+          <Kpi
+            index={6}
+            label="Complets non ouverts"
+            value={formatNumber(pilotage.completsNonOuverts)}
+            hint={`${formatNumber(pilotage.completsNonOuverts48h)} attendent depuis plus de 48 h`}
+            icon={InboxIcon}
+          />
+        </Link>
         <Kpi
           index={7}
           label="Transformation"

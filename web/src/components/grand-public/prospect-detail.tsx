@@ -539,7 +539,7 @@ function FormulaireConversion({
     },
     onSuccess: (saved) => {
       onConverti(saved);
-      toast.success('Conversion confirmée.');
+      toast.success(`Conversion de ${saved.prenom} ${saved.nom} confirmée.`);
     },
     onError: (error) => toastApiError(error, 'La conversion n’a pas pu être confirmée.'),
   });

@@ -154,6 +154,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await expect(console.getByRole('button', { name: new RegExp(NOM, 'u') })).toBeVisible();
 
     await page.getByRole('button', { name: 'Mettre en pause' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(page.getByText(/En pause depuis le/u)).toBeVisible();
     await chercher();
     await expect(console.getByText('Aucun résultat. Vérifiez le nom ou le numéro.')).toBeVisible();
