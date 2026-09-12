@@ -58,7 +58,17 @@ export function isSuspiciousSuggestion(suggestion: Suggestion): boolean {
   const name = (suggestion.suggestedName ?? '').toLowerCase();
   const text = `${note} ${name}`;
 
-  const keywords = ['faux', 'bidon', "n'existe pas", 'invalide', 'test', '0000', 'injoignable', 'erreur', 'mauvais'];
+  const keywords = [
+    'faux',
+    'bidon',
+    "n'existe pas",
+    'invalide',
+    'test',
+    '0000',
+    'injoignable',
+    'erreur',
+    'mauvais',
+  ];
   if (keywords.some((k) => text.includes(k))) return true;
 
   if (
@@ -97,9 +107,7 @@ export function SuggestionsView() {
 
   const decideBatch = useMutation({
     mutationFn: async (variables: { ids: string[]; status: SuggestionStatus }) => {
-      await Promise.all(
-        variables.ids.map((id) => setSuggestionStatus(id, variables.status)),
-      );
+      await Promise.all(variables.ids.map((id) => setSuggestionStatus(id, variables.status)));
       return variables;
     },
     onSuccess: (variables) => {
@@ -162,7 +170,8 @@ export function SuggestionsView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Numéros recommandés par un représentant qui décline. Les fiches suspectes ou invalides sont automatiquement détectées pour vous éviter de perdre du temps.
+          Numéros recommandés par un représentant qui décline. Les fiches suspectes ou invalides
+          sont automatiquement détectées pour vous éviter de perdre du temps.
         </p>
 
         {suspiciousItems.length > 0 ? (
@@ -200,7 +209,13 @@ export function SuggestionsView() {
 
         {items.length > 0 ? (
           <div className="flex flex-wrap items-center gap-2">
-            <Button type="button" size="sm" variant="ghost" onClick={selectAll} className="gap-1.5 text-[0.8125rem]">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={selectAll}
+              className="gap-1.5 text-[0.8125rem]"
+            >
               <CheckSquareIcon className="size-3.5" aria-hidden="true" />
               {selectedIds.length === items.length ? 'Tout décocher' : 'Tout cocher'}
             </Button>
@@ -281,7 +296,9 @@ export function SuggestionsView() {
                         onToggleSelect={() => toggleSelect(suggestion.id)}
                         isParrainOpen={activeParrainId === suggestion.id}
                         onToggleParrain={() =>
-                          setActiveParrainId(activeParrainId === suggestion.id ? null : suggestion.id)
+                          setActiveParrainId(
+                            activeParrainId === suggestion.id ? null : suggestion.id,
+                          )
                         }
                         onDecide={(next) => {
                           decide.mutate({ id: suggestion.id, status: next });
@@ -336,9 +353,15 @@ function SuggestionCard({
   const isSuspicious = isSuspiciousSuggestion(suggestion);
 
   return (
-    <article className={`flex flex-col gap-3 rounded-lg border p-4 shadow-elev-sm transition-colors ${
-      isSelected ? 'border-primary/60 bg-accent/30' : isSuspicious ? 'border-destructive/40 bg-destructive-surface/20' : 'border-border bg-card'
-    }`}>
+    <article
+      className={`flex flex-col gap-3 rounded-lg border p-4 shadow-elev-sm transition-colors ${
+        isSelected
+          ? 'border-primary/60 bg-accent/30'
+          : isSuspicious
+            ? 'border-destructive/40 bg-destructive-surface/20'
+            : 'border-border bg-card'
+      }`}
+    >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
           <input
@@ -352,7 +375,10 @@ function SuggestionCard({
             <p className="font-display text-[1.0625rem] font-[700] tabular-nums flex items-center gap-2">
               {formatPhone(suggestion.suggestedPhoneE164)}
               {isSuspicious ? (
-                <Badge variant="destructive" className="text-[0.7rem] px-1.5 py-0.5 gap-1 font-normal">
+                <Badge
+                  variant="destructive"
+                  className="text-[0.7rem] px-1.5 py-0.5 gap-1 font-normal"
+                >
                   <AlertTriangleIcon className="size-3" aria-hidden="true" />
                   Faux numéro suspect
                 </Badge>
@@ -380,7 +406,9 @@ function SuggestionCard({
       </div>
 
       {suggestion.note === null || suggestion.note === '' ? null : (
-        <p className="max-w-prose text-[0.875rem] bg-muted/40 p-2 rounded border border-border/50">{suggestion.note}</p>
+        <p className="max-w-prose text-[0.875rem] bg-muted/40 p-2 rounded border border-border/50">
+          {suggestion.note}
+        </p>
       )}
 
       {/* Bulle d'Information / Popover Parrain UX */}
@@ -414,9 +442,18 @@ function SuggestionCard({
               </button>
             </div>
             <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
-              <p><strong className="text-foreground">Code court :</strong> {suggestion.sourceRepresentantShortCode}</p>
-              <p><strong className="text-foreground">Recueilli par :</strong> {suggestion.suggestedByName}</p>
-              <p><strong className="text-foreground">Date :</strong> {formatDateTime(suggestion.clientCreatedAt)}</p>
+              <p>
+                <strong className="text-foreground">Code court :</strong>{' '}
+                {suggestion.sourceRepresentantShortCode}
+              </p>
+              <p>
+                <strong className="text-foreground">Recueilli par :</strong>{' '}
+                {suggestion.suggestedByName}
+              </p>
+              <p>
+                <strong className="text-foreground">Date :</strong>{' '}
+                {formatDateTime(suggestion.clientCreatedAt)}
+              </p>
               {suggestion.note ? (
                 <p className="mt-1 text-foreground bg-muted/60 p-2 rounded text-[0.75rem]">
                   💬 <em>"{suggestion.note}"</em>
@@ -482,4 +519,3 @@ function SuggestionCard({
     </article>
   );
 }
-
