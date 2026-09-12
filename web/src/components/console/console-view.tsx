@@ -809,6 +809,10 @@ const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe !== null;
 
 /** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
+/** Un dossier repris d'un rappel s'ouvre sur son formulaire, pas sur la question déjà tranchée. */
+const etapeAppelInitiale = (statutParSelect: boolean, dossierRepris: boolean): number =>
+  statutParSelect && dossierRepris ? 1 : 0;
+
 const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe === 'joignable';
 
@@ -885,7 +889,9 @@ export function Consignation({
   const [refusee, setRefusee] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   // Grand Public seul : le rang affiché dans ETAPES_APPEL.
-  const [etapeAppel, setEtapeAppel] = useState(0);
+  const [etapeAppel, setEtapeAppel] = useState(() =>
+    etapeAppelInitiale(statutParSelect, repris.conversion !== null),
+  );
   const racineRef = useRef<HTMLElement>(null);
   const signalerEchec = usePremiereErreur(racineRef);
 
@@ -1129,7 +1135,10 @@ export function Consignation({
   const choisirGroupe = (choisi: Groupe): void => {
     const poser = (): void => {
       setGroupe(choisi);
-      if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
+      if (!surJoignable(choisi, statutParSelect)) return;
+      ouvrirDossier();
+      // « Joignable » montre tout de suite le formulaire, statut compris.
+      if (!closed) setEtapeAppel(1);
     };
     if (!statutParSelect) {
       poser();
@@ -1378,22 +1387,27 @@ export function Consignation({
   }
 
   /** Grand Public : sans dossier ouvert, l'appel se consigne dès « Réponse ». */
+  function reponseDonnee(): ReactNode {
+    if (!surStatut) return null;
+    return (
+      <>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+            {GROUPES.find((item) => item.cle === groupe)?.label}
+          </p>
+          <Button variant="ghost" disabled={send.isPending} onClick={changerReponse}>
+            Changer de réponse
+          </Button>
+        </div>
+        {selectStatut()}
+      </>
+    );
+  }
+
   function etapeReponse(): ReactNode {
     return (
       <>
-        {surStatut ? (
-          <>
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-                {GROUPES.find((item) => item.cle === groupe)?.label}
-              </p>
-              <Button variant="ghost" disabled={send.isPending} onClick={changerReponse}>
-                Changer de réponse
-              </Button>
-            </div>
-            {selectStatut()}
-          </>
-        ) : null}
+        {reponseDonnee()}
         {choixIssue()}
         {etape === 'dossier' ? piedEtapes() : finAppel()}
       </>
@@ -1403,6 +1417,7 @@ export function Consignation({
   function etapeDuDossier(etapeDossier: EtapeDossier): ReactNode {
     return (
       <>
+        {etapeDossier === 'Identité' ? reponseDonnee() : null}
         {panneauDossier(etapeDossier)}
         {etapeDossier === 'Adhésion' ? (
           <>

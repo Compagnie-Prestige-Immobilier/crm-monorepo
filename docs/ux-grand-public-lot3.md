@@ -52,9 +52,11 @@ Awa Diop · +221 77 123 45 67            (visible à chaque étape)
 [1 Réponse] · 2 Identité · 3 Situation · 4 Adhésion
 
 Réponse   Avez-vous eu la personne au téléphone ?
-          [Joignable] [Injoignable]  puis le statut
-          sans dossier ouvert : échéance, commentaire, [Enregistrer l'appel]
-          dossier ouvert      : [Continuer]
+          [Joignable]   ouvre aussitôt Identité, le formulaire
+          [Injoignable] puis le statut, échéance, commentaire,
+                        [Enregistrer l'appel]
+Identité  JOIGNABLE [Changer de réponse], le statut, puis les champs
+          d'identité ; un statut sans dossier ramène à Réponse
 2 à 4     les mêmes étapes que Nouveau prospect ;
           Adhésion porte [Enregistrer l'adhésion] [Il refuse] [À rappeler]
 ```
