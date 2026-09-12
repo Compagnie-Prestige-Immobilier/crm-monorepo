@@ -4,7 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangleIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useRef, useState, type KeyboardEvent } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -33,11 +33,9 @@ import {
   DUREES_MOIS,
   PROSPECT_TYPES,
   PROSPECT_TYPE_LABELS,
-  createGrandPublicProspect,
   formatDureeMois,
   fetchCanauxProvenance,
   grandPublicKeys,
-  type GrandPublicProspectInput,
   type ProspectType,
 } from '@/lib/data/grand-public';
 import {
@@ -66,9 +64,14 @@ import {
   type UpdateProspectInput,
 } from '@/lib/types';
 
+/** Les clés de la situation reprennent celles de `Situation` : un changement efface l'erreur du même nom. */
 type Errors = Partial<
-  Record<'prenom' | 'nom' | 'phone' | 'whatsapp' | 'relaisPhone' | 'anciennete', string>
+  Record<'prenom' | 'nom' | 'phone' | 'whatsapp' | 'relaisPhone' | 'ancienneteMois', string>
 >;
+
+function sansCles<T extends object>(valeurs: T, cles: readonly string[]): T {
+  return Object.fromEntries(Object.entries(valeurs).filter(([cle]) => !cles.includes(cle))) as T;
+}
 
 type Champ =
   | 'employeur'
@@ -84,8 +87,7 @@ type Champ =
 
 /**
  * Ce que chaque situation demande, en plus de l'identité, de la profession, du
- * revenu et de la provenance. La MÊME table commande l'affichage et le vidage :
- * un champ montré ailleurs partirait sinon avec la fiche suivante.
+ * revenu et de la provenance. La MÊME table commande l'affichage et le vidage.
  */
 const CHAMPS: Record<ProspectType, readonly Champ[]> = {
   FONCTIONNAIRE: ['employeur', 'syndicat', 'banque', 'anciennete'],
@@ -142,23 +144,6 @@ interface Depart {
   typeBien: TypeBien | null;
   champsLibres: Record<string, string>;
 }
-
-const DEPART_VIDE: Depart = {
-  prenom: '',
-  nom: '',
-  phone: '',
-  callingCode: '221',
-  whatsappCode: '221',
-  professionId: null,
-  incomeBandId: null,
-  paymentMode: null,
-  type: null,
-  situation: SITUATION_VIDE,
-  dureeMois: null,
-  canalId: null,
-  typeBien: null,
-  champsLibres: {},
-};
 
 function departDepuis(prospect: ProspectRow): Depart {
   const principal = fromE164(prospect.phoneE164 ?? '');
@@ -260,17 +245,6 @@ function modifiablesDepuis(prospect: ProspectRow): Modifiables {
   };
 }
 
-/** Ce qui n'a pas été renseigné ne part pas : le serveur pose ses propres défauts. */
-function pourCreation(valeurs: Modifiables): GrandPublicProspectInput {
-  const input: Record<string, unknown> = {};
-  for (const [cle, valeur] of Object.entries(valeurs)) {
-    if (cle === 'champsLibres') continue;
-    if (valeur !== null) input[cle] = valeur;
-  }
-  if (Object.keys(valeurs.champsLibres).length > 0) input.champsLibres = valeurs.champsLibres;
-  return input as GrandPublicProspectInput;
-}
-
 /** L'API ne sait pas vider ces trois colonnes : un champ repassé à vide n'y touche pas. */
 const NON_EFFACABLES = new Set(['type', 'paymentMode', 'dureeSystemeMois']);
 
@@ -317,7 +291,7 @@ function situationInvalide(
     saisi(situation.ancienneteMois) &&
     anciennete(situation.ancienneteMois) === null
   ) {
-    found.anciennete = 'Saisissez un nombre entier de mois, entre 0 et 840.';
+    found.ancienneteMois = 'Saisissez un nombre entier de mois, entre 0 et 840.';
   }
   return found;
 }
@@ -355,13 +329,6 @@ function pourModification(avant: Modifiables, apres: Modifiables): UpdateProspec
   return patch as UpdateProspectInput;
 }
 
-/** Ce que le téléconseiller a demandé en enregistrant : la suite du geste. */
-type Suite = 'suivant' | 'fiche' | 'quitter';
-
-type Envoi =
-  | { mode: 'creation'; input: GrandPublicProspectInput; suite: Suite }
-  | { mode: 'modification'; id: string; patch: UpdateProspectInput };
-
 const montre = (type: ProspectType | null, champ: Champ): boolean =>
   type !== null && CHAMPS[type].includes(champ);
 
@@ -382,11 +349,16 @@ const CHAMP_PAR_CLE: Record<keyof Situation, Champ> = {
   syndicatId: 'syndicat',
 };
 
+const clesMasquees = (type: ProspectType | null): string[] =>
+  Object.entries(CHAMP_PAR_CLE)
+    .filter(([, champ]) => !montre(type, champ))
+    .map(([cle]) => cle);
+
 /** Ne garde que ce que la nouvelle situation demande, vide le reste vers `SITUATION_VIDE`. */
 function pourSituation(type: ProspectType | null, actuel: Situation): Situation {
   const result: Record<string, unknown> = { ...actuel };
-  for (const [cle, champ] of Object.entries(CHAMP_PAR_CLE)) {
-    if (!montre(type, champ)) result[cle] = SITUATION_VIDE[cle as keyof Situation];
+  for (const cle of clesMasquees(type)) {
+    result[cle] = SITUATION_VIDE[cle as keyof Situation];
   }
   return result as unknown as Situation;
 }
@@ -428,20 +400,6 @@ function dureeSelectValue(dureeMois: number | null): string {
 
 function libelleProfession(type: ProspectType | null): string {
   return type === 'INFORMEL' ? 'Activité' : 'Profession';
-}
-
-function IntroHeader({ embedded }: { embedded: boolean }) {
-  if (embedded) return null;
-  return (
-    <div>
-      <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">
-        Nouveau prospect Grand Public
-      </h1>
-      <p className="text-body text-muted-foreground">
-        Le nom, le prénom et le téléphone suffisent. Le reste se complète plus tard.
-      </p>
-    </div>
-  );
 }
 
 function PhoneConflictCard({
@@ -608,25 +566,23 @@ function DureeField({
 }
 
 export function GrandPublicProspectForm({
-  embedded = false,
   initial,
   onSaved,
   onModifie,
+  onAnnule,
 }: {
-  embedded?: boolean;
-  /** Présent : le formulaire MODIFIE cette fiche au lieu d'en créer une. */
-  initial?: ProspectRow;
-  onSaved?: (prospect: ProspectRow) => void;
+  initial: ProspectRow;
+  onSaved: (prospect: ProspectRow) => void;
   /** La boîte qui l'héberge se referme aussi par Échap ou un clic à côté : elle doit savoir. */
-  onModifie?: (modifie: boolean) => void;
+  onModifie: (modifie: boolean) => void;
+  onAnnule: () => void;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
-  const prenomRef = useRef<HTMLInputElement>(null);
   const formRef = useRef<HTMLFormElement>(null);
   const signalerEchec = usePremiereErreur(formRef);
 
-  const [depart] = useState(() => (initial === undefined ? DEPART_VIDE : departDepuis(initial)));
+  const [depart] = useState(() => departDepuis(initial));
   const [prenom, setPrenom] = useState(depart.prenom);
   const [nom, setNom] = useState(depart.nom);
   const [phone, setPhone] = useState(depart.phone);
@@ -644,7 +600,9 @@ export function GrandPublicProspectForm({
   const [errorsLibres, setErrorsLibres] = useState<Record<string, string>>({});
   const [errors, setErrors] = useState<Errors>({});
   const [conflict, setConflict] = useState<ProspectPhoneConflict | null>(null);
-  const [saved, setSaved] = useState<string[]>([]);
+  const effacerErreurs = (cles: readonly string[]): void => {
+    setErrors((precedentes) => sansCles(precedentes, cles));
+  };
 
   const courant: Depart = {
     prenom,
@@ -664,7 +622,7 @@ export function GrandPublicProspectForm({
   };
   const modifie = JSON.stringify(courant) !== JSON.stringify(depart);
   useEffect(() => {
-    onModifie?.(modifie);
+    onModifie(modifie);
   }, [modifie, onModifie]);
 
   const reference = useQuery({
@@ -682,45 +640,15 @@ export function GrandPublicProspectForm({
   });
 
   const save = useMutation({
-    mutationFn: (variables: Envoi) =>
-      variables.mode === 'creation'
-        ? createGrandPublicProspect(variables.input)
-        : updateProspect(variables.id, variables.patch),
-    onSuccess: (prospect, variables) => {
+    mutationFn: (patch: UpdateProspectInput) => updateProspect(initial.id, patch),
+    onSuccess: (prospect) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
       void queryClient.invalidateQueries({ queryKey: queryKeys.dashboardRoot });
-
-      if (variables.mode === 'modification') {
-        toast.success('Fiche modifiée.');
-        // La fiche est rendue par le serveur : sans cela, revenir dessus
-        // afficherait encore l'état d'avant.
-        router.refresh();
-        onSaved?.(prospect);
-        return;
-      }
-
-      setSaved((previous) => [...previous, `${prospect.prenom} ${prospect.nom}`]);
-      toast.success(`${prospect.prenom} ${prospect.nom} enregistré.`);
-
-      if (variables.suite !== 'suivant') {
-        // La boîte de création se referme, PUIS l'écran demandé s'ouvre : s'arrêter
-        // à `onSaved` laissait « ouvrir la fiche » n'ouvrir rien.
-        onSaved?.(prospect);
-        router.push(variables.suite === 'fiche' ? `/grand-public/${prospect.id}` : '/grand-public');
-        return;
-      }
-
-      // Seule l'identité repart de zéro : une rafale vient du même canal et
-      // s'accorde sur la même durée de système.
-      setPrenom('');
-      setNom('');
-      setPhone('');
-      setProfessionId(null);
-      setIncomeBandId(null);
-      setType(null);
-      setSituation(SITUATION_VIDE);
-      setErrors({});
-      prenomRef.current?.focus();
+      toast.success('Fiche modifiée.');
+      // La fiche est rendue par le serveur : sans cela, revenir dessus
+      // afficherait encore l'état d'avant.
+      router.refresh();
+      onSaved(prospect);
     },
     onError: (error) => {
       const existing = prospectPhoneConflict(error);
@@ -732,7 +660,7 @@ export function GrandPublicProspectForm({
     },
   });
 
-  function submit(suite: Suite): void {
+  function submit(): void {
     if (save.isPending) return;
 
     const e164 = toInternationalE164(phone, callingCode);
@@ -778,52 +706,36 @@ export function GrandPublicProspectForm({
       relaisPhoneE164: toInternationalE164(situation.relaisPhone, '221'),
     };
 
-    if (initial !== undefined) {
-      save.mutate({
-        mode: 'modification',
-        id: initial.id,
-        patch: pourModification(modifiablesDepuis(initial), valeurs),
-      });
-      return;
-    }
-
-    save.mutate({ mode: 'creation', input: pourCreation(valeurs), suite });
+    save.mutate(pourModification(modifiablesDepuis(initial), valeurs));
   }
 
   const searchHref = searchHrefPourConflit(phone, callingCode);
   const paysCountries = paysDisponibles(reference.data);
   const enseignante = estEnseignante(reference.data, professionId);
+  const tactile = window.matchMedia('(pointer: coarse)').matches;
 
   return (
-    // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
     <form
       ref={formRef}
       className="mx-auto flex w-full max-w-2xl flex-col gap-6"
       onSubmit={(event) => {
         event.preventDefault();
-        submit('suivant');
-      }}
-      onKeyDown={(event: KeyboardEvent<HTMLFormElement>) => {
-        if (event.key !== 'Enter' || !(event.ctrlKey || event.metaKey)) return;
-        event.preventDefault();
-        submit('suivant');
+        submit();
       }}
     >
-      <IntroHeader embedded={embedded} />
-
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Prénom" required error={errors.prenom}>
           {(props) => (
             <Input
               {...props}
-              ref={prenomRef}
               value={prenom}
               maxLength={120}
               autoComplete="off"
-              // oxlint-disable-next-line jsx-a11y/no-autofocus -- premier champ du formulaire
-              autoFocus
+              // oxlint-disable-next-line jsx-a11y/no-autofocus -- sauf au toucher : le clavier masquerait la boîte
+              autoFocus={!tactile}
               onChange={(event) => {
                 setPrenom(event.target.value);
+                effacerErreurs(['prenom']);
               }}
             />
           )}
@@ -838,6 +750,7 @@ export function GrandPublicProspectForm({
               autoComplete="off"
               onChange={(event) => {
                 setNom(event.target.value);
+                effacerErreurs(['nom']);
               }}
             />
           )}
@@ -849,10 +762,14 @@ export function GrandPublicProspectForm({
         callingCode={callingCode}
         error={errors.phone}
         countries={countriesPourTelephone(type, paysCountries)}
-        onCallingCodeChange={setCallingCode}
+        onCallingCodeChange={(code) => {
+          setCallingCode(code);
+          effacerErreurs(['phone']);
+        }}
         onChange={(value) => {
           setPhone(value);
           setConflict(null);
+          effacerErreurs(['phone']);
         }}
       />
 
@@ -873,7 +790,7 @@ export function GrandPublicProspectForm({
                 onClick={() => {
                   const next = active ? null : option;
                   setType(next);
-                  setErrors({});
+                  effacerErreurs(clesMasquees(next));
                   setSituation((previous) => pourSituation(next, previous));
                   // L'indicatif venait du pays de résidence : hors diaspora, il
                   // repart du Sénégal plutôt que de suivre une fiche abandonnée.
@@ -908,13 +825,17 @@ export function GrandPublicProspectForm({
         paysCountries={paysCountries}
         whatsappCode={whatsappCode}
         errors={errors}
-        onWhatsappCode={setWhatsappCode}
+        onWhatsappCode={(code) => {
+          setWhatsappCode(code);
+          effacerErreurs(['whatsapp']);
+        }}
         onIndicatifResidence={(indicatif) => {
           setCallingCode(indicatif);
           setWhatsappCode(indicatif);
         }}
         onPatch={(patch) => {
           setSituation((previous) => ({ ...previous, ...patch }));
+          effacerErreurs(Object.keys(patch));
         }}
       />
 
@@ -942,6 +863,7 @@ export function GrandPublicProspectForm({
           error={errorsLibres[champ.id]}
           onChange={(valeur) => {
             setChampsLibres((precedent) => ({ ...precedent, [champ.id]: valeur }));
+            setErrorsLibres((precedentes) => sansCles(precedentes, [champ.id]));
           }}
         />
       ))}
@@ -962,72 +884,23 @@ export function GrandPublicProspectForm({
         )}
       </Field>
 
-      <PiedDeFormulaire
-        modification={initial !== undefined}
-        saved={saved}
-        pending={save.isPending}
-        onSuite={submit}
-      />
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <Button
+          type="button"
+          variant="ghost"
+          size="lg"
+          disabled={save.isPending}
+          onClick={onAnnule}
+        >
+          Annuler
+        </Button>
+        <Button type="submit" size="lg" pending={save.isPending}>
+          Enregistrer les modifications
+        </Button>
+      </div>
     </form>
   );
 }
-
-function PiedDeFormulaire({
-  modification,
-  saved,
-  pending,
-  onSuite,
-}: {
-  modification: boolean;
-  saved: readonly string[];
-  pending: boolean;
-  onSuite: (suite: Suite) => void;
-}) {
-  const last = saved.at(-1);
-  const plural = saved.length > 1 ? 's' : '';
-
-  return (
-    <div className="flex flex-wrap items-center justify-end gap-3">
-      {modification ? null : (
-        <>
-          <p aria-live="polite" className="mr-auto text-[0.8125rem] text-muted-foreground">
-            {last === undefined
-              ? 'Ctrl + Entrée enregistre et enchaîne. Le canal et la durée restent en place.'
-              : `${String(saved.length)} prospect${plural} enregistré${plural}. Dernier : ${last}.`}
-          </p>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            disabled={pending}
-            onClick={() => {
-              onSuite('quitter');
-            }}
-          >
-            Enregistrer et quitter
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            disabled={pending}
-            onClick={() => {
-              onSuite('fiche');
-            }}
-          >
-            Enregistrer et ouvrir la fiche
-          </Button>
-        </>
-      )}
-      <Button type="submit" size="lg" pending={pending}>
-        {libelleEnvoi(modification)}
-      </Button>
-    </div>
-  );
-}
-
-const libelleEnvoi = (modification: boolean): string =>
-  modification ? 'Enregistrer les modifications' : 'Enregistrer et suivant';
 
 /** Un entier de mois, ou `null` : le serveur refuse tout le reste. */
 function anciennete(saisie: string): number | null {
@@ -1328,7 +1201,7 @@ function ChampsSituation({
         type={type}
         valeurs={valeurs}
         reference={reference}
-        error={errors.anciennete}
+        error={errors.ancienneteMois}
         onPatch={onPatch}
       />
       <LieuField type={type} valeurs={valeurs} reference={reference} onPatch={onPatch} />

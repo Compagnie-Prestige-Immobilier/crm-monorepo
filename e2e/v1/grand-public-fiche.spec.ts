@@ -254,7 +254,7 @@ test.describe('consentement puis conversion, sur une même fiche', () => {
     await expect(boite).toBeVisible();
     await boite.getByRole('combobox', { name: 'Offre' }).click();
     await page.getByRole('option', { name: 'Adhésion', exact: true }).click();
-    await boite.getByRole('button', { name: 'Confirmer', exact: true }).click();
+    await boite.getByRole('button', { name: 'Confirmer la conversion', exact: true }).click();
 
     await expect(page.getByText('Conversion confirmée.')).toBeVisible();
     await expect(page.getByRole('main').getByText('Converti', { exact: true })).toBeVisible();

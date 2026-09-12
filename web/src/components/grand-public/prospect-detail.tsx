@@ -3,9 +3,10 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftIcon, PencilIcon, PhoneIcon } from 'lucide-react';
 import Link from 'next/link';
-import { useState, type ReactNode } from 'react';
+import { useId, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { Field } from '@/components/forms/field';
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
@@ -15,6 +16,7 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGardeSaisie } from '@/components/ui/confirm-dialog';
 import {
+  DUREES_MOIS,
   PROSPECT_TYPE_LABELS,
   confirmGrandPublicConversion,
   formatDureeMois,
@@ -29,7 +31,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
@@ -38,6 +39,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
+import { formatXof, parseMoneyInput } from '@/lib/money';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
@@ -222,9 +224,9 @@ function ModifierLaFiche({
           </DialogHeader>
           {ouverte ? (
             <GrandPublicProspectForm
-              embedded
               initial={prospect}
               onModifie={garde.signalerModifie}
+              onAnnule={garde.demanderFermeture}
               onSaved={(saved) => {
                 garde.signalerModifie(false);
                 onEnregistre(saved);
@@ -318,10 +320,6 @@ export function GrandPublicProspectDetail({
   const queryClient = useQueryClient();
   const [prospect, setProspect] = useState(initialProspect);
   const [conversionOpen, setConversionOpen] = useState(false);
-  const [offerId, setOfferId] = useState<string | null>(null);
-  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
-  const [amountXof, setAmountXof] = useState('');
-  const [durationMonths, setDurationMonths] = useState('');
   const journey = prospect.journeys?.find((item) => item.projet === 'GRAND_PUBLIC');
 
   const refresh = (saved: ProspectRow) => {
@@ -337,24 +335,6 @@ export function GrandPublicProspectDetail({
       toast.success('Consentement enregistré.');
     },
     onError: (error) => toastApiError(error, 'Le consentement n’a pas pu être enregistré.'),
-  });
-
-  const conversion = useMutation({
-    mutationFn: () => {
-      if (offerId === null) throw new Error('Choisissez une offre.');
-      return confirmGrandPublicConversion(prospect.id, {
-        offerId,
-        ...(paymentMode === null ? {} : { paymentMode }),
-        ...(amountXof === '' ? {} : { amountXof: Number(amountXof) }),
-        ...(durationMonths === '' ? {} : { durationMonths: Number(durationMonths) }),
-      });
-    },
-    onSuccess: (saved) => {
-      refresh(saved);
-      setConversionOpen(false);
-      toast.success('Conversion confirmée.');
-    },
-    onError: (error) => toastApiError(error, 'La conversion n’a pas pu être confirmée.'),
   });
 
   if (journey === undefined) {
@@ -492,88 +472,193 @@ export function GrandPublicProspectDetail({
 
       <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
         <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Confirmer la conversion</DialogTitle>
-            <DialogDescription>
-              Associez l’offre retenue et, si connu, son paiement.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-4">
-            <div className="grid gap-2">
-              <Label htmlFor="gp-conversion-offer">Offre</Label>
-              <Select value={offerId} onValueChange={setOfferId}>
-                <SelectTrigger id="gp-conversion-offer">
-                  <SelectValue placeholder="Choisir une offre" />
-                </SelectTrigger>
-                <SelectContent>
-                  {offers
-                    .filter((offer) => offer.isActive)
-                    .map((offer) => (
-                      <SelectItem key={offer.id} value={offer.id}>
-                        {offer.label}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2">
-              <Label htmlFor="gp-conversion-payment">Mode de paiement</Label>
-              <Select
-                value={paymentMode}
-                onValueChange={(value) => setPaymentMode(value as PaymentMode)}
-              >
-                <SelectTrigger id="gp-conversion-payment">
-                  <SelectValue placeholder="Non renseigné" />
-                </SelectTrigger>
-                <SelectContent>
-                  {PAYMENT_MODES.map((mode) => (
-                    <SelectItem key={mode} value={mode}>
-                      {PAYMENT_MODE_LABELS[mode]}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="gp-conversion-amount">Montant (F CFA)</Label>
-                <Input
-                  id="gp-conversion-amount"
-                  type="number"
-                  min="0"
-                  value={amountXof}
-                  onChange={(event) => setAmountXof(event.target.value)}
-                />
-              </div>
-              {paymentMode === 'ECHELONNE' ? (
-                <div className="grid gap-2">
-                  <Label htmlFor="gp-conversion-duration">Durée (mois)</Label>
-                  <Input
-                    id="gp-conversion-duration"
-                    type="number"
-                    min="1"
-                    max="300"
-                    value={durationMonths}
-                    onChange={(event) => setDurationMonths(event.target.value)}
-                  />
-                </div>
-              ) : null}
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setConversionOpen(false)}>
-              Annuler
-            </Button>
-            <Button
-              onClick={() => conversion.mutate()}
-              disabled={offerId === null}
-              pending={conversion.isPending}
-            >
-              Confirmer
-            </Button>
-          </DialogFooter>
+          <FormulaireConversion
+            prospectId={prospect.id}
+            offers={offers}
+            onAnnule={() => {
+              setConversionOpen(false);
+            }}
+            onConverti={(saved) => {
+              refresh(saved);
+              setConversionOpen(false);
+            }}
+          />
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+/** Démonté à la fermeture de la boîte : une nouvelle ouverture repart vide. */
+function FormulaireConversion({
+  prospectId,
+  offers,
+  onAnnule,
+  onConverti,
+}: {
+  prospectId: string;
+  offers: readonly Offer[];
+  onAnnule: () => void;
+  onConverti: (prospect: ProspectRow) => void;
+}) {
+  const aideId = useId();
+  const offresActives = offers.filter((offer) => offer.isActive);
+  const [offerId, setOfferId] = useState<string | null>(null);
+  const [paymentMode, setPaymentMode] = useState<PaymentMode | null>(null);
+  const [montant, setMontant] = useState<string | null>(null);
+  const [dureeMois, setDureeMois] = useState<string | null>(null);
+
+  const conversion = useMutation({
+    mutationFn: () => {
+      if (offerId === null) throw new Error('Choisissez une offre.');
+      return confirmGrandPublicConversion(prospectId, {
+        offerId,
+        ...(paymentMode === null ? {} : { paymentMode }),
+        ...(montant === null ? {} : { amountXof: Number(montant) }),
+        ...(dureeMois === null ? {} : { durationMonths: Number(dureeMois) }),
+      });
+    },
+    onSuccess: (saved) => {
+      onConverti(saved);
+      toast.success('Conversion confirmée.');
+    },
+    onError: (error) => toastApiError(error, 'La conversion n’a pas pu être confirmée.'),
+  });
+
+  return (
+    <>
+      <DialogHeader>
+        <DialogTitle>Confirmer la conversion</DialogTitle>
+        <DialogDescription>Associez l’offre retenue et, si connu, son paiement.</DialogDescription>
+      </DialogHeader>
+      <div className="grid gap-4">
+        <Field label="Offre" required>
+          {(props) => (
+            <Select
+              items={offresActives.map((offer) => ({ value: offer.id, label: offer.label }))}
+              value={offerId}
+              onValueChange={setOfferId}
+            >
+              <SelectTrigger id={props.id}>
+                <SelectValue placeholder="Choisir une offre" />
+              </SelectTrigger>
+              <SelectContent>
+                {offresActives.map((offer) => (
+                  <SelectItem key={offer.id} value={offer.id}>
+                    {offer.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <Field label="Mode de paiement">
+          {(props) => (
+            <Select
+              items={PAYMENT_MODES.map((mode) => ({
+                value: mode,
+                label: PAYMENT_MODE_LABELS[mode],
+              }))}
+              value={paymentMode}
+              onValueChange={(value) => {
+                setPaymentMode(value as PaymentMode);
+                if (value !== 'ECHELONNE') setDureeMois(null);
+              }}
+            >
+              <SelectTrigger id={props.id}>
+                <SelectValue placeholder="Non renseigné" />
+              </SelectTrigger>
+              <SelectContent>
+                {PAYMENT_MODES.map((mode) => (
+                  <SelectItem key={mode} value={mode}>
+                    {PAYMENT_MODE_LABELS[mode]}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </Field>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ChampMontant montant={montant} onChange={setMontant} />
+          {paymentMode === 'ECHELONNE' ? (
+            <Field label="Durée">
+              {(props) => (
+                <Select
+                  items={DUREES_MOIS.map((mois) => ({
+                    value: String(mois),
+                    label: formatDureeMois(mois),
+                  }))}
+                  value={dureeMois}
+                  onValueChange={setDureeMois}
+                >
+                  <SelectTrigger id={props.id}>
+                    <SelectValue placeholder="Choisir une durée" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {DUREES_MOIS.map((mois) => (
+                      <SelectItem key={mois} value={String(mois)}>
+                        {formatDureeMois(mois)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          ) : null}
+        </div>
+      </div>
+      <DialogFooter>
+        {offerId === null ? (
+          <p id={aideId} className="text-[0.8125rem] text-muted-foreground sm:self-center">
+            Choisissez une offre.
+          </p>
+        ) : null}
+        <Button variant="ghost" onClick={onAnnule}>
+          Annuler
+        </Button>
+        <Button
+          onClick={() => conversion.mutate()}
+          disabled={offerId === null}
+          aria-describedby={offerId === null ? aideId : undefined}
+          pending={conversion.isPending}
+        >
+          Confirmer la conversion
+        </Button>
+      </DialogFooter>
+    </>
+  );
+}
+
+function ChampMontant({
+  montant,
+  onChange,
+}: {
+  montant: string | null;
+  onChange: (montant: string | null) => void;
+}) {
+  return (
+    <Field label="Montant (F CFA)">
+      {(props) => (
+        <>
+          <Input
+            {...props}
+            inputMode="numeric"
+            autoComplete="off"
+            value={montant ?? ''}
+            aria-describedby={`${props.id}-apercu`}
+            onChange={(event) => {
+              onChange(parseMoneyInput(event.target.value));
+            }}
+          />
+          <p
+            id={`${props.id}-apercu`}
+            aria-live="polite"
+            className="text-[0.9375rem] font-[600] tabular-nums"
+          >
+            {formatXof(montant, '')}
+          </p>
+        </>
+      )}
+    </Field>
   );
 }
