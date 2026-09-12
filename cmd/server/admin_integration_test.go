@@ -388,6 +388,9 @@ func adminTelecharger(b *banc, chemin string) (statut int, corps []byte) {
 	if err != nil {
 		b.t.Fatal(err)
 	}
+	// Le téléchargement du dump le consomme et le détruit : il exige l'origine
+	// comme une écriture, sans quoi un lien suffirait à détruire la sauvegarde.
+	req.Header.Set("Origin", b.ts.URL)
 	resp, err := b.client.Do(req)
 	if err != nil {
 		b.t.Fatal(err)

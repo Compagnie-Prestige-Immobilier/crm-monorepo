@@ -36,6 +36,7 @@ func monterDomaines(api huma.API, d *socle.Deps) error {
 	analytics.Monter(api, d)
 	prospects.Monter(api, d)
 	prospects.MonterFormulairePublic(api, d)
+	prospects.MonterLienFormulaire(api, d)
 	accueil.Monter(api, d)
 	exports.Monter(api, d)
 	banque.Monter(api, d)
@@ -57,6 +58,7 @@ func gardesDomaines() []map[string][]socle.Role {
 		analytics.Garde,
 		prospects.Garde,
 		prospects.GardeFormulairePublic,
+		prospects.GardeLienFormulaire,
 		accueil.Garde,
 		exports.Garde,
 		banque.Garde,

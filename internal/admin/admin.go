@@ -74,7 +74,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"POST /api/v1/enrolement/{projet}/tirage":                     socle.AdminSeul,
-	"POST /api/v1/webhooks/enrolement/{secret}/{projet}":          {socle.Public},
+	"POST /api/v1/webhooks/enrolement/{projet}":                   {socle.Public},
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"DELETE /api/v1/tableaux-de-bord/{ecran}/disposition":         rolesChiffres,

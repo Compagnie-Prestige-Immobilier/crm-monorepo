@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -20,8 +21,12 @@ import (
 
 type service struct {
 	*socle.Deps
-	leurre     string
-	tentatives *socle.Limiteur
+	leurre string
+	// Deux compteurs : par adresse contre un seul attaquant, par identifiant
+	// contre une attaque distribuée qui, sans lui, a un budget illimité sur un
+	// compte donné.
+	tentatives   *socle.Limiteur
+	parIdentifie *socle.Limiteur
 }
 
 // `maxAge` en secondes ; -1 efface le cookie (Max-Age=0), ce qu'une durée négative
@@ -93,7 +98,7 @@ type SessionOutput struct {
 
 func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, error) {
 	adresse, _ := ctx.Value(socle.CleAdresse{}).(string)
-	if !s.tentatives.Autorise(adresse) {
+	if !s.tentatives.Autorise(adresse) || !s.parIdentifie.Autorise(strings.ToLower(in.Body.Identifier)) {
 		return nil, socle.Problem(http.StatusTooManyRequests, "RATE_LIMITED", "Trop de tentatives. Réessayez dans une minute.")
 	}
 	u, err := s.Q.UserForLogin(ctx, in.Body.Identifier)
@@ -216,7 +221,12 @@ func Monter(api huma.API, d *socle.Deps) error {
 	if err != nil {
 		return err
 	}
-	s := &service{Deps: d, leurre: leurre, tentatives: socle.NouveauLimiteur(d.Cfg.LoginRate)}
+	s := &service{
+		Deps:         d,
+		leurre:       leurre,
+		tentatives:   socle.NouveauLimiteur(d.Cfg.LoginRate),
+		parIdentifie: socle.NouveauLimiteur(d.Cfg.LoginRate),
+	}
 	huma.Post(api, "/api/v1/auth/login", s.login)
 	huma.Post(api, "/api/v1/auth/demo-login", s.demoLogin)
 	huma.Get(api, "/api/v1/auth/me", s.me)

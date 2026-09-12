@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"cpi-go/internal/shared/socle"
+	"crypto/subtle"
 	"log/slog"
 	"net/http"
 	"time"
@@ -13,7 +14,7 @@ import (
 const webhookTirageDelai = 5 * time.Minute
 
 type EnrolementWebhookInput struct {
-	Secret string `path:"secret"`
+	Secret string `query:"secret"`
 	Projet string `path:"projet"`
 }
 
@@ -21,11 +22,13 @@ type EnrolementWebhookInput struct {
 // le prochain tirage. Elle n'envoie rien d'utile dans son corps : le tirage
 // relit la source, seule autorité sur l'état des inscriptions.
 //
-// Le secret voyage dans l'URL configurée côté plateforme, comme pour Brevo.
+// Le secret voyage en paramètre de requête et non dans le chemin : le journal
+// des requêtes consigne `r.URL.Path`, donc un secret placé dans le chemin
+// s'écrivait en clair dans chaque ligne de journal.
 // Sans PLATEFORME_WEBHOOK_SECRET, la route n'existe pas.
 func (s *service) tirageDemandeParPlateforme(ctx context.Context, in *EnrolementWebhookInput) (*struct{}, error) {
 	secret := socle.Env("PLATEFORME_WEBHOOK_SECRET", "")
-	if secret == "" || in.Secret != secret {
+	if secret == "" || subtle.ConstantTimeCompare([]byte(in.Secret), []byte(secret)) != 1 {
 		return nil, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Route inconnue.")
 	}
 	projet := projetChues
@@ -53,7 +56,7 @@ func (s *service) tirerEnArrierePlan(parent context.Context, projet string) {
 func monterWebhookEnrolement(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{
 		OperationID: "enrolementWebhook", Method: http.MethodPost,
-		Path:          "/api/v1/webhooks/enrolement/{secret}/{projet}",
+		Path:          "/api/v1/webhooks/enrolement/{projet}",
 		DefaultStatus: http.StatusAccepted,
 	}, s.tirageDemandeParPlateforme)
 }

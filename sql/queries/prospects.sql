@@ -421,7 +421,16 @@ SELECT "id", "label" AS libelle FROM "professions" WHERE "isActive" ORDER BY "po
 SELECT "id", "label" FROM "professions" WHERE "id" = $1 AND "isActive";
 
 -- name: AgentParJeton :one
-SELECT "id" FROM "users" WHERE "id" = $1 AND "isActive" AND "deletedAt" IS NULL;
+SELECT "id" FROM "users"
+WHERE "formulaireJeton" = $1 AND "isActive" AND "deletedAt" IS NULL;
+
+-- name: JetonFormulaireDuCompte :one
+SELECT "formulaireJeton" FROM "users" WHERE "id" = $1;
+
+-- name: JetonFormulaireRegenere :one
+UPDATE "users" SET "formulaireJeton" = replace(gen_random_uuid()::text, '-', '')
+WHERE "id" = $1
+RETURNING "formulaireJeton";
 
 -- name: ProspectParEmail :one
 SELECT "id", "createdById", "statut", "phoneE164", "nom", "prenom", "whatsappStatus", "whatsappE164",

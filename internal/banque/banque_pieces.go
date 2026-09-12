@@ -165,7 +165,7 @@ func monterPieces(api huma.API, s *service) {
 
 func reponseFichier(corps []byte, nom, typeMime string, telecharger bool) *huma.StreamResponse {
 	disposition := "inline"
-	if telecharger {
+	if telecharger || typeMime == piecesTypeMimeDefaut {
 		disposition = "attachment"
 	}
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
@@ -199,10 +199,17 @@ func lirePlateformeBrut(ctx context.Context, url, jeton string) (corps []byte, t
 	return lu, resp.Header.Get("Content-Type"), err
 }
 
+// La plateforme est une source distante : réémettre son `Content-Type` tel quel
+// afficherait un `text/html` qu'elle rendrait dans l'origine du panneau. Seuls
+// les types que la visionneuse sait afficher passent, le reste est téléchargé.
+var typesPieceAffichables = map[string]bool{
+	"application/pdf": true, "image/jpeg": true, "image/png": true, "image/webp": true,
+}
+
 // Le type rendu par la plateforme fait foi ; à défaut, l'extension le dit.
 func typeDeContenu(entete string) string {
 	propre := strings.TrimSpace(strings.Split(entete, ";")[0])
-	if propre == "" {
+	if propre == "" || !typesPieceAffichables[strings.ToLower(propre)] {
 		return piecesTypeMimeDefaut
 	}
 	return propre

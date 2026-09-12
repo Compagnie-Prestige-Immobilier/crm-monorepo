@@ -175,8 +175,14 @@ func journaliserRequete(r *http.Request, motif string, auteur *auteurRequete, st
 	slog.Log(r.Context(), niveau, "http", champs...)
 }
 
-func origineAutorisee(r *http.Request) bool {
-	if r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions {
+// Ce GET change l'état : il consomme et détruit le fichier de sauvegarde. Sans
+// lui dans cette liste, SameSite=Lax envoie le cookie sur une navigation de
+// premier niveau et un lien suffit à détruire le dump d'un ADMIN.
+var getsQuiEcrivent = map[string]bool{"GET /api/v1/admin/database-dump/download": true}
+
+func origineAutorisee(r *http.Request, motif string) bool {
+	if !getsQuiEcrivent[motif] &&
+		(r.Method == http.MethodGet || r.Method == http.MethodHead || r.Method == http.MethodOptions) {
 		return true
 	}
 	origine := r.Header.Get("Origin")
@@ -202,7 +208,7 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 		roles, gardee := Garde[motif]
 		publique := gardee && Autorise(roles, Public)
 		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas d'origine.
-		if !publique && !origineAutorisee(r) {
+		if !publique && !origineAutorisee(r, motif) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Origine refusée."))
 			return
 		}
