@@ -5,6 +5,7 @@ import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
@@ -1083,17 +1084,7 @@ export function Consignation({
     else onAbandon();
   };
 
-  const annuler = useCallback(() => {
-    // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
-    // perdrait ce qu'EB-10 demande justement de garder.
-    if (slots !== null) {
-      setSlots(null);
-      return;
-    }
-    if (!saisieEnCours) {
-      onAbandon();
-      return;
-    }
+  const effacerSaisie = useCallback(() => {
     const avant = { groupe, motif, comment, conversion };
     setEtapeAppel(0);
     setGroupe(null);
@@ -1101,6 +1092,7 @@ export function Consignation({
     setComment('');
     setConversion(null);
     setConversionErrors({});
+    setSlots(null);
     commentRef.current?.blur();
     toast('Saisie effacée.', {
       action: {
@@ -1113,11 +1105,43 @@ export function Consignation({
         },
       },
     });
-  }, [slots, saisieEnCours, onAbandon, groupe, motif, comment, conversion]);
+  }, [groupe, motif, comment, conversion]);
 
+  const annuler = useCallback(() => {
+    // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
+    // perdrait ce qu'EB-10 demande justement de garder.
+    if (slots !== null) {
+      setSlots(null);
+      return;
+    }
+    if (!saisieEnCours) {
+      onAbandon();
+      return;
+    }
+    effacerSaisie();
+  }, [slots, saisieEnCours, onAbandon, effacerSaisie]);
+
+  const focaliser = (selecteur: string): void => {
+    racineRef.current?.querySelector<HTMLElement>(selecteur)?.focus();
+  };
+
+  // Grand Public : le select n'existe qu'après le rendu, `flushSync` le monte avant le focus.
   const choisirGroupe = (choisi: Groupe): void => {
-    setGroupe(choisi);
-    if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
+    const poser = (): void => {
+      setGroupe(choisi);
+      if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
+    };
+    if (!statutParSelect) {
+      poser();
+      return;
+    }
+    flushSync(poser);
+    focaliser('[data-slot="select-trigger"]');
+  };
+
+  const changerReponse = (): void => {
+    flushSync(effacerSaisie);
+    focaliser('fieldset button');
   };
 
   const proposes = motifsDuGroupe(catalogue, groupe);
@@ -1359,9 +1383,14 @@ export function Consignation({
       <>
         {surStatut ? (
           <>
-            <p className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-              {GROUPES.find((item) => item.cle === groupe)?.label}
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <p className="text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+                {GROUPES.find((item) => item.cle === groupe)?.label}
+              </p>
+              <Button variant="ghost" disabled={send.isPending} onClick={changerReponse}>
+                Changer de réponse
+              </Button>
+            </div>
             {selectStatut()}
           </>
         ) : null}

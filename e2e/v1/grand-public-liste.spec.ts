@@ -302,19 +302,26 @@ test('GP-10 une panne du référentiel des canaux ne fait pas tomber la liste', 
 test.describe('GP-11 largeur 375 px', () => {
   test.use({ viewport: { width: 375, height: 780 } });
 
-  test('GP-11 le tableau défile seul, la page ne défile pas latéralement', async ({ page }) => {
+  test('GP-11 le tableau garde ses colonnes clés, la page ne défile pas latéralement', async ({
+    page,
+  }) => {
     await page.goto('/grand-public');
     await expect(page.getByRole('table')).toBeVisible();
 
-    const cadre = await page.getByRole('table').evaluate((table) => {
-      const conteneur = table.parentElement as HTMLElement;
-      return {
-        deborde: conteneur.scrollWidth > conteneur.clientWidth,
-        overflowX: getComputedStyle(conteneur).overflowX,
-      };
-    });
-    expect(cadre.overflowX, 'le cadre du tableau doit porter le défilement').toBe('auto');
-    expect(cadre.deborde, 'le tableau doit déborder de son cadre à 375 px').toBe(true);
+    const overflowX = await page
+      .getByRole('table')
+      .evaluate((table) => getComputedStyle(table.parentElement as HTMLElement).overflowX);
+    expect(overflowX, 'le cadre du tableau doit porter le défilement').toBe('auto');
+
+    for (const colonne of ['Nom', 'Statut']) {
+      await expect(page.getByRole('columnheader', { name: colonne, exact: true })).toBeVisible();
+    }
+    for (const colonne of ['Situation', 'Profession', 'Canal', 'Banque', 'Segment', 'Saisi le']) {
+      await expect(
+        page.locator('th').filter({ hasText: new RegExp(`^${colonne}$`, 'u') }),
+        `la colonne ${colonne} est masquée sous 768 px`,
+      ).toBeHidden();
+    }
 
     const document375 = await page.evaluate(
       () => document.documentElement.scrollWidth <= window.innerWidth,

@@ -11,6 +11,7 @@ import {
   PlusIcon,
   RotateCcwIcon,
   SlidersHorizontalIcon,
+  XIcon,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -48,6 +49,7 @@ import {
 import { buildGrandPublicExportUrl, grandPublicExportFileName } from '@/lib/data/export';
 import {
   EMPTY_GRAND_PUBLIC_FILTERS,
+  ORIGINE_FICHE_LABELS,
   PROSPECT_TYPES,
   PROSPECT_TYPE_LABELS,
   countGrandPublicFilters,
@@ -134,6 +136,101 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
 
 function filtresLabel(activeCount: number): string {
   return activeCount > 0 ? `Filtres (${String(activeCount)})` : 'Filtres';
+}
+
+/** Sous `md`, la ligne garde le nom, le téléphone, « Appeler » et le statut. */
+const SECONDAIRE = 'hidden md:table-cell';
+
+interface Puce {
+  cle: string;
+  libelle: string;
+  retrait: Partial<GrandPublicFilters>;
+}
+
+function libellePeriode(du: string | null, au: string | null): string | null {
+  if (du !== null && au !== null) return `Du ${formatDate(du)} au ${formatDate(au)}`;
+  if (du !== null) return `Depuis le ${formatDate(du)}`;
+  if (au !== null) return `Jusqu’au ${formatDate(au)}`;
+  return null;
+}
+
+function pucesActives(
+  filters: GrandPublicFilters,
+  canalOptions: readonly { value: string; label: string }[],
+): Puce[] {
+  const puces: Puce[] = [];
+  if (filters.origine !== 'TOUS') {
+    puces.push({
+      cle: 'origine',
+      libelle: ORIGINE_FICHE_LABELS[filters.origine],
+      retrait: { origine: 'TOUS' },
+    });
+  }
+  if (filters.canalProvenanceId !== null) {
+    const canal = canalOptions.find((option) => option.value === filters.canalProvenanceId);
+    puces.push({
+      cle: 'canal',
+      libelle: canal?.label ?? 'Canal de provenance',
+      retrait: { canalProvenanceId: null },
+    });
+  }
+  if (filters.type !== null) {
+    puces.push({
+      cle: 'type',
+      libelle: PROSPECT_TYPE_LABELS[filters.type],
+      retrait: { type: null },
+    });
+  }
+  if (filters.statut !== null) {
+    puces.push({
+      cle: 'statut',
+      libelle: PROSPECT_STATUT_LABELS[filters.statut],
+      retrait: { statut: null },
+    });
+  }
+  const periode = libellePeriode(filters.dateFrom, filters.dateTo);
+  if (periode !== null) {
+    puces.push({ cle: 'periode', libelle: periode, retrait: { dateFrom: null, dateTo: null } });
+  }
+  return puces;
+}
+
+/** Panneau replié : les critères posés restent lisibles et se retirent un à un. */
+function PucesFiltres({
+  ouvert,
+  puces,
+  onRetirer,
+  onEffacer,
+}: {
+  ouvert: boolean;
+  puces: readonly Puce[];
+  onRetirer: (retrait: Partial<GrandPublicFilters>) => void;
+  onEffacer: () => void;
+}) {
+  if (ouvert || puces.length === 0) return null;
+  return (
+    <div className="mt-3 flex flex-wrap items-center gap-2">
+      {puces.map((puce) => (
+        <Button
+          key={puce.cle}
+          type="button"
+          variant="outline"
+          size="sm"
+          aria-label={`Retirer le filtre ${puce.libelle}`}
+          onClick={() => {
+            onRetirer(puce.retrait);
+          }}
+        >
+          {puce.libelle}
+          <XIcon aria-hidden="true" />
+        </Button>
+      ))}
+      <Button type="button" variant="ghost" size="sm" onClick={onEffacer}>
+        <RotateCcwIcon aria-hidden="true" />
+        Tout effacer
+      </Button>
+    </div>
+  );
 }
 
 const CLE_RECHERCHE_LISTE = 'grand-public:recherche';
@@ -256,6 +353,13 @@ export function GrandPublicProspectsView({
             />
           </Button>
         </div>
+
+        <PucesFiltres
+          ouvert={filtersOpen}
+          puces={pucesActives(filters, canalOptions)}
+          onRetirer={setFilters}
+          onEffacer={resetFilters}
+        />
 
         {filtersOpen ? (
           <div className="mt-5 flex flex-col gap-5 border-t border-border pt-5">
@@ -466,7 +570,7 @@ function ProspectsTable({
     <div className="flex flex-col gap-3">
       <div
         className={cn(
-          'overflow-x-auto rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
+          'overflow-hidden rounded-lg border border-border bg-card shadow-elev-sm transition-opacity',
           list.isFetching && 'opacity-80',
         )}
       >
@@ -475,13 +579,13 @@ function ProspectsTable({
             <TableRow className="hover:bg-transparent">
               <TableHead>Nom</TableHead>
               <TableHead>Statut</TableHead>
-              <TableHead>Situation</TableHead>
-              <TableHead>Profession</TableHead>
-              <TableHead>Canal</TableHead>
-              <TableHead>Banque</TableHead>
-              <TableHead>Segment</TableHead>
-              <TableHead>Téléconseiller</TableHead>
-              <TableHead>Saisi le</TableHead>
+              <TableHead className={SECONDAIRE}>Situation</TableHead>
+              <TableHead className={SECONDAIRE}>Profession</TableHead>
+              <TableHead className={SECONDAIRE}>Canal</TableHead>
+              <TableHead className={SECONDAIRE}>Banque</TableHead>
+              <TableHead className={SECONDAIRE}>Segment</TableHead>
+              <TableHead className={SECONDAIRE}>Téléconseiller</TableHead>
+              <TableHead className={SECONDAIRE}>Saisi le</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -578,10 +682,16 @@ function Row({ prospect, peutAppeler }: { prospect: ProspectRow; peutAppeler: bo
             onClick={memoriserRechercheListe}
             className="block min-w-0 rounded-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
-            <span className="block truncate font-[600] underline-offset-2 hover:underline">
+            <span
+              title={name}
+              className="block truncate font-[600] underline-offset-2 hover:underline"
+            >
               {name}
             </span>
-            <span className="block truncate text-[0.75rem] text-muted-foreground tabular-nums">
+            <span
+              title={formatPhone(prospect.phoneE164)}
+              className="block truncate text-[0.75rem] text-muted-foreground tabular-nums"
+            >
               {formatPhone(prospect.phoneE164)}
             </span>
           </Link>
@@ -600,43 +710,49 @@ function Row({ prospect, peutAppeler }: { prospect: ProspectRow; peutAppeler: bo
       <TableCell>
         <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>
       </TableCell>
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         {prospect.type === null ? <Absent /> : PROSPECT_TYPE_LABELS[prospect.type]}
       </TableCell>
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         {prospect.profession === null || prospect.profession === '' ? (
           <Absent />
         ) : (
-          <span className="truncate">{prospect.profession}</span>
+          <span title={prospect.profession} className="truncate">
+            {prospect.profession}
+          </span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         {prospect.canalProvenanceLabel === null ? (
           <Absent />
         ) : (
           <CanalProvenance label={prospect.canalProvenanceLabel} />
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         {prospect.banqueName === null ? (
           <Absent>Non renseignée</Absent>
         ) : (
-          <span className="truncate">{prospect.banqueName}</span>
+          <span title={prospect.banqueName} className="truncate">
+            {prospect.banqueName}
+          </span>
         )}
       </TableCell>
       {/* Sans banque NI syndicat, la fiche n'entre dans aucun BDD1-4. On l'écrit :
           la ranger dans BDD4 serait une réponse là où il n'y a qu'une absence. */}
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         {prospect.segment === null ? (
           <Absent>Aucun</Absent>
         ) : (
           <Badge variant="outline">{prospect.segment}</Badge>
         )}
       </TableCell>
-      <TableCell>
-        <span className="truncate">{prospect.ownedByCommercialName}</span>
+      <TableCell className={SECONDAIRE}>
+        <span title={prospect.ownedByCommercialName} className="truncate">
+          {prospect.ownedByCommercialName}
+        </span>
       </TableCell>
-      <TableCell>
+      <TableCell className={SECONDAIRE}>
         <time dateTime={prospect.clientCreatedAt} className="whitespace-nowrap tabular-nums">
           {formatDate(prospect.clientCreatedAt)}
         </time>

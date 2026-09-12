@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { LienTelephone } from '@/components/lien-telephone';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -36,6 +37,7 @@ import {
 import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
+import { readEnum, readString } from '@/lib/search-params';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 import { cn } from '@/lib/utils';
 
@@ -44,6 +46,33 @@ const SCOPES: readonly { value: CallbackScope; label: string }[] = [
   { value: 'today', label: 'Aujourd’hui' },
   { value: 'week', label: 'Cette semaine' },
 ];
+
+interface FiltresRappels {
+  portee: CallbackScope;
+  teleconseiller: string | null;
+}
+
+const FILTRES_RAPPELS: UrlFilterAdapter<FiltresRappels> = {
+  parse: (params) => ({
+    portee:
+      readEnum<CallbackScope>(
+        params,
+        'portee',
+        SCOPES.map((tab) => tab.value),
+      ) ?? 'overdue',
+    teleconseiller: readString(params, 'teleconseiller'),
+  }),
+  serialize: ({ portee, teleconseiller }) => {
+    const params = new URLSearchParams();
+    if (portee !== 'overdue') params.set('portee', portee);
+    if (teleconseiller !== null) params.set('teleconseiller', teleconseiller);
+    return params;
+  },
+  cleared: () => ({ portee: 'overdue', teleconseiller: null }),
+};
+
+/** Sous `md`, la ligne garde le prospect, l'échéance et les actions. */
+const SECONDAIRE = 'hidden md:table-cell';
 
 const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> = {
   overdue: {
@@ -72,13 +101,21 @@ const consignerHref = (grandPublic: boolean, prospectId: string): string =>
     ? `/grand-public/appel/${encodeURIComponent(prospectId)}?retour=rappels`
     : `/chues/console?fiche=${encodeURIComponent(prospectId)}`;
 
+const ficheHref = (grandPublic: boolean, prospectId: string): string =>
+  grandPublic
+    ? `/grand-public/${encodeURIComponent(prospectId)}`
+    : `/chues/prospects/${encodeURIComponent(prospectId)}`;
+
+const nomDuRappel = (rappel: Callback): string =>
+  rappel.prospectName === '' ? `Fiche ${rappel.shortCode}` : rappel.prospectName;
+
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const pathname = usePathname();
   const grandPublic = pathname.startsWith('/grand-public');
   const projet = grandPublic ? 'GRAND_PUBLIC' : 'CHUES';
   const queryClient = useQueryClient();
-  const [scope, setScope] = useState<CallbackScope>('overdue');
-  const [assignedToId, setAssignedToId] = useState<string | null>(null);
+  const { filters, setFilters } = useUrlFilters(FILTRES_RAPPELS);
+  const { portee: scope, teleconseiller: assignedToId } = filters;
   const [aAnnuler, setAAnnuler] = useState<RappelAAnnuler | null>(null);
 
   const overdue = useQuery({
@@ -148,9 +185,11 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                   <TableRow>
                     <TableHead>Prospect</TableHead>
                     <TableHead>Échéance</TableHead>
-                    <TableHead>Retard</TableHead>
-                    <TableHead>Commentaire</TableHead>
-                    {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
+                    <TableHead className={SECONDAIRE}>Retard</TableHead>
+                    <TableHead className={SECONDAIRE}>Commentaire</TableHead>
+                    {canFilter ? (
+                      <TableHead className={SECONDAIRE}>Téléconseiller</TableHead>
+                    ) : null}
                     <TableHead>
                       <span className="sr-only">Actions</span>
                     </TableHead>
@@ -160,11 +199,14 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                   {list.data.items.map((callback) => (
                     <TableRow key={callback.id}>
                       <TableCell>
-                        <span className="font-[600]">
+                        <Link
+                          href={ficheHref(grandPublic, callback.prospectId)}
+                          className="font-[600] underline underline-offset-4"
+                        >
+                          {nomDuRappel(callback)}
+                        </Link>
+                        <span className="block text-[0.8125rem] text-muted-foreground">
                           <LienTelephone phoneE164={callback.phoneE164} />
-                        </span>
-                        <span className="block text-[0.75rem] text-muted-foreground">
-                          Fiche {callback.shortCode}
                         </span>
                       </TableCell>
                       <TableCell>
@@ -172,7 +214,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                           {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
                         </time>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className={SECONDAIRE}>
                         {callback.overdue ? (
                           <Badge variant="destructive">
                             {formatDelay(
@@ -183,12 +225,14 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                           <span className="text-muted-foreground">Sans objet</span>
                         )}
                       </TableCell>
-                      <TableCell className="max-w-80 text-muted-foreground">
+                      <TableCell className={cn(SECONDAIRE, 'max-w-80 text-muted-foreground')}>
                         {callback.comment ?? ''}
                       </TableCell>
-                      {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
+                      {canFilter ? (
+                        <TableCell className={SECONDAIRE}>{callback.assignedToName}</TableCell>
+                      ) : null}
                       <TableCell>
-                        <div className="flex justify-end gap-2">
+                        <div className="flex flex-wrap justify-end gap-2">
                           <Link
                             href={consignerHref(grandPublic, callback.prospectId)}
                             className={buttonVariants({ variant: 'outline', size: 'sm' })}
@@ -241,13 +285,15 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
           <FilterCombobox
             label="Téléconseiller"
             placeholder="Tous les téléconseillers"
-            className="w-72"
+            className="w-full sm:w-72"
             options={(teleconseillers.data?.items ?? []).map((user) => ({
               value: user.id,
               label: user.fullName,
             }))}
             value={assignedToId}
-            onChange={setAssignedToId}
+            onChange={(teleconseiller) => {
+              setFilters({ teleconseiller });
+            }}
           />
         ) : null}
       </div>
@@ -255,7 +301,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
       <Tabs
         value={scope}
         onValueChange={(value) => {
-          setScope(value as CallbackScope);
+          setFilters({ portee: value as CallbackScope });
         }}
         className="gap-6"
       >

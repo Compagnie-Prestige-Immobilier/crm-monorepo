@@ -24,7 +24,7 @@ export function SearchField({
   const inputRef = useRef<HTMLInputElement>(null);
 
   return (
-    <div className={cn('flex min-w-[15rem] flex-1 flex-col gap-1.5', className)}>
+    <div className={cn('flex min-w-[min(15rem,100%)] flex-1 flex-col gap-1.5', className)}>
       <Label htmlFor={inputId}>{label}</Label>
       <div className="relative">
         <SearchIcon

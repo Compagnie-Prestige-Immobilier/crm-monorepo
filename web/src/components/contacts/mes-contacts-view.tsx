@@ -4,10 +4,11 @@ import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useState, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { LienTelephone } from '@/components/lien-telephone';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
@@ -39,6 +40,7 @@ import {
   type ProspectRow,
   type RepresentantRow,
 } from '@/lib/types';
+import { readEnum, readString } from '@/lib/search-params';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
 type Onglet = 'PROSPECTS' | 'REPRESENTANTS';
@@ -47,6 +49,25 @@ const ONGLETS: readonly { value: Onglet; label: string }[] = [
   { value: 'PROSPECTS', label: 'Prospects' },
   { value: 'REPRESENTANTS', label: 'Représentants' },
 ];
+
+interface FiltresContacts {
+  onglet: Onglet;
+  appelePar: string | null;
+}
+
+const FILTRES_CONTACTS: UrlFilterAdapter<FiltresContacts> = {
+  parse: (params) => ({
+    onglet: readEnum<Onglet>(params, 'onglet', ['PROSPECTS', 'REPRESENTANTS']) ?? 'PROSPECTS',
+    appelePar: readString(params, 'appelePar'),
+  }),
+  serialize: ({ onglet, appelePar }) => {
+    const params = new URLSearchParams();
+    if (onglet !== 'PROSPECTS') params.set('onglet', onglet);
+    if (appelePar !== null) params.set('appelePar', appelePar);
+    return params;
+  },
+  cleared: () => ({ onglet: 'PROSPECTS', appelePar: null }),
+};
 
 const SANS_VALEUR = <span className="text-muted-foreground">–</span>;
 
@@ -86,8 +107,8 @@ export function MesContactsView({
   userId: string;
   canFilter: boolean;
 }) {
-  const [onglet, setOnglet] = useState<Onglet>('PROSPECTS');
-  const [filtreId, setFiltreId] = useState<string | null>(null);
+  const { filters, setFilters } = useUrlFilters(FILTRES_CONTACTS);
+  const { onglet, appelePar: filtreId } = filters;
 
   // L'API ne borne ces listes ni au demandeur ni aux fiches appelées : sans
   // identifiant, elle rendrait aussi les fiches que personne n'a jamais appelées.
@@ -129,13 +150,15 @@ export function MesContactsView({
           <FilterCombobox
             label="Appelé par"
             placeholder="Mes appels"
-            className="w-72"
+            className="w-full sm:w-72"
             options={(teleconseillers.data?.items ?? []).map((user) => ({
               value: user.id,
               label: user.fullName,
             }))}
             value={filtreId}
-            onChange={setFiltreId}
+            onChange={(appelePar) => {
+              setFilters({ appelePar });
+            }}
           />
         ) : null}
       </div>
@@ -149,7 +172,7 @@ export function MesContactsView({
               variant={entree.value === onglet ? 'default' : 'outline'}
               aria-pressed={entree.value === onglet}
               onClick={() => {
-                setOnglet(entree.value);
+                setFilters({ onglet: entree.value });
               }}
             >
               {entree.label}
