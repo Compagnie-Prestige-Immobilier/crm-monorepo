@@ -92,7 +92,13 @@ function DialogFooter({ className, ...props }: React.ComponentProps<'div'>) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn('flex flex-col-reverse gap-2 sm:flex-row sm:justify-end', className)}
+      // Les marges négatives mangent le `p-6` et le `gap-4` du dialogue : les boutons restent
+      // en place, et le fond couvre le contenu qui défile dessous.
+      className={cn(
+        'sticky bottom-0 -mx-6 -mt-4 -mb-6 bg-card px-6 pt-4 pb-6',
+        'flex flex-col-reverse gap-2 sm:flex-row sm:justify-end',
+        className,
+      )}
       {...props}
     />
   );
