@@ -35,6 +35,23 @@ const (
 	referentielsNomActif   = "isActive"
 	referentielsNomSysteme = "isSystem"
 
+	referentielsNomEffet       = "effect"
+	referentielsNomRappel      = "requiresCallback"
+	referentielsNomCommentaire = "requiresComment"
+	referentielsNomReessai     = "retryAfterMinutes"
+	referentielsNomPriorite    = "priorite"
+	referentielsNomRelation    = "relationStatus"
+	referentielsNomRang        = "sortOrder"
+	referentielsNomCouleur     = "color"
+	referentielsNomJoint       = "countsAsReached"
+
+	referentielsActionCreer    = "referentiel.create"
+	referentielsActionModifier = "referentiel.update"
+	referentielsActionActiver  = "referentiel.active"
+
+	referentielsFamilleStatuts = "statuts-qualification"
+	referentielsFamilleMotifs  = "call-outcome-reasons"
+
 	referentielsSelCode      = `t."code"`
 	referentielsSelName      = `t."name"`
 	referentielsSelLabel     = `t."label"`
@@ -629,7 +646,7 @@ func (s *service) referentielsCreer(ctx context.Context, in *ReferentielsCreerIn
 		if _, err := tx.Exec(ctx, b.String(), append([]any{id.String()}, args...)...); err != nil {
 			return l.erreurEcriture(err)
 		}
-		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, "referentiel.create", in.Kind, id.String(),
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, referentielsActionCreer, in.Kind, id.String(),
 			nil, referentielsValeursJournal(cols, args))
 	}); err != nil {
 		return nil, err
@@ -716,37 +733,13 @@ func (s *service) referentielsModifier(ctx context.Context, in *ReferentielsModi
 		if tag.RowsAffected() == 0 {
 			return l.introuvableErreur()
 		}
-		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, "referentiel.update", in.Kind, in.ID,
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, referentielsActionModifier, in.Kind, in.ID,
 			avant, referentielsValeursJournal(cols, args))
 	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
 	return s.referentielsItem(ctx, l, in.ID)
-}
-
-func referentielsValeursJournal(cols []string, args []any) map[string]any {
-	valeurs := make(map[string]any, len(cols))
-	for i, col := range cols {
-		valeurs[col] = args[i]
-	}
-	return valeurs
-}
-
-func referentielsEtatJournal(ctx context.Context, tx pgx.Tx, l *referentielsListe, id string, cols []string) (map[string]any, error) {
-	var ligne map[string]any
-	err := tx.QueryRow(ctx, `SELECT to_jsonb(t) FROM "`+l.table+`" t WHERE t."id" = $1`, id).Scan(&ligne)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, l.introuvableErreur()
-	}
-	if err != nil {
-		return nil, err
-	}
-	avant := make(map[string]any, len(cols))
-	for _, col := range cols {
-		avant[col] = ligne[col]
-	}
-	return avant, nil
 }
 
 type ReferentielsBundleInput struct {
@@ -967,14 +960,22 @@ func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsC
 		r := db.RepresentantRelation(*in.Body.RelationStatus)
 		relation = &r
 	}
-	row, err := s.Q.InsertStatutQualification(ctx, db.InsertStatutQualificationParams{
-		ID: id.String(), Code: code, Label: label, Effect: effet,
-		RequiresCallback: requiresCallback, RequiresComment: referentielsVaut(in.Body.RequiresComment, false),
-		RetryAfterMinutes: referentielsReessai(in.Body.RetryAfterMinutes),
-		Priorite:          db.PrioriteTraitement(referentielsVaut(in.Body.Priorite, "NORMALE")),
-		RelationStatus:    relation, SortOrder: rang, MinPayloadVersion: referentielsVersionStatut,
-	})
-	if err != nil {
+	var row db.StatutsQualification
+	if err := s.referentielTracer(ctx, referentielsActionCreer, referentielsFamilleStatuts, id.String(),
+		func(q *db.Queries) (map[string]any, map[string]any, error) {
+			pose, err := q.InsertStatutQualification(ctx, db.InsertStatutQualificationParams{
+				ID: id.String(), Code: code, Label: label, Effect: effet,
+				RequiresCallback: requiresCallback, RequiresComment: referentielsVaut(in.Body.RequiresComment, false),
+				RetryAfterMinutes: referentielsReessai(in.Body.RetryAfterMinutes),
+				Priorite:          db.PrioriteTraitement(referentielsVaut(in.Body.Priorite, "NORMALE")),
+				RelationStatus:    relation, SortOrder: rang, MinPayloadVersion: referentielsVersionStatut,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			row = pose
+			return nil, referentielsStatutJournal(&pose), nil
+		}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
@@ -1049,12 +1050,21 @@ func (s *service) referentielsStatutModifier(ctx context.Context, in *Referentie
 		p := db.PrioriteTraitement(*in.Body.Priorite)
 		priorite = &p
 	}
-	row, err := s.Q.UpdateStatutQualification(ctx, db.UpdateStatutQualificationParams{
-		ID: in.ID, Label: label, RequiresCallback: in.Body.RequiresCallback,
-		RequiresComment: in.Body.RequiresComment, Priorite: priorite,
-		RetryAfterMinutes: referentielsReessai(in.Body.RetryAfterMinutes), RelationStatus: relation,
-	})
-	if err != nil {
+	var row db.StatutsQualification
+	if err := s.referentielTracer(ctx, referentielsActionModifier, referentielsFamilleStatuts, in.ID,
+		func(q *db.Queries) (map[string]any, map[string]any, error) {
+			modifie, err := q.UpdateStatutQualification(ctx, db.UpdateStatutQualificationParams{
+				ID: in.ID, Label: label, RequiresCallback: in.Body.RequiresCallback,
+				RequiresComment: in.Body.RequiresComment, Priorite: priorite,
+				RetryAfterMinutes: referentielsReessai(in.Body.RetryAfterMinutes), RelationStatus: relation,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			row = modifie
+			avant, apres := referentielsStatutDiff(&existant, &modifie, in)
+			return avant, apres, nil
+		}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
@@ -1087,8 +1097,12 @@ func (s *service) referentielsStatutActiver(ctx context.Context, in *Referentiel
 				"« "+existant.Label+" » est le dernier statut actif de sa branche : le retirer laisserait le script sans issue possible.")
 		}
 	}
-	row, err := s.Q.SetStatutQualificationActive(ctx, db.SetStatutQualificationActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
-	if err != nil {
+	var row db.StatutsQualification
+	bascule := func(q *db.Queries) (err error) {
+		row, err = q.SetStatutQualificationActive(ctx, db.SetStatutQualificationActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
+		return err
+	}
+	if err := s.referentielBasculer(ctx, referentielsFamilleStatuts, in.ID, existant.IsActive, in.Body.IsActive, bascule); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
@@ -1191,13 +1205,21 @@ func (s *service) referentielsMotifCreer(ctx context.Context, in *ReferentielsCr
 		c := strings.TrimSpace(*in.Body.Color)
 		couleur = &c
 	}
-	row, err := s.Q.InsertCallOutcomeReason(ctx, db.InsertCallOutcomeReasonParams{
-		ID: id.String(), Code: code, Label: label, Effect: db.CallOutcomeEffect(in.Body.Effect),
-		RequiresComment: referentielsVaut(in.Body.RequiresComment, false), RequiresCallback: requiresCallback,
-		CountsAsReached: referentielsVaut(in.Body.CountsAsReached, true), Color: couleur,
-		SortOrder: referentielsVaut(in.Body.SortOrder, 100), MinPayloadVersion: referentielsVersionMotif,
-	})
-	if err != nil {
+	var row db.CallOutcomeReason
+	if err := s.referentielTracer(ctx, referentielsActionCreer, referentielsFamilleMotifs, id.String(),
+		func(q *db.Queries) (map[string]any, map[string]any, error) {
+			pose, err := q.InsertCallOutcomeReason(ctx, db.InsertCallOutcomeReasonParams{
+				ID: id.String(), Code: code, Label: label, Effect: db.CallOutcomeEffect(in.Body.Effect),
+				RequiresComment: referentielsVaut(in.Body.RequiresComment, false), RequiresCallback: requiresCallback,
+				CountsAsReached: referentielsVaut(in.Body.CountsAsReached, true), Color: couleur,
+				SortOrder: referentielsVaut(in.Body.SortOrder, 100), MinPayloadVersion: referentielsVersionMotif,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			row = pose
+			return nil, referentielsMotifJournal(&pose), nil
+		}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
@@ -1269,12 +1291,21 @@ func (s *service) referentielsMotifModifier(ctx context.Context, in *Referentiel
 		}
 		label = &propre
 	}
-	row, err := s.Q.UpdateCallOutcomeReason(ctx, db.UpdateCallOutcomeReasonParams{
-		ID: in.ID, Label: label, Color: in.Body.Color, SortOrder: in.Body.SortOrder,
-		RequiresComment: in.Body.RequiresComment, RequiresCallback: in.Body.RequiresCallback,
-		CountsAsReached: in.Body.CountsAsReached,
-	})
-	if err != nil {
+	var row db.CallOutcomeReason
+	if err := s.referentielTracer(ctx, referentielsActionModifier, referentielsFamilleMotifs, in.ID,
+		func(q *db.Queries) (map[string]any, map[string]any, error) {
+			modifie, err := q.UpdateCallOutcomeReason(ctx, db.UpdateCallOutcomeReasonParams{
+				ID: in.ID, Label: label, Color: in.Body.Color, SortOrder: in.Body.SortOrder,
+				RequiresComment: in.Body.RequiresComment, RequiresCallback: in.Body.RequiresCallback,
+				CountsAsReached: in.Body.CountsAsReached,
+			})
+			if err != nil {
+				return nil, nil, err
+			}
+			row = modifie
+			avant, apres := referentielsMotifDiff(&existant, &modifie, in)
+			return avant, apres, nil
+		}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
@@ -1291,8 +1322,12 @@ func (s *service) referentielsMotifActiver(ctx context.Context, in *Referentiels
 		return nil, socle.Problem(http.StatusConflict, "OUTCOME_REASON_SYSTEM_IMMUTABLE",
 			"« "+existant.Label+" » est un motif système : le retirer mettrait la saisie en échec.")
 	}
-	row, err := s.Q.SetCallOutcomeReasonActive(ctx, db.SetCallOutcomeReasonActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
-	if err != nil {
+	var row db.CallOutcomeReason
+	bascule := func(q *db.Queries) (err error) {
+		row, err = q.SetCallOutcomeReasonActive(ctx, db.SetCallOutcomeReasonActiveParams{ID: in.ID, IsActive: in.Body.IsActive})
+		return err
+	}
+	if err := s.referentielBasculer(ctx, referentielsFamilleMotifs, in.ID, existant.IsActive, in.Body.IsActive, bascule); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(referentielsSujet)
