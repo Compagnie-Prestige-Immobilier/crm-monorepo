@@ -399,7 +399,8 @@ func TestBanqueCorrectionAdminAuditee(t *testing.T) {
 	}
 
 	var traces int
-	if err := s.pool.QueryRow(s.ctx, `SELECT count(*)::int FROM "audit_logs" WHERE "entity" = 'bank_case' AND "entityId" = $1`, id).Scan(&traces); err != nil {
+	if err := s.pool.QueryRow(s.ctx, `SELECT count(*)::int FROM "audit_logs"
+		WHERE "entity" = 'bank_case' AND "entityId" = $1 AND "action" = 'bank_case.correction'`, id).Scan(&traces); err != nil {
 		t.Fatal(err)
 	}
 	if traces != 1 {

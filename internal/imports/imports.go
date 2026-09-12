@@ -37,6 +37,7 @@ const (
 	dureeTrancheImport            = 60 * time.Second
 	feuilleImport                 = "#feuille"
 	messageDoublonFichierImport   = "Ce numéro figure déjà à la ligne %d du fichier."
+	messageDejaEnBaseImport       = "Ce numéro est déjà celui d’une fiche existante."
 	messageValeursTronqueesImport = "%s, … (%d au total)"
 )
 

@@ -479,6 +479,8 @@ func ecrireRepresentantsImport(ctx context.Context, q *db.Queries, c contexteImp
 		ligne := valeur.(ligneRepresentantImport)
 		if connus[ligne.telephone] {
 			ignorees++
+			erreurs = append(erreurs, *refusImport(ligne.numero, EnteteRepresentantImport(1),
+				"DUPLICATE_IN_DATABASE", messageDejaEnBaseImport))
 			continue
 		}
 		retenues = append(retenues, ligne)
