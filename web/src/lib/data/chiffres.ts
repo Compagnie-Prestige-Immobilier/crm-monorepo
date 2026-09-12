@@ -125,9 +125,7 @@ export async function fetchQualiteDuMarketing(
   return unwrap(await client.GET('/api/v1/supervision/prospects/marketing'));
 }
 
-export async function fetchChiffresObjectifs(
-  client: ApiClient = getApiClient(),
-) {
+export async function fetchChiffresObjectifs(client: ApiClient = getApiClient()) {
   return unwrap(await client.GET('/api/v1/supervision/objectifs'));
 }
 
