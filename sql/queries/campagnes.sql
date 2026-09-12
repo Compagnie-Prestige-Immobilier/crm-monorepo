@@ -246,6 +246,8 @@ WHERE a."clientCreatedAt" >= $2
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC
 LIMIT 50;
 
+-- L'état se calculait en Go après avoir remonté les 3 080 lignes du lot, à
+-- chaque page. Il se dit ici, ce qui rend la pagination et le filtre au serveur.
 -- name: LotFichesRepresentants :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        r."id" AS "ficheId", r."fullName", r."phoneE164", r."nextCallbackAt",
@@ -256,7 +258,26 @@ LEFT JOIN "representants" r ON r."id" = i."representantId"
 LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
-ORDER BY i."position";
+  AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN r."nextCallbackAt" IS NOT NULL THEN 'A_RAPPELER'
+        WHEN EXISTS (SELECT 1 FROM "rep_call_attempts" a
+                     WHERE a."representantId" = i."representantId"
+                       AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
+        ELSE 'NON_TRAITEE' END)
+ORDER BY i."position"
+LIMIT sqlc.arg('page_size')::bigint OFFSET sqlc.arg('page_offset')::bigint;
+
+-- name: LotFichesRepresentantsCount :one
+SELECT COUNT(*)::int FROM "lot_export_items" i
+LEFT JOIN "representants" r ON r."id" = i."representantId"
+WHERE i."lotId" = $1
+  AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
+  AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN r."nextCallbackAt" IS NOT NULL THEN 'A_RAPPELER'
+        WHEN EXISTS (SELECT 1 FROM "rep_call_attempts" a
+                     WHERE a."representantId" = i."representantId"
+                       AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
+        ELSE 'NON_TRAITEE' END);
 
 -- name: LotFichesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
@@ -267,7 +288,23 @@ LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
-ORDER BY i."position";
+  AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "call_attempts" a
+                     WHERE a."prospectId" = i."prospectId"
+                       AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
+        ELSE 'NON_TRAITEE' END)
+ORDER BY i."position"
+LIMIT sqlc.arg('page_size')::bigint OFFSET sqlc.arg('page_offset')::bigint;
+
+-- name: LotFichesProspectsCount :one
+SELECT COUNT(*)::int FROM "lot_export_items" i
+WHERE i."lotId" = $1
+  AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
+  AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "call_attempts" a
+                     WHERE a."prospectId" = i."prospectId"
+                       AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
+        ELSE 'NON_TRAITEE' END);
 
 -- name: LotLignesRepresentants :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", r."fullName", r."phoneE164",

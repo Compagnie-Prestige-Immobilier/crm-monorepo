@@ -1370,26 +1370,55 @@ func (s *service) campagneFiches(ctx context.Context, in *CampagneFichesInput) (
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.lotLireFiches(ctx, row, lotPointeurTexte(in.TeleconseillerID), traitees)
+	agent := lotPointeurTexte(in.TeleconseillerID)
+	page := lotPage{
+		etat:     lotPointeurTexte(in.Etat),
+		taille:   int64(in.PageSize),
+		decalage: int64((in.Page - 1) * in.PageSize),
+	}
+	items, err := s.lotLireFiches(ctx, row, traitees, agent, page)
 	if err != nil {
 		return nil, err
 	}
-	if in.Etat != "" {
-		items = slices.DeleteFunc(items, func(fiche CampagneFiche) bool { return fiche.Etat != in.Etat })
+	total, err := s.lotCompterFiches(ctx, row, agent, page)
+	if err != nil {
+		return nil, err
 	}
-	debut := min((in.Page-1)*in.PageSize, len(items))
-	fin := min(debut+in.PageSize, len(items))
 	out := &CampagneFichesOutput{}
-	out.Body.Items = items[debut:fin]
-	out.Body.Meta = lotMetaPage(len(items), in.Page, in.PageSize)
+	out.Body.Items = items
+	out.Body.Meta = lotMetaPage(total, in.Page, in.PageSize)
 	return out, nil
 }
 
-func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, agent *string,
-	traitees map[int32]bool,
+// Le lot d'un déploiement porte 3 080 fiches : les remonter toutes pour en
+// rendre cinquante coûtait la base entière du lot à chaque page.
+type lotPage struct {
+	etat     *string
+	taille   int64
+	decalage int64
+}
+
+func (s *service) lotCompterFiches(ctx context.Context, row *db.LotParIdRow, agent *string, page lotPage) (int, error) {
+	if lotSurRepresentants(string(row.Cible)) {
+		n, err := s.Q.LotFichesRepresentantsCount(ctx, db.LotFichesRepresentantsCountParams{
+			LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
+		})
+		return int(n), err
+	}
+	n, err := s.Q.LotFichesProspectsCount(ctx, db.LotFichesProspectsCountParams{
+		LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
+	})
+	return int(n), err
+}
+
+func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traitees map[int32]bool,
+	agent *string, page lotPage,
 ) ([]CampagneFiche, error) {
 	if lotSurRepresentants(string(row.Cible)) {
-		lignes, err := s.Q.LotFichesRepresentants(ctx, db.LotFichesRepresentantsParams{LotId: row.ID, AssigneeID: agent})
+		lignes, err := s.Q.LotFichesRepresentants(ctx, db.LotFichesRepresentantsParams{
+			LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
+			PageSize: page.taille, PageOffset: page.decalage,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -1406,7 +1435,10 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, agent 
 		}
 		return fiches, nil
 	}
-	lignes, err := s.Q.LotFichesProspects(ctx, db.LotFichesProspectsParams{LotId: row.ID, AssigneeID: agent})
+	lignes, err := s.Q.LotFichesProspects(ctx, db.LotFichesProspectsParams{
+		LotId: row.ID, AssigneeID: agent, Etat: page.etat, Depuis: row.CreatedAt,
+		PageSize: page.taille, PageOffset: page.decalage,
+	})
 	if err != nil {
 		return nil, err
 	}

@@ -1100,7 +1100,9 @@ def cmd_redeploy() -> None:
         fail(f"cible inconnue : {cible!r}. Seule « {GO_NAME} » est acceptée.")
         sys.exit(1)
     else:
-        couples = (("API_ID", "API"), ("WEB_ID", "panel web"))
+        # L'API et le panneau v1 ont été supprimés à la bascule du 12 septembre
+        # 2026 : sans cible, il n'y a plus que le binaire Go à déployer.
+        couples = (("GO_ID", GO_NAME),)
 
     # Même raisonnement que dans `find_existing` : un identifiant manquant se
     # lit comme « rien à déployer », et un déploiement qui ne déploie rien doit
@@ -1115,7 +1117,12 @@ def cmd_redeploy() -> None:
         call("application.deploy", {"applicationId": ids[key]})
         ok("demandé")
 
-    info("Dokploy construit et bascule de façon asynchrone ; suivez ses journaux.")
+    # Sortir ici déclarait la CI verte dès l'appel : un binaire qui ne démarre
+    # pas, ou une migration qui échoue, passaient pour un déploiement réussi.
+    for key, label in couples:
+        step(f"Attente de {label}")
+        _attendre_application(ids[key])
+    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
 
 
 def _epilogue(s: dict[str, str]) -> str:
