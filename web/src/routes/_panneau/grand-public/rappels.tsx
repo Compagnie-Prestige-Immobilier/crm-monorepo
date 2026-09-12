@@ -2,9 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { RappelsView } from '@/components/rappels/rappels-view';
-import { RepresentantsSuiviView } from '@/components/rappels/representants-suivi-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/rappels')({
@@ -26,23 +24,8 @@ function Loading() {
   );
 }
 
-/** La page `(panel)/grand-public/rappels` de la v1. */
+/** Les rappels de prospects seuls : les représentants sont une notion CHUES. */
 function RappelsPage() {
   const { user } = Route.useRouteContext();
-  const canFilter = user.role !== 'COMMERCIAL';
-
-  return (
-    <Tabs defaultValue="representants">
-      <TabsList>
-        <TabsTrigger value="representants">Représentants</TabsTrigger>
-        <TabsTrigger value="prospects">Prospects</TabsTrigger>
-      </TabsList>
-      <TabsContent value="representants">
-        <RepresentantsSuiviView userId={user.id} canFilter={canFilter} />
-      </TabsContent>
-      <TabsContent value="prospects">
-        <RappelsView canFilter={canFilter} />
-      </TabsContent>
-    </Tabs>
-  );
+  return <RappelsView canFilter={user.role !== 'COMMERCIAL'} />;
 }

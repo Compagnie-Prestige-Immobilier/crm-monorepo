@@ -130,7 +130,8 @@ test.describe('parcours 6, rappels promis', () => {
     await expect(ligne).toBeVisible();
     await expect(ligne.getByRole('link', { name: 'Consigner l’appel' })).toBeVisible();
 
-    await ligne.getByRole('button', { name: 'Annuler' }).click();
+    await ligne.getByRole('button', { name: 'Annuler le rappel' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Annuler le rappel' }).click();
     await expect(page.getByText('Rappel annulé.')).toBeVisible();
     await expect(ligne).toHaveCount(0);
 

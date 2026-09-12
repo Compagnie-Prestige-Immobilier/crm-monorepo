@@ -12,6 +12,7 @@ import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -57,14 +58,26 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
   },
 };
 
+/** L'heure du serveur à la lecture de la liste : l'échéance se dit comme dans le tableau. */
+interface RappelAAnnuler {
+  rappel: Callback;
+  maintenant: number;
+}
+
+/** Grand Public consigne sur son écran d'appel, puis y revient ; CHUES passe par sa console. */
+const consignerHref = (grandPublic: boolean, prospectId: string): string =>
+  grandPublic
+    ? `/grand-public/appel/${encodeURIComponent(prospectId)}?retour=rappels`
+    : `/chues/console?fiche=${encodeURIComponent(prospectId)}`;
+
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const pathname = usePathname();
   const grandPublic = pathname.startsWith('/grand-public');
   const projet = grandPublic ? 'GRAND_PUBLIC' : 'CHUES';
-  const racine = grandPublic ? '/grand-public' : '/chues';
   const queryClient = useQueryClient();
   const [scope, setScope] = useState<CallbackScope>('overdue');
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
+  const [aAnnuler, setAAnnuler] = useState<RappelAAnnuler | null>(null);
 
   const overdue = useQuery({
     queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
@@ -87,10 +100,12 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const cancel = useMutation({
     mutationFn: (callback: Callback) => cancelCallback(callback.id),
     onSuccess: () => {
+      setAAnnuler(null);
       toast.success('Rappel annulé.');
       void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
     },
     onError: (error) => {
+      setAAnnuler(null);
       toastApiError(error, 'Le rappel n’a pas été annulé.');
     },
   });
@@ -167,7 +182,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                       <TableCell>
                         <div className="flex justify-end gap-2">
                           <Link
-                            href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                            href={consignerHref(grandPublic, callback.prospectId)}
                             className={buttonVariants({ variant: 'outline', size: 'sm' })}
                           >
                             <PhoneCallIcon aria-hidden="true" />
@@ -176,12 +191,14 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                           <Button
                             variant="ghost"
                             size="sm"
-                            disabled={cancel.isPending}
                             onClick={() => {
-                              cancel.mutate(callback);
+                              setAAnnuler({
+                                rappel: callback,
+                                maintenant: Date.parse(list.data.serverTime),
+                              });
                             }}
                           >
-                            Annuler
+                            Annuler le rappel
                           </Button>
                         </div>
                       </TableCell>
@@ -251,6 +268,48 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
           </TabsContent>
         ))}
       </Tabs>
+
+      <ConfirmerAnnulation
+        cible={aAnnuler}
+        pending={cancel.isPending}
+        onFermer={() => {
+          setAAnnuler(null);
+        }}
+        onConfirmer={(rappel) => {
+          cancel.mutate(rappel);
+        }}
+      />
     </div>
+  );
+}
+
+function ConfirmerAnnulation({
+  cible,
+  pending,
+  onFermer,
+  onConfirmer,
+}: {
+  cible: RappelAAnnuler | null;
+  pending: boolean;
+  onFermer: () => void;
+  onConfirmer: (rappel: Callback) => void;
+}) {
+  if (cible === null) return null;
+  const { rappel, maintenant } = cible;
+  return (
+    <ConfirmDialog
+      open
+      onOpenChange={(ouvert) => {
+        if (!ouvert) onFermer();
+      }}
+      title={`Annuler le rappel de la fiche ${rappel.shortCode} ?`}
+      description={`Promis pour ${formatCallbackAt(rappel.scheduledAt, maintenant)}, au ${formatPhone(rappel.phoneE164)}.`}
+      confirmLabel="Annuler le rappel"
+      cancelLabel="Garder le rappel"
+      pending={pending}
+      onConfirm={() => {
+        onConfirmer(rappel);
+      }}
+    />
   );
 }

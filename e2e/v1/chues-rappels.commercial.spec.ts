@@ -207,7 +207,8 @@ test.describe('la file posée par ce spec', () => {
 
     const ligne = page.getByRole('table').getByRole('row').filter({ hasText: cible.affiche });
     await expect(ligne).toHaveCount(1);
-    await ligne.getByRole('button', { name: 'Annuler' }).click();
+    await ligne.getByRole('button', { name: 'Annuler le rappel' }).click();
+    await page.getByRole('dialog').getByRole('button', { name: 'Annuler le rappel' }).click();
 
     await expect(page.getByText('Rappel annulé.', { exact: true })).toBeVisible();
     await expect(

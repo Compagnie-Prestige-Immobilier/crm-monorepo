@@ -184,7 +184,8 @@ test('GP-32 · chaque portée a son propre état vide', async ({ page }) => {
 
   // L'état vide de la semaine se mérite : on retire sa propre échéance par le
   // geste de l'écran, jamais par un appel qui court-circuiterait le bouton.
-  await ligne.getByRole('button', { name: 'Annuler' }).click();
+  await ligne.getByRole('button', { name: 'Annuler le rappel' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Annuler le rappel' }).click();
   // Le toast de Sonner est un `<li>` sans rôle : `getByRole('status')` attrape
   // le compteur de retards de l'écran, pas la confirmation.
   await expect(page.getByText('Rappel annulé.', { exact: true })).toBeVisible();
