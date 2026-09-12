@@ -44,6 +44,14 @@ WHERE p."deletedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
   )
+  AND (
+    NOT sqlc.arg('attribuees')::boolean
+    OR EXISTS (
+      SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
+      WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
+    )
+  )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type')::"ProspectType")
   AND (sqlc.narg('canal_provenance_id')::text IS NULL OR p."canalProvenanceId" = sqlc.narg('canal_provenance_id')::text)
@@ -122,6 +130,14 @@ WHERE p."deletedAt" IS NULL
     sqlc.arg('scope_all')::boolean
     OR p."createdById" = sqlc.arg('scope_user_id')::text
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
+    OR EXISTS (
+      SELECT 1 FROM "lot_export_items" li
+      JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
+      WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
+    )
+  )
+  AND (
+    NOT sqlc.arg('attribuees')::boolean
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL

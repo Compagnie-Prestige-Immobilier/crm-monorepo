@@ -3,7 +3,6 @@ import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { flattenPage, toProspectQuery, type ProspectQuery } from '@/lib/api/query-params';
-import { fetchMesAttributions } from '@/lib/data/attributions';
 import type { OrigineFiche } from '@/lib/data/grand-public';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
@@ -58,16 +57,9 @@ export async function fetchProspectsAQualifier(
     ...(origine === 'MOI' && criteres.viewerId !== undefined
       ? { commercialId: criteres.viewerId }
       : {}),
+    ...(origine === 'CAMPAGNE' ? { attribuees: true } : {}),
   };
-  const page = flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
-  if (origine !== 'CAMPAGNE') return page;
-
-  // L'API ne filtre pas sur l'attribution : la page servie est celle du
-  // portefeuille, on n'en garde que les fiches qu'une campagne a confiées.
-  const { prospectIds } = await fetchMesAttributions(client);
-  const attribues = new Set(prospectIds);
-  const items = page.items.filter((prospect) => attribues.has(prospect.id));
-  return { ...page, items, total: items.length, pageCount: 1 };
+  return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
 }
 
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */

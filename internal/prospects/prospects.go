@@ -454,6 +454,7 @@ type ProspectListInput struct {
 	DateTo                 string `query:"dateTo"`
 	Revue                  string `query:"revue" enum:"true,false"`
 	MesFiches              bool   `query:"mesFiches"`
+	Attribuees             bool   `query:"attribuees" doc:"true : ne rend que les fiches qu'une campagne active a confiées au lecteur."`
 	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
@@ -525,7 +526,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		p.tout, p.converti = false, false
 	}
 	arg := db.ListProspectsParams{
-		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
+		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, Attribuees: in.Attribuees,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
@@ -560,7 +561,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 	return db.CountProspectsParams{
 		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti,
-		CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
+		Attribuees: arg.Attribuees, CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
 		RepresentantID: arg.RepresentantID, BanqueID: arg.BanqueID, SyndicatID: arg.SyndicatID,
 		Origin: arg.Origin, Phase2Status: arg.Phase2Status, EnrollmentMethod: arg.EnrollmentMethod,
 		EnrollmentCapturedByID: arg.EnrollmentCapturedByID, LastCallByID: arg.LastCallByID,
