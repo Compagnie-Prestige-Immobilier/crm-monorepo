@@ -3,6 +3,7 @@ package prospects
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"net/http"
@@ -165,13 +166,23 @@ func (s *service) prospectEcrireBascule(ctx context.Context, in *ProspectSegment
 			}
 			return prospectRevConflit(courante.Rev)
 		}
-		return q.InsererSegmentChange(ctx, db.InsererSegmentChangeParams{
+		if err := q.InsererSegmentChange(ctx, db.InsererSegmentChangeParams{
 			ID: trace.String(), ProspectId: in.ID,
 			FromSegment: db.BddSegment(depart), ToSegment: db.BddSegment(arrivee.segment),
 			FromBanqueId: *avant.BanqueId, ToBanqueId: arrivee.banqueID,
 			FromSyndicatId: *avant.SyndicatId, ToSyndicatId: arrivee.syndicatID,
 			Reason: prospectVide(strings.TrimSpace(in.Body.Reason)), ChangedById: userID, Source: db.ChangeSourceWEB,
-		})
+		}); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, userID, "prospect.segment", prospectEntite, in.ID,
+			map[string]any{
+				"segment": depart, prospectChampBanque: *avant.BanqueId, prospectChampSyndicat: *avant.SyndicatId,
+			},
+			map[string]any{
+				"segment": arrivee.segment, prospectChampBanque: arrivee.banqueID,
+				prospectChampSyndicat: arrivee.syndicatID, "motif": strings.TrimSpace(in.Body.Reason),
+			})
 	})
 }
 

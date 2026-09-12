@@ -1265,10 +1265,20 @@ func (s *service) ecrireDispositionParDefaut(ctx context.Context, in *EcrireDisp
 	if err != nil {
 		return nil, err
 	}
-	ecrite, err := s.Q.UpsertSetting(ctx, db.UpsertSettingParams{
-		Key: CleDispositionDefaut(in.Ecran), Value: string(brut), UpdatedById: &u.ID,
-	})
-	if err != nil {
+	var ecrite time.Time
+	// La disposition par défaut s'impose à tous ceux qui n'en ont pas posé une :
+	// elle part avec sa trace, dans la même transaction.
+	if err := s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		quand, err := q.UpsertSetting(ctx, db.UpsertSettingParams{
+			Key: CleDispositionDefaut(in.Ecran), Value: string(brut), UpdatedById: &u.ID,
+		})
+		if err != nil {
+			return err
+		}
+		ecrite = quand
+		return database.Auditer(ctx, q, u.ID, "dashboard.default_layout", "dashboard", in.Ecran, nil,
+			json.RawMessage(brut))
+	}); err != nil {
 		return nil, err
 	}
 	return reponseDisposition(d, "defaut", &ecrite), nil

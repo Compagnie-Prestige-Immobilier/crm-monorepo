@@ -40,7 +40,15 @@ func (s *service) prospectConsentement(ctx context.Context, in *ProspectConsente
 	if arg.Consent != db.GrandPublicConsentNONDEMANDE {
 		arg.ConsentAt, arg.ConsentByID = prospectPtr(time.Now()), &u.ID
 	}
-	if err := s.Q.UpsertJourneyConsentement(ctx, arg); err != nil {
+	// Même transaction : le consentement est la pièce qui autorise le
+	// démarchage, il ne survit pas sans sa trace.
+	if err := s.prospectTx(ctx, func(q *db.Queries) error {
+		if err := q.UpsertJourneyConsentement(ctx, arg); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "prospect.consentement", prospectEntite, in.ID, nil,
+			map[string]any{"consent": string(arg.Consent)})
+	}); err != nil {
 		return nil, err
 	}
 	item, err := s.prospectLire(ctx, &u, in.ID)
@@ -444,8 +452,22 @@ func (s *service) prospectMajChamps(ctx context.Context, in *ProspectMajChampsIn
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Q.UpsertAppSetting(ctx, db.UpsertAppSettingParams{
-		Key: prospectCleChamps(projet), Value: string(valeur), UpdatedById: &u.ID,
+	ancien, err := s.Q.AppSettingParCle(ctx, prospectCleChamps(projet))
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return nil, err
+	}
+	var avant any
+	if err == nil {
+		avant = json.RawMessage(ancien.Value)
+	}
+	if err := s.prospectTx(ctx, func(q *db.Queries) error {
+		if err := q.UpsertAppSetting(ctx, db.UpsertAppSettingParams{
+			Key: prospectCleChamps(projet), Value: string(valeur), UpdatedById: &u.ID,
+		}); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "champs_conversion.update", "champs_conversion", in.Projet,
+			avant, json.RawMessage(valeur))
 	}); err != nil {
 		return nil, err
 	}

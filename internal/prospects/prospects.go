@@ -18,7 +18,6 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
-	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 const (
@@ -1009,11 +1008,11 @@ func (m *prospectMaj) set(colonne string, valeur any) {
 	m.colonnes = append(m.colonnes, `"`+colonne+`" = $`+strconv.Itoa(len(m.args)))
 }
 
-func (m *prospectMaj) appliquer(ctx context.Context, pool *pgxpool.Pool, id string) error {
+func (m *prospectMaj) appliquer(ctx context.Context, base db.DBTX, id string) error {
 	m.args = append(m.args, id)
 	requete := `UPDATE "prospects" SET ` + strings.Join(m.colonnes, ", ") +
 		` WHERE "id" = $` + strconv.Itoa(len(m.args))
-	_, err := pool.Exec(ctx, requete, m.args...)
+	_, err := base.Exec(ctx, requete, m.args...)
 	return err
 }
 
@@ -1069,7 +1068,20 @@ func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInpu
 	if err := s.prospectMajColonnes(maj, corps, &existant, phoneE164); err != nil {
 		return nil, err
 	}
-	if err := maj.appliquer(ctx, s.Pool, in.ID); err != nil {
+	// Même transaction : la fiche et sa trace, sinon le journal décrirait une
+	// modification défaite.
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if err := maj.appliquer(ctx, tx, in.ID); err != nil {
+			return err
+		}
+		q := s.Q.WithTx(tx)
+		apres, err := q.ProspectVivant(ctx, in.ID)
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "prospect.update", prospectEntite, in.ID,
+			prospectChampsJournal(&existant), prospectChampsJournal(&apres))
+	}); err != nil {
 		return nil, err
 	}
 	item, err := s.prospectLire(ctx, &u, in.ID)
@@ -1249,6 +1261,14 @@ func prospectDeduireWhatsapp(numero *string, phoneE164 string) db.WhatsappStatus
 		return db.WhatsappStatusMEMENUMERO
 	}
 	return db.WhatsappStatusAUTRENUMERO
+}
+
+func prospectChampsJournal(p *db.ProspectVivantRow) map[string]any {
+	return map[string]any{
+		prospectChampNom: p.Nom, socle.ProspectChampPrenom: p.Prenom, socle.ProspectChampPhone: p.PhoneE164,
+		"statut": string(p.Statut), prospectChampBanque: p.BanqueId, prospectChampSyndicat: p.SyndicatId,
+		"representantId": p.RepresentantId, "email": p.Email,
+	}
 }
 
 type ProspectOkOutput struct {

@@ -43,6 +43,7 @@ const (
 	lotCheminID = "/api/v1/lots-export/{id}"
 
 	lotDureeRepartition = 120 * time.Second
+	lotCleNom           = "name"
 )
 
 var campagnesEcriture = []socle.Role{socle.Admin, socle.Superviseur}
@@ -598,6 +599,14 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 		items = append(items, item)
 	}
 	if _, err := q.InsertLotItems(ctx, items); err != nil {
+		return "", err
+	}
+	if err := database.Auditer(ctx, q, createurID, "lot_export.create", "lot_export", lotID.String(), nil,
+		map[string]any{
+			lotCleNom: strings.TrimSpace(in.Body.Name), "cible": in.Body.Cible,
+			"projet": string(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
+			"teleconseillerIds": filtres.Distribution.TeleconseillerIds,
+		}); err != nil {
 		return "", err
 	}
 	return lotID.String(), tx.Commit(ctx)
@@ -1308,13 +1317,31 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 	return tx.Commit(ctx)
 }
 
+// La suppression emporte les fiches du lot : la trace porte ce que le lot
+// distribuait, seul moyen de dire après coup ce qui a disparu des consoles.
 func (s *service) campagneSupprimer(ctx context.Context, in *CampagneIDInput) (*struct{}, error) {
-	lignes, err := s.Q.SupprimerLot(ctx, in.ID)
+	row, err := s.lot(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	if lignes == 0 {
-		return nil, socle.Problem(http.StatusNotFound, "LOT_EXPORT_NOT_FOUND", campagneIntrouvable)
+	auteur := socle.UtilisateurCourant(ctx).ID
+	avant := map[string]any{
+		lotCleNom: row.Name, "cible": string(row.Cible), "projet": string(row.Projet),
+		"fiches": row.ItemCount, "createdById": row.CreatedById,
+		"teleconseillerIds": lotLireFiltres(row.Filters).Distribution.TeleconseillerIds,
+	}
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		lignes, err := q.SupprimerLot(ctx, in.ID)
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return socle.Problem(http.StatusNotFound, "LOT_EXPORT_NOT_FOUND", campagneIntrouvable)
+		}
+		return database.Auditer(ctx, q, auteur, "lot_export.delete", "lot_export", in.ID, avant, nil)
+	}); err != nil {
+		return nil, err
 	}
 	return &struct{}{}, nil
 }
