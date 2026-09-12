@@ -67,6 +67,8 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         headers: { Origin: window.location.origin },
       });
       if (!response.ok) throw new Error('logout failed');
+      // Un téléphone se partage : le compte suivant ne doit rien lire du précédent.
+      queryClient.clear();
       queryClient.setQueryData(meQueryOptions.queryKey, null);
       router.replace('/connexion');
     } catch {
