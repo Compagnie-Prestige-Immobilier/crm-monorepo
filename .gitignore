@@ -11,7 +11,10 @@ node_modules/
 *.tsbuildinfo
 db/
 cpi-go
+cpi-go.exe
 openapi.json
+openapi.err
+.claude/launch.json
 storage/
 web/dist/*
 apps/api
