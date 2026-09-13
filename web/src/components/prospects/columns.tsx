@@ -61,7 +61,7 @@ export interface ProspectRowActions {
 }
 
 function Empty() {
-  return <span className="text-muted-foreground">–</span>;
+  return <span className="text-muted-foreground/60 italic">–</span>;
 }
 
 export function prospectColumns(actions: ProspectRowActions): ColumnDef<ProspectRow>[] {

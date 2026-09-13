@@ -181,18 +181,32 @@ export function LotsExportView({
 
         if (lots.data.items.length === 0)
           return (
-            <div className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
+            <div className="flex flex-col items-center gap-3 rounded-lg border border-border bg-card py-16 text-center shadow-elev-sm">
               <BoxesIcon className="size-8 text-muted-foreground" aria-hidden="true" />
-              <p className="font-[600]">
-                {filtre
-                  ? 'Aucune campagne ne correspond à ces critères.'
-                  : 'Aucune campagne pour l’instant.'}
-              </p>
-              <p className="max-w-md text-[0.8125rem] text-muted-foreground">
-                {filtre
-                  ? 'Élargissez la recherche ou changez la cible.'
-                  : 'Créez-en une pour répartir des fiches.'}
-              </p>
+              <div className="flex flex-col gap-1">
+                <p className="font-[600]">
+                  {filtre
+                    ? 'Aucune campagne ne correspond à ces critères.'
+                    : 'Aucune campagne pour l’instant.'}
+                </p>
+                <p className="max-w-md text-[0.8125rem] text-muted-foreground">
+                  {filtre
+                    ? 'Élargissez la recherche ou changez la cible.'
+                    : 'Créez-en une pour répartir des fiches entre les téléconseillers.'}
+                </p>
+              </div>
+              {!filtre && canCreate ? (
+                <Button
+                  type="button"
+                  className="mt-2"
+                  onClick={() => {
+                    setCreationOuverte(true);
+                  }}
+                >
+                  <PlusIcon aria-hidden="true" />
+                  Nouvelle campagne
+                </Button>
+              ) : null}
             </div>
           );
 
@@ -209,7 +223,11 @@ export function LotsExportView({
                       >
                         {lot.name}
                       </Link>
-                      {lot.pausedAt === null ? null : <Badge variant="warning">En pause</Badge>}
+                      {lot.pausedAt === null ? (
+                        <Badge variant="success">Active</Badge>
+                      ) : (
+                        <Badge variant="warning">En pause</Badge>
+                      )}
                     </h2>
                     <div className="flex items-center gap-2">
                       <p className="text-[0.8125rem] text-muted-foreground">
@@ -231,7 +249,7 @@ export function LotsExportView({
                     </div>
                   </div>
                   <div className="flex flex-wrap items-center gap-2 text-[0.875rem]">
-                    <span className="inline-flex items-center rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-secondary-foreground">
+                    <span className="inline-flex items-center rounded-md bg-secondary px-2.5 py-0.5 text-xs font-semibold text-secondary-foreground">
                       {lot.scopeLabel}
                     </span>
                     <span className="text-muted-foreground">·</span>
