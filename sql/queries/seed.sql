@@ -24,7 +24,7 @@ ON CONFLICT ("code") DO UPDATE SET "name" = $3, "departementId" = $4, "updatedAt
 -- name: SeedUpsertBanque :exec
 INSERT INTO "banques" ("id", "name", "shortName", "sortOrder", "updatedAt")
 VALUES ($1, $2, $3, $4, now())
-ON CONFLICT ("name") DO UPDATE SET "shortName" = $3, "sortOrder" = $4, "updatedAt" = now();
+ON CONFLICT ("shortName") DO UPDATE SET "name" = $2, "sortOrder" = $4, "updatedAt" = now();
 
 -- name: SeedUpsertSyndicat :exec
 INSERT INTO "syndicats" ("id", "name", "sigle", "secteur", "sortOrder", "updatedAt")
