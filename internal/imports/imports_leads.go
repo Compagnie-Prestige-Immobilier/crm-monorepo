@@ -123,26 +123,24 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 	// relevé qui avait créé 167 fiches, et le privait de ses destinataires.
 	estSucces := job.Status == db.ImportStatusSucceeded && job.Mode == db.ImportModeAPPLY
 
+	// Le lecteur de ce relevé lance des campagnes, il ne corrige pas de classeur :
+	// les lignes lues et refusées ne lui servent qu'à s'inquiéter. Elles restent
+	// dans l'écran Imports et dans le courriel d'échec, qui part aux personnes en
+	// copie. Le nom du fichier ne bouge jamais d'un jour à l'autre : en objet, il
+	// donnait chaque matin le même message.
 	if estSucces {
-		intro := "Le classeur des leads a été importé avec succès et est maintenant disponible pour le lancement d’une campagne."
-		if job.ErrorRows > 0 {
-			intro = fmt.Sprintf("Le classeur des leads a été importé et est disponible pour le lancement d’une campagne. %s ligne(s) ont été refusées, le détail est dans l’écran Imports.", valeurs["refusees"])
-		}
 		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 			Type:          notifications.CourrielImportLeads,
-			Sujet:         "[Leads] Relevé des leads importé : " + job.FileName,
+			Sujet:         fmt.Sprintf("[Leads] %s nouvelles fiches, %s", valeurs["creees"], time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
 			Destinataires: reglages.ImportLeads.Destinataires,
 			Copies:        reglages.ImportLeads.Copies,
 			ObjetType:     "import",
 			ObjetID:       job.ID,
 			Titre:         "Relevé des leads",
-			Intro:         intro,
+			Intro:         "Les nouveaux leads sont disponibles pour le lancement d’une campagne.",
 			Lignes: [][2]string{
-				{"Fichier", job.FileName},
 				{libelleChampDate, dateStr},
-				{"Leads lus", valeurs["lues"]},
 				{"Leads créés", valeurs["creees"]},
-				{"Leads refusés", valeurs["refusees"]},
 			},
 			Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
 			LibelleLien: "Voir le détail dans CPI GO",
