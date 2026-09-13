@@ -32,15 +32,6 @@ import { adminApi } from './fixtures';
 
 type Role = 'ADMIN' | 'DIRECTION' | 'SUPERVISEUR' | 'COMMERCIAL' | 'ACCUEIL' | 'BANQUE_FINANCE';
 
-const TOUS: readonly Role[] = [
-  'ADMIN',
-  'DIRECTION',
-  'SUPERVISEUR',
-  'COMMERCIAL',
-  'ACCUEIL',
-  'BANQUE_FINANCE',
-];
-
 /** `ROLE_LABELS` de `apps/web/src/lib/types.ts`, tel que le refus l'écrit. */
 const LIBELLE_DU_ROLE: Record<Role, string> = {
   ADMIN: 'Administrateur',

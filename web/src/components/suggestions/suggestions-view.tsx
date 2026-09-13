@@ -71,14 +71,11 @@ export function isSuspiciousSuggestion(suggestion: Suggestion): boolean {
   ];
   if (keywords.some((k) => text.includes(k))) return true;
 
-  if (
-    (suggestion.suggestedName === null || suggestion.suggestedName.trim() === '') &&
-    (suggestion.note === null || suggestion.note.trim() === '')
-  ) {
-    return true;
-  }
+  return estVide(suggestion.suggestedName) && estVide(suggestion.note);
+}
 
-  return false;
+function estVide(valeur: string | null): boolean {
+  return valeur === null || valeur.trim() === '';
 }
 
 export function SuggestionsView() {
@@ -126,9 +123,8 @@ export function SuggestionsView() {
   const counts = suggestionCountsByPhone(items);
   const total = data?.total ?? 0;
 
-  const suspiciousItems = useMemo(
-    () => items.filter((item) => item.status === 'A_APPELER' && isSuspiciousSuggestion(item)),
-    [items],
+  const suspiciousItems = items.filter(
+    (item) => item.status === 'A_APPELER' && isSuspiciousSuggestion(item),
   );
 
   const prefill = useMemo(
@@ -354,13 +350,10 @@ function SuggestionCard({
 
   return (
     <article
-      className={`flex flex-col gap-3 rounded-lg border p-4 shadow-elev-sm transition-colors ${
-        isSelected
-          ? 'border-primary/60 bg-accent/30'
-          : isSuspicious
-            ? 'border-destructive/40 bg-destructive-surface/20'
-            : 'border-border bg-card'
-      }`}
+      className={`flex flex-col gap-3 rounded-lg border p-4 shadow-elev-sm transition-colors ${classeCarte(
+        isSelected,
+        isSuspicious,
+      )}`}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="flex items-start gap-3 min-w-0">
@@ -427,49 +420,7 @@ function SuggestionCard({
           {formatDateTime(suggestion.clientCreatedAt)}
         </time>
 
-        {isParrainOpen ? (
-          <div className="absolute left-0 top-6 z-20 w-80 rounded-lg border border-border bg-card p-3 shadow-lg flex flex-col gap-2 text-[0.8125rem] text-foreground animate-in fade-in zoom-in-95 duration-150">
-            <div className="flex items-center justify-between border-b border-border pb-1.5 font-[600]">
-              <span className="flex items-center gap-1.5">
-                👤 Représentant Parrain ({suggestion.sourceRepresentantShortCode})
-              </span>
-              <button
-                type="button"
-                onClick={onToggleParrain}
-                className="text-muted-foreground hover:text-foreground text-[0.75rem]"
-              >
-                ✕
-              </button>
-            </div>
-            <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
-              <p>
-                <strong className="text-foreground">Code court :</strong>{' '}
-                {suggestion.sourceRepresentantShortCode}
-              </p>
-              <p>
-                <strong className="text-foreground">Recueilli par :</strong>{' '}
-                {suggestion.suggestedByName}
-              </p>
-              <p>
-                <strong className="text-foreground">Date :</strong>{' '}
-                {formatDateTime(suggestion.clientCreatedAt)}
-              </p>
-              {suggestion.note ? (
-                <p className="mt-1 text-foreground bg-muted/60 p-2 rounded text-[0.75rem]">
-                  💬 <em>"{suggestion.note}"</em>
-                </p>
-              ) : null}
-            </div>
-            {suggestion.sourceRepresentantId ? (
-              <Link
-                href={`/chues/representants/${suggestion.sourceRepresentantId}`}
-                className="mt-1 text-center text-[0.75rem] font-[600] text-primary hover:underline"
-              >
-                Consulter la fiche complète du parrain →
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
+        {isParrainOpen ? <BulleParrain suggestion={suggestion} onFermer={onToggleParrain} /> : null}
       </div>
 
       <div className="flex flex-wrap gap-2">
@@ -517,5 +468,56 @@ function SuggestionCard({
         )}
       </div>
     </article>
+  );
+}
+
+function classeCarte(isSelected: boolean, isSuspicious: boolean): string {
+  if (isSelected) return 'border-primary/60 bg-accent/30';
+  if (isSuspicious) return 'border-destructive/40 bg-destructive-surface/20';
+  return 'border-border bg-card';
+}
+
+function BulleParrain({ suggestion, onFermer }: { suggestion: Suggestion; onFermer: () => void }) {
+  return (
+    <div className="absolute left-0 top-6 z-20 w-80 rounded-lg border border-border bg-card p-3 shadow-lg flex flex-col gap-2 text-[0.8125rem] text-foreground animate-in fade-in zoom-in-95 duration-150">
+      <div className="flex items-center justify-between border-b border-border pb-1.5 font-[600]">
+        <span className="flex items-center gap-1.5">
+          👤 Représentant Parrain ({suggestion.sourceRepresentantShortCode})
+        </span>
+        <button
+          type="button"
+          onClick={onFermer}
+          className="text-muted-foreground hover:text-foreground text-[0.75rem]"
+        >
+          ✕
+        </button>
+      </div>
+      <div className="flex flex-col gap-1 text-[0.75rem] text-muted-foreground">
+        <p>
+          <strong className="text-foreground">Code court :</strong>{' '}
+          {suggestion.sourceRepresentantShortCode}
+        </p>
+        <p>
+          <strong className="text-foreground">Recueilli par :</strong> {suggestion.suggestedByName}
+        </p>
+        <p>
+          <strong className="text-foreground">Date :</strong>{' '}
+          {formatDateTime(suggestion.clientCreatedAt)}
+        </p>
+        {suggestion.note ? (
+          <p className="mt-1 text-foreground bg-muted/60 p-2 rounded text-[0.75rem]">
+            💬 <em>"{suggestion.note}"</em>
+          </p>
+        ) : null}
+      </div>
+      {suggestion.sourceRepresentantId ? (
+        <Link
+          href={`/chues/representants/${suggestion.sourceRepresentantId}`}
+          className="mt-1 text-center text-[0.75rem] font-[600] text-primary hover:underline"
+        >
+          Consulter la fiche complète du parrain →
+        </Link>
+      ) : null}
+    </div>
   );
 }

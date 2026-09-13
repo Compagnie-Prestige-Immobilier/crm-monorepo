@@ -1,4 +1,10 @@
-import { expect, test, type APIResponse, type Page } from '@playwright/test';
+import {
+  expect,
+  test,
+  type APIRequestContext,
+  type APIResponse,
+  type Page,
+} from '@playwright/test';
 
 import { adminApi } from './fixtures';
 
@@ -83,6 +89,22 @@ function conforme(row: FicheEnBase, attendu: { fullName: string; phone: string }
   );
 }
 
+async function retirerLesFiches(
+  api: APIRequestContext,
+  lignes: readonly FicheEnBase[],
+  phone: string,
+): Promise<void> {
+  for (const row of lignes.filter((item) => item.phoneE164 === phone)) {
+    const deleted = await api.delete(`/api/v1/representants/${row.id}`, {
+      params: { cascade: 'true' },
+    });
+    expect(
+      deleted.ok(),
+      `Le ménage de ${phone} a répondu ${String(deleted.status())} : ${await deleted.text()}`,
+    ).toBe(true);
+  }
+}
+
 /**
  * Ménage puis pose des deux fiches, en le moins d'appels possible.
  *
@@ -111,15 +133,7 @@ test.beforeAll(async () => {
     if (departement === undefined) return;
 
     for (const fiche of aPoser) {
-      for (const row of liste.items.filter((item) => item.phoneE164 === fiche.phone)) {
-        const deleted = await api.delete(`/api/v1/representants/${row.id}`, {
-          params: { cascade: 'true' },
-        });
-        expect(
-          deleted.ok(),
-          `Le ménage de ${fiche.phone} a répondu ${String(deleted.status())} : ${await deleted.text()}`,
-        ).toBe(true);
-      }
+      await retirerLesFiches(api, liste.items, fiche.phone);
       const created = await api.post('/api/v1/representants', {
         data: { fullName: fiche.fullName, phone: fiche.phone, departementId: departement.id },
       });

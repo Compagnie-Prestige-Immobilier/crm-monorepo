@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
-import { adminApi, ensureWorkspaceFixtures } from './fixtures';
+import { adminApi, ensureWorkspaceFixtures, supprimerProspects } from './fixtures';
 
 /**
  * La section « Terrain » : console d'appel, saisie de prospect, cascade
@@ -50,9 +50,10 @@ test.beforeAll(async () => {
       const found = (await (
         await api.get('/api/v1/prospects', { params: { search: phone, pageSize: '50' } })
       ).json()) as { items: { id: string; phoneE164: string }[] };
-      for (const row of found.items.filter((item) => item.phoneE164 === phone)) {
-        await api.delete(`/api/v1/prospects/${row.id}`);
-      }
+      await supprimerProspects(
+        api,
+        found.items.filter((item) => item.phoneE164 === phone),
+      );
     }
   } finally {
     await api.dispose();

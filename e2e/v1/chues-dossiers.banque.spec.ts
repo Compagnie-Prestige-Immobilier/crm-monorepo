@@ -105,6 +105,29 @@ async function poserMethodeObtenue(api: APIRequestContext, prospectId: string): 
   await lire<unknown>(response);
 }
 
+async function poserLesDossiersDePagination(
+  banqueApi: APIRequestContext,
+  prospectId: string,
+): Promise<void> {
+  const deja = await lire<{ meta: { total: number } }>(
+    await banqueApi.get('/api/v1/bank-cases', {
+      params: { search: PAGINATION_PREFIXE, pageSize: '1' },
+    }),
+  );
+  if (!(deja.meta.total < PAGINATION_TOTAL)) return;
+  for (let index = 1; index <= PAGINATION_TOTAL; index += 1) {
+    const cree = await banqueApi.post('/api/v1/bank-cases', {
+      data: {
+        prospectId,
+        reference: `${PAGINATION_PREFIXE}-${String(index).padStart(2, '0')}`,
+      },
+    });
+    // 409 : la référence existe déjà, donc la volumétrie est là.
+    if (cree.status() === 409) continue;
+    await lire<{ id: string }>(cree);
+  }
+}
+
 test.beforeAll(async () => {
   test.setTimeout(180_000);
 
@@ -173,24 +196,7 @@ test.beforeAll(async () => {
       storageState: 'v1/.auth/banque.json',
     });
     try {
-      const deja = await lire<{ meta: { total: number } }>(
-        await banqueApi.get('/api/v1/bank-cases', {
-          params: { search: PAGINATION_PREFIXE, pageSize: '1' },
-        }),
-      );
-      if (deja.meta.total < PAGINATION_TOTAL) {
-        for (let index = 1; index <= PAGINATION_TOTAL; index += 1) {
-          const cree = await banqueApi.post('/api/v1/bank-cases', {
-            data: {
-              prospectId: eligible.id,
-              reference: `${PAGINATION_PREFIXE}-${String(index).padStart(2, '0')}`,
-            },
-          });
-          // 409 : la référence existe déjà, donc la volumétrie est là.
-          if (cree.status() === 409) continue;
-          await lire<{ id: string }>(cree);
-        }
-      }
+      await poserLesDossiersDePagination(banqueApi, eligible.id);
     } finally {
       await banqueApi.dispose();
     }
@@ -205,7 +211,7 @@ async function signature(chemin: string, longueur = 4): Promise<number[]> {
   for await (const morceau of createReadStream(chemin, { start: 0, end: longueur - 1 })) {
     morceaux.push(morceau as Buffer);
   }
-  return [...Buffer.concat(morceaux)];
+  return Array.from(Buffer.concat(morceaux));
 }
 
 /** Ouvre un dossier sur le client éligible de ce fichier, par les gestes. */

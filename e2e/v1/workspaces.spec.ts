@@ -23,7 +23,7 @@ async function readMagic(path: string, length = 4): Promise<number[]> {
   for await (const chunk of createReadStream(path, { start: 0, end: length - 1 })) {
     chunks.push(chunk as Buffer);
   }
-  return [...Buffer.concat(chunks)];
+  return Array.from(Buffer.concat(chunks));
 }
 
 async function expectNoErrorState(page: Page): Promise<void> {

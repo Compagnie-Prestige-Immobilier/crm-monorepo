@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Locator, type Page } from '@playwright/test';
 
-import { adminApi } from './fixtures';
+import { adminApi, supprimerProspects } from './fixtures';
 
 /**
  * GP-13 à GP-21 : la saisie d'un prospect Grand Public (`/grand-public/nouveau`).
@@ -62,9 +62,10 @@ test.beforeAll(async () => {
     const trouves = await lire<{ items: Fiche[] }>(
       await api.get('/api/v1/prospects', { params: { search: PREFIXE, pageSize: '100' } }),
     );
-    for (const fiche of trouves.items) {
-      if (fiche.prenom.startsWith(PREFIXE)) await api.delete(`/api/v1/prospects/${fiche.id}`);
-    }
+    await supprimerProspects(
+      api,
+      trouves.items.filter((fiche) => fiche.prenom.startsWith(PREFIXE)),
+    );
   } finally {
     await api.dispose();
   }

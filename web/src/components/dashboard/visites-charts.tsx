@@ -315,6 +315,18 @@ export function EscalierChart(props: ItemsChartProps) {
   return <LineSeries {...props} stepped />;
 }
 
+function PartUnique({ item }: { item: NamedCount | undefined }) {
+  return (
+    <Frame>
+      <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
+        <strong className="font-display text-3xl font-[700] text-foreground">
+          {formatNumber(item?.value ?? 0)}
+        </strong>
+        <span className="text-xs text-muted-foreground">{item?.label ?? 'Aucune donnée'}</span>
+      </div>
+    </Frame>
+  );
+}
 function Share({
   items,
   presentation,
@@ -332,19 +344,7 @@ function Share({
     onSelect === undefined
       ? {}
       : { onClick: (datum: { id: string | number }) => onSelect(clickIndex(items, datum.id)) };
-  if (items.length < 2) {
-    const item = items[0];
-    return (
-      <Frame>
-        <div className="flex h-full flex-col items-center justify-center gap-1 text-center">
-          <strong className="font-display text-3xl font-[700] text-foreground">
-            {formatNumber(item?.value ?? 0)}
-          </strong>
-          <span className="text-xs text-muted-foreground">{item?.label ?? 'Aucune donnée'}</span>
-        </div>
-      </Frame>
-    );
-  }
+  if (items.length < 2) return <PartUnique item={items[0]} />;
   return (
     <Frame>
       <ResponsivePie
@@ -504,7 +504,7 @@ export function BullesChart({
     </Frame>
   );
 }
-export function MixteChart({ items, label = 'Visites', presentation }: ItemsChartProps) {
+export function MixteChart({ items, presentation }: ItemsChartProps) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
   const cumul = items.reduce<{ x: string; y: number }[]>(
@@ -582,12 +582,12 @@ export function CarteDeChaleurTable({
     matrice.cellules.find((cellule) => cellule.ligne === ligne && cellule.colonne === colonne)
       ?.value ?? 0;
   return (
-    <div className="h-full overflow-auto" tabIndex={0}>
+    <div className="h-full overflow-auto" role="region" aria-label={caption} tabIndex={0}>
       <table className="w-full border-collapse text-[0.75rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>
           <tr>
-            <th />
+            <th aria-label={caption} />
             {matrice.colonnes.map((colonne) => (
               <th key={colonne} className="px-1.5 py-1 text-center font-[600]">
                 {colonne}
@@ -631,7 +631,7 @@ export function TableauWidget({
 }) {
   const total = items.reduce((sum, item) => sum + item.value, 0);
   return (
-    <div className="h-full overflow-auto" tabIndex={0}>
+    <div className="h-full overflow-auto" role="region" aria-label={caption} tabIndex={0}>
       <table className="w-full text-[0.8125rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>
@@ -660,7 +660,7 @@ export function TableauEquipe({ donnee, caption }: { donnee: EquipeDatum; captio
   if (donnee.lignes.length === 0)
     return <EmptyChart message="Personne n’a travaillé sur la période." />;
   return (
-    <div className="h-full overflow-auto" tabIndex={0}>
+    <div className="h-full overflow-auto" role="region" aria-label={caption} tabIndex={0}>
       <table className="min-w-[42rem] w-full text-[0.875rem]">
         <caption className="sr-only">{caption}</caption>
         <thead>

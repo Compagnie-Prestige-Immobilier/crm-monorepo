@@ -25,14 +25,11 @@ export function ProspectsView({
   canAdminister,
   canExport = false,
   readOnly = false,
-  simplified = false,
   campaignScoped = false,
 }: {
   canAdminister: boolean;
   canExport?: boolean;
   readOnly?: boolean;
-  /** Les critères repliés le RESTENT à l'ouverture, même venus d'un lien filtré. */
-  simplified?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {

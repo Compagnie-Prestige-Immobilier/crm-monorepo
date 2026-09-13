@@ -441,6 +441,16 @@ function resumeDernierAppel(prospect: ProspectRow): string {
   return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
 }
 
+function estInjoignable(outcome: CallOutcome | null): boolean {
+  return outcome === 'UNREACHABLE' || outcome === 'WRONG_NUMBER' || outcome === 'OTHER';
+}
+
+function libelleMotif(outcome: CallOutcome | null): string {
+  if (outcome === 'WRONG_NUMBER') return 'Mauvais numéro';
+  if (outcome === 'OTHER') return 'Autre';
+  return 'Ne répond pas';
+}
+
 /**
  * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
  * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
@@ -692,6 +702,48 @@ function Consignation({
     },
   });
 
+  function motifInjoignable(): React.ReactNode {
+    if (!estInjoignable(draftOutcome)) return null;
+    return (
+      <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+          Motif de non-joignabilité
+        </span>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            type="button"
+            variant={draftOutcome === 'UNREACHABLE' ? 'default' : 'outline'}
+            onClick={() => setDraftOutcome('UNREACHABLE')}
+          >
+            Ne répond pas
+          </Button>
+          <Button
+            type="button"
+            variant={draftOutcome === 'WRONG_NUMBER' ? 'default' : 'outline'}
+            onClick={() => setDraftOutcome('WRONG_NUMBER')}
+          >
+            Mauvais numéro
+          </Button>
+          <Button
+            type="button"
+            variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
+            onClick={() => {
+              setDraftOutcome('OTHER');
+              commentRef.current?.focus();
+            }}
+          >
+            Autre
+          </Button>
+        </div>
+        <div className="flex flex-wrap gap-2 pt-2">
+          <Button onClick={validate} disabled={send.isPending}>
+            Enregistrer l’issue ({libelleMotif(draftOutcome)})<Kbd>Entrée</Kbd>
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
@@ -746,13 +798,7 @@ function Consignation({
             <Button
               type="button"
               size="lg"
-              variant={
-                draftOutcome === 'UNREACHABLE' ||
-                draftOutcome === 'WRONG_NUMBER' ||
-                draftOutcome === 'OTHER'
-                  ? 'default'
-                  : 'outline'
-              }
+              variant={estInjoignable(draftOutcome) ? 'default' : 'outline'}
               className="min-w-36 justify-center gap-2 font-semibold"
               onClick={() => {
                 choisir('UNREACHABLE');
@@ -764,52 +810,7 @@ function Consignation({
           </div>
         </fieldset>
 
-        {draftOutcome !== 'UNREACHABLE' &&
-        draftOutcome !== 'WRONG_NUMBER' &&
-        draftOutcome !== 'OTHER' ? null : (
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Motif de non-joignabilité
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={draftOutcome === 'UNREACHABLE' ? 'default' : 'outline'}
-                onClick={() => setDraftOutcome('UNREACHABLE')}
-              >
-                Ne répond pas
-              </Button>
-              <Button
-                type="button"
-                variant={draftOutcome === 'WRONG_NUMBER' ? 'default' : 'outline'}
-                onClick={() => setDraftOutcome('WRONG_NUMBER')}
-              >
-                Mauvais numéro
-              </Button>
-              <Button
-                type="button"
-                variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
-                onClick={() => {
-                  setDraftOutcome('OTHER');
-                  commentRef.current?.focus();
-                }}
-              >
-                Autre
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={validate} disabled={send.isPending}>
-                Enregistrer l’issue (
-                {draftOutcome === 'WRONG_NUMBER'
-                  ? 'Mauvais numéro'
-                  : draftOutcome === 'OTHER'
-                    ? 'Autre'
-                    : 'Ne répond pas'}
-                )<Kbd>Entrée</Kbd>
-              </Button>
-            </div>
-          </div>
-        )}
+        {motifInjoignable()}
 
         {conversion === null ? null : (
           <>

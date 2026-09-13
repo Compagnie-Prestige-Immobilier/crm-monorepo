@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
-import { adminApi } from './fixtures';
+import { adminApi, supprimerProspects } from './fixtures';
 
 /**
  * Étape 2 du projet CHUES : `/chues/prospects/nouveau`, vu par un
@@ -41,9 +41,10 @@ test.beforeAll(async () => {
     const anciens = await attendu<{ items: { id: string; prenom: string }[] }>(
       await api.get('/api/v1/prospects', { params: { search: PREFIXE, pageSize: '100' } }),
     );
-    for (const fiche of anciens.items) {
-      if (fiche.prenom === PREFIXE) await api.delete(`/api/v1/prospects/${fiche.id}`);
-    }
+    await supprimerProspects(
+      api,
+      anciens.items.filter((fiche) => fiche.prenom === PREFIXE),
+    );
 
     const departements = await attendu<{ id: string; regionId: string; regionName: string }[]>(
       await api.get('/api/v1/referentiels/departements', { params: { activeOnly: 'false' } }),

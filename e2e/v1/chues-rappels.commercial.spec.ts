@@ -1,6 +1,6 @@
-import { expect, request, test } from '@playwright/test';
+import { expect, request, test, type Page } from '@playwright/test';
 
-import { adminApi } from './fixtures';
+import { adminApi, supprimerProspects } from './fixtures';
 
 /**
  * La file des rappels promis, vue par le téléconseiller qui les a promis.
@@ -65,7 +65,7 @@ const idDe = (cle: string): string => {
   return id;
 };
 
-const fileVide = async (page: import('@playwright/test').Page): Promise<void> => {
+const fileVide = async (page: Page): Promise<void> => {
   await page.route('**/api/v1/phase2/callbacks**', async (route) => {
     await route.fulfill({
       status: 200,
@@ -95,9 +95,10 @@ test.beforeAll(async () => {
       const found = (await (
         await api.get('/api/v1/prospects', { params: { search: row.phone, pageSize: '50' } })
       ).json()) as { items: { id: string; phoneE164: string }[] };
-      for (const existante of found.items.filter((item) => item.phoneE164 === row.phone)) {
-        await api.delete(`/api/v1/prospects/${existante.id}`);
-      }
+      await supprimerProspects(
+        api,
+        found.items.filter((item) => item.phoneE164 === row.phone),
+      );
 
       const cree = await api.post('/api/v1/prospects', {
         data: { nom: row.nom, prenom: 'Fiche', phone: row.phone },

@@ -155,7 +155,7 @@ async function signature(chemin: string): Promise<number[]> {
   for await (const morceau of createReadStream(chemin, { start: 0, end: 3 })) {
     morceaux.push(morceau as Buffer);
   }
-  return [...Buffer.concat(morceaux)];
+  return Array.from(Buffer.concat(morceaux));
 }
 
 async function directionApi(): Promise<APIRequestContext> {

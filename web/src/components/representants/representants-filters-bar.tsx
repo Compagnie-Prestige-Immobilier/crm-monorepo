@@ -383,6 +383,49 @@ function presenceFromValue(value: string): boolean | null {
   return null;
 }
 
+function chipsDesReferentiels(
+  filters: RepresentantFilters,
+  reference: Referentiels,
+  statuts: readonly { id: string; label: string }[] | undefined,
+): AdvancedChipItem<RepresentantAdvancedFilterKey>[] {
+  const choix: {
+    key: RepresentantAdvancedFilterKey;
+    field: string;
+    id: string | null;
+    options: readonly { id: string; label: string }[];
+  }[] = [
+    {
+      key: 'statutQualificationId',
+      field: 'Statut de qualification',
+      id: filters.statutQualificationId,
+      options: statuts ?? [],
+    },
+    {
+      key: 'departementId',
+      field: 'Département',
+      id: filters.departementId,
+      options: departementsDe(reference).map((d) => ({ id: d.id, label: d.name })),
+    },
+    {
+      key: 'iefId',
+      field: 'IEF',
+      id: filters.iefId,
+      options: iefsDe(reference).map((i) => ({ id: i.id, label: i.name })),
+    },
+    {
+      key: 'commercialId',
+      field: 'Téléconseiller',
+      id: filters.commercialId,
+      options: commerciauxDe(reference).map((c) => ({ id: c.value, label: c.label })),
+    },
+  ];
+  return choix.flatMap(({ key, field, id, options }) =>
+    id === null
+      ? []
+      : [{ key, field, value: options.find((o) => o.id === id)?.label ?? 'Sélectionné' }],
+  );
+}
+
 function buildChips(
   filters: RepresentantFilters,
   reference: Referentiels,
@@ -397,38 +440,7 @@ function buildChips(
       value: REPRESENTANT_RELATION_LABELS[filters.relationStatus],
     });
   }
-  if (filters.statutQualificationId !== null) {
-    const statut = statuts?.find((s) => s.id === filters.statutQualificationId);
-    chips.push({
-      key: 'statutQualificationId',
-      field: 'Statut de qualification',
-      value: statut?.label ?? 'Sélectionné',
-    });
-  }
-  if (filters.departementId !== null) {
-    const dep = reference?.departements.find((d) => d.id === filters.departementId);
-    chips.push({
-      key: 'departementId',
-      field: 'Département',
-      value: dep?.name ?? 'Sélectionné',
-    });
-  }
-  if (filters.iefId !== null) {
-    const ief = reference?.iefs.find((i) => i.id === filters.iefId);
-    chips.push({
-      key: 'iefId',
-      field: 'IEF',
-      value: ief?.name ?? 'Sélectionné',
-    });
-  }
-  if (filters.commercialId !== null) {
-    const com = reference?.commerciaux.find((c) => c.value === filters.commercialId);
-    chips.push({
-      key: 'commercialId',
-      field: 'Téléconseiller',
-      value: com?.label ?? 'Sélectionné',
-    });
-  }
+  chips.push(...chipsDesReferentiels(filters, reference, statuts));
   if (filters.dateFrom !== null) {
     chips.push({
       key: 'dateFrom',

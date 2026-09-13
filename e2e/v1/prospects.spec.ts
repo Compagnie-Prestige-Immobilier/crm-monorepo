@@ -22,7 +22,7 @@ async function readMagic(path: string): Promise<number[]> {
   for await (const chunk of createReadStream(path, { start: 0, end: 3 })) {
     chunks.push(chunk as Buffer);
   }
-  return [...Buffer.concat(chunks)];
+  return Array.from(Buffer.concat(chunks));
 }
 
 test('le jeton de session reste hors de portée du JavaScript de la page', async ({ page }) => {
