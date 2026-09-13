@@ -3,7 +3,6 @@ module cpi-go
 go 1.26.2
 
 require (
-	github.com/alexedwards/argon2id v1.0.0
 	github.com/danielgtaylor/huma/v2 v2.39.1
 	github.com/go-co-op/gocron/v2 v2.22.0
 	github.com/google/uuid v1.6.0
@@ -42,7 +41,7 @@ require (
 	github.com/xuri/efp v0.0.1 // indirect
 	github.com/xuri/nfp v0.0.2-0.20250530014748-2ddeb826f9a9 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
-	golang.org/x/image v0.38.0 // indirect
+	golang.org/x/image v0.45.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/sync v0.23.0 // indirect
 	golang.org/x/sys v0.48.0 // indirect
