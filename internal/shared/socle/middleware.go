@@ -82,7 +82,7 @@ func EcrireProblem(w http.ResponseWriter, r *http.Request, p *ProblemError) {
 	}
 	w.Header().Set("Content-Type", "application/problem+json")
 	w.WriteHeader(p.Status)
-	_, _ = w.Write(corps)
+	_, _ = w.Write(corps) // nosemgrep: go.lang.security.audit.xss.no-direct-write-to-responsewriter -- JSON problem+json, jamais du HTML
 }
 
 func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) http.Handler {

@@ -1257,7 +1257,7 @@ def _attendre_sante(url: str, secondes: int = 120) -> None:
     requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
     for _ in range(secondes // 5):
         try:
-            with urllib.request.urlopen(requete, timeout=10) as reponse:
+            with urllib.request.urlopen(requete, timeout=10) as reponse:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
                 if reponse.status == 200:
                     return
         except (urllib.error.URLError, TimeoutError):

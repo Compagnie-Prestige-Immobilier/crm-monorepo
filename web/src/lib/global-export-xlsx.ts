@@ -75,13 +75,16 @@ async function exportChartPng(
   return canvas.toDataURL('image/png');
 }
 
+const XML_ENTITIES: Record<string, string> = {
+  '&': '&amp;',
+  '<': '&lt;',
+  '>': '&gt;',
+  '"': '&quot;',
+  "'": '&apos;',
+};
+
 function escapeXml(value: string): string {
-  return value
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&apos;');
+  return value.replace(/[&<>"']/g, (character) => XML_ENTITIES[character] ?? character);
 }
 
 function chartGroups(sheet: Worksheet): Map<string, { label: string; value: number }[]> {

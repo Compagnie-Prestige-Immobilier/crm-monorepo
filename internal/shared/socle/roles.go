@@ -34,7 +34,7 @@ var (
 // Une entrée par route, clé "METHODE chemin huma", fusion des gardes de chaque
 // domaine (domaines.go). Toute route sans entrée, ou toute entrée sans route,
 // arrête le démarrage (verifierGarde).
-var Garde = map[string][]Role{}
+var Garde map[string][]Role
 
 // Construite UNE fois. Toutes les instances montent les mêmes routes, donc la
 // carte est identique à chaque appel ; la reconstruire écrivait dans une map que
@@ -45,6 +45,7 @@ var gardesConstruites sync.Once
 
 func FusionnerGardes(gardes ...map[string][]Role) {
 	gardesConstruites.Do(func() {
+		Garde = make(map[string][]Role)
 		for _, g := range gardes {
 			maps.Copy(Garde, g)
 		}

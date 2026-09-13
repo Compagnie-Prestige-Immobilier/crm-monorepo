@@ -1,0 +1,3 @@
+[[IgnoredVulns]]
+id = "GO-2026-5932"
+reason = "Vise seulement golang.org/x/crypto/openpgp, que le binaire n'importe pas (go list -deps). Aucune version corrigee n'existe."
