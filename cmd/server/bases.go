@@ -124,7 +124,7 @@ func (s *serviceBases) creer(ctx context.Context, in *BaseCreerInput) (*BasesOut
 	if err := creerBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
 		return nil, err
 	}
-	pool, i, err := monterBaseDemo(travail, s.Cfg, s.reg, baseSQL, nom)
+	pool, i, err := monterBaseDemo(travail, s.Cfg, s.reg, baseSQL, nom, true)
 	if err != nil {
 		detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
 		return nil, err
@@ -258,8 +258,11 @@ func poserSchemaSiVide(ctx context.Context, dsn string) error {
 	return err
 }
 
+// `semerAussi` n'est vrai qu'à la création. Le semis est idempotent, donc le
+// rejouer ne casserait rien, mais il refabriquerait 240 représentants et leurs
+// prospects à chaque démarrage, pour chaque base, avant la première requête.
 func monterBaseDemo(ctx context.Context, principal *socle.Config, reg *registre,
-	baseSQL, nom string,
+	baseSQL, nom string, semerAussi bool,
 ) (*pgxpool.Pool, *instance, error) {
 	dsn, err := urlPourBase(principal.DatabaseURL, baseSQL)
 	if err != nil {
@@ -274,9 +277,11 @@ func monterBaseDemo(ctx context.Context, principal *socle.Config, reg *registre,
 	if err != nil {
 		return nil, nil, err
 	}
-	if err := semer(ctx, pool, &cfg); err != nil {
-		pool.Close()
-		return nil, nil, fmt.Errorf("semis de %s : %w", nom, err)
+	if semerAussi {
+		if err := semer(ctx, pool, &cfg); err != nil {
+			pool.Close()
+			return nil, nil, fmt.Errorf("semis de %s : %w", nom, err)
+		}
 	}
 	i, err := instancier(&cfg, pool, reg)
 	if err != nil {
@@ -295,7 +300,7 @@ func remonterBasesDemo(ctx context.Context, d *socle.Deps, reg *registre) {
 		return
 	}
 	for i := range lignes {
-		pool, inst, err := monterBaseDemo(ctx, d.Cfg, reg, lignes[i].BaseSql, lignes[i].Nom)
+		pool, inst, err := monterBaseDemo(ctx, d.Cfg, reg, lignes[i].BaseSql, lignes[i].Nom, false)
 		if err != nil {
 			slog.Error("base de démonstration non remontée", "nom", lignes[i].Nom, "err", err)
 			continue
