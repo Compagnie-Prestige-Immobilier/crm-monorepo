@@ -89,6 +89,48 @@ func TestSeedEstIdempotent(t *testing.T) {
 	}
 }
 
+// La regle des comptes de demonstration est fermee par defaut. L'ancienne les
+// desactivait sur `NODE_ENV == "production"` : la variable etait absente en
+// production, et les sept comptes y sont restes ouverts avec un mot de passe
+// ecrit dans ce depot. Il faut desormais une raison POSITIVE de les semer.
+func TestSeedComptesFixturesFermesParDefaut(t *testing.T) {
+	pool, cfg, ctx := seedTestPool(t)
+	seedTestCompteAdmin(t, ctx, pool, uuid.NewString())
+
+	cas := []struct {
+		nom     string
+		base    string
+		nodeEnv string
+		semes   bool
+	}{
+		{"production, variable absente", socle.BasePublique, "", false},
+		{"production declaree", socle.BasePublique, "production", false},
+		{"poste de developpement", socle.BasePublique, "development", true},
+		{"base de demonstration en production", "formation", "production", true},
+	}
+	for _, c := range cas {
+		t.Run(c.nom, func(t *testing.T) {
+			t.Setenv("NODE_ENV", c.nodeEnv)
+			local := *cfg
+			local.Base = c.base
+			if err := semer(ctx, pool, &local); err != nil {
+				t.Fatal(err)
+			}
+			var actifs int
+			if err := pool.QueryRow(ctx,
+				`SELECT COUNT(*) FROM "users" WHERE "email" LIKE 'fixture.%' AND "isActive"`).Scan(&actifs); err != nil {
+				t.Fatal(err)
+			}
+			if c.semes && actifs == 0 {
+				t.Fatal("les comptes de demonstration devraient etre ouverts")
+			}
+			if !c.semes && actifs != 0 {
+				t.Fatalf("%d compte(s) de demonstration ouverts sur la base principale", actifs)
+			}
+		})
+	}
+}
+
 func TestSeedGeographieComplete(t *testing.T) {
 	pool, cfg, ctx := seedTestPool(t)
 	seedTestCompteAdmin(t, ctx, pool, uuid.NewString())

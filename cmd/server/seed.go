@@ -48,12 +48,12 @@ func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 			return err
 		}
 	}
-	// Le nom de la base decide, et non `NODE_ENV` : une variable d'environnement
-	// s'oublie, et c'est exactement ce qui est arrivé en production, où les
-	// comptes fixtures sont restés ouverts faute de l'avoir posée. La base
-	// principale n'a jamais de comptes de démonstration ni de jeu d'essai ;
-	// toute base de démonstration en a toujours.
-	demonstration := cfg.Base != socle.BasePublique
+	// Fermé par défaut. L'ancienne règle DÉSACTIVAIT les comptes de démonstration
+	// sur `NODE_ENV == "production"` : la variable n'était pas posée en
+	// production, et les sept comptes y sont restés ouverts avec un mot de passe
+	// écrit dans ce dépôt. Ici il faut une raison POSITIVE de les semer, une base
+	// de démonstration ou un poste de développement déclaré.
+	demonstration := cfg.Base != socle.BasePublique || socle.Env("NODE_ENV", "") == "development"
 	if err := seedSemerFixtures(ctx, q, tx, demonstration); err != nil {
 		return err
 	}
@@ -296,9 +296,8 @@ func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
 	return nil
 }
 
-// Jamais en production : le seed tourne à chaque démarrage du conteneur et ne
-// doit pas réactiver ou re-hacher les comptes fixtures. Une base qui les porte
-// déjà les voit fermés ; ils ne se suppriment pas, des fiches peuvent les citer.
+// Jamais sur la base principale d'une production : elle les voit fermés. Ils ne
+// se suppriment pas, des fiches peuvent les citer.
 func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstration bool) error {
 	emails := make([]string, len(seedFixtureUsers))
 	for i, f := range seedFixtureUsers {
@@ -334,10 +333,17 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstrat
 		}
 		crees += lignes
 	}
+	// Ils ne se créent que s'ils sont absents : sans cette reprise, un compte
+	// fermé une fois par un semis de base principale le resterait pour toujours,
+	// même sur une base qui a le droit d'en porter.
+	rouverts, err := q.SeedEnableFixtureUsers(ctx, emails)
+	if err != nil {
+		return err
+	}
 	if err := seedInsererDonneesDemo(ctx, tx); err != nil {
 		return err
 	}
-	slog.Info("seed fixtures", "total", len(seedFixtureUsers), "créés", crees)
+	slog.Info("seed fixtures", "total", len(seedFixtureUsers), "créés", crees, "rouverts", rouverts)
 	return nil
 }
 

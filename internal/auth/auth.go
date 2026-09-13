@@ -98,7 +98,8 @@ type SessionOutput struct {
 
 func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, error) {
 	adresse, _ := ctx.Value(socle.CleAdresse{}).(string)
-	if !s.tentatives.Autorise(adresse) || !s.parIdentifie.Autorise(strings.ToLower(in.Body.Identifier)) {
+	identifiant := strings.ToLower(strings.TrimSpace(in.Body.Identifier))
+	if !s.tentatives.Autorise(adresse) || !s.parIdentifie.Disponible(identifiant) {
 		return nil, socle.Problem(http.StatusTooManyRequests, "RATE_LIMITED", "Trop de tentatives. Réessayez dans une minute.")
 	}
 	u, err := s.Q.UserForLogin(ctx, in.Body.Identifier)
@@ -111,6 +112,9 @@ func (s *service) login(ctx context.Context, in *LoginInput) (*SessionOutput, er
 	// Une connexion n'etait journalisee nulle part : ni qui entre, ni qui
 	// s'acharne. C'est la premiere chose qu'on cherche apres un incident.
 	if !database.VerifierMotDePasse(in.Body.Password, condensat) || err != nil {
+		// Le jeton se consomme ICI, sur l'échec : le seau par identifiant sert à
+		// arrêter une attaque distribuée, pas à enfermer dehors qui tape juste.
+		s.parIdentifie.Autorise(identifiant)
 		slog.Warn("connexion refusée", "identifiant", in.Body.Identifier, "adresse", adresse, "cause", "identifiants")
 		return nil, socle.Problem(http.StatusUnauthorized, "INVALID_CREDENTIALS", "Identifiants invalides.")
 	}

@@ -114,3 +114,10 @@ ON CONFLICT ("email") DO NOTHING;
 -- name: SeedDisableFixtureUsers :execrows
 UPDATE "users" SET "isActive" = false, "updatedAt" = now()
 WHERE "email" = ANY($1::text[]) AND "isActive";
+
+-- Une base qui a le droit de porter des comptes de démonstration doit les avoir
+-- utilisables : le semis ne les crée que s'ils sont absents, donc un compte
+-- fermé une fois le restait pour toujours.
+-- name: SeedEnableFixtureUsers :execrows
+UPDATE "users" SET "isActive" = true, "updatedAt" = now()
+WHERE "email" = ANY($1::text[]) AND NOT "isActive" AND "deletedAt" IS NULL;
