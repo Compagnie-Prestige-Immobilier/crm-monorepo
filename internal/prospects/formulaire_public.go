@@ -584,7 +584,7 @@ func (s *service) formulaireRapprocherOuCreer(ctx context.Context, agentID strin
 // rattraper le numéro inconnu, et quand les deux désignent deux fiches, celle du
 // numéro l'emporte : fusionner serait destructeur.
 func (s *service) formulaireTrouver(ctx context.Context, saisie *formulaireSaisie) (db.ProspectParTelephoneRow, bool, error) {
-	parNumero, err := s.Q.ProspectParTelephone(ctx, saisie.phoneE164)
+	parNumero, err := s.Q.ProspectParTelephone(ctx, &saisie.phoneE164)
 	if err == nil {
 		return parNumero, true, nil
 	}
@@ -615,7 +615,7 @@ func (s *service) formulaireCreer(ctx context.Context, agentID string, saisie *f
 		return "", err
 	}
 	arg := db.InsertProspectParams{
-		ID: id.String(), Nom: saisie.nom, Prenom: saisie.prenom, PhoneE164: saisie.phoneE164,
+		ID: id.String(), Nom: saisie.nom, Prenom: saisie.prenom, PhoneE164: &saisie.phoneE164,
 		CreatedById: agentID, ClientCreatedAt: maintenant,
 		Statut: db.ProspectStatutNOUVEAU, Projet: db.ProjetCHUES,
 		Origin: prospectPtr(formulairePublicOrigine), ARevoirAt: &maintenant,
@@ -627,7 +627,7 @@ func (s *service) formulaireCreer(ctx context.Context, agentID string, saisie *f
 		DureeSystemeMois: saisie.dureeSystemeMois, WhatsappStatus: db.WhatsappStatusNONDEMANDE,
 		ChampsLibres: libres,
 	}
-	statut, numero := prospectWhatsapp(formulaireWhatsapp(saisie), nil, saisie.phoneE164)
+	statut, numero := prospectWhatsapp(formulaireWhatsapp(saisie), nil, &saisie.phoneE164)
 	if statut != nil {
 		arg.WhatsappStatus, arg.WhatsappE164 = *statut, numero
 	}

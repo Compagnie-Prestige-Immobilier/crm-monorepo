@@ -412,12 +412,16 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 	if err != nil {
 		return "", err
 	}
+	if prospect.PhoneE164 == nil {
+		return "", socle.Problem(http.StatusUnprocessableEntity, "BANK_CASE_PHONE_REQUIRED",
+			"Ce prospect n’a pas de numéro : la banque ne pourrait pas le joindre. Renseignez son téléphone.")
+	}
 	nom := banqueEspaces.ReplaceAllString(strings.TrimSpace(prospect.Prenom+" "+prospect.Nom), " ")
 	instant := time.Now()
 	err = s.transactionBanque(ctx, func(q *db.Queries) error {
 		if err := q.BankCaseInsert(ctx, db.BankCaseInsertParams{
 			ID: id.String(), Reference: banqueReferenceAffichee(reference), ReferenceKey: banqueReferenceCle(reference),
-			ProspectId: prospect.ID, CustomerName: nom, CustomerPhoneE164: prospect.PhoneE164,
+			ProspectId: prospect.ID, CustomerName: nom, CustomerPhoneE164: *prospect.PhoneE164,
 			ProcessingBankId: banqueID, CurrentStageId: initiale, CreatedById: agentID, InscriptionId: inscriptionID,
 		}); err != nil {
 			return err
@@ -1147,7 +1151,7 @@ func (s *service) banqueCreerDemande(ctx context.Context, in *CreationDemandeBan
 }
 
 func (s *service) banqueNumeroDisponible(ctx context.Context, phone string) error {
-	_, err := s.Q.ClientRequestProspectByPhone(ctx, phone)
+	_, err := s.Q.ClientRequestProspectByPhone(ctx, &phone)
 	if err == nil {
 		return problemBanque(http.StatusConflict, banqueCodeDemandeProspect,
 			"Un prospect porte déjà ce numéro. Recherchez-le par son téléphone.", map[string]any{socle.ProspectChampPhone: phone})
@@ -1288,7 +1292,7 @@ func (s *service) banqueApprouverDemande(ctx context.Context, in *ApprobationBan
 	}
 	// LECTURE GLOBALE : l'unicité du téléphone est portée par un index partiel
 	// global ; filtrée, elle laisserait créer un prospect que la base refuse.
-	if _, err := s.Q.ClientRequestProspectByPhone(ctx, demande.PhoneE164); err == nil {
+	if _, err := s.Q.ClientRequestProspectByPhone(ctx, &demande.PhoneE164); err == nil {
 		return nil, problemBanque(http.StatusConflict, banqueCodeDemandeProspect,
 			"Un prospect porte déjà ce numéro. Recherchez-le par son téléphone.",
 			map[string]any{"phoneE164": demande.PhoneE164})
@@ -1324,7 +1328,7 @@ func (s *service) banqueEcrireApprobation(ctx context.Context, u *socle.Utilisat
 	maintenant := time.Now()
 	return s.transactionBanque(ctx, func(q *db.Queries) error {
 		if err := q.ClientRequestProspectInsert(ctx, db.ClientRequestProspectInsertParams{
-			ID: prospectID.String(), Nom: demande.Nom, Prenom: demande.Prenom, PhoneE164: demande.PhoneE164,
+			ID: prospectID.String(), Nom: demande.Nom, Prenom: demande.Prenom, PhoneE164: &demande.PhoneE164,
 			BanqueId: banqueID, SyndicatId: &in.Body.SyndicatID, RepresentantId: &in.Body.RepresentantID,
 			CreatedById: u.ID, OriginLabel: &demande.BanqueName, ClientCreatedAt: saisie,
 		}); err != nil {

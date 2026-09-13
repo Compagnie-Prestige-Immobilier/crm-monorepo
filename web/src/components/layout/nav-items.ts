@@ -592,17 +592,10 @@ const SECTIONS: readonly NavSection[] = [
     items: [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
-        href: '/grand-public',
-        label: 'Grand Public',
-        icon: UsersIcon,
-        description: 'Créer, retrouver et suivre les prospects',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
-      },
-      {
         href: '/grand-public/console',
         label: 'Appeler les prospects',
-        icon: HeadsetIcon,
-        description: 'Chercher un prospect et consigner l’appel',
+        icon: PhoneCallIcon,
+        description: 'Les fiches de campagne à appeler',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
@@ -621,10 +614,18 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
+        href: '/grand-public',
+        label: 'Prospects',
+        icon: UsersIcon,
+        description: 'Créer, retrouver et suivre les prospects',
+        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        secondary: true,
+      },
+      {
         href: '/grand-public/nouveau',
-        label: 'Noter un prospect',
+        label: 'Nouveau prospect',
         icon: PlusCircleIcon,
-        description: 'Saisie d’un prospect',
+        description: 'Créer une fiche',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
         secondary: true,
       },
@@ -703,22 +704,6 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/grand-public/console',
-        label: 'Appeler les prospects',
-        icon: HeadsetIcon,
-        description: 'Chercher un prospect et consigner l’appel',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public/nouveau',
-        label: 'Noter un prospect',
-        icon: PlusCircleIcon,
-        description: 'Saisie d’un prospect',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
         href: '/grand-public/banque',
         label: 'Tableau de bord',
         icon: ChartColumnIcon,
@@ -732,7 +717,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Exporter les dossiers',
         icon: FileSpreadsheetIcon,
         description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['ADMIN'],
+        roles: ['ADMIN', 'SUPERVISEUR'],
         secondary: true,
       },
       {

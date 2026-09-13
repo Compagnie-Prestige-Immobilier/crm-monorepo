@@ -11,9 +11,13 @@ node_modules/
 *.tsbuildinfo
 db/
 cpi-go
+cpi-go.exe
 openapi.json
 storage/
 web/dist/*
+apps/api
+apps/web
+packages/*
 !web/dist/.gitkeep
 web/src/routeTree.gen.ts
 web/src/api/schema.d.ts
@@ -29,3 +33,5 @@ gitleaks-report.json
 osv-report.json
 trivy-report.json
 semgrep.sarif
+
+web/.tanstack/

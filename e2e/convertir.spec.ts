@@ -105,10 +105,16 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
 }
 
 /** La touche du raccourci entre dans le nom du bouton, sauf en 390 px. */
-function issue(page: Page, libelle: RegExp) {
-  return page
-    .getByRole('group', { name: 'Comment s’est passé l’appel ?' })
-    .getByRole('button', { name: libelle });
+/** Deux temps depuis le référentiel : le groupe, puis son motif. */
+async function issue(page: Page, groupeLibelle: string, motif: RegExp): Promise<void> {
+  await page
+    .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
+    .getByRole('button', { name: new RegExp(`${groupeLibelle}$`, 'u') })
+    .click();
+  await page
+    .getByRole('group', { name: new RegExp(`^${groupeLibelle} ·`, 'u') })
+    .getByRole('button', { name: motif })
+    .click();
 }
 
 /**
@@ -119,7 +125,7 @@ async function revenirAuxIssues(page: Page): Promise<void> {
   // La fiche est rendue quand son bouton de copie l'est : avant, Échap
   // fermerait le dialogue d'ouverture et non le dossier.
   await expect(page.getByRole('button', { name: /^Copier/u })).toBeVisible();
-  const issues = page.getByRole('group', { name: 'Comment s’est passé l’appel ?' });
+  const issues = page.getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' });
   if (await issues.isVisible()) return;
   await page.keyboard.press('Escape');
   await expect(issues).toBeVisible();
@@ -176,7 +182,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     const rendezVous = rendezVousProchain();
 
     await ouvrirFiche(page, fiche);
-    await issue(page, /(^|\s)Joignable$/u).click();
+    await issue(page, 'Joignable', /Méthode obtenue$/u);
     await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
     await page.getByLabel('Commentaire').fill(commentaire);
@@ -214,7 +220,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     const suffixe = marque();
 
     await ouvrirFiche(page, fiche);
-    await issue(page, /(^|\s)Joignable$/u).click();
+    await issue(page, 'Joignable', /Méthode obtenue$/u);
     await remplirDossier(page, {
       profession: `Greffier ${suffixe}`,
       email: `omar.${suffixe}@ecole.sn`,
@@ -228,7 +234,7 @@ test.describe('parcours 5, convertir un prospect', () => {
       page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
     ).toBeVisible();
     await revenirAuxIssues(page);
-    await issue(page, /Injoignable$/u).click();
+    await issue(page, 'Injoignable', /Injoignable$/u);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 2,
@@ -237,7 +243,7 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     await ouvrirFiche(page, fiche);
     await revenirAuxIssues(page);
-    await issue(page, /Mauvais numéro$/u).click();
+    await issue(page, 'Joignable', /Faux numéro$/u);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 3,
@@ -281,7 +287,7 @@ test.describe('parcours 5 en 390 px', () => {
 
     await ouvrirFiche(page, fiche);
     await sansDebordementHorizontal(page);
-    await issue(page, /(^|\s)Joignable$/u).click();
+    await issue(page, 'Joignable', /Méthode obtenue$/u);
 
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,

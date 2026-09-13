@@ -732,7 +732,7 @@ type QualificationCallAttemptBody struct {
 	SyndicatID             *string           `json:"syndicatId,omitempty" format:"uuid"`
 	Type                   *string           `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	IncomeBandID           *string           `json:"incomeBandId,omitempty" format:"uuid"`
-	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE"`
+	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
 	DureeSystemeMois       *int32            `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300"`
 	ChampsLibres           map[string]string `json:"champsLibres,omitempty"`
 }
@@ -1133,14 +1133,14 @@ func qualificationWhatsappProspect(b *QualificationCallAttemptBody, courant *db.
 	return &pose, true, saisi, nil
 }
 
-func qualificationDeduireWhatsapp(statut, numero *string, phoneE164 string) string {
+func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 	if statut != nil {
 		return *statut
 	}
 	if numero == nil {
 		return "NON_DEMANDE"
 	}
-	if *numero == phoneE164 {
+	if phoneE164 != nil && *numero == *phoneE164 {
 		return "MEME_NUMERO"
 	}
 	return qualificationAutreNumero
