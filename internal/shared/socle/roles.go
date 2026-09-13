@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"maps"
 	"strings"
+	"sync"
 
 	"github.com/danielgtaylor/huma/v2"
 )
@@ -35,11 +36,19 @@ var (
 // arrête le démarrage (verifierGarde).
 var Garde = map[string][]Role{}
 
+// Construite UNE fois. Toutes les instances montent les mêmes routes, donc la
+// carte est identique à chaque appel ; la reconstruire écrivait dans une map que
+// la garde d'accès lit à chaque requête, et créer une base de démonstration sous
+// trafic faisait alors planter le processus sur « concurrent map read and map
+// write ».
+var gardesConstruites sync.Once
+
 func FusionnerGardes(gardes ...map[string][]Role) {
-	clear(Garde)
-	for _, g := range gardes {
-		maps.Copy(Garde, g)
-	}
+	gardesConstruites.Do(func() {
+		for _, g := range gardes {
+			maps.Copy(Garde, g)
+		}
+	})
 }
 
 func cleGarde(method, path string) string {

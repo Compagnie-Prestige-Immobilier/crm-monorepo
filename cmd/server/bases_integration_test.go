@@ -4,6 +4,7 @@ package main
 
 import (
 	"net/http"
+	"sync"
 	"testing"
 
 	"github.com/jackc/pgx/v5"
@@ -49,6 +50,41 @@ func TestBaseDemonstrationCreeeServieEtSupprimee(t *testing.T) {
 	if baseSQLExiste(t, b, baseSQL) {
 		t.Fatal("la base Postgres doit avoir disparu du serveur")
 	}
+}
+
+// Créer une base monte une instance, donc reconstruisait la carte GLOBALE des
+// gardes que la garde d'accès lit à chaque requête. Sous trafic, cela plantait
+// le processus sur « concurrent map read and map write ». À lancer avec -race.
+func TestBaseDemonstrationCreeeSousTraficNeCourtPas(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	nom := "essai-course"
+	baseSQL := prefixeBaseSQL + "essai_course"
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = $1`, nom)
+		detruireBaseSQL(b.ctx, b.dsn, baseSQL)
+	})
+
+	arret := make(chan struct{})
+	var trafic sync.WaitGroup
+	for range 8 {
+		trafic.Add(1)
+		go func() {
+			defer trafic.Done()
+			for {
+				select {
+				case <-arret:
+					return
+				default:
+					appelJSON(b, http.MethodGet, "/api/v1/auth/me", nil, nil)
+				}
+			}
+		}()
+	}
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/admin/bases", map[string]any{"nom": nom}, nil)
+	close(arret)
+	trafic.Wait()
+	b.attend(statut, http.StatusCreated, "création sous trafic", body)
 }
 
 // La base principale ne se supprime pas, et un nom hors de l'expression n'entre
