@@ -334,12 +334,10 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes d’appels',
         icon: MegaphoneIcon,
-        description: 'Fiches exportées pour le terrain',
+        description: 'Fiches exportées et distribution',
         roles: ENCADREMENT,
-        hidden: true,
-        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/parametres-chues',
@@ -394,12 +392,10 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/chues/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes d’appels',
         icon: MegaphoneIcon,
-        description: 'Fiches exportées pour le terrain',
+        description: 'Fiches exportées et distribution',
         roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
       },
       {
         href: '/chues/dossiers',
@@ -697,12 +693,10 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/grand-public/campagnes',
-        label: 'Tableau de bord',
+        label: 'Campagnes d’appels',
         icon: MegaphoneIcon,
-        description: 'Fiches exportées pour le terrain',
+        description: 'Fiches exportées et distribution',
         roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        hidden: true,
-        onglet: '/grand-public/statistiques',
       },
       {
         // Lien direct vers l'écran de l'Admin : la supervision et la direction

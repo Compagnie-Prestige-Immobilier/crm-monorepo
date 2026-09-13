@@ -135,8 +135,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await dialogue.getByRole('radio', { name: /Fiches importées/u }).check();
     await dialogue.getByRole('combobox', { name: 'Import', exact: true }).click();
     await page.getByRole('option', { name: NOM_CLASSEUR }).click();
+    await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Tout décocher' }).click();
     await dialogue.getByRole('checkbox', { name: teleconseiller.nom, exact: true }).check();
+    await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Créer la campagne' }).click();
 
     await expect(page).toHaveURL(/\/chues\/campagnes\/[0-9a-f-]+$/u);
