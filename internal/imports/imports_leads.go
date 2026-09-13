@@ -98,6 +98,13 @@ func (s *service) simulerPuisAppliquerLeads(ctx context.Context, jobID, nom stri
 
 // Le bilan du relevé part aux adresses réglées côté admin, appliqué ou refusé :
 // un classeur refusé se corrige d'autant plus vite qu'on le sait.
+func fichesCreeesLeads(creees int32) string {
+	if creees <= 1 {
+		return fmt.Sprintf("%d nouvelle fiche", creees)
+	}
+	return fmt.Sprintf("%d nouvelles fiches", creees)
+}
+
 func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 	job, err := s.Q.ImportJobByID(ctx, jobID)
 	if err != nil {
@@ -131,7 +138,7 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 	if estSucces {
 		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 			Type:          notifications.CourrielImportLeads,
-			Sujet:         fmt.Sprintf("[Leads] %s nouvelles fiches, %s", valeurs["creees"], time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
+			Sujet:         fmt.Sprintf("[Leads] %s, %s", fichesCreeesLeads(job.CreatedRows), time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
 			Destinataires: reglages.ImportLeads.Destinataires,
 			Copies:        reglages.ImportLeads.Copies,
 			ObjetType:     "import",
