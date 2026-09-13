@@ -54,13 +54,11 @@ export function BasesView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-[600]">Bases de démonstration</h1>
-        <p className="text-sm text-muted-foreground">
-          Chaque base est une copie vide du CRM, remplie de données d’exemple, avec les comptes de
-          connexion rapide. Aucun courriel n’en sort et aucune tâche planifiée n’y tourne.
-        </p>
-      </div>
+      {/* Pas de titre ici : la barre du haut porte le `h1` de chaque écran. */}
+      <p className="text-sm text-muted-foreground">
+        Chaque base est une copie vide du CRM, remplie de données d’exemple, avec les comptes de
+        connexion rapide. Aucun courriel n’en sort et aucune tâche planifiée n’y tourne.
+      </p>
 
       <Card>
         <CardHeader>

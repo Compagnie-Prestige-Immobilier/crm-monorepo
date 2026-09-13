@@ -40,13 +40,11 @@ export function ArchivesView() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div>
-        <h1 className="text-2xl font-[600]">Visites archivées</h1>
-        <p className="text-sm text-muted-foreground">
-          Retirées du registre, des statistiques et de l’impression. Elles se détruisent
-          définitivement au bout de trente jours.
-        </p>
-      </div>
+      {/* Pas de titre ici : la barre du haut porte le `h1` de chaque écran. */}
+      <p className="text-sm text-muted-foreground">
+        Retirées du registre, des statistiques et de l’impression. Elles se détruisent
+        définitivement au bout de trente jours.
+      </p>
 
       {archives.data.items.length === 0 ? (
         <EmptyState
