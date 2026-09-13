@@ -129,6 +129,52 @@ func TestAccueilVisiteCreeeAvecReferenceUniqueEtTelephoneCanonique(t *testing.T)
 	}
 }
 
+// La regle du proprietaire : archivage immediat, et seule la DIRECTION peut
+// detruire, une fois l'archive vieille de trente jours.
+func TestAccueilVisiteArchiveePuisDetruiteParLaDirection(t *testing.T) {
+	br := nouveauBancRegistre(t, "ACCUEIL")
+	visite := br.creerVisite("2019-05-02", "10:00", "SEYNABOU KA", "781112244")
+	id := visite["id"].(string)
+
+	statut, body := appelRegistre(br.banc, http.MethodDelete, "/api/v1/visites/"+id, nil)
+	br.attend(statut, http.StatusNoContent, "archivage par l’accueil", body)
+
+	statut, body = appelRegistre(br.banc, http.MethodGet, "/api/v1/visites/"+id, nil)
+	br.attend(statut, http.StatusNotFound, "une archive sort du registre", body)
+	statut, body = appelRegistre(br.banc, http.MethodGet, "/api/v1/visites?from=2019-05-02&to=2019-05-02", nil)
+	br.attend(statut, http.StatusOK, "liste du jour", body)
+	if meta, _ := body["meta"].(map[string]any); meta["total"].(float64) != 0 {
+		t.Fatalf("une archive ne compte plus dans le registre : %v", meta)
+	}
+
+	// L'accueil n'a pas le droit de detruire ; la direction non plus tant que
+	// l'archive est fraiche.
+	statut, body = appelRegistre(br.banc, http.MethodDelete, "/api/v1/visites/"+id+"/definitif", nil)
+	br.attend(statut, http.StatusForbidden, "destruction refusée à l’accueil", body)
+
+	direction := nouveauBancRegistre(t, "DIRECTION")
+	statut, body = appelRegistre(direction.banc, http.MethodDelete, "/api/v1/visites/"+id+"/definitif", nil)
+	br.attend(statut, http.StatusConflict, "archive trop récente", body)
+	if body["code"] != "ARCHIVE_TROP_RECENTE" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	if _, err := br.pool.Exec(br.ctx,
+		`UPDATE "visites" SET "deletedAt" = now() - interval '31 days' WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	statut, body = appelRegistre(direction.banc, http.MethodDelete, "/api/v1/visites/"+id+"/definitif", nil)
+	br.attend(statut, http.StatusNoContent, "destruction par la direction", body)
+
+	var reste int
+	if err := br.pool.QueryRow(br.ctx, `SELECT COUNT(*) FROM "visites" WHERE "id" = $1`, id).Scan(&reste); err != nil {
+		t.Fatal(err)
+	}
+	if reste != 0 {
+		t.Fatal("la visite doit avoir disparu de la base")
+	}
+}
+
 func TestAccueilCorrectionEffaceEtLaisseEnPlace(t *testing.T) {
 	br := nouveauBancRegistre(t, "DIRECTION")
 	visite := br.creerVisite("2019-04-10", "09:30", "FATOU DIOP", "781112233")

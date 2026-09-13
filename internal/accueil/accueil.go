@@ -63,6 +63,8 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/visites":                                 socle.Registre,
 	"GET /api/v1/visites/{id}":                             socle.Registre,
 	"PATCH /api/v1/visites/{id}":                           socle.Registre,
+	"DELETE /api/v1/visites/{id}":                          socle.Registre,
+	"DELETE /api/v1/visites/{id}/definitif":                {socle.Direction},
 	"POST /api/v1/visites/import":                          {socle.Admin, socle.Direction},
 	"GET /api/v1/visites/import/{id}":                      {socle.Admin, socle.Direction},
 	"GET /api/v1/visites/import/{id}/revue":                {socle.Admin, socle.Direction},
@@ -72,6 +74,7 @@ var Garde = map[string][]socle.Role{
 
 func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
+	monterArchivageVisites(api, s)
 	huma.Register(api, huma.Operation{
 		OperationID: "listVisiteReferentiels", Method: http.MethodGet, Path: "/api/v1/visites/referentiels",
 		Summary: "Les quatre listes de l’accueil, en un appel.",
@@ -89,11 +92,11 @@ func Monter(api huma.API, d *socle.Deps) {
 		DefaultStatus: http.StatusCreated, Summary: "Inscrit un visiteur au registre.",
 	}, s.creerVisite)
 	huma.Register(api, huma.Operation{
-		OperationID: "getVisite", Method: http.MethodGet, Path: "/api/v1/visites/{id}",
+		OperationID: "getVisite", Method: http.MethodGet, Path: cheminVisite,
 		Summary: "Une ligne du registre.",
 	}, s.lireVisite)
 	huma.Register(api, huma.Operation{
-		OperationID: "updateVisite", Method: http.MethodPatch, Path: "/api/v1/visites/{id}",
+		OperationID: "updateVisite", Method: http.MethodPatch, Path: cheminVisite,
 		Summary: "Corrige une ligne du registre.",
 	}, s.corrigerVisite)
 	monterListesVisite(api, s)
@@ -190,6 +193,7 @@ type FiltresVisites struct {
 	DestinataireID string `query:"destinataireId" format:"uuid"`
 	ObjetID        string `query:"objetId" format:"uuid"`
 	Search         string `query:"search" maxLength:"120"`
+	Archivees      bool   `query:"archivees"`
 	Page           int    `query:"page" minimum:"1" default:"1"`
 	PageSize       int    `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
 	SortBy         string `query:"sortBy" enum:"visitedAt,visitorName,entreprise,direction,destinataire,objet" default:"visitedAt"`
@@ -227,7 +231,14 @@ LEFT JOIN "visite_destinataires" s ON s."id" = v."destinataireId"`
 // Tri sur six colonnes et sept filtres facultatifs : le SQL est assemblé plutôt
 // que copié en douze requêtes sqlc (audits/go-donnees.md §10, cas D3).
 func (f *FiltresVisites) where() (clause string, args []any) {
-	conditions := []string{"true"}
+	// Une visite archivée sort du registre, des statistiques et de l'impression :
+	// c'est le seul endroit qui filtre la liste, d'où l'oubli impossible. La
+	// direction seule peut demander à voir les archives, pour les détruire.
+	etat := `v."deletedAt" IS NULL`
+	if f.Archivees {
+		etat = `v."deletedAt" IS NOT NULL`
+	}
+	conditions := []string{etat}
 	args = []any{}
 	ajouter := func(fragment string, valeur any) {
 		args = append(args, valeur)
@@ -260,6 +271,12 @@ func (f *FiltresVisites) where() (clause string, args []any) {
 }
 
 func (s *service) listerVisites(ctx context.Context, in *FiltresVisites) (*ListeVisitesOutput, error) {
+	// L'accueil ne voit pas les archives : lui rendre ce qu'il vient de retirer
+	// annulerait le geste à ses yeux.
+	if in.Archivees && socle.UtilisateurCourant(ctx).Role != socle.Direction {
+		return nil, socle.Problem(http.StatusForbidden, "FORBIDDEN",
+			"Seule la direction consulte les visites archivées.")
+	}
 	filtre, args := in.where()
 	var total int
 	if err := s.Pool.QueryRow(ctx, `SELECT count(*)::int `+jointuresVisite+" "+filtre, args...).Scan(&total); err != nil {

@@ -44,7 +44,22 @@ JOIN "visite_entreprises" e ON e."id" = v."entrepriseId"
 JOIN "visite_objets" o ON o."id" = v."objetId"
 LEFT JOIN "visite_directions" d ON d."id" = v."directionId"
 LEFT JOIN "visite_destinataires" s ON s."id" = v."destinataireId"
-WHERE v."id" = $1;
+WHERE v."id" = $1 AND v."deletedAt" IS NULL;
+
+-- name: ArchiverVisite :execrows
+UPDATE "visites" SET "deletedAt" = now(), "deletedById" = $2
+WHERE "id" = $1 AND "deletedAt" IS NULL;
+
+-- name: VisiteArchivee :one
+SELECT "id", "reference", "visitorName", "deletedAt" FROM "visites"
+WHERE "id" = $1 AND "deletedAt" IS NOT NULL;
+
+-- La destruction n'est possible qu'au bout du délai : elle est irréversible, et
+-- l'archive doit avoir eu le temps d'être revue.
+-- name: DetruireVisite :execrows
+DELETE FROM "visites"
+WHERE "id" = $1 AND "deletedAt" IS NOT NULL
+  AND "deletedAt" < now() - make_interval(days => @delai_jours::int);
 
 -- Le rang du registre court par ANNÉE et le tri lexicographique le suit tant
 -- qu'il tient sur six chiffres.
@@ -69,7 +84,7 @@ WHERE "id" = $1;
 SELECT "visitedAt", "entrepriseId", "objetId", "directionId", "destinataireId",
        "timeKnown", "createdAt", "createdById", "visitorName", "phoneE164"
 FROM "visites"
-WHERE "visitedAt" >= $1 AND "visitedAt" <= $2;
+WHERE "visitedAt" >= $1 AND "visitedAt" <= $2 AND "deletedAt" IS NULL;
 
 -- name: NomsAgentsDuRegistre :many
 SELECT "id", "fullName" FROM "users" WHERE "id" = ANY(@ids::text[]);
@@ -140,4 +155,4 @@ JOIN "visite_entreprises" e ON e."id" = v."entrepriseId"
 JOIN "visite_objets" o ON o."id" = v."objetId"
 LEFT JOIN "visite_directions" d ON d."id" = v."directionId"
 LEFT JOIN "visite_destinataires" s ON s."id" = v."destinataireId"
-WHERE v."reference" = ANY(@refs::text[]);
+WHERE v."reference" = ANY(@refs::text[]) AND v."deletedAt" IS NULL;

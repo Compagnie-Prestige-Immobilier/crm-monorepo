@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useId, useState, type ReactNode } from 'react';
 
+import { ArchiverVisite } from '@/components/accueil/archiver-visite';
 import { ImpressionDialog } from '@/components/accueil/impression-dialog';
 import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
@@ -800,16 +801,19 @@ function LigneVisite({
         {visite.comment ?? ''}
       </TableCell>
       <TableCell className="text-right print:hidden">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          aria-label={`Modifier la visite de ${visite.visitorName}`}
-          onClick={onCorriger}
-        >
-          <PencilIcon aria-hidden="true" />
-          Modifier
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            aria-label={`Modifier la visite de ${visite.visitorName}`}
+            onClick={onCorriger}
+          >
+            <PencilIcon aria-hidden="true" />
+            Modifier
+          </Button>
+          <ArchiverVisite visiteId={visite.id} visiteur={visite.visitorName} />
+        </div>
       </TableCell>
     </TableRow>
   );
