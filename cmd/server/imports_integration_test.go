@@ -527,6 +527,19 @@ func (b *banc) travauxDuClasseur(nom string) int {
 	return travaux
 }
 
+// La ligne est écrite quelle que soit l'heure : hors heures ouvrables, elle
+// attend le rejeu au lieu de partir.
+func (b *banc) bilanDuReleveEnCourriel(travail string) {
+	b.t.Helper()
+	var sujet string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "sujet" FROM "courriels" WHERE "type" = 'IMPORT_LEADS' AND "objetId" = $1`, travail).Scan(&sujet); err != nil {
+		b.t.Fatalf("le bilan du relevé doit être consigné : %v", err)
+	}
+	if !strings.HasPrefix(sujet, "[Leads] 1 nouvelle fiche, ") {
+		b.t.Fatalf("sujet : %s", sujet)
+	}
+}
+
 func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	t.Setenv("IMPORTS_DIR", t.TempDir())
@@ -560,13 +573,7 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" = $1`, *travail)
 	})
-	var sujet string
-	if err := b.pool.QueryRow(b.ctx, `SELECT "sujet" FROM "courriels" WHERE "type" = 'IMPORT_LEADS' AND "objetId" = $1`, *travail).Scan(&sujet); err != nil {
-		t.Fatalf("le bilan du relevé doit partir en courriel : %v", err)
-	}
-	if !strings.HasPrefix(sujet, "[Leads] Relevé des leads importé : ") {
-		t.Fatalf("sujet : %s", sujet)
-	}
+	b.bilanDuReleveEnCourriel(*travail)
 
 	if err := imports.ReleverLeads(b.ctx, moteur); err != nil {
 		t.Fatal(err)

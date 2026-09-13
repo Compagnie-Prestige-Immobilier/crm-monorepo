@@ -177,6 +177,24 @@ func courrielRetenu(base string) *string {
 	return &detail
 }
 
+const (
+	heurePremiereCourriel = 8
+	heureDerniereCourriel = 18
+)
+
+// Aucun courriel ne part la nuit ni le dimanche. La ligne est écrite quand
+// même : le rejeu la reprend à la première heure ouvrable, et rien ne se perd.
+func courrielHorsHeures(zone *time.Location) *string {
+	maintenant := time.Now().In(zone)
+	ouvrable := maintenant.Weekday() != time.Sunday &&
+		maintenant.Hour() >= heurePremiereCourriel && maintenant.Hour() < heureDerniereCourriel
+	if ouvrable {
+		return nil
+	}
+	detail := "Hors heures d'envoi : expédition reportée à la prochaine heure ouvrable."
+	return &detail
+}
+
 // L'envoi est tracé même sans destinataire ni transport : le journal doit
 // montrer ce qui n'est pas parti et pourquoi.
 func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
@@ -195,6 +213,9 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 		nomPDF = &c.NomPieceJointe
 	}
 	statut, erreur := CourrielEchec, courrielRetenu(d.Cfg.Base)
+	if erreur == nil {
+		erreur = courrielHorsHeures(d.Cfg.TimeZone)
+	}
 	var messageID *string
 	var envoyeLe *time.Time
 	if erreur == nil {
@@ -220,6 +241,11 @@ const (
 // Un refus de Brevo perdait le courriel : le statut passait à ECHEC et personne
 // ne le reprenait. Trois tentatives, puis la ligne reste en échec pour l'alerte.
 func (s *service) rejouerCourrielsEnEchec(ctx context.Context) error {
+	// Sans cette garde, une nuit épuiserait les trois tentatives d'un courriel
+	// simplement mis en attente, et il ne partirait jamais.
+	if courrielHorsHeures(s.Cfg.TimeZone) != nil {
+		return nil
+	}
 	lignes, err := s.Q.CourrielsARejouer(ctx, db.CourrielsARejouerParams{
 		TentativesMax: tentativesCourrielMax, Prendre: courrielsParRejeu,
 	})
