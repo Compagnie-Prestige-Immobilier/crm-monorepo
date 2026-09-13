@@ -7,6 +7,7 @@ import (
 	"cpi-go/internal/imports"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"mime/multipart"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -507,6 +509,24 @@ func (b *banc) lienDesLeads(classeur []byte, nomFichier string) string {
 	return source.URL + "/partage?e=abc"
 }
 
+// Les règles de provenance posées par migration visent « Site web », que seul le
+// seed crée : la base de la CI n'a que le schéma et les migrations.
+func (b *banc) canalSiteWeb() {
+	b.t.Helper()
+	var cree string
+	err := b.pool.QueryRow(b.ctx,
+		`INSERT INTO "canaux_provenance" ("id","code","label","position","updatedAt")
+		 VALUES (gen_random_uuid()::text, 'SITE_WEB', 'Site web', 60, now())
+		 ON CONFLICT DO NOTHING RETURNING "id"`).Scan(&cree)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return
+	}
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "canaux_provenance" WHERE "id" = $1`, cree) })
+}
+
 func (b *banc) ficheDuLead(telephone string) (projet, canal string, travail *string) {
 	b.t.Helper()
 	if err := b.pool.QueryRow(b.ctx,
@@ -542,6 +562,7 @@ func (b *banc) bilanDuReleveEnCourriel(travail string) {
 
 func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
+	b.canalSiteWeb()
 	t.Setenv("IMPORTS_DIR", t.TempDir())
 	telephone := fmt.Sprintf("+22177%07d", time.Now().UnixNano()%10_000_000)
 	nomClasseurLeads := "Leads test " + telephone[6:] + ".xlsx"
