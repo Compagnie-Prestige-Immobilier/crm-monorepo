@@ -15,9 +15,16 @@ export function etiquetteImport(projet: Projet, importedAt: string): string {
   return `Import ${projet === 'CHUES' ? 'CHUES' : 'GP'} du ${formatDateTime(importedAt)}`;
 }
 
+// Un classeur de leads porte un onglet par jour et garde le nom de fichier du
+// premier : deux lignes partagent donc l'identifiant du classeur, et seule
+// l'adjonction de l'onglet les distingue.
+export function cleImport(lot: LotExportImport): string {
+  return `${lot.id}::${lot.feuille ?? ''}`;
+}
+
 function libelle(projet: Projet, lot: LotExportImport): string {
   const pluriel = lot.fiches > 1 ? 's' : '';
-  return `${etiquetteImport(projet, lot.importedAt)} · ${formatNumber(lot.fiches)} fiche${pluriel} · ${lot.fileName}`;
+  return `${etiquetteImport(projet, lot.importedAt)} · ${formatNumber(lot.fiches)} fiche${pluriel} · ${lot.libelle}`;
 }
 
 function placeholder(chargement: boolean, vide: boolean): string {
@@ -47,11 +54,11 @@ export function ChampImport({
         <Liste
           id={props.id}
           describedBy={props['aria-describedby']}
-          items={lots.map((lot) => ({ value: lot.id, label: libelle(projet, lot) }))}
+          items={lots.map((lot) => ({ value: cleImport(lot), label: libelle(projet, lot) }))}
           value={valeur}
           placeholder={placeholder(imports.isPending, lots.length === 0)}
-          onChange={(id) => {
-            const lot = lots.find((candidat) => candidat.id === id);
+          onChange={(cle) => {
+            const lot = lots.find((candidat) => cleImport(candidat) === cle);
             if (lot !== undefined) onChange(lot);
           }}
         />

@@ -44,14 +44,16 @@ UPDATE "lots_export" SET "name" = $2 WHERE "id" = $1;
 UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 
 -- Les fiches créées par chaque import, pour le projet de la campagne à monter.
+-- Un classeur de leads porte un onglet par jour et garde le nom de fichier du
+-- premier : le lot se compte par onglet, sinon les trois jours se confondent.
 -- name: ImportsAvecFiches :many
-SELECT j."id", j."fileName", j."createdAt", j."finishedAt", COUNT(*)::int AS fiches
+SELECT j."id", j."fileName", p."importFeuille", j."createdAt", j."finishedAt", COUNT(*)::int AS fiches
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj
               WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.arg('projet')::"Projet")
-GROUP BY j."id"
-ORDER BY j."finishedAt" DESC, j."id" DESC
+GROUP BY j."id", p."importFeuille"
+ORDER BY j."finishedAt" DESC, j."id" DESC, p."importFeuille"
 LIMIT 100;
 
 -- name: EcrireFiltresLot :exec
@@ -387,6 +389,7 @@ WHERE p."deletedAt" IS NULL
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
+  AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)
@@ -402,6 +405,7 @@ WHERE p."deletedAt" IS NULL
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
+  AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)

@@ -86,6 +86,7 @@ type CampagneCritereProspects struct {
 	Type           string `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	Segment        string `json:"segment,omitempty" enum:"BDD1,BDD2,BDD3,BDD4"`
 	ImportJobID    string `json:"importJobId,omitempty" format:"uuid"`
+	ImportFeuille  string `json:"importFeuille,omitempty" maxLength:"200"`
 	IncludeDeleted bool   `json:"includeDeleted,omitempty"`
 }
 
@@ -218,6 +219,7 @@ type lotFiltres struct {
 	Type           string          `json:"type,omitempty"`
 	Segment        string          `json:"segment,omitempty"`
 	ImportJobID    string          `json:"importJobId,omitempty"`
+	ImportFeuille  string          `json:"importFeuille,omitempty"`
 	IncludeDeleted *bool           `json:"includeDeleted,omitempty"`
 	Distribution   lotDistribution `json:"distribution"`
 }
@@ -303,6 +305,9 @@ func lotScopeLabel(cible string, f *lotFiltres) string {
 		return lotScopeLabelRepresentants(f)
 	}
 	if f.ImportJobID != "" {
+		if libelle := libelleFeuilleImport(f.ImportFeuille); libelle != "" {
+			return lotSiVide(f.Projet, "Tous projets") + ", " + libelle
+		}
 		return lotSiVide(f.Projet, "Tous projets") + ", fiches importées"
 	}
 	if f.Segment != "" {
@@ -412,6 +417,7 @@ func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
 			Type:           body.Prospects.Type,
 			Segment:        body.Prospects.Segment,
 			ImportJobID:    body.Prospects.ImportJobID,
+			ImportFeuille:  body.Prospects.ImportFeuille,
 			IncludeDeleted: &inclure,
 		}
 	}
@@ -462,12 +468,13 @@ func lotProspectsCible(f *lotFiltres) db.CompterProspectsCibleParams {
 		typeProspect = &valeur
 	}
 	return db.CompterProspectsCibleParams{
-		Projet:      projet,
-		Type:        typeProspect,
-		ImportJobID: lotPointeurTexte(f.ImportJobID),
-		ParSegment:  f.Segment != "",
-		Chues:       f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
-		Cbao:        f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
+		Projet:        projet,
+		Type:          typeProspect,
+		ImportJobID:   lotPointeurTexte(f.ImportJobID),
+		ImportFeuille: lotPointeurTexte(f.ImportFeuille),
+		ParSegment:    f.Segment != "",
+		Chues:         f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
+		Cbao:          f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
 	}
 }
 
@@ -646,8 +653,8 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 	}
 	p := lotProspectsCible(f)
 	return q.TirerProspectsCible(ctx, db.TirerProspectsCibleParams{
-		Projet: p.Projet, Type: p.Type, ImportJobID: p.ImportJobID, ParSegment: p.ParSegment,
-		Chues: p.Chues, Cbao: p.Cbao, Places: lotInt32(places),
+		Projet: p.Projet, Type: p.Type, ImportJobID: p.ImportJobID, ImportFeuille: p.ImportFeuille,
+		ParSegment: p.ParSegment, Chues: p.Chues, Cbao: p.Cbao, Places: lotInt32(places),
 	})
 }
 

@@ -7,7 +7,7 @@ import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
-import { ChampImport, etiquetteImport } from '@/components/lots-export/lot-import-select';
+import { ChampImport, cleImport } from '@/components/lots-export/lot-import-select';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -239,10 +239,15 @@ function critereImport(projet: Projet, importe: LotExportImport | null): Critere
       prospects: {
         ...PROSPECTS_VIVANTS,
         projet,
-        ...(importe === null ? {} : { importJobId: importe.id }),
+        ...(importe === null
+          ? {}
+          : {
+              importJobId: importe.id,
+              ...(importe.feuille == null ? {} : { importFeuille: importe.feuille }),
+            }),
       },
     },
-    etiquette: importe === null ? 'Fiches importées' : etiquetteImport(projet, importe.importedAt),
+    etiquette: importe === null ? 'Fiches importées' : importe.libelle,
   };
 }
 
@@ -401,7 +406,7 @@ function ChampsCritere({
     return (
       <ChampImport
         projet={projetDe(choix.cle)}
-        valeur={choix.importe?.id ?? ''}
+        valeur={choix.importe === null ? '' : cleImport(choix.importe)}
         onChange={(importe) => {
           onChange({ ...choix, importe });
         }}
@@ -619,7 +624,10 @@ function ChampTeleconseillers({
                     value={objectifs[compte.id] ?? ''}
                     className="h-9 w-20 rounded-sm border border-border bg-background px-2 text-right tabular-nums"
                     onClick={(event) => {
-                      event.preventDefault();
+                      event.stopPropagation();
+                    }}
+                    onPointerDown={(event) => {
+                      event.stopPropagation();
                     }}
                     onChange={(event) => {
                       onObjectif(compte.id, event.target.value);
@@ -656,7 +664,7 @@ function ApercuLot({
   jours: number;
 }) {
   return (
-    <output className="block rounded-md border border-border bg-secondary/50 px-4 py-3 text-[0.9375rem]">
+    <output className="block rounded-md border border-primary/30 bg-primary/5 px-4 py-3 text-[0.875rem] font-medium text-foreground">
       {(() => {
         if (equipe === 0) return 'Cochez au moins un téléconseiller.';
         if (apercu.isError)
@@ -880,86 +888,102 @@ function FormulaireDeLot({
         </DialogDescription>
       </DialogHeader>
 
-      <ChoixCible cibles={cibles} groupe={groupe} choix={choix} onChange={setChoix} />
+      <div className="flex flex-col gap-6">
+        <section className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4">
+          <h3 className="text-[0.8125rem] font-semibold uppercase tracking-wider text-muted-foreground">
+            1. Cibles et fiches à exporter
+          </h3>
+          <ChoixCible cibles={cibles} groupe={groupe} choix={choix} onChange={setChoix} />
+          <ChampsCritere
+            choix={choix}
+            onChange={setChoix}
+            departements={orEmpty(departements.data)}
+            iefs={orEmpty(iefs.data)}
+          />
+        </section>
 
-      <ChampsCritere
-        choix={choix}
-        onChange={setChoix}
-        departements={orEmpty(departements.data)}
-        iefs={orEmpty(iefs.data)}
-      />
-
-      <ChampTeleconseillers
-        comptes={teleconseillers.data}
-        chargement={teleconseillers.isPending}
-        isError={teleconseillers.isError}
-        erreur={teleconseillers.error}
-        decoches={decoches}
-        onChange={setDecoches}
-        objectifs={objectifsSaisis}
-        defaut={fichesParJour}
-        onObjectif={(id, saisie) => {
-          setObjectifsSaisis((courants) => ({ ...courants, [id]: saisie }));
-        }}
-      />
-
-      <Field
-        label="Nom de la campagne"
-        description="Proposé d’après les critères. Modifiable ici et plus tard."
-      >
-        {(props) => (
-          <Input
-            {...props}
-            maxLength={120}
-            value={nomSaisi ?? nomPropose}
-            onChange={(event) => {
-              setNomSaisi(event.target.value);
+        <section className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4">
+          <h3 className="text-[0.8125rem] font-semibold uppercase tracking-wider text-muted-foreground">
+            2. Équipe et volume de traitement
+          </h3>
+          <ChampTeleconseillers
+            comptes={teleconseillers.data}
+            chargement={teleconseillers.isPending}
+            isError={teleconseillers.isError}
+            erreur={teleconseillers.error}
+            decoches={decoches}
+            onChange={setDecoches}
+            objectifs={objectifsSaisis}
+            defaut={fichesParJour}
+            onObjectif={(id, saisie) => {
+              setObjectifsSaisis((courants) => ({ ...courants, [id]: saisie }));
             }}
           />
-        )}
-      </Field>
 
-      <div className="grid gap-4 sm:grid-cols-2">
-        <Field
-          label="Fiches par jour, à défaut d’objectif"
-          description="La valeur retenue pour qui n’a pas d’objectif propre."
-        >
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={500}
-              step={1}
-              value={fichesParJourSaisi}
-              onChange={(event) => {
-                setFichesParJourSaisi(event.target.value);
-              }}
-            />
-          )}
-        </Field>
-        <Field label="Nombre de jours">
-          {(props) => (
-            <Input
-              {...props}
-              type="number"
-              inputMode="numeric"
-              min={1}
-              max={10}
-              step={1}
-              value={joursSaisi}
-              onChange={(event) => {
-                setJoursSaisi(event.target.value);
-              }}
-            />
-          )}
-        </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field
+              label="Fiches par jour, à défaut d’objectif"
+              description="La valeur retenue pour qui n’a pas d’objectif propre."
+            >
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={500}
+                  step={1}
+                  value={fichesParJourSaisi}
+                  onChange={(event) => {
+                    setFichesParJourSaisi(event.target.value);
+                  }}
+                />
+              )}
+            </Field>
+            <Field label="Nombre de jours">
+              {(props) => (
+                <Input
+                  {...props}
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={10}
+                  step={1}
+                  value={joursSaisi}
+                  onChange={(event) => {
+                    setJoursSaisi(event.target.value);
+                  }}
+                />
+              )}
+            </Field>
+          </div>
+        </section>
+
+        <section className="flex flex-col gap-4 rounded-lg border border-border/80 bg-card p-4">
+          <h3 className="text-[0.8125rem] font-semibold uppercase tracking-wider text-muted-foreground">
+            3. Identification et résumé
+          </h3>
+          <Field
+            label="Nom de la campagne"
+            description="Proposé d’après les critères. Modifiable ici et plus tard."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                maxLength={120}
+                value={nomSaisi ?? nomPropose}
+                onChange={(event) => {
+                  setNomSaisi(event.target.value);
+                }}
+              />
+            )}
+          </Field>
+
+          <ApercuLot apercu={apercu} stable={critereStable} equipe={equipe.length} jours={jours} />
+
+          <ErreurCreation isError={creation.isError} error={creation.error} />
+        </section>
       </div>
-
-      <ApercuLot apercu={apercu} stable={critereStable} equipe={equipe.length} jours={jours} />
-
-      <ErreurCreation isError={creation.isError} error={creation.error} />
 
       <DialogFooter>
         <Button type="button" variant="ghost" onClick={onAnnule}>
