@@ -339,12 +339,12 @@ function VisitesKpiCards({
 }) {
   return (
     <div className="grid gap-3 sm:grid-cols-3 print:hidden">
-      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+      <div className="flex min-w-0 items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
         <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
           <CalendarCheck2Icon className="size-5" aria-hidden="true" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-[0.8125rem] font-[500] text-muted-foreground">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-[0.8125rem] font-[500] text-muted-foreground">
             {jourSeul ? 'Visites aujourd’hui' : 'Visites au registre'}
           </span>
           <span className="font-display text-[1.25rem] font-[700] tabular-nums tracking-[-0.02em]">
@@ -353,12 +353,12 @@ function VisitesKpiCards({
         </div>
       </div>
 
-      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+      <div className="flex min-w-0 items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
         <div className="flex size-10 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
           <Building2Icon className="size-5" aria-hidden="true" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-[0.8125rem] font-[500] text-muted-foreground">
+        <div className="flex min-w-0 flex-col">
+          <span className="truncate text-[0.8125rem] font-[500] text-muted-foreground">
             Entreprises & Organismes
           </span>
           <span className="font-display text-[1.25rem] font-[700] tabular-nums tracking-[-0.02em]">
@@ -367,7 +367,7 @@ function VisitesKpiCards({
         </div>
       </div>
 
-      <div className="flex items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
+      <div className="flex min-w-0 items-center gap-3.5 rounded-lg border border-border bg-card p-3.5 shadow-elev-xs">
         <div className="flex size-10 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
           <FileTextIcon className="size-5" aria-hidden="true" />
         </div>

@@ -12,6 +12,7 @@ import {
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone } from '@/components/console/console-ui';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -1206,7 +1207,7 @@ function Qualification({
 
   const [now] = useState(() => Date.now());
 
-  const departChrono = useBrouillonAuto(ouverture, {
+  const { depuis: departChrono, enAttente: brouillonEnAttente } = useBrouillonAuto(ouverture, {
     resultat,
     statutId,
     etablissementConfirme,
@@ -1462,6 +1463,7 @@ function Qualification({
       ) : null}
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+      <BrouillonEnAttente enAttente={brouillonEnAttente} />
 
       <EnTeteRepresentant representant={representant} />
 

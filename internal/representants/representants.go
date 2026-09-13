@@ -566,7 +566,7 @@ func (s *service) verifierIdentifiantRepresentantLibre(ctx context.Context, u *s
 		return err
 	}
 	if u.Role != socle.Admin && proprietaire != u.ID {
-		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre commercial.")
+		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre téléconseiller.")
 	}
 	p := socle.Problem(http.StatusConflict, "REPRESENTANT_ALREADY_EXISTS", "Un représentant porte déjà cet identifiant.")
 	p.Errors = []*huma.ErrorDetail{{Location: "body.id", Message: p.Message, Value: id}}
@@ -840,7 +840,7 @@ func (s *service) modifierRepresentant(ctx context.Context, in *RepresentantUpda
 		return nil, err
 	}
 	if u.Role != socle.Admin && existant.CreatedById != u.ID {
-		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre commercial.")
+		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	modifie := existant
 	if err := representantAppliquerPatch(&modifie, in, s.Cfg.PhoneRegion); err != nil {
@@ -1333,7 +1333,7 @@ func (s *service) supprimerRepresentant(ctx context.Context, in *RepresentantDel
 		return nil, err
 	}
 	if u.Role != socle.Admin && existant.CreatedById != u.ID {
-		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre commercial.")
+		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	prospects, err := s.Q.CompterProspectsVivants(ctx, &in.ID)
 	if err != nil {

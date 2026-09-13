@@ -425,7 +425,7 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 		return row, err
 	}
 	if u.Role != socle.Admin && row.CreatedById != u.ID {
-		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre commercial.")
+		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	return row, nil
 }
@@ -802,7 +802,7 @@ func (s *service) prospectIdentifiantLibre(ctx context.Context, u *socle.Utilisa
 		return err
 	}
 	if u.Role != socle.Admin && row.CreatedById != u.ID {
-		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre commercial.")
+		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre téléconseiller.")
 	}
 	p := socle.Problem(http.StatusConflict, "PROSPECT_ALREADY_EXISTS", "Un prospect porte déjà cet identifiant.")
 	p.Errors = []*huma.ErrorDetail{{Location: socle.CleIdentifiantExistant, Value: id}}
