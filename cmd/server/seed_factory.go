@@ -92,12 +92,19 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		  p."enrollmentCapturedAt",p."enrollmentCapturedAt",CASE WHEN right(p.id,12)::int%5<>0 THEN p."enrollmentCapturedAt" END,p.id,
 		  jsonb_build_object('source','factory','revenu','250000','ville','Dakar'),p."enrollmentCapturedAt",now(),now()
 		FROM "prospects" p WHERE p.id LIKE '0199f100-0000-7001-8000-%' AND p."phase2Status"='METHOD_OBTAINED'
-		ON CONFLICT (id) DO UPDATE SET "identifiantDistant"=EXCLUDED."identifiantDistant",projet=EXCLUDED.projet,"inscriteLe"=EXCLUDED."inscriteLe","soumiseLe"=EXCLUDED."soumiseLe","decideeLe"=EXCLUDED."decideeLe","premierTirageAt"=EXCLUDED."premierTirageAt"`,
+		ON CONFLICT (id) DO UPDATE SET "identifiantDistant"=EXCLUDED."identifiantDistant",projet=EXCLUDED.projet,"inscriteLe"=EXCLUDED."inscriteLe","soumiseLe"=EXCLUDED."soumiseLe","decideeLe"=EXCLUDED."decideeLe","premierTirageAt"=EXCLUDED."premierTirageAt",
+		  -- Le releve de la plateforme les marque disparues : elles n'y figurent pas.
+		  "disparueLe"=NULL`,
+		// Une base semee par une version anterieure a un dossier sur CHAQUE rang.
+		`DELETE FROM "bank_cases" WHERE id LIKE '0199f100-0000-7030-8000-%' AND right(id,12)::int%6=0`,
+		// Un rang sur six n'a PAS de dossier : ces inscriptions alimentent « A ouvrir
+		// (plateforme) », qui ne liste qu'une inscription validee sans dossier. Un
+		// pas de six, et non les derniers rangs, pour couvrir les deux projets.
 		`INSERT INTO "bank_cases" ("id","reference","referenceKey","prospectId","customerName","customerPhoneE164","processingBankId","currentStageId","amountXof","rejectionReasonId","createdById","createdAt","updatedAt","inscriptionId")
 		SELECT replace(p.id,'7001','7030'),'FACTORY-BF-'||lpad(g::text,3,'0'),'FACTORY-BF-'||lpad(g::text,3,'0'),p.id,p.prenom||' '||p.nom,p."phoneE164",p."banqueId",st.id,
 		  CASE WHEN st.type='CASHED' THEN 150000+g*1000 END,CASE WHEN st.type='REJECTED' THEN (SELECT id FROM "bank_rejection_reasons" WHERE code='DOCUMENT_MANQUANT') END,
 		  u.id,p."lastCallAt"+(p."lastCallAt"-p."clientCreatedAt")*.25,now(),replace(p.id,'7001','7020')
-		FROM generate_series(1,240) g JOIN "prospects" p ON p.id='0199f100-0000-7001-8000-'||lpad(g::text,12,'0')
+		FROM generate_series(1,240) g JOIN "prospects" p ON p.id='0199f100-0000-7001-8000-'||lpad(g::text,12,'0') AND g%6<>0
 		JOIN "users" u ON u.email='fixture.banque@cpi.sn'
 		JOIN "bank_case_stages" st ON st.code=CASE WHEN g<=120 THEN 'ENCAISSE' WHEN g%3=0 THEN 'REJETE' ELSE 'EN_TRAITEMENT_BANQUE' END
 		ON CONFLICT (id) DO UPDATE SET reference=EXCLUDED.reference,"referenceKey"=EXCLUDED."referenceKey","currentStageId"=EXCLUDED."currentStageId","amountXof"=EXCLUDED."amountXof","rejectionReasonId"=EXCLUDED."rejectionReasonId","createdAt"=EXCLUDED."createdAt","processingBankId"=EXCLUDED."processingBankId"`,

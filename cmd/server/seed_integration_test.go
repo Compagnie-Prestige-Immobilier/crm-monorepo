@@ -249,6 +249,21 @@ func TestSeedFactoryTableauxDeBord(t *testing.T) {
 				t.Fatalf("passage %d, %s : %d lignes attendues, %d présentes", passage, table, attendu, nombre)
 			}
 		}
+		seedVerifierInscriptionsAOuvrir(b, passage)
+	}
+}
+
+// Le factory a longtemps ouvert un dossier pour CHAQUE inscription validée, et
+// « À ouvrir (plateforme) » s'affichait vide sur une base de démonstration.
+func seedVerifierInscriptionsAOuvrir(b *banc, passage int) {
+	b.t.Helper()
+	for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
+		statut, body := b.appel(http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet="+projet, nil, false)
+		b.attend(statut, http.StatusOK, "inscriptions à ouvrir "+projet, body)
+		items, ok := body["items"].([]any)
+		if !ok || len(items) == 0 {
+			b.t.Fatalf("passage %d, %s : aucune inscription à ouvrir", passage, projet)
+		}
 	}
 }
 
