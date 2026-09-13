@@ -73,6 +73,40 @@ func TestImportLeadsSepareLesOngletsParJour(t *testing.T) {
 			t.Fatalf("un lot %q d'une fiche attendu, vu %v", attendu, libelles)
 		}
 	}
+
+	rattrapageRelitLeClasseur(b, onglets, nomClasseur)
+}
+
+// Les fiches importées avant ce jour n'ont pas d'onglet : le geste du panneau
+// relit leur classeur et le leur pose. À retirer avec le rattrapage lui-même.
+func rattrapageRelitLeClasseur(b *banc, onglets []ongletLeadsTest, nomClasseur string) {
+	b.t.Helper()
+	for _, onglet := range onglets {
+		if _, err := b.pool.Exec(b.ctx,
+			`UPDATE "prospects" SET "importFeuille" = NULL WHERE "phoneE164" = $1`, onglet.telephone); err != nil {
+			b.t.Fatal(err)
+		}
+	}
+
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/imports/rattraper-feuilles", nil, nil)
+	b.attend(statut, http.StatusOK, "rattrapage des onglets", body)
+
+	for _, onglet := range onglets {
+		var feuille *string
+		if err := b.pool.QueryRow(b.ctx,
+			`SELECT "importFeuille" FROM "prospects" WHERE "phoneE164" = $1`, onglet.telephone).Scan(&feuille); err != nil {
+			b.t.Fatal(err)
+		}
+		if feuille == nil || *feuille != onglet.nom {
+			b.t.Fatalf("rattrapage de %s : onglet %v", onglet.nom, feuille)
+		}
+	}
+
+	statut, body = appelJSON(b, http.MethodGet, "/api/v1/lots-export/imports?projet=GRAND_PUBLIC", nil, nil)
+	b.attend(statut, http.StatusOK, "les imports apres rattrapage", body)
+	if libelles := libellesDesImports(b, body, nomClasseur); libelles["Leads 11 septembre 2026"] != 1 {
+		b.t.Fatalf("le lot doit retrouver son nom apres rattrapage : %v", libelles)
+	}
 }
 
 type ongletLeadsTest struct{ nom, telephone string }
