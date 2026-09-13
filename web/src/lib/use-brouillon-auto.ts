@@ -16,8 +16,8 @@ const ATTENTE_MAX_MS = 5_000;
  * déclenche alors pas ; `visibilitychange` vers `hidden` est le dernier moment
  * où le navigateur laisse encore écrire.
  *
- * Un échec ne se dit pas : c'est un filet, pas une opération métier. La charge
- * refusée reste en attente et repart à la modification suivante.
+ * Une charge refusée reste en attente et repart à la modification suivante, mais
+ * `enAttente` le dit : sans cela le téléconseiller croit sa saisie à l'abri.
  *
  * Rend le départ du chronomètre, nul tant que rien n'a été modifié. L'heure est
  * relevée à la frappe et non à l'envoi, et part avec le brouillon : le serveur
@@ -26,7 +26,7 @@ const ATTENTE_MAX_MS = 5_000;
 export function useBrouillonAuto(
   ouverture: OuvertureFiche | null,
   draft: Record<string, unknown>,
-): string | null {
+): { depuis: string | null; enAttente: boolean } {
   const ouvertureId = ouverture?.id ?? null;
   const serialise = JSON.stringify(draft);
   const aEcrire = useRef<string | null>(null);
@@ -35,6 +35,7 @@ export function useBrouillonAuto(
   const plafond = useRef<ReturnType<typeof setTimeout> | null>(null);
   const premiereSaisie = useRef<string | null>(null);
   const [saisie, setSaisie] = useState<string | null>(null);
+  const [enAttente, setEnAttente] = useState(false);
 
   const annuler = useCallback(() => {
     if (repos.current !== null) clearTimeout(repos.current);
@@ -55,9 +56,13 @@ export function useBrouillonAuto(
     ).then(
       () => {
         ecrit.current = charge;
+        setEnAttente(false);
       },
       () => {
+        // Le filet a lâché. Le téléconseiller doit le savoir : il croyait sa
+        // saisie à l'abri, et un onglet fermé maintenant l'emporterait.
         aEcrire.current ??= charge;
+        setEnAttente(true);
       },
     );
   }, [annuler, ouvertureId]);
@@ -97,5 +102,5 @@ export function useBrouillonAuto(
     };
   }, [annuler, envoyer]);
 
-  return ouverture?.firstInputAt ?? saisie;
+  return { depuis: ouverture?.firstInputAt ?? saisie, enAttente };
 }

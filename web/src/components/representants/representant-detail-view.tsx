@@ -19,6 +19,7 @@ import {
   ComposeurFil,
   SupprimerCommentaireDialog,
 } from '@/components/representants/representant-comments';
+import { SupprimerRepresentant } from '@/components/representants/supprimer-representant';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -515,6 +516,9 @@ export function RepresentantDetailView({
             whatsapp={whatsappLabel(scriptOf(representant))}
           />
           <ProspectsApportes prospects={prospects} />
+          {canAdminister && !readOnly ? (
+            <SupprimerRepresentant representantId={representantId} />
+          ) : null}
         </div>
       </div>
 

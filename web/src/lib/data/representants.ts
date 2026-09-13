@@ -295,6 +295,23 @@ export async function createRepresentantComment(
   );
 }
 
+/**
+ * Archivage : la fiche porte un `deletedAt`, ses appels et son histoire restent.
+ * Sans `cascade`, le serveur refuse en 409 tant que la fiche porte des prospects,
+ * pour qu'on ne les emporte pas sans le savoir.
+ */
+export async function deleteRepresentant(
+  id: string,
+  cascade = false,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.DELETE('/api/v1/representants/{id}', {
+      params: { path: { id }, query: cascade ? { cascade: true } : {} },
+    }),
+  );
+}
+
 export async function deleteRepresentantComment(
   representantId: string,
   commentId: string,

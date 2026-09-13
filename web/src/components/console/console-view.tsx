@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
@@ -490,7 +491,10 @@ function Consignation({
   const nomComplet = nomDe(prospect);
   const [now] = useState(() => Date.now());
 
-  const departChrono = useBrouillonAuto(ouverture, brouillonDe(comment, conversion));
+  const { depuis: departChrono, enAttente: brouillonEnAttente } = useBrouillonAuto(
+    ouverture,
+    brouillonDe(comment, conversion),
+  );
 
   const send = useMutation({
     mutationFn: async (draft: AttemptDraft) => {
@@ -902,6 +906,7 @@ function Consignation({
       </Button>
 
       {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+      <BrouillonEnAttente enAttente={brouillonEnAttente} />
 
       {corpsFiche()}
 

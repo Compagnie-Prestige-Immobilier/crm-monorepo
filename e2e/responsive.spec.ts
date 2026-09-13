@@ -5,12 +5,20 @@ import { mesurerDebordement } from './donnees-listes';
 
 const compte = compteDe('ADMIN');
 
+// Le panneau sur téléphone est le SEUL client : un écran qui déborde y est
+// inutilisable. Les écrans de travail quotidien comptent autant que les listes.
 const ROUTES = [
   '/connexion',
   '/',
   '/compte',
   '/chues/representants',
   '/chues/prospects',
+  '/chues/console',
+  '/chues/campagnes',
+  '/chues/rappels',
+  '/chues/statistiques',
+  '/chues/banque',
+  '/accueil',
   '/grand-public',
   '/grand-public/nouveau',
 ];
