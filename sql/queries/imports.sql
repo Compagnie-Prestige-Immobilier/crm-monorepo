@@ -8,6 +8,19 @@ RETURNING *;
 -- name: ImportJobByID :one
 SELECT * FROM "import_jobs" WHERE "id" = $1;
 
+-- RATTRAPAGE PONCTUEL, à retirer avec `imports_rattrapage.go`.
+-- name: ImportsSansFeuille :many
+SELECT j."id", j."fileName", j."storagePath"
+FROM "import_jobs" j
+WHERE j."kind" = 'PROSPECTS_GRAND_PUBLIC'
+  AND EXISTS (SELECT 1 FROM "prospects" p
+              WHERE p."importJobId" = j."id" AND p."deletedAt" IS NULL AND p."importFeuille" IS NULL)
+ORDER BY j."createdAt";
+
+-- name: RattraperFeuilleProspect :execrows
+UPDATE "prospects" SET "importFeuille" = @feuille
+WHERE "importJobId" = @import_job_id AND "phoneE164" = @phone_e164 AND "importFeuille" IS NULL;
+
 -- Le relevé automatique n'a pas d'appelant : l'administrateur le plus ancien porte ses imports.
 -- name: ImportDemandeurSysteme :one
 SELECT "id" FROM "users" WHERE "role" = 'ADMIN' AND "isActive"

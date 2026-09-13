@@ -22,6 +22,7 @@ import { useLive } from '@/components/live/use-live';
 import { QueryErrorInline } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { RattraperFeuilles } from '@/components/imports/rattraper-feuilles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -443,6 +444,9 @@ export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: Uploa
           }}
         />
       )}
+
+      {/* RATTRAPAGE PONCTUEL, à retirer avec `rattraper-feuilles.tsx`. */}
+      <RattraperFeuilles />
 
       {/* L'historique se consulte APRÈS coup, et rarement : replié, il laisse
           l'écran à son seul geste, déposer un classeur. */}

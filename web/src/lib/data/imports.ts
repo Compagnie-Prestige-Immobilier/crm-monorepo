@@ -102,6 +102,15 @@ const UPLOAD_PATHS: Readonly<Record<Exclude<ImportKind, 'VISITES_REGISTRE'>, str
   VISITES: '/api/v1/imports/visites',
 };
 
+export type RattrapageFeuilles = Schemas['RattrapageFeuillesDto'];
+
+/** RATTRAPAGE PONCTUEL, à retirer avec `rattraper-feuilles.tsx`. */
+export async function rattraperFeuillesImport(
+  client: ApiClient = getApiClient(),
+): Promise<RattrapageFeuilles> {
+  return unwrap(await client.POST('/api/v1/imports/rattraper-feuilles', {}));
+}
+
 // Le contrat engendré représente un fichier multipart par `string`; FormData
 // conserve ici le vrai fichier et laisse le navigateur écrire la frontière.
 export async function createImportJob(
