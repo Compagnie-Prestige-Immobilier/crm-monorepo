@@ -391,10 +391,15 @@ func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*C
 	if err != nil {
 		return nil, err
 	}
-	statut, messageID, erreur, envoyeLe := expedierCourriel(ctx, &MessageBrevo{
-		Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
-		Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
-	})
+	statut, erreur := CourrielEchec, courrielRetenu(s.Cfg.Base)
+	var messageID *string
+	var envoyeLe *time.Time
+	if erreur == nil {
+		statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
+			Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
+			Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
+		})
+	}
 	if err := s.Q.CourrielRenvoye(ctx, db.CourrielRenvoyeParams{
 		ID: ligne.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
 	}); err != nil {
