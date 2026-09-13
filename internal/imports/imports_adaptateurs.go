@@ -915,6 +915,7 @@ type ligneGrandPublicImport struct {
 	typeContrat                                            *db.TypeContrat
 	modeEpargne                                            *db.ModeEpargne
 	paysID, villeResidence, whatsapp, relaisNom, relaisTel *string
+	feuille                                                *string
 }
 
 type etatGrandPublicImport struct {
@@ -1164,6 +1165,7 @@ func lireGrandPublicImport(cellules map[string]string, numero int, brut any) (an
 		profession: couperImport(cellules[enteteGrandPublicImport(3)], 120),
 		syndicatID: syndicatID, banqueID: banqueID, canalID: canalID,
 		typeProspect: typeProspect, dureeSystemeMois: duree,
+		feuille: couperImport(cellules[feuilleImport], 200),
 	}
 	if refus := completerSituationGrandPublicImport(&ligne, cellules, numero, etat); refus != nil {
 		return nil, refus
@@ -1431,6 +1433,7 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			PaysResidenceID: ligne.paysID, VilleResidence: ligne.villeResidence,
 			WhatsappStatus: statut, WhatsappE164: numero, RelaisNom: ligne.relaisNom,
 			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur, ClientCreatedAt: saisieLe,
+			ImportFeuille: ligne.feuille,
 		})
 	}
 	if len(fiches) > 0 {

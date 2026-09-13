@@ -4,6 +4,12 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
+	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
+
+	"golang.org/x/text/transform"
 )
 
 type CampagneImportsInput struct {
@@ -13,8 +19,53 @@ type CampagneImportsInput struct {
 type CampagneImport struct {
 	ID         string `json:"id"`
 	FileName   string `json:"fileName"`
+	Feuille    string `json:"feuille,omitempty"`
+	Libelle    string `json:"libelle"`
 	ImportedAt string `json:"importedAt"`
 	Fiches     int    `json:"fiches"`
+}
+
+var dateFeuilleImport = regexp.MustCompile(`(?i)(\d{1,2})\s+([a-z]{3,10})\.?\s+(\d{2,4})`)
+
+// Le marketing nomme ses onglets « DEBUT CAMPAGNE 10 SEPT 26 » ou « Leads 11
+// sept 2026 » : seule la date compte, et elle doit se lire pareil partout. Un
+// onglet sans date lisible garde son nom, plutôt qu'une date inventée.
+func libelleFeuilleImport(feuille string) string {
+	nom := strings.TrimSpace(feuille)
+	if nom == "" {
+		return ""
+	}
+	plat, _, err := transform.String(lotPlieurAccents, strings.ToLower(nom))
+	if err != nil {
+		return nom
+	}
+	trouve := dateFeuilleImport.FindStringSubmatch(plat)
+	if trouve == nil {
+		return nom
+	}
+	jour, _ := strconv.Atoi(trouve[1])
+	annee, _ := strconv.Atoi(trouve[3])
+	if annee < 100 {
+		annee += 2000
+	}
+	if jour < 1 || jour > 31 {
+		return nom
+	}
+	for i, mois := range lotMoisEnLettres {
+		if strings.HasPrefix(trouve[2], abregeMoisImport(mois)) {
+			return fmt.Sprintf("Leads %d %s %d", jour, lotMoisEnLettres[i], annee)
+		}
+	}
+	return nom
+}
+
+// « septembre » se reconnaît à « sept », « mai » n'a que trois lettres.
+func abregeMoisImport(mois string) string {
+	plat, _, err := transform.String(lotPlieurAccents, mois)
+	if err != nil {
+		return mois
+	}
+	return plat[:min(4, len(plat))]
 }
 
 type CampagneImportsOutput struct {
@@ -36,8 +87,17 @@ func (s *service) campagneImports(ctx context.Context, in *CampagneImportsInput)
 		if rows[i].FinishedAt != nil {
 			importeLe = *rows[i].FinishedAt
 		}
+		var feuille string
+		if rows[i].ImportFeuille != nil {
+			feuille = *rows[i].ImportFeuille
+		}
+		libelle := libelleFeuilleImport(feuille)
+		if libelle == "" {
+			libelle = rows[i].FileName
+		}
 		out.Body.Items = append(out.Body.Items, CampagneImport{
-			ID: rows[i].ID, FileName: rows[i].FileName, ImportedAt: lotISO(importeLe), Fiches: int(rows[i].Fiches),
+			ID: rows[i].ID, FileName: rows[i].FileName, Feuille: feuille, Libelle: libelle,
+			ImportedAt: lotISO(importeLe), Fiches: int(rows[i].Fiches),
 		})
 	}
 	return out, nil
