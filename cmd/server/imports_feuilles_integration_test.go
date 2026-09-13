@@ -20,6 +20,7 @@ import (
 func TestImportLeadsSepareLesOngletsParJour(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
+	b.canalSiteWeb()
 	t.Setenv("IMPORTS_DIR", t.TempDir())
 
 	base := time.Now().UnixNano() % 10_000_000
