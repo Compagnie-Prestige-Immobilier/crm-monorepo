@@ -33,7 +33,7 @@ type SanteOutput struct {
 	}
 }
 
-func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool) (huma.API, error) {
+func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool, reg *registre) (huma.API, error) {
 	// Le panneau itère sur les listes sans garde : le contrat promet `[]`, jamais `null`.
 	huma.DefaultArrayNullable = false
 	conf := huma.DefaultConfig("CPI GO", "2.0.0")
@@ -60,7 +60,8 @@ func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool) (huma.AP
 	if err := monterDomaines(api, d); err != nil {
 		return nil, err
 	}
-	socle.FusionnerGardes(gardesDomaines()...)
+	monterBases(api, d, reg)
+	socle.FusionnerGardes(append(gardesDomaines(), GardeBases)...)
 	return api, socle.VerifierGarde(api)
 }
 
@@ -98,8 +99,8 @@ func cachePanneau(chemin string) string {
 	return "no-cache"
 }
 
-func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config) *socle.Deps {
-	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive(), Bases: []string{cfg.Base}}
+func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config, annuaire *socle.Annuaire) *socle.Deps {
+	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive(), Annuaire: annuaire}
 }
 
 // Une instance par base : ses requêtes, son bus SSE, ses routes montées sur
@@ -110,12 +111,11 @@ type instance struct {
 	deps *socle.Deps
 }
 
-func instancier(cfg *socle.Config, pool *pgxpool.Pool, bases []string) (*instance, error) {
+func instancier(cfg *socle.Config, pool *pgxpool.Pool, reg *registre) (*instance, error) {
 	socle.InstallerErreurs()
 	mux := http.NewServeMux()
-	d := nouveauDeps(pool, cfg)
-	d.Bases = bases
-	api, err := nouvelleAPI(mux, d, pool)
+	d := nouveauDeps(pool, cfg, reg.annuaire)
+	api, err := nouvelleAPI(mux, d, pool, reg)
 	if err != nil {
 		return nil, err
 	}
@@ -125,15 +125,11 @@ func instancier(cfg *socle.Config, pool *pgxpool.Pool, bases []string) (*instanc
 
 // Le cookie `cpi_base` choisit l'instance ; absent ou inconnu, la base
 // publique. Un seul journal et un seul limiteur, une garde par base.
-func assembler(cfg *socle.Config, instances map[string]*instance) *http.Server {
-	gardes := make(map[string]http.Handler, len(instances))
-	for nom, i := range instances {
-		gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q)
-	}
+func assembler(cfg *socle.Config, reg *registre, principal *http.ServeMux) *http.Server {
 	repartir := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		garde := gardes[socle.BasePublique]
+		garde, _ := reg.garde(socle.BasePublique)
 		if c, err := r.Cookie(socle.NomCookieBase); err == nil {
-			if g, ok := gardes[c.Value]; ok {
+			if g, ok := reg.garde(c.Value); ok {
 				garde = g
 			}
 		}
@@ -141,7 +137,7 @@ func assembler(cfg *socle.Config, instances map[string]*instance) *http.Server {
 	})
 	return &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           socle.JournalEtRecuperation(instances[socle.BasePublique].mux, socle.LimiterApi(cfg, repartir), cfg),
+		Handler:           socle.JournalEtRecuperation(principal, socle.LimiterApi(cfg, repartir), cfg),
 		ReadHeaderTimeout: 10 * time.Second,
 		ReadTimeout:       30 * time.Second,
 		IdleTimeout:       120 * time.Second,
@@ -149,11 +145,13 @@ func assembler(cfg *socle.Config, instances map[string]*instance) *http.Server {
 }
 
 func serveur(cfg *socle.Config, pool *pgxpool.Pool) (*http.Server, huma.API, error) {
-	i, err := instancier(cfg, pool, []string{cfg.Base})
+	reg := nouveauRegistre(socle.NouvelAnnuaire(cfg.Base))
+	i, err := instancier(cfg, pool, reg)
 	if err != nil {
 		return nil, nil, err
 	}
-	return assembler(cfg, map[string]*instance{cfg.Base: i}), i.api, nil
+	reg.monter(cfg.Base, i, pool)
+	return assembler(cfg, reg, i.mux), i.api, nil
 }
 
 func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
@@ -343,9 +341,11 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 	for _, b := range bases {
 		noms = append(noms, b.Base)
 	}
-	instances := make(map[string]*instance, len(bases))
+	reg := nouveauRegistre(socle.NouvelAnnuaire())
+	var principal *instance
 	var fermer []func()
 	defer func() {
+		reg.fermerTout()
 		for i := len(fermer) - 1; i >= 0; i-- {
 			fermer[i]()
 		}
@@ -355,25 +355,33 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 		if err != nil {
 			return fmt.Errorf("base %s : %w", base.Base, err)
 		}
-		fermer = append(fermer, pool.Close)
-		i, err := instancier(base, pool, noms)
+		i, err := instancier(base, pool, reg)
 		if err != nil {
+			pool.Close()
 			return err
 		}
-		sched, err := planifier(ctx, i.deps)
-		if err != nil {
-			return err
+		reg.monter(base.Base, i, pool)
+		// Les tâches ne tournent que sur la base principale : sur une base de
+		// démonstration elles relèveraient le vrai classeur SharePoint et
+		// écriraient aux vraies adresses.
+		if base.Base == socle.BasePublique {
+			principal = i
+			sched, err := planifier(ctx, i.deps)
+			if err != nil {
+				return err
+			}
+			fermer = append(fermer, func() { _ = sched.Shutdown() })
 		}
-		fermer = append(fermer, func() { _ = sched.Shutdown() })
-		instances[base.Base] = i
 	}
+	if principal == nil {
+		return errors.New("base principale absente")
+	}
+	remonterBasesDemo(ctx, principal.deps, reg)
 	// Un seul journal de requêtes pour toutes les bases : ses compteurs se
 	// vident dans la base publique, celle du mux qui porte le middleware.
-	go socle.ViderMetriquesChaqueMinute(ctx, instances[socle.BasePublique].deps.Q)
-	srv := assembler(cfg, instances)
-	for _, i := range instances {
-		srv.RegisterOnShutdown(i.deps.Live.Fermer)
-	}
+	go socle.ViderMetriquesChaqueMinute(ctx, principal.deps.Q)
+	srv := assembler(cfg, reg, principal.mux)
+	srv.RegisterOnShutdown(principal.deps.Live.Fermer)
 	erreurs := make(chan error, 1)
 	go func() {
 		slog.Info("démarrage", "port", cfg.Port, "url", "http://localhost:"+cfg.Port, "bases", noms)

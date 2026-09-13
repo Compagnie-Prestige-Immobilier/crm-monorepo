@@ -18,7 +18,7 @@ import (
 // Même forme que le seed Prisma de la v1 : 20 upsert de référentiels dans
 // une transaction, contrôle bloquant sur le nombre de départements, admin et
 // fixtures créés seulement s'ils sont absents.
-func semer(ctx context.Context, pool *pgxpool.Pool, _ *socle.Config) error {
+func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 	tx, err := pool.Begin(ctx)
 	if err != nil {
 		return err
@@ -48,10 +48,16 @@ func semer(ctx context.Context, pool *pgxpool.Pool, _ *socle.Config) error {
 			return err
 		}
 	}
-	if err := seedSemerFixtures(ctx, q, tx); err != nil {
+	// Le nom de la base decide, et non `NODE_ENV` : une variable d'environnement
+	// s'oublie, et c'est exactement ce qui est arrivé en production, où les
+	// comptes fixtures sont restés ouverts faute de l'avoir posée. La base
+	// principale n'a jamais de comptes de démonstration ni de jeu d'essai ;
+	// toute base de démonstration en a toujours.
+	demonstration := cfg.Base != socle.BasePublique
+	if err := seedSemerFixtures(ctx, q, tx, demonstration); err != nil {
 		return err
 	}
-	if socle.Env("NODE_ENV", "") == "development" {
+	if demonstration {
 		if err := seedFactory(ctx, tx); err != nil {
 			return err
 		}
@@ -293,17 +299,17 @@ func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
 // Jamais en production : le seed tourne à chaque démarrage du conteneur et ne
 // doit pas réactiver ou re-hacher les comptes fixtures. Une base qui les porte
 // déjà les voit fermés ; ils ne se suppriment pas, des fiches peuvent les citer.
-func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx) error {
+func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstration bool) error {
 	emails := make([]string, len(seedFixtureUsers))
 	for i, f := range seedFixtureUsers {
 		emails[i] = f.email
 	}
-	if socle.Env("NODE_ENV", "") == "production" {
+	if !demonstration {
 		desactives, err := q.SeedDisableFixtureUsers(ctx, emails)
 		if err != nil {
 			return err
 		}
-		slog.Info("seed fixtures", "statut", "aucune en production", "désactivés", desactives)
+		slog.Info("seed fixtures", "statut", "aucune sur la base principale", "désactivés", desactives)
 		return nil
 	}
 	password := socle.Env("SEED_FIXTURE_PASSWORD", "ChangeMoi123456")

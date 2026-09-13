@@ -192,7 +192,7 @@ type BasesOutput struct {
 
 func (s *service) bases(context.Context, *struct{}) (*BasesOutput, error) {
 	out := &BasesOutput{}
-	out.Body.Bases = s.Bases
+	out.Body.Bases = s.Annuaire.Noms()
 	return out, nil
 }
 

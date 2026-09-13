@@ -602,7 +602,7 @@ func (s *socleBanque) signalerComplets() {
 	if err != nil {
 		s.t.Fatal(err)
 	}
-	if _, err := banque.SignalerDossiersComplets(s.ctx, nouveauDeps(s.pool, cfg), "CHUES"); err != nil {
+	if _, err := banque.SignalerDossiersComplets(s.ctx, nouveauDeps(s.pool, cfg, socle.NouvelAnnuaire(cfg.Base)), "CHUES"); err != nil {
 		s.t.Fatal(err)
 	}
 }
