@@ -159,6 +159,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		Path: "/api/v1/notification-templates/{id}",
 	}, s.modifierGabaritNotification)
 	huma.Register(api, poste("renderNotificationTemplate", "/api/v1/notification-templates/{id}/render"), s.rendreGabaritNotification)
+	monterGabaritActif(api, s)
 	s.monterCourriels(api)
 }
 
@@ -174,6 +175,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/notification-templates":             socle.AdminSeul,
 	"GET /api/v1/notification-templates/{id}":         socle.AdminSeul,
 	"PATCH /api/v1/notification-templates/{id}":       socle.AdminSeul,
+	"POST /api/v1/notification-templates/{id}/active": socle.AdminSeul,
 	"POST /api/v1/notification-templates/{id}/render": socle.AdminSeul,
 }
 

@@ -11,6 +11,14 @@ SELECT "id", "name", "category"::text AS category, "titleTemplate", "bodyTemplat
 FROM "notification_templates"
 WHERE "id" = $1;
 
+-- Archiver plutôt que supprimer : une notification déjà partie cite son gabarit,
+-- et le détruire priverait le journal de ce qui a été annoncé.
+-- name: BasculerGabaritNotificationActif :one
+UPDATE "notification_templates" SET "isActive" = @is_active
+WHERE "id" = @id
+RETURNING "id", "name", "category"::text AS category, "titleTemplate", "bodyTemplate",
+          "route", "variables", "isActive", "updatedAt";
+
 -- name: InsertNotificationTemplate :one
 INSERT INTO "notification_templates" (
   "id", "name", "category", "titleTemplate", "bodyTemplate", "route", "variables", "createdById"

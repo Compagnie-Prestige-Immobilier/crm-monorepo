@@ -392,6 +392,52 @@ func TestNotificationGabaritRenduAvecSesVariables(t *testing.T) {
 	}
 }
 
+// Un gabarit ne se supprime pas : une notification deja partie le cite. Il se
+// retire de la liste, et le retrait se defait.
+func TestNotificationGabaritArchiveSortDeLaListe(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationPurge()
+	b.notificationAdminConnecte()
+
+	nom := "Archivable " + uuid.NewString()
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/notification-templates", map[string]any{
+		"name": nom, "titleTemplate": "Bonjour", "bodyTemplate": "Corps",
+	})
+	b.attend(statut, http.StatusCreated, "création du gabarit", body)
+	id := body["id"].(string)
+
+	statut, body = b.notificationAppel(http.MethodPost,
+		"/api/v1/notification-templates/"+id+"/active", map[string]any{"isActive": false})
+	b.attend(statut, http.StatusOK, "retrait du gabarit", body)
+	if body["isActive"] != false {
+		t.Fatalf("isActive : %v", body["isActive"])
+	}
+	if compterGabarit(t, b, nom) != 0 {
+		t.Fatal("un gabarit retiré ne doit plus figurer dans la liste")
+	}
+
+	statut, body = b.notificationAppel(http.MethodPost,
+		"/api/v1/notification-templates/"+id+"/active", map[string]any{"isActive": true})
+	b.attend(statut, http.StatusOK, "remise en service", body)
+	if compterGabarit(t, b, nom) != 1 {
+		t.Fatal("le retrait doit se défaire")
+	}
+}
+
+func compterGabarit(t *testing.T, b *banc, nom string) int {
+	t.Helper()
+	statut, body := b.notificationAppel(http.MethodGet, "/api/v1/notification-templates", nil)
+	b.attend(statut, http.StatusOK, "liste des gabarits", body)
+	items, _ := body["items"].([]any)
+	vus := 0
+	for _, item := range items {
+		if ligne, ok := item.(map[string]any); ok && ligne["name"] == nom {
+			vus++
+		}
+	}
+	return vus
+}
+
 func TestNotificationRappelQuotidienIdempotentSurLaPeriode(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	b.notificationPurge()
