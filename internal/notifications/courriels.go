@@ -166,6 +166,17 @@ func LireReglagesCourriels(ctx context.Context, d *socle.Deps) (ReglagesCourriel
 	return r, nil
 }
 
+// Rien ne sort d'une base de démonstration : les adresses y sont celles de
+// vrais clients, et un écran de démonstration ne doit pas leur écrire. La ligne
+// est écrite quand même, pour qu'on voie à l'écran ce qui serait parti.
+func courrielRetenu(base string) *string {
+	if base == socle.BasePublique {
+		return nil
+	}
+	detail := "Base de démonstration : aucun courriel n'est expédié."
+	return &detail
+}
+
 // L'envoi est tracé même sans destinataire ni transport : le journal doit
 // montrer ce qui n'est pas parti et pourquoi.
 func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
@@ -183,10 +194,15 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 		}
 		nomPDF = &c.NomPieceJointe
 	}
-	statut, messageID, erreur, envoyeLe := expedierCourriel(ctx, &MessageBrevo{
-		Destinataires: courrielAdresses(c.Destinataires), Copies: courrielAdresses(c.Copies),
-		Sujet: c.Sujet, HTML: htmlCorps, Texte: texte, PieceJointe: courrielPiece(nomPDF, pdf),
-	})
+	statut, erreur := CourrielEchec, courrielRetenu(d.Cfg.Base)
+	var messageID *string
+	var envoyeLe *time.Time
+	if erreur == nil {
+		statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
+			Destinataires: courrielAdresses(c.Destinataires), Copies: courrielAdresses(c.Copies),
+			Sujet: c.Sujet, HTML: htmlCorps, Texte: texte, PieceJointe: courrielPiece(nomPDF, pdf),
+		})
+	}
 	err = d.Q.CourrielInsert(ctx, db.CourrielInsertParams{
 		ID: id.String(), Type: c.Type, Sujet: c.Sujet, Destinataires: c.Destinataires, Copies: c.Copies,
 		ObjetType: c.ObjetType, ObjetId: c.ObjetID, Html: htmlCorps, Texte: texte,

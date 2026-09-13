@@ -163,7 +163,7 @@ func (b *banc) notificationService() *socle.Deps {
 	if err != nil {
 		b.t.Fatal(err)
 	}
-	s := nouveauDeps(b.pool, cfg)
+	s := nouveauDeps(b.pool, cfg, socle.NouvelAnnuaire(cfg.Base))
 	return s
 }
 

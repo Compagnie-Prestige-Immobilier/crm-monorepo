@@ -31,6 +31,7 @@ type banc struct {
 	client *http.Client
 	userID string
 	email  string
+	dsn    string
 }
 
 func nouveauBanc(t *testing.T, role string) *banc {
@@ -60,6 +61,10 @@ func nouveauBanc(t *testing.T, role string) *banc {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// `make test` n'exporte que TEST_DATABASE_URL : sans cette ligne le serveur
+	// d'essai tourne avec une DATABASE_URL vide, et tout ce qui ouvre une
+	// seconde base à partir d'elle échoue là où la production réussirait.
+	cfg.DatabaseURL = dsn
 	srv, _, err := serveur(cfg, pool)
 	if err != nil {
 		t.Fatal(err)
@@ -67,7 +72,7 @@ func nouveauBanc(t *testing.T, role string) *banc {
 	ts := httptest.NewServer(srv.Handler)
 	t.Cleanup(ts.Close)
 	jar, _ := cookiejar.New(nil)
-	return &banc{t: t, ctx: ctx, pool: pool, ts: ts, client: &http.Client{Jar: jar}, userID: id, email: email}
+	return &banc{t: t, ctx: ctx, pool: pool, ts: ts, client: &http.Client{Jar: jar}, userID: id, email: email, dsn: dsn}
 }
 
 func (b *banc) appel(method, chemin string, corps map[string]string, origine bool) (statut int, reponse map[string]any) {

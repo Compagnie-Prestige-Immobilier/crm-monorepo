@@ -178,14 +178,16 @@ func TestSeedAdminMotDePasseTropCourtRefuse(t *testing.T) {
 }
 
 func TestSeedFactoryTableauxDeBord(t *testing.T) {
-	t.Setenv("NODE_ENV", "development")
 	b := nouveauBanc(t, "ADMIN")
 	seedTestCompteAdmin(t, b.ctx, b.pool, uuid.NewString())
 	statut, body := b.connexion(b.email, "motdepasse")
 	b.attend(statut, http.StatusOK, "connexion", body)
 
+	// Le jeu d'essai ne se sème plus sur `NODE_ENV=development` mais sur toute
+	// base qui n'est pas la base principale.
+	demo := &socle.Config{Base: "demonstration"}
 	for passage := range 2 {
-		if err := semer(b.ctx, b.pool, nil); err != nil {
+		if err := semer(b.ctx, b.pool, demo); err != nil {
 			t.Fatal(err)
 		}
 		analyticsViderCache()
