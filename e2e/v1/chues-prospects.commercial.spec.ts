@@ -9,7 +9,7 @@ import {
   type Page,
 } from '@playwright/test';
 
-import { adminApi } from './fixtures';
+import { adminApi, supprimerProspects } from './fixtures';
 
 /**
  * `/chues/prospects` vu par un TÉLÉCONSEILLER (`fixture.awa@cpi.sn`).
@@ -132,9 +132,10 @@ test.beforeAll(async () => {
     expect(syndicatId, 'Syndicat CHUES absent du référentiel').toBeDefined();
 
     for (const fiche of aPoser) {
-      for (const row of miennes.items.filter((item) => item.phoneE164 === fiche.phone)) {
-        await awa.delete(`/api/v1/prospects/${row.id}`);
-      }
+      await supprimerProspects(
+        awa,
+        miennes.items.filter((item) => item.phoneE164 === fiche.phone),
+      );
       const created = await awa.post('/api/v1/prospects', {
         data: { ...fiche, banqueId, syndicatId },
       });

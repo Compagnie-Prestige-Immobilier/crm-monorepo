@@ -210,11 +210,9 @@ test('GP-38 · « Proposer par défaut » n’est offert qu’à l’ADMIN', asy
       const bouton = vue.getByRole('button', { name: 'Proposer par défaut' });
       // JAMAIS de clic : la confirmation fixerait la disposition de tous les
       // comptes qui n'en ont pas enregistré (§1.12, §4.3.4).
-      if (etat === ADMIN_STATE) {
-        await expect(bouton, 'l’ADMIN doit pouvoir proposer une disposition').toBeVisible();
-      } else {
-        await expect(bouton, 'la DIRECTION ne fixe pas la disposition de tous').toHaveCount(0);
-      }
+      await (etat === ADMIN_STATE
+        ? expect(bouton, 'l’ADMIN doit pouvoir proposer une disposition').toBeVisible()
+        : expect(bouton, 'la DIRECTION ne fixe pas la disposition de tous').toHaveCount(0));
     } finally {
       await contexte.close();
     }
@@ -391,9 +389,8 @@ test('GP-45 · à 375 px la grille passe en une colonne', async ({ page }) => {
 
   const enregistrer = page.getByRole('button', { name: 'Enregistrer' });
   await expect(enregistrer).toBeVisible();
-  const boite = await enregistrer.boundingBox();
-  expect(
-    (boite?.x ?? 0) + (boite?.width ?? 0),
-    'la barre d’édition déborde du cadre à 375 px',
-  ).toBeLessThanOrEqual(375);
+  const boite = (await enregistrer.boundingBox()) ?? { x: 0, width: 0 };
+  expect(boite.x + boite.width, 'la barre d’édition déborde du cadre à 375 px').toBeLessThanOrEqual(
+    375,
+  );
 });

@@ -39,7 +39,6 @@ function ProspectsPage() {
       canAdminister={user.role === 'ADMIN'}
       canExport={canExportProspects(user.role)}
       readOnly={readsOnly(user.role)}
-      simplified={user.role === 'COMMERCIAL' || user.role === 'SUPERVISEUR'}
       campaignScoped={user.role === 'COMMERCIAL'}
     />
   );

@@ -73,6 +73,13 @@ export async function adminApi(): Promise<APIRequestContext> {
   });
 }
 
+export async function supprimerProspects(
+  api: APIRequestContext,
+  fiches: readonly { id: string }[],
+): Promise<void> {
+  for (const fiche of fiches) await api.delete(`/api/v1/prospects/${fiche.id}`);
+}
+
 /**
  * Lit une réponse en exigeant qu'elle ait abouti, et NOMME l'échec.
  *
@@ -165,11 +172,10 @@ async function ensureProspects(
     const found = await json<{ items: { id: string; phoneE164: string; phase2Status: string }[] }>(
       await api.get('/api/v1/prospects', { params: { search: phone, pageSize: '5' } }),
     );
-    for (const row of found.items) {
-      if (row.phoneE164 === phone && row.phase2Status !== 'PENDING') {
-        await api.delete(`/api/v1/prospects/${row.id}`);
-      }
-    }
+    await supprimerProspects(
+      api,
+      found.items.filter((row) => row.phoneE164 === phone && row.phase2Status !== 'PENDING'),
+    );
   }
 
   // `{ items, meta: { total } }` : le total vit sous `meta`, pas à la racine.

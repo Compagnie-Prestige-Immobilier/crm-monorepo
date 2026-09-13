@@ -185,6 +185,34 @@ async function creerRepresentant(
   await lire<{ id: string }>(cree);
 }
 
+async function rangerDansLaReserve(
+  api: APIRequestContext,
+  rang: number,
+  departementId: string,
+): Promise<void> {
+  const existant = await representantExistant(api, rang);
+  if (existant === undefined) {
+    await creerRepresentant(api, rang, departementId);
+    return;
+  }
+  // Une fiche posée par une exécution d'avant le département dédié rejoint la réserve.
+  await lire(
+    await api.patch(`/api/v1/representants/${existant.id}`, {
+      data: { departementId, fullName: nomRepresentant(rang) },
+    }),
+  );
+}
+
+async function retirerRepresentant(api: APIRequestContext, rang: number): Promise<void> {
+  const existant = await representantExistant(api, rang);
+  if (existant === undefined) return;
+  const retire = await api.delete(`/api/v1/representants/${existant.id}`);
+  expect(
+    retire.ok(),
+    `Le représentant ${nomRepresentant(rang)} d’une exécution précédente n’a pas pu être retiré : ${await retire.text()}`,
+  ).toBe(true);
+}
+
 test.beforeAll(async () => {
   test.setTimeout(180_000);
   const api = await adminApi();
@@ -195,17 +223,7 @@ test.beforeAll(async () => {
     const departementId = departement.id;
 
     for (let rang = 1; rang <= RESERVE; rang += 1) {
-      const existant = await representantExistant(api, rang);
-      if (existant === undefined) {
-        await creerRepresentant(api, rang, departementId);
-        continue;
-      }
-      // Une fiche posée par une exécution d'avant le département dédié rejoint la réserve.
-      await lire(
-        await api.patch(`/api/v1/representants/${existant.id}`, {
-          data: { departementId, fullName: nomRepresentant(rang) },
-        }),
-      );
+      await rangerDansLaReserve(api, rang, departementId);
     }
 
     // CHU-LOT-09 exige que le 21ᵉ N'EXISTE PAS encore : il doit naître APRÈS le
@@ -214,15 +232,7 @@ test.beforeAll(async () => {
     // Le 22ᵉ non plus : une fiche à ce numéro, née du lancement d'une campagne
     // de contacts recommandés (EB-19), résoudrait la suggestion et la sortirait
     // de la cible de CHU-LOT-21.
-    for (const rang of [RANG_TARDIF, RANG_SUGGERE]) {
-      const existant = await representantExistant(api, rang);
-      if (existant === undefined) continue;
-      const retire = await api.delete(`/api/v1/representants/${existant.id}`);
-      expect(
-        retire.ok(),
-        `Le représentant ${nomRepresentant(rang)} d’une exécution précédente n’a pas pu être retiré : ${await retire.text()}`,
-      ).toBe(true);
-    }
+    for (const rang of [RANG_TARDIF, RANG_SUGGERE]) await retirerRepresentant(api, rang);
 
     await retirerLesCampagnes(api);
     await poserUnContactRecommande(api);
@@ -633,6 +643,25 @@ const FICHES_SUP = FICHES_AWA + FICHES_FATOU + FICHES_SUPERVISEUR;
 
 const [AWA, FATOU, SUPERVISEUR] = EQUIPE.map((membre) => membre.nom) as [string, string, string];
 
+interface CorpsApercu {
+  cible?: string;
+  distribution?: {
+    jours?: number;
+    fichesParJour?: number;
+    objectifs?: { fichesParJour: number }[];
+  };
+}
+
+function estLApercuAttendu(corps: CorpsApercu | null): boolean {
+  return (
+    corps?.cible === 'REPRESENTANTS' &&
+    corps.distribution?.jours === JOURS_SUP &&
+    corps.distribution.fichesParJour === FICHES_PAR_JOUR &&
+    corps.distribution.objectifs?.length === 1 &&
+    corps.distribution.objectifs[0]?.fichesParJour === OBJECTIF_AWA
+  );
+}
+
 interface Fiche {
   position: number;
   ficheId: string | null;
@@ -728,21 +757,7 @@ test.describe('campagne réglée par un superviseur', () => {
     const attendreLApercu = page.waitForResponse((candidate) => {
       if (!candidate.url().includes('/api/v1/lots-export/apercu')) return false;
       if (candidate.request().method() !== 'POST') return false;
-      const corps = candidate.request().postDataJSON() as {
-        cible?: string;
-        distribution?: {
-          jours?: number;
-          fichesParJour?: number;
-          objectifs?: { fichesParJour: number }[];
-        };
-      } | null;
-      return (
-        corps?.cible === 'REPRESENTANTS' &&
-        corps.distribution?.jours === JOURS_SUP &&
-        corps.distribution.fichesParJour === FICHES_PAR_JOUR &&
-        corps.distribution.objectifs?.length === 1 &&
-        corps.distribution.objectifs[0]?.fichesParJour === OBJECTIF_AWA
-      );
+      return estLApercuAttendu(candidate.request().postDataJSON() as CorpsApercu | null);
     });
     await dialogue.getByLabel('Fiches par jour, à défaut d’objectif').fill(String(FICHES_PAR_JOUR));
     await attendreLApercu;

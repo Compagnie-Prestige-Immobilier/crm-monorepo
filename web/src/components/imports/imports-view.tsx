@@ -633,16 +633,6 @@ function JobActions({
   const showEmptyHint =
     job.status === 'succeeded' && job.mode === 'DRY_RUN' && job.createdRows === 0;
 
-  let hintText = '';
-  if (showEmptyHint) {
-    if (job.errorRows === 0 && job.skippedRows > 0) {
-      hintText = `Toutes les fiches (${formatNumber(job.skippedRows)}) sont déjà présentes en base de données. Aucun doublon n’a été créé.`;
-    } else {
-      hintText =
-        'Aucune nouvelle fiche à créer : les données sont soit déjà en base, soit à corriger.';
-    }
-  }
-
   return (
     <>
       <div className="flex flex-wrap items-center gap-3">
@@ -660,10 +650,19 @@ function JobActions({
       </div>
 
       {showEmptyHint ? (
-        <p className="text-[0.875rem] font-[500] text-muted-foreground">{hintText}</p>
+        <p className="text-[0.875rem] font-[500] text-muted-foreground">
+          {texteAucuneCreation(job)}
+        </p>
       ) : null}
     </>
   );
+}
+
+function texteAucuneCreation(job: ImportJob): string {
+  if (job.errorRows === 0 && job.skippedRows > 0) {
+    return `Toutes les fiches (${formatNumber(job.skippedRows)}) sont déjà présentes en base de données. Aucun doublon n’a été créé.`;
+  }
+  return 'Aucune nouvelle fiche à créer : les données sont soit déjà en base, soit à corriger.';
 }
 
 function TerminalState({ job }: { job: ImportJob }) {

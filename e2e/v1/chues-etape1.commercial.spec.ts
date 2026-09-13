@@ -47,6 +47,36 @@ async function chercherRepresentant(
   return trouves.items.find((row) => row.phoneE164 === phone);
 }
 
+async function reposerRepresentant(
+  api: APIRequestContext,
+  fiche: (typeof FICHES)[number],
+  departementId: string | undefined,
+): Promise<void> {
+  const existant = await chercherRepresentant(api, fiche.phone);
+  if (existant !== undefined) {
+    const suppression = await api.delete(`/api/v1/representants/${existant.id}`, {
+      params: { cascade: 'true' },
+    });
+    expect(
+      suppression.ok(),
+      `suppression de ${fiche.phone} : ${String(suppression.status())} ${await suppression.text()}`,
+    ).toBe(true);
+  }
+
+  const cree = await api.post('/api/v1/representants', {
+    data: { fullName: fiche.fullName, phone: fiche.phone, departementId },
+  });
+  const { id } = await attendu<{ id: string }>(cree);
+
+  if (fiche.relation !== 'INCONNU') {
+    await attendu<{ id: string }>(
+      await api.patch(`/api/v1/representants/${id}`, {
+        data: { relationStatus: fiche.relation },
+      }),
+    );
+  }
+}
+
 test.beforeAll(async () => {
   const api = await adminApi();
   try {
@@ -56,31 +86,7 @@ test.beforeAll(async () => {
     const departementId = departements[0]?.id;
     expect(departementId, 'aucun département dans le référentiel').toBeDefined();
 
-    for (const fiche of FICHES) {
-      const existant = await chercherRepresentant(api, fiche.phone);
-      if (existant !== undefined) {
-        const suppression = await api.delete(`/api/v1/representants/${existant.id}`, {
-          params: { cascade: 'true' },
-        });
-        expect(
-          suppression.ok(),
-          `suppression de ${fiche.phone} : ${String(suppression.status())} ${await suppression.text()}`,
-        ).toBe(true);
-      }
-
-      const cree = await api.post('/api/v1/representants', {
-        data: { fullName: fiche.fullName, phone: fiche.phone, departementId },
-      });
-      const { id } = await attendu<{ id: string }>(cree);
-
-      if (fiche.relation !== 'INCONNU') {
-        await attendu<{ id: string }>(
-          await api.patch(`/api/v1/representants/${id}`, {
-            data: { relationStatus: fiche.relation },
-          }),
-        );
-      }
-    }
+    for (const fiche of FICHES) await reposerRepresentant(api, fiche, departementId);
   } finally {
     await api.dispose();
   }

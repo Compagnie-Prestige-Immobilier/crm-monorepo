@@ -1,6 +1,6 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
-import { adminApi, ensureWorkspaceFixtures } from './fixtures';
+import { adminApi, ensureWorkspaceFixtures, supprimerProspects } from './fixtures';
 
 /**
  * ET3-1 à ET3-6 (E2E.md) : `/chues/console`, étape 3, convertir un
@@ -67,9 +67,10 @@ test.beforeAll(async () => {
       const found = await ok<{ items: { id: string; phoneE164: string }[] }>(
         await api.get('/api/v1/prospects', { params: { search: fiche.phone, pageSize: '50' } }),
       );
-      for (const row of found.items.filter((item) => item.phoneE164 === fiche.phone)) {
-        await api.delete(`/api/v1/prospects/${row.id}`);
-      }
+      await supprimerProspects(
+        api,
+        found.items.filter((item) => item.phoneE164 === fiche.phone),
+      );
       const created = await ok<{ id: string }>(
         await api.post('/api/v1/prospects', {
           data: { nom: NOM, prenom: fiche.prenom, phone: fiche.phone, banqueId, representantId },
