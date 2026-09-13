@@ -1,5 +1,6 @@
 import {
   ActivityIcon,
+  ArchiveIcon,
   BellIcon,
   ChartColumnIcon,
   ClipboardListIcon,
@@ -218,6 +219,16 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Export, correction et réimport en masse',
         roles: ['ADMIN', 'DIRECTION'],
         hidden: true,
+      },
+      {
+        // Destruction définitive d'une visite : la direction seule, et seulement
+        // au bout de trente jours. L'accueil archive, il ne détruit pas.
+        href: '/accueil/archives',
+        label: 'Visites archivées',
+        icon: ArchiveIcon,
+        description: 'Retirées du registre, à détruire après trente jours',
+        roles: ['DIRECTION'],
+        secondary: true,
       },
     ],
   },
