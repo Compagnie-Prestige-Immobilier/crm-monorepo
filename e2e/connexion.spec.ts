@@ -7,7 +7,7 @@ const BASE_DEMO = process.env.DATABASE_URL_DEMO;
 
 async function remplir(page: Page, motDePasse: string): Promise<void> {
   await page.getByLabel('E-mail ou identifiant').fill(compte.email);
-  await page.getByLabel('Mot de passe').fill(motDePasse);
+  await page.getByLabel('Mot de passe', { exact: true }).fill(motDePasse);
   await page.getByRole('button', { name: 'Se connecter' }).click();
 }
 
@@ -44,7 +44,7 @@ test.describe('parcours 1, limiteur de connexion', () => {
   test('la onzieme tentative est refusee', async ({ page }) => {
     await page.goto('/connexion');
     await page.getByLabel('E-mail ou identifiant').fill(compte.email);
-    await page.getByLabel('Mot de passe').fill('MauvaisMotDePasse');
+    await page.getByLabel('Mot de passe', { exact: true }).fill('MauvaisMotDePasse');
 
     // Le limiteur est un seau de jetons qui se remplit au fil de la minute : dix
     // tentatives par l'écran, machine chargée, dureraient assez pour en regagner.
@@ -73,7 +73,7 @@ test.describe('parcours 1, seconde base', () => {
     await page.getByRole('combobox', { name: 'Base' }).click();
     await page.getByRole('option', { name: 'demo' }).click();
     await expect(page.getByLabel('E-mail ou identifiant')).toBeHidden();
-    await expect(page.getByLabel('Mot de passe')).toBeHidden();
+    await expect(page.getByLabel('Mot de passe', { exact: true })).toBeHidden();
     await page.getByRole('combobox', { name: 'Profil démo' }).click();
     await page.getByRole('option', { name: 'Téléconseiller' }).click();
     await page.getByRole('button', { name: 'Se connecter' }).click();

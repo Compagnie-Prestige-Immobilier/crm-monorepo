@@ -20,7 +20,7 @@ func TestBaseDemonstrationCreeeServieEtSupprimee(t *testing.T) {
 	baseSQL := prefixeBaseSQL + "essai_audit"
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = $1`, nom)
-		detruireBaseSQL(b.ctx, b.dsn, baseSQL)
+		_ = detruireBaseSQL(b.ctx, b.dsn, baseSQL)
 	})
 
 	statut, body := appelJSON(b, http.MethodPost, "/api/v1/admin/bases", map[string]any{"nom": nom}, nil)
@@ -62,7 +62,7 @@ func TestBaseDemonstrationCreeeSousTraficNeCourtPas(t *testing.T) {
 	baseSQL := prefixeBaseSQL + "essai_course"
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = $1`, nom)
-		detruireBaseSQL(b.ctx, b.dsn, baseSQL)
+		_ = detruireBaseSQL(b.ctx, b.dsn, baseSQL)
 	})
 
 	arret := make(chan struct{})

@@ -9,6 +9,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"cpi-go/web"
 	"encoding/json"
+	"fmt"
 	"io"
 	"io/fs"
 	"net/http"
@@ -348,6 +349,32 @@ func TestLimiteurDeConnexion(t *testing.T) {
 	statut, body := b.connexion(b.email, "motdepasse")
 	b.attend(statut, http.StatusTooManyRequests, "quatrième tentative", body)
 	if body["code"] != "RATE_LIMITED" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+// Le seau par identifiant arrête une attaque distribuée, que le seau par
+// adresse laisse passer. Il ne doit pas devenir une arme : un tiers ne peut pas
+// enfermer dehors un collègue en épuisant son budget, parce qu'une connexion
+// RÉUSSIE ne coûte aucun jeton.
+func TestLimiteurParIdentifiantNeCompteQueLesEchecs(t *testing.T) {
+	t.Setenv("AUTH_LOGIN_RATE_LIMIT", "3")
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	b := nouveauBanc(t, "SUPERVISEUR")
+	// Une adresse differente par tentative : sans cela c'est le seau par ADRESSE
+	// qui refuserait, et le test ne dirait rien du seau par identifiant.
+	connexionDepuis := func(adresse, motDePasse string) (int, map[string]any) {
+		return appelJSON(b, http.MethodPost, "/api/v1/auth/login",
+			map[string]any{"identifier": b.email, "password": motDePasse},
+			map[string]string{"X-Forwarded-For": adresse})
+	}
+	for i := range 5 {
+		statut, body := connexionDepuis(fmt.Sprintf("198.51.100.%d", 40+i), "motdepasse")
+		b.attend(statut, http.StatusOK, "connexion valide repetee", body)
+	}
+	statut, body := connexionDepuis("198.51.100.50", "faux")
+	b.attend(statut, http.StatusUnauthorized, "un echec reste possible apres cinq reussites", body)
+	if body["code"] != "INVALID_CREDENTIALS" {
 		t.Fatalf("code : %v", body["code"])
 	}
 }

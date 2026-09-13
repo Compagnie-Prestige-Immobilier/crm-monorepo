@@ -10,7 +10,7 @@ test.describe('pannes et erreurs sur la connexion', () => {
   test('hors ligne, le serveur est annonce injoignable', async ({ page, context }) => {
     await page.goto('/connexion');
     await page.getByLabel('E-mail ou identifiant').fill(compte.email);
-    await page.getByLabel('Mot de passe').fill(MOT_DE_PASSE);
+    await page.getByLabel('Mot de passe', { exact: true }).fill(MOT_DE_PASSE);
 
     await context.setOffline(true);
     await page.getByRole('button', { name: 'Se connecter' }).click();
@@ -36,7 +36,7 @@ test.describe('pannes et erreurs sur la connexion', () => {
 
     await page.goto('/connexion');
     await page.getByLabel('E-mail ou identifiant').fill(compte.email);
-    await page.getByLabel('Mot de passe').fill(MOT_DE_PASSE);
+    await page.getByLabel('Mot de passe', { exact: true }).fill(MOT_DE_PASSE);
     await page.getByRole('button', { name: 'Se connecter' }).click();
 
     await expect(page.getByRole('alert')).toHaveText('Une erreur interne est survenue.');

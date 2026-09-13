@@ -263,6 +263,16 @@ func NouveauLimiteur(parMinute int) *Limiteur {
 	return &Limiteur{parCle: map[string]*rate.Limiter{}, vus: map[string]time.Time{}, parMin: parMinute}
 }
 
+// Regarde sans consommer. Compter les connexions RÉUSSIES dans un seau par
+// identifiant permettrait à un tiers d'enfermer dehors un collègue en brûlant
+// son budget : seul un échec doit coûter un jeton.
+func (l *Limiteur) Disponible(cle string) bool {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	lim, ok := l.parCle[cle]
+	return !ok || lim.Tokens() >= 1
+}
+
 func (l *Limiteur) Autorise(cle string) bool {
 	l.mu.Lock()
 	defer l.mu.Unlock()

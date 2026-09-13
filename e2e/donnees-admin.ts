@@ -29,7 +29,7 @@ export async function connexion(
 ): Promise<void> {
   await page.goto('/connexion');
   await page.getByLabel('E-mail ou identifiant').fill(identifiant);
-  await page.getByLabel('Mot de passe').fill(motDePasse);
+  await page.getByLabel('Mot de passe', { exact: true }).fill(motDePasse);
   await page.getByRole('button', { name: 'Se connecter' }).click();
 }
 

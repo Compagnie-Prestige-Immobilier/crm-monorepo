@@ -126,7 +126,7 @@ func (s *serviceBases) creer(ctx context.Context, in *BaseCreerInput) (*BasesOut
 	}
 	pool, i, err := monterBaseDemo(travail, s.Cfg, s.reg, baseSQL, nom, true)
 	if err != nil {
-		detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
+		_ = detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
 		return nil, err
 	}
 	acteur := socle.UtilisateurCourant(ctx).ID
@@ -134,7 +134,7 @@ func (s *serviceBases) creer(ctx context.Context, in *BaseCreerInput) (*BasesOut
 		Nom: nom, BaseSql: baseSQL, CreatedById: &acteur,
 	}); err != nil {
 		pool.Close()
-		detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
+		_ = detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
 		return nil, err
 	}
 	s.reg.monter(nom, i, pool)
@@ -164,15 +164,22 @@ func (s *serviceBases) supprimer(ctx context.Context, in *BaseSupprimerInput) (*
 	if baseSQL == "" {
 		return nil, socle.Problem(http.StatusNotFound, "BASE_INTROUVABLE", "Cette base n'existe pas.")
 	}
-	if _, err := s.Q.BaseDemonstrationSupprimer(ctx, nom); err != nil {
-		return nil, err
-	}
+	// La ligne part EN DERNIER. Effacée d'abord, une destruction qui échoue
+	// laisserait sur le disque une base que plus rien ne référence, invisible
+	// depuis le panneau. Dans cet ordre, l'échec laisse la base listée, donc
+	// visible et supprimable de nouveau.
 	if pool := s.reg.demonter(nom); pool != nil {
 		pool.Close()
 	}
 	travail, arreter := context.WithTimeout(context.WithoutCancel(ctx), time.Minute)
 	defer arreter()
-	detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL)
+	if err := detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
+		return nil, socle.Problem(http.StatusServiceUnavailable, "SUPPRESSION_IMPOSSIBLE",
+			"La base n'a pas pu être détruite. Elle reste listée, réessayez.")
+	}
+	if _, err := s.Q.BaseDemonstrationSupprimer(ctx, nom); err != nil {
+		return nil, err
+	}
 	slog.Info("base de démonstration supprimée", "nom", nom, "baseSql", baseSQL,
 		"userId", socle.UtilisateurCourant(ctx).ID)
 	return s.lister(ctx, nil)
@@ -200,16 +207,18 @@ func creerBaseSQL(ctx context.Context, dsn, baseSQL string) error {
 
 // Sans `FORCE`, une connexion résiduelle fait échouer la destruction et laisse
 // une base orpheline que plus rien ne référence.
-func detruireBaseSQL(ctx context.Context, dsn, baseSQL string) {
+func detruireBaseSQL(ctx context.Context, dsn, baseSQL string) error {
 	conn, err := connexionMaintenance(ctx, dsn)
 	if err != nil {
 		slog.Error("base de démonstration : destruction impossible", "baseSql", baseSQL, "err", err)
-		return
+		return err
 	}
 	defer func() { _ = conn.Close(ctx) }()
-	if _, err := conn.Exec(ctx, "DROP DATABASE IF EXISTS "+pgx.Identifier{baseSQL}.Sanitize()+" WITH (FORCE)"); err != nil {
+	_, err = conn.Exec(ctx, "DROP DATABASE IF EXISTS "+pgx.Identifier{baseSQL}.Sanitize()+" WITH (FORCE)")
+	if err != nil {
 		slog.Error("base de démonstration : destruction impossible", "baseSql", baseSQL, "err", err)
 	}
+	return err
 }
 
 // `CREATE DATABASE` ne peut pas s'exécuter depuis la base qu'on quitte : la
