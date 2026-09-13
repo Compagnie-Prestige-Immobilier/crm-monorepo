@@ -93,6 +93,12 @@ jobs:
       - run: pnpm --filter @crm/panel build
       - run: pnpm lint && pnpm typecheck
       - run: CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o cpi-go ./cmd/server
+      # L'export de la base appelle `pg_dump`, qui refuse un serveur plus recent que lui.
+      - name: pg_dump 18
+        run: |
+          sudo apt-get install -y -q postgresql-common
+          sudo /usr/share/postgresql-common/pgdg/apt.postgresql.org.sh -y
+          sudo apt-get install -y -q postgresql-client-18
       - run: go test -tags integration -count=1 ./...
 
       - run: pnpm exec playwright install --with-deps chromium
