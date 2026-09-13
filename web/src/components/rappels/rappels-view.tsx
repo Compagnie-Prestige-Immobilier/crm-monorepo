@@ -157,7 +157,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                             )}
                           </Badge>
                         ) : (
-                          <span className="text-muted-foreground">Sans objet</span>
+                          <Badge variant="secondary">À venir</Badge>
                         )}
                       </TableCell>
                       <TableCell className="max-w-80 text-muted-foreground">
@@ -168,7 +168,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                         <div className="flex justify-end gap-2">
                           <Link
                             href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                            className={buttonVariants({ variant: 'outline', size: 'sm' })}
+                            className={buttonVariants({ variant: 'default', size: 'sm' })}
                           >
                             <PhoneCallIcon aria-hidden="true" />
                             Consigner l’appel
