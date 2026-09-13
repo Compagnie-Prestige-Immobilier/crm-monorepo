@@ -210,7 +210,7 @@ func seedSemerCallOutcomeReasons(ctx context.Context, q *db.Queries) error {
 		return q.SeedUpsertCallOutcomeReason(ctx, db.SeedUpsertCallOutcomeReasonParams{
 			ID: id, Code: r.code, Label: r.label, Effect: r.effect, RequiresComment: r.requiresComment,
 			RequiresCallback: r.requiresCallback, CountsAsReached: r.countsAsReached, Color: &r.color,
-			SortOrder: r.sortOrder, IsSystem: true, MinPayloadVersion: 1,
+			SortOrder: r.sortOrder, IsSystem: true, MinPayloadVersion: r.minPayloadVersion,
 		})
 	})
 }

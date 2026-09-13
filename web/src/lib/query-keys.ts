@@ -42,6 +42,7 @@ export const queryKeys = {
   regions: ['referentiels', 'regions'] as const,
   referentielUsage: ['referentiels', 'usage'] as const,
   /** Ce que la SAISIE propose : actifs seulement. */
+  motifsAppel: ['referentiels', 'motifsAppel'] as const,
   statutsQualification: ['referentiels', 'statutsQualification'] as const,
   /** Ce que l'ADMINISTRATION montre : tout, désactivés compris. */
   statutsQualificationAdmin: ['referentiels', 'statutsQualification', 'administration'] as const,

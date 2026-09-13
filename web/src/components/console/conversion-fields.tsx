@@ -3,6 +3,7 @@
 import { Fragment, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
+import { ChampAjoute } from '@/components/forms/champ-ajoute';
 import { Field } from '@/components/forms/field';
 import { Liste } from '@/components/forms/liste';
 import { Input } from '@/components/ui/input';
@@ -12,7 +13,7 @@ import {
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
-import { valeursProposees, type ChampLibre, type ReglageChamp } from '@/lib/data/champs-conversion';
+import type { ChampLibre, ReglageChamp } from '@/lib/data/champs-conversion';
 import {
   DUREES_MOIS,
   formatDureeMois,
@@ -26,6 +27,8 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   ENROLLMENT_METHOD_LABELS,
   ENROLLMENT_METHOD_ORDER,
+  PAYMENT_MODE_LABELS,
+  PAYMENT_MODES,
   type EnrollmentMethod,
   type PaymentMode,
   type ProspectType,
@@ -34,10 +37,10 @@ import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
 
-const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = [
-  { value: 'COMPTANT', label: 'Comptant' },
-  { value: 'ECHELONNE', label: 'Échelonné' },
-];
+const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = PAYMENT_MODES.map((mode) => ({
+  value: mode,
+  label: PAYMENT_MODE_LABELS[mode],
+}));
 
 const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
 
@@ -55,6 +58,46 @@ const COORDONNEES: Partial<
   WHATSAPP: { libelle: 'Numéro WhatsApp CHUES', cle: 'whatsappChuesE164' },
 };
 
+export interface SaisieTelephone {
+  value: string;
+  error: string | undefined;
+  onChange: (value: string) => void;
+}
+
+/** Sur un appel le numéro est celui qu'on vient de composer ; à l'ajout, il se tape. */
+function ChampTelephone({
+  phoneE164,
+  telephone,
+}: {
+  phoneE164: string | null;
+  telephone: SaisieTelephone | undefined;
+}) {
+  if (telephone === undefined) {
+    return (
+      <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
+        {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
+      </Field>
+    );
+  }
+  return (
+    <Field label="Téléphone" required error={telephone.error}>
+      {(props) => (
+        <Input
+          {...props}
+          type="tel"
+          inputMode="tel"
+          autoComplete="off"
+          placeholder="77 123 45 67"
+          value={telephone.value}
+          onChange={(event) => {
+            telephone.onChange(event.target.value);
+          }}
+        />
+      )}
+    </Field>
+  );
+}
+
 /**
  * L'ordre, la visibilité et le caractère obligatoire viennent de
  * `reglages` : sans réglage chargé, le formulaire reste celui du projet.
@@ -63,17 +106,23 @@ export function ConversionFields({
   draft,
   errors,
   phoneE164,
+  telephone,
   disabled,
   reglages,
   libres,
+  seulement,
   onChange,
 }: {
   draft: ConversionDraft;
   errors: ConversionErrors;
-  phoneE164: string;
+  phoneE164: string | null;
+  /** Présent : la fiche n'existe pas encore, son numéro se saisit ici. */
+  telephone?: SaisieTelephone | undefined;
   disabled: boolean;
   reglages: readonly ReglageChamp[];
   libres: readonly ChampLibre[];
+  /** Posé : seuls ces champs se rendent, pour découper la saisie en étapes. */
+  seulement?: readonly ChampReglable[] | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
@@ -135,11 +184,7 @@ export function ConversionFields({
         )}
       </Field>
     ),
-    phoneE164: (
-      <Field label="Téléphone" description="Le numéro ne se corrige pas depuis un appel.">
-        {(props) => <Input {...props} readOnly value={formatPhone(phoneE164)} />}
-      </Field>
-    ),
+    phoneE164: <ChampTelephone phoneE164={phoneE164} telephone={telephone} />,
     whatsappStatus: (
       <ChoixOuiNon
         label="Ce numéro est-il un numéro WhatsApp ?"
@@ -424,7 +469,14 @@ export function ConversionFields({
       ) : null,
   };
 
-  const ordre = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
+  // Grand Public pose déjà la question dans « Situation », qui a son option
+  // fonctionnaire : la reposer en oui / non ferait deux réponses pour une.
+  const base = reglages.length > 0 ? reglages.map((regle) => regle.champ) : Object.keys(noeuds);
+  const { ordre, libresVus } = restreindreEtapes(
+    base.filter((champ) => complet || champ !== 'fonctionnaire'),
+    libres,
+    seulement,
+  );
 
   return (
     <fieldset className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" disabled={disabled}>
@@ -438,7 +490,7 @@ export function ConversionFields({
         ) : null,
       )}
 
-      {libres.map((champ) => (
+      {libresVus.map((champ) => (
         <ChampAjoute
           key={champ.id}
           champ={champ}
@@ -451,6 +503,19 @@ export function ConversionFields({
       ))}
     </fieldset>
   );
+}
+
+/** Posé : seuls ces champs se rendent, les champs ajoutés suivant la tranche des revenus. */
+function restreindreEtapes(
+  ordre: string[],
+  libres: readonly ChampLibre[],
+  seulement: readonly ChampReglable[] | undefined,
+): { ordre: string[]; libresVus: readonly ChampLibre[] } {
+  if (seulement === undefined) return { ordre, libresVus: libres };
+  return {
+    ordre: ordre.filter((champ) => seulement.includes(champ as ChampReglable)),
+    libresVus: seulement.includes('paymentMode') ? libres : [],
+  };
 }
 
 /** EB-24 : ce que le téléconseiller dicte au prospect, selon la méthode choisie. */
@@ -483,50 +548,6 @@ function visibleParDefaut(champ: string, complet: boolean): boolean {
     return !complet;
   }
   return true;
-}
-
-function ChampAjoute({
-  champ,
-  value,
-  error,
-  onChange,
-}: {
-  champ: ChampLibre;
-  value: string;
-  error: string | undefined;
-  onChange: (valeur: string) => void;
-}) {
-  if (champ.type === 'TEXTE') {
-    return (
-      <Field label={champ.libelle} required={champ.obligatoire} error={error}>
-        {(props) => (
-          <Input
-            {...props}
-            value={value}
-            onChange={(event) => {
-              onChange(event.target.value);
-            }}
-          />
-        )}
-      </Field>
-    );
-  }
-
-  const items = valeursProposees(champ).map((option) => ({ value: option, label: option }));
-  return (
-    <Field label={champ.libelle} required={champ.obligatoire} error={error}>
-      {(props) => (
-        <Liste
-          id={props.id}
-          describedBy={props['aria-describedby']}
-          items={items}
-          value={value}
-          placeholder="Choisir une valeur"
-          onChange={onChange}
-        />
-      )}
-    </Field>
-  );
 }
 
 function MethodChoice({

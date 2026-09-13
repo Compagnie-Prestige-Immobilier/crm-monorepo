@@ -4,19 +4,30 @@ import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tan
 import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
-import { ConversionFields } from '@/components/console/conversion-fields';
+import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
+import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
-import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
+import { ETAPES_APPEL, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
+import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import {
   AttemptRefused,
@@ -32,27 +43,32 @@ import {
   validateConversion,
   type AttemptDraft,
   type CallbackSlot,
+  type ChampReglable,
   type ConversionDraft,
   type ConversionErrors,
 } from '@/lib/data/console';
+import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import {
-  enregistrerBrouillon,
-  fetchOuvertureCourante,
-  ouvrirFiche,
-  type OuvertureFiche,
-} from '@/lib/data/ouvertures';
-import { useChampsConversion } from '@/lib/data/champs-conversion';
-import { fetchProspect, fetchProspects } from '@/lib/data/prospects';
-import { EMPTY_FILTERS } from '@/lib/filters';
+  commentaireExigePar,
+  issueDuMotif,
+  estJoignable,
+  fetchMotifsAppel,
+  type MotifAppel,
+} from '@/lib/data/call-outcome-reasons';
+import {
+  useChampsConversion,
+  type ChampLibre,
+  type ReglageChamp,
+} from '@/lib/data/champs-conversion';
+import type { OrigineFiche } from '@/lib/data/grand-public';
+import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
-  type CallOutcome,
   type EnrollmentMethod,
-  type ProspectFilters,
   type ProspectRow,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
@@ -64,14 +80,19 @@ type Projet = 'CHUES' | 'GRAND_PUBLIC';
 /** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
 const RAPPEL_KEY = '2';
 
-const ISSUES: readonly { key: string; label: string; outcome: CallOutcome | 'JOIGNABLE' }[] = [
-  { key: '1', label: 'Joignable', outcome: 'JOIGNABLE' },
-  { key: '2', label: 'Injoignable', outcome: 'UNREACHABLE' },
-];
+const GROUPES = [
+  { cle: 'joignable', touche: '1', label: 'Joignable' },
+  { cle: 'injoignable', touche: '2', label: 'Injoignable' },
+] as const;
+
+type Groupe = (typeof GROUPES)[number]['cle'];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1', 'Joignable : ouvre le dossier et l’adhésion'],
-  ['2', 'Injoignable : enregistre l’appel sans réponse'],
+  ['1', 'Joignable, puis son motif'],
+  ['2', 'Injoignable, puis son motif'],
+  ['1 … 9', 'Motif, une fois le groupe choisi'],
+  ['1 … 6', 'Échéance proposée, après un motif de rappel'],
+  ['0', 'Saisir une autre échéance'],
   ['Entrée', 'Valider'],
   ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
   ['C', 'Copier le numéro'],
@@ -80,27 +101,96 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['?', 'Afficher cette carte'],
 ];
 
-const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
+/**
+ * Le repli quand le référentiel ne répond pas : les six motifs système, ceux que
+ * le serveur applique lui-même en l'absence de `reasonCode`. Sans lui, une
+ * lecture en échec laisserait l'écran d'appel sans aucune issue.
+ */
+export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
+  { code: 'METHOD_OBTAINED', label: 'Méthode obtenue', effect: 'CLOSE_METHOD' },
+  { code: 'REFUSED', label: 'Refus', effect: 'CLOSE_REFUSED' },
+  { code: 'CALLBACK', label: CALL_OUTCOME_LABELS.CALLBACK, effect: 'SCHEDULE_CALLBACK' },
+  { code: 'WRONG_NUMBER', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, effect: 'CLOSE_WRONG_NUMBER' },
+  { code: 'UNREACHABLE', label: CALL_OUTCOME_LABELS.UNREACHABLE, effect: 'KEEP_OPEN' },
+  { code: 'OTHER', label: 'Autre', effect: 'KEEP_OPEN', requiresComment: true },
+].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
-/** Sans recherche : les vingt dernières fiches ajoutées au projet. */
-const annuaireFilters = (projet: Projet, search: string): ProspectFilters => ({
-  ...EMPTY_FILTERS,
-  projet,
-  search,
-  pageSize: 20,
-  sortBy: 'clientCreatedAt',
-  sortDir: 'desc',
-});
+/**
+ * Grand Public : « Injoignable » propose les statuts non aboutis de CHUES, figés
+ * ici pour que l'ADMIN ne puisse pas vider l'écran. Le référentiel porte les
+ * mêmes codes en entrées système : sans elles, le serveur refuserait l'appel.
+ */
+const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
+  { code: 'PAS_DE_REPONSE', label: 'Pas de réponse' },
+  { code: 'NUMERO_OCCUPE', label: 'Occupé' },
+  { code: 'MESSAGERIE', label: 'Messagerie' },
+  { code: 'TELEPHONE_INDISPONIBLE', label: 'Téléphone indisponible' },
+  { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' },
+  { code: 'AUTRE_NON_JOINT', label: 'Autre', requiresComment: true },
+].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
+
+/** Après « Joignable », les statuts qui disent le contraire n'ont plus de sens. */
+const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
+  'UNREACHABLE',
+  ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
+]);
+
+/** Les statuts propres à l'écran Grand Public : la console CHUES garde ses motifs. */
+const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
+  'INTERESSE',
+  'HORS_CIBLE',
+  ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
+]);
+
+/** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
+export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
+  catalogue.filter((item) => !CODES_INJOIGNABLE.has(item.code) && item.effect !== 'CLOSE_METHOD');
+
+const statutsDuGroupe = (groupe: Groupe | null, catalogue: readonly MotifAppel[]) =>
+  groupe === 'injoignable' ? MOTIFS_INJOIGNABLE : statutsJoignables(catalogue);
+
+/**
+ * Le statut de l'adhésion : celui qu'on a choisi s'il en est un, sinon le
+ * premier du référentiel. CHUES garde ainsi le motif précis de son bouton.
+ */
+const statutAdhesion = (
+  motif: MotifAppel | null,
+  catalogue: readonly MotifAppel[],
+): MotifAppel | undefined =>
+  motif?.effect === 'CLOSE_METHOD'
+    ? motif
+    : catalogue.find((item) => item.effect === 'CLOSE_METHOD');
+
+const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
 const nouveauHref = (projet: Projet): string =>
   projet === 'GRAND_PUBLIC' ? '/grand-public/nouveau' : '/chues/prospects/nouveau';
+
+/** Grand Public consigne l'appel sur son propre écran, le même que depuis la liste des fiches. */
+const appelHref = (projet: Projet, id: string): string | null =>
+  projet === 'GRAND_PUBLIC' ? `/grand-public/appel/${id}` : null;
+
+const CLASSE_CHOIX = cn(
+  'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
+  'underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+);
 
 /**
  * Étape 3 : convertir un prospect. L'écran ouvre sur la recherche, la fiche
  * choisie reçoit l'appel, puis on revient à la liste. `?fiche=<id>` (depuis
  * les rappels) ouvre directement la fiche visée.
  */
-export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
+export function ConsoleView({
+  projet = 'CHUES',
+  viewerId,
+  origineFiltrable = false,
+}: {
+  projet?: Projet;
+  /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
+  viewerId?: string | undefined;
+  /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
+  origineFiltrable?: boolean | undefined;
+}) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
 
@@ -108,6 +198,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
+  const origineInitiale: OrigineFiche = projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+  const [origine, setOrigine] = useState<OrigineFiche>(origineInitiale);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
@@ -122,8 +214,8 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
-    queryKey: queryKeys.prospects(annuaireFilters(projet, cherche)),
-    queryFn: () => fetchProspects(annuaireFilters(projet, cherche)),
+    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', projet, cherche, origine] as const,
+    queryFn: () => fetchProspectsAQualifier({ projet, search: cherche, origine, viewerId }),
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
@@ -133,21 +225,6 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
     setVise(null);
     setDemandee(null);
   }, []);
-
-  const reprendre = useCallback((prise: Ouverte) => {
-    setVise(null);
-    setDemandee(null);
-    setOuverte(prise);
-  }, []);
-
-  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
-  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
-  const repriseFaite = useRef(false);
-  useEffect(() => {
-    if (repriseFaite.current) return;
-    repriseFaite.current = true;
-    void reprendreOuverte(reprendre);
-  }, [reprendre]);
 
   const ouvrir = useMutation({
     mutationFn: async (row: ProspectRow): Promise<Ouverte> => ({
@@ -191,28 +268,16 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
 
   return (
     <div className="flex w-full flex-col gap-5">
-      {demandee !== null && parLien.isError ? (
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-        >
-          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
-        </p>
-      ) : null}
-
-      {confirme === null ? null : (
-        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
-          Appel enregistré pour {confirme}.
-        </p>
-      )}
-
-      <ChampAnnuaire value={search} onChange={setSearch} />
-
-      <p className="text-[0.8125rem] text-muted-foreground">
-        {cherche === ''
-          ? 'Les vingt dernières fiches ajoutées. Cherchez un nom ou un numéro pour en voir d’autres.'
-          : 'Choisissez qui vous venez d’appeler.'}
-      </p>
+      <EnTeteAnnuaire
+        lienEnEchec={demandee !== null && parLien.isError}
+        confirme={confirme}
+        cherche={cherche}
+        search={search}
+        projet={projet}
+        origine={origineFiltrable ? origine : null}
+        onSearch={setSearch}
+        onOrigine={setOrigine}
+      />
 
       <ListeAnnuaire
         annuaire={annuaire}
@@ -244,7 +309,65 @@ export function ConsoleView({ projet = 'CHUES' }: { projet?: Projet }) {
   );
 }
 
-/** La fiche et l'ouverture qui la chronomètre. */
+/**
+ * Ce qui précède la liste : l'avis d'un lien mort, la confirmation du dernier
+ * appel, la recherche et la provenance.
+ */
+function EnTeteAnnuaire({
+  lienEnEchec,
+  confirme,
+  cherche,
+  search,
+  projet,
+  origine,
+  onSearch,
+  onOrigine,
+}: {
+  lienEnEchec: boolean;
+  confirme: string | null;
+  cherche: string;
+  search: string;
+  projet: Projet;
+  /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
+  origine: OrigineFiche | null;
+  onSearch: (value: string) => void;
+  onOrigine: (value: OrigineFiche) => void;
+}) {
+  let texteAide: string;
+  if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
+  else if (projet === 'GRAND_PUBLIC')
+    texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
+  else
+    texteAide =
+      'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
+
+  return (
+    <>
+      {lienEnEchec ? (
+        <p
+          role="alert"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
+        </p>
+      ) : null}
+
+      {confirme === null ? null : (
+        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
+          Appel enregistré pour {confirme}.
+        </p>
+      )}
+
+      <ChampAnnuaire value={search} onChange={onSearch} />
+
+      {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
+
+      <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
+    </>
+  );
+}
+
+/** La fiche et l'ouverture qui la mesure. Nulle quand la fiche est close. */
 interface Ouverte {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
@@ -253,7 +376,7 @@ interface Ouverte {
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
 
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
-const brouillonDe = (
+export const brouillonDe = (
   comment: string,
   conversion: ConversionDraft | null,
 ): Record<string, unknown> => ({
@@ -292,22 +415,10 @@ function chargementParLien(demandee: string | null, isPending: boolean): boolean
 function saisieCommencee(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
-  draftOutcome: CallOutcome | null,
+  motif: MotifAppel | null,
   comment: string,
 ): boolean {
-  return conversion !== null || slots !== null || draftOutcome !== null || comment !== '';
-}
-
-/**
- * La fiche que le serveur tient encore pour cette console, remise à l'écran
- * telle quelle : au montage, elle répare un rechargement.
- */
-async function reprendreOuverte(reprendre: (prise: Ouverte) => void): Promise<void> {
-  const courante = await fetchOuvertureCourante('prospect').catch(() => null);
-  if (courante === null || courante.prospectId === null) return;
-  const prospect = await fetchProspect(courante.prospectId).catch(() => null);
-  if (prospect === null) return;
-  reprendre({ prospect, ouverture: courante });
+  return conversion !== null || slots !== null || motif !== null || comment !== '';
 }
 
 function ListeAnnuaire({
@@ -316,7 +427,7 @@ function ListeAnnuaire({
   projet,
   onChoisir,
 }: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspects>>>;
+  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   projet: Projet;
   onChoisir: (row: ProspectRow) => void;
@@ -340,7 +451,7 @@ function ListeAnnuaire({
       <div className="flex flex-col gap-3">
         <p className="text-[0.9375rem]">
           {cherche === ''
-            ? 'Aucun prospect pour l’instant.'
+            ? 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.'
             : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
         </p>
         <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
@@ -351,40 +462,60 @@ function ListeAnnuaire({
   }
 
   return (
-    <ol className="flex flex-col gap-2">
-      {annuaire.data.items.map((row) => (
-        <li key={row.id}>
-          <button
-            type="button"
-            onClick={() => {
-              onChoisir(row);
-            }}
-            className={cn(
-              'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-              'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-            )}
-          >
-            <span className="flex min-w-0 flex-col">
-              <span className="truncate text-[0.9375rem] font-[600]">
-                {row.nom} {row.prenom}
-              </span>
-              <span className="text-[0.8125rem] text-muted-foreground">
-                <span className="tabular-nums">{formatPhone(row.phoneE164)}</span>
-                {row.banqueName === null ? '' : ` · ${row.banqueName}`}
-                {row.lastAttemptAt === null
-                  ? ' · jamais appelé'
-                  : ` · dernier appel ${formatDateTime(row.lastAttemptAt)}`}
-              </span>
-            </span>
-            {row.phase2Status === 'PENDING' ? null : (
-              <span className="rounded-full border border-border px-2 py-0.5 text-[0.75rem] text-muted-foreground">
-                {PHASE2_STATUS_LABELS[row.phase2Status]}
-              </span>
-            )}
-          </button>
-        </li>
-      ))}
-    </ol>
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nom et prénom</TableHead>
+          <TableHead>Numéro</TableHead>
+          <TableHead>Dernier appel</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {annuaire.data.items.map((row) => {
+          const href = appelHref(projet, row.id);
+          return (
+            <TableRow key={row.id}>
+              <TableCell>
+                {href === null ? (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onChoisir(row);
+                    }}
+                    className={CLASSE_CHOIX}
+                  >
+                    <NomProspect row={row} />
+                  </button>
+                ) : (
+                  <Link href={href} className={CLASSE_CHOIX}>
+                    <NomProspect row={row} />
+                  </Link>
+                )}
+              </TableCell>
+              <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
+              <TableCell className="whitespace-nowrap text-muted-foreground">
+                {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
+              </TableCell>
+            </TableRow>
+          );
+        })}
+      </TableBody>
+    </Table>
+  );
+}
+
+function NomProspect({ row }: { row: ProspectRow }) {
+  return (
+    <>
+      <span className="truncate">
+        {row.nom} {row.prenom}
+      </span>
+      {row.phase2Status === 'PENDING' ? null : (
+        <span className="shrink-0 rounded-full border border-border px-2 py-0.5 text-[0.75rem] font-[400] text-muted-foreground">
+          {PHASE2_STATUS_LABELS[row.phase2Status]}
+        </span>
+      )}
+    </>
   );
 }
 
@@ -416,6 +547,135 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
+/** Le dossier d'adhésion, une fois la personne dite joignable. */
+export function PanneauDossier({
+  ouvert,
+  prospect,
+  conversion,
+  errors,
+  telephone,
+  disabled,
+  formulaire,
+  seulement,
+  envoiLien = true,
+  onChange,
+}: {
+  ouvert: boolean;
+  prospect: FicheContactable;
+  conversion: ConversionDraft | null;
+  errors: ConversionErrors;
+  telephone?: SaisieTelephone | undefined;
+  disabled: boolean;
+  formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
+  seulement?: readonly ChampReglable[] | undefined;
+  envoiLien?: boolean | undefined;
+  onChange: (patch: Partial<ConversionDraft>) => void;
+}) {
+  if (!ouvert || conversion === null) return null;
+
+  return (
+    <>
+      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
+        Joignable · son dossier, et la manière dont il adhère
+      </p>
+
+      {envoiLien ? <EnvoiLienFormulaire prospect={prospect} email={conversion.email} /> : null}
+
+      <ConversionFields
+        draft={conversion}
+        errors={errors}
+        phoneE164={prospect.phoneE164}
+        telephone={telephone}
+        disabled={disabled}
+        reglages={formulaire.champs}
+        libres={formulaire.libres}
+        seulement={seulement}
+        onChange={onChange}
+      />
+    </>
+  );
+}
+
+/** Les deux boutons, puis les motifs du groupe ouvert. */
+function ChoixIssue({
+  etape,
+  groupe,
+  proposes,
+  motif,
+  disabled,
+  onGroupe,
+  onMotif,
+}: {
+  etape: Etape;
+  groupe: Groupe | null;
+  proposes: readonly MotifAppel[];
+  motif: MotifAppel | null;
+  disabled: boolean;
+  onGroupe: (groupe: Groupe) => void;
+  onMotif: (motif: MotifAppel) => void;
+}) {
+  if (etape === 'issues') {
+    return (
+      <fieldset className="flex flex-col gap-2" disabled={disabled}>
+        <LegendeIssue>Avez-vous eu la personne au téléphone ?</LegendeIssue>
+        <div className="flex flex-wrap gap-2">
+          {GROUPES.map((item) => (
+            <Button
+              key={item.cle}
+              variant="outline"
+              onClick={() => {
+                onGroupe(item.cle);
+              }}
+            >
+              <Kbd>{item.touche}</Kbd>
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      </fieldset>
+    );
+  }
+
+  if (etape !== 'motifs') return null;
+
+  return (
+    <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
+      <LegendeIssue>
+        {groupe === 'joignable' ? 'Joignable · que dit la personne ?' : 'Injoignable · pourquoi ?'}
+      </LegendeIssue>
+      {proposes.length === 0 ? (
+        <p role="alert" className="text-[0.875rem] text-warning">
+          Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de
+          référence.
+        </p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          {proposes.map((item, rang) => (
+            <Button
+              key={item.code}
+              variant={motif?.code === item.code ? 'default' : 'outline'}
+              onClick={() => {
+                onMotif(item);
+              }}
+            >
+              {rang < 9 ? <Kbd>{String(rang + 1)}</Kbd> : null}
+              {item.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </fieldset>
+  );
+}
+
+function LegendeIssue({ children }: { children: ReactNode }) {
+  return (
+    <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+      {children}
+    </legend>
+  );
+}
+
 function ListeSkeleton() {
   return (
     <div className="flex flex-col gap-2">
@@ -444,31 +704,60 @@ function resumeDernierAppel(prospect: ProspectRow): string {
  * L'étape visible, et elle seule : c'est elle qui tranche à qui vont les
  * chiffres, Entrée et Échap quand le dossier et l'échéance coexistent.
  */
-type Etape = 'issues' | 'dossier' | 'echeance';
+type Etape = 'issues' | 'motifs' | 'statut' | 'dossier' | 'echeance' | null;
 
 function etapeCourante(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
+  groupe: Groupe | null,
+  surStatut: boolean,
 ): Etape {
   if (slots !== null) return 'echeance';
   if (conversion !== null) return 'dossier';
-  return 'issues';
+  if (surStatut) return 'statut';
+  return groupe === null ? 'issues' : 'motifs';
+}
+
+/** Grand Public : chaque réponse à « joignable ? » ouvre son select de statut. */
+const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
+  statutParSelect && groupe !== null;
+
+/** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
+const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
+  statutParSelect && groupe === 'joignable';
+
+/** Les boutons de motif de la console CHUES, pour le groupe ouvert. */
+function motifsDuGroupe(
+  catalogue: readonly MotifAppel[],
+  groupe: Groupe | null,
+): readonly MotifAppel[] {
+  return catalogue.filter(
+    (item) =>
+      !CODES_GRAND_PUBLIC.has(item.code) &&
+      (estJoignable(item) ? 'joignable' : 'injoignable') === groupe,
+  );
 }
 
 /**
  * La consignation d'un appel, en deux temps : d'abord si la personne était
  * joignable, puis, si oui, son dossier et la manière dont elle adhère.
  */
-function Consignation({
+export function Consignation({
   prospect,
   ouverture,
   projet,
+  statutParSelect = false,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
+  /**
+   * Vrai : « Joignable » ouvre le dossier et son select de statut,
+   * « Injoignable » les motifs figés. Faux : les motifs du référentiel.
+   */
+  statutParSelect?: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string) => void;
 }) {
@@ -478,14 +767,27 @@ function Consignation({
 
   const [repris] = useState(() => lireBrouillon(ouverture?.draft));
   const [comment, setComment] = useState(repris.comment);
-  const [draftOutcome, setDraftOutcome] = useState<CallOutcome | null>(null);
+  // Un brouillon repris vient d'un appel où la personne répondait : la question
+  // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
+  const [groupe, setGroupe] = useState<Groupe | null>(
+    repris.conversion === null ? null : 'joignable',
+  );
+  const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
+  // Grand Public seul : l'appel se consigne en trois étapes, la console CHUES reste d'un bloc.
+  const [etapeAppel, setEtapeAppel] = useState(0);
 
   const formulaire = useChampsConversion(projet);
+  const motifs = useQuery({
+    queryKey: queryKeys.motifsAppel,
+    queryFn: () => fetchMotifsAppel(),
+    staleTime: 300_000,
+  });
+  const catalogue = motifs.data ?? MOTIFS_SYSTEME;
 
   const nomComplet = nomDe(prospect);
   const [now] = useState(() => Date.now());
@@ -526,33 +828,34 @@ function Consignation({
 
   const record = useCallback(
     (
-      outcome: CallOutcome,
+      choisi: MotifAppel,
       method: EnrollmentMethod | null,
       callbackAt: string | null = null,
       renseignements?: ConversionDraft,
     ) => {
       if (send.isPending) return;
       const draft: AttemptDraft = {
-        outcome,
+        outcome: issueDuMotif(choisi),
+        reasonCode: choisi.code,
         method,
         comment,
         callbackAt,
         ...(renseignements === undefined ? {} : { conversion: renseignements }),
         ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
       };
-      const problem = validateAttempt(draft);
+      const problem = validateAttempt(draft, Date.now(), choisi.requiresComment);
       if (problem !== null) {
         toast.error(problem);
+        if (statutParSelect && choisi.requiresComment) setEtapeAppel(2);
         return;
       }
       send.mutate(draft);
     },
-    [send, comment, ouverture],
+    [send, comment, ouverture, statutParSelect],
   );
 
   const ouvrirDossier = useCallback(() => {
     if (send.isPending) return;
-    setDraftOutcome(null);
     setSlots(null);
     setConversionErrors({});
     setConversion(conversionFrom(prospect));
@@ -567,40 +870,53 @@ function Consignation({
       formulaire.libres,
     );
     setConversionErrors(problems);
-    if (Object.keys(problems).length > 0 || conversion.method === null) return;
-    record('METHOD_OBTAINED', conversion.method, null, conversion);
-  }, [conversion, formulaire, record]);
-
-  const startOther = useCallback(() => {
-    setDraftOutcome('OTHER');
-    commentRef.current?.focus();
-  }, []);
+    const adhesion = statutAdhesion(motif, catalogue);
+    if (Object.keys(problems).length > 0 || conversion.method === null) {
+      if (statutParSelect) setEtapeAppel(1);
+      return;
+    }
+    if (adhesion === undefined) {
+      toast.error('Le statut « Méthode obtenue » est désactivé dans les listes de référence.');
+      return;
+    }
+    record(adhesion, conversion.method, null, conversion);
+  }, [conversion, formulaire, motif, catalogue, record, statutParSelect]);
 
   const startCallback = useCallback(() => {
-    setDraftOutcome(null);
     setFreeCallback('');
     setSlots(callbackSlots(Date.now()));
   }, []);
 
   const choisir = useCallback(
-    (outcome: CallOutcome | 'JOIGNABLE') => {
-      if (outcome === 'JOIGNABLE') {
-        setDraftOutcome(null);
-        if (conversion === null) ouvrirDossier();
-      } else if (outcome === 'UNREACHABLE') {
-        setConversion(null);
-        setConversionErrors({});
-        setSlots(null);
-        setDraftOutcome('UNREACHABLE');
-      } else if (outcome === 'CALLBACK') {
-        startCallback();
-      } else if (outcome === 'OTHER') {
-        startOther();
-      } else {
-        record(outcome, null);
-      }
+    (choisi: MotifAppel) => {
+      if (send.isPending) return;
+      setMotif(choisi);
+      if (choisi.effect === 'CLOSE_METHOD') ouvrirDossier();
+      else if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      else if (choisi.requiresComment) commentRef.current?.focus();
+      else record(choisi, null);
     },
-    [conversion, ouvrirDossier, startCallback, startOther, record],
+    [send.isPending, ouvrirDossier, startCallback, record],
+  );
+
+  /**
+   * Le même choix, mais qui ne consigne rien : dans un select, la valeur se
+   * survole avant de se poser, et l'appel partirait sur un statut effleuré.
+   */
+  const poserStatut = useCallback(
+    (choisi: MotifAppel) => {
+      if (send.isPending) return;
+      setMotif(choisi);
+      if (choisi.effect === 'CLOSE_METHOD') {
+        ouvrirDossier();
+        return;
+      }
+      setConversion(null);
+      setConversionErrors({});
+      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      else setSlots(null);
+    },
+    [send.isPending, ouvrirDossier, startCallback],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -612,18 +928,19 @@ function Consignation({
         toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
         return;
       }
-      record('CALLBACK', null, iso);
+      if (motif !== null) record(motif, null, iso);
       return;
     }
     if (conversion !== null) {
       submitConversion();
       return;
     }
-    if (draftOutcome !== null) record(draftOutcome, null);
-  }, [conversion, submitConversion, slots, freeCallback, draftOutcome, record]);
+    if (motif !== null) record(motif, null);
+  }, [conversion, submitConversion, slots, freeCallback, motif, record]);
 
-  const etape = etapeCourante(conversion, slots);
-  const saisieEnCours = saisieCommencee(conversion, slots, draftOutcome, comment);
+  const surStatut = surSelect(groupe, statutParSelect);
+  const etape = etapeCourante(conversion, slots, groupe, surStatut);
+  const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
   const annuler = useCallback(() => {
     // L'échéance se referme seule : la jeter avec le dossier rempli au-dessous
@@ -636,18 +953,37 @@ function Consignation({
       onAbandon();
       return;
     }
-    setDraftOutcome(null);
+    setGroupe(null);
+    setMotif(null);
     setComment('');
     setConversion(null);
     setConversionErrors({});
     commentRef.current?.blur();
   }, [slots, saisieEnCours, onAbandon]);
 
-  const issueShortcuts: Record<string, () => void> = Object.fromEntries(
-    ISSUES.map((issue) => [
-      issue.key,
+  const choisirGroupe = (choisi: Groupe): void => {
+    setGroupe(choisi);
+    if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
+  };
+
+  const proposes = motifsDuGroupe(catalogue, groupe);
+  const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
+  const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
+
+  const groupeShortcuts: Record<string, () => void> = Object.fromEntries(
+    GROUPES.map((item) => [
+      item.touche,
       () => {
-        choisir(issue.outcome);
+        choisirGroupe(item.cle);
+      },
+    ]),
+  );
+
+  const motifShortcuts: Record<string, () => void> = Object.fromEntries(
+    proposes.slice(0, 9).map((item, rang) => [
+      String(rang + 1),
+      () => {
+        choisir(item);
       },
     ]),
   );
@@ -656,7 +992,7 @@ function Consignation({
     (slots ?? []).map((slot) => [
       slot.key,
       () => {
-        record('CALLBACK', null, slot.at);
+        if (motif !== null) record(motif, null, slot.at);
       },
     ]),
   );
@@ -664,8 +1000,16 @@ function Consignation({
     callbackRef.current?.focus();
   };
 
-  let digitShortcuts = issueShortcuts;
-  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: startCallback };
+  // EB-10 : le rappel reste atteignable au clavier une fois le dossier ouvert.
+  const versLeRappel = (): void => {
+    if (motifRappel === undefined) return;
+    setMotif(motifRappel);
+    startCallback();
+  };
+
+  let digitShortcuts = etape === 'motifs' ? motifShortcuts : groupeShortcuts;
+  if (etape === 'statut') digitShortcuts = {};
+  if (etape === 'dossier') digitShortcuts = { [RAPPEL_KEY]: versLeRappel };
   if (etape === 'echeance') digitShortcuts = slotShortcuts;
 
   useShortcuts({
@@ -688,142 +1032,175 @@ function Consignation({
     },
   });
 
+  function corpsAppel(): React.ReactNode {
+    // Grand Public seul : Joignable, puis le dossier, puis l'issue. L'étape se
+    // choisit par indice, sans condition.
+    const tranches = [
+      <>
+        {surStatut ? (
+          <SelectStatut
+            catalogue={statutsDuGroupe(groupe, catalogue)}
+            motif={motif}
+            disabled={send.isPending}
+            onChange={poserStatut}
+            onFerme={() => {
+              if (motif?.requiresComment) commentRef.current?.focus();
+            }}
+          />
+        ) : null}
+
+        <ChoixIssue
+          etape={etape}
+          groupe={groupe}
+          proposes={proposes}
+          motif={motif}
+          disabled={send.isPending}
+          onGroupe={choisirGroupe}
+          onMotif={choisir}
+        />
+      </>,
+      <>
+        <PanneauDossier
+          ouvert={etape === 'dossier'}
+          prospect={prospect}
+          conversion={conversion}
+          errors={conversionErrors}
+          disabled={send.isPending}
+          formulaire={formulaire}
+          onChange={(patch) => {
+            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+          }}
+        />
+
+        {conversion === null ? (
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Pas de dossier à remplir : poursuivez vers l’issue.
+          </p>
+        ) : null}
+      </>,
+      <>
+        {etape === 'echeance' && slots !== null ? (
+          <PanneauEcheance
+            slots={slots}
+            now={now}
+            freeCallback={freeCallback}
+            surDossier={conversion !== null}
+            disabled={send.isPending}
+            inputRef={callbackRef}
+            onChoisir={(at) => {
+              if (motif !== null) record(motif, null, at);
+            }}
+            onFreeCallback={setFreeCallback}
+            onValidate={validate}
+          />
+        ) : null}
+
+        {etape === null ? null : (
+          <Commentaire
+            value={comment}
+            obligatoirePour={commentaireExigePar(motif)}
+            inputRef={commentRef}
+            onChange={setComment}
+            onValidate={validate}
+          />
+        )}
+
+        <PiedAppel
+          etape={etape}
+          disabled={send.isPending}
+          statutPose={motif !== null}
+          onValidate={validate}
+          onAbandon={onAbandon}
+        />
+
+        <PiedDossier
+          ouvert={etape === 'dossier'}
+          disabled={send.isPending}
+          motifRefus={motifRefus}
+          onAdhesion={submitConversion}
+          onRefus={(refus) => {
+            setMotif(refus);
+            record(refus, null);
+          }}
+          onRappel={versLeRappel}
+          onAnnuler={() => {
+            setConversion(null);
+            setConversionErrors({});
+          }}
+        />
+      </>,
+    ];
+    return (
+      <section aria-label="Fiche courante" className="flex flex-col gap-4">
+        <EnTeteFiche
+          prospect={prospect}
+          nomComplet={nomComplet}
+          projet={projet}
+          surDossier={etape === 'dossier'}
+        />
+
+        <EtapesProgression etapes={ETAPES_APPEL} courante={etapeAppel} onChoisir={setEtapeAppel} />
+
+        {tranches[etapeAppel]}
+
+        <PiedEtapes
+          courante={etapeAppel}
+          total={ETAPES_APPEL.length}
+          desactive={send.isPending}
+          onRetour={() => {
+            setEtapeAppel(etapeAppel - 1);
+          }}
+          onSuite={() => {
+            setEtapeAppel(etapeAppel + 1);
+          }}
+        />
+      </section>
+    );
+  }
+
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
-          <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-3">
-              <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
-                {nomComplet}
-              </h2>
-              <span className="select-all font-mono text-[1.25rem] font-[700] tracking-tight tabular-nums text-foreground">
-                {formatPhone(prospect.phoneE164)}
-              </span>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  copyPhone(prospect.phoneE164);
-                }}
-              >
-                <CopyIcon aria-hidden="true" />
-                Copier
-                <Kbd>C</Kbd>
-              </Button>
-              <BoutonWhatsApp prospect={prospect} />
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-              <span>{rattachements(prospect, projet)}</span>
-              <span>·</span>
-              <span>{resumeDernierAppel(prospect)}</span>
-            </div>
-          </div>
-          {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
-        </div>
+        <EnTeteFiche
+          prospect={prospect}
+          nomComplet={nomComplet}
+          projet={projet}
+          surDossier={etape === 'dossier'}
+        />
 
-        <fieldset className="flex flex-col gap-3" disabled={send.isPending}>
-          <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-            Comment s’est passé l’appel ?
-          </legend>
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              type="button"
-              size="lg"
-              variant={conversion !== null ? 'default' : 'outline'}
-              className="min-w-36 justify-center gap-2 font-semibold"
-              onClick={() => {
-                choisir('JOIGNABLE');
-              }}
-            >
-              <Kbd>1</Kbd>
-              Joignable
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              variant={
-                draftOutcome === 'UNREACHABLE' ||
-                draftOutcome === 'WRONG_NUMBER' ||
-                draftOutcome === 'OTHER'
-                  ? 'default'
-                  : 'outline'
-              }
-              className="min-w-36 justify-center gap-2 font-semibold"
-              onClick={() => {
-                choisir('UNREACHABLE');
-              }}
-            >
-              <Kbd>2</Kbd>
-              Injoignable
-            </Button>
-          </div>
-        </fieldset>
+        {surStatut ? (
+          <SelectStatut
+            catalogue={statutsDuGroupe(groupe, catalogue)}
+            motif={motif}
+            disabled={send.isPending}
+            onChange={poserStatut}
+            onFerme={() => {
+              if (motif?.requiresComment) commentRef.current?.focus();
+            }}
+          />
+        ) : null}
 
-        {draftOutcome !== 'UNREACHABLE' &&
-        draftOutcome !== 'WRONG_NUMBER' &&
-        draftOutcome !== 'OTHER' ? null : (
-          <div className="flex flex-col gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
-            <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-              Motif de non-joignabilité
-            </span>
-            <div className="flex flex-wrap gap-2">
-              <Button
-                type="button"
-                variant={draftOutcome === 'UNREACHABLE' ? 'default' : 'outline'}
-                onClick={() => setDraftOutcome('UNREACHABLE')}
-              >
-                Ne répond pas
-              </Button>
-              <Button
-                type="button"
-                variant={draftOutcome === 'WRONG_NUMBER' ? 'default' : 'outline'}
-                onClick={() => setDraftOutcome('WRONG_NUMBER')}
-              >
-                Mauvais numéro
-              </Button>
-              <Button
-                type="button"
-                variant={draftOutcome === 'OTHER' ? 'default' : 'outline'}
-                onClick={() => {
-                  setDraftOutcome('OTHER');
-                  commentRef.current?.focus();
-                }}
-              >
-                Autre
-              </Button>
-            </div>
-            <div className="flex flex-wrap gap-2 pt-2">
-              <Button onClick={validate} disabled={send.isPending}>
-                Enregistrer l’issue (
-                {draftOutcome === 'WRONG_NUMBER'
-                  ? 'Mauvais numéro'
-                  : draftOutcome === 'OTHER'
-                    ? 'Autre'
-                    : 'Ne répond pas'}
-                )<Kbd>Entrée</Kbd>
-              </Button>
-            </div>
-          </div>
-        )}
+        <PanneauDossier
+          ouvert={etape === 'dossier'}
+          prospect={prospect}
+          conversion={conversion}
+          errors={conversionErrors}
+          disabled={send.isPending}
+          formulaire={formulaire}
+          onChange={(patch) => {
+            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+          }}
+        />
 
-        {conversion === null ? null : (
-          <>
-            <EnvoiLienFormulaire prospect={prospect} email={conversion.email} />
-
-            <ConversionFields
-              draft={conversion}
-              errors={conversionErrors}
-              phoneE164={prospect.phoneE164}
-              disabled={send.isPending}
-              reglages={formulaire.champs}
-              libres={formulaire.libres}
-              onChange={(patch) => {
-                setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-              }}
-            />
-          </>
-        )}
+        <ChoixIssue
+          etape={etape}
+          groupe={groupe}
+          proposes={proposes}
+          motif={motif}
+          disabled={send.isPending}
+          onGroupe={choisirGroupe}
+          onMotif={choisir}
+        />
 
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
@@ -834,76 +1211,60 @@ function Consignation({
             disabled={send.isPending}
             inputRef={callbackRef}
             onChoisir={(at) => {
-              record('CALLBACK', null, at);
+              if (motif !== null) record(motif, null, at);
             }}
             onFreeCallback={setFreeCallback}
             onValidate={validate}
           />
         )}
 
-        <Commentaire
-          value={comment}
-          obligatoire={draftOutcome === 'OTHER'}
-          inputRef={commentRef}
-          onChange={setComment}
+        {etape === null ? null : (
+          <Commentaire
+            value={comment}
+            obligatoirePour={commentaireExigePar(motif)}
+            inputRef={commentRef}
+            onChange={setComment}
+            onValidate={validate}
+          />
+        )}
+
+        <PiedAppel
+          etape={statutParSelect ? etape : null}
+          disabled={send.isPending}
+          statutPose={motif !== null}
           onValidate={validate}
+          onAbandon={onAbandon}
         />
 
-        {draftOutcome !== 'UNREACHABLE' ? null : (
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={validate} disabled={send.isPending}>
-              Enregistrer l’appel injoignable
-              <Kbd>Entrée</Kbd>
-            </Button>
-          </div>
-        )}
-
-        {conversion === null ? null : (
-          <div className="flex flex-wrap gap-2 pt-2">
-            <Button onClick={submitConversion} disabled={send.isPending}>
-              Enregistrer l’adhésion
-              <Kbd>Entrée</Kbd>
-            </Button>
-            <Button
-              variant="outline"
-              disabled={send.isPending}
-              onClick={() => {
-                record('REFUSED', null);
-              }}
-            >
-              Il refuse
-            </Button>
-            <Button variant="outline" disabled={send.isPending} onClick={startCallback}>
-              À rappeler
-              <Kbd>{RAPPEL_KEY}</Kbd>
-            </Button>
-            <Button
-              variant="ghost"
-              disabled={send.isPending}
-              onClick={() => {
-                setConversion(null);
-                setConversionErrors({});
-              }}
-            >
-              Annuler
-              <Kbd>Échap</Kbd>
-            </Button>
-          </div>
-        )}
+        <PiedDossier
+          ouvert={etape === 'dossier'}
+          disabled={send.isPending}
+          motifRefus={motifRefus}
+          onAdhesion={submitConversion}
+          onRefus={(refus) => {
+            setMotif(refus);
+            record(refus, null);
+          }}
+          onRappel={versLeRappel}
+          onAnnuler={() => {
+            setConversion(null);
+            setConversionErrors({});
+          }}
+        />
       </section>
     );
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-5xl flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
       <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste
       </Button>
 
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+      <ChronoDemarre demarre={departChrono} />
 
-      {corpsFiche()}
+      {statutParSelect ? corpsAppel() : corpsFiche()}
 
       <details
         open={helpOpen}
@@ -931,8 +1292,156 @@ function Consignation({
   );
 }
 
+/** Les quatre issues du dossier d'adhésion, une fois celui-ci rempli. */
+export function PiedDossier({
+  ouvert,
+  disabled,
+  motifRefus,
+  raccourcis = true,
+  extra,
+  onAdhesion,
+  onRefus,
+  onRappel,
+  onAnnuler,
+}: {
+  ouvert: boolean;
+  disabled: boolean;
+  motifRefus: MotifAppel | undefined;
+  /** Faux : l'écran n'écoute pas le clavier, et les touches ne s'affichent pas. */
+  raccourcis?: boolean;
+  /** Les gestes propres à l'écran hôte, avant « Annuler ». */
+  extra?: ReactNode;
+  onAdhesion: () => void;
+  onRefus: (motif: MotifAppel) => void;
+  onRappel: () => void;
+  onAnnuler: () => void;
+}) {
+  if (!ouvert) return null;
+  const touche = (libelle: string): ReactNode => (raccourcis ? <Kbd>{libelle}</Kbd> : null);
+  return (
+    <>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onAdhesion} disabled={disabled}>
+          Enregistrer l’adhésion
+          {touche('Entrée')}
+        </Button>
+        {motifRefus === undefined ? null : (
+          <Button
+            variant="outline"
+            disabled={disabled}
+            onClick={() => {
+              onRefus(motifRefus);
+            }}
+          >
+            Il refuse
+          </Button>
+        )}
+        <Button variant="outline" disabled={disabled} onClick={onRappel}>
+          À rappeler
+          {touche(RAPPEL_KEY)}
+        </Button>
+        {extra}
+        <Button variant="ghost" disabled={disabled} onClick={onAnnuler}>
+          Annuler
+          {touche('Échap')}
+        </Button>
+      </div>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        « À rappeler » garde ce dossier pour le prochain appel. « Annuler » l’efface.
+      </p>
+    </>
+  );
+}
+
+/** Le chronomètre ne tourne qu'une fois la saisie commencée. */
+function ChronoDemarre({ demarre }: { demarre: string | null }) {
+  if (demarre === null) return null;
+  return <Chrono firstInputAt={demarre} />;
+}
+
+/** L'identité de la fiche : qui on appelle, son numéro, et ce qu'on en sait. */
+function EnTeteFiche({
+  prospect,
+  nomComplet,
+  projet,
+  surDossier,
+}: {
+  prospect: ProspectRow;
+  nomComplet: string;
+  projet: Projet;
+  surDossier: boolean;
+}) {
+  return (
+    <>
+      <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+          {formatPhone(prospect.phoneE164)}
+        </span>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => {
+            copyPhone(prospect.phoneE164);
+          }}
+        >
+          <CopyIcon aria-hidden="true" />
+          Copier
+          <Kbd>C</Kbd>
+        </Button>
+        {surDossier ? null : <BoutonWhatsApp prospect={prospect} />}
+      </div>
+
+      <p className="text-[0.8125rem] text-muted-foreground">{rattachements(prospect, projet)}</p>
+      <p className="text-[0.8125rem] text-muted-foreground">{resumeDernierAppel(prospect)}</p>
+
+      {prospect.phase2Status !== 'PENDING' ? (
+        <div
+          role="status"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          Déjà classée : {PHASE2_STATUS_LABELS[prospect.phase2Status].toLowerCase()}.
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+/**
+ * Le pied des statuts qui n'ouvrent pas de dossier : eux n'ont pas les quatre
+ * boutons de l'adhésion, mais l'appel se consigne quand même.
+ */
+function PiedAppel({
+  etape,
+  disabled,
+  statutPose,
+  onValidate,
+  onAbandon,
+}: {
+  etape: Etape;
+  disabled: boolean;
+  /** Sans statut, l'appel n'a rien à dire : le bouton attend qu'on en choisisse un. */
+  statutPose: boolean;
+  onValidate: () => void;
+  onAbandon: () => void;
+}) {
+  if (etape !== 'statut' && etape !== 'echeance') return null;
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button onClick={onValidate} disabled={disabled || !statutPose}>
+        Enregistrer l’appel
+        <Kbd>Entrée</Kbd>
+      </Button>
+      <Button variant="outline" disabled={disabled} onClick={onAbandon}>
+        Revenir à la liste
+      </Button>
+    </div>
+  );
+}
+
 /** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
-function PanneauEcheance({
+export function PanneauEcheance({
   slots,
   now,
   freeCallback,
@@ -1016,15 +1525,16 @@ function PanneauEcheance({
   );
 }
 
-function Commentaire({
+export function Commentaire({
   value,
-  obligatoire,
+  obligatoirePour,
   inputRef,
   onChange,
   onValidate,
 }: {
   value: string;
-  obligatoire: boolean;
+  /** Le statut qui réclame le commentaire, nul quand il reste facultatif. */
+  obligatoirePour: string | null;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
   onChange: (value: string) => void;
   onValidate: () => void;
@@ -1033,7 +1543,7 @@ function Commentaire({
     <div className="flex flex-col gap-1.5">
       <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
         Commentaire
-        {obligatoire ? ' (obligatoire pour Autre)' : ''}
+        {obligatoirePour === null ? '' : ` (obligatoire pour ${obligatoirePour})`}
       </label>
       <Textarea
         id="console-comment"

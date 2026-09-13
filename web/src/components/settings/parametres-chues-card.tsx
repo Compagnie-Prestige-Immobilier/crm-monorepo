@@ -31,6 +31,9 @@ const LIBELLES: Record<string, string> = {
   messageWhatsapp: 'Message WhatsApp',
   accuseReceptionObjet: 'Accusé de réception, objet',
   accuseReceptionCorps: 'Accusé de réception, corps',
+  adhesionObjet: 'Avis d’adhésion, objet',
+  adhesionCorps: 'Avis d’adhésion, corps',
+  destinatairesAdhesion: 'Avis d’adhésion, destinataires',
   destinatairesEnrolement: 'Cellule enrôlement',
   destinatairesBpe: 'Cellule BPE',
   destinatairesSupervision: 'Superviseurs',
@@ -68,6 +71,7 @@ const LISTES = [
   'destinatairesBpe',
   'destinatairesSupervision',
   'destinatairesDirection',
+  'destinatairesAdhesion',
 ] as const;
 
 const CODIFICATION = 'codificationProvenances';
@@ -190,6 +194,18 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
                 saisir(texte.cle, saisie);
               }}
             />
+          ))}
+          {(['adhesionObjet', 'adhesionCorps'] as const).map((cle) => (
+            <Field key={cle} label={LIBELLES[cle] ?? cle}>
+              {(props) => (
+                <Textarea
+                  {...props}
+                  rows={cle === 'adhesionObjet' ? 1 : 6}
+                  value={valeur(cle)}
+                  onChange={(event) => saisir(cle, event.target.value)}
+                />
+              )}
+            </Field>
           ))}
         </CardContent>
       </Card>
