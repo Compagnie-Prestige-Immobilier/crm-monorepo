@@ -19,6 +19,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
+const echellesIdentifiant = 3
+
 type service struct {
 	*socle.Deps
 	leurre string
@@ -225,11 +227,15 @@ func Monter(api huma.API, d *socle.Deps) error {
 	if err != nil {
 		return err
 	}
+	// Le seau par identifiant est PLUS large que celui par adresse. Il vise une
+	// attaque distribuée, que le seau par adresse laisse passer ; serré, il
+	// gênerait d'abord la personne qui se trompe de mot de passe depuis son
+	// poste, et elle est déjà tenue par son adresse.
 	s := &service{
 		Deps:         d,
 		leurre:       leurre,
 		tentatives:   socle.NouveauLimiteur(d.Cfg.LoginRate),
-		parIdentifie: socle.NouveauLimiteur(d.Cfg.LoginRate),
+		parIdentifie: socle.NouveauLimiteur(d.Cfg.LoginRate * echellesIdentifiant),
 	}
 	huma.Post(api, "/api/v1/auth/login", s.login)
 	huma.Post(api, "/api/v1/auth/demo-login", s.demoLogin)

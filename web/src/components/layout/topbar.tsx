@@ -7,6 +7,7 @@ import { useState } from 'react';
 
 import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
 import { hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
+import { RechercheGlobale } from '@/components/layout/recherche-globale';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { GlobalExportButton } from '@/components/exports/global-export-button';
 import { ThemeToggle } from '@/components/layout/theme-toggle';
@@ -54,6 +55,8 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
       <h1 className="min-w-0 flex-1 truncate font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
         {title}
       </h1>
+
+      <RechercheGlobale role={user.role} />
 
       <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
 
