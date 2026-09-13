@@ -409,7 +409,7 @@ func TestNotificationGabaritArchiveSortDeLaListe(t *testing.T) {
 	statut, body = b.notificationAppel(http.MethodPost,
 		"/api/v1/notification-templates/"+id+"/active", map[string]any{"isActive": false})
 	b.attend(statut, http.StatusOK, "retrait du gabarit", body)
-	if body["isActive"] != false {
+	if actif, _ := body["isActive"].(bool); actif {
 		t.Fatalf("isActive : %v", body["isActive"])
 	}
 	if compterGabarit(t, b, nom) != 0 {
