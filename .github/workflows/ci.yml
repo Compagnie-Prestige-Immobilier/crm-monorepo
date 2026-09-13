@@ -62,11 +62,17 @@ jobs:
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
 
-      - name: Schéma sur la base de test et sur la seconde base
+      # Le binaire applique goose au démarrage : une base qui n'a que
+      # `schema.sql` n'est PAS celle de production. Sans les migrations ici,
+      # `sqlc vet` échouait sur chaque colonne ajoutée depuis le dernier gel du
+      # schéma, et le déploiement restait bloqué derrière ce job.
+      - name: Schéma et migrations sur la base de test et sur la seconde base
         run: |
           PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -f sql/schema.sql
           PGPASSWORD=crm psql -h localhost -U crm -d crm -v ON_ERROR_STOP=1 -q -c 'CREATE DATABASE crm_demo'
           PGPASSWORD=crm psql -h localhost -U crm -d crm_demo -v ON_ERROR_STOP=1 -q -f sql/schema.sql
+          go run github.com/pressly/goose/v3/cmd/goose@v3.28.0 -dir sql/migrations postgres "$DATABASE_URL" up
+          go run github.com/pressly/goose/v3/cmd/goose@v3.28.0 -dir sql/migrations postgres "$DATABASE_URL_DEMO" up
       # `vet` prépare chaque requête sur la base réelle : une colonne absente
       # rougit ici, pas en production.
       - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 vet
