@@ -6,6 +6,7 @@ import (
 	"cpi-go/internal/shared/database"
 	"log/slog"
 	"net/http"
+	"os"
 	"strings"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -43,10 +44,22 @@ func (s *service) rattraperFeuilles(ctx context.Context, _ *struct{}) (*Rattrapa
 	if err != nil {
 		return nil, err
 	}
+	// L'échéance efface le classeur du disque : les travaux les plus anciens
+	// n'ont plus rien à relire. Le même document vit toujours sur SharePoint, et
+	// le rapprochement se fait par téléphone, pas par fichier.
+	recours := classeurDepuisSharePoint(ctx)
+	if recours != "" {
+		defer func() { _ = os.Remove(recours) }()
+	}
+
 	out := &RattrapageOutput{}
 	out.Body.Classeurs = make([]RattrapageClasseur, 0, len(travaux))
 	for i := range travaux {
-		bilan := s.rattraperUnClasseur(ctx, travaux[i].ID, travaux[i].StoragePath)
+		chemin := travaux[i].StoragePath
+		if _, err := os.Stat(chemin); err != nil {
+			chemin = recours
+		}
+		bilan := s.rattraperUnClasseur(ctx, travaux[i].ID, chemin)
 		bilan.FileName = travaux[i].FileName
 		out.Body.Fiches += bilan.Fiches
 		out.Body.Classeurs = append(out.Body.Classeurs, bilan)
@@ -54,8 +67,32 @@ func (s *service) rattraperFeuilles(ctx context.Context, _ *struct{}) (*Rattrapa
 	return out, nil
 }
 
+func classeurDepuisSharePoint(ctx context.Context) string {
+	lien := strings.TrimSpace(os.Getenv("IMPORT_LEADS_URL"))
+	if lien == "" {
+		return ""
+	}
+	classeur, _, err := telechargerLeads(ctx, lien, reglagesImports().maxOctets)
+	if err != nil {
+		slog.Warn("rattrapage des onglets, relevé SharePoint", "err", err)
+		return ""
+	}
+	fichier, err := os.CreateTemp("", "rattrapage-*.xlsx")
+	if err != nil {
+		return ""
+	}
+	defer func() { _ = fichier.Close() }()
+	if _, err := fichier.Write(classeur); err != nil {
+		return ""
+	}
+	return fichier.Name()
+}
+
 // Un classeur effacé par l'expiration se signale sans faire échouer les autres.
 func (s *service) rattraperUnClasseur(ctx context.Context, jobID, chemin string) RattrapageClasseur {
+	if chemin == "" {
+		return RattrapageClasseur{Motif: "classeur échu et relevé SharePoint indisponible"}
+	}
 	feuilles, err := s.feuillesParTelephone(chemin)
 	if err != nil {
 		return RattrapageClasseur{Motif: err.Error()}
