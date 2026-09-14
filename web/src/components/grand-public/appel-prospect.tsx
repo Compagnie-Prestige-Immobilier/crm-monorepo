@@ -6,6 +6,7 @@ import { useEffect, useRef } from 'react';
 
 import { Consignation } from '@/components/console/console-view';
 import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
 import { callbackKeys } from '@/lib/data/console';
 import { ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -51,10 +52,13 @@ export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
       projet="GRAND_PUBLIC"
       statutParSelect
       onAbandon={retour}
-      onEnregistre={() => {
+      onEnregistre={(_nom, detailStatut) => {
         queryClient.setQueryData(queryKeys.ouvertureCourante, null);
         void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
         void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+        toast.success(
+          `Appel consigné pour ${prospect.prenom} ${prospect.nom}${detailStatut ? ` · ${detailStatut}` : ''}`,
+        );
         retour();
       }}
     />
