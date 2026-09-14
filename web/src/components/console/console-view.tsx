@@ -93,9 +93,7 @@ const GROUPES = [
 type Groupe = (typeof GROUPES)[number]['cle'];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1', 'Joignable, puis motif'],
-  ['2', 'Injoignable, puis motif'],
-  ['1 … 9', 'Motif au choix'],
+  ['1 … 9', 'Statut au choix'],
   ['1 … 6', 'Échéance proposée'],
   ['0', 'Autre échéance'],
   ['Entrée', 'Valider'],
@@ -107,12 +105,18 @@ const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
 ];
 
 export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
-  { code: 'METHOD_OBTAINED', label: 'Méthode obtenue', effect: 'CLOSE_METHOD' },
-  { code: 'REFUSED', label: 'Refus', effect: 'CLOSE_REFUSED' },
-  { code: 'CALLBACK', label: CALL_OUTCOME_LABELS.CALLBACK, effect: 'SCHEDULE_CALLBACK' },
-  { code: 'WRONG_NUMBER', label: CALL_OUTCOME_LABELS.WRONG_NUMBER, effect: 'CLOSE_WRONG_NUMBER' },
-  { code: 'UNREACHABLE', label: CALL_OUTCOME_LABELS.UNREACHABLE, effect: 'KEEP_OPEN' },
-  { code: 'OTHER', label: 'Autre', effect: 'KEEP_OPEN', requiresComment: true },
+  { code: 'REFUS_DEJA_ENGAGE', label: 'Déjà engagé', effect: 'CLOSE_REFUSED' },
+  { code: 'REFUS_PAS_CONFIANCE', label: 'Pas confiance', effect: 'CLOSE_REFUSED' },
+  { code: 'REFUS_MEFIANT', label: 'Méfiant', effect: 'CLOSE_REFUSED' },
+  { code: 'REFUS_NE_VEUT_PAS', label: 'Ne veut pas', effect: 'CLOSE_REFUSED' },
+  { code: 'REFUS_PAS_POUR_LE_MOMENT', label: 'Pas pour le moment', effect: 'CLOSE_REFUSED' },
+  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  { code: 'RDV_TELEPHONIQUE', label: 'RDV téléphonique', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  { code: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement', effect: 'CLOSE_METHOD' },
+  { code: 'CONSTRUCTION', label: 'Construction', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN', requiresComment: true },
+  { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED', requiresComment: true },
+  { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN', requiresComment: true },
 ].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
 const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
@@ -168,12 +172,14 @@ export function ConsoleView({
   projet = 'CHUES',
   viewerId,
   origineFiltrable = false,
+  canCreateProspect = false,
 }: {
   projet?: Projet;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
   viewerId?: string | undefined;
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
   origineFiltrable?: boolean | undefined;
+  canCreateProspect?: boolean | undefined;
 }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -182,7 +188,7 @@ export function ConsoleView({
   const [vise, setVise] = useState<ProspectRow | null>(null);
   const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
-  const origineInitiale: OrigineFiche = projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+  const origineInitiale = origineInitialePour(projet);
   const [origine, setOrigine] = useState<OrigineFiche>(origineInitiale);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
@@ -234,11 +240,10 @@ export function ConsoleView({
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
         projet={projet}
+        canCreateProspect={canCreateProspect}
         onAbandon={revenir}
         onEnregistre={(nom, detailStatut) => {
-          const text = detailStatut
-            ? `Appel consigné pour ${nom} · Statut : ${detailStatut}`
-            : `Appel consigné pour ${nom}`;
+          const text = texteConfirmationAppel(nom, detailStatut);
           setConfirme(text);
           toast.success(text);
           revenir();
@@ -271,6 +276,7 @@ export function ConsoleView({
         annuaire={annuaire}
         cherche={cherche}
         projet={projet}
+        canCreateProspect={canCreateProspect}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -373,6 +379,14 @@ interface Ouverte {
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
 
+const origineInitialePour = (projet: Projet): OrigineFiche =>
+  projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+
+const texteConfirmationAppel = (nom: string, detailStatut?: string): string =>
+  detailStatut
+    ? `Appel consigné pour ${nom} · Statut : ${detailStatut}`
+    : `Appel consigné pour ${nom}`;
+
 /** Ce que `lireBrouillon` sait relire, et rien d'autre. */
 export const brouillonDe = (
   comment: string,
@@ -423,11 +437,13 @@ function ListeAnnuaire({
   annuaire,
   cherche,
   projet,
+  canCreateProspect,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   projet: Projet;
+  canCreateProspect: boolean;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -452,9 +468,11 @@ function ListeAnnuaire({
             ? 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.'
             : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
         </p>
-        <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
-          Ajouter un prospect
-        </Link>
+        {canCreateProspect ? (
+          <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
+            Ajouter un prospect
+          </Link>
+        ) : null}
       </div>
     );
   }
@@ -619,7 +637,7 @@ export function PanneauDossier({
   return (
     <>
       <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-        Joignable · son dossier, et la manière dont il adhère
+        Transfert enrôlement · méthode et informations du dossier
       </p>
 
       {envoiLien ? <EnvoiLienFormulaire prospect={prospect} email={conversion.email} /> : null}
@@ -639,10 +657,10 @@ export function PanneauDossier({
   );
 }
 
-/** Les deux boutons, puis les motifs du groupe ouvert. */
+/** Les statuts de qualification disponibles pour la fiche. */
 function ChoixIssue({
   etape,
-  groupe,
+  groupe: _groupe,
   proposes,
   motif,
   disabled,
@@ -687,12 +705,10 @@ function ChoixIssue({
     <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-          {groupe === 'joignable'
-            ? 'Joignable · que dit la personne ?'
-            : 'Injoignable · pourquoi ?'}
+          Qualification de l’appel
         </p>
         <Button type="button" variant="ghost" size="sm" onClick={onRetour}>
-          Changer de réponse
+          Changer de statut
         </Button>
       </div>
       {proposes.length === 0 ? (
@@ -790,12 +806,14 @@ export function Consignation({
   prospect,
   ouverture,
   projet,
+  canCreateProspect,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
+  canCreateProspect: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string, detailStatut?: string) => void;
 }) {
@@ -808,7 +826,7 @@ export function Consignation({
   // Un brouillon repris vient d'un appel où la personne répondait : la question
   // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
   const [groupe, setGroupe] = useState<Groupe | null>(
-    repris.conversion === null ? null : 'joignable',
+    'joignable',
   );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
@@ -970,7 +988,7 @@ export function Consignation({
       onAbandon();
       return;
     }
-    setGroupe(null);
+    setGroupe('joignable');
     setMotif(null);
     setComment('');
     setConversion(null);
@@ -988,7 +1006,7 @@ export function Consignation({
   };
 
   const retourAuxIssues = (): void => {
-    setGroupe(null);
+    setGroupe('joignable');
     setMotif(null);
     setSlots(null);
     setFreeCallback('');
@@ -1050,6 +1068,7 @@ export function Consignation({
       copyPhone(prospect.phoneE164);
     },
     n: () => {
+      if (!canCreateProspect) return;
       const rep = prospect.representantId;
       if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
@@ -1446,8 +1465,13 @@ function PiedAppel({
   );
 }
 
-const titreEcheance = (code: string | undefined): string =>
-  code === 'RDV_AGENCE' ? "Date et heure du rendez-vous d'information" : 'Échéance du rappel';
+const titreEcheance = (code: string | undefined): string => {
+  if (code === 'RDV_AGENCE' || code === 'RDV_TELEPHONIQUE') {
+    return 'Date et heure du rendez-vous téléphonique';
+  }
+  if (code === 'CONSTRUCTION') return 'Date et heure du rendez-vous construction';
+  return 'Échéance du rappel';
+};
 
 /** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
 export function PanneauEcheance({

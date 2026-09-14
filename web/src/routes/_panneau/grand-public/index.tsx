@@ -35,7 +35,7 @@ function GrandPublicPage() {
   return (
     <GrandPublicProspectsView
       viewerId={user.id}
-      canCreate={user.role !== 'DIRECTION'}
+      canCreate={['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role)}
       canExport={canExportProspects(user.role)}
       campaignScoped={user.role === 'COMMERCIAL'}
       canFilterOrigine={user.role === 'COMMERCIAL' || user.role === 'CHARGE_CLIENTELE'}

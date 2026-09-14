@@ -25,11 +25,13 @@ export function ProspectsView({
   canAdminister,
   canExport = false,
   readOnly = false,
+  canCreate = false,
   campaignScoped = false,
 }: {
   canAdminister: boolean;
   canExport?: boolean;
   readOnly?: boolean;
+  canCreate?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {
@@ -57,12 +59,10 @@ export function ProspectsView({
         </p>
         <div className="flex flex-wrap gap-2">
           {canExport ? <ProspectExportMenu filters={filters} /> : null}
-          {readOnly ? null : (
-            <Button onClick={() => setCreateOpen(true)}>
-              <PlusIcon aria-hidden="true" />
-              Nouveau prospect
-            </Button>
-          )}
+          <CreateProspectButton
+            visible={!readOnly && canCreate}
+            onClick={() => setCreateOpen(true)}
+          />
         </div>
       </div>
 
@@ -84,5 +84,15 @@ export function ProspectsView({
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function CreateProspectButton({ visible, onClick }: { visible: boolean; onClick: () => void }) {
+  if (!visible) return null;
+  return (
+    <Button onClick={onClick}>
+      <PlusIcon aria-hidden="true" />
+      Nouveau prospect
+    </Button>
   );
 }

@@ -7,7 +7,7 @@ import { guardRoles } from '@/lib/guard';
 import { readString } from '@/lib/search-params';
 
 export const Route = createFileRoute('/_panneau/chues/prospects/nouveau')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
   component: NouveauProspectPage,
   pendingComponent: Loading,
 });

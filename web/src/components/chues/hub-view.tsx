@@ -23,7 +23,7 @@ import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-fi
  * Téléconseil, supervision et direction y lisent le MÊME écran : les trois
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
-export function HubView({ prenom }: { prenom: string }) {
+export function HubView({ prenom, canCreateProspect }: { prenom: string; canCreateProspect: boolean }) {
   const [nouveauRepresentant, setNouveauRepresentant] = useState(false);
   const nonQualifies = useQuery({
     queryKey: queryKeys.representants(NON_QUALIFIES),
@@ -108,7 +108,11 @@ export function HubView({ prenom }: { prenom: string }) {
               legende="ont dit oui, sans contacts notés"
             />
           }
-          action={<Geste href="/chues/prospects/nouveau" label="Ajouter un prospect" />}
+          action={
+            canCreateProspect ? (
+              <Geste href="/chues/prospects/nouveau" label="Ajouter un prospect" />
+            ) : null
+          }
         />
 
         <Etape

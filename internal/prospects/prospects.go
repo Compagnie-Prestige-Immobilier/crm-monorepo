@@ -1443,7 +1443,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/prospects":                                           prospectLecture,
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
-	"POST /api/v1/prospects":                                          socle.Parcours,
+	"POST /api/v1/prospects":                                          {socle.Admin, socle.Superviseur, socle.Direction},
 	"PATCH " + prospectCheminID:                                       socle.Parcours,
 	"DELETE " + prospectCheminID:                                      socle.Parcours,
 	"POST /api/v1/prospects/merge":                                    {socle.Commercial, socle.ChargeClientele, socle.Admin},
