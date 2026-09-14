@@ -70,10 +70,12 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
   await page.getByRole('button', { name: fiche.nom }).click();
   await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
+  // « À rappeler » se promet à une personne jointe : le bouton vit sous le dossier.
   await page
     .getByRole('group', { name: 'Comment s’est passé l’appel ?' })
-    .getByRole('button', { name: /À rappeler$/u })
+    .getByRole('button', { name: /(^|\s)Joignable$/u })
     .click();
+  await page.getByRole('button', { name: /^À rappeler/u }).click();
   await page
     .getByRole('group', { name: 'Quand rappeler' })
     .getByRole('button', { name: /Dans 1 h/u })
