@@ -1,21 +1,75 @@
 # CPI CRM
 
-Un binaire Go : API, panneau React embarqué, crons. Cible et arbitrages dans
-`docs/v2-refonte/plan.md`, conventions dans `AGENTS.md`.
+Le CRM de la Compagnie Prestige Immobilier : un binaire Go qui sert l'API, le
+panneau React embarqué et les tâches planifiées, sur une base Postgres.
+Conventions de travail dans `AGENTS.md`, cap et arbitrages de la v2 dans
+`docs/v2-refonte/plan.md`.
+
+## Prérequis
+
+| Outil    | Version                      |
+| -------- | ---------------------------- |
+| Go       | 1.26 (`go.mod`)              |
+| Node     | 24 (`.node-version`)         |
+| pnpm     | 11 (`package.json`)          |
+| Postgres | 18, local, sans mot de passe |
+
+## Démarrer
 
 ```
-make setup   # base cpi_v2_dev depuis sql/schema.sql, dépendances, sqlc, OpenAPI, types
-make dev     # API sur :4000 et Vite sur :5173, logs lisibles
-make test    # tests d'intégration contre la base
-make lint    # golangci-lint, sqlc vet sur la base, lint du panneau
+cp .env.example .env
+make setup   # crée cpi_v2_dev, sème référentiels et comptes, dépendances, code généré
+make dev     # API sur :4000, Vite sur :5173
+```
+
+Compte par défaut : `admin@cpi.sn` / `admin-local-2026` (seed de développement).
+
+## Commandes
+
+```
 make build   # panneau embarqué + binaire ./cpi-go
-make e2e     # build puis parcours Playwright contre le binaire et la base locale
+make test    # tests d'intégration Go contre la base
+make e2e     # build puis parcours Playwright contre le binaire
+make lint    # golangci-lint, sqlc vet, lint du panneau
+make gen     # sqlc, OpenAPI, types TypeScript du panneau
+
+pnpm verify:local   # format, lint, code mort, types, plafonds, golangci-lint
+pnpm complexite:go  # dix fonctions les plus complexes
 ```
 
-Plusieurs bases sur le même Postgres : `DATABASE_URL` est la base `public`,
-chaque `DATABASE_URL_<NOM>` en ajoute une, choisie sur la page de connexion par
-`⌘/Ctrl+Shift+D` ou `⌘/Ctrl+Shift+N`. Une base de démonstration se crée comme
-la première, puis reçoit les mêmes référentiels, profils et données de dev :
+Les parcours Playwright se lancent avec `--workers=29` depuis `e2e/`.
+
+## Arborescence
+
+```
+cmd/server/            démarrage, drapeaux, config, crons, tests d'intégration
+internal/<domaine>/    un package par domaine : auth, referentiels, representants,
+                       prospects, qualification, campagnes, exports, banque, accueil,
+                       admin, notifications, imports, analytics
+internal/shared/       socle (middleware, erreurs RFC 9457, rôles, session, SSE)
+                       et database (migrations goose, audit, argon2id, téléphone)
+sql/                   schema.sql (référence), queries/ (sqlc), migrations/ (goose)
+web/                   panneau React repris de la v1, SPA Vite embarquée
+e2e/                   parcours Playwright, un par métier
+infra/dokploy/         deploy.py et son mode d'emploi
+tools/dev/             plafonds.sh, contrat-ecarts.cjs, charge.sh
+docs/                  QUALITY.md, decisions/, v2-refonte/ (plan et audits)
+```
+
+Rien de généré n'est commité : `db/`, `openapi.json`, `web/dist/`,
+`web/src/api/*.d.ts` et `web/src/routeTree.gen.ts` se rebâtissent au build.
+
+## Drapeaux du binaire
+
+`-openapi` écrit le contrat sur stdout, `-roles` la matrice des rôles, `-seed`
+sème référentiels, admin (`SEED_ADMIN_*`) et comptes de démonstration hors
+production, `-healthcheck` interroge le serveur.
+
+## Plusieurs bases
+
+`DATABASE_URL` est la base principale. Chaque `DATABASE_URL_<NOM>` en ajoute
+une, choisie sur la page de connexion par `⌘/Ctrl+Shift+D` ou `N`. Une base de
+démonstration se crée comme la première, puis reçoit le même seed :
 
 ```
 createdb cpi_v2_demo && psql cpi_v2_demo -v ON_ERROR_STOP=1 -q -f sql/schema.sql
@@ -24,37 +78,11 @@ DATABASE_URL_DEMO=postgres://localhost:5432/cpi_v2_demo?sslmode=disable \
 NODE_ENV=development go run ./cmd/server -seed
 ```
 
-Drapeaux du binaire : `-openapi` (contrat sur stdout), `-roles` (matrice des
-rôles), `-seed` (référentiels, admin `SEED_ADMIN_*`, comptes de démonstration
-hors production), `-healthcheck`. Le panneau (`web/`) est embarqué : un
-changement d'écran se voit après `make build`, ou en direct avec `make dev`.
-
-```
-cmd/server/            démarrage, drapeaux, config, planification des crons, tests d'intégration
-internal/<domaine>/    un package par domaine : auth, referentiels, representants, prospects,
-                       qualification, campagnes, exports, banque, accueil, admin, notifications,
-                       imports, analytics ; chacun expose Monter(api, deps), Garde et Taches(deps)
-internal/shared/socle/ middleware, erreurs RFC 9457, garde des rôles, session, SSE, config
-internal/shared/database/ migrations goose, audit, argon2id, téléphone
-sql/                   schema.sql, queries/ (sqlc), migrations/ (embarquées)
-db/                    généré par sqlc, non commité
-web/  e2e/             panneau v1 repris tel quel (SPA Vite embarquée), parcours Playwright
-infra/dokploy/         deploy.py, pilotage de Dokploy
-```
-
-Variables dans `.env.example`. En production les logs sont en JSON
-(`LOG_FORMAT=json`) ; chaque ligne porte `requestId`, `pattern`, `status`,
-`ms`, et toute erreur 5xx est journalisée avec le même `requestId` que le
-corps de réponse.
-
-`sql/schema.sql` est le schéma de référence (`pg_dump --schema-only` de la
-base v1). Les migrations v2 sont dans `sql/migrations/` (goose, appliquées au
-démarrage).
-
 ## Déploiement
 
-`Dockerfile` à la racine construit le panneau puis le binaire. Dokploy est
-branché en « custom git » : une fusion vers `prod` passe la CI
-(`.github/workflows/ci.yml`) puis lance `python3 infra/dokploy/deploy.py
-redeploy cpi-go`. Le reste des commandes (`provision`, `configure`, `bascule`,
-`retour`, `backup`, `status`) est décrit dans `infra/dokploy/README.md`.
+`Dockerfile` construit le panneau puis le binaire. Une fusion vers `prod`
+passe la CI (`.github/workflows/ci.yml`) puis lance
+`python3 infra/dokploy/deploy.py redeploy cpi-go`. Les migrations goose
+s'appliquent au démarrage. En production les logs sont en JSON
+(`LOG_FORMAT=json`), chaque ligne porte `requestId`, `pattern`, `status` et
+`ms`. Le reste des commandes est dans `infra/dokploy/README.md`.

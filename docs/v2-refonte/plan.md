@@ -10,7 +10,7 @@ version 3.2, principe directeur écrit (§1) et référentiels servis par un seu
 handler, schéma conservé. Chaque
 affirmation technique renvoie à un `chemin:ligne` ou à une documentation
 officielle citée dans les audits. Ce qui n'a pas pu être vérifié est marqué
-« à prouver en phase 0 ». Le registre des risques est dans `risques.md`.
+« à prouver en phase 0 ».
 
 ## 0. Où se fait le travail
 
@@ -295,7 +295,7 @@ apps/go/
   sqlc.yaml go.mod
   web/                 Vite + React 19, panneau ; dist/ embarqué
 infra/                 Dockerfile, deploy.py
-docs/v2-refonte/       ce plan, audits/, risques.md
+docs/v2-refonte/       ce plan, audits/
 ```
 
 Un seul package Go, vingt fichiers, aucun au-dessus de 1 500 lignes
@@ -313,8 +313,8 @@ jamais réécrit, `packages/database/src/seed.ts:104-105,360-398`) devient
 ## 5. Phases
 
 Durées en jours ouvrés, binôme propriétaire + agents. Les durées
-définitives sont figées à la fin de la phase 0. Calendrier dans
-`diagrammes/07-calendrier.puml` : du 14 septembre au 5 octobre 2026.
+définitives sont figées à la fin de la phase 0. Calendrier : du 14 septembre
+au 5 octobre 2026.
 
 ### Phase 0. Preuves et préparation, 1 jour
 
@@ -487,7 +487,7 @@ n'existe plus (phase 0). Après le nettoyage de J+7, la v1 ne démarre plus.
 
 ## 8. Risques
 
-Registre complet : `risques.md`. Les premiers :
+Les premiers :
 
 | Risque | Preuve | Parade |
 | --- | --- | --- |

@@ -1,5 +1,4 @@
 // Écarts entre le contrat figé du panneau v1 et l'OpenAPI engendré par le Go.
-// Sert la migration décrite dans docs/v2-refonte/unifier-le-contrat-openapi.md.
 // Usage : make gen puis node tools/dev/contrat-ecarts.cjs [schemas|routes]
 
 const path = require('node:path');
