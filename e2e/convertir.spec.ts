@@ -111,20 +111,6 @@ function issue(page: Page, libelle: RegExp) {
     .getByRole('button', { name: libelle });
 }
 
-/**
- * Une fiche rouverte reprend le brouillon de sa dernière ouverture : quand le
- * dossier est resté rempli, Échap le referme et rend les issues.
- */
-async function revenirAuxIssues(page: Page): Promise<void> {
-  // La fiche est rendue quand son bouton de copie l'est : avant, Échap
-  // fermerait le dialogue d'ouverture et non le dossier.
-  await expect(page.getByRole('button', { name: /^Copier/u })).toBeVisible();
-  const issues = page.getByRole('group', { name: 'Comment s’est passé l’appel ?' });
-  if (await issues.isVisible()) return;
-  await page.keyboard.press('Escape');
-  await expect(issues).toBeVisible();
-}
-
 const consigne = (page: Page, nom: string) =>
   page.getByRole('status').filter({ hasText: `Appel enregistré pour ${nom}.` });
 
@@ -225,10 +211,10 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     await ouvrirFiche(page, fiche);
     await expect(
-      page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
+      page.getByRole('region', { name: 'Fiche courante' }).getByText(/· Méthode obtenue$/u),
     ).toBeVisible();
-    await revenirAuxIssues(page);
     await issue(page, /Injoignable$/u).click();
+    await page.getByRole('button', { name: /^Enregistrer l’appel injoignable/u }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 2,
@@ -236,8 +222,9 @@ test.describe('parcours 5, convertir un prospect', () => {
     });
 
     await ouvrirFiche(page, fiche);
-    await revenirAuxIssues(page);
-    await issue(page, /Mauvais numéro$/u).click();
+    await issue(page, /Injoignable$/u).click();
+    await page.getByRole('button', { name: 'Mauvais numéro', exact: true }).click();
+    await page.getByRole('button', { name: /^Enregistrer l’issue \(Mauvais numéro\)/u }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 3,
