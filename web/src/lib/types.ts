@@ -245,14 +245,14 @@ export const ENROLLMENT_METHOD_ORDER = [
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
-  APPOINTMENT: 'RDV CPI',
-  PHYSICAL: 'RDV CPI',
+  APPOINTMENT: 'RDV en agence (Adhésion)',
+  PHYSICAL: 'RDV en agence (Adhésion)',
   PLATFORM: 'Plateforme en ligne',
   PLATEFORME_EN_LIGNE: 'Plateforme en ligne',
-  VOICE_OR_ELECTRONIC_MESSAGING: 'Mail',
-  MAIL: 'Mail',
-  WHATSAPP: 'WhatsApp',
-  RDV_CPI: 'RDV CPI',
+  VOICE_OR_ELECTRONIC_MESSAGING: 'Par e-mail',
+  MAIL: 'Par e-mail',
+  WHATSAPP: 'Par WhatsApp',
+  RDV_CPI: 'RDV en agence (Adhésion)',
 };
 
 export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {

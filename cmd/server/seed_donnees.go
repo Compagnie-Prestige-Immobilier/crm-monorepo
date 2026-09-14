@@ -304,7 +304,7 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"AUTRE_NON_JOINT", "Autre non joint", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, false, 36, 8},
 	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 45, 8},
 	{"INTERESSE", "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 15, 8},
-	{"RDV_AGENCE", "Rendez-vous agence (Souhaite venir se renseigner)", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 16, 8},
+	{"RDV_AGENCE", "Prise de RDV d'information (Visite en agence)", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 16, 8},
 }
 
 type seedCanalProvenance struct {

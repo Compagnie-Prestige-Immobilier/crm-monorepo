@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeftIcon, CopyIcon } from 'lucide-react';
+import { ArrowLeftIcon, CheckCircle2Icon, CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -17,6 +17,7 @@ import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { ETAPES_APPEL, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
+import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
@@ -89,24 +90,19 @@ const GROUPES = [
 type Groupe = (typeof GROUPES)[number]['cle'];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1', 'Joignable, puis son motif'],
-  ['2', 'Injoignable, puis son motif'],
-  ['1 … 9', 'Motif, une fois le groupe choisi'],
-  ['1 … 6', 'Échéance proposée, après un motif de rappel'],
-  ['0', 'Saisir une autre échéance'],
+  ['1', 'Joignable, puis motif'],
+  ['2', 'Injoignable, puis motif'],
+  ['1 … 9', 'Motif au choix'],
+  ['1 … 6', 'Échéance proposée'],
+  ['0', 'Autre échéance'],
   ['Entrée', 'Valider'],
-  ['Échap', 'Revenir en arrière, ou effacer la saisie en cours'],
+  ['Échap', 'Revenir'],
   ['C', 'Copier le numéro'],
-  ['N', 'Ajouter un prospect sur ce représentant'],
-  ['R', 'Fiche du représentant'],
-  ['?', 'Afficher cette carte'],
+  ['N', 'Ajouter un prospect'],
+  ['R', 'Fiche représentant'],
+  ['?', 'Carte clavier'],
 ];
 
-/**
- * Le repli quand le référentiel ne répond pas : les six motifs système, ceux que
- * le serveur applique lui-même en l'absence de `reasonCode`. Sans lui, une
- * lecture en échec laisserait l'écran d'appel sans aucune issue.
- */
 export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'METHOD_OBTAINED', label: 'Méthode obtenue', effect: 'CLOSE_METHOD' },
   { code: 'REFUSED', label: 'Refus', effect: 'CLOSE_REFUSED' },
@@ -116,11 +112,6 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'OTHER', label: 'Autre', effect: 'KEEP_OPEN', requiresComment: true },
 ].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
-/**
- * Grand Public : « Injoignable » propose les statuts non aboutis de CHUES, figés
- * ici pour que l'ADMIN ne puisse pas vider l'écran. Le référentiel porte les
- * mêmes codes en entrées système : sans elles, le serveur refuserait l'appel.
- */
 const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'PAS_DE_REPONSE', label: 'Pas de réponse' },
   { code: 'NUMERO_OCCUPE', label: 'Occupé' },
@@ -130,13 +121,11 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'AUTRE_NON_JOINT', label: 'Autre', requiresComment: true },
 ].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
 
-/** Après « Joignable », les statuts qui disent le contraire n'ont plus de sens. */
 const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   'UNREACHABLE',
   ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
 ]);
 
-/** Les statuts propres à l'écran Grand Public : la console CHUES garde ses motifs. */
 const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
   'INTERESSE',
   'RDV_AGENCE',
@@ -253,8 +242,12 @@ export function ConsoleView({
         ouverture={consultee.ouverture}
         projet={projet}
         onAbandon={revenir}
-        onEnregistre={(nom) => {
-          setConfirme(nom);
+        onEnregistre={(nom, detailStatut) => {
+          const text = detailStatut
+            ? `Appel consigné pour ${nom} · Statut : ${detailStatut}`
+            : `Appel consigné pour ${nom}`;
+          setConfirme(text);
+          toast.success(text);
           revenir();
           // La tentative a fermé l'ouverture : la barre supérieure lit ce cache
           // pour refuser la déconnexion, et le laisser périmé l'y enfermerait.
@@ -355,9 +348,19 @@ function EnTeteAnnuaire({
       ) : null}
 
       {confirme === null ? null : (
-        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
-          Appel enregistré pour {confirme}.
-        </p>
+        <div
+          role="status"
+          className={cn(
+            'flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-[0.875rem] font-[600] text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
+            REVELE,
+          )}
+        >
+          <CheckCircle2Icon
+            className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400"
+            aria-hidden="true"
+          />
+          <span>{confirme}</span>
+        </div>
       )}
 
       <ChampAnnuaire value={search} onChange={onSearch} />
@@ -469,6 +472,7 @@ function ListeAnnuaire({
         <TableRow>
           <TableHead>Nom et prénom</TableHead>
           <TableHead>Numéro</TableHead>
+          <TableHead>Statut / Qualification</TableHead>
           <TableHead>Dernier appel</TableHead>
         </TableRow>
       </TableHeader>
@@ -494,7 +498,12 @@ function ListeAnnuaire({
                   </Link>
                 )}
               </TableCell>
-              <TableCell className="whitespace-nowrap">{formatPhone(row.phoneE164)}</TableCell>
+              <TableCell className="whitespace-nowrap font-mono text-[0.875rem]">
+                {formatPhone(row.phoneE164)}
+              </TableCell>
+              <TableCell>
+                <StatutAnnuaire row={row} />
+              </TableCell>
               <TableCell className="whitespace-nowrap text-muted-foreground">
                 {row.lastAttemptAt === null ? 'Jamais appelé' : formatDateTime(row.lastAttemptAt)}
               </TableCell>
@@ -503,6 +512,45 @@ function ListeAnnuaire({
         })}
       </TableBody>
     </Table>
+  );
+}
+
+function variantDuStatut(
+  outcome: string | null,
+  phase2Status: string,
+): 'success' | 'destructive' | 'warning' | 'info' {
+  if (outcome === 'METHOD_OBTAINED' || phase2Status === 'METHOD_OBTAINED') return 'success';
+  if (outcome === 'REFUSED' || outcome === 'WRONG_NUMBER') return 'destructive';
+  if (outcome === 'CALLBACK') return 'warning';
+  return 'info';
+}
+
+function StatutAnnuaire({ row }: { row: ProspectRow }) {
+  if (row.lastAttemptAt === null)
+    return <span className="text-[0.8125rem] text-muted-foreground">Non qualifié</span>;
+  const label =
+    row.lastReasonLabel ?? (row.lastOutcome ? CALL_OUTCOME_LABELS[row.lastOutcome] : 'Qualifié');
+  const variant = variantDuStatut(row.lastOutcome, row.phase2Status);
+
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Badge variant={variant} className="w-fit">
+        {label}
+      </Badge>
+      {row.lastAttemptAt ? (
+        <span className="text-[0.75rem] text-muted-foreground">
+          {formatDateTime(row.lastAttemptAt)}
+        </span>
+      ) : null}
+      {row.lastComment ? (
+        <span
+          className="max-w-xs truncate text-[0.75rem] text-muted-foreground"
+          title={row.lastComment}
+        >
+          « {row.lastComment} »
+        </span>
+      ) : null}
+    </div>
   );
 }
 
@@ -794,7 +842,7 @@ export function Consignation({
    */
   statutParSelect?: boolean;
   onAbandon: () => void;
-  onEnregistre: (nom: string) => void;
+  onEnregistre: (nom: string, detailStatut?: string) => void;
 }) {
   const router = useRouter();
   const commentRef = useRef<HTMLTextAreaElement>(null);
@@ -852,7 +900,8 @@ export function Consignation({
       return pushCallAttempt(newAttemptInput(prospect.id, draft));
     },
     onSuccess: () => {
-      onEnregistre(nomComplet);
+      const labelStatut = motif?.label ?? 'Qualifié';
+      onEnregistre(nomComplet, labelStatut);
     },
     onError: (error) => {
       if (error instanceof AttemptRefused) {
@@ -1141,13 +1190,14 @@ export function Consignation({
           onMotif={choisir}
         />
 
-        {slots !== null ? (
+        {slots === null ? null : (
           <div className="flex flex-col gap-4 pt-2">
             <PanneauEcheance
               slots={slots}
               now={now}
               freeCallback={freeCallback}
               surDossier={conversion !== null}
+              titre={titreEcheance(motif?.code)}
               disabled={send.isPending}
               inputRef={callbackRef}
               onChoisir={(at) => {
@@ -1164,7 +1214,7 @@ export function Consignation({
               onAbandon={onAbandon}
             />
           </div>
-        ) : null}
+        )}
       </>,
       <>
         <PanneauDossier
@@ -1185,57 +1235,35 @@ export function Consignation({
           </p>
         ) : null}
       </>,
-      <>
-        {etape === 'echeance' && slots !== null ? (
-          <PanneauEcheance
-            slots={slots}
-            now={now}
-            freeCallback={freeCallback}
-            surDossier={conversion !== null}
-            disabled={send.isPending}
-            inputRef={callbackRef}
-            onChoisir={(at) => {
-              if (motif !== null) record(motif, null, at);
-            }}
-            onFreeCallback={setFreeCallback}
-            onValidate={validate}
-          />
-        ) : null}
-
-        {etape === null ? null : (
-          <Commentaire
-            value={comment}
-            obligatoirePour={commentaireExigePar(motif)}
-            inputRef={commentRef}
-            onChange={setComment}
-            onValidate={validate}
-          />
-        )}
-
-        <PiedAppel
-          etape={dossierSansAdhesion ? 'statut' : etape}
-          disabled={send.isPending || enregistrementDesactive}
-          statutPose={motif !== null}
-          onValidate={validate}
-          onAbandon={onAbandon}
-        />
-
-        <PiedDossier
-          ouvert={etape === 'dossier' && !dossierSansAdhesion}
-          disabled={send.isPending}
-          motifRefus={motifRefus}
-          onAdhesion={submitConversion}
-          onRefus={(refus) => {
-            setMotif(refus);
-            record(refus, null);
-          }}
-          onRappel={versLeRappel}
-          onAnnuler={() => {
-            setConversion(null);
-            setConversionErrors({});
-          }}
-        />
-      </>,
+      <TrancheIssue
+        key="tranche-issue"
+        etape={etape}
+        slots={slots}
+        now={now}
+        freeCallback={freeCallback}
+        surDossier={conversion !== null}
+        pending={send.isPending}
+        callbackRef={callbackRef}
+        commentRef={commentRef}
+        comment={comment}
+        motif={motif}
+        dossierSansAdhesion={dossierSansAdhesion}
+        enregistrementDesactive={enregistrementDesactive}
+        motifRefus={motifRefus}
+        onRecord={(m, at) => {
+          record(m, null, at === '' ? null : at);
+        }}
+        onFreeCallback={setFreeCallback}
+        onValidate={validate}
+        onAbandon={onAbandon}
+        onCommentChange={setComment}
+        onSubmitConversion={submitConversion}
+        onRappel={versLeRappel}
+        onAnnulerDossier={() => {
+          setConversion(null);
+          setConversionErrors({});
+        }}
+      />,
     ];
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
@@ -1554,12 +1582,92 @@ function PiedAppel({
   );
 }
 
+interface PropsIssue {
+  etape: Etape;
+  slots: readonly CallbackSlot[] | null;
+  now: number;
+  freeCallback: string;
+  surDossier: boolean;
+  pending: boolean;
+  callbackRef: React.RefObject<HTMLInputElement | null>;
+  commentRef: React.RefObject<HTMLTextAreaElement | null>;
+  comment: string;
+  motif: MotifAppel | null;
+  dossierSansAdhesion: boolean;
+  enregistrementDesactive: boolean;
+  motifRefus: MotifAppel | undefined;
+  onRecord: (motif: MotifAppel, at: string) => void;
+  onFreeCallback: (value: string) => void;
+  onValidate: () => void;
+  onAbandon: () => void;
+  onCommentChange: (value: string) => void;
+  onSubmitConversion: () => void;
+  onRappel: () => void;
+  onAnnulerDossier: () => void;
+}
+
+function TrancheIssue(p: PropsIssue) {
+  return (
+    <>
+      {p.etape === 'echeance' && p.slots !== null ? (
+        <PanneauEcheance
+          slots={p.slots}
+          now={p.now}
+          freeCallback={p.freeCallback}
+          surDossier={p.surDossier}
+          disabled={p.pending}
+          inputRef={p.callbackRef}
+          onChoisir={(at) => {
+            if (p.motif !== null) p.onRecord(p.motif, at);
+          }}
+          onFreeCallback={p.onFreeCallback}
+          onValidate={p.onValidate}
+        />
+      ) : null}
+
+      {p.etape === null ? null : (
+        <Commentaire
+          value={p.comment}
+          obligatoirePour={commentaireExigePar(p.motif)}
+          inputRef={p.commentRef}
+          onChange={p.onCommentChange}
+          onValidate={p.onValidate}
+        />
+      )}
+
+      <PiedAppel
+        etape={p.dossierSansAdhesion ? 'statut' : p.etape}
+        disabled={p.pending || p.enregistrementDesactive}
+        statutPose={p.motif !== null}
+        onValidate={p.onValidate}
+        onAbandon={p.onAbandon}
+      />
+
+      <PiedDossier
+        ouvert={p.etape === 'dossier' && !p.dossierSansAdhesion}
+        disabled={p.pending}
+        motifRefus={p.motifRefus}
+        onAdhesion={p.onSubmitConversion}
+        onRefus={(refus) => {
+          p.onRecord(refus, '');
+        }}
+        onRappel={p.onRappel}
+        onAnnuler={p.onAnnulerDossier}
+      />
+    </>
+  );
+}
+
+const titreEcheance = (code: string | undefined): string =>
+  code === 'RDV_AGENCE' ? "Date et heure du rendez-vous d'information" : 'Échéance du rappel';
+
 /** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
 export function PanneauEcheance({
   slots,
   now,
   freeCallback,
   surDossier,
+  titre,
   disabled,
   inputRef,
   onChoisir,
@@ -1570,6 +1678,7 @@ export function PanneauEcheance({
   now: number;
   freeCallback: string;
   surDossier: boolean;
+  titre?: string;
   disabled: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onChoisir: (at: string) => void;
@@ -1579,7 +1688,7 @@ export function PanneauEcheance({
   return (
     <fieldset className="flex flex-col gap-3" disabled={disabled}>
       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Quand rappeler
+        {titre ?? 'Quand rappeler'}
       </legend>
       {surDossier ? (
         <p className="text-[0.8125rem] text-muted-foreground">
