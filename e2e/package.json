@@ -8,11 +8,9 @@
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
-    "@axe-core/playwright": "^4.13.0",
     "@playwright/test": "catalog:",
     "@types/node": "catalog:",
     "@types/pg": "catalog:",
-    "date-fns": "catalog:",
     "exceljs": "catalog:",
     "oxlint": "catalog:",
     "pg": "catalog:",

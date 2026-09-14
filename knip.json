@@ -5,7 +5,7 @@
       "entry": ["src/routes/**/*.tsx"]
     },
     "e2e": {
-      "entry": ["*.ts", "*.spec.ts", "v1/*.ts", "v1/*.spec.ts"]
+      "entry": ["*.ts", "*.spec.ts"]
     }
   }
 }

@@ -2,9 +2,6 @@ import { defineConfig, devices } from '@playwright/test';
 
 import { BASE_URL, DATABASE_URL, PORT } from './comptes';
 
-/** La suite v1 a sa propre configuration, `playwright.v1.config.ts`. */
-const SUITE_V1 = /\/v1\//;
-
 export default defineConfig({
   testDir: '.',
   // Un travailleur par cœur, un fichier par travailleur : au-delà des cœurs,
@@ -26,17 +23,16 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'installation', testMatch: /auth\.setup\.ts/, testIgnore: SUITE_V1 },
+    { name: 'installation', testMatch: /auth\.setup\.ts/ },
     {
       name: 'poste',
-      testIgnore: [/responsive\.spec\.ts/, SUITE_V1],
+      testIgnore: /responsive\.spec\.ts/,
       use: { ...devices['Desktop Chrome'], viewport: { width: 1280, height: 800 } },
       dependencies: ['installation'],
     },
     {
       name: 'telephone',
       testMatch: /responsive\.spec\.ts/,
-      testIgnore: SUITE_V1,
       use: { ...devices['Pixel 5'] },
       dependencies: ['installation'],
     },
