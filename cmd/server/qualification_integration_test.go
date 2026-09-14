@@ -121,6 +121,37 @@ func qualificationCorpsTentative(prospectID string, extra map[string]any) map[st
 	return corps
 }
 
+func TestQualificationProspectGrandPublicNonAttribueRefuse(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	importeur, prospect, lot := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	qualificationExec(b, `INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","updatedAt")
+	                      VALUES ($1,$2,$1,'x','Import Leads','ADMIN',now())`, importeur, importeur+"@cpi.sn")
+	qualificationExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","projet","clientCreatedAt","updatedAt")
+	                      VALUES ($1,'Sarr','Mame',$2,$3,'GRAND_PUBLIC',now(),now())`, prospect, qualificationNumero(), importeur)
+	qualificationExec(b, `INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,'GRAND_PUBLIC',now())`,
+		uuid.NewString(), prospect)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "users" WHERE "id" = $1`, importeur)
+	})
+
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, nil))
+	b.attend(statut, http.StatusForbidden, "prospect Grand Public hors de ses campagnes", body)
+	if body["code"] != "PHASE2_NOT_ASSIGNED" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	qualificationExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                      VALUES ($1,'Leads importés','PROSPECTS','GRAND_PUBLIC','{}'::jsonb,1,$2)`, lot, importeur)
+	qualificationExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, prospect, b.userID)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, nil))
+	b.attend(statut, http.StatusOK, "prospect Grand Public attribué par une campagne", body)
+}
+
 func TestQualificationTentativeProspectRejoueeNEcritQuUneLigne(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
