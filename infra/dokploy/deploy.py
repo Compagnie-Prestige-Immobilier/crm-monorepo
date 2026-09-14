@@ -1238,15 +1238,22 @@ def cmd_bascule() -> None:
 
 
 def _attendre_application(application_id: str, minutes: int = 20) -> None:
-    """Dokploy construit de façon asynchrone : on attend `done`, on refuse `error`."""
+    """Dokploy construit de façon asynchrone : on attend `done`, on refuse `error`.
+
+    Juste après la demande, l'état vaut encore le `done` du déploiement précédent :
+    s'en contenter déclarait réussie une construction qui n'avait pas commencé.
+    """
+    commencee = False
     for _ in range(minutes * 6):
         app = call("application.one", {"applicationId": application_id}, method="GET") or {}
         statut = app.get("applicationStatus")
-        if statut == "done":
-            return
         if statut == "error":
             fail("la construction a échoué sur Dokploy ; la v1 n'a pas été touchée.")
             sys.exit(1)
+        if statut != "done":
+            commencee = True
+        elif commencee:
+            return
         time.sleep(10)
     fail(f"construction toujours en cours après {minutes} minutes ; la v1 n'a pas été touchée.")
     sys.exit(1)
