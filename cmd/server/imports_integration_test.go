@@ -361,8 +361,8 @@ func TestImportEchuEstExpireEtSonClasseurDetruit(t *testing.T) {
 	if err := b.pool.QueryRow(b.ctx, `SELECT "status","report" FROM "import_jobs" WHERE "id" = $1`, travail).Scan(&statut, &rapport); err != nil {
 		t.Fatal(err)
 	}
-	if statut != "expired" || rapport != nil {
-		t.Fatalf("échéance : statut %s, rapport %s", statut, rapport)
+	if statut != "expired" || rapport == nil {
+		t.Fatalf("échéance : statut %s, le rapport doit survivre au classeur, reçu %s", statut, rapport)
 	}
 	if _, err := os.Stat(chemin); !os.IsNotExist(err) {
 		t.Fatalf("le classeur échu doit être détruit : %v", err)

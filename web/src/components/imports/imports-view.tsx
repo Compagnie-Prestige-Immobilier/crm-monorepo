@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { useFileDownload } from '@/components/exports/download-button';
+import { csvRows, downloadCsv } from '@/lib/csv';
 import { useLive } from '@/components/live/use-live';
 import { QueryErrorInline } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -461,6 +462,14 @@ export function ImportsView({ initialKind = 'PROSPECTS' }: { initialKind?: Uploa
             onOpen={(opened) => {
               queryClient.setQueryData(queryKeys.importJob(opened.id), opened);
               setJobId(opened.id);
+              requestAnimationFrame(() => {
+                document
+                  .getElementById(ANCRE_TRAVAIL)
+                  ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              });
+              void fetchImportJob(opened.id).then(telechargerLignesRefusees, () => {
+                toast.error('Le rapport de cet import n’a pas pu être relu.');
+              });
             }}
           />
         </div>
@@ -495,7 +504,7 @@ function JobPanel({
   const running = isRunning(job);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div id={ANCRE_TRAVAIL} className="flex scroll-mt-20 flex-col gap-6">
       <Card>
         <CardHeader>
           <CardTitle className="flex flex-wrap items-center gap-2 text-[1.0625rem]">
@@ -575,6 +584,22 @@ function AppliedBanner({ job }: { job: ImportJob }) {
         </p>
       </div>
     </div>
+  );
+}
+
+const ANCRE_TRAVAIL = 'travail-import';
+
+function telechargerLignesRefusees(job: ImportJob): void {
+  if (job.report === null || job.report.errors.length === 0) return;
+  const lignes = job.report.errors.map((erreur) => [
+    erreur.rowNumber,
+    erreur.column ?? null,
+    erreur.message,
+  ]);
+  const classeur = job.fileName.replace(/\.xlsx$/iu, '');
+  downloadCsv(
+    csvRows([['Ligne', 'Colonne', 'Motif'], ...lignes]),
+    `${classeur} - lignes refusées du ${job.createdAt.slice(0, 10)}.csv`,
   );
 }
 

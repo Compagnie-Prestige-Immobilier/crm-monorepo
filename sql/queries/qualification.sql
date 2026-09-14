@@ -184,6 +184,12 @@ ON CONFLICT DO NOTHING;
 UPDATE "scheduled_callbacks" SET "status" = 'DONE', "closedAttemptId" = @attempt_id
 WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
 
+-- name: MarquerProspectContacte :exec
+UPDATE "prospects" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOUVEAU';
+
+-- name: MarquerParcoursContacte :exec
+UPDATE "prospect_journeys" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOUVEAU';
+
 -- name: CloreParcours :exec
 UPDATE "prospect_journeys" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",

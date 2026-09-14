@@ -729,6 +729,15 @@ export function GrandPublicProspectForm({
   const searchHref = searchHrefPourConflit(phone, callingCode);
   const paysCountries = paysDisponibles(reference.data);
   const enseignante = estEnseignante(reference.data, professionId);
+  const identiteIncomplete =
+    Object.keys(
+      identiteManquante({
+        prenom,
+        nom,
+        phone,
+        e164: toInternationalE164(phone, callingCode),
+      }),
+    ).length > 0;
 
   return (
     // oxlint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- raccourci Ctrl+Entrée du formulaire
@@ -746,7 +755,12 @@ export function GrandPublicProspectForm({
     >
       <IntroHeader embedded={embedded} />
 
-      <EtapesProgression etapes={ETAPES_SAISIE} courante={etape} onChoisir={setEtape} />
+      <EtapesProgression
+        etapes={ETAPES_SAISIE}
+        courante={etape}
+        maximum={identiteIncomplete ? 0 : 2}
+        onChoisir={setEtape}
+      />
 
       {etape === 0 ? (
         <>
@@ -927,6 +941,7 @@ export function GrandPublicProspectForm({
         courante={etape}
         total={ETAPES_SAISIE.length}
         desactive={save.isPending}
+        suiteDesactive={identiteIncomplete}
         onRetour={() => {
           setEtape(etape - 1);
         }}
