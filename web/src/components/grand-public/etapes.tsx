@@ -11,10 +11,12 @@ export const ETAPES_APPEL: readonly string[] = ['Joignable', 'Dossier', 'Issue']
 export function EtapesProgression({
   etapes,
   courante,
+  maximum = etapes.length - 1,
   onChoisir,
 }: {
   etapes: readonly string[];
   courante: number;
+  maximum?: number;
   onChoisir: (etape: number) => void;
 }) {
   return (
@@ -34,12 +36,13 @@ export function EtapesProgression({
               ) : null}
               <button
                 type="button"
+                disabled={rang > maximum}
                 aria-current={active ? 'step' : undefined}
                 onClick={() => {
                   onChoisir(rang);
                 }}
                 className={cn(
-                  'flex min-h-11 items-center gap-2 rounded-md border px-3 text-[0.875rem]',
+                  'flex min-h-11 items-center gap-2 rounded-md border px-3 text-[0.875rem] disabled:cursor-not-allowed disabled:opacity-50',
                   active
                     ? 'border-primary bg-secondary font-[600] text-secondary-foreground'
                     : 'border-border text-muted-foreground hover:bg-secondary/60',
@@ -68,12 +71,14 @@ export function PiedEtapes({
   courante,
   total,
   desactive,
+  suiteDesactive = false,
   onRetour,
   onSuite,
 }: {
   courante: number;
   total: number;
   desactive: boolean;
+  suiteDesactive?: boolean;
   onRetour: () => void;
   onSuite: () => void;
 }) {
@@ -87,7 +92,7 @@ export function PiedEtapes({
         <span />
       )}
       {courante < total - 1 ? (
-        <Button type="button" disabled={desactive} onClick={onSuite}>
+        <Button type="button" disabled={desactive || suiteDesactive} onClick={onSuite}>
           Continuer
         </Button>
       ) : null}
