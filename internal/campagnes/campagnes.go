@@ -60,6 +60,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/lots-export/{id}/fiches":            socle.Encadrement,
 	"POST /api/v1/lots-export/{id}/reaffectation":    campagnesEcriture,
 	"POST /api/v1/lots-export/{id}/retrait":          campagnesEcriture,
+	"POST /api/v1/lots-export/{id}/equipe":           campagnesEcriture,
 	"GET /api/v1/lots-export/{id}/export.xlsx":       socle.Encadrement,
 	"GET /api/v1/lots-export/{id}/programme.pdf":     socle.Encadrement,
 	"GET /api/v1/lots-export/{id}/fiches-recues.pdf": socle.Encadrement,
@@ -1112,7 +1113,7 @@ func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, store
 			AssignedCalls: int(ligne.AssignedCalls), OutsideAssignmentCalls: int(ligne.OutsideAssignmentCalls),
 		})
 	}
-	return performance, nil
+	return s.lotMembresSansFiche(ctx, performance, stored)
 }
 
 func (s *service) lotLignesPerformance(ctx context.Context, row *db.LotParIdRow) ([]db.LotPerformanceRepresentantsRow, error) {
@@ -1162,51 +1163,27 @@ type CampagneReaffecterInput struct {
 	}
 }
 
-// Une fiche déjà appelée reste où elle est : la déplacer ferait porter le
-// travail d'un téléconseiller au compteur d'un autre.
 func (s *service) campagneReaffecter(ctx context.Context, in *CampagneReaffecterInput) (*CampagneDetailOutput, error) {
 	row, err := s.lot(ctx, in.ID)
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.lotEquipe(ctx, []string{in.Body.VersTeleconseillerID}); err != nil {
-		return nil, err
-	}
-	traitees, err := s.lotPositionsTraitees(ctx, row)
-	if err != nil {
-		return nil, err
-	}
-	var candidates []int32
-	for _, position := range in.Body.Positions {
-		if !traitees[lotInt32(position)] {
-			candidates = append(candidates, lotInt32(position))
-		}
-	}
-	deplacables, err := s.Q.LotPositionsDeplacables(ctx, db.LotPositionsDeplacablesParams{
-		LotId: in.ID, Column2: candidates, AssigneeId: lotPointeurTexte(in.Body.VersTeleconseillerID),
-	})
-	if err != nil {
-		return nil, err
-	}
-	if len(deplacables) == 0 {
-		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_REAFFECTATION_VIDE",
-			"Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.")
-	}
-	parCedant := map[string][]int32{}
-	for _, item := range deplacables {
-		cedant := lotValeurTexte(item.AssigneeId)
-		parCedant[cedant] = append(parCedant[cedant], item.Position)
-	}
 	vers := in.Body.VersTeleconseillerID
+	if _, err := s.lotEquipe(ctx, []string{vers}); err != nil {
+		return nil, err
+	}
+	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers)
+	if err != nil {
+		return nil, err
+	}
+	if len(mouvements) == 0 {
+		return nil, lotReaffectationVide()
+	}
 	equipe := lotLireFiltres(row.Filters).Distribution.TeleconseillerIds
 	if !slices.Contains(equipe, vers) {
 		equipe = append(equipe, vers)
 	}
-	lotMouvements := make([]lotMouvement, 0, len(parCedant))
-	for _, cedant := range slices.Sorted(maps.Keys(parCedant)) {
-		lotMouvements = append(lotMouvements, lotMouvement{de: cedant, vers: vers, positions: parCedant[cedant]})
-	}
-	if err := s.lotAppliquerMouvements(ctx, row, lotMouvements, equipe, "lot_export.reaffectation",
+	if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.reaffectation",
 		map[string]any{"vers": vers}); err != nil {
 		return nil, err
 	}
@@ -1396,5 +1373,6 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "retirerTeleconseillerLotExport", Method: http.MethodPost,
 		Path: "/api/v1/lots-export/{id}/retrait",
 	}, s.campagneRetrait)
+	monterCampagnesEquipe(api, s)
 	monterCampagnesExport(api, s)
 }
