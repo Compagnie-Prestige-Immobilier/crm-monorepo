@@ -8,6 +8,7 @@ import {
   ouvrirFicheDepuisAnnuaire,
   sansDebordementHorizontal,
   semerProspect,
+  semerProspectGrandPublicImporte,
   semerRepresentant,
   type FicheSemee,
 } from './donnees-chues';
@@ -251,6 +252,33 @@ test.describe('parcours 5, convertir un prospect', () => {
       enrollmentMethod: null,
       parcoursStatut: 'WRONG_NUMBER',
     });
+  });
+
+  test('un prospect Grand Public importe peut etre qualifie par un commercial', async ({ page }) => {
+    const suffixe = marque();
+    let fiche: FicheSemee | null = null;
+    await avecBase(async (client) => {
+      // Seme avec un autre ID d'auteur (ex: Admin) pour feindre un import
+      fiche = await semerProspectGrandPublicImporte(client, `GrandPublic ${suffixe}`, `Import ${suffixe}`, '00000000-0000-0000-0000-000000000001');
+    });
+    if (fiche === null) throw new Error('prospect Grand Public non seme');
+    telephones.push((fiche as FicheSemee).phoneE164);
+
+    await page.goto(`/chues/prospects/${(fiche as FicheSemee).id}`);
+    await expect(page.getByText((fiche as FicheSemee).nom).first()).toBeVisible();
+
+    // Verifier la consignation d'appel depuis la console Grand Public / qualification
+    await page.goto('/grand-public/consigner');
+    await page.getByLabel('Quel prospect avez-vous appelé ?').fill((fiche as FicheSemee).nom);
+    await page.getByRole('button', { name: (fiche as FicheSemee).nom }).click();
+    await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
+
+    await issue(page, 'Injoignable', /Injoignable$/u);
+    await expect(consigne(page, (fiche as FicheSemee).nom)).toBeVisible();
+
+    const classement = await lireClassement((fiche as FicheSemee).id);
+    expect(classement.tentatives).toBe(1);
+    expect(classement.phase2Status).toBe('UNREACHABLE');
   });
 
   test('une fiche ouverte n’empeche pas d’en ouvrir une autre ailleurs', async ({ page }) => {

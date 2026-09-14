@@ -966,8 +966,19 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 }
 
 // Un téléconseiller n'appelle que ses campagnes ; l'encadrement n'est pas borné.
+// Les prospects du projet Grand Public sont accessibles à tous les téléconseillers.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	if qualificationVoitTout(u.Role) {
+		return nil
+	}
+	p, err := s.Q.ProspectPourTentative(ctx, prospectID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return socle.Problem(http.StatusNotFound, "PHASE2_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
+		}
+		return err
+	}
+	if p.Projet == db.ProjetGRANDPUBLIC {
 		return nil
 	}
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{ID: prospectID, Agent: u.ID})

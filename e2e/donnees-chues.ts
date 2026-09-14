@@ -64,6 +64,27 @@ export async function semerProspect(
   return { id, nom: `${nom} ${prenom}`, phoneE164 };
 }
 
+export async function semerProspectGrandPublicImporte(
+  client: Client,
+  nom: string,
+  prenom: string,
+  autreCreatedById: string,
+): Promise<FicheSemee> {
+  const id = randomUUID();
+  const phoneE164 = numeroUnique();
+  await client.query(
+    `INSERT INTO prospects (id, nom, prenom, "phoneE164", "createdById", "projet", "clientCreatedAt", "updatedAt")
+     VALUES ($1, $2, $3, $4, $5, 'GRAND_PUBLIC', now(), now())`,
+    [id, nom, prenom, phoneE164, autreCreatedById],
+  );
+  await client.query(
+    `INSERT INTO prospect_journeys (id, "prospectId", projet, "updatedAt")
+     VALUES ($1, $2, 'GRAND_PUBLIC', now())`,
+    [randomUUID(), id],
+  );
+  return { id, nom: `${nom} ${prenom}`, phoneE164 };
+}
+
 const REPRESENTANTS = 'SELECT id FROM representants WHERE "phoneE164" = ANY($1)';
 const PROSPECTS = `SELECT id FROM prospects
   WHERE "phoneE164" = ANY($1) OR "representantId" IN (${REPRESENTANTS})`;

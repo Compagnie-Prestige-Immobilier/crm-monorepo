@@ -11,7 +11,7 @@ func Taches(d *socle.Deps) []socle.Tache {
 	s := &service{d}
 	return []socle.Tache{
 		{Nom: "cpi.imports.sweep", Cron: socle.ChaqueMinute, Run: s.balayerImports},
-		{Nom: "cpi.imports.leads", Cron: "*/15 * * * *", Run: s.releverLeads},
+		{Nom: "cpi.imports.leads", Cron: "0 10-23 * * *", Run: s.releverLeads},
 	}
 }
 
