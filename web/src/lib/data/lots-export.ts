@@ -113,6 +113,16 @@ export async function retirerTeleconseiller(
   );
 }
 
+export async function ajouterTeleconseiller(
+  id: string,
+  body: { teleconseillerId: string; positions: number[] },
+  client: ApiClient = getApiClient(),
+): Promise<LotExportDetail> {
+  return unwrap(
+    await client.POST('/api/v1/lots-export/{id}/equipe', { params: { path: { id } }, body }),
+  );
+}
+
 export async function deleteLotExport(
   id: string,
   client: ApiClient = getApiClient(),
