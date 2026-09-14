@@ -811,6 +811,7 @@ export function Consignation({
   );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
+  const dossierMisDeCote = useRef<ConversionDraft | null>(null);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
@@ -898,7 +899,7 @@ export function Consignation({
     if (send.isPending) return;
     setSlots(null);
     setConversionErrors({});
-    setConversion((draft) => draft ?? conversionFrom(prospect));
+    setConversion((draft) => draft ?? dossierMisDeCote.current ?? conversionFrom(prospect));
   }, [send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
@@ -954,7 +955,11 @@ export function Consignation({
       // « Joignable » ouvre le dossier avant même de savoir quel motif suivra :
       // un motif qui n'est pas l'adhésion doit donc le refermer, quel que soit
       // le groupe — le garder ouvert affiche un dossier à remplir pour un refus.
-      setConversion(null);
+      // La saisie est gardée de côté : revenir à l'adhésion la retrouve.
+      setConversion((draft) => {
+        if (draft !== null) dossierMisDeCote.current = draft;
+        return null;
+      });
       setConversionErrors({});
       if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else setSlots(null);
@@ -1014,6 +1019,7 @@ export function Consignation({
     setMotif(null);
     setComment('');
     setConversion(null);
+    dossierMisDeCote.current = null;
     setConversionErrors({});
     commentRef.current?.blur();
   }, [slots, saisieEnCours, onAbandon]);
