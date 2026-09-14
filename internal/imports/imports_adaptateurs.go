@@ -619,7 +619,8 @@ const enteteNomCompletImport = "Nom complet"
 
 var colonnesGrandPublicImport = []colonneImport{
 	{entete: exports.ExportEntetePrenom, alias: []string{"Prénoms"}},
-	{entete: exports.ExportEnteteNom, alias: []string{"Nom de famille", "Noms", enteteNomCompletImport}},
+	// Pas « requise » : « Nom complet » la remplace, et le refus se dit ligne à ligne.
+	{entete: exports.ExportEnteteNom, alias: []string{"Nom de famille", "Noms"}},
 	{entete: enteteTelephoneImport, alias: []string{"Tel", "Numéro", "Numéro de téléphone", "Contact"}},
 	{entete: exports.ExportEnteteProfession, alias: []string{"Métier", "Activité", "Poste", "JOB_TITLE"}},
 	{entete: exports.ExportEnteteSyndicat},
