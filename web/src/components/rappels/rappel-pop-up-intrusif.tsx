@@ -1,7 +1,14 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { BellRingIcon, ClockIcon, PhoneCallIcon, XCircleIcon } from 'lucide-react';
+import {
+  BellRingIcon,
+  CalendarClockIcon,
+  ClockIcon,
+  PhoneCallIcon,
+  UserRoundIcon,
+  XCircleIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
@@ -27,6 +34,9 @@ import {
 } from '@/lib/data/console';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
+
+type Rappel = Callback & { readonly prospectName?: string };
+const EMPTY_CALLBACKS: Callback[] = [];
 
 /** Synthétise un carillon sonore de rappel à trois notes via Web Audio API. */
 function jouerSonnerieRappel() {
@@ -56,13 +66,16 @@ function jouerSonnerieRappel() {
       osc.start(now + note.time);
       osc.stop(now + note.time + note.duration);
     }
+    window.setTimeout(() => {
+      void ctx.close();
+    }, 1_400);
   } catch {
     // Context d'audio bloqué par la politique navigateur ou non disponible.
   }
 }
 
 interface ContenuRappelProps {
-  readonly callback: Callback;
+  readonly callback: Rappel;
   readonly serverTimeMs: number;
   readonly racine: string;
   readonly onIgnorer: () => void;
@@ -92,42 +105,51 @@ function ContenuRappelPopUp({
             </div>
             <div>
               <DialogTitle className="flex items-center gap-2 text-lg font-bold text-amber-900 dark:text-amber-200">
-                Rappel d’échéance prospect
+                Rappel à passer maintenant
                 <Badge variant="destructive" className="ml-1 uppercase">
                   Urgent
                 </Badge>
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
-                Une heure de rappel est atteinte. Contactez le prospect dès maintenant.
+                Le créneau est atteint. Toutes les informations utiles sont ci-dessous.
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
         <div className="mt-2 space-y-3 rounded-lg border bg-muted/40 p-4">
-          <div className="flex items-center justify-between border-b pb-2">
+          <div className="grid gap-3 border-b pb-3 sm:grid-cols-[1fr_auto]">
             <div>
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Téléphone</p>
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                <UserRoundIcon className="size-3.5" aria-hidden="true" />
+                Prospect
+              </p>
               <p className="text-xl font-bold tracking-tight text-foreground">
-                {formatPhone(callback.phoneE164)}
+                {callback.prospectName ?? `Prospect · ${callback.shortCode}`}
               </p>
             </div>
-            <div className="text-right">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Fiche</p>
-              <p className="font-mono text-sm font-semibold">{callback.shortCode}</p>
+            <div className="sm:text-right">
+              <p className="text-xs font-semibold text-muted-foreground uppercase">Téléphone</p>
+              <p className="text-lg font-bold tracking-tight text-foreground">
+                {formatPhone(callback.phoneE164)}
+              </p>
+              <p className="font-mono text-xs text-muted-foreground">Fiche {callback.shortCode}</p>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 text-xs">
+          <div className="grid gap-2 text-sm sm:grid-cols-2">
             <div>
-              <span className="text-muted-foreground">Prévu à : </span>
+              <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
+                <CalendarClockIcon className="size-3.5" aria-hidden="true" />
+                Prévu
+              </p>
               <time className="font-semibold" dateTime={callback.scheduledAt}>
                 {formatCallbackAt(callback.scheduledAt, serverTimeMs)}
               </time>
             </div>
             {retardTxt ? (
-              <div className="text-right">
-                <span className="text-muted-foreground">Retard : </span>
+              <div className="sm:text-right">
+                <p className="text-xs font-semibold text-muted-foreground uppercase">Retard</p>
                 <span className="font-semibold text-destructive">{retardTxt}</span>
               </div>
             ) : null}
@@ -136,7 +158,7 @@ function ContenuRappelPopUp({
           {callback.comment ? (
             <div className="mt-2 rounded border bg-background p-2.5 text-xs text-foreground">
               <span className="mb-0.5 block font-semibold text-muted-foreground">
-                Dernier commentaire :
+                Commentaire du rappel
               </span>
               <p className="whitespace-pre-wrap italic">&laquo; {callback.comment} &raquo;</p>
             </div>
@@ -182,7 +204,9 @@ export function RappelPopUpIntrusif() {
   const queryClient = useQueryClient();
 
   const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
-  const alertedIdsRef = useRef<Set<string>>(new Set());
+  const [triggeredIds, setTriggeredIds] = useState<Set<string>>(() => new Set());
+  const initializedRef = useRef(false);
+  const overdueIdsRef = useRef<Set<string>>(new Set());
 
   const overdueQuery = useQuery({
     queryKey: [...callbackKeys.list('overdue', null), projet, 'intrusif'],
@@ -201,19 +225,41 @@ export function RappelPopUpIntrusif() {
     },
   });
 
-  const callbacks = overdueQuery.data?.items ?? [];
+  const callbacks = overdueQuery.data?.items ?? EMPTY_CALLBACKS;
   const serverTimeStr = overdueQuery.data?.serverTime ?? new Date().toISOString();
   const serverTimeMs = Date.parse(serverTimeStr);
 
-  const activeCallback: Callback | null =
-    callbacks.find((c) => !dismissedIds.has(c.id) && c.overdue) ?? null;
+  useEffect(() => {
+    if (!overdueQuery.isSuccess) return;
+
+    const overdueIds = new Set(
+      callbacks.filter((callback) => callback.overdue).map(({ id }) => id),
+    );
+    if (!initializedRef.current) {
+      initializedRef.current = true;
+      overdueIdsRef.current = overdueIds;
+      return;
+    }
+
+    const newlyOverdue = callbacks.filter(
+      (callback) => callback.overdue && !overdueIdsRef.current.has(callback.id),
+    );
+    overdueIdsRef.current = overdueIds;
+    if (newlyOverdue.length === 0) return;
+    setTriggeredIds((previous) => new Set([...previous, ...newlyOverdue.map(({ id }) => id)]));
+  }, [callbacks, overdueQuery.isSuccess]);
+
+  const activeCallback: Rappel | null =
+    callbacks.find((c) => triggeredIds.has(c.id) && !dismissedIds.has(c.id) && c.overdue) ?? null;
 
   useEffect(() => {
     if (!activeCallback) return;
-    if (alertedIdsRef.current.has(activeCallback.id)) return;
 
-    alertedIdsRef.current.add(activeCallback.id);
     jouerSonnerieRappel();
+    const interval = window.setInterval(jouerSonnerieRappel, 8_000);
+    return () => {
+      window.clearInterval(interval);
+    };
   }, [activeCallback]);
 
   if (!activeCallback) return null;

@@ -1,7 +1,13 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeftIcon, CheckCircle2Icon, CopyIcon } from 'lucide-react';
+import {
+  ArrowLeftIcon,
+  CalendarClockIcon,
+  CheckCircle2Icon,
+  CopyIcon,
+  PhoneIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -51,7 +57,6 @@ import { enregistrerBrouillon, ouvrirFiche, type OuvertureFiche } from '@/lib/da
 import {
   commentaireExigePar,
   issueDuMotif,
-  estJoignable,
   fetchMotifsAppel,
   type MotifAppel,
 } from '@/lib/data/call-outcome-reasons';
@@ -642,6 +647,7 @@ function ChoixIssue({
   motif,
   disabled,
   onGroupe,
+  onRetour,
   onMotif,
 }: {
   etape: Etape;
@@ -650,6 +656,7 @@ function ChoixIssue({
   motif: MotifAppel | null;
   disabled: boolean;
   onGroupe: (groupe: Groupe) => void;
+  onRetour: () => void;
   onMotif: (motif: MotifAppel) => void;
 }) {
   if (etape === 'issues') {
@@ -678,9 +685,16 @@ function ChoixIssue({
 
   return (
     <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
-      <LegendeIssue>
-        {groupe === 'joignable' ? 'Joignable · que dit la personne ?' : 'Injoignable · pourquoi ?'}
-      </LegendeIssue>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+          {groupe === 'joignable'
+            ? 'Joignable · que dit la personne ?'
+            : 'Injoignable · pourquoi ?'}
+        </p>
+        <Button type="button" variant="ghost" size="sm" onClick={onRetour}>
+          Changer de réponse
+        </Button>
+      </div>
       {proposes.length === 0 ? (
         <p role="alert" className="text-[0.875rem] text-warning">
           Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de
@@ -692,6 +706,7 @@ function ChoixIssue({
             <Button
               key={item.code}
               variant={motif?.code === item.code ? 'default' : 'outline'}
+              aria-pressed={motif?.code === item.code}
               onClick={() => {
                 onMotif(item);
               }}
@@ -759,7 +774,12 @@ function motifsDuGroupe(
   catalogue: readonly MotifAppel[],
   groupe: Groupe | null,
 ): readonly MotifAppel[] {
-  return catalogue.filter((item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe);
+  return catalogue.filter(
+    (item) =>
+      (CODES_INJOIGNABLE.has(item.code) || item.effect === 'CLOSE_WRONG_NUMBER'
+        ? 'injoignable'
+        : 'joignable') === groupe,
+  );
 }
 
 /**
@@ -913,9 +933,8 @@ export function Consignation({
       if (choisi.effect === 'CLOSE_METHOD') ouvrirDossier();
       else if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else if (choisi.requiresComment) commentRef.current?.focus();
-      else record(choisi, null);
     },
-    [send.isPending, ouvrirDossier, startCallback, record],
+    [send.isPending, ouvrirDossier, startCallback],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -962,6 +981,19 @@ export function Consignation({
 
   const choisirGroupe = (choisi: Groupe): void => {
     setGroupe(choisi);
+    setMotif(null);
+    setSlots(null);
+    setFreeCallback('');
+    setConversionErrors({});
+  };
+
+  const retourAuxIssues = (): void => {
+    setGroupe(null);
+    setMotif(null);
+    setSlots(null);
+    setFreeCallback('');
+    setConversion(null);
+    setConversionErrors({});
   };
 
   const proposes = motifsDuGroupe(catalogue, groupe);
@@ -1031,24 +1063,32 @@ export function Consignation({
   });
 
   function corpsFiche(): React.ReactNode {
+    const rappelOuvert = slots !== null;
+
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <EnTeteFiche
+        <EnTeteConsignation
+          rappelOuvert={rappelOuvert}
           prospect={prospect}
           nomComplet={nomComplet}
           projet={projet}
+          motif={motif}
           surDossier={etape === 'dossier'}
         />
 
-        <ChoixIssue
+        <ChoixConsignation
+          rappelOuvert={rappelOuvert}
           etape={etape}
           groupe={groupe}
           proposes={proposes}
           motif={motif}
           disabled={send.isPending}
           onGroupe={choisirGroupe}
+          onRetour={retourAuxIssues}
           onMotif={choisir}
         />
+
+        <MotifSelectionne motif={motif} rappelOuvert={rappelOuvert} conversion={conversion} />
 
         {etape !== 'echeance' || slots === null ? null : (
           <PanneauEcheance
@@ -1067,21 +1107,24 @@ export function Consignation({
           />
         )}
 
-        <PanneauDossier
-          ouvert={etape === 'dossier'}
-          prospect={prospect}
-          conversion={conversion}
-          errors={conversionErrors}
-          disabled={send.isPending}
-          formulaire={formulaire}
-          onChange={(patch) => {
-            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-          }}
-        />
+        {rappelOuvert ? null : (
+          <PanneauDossier
+            ouvert={etape === 'dossier'}
+            prospect={prospect}
+            conversion={conversion}
+            errors={conversionErrors}
+            disabled={send.isPending}
+            formulaire={formulaire}
+            onChange={(patch) => {
+              setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+            }}
+          />
+        )}
 
         {etape === null ? null : (
           <Commentaire
             value={comment}
+            titre={rappelOuvert ? 'Commentaire du rappel' : 'Commentaire'}
             obligatoirePour={commentaireExigePar(motif)}
             inputRef={commentRef}
             onChange={setComment}
@@ -1270,6 +1313,106 @@ function EnTeteFiche({
   );
 }
 
+function EnTeteRappel({
+  prospect,
+  nomComplet,
+  motif,
+}: {
+  prospect: ProspectRow;
+  nomComplet: string;
+  motif: MotifAppel | null;
+}) {
+  return (
+    <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/[0.06] p-4">
+      <div className="flex items-start gap-3">
+        <div className="flex size-11 shrink-0 items-center justify-center rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300">
+          <CalendarClockIcon aria-hidden="true" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-[0.75rem] font-[700] tracking-[0.08em] text-amber-700 uppercase dark:text-amber-300">
+            {motif?.code === 'RDV_AGENCE' ? 'Rendez-vous d’information' : 'Rappel téléphonique'}
+          </p>
+          <h2 className="mt-0.5 font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+            {nomComplet}
+          </h2>
+          <p className="mt-1 flex items-center gap-1.5 text-[0.9375rem] text-muted-foreground">
+            <PhoneIcon className="size-4" aria-hidden="true" />
+            <span className="select-all font-[600] text-foreground">
+              {formatPhone(prospect.phoneE164)}
+            </span>
+          </p>
+        </div>
+      </div>
+      <p className="mt-3 text-[0.8125rem] text-muted-foreground">
+        Choisissez le jour et l’heure, puis ajoutez une note utile pour le prochain appel.
+      </p>
+    </div>
+  );
+}
+
+function EnTeteConsignation({
+  rappelOuvert,
+  prospect,
+  nomComplet,
+  projet,
+  motif,
+  surDossier,
+}: {
+  rappelOuvert: boolean;
+  prospect: ProspectRow;
+  nomComplet: string;
+  projet: Projet;
+  motif: MotifAppel | null;
+  surDossier: boolean;
+}) {
+  if (rappelOuvert)
+    return <EnTeteRappel prospect={prospect} nomComplet={nomComplet} motif={motif} />;
+  return (
+    <EnTeteFiche
+      prospect={prospect}
+      nomComplet={nomComplet}
+      projet={projet}
+      surDossier={surDossier}
+    />
+  );
+}
+
+function ChoixConsignation({
+  rappelOuvert,
+  ...props
+}: {
+  rappelOuvert: boolean;
+  etape: Etape;
+  groupe: Groupe | null;
+  proposes: readonly MotifAppel[];
+  motif: MotifAppel | null;
+  disabled: boolean;
+  onGroupe: (groupe: Groupe) => void;
+  onRetour: () => void;
+  onMotif: (motif: MotifAppel) => void;
+}) {
+  if (rappelOuvert) return null;
+  return <ChoixIssue {...props} />;
+}
+
+function MotifSelectionne({
+  motif,
+  rappelOuvert,
+  conversion,
+}: {
+  motif: MotifAppel | null;
+  rappelOuvert: boolean;
+  conversion: ConversionDraft | null;
+}) {
+  if (motif === null || rappelOuvert || conversion !== null) return null;
+  return (
+    <p role="status" className="text-[0.8125rem] text-muted-foreground">
+      Motif sélectionné : <span className="font-[600] text-foreground">{motif.label}</span>.
+      Vérifiez la note, puis enregistrez l’appel.
+    </p>
+  );
+}
+
 /**
  * Le pied des statuts qui n'ouvrent pas de dossier : eux n'ont pas les quatre
  * boutons de l'adhésion, mais l'appel se consigne quand même.
@@ -1288,7 +1431,8 @@ function PiedAppel({
   onValidate: () => void;
   onAbandon: () => void;
 }) {
-  if (etape !== 'statut' && etape !== 'echeance') return null;
+  if (etape !== 'motifs' && etape !== 'statut' && etape !== 'echeance') return null;
+  if (etape === 'motifs' && !statutPose) return null;
   return (
     <div className="flex flex-wrap gap-2">
       <Button onClick={onValidate} disabled={disabled || !statutPose}>
@@ -1394,12 +1538,14 @@ export function PanneauEcheance({
 
 export function Commentaire({
   value,
+  titre = 'Commentaire',
   obligatoirePour,
   inputRef,
   onChange,
   onValidate,
 }: {
   value: string;
+  titre?: string;
   /** Le statut qui réclame le commentaire, nul quand il reste facultatif. */
   obligatoirePour: string | null;
   inputRef: React.RefObject<HTMLTextAreaElement | null>;
@@ -1409,7 +1555,7 @@ export function Commentaire({
   return (
     <div className="flex flex-col gap-1.5">
       <label htmlFor="console-comment" className="text-[0.875rem] font-[600]">
-        Commentaire
+        {titre}
         {obligatoirePour === null ? '' : ` (obligatoire pour ${obligatoirePour})`}
       </label>
       <Textarea
