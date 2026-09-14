@@ -970,6 +970,27 @@ export function Consignation({
     if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
   };
 
+  // L'étape Dossier porte son formulaire : l'y amener l'ouvre, sans passer par
+  // Joignable. Après Injoignable il n'y a rien à remplir, l'étape reste fermée.
+  const allerEtape = useCallback(
+    (rang: number): void => {
+      if (send.isPending) return;
+      if (rang !== 1) {
+        setEtapeAppel(rang);
+        return;
+      }
+      if (groupe === 'injoignable') {
+        toast.error('Injoignable : pas de dossier à remplir.');
+        return;
+      }
+      if (conversion === null && groupe === null) setGroupe('joignable');
+      if (conversion === null) ouvrirDossier();
+      else if (slots !== null) setSlots(null);
+      setEtapeAppel(rang);
+    },
+    [send.isPending, groupe, conversion, slots, ouvrirDossier],
+  );
+
   const proposes = motifsDuGroupe(catalogue, groupe);
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
   const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
@@ -1037,8 +1058,8 @@ export function Consignation({
   });
 
   function corpsAppel(): React.ReactNode {
-    // Grand Public seul : Joignable, puis le dossier, puis l'issue. L'étape se
-    // choisit par indice, sans condition.
+    // Grand Public seul : Joignable, puis le dossier, puis l'issue. Aller au
+    // dossier l'ouvre, sauf après Injoignable où il n'y a rien à remplir.
     const tranches = [
       <>
         {surStatut ? (
@@ -1143,7 +1164,7 @@ export function Consignation({
           surDossier={etape === 'dossier'}
         />
 
-        <EtapesProgression etapes={ETAPES_APPEL} courante={etapeAppel} onChoisir={setEtapeAppel} />
+        <EtapesProgression etapes={ETAPES_APPEL} courante={etapeAppel} onChoisir={allerEtape} />
 
         {tranches[etapeAppel]}
 
@@ -1155,7 +1176,7 @@ export function Consignation({
             setEtapeAppel(etapeAppel - 1);
           }}
           onSuite={() => {
-            setEtapeAppel(etapeAppel + 1);
+            allerEtape(etapeAppel + 1);
           }}
         />
       </section>
