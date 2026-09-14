@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { BoutonAjoutTeleconseiller } from '@/components/lots-export/lot-ajout-teleconseiller';
 import { LotExportFiches } from '@/components/lots-export/lot-export-fiches';
 import {
   Table,
@@ -794,9 +795,12 @@ function CartePerformance({
   return (
     <Card>
       <CardHeader>
-        <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
-          Performance de la campagne
-        </h3>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <h3 className="font-display text-h4 font-[700] leading-tight tracking-[-0.02em]">
+            Performance de la campagne
+          </h3>
+          {peutRegler ? <BoutonAjoutTeleconseiller lot={lot} /> : null}
+        </div>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
           Une fiche est traitée quand la personne assignée y consigne au moins un appel. Un appel
           hors attribution vise une fiche confiée à un collègue dans cette campagne.

@@ -329,6 +329,43 @@ func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 	t.Fatalf("le téléconseiller ajouté doit entrer dans la répartition : %v", repartition)
 }
 
+func TestCampagneAjoutTeleconseillerSansPuisAvecFiches(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+	chemin := "/api/v1/lots-export/" + b.lotID + "/equipe"
+
+	oublie := b.agent("Agent Coumba Fall")
+	statut, body := b.appelCampagne(http.MethodPost, chemin, map[string]any{"teleconseillerId": oublie})
+	b.attend(statut, http.StatusOK, "ajout sans fiche", body)
+	if !campagneListeMembre(body["repartition"], oublie) || !campagneListeMembre(body["performance"], oublie) {
+		t.Fatalf("le téléconseiller ajouté sans fiche doit paraître au programme et à la performance : %v", body)
+	}
+
+	statut, body = b.appelCampagne(http.MethodPost, chemin, map[string]any{"teleconseillerId": oublie})
+	b.attend(statut, http.StatusUnprocessableEntity, "ajout en double", body)
+	if body["code"] != "LOT_EXPORT_DEJA_DANS_EQUIPE" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	renfort := b.agent("Agent Pape Diouf")
+	aDonner := b.positionsDe(b.agentB)[:2]
+	statut, body = b.appelCampagne(http.MethodPost, chemin, map[string]any{"teleconseillerId": renfort, "positions": aDonner})
+	b.attend(statut, http.StatusOK, "ajout avec deux fiches", body)
+	if recues := b.positionsDe(renfort); len(recues) != len(aDonner) {
+		t.Fatalf("le renfort doit tenir les deux fiches données : %v", recues)
+	}
+}
+
+func campagneListeMembre(liste any, id string) bool {
+	lignes, _ := liste.([]any)
+	for _, ligne := range lignes {
+		if membre, _ := ligne.(map[string]any); membre["teleconseillerId"] == id {
+			return true
+		}
+	}
+	return false
+}
+
 func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	b.creer()
