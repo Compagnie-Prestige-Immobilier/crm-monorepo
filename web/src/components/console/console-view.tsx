@@ -11,10 +11,8 @@ import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
-import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
-import { ETAPES_APPEL, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
@@ -126,19 +124,9 @@ const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
 ]);
 
-const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
-  'INTERESSE',
-  'RDV_AGENCE',
-  'HORS_CIBLE',
-  ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
-]);
-
 /** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
   catalogue.filter((item) => !CODES_INJOIGNABLE.has(item.code) && item.effect !== 'CLOSE_METHOD');
-
-const statutsDuGroupe = (groupe: Groupe | null, catalogue: readonly MotifAppel[]) =>
-  groupe === 'injoignable' ? MOTIFS_INJOIGNABLE : statutsJoignables(catalogue);
 
 /**
  * Le statut de l'adhésion : celui qu'on a choisi s'il en est un, sinon le
@@ -760,65 +748,18 @@ function etapeCourante(
   conversion: ConversionDraft | null,
   slots: readonly CallbackSlot[] | null,
   groupe: Groupe | null,
-  surStatut: boolean,
 ): Etape {
   if (slots !== null) return 'echeance';
   if (conversion !== null) return 'dossier';
-  if (surStatut) return 'statut';
   return groupe === null ? 'issues' : 'motifs';
 }
 
-/** Grand Public : chaque réponse à « joignable ? » ouvre son select de statut. */
-const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
-  statutParSelect && groupe !== null;
-
-/** Grand Public : le dossier reste ouvert sous un statut qui n'est pas l'adhésion. */
-const dossierOuvertSansAdhesion = (
-  statutParSelect: boolean,
-  conversion: ConversionDraft | null,
-  motif: MotifAppel | null,
-): boolean =>
-  statutParSelect && conversion !== null && motif !== null && motif.effect !== 'CLOSE_METHOD';
-
-function maximumEtapeAppel(
-  conversion: ConversionDraft | null,
-  motif: MotifAppel | null,
-  formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] },
-  now: number,
-): number {
-  if (motif === null) return 0;
-  if (conversion === null) return 2;
-  const erreurs = validateConversion(conversion, now, formulaire.champs, formulaire.libres);
-  const valide = Object.keys(erreurs).every(
-    (champ) => champ === 'method' && motif.effect !== 'CLOSE_METHOD',
-  );
-  return valide ? 2 : 1;
-}
-
-function issueIncomplete(
-  motif: MotifAppel | null,
-  comment: string,
-  rappel: string,
-  slots: readonly CallbackSlot[] | null,
-): boolean {
-  if (motif?.requiresComment && comment.trim() === '') return true;
-  return slots !== null && dakarLocalToIso(rappel) === null;
-}
-
-/** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
-const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
-  statutParSelect && groupe === 'joignable';
-
-/** Les boutons de motif de la console CHUES, pour le groupe ouvert. */
+/** Les boutons de motif pour le groupe ouvert (joignable / injoignable). */
 function motifsDuGroupe(
   catalogue: readonly MotifAppel[],
   groupe: Groupe | null,
 ): readonly MotifAppel[] {
-  return catalogue.filter(
-    (item) =>
-      !CODES_GRAND_PUBLIC.has(item.code) &&
-      (estJoignable(item) ? 'joignable' : 'injoignable') === groupe,
-  );
+  return catalogue.filter((item) => (estJoignable(item) ? 'joignable' : 'injoignable') === groupe);
 }
 
 /**
@@ -829,18 +770,12 @@ export function Consignation({
   prospect,
   ouverture,
   projet,
-  statutParSelect = false,
   onAbandon,
   onEnregistre,
 }: {
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
-  /**
-   * Vrai : « Joignable » ouvre le dossier et son select de statut,
-   * « Injoignable » les motifs figés. Faux : les motifs du référentiel.
-   */
-  statutParSelect?: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string, detailStatut?: string) => void;
 }) {
@@ -862,8 +797,6 @@ export function Consignation({
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
   const [helpOpen, setHelpOpen] = useState(false);
-  // Grand Public seul : l'appel se consigne en trois étapes, la console CHUES reste d'un bloc.
-  const [etapeAppel, setEtapeAppel] = useState(0);
 
   const formulaire = useChampsConversion(projet);
   const motifs = useQuery({
@@ -934,12 +867,11 @@ export function Consignation({
       const problem = validateAttempt(draft, Date.now(), choisi.requiresComment);
       if (problem !== null) {
         toast.error(problem);
-        if (statutParSelect && choisi.requiresComment) setEtapeAppel(2);
         return;
       }
       send.mutate(draft);
     },
-    [send, comment, ouverture, statutParSelect],
+    [send, comment, ouverture],
   );
 
   const ouvrirDossier = useCallback(() => {
@@ -960,7 +892,6 @@ export function Consignation({
     setConversionErrors(problems);
     const adhesion = statutAdhesion(motif, catalogue);
     if (Object.keys(problems).length > 0 || conversion.method === null) {
-      if (statutParSelect) setEtapeAppel(1);
       return;
     }
     if (adhesion === undefined) {
@@ -968,7 +899,7 @@ export function Consignation({
       return;
     }
     record(adhesion, conversion.method, null, conversion);
-  }, [conversion, formulaire, motif, catalogue, record, statutParSelect]);
+  }, [conversion, formulaire, motif, catalogue, record]);
 
   const startCallback = useCallback(() => {
     setFreeCallback('');
@@ -987,37 +918,9 @@ export function Consignation({
     [send.isPending, ouvrirDossier, startCallback, record],
   );
 
-  /**
-   * Le même choix, mais qui ne consigne rien : dans un select, la valeur se
-   * survole avant de se poser, et l'appel partirait sur un statut effleuré.
-   */
-  const poserStatut = useCallback(
-    (choisi: MotifAppel) => {
-      if (send.isPending) return;
-      setMotif(choisi);
-      if (choisi.effect === 'CLOSE_METHOD') {
-        ouvrirDossier();
-        return;
-      }
-      // « Joignable » ouvre le dossier avant même de savoir quel motif suivra :
-      // un motif qui n'est pas l'adhésion doit donc le refermer, quel que soit
-      // le groupe — le garder ouvert affiche un dossier à remplir pour un refus.
-      // La saisie est gardée de côté : revenir à l'adhésion la retrouve.
-      setConversion((draft) => {
-        if (draft !== null) dossierMisDeCote.current = draft;
-        return null;
-      });
-      setConversionErrors({});
-      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
-      else setSlots(null);
-    },
-    [send.isPending, ouvrirDossier, startCallback],
-  );
-
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
   // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
-    if (statutParSelect && maximumEtapeAppel(conversion, motif, formulaire, now) < 2) return;
     if (slots !== null) {
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
@@ -1032,23 +935,9 @@ export function Consignation({
       return;
     }
     if (motif !== null) record(motif, null);
-  }, [
-    conversion,
-    submitConversion,
-    slots,
-    freeCallback,
-    motif,
-    record,
-    statutParSelect,
-    formulaire,
-    now,
-  ]);
+  }, [conversion, submitConversion, slots, freeCallback, motif, record]);
 
-  const surStatut = surSelect(groupe, statutParSelect);
-  const etape = etapeCourante(conversion, slots, groupe, surStatut);
-  const dossierSansAdhesion = dossierOuvertSansAdhesion(statutParSelect, conversion, motif);
-  const maximumEtape = maximumEtapeAppel(conversion, motif, formulaire, now);
-  const enregistrementDesactive = issueIncomplete(motif, comment, freeCallback, slots);
+  const etape = etapeCourante(conversion, slots, groupe);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
   const annuler = useCallback(() => {
@@ -1073,29 +962,7 @@ export function Consignation({
 
   const choisirGroupe = (choisi: Groupe): void => {
     setGroupe(choisi);
-    if (surJoignable(choisi, statutParSelect)) ouvrirDossier();
   };
-
-  // L'étape Dossier porte son formulaire : l'y amener l'ouvre, sans passer par
-  // Joignable. Après Injoignable il n'y a rien à remplir, l'étape reste fermée.
-  const allerEtape = useCallback(
-    (rang: number): void => {
-      if (send.isPending) return;
-      if (rang !== 1) {
-        setEtapeAppel(rang);
-        return;
-      }
-      if (groupe === 'injoignable') {
-        toast.error('Injoignable : pas de dossier à remplir.');
-        return;
-      }
-      if (conversion === null && groupe === null) setGroupe('joignable');
-      if (conversion === null) ouvrirDossier();
-      else if (slots !== null) setSlots(null);
-      setEtapeAppel(rang);
-    },
-    [send.isPending, groupe, conversion, slots, ouvrirDossier],
-  );
 
   const proposes = motifsDuGroupe(catalogue, groupe);
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
@@ -1163,142 +1030,6 @@ export function Consignation({
     },
   });
 
-  function corpsAppel(): React.ReactNode {
-    // Grand Public seul : Joignable, puis le dossier, puis l'issue. Aller au
-    // dossier l'ouvre, sauf après Injoignable où il n'y a rien à remplir.
-    const tranches = [
-      <>
-        {surStatut ? (
-          <SelectStatut
-            catalogue={statutsDuGroupe(groupe, catalogue)}
-            motif={motif}
-            disabled={send.isPending}
-            onChange={poserStatut}
-            onFerme={() => {
-              if (motif?.requiresComment) commentRef.current?.focus();
-            }}
-          />
-        ) : null}
-
-        <ChoixIssue
-          etape={etape}
-          groupe={groupe}
-          proposes={proposes}
-          motif={motif}
-          disabled={send.isPending}
-          onGroupe={choisirGroupe}
-          onMotif={choisir}
-        />
-
-        {slots === null ? null : (
-          <div className="flex flex-col gap-4 pt-2">
-            <PanneauEcheance
-              slots={slots}
-              now={now}
-              freeCallback={freeCallback}
-              surDossier={conversion !== null}
-              titre={titreEcheance(motif?.code)}
-              disabled={send.isPending}
-              inputRef={callbackRef}
-              onChoisir={(at) => {
-                if (motif !== null) record(motif, null, at);
-              }}
-              onFreeCallback={setFreeCallback}
-              onValidate={validate}
-            />
-            <PiedAppel
-              etape="echeance"
-              disabled={send.isPending}
-              statutPose={motif !== null}
-              onValidate={validate}
-              onAbandon={onAbandon}
-            />
-          </div>
-        )}
-      </>,
-      <>
-        <PanneauDossier
-          ouvert={etape === 'dossier'}
-          prospect={prospect}
-          conversion={conversion}
-          errors={conversionErrors}
-          disabled={send.isPending}
-          formulaire={formulaire}
-          onChange={(patch) => {
-            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-          }}
-        />
-
-        {conversion === null ? (
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Pas de dossier à remplir : poursuivez vers l’issue.
-          </p>
-        ) : null}
-      </>,
-      <TrancheIssue
-        key="tranche-issue"
-        etape={etape}
-        slots={slots}
-        now={now}
-        freeCallback={freeCallback}
-        surDossier={conversion !== null}
-        pending={send.isPending}
-        callbackRef={callbackRef}
-        commentRef={commentRef}
-        comment={comment}
-        motif={motif}
-        dossierSansAdhesion={dossierSansAdhesion}
-        enregistrementDesactive={enregistrementDesactive}
-        motifRefus={motifRefus}
-        onRecord={(m, at) => {
-          record(m, null, at === '' ? null : at);
-        }}
-        onFreeCallback={setFreeCallback}
-        onValidate={validate}
-        onAbandon={onAbandon}
-        onCommentChange={setComment}
-        onSubmitConversion={submitConversion}
-        onRappel={versLeRappel}
-        onAnnulerDossier={() => {
-          setConversion(null);
-          setConversionErrors({});
-        }}
-      />,
-    ];
-    return (
-      <section aria-label="Fiche courante" className="flex flex-col gap-4">
-        <EnTeteFiche
-          prospect={prospect}
-          nomComplet={nomComplet}
-          projet={projet}
-          surDossier={etape === 'dossier'}
-        />
-
-        <EtapesProgression
-          etapes={ETAPES_APPEL}
-          courante={etapeAppel}
-          maximum={maximumEtape}
-          onChoisir={allerEtape}
-        />
-
-        {tranches[etapeAppel]}
-
-        <PiedEtapes
-          courante={etapeAppel}
-          total={ETAPES_APPEL.length}
-          desactive={send.isPending}
-          suiteDesactive={etapeAppel >= maximumEtape}
-          onRetour={() => {
-            setEtapeAppel(etapeAppel - 1);
-          }}
-          onSuite={() => {
-            allerEtape(etapeAppel + 1);
-          }}
-        />
-      </section>
-    );
-  }
-
   function corpsFiche(): React.ReactNode {
     return (
       <section aria-label="Fiche courante" className="flex flex-col gap-4">
@@ -1307,30 +1038,6 @@ export function Consignation({
           nomComplet={nomComplet}
           projet={projet}
           surDossier={etape === 'dossier'}
-        />
-
-        {surStatut ? (
-          <SelectStatut
-            catalogue={statutsDuGroupe(groupe, catalogue)}
-            motif={motif}
-            disabled={send.isPending}
-            onChange={poserStatut}
-            onFerme={() => {
-              if (motif?.requiresComment) commentRef.current?.focus();
-            }}
-          />
-        ) : null}
-
-        <PanneauDossier
-          ouvert={etape === 'dossier'}
-          prospect={prospect}
-          conversion={conversion}
-          errors={conversionErrors}
-          disabled={send.isPending}
-          formulaire={formulaire}
-          onChange={(patch) => {
-            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
-          }}
         />
 
         <ChoixIssue
@@ -1349,6 +1056,7 @@ export function Consignation({
             now={now}
             freeCallback={freeCallback}
             surDossier={conversion !== null}
+            titre={titreEcheance(motif?.code)}
             disabled={send.isPending}
             inputRef={callbackRef}
             onChoisir={(at) => {
@@ -1358,6 +1066,18 @@ export function Consignation({
             onValidate={validate}
           />
         )}
+
+        <PanneauDossier
+          ouvert={etape === 'dossier'}
+          prospect={prospect}
+          conversion={conversion}
+          errors={conversionErrors}
+          disabled={send.isPending}
+          formulaire={formulaire}
+          onChange={(patch) => {
+            setConversion((draft) => (draft === null ? null : { ...draft, ...patch }));
+          }}
+        />
 
         {etape === null ? null : (
           <Commentaire
@@ -1370,7 +1090,7 @@ export function Consignation({
         )}
 
         <PiedAppel
-          etape={statutParSelect ? etape : null}
+          etape={etape}
           disabled={send.isPending}
           statutPose={motif !== null}
           onValidate={validate}
@@ -1378,7 +1098,7 @@ export function Consignation({
         />
 
         <PiedDossier
-          ouvert={etape === 'dossier' && !dossierSansAdhesion}
+          ouvert={etape === 'dossier'}
           disabled={send.isPending}
           motifRefus={motifRefus}
           onAdhesion={submitConversion}
@@ -1406,7 +1126,7 @@ export function Consignation({
       <ChronoDemarre demarre={departChrono} />
       <BrouillonEnAttente enAttente={brouillonEnAttente} />
 
-      {statutParSelect ? corpsAppel() : corpsFiche()}
+      {corpsFiche()}
 
       <details
         open={helpOpen}
@@ -1579,82 +1299,6 @@ function PiedAppel({
         Revenir à la liste
       </Button>
     </div>
-  );
-}
-
-interface PropsIssue {
-  etape: Etape;
-  slots: readonly CallbackSlot[] | null;
-  now: number;
-  freeCallback: string;
-  surDossier: boolean;
-  pending: boolean;
-  callbackRef: React.RefObject<HTMLInputElement | null>;
-  commentRef: React.RefObject<HTMLTextAreaElement | null>;
-  comment: string;
-  motif: MotifAppel | null;
-  dossierSansAdhesion: boolean;
-  enregistrementDesactive: boolean;
-  motifRefus: MotifAppel | undefined;
-  onRecord: (motif: MotifAppel, at: string) => void;
-  onFreeCallback: (value: string) => void;
-  onValidate: () => void;
-  onAbandon: () => void;
-  onCommentChange: (value: string) => void;
-  onSubmitConversion: () => void;
-  onRappel: () => void;
-  onAnnulerDossier: () => void;
-}
-
-function TrancheIssue(p: PropsIssue) {
-  return (
-    <>
-      {p.etape === 'echeance' && p.slots !== null ? (
-        <PanneauEcheance
-          slots={p.slots}
-          now={p.now}
-          freeCallback={p.freeCallback}
-          surDossier={p.surDossier}
-          disabled={p.pending}
-          inputRef={p.callbackRef}
-          onChoisir={(at) => {
-            if (p.motif !== null) p.onRecord(p.motif, at);
-          }}
-          onFreeCallback={p.onFreeCallback}
-          onValidate={p.onValidate}
-        />
-      ) : null}
-
-      {p.etape === null ? null : (
-        <Commentaire
-          value={p.comment}
-          obligatoirePour={commentaireExigePar(p.motif)}
-          inputRef={p.commentRef}
-          onChange={p.onCommentChange}
-          onValidate={p.onValidate}
-        />
-      )}
-
-      <PiedAppel
-        etape={p.dossierSansAdhesion ? 'statut' : p.etape}
-        disabled={p.pending || p.enregistrementDesactive}
-        statutPose={p.motif !== null}
-        onValidate={p.onValidate}
-        onAbandon={p.onAbandon}
-      />
-
-      <PiedDossier
-        ouvert={p.etape === 'dossier' && !p.dossierSansAdhesion}
-        disabled={p.pending}
-        motifRefus={p.motifRefus}
-        onAdhesion={p.onSubmitConversion}
-        onRefus={(refus) => {
-          p.onRecord(refus, '');
-        }}
-        onRappel={p.onRappel}
-        onAnnuler={p.onAnnulerDossier}
-      />
-    </>
   );
 }
 

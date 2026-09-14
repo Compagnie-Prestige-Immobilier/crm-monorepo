@@ -50,7 +50,6 @@ export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
       prospect={prospect}
       ouverture={ouvrir.data ?? null}
       projet="GRAND_PUBLIC"
-      statutParSelect
       onAbandon={retour}
       onEnregistre={(_nom, detailStatut) => {
         queryClient.setQueryData(queryKeys.ouvertureCourante, null);
