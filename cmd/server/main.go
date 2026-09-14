@@ -115,6 +115,12 @@ func instancier(cfg *socle.Config, pool *pgxpool.Pool, reg *registre) (*instance
 	socle.InstallerErreurs()
 	mux := http.NewServeMux()
 	d := nouveauDeps(pool, cfg, reg.annuaire)
+	if cfg.Base == socle.BasePublique {
+		d.Planifications = map[string]string{}
+		for _, t := range tachesDomaines(d) {
+			d.Planifications[t.Nom] = t.Cron
+		}
+	}
 	api, err := nouvelleAPI(mux, d, pool, reg)
 	if err != nil {
 		return nil, err
@@ -160,10 +166,6 @@ func planifier(ctx context.Context, d *socle.Deps) (gocron.Scheduler, error) {
 		return nil, err
 	}
 	taches := tachesDomaines(d)
-	d.Planifications = make(map[string]string, len(taches))
-	for _, t := range taches {
-		d.Planifications[t.Nom] = t.Cron
-	}
 	// Hôte d'essai à côté de la v1 sur la même base : deux planificateurs se
 	// disputeraient notifications dues et jobs d'import.
 	if socle.Env("TACHES_PLANIFIEES", socle.Vrai) == socle.Faux {
