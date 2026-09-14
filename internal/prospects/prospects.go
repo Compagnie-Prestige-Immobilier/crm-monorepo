@@ -426,7 +426,7 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 	if err != nil {
 		return row, err
 	}
-	if u.Role != socle.Admin && row.CreatedById != u.ID {
+	if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction && row.Projet != db.ProjetGRANDPUBLIC && row.CreatedById != u.ID {
 		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	return row, nil

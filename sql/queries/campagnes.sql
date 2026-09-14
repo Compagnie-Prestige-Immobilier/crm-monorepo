@@ -47,13 +47,18 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 -- Un classeur de leads porte un onglet par jour et garde le nom de fichier du
 -- premier : le lot se compte par onglet, sinon les trois jours se confondent.
 -- name: ImportsAvecFiches :many
-SELECT j."id", j."fileName", p."importFeuille", j."createdAt", j."finishedAt", COUNT(*)::int AS fiches
+SELECT MAX(j."id")::text AS "id",
+       MAX(j."fileName")::text AS "fileName",
+       p."importFeuille",
+       MIN(j."createdAt")::timestamp AS "createdAt",
+       MAX(j."finishedAt")::timestamp AS "finishedAt",
+       COUNT(*)::int AS fiches
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj
               WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.arg('projet')::"Projet")
-GROUP BY j."id", p."importFeuille"
-ORDER BY j."finishedAt" DESC, j."id" DESC, p."importFeuille"
+GROUP BY COALESCE(p."importFeuille", j."id")
+ORDER BY MAX(j."finishedAt") DESC, MAX(j."id") DESC
 LIMIT 100;
 
 -- name: EcrireFiltresLot :exec

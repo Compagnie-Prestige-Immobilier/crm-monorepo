@@ -83,10 +83,7 @@ func (s *service) campagneImports(ctx context.Context, in *CampagneImportsInput)
 	out := &CampagneImportsOutput{}
 	out.Body.Items = make([]CampagneImport, 0, len(rows))
 	for i := range rows {
-		importeLe := rows[i].CreatedAt
-		if rows[i].FinishedAt != nil {
-			importeLe = *rows[i].FinishedAt
-		}
+		importeLe := rows[i].FinishedAt
 		var feuille string
 		if rows[i].ImportFeuille != nil {
 			feuille = *rows[i].ImportFeuille

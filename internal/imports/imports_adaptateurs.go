@@ -810,15 +810,28 @@ func canalParKeywordGrandPublic(cle string, canaux map[string]string) *string {
 	return nil
 }
 
-func cibleFamilleGrandPublic(cle string) string {
-	switch {
-	case strings.Contains(cle, "pay") || strings.Contains(cle, "ad") || strings.Contains(cle, "meta") || strings.Contains(cle, "pub") || strings.Contains(cle, "sponsor"):
-		return "meta"
-	case strings.Contains(cle, "organique") || strings.Contains(cle, "site") || strings.Contains(cle, "web") || strings.Contains(cle, "page") || strings.Contains(cle, "adhesion"):
-		return "site"
-	default:
-		return ""
+const familleGoogleImport = "google"
+
+func contientUnDe(cle string, mots []string) bool {
+	for _, m := range mots {
+		if strings.Contains(cle, m) {
+			return true
+		}
 	}
+	return false
+}
+
+func cibleFamilleGrandPublic(cle string) string {
+	if contientUnDe(cle, []string{familleGoogleImport, "goog", "gads", "search"}) {
+		return familleGoogleImport
+	}
+	if contientUnDe(cle, []string{"fb", "facebook", "ig", "instagram", "meta", "pay", "ad", "pub", "sponsor"}) {
+		return "meta"
+	}
+	if contientUnDe(cle, []string{"organique", "site", "web", "page", "adhesion", "direct", "inconnu"}) {
+		return "site"
+	}
+	return ""
 }
 
 func canalParFamilleGrandPublic(cle string, canaux map[string]string) *string {
@@ -829,6 +842,13 @@ func canalParFamilleGrandPublic(cle string, canaux map[string]string) *string {
 	for cCle, cID := range canaux {
 		if strings.Contains(cCle, cible) {
 			return &cID
+		}
+	}
+	if cible == familleGoogleImport {
+		for cCle, cID := range canaux {
+			if strings.Contains(cCle, "meta") || strings.Contains(cCle, "site") {
+				return &cID
+			}
 		}
 	}
 	return nil
