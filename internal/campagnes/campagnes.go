@@ -96,7 +96,7 @@ type CampagneObjectif struct {
 }
 
 type CampagneDistributionSaisie struct {
-	TeleconseillerIds []string           `json:"teleconseillerIds" minItems:"1" maxItems:"50"`
+	TeleconseillerIds []string           `json:"teleconseillerIds" minItems:"1" maxItems:"200"`
 	FichesParJour     int                `json:"fichesParJour,omitempty" minimum:"1" maximum:"500" default:"50"`
 	Jours             int                `json:"jours,omitempty" minimum:"1" maximum:"10" default:"1"`
 	Objectifs         []CampagneObjectif `json:"objectifs,omitempty"`
