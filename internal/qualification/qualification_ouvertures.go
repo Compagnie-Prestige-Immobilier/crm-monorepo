@@ -13,7 +13,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 )
@@ -367,25 +366,6 @@ func (s *service) qualificationOuvertureCourante(ctx context.Context, in *Qualif
 	return out, nil
 }
 
-type QualificationOuverturesOutput struct {
-	Body struct {
-		Items []QualificationOuvertureFicheDTO `json:"items"`
-	}
-}
-
-func (s *service) qualificationOuverturesRestees(ctx context.Context, _ *struct{}) (*QualificationOuverturesOutput, error) {
-	rows, err := s.Q.ListerOuvertures(ctx, db.ListerOuverturesParams{OuvertesSeulement: true})
-	if err != nil {
-		return nil, err
-	}
-	out := &QualificationOuverturesOutput{}
-	out.Body.Items = make([]QualificationOuvertureFicheDTO, 0, len(rows))
-	for i := range rows {
-		out.Body.Items = append(out.Body.Items, qualificationOuvertureDTO(&rows[i]))
-	}
-	return out, nil
-}
-
 type QualificationBrouillonInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
@@ -438,62 +418,6 @@ func qualificationBrouillonRefuse(ctx context.Context, q *db.Queries, u *socle.U
 		return err
 	}
 	return socle.Problem(http.StatusConflict, "OUVERTURE_DEJA_FERMEE", "Cette fiche a déjà été qualifiée ou libérée.")
-}
-
-// Libérer, c'est fermer sans qualifier. La fiche repasse en file de rappel,
-// sans quoi la libérer la ferait disparaître du travail de tous.
-func (s *service) qualificationLibererOuverture(ctx context.Context, in *QualificationIDInput) (*QualificationOuvertureOutput, error) {
-	u := socle.UtilisateurCourant(ctx)
-	out := &QualificationOuvertureOutput{}
-	err := qualificationTx(ctx, s, func(q *db.Queries) error {
-		row, e := q.OuvertureEtat(ctx, in.ID)
-		if errors.Is(e, pgx.ErrNoRows) {
-			return socle.Problem(http.StatusNotFound, "OUVERTURE_INTROUVABLE",
-				"Cette ouverture n’existe pas, ou elle appartient à un autre téléconseiller.")
-		}
-		if e != nil {
-			return e
-		}
-		at := time.Now().UTC()
-		n, e := q.LibererOuverture(ctx, db.LibererOuvertureParams{At: &at, ReleasedByID: &u.ID, ID: in.ID})
-		if e != nil {
-			return e
-		}
-		if n == 0 {
-			return socle.Problem(http.StatusConflict, "OUVERTURE_DEJA_FERMEE", "Cette fiche a déjà été qualifiée ou libérée.")
-		}
-		if e := qualificationRemettreEnFile(ctx, q, &row, in.ID, at); e != nil {
-			return e
-		}
-		out.Body, e = qualificationOuvertureParID(ctx, q, in.ID)
-		return e
-	})
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-// `sourceAttemptId` est unique et sans clé étrangère : l'identifiant de
-// l'ouverture y rend la libération rejouable sans compter les lignes.
-func qualificationRemettreEnFile(ctx context.Context, q *db.Queries, row *db.OuvertureEtatRow, ouvertureID string, at time.Time) error {
-	if row.RepresentantId != nil {
-		return q.MajRappelRepresentant(ctx, db.MajRappelRepresentantParams{At: &at, ID: *row.RepresentantId})
-	}
-	if row.ProspectId == nil {
-		return nil
-	}
-	if err := q.SupplanterRappels(ctx, *row.ProspectId); err != nil {
-		return err
-	}
-	id, err := uuid.NewV7()
-	if err != nil {
-		return err
-	}
-	return q.InsererRappel(ctx, db.InsererRappelParams{
-		ID: id.String(), ProspectID: *row.ProspectId, AssignedToID: row.OpenedById,
-		ScheduledAt: at, SourceAttemptID: ouvertureID,
-	})
 }
 
 type QualificationComptageInput struct {

@@ -286,11 +286,12 @@ const (
 	seedCouleurWarning = "warning"
 	seedCouleurSuccess = "success"
 	seedCouleurDanger  = "danger"
+	seedCouleurInfo    = "info"
 )
 
 var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"METHOD_OBTAINED", "Méthode obtenue", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 10, 1},
-	{string(db.CallOutcomeCALLBACK), "À rappeler", "info", db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20, 1},
+	{string(db.CallOutcomeCALLBACK), "À rappeler", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20, 1},
 	{"UNREACHABLE", "Injoignable", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 30, 1},
 	{"REFUSED", "Refus", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 40, 1},
 	{"WRONG_NUMBER", "Faux numéro", seedCouleurDanger, db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50, 1},
@@ -303,6 +304,9 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"AUTRE_NON_JOINT", "Autre non joint", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, false, 36, 8},
 	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 45, 8},
 	{"INTERESSE", "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, true, false, true, 15, 8},
+	{"DEMANDE_INFORMATIONS", "Demande d’informations", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 16, 8},
+	{"DEMANDE_DEVIS", "Demande de devis / proposition", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 17, 8},
+	{"EN_REFLEXION", "En réflexion", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 18, 8},
 }
 
 type seedCanalProvenance struct {

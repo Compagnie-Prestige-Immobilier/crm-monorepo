@@ -34,7 +34,7 @@ function SupervisionPage() {
     <Suspense fallback={<SupervisionSkeleton />}>
       <div className="flex flex-col gap-6">
         <OngletsPilotage coque="chues" role={user.role} />
-        <SupervisionTabs projet="CHUES" role={user.role} />
+        <SupervisionTabs projet="CHUES" />
       </div>
     </Suspense>
   );
