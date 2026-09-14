@@ -101,6 +101,8 @@ jobs:
           sudo apt-get install -y -q postgresql-client-18
       - run: go test -tags integration -count=1 ./...
 
+      # Le parcours « seconde base » se connecte à un profil démo : sans semis, la base démo le refuse.
+      - run: DATABASE_URL="$DATABASE_URL_DEMO" ./cpi-go -seed
       - run: pnpm exec playwright install --with-deps chromium
         working-directory: e2e
       - run: pnpm test
