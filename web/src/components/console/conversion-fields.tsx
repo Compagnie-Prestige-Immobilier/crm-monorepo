@@ -649,7 +649,7 @@ function ChoixOuiNon({
             className={cn(
               'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
               'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-              value === choice.value
+              value !== null && value === choice.value
                 ? 'border-primary bg-secondary text-secondary-foreground'
                 : 'border-border hover:bg-secondary/60',
             )}
@@ -657,7 +657,7 @@ function ChoixOuiNon({
             <input
               type="radio"
               name={name}
-              checked={value === choice.value}
+              checked={value !== null && value === choice.value}
               className="size-4 accent-[var(--primary)]"
               onChange={() => {
                 onChange(choice.value);

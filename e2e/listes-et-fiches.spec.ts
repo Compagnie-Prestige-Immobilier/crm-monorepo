@@ -170,6 +170,10 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     );
     expect(enBase?.projet, 'le parcours Grand Public manque en base').toBe('GRAND_PUBLIC');
 
+    await page.goto('/grand-public/nouveau');
+    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '2 Situation', exact: true })).toBeDisabled();
+
     await page.goto('/grand-public');
     await chercher(page, 'Rechercher');
 
@@ -182,14 +186,26 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(page.getByRole('heading', { name: `GP ${cle} Ousmane`, level: 2 })).toBeVisible();
 
     await page.getByRole('group').getByRole('button', { name: '1 Joignable', exact: true }).click();
+    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
+    await expect(page.getByRole('button', { name: '2 Dossier', exact: true })).toBeDisabled();
+    await page.keyboard.press('Enter');
+    await expect(page).toHaveURL(new RegExp(`/grand-public/appel/${prospectGrandPublic}$`));
+    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
+    await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+    await page.getByRole('textbox', { name: /^Nom/ }).fill('');
+    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: 'Retour', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
+    await page.getByRole('option', { name: 'Autre', exact: true }).click();
     await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
     await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await expect(page.getByRole('textbox', { name: /^Nom/ })).toHaveValue(`Dossier ${cle}`);
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await expect(page.getByRole('button', { name: /Enregistrer l’appel/ })).toBeDisabled();
     await page.getByRole('textbox').fill('Souhaite recevoir les informations.');
     await page.getByRole('button', { name: /Enregistrer l’appel/ }).click();
     await expect(page).toHaveURL(/\/grand-public$/);
@@ -202,6 +218,13 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
       [prospectGrandPublic],
     );
     expect(appel).toEqual({ code: 'INTERESSE', nom: `Dossier ${cle}` });
+    const statutApresAppel = await ligne<{ statut: string }>(
+      'SELECT statut FROM prospect_journeys WHERE "prospectId" = $1 AND projet = \'GRAND_PUBLIC\'',
+      [prospectGrandPublic],
+    );
+    console.log('Diagnostic après appel Intéressé :', statutApresAppel);
+    await chercher(page, 'Rechercher');
+    await expect(page.getByRole('row').filter({ hasText: `GP ${cle}` })).toContainText('Contacté');
 
     await page.goto(`/grand-public/${prospectGrandPublic}`);
     await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
