@@ -307,6 +307,28 @@ func TestCampagneReaffectationDeplaceEtTrace(t *testing.T) {
 	}
 }
 
+func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+	oublie := b.agent("Agent Coumba Fall")
+	aDonner := b.positionsDe(b.agentA)[:2]
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation", map[string]any{
+		"positions": aDonner, "versTeleconseillerId": oublie,
+	})
+	b.attend(statut, http.StatusOK, "réaffectation vers un téléconseiller hors campagne", body)
+
+	if recues := b.positionsDe(oublie); len(recues) != len(aDonner) {
+		t.Fatalf("les fiches doivent passer au téléconseiller ajouté : %v", recues)
+	}
+	repartition, _ := body["repartition"].([]any)
+	for _, ligne := range repartition {
+		if membre, _ := ligne.(map[string]any); membre["teleconseillerId"] == oublie {
+			return
+		}
+	}
+	t.Fatalf("le téléconseiller ajouté doit entrer dans la répartition : %v", repartition)
+}
+
 func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	b.creer()
