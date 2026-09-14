@@ -61,6 +61,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/admin/supervision":                               socle.Encadrement,
 	"GET /api/v1/admin/exploitation":                              socle.AdminSeul,
 	"GET /api/v1/admin/journal":                                   socle.AdminSeul,
+	"GET /api/v1/admin/exploitation/routes":                       socle.AdminSeul,
 	"GET /api/v1/admin/purge":                                     socle.AdminSeul,
 	"POST /api/v1/admin/purge":                                    socle.AdminSeul,
 	"GET /api/v1/admin/database-dump":                             socle.AdminSeul,
