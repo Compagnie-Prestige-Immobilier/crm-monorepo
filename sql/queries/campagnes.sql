@@ -57,7 +57,7 @@ FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj
               WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.arg('projet')::"Projet")
-GROUP BY COALESCE(p."importFeuille", j."id")
+GROUP BY COALESCE(p."importFeuille", j."id"), p."importFeuille"
 ORDER BY MAX(j."finishedAt") DESC, MAX(j."id") DESC
 LIMIT 100;
 
