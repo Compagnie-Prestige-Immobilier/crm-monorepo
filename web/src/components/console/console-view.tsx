@@ -139,6 +139,9 @@ const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
 /** Les statuts propres à l'écran Grand Public : la console CHUES garde ses motifs. */
 const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
   'INTERESSE',
+  'DEMANDE_INFORMATIONS',
+  'DEMANDE_DEVIS',
+  'EN_REFLEXION',
   'HORS_CIBLE',
   ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
 ]);

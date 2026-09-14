@@ -4,7 +4,6 @@ import { avecBase, compteDe } from './comptes';
 import {
   apiDe,
   creerCompte,
-  creerProspect,
   ligne,
   purger,
   sessionApi,
@@ -16,27 +15,12 @@ const cle = suffixe();
 const SUPERVISEUR = compteDe('SUPERVISEUR');
 
 let veilleur: CompteCree | null = null;
-let prospectOuvert = '';
 
 test.beforeAll(async () => {
   const api = await apiDe('ADMIN', '198.51.100.74');
   const compte = await creerCompte(api, 'COMMERCIAL', `MotDePasseVeille${cle.slice(0, 4)}`);
   veilleur = compte;
-  prospectOuvert = await creerProspect(api, {
-    nom: `Ouverte ${cle}`,
-    prenom: 'Khady',
-    phone: `+2217755${String(10_000 + Math.floor(Math.random() * 80_000))}`,
-    projet: 'CHUES',
-  });
   await api.dispose();
-
-  await avecBase(async (client) => {
-    await client.query(
-      `INSERT INTO ouvertures_fiche (id, "openedById", "prospectId", "openedAt", "updatedAt")
-       VALUES ($1, $2, $3, now() - interval '3 hours', now())`,
-      [`ouverture-${cle}`, compte.id, prospectOuvert],
-    );
-  });
 });
 
 test.afterAll(async () => {
@@ -44,7 +28,6 @@ test.afterAll(async () => {
     await client.query('DELETE FROM dashboard_layouts WHERE "userId" = $1', [SUPERVISEUR.id]);
   });
   await purger({
-    prospects: [prospectOuvert],
     comptes: veilleur === null ? [] : [veilleur.id],
   });
 });
@@ -155,20 +138,6 @@ test.describe('parcours 9, la supervision', () => {
 
     await page.reload();
     await expect(rangee).toContainText('Connecté');
-  });
-
-  test('une fiche laissée ouverte est nommée avec son téléconseiller', async ({ page }) => {
-    await page.goto('/chues/supervision?volet=comptes');
-    const tableau = page.getByRole('table', { name: 'Fiches restées ouvertes' });
-
-    await expect(tableau).toContainText(`Khady Ouverte ${cle}`);
-    await expect(tableau).toContainText(String(veilleur?.nom ?? ''));
-    await expect(
-      tableau
-        .getByRole('row')
-        .filter({ hasText: `Khady Ouverte ${cle}` })
-        .getByRole('button', { name: 'Libérer' }),
-    ).toBeVisible();
   });
 
   test('le volet Activité compte les appels et les saisies', async ({ page }) => {

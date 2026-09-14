@@ -86,11 +86,6 @@ INSERT INTO "representant_relation_changes"
 VALUES (@id, @representant_id, CAST(@depuis AS text)::"RepresentantRelation",
         CAST(@vers AS text)::"RepresentantRelation", @changed_by_id, 'WEB');
 
--- name: MajRappelRepresentant :exec
-UPDATE "representants"
-SET "nextCallbackAt" = @at, "nextCallbackOrigine" = 'AUTOMATIQUE', "rev" = "rev" + 1
-WHERE "id" = @id;
-
 -- name: CallAttemptExiste :one
 SELECT EXISTS (SELECT 1 FROM "call_attempts" WHERE "id" = $1);
 
@@ -289,13 +284,6 @@ SET "closedAt" = GREATEST(@at, COALESCE("firstInputAt", "openedAt"))
 WHERE "openedById" = @opened_by_id AND "closedAt" IS NULL
   AND ("representantId" IS DISTINCT FROM CAST(sqlc.narg('representant_id') AS text)
        OR "prospectId" IS DISTINCT FROM CAST(sqlc.narg('prospect_id') AS text));
-
--- name: LibererOuverture :execrows
-UPDATE "ouvertures_fiche" SET
-  "closedAt" = GREATEST(@at, COALESCE("firstInputAt", "openedAt")),
-  "releasedById" = @released_by_id,
-  "releasedAt" = GREATEST(@at, COALESCE("firstInputAt", "openedAt"))
-WHERE "id" = @id AND "closedAt" IS NULL;
 
 -- name: ComptageOuvertures :many
 SELECT o."openedById", u."fullName" AS "openedByName",

@@ -90,23 +90,6 @@ export async function enregistrerBrouillon(
   ) as OuvertureFiche;
 }
 
-/** Les fiches restées ouvertes : superviseur et administrateur seulement. */
-export async function fetchOuverturesOuvertes(
-  client: ApiClient = getApiClient(),
-): Promise<OuvertureFiche[]> {
-  return (unwrap(await client.GET('/api/v1/ouvertures/ouvertes')) as { items: OuvertureFiche[] })
-    .items;
-}
-
-export async function libererOuverture(
-  id: string,
-  client: ApiClient = getApiClient(),
-): Promise<OuvertureFiche> {
-  return unwrap(
-    await client.POST('/api/v1/ouvertures/{id}/liberation', { params: { path: { id } } }),
-  ) as OuvertureFiche;
-}
-
 export async function fetchComptageOuvertures(
   query: { from?: string; to?: string; openedById?: string } = {},
   client: ApiClient = getApiClient(),

@@ -92,7 +92,12 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
  * appels aboutis, que les chiffres comptent par issue. OTHER exige un
  * commentaire en base : son motif le réclame donc aussi.
  */
-const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = { INTERESSE: 'OTHER' };
+const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
+  INTERESSE: 'OTHER',
+  DEMANDE_INFORMATIONS: 'OTHER',
+  DEMANDE_DEVIS: 'OTHER',
+  EN_REFLEXION: 'OTHER',
+};
 
 export const issueDuMotif = (motif: Pick<MotifAppel, 'code' | 'effect'>): CallOutcome =>
   ISSUE_DU_CODE[motif.code] ?? EFFET_ISSUE[motif.effect];

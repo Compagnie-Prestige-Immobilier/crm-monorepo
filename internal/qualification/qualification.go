@@ -38,8 +38,6 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/ouvertures":                   socle.Parcours,
 	"GET /api/v1/ouvertures/courante":           socle.Parcours,
 	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.Parcours,
-	"GET /api/v1/ouvertures/ouvertes":           {socle.Admin, socle.Superviseur},
-	"POST /api/v1/ouvertures/{id}/liberation":   {socle.Admin, socle.Superviseur},
 	"GET /api/v1/ouvertures/comptage":           socle.Parcours,
 	"GET /api/v1/suggestions":                   socle.Parcours,
 	"PATCH /api/v1/suggestions/{id}":            socle.Parcours,
@@ -60,8 +58,6 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("ouvrirFiche", http.MethodPost, "/api/v1/ouvertures"), s.qualificationOuvrirFiche)
 	huma.Register(api, qualificationRoute("ouvertureCourante", http.MethodGet, "/api/v1/ouvertures/courante"), s.qualificationOuvertureCourante)
 	huma.Register(api, qualificationRoute("enregistrerBrouillonOuverture", http.MethodPut, "/api/v1/ouvertures/{id}/brouillon"), s.qualificationEnregistrerBrouillon)
-	huma.Register(api, qualificationRoute("listOuverturesOuvertes", http.MethodGet, "/api/v1/ouvertures/ouvertes"), s.qualificationOuverturesRestees)
-	huma.Register(api, qualificationRoute("libererOuverture", http.MethodPost, "/api/v1/ouvertures/{id}/liberation"), s.qualificationLibererOuverture)
 	huma.Register(api, qualificationRoute("compterOuvertures", http.MethodGet, "/api/v1/ouvertures/comptage"), s.qualificationComptage)
 	huma.Register(api, qualificationRoute("listSuggestions", http.MethodGet, "/api/v1/suggestions"), s.qualificationListerSuggestions)
 	huma.Register(api, qualificationRoute("updateSuggestionStatus", http.MethodPatch, "/api/v1/suggestions/{id}"), s.qualificationBasculerSuggestion)
