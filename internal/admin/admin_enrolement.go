@@ -318,7 +318,7 @@ func cleReglages(projet string) string { return socle.CleReglagesEnrolement(proj
 // Un réglage illisible ou hors bornes retombe sur l'usine plutôt que
 // d'arrêter l'écran.
 func reglagesStockes(valeur string) reglagesEnrolement {
-	valeurs := reglagesEnrolement{FrequenceMinutes: frequenceDefaut}
+	valeurs := reglagesEnrolement{FrequenceMinutes: frequenceDefaut, StatutsComplets: []string{}}
 	var stockees reglagesEnrolement
 	if json.Unmarshal([]byte(valeur), &stockees) != nil {
 		return valeurs
@@ -327,9 +327,8 @@ func reglagesStockes(valeur string) reglagesEnrolement {
 		valeurs.FrequenceMinutes = stockees.FrequenceMinutes
 	}
 	valeurs.RepriseDepuis, valeurs.DernierTirage = stockees.RepriseDepuis, stockees.DernierTirage
-	valeurs.StatutsComplets = stockees.StatutsComplets
-	if valeurs.StatutsComplets == nil {
-		valeurs.StatutsComplets = []string{}
+	if stockees.StatutsComplets != nil {
+		valeurs.StatutsComplets = stockees.StatutsComplets
 	}
 	return valeurs
 }
@@ -337,7 +336,7 @@ func reglagesStockes(valeur string) reglagesEnrolement {
 func (s *service) reglagesTirage(ctx context.Context, projet string) (reglagesEnrolement, *time.Time, error) {
 	ligne, existe, err := s.reglage(ctx, cleReglages(projet))
 	if err != nil || !existe {
-		return reglagesEnrolement{FrequenceMinutes: frequenceDefaut}, nil, err
+		return reglagesStockes(""), nil, err
 	}
 	return reglagesStockes(ligne.Value), &ligne.UpdatedAt, nil
 }
