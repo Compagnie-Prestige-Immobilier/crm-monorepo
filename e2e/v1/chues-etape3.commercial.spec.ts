@@ -103,15 +103,15 @@ test('ET3-1 · l’écran ouvre sur la recherche, focalisée, avec les dernière
   await expect(champ(page)).toBeFocused();
   await expect(page.getByRole('heading', { level: 2 })).toHaveCount(0);
   await expect(
-    page.getByText('Les vingt dernières fiches ajoutées.', { exact: false }),
+    page.getByText('Vos fiches et celles que vos campagnes vous ont confiées.', { exact: false }),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: new RegExp(`${NOM} ${FICHES.ouverte.prenom}`) }),
   ).toBeVisible();
-  const liste = page
-    .getByRole('list')
+  const annuaire = page
+    .getByRole('table')
     .filter({ has: page.getByRole('button', { name: new RegExp(NOM) }) });
-  expect(await liste.getByRole('listitem').count()).toBeLessThanOrEqual(20);
+  expect(await annuaire.getByRole('row').count()).toBeLessThanOrEqual(21);
 });
 
 test('ET3-2 · ?fiche=<id> ouvre directement la fiche visée', async ({ page }) => {

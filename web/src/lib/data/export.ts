@@ -36,10 +36,15 @@ export function exportFileName(now = new Date(), mode: ProspectExportMode = 'fil
  * consolidé n'a pas d'équivalent ici : il segmente en BDD1-BDD4, ce qui est
  * une notion CHUES.
  */
-export function buildGrandPublicExportUrl(filters: GrandPublicFilters): string {
+export function buildGrandPublicExportUrl(filters: GrandPublicFilters, viewerId: string): string {
   const params = serializeGrandPublicFilters(filters);
   params.delete('page');
   params.delete('pageSize');
+  // La route d'export ne connaît pas l'attribution de campagne. « Ajoutés par
+  // moi » se retraduit en auteur de la saisie ; l'écran retire le bouton dans
+  // l'autre cas plutôt que de livrer un classeur plus large que la liste.
+  params.delete('origine');
+  if (filters.origine === 'MOI') params.set('commercialId', viewerId);
   params.set('projet', 'GRAND_PUBLIC');
   return `/api/export/prospects?${params.toString()}`;
 }

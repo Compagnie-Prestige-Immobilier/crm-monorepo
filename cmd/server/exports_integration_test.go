@@ -252,7 +252,7 @@ func TestExportRefuseParRole(t *testing.T) {
 	statut, _, _ = b.classeur("/api/v1/export/prospects-modele.xlsx")
 	b.attend(statut, http.StatusForbidden, "modèle réservé à l'admin", nil)
 	statut, _, _ = b.classeur("/api/v1/export/bank-cases.xlsx")
-	b.attend(statut, http.StatusForbidden, "dossiers bancaires", nil)
+	b.attend(statut, http.StatusOK, "dossiers bancaires pour un superviseur", nil)
 	statut, disposition, _ := b.classeur("/api/v1/export/representants.xlsx")
 	b.attend(statut, http.StatusOK, "annuaire des représentants", nil)
 	exportAttendFichier(t, disposition, "representants-cpi-")

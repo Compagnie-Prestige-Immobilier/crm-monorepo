@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { formatPhone, initials } from '@/lib/format';
+import { formatPhone, initials, SANS_NUMERO } from '@/lib/format';
 
 export interface ChiffreDeFiche {
   label: string;
@@ -20,7 +20,7 @@ export function FicheEnTete({
 }: {
   nom: string;
   complement?: string | null;
-  phoneE164: string;
+  phoneE164: string | null;
   badges: ReactNode;
   actions?: ReactNode;
   chiffres: readonly ChiffreDeFiche[];
@@ -40,12 +40,16 @@ export function FicheEnTete({
               </span>
             )}
           </h2>
-          <a
-            href={`tel:${phoneE164}`}
-            className="text-[0.9375rem] tabular-nums text-muted-foreground underline-offset-4 hover:underline"
-          >
-            {formatPhone(phoneE164)}
-          </a>
+          {phoneE164 === null ? (
+            <span className="text-[0.9375rem] text-muted-foreground italic">{SANS_NUMERO}</span>
+          ) : (
+            <a
+              href={`tel:${phoneE164}`}
+              className="text-[0.9375rem] tabular-nums text-muted-foreground underline-offset-4 hover:underline"
+            >
+              {formatPhone(phoneE164)}
+            </a>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-2">{badges}</div>
         </div>
         {actions === undefined ? null : (

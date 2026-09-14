@@ -317,7 +317,7 @@ export function RepScript() {
   );
 }
 
-/** La fiche ouverte et l'ouverture qui la verrouille : les deux vont ensemble. */
+/** La fiche ouverte et l'ouverture qui la mesure : les deux vont ensemble. */
 interface Ouverte {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;

@@ -3,7 +3,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { MailIcon } from 'lucide-react';
 
-import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { buttonVariants } from '@/components/ui/button';
 import { fetchSessionUser } from '@/lib/data/auth';
 import { monLienFormulaireQuery } from '@/lib/data/lien-formulaire';
@@ -11,7 +11,6 @@ import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { formatPhone } from '@/lib/format';
 import { lienFormulairePublic, texteDuMessage } from '@/lib/formulaire-public';
 import { queryKeys } from '@/lib/query-keys';
-import type { ProspectRow } from '@/lib/types';
 
 const STALE_TIME = 300_000;
 
@@ -21,7 +20,13 @@ const OBJET = 'Votre demande d’adhésion CPI CHUES';
  * EB-25 : l'autre mode de conversion. Le prospect remplit lui-même le
  * formulaire public, par le lien du compte qui le lui envoie.
  */
-export function EnvoiLienFormulaire({ prospect, email }: { prospect: ProspectRow; email: string }) {
+export function EnvoiLienFormulaire({
+  prospect,
+  email,
+}: {
+  prospect: FicheContactable;
+  email: string;
+}) {
   const parametres = useQuery({
     queryKey: queryKeys.parametresChues,
     queryFn: () => fetchParametresChues(),

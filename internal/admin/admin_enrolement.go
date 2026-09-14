@@ -692,10 +692,7 @@ func (s *service) indexerProspects(ctx context.Context, projet string, lignes []
 		}
 		for _, row := range rows {
 			c := candidatProspect{id: row.ID, clientCreatedAt: row.ClientCreatedAt}
-			ajouterCandidat(index.parTelephone, row.PhoneE164, c)
-			if row.WhatsappE164 != nil {
-				ajouterCandidat(index.parTelephone, *row.WhatsappE164, c)
-			}
+			indexerNumeros(index.parTelephone, c, row.PhoneE164, row.WhatsappE164)
 		}
 	}
 	if len(emails) > 0 {
@@ -710,6 +707,16 @@ func (s *service) indexerProspects(ctx context.Context, projet string, lignes []
 		}
 	}
 	return index, nil
+}
+
+// Une fiche sans numéro ne s'indexe pas : elle ne peut appareiller aucune
+// inscription distante, qui ne se reconnaît qu'au téléphone ou à l'e-mail.
+func indexerNumeros(index map[string][]candidatProspect, c candidatProspect, numeros ...*string) {
+	for _, numero := range numeros {
+		if numero != nil {
+			ajouterCandidat(index, *numero, c)
+		}
+	}
 }
 
 type inscriptionDistante struct {

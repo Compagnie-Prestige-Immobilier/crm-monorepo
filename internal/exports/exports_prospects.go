@@ -227,7 +227,8 @@ SELECT p."id", p."nom", p."prenom", p."phoneE164",
   p."createdById", p."projet"::text, COALESCE(p."etablissement", '')::text, COALESCE(p."email", '')::text,
   COALESCE(ib."label", '')::text, COALESCE(p."paymentMode"::text, '')::text, p."whatsappStatus"::text,
   COALESCE(p."origin", '')::text, COALESCE(p."originLabel", '')::text,
-  p."aRevoirAt", p."revueAt", COALESCE(rv."fullName", '')::text, p."createdAt", p."updatedAt"`
+  p."aRevoirAt", p."revueAt", COALESCE(rv."fullName", '')::text, p."createdAt", p."updatedAt",
+  COALESCE(p."typeBien"::text, '')::text`
 
 type exportLigneProspect struct {
 	ID                string
@@ -283,6 +284,7 @@ type exportLigneProspect struct {
 	RevuPar           string
 	CreeLe            time.Time
 	ModifieLe         time.Time
+	TypeBien          string
 }
 
 // Le segment n'est pas stocké : il se recalcule sur les deux axes, sinon
