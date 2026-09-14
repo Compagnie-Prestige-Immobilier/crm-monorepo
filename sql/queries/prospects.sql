@@ -369,11 +369,13 @@ SELECT
   a."outcome",
   a."comment",
   a."createdAt" AS at,
+  a."reason_label",
   (SELECT count(*) FROM "call_attempts" n WHERE n."prospectId" = p."id")::int AS nombre
 FROM "prospects" p
 JOIN LATERAL (
-  SELECT ca."outcome", ca."comment", ca."createdAt"
+  SELECT ca."outcome", ca."comment", ca."createdAt", cr."label" AS reason_label
   FROM "call_attempts" ca
+  LEFT JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
   WHERE ca."prospectId" = p."id"
   ORDER BY ca."createdAt" DESC, ca."id" DESC
   LIMIT 1

@@ -596,6 +596,11 @@ function Row({ prospect }: { prospect: ProspectRow }) {
       </TableCell>
       <TableCell>
         <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>
+        {prospect.lastReasonLabel ? (
+          <span className="block truncate text-[0.75rem] text-muted-foreground">
+            {prospect.lastReasonLabel}
+          </span>
+        ) : null}
       </TableCell>
       <TableCell>
         {prospect.type === null ? <Absent /> : PROSPECT_TYPE_LABELS[prospect.type]}

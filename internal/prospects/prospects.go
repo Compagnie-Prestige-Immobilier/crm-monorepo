@@ -210,6 +210,7 @@ type Prospect struct {
 	RevueByID                *string           `json:"revueById"`
 	RevueByName              *string           `json:"revueByName"`
 	LastOutcome              *string           `json:"lastOutcome"`
+	LastReasonLabel          *string           `json:"lastReasonLabel"`
 	LastComment              *string           `json:"lastComment"`
 	LastAttemptAt            *string           `json:"lastAttemptAt"`
 	CallAttemptCount         int32             `json:"callAttemptCount"`
@@ -321,6 +322,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 	}
 	if derniere != nil {
 		item.LastOutcome = prospectPtr(string(derniere.Outcome))
+		item.LastReasonLabel = derniere.ReasonLabel
 		item.LastComment = derniere.Comment
 		item.LastAttemptAt = prospectPtr(prospectISO(derniere.At))
 		item.CallAttemptCount = derniere.Nombre
