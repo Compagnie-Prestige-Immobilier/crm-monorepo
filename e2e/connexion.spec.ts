@@ -69,6 +69,8 @@ test.describe('parcours 1, seconde base', () => {
 
   test('la base démo propose un profil sans identifiants et le signale', async ({ page }) => {
     await page.goto('/connexion');
+    // Le raccourci n'est écouté qu'une fois le formulaire monté, après la lecture de la session.
+    await expect(page.getByRole('button', { name: 'Se connecter' })).toBeVisible();
     await page.keyboard.press('Control+Shift+N');
     await page.getByRole('combobox', { name: 'Base' }).click();
     await page.getByRole('option', { name: 'demo' }).click();
