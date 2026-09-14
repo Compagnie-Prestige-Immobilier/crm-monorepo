@@ -237,6 +237,7 @@ export function ConversionFields({
         {(props) => (
           <Input
             {...props}
+            autoComplete="off"
             value={draft.profession}
             onChange={(event) => {
               onChange({ profession: event.target.value });

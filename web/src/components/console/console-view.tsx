@@ -948,14 +948,15 @@ export function Consignation({
         ouvrirDossier();
         return;
       }
-      if (groupe !== 'joignable') {
-        setConversion(null);
-        setConversionErrors({});
-      }
+      // « Joignable » ouvre le dossier avant même de savoir quel motif suivra :
+      // un motif qui n'est pas l'adhésion doit donc le refermer, quel que soit
+      // le groupe — le garder ouvert affiche un dossier à remplir pour un refus.
+      setConversion(null);
+      setConversionErrors({});
       if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else setSlots(null);
     },
-    [send.isPending, groupe, ouvrirDossier, startCallback],
+    [send.isPending, ouvrirDossier, startCallback],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
