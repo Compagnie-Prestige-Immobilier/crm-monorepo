@@ -254,31 +254,51 @@ test.describe('parcours 5, convertir un prospect', () => {
     });
   });
 
-  test('un prospect Grand Public importe peut etre qualifie par un commercial', async ({ page }) => {
+  test('un prospect Grand Public importe se qualifie par le teleconseiller a qui il est attribue', async ({
+    page,
+  }) => {
     const suffixe = marque();
+    const lotId = crypto.randomUUID();
+    const importeur = compteDe('ADMIN').id;
     let fiche: FicheSemee | null = null;
     await avecBase(async (client) => {
-      // Seme avec un autre ID d'auteur (ex: Admin) pour feindre un import
-      fiche = await semerProspectGrandPublicImporte(client, `GrandPublic ${suffixe}`, `Import ${suffixe}`, '00000000-0000-0000-0000-000000000001');
+      fiche = await semerProspectGrandPublicImporte(
+        client,
+        `GrandPublic ${suffixe}`,
+        `Import ${suffixe}`,
+        importeur,
+      );
+      await client.query(
+        `INSERT INTO lots_export (id, name, cible, projet, filters, "itemCount", "createdById")
+         VALUES ($1, $2, 'PROSPECTS', 'GRAND_PUBLIC', '{}'::jsonb, 1, $3)`,
+        [lotId, `Leads ${suffixe}`, importeur],
+      );
+      await client.query(
+        `INSERT INTO lot_export_items ("lotId", "prospectId", position, "assigneeId", day)
+         VALUES ($1, $2, 1, $3, 1)`,
+        [lotId, (fiche as FicheSemee).id, compte.id],
+      );
     });
     if (fiche === null) throw new Error('prospect Grand Public non seme');
-    telephones.push((fiche as FicheSemee).phoneE164);
+    const semee = fiche as FicheSemee;
+    telephones.push(semee.phoneE164);
 
-    await page.goto(`/chues/prospects/${(fiche as FicheSemee).id}`);
-    await expect(page.getByText((fiche as FicheSemee).nom).first()).toBeVisible();
-
-    // Verifier la consignation d'appel depuis la console Grand Public / qualification
-    await page.goto('/grand-public/consigner');
-    await page.getByLabel('Quel prospect avez-vous appelé ?').fill((fiche as FicheSemee).nom);
-    await page.getByRole('button', { name: (fiche as FicheSemee).nom }).click();
-    await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
-
-    await issue(page, 'Injoignable', /Injoignable$/u);
-    await expect(consigne(page, (fiche as FicheSemee).nom)).toBeVisible();
-
-    const classement = await lireClassement((fiche as FicheSemee).id);
-    expect(classement.tentatives).toBe(1);
-    expect(classement.phase2Status).toBe('UNREACHABLE');
+    try {
+      await page.goto(`/grand-public/appel/${semee.id}`);
+      await page
+        .getByRole('group')
+        .getByRole('button', { name: '2 Injoignable', exact: true })
+        .click();
+      await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
+      await page.getByRole('option', { name: 'Pas de réponse', exact: true }).click();
+      await page.keyboard.press('Enter');
+      await expect(page).toHaveURL(/\/grand-public$/u);
+      await expect.poll(async () => (await lireClassement(semee.id)).tentatives).toBe(1);
+    } finally {
+      await avecBase(async (client) => {
+        await client.query('DELETE FROM lots_export WHERE id = $1', [lotId]);
+      });
+    }
   });
 
   test('une fiche ouverte n’empeche pas d’en ouvrir une autre ailleurs', async ({ page }) => {
