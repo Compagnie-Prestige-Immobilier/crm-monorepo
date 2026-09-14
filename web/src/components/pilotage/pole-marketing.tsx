@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { GaugeIcon, MegaphoneIcon, PhoneCallIcon, TrophyIcon } from 'lucide-react';
+import { MegaphoneIcon, PhoneCallIcon, TrophyIcon } from 'lucide-react';
 
 import { Kpi } from '@/components/bank/bank-kpi';
 import { ChartCard } from '@/components/dashboard/chart-card';
@@ -13,6 +13,7 @@ import {
   type Part,
 } from '@/components/pilotage/qualite-charts';
 import { QueryErrorState } from '@/components/query-error-state';
+import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useChartTheme } from '@/lib/chart-theme';
 import { CANAL_ICONES } from '@/lib/data/canaux-icones';
@@ -21,20 +22,73 @@ import { formatNumber } from '@/lib/format';
 const AIDE_SCORE =
   'Moyenne de deux parts : les prospects joints parmi ceux déjà appelés, et les prospects convertis sur tout ce que le marketing a amené. Sans aucun appel, il n’y a pas de score.';
 
+const SCORE_BON = 50;
+const SCORE_FAIBLE = 30;
+
 function pourcent(part: number, total: number): string {
   return total === 0 ? '—' : `${String(Math.round((part / total) * 100))} %`;
+}
+
+function AnneauScore({ score }: { score: number | null }) {
+  let couleur = '#C8921A';
+  let verdict = 'Pas encore d’appel';
+  if (score !== null && score >= SCORE_BON) {
+    couleur = '#1A6B44';
+    verdict = 'Bonne qualité';
+  } else if (score !== null && score < SCORE_FAIBLE) {
+    couleur = '#B03030';
+    verdict = 'Qualité faible';
+  } else if (score !== null) {
+    verdict = 'Qualité moyenne';
+  }
+  const rayon = 26;
+  const perimetre = 2 * Math.PI * rayon;
+  const rempli = (perimetre * (score ?? 0)) / 100;
+  return (
+    <Card className="animate-rise">
+      <CardContent className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="truncate text-[0.75rem] font-[600] uppercase tracking-wide text-muted-foreground">
+            Score du marketing
+          </p>
+          <p className="mt-1 font-display text-[1.75rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
+            {score === null ? '—' : `${String(score)} / 100`}
+          </p>
+          <p className="mt-2 text-[0.75rem] tabular-nums" style={{ color: couleur }}>
+            {verdict}
+          </p>
+        </div>
+        <svg width="64" height="64" viewBox="0 0 64 64" role="img" aria-label={verdict}>
+          <circle
+            cx="32"
+            cy="32"
+            r={rayon}
+            fill="none"
+            stroke={couleur}
+            strokeOpacity="0.2"
+            strokeWidth="7"
+          />
+          <circle
+            cx="32"
+            cy="32"
+            r={rayon}
+            fill="none"
+            stroke={couleur}
+            strokeWidth="7"
+            strokeLinecap="round"
+            strokeDasharray={`${String(rempli)} ${String(perimetre)}`}
+            transform="rotate(-90 32 32)"
+          />
+        </svg>
+      </CardContent>
+    </Card>
+  );
 }
 
 function Entete({ marketing }: { marketing: QualiteDuMarketing }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      <Kpi
-        index={0}
-        icon={GaugeIcon}
-        label="Score du marketing"
-        value={marketing.score === null ? '—' : `${String(marketing.score)} / 100`}
-        hint="Joignabilité et conversions"
-      />
+      <AnneauScore score={marketing.score} />
       <Kpi
         index={1}
         icon={MegaphoneIcon}
@@ -104,8 +158,7 @@ export function PoleMarketing() {
       label: motif.label,
       value: motif.count,
       couleur: couleurDEffet[motif.effect] ?? theme.tick,
-    }))
-    .reverse();
+    }));
   const familles: Part[] = [
     {
       label: 'Joints',
@@ -170,11 +223,11 @@ export function PoleMarketing() {
         </ChartCard>
         <ChartCard
           title="Motifs du dernier appel"
-          description="Chaque prospect rangé sous le motif choisi par le téléconseiller"
+          description="Part de chaque motif choisi par le téléconseiller"
           hauteur="haute"
           info="Les motifs viennent des listes de référence. « Jamais appelé » n’en est pas un : la fiche attend encore son premier appel."
         >
-          <BarresHorizontales parts={motifs} gauche={150} vide="Aucun prospect à mesurer." />
+          <AnneauDesFamilles parts={motifs} vide="Aucun prospect à mesurer." />
         </ChartCard>
       </div>
 
