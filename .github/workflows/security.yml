@@ -119,6 +119,12 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # L'analyse d'appels Go compile le module : sans `db/`, jamais commité, elle échoue.
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: go.mod
+          cache-dependency-path: go.sum
+      - run: go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate
 
       - name: osv-scanner
         run: |
