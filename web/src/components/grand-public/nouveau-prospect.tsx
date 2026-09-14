@@ -390,7 +390,7 @@ export function NouveauProspect({
   const maximumEtape = etapePourErreurs(problemes, erreurTelephone(phone, e164) !== undefined);
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full max-w-3xl flex-col gap-5">
       {embedded ? null : (
         <>
           <Button variant="ghost" className="self-start px-0" onClick={onAnnuler}>

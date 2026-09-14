@@ -303,10 +303,8 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"INJOIGNABLE_DEFINITIF", "Injoignable définitif", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 35, 8},
 	{"AUTRE_NON_JOINT", "Autre non joint", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, false, 36, 8},
 	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 45, 8},
-	{"INTERESSE", "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, true, false, true, 15, 8},
-	{"DEMANDE_INFORMATIONS", "Demande d’informations", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 16, 8},
-	{"DEMANDE_DEVIS", "Demande de devis / proposition", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 17, 8},
-	{"EN_REFLEXION", "En réflexion", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 18, 8},
+	{"INTERESSE", "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 15, 8},
+	{"RDV_AGENCE", "Rendez-vous agence (Souhaite venir se renseigner)", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 16, 8},
 }
 
 type seedCanalProvenance struct {

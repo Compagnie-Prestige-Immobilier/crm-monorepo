@@ -438,6 +438,28 @@ export function ConversionFields({
               />
             ))}
           </div>
+          {draft.method === 'APPOINTMENT' ? (
+            <div className="mt-2">
+              <Field
+                label="Date et heure du rendez-vous en agence"
+                required
+                error={errors.rendezVousAt}
+                description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
+              >
+                {(props) => (
+                  <Input
+                    {...props}
+                    type="datetime-local"
+                    className="max-w-64"
+                    value={draft.rendezVousAt}
+                    onChange={(event) => {
+                      onChange({ rendezVousAt: event.target.value });
+                    }}
+                  />
+                )}
+              </Field>
+            </div>
+          ) : null}
           {errors.method === undefined ? null : (
             <p role="alert" className="text-[0.75rem] text-destructive">
               {errors.method}
@@ -447,27 +469,7 @@ export function ConversionFields({
         <CoordonneeChues method={draft.method} />
       </>
     ),
-    rendezVousAt:
-      draft.method === 'APPOINTMENT' ? (
-        <Field
-          label="Date et heure du rendez-vous"
-          required
-          error={errors.rendezVousAt}
-          description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
-        >
-          {(props) => (
-            <Input
-              {...props}
-              type="datetime-local"
-              className="max-w-64"
-              value={draft.rendezVousAt}
-              onChange={(event) => {
-                onChange({ rendezVousAt: event.target.value });
-              }}
-            />
-          )}
-        </Field>
-      ) : null,
+    rendezVousAt: null,
   };
 
   // Grand Public pose déjà la question dans « Situation », qui a son option
