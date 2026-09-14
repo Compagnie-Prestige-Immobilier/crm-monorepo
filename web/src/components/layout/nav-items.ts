@@ -626,8 +626,16 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Créer, retrouver et suivre les prospects',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        roles: ['CHARGE_CLIENTELE'],
         secondary: true,
+      },
+      {
+        href: '/grand-public',
+        label: 'Prospects',
+        icon: UsersIcon,
+        description: 'Créer, retrouver et suivre les prospects',
+        roles: ['COMMERCIAL'],
+        hidden: true,
       },
       {
         href: '/grand-public/nouveau',
