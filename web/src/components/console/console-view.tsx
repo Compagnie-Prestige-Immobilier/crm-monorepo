@@ -723,6 +723,39 @@ function etapeCourante(
 const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe !== null;
 
+/** Grand Public : le dossier reste ouvert sous un statut qui n'est pas l'adhésion. */
+const dossierOuvertSansAdhesion = (
+  statutParSelect: boolean,
+  conversion: ConversionDraft | null,
+  motif: MotifAppel | null,
+): boolean =>
+  statutParSelect && conversion !== null && motif !== null && motif.effect !== 'CLOSE_METHOD';
+
+function maximumEtapeAppel(
+  conversion: ConversionDraft | null,
+  motif: MotifAppel | null,
+  formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] },
+  now: number,
+): number {
+  if (motif === null) return 0;
+  if (conversion === null) return 2;
+  const erreurs = validateConversion(conversion, now, formulaire.champs, formulaire.libres);
+  const valide = Object.keys(erreurs).every(
+    (champ) => champ === 'method' && motif.effect !== 'CLOSE_METHOD',
+  );
+  return valide ? 2 : 1;
+}
+
+function issueIncomplete(
+  motif: MotifAppel | null,
+  comment: string,
+  rappel: string,
+  slots: readonly CallbackSlot[] | null,
+): boolean {
+  if (motif?.requiresComment && comment.trim() === '') return true;
+  return slots !== null && dakarLocalToIso(rappel) === null;
+}
+
 /** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
 const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe === 'joignable';
@@ -803,16 +836,16 @@ export function Consignation({
       // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
-      if (draft.outcome === 'CALLBACK' && ouverture !== null) {
+      const garderBrouillon =
+        draft.outcome === 'CALLBACK' || (draft.method === null && conversion !== null);
+      if (garderBrouillon && ouverture !== null) {
         // La borne vient d'ici et non de l'horloge du serveur : la base exige
         // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.
         await enregistrerBrouillon(
           ouverture.id,
           brouillonDe(draft.comment, conversion),
           departChrono ?? new Date().toISOString(),
-        ).catch(() => {
-          toast.error('Les réponses saisies n’ont pas pu être conservées. L’appel, lui, part.');
-        });
+        );
       }
       return pushCallAttempt(newAttemptInput(prospect.id, draft));
     },
@@ -862,7 +895,7 @@ export function Consignation({
     if (send.isPending) return;
     setSlots(null);
     setConversionErrors({});
-    setConversion(conversionFrom(prospect));
+    setConversion((draft) => draft ?? conversionFrom(prospect));
   }, [send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
@@ -915,17 +948,20 @@ export function Consignation({
         ouvrirDossier();
         return;
       }
-      setConversion(null);
-      setConversionErrors({});
+      if (groupe !== 'joignable') {
+        setConversion(null);
+        setConversionErrors({});
+      }
       if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else setSlots(null);
     },
-    [send.isPending, ouvrirDossier, startCallback],
+    [send.isPending, groupe, ouvrirDossier, startCallback],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
   // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
+    if (statutParSelect && maximumEtapeAppel(conversion, motif, formulaire, now) < 2) return;
     if (slots !== null) {
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
@@ -935,15 +971,28 @@ export function Consignation({
       if (motif !== null) record(motif, null, iso);
       return;
     }
-    if (conversion !== null) {
+    if (conversion !== null && (motif === null || motif.effect === 'CLOSE_METHOD')) {
       submitConversion();
       return;
     }
     if (motif !== null) record(motif, null);
-  }, [conversion, submitConversion, slots, freeCallback, motif, record]);
+  }, [
+    conversion,
+    submitConversion,
+    slots,
+    freeCallback,
+    motif,
+    record,
+    statutParSelect,
+    formulaire,
+    now,
+  ]);
 
   const surStatut = surSelect(groupe, statutParSelect);
   const etape = etapeCourante(conversion, slots, groupe, surStatut);
+  const dossierSansAdhesion = dossierOuvertSansAdhesion(statutParSelect, conversion, motif);
+  const maximumEtape = maximumEtapeAppel(conversion, motif, formulaire, now);
+  const enregistrementDesactive = issueIncomplete(motif, comment, freeCallback, slots);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
   const annuler = useCallback(() => {
@@ -1131,15 +1180,15 @@ export function Consignation({
         )}
 
         <PiedAppel
-          etape={etape}
-          disabled={send.isPending}
+          etape={dossierSansAdhesion ? 'statut' : etape}
+          disabled={send.isPending || enregistrementDesactive}
           statutPose={motif !== null}
           onValidate={validate}
           onAbandon={onAbandon}
         />
 
         <PiedDossier
-          ouvert={etape === 'dossier'}
+          ouvert={etape === 'dossier' && !dossierSansAdhesion}
           disabled={send.isPending}
           motifRefus={motifRefus}
           onAdhesion={submitConversion}
@@ -1164,7 +1213,12 @@ export function Consignation({
           surDossier={etape === 'dossier'}
         />
 
-        <EtapesProgression etapes={ETAPES_APPEL} courante={etapeAppel} onChoisir={allerEtape} />
+        <EtapesProgression
+          etapes={ETAPES_APPEL}
+          courante={etapeAppel}
+          maximum={maximumEtape}
+          onChoisir={allerEtape}
+        />
 
         {tranches[etapeAppel]}
 
@@ -1172,6 +1226,7 @@ export function Consignation({
           courante={etapeAppel}
           total={ETAPES_APPEL.length}
           desactive={send.isPending}
+          suiteDesactive={etapeAppel >= maximumEtape}
           onRetour={() => {
             setEtapeAppel(etapeAppel - 1);
           }}
@@ -1262,7 +1317,7 @@ export function Consignation({
         />
 
         <PiedDossier
-          ouvert={etape === 'dossier'}
+          ouvert={etape === 'dossier' && !dossierSansAdhesion}
           disabled={send.isPending}
           motifRefus={motifRefus}
           onAdhesion={submitConversion}

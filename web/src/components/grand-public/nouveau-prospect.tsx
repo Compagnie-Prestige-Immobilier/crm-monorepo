@@ -132,7 +132,8 @@ const ERREURS_SITUATION: readonly (keyof ConversionErrors)[] = [
 ];
 
 /** Un envoi refusé rouvre l'étape qui porte la première erreur : elle est invisible d'ici. */
-function etapePourErreurs(problemes: ConversionErrors): number {
+function etapePourErreurs(problemes: ConversionErrors, telephoneInvalide = false): number {
+  if (telephoneInvalide) return 0;
   if (ERREURS_IDENTITE.some((cle) => problemes[cle] !== undefined)) return 0;
   if (ERREURS_SITUATION.some((cle) => problemes[cle] !== undefined)) return 1;
   return 2;
@@ -380,6 +381,13 @@ export function NouveauProspect({
   );
 
   const pending = save.isPending;
+  const problemes = validateConversion(
+    conversion,
+    maintenant(),
+    formulaire.champs,
+    formulaire.libres,
+  );
+  const maximumEtape = etapePourErreurs(problemes, erreurTelephone(phone, e164) !== undefined);
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
@@ -395,7 +403,12 @@ export function NouveauProspect({
         </>
       )}
 
-      <EtapesProgression etapes={ETAPES_SAISIE} courante={etape} onChoisir={setEtape} />
+      <EtapesProgression
+        etapes={ETAPES_SAISIE}
+        courante={etape}
+        maximum={maximumEtape}
+        onChoisir={setEtape}
+      />
 
       <section
         aria-label={`Nouveau prospect, étape ${etape + 1} : ${ETAPES_SAISIE[etape] ?? ''}`}
@@ -507,6 +520,7 @@ export function NouveauProspect({
           courante={etape}
           total={ETAPES_SAISIE.length}
           desactive={pending}
+          suiteDesactive={etape >= maximumEtape}
           onRetour={() => {
             setEtape(etape - 1);
           }}

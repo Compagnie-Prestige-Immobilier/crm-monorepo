@@ -1019,6 +1019,9 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 	if err := qualificationInsererTentative(ctx, q, u, b, t); err != nil {
 		return "", vide, err
 	}
+	if err := qualificationMarquerContacte(ctx, q, b.ProspectID, parcours.ID); err != nil {
+		return "", vide, err
+	}
 	corrige, err := s.qualificationCorrigerProspect(ctx, q, u, b, &prospect)
 	if err != nil {
 		return "", vide, err
@@ -1060,6 +1063,15 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 		return socle.Problem(http.StatusConflict, "PHASE2_ATTEMPT_RACE", "Cette tentative vient d’être enregistrée. Réessayez.")
 	}
 	return err
+}
+
+// Un premier appel sort la fiche et son parcours de « Nouveau » : c'est
+// l'appel qui fait progresser le statut, pas une saisie manuelle.
+func qualificationMarquerContacte(ctx context.Context, q *db.Queries, prospectID, journeyID string) error {
+	if err := q.MarquerProspectContacte(ctx, prospectID); err != nil {
+		return err
+	}
+	return q.MarquerParcoursContacte(ctx, journeyID)
 }
 
 func qualificationFicheModifiee(p *db.CorrigerProspectParTentativeParams) bool {
