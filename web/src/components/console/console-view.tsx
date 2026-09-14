@@ -139,9 +139,7 @@ const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
 /** Les statuts propres à l'écran Grand Public : la console CHUES garde ses motifs. */
 const CODES_GRAND_PUBLIC: ReadonlySet<string> = new Set([
   'INTERESSE',
-  'DEMANDE_INFORMATIONS',
-  'DEMANDE_DEVIS',
-  'EN_REFLEXION',
+  'RDV_AGENCE',
   'HORS_CIBLE',
   ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
 ]);
@@ -1142,6 +1140,31 @@ export function Consignation({
           onGroupe={choisirGroupe}
           onMotif={choisir}
         />
+
+        {slots !== null ? (
+          <div className="flex flex-col gap-4 pt-2">
+            <PanneauEcheance
+              slots={slots}
+              now={now}
+              freeCallback={freeCallback}
+              surDossier={conversion !== null}
+              disabled={send.isPending}
+              inputRef={callbackRef}
+              onChoisir={(at) => {
+                if (motif !== null) record(motif, null, at);
+              }}
+              onFreeCallback={setFreeCallback}
+              onValidate={validate}
+            />
+            <PiedAppel
+              etape="echeance"
+              disabled={send.isPending}
+              statutPose={motif !== null}
+              onValidate={validate}
+              onAbandon={onAbandon}
+            />
+          </div>
+        ) : null}
       </>,
       <>
         <PanneauDossier
@@ -1346,7 +1369,7 @@ export function Consignation({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full max-w-3xl flex-col gap-5">
       <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste

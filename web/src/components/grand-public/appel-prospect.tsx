@@ -63,7 +63,7 @@ export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
 
 function ChargementFiche() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <div className="flex w-full max-w-3xl flex-col gap-5">
       <Skeleton className="h-8 w-64" />
       <Skeleton className="h-12 w-80" />
       <Skeleton className="h-96 w-full rounded-lg" />
