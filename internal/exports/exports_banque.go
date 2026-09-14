@@ -643,7 +643,8 @@ func (g *exportClasseurGlobal) prospects(ctx context.Context) error {
 	entetes = append(entetes, exportEntetesChampsLibres(libres)...)
 	entetes = append(entetes, exportEnteteIdentifiantAgent, "Projet d’origine", "Établissement",
 		"E-mail", "Revenu mensuel", "Paiement", "Statut WhatsApp", "Origine", "Détail origine",
-		"À revoir depuis", "Revu le", "Revu par", exportEnteteCreeLe, exportEnteteModifieLe)
+		"À revoir depuis", "Revu le", "Revu par", exportEnteteCreeLe, exportEnteteModifieLe,
+		"Type de bien")
 	f, err := g.feuille(exportEnteteProspects, entetes)
 	if err != nil {
 		return err
@@ -677,7 +678,8 @@ func (g *exportClasseurGlobal) ligneProspect(f *exportFeuille, l *exportLignePro
 		l.Etablissement, l.Email, l.Revenu, exportLibelle(exportLibellesPaiement, l.Paiement),
 		exportLibelle(exportLibellesWhatsapp, l.WhatsappStatut), l.Origine, l.OrigineDetail,
 		c.horodate(l.ARevoirDepuis), c.horodate(l.RevuLe), l.RevuPar,
-		excelize.Cell{StyleID: c.date, Value: l.CreeLe}, excelize.Cell{StyleID: c.date, Value: l.ModifieLe})
+		excelize.Cell{StyleID: c.date, Value: l.CreeLe}, excelize.Cell{StyleID: c.date, Value: l.ModifieLe},
+		exportLibelle(exportLibellesTypeBien, l.TypeBien))
 	return f.ecrire(valeurs...)
 }
 

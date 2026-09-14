@@ -782,7 +782,7 @@ func lignesDeclareesImport(fichier *excelize.File, feuille string) *int32 {
 
 func (c *classeurImport) parcourir(sur func(ligne int, cellules map[string]string) error) error {
 	feuilles := c.fichier.GetSheetList()
-	if c.adaptateur.feuilles == nil {
+	if c.adaptateur.feuilles == nil || c.adaptateur.feuilles.motif == nil {
 		return c.parcourirFeuille(feuilles[0], false, sur)
 	}
 	apparies := 0

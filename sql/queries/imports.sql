@@ -203,18 +203,18 @@ ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectGrandPublic :batchexec
 INSERT INTO "prospects" (
-  "id", "projet", "nom", "prenom", "phoneE164", "profession", "syndicatId", "banqueId",
+  "id", "projet", "nom", "prenom", "phoneE164", "email", "statut", "profession", "syndicatId", "banqueId",
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
-  "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164", "email",
+  "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
   "createdById", "clientCreatedAt", "importJobId", "importFeuille", "updatedAt"
-) VALUES (@id, @projet, @nom, @prenom, @phone_e164, sqlc.narg('profession'),
+) VALUES (@id, @projet, @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
           sqlc.narg('employeur'), sqlc.narg('type_contrat'), sqlc.narg('anciennete_mois'),
           sqlc.narg('lieu_activite'), sqlc.narg('mode_epargne'), sqlc.narg('pays_residence_id'),
           sqlc.narg('ville_residence'), @whatsapp_status, sqlc.narg('whatsapp_e164'),
-          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'), sqlc.narg('email'),
+          sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'),
           @created_by_id, @client_created_at, @import_job_id, sqlc.narg('import_feuille'), now())
 ON CONFLICT DO NOTHING;
 

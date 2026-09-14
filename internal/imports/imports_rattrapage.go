@@ -100,7 +100,7 @@ func (s *service) rattraperUnClasseur(ctx context.Context, jobID, chemin string)
 	bilan := RattrapageClasseur{}
 	for telephone, feuille := range feuilles {
 		rangs, err := s.Q.RattraperFeuilleProspect(ctx, db.RattraperFeuilleProspectParams{
-			ImportJobID: &jobID, PhoneE164: telephone, Feuille: &feuille,
+			ImportJobID: &jobID, PhoneE164: &telephone, Feuille: &feuille,
 		})
 		if err != nil {
 			slog.Warn("rattrapage des onglets", "job", jobID, "err", err)
