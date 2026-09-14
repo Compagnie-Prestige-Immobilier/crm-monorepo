@@ -99,7 +99,7 @@ LIMIT 100;
 
 -- name: ExpireImportJob :execrows
 UPDATE "import_jobs"
-SET "status" = 'expired', "claimToken" = NULL, "report" = NULL, "finishedAt" = @now::timestamp, "updatedAt" = now()
+SET "status" = 'expired', "claimToken" = NULL, "finishedAt" = @now::timestamp, "updatedAt" = now()
 WHERE "id" = @id AND "status" <> 'expired';
 
 -- name: ClaimableImportJobs :many

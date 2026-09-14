@@ -681,8 +681,8 @@ function TerminalState({ job }: { job: ImportJob }) {
     return (
       <>
         <ClockIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-        Échéance passée : le classeur et le rapport ont été détruits. Redéposez le fichier pour
-        recommencer.
+        Échéance passée : le classeur a été détruit. Le rapport reste consultable ; redéposez le
+        fichier pour recommencer.
       </>
     );
   }
@@ -802,7 +802,7 @@ function History({
           carte en tient lieu. */}
       <CardHeader>
         <CardDescription>
-          Un travail « échu » n’a pas échoué : son classeur et son rapport ont passé leur échéance.
+          Un travail « échu » n’a pas échoué : son classeur a passé son échéance, son rapport reste.
         </CardDescription>
       </CardHeader>
       <CardContent className="flex flex-col gap-4 p-0">
