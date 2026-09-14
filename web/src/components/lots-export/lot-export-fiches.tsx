@@ -39,7 +39,9 @@ import {
   fetchLotExportFiches,
   lotFichesRecuesFileName,
   lotFichesRecuesUrl,
+  fetchTeleconseillers,
   reaffecterFiches,
+  type Teleconseiller,
   type LotExportDetail,
   type LotExportFiche,
   type LotExportFicheEtat,
@@ -75,6 +77,19 @@ const ficheHref = (fiche: LotExportFiche, cible: LotExportDetail['cible']): stri
     ? `/chues/prospects/${fiche.ficheId}`
     : `/chues/representants/${fiche.ficheId}`;
 };
+
+function destinatairesPossibles(
+  equipe: LotExportDetail['repartition'],
+  comptes: readonly Teleconseiller[] = [],
+): { value: string; label: string }[] {
+  const membres = new Set(equipe.map((ligne) => ligne.teleconseillerId));
+  return [
+    ...equipe.map((ligne) => ({ value: ligne.teleconseillerId, label: ligne.teleconseillerName })),
+    ...comptes
+      .filter((compte) => !membres.has(compte.id))
+      .map((compte) => ({ value: compte.id, label: compte.fullName })),
+  ];
+}
 
 export function LotExportFiches({
   lot,
@@ -132,8 +147,15 @@ export function LotExportFiches({
   });
 
   const equipe = lot.repartition;
-  const destinataire =
-    equipe.find((ligne) => ligne.teleconseillerId === vers)?.teleconseillerName ?? '';
+  // Un téléconseiller oublié à la création entre dans la campagne en recevant des fiches.
+  const teleconseillers = useQuery({
+    queryKey: queryKeys.lotsExportTeleconseillers,
+    queryFn: () => fetchTeleconseillers(),
+    staleTime: 5 * 60_000,
+    enabled: peutReaffecter,
+  });
+  const destinataires = destinatairesPossibles(equipe, teleconseillers.data);
+  const destinataire = destinataires.find((item) => item.value === vers)?.label ?? '';
   const lignes = fiches.data?.items ?? [];
   const total = fiches.data?.total ?? 0;
   const pageCount = fiches.data?.pageCount ?? 1;
@@ -189,7 +211,7 @@ export function LotExportFiches({
 
         <BandeauReaffectation
           visible={peutReaffecter}
-          equipe={equipe}
+          destinataires={destinataires}
           nombre={cochees.length}
           vers={vers}
           pending={reaffectation.isPending}
@@ -492,7 +514,7 @@ function LigneFiche({
 
 function BandeauReaffectation({
   visible,
-  equipe,
+  destinataires: items,
   nombre,
   vers,
   pending,
@@ -500,7 +522,7 @@ function BandeauReaffectation({
   onAttribuer,
 }: {
   visible: boolean;
-  equipe: LotExportDetail['repartition'];
+  destinataires: readonly { value: string; label: string }[];
   nombre: number;
   vers: string;
   pending: boolean;
@@ -508,10 +530,6 @@ function BandeauReaffectation({
   onAttribuer: () => void;
 }) {
   if (!visible || nombre === 0) return null;
-  const items = equipe.map((ligne) => ({
-    value: ligne.teleconseillerId,
-    label: ligne.teleconseillerName,
-  }));
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-md border border-border bg-secondary/50 px-4 py-3">
       <p className="text-[0.875rem]">
