@@ -13,6 +13,7 @@ const teleconseiller = compteDe('COMMERCIAL');
 const cle = marque();
 const NOM = `Campagne${cle}`;
 const NOM_CLASSEUR = `leads-${cle}.xlsx`;
+const ONGLET = `Leads ${cle}`;
 
 const SITE_GRAND_PUBLIC = 'https://monespace.cpi.sn/';
 const META_CHUES = 'Meta CPI-CHUES ( Facebook & Instagram )';
@@ -21,6 +22,7 @@ const JOUR_DU_LEAD = '2026-09-10';
 let dossier = '';
 let classeur = '';
 let lotId: string | null = null;
+let canalSiteWebPose: string | null = null;
 const telephones = [numero(), numero(), numero()];
 
 interface FicheLue {
@@ -38,7 +40,7 @@ interface FicheLue {
  */
 async function classeurDeCampagne(chemin: string): Promise<void> {
   const classeurExcel = new ExcelJS.Workbook();
-  const feuille = classeurExcel.addWorksheet('Leads');
+  const feuille = classeurExcel.addWorksheet(ONGLET);
   feuille.addRow(['Date', 'Nom complet', 'Email', 'Téléphone', 'Canal']);
   feuille.addRow([
     new Date(`${JOUR_DU_LEAD}T00:00:00.000Z`),
@@ -82,6 +84,13 @@ test.beforeAll(async () => {
   dossier = await mkdtemp(path.join(tmpdir(), 'cpi-imports-'));
   classeur = path.join(dossier, NOM_CLASSEUR);
   await classeurDeCampagne(classeur);
+  // Les règles de provenance de la migration 20260911120000 visent « Site web », que seul le seed crée.
+  const [pose] = await lire<{ id: string }>(
+    `INSERT INTO canaux_provenance (id, code, label, position, "updatedAt")
+     VALUES (gen_random_uuid()::text, 'SITE_WEB', 'Site web', 60, now())
+     ON CONFLICT DO NOTHING RETURNING id`,
+  );
+  canalSiteWebPose = pose?.id ?? null;
 });
 
 test.afterAll(async () => {
@@ -94,29 +103,38 @@ test.afterAll(async () => {
   // `import_jobs` retient son demandeur : sans ce ménage, la suite ne peut plus
   // supprimer ses comptes à la fin.
   await ecrire('DELETE FROM import_jobs WHERE "fileName" = $1', [NOM_CLASSEUR]);
+  if (canalSiteWebPose !== null) {
+    await ecrire('DELETE FROM canaux_provenance WHERE id = $1', [canalSiteWebPose]);
+  }
   await rm(dossier, { recursive: true, force: true });
 });
 
 test.describe('parité imports, un export de campagne entre tel quel', () => {
   test.use({ storageState: administrateur.etat });
 
-  test('la provenance décide du canal et du projet, la campagne inconnue est refusée', async ({
+  test('la provenance décide du canal et du projet, la campagne inconnue reste Grand Public', async ({
     page,
   }) => {
     await page.goto('/admin/imports');
-    await deposerClasseur(page, 'Prospects Grand Public', classeur);
-    await appliquerImport(page, 'Créer 2 prospects Grand Public', 'Appliqué');
+    await deposerClasseur(page, 'Leads Marketing (SharePoint / Adhésions)', classeur);
+    await appliquerImport(page, 'Créer 3 prospects Grand Public', 'Appliqué');
 
     const fiches = await fichesDuClasseur();
-    expect(fiches, 'la campagne inconnue ne doit rien écrire').toHaveLength(2);
-    expect(fiches[0]).toMatchObject({
+    expect(fiches).toHaveLength(3);
+    expect(fiches[0], 'la campagne inconnue entre sans canal').toMatchObject({
+      projet: 'GRAND_PUBLIC',
+      email: `awa.${cle}@example.sn`,
+      canal: null,
+      parcours: 1,
+    });
+    expect(fiches[1]).toMatchObject({
       projet: 'GRAND_PUBLIC',
       email: `fatou.${cle}@example.sn`,
       canal: 'Site web',
       lead: JOUR_DU_LEAD,
       parcours: 1,
     });
-    expect(fiches[1]).toMatchObject({
+    expect(fiches[2]).toMatchObject({
       projet: 'CHUES',
       email: `moussa.${cle}@example.sn`,
       canal: 'Meta (Facebook et Instagram)',
@@ -132,9 +150,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await page.goto('/chues/campagnes');
     await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
     const dialogue = page.getByRole('dialog');
-    await dialogue.getByRole('radio', { name: /Fiches importées/u }).check();
+    await dialogue.getByText('Fiches importées', { exact: true }).click();
+    await expect(dialogue.getByRole('radio', { name: /Fiches importées/u })).toBeChecked();
     await dialogue.getByRole('combobox', { name: 'Import', exact: true }).click();
-    await page.getByRole('option', { name: NOM_CLASSEUR }).click();
+    await page.getByRole('option', { name: ONGLET }).click();
     await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Tout décocher' }).click();
     await dialogue.getByRole('checkbox', { name: teleconseiller.nom, exact: true }).check();
@@ -143,8 +162,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
 
     await expect(page).toHaveURL(/\/chues\/campagnes\/[0-9a-f-]+$/u);
     lotId = page.url().split('/').at(-1) ?? null;
-    await expect(page.getByRole('heading', { level: 2, name: /^Import CHUES du/u })).toBeVisible();
-    await expect(page.getByText('CHUES, fiches importées')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { level: 2, name: new RegExp(`^${ONGLET}, `, 'u') }),
+    ).toBeVisible();
+    await expect(page.getByText(`CHUES, ${ONGLET}`)).toBeVisible();
 
     const contexte = await browser.newContext({ storageState: teleconseiller.etat });
     const console = await contexte.newPage();
