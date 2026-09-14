@@ -723,6 +723,14 @@ function etapeCourante(
 const surSelect = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe !== null;
 
+/** Grand Public : le dossier reste ouvert sous un statut qui n'est pas l'adhésion. */
+const dossierOuvertSansAdhesion = (
+  statutParSelect: boolean,
+  conversion: ConversionDraft | null,
+  motif: MotifAppel | null,
+): boolean =>
+  statutParSelect && conversion !== null && motif !== null && motif.effect !== 'CLOSE_METHOD';
+
 /** Grand Public : « Joignable » ouvre en plus le dossier sous le select. */
 const surJoignable = (groupe: Groupe | null, statutParSelect: boolean): boolean =>
   statutParSelect && groupe === 'joignable';
@@ -803,7 +811,9 @@ export function Consignation({
       // EB-10 : le brouillon part AVANT la tentative, qui referme l'ouverture et
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
-      if (draft.outcome === 'CALLBACK' && ouverture !== null) {
+      const garderBrouillon =
+        draft.outcome === 'CALLBACK' || (draft.method === null && conversion !== null);
+      if (garderBrouillon && ouverture !== null) {
         // La borne vient d'ici et non de l'horloge du serveur : la base exige
         // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.
         await enregistrerBrouillon(
@@ -862,7 +872,7 @@ export function Consignation({
     if (send.isPending) return;
     setSlots(null);
     setConversionErrors({});
-    setConversion(conversionFrom(prospect));
+    setConversion((draft) => draft ?? conversionFrom(prospect));
   }, [send.isPending, prospect]);
 
   const submitConversion = useCallback(() => {
@@ -915,12 +925,14 @@ export function Consignation({
         ouvrirDossier();
         return;
       }
-      setConversion(null);
-      setConversionErrors({});
+      if (groupe !== 'joignable') {
+        setConversion(null);
+        setConversionErrors({});
+      }
       if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else setSlots(null);
     },
-    [send.isPending, ouvrirDossier, startCallback],
+    [send.isPending, groupe, ouvrirDossier, startCallback],
   );
 
   // L'échéance passe devant le dossier : ouverte par-dessus lui, c'est elle que
@@ -935,7 +947,7 @@ export function Consignation({
       if (motif !== null) record(motif, null, iso);
       return;
     }
-    if (conversion !== null) {
+    if (conversion !== null && (motif === null || motif.effect === 'CLOSE_METHOD')) {
       submitConversion();
       return;
     }
@@ -944,6 +956,7 @@ export function Consignation({
 
   const surStatut = surSelect(groupe, statutParSelect);
   const etape = etapeCourante(conversion, slots, groupe, surStatut);
+  const dossierSansAdhesion = dossierOuvertSansAdhesion(statutParSelect, conversion, motif);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
 
   const annuler = useCallback(() => {
@@ -1110,7 +1123,7 @@ export function Consignation({
         )}
 
         <PiedAppel
-          etape={etape}
+          etape={dossierSansAdhesion ? 'statut' : etape}
           disabled={send.isPending}
           statutPose={motif !== null}
           onValidate={validate}
@@ -1118,7 +1131,7 @@ export function Consignation({
         />
 
         <PiedDossier
-          ouvert={etape === 'dossier'}
+          ouvert={etape === 'dossier' && !dossierSansAdhesion}
           disabled={send.isPending}
           motifRefus={motifRefus}
           onAdhesion={submitConversion}
@@ -1241,7 +1254,7 @@ export function Consignation({
         />
 
         <PiedDossier
-          ouvert={etape === 'dossier'}
+          ouvert={etape === 'dossier' && !dossierSansAdhesion}
           disabled={send.isPending}
           motifRefus={motifRefus}
           onAdhesion={submitConversion}

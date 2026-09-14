@@ -181,6 +181,28 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(page).toHaveURL(new RegExp(`/grand-public/appel/${prospectGrandPublic}$`));
     await expect(page.getByRole('heading', { name: `GP ${cle} Ousmane`, level: 2 })).toBeVisible();
 
+    await page.getByRole('group').getByRole('button', { name: '1 Joignable', exact: true }).click();
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
+    await page.getByRole('button', { name: 'Retour', exact: true }).click();
+    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
+    await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await expect(page.getByRole('textbox', { name: /^Nom/ })).toHaveValue(`Dossier ${cle}`);
+    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await page.getByRole('textbox').fill('Souhaite recevoir les informations.');
+    await page.getByRole('button', { name: /Enregistrer l’appel/ }).click();
+    await expect(page).toHaveURL(/\/grand-public$/);
+    const appel = await ligne<{ code: string; nom: string }>(
+      `SELECT r.code, o.draft->'conversion'->>'nom' AS nom
+         FROM call_attempts a
+         JOIN call_outcome_reasons r ON r.id = a."reasonId"
+         JOIN ouvertures_fiche o ON o."closingAttemptId" = a.id
+        WHERE a."prospectId" = $1`,
+      [prospectGrandPublic],
+    );
+    expect(appel).toEqual({ code: 'INTERESSE', nom: `Dossier ${cle}` });
+
     await page.goto(`/grand-public/${prospectGrandPublic}`);
     await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
