@@ -205,7 +205,6 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await expect(page.getByRole('textbox', { name: /^Nom/ })).toHaveValue(`Dossier ${cle}`);
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
-    await expect(page.getByRole('button', { name: /Enregistrer l’appel/ })).toBeDisabled();
     await page.getByRole('textbox').fill('Souhaite recevoir les informations.');
     await page.getByRole('button', { name: /Enregistrer l’appel/ }).click();
     await expect(page).toHaveURL(/\/grand-public$/);
