@@ -114,7 +114,9 @@ function ContenuRappelPopUp({
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 Le créneau est atteint. Toutes les informations utiles sont ci-dessous.
-                {enAttente > 1 ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.` : ''}
+                {enAttente > 1
+                  ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.`
+                  : ''}
               </DialogDescription>
             </div>
           </div>
@@ -253,11 +255,15 @@ export function RappelPopUpIntrusif() {
     setTriggeredIds((previous) => new Set([...previous, ...newlyOverdue.map(({ id }) => id)]));
   }, [callbacks, overdueQuery.isSuccess]);
 
+  const enAttenteIds = callbacks
+    .filter(
+      (callback) =>
+        triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
+    )
+    .map(({ id }) => id);
   const activeCallback: Rappel | null =
-    callbacks.find((c) => triggeredIds.has(c.id) && !dismissedIds.has(c.id) && c.overdue) ?? null;
-  const enAttente = callbacks.filter(
-    (callback) => triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
-  ).length;
+    callbacks.find((callback) => callback.id === enAttenteIds[0]) ?? null;
+  const enAttente = enAttenteIds.length;
 
   useEffect(() => {
     if (!activeCallback) return;
@@ -271,13 +277,14 @@ export function RappelPopUpIntrusif() {
 
   if (!activeCallback) return null;
 
-  const ignorerRappel = () => {
-    setDismissedIds((prev) => new Set([...prev, activeCallback.id]));
+  // Une file de rappels en retard ne doit pas bloquer l'écran : « Plus tard » les écarte tous.
+  const reporterTout = () => {
+    setDismissedIds((prev) => new Set([...prev, ...enAttenteIds]));
   };
 
   const annulerRappel = (id: string) => {
     cancelMutation.mutate(id);
-    ignorerRappel();
+    setDismissedIds((prev) => new Set([...prev, id]));
   };
 
   return (
@@ -285,7 +292,7 @@ export function RappelPopUpIntrusif() {
       callback={activeCallback}
       serverTimeMs={serverTimeMs}
       racine={racine}
-      onIgnorer={ignorerRappel}
+      onIgnorer={reporterTout}
       onAnnuler={annulerRappel}
       isPendingCancel={cancelMutation.isPending}
       enAttente={enAttente}
