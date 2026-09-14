@@ -81,6 +81,7 @@ interface ContenuRappelProps {
   readonly onIgnorer: () => void;
   readonly onAnnuler: (id: string) => void;
   readonly isPendingCancel: boolean;
+  readonly enAttente: number;
 }
 
 function ContenuRappelPopUp({
@@ -90,6 +91,7 @@ function ContenuRappelPopUp({
   onIgnorer,
   onAnnuler,
   isPendingCancel,
+  enAttente,
 }: ContenuRappelProps) {
   const retardMs = serverTimeMs - Date.parse(callback.scheduledAt);
   const retardTxt = retardMs > 0 ? formatDelay(retardMs) : null;
@@ -112,6 +114,7 @@ function ContenuRappelPopUp({
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 Le créneau est atteint. Toutes les informations utiles sont ci-dessous.
+                {enAttente > 1 ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.` : ''}
               </DialogDescription>
             </div>
           </div>
@@ -179,7 +182,7 @@ function ContenuRappelPopUp({
             className="gap-1.5 text-destructive hover:bg-destructive/10"
           >
             <XCircleIcon className="h-4 w-4" />
-            Annuler rappel
+            Annuler ce rappel
           </Button>
 
           <Link
@@ -238,6 +241,7 @@ export function RappelPopUpIntrusif() {
     if (!initializedRef.current) {
       initializedRef.current = true;
       overdueIdsRef.current = overdueIds;
+      setTriggeredIds(overdueIds);
       return;
     }
 
@@ -251,6 +255,9 @@ export function RappelPopUpIntrusif() {
 
   const activeCallback: Rappel | null =
     callbacks.find((c) => triggeredIds.has(c.id) && !dismissedIds.has(c.id) && c.overdue) ?? null;
+  const enAttente = callbacks.filter(
+    (callback) => triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
+  ).length;
 
   useEffect(() => {
     if (!activeCallback) return;
@@ -281,6 +288,7 @@ export function RappelPopUpIntrusif() {
       onIgnorer={ignorerRappel}
       onAnnuler={annulerRappel}
       isPendingCancel={cancelMutation.isPending}
+      enAttente={enAttente}
     />
   );
 }

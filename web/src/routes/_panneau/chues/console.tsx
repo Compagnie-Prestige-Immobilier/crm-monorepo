@@ -16,5 +16,8 @@ function Loading() {
 
 /** La page `(panel)/chues/console` de la v1. */
 function ConsolePage() {
-  return <ConsoleView projet="CHUES" />;
+  const { user } = Route.useRouteContext();
+  const canCreateProspect = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
+
+  return <ConsoleView projet="CHUES" canCreateProspect={canCreateProspect} />;
 }

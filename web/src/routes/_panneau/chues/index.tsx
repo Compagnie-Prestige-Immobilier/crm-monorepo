@@ -40,7 +40,10 @@ function ProjetChuesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <HubView prenom={user.fullName.split(' ')[0] ?? user.fullName} />
+      <HubView
+        prenom={user.fullName.split(' ')[0] ?? user.fullName}
+        canCreateProspect={['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role)}
+      />
       <LienFormulairePublic />
     </div>
   );

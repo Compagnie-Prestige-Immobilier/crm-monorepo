@@ -279,9 +279,8 @@ type seedCallOutcomeReason struct {
 	sortOrder, minPayloadVersion                       int32
 }
 
-// Les six premiers reprennent CallOutcome à l'identique, en version 1 : les
-// téléphones déjà déployés ne savent émettre qu'eux. Les suivants servent
-// l'écran d'appel Grand Public, qui les fige.
+// Ces motifs sont le référentiel actif de qualification des prospects. Les
+// anciens motifs restent en base pour préserver l'historique, mais sont désactivés.
 const (
 	seedCouleurWarning = "warning"
 	seedCouleurSuccess = "success"
@@ -290,21 +289,18 @@ const (
 )
 
 var seedCallOutcomeReasons = []seedCallOutcomeReason{
-	{"METHOD_OBTAINED", "Méthode obtenue", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 10, 1},
-	{string(db.CallOutcomeCALLBACK), "À rappeler", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, false, true, 20, 1},
-	{"UNREACHABLE", "Injoignable", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 30, 1},
-	{"REFUSED", "Refus", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 40, 1},
-	{"WRONG_NUMBER", "Faux numéro", seedCouleurDanger, db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, true, 50, 1},
-	{string(db.CallOutcomeOTHER), seedLibelleAutre, "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 60, 1},
-	{"PAS_DE_REPONSE", "Pas de réponse", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 31, 8},
-	{"NUMERO_OCCUPE", "Occupé", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 32, 8},
-	{"MESSAGERIE", "Messagerie", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 33, 8},
-	{"TELEPHONE_INDISPONIBLE", "Téléphone indisponible", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 34, 8},
-	{"INJOIGNABLE_DEFINITIF", "Injoignable définitif", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 35, 8},
-	{"AUTRE_NON_JOINT", "Autre non joint", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, false, 36, 8},
-	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 45, 8},
-	{"INTERESSE", "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 15, 8},
-	{"RDV_AGENCE", "Prise de RDV d'information (Visite en agence)", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 16, 8},
+	{"REFUS_DEJA_ENGAGE", "Déjà engagé", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 10, 9},
+	{"REFUS_PAS_CONFIANCE", "Pas confiance", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 11, 9},
+	{"REFUS_MEFIANT", "Méfiant", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 12, 9},
+	{"REFUS_NE_VEUT_PAS", "Ne veut pas", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 13, 9},
+	{"REFUS_PAS_POUR_LE_MOMENT", "Pas pour le moment", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 14, 9},
+	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 20, 9},
+	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 21, 9},
+	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
+	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 23, 9},
+	{"PARTENARIAT", "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
+	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, true, false, true, 25, 9},
+	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 26, 9},
 }
 
 type seedCanalProvenance struct {
