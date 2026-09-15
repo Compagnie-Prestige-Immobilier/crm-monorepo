@@ -5,6 +5,7 @@ import { Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { Pages } from '@/components/console/rep-annuaire';
 import { EmptyState } from '@/components/empty-state';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -22,7 +23,8 @@ const PAGE_SIZE = 50;
 export function ArchivesView() {
   const client = useQueryClient();
   const [aDetruire, setADetruire] = useState<{ id: string; nom: string } | null>(null);
-  const archives = useQuery(visitesArchiveesQuery(1, PAGE_SIZE));
+  const [page, setPage] = useState(1);
+  const archives = useQuery(visitesArchiveesQuery(page, PAGE_SIZE));
 
   const destruction = useMutation({
     mutationFn: (id: string) => detruireVisite(id),
@@ -81,6 +83,7 @@ export function ArchivesView() {
           ))}
         </ul>
       )}
+      <Pages page={page} pageCount={archives.data.meta.pageCount} onPage={setPage} />
 
       <ConfirmDialog
         open={aDetruire !== null}

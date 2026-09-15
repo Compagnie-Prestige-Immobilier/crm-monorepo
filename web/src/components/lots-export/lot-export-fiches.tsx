@@ -58,6 +58,7 @@ const ETAT_LABELS: Record<LotExportFicheEtat, string> = {
   TRAITEE: 'Traitée',
   A_RAPPELER: 'À rappeler',
   PLATEFORME: 'Plateforme',
+  HORS_PROJET: 'Hors projet',
 };
 
 /** Une fiche traitée ne se déplace pas : le travail resterait au compteur d'un autre. */

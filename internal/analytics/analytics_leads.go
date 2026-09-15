@@ -36,7 +36,9 @@ type LeadTresInteresse struct {
 
 type LeadsImportes struct {
 	Imports []ImportDeLeads     `json:"imports"`
-	Fiches  []LeadTresInteresse `json:"fiches"`
+	Fiches  []LeadTresInteresse `json:"fiches" doc:"Les 500 plus récentes au plus."`
+	// Le tableau s'arrête à 500 lignes : ce nombre dit ce qu'il ne montre pas.
+	TotalFiches int `json:"totalFiches"`
 }
 
 type LeadsImportesOutput struct{ Body LeadsImportes }
@@ -50,9 +52,14 @@ func (s *service) leadsImportes(ctx context.Context, _ *struct{}) (*LeadsImporte
 	if err != nil {
 		return nil, err
 	}
+	total, err := s.Q.LeadsImportesInteressesTotal(ctx, motifsTresInteresse)
+	if err != nil {
+		return nil, err
+	}
 	corps := LeadsImportes{
-		Imports: make([]ImportDeLeads, 0, len(imports)),
-		Fiches:  make([]LeadTresInteresse, 0, len(fiches)),
+		Imports:     make([]ImportDeLeads, 0, len(imports)),
+		Fiches:      make([]LeadTresInteresse, 0, len(fiches)),
+		TotalFiches: int(total),
 	}
 	for _, ligne := range imports {
 		corps.Imports = append(corps.Imports, ImportDeLeads{

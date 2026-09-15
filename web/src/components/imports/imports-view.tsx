@@ -168,7 +168,7 @@ function applyLabel(job: ImportJob): string {
   if (job.createdRows > 0) {
     parts.push(`${formatNumber(job.createdRows)} création${job.createdRows > 1 ? 's' : ''}`);
   }
-  parts.push(`${formatNumber(job.updatedRows)} correction${job.updatedRows > 1 ? 's' : ''}`);
+  parts.push(`${formatNumber(job.updatedRows)} mise${job.updatedRows > 1 ? 's' : ''} à jour`);
   return `Appliquer ${parts.join(' et ')}`;
 }
 
@@ -525,6 +525,7 @@ function JobPanel({
 
       <AppliedBanner job={job} />
       <ErrorsCard job={job} />
+      <WarningsCard job={job} />
       <JobActions
         job={job}
         applying={applying}
@@ -618,27 +619,56 @@ function ErrorsCard({ job }: { job: ImportJob }) {
           {errorsCaption(report)} Le numéro est celui de la ligne dans le classeur, en-tête compris.
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="w-24">Ligne</TableHead>
-              <TableHead className="w-56">Colonne</TableHead>
-              <TableHead>Motif</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {report.errors.map((error, index) => (
-              <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
-                <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
-                <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>
-                <TableCell>{error.message}</TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </CardContent>
+      <TableLignes lignes={report.errors} />
     </Card>
+  );
+}
+
+/** Lues et écrites, mais corrigées, ignorées ou à vérifier : le classeur les dit. */
+function WarningsCard({ job }: { job: ImportJob }) {
+  const avertissements = job.report?.warnings ?? [];
+  if (job.report === null || avertissements.length === 0) return null;
+  const total = job.report.warningRows ?? avertissements.length;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-[1.0625rem]">
+          <AlertTriangleIcon className="size-4 text-warning" aria-hidden="true" />
+          Avertissements
+        </CardTitle>
+        <CardDescription>
+          {formatNumber(total)} ligne{total > 1 ? 's' : ''} corrigée{total > 1 ? 's' : ''}, ignorée
+          {total > 1 ? 's' : ''} ou à vérifier. Le numéro est celui de la ligne dans le classeur,
+          en-tête compris.
+        </CardDescription>
+      </CardHeader>
+      <TableLignes lignes={avertissements} />
+    </Card>
+  );
+}
+
+function TableLignes({ lignes }: { lignes: ImportJobReport['errors'] }) {
+  return (
+    <CardContent className="p-0">
+      <Table>
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            <TableHead className="w-24">Ligne</TableHead>
+            <TableHead className="w-56">Colonne</TableHead>
+            <TableHead>Motif</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lignes.map((ligne, index) => (
+            <TableRow key={`${String(ligne.rowNumber)}-${ligne.code}-${String(index)}`}>
+              <TableCell className="tabular-nums">{ligne.rowNumber}</TableCell>
+              <TableCell className="text-muted-foreground">{ligne.column ?? '–'}</TableCell>
+              <TableCell>{ligne.message}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </CardContent>
   );
 }
 

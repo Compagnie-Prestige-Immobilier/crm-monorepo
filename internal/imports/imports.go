@@ -119,6 +119,11 @@ type RapportImportDTO struct {
 	Truncated         bool                `json:"truncated"`
 	MaxReportedErrors int                 `json:"maxReportedErrors"`
 	Errors            []erreurLigneImport `json:"errors"`
+	// Une ligne lue mais corrigée, ignorée ou à vérifier : jamais refusée.
+	WarningRows int                 `json:"warningRows"`
+	Warnings    []erreurLigneImport `json:"warnings"`
+	// Le compte exact par code, que le plafond des lignes rapportées ne borne pas.
+	Compteurs map[string]int `json:"compteurs"`
 }
 
 type ImportJobDTO struct {
@@ -173,10 +178,16 @@ func versImportJobDTO(job *db.ImportJob) ImportJobDTO {
 		FailureCode: job.FailureCode, FailureMsg: job.FailureMsg, StartedAt: job.StartedAt,
 		FinishedAt: job.FinishedAt, ExpiresAt: job.ExpiresAt, CreatedAt: job.CreatedAt, UpdatedAt: job.UpdatedAt,
 	}
-	var rapport RapportImportDTO
-	if len(job.Report) > 0 && json.Unmarshal(job.Report, &rapport) == nil {
+	if len(job.Report) > 0 {
+		rapport := rapportDuTravailImport(job.Report)
 		if rapport.Errors == nil {
 			rapport.Errors = []erreurLigneImport{}
+		}
+		if rapport.Warnings == nil {
+			rapport.Warnings = []erreurLigneImport{}
+		}
+		if rapport.Compteurs == nil {
+			rapport.Compteurs = map[string]int{}
 		}
 		dto.Report = &rapport
 	}
@@ -394,12 +405,13 @@ type contexteImport struct {
 
 type bilanTrancheImport struct {
 	crees, misAJour, ignorees int
-	erreurs                   []erreurLigneImport
+	erreurs, avertissements   []erreurLigneImport
 }
 
 type totauxImport struct {
-	traitees, crees, misAJour, ignorees, refusees int32
-	erreurs                                       []erreurLigneImport
+	traitees, crees, misAJour, ignorees, refusees, avertis int32
+	erreurs, avertissements                                []erreurLigneImport
+	compteurs                                              map[string]int
 }
 
 type adaptateurImport struct {
@@ -495,11 +507,8 @@ func (s *service) consommerImport(ctx context.Context, job *db.ImportJob, jeton 
 			jobID: job.ID, demandeur: job.RequestedById,
 			region: s.Cfg.PhoneRegion, appliquer: job.Mode == db.ImportModeAPPLY,
 		},
-		totaux: totauxImport{
-			traitees: job.ProcessedRows, crees: job.CreatedRows, misAJour: job.UpdatedRows,
-			ignorees: job.SkippedRows, refusees: job.ErrorRows, erreurs: erreursDuRapportImport(job.Report),
-		},
-		saut: int(job.ProcessedRows), tranche: reglagesImports().tranche,
+		totaux: totauxRepris(job),
+		saut:   int(job.ProcessedRows), tranche: reglagesImports().tranche,
 	}
 	if course.etat, err = a.preparer(ctx, s.Q, course.contexte); err != nil {
 		return err
@@ -514,7 +523,7 @@ func (s *service) consommerImport(ctx context.Context, job *db.ImportJob, jeton 
 			return err
 		}
 	}
-	return s.terminerImport(ctx, job, jeton, course.totaux, course.vues)
+	return s.terminerImport(ctx, job, jeton, &course.totaux, course.vues)
 }
 
 func (c *courseImport) consommerLigne(ctx context.Context, numero int, cellules map[string]string) error {
@@ -584,18 +593,22 @@ func (c *courseImport) ecrireTranche(ctx context.Context) error {
 	c.totaux.ignorees += entier32Import(int64(bilan.ignorees))
 	c.totaux.refusees += entier32Import(int64(len(bilan.erreurs)))
 	c.totaux.erreurs = bornerErreursImport(c.totaux.erreurs, bilan.erreurs)
+	c.totaux.avertis += entier32Import(int64(len(bilan.avertissements)))
+	c.totaux.avertissements = bornerErreursImport(c.totaux.avertissements, bilan.avertissements)
+	compterCodesImport(c.totaux.compteurs, bilan.avertissements)
 	c.tampon, c.consommees = nil, 0
 	c.s.Live.Emettre("imports")
 	return nil
 }
 
-func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton string, totaux totauxImport, vues int) error {
+func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton string, totaux *totauxImport, vues int) error {
 	rapport, err := json.Marshal(RapportImportDTO{
 		Kind: string(job.Kind), Mode: string(job.Mode), TotalRows: vues,
 		ProcessedRows: int(totaux.traitees), CreatedRows: int(totaux.crees),
 		UpdatedRows: int(totaux.misAJour), SkippedRows: int(totaux.ignorees),
 		ErrorRows: int(totaux.refusees), Truncated: int(totaux.refusees) > len(totaux.erreurs),
 		MaxReportedErrors: maxErreursImport, Errors: totaux.erreurs,
+		WarningRows: int(totaux.avertis), Warnings: totaux.avertissements, Compteurs: totaux.compteurs,
 	})
 	if err != nil {
 		return err
@@ -649,12 +662,32 @@ func bornerErreursImport(courantes, entrantes []erreurLigneImport) []erreurLigne
 	return fusion
 }
 
-func erreursDuRapportImport(brut []byte) []erreurLigneImport {
+func rapportDuTravailImport(brut []byte) RapportImportDTO {
 	var rapport RapportImportDTO
 	if len(brut) == 0 || json.Unmarshal(brut, &rapport) != nil {
-		return nil
+		return RapportImportDTO{}
 	}
-	return rapport.Errors
+	return rapport
+}
+
+// Une reprise repart des compteurs du travail, avertissements compris.
+func totauxRepris(job *db.ImportJob) totauxImport {
+	rapport := rapportDuTravailImport(job.Report)
+	compteurs := rapport.Compteurs
+	if compteurs == nil {
+		compteurs = map[string]int{}
+	}
+	return totauxImport{
+		traitees: job.ProcessedRows, crees: job.CreatedRows, misAJour: job.UpdatedRows,
+		ignorees: job.SkippedRows, refusees: job.ErrorRows, erreurs: rapport.Errors,
+		avertis: entier32Import(int64(rapport.WarningRows)), avertissements: rapport.Warnings, compteurs: compteurs,
+	}
+}
+
+func compterCodesImport(compteurs map[string]int, lignes []erreurLigneImport) {
+	for _, ligne := range lignes {
+		compteurs[ligne.Code]++
+	}
 }
 
 // ---------------------------------------------------------------- balayage
@@ -724,7 +757,9 @@ type dispositionFeuilleImport struct {
 	ligneEntete           int
 	premiereDonnee        int
 	repliFeuillesRemplies bool
-	exemples              []string
+	// Le classeur des leads nomme ses onglets par jour : tous se lisent.
+	toutesFeuilles bool
+	exemples       []string
 }
 
 // Sans disposition, l'en-tête et la ligne d'exemple du modèle sont sautés par
@@ -782,6 +817,9 @@ func lignesDeclareesImport(fichier *excelize.File, feuille string) *int32 {
 
 func (c *classeurImport) parcourir(sur func(ligne int, cellules map[string]string) error) error {
 	feuilles := c.fichier.GetSheetList()
+	if c.adaptateur.feuilles != nil && c.adaptateur.feuilles.toutesFeuilles {
+		return c.parcourirFeuillesRemplies(feuilles, sur)
+	}
 	if c.adaptateur.feuilles == nil || c.adaptateur.feuilles.motif == nil {
 		return c.parcourirFeuille(feuilles[0], false, sur)
 	}

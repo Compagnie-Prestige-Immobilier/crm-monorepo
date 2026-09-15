@@ -10,7 +10,7 @@ import (
 type CampagneFichesInput struct {
 	ID               string `path:"id" format:"uuid"`
 	TeleconseillerID string `query:"teleconseillerId" format:"uuid"`
-	Etat             string `query:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME"`
+	Etat             string `query:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME,HORS_PROJET"`
 	Page             int    `query:"page" minimum:"1" default:"1"`
 	PageSize         int    `query:"pageSize" minimum:"1" maximum:"200" default:"50"`
 }
@@ -113,9 +113,12 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traite
 			Etat:               lotEtatDe(traitees[ligne.Position], false),
 			StatutLabel:        lotStatutFiche(ligne.LastReasonLabel, ligne.LastCallOutcome),
 		})
-		if ligne.Plateforme {
-			fiches[len(fiches)-1].Etat = lotEtatPlateforme
-			fiches[len(fiches)-1].TeleconseillerName = "Retirée : plateforme"
+		derniere := &fiches[len(fiches)-1]
+		switch {
+		case ligne.Plateforme:
+			derniere.Etat, derniere.TeleconseillerName = lotEtatPlateforme, "Retirée : plateforme"
+		case ligne.HorsProjet:
+			derniere.Etat, derniere.TeleconseillerName = lotEtatHorsProjet, "Retirée : hors projet"
 		}
 	}
 	return fiches, nil

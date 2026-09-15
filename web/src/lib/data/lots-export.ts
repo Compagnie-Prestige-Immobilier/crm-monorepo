@@ -86,6 +86,25 @@ export async function fetchLotExportFiches(
   );
 }
 
+/**
+ * Toutes les fiches d'un état, page après page : une campagne de 3 000 fiches
+ * ne se confie pas sur les 200 premières sans le dire.
+ */
+export async function fetchLotExportFichesToutes(
+  id: string,
+  etat: NonNullable<LotExportFichesQuery['etat']>,
+  client: ApiClient = getApiClient(),
+): Promise<LotExportFiche[]> {
+  const taille = 200;
+  const premiere = await fetchLotExportFiches(id, { etat, page: 1, pageSize: taille }, client);
+  const suites = await Promise.all(
+    Array.from({ length: Math.max(0, premiere.pageCount - 1) }, (_, index) =>
+      fetchLotExportFiches(id, { etat, page: index + 2, pageSize: taille }, client),
+    ),
+  );
+  return premiere.items.concat(...suites.map((page) => page.items));
+}
+
 export async function reaffecterFiches(
   id: string,
   body: { positions: number[]; versTeleconseillerId: string },

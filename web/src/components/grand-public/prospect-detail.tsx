@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, PencilIcon, PhoneIcon } from 'lucide-react';
+import { ArrowLeftIcon, PencilIcon, PhoneCallIcon, PhoneIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
+import { HistoireDeLaFiche } from '@/components/prospects/histoire-fiche';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -51,6 +52,7 @@ import {
   type ProspectStatut,
   type Offer,
   type PaymentMode,
+  type Role,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -297,10 +299,12 @@ export function GrandPublicProspectDetail({
   prospect: initialProspect,
   offers: offersProp,
   canEdit: canEditProp,
+  role,
 }: {
   prospect: ProspectRow;
   offers?: Offer[];
   canEdit?: boolean;
+  role: Role;
 }) {
   const offers = offersProp ?? [];
   const canEdit = Boolean(canEditProp);
@@ -392,6 +396,15 @@ export function GrandPublicProspectDetail({
           <Badge variant={STATUT_VARIANT[journey.statut]} className="text-[0.8125rem]">
             {PROSPECT_STATUT_LABELS[journey.statut]}
           </Badge>
+          {canEdit ? (
+            <Link
+              href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
+              className={buttonVariants({ variant: 'default' })}
+            >
+              <PhoneCallIcon aria-hidden="true" />
+              Consigner un appel
+            </Link>
+          ) : null}
           <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
           <ActionsConsentement
             canEdit={canEdit}
@@ -470,11 +483,14 @@ export function GrandPublicProspectDetail({
             <Ligne label="Dernier appel">
               <DernierAppel prospect={prospect} />
             </Ligne>
+            <LigneSi label="Note du classeur" value={prospect.remarqueImport ?? null} />
           </dl>
         </CardContent>
       </Card>
 
       <ChampsAjoutes prospect={prospect} />
+
+      <HistoireDeLaFiche prospect={prospect} role={role} />
 
       <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
         <DialogContent>

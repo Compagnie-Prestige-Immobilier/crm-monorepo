@@ -98,24 +98,11 @@ func (s *service) creerProspectPlateforme(ctx context.Context, projet, base stri
 }
 
 func (s *service) retirerDesCampagnes(ctx context.Context, prospectID string) error {
-	lots, err := s.Q.LotsAttribuesDuProspect(ctx, &prospectID)
-	if err != nil || len(lots) == 0 {
-		return err
-	}
-	if err := s.Q.RetirerProspectDesCampagnes(ctx, &prospectID); err != nil {
-		return err
-	}
 	demandeur, err := s.Q.ImportDemandeurSysteme(ctx)
 	if err != nil {
 		return err
 	}
-	for _, lot := range lots {
-		if err := database.Auditer(ctx, s.Q, demandeur, "lot_export.plateforme", "lot_export", lot.LotId, nil,
-			map[string]any{"prospectId": prospectID, "position": lot.Position, "teleconseillerId": lot.AssigneeId}); err != nil {
-			return err
-		}
-	}
-	return nil
+	return database.PasserAuxCCP(ctx, s.Q, demandeur, prospectID)
 }
 
 func hoteDe(base string) *string {

@@ -1,35 +1,32 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import {
-  ArrowLeftIcon,
-  CalendarIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
-  CopyIcon,
-  PencilIcon,
-} from 'lucide-react';
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
+import { useSearchParams } from 'next/navigation';
+import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
-import { Chrono, copyPhone } from '@/components/console/console-ui';
+import { AUCUN_MOTIF, Palier, type Choix } from '@/components/console/console-paliers';
+import { Chrono, Kbd, copyPhone } from '@/components/console/console-ui';
+import { Commentaire } from '@/components/console/console-view';
+import {
+  ChampAnnuaire,
+  FiltreRelation,
+  ListeSkeleton,
+  Pages,
+  ResultatsAnnuaire,
+} from '@/components/console/rep-annuaire';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
-import { QueryErrorState } from '@/components/query-error-state';
+import { EtapesProgression } from '@/components/grand-public/etapes';
 import { AppelsRepresentant } from '@/components/representants/appels-representant';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -45,6 +42,7 @@ import {
 import { ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
+  fetchRepresentant,
   fetchRepresentantCallAttempts,
   fetchRepresentantsAQualifier,
   type ScriptedRepresentant,
@@ -64,22 +62,13 @@ import {
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import {
-  REPRESENTANT_RELATION_CHOICES,
-  REPRESENTANT_RELATION_LABELS,
-  type RepresentantRelation,
-} from '@/lib/representant-filters';
+import type { RepresentantRelation } from '@/lib/representant-filters';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
 /** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
 type Resultat = 'JOIGNABLE' | 'INJOIGNABLE';
-
-const RESULTATS: readonly { valeur: Resultat; label: string }[] = [
-  { valeur: 'JOIGNABLE', label: 'Joignable' },
-  { valeur: 'INJOIGNABLE', label: 'Injoignable' },
-];
 
 const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']> = {
   REACHED: 'REACHED',
@@ -93,28 +82,15 @@ const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']>
 const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
   OUTCOME_PAR_EFFET[effect];
 
-/** Ces effets closent l'appel : le script reste posé, plus rien n'y est exigé. */
-const EFFETS_SANS_SCRIPT: readonly StatutQualificationEffect[] = [
-  'REFUSED',
-  'SCHEDULE_CALLBACK',
-  'WRONG_NUMBER',
-];
-
-const scriptExige = (effect: StatutQualificationEffect): boolean =>
-  !EFFETS_SANS_SCRIPT.includes(effect);
-
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
+  ['1 à 9', 'Répondre'],
+  ['Entrée', 'Continuer ou enregistrer'],
+  ['Échap', 'Pas précédent'],
   ['C', 'Copier le numéro'],
   ['E', 'Corriger la fiche'],
-  ['Échap', 'Revenir en arrière'],
 ];
 
 const digitsOf = (value: string): number => value.replace(/\D/gu, '').length;
-
-function recapOuiNon(value: boolean | null): string | null {
-  if (value === null) return null;
-  return value ? 'Oui' : 'Non';
-}
 
 function recapEtablissement(confirme: boolean | null, nouvel: string): string | null {
   if (confirme === null) return null;
@@ -141,14 +117,6 @@ const RELATIONS_DEMANDEES: Record<RepresentantRelation, RepresentantRelation[]> 
   AMBASSADEUR: ['AMBASSADEUR'],
   REFUS: ['REFUS'],
 };
-
-const RELATION_ITEMS = [
-  { value: 'tous', label: 'Tous' },
-  ...REPRESENTANT_RELATION_CHOICES.map((relation) => ({
-    value: relation,
-    label: REPRESENTANT_RELATION_LABELS[relation],
-  })),
-];
 
 function parametresAnnuaire(
   cherche: string,
@@ -184,14 +152,24 @@ function critereEnCoursDe(cherche: string, relation: RepresentantRelation | null
  */
 export function RepScript() {
   const queryClient = useQueryClient();
+  const searchParams = useSearchParams();
 
   const [choisi, setChoisi] = useState<Ouverte | null>(null);
-  const [aConfirmer, setAConfirmer] = useState<ScriptedRepresentant | null>(null);
+  const [visee, setVisee] = useState<ScriptedRepresentant | null>(null);
+  // La fiche nommée dans l'URL, depuis « Consigner un appel » de sa page.
+  const [demandee, setDemandee] = useState<string | null>(searchParams.get('fiche'));
   const [search, setSearch] = useState('');
   const [relation, setRelation] = useState<RepresentantRelation | null>(null);
   const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
+
+  const parLien = useQuery({
+    queryKey: queryKeys.representant(demandee ?? ''),
+    queryFn: () => fetchRepresentant(demandee ?? ''),
+    enabled: demandee !== null,
+    retry: false,
+  });
 
   const annuaire = useQuery({
     queryKey: [...queryKeys.representantsRoot, 'a-qualifier', cherche, relation, page] as const,
@@ -200,8 +178,7 @@ export function RepScript() {
     placeholderData: (previous) => previous,
   });
 
-  const liste = annuaire.data?.items ?? [];
-  const pageCount = annuaire.data?.pageCount ?? 1;
+  const { liste, pageCount } = pagesDe(annuaire.data);
 
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
@@ -210,7 +187,8 @@ export function RepScript() {
     }),
     onSuccess: (ouverte) => {
       setConfirme(null);
-      setAConfirmer(null);
+      setVisee(null);
+      setDemandee(null);
       setChoisi(ouverte);
       queryClient.setQueryData(queryKeys.ouvertureCourante, ouverte.ouverture);
     },
@@ -219,15 +197,20 @@ export function RepScript() {
     },
   });
 
+  const aConfirmer = ficheVisee(visee, demandee, parLien.data);
   const tranchee = aConfirmer === null ? null : relationTrancheeTexte(aConfirmer);
 
   function fermerConfirmation(ouvert: boolean): void {
-    if (!ouvert) setAConfirmer(null);
+    if (ouvert) return;
+    setVisee(null);
+    setDemandee(null);
   }
 
   function confirmerOuverture(): void {
     if (aConfirmer !== null) ouvrir.mutate(aConfirmer);
   }
+
+  if (chargementParLien(demandee, parLien.isPending)) return <ListeSkeleton />;
 
   if (choisi !== null) {
     return (
@@ -254,11 +237,7 @@ export function RepScript() {
 
   return (
     <div className="flex w-full flex-col gap-5">
-      {confirme === null ? null : (
-        <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
-          Appel enregistré pour {confirme}.
-        </p>
-      )}
+      <BandeauConfirme nom={confirme} />
 
       <div className="flex flex-wrap items-end gap-3">
         <div className="min-w-[16rem] flex-1">
@@ -283,10 +262,10 @@ export function RepScript() {
         annuaire={annuaire}
         liste={liste}
         critereEnCours={critereEnCoursDe(cherche, relation)}
-        onOuvrir={setAConfirmer}
+        onOuvrir={setVisee}
       />
 
-      {pageCount > 1 ? <Pages page={page} pageCount={pageCount} onPage={setPage} /> : null}
+      <Pages page={page} pageCount={pageCount} onPage={setPage} />
 
       <ConfirmDialog
         open={aConfirmer !== null}
@@ -310,184 +289,221 @@ interface Ouverte {
   ouverture: OuvertureFiche;
 }
 
-function ResultatsAnnuaire({
-  annuaire,
-  liste,
-  critereEnCours,
-  onOuvrir,
-}: {
-  annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchRepresentantsAQualifier>>>;
-  liste: readonly ScriptedRepresentant[];
-  critereEnCours: boolean;
-  onOuvrir: (row: ScriptedRepresentant) => void;
-}) {
-  if (annuaire.isError) {
-    return (
-      <QueryErrorState
-        error={annuaire.error}
-        fallback="L’annuaire n’a pas pu être lu."
-        onRetry={() => {
-          void annuaire.refetch();
-        }}
-      />
-    );
-  }
+/** La fiche cliquée dans l'annuaire, sinon celle que l'URL demande une fois lue. */
+function ficheVisee(
+  visee: ScriptedRepresentant | null,
+  demandee: string | null,
+  lue: ScriptedRepresentant | undefined,
+): ScriptedRepresentant | null {
+  if (visee !== null) return visee;
+  if (demandee === null) return null;
+  return lue ?? null;
+}
 
-  if (annuaire.isPending) {
-    return (
-      <div className="flex flex-col gap-2">
-        <Skeleton className="h-14" />
-        <Skeleton className="h-14" />
-        <Skeleton className="h-14" />
-      </div>
-    );
-  }
+const chargementParLien = (demandee: string | null, isPending: boolean): boolean =>
+  demandee !== null && isPending;
 
-  if (liste.length === 0) {
-    return (
-      <p className="text-[0.9375rem]">
-        {critereEnCours
-          ? 'Aucun résultat parmi vos fiches. Vérifiez le nom ou le numéro, ou demandez une campagne.'
-          : 'Aucune fiche ne vous est attribuée. Demandez une campagne.'}
-      </p>
-    );
-  }
+function pagesDe(data: Awaited<ReturnType<typeof fetchRepresentantsAQualifier>> | undefined): {
+  liste: ScriptedRepresentant[];
+  pageCount: number;
+} {
+  return { liste: data?.items ?? [], pageCount: data?.pageCount ?? 1 };
+}
 
+/** Le bandeau que l'annuaire pose après une qualification enregistrée. */
+function BandeauConfirme({ nom }: { nom: string | null }) {
+  if (nom === null) return null;
   return (
-    <ol className="flex flex-col gap-2">
-      {liste.map((row) => (
-        <li key={row.id}>
-          <button
-            type="button"
-            onClick={() => {
-              onOuvrir(row);
-            }}
-            className={cn(
-              'flex w-full flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-md border border-border px-3 py-3 text-left',
-              'hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-            )}
-          >
-            <span className="flex min-w-0 flex-col gap-0.5">
-              <span className="truncate text-[0.9375rem] font-[600]">{row.fullName}</span>
-              <span className="text-[0.8125rem] text-muted-foreground">
-                <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
-                  {formatPhone(row.phoneE164)}
-                </span>
-                {row.departementName === null ? '' : ` · ${row.departementName}`}
-              </span>
-            </span>
-            <RelationBadge
-              status={row.relationStatus}
-              label={row.statutQualificationLabel}
-              effect={row.statutQualificationEffect}
-              lastCallOutcome={row.lastCallOutcome}
-            />
-          </button>
-        </li>
-      ))}
-    </ol>
+    <p role="status" className={cn('text-[0.875rem] font-[600] text-accent-text', REVELE)}>
+      Appel enregistré pour {nom}.
+    </p>
   );
 }
 
-function FiltreRelation({
+type Pas =
+  | 'reponse'
+  | 'ecole'
+  | 'contacte'
+  | 'ues'
+  | 'syndicat'
+  | 'representant'
+  | 'whatsapp'
+  | 'statut'
+  | 'precision'
+  | 'echeance'
+  | 'recommande'
+  | 'note';
+
+const LIBELLES_PAS: Readonly<Record<Pas, string>> = {
+  reponse: 'Réponse',
+  ecole: 'École',
+  contacte: 'Contacté',
+  ues: 'UES',
+  syndicat: 'Syndicat',
+  representant: 'Représentant',
+  whatsapp: 'WhatsApp',
+  statut: 'Statut',
+  precision: 'Précision',
+  echeance: 'Rappel',
+  recommande: 'Recommandé',
+  note: 'Note',
+};
+
+/** Les questions qui se tranchent d'un clic ; le statut a la sienne selon la branche. */
+const QUESTIONS_PAS: Readonly<Partial<Record<Pas, string>>> = {
+  reponse: 'Avez-vous eu la personne au téléphone ?',
+  ecole: 'L’école de la fiche est-elle la bonne ?',
+  contacte: 'A-t-il déjà été contacté par CPI ?',
+  ues: 'Connaît-il l’UES ?',
+  representant: 'Accepte-t-il d’être représentant CHUES ?',
+  whatsapp: 'A-t-il WhatsApp sur ce numéro ?',
+  precision: 'Quelle précision ?',
+};
+
+const questionDe = (pas: Pas, joignable: boolean): string | null => {
+  if (pas !== 'statut') return QUESTIONS_PAS[pas] ?? null;
+  return joignable ? 'Quel statut de qualification ?' : 'Pourquoi n’a-t-il pas répondu ?';
+};
+
+interface Suite {
+  libelle: string;
+  passer?: string;
+}
+
+const CONTINUER: Suite = { libelle: 'Continuer' };
+
+const SUITE_PAS: Readonly<Partial<Record<Pas, Suite>>> = {
+  syndicat: { libelle: 'Continuer', passer: 'Sans syndicat' },
+  precision: { libelle: 'Sans précision' },
+  echeance: CONTINUER,
+  recommande: { libelle: 'Continuer', passer: 'Personne à proposer' },
+  note: { libelle: 'Enregistrer l’appel' },
+};
+
+/** Le bouton de suite : les pas sans clic unique, et ceux dont la réponse ouvre un champ. */
+function suiteDe(
+  pas: Pas,
+  etat: { ecoleInfirmee: boolean; autreWhatsapp: boolean; statutRetenu: boolean },
+): Suite | null {
+  switch (pas) {
+    case 'ecole':
+      return etat.ecoleInfirmee ? CONTINUER : null;
+    case 'whatsapp':
+      return etat.autreWhatsapp ? CONTINUER : null;
+    case 'statut':
+      return etat.statutRetenu ? CONTINUER : null;
+    default:
+      return SUITE_PAS[pas] ?? null;
+  }
+}
+
+/** Le parcours, recalculé à chaque réponse : la suite dépend de ce qui vient d'être dit. */
+function parcoursDe(
+  resultat: Resultat | null,
+  ambassadeur: boolean | null,
+  avecPrecision: boolean,
+  avecEcheance: boolean,
+): Pas[] {
+  const pas: Pas[] = ['reponse'];
+  if (resultat === 'JOIGNABLE') {
+    pas.push('ecole', 'contacte', 'ues', 'syndicat', 'representant');
+    if (ambassadeur === true) pas.push('whatsapp');
+  }
+  pas.push('statut');
+  if (avecPrecision) pas.push('precision');
+  if (avecEcheance) pas.push('echeance');
+  if (resultat === 'JOIGNABLE' && ambassadeur === false) pas.push('recommande');
+  pas.push('note');
+  return pas;
+}
+
+const suivantDe = (pas: Pas, parcours: readonly Pas[]): Pas =>
+  parcours[parcours.indexOf(pas) + 1] ?? 'note';
+
+function choixOuiNon(
+  value: boolean | null,
+  choisir: (valeur: boolean) => void,
+  aides: readonly [string, string] | null = null,
+): Choix[] {
+  return [
+    {
+      cle: 'oui',
+      label: 'Oui',
+      ...(aides === null ? {} : { aide: aides[0] }),
+      actif: value === true,
+      choisir: () => {
+        choisir(true);
+      },
+    },
+    {
+      cle: 'non',
+      label: 'Non',
+      ...(aides === null ? {} : { aide: aides[1] }),
+      actif: value === false,
+      choisir: () => {
+        choisir(false);
+      },
+    },
+  ];
+}
+
+/** Ce que le statut entraîne, dit avant de cliquer. */
+function aideDuStatut(
+  statut: StatutQualification,
+  statuts: readonly StatutQualification[],
+): string | undefined {
+  if (sousStatutsDe(statuts, statut.id).length > 0) return 'Puis une précision';
+  if (dateDemandee(statut)) return 'Puis la date et l’heure';
+  if (exigeMotif(statut)) return 'Puis le motif';
+  return undefined;
+}
+
+const choixStatut = (
+  statut: StatutQualification,
+  statuts: readonly StatutQualification[],
+  actif: boolean,
+  choisir: () => void,
+): Choix => {
+  const aide = aideDuStatut(statut, statuts);
+  return {
+    cle: statut.id,
+    label: libelleStatut(statut),
+    ...(aide === undefined ? {} : { aide }),
+    actif,
+    choisir,
+  };
+};
+
+const raccourcisDe = (choix: readonly Choix[]): Record<string, () => void> =>
+  Object.fromEntries(choix.slice(0, 9).map((item, rang) => [String(rang + 1), item.choisir]));
+
+/** Un champ texte posé sous la réponse qui l'ouvre. */
+function ChampTexte({
+  id,
+  label,
   value,
+  inputMode,
+  placeholder,
   onChange,
 }: {
-  value: RepresentantRelation | null;
-  onChange: (valeur: RepresentantRelation | null) => void;
+  id: string;
+  label: string;
+  value: string;
+  inputMode?: 'tel';
+  placeholder?: string;
+  onChange: (valeur: string) => void;
 }) {
-  const id = useId();
-
   return (
-    <div className="flex min-w-[12rem] flex-col gap-1.5">
+    <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
       <label htmlFor={id} className="text-[0.875rem] font-[600]">
-        Qualification
-      </label>
-      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
-          VALEUR au lieu du libellé de la ligne choisie. */}
-      <Select
-        items={RELATION_ITEMS}
-        value={value ?? 'tous'}
-        onValueChange={(valeur) => {
-          if (valeur === null) return;
-          onChange(valeur === 'tous' ? null : (valeur as RepresentantRelation));
-        }}
-      >
-        <SelectTrigger id={id} className="h-12">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {RELATION_ITEMS.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function Pages({
-  page,
-  pageCount,
-  onPage,
-}: {
-  page: number;
-  pageCount: number;
-  onPage: (page: number) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-2">
-      <Button
-        type="button"
-        variant="outline"
-        disabled={page <= 1}
-        onClick={() => {
-          onPage(page - 1);
-        }}
-      >
-        <ChevronLeftIcon aria-hidden="true" />
-        Page précédente
-      </Button>
-      <span className="min-w-20 text-center text-[0.9375rem] tabular-nums">
-        {page} / {pageCount}
-      </span>
-      <Button
-        type="button"
-        variant="outline"
-        disabled={page >= pageCount}
-        onClick={() => {
-          onPage(page + 1);
-        }}
-      >
-        Page suivante
-        <ChevronRightIcon aria-hidden="true" />
-      </Button>
-    </div>
-  );
-}
-
-/** Le champ de recherche, en tête de la liste et jamais replié. */
-function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const champ = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    champ.current?.focus();
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor="rep-annuaire" className="text-[0.875rem] font-[600]">
-        Qui avez-vous appelé ?
+        {label}
       </label>
       <Input
-        id="rep-annuaire"
-        ref={champ}
-        type="search"
+        id={id}
         autoComplete="off"
-        placeholder="Chercher un représentant : nom ou numéro"
-        className="h-12 text-[1rem]"
+        maxLength={160}
+        {...(inputMode === undefined ? {} : { inputMode })}
+        {...(placeholder === undefined ? {} : { placeholder })}
         value={value}
         onChange={(event) => {
           onChange(event.target.value);
@@ -497,115 +513,44 @@ function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: s
   );
 }
 
-const OUI_NON = [
-  { valeur: true, label: 'Oui' },
-  { valeur: false, label: 'Non' },
-];
-
-interface QuestionsJoignableProps {
-  etablissementConfirme: boolean | null;
-  setEtablissementConfirme: (valeur: boolean | null) => void;
-  nouvelEtablissement: string;
-  setNouvelEtablissement: (valeur: string) => void;
-  contacte: boolean | null;
-  setContacte: (valeur: boolean | null) => void;
-  connaitUES: boolean | null;
-  setConnaitUES: (valeur: boolean | null) => void;
-  syndicatId: string | null;
-  setSyndicatId: (valeur: string | null) => void;
-  syndicatOptions: { value: string; label: string; hint: string }[];
-  ambassadeur: boolean | null;
-  setAmbassadeur: (valeur: boolean | null) => void;
-  memeWhatsapp: boolean | null;
-  setMemeWhatsapp: (valeur: boolean | null) => void;
-  whatsapp: string;
-  setWhatsapp: (valeur: string) => void;
-}
-
-/** Les questions qui n'ont de sens que si la personne a décroché. */
-function QuestionsJoignable(props: QuestionsJoignableProps) {
+/** Retour à chaque pas ; la suite quand le pas ne se tranche pas d'un clic. */
+function PiedPas({
+  premier,
+  suite,
+  disabled,
+  suiteDesactivee,
+  onRetour,
+  onSuite,
+  onPasser,
+}: {
+  premier: boolean;
+  suite: Suite | null;
+  disabled: boolean;
+  suiteDesactivee: boolean;
+  onRetour: () => void;
+  onSuite: () => void;
+  onPasser: () => void;
+}) {
   return (
-    <>
-      <Question titre="L’établissement de la fiche est-il confirmé ?" anime>
-        <Choix
-          options={OUI_NON}
-          value={props.etablissementConfirme}
-          onChange={(valeur) => {
-            props.setEtablissementConfirme(valeur);
-            if (valeur) props.setNouvelEtablissement('');
-          }}
-        />
-        {props.etablissementConfirme === false ? (
-          <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-            <label htmlFor="rep-etablissement" className="text-[0.875rem] font-[600]">
-              Nouvel établissement
-            </label>
-            <Input
-              id="rep-etablissement"
-              autoComplete="off"
-              maxLength={160}
-              value={props.nouvelEtablissement}
-              onChange={(event) => {
-                props.setNouvelEtablissement(event.target.value);
-              }}
-            />
-          </div>
-        ) : null}
-      </Question>
-
-      <Question titre="A-t-il déjà été contacté ?" anime>
-        <Choix options={OUI_NON} value={props.contacte} onChange={props.setContacte} />
-      </Question>
-
-      <Question titre="Connaît-il l’UES ?" anime>
-        <Choix options={OUI_NON} value={props.connaitUES} onChange={props.setConnaitUES} />
-      </Question>
-
-      <Question titre="Sur quel syndicat ? (facultatif)" anime>
-        <FilterCombobox
-          className="max-w-80"
-          label=""
-          placeholder="Choisir un syndicat"
-          value={props.syndicatId}
-          options={props.syndicatOptions}
-          onChange={props.setSyndicatId}
-        />
-      </Question>
-
-      <Question titre="Souhaite-t-il être représentant CHUES ?" anime>
-        <Choix
-          options={OUI_NON}
-          value={props.ambassadeur}
-          onChange={(valeur) => {
-            props.setAmbassadeur(valeur);
-            if (!valeur) props.setMemeWhatsapp(null);
-          }}
-        />
-      </Question>
-
-      {props.ambassadeur === true ? (
-        <Question titre="A-t-il WhatsApp sur ce numéro ?" anime>
-          <Choix options={OUI_NON} value={props.memeWhatsapp} onChange={props.setMemeWhatsapp} />
-          {props.memeWhatsapp === false ? (
-            <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-              <label htmlFor="rep-whatsapp" className="text-[0.875rem] font-[600]">
-                Numéro WhatsApp
-              </label>
-              <Input
-                id="rep-whatsapp"
-                inputMode="tel"
-                autoComplete="off"
-                placeholder="77 123 45 67"
-                value={props.whatsapp}
-                onChange={(event) => {
-                  props.setWhatsapp(event.target.value);
-                }}
-              />
-            </div>
-          ) : null}
-        </Question>
-      ) : null}
-    </>
+    <div className="flex flex-wrap items-center gap-2">
+      {premier ? null : (
+        <Button variant="outline" disabled={disabled} onClick={onRetour}>
+          Retour
+          <Kbd>Échap</Kbd>
+        </Button>
+      )}
+      {suite?.passer === undefined ? null : (
+        <Button variant="ghost" disabled={disabled} onClick={onPasser}>
+          {suite.passer}
+        </Button>
+      )}
+      {suite === null ? null : (
+        <Button disabled={disabled || suiteDesactivee} onClick={onSuite}>
+          {suite.libelle}
+          <Kbd>Entrée</Kbd>
+        </Button>
+      )}
+    </div>
   );
 }
 
@@ -677,236 +622,65 @@ function QuestionSuggestion({
   );
 }
 
-/**
- * Le vocabulaire du référentiel, borné à la branche que le résultat ouvre.
- * Deux paliers de tuiles : le statut, puis sa précision quand il en porte.
- */
-function ChoixStatut({
-  statuts,
-  value,
-  onChange,
-  pose,
-}: {
-  statuts: readonly StatutQualification[];
-  value: string | null;
-  onChange: (valeur: string | null) => void;
-  pose: StatutQualification | null;
-}) {
-  const { racines, valeurRacine, sousStatuts, sousStatutId } = deriverChoixStatut(
-    statuts,
-    value,
-    pose,
-  );
-  return (
-    <div className="flex flex-col gap-5 md:col-span-2">
-      <Question titre="Quel statut de qualification ?" anime>
-        <Choix
-          options={racines.map((statut) => ({ valeur: statut.id, label: libelleStatut(statut) }))}
-          value={valeurRacine ?? pose?.id ?? null}
-          onChange={onChange}
-        />
-        {pose === null || value !== null ? null : (
-          <p className="text-[0.8125rem] text-muted-foreground">
-            Posé par votre réponse. Choisissez-en un autre s’il y a lieu.
-          </p>
-        )}
-      </Question>
-      <ChoixSousStatut sousStatuts={sousStatuts} value={sousStatutId} onChange={onChange} />
-    </div>
-  );
-}
-
-/** Le premier niveau se choisit toujours ; la précision n'apparaît que s'il en porte. */
-function deriverChoixStatut(
-  statuts: readonly StatutQualification[],
-  value: string | null,
-  pose: StatutQualification | null,
-) {
-  const choisi = statuts.find((statut) => statut.id === value) ?? null;
-  const valeurRacine = choisi === null ? null : (choisi.parentId ?? choisi.id);
-  return {
-    racines: statutsRacine(statuts),
-    valeurRacine,
-    sousStatuts: sousStatutsDe(statuts, valeurRacine ?? pose?.id ?? null),
-    sousStatutId: choisi?.parentId === null ? null : value,
-  };
-}
-
-function ChoixSousStatut({
-  sousStatuts,
-  value,
-  onChange,
-}: {
-  sousStatuts: readonly StatutQualification[];
-  value: string | null;
-  onChange: (valeur: string | null) => void;
-}) {
-  if (sousStatuts.length === 0) return null;
-  return (
-    <Question titre="Une précision ? (facultatif)" anime>
-      <Choix
-        options={sousStatuts.map((statut) => ({ valeur: statut.id, label: statut.label }))}
-        value={value}
-        onChange={(id) => {
-          onChange(id === value ? (sousStatuts[0]?.parentId ?? null) : id);
-        }}
-      />
-    </Question>
-  );
-}
-
-interface EtapeQuestionsProps {
+interface Reponses {
   resultat: Resultat | null;
-  onResultat: (valeur: Resultat) => void;
-  statuts: readonly StatutQualification[];
-  statutId: string | null;
-  onStatut: (valeur: string | null) => void;
-  statutPose: StatutQualification | null;
-  exigeRappel: boolean;
-  joignable: boolean;
-  proposeQuelquUn: boolean;
-  questionsJoignable: QuestionsJoignableProps;
-  suggestion: SuggestionProps;
-  rappel: { now: number; value: string | null; onChange: (valeur: string | null) => void };
-  commentaire: string;
-  onCommentaire: (valeur: string) => void;
-  inputRef: React.RefObject<HTMLTextAreaElement | null>;
-  motifObligatoire: boolean;
-  manque: string | null;
-  onContinuer: () => void;
-}
-
-/** La première étape : les questions, dans l'ordre où l'appel les pose. */
-function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
-  return (
-    <div className="grid max-w-5xl gap-x-8 gap-y-5 md:grid-cols-2">
-      <div className="md:col-span-2">
-        <Question titre="Comment s’est passé l’appel ?">
-          <Choix
-            options={RESULTATS.map(({ valeur, label }) => ({ valeur, label }))}
-            value={props.resultat}
-            onChange={props.onResultat}
-          />
-        </Question>
-      </div>
-
-      {props.joignable ? <QuestionsJoignable {...props.questionsJoignable} /> : null}
-
-      {props.proposeQuelquUn ? <QuestionSuggestion {...props.suggestion} /> : null}
-
-      {props.resultat === null ? null : (
-        <ChoixStatut
-          statuts={props.statuts}
-          value={props.statutId}
-          onChange={props.onStatut}
-          pose={props.statutPose}
-        />
-      )}
-
-      {/* L'échéance ne se demande qu'au statut qui la réclame. Proposée sur
-          tout appel abouti, elle armait un rappel que personne n'avait promis,
-          et la fiche remontait dans « à rappeler » sans raison. */}
-      {props.exigeRappel ? (
-        <Question titre="Quand rappeler ?" anime>
-          <ChoixEcheance
-            now={props.rappel.now}
-            value={props.rappel.value}
-            onChange={props.rappel.onChange}
-          />
-        </Question>
-      ) : null}
-
-      {props.resultat === null ? null : (
-        <Question
-          titre={props.motifObligatoire ? 'Pourquoi ?' : 'Quelque chose à ajouter ? (facultatif)'}
-          anime
-        >
-          <div className="flex max-w-96 flex-col gap-1.5">
-            <label htmlFor="rep-commentaire" className="text-[0.875rem] font-[600]">
-              {props.motifObligatoire ? 'Motif' : 'Commentaire'}
-            </label>
-            <Textarea
-              id="rep-commentaire"
-              ref={inputRef}
-              rows={3}
-              maxLength={2000}
-              placeholder="En une phrase"
-              value={props.commentaire}
-              onChange={(event) => {
-                props.onCommentaire(event.target.value);
-              }}
-            />
-          </div>
-        </Question>
-      )}
-
-      <div className="flex flex-col gap-1.5 md:col-span-2">
-        <Button className="self-start" disabled={props.manque !== null} onClick={props.onContinuer}>
-          Continuer
-        </Button>
-        {props.manque === null ? null : (
-          <p className="text-[0.8125rem] text-muted-foreground">{props.manque}</p>
-        )}
-      </div>
-    </div>
-  );
-}
-
-interface RecapAppelProps {
-  representant: ScriptedRepresentant;
-  resultat: Resultat | null;
-  statutLabel: string | null;
-  joignable: boolean;
   etablissementConfirme: boolean | null;
   nouvelEtablissement: string;
   contacte: boolean | null;
   connaitUES: boolean | null;
   syndicatName: string;
   ambassadeur: boolean | null;
+  memeWhatsapp: boolean | null;
+  whatsapp: string;
+  statut: StatutQualification | null;
+  statuts: readonly StatutQualification[];
   rappelAt: string | null;
   now: number;
   personneProposee: string | null;
-  commentaire: string;
 }
 
-function RecapAppel(props: RecapAppelProps) {
-  return (
-    <dl className="flex flex-col gap-1 rounded-lg border border-border bg-card px-4 py-3 text-[0.875rem]">
-      <Recap intitule="Personne appelée" valeur={props.representant.fullName} />
-      <Recap intitule="Téléphone" valeur={formatPhone(props.representant.phoneE164)} />
-      <Recap
-        intitule="Résultat"
-        valeur={RESULTATS.find((item) => item.valeur === props.resultat)?.label ?? null}
-      />
-      <Recap intitule="Statut" valeur={props.statutLabel} />
-      {props.joignable ? (
-        <>
-          <Recap
-            intitule="Établissement"
-            valeur={recapEtablissement(props.etablissementConfirme, props.nouvelEtablissement)}
-          />
-          <Recap intitule="Déjà contacté" valeur={recapOuiNon(props.contacte)} />
-          <Recap intitule="Connaît l’UES" valeur={recapOuiNon(props.connaitUES)} />
-          {props.syndicatName === '' ? null : (
-            <Recap intitule="Syndicat" valeur={props.syndicatName} />
-          )}
-          <Recap
-            intitule="Souhaite être représentant CHUES"
-            valeur={recapOuiNon(props.ambassadeur)}
-          />
-        </>
-      ) : null}
-      {props.rappelAt === null ? null : (
-        <Recap intitule="Rappel" valeur={formatCallbackAt(props.rappelAt, props.now)} />
-      )}
-      {props.personneProposee === null ? null : (
-        <Recap intitule="Personne proposée" valeur={props.personneProposee} />
-      )}
-      {props.commentaire === '' ? null : (
-        <Recap intitule="Commentaire" valeur={props.commentaire} />
-      )}
-    </dl>
-  );
+function ouiNon(valeur: boolean | null, oui: string, non: string): string | null {
+  if (valeur === null) return null;
+  return valeur ? oui : non;
+}
+
+function recapEcole(confirme: boolean | null, nouvel: string): string | null {
+  const ecole = recapEtablissement(confirme, nouvel);
+  if (ecole === null) return null;
+  return ecole === 'Confirmé' ? 'École confirmée' : `École : ${ecole}`;
+}
+
+function recapWhatsapp(meme: boolean | null, numero: string): string | null {
+  if (meme === null) return null;
+  return meme ? 'WhatsApp sur ce numéro' : `WhatsApp : ${numero.trim() || 'à saisir'}`;
+}
+
+function recapStatut(
+  statut: StatutQualification | null,
+  statuts: readonly StatutQualification[],
+): string | null {
+  if (statut === null) return null;
+  const parent = statuts.find((ligne) => ligne.id === statut.parentId);
+  return parent === undefined
+    ? libelleStatut(statut)
+    : `${libelleStatut(parent)} › ${statut.label}`;
+}
+
+/** Ce qui est déjà tranché, rappelé au-dessus du pas en cours. */
+function recapDe(r: Reponses): string[] {
+  const lignes = [
+    ouiNon(r.resultat === null ? null : r.resultat === 'JOIGNABLE', 'A répondu', 'N’a pas répondu'),
+    recapEcole(r.etablissementConfirme, r.nouvelEtablissement),
+    ouiNon(r.contacte, 'Déjà contacté', 'Jamais contacté'),
+    ouiNon(r.connaitUES, 'Connaît l’UES', 'Ne connaît pas l’UES'),
+    r.syndicatName === '' ? null : r.syndicatName,
+    ouiNon(r.ambassadeur, 'Accepte d’être représentant', 'Refuse d’être représentant'),
+    recapWhatsapp(r.memeWhatsapp, r.whatsapp),
+    recapStatut(r.statut, r.statuts),
+    r.rappelAt === null ? null : `Rappel ${formatCallbackAt(r.rappelAt, r.now)}`,
+    r.personneProposee === null ? null : `Propose ${r.personneProposee}`,
+  ];
+  return lignes.filter((ligne): ligne is string => ligne !== null);
 }
 
 /** Ce qu'une relation DÉJÀ TRANCHÉE ajoute à la confirmation d'ouverture. */
@@ -927,16 +701,13 @@ function HistoriqueAppels({ representantId }: { representantId: string }) {
     queryFn: () => fetchRepresentantCallAttempts(representantId),
   });
 
-  if (appels.isPending) return <Skeleton className="h-20 w-full" />;
+  if (appels.isPending) return <Skeleton className="mt-2 h-20 w-full" />;
   if (appels.isError || appels.data.length === 0) return null;
 
   return (
-    <section className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
-      <h3 className="text-[0.875rem] font-[600]">Appels précédents</h3>
-      <div className="max-h-64 overflow-y-auto scrollbar-thin">
-        <AppelsRepresentant items={appels.data} />
-      </div>
-    </section>
+    <div className="mt-2 max-h-64 overflow-y-auto scrollbar-thin">
+      <AppelsRepresentant items={appels.data} />
+    </div>
   );
 }
 
@@ -963,7 +734,7 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
       </div>
 
       <div className="flex flex-wrap items-center gap-3">
-        <span className="select-all font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+        <span className="select-all font-display text-[1.5rem] font-[700] tracking-[-0.02em] tabular-nums">
           {formatPhone(representant.phoneE164)}
         </span>
         <Button
@@ -1027,57 +798,31 @@ function syndicatsDe(
   };
 }
 
-interface EtatManque {
+const TEXTE_MANQUE: Readonly<Partial<Record<Pas, string>>> = {
+  reponse: 'Dites d’abord si la personne a répondu.',
+  representant: 'Dites s’il accepte d’être représentant CHUES.',
+  statut: 'Choisissez un statut.',
+  note: 'Écrivez le motif.',
+  echeance: 'Choisissez quand rappeler.',
+};
+
+/** Le pas où il manque encore une réponse, ou rien : l'appel peut partir. */
+function pasManquant(etat: {
   resultat: Resultat | null;
   statut: StatutQualification | null;
   statutChoisi: StatutQualification | null;
-  joignable: boolean;
-  etablissementConfirme: boolean | null;
-  nouvelEtablissement: string;
-  contacte: boolean | null;
-  connaitUES: boolean | null;
   ambassadeur: boolean | null;
-  memeWhatsapp: boolean | null;
-  whatsapp: string;
-  rappelAt: string | null;
   commentaire: string;
-  proposeQuelquUn: boolean;
-  suggestionCommencee: boolean;
-  sugPhone: string;
-}
-
-/** Les questions qui précèdent, exigées par le seul statut qui n'a pas clos l'appel. */
-function manqueScript(etat: EtatManque): string | null {
-  if (etat.statut !== null && !scriptExige(etat.statut.effect)) return null;
-  return null;
-}
-
-/** Le script joignable, dans l'ordre : chaque réponse manquante bloque la suivante. */
-function manqueJoignable(etat: EtatManque): string | null {
-  const script = manqueScript(etat);
-  if (script !== null) return script;
+  rappelAt: string | null;
+}): Pas | null {
+  if (etat.resultat === null) return 'reponse';
   // Sans statut retenu à part, c'est la réponse à la question qui le pose.
-  if (etat.statutChoisi === null && etat.ambassadeur === null) {
-    return 'Dites s’il souhaite être représentant CHUES';
+  if (etat.resultat === 'JOIGNABLE' && etat.statutChoisi === null && etat.ambassadeur === null) {
+    return 'representant';
   }
-  return null;
-}
-
-function manqueResultatOuScript(etat: EtatManque): string | null {
-  if (etat.resultat === null) return 'Choisissez d’abord le résultat';
-  if (!etat.joignable) return null;
-  return manqueJoignable(etat);
-}
-
-// Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
-// silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
-/** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
-function manqueDe(etat: EtatManque): string | null {
-  const avantStatut = manqueResultatOuScript(etat);
-  if (avantStatut !== null) return avantStatut;
-  if (etat.statut === null) return 'Choisissez un statut de qualification';
-  if (exigeMotif(etat.statut) && etat.commentaire.trim() === '') return 'Écrivez le motif';
-  if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
+  if (etat.statut === null) return 'statut';
+  if (exigeMotif(etat.statut) && etat.commentaire.trim() === '') return 'note';
+  if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'echeance';
   return null;
 }
 
@@ -1164,7 +909,7 @@ function Qualification({
   onEnregistre: (nom: string) => void;
 }) {
   const [repris] = useState(() => lireBrouillonRep(ouverture.draft));
-  const [etape, setEtape] = useState<1 | 2>(1);
+  const [pas, setPas] = useState<Pas>('reponse');
   const [resultat, setResultat] = useState<Resultat | null>(repris.resultat);
   const [statutId, setStatutId] = useState<string | null>(repris.statutId);
   const [etablissementConfirme, setEtablissementConfirme] = useState<boolean | null>(
@@ -1245,29 +990,42 @@ function Qualification({
       sugNote,
     );
 
-  const manque = manqueDe({
+  const {
+    racineRetenue,
+    sousStatuts,
+    parcours,
+    rang,
+    manque,
+    motifObligatoire,
+    personneProposee,
+    suite,
+    question,
+  } = deriverPas({
+    pas,
     resultat,
+    joignable,
+    ambassadeur,
     statut,
     statutChoisi,
-    joignable,
-    etablissementConfirme,
-    nouvelEtablissement,
-    contacte,
-    connaitUES,
-    ambassadeur,
-    memeWhatsapp,
-    whatsapp,
-    rappelAt,
+    statutPose,
+    statuts,
     commentaire,
+    rappelAt,
+    etablissementConfirme,
+    memeWhatsapp,
     proposeQuelquUn,
     suggestionCommencee,
     sugPhone,
+    sugName,
   });
 
-  const motifObligatoire = statut !== null && exigeMotif(statut);
-
   function enregistrer(): void {
-    if (manque !== null || resultat === null || statut === null || send.isPending) return;
+    if (send.isPending) return;
+    if (manque !== null) {
+      setPas(manque);
+      return;
+    }
+    if (resultat === null || statut === null) return;
     send.mutate(
       reponseDe({
         statut,
@@ -1291,14 +1049,12 @@ function Qualification({
     );
   }
 
-  // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
-  // délai du statut, le téléconseiller le déplace s'il veut.
-  function choisirStatut(id: string | null): void {
-    setStatutId(id);
-    const choisi = statuts.find((ligne) => ligne.id === id) ?? null;
-    const souhait = souhaitDuStatut(choisi);
-    if (souhait !== null) setAmbassadeur(souhait);
-    setRappelAt(rappelInitialDuStatut(choisi, now));
+  function precedent(): void {
+    if (rang === 0) {
+      onAbandon();
+      return;
+    }
+    setPas(parcours[rang - 1] ?? 'reponse');
   }
 
   function choisirResultat(valeur: Resultat): void {
@@ -1311,21 +1067,167 @@ function Qualification({
       setConnaitUES(null);
       setAmbassadeur(null);
       setMemeWhatsapp(null);
+      setRappelAt(null);
     }
-    if (valeur === 'INJOIGNABLE') setRappelAt(null);
+    setPas(valeur === 'JOIGNABLE' ? 'ecole' : 'statut');
   }
 
-  const reculer = useCallback(() => {
-    setEtape((courante) => {
-      if (courante === 2) return 1;
-      onAbandon();
-      return 1;
-    });
-  }, [onAbandon]);
+  function choisirEcole(valeur: boolean): void {
+    setEtablissementConfirme(valeur);
+    if (!valeur) return;
+    setNouvelEtablissement('');
+    setPas('contacte');
+  }
+
+  function choisirContacte(valeur: boolean): void {
+    setContacte(valeur);
+    setPas('ues');
+  }
+
+  function choisirUES(valeur: boolean): void {
+    setConnaitUES(valeur);
+    setPas('syndicat');
+  }
+
+  function choisirAmbassadeur(valeur: boolean): void {
+    setAmbassadeur(valeur);
+    if (!valeur) setMemeWhatsapp(null);
+    setPas(valeur ? 'whatsapp' : 'statut');
+  }
+
+  function choisirMemeWhatsapp(valeur: boolean): void {
+    setMemeWhatsapp(valeur);
+    if (valeur) setPas('statut');
+  }
+
+  // Un numéro qui n'a pas répondu se retente : le réessai arrive préréglé au
+  // délai du statut, le téléconseiller le déplace s'il veut.
+  function choisirStatut(id: string): void {
+    setStatutId(id);
+    const choisi = statuts.find((ligne) => ligne.id === id) ?? null;
+    const souhait = souhaitDuStatut(choisi);
+    if (souhait !== null) setAmbassadeur(souhait);
+    setRappelAt(rappelInitialDuStatut(choisi, now));
+    const suite = parcoursDe(
+      resultat,
+      souhait ?? ambassadeur,
+      sousStatutsDe(statuts, id).length > 0,
+      choisi !== null && dateDemandee(choisi),
+    );
+    setPas(suivantDe('statut', suite));
+  }
+
+  function choisirPrecision(id: string | null): void {
+    const retenu = statuts.find((ligne) => ligne.id === id) ?? racineRetenue;
+    setStatutId(retenu?.id ?? null);
+    setRappelAt(rappelInitialDuStatut(retenu, now));
+    const suite = parcoursDe(resultat, ambassadeur, true, retenu !== null && dateDemandee(retenu));
+    setPas(suivantDe('precision', suite));
+  }
+
+  function continuer(): void {
+    if (pas === 'note') {
+      enregistrer();
+      return;
+    }
+    if (pas === 'precision') {
+      choisirPrecision(null);
+      return;
+    }
+    if (pas === 'echeance' && rappelAt === null) return;
+    setPas(suivantDe(pas, parcours));
+  }
+
+  function passer(): void {
+    if (pas === 'syndicat') setSyndicatId(null);
+    if (pas === 'recommande') {
+      setSugPhone('');
+      setSugName('');
+      setSugNote('');
+    }
+    setPas(suivantDe(pas, parcours));
+  }
+
+  function choixQuestions(): Choix[] {
+    switch (pas) {
+      case 'reponse':
+        return [
+          {
+            cle: 'oui',
+            label: 'Oui, elle a répondu',
+            aide: 'Puis les questions du script',
+            actif: resultat === 'JOIGNABLE',
+            choisir: () => {
+              choisirResultat('JOIGNABLE');
+            },
+          },
+          {
+            cle: 'non',
+            label: 'Non, elle n’a pas répondu',
+            aide: 'Puis la raison',
+            actif: resultat === 'INJOIGNABLE',
+            choisir: () => {
+              choisirResultat('INJOIGNABLE');
+            },
+          },
+        ];
+      case 'ecole':
+        return choixOuiNon(etablissementConfirme, choisirEcole);
+      case 'contacte':
+        return choixOuiNon(contacte, choisirContacte);
+      case 'ues':
+        return choixOuiNon(connaitUES, choisirUES);
+      case 'representant':
+        return choixOuiNon(ambassadeur, choisirAmbassadeur, [
+          'Puis son WhatsApp',
+          'Puis quelqu’un à recommander',
+        ]);
+      case 'whatsapp':
+        return choixOuiNon(memeWhatsapp, choisirMemeWhatsapp);
+      default:
+        return [];
+    }
+  }
+
+  function choixStatuts(): Choix[] {
+    if (pas === 'precision') {
+      return sousStatuts.map((ligne) => ({
+        cle: ligne.id,
+        label: ligne.label,
+        actif: statutChoisi?.id === ligne.id,
+        choisir: () => {
+          choisirPrecision(ligne.id);
+        },
+      }));
+    }
+    return statutsRacine(statuts).map((ligne) =>
+      choixStatut(ligne, statuts, ligne.id === racineRetenue?.id, () => {
+        choisirStatut(ligne.id);
+      }),
+    );
+  }
+
+  const choix = question === null ? [] : choixDuPas(pas, choixStatuts, choixQuestions);
+  const recap = recapDe({
+    resultat,
+    etablissementConfirme,
+    nouvelEtablissement,
+    contacte,
+    connaitUES,
+    syndicatName,
+    ambassadeur,
+    memeWhatsapp,
+    whatsapp,
+    statut,
+    statuts,
+    rappelAt,
+    now,
+    personneProposee,
+  });
 
   useShortcuts(
     {
-      Escape: reculer,
+      Escape: precedent,
       c: () => {
         copyPhone(representant.phoneE164);
       },
@@ -1335,127 +1237,287 @@ function Qualification({
       '?': () => {
         setHelpOpen((open) => !open);
       },
+      ...raccourcisDe(choix),
+      ...(suite === null ? {} : { Enter: continuer }),
     },
     !edit,
   );
 
-  function corpsEtape(): React.ReactNode {
-    if (etape === 1) {
+  function complement(): React.ReactNode {
+    if (pas === 'ecole' && etablissementConfirme === false) {
       return (
-        <EtapeQuestions
-          resultat={resultat}
-          onResultat={choisirResultat}
-          statuts={statuts}
-          statutId={statutId}
-          onStatut={choisirStatut}
-          statutPose={statutPose}
-          exigeRappel={statut !== null && dateDemandee(statut)}
-          joignable={joignable}
-          proposeQuelquUn={proposeQuelquUn}
-          questionsJoignable={{
-            etablissementConfirme,
-            setEtablissementConfirme,
-            nouvelEtablissement,
-            setNouvelEtablissement,
-            contacte,
-            setContacte,
-            connaitUES,
-            setConnaitUES,
-            syndicatId,
-            setSyndicatId,
-            syndicatOptions,
-            ambassadeur,
-            setAmbassadeur,
-            memeWhatsapp,
-            setMemeWhatsapp,
-            whatsapp,
-            setWhatsapp,
-          }}
-          suggestion={{ sugPhone, setSugPhone, sugName, setSugName, sugNote, setSugNote }}
-          rappel={{ now, value: rappelAt, onChange: setRappelAt }}
-          commentaire={commentaire}
-          onCommentaire={setCommentaire}
-          inputRef={commentaireRef}
-          motifObligatoire={motifObligatoire}
-          manque={manque}
-          onContinuer={() => {
-            setEtape(2);
-          }}
+        <ChampTexte
+          id="rep-etablissement"
+          label="Quelle école ?"
+          value={nouvelEtablissement}
+          onChange={setNouvelEtablissement}
+        />
+      );
+    }
+    if (pas === 'whatsapp' && memeWhatsapp === false) {
+      return (
+        <ChampTexte
+          id="rep-whatsapp"
+          label="Son numéro WhatsApp"
+          inputMode="tel"
+          placeholder="77 123 45 67"
+          value={whatsapp}
+          onChange={setWhatsapp}
+        />
+      );
+    }
+    if (pas === 'statut' && statutChoisi === null && statutPose !== null) {
+      return (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Posé par votre réponse. Continuez, ou choisissez-en un autre.
+        </p>
+      );
+    }
+    return null;
+  }
+
+  function corpsLibre(): React.ReactNode {
+    if (pas === 'syndicat') {
+      return (
+        <Question titre="Sur quel syndicat ?">
+          <FilterCombobox
+            className="max-w-80"
+            label=""
+            placeholder="Choisir un syndicat"
+            value={syndicatId}
+            options={syndicatOptions}
+            onChange={setSyndicatId}
+          />
+        </Question>
+      );
+    }
+    if (pas === 'echeance') {
+      return (
+        <Question titre="Quand rappeler ?">
+          <ChoixEcheance now={now} value={rappelAt} onChange={setRappelAt} />
+        </Question>
+      );
+    }
+    if (pas === 'recommande') {
+      return (
+        <QuestionSuggestion
+          sugPhone={sugPhone}
+          setSugPhone={setSugPhone}
+          sugName={sugName}
+          setSugName={setSugName}
+          sugNote={sugNote}
+          setSugNote={setSugNote}
         />
       );
     }
     return (
-      <div className="flex flex-col gap-5">
-        <RecapAppel
-          representant={representant}
-          resultat={resultat}
-          statutLabel={statut === null ? null : libelleStatut(statut)}
-          joignable={joignable}
-          etablissementConfirme={etablissementConfirme}
-          nouvelEtablissement={nouvelEtablissement}
-          contacte={contacte}
-          connaitUES={connaitUES}
-          syndicatName={syndicatName}
-          ambassadeur={ambassadeur}
-          rappelAt={rappelAt}
-          now={now}
-          personneProposee={
-            proposeQuelquUn && suggestionCommencee
-              ? [sugPhone.trim(), sugName.trim()].filter(Boolean).join(' · ')
-              : null
-          }
-          commentaire={commentaire.trim()}
+      <>
+        <Commentaire
+          value={commentaire}
+          titre={motifObligatoire ? 'Motif' : 'Commentaire, facultatif'}
+          obligatoirePour={motifObligatoire && statut !== null ? libelleStatut(statut) : null}
+          inputRef={commentaireRef}
+          onChange={setCommentaire}
+          onValidate={enregistrer}
         />
-
-        {/* Un seul retour à l'écran, en tête : deux boutons du même nom
-            rendraient le chemin ambigu. */}
-        <Button
-          className="self-start"
-          disabled={manque !== null || send.isPending}
-          onClick={enregistrer}
-        >
-          Enregistrer
-        </Button>
-      </div>
+        {manque === null ? null : (
+          <p role="alert" className="text-[0.875rem] text-warning">
+            {TEXTE_MANQUE[manque]}
+          </p>
+        )}
+      </>
     );
   }
 
   return (
-    <div className="flex w-full flex-col gap-5">
-      {etape === 2 ? (
-        <Button variant="ghost" className="self-start px-0" onClick={reculer}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Étape précédente
-        </Button>
-      ) : null}
+    <EcranPas
+      representant={representant}
+      departChrono={departChrono}
+      brouillonEnAttente={brouillonEnAttente}
+      etapes={parcours.map((item) => LIBELLES_PAS[item])}
+      rang={rang}
+      recap={recap}
+      pied={{
+        suite,
+        suiteDesactivee: pas === 'echeance' && rappelAt === null,
+        onRetour: precedent,
+        onSuite: continuer,
+        onPasser: passer,
+      }}
+      pending={send.isPending}
+      helpOpen={helpOpen}
+      edit={edit}
+      onAbandon={onAbandon}
+      onAllerA={(cible) => {
+        setPas(parcours[cible] ?? 'reponse');
+      }}
+      onHelp={setHelpOpen}
+      onEdit={setEdit}
+    >
+      {question === null ? (
+        corpsLibre()
+      ) : (
+        <>
+          <Palier
+            question={question}
+            choix={choix}
+            raccourcis
+            vide={AUCUN_MOTIF}
+            disabled={send.isPending}
+          />
+          {complement()}
+        </>
+      )}
+    </EcranPas>
+  );
+}
 
-      {etape === 1 ? (
-        <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
+const choixDuPas = (pas: Pas, statuts: () => Choix[], questions: () => Choix[]): Choix[] =>
+  pas === 'statut' || pas === 'precision' ? statuts() : questions();
+
+interface EtatPas {
+  pas: Pas;
+  resultat: Resultat | null;
+  joignable: boolean;
+  ambassadeur: boolean | null;
+  statut: StatutQualification | null;
+  statutChoisi: StatutQualification | null;
+  statutPose: StatutQualification | null;
+  statuts: readonly StatutQualification[];
+  commentaire: string;
+  rappelAt: string | null;
+  etablissementConfirme: boolean | null;
+  memeWhatsapp: boolean | null;
+  proposeQuelquUn: boolean;
+  suggestionCommencee: boolean;
+  sugPhone: string;
+  sugName: string;
+}
+
+/** Tout ce que le pas courant déduit des réponses : le parcours, ce qui manque, la question posée. */
+function deriverPas(e: EtatPas) {
+  const racineRetenue =
+    e.statutChoisi === null
+      ? e.statutPose
+      : (e.statuts.find((ligne) => ligne.id === e.statutChoisi?.parentId) ?? e.statutChoisi);
+  const sousStatuts = sousStatutsDe(e.statuts, racineRetenue?.id ?? null);
+  const parcours = parcoursDe(
+    e.resultat,
+    e.ambassadeur,
+    sousStatuts.length > 0,
+    e.statut !== null && dateDemandee(e.statut),
+  );
+  const personneProposee =
+    e.proposeQuelquUn && e.suggestionCommencee
+      ? [e.sugPhone.trim(), e.sugName.trim()].filter(Boolean).join(' · ')
+      : null;
+  return {
+    racineRetenue,
+    sousStatuts,
+    parcours,
+    rang: Math.max(parcours.indexOf(e.pas), 0),
+    manque: pasManquant(e),
+    motifObligatoire: e.statut !== null && exigeMotif(e.statut),
+    personneProposee,
+    suite: suiteDe(e.pas, {
+      ecoleInfirmee: e.etablissementConfirme === false,
+      autreWhatsapp: e.memeWhatsapp === false,
+      statutRetenu: e.statut !== null,
+    }),
+    question: questionDe(e.pas, e.joignable),
+  };
+}
+
+/** La coque du pas en cours : en-tête, progression, réponses déjà données, le pas, son pied. */
+function EcranPas({
+  representant,
+  departChrono,
+  brouillonEnAttente,
+  etapes,
+  rang,
+  recap,
+  pied,
+  pending,
+  helpOpen,
+  edit,
+  onAbandon,
+  onAllerA,
+  onHelp,
+  onEdit,
+  children,
+}: {
+  representant: ScriptedRepresentant;
+  departChrono: string | null;
+  brouillonEnAttente: boolean;
+  etapes: readonly string[];
+  rang: number;
+  recap: readonly string[];
+  pied: {
+    suite: Suite | null;
+    suiteDesactivee: boolean;
+    onRetour: () => void;
+    onSuite: () => void;
+    onPasser: () => void;
+  };
+  pending: boolean;
+  helpOpen: boolean;
+  edit: boolean;
+  onAbandon: () => void;
+  onAllerA: (rang: number) => void;
+  onHelp: (open: boolean) => void;
+  onEdit: (open: boolean) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex w-full flex-col gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <Button variant="ghost" className="-ml-2 px-2" onClick={onAbandon}>
           <ArrowLeftIcon aria-hidden="true" />
           Revenir à la liste
         </Button>
-      ) : null}
-
-      {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+        {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
+      </div>
       <BrouillonEnAttente enAttente={brouillonEnAttente} />
 
       <EnTeteRepresentant representant={representant} />
 
       {representant.callAttemptCount === 0 ? null : (
-        <HistoriqueAppels representantId={representant.id} />
+        <details className="rounded-lg border border-border bg-card px-4 py-2">
+          <summary className="cursor-pointer text-[0.875rem] font-[600]">
+            Appels précédents ({representant.callAttemptCount})
+          </summary>
+          <HistoriqueAppels representantId={representant.id} />
+        </details>
       )}
 
-      <p className="text-[0.8125rem] font-[600] text-muted-foreground">
-        Étape {etape} sur 2 ·{' '}
-        {etape === 1 ? 'Comment s’est passé l’appel ?' : 'Quelque chose à ajouter ?'}
-      </p>
+      <EtapesProgression etapes={etapes} courante={rang} maximum={rang} onChoisir={onAllerA} />
 
-      {corpsEtape()}
+      {recap.length === 0 ? null : (
+        <ul className="flex flex-wrap gap-1.5" aria-label="Réponses déjà données">
+          {recap.map((item) => (
+            <li key={item}>
+              <Badge variant="secondary">{item}</Badge>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {children}
+
+      <PiedPas
+        premier={rang === 0}
+        suite={pied.suite}
+        disabled={pending}
+        suiteDesactivee={pied.suiteDesactivee}
+        onRetour={pied.onRetour}
+        onSuite={pied.onSuite}
+        onPasser={pied.onPasser}
+      />
 
       <details
         open={helpOpen}
         onToggle={(event) => {
-          setHelpOpen(event.currentTarget.open);
+          onHelp(event.currentTarget.open);
         }}
       >
         <summary className="cursor-pointer list-none text-[0.8125rem] text-muted-foreground">
@@ -1475,7 +1537,7 @@ function Qualification({
         variant="ghost"
         className="self-start px-0 text-[0.8125rem]"
         onClick={() => {
-          setEdit(true);
+          onEdit(true);
         }}
       >
         <PencilIcon aria-hidden="true" />
@@ -1485,7 +1547,7 @@ function Qualification({
       {edit ? (
         <RepresentantFormDialog
           open
-          onOpenChange={setEdit}
+          onOpenChange={onEdit}
           representant={representant}
           pendantAppel
         />
@@ -1509,38 +1571,6 @@ function Question({
       <legend className="pb-2 text-[1rem] font-[600]">{titre}</legend>
       {children}
     </fieldset>
-  );
-}
-
-/** Tuiles à réponse unique. Retoucher une réponse déjà prise reste possible. */
-function Choix<T extends string | boolean>({
-  options,
-  value,
-  onChange,
-}: {
-  options: readonly { valeur: T; label: string }[];
-  value: T | null;
-  onChange: (valeur: T) => void;
-}) {
-  return (
-    <div className="flex flex-wrap gap-2">
-      {options.map((option) => {
-        const actif = value === option.valeur;
-        return (
-          <Button
-            key={String(option.valeur)}
-            type="button"
-            variant={actif ? 'default' : 'outline'}
-            aria-pressed={actif}
-            onClick={() => {
-              onChange(option.valeur);
-            }}
-          >
-            {option.label}
-          </Button>
-        );
-      })}
-    </div>
   );
 }
 
@@ -1658,17 +1688,6 @@ function ChoixEcheance({
           )}
         </div>
       ) : null}
-    </div>
-  );
-}
-
-function Recap({ intitule, valeur }: { intitule: string; valeur: string | null }) {
-  return (
-    <div className="flex justify-between gap-3">
-      <dt className="text-muted-foreground">{intitule}</dt>
-      <dd className={cn('text-right', valeur === null && 'text-muted-foreground italic')}>
-        {valeur ?? 'Non renseigné'}
-      </dd>
     </div>
   );
 }
