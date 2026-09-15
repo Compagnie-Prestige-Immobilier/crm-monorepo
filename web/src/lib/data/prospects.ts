@@ -104,6 +104,19 @@ export async function fetchProspectCallAttempts(
   return payload.items;
 }
 
+export type UpdateCallAttemptInput = components['schemas']['UpdateCallAttemptDto'];
+export type CallAttemptState = components['schemas']['CallAttemptStateDto'];
+
+export async function updateCallAttempt(
+  id: string,
+  body: UpdateCallAttemptInput,
+  client: ApiClient = getApiClient(),
+): Promise<CallAttemptState> {
+  return unwrap(
+    await client.PATCH('/api/v1/phase2/call-attempts/{id}', { params: { path: { id } }, body }),
+  );
+}
+
 export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
 
 /** Les relevés du téléphone venaient de l'application mobile, abandonnée : la liste reste vide. */

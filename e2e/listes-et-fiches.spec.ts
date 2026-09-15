@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 
 import { expect, test, type Page } from '@playwright/test';
 
-import { compteDe } from './comptes';
+import { avecBase, compteDe } from './comptes';
+import { effacerFiches, semerProspectGrandPublicImporte, type FicheSemee } from './donnees-chues';
 import {
   apiDe,
   creerProspect,
@@ -228,6 +229,68 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await page.goto(`/grand-public/${prospectGrandPublic}`);
     await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
+  });
+});
+
+test.describe('parcours 7, un appel Grand Public se corrige depuis la fiche', () => {
+  test.use({ storageState: compteDe('COMMERCIAL').etat });
+  const telephones: string[] = [];
+
+  test.afterAll(async () => {
+    await effacerFiches(telephones);
+  });
+
+  test('le téléconseiller modifie son appel et l’historique garde l’avant et l’après', async ({
+    page,
+  }) => {
+    const teleconseiller = compteDe('COMMERCIAL');
+    const appelId = randomUUID();
+    const commentaire = `Refuse après rappel ${cle}.`;
+    let fiche: FicheSemee = { id: '', nom: '', phoneE164: '' };
+    await avecBase(async (client) => {
+      fiche = await semerProspectGrandPublicImporte(
+        client,
+        `Correction ${cle}`,
+        'Awa',
+        teleconseiller.id,
+      );
+      await client.query(
+        `INSERT INTO call_attempts
+           (id, "prospectId", "performedById", outcome, "reasonId", comment, "clientCreatedAt")
+         VALUES ($1, $2, $3, 'UNREACHABLE',
+                 (SELECT id FROM call_outcome_reasons WHERE code = 'PAS_DE_REPONSE'),
+                 'Messagerie pleine.', now() - interval '1 hour')`,
+        [appelId, fiche.id, teleconseiller.id],
+      );
+    });
+    telephones.push(fiche.phoneE164);
+
+    await page.goto(`/grand-public/${fiche.id}`);
+    const histoire = page.getByRole('list', { name: 'Histoire' });
+    await histoire.getByRole('button', { name: /Pas de réponse/u }).click();
+    await page.getByRole('button', { name: 'Modifier l’appel', exact: true }).click();
+
+    const modale = page.getByRole('dialog', { name: /^Modifier l’appel du/u });
+    await modale.getByRole('combobox', { name: 'Statut de qualification' }).click();
+    await page.getByRole('option', { name: 'Ne veut pas', exact: true }).click();
+    await modale.getByRole('textbox', { name: /^Commentaire/u }).fill(commentaire);
+    await modale.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    await expect(modale).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
+    await histoire.getByRole('button', { name: /Appel modifié/u }).click();
+    const volet = page.getByRole('dialog', { name: 'Appel modifié' });
+    await expect(volet).toContainText('Pas de réponse → Ne veut pas');
+    await expect(volet).toContainText(`Messagerie pleine. → ${commentaire}`);
+
+    const enBase = await ligne<{ outcome: string; code: string; comment: string }>(
+      `SELECT a.outcome::text AS outcome, r.code, a.comment
+         FROM call_attempts a
+         JOIN call_outcome_reasons r ON r.id = a."reasonId"
+        WHERE a.id = $1`,
+      [appelId],
+    );
+    expect(enBase).toEqual({ outcome: 'REFUSED', code: 'REFUS_NE_VEUT_PAS', comment: commentaire });
   });
 });
 

@@ -388,15 +388,26 @@ SELECT
   a."engagementEnCours", a."dureeEtablissementMois", a."rendezVousAt", a."deviceCallType",
   a."deviceCallDurationSeconds", a."deviceCallAt", a."performedById", a."clientCreatedAt",
   u."fullName" AS performed_by_name,
+  cr."code" AS reason_code,
   cr."label" AS reason_label,
+  sc."scheduledAt" AS callback_at,
   ou."firstInputAt" AS ouverture_first_input_at,
   ou."closedAt" AS ouverture_closed_at
 FROM "call_attempts" a
 JOIN "users" u ON u."id" = a."performedById"
 LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
+LEFT JOIN "scheduled_callbacks" sc ON sc."sourceAttemptId" = a."id" AND sc."status" = 'PENDING'
 LEFT JOIN "ouvertures_fiche" ou ON ou."closingAttemptId" = a."id" AND ou."firstInputAt" IS NOT NULL
 WHERE a."prospectId" = $1
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC;
+
+-- name: ModificationsDesTentatives :many
+SELECT l."entityId" AS attempt_id, l."at", u."fullName" AS user_name, l."before", l."after"
+FROM "audit_logs" l
+JOIN "call_attempts" a ON a."id" = l."entityId" AND a."prospectId" = $1
+LEFT JOIN "users" u ON u."id" = l."userId"
+WHERE l."entity" = 'call_attempt' AND l."action" = 'call_attempt.update'
+ORDER BY l."at" ASC, l."id" ASC;
 
 -- name: AppSettingParCle :one
 SELECT "key", "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;

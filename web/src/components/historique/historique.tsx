@@ -106,9 +106,11 @@ export function Historique({
   enTete?: ReactNode;
 }) {
   const [filtre, setFiltre] = useState<Filtre>('tout');
-  const [ouvert, setOuvert] = useState<EvenementHistorique | null>(null);
+  const [ouvertId, setOuvertId] = useState<string | null>(null);
 
   const tries = [...evenements].sort((a, b) => b.at.localeCompare(a.at));
+  // Relu par identifiant : le volet suit la liste rechargée après une modification.
+  const ouvert = tries.find((e) => e.id === ouvertId) ?? null;
   const visibles = filtre === 'tout' ? tries : tries.filter((e) => e.categorie === filtre);
   const jours = parJour(visibles);
 
@@ -153,7 +155,7 @@ export function Historique({
                     key={evenement.id}
                     evenement={evenement}
                     onOpen={() => {
-                      setOuvert(evenement);
+                      setOuvertId(evenement.id);
                     }}
                   />
                 ))}
@@ -166,7 +168,7 @@ export function Historique({
       <VoletEvenement
         evenement={ouvert}
         onClose={() => {
-          setOuvert(null);
+          setOuvertId(null);
         }}
       />
     </div>

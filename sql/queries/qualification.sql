@@ -228,6 +228,49 @@ WHERE c."id" = $1;
 UPDATE "scheduled_callbacks" SET "status" = 'CANCELLED'
 WHERE "id" = $1 AND "status" = 'PENDING';
 
+-- La dernière tentative suit l'ordre de la garde de `lastCallAt` : heure terrain, puis ordre d'arrivée.
+-- name: TentativeAModifier :one
+SELECT a."id", a."prospectId", a."performedById", a."outcome", a."comment", a."clientCreatedAt",
+       p."projet", cr."code" AS reason_code, cr."label" AS reason_label, sc."scheduledAt" AS callback_at,
+       (a."id" = (SELECT d."id" FROM "call_attempts" d WHERE d."prospectId" = a."prospectId"
+                  ORDER BY d."clientCreatedAt" DESC, d."createdAt" DESC, d."id" DESC LIMIT 1))::bool AS derniere
+FROM "call_attempts" a
+JOIN "prospects" p ON p."id" = a."prospectId" AND p."deletedAt" IS NULL
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
+LEFT JOIN "scheduled_callbacks" sc ON sc."sourceAttemptId" = a."id" AND sc."status" = 'PENDING'
+WHERE a."id" = $1
+FOR UPDATE OF a, p;
+
+-- name: ModifierTentative :exec
+UPDATE "call_attempts" SET
+  "outcome" = CAST(@outcome AS text)::"CallOutcome", "reasonId" = @reason_id, "comment" = @comment
+WHERE "id" = @id;
+
+-- name: PlanifierRappelDeTentative :exec
+INSERT INTO "scheduled_callbacks"
+  ("id", "prospectId", "assignedToId", "scheduledAt", "comment", "sourceAttemptId")
+VALUES (@id, @prospect_id, @assigned_to_id, @scheduled_at, @comment, @source_attempt_id)
+ON CONFLICT ("sourceAttemptId") DO UPDATE SET
+  "scheduledAt" = EXCLUDED."scheduledAt", "comment" = EXCLUDED."comment",
+  "status" = 'PENDING', "closedAttemptId" = NULL;
+
+-- name: ReporterRappelDeTentative :exec
+UPDATE "scheduled_callbacks" SET "scheduledAt" = @scheduled_at, "comment" = @comment
+WHERE "sourceAttemptId" = @source_attempt_id AND "status" = 'PENDING';
+
+-- name: AnnulerRappelDeTentative :exec
+UPDATE "scheduled_callbacks" SET "status" = 'CANCELLED'
+WHERE "sourceAttemptId" = $1 AND "status" = 'PENDING';
+
+-- name: RouvrirPhase2 :exec
+WITH fiche AS (
+  UPDATE "prospects" SET "phase2Status" = 'PENDING', "rev" = "rev" + 1
+  WHERE "id" = @prospect_id AND "phase2Status" IN ('REFUSED', 'WRONG_NUMBER')
+)
+UPDATE "prospect_journeys" SET "phase2Status" = 'PENDING'
+WHERE "prospectId" = @prospect_id AND "projet" = CAST(@projet AS text)::"Projet"
+  AND "phase2Status" IN ('REFUSED', 'WRONG_NUMBER');
+
 -- name: ListerOuvertures :many
 SELECT o."id", o."openedById", u."fullName" AS "openedByName",
        o."representantId", o."prospectId",
