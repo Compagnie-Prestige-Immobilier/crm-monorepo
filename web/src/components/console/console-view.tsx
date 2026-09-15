@@ -93,7 +93,9 @@ const GROUPES = [
 type Groupe = (typeof GROUPES)[number]['cle'];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
-  ['1 … 9', 'Statut au choix'],
+  ['1', 'Joignable, puis motif'],
+  ['2', 'Injoignable, puis motif'],
+  ['1 … 9', 'Motif au choix'],
   ['1 … 6', 'Échéance proposée'],
   ['0', 'Autre échéance'],
   ['Entrée', 'Valider'],
@@ -132,6 +134,9 @@ const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   'UNREACHABLE',
   ...MOTIFS_INJOIGNABLE.map((motif) => motif.code),
 ]);
+
+/** Le catalogue affiché avant la réponse du référentiel : joignables et injoignables. */
+const CATALOGUE_SECOURS: readonly MotifAppel[] = [...MOTIFS_SYSTEME, ...MOTIFS_INJOIGNABLE];
 
 /** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
@@ -826,7 +831,7 @@ export function Consignation({
   // Un brouillon repris vient d'un appel où la personne répondait : la question
   // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
   const [groupe, setGroupe] = useState<Groupe | null>(
-    'joignable',
+    repris.conversion === null ? null : 'joignable',
   );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
@@ -842,7 +847,7 @@ export function Consignation({
     queryFn: () => fetchMotifsAppel(),
     staleTime: 300_000,
   });
-  const catalogue = motifs.data ?? MOTIFS_SYSTEME;
+  const catalogue = motifs.data ?? CATALOGUE_SECOURS;
 
   const nomComplet = nomDe(prospect);
   const [now] = useState(() => Date.now());
@@ -948,9 +953,20 @@ export function Consignation({
     (choisi: MotifAppel) => {
       if (send.isPending) return;
       setMotif(choisi);
-      if (choisi.effect === 'CLOSE_METHOD') ouvrirDossier();
-      else if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
-      else if (choisi.requiresComment) commentRef.current?.focus();
+      if (choisi.effect === 'CLOSE_METHOD') {
+        ouvrirDossier();
+        return;
+      }
+      setConversion((draft) => {
+        if (draft !== null) dossierMisDeCote.current = draft;
+        return null;
+      });
+      setConversionErrors({});
+      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      else {
+        setSlots(null);
+        if (choisi.requiresComment) commentRef.current?.focus();
+      }
     },
     [send.isPending, ouvrirDossier, startCallback],
   );
@@ -988,7 +1004,7 @@ export function Consignation({
       onAbandon();
       return;
     }
-    setGroupe('joignable');
+    setGroupe(null);
     setMotif(null);
     setComment('');
     setConversion(null);
@@ -1002,11 +1018,15 @@ export function Consignation({
     setMotif(null);
     setSlots(null);
     setFreeCallback('');
+    setConversion((draft) => {
+      if (draft !== null) dossierMisDeCote.current = draft;
+      return null;
+    });
     setConversionErrors({});
   };
 
   const retourAuxIssues = (): void => {
-    setGroupe('joignable');
+    setGroupe(null);
     setMotif(null);
     setSlots(null);
     setFreeCallback('');
