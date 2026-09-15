@@ -33,7 +33,7 @@ import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import type { FilterOption, Projet } from '@/lib/types';
 
-export function BankDashboardView({ projet }: { projet: Projet }) {
+export function BankDashboardView({ projet }: { projet?: Projet | null | undefined } = {}) {
   const router = useRouter();
   const { filters, hrefWith } = useBankFilters(projet);
   const live = useLive();

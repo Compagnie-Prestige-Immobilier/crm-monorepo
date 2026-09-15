@@ -95,6 +95,9 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
 const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
   INTERESSE: 'OTHER',
   RDV_AGENCE: 'CALLBACK',
+  DEMANDE_INFORMATION: 'OTHER',
+  PARTENARIAT: 'OTHER',
+  AUTRES: 'OTHER',
 };
 
 export const issueDuMotif = (motif: Pick<MotifAppel, 'code' | 'effect'>): CallOutcome =>

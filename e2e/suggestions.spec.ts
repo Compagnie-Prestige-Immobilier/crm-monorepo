@@ -15,8 +15,8 @@ import {
 } from './donnees-chues';
 
 const compte = compteDe('COMMERCIAL');
-const ANNUAIRE = '/chues/appels-representants';
-const SUGGESTIONS = '/chues/suggestions';
+const ANNUAIRE = '/teleconseil/appels-representants';
+const SUGGESTIONS = '/teleconseil/suggestions';
 
 const telephones: string[] = [];
 

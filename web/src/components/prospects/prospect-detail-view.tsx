@@ -86,7 +86,7 @@ function evenementCreation(prospect: ProspectRow): EvenementHistorique {
       prospect.representantId === null
         ? null
         : {
-            href: `/chues/representants/${prospect.representantId}`,
+            href: `/teleconseil/representants/${prospect.representantId}`,
             label: 'Ouvrir la fiche du représentant',
           },
     detail: (
@@ -295,7 +295,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/prospects">Tous les prospects</DetailBackLink>
+        <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -305,7 +305,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/prospects">Tous les prospects</DetailBackLink>
+        <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -327,11 +327,12 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/chues/prospects">Tous les prospects</DetailBackLink>
+      <DetailBackLink href="/teleconseil/prospects">Tous les prospects</DetailBackLink>
 
       <FicheEnTete
         nom={`${prospect.prenom} ${prospect.nom}`}
         phoneE164={prospect.phoneE164}
+        projet={prospect.projet}
         badges={
           <>
             <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
@@ -414,7 +415,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
           </dl>
           {prospect.representantId === null ? null : (
             <Link
-              href={`/chues/representants/${prospect.representantId}`}
+              href={`/teleconseil/representants/${prospect.representantId}`}
               className={buttonVariants({ variant: 'outline', size: 'sm', className: 'w-fit' })}
             >
               <ExternalLinkIcon aria-hidden="true" />

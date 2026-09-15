@@ -26,15 +26,15 @@ export async function fetchBankCases(
   );
 }
 
-/** `projet` borne la lecture à la coque ouverte : un dossier de l'autre parcours répond 404. */
+/** `projet` borne la lecture s'il est spécifié. */
 export async function fetchBankCase(
   id: string,
-  projet: Projet,
+  projet?: Projet | null,
   client: ApiClient = getApiClient(),
 ): Promise<BankCaseDetail> {
   return unwrap(
     await client.GET('/api/v1/bank-cases/{id}', {
-      params: { path: { id }, query: { projet } },
+      params: { path: { id }, query: projet ? { projet } : {} },
     }),
   );
 }
@@ -71,14 +71,15 @@ export async function fetchRejectionReasons(
 
 export async function searchBankProspects(
   q: string,
-  projet: Projet,
+  projet?: Projet | null,
   client: ApiClient = getApiClient(),
 ): Promise<BankProspectSearchItem[]> {
   const term = q.trim();
   if (term.length < 2) return [];
+  const query = { search: term, pageSize: 20, ...(projet ? { projet } : {}) };
   return unwrap(
     await client.GET('/api/v1/bank-cases/prospect-search', {
-      params: { query: { search: term, pageSize: 20, projet } },
+      params: { query },
     }),
   ).items;
 }
@@ -92,11 +93,19 @@ export async function createBankCase(
 
 /** Inscriptions validées sur la plateforme sans dossier bancaire : la seule porte d'ouverture. */
 export async function fetchInscriptionsAOuvrir(
-  projet: Projet,
+  projet?: Projet | null,
   client: ApiClient = getApiClient(),
 ): Promise<InscriptionAOuvrir[]> {
-  return unwrap(await client.GET('/api/v1/bank-cases/a-ouvrir', { params: { query: { projet } } }))
-    .items;
+  const projets: readonly Projet[] =
+    projet === undefined || projet === null ? ['CHUES', 'GRAND_PUBLIC'] : [projet];
+  const pages = await Promise.all(
+    projets.map((projetCourant) =>
+      client.GET('/api/v1/bank-cases/a-ouvrir', {
+        params: { query: { projet: projetCourant } },
+      }),
+    ),
+  );
+  return pages.flatMap((page) => unwrap(page).items);
 }
 
 export interface TransitionInput {

@@ -45,7 +45,7 @@ export function nomClient(inscription: InscriptionAOuvrir): string {
 }
 
 /** Ce que la plateforme a validé et que la banque n'a pas encore ouvert. */
-export function BankAOuvrirView({ projet }: { projet: Projet }) {
+export function BankAOuvrirView({ projet }: { projet?: Projet | null | undefined } = {}) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const surbrillance = useSearchParams().get('ouvrir');

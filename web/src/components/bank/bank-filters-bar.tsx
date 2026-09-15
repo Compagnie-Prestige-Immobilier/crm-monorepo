@@ -31,9 +31,15 @@ import { fetchBanques } from '@/lib/data/reference';
 import { withRetired } from '@/lib/format';
 import { parseMoneyInput } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
-import type { FilterOption } from '@/lib/types';
+import type { FilterOption, Projet } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
+
+const PROJET_OPTIONS: readonly FilterOption[] = [
+  { value: 'TOUS', label: 'Tous' },
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
+];
 
 function optionsOrEmpty<T>(data: readonly T[] | undefined): readonly T[] {
   return data ?? [];
@@ -200,6 +206,18 @@ export function BankFiltersBar({
 
       {/* ─── Filtrage simple ────────────────────────────────────────────── */}
       <div className="flex flex-wrap items-end gap-3">
+        <FilterCombobox
+          label="Projet"
+          placeholder="Tous les projets"
+          options={PROJET_OPTIONS}
+          value={filters.projet ?? 'TOUS'}
+          onChange={(value) => {
+            const nextProjet: Projet | null =
+              value === 'CHUES' || value === 'GRAND_PUBLIC' ? value : null;
+            setFilters({ projet: nextProjet });
+          }}
+        />
+
         <SearchField
           value={searchDraft}
           onChange={setSearchDraft}

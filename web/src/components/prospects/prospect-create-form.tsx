@@ -177,7 +177,7 @@ function PhoneConflictCard({
             {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
           </p>
           <Link
-            href={`/chues/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}
+            href={`/teleconseil/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}
             className="w-fit rounded-sm font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
           >
             Ouvrir la fiche existante
@@ -248,7 +248,7 @@ function SavedStatusLine({
         {texte}
       </p>
       <Link
-        href="/chues"
+        href="/teleconseil"
         className="rounded-sm text-[0.875rem] font-[600] underline underline-offset-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
       >
         Terminé, revenir au projet

@@ -69,6 +69,7 @@ func referentielsStatutJournal(r *db.StatutsQualification) map[string]any {
 		referentielsNomRappel: r.RequiresCallback, referentielsNomCommentaire: r.RequiresComment,
 		referentielsNomReessai: r.RetryAfterMinutes, referentielsNomPriorite: string(r.Priorite),
 		referentielsNomRelation: r.RelationStatus, referentielsNomRang: r.SortOrder,
+		referentielsNomParent: r.ParentId,
 	}
 }
 

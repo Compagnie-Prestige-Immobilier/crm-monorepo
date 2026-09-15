@@ -100,7 +100,7 @@ const (
 var aidesCourriels = AidesCourriels{
 	Enrolement: AideCourriel{
 		IntroUsine: "{teleconseiller} a obtenu la méthode d’enrôlement « {methode} » pour {client}. " +
-			"Rendez-vous : {rendezVous}. Le prospect est transmis à l’équipe enrôlement.",
+			"Le prospect est transmis à l’équipe enrôlement.",
 		Variables: []string{VariableClient, "telephone", "methode", "rendezVous", VariableTeleconseiller, VariableBanque, VariableProjet},
 	},
 	Encaissement: AideCourriel{

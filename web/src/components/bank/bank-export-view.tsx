@@ -27,7 +27,7 @@ const SHEETS: readonly { name: string; description: string }[] = [
   },
 ];
 
-export function BankExportView({ projet }: { projet: Projet }) {
+export function BankExportView({ projet }: { projet?: Projet | null | undefined } = {}) {
   const { filters } = useBankFilters(projet);
   const { pending, download } = useFileDownload();
   const activeCount = countActiveBankFilters(filters);

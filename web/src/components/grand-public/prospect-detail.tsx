@@ -357,7 +357,7 @@ export function GrandPublicProspectDetail({
           Les deux projets ne partagent aucun écran. Elle se consulte depuis le suivi CHUES.
         </p>
         <Link
-          href="/chues/prospects"
+          href="/teleconseil/prospects"
           className={cn(buttonVariants({ variant: 'outline' }), 'mt-1')}
         >
           Ouvrir le suivi CHUES
@@ -370,10 +370,7 @@ export function GrandPublicProspectDetail({
 
   return (
     <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Link
-        href="/grand-public"
-        className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
-      >
+      <Link href="/teleconseil" className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}>
         <ArrowLeftIcon aria-hidden="true" />
         Prospects Grand Public
       </Link>

@@ -6,6 +6,7 @@ import { useState } from 'react';
 
 import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
+import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { ProspectExportMenu } from '@/components/prospects/export-menu';
 import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
 import { ProspectsTable } from '@/components/prospects/prospects-table';
@@ -20,18 +21,21 @@ import {
 import { fetchProspects } from '@/lib/data/prospects';
 import { formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
+import type { Projet } from '@/lib/types';
 
 export function ProspectsView({
   canAdminister,
   canExport = false,
   readOnly = false,
   canCreate = false,
+  canCreateGrandPublic = false,
   campaignScoped = false,
 }: {
   canAdminister: boolean;
   canExport?: boolean;
   readOnly?: boolean;
   canCreate?: boolean;
+  canCreateGrandPublic?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {
@@ -60,7 +64,7 @@ export function ProspectsView({
         <div className="flex flex-wrap gap-2">
           {canExport ? <ProspectExportMenu filters={filters} /> : null}
           <CreateProspectButton
-            visible={!readOnly && canCreate}
+            visible={peutCreerProjet(filters.projet, readOnly, canCreate, canCreateGrandPublic)}
             onClick={() => setCreateOpen(true)}
           />
         </div>
@@ -73,17 +77,55 @@ export function ProspectsView({
         campaignScoped={campaignScoped}
       />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>Nouveau prospect CHUES</DialogTitle>
-            <DialogDescription>
-              Recherchez le représentant par son nom ou son numéro.
-            </DialogDescription>
-          </DialogHeader>
-          <ProspectCreateForm representantId={null} onSaved={() => setCreateOpen(false)} />
-        </DialogContent>
+        <CreationDialogContent
+          projet={filters.projet}
+          onClose={() => setCreateOpen(false)}
+          canCreateGrandPublic={canCreateGrandPublic}
+        />
       </Dialog>
     </div>
+  );
+}
+
+function peutCreerProjet(
+  projet: Projet | null,
+  readOnly: boolean,
+  canCreateChues: boolean,
+  canCreateGrandPublic: boolean,
+): boolean {
+  if (readOnly || projet === null) return false;
+  return projet === 'CHUES' ? canCreateChues : canCreateGrandPublic;
+}
+
+function CreationDialogContent({
+  projet,
+  onClose,
+  canCreateGrandPublic,
+}: {
+  projet: Projet | null;
+  onClose: () => void;
+  canCreateGrandPublic: boolean;
+}) {
+  const grandPublic = projet === 'GRAND_PUBLIC';
+
+  return (
+    <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+      <DialogHeader>
+        <DialogTitle>
+          {grandPublic ? 'Nouveau prospect Grand Public' : 'Nouveau prospect'}
+        </DialogTitle>
+        {grandPublic ? null : (
+          <DialogDescription>
+            Recherchez le représentant par son nom ou son numéro.
+          </DialogDescription>
+        )}
+      </DialogHeader>
+      {grandPublic && canCreateGrandPublic ? (
+        <NouveauProspect embedded onSaved={onClose} onAnnuler={onClose} />
+      ) : (
+        <ProspectCreateForm representantId={null} onSaved={onClose} />
+      )}
+    </DialogContent>
   );
 }
 

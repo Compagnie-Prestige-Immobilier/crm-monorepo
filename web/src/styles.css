@@ -687,10 +687,14 @@ html.dark:has([data-coque='chues']) {
   }
 
   /* §10 Accessibilité : anneau de focus visible partout, jamais supprimé. */
-  :focus-visible {
+  :focus-visible:not([aria-hidden='true']) {
     outline: 2px solid var(--ring);
     outline-offset: 2px;
     border-radius: var(--radius-xs);
+  }
+
+  :focus-visible[aria-hidden='true'] {
+    outline: none;
   }
 
   ::selection {

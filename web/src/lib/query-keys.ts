@@ -77,14 +77,15 @@ export const queryKeys = {
   // ─── Banque & Finance ─────────────────────────────────────────────────────
   bankCasesRoot: ['bank-cases'] as const,
   bankCases: (filters: BankCaseFilters) => ['bank-cases', bankFiltersQueryKey(filters)] as const,
-  bankCase: (id: string, projet: Projet) => ['bank-cases', 'detail', id, projet] as const,
+  bankCase: (id: string, projet?: Projet | null) =>
+    ['bank-cases', 'detail', id, projet ?? 'ALL'] as const,
   bankAnalyticsRoot: ['bank-analytics'] as const,
   bankAnalytics: (filters: BankCaseFilters) =>
     ['bank-analytics', bankFiltersQueryKey(filters)] as const,
   bankStagesRoot: ['bank-stages'] as const,
   bankStages: (includeInactive: boolean) => ['bank-stages', includeInactive] as const,
   bankRejectionReasons: ['bank-rejection-reasons'] as const,
-  bankAOuvrir: (projet: Projet) => ['bank-a-ouvrir', projet] as const,
+  bankAOuvrir: (projet?: Projet | null) => ['bank-a-ouvrir', projet ?? 'ALL'] as const,
   courrielsRoot: ['courriels'] as const,
   courriels: (objetType: string, objetId: string) => ['courriels', objetType, objetId] as const,
   courrielsJournal: (type: string, statut: string, page: number) =>

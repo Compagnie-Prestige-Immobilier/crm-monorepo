@@ -7,7 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/nouveau')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CHARGE_CLIENTELE']),
   component: NouveauGrandPublicPage,
   pendingComponent: Loading,
 });

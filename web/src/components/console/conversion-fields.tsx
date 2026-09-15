@@ -44,6 +44,17 @@ const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = PAYMENT_MODE
 
 const DUREES = DUREES_MOIS.map((mois) => ({ value: String(mois), label: formatDureeMois(mois) }));
 
+const regleChampLibre = (champ: ChampLibre, facultatif: boolean | undefined): ChampLibre =>
+  facultatif ? { ...champ, obligatoire: false } : champ;
+
+function reglesFormulaire(
+  regles: ReturnType<typeof reglesChamps>,
+  facultatif: boolean | undefined,
+): ReturnType<typeof reglesChamps> {
+  if (!facultatif) return regles;
+  return { visible: regles.visible, requis: () => false };
+}
+
 const COORDONNEES: Partial<
   Record<
     EnrollmentMethod,
@@ -111,6 +122,7 @@ export function ConversionFields({
   reglages,
   libres,
   seulement,
+  champsFacultatifs,
   onChange,
 }: {
   draft: ConversionDraft;
@@ -123,10 +135,11 @@ export function ConversionFields({
   libres: readonly ChampLibre[];
   /** Posé : seuls ces champs se rendent, pour découper la saisie en étapes. */
   seulement?: readonly ChampReglable[] | undefined;
+  champsFacultatifs?: boolean | undefined;
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
-  const regles = reglesChamps(reglages);
+  const regles = reglesFormulaire(reglesChamps(reglages), champsFacultatifs);
 
   const banques = useQuery({
     queryKey: queryKeys.banques,
@@ -496,7 +509,7 @@ export function ConversionFields({
       {libresVus.map((champ) => (
         <ChampAjoute
           key={champ.id}
-          champ={champ}
+          champ={regleChampLibre(champ, champsFacultatifs)}
           value={draft.champsLibres[champ.id] ?? ''}
           error={errors.libres?.[champ.id]}
           onChange={(valeur) => {

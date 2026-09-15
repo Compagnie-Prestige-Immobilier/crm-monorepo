@@ -343,7 +343,7 @@ function RequestReviewActions({
 }
 
 /*
-  `/chues/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
+  `/teleconseil/prospects` est réservé à l'ADMIN : proposer ce lien à un agent
   bancaire l'enverrait droit sur un refus de droits. Il retrouve son
   client par la recherche du formulaire d'ouverture de dossier.
 
@@ -351,7 +351,7 @@ function RequestReviewActions({
 
   `request.createdProspectId` est connu, et l'ignorer paraît être un
   raccourci paresseux. Ce n'en est pas un : le panel n'a pas d'écran de
-  détail de prospect. Il n'existe ni route `/chues/prospects/[id]`, ni critère
+  détail de prospect. Il n'existe ni route dédiée, ni critère
   par identifiant dans `ProspectFilters` : la fiche s'ouvre dans un
   dialogue, depuis la ligne du tableau. Un lien par identifiant n'aurait
   donc aucune destination.
@@ -378,7 +378,7 @@ function RequestProspectLink({
   if (canReview) {
     return (
       <Link
-        href={`/chues/prospects?search=${encodeURIComponent(request.phoneE164)}`}
+        href={`/teleconseil/prospects?search=${encodeURIComponent(request.phoneE164)}`}
         className={buttonVariants({ variant: 'outline' })}
       >
         Voir le prospect créé
@@ -387,7 +387,7 @@ function RequestProspectLink({
   }
 
   return (
-    <Link href="/chues/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
+    <Link href="/finance/dossiers/nouveau" className={buttonVariants({ variant: 'outline' })}>
       Ouvrir un dossier pour ce client
     </Link>
   );

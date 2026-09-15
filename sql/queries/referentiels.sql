@@ -21,6 +21,7 @@ WHERE "effect"::text = ANY(@branche::text[]);
 SELECT count(*)::int AS restants
 FROM "statuts_qualification"
 WHERE "isActive"
+  AND "parentId" IS NULL
   AND "id" <> sqlc.arg('id')
   AND "effect"::text = ANY(@branche::text[]);
 
@@ -28,8 +29,8 @@ WHERE "isActive"
 INSERT INTO "statuts_qualification" (
   "id", "code", "label", "effect", "requiresCallback", "requiresComment",
   "retryAfterMinutes", "priorite", "relationStatus", "sortOrder",
-  "isActive", "isSystem", "minPayloadVersion"
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, false, $11)
+  "isActive", "isSystem", "minPayloadVersion", "parentId"
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, true, false, $11, $12)
 RETURNING *;
 
 -- name: UpdateStatutQualification :one

@@ -30,11 +30,11 @@ SELECT COUNT(*)::int AS convertis,
        COUNT(*) FILTER (WHERE EXISTS (
          SELECT 1 FROM "inscriptions_plateforme" i
          WHERE i."prospectId" = p."id"
-           AND i."projet" = @projet::"Projet"
+           AND (sqlc.narg('projet')::"Projet" IS NULL OR i."projet" = sqlc.narg('projet')::"Projet")
            AND i."disparueLe" IS NULL
        ))::int AS inscrits
 FROM "prospects" p
-WHERE p."projet" = @projet::"Projet"
+WHERE (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet')::"Projet")
   AND p."deletedAt" IS NULL
   AND p."phase2Status" = 'METHOD_OBTAINED';
 
@@ -202,3 +202,57 @@ LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
 WHERE p."deletedAt" IS NULL
 GROUP BY 1, 2, r."sortOrder"
 ORDER BY count DESC;
+
+-- name: LeadsImportesParImport :many
+-- Ce qu'a donne chaque classeur de leads : le motif du dernier appel dit si la
+-- fiche vaut d'etre suivie.
+SELECT
+  j."id",
+  j."fileName" AS fichier,
+  j."createdAt" AS importe_le,
+  COUNT(p."id")::int AS importes,
+  COUNT(p."id") FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS appeles,
+  COUNT(p."id") FILTER (
+    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
+  )::int AS joints,
+  COUNT(p."id") FILTER (WHERE r."code" = ANY(@motifs::text[]))::int AS interesses
+FROM "import_jobs" j
+JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
+LEFT JOIN LATERAL (
+  SELECT c."reasonId"
+  FROM "call_attempts" c
+  WHERE c."prospectId" = p."id"
+  ORDER BY c."createdAt" DESC
+  LIMIT 1
+) dernier ON TRUE
+LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
+GROUP BY j."id", j."fileName", j."createdAt"
+ORDER BY j."createdAt" DESC;
+
+-- name: LeadsImportesInteresses :many
+SELECT
+  p."id",
+  p."nom",
+  p."prenom",
+  p."phoneE164",
+  p."statut",
+  j."fileName" AS fichier,
+  p."importFeuille" AS feuille,
+  dernier."createdAt" AS appele_le,
+  u."fullName" AS appele_par,
+  r."label" AS motif,
+  dernier."comment" AS commentaire
+FROM "prospects" p
+JOIN "import_jobs" j ON j."id" = p."importJobId"
+JOIN LATERAL (
+  SELECT c."reasonId", c."createdAt", c."comment", c."performedById"
+  FROM "call_attempts" c
+  WHERE c."prospectId" = p."id"
+  ORDER BY c."createdAt" DESC
+  LIMIT 1
+) dernier ON TRUE
+JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId" AND r."code" = ANY(@motifs::text[])
+JOIN "users" u ON u."id" = dernier."performedById"
+WHERE p."deletedAt" IS NULL
+ORDER BY dernier."createdAt" DESC
+LIMIT 500;

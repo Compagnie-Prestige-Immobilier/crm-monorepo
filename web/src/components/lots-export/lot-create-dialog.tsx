@@ -7,7 +7,6 @@ import {
   CheckIcon,
   ContactRoundIcon,
   FileSpreadsheetIcon,
-  Layers2Icon,
   LoaderIcon,
   PhoneMissedIcon,
   UserRoundCheckIcon,
@@ -21,7 +20,11 @@ import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
 import { Liste } from '@/components/forms/liste';
-import { ChampImport, cleImport } from '@/components/lots-export/lot-import-select';
+import {
+  ChampImport,
+  cleImport,
+  type ImportChoisi,
+} from '@/components/lots-export/lot-import-select';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -33,7 +36,6 @@ import {
   fetchTeleconseillers,
   previewLotExport,
   type CreateLotExportInput,
-  type LotExportImport,
   type LotExportPreview,
   type Teleconseiller,
 } from '@/lib/data/lots-export';
@@ -41,15 +43,7 @@ import { fetchDepartements, fetchIefs } from '@/lib/data/reference';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import {
-  BDD_SEGMENTS,
-  SEGMENT_LABELS,
-  type BddSegment,
-  type Departement,
-  type Ief,
-  type Projet,
-  type ProspectType,
-} from '@/lib/types';
+import type { Departement, Ief, Projet, ProspectType } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
@@ -62,20 +56,6 @@ const CIBLES = [
     icon: UsersRoundIcon,
   },
   {
-    cle: 'chues-segment',
-    projet: 'CHUES',
-    titre: 'Un segment CHUES',
-    aide: 'Un seul segment, de BDD1 à BDD4.',
-    icon: Layers2Icon,
-  },
-  {
-    cle: 'import-chues',
-    projet: 'CHUES',
-    titre: 'Fiches importées',
-    aide: 'Un classeur importé, choisi par sa date.',
-    icon: FileSpreadsheetIcon,
-  },
-  {
     cle: 'grand-public',
     projet: 'GRAND_PUBLIC',
     titre: 'Prospects Grand Public',
@@ -83,10 +63,10 @@ const CIBLES = [
     icon: ContactRoundIcon,
   },
   {
-    cle: 'import-grand-public',
-    projet: 'GRAND_PUBLIC',
+    cle: 'import',
+    projet: null,
     titre: 'Fiches importées',
-    aide: 'Un classeur importé, choisi par sa date.',
+    aide: 'Un classeur importé, CHUES ou Grand Public, choisi par sa date.',
     icon: FileSpreadsheetIcon,
   },
   {
@@ -112,7 +92,7 @@ const CIBLES = [
   },
 ] as const satisfies readonly {
   cle: string;
-  projet: Projet;
+  projet: Projet | null;
   titre: string;
   aide: string;
   icon: LucideIcon;
@@ -134,9 +114,7 @@ const TETE: Record<CleRepresentants, string> = {
 };
 
 const surRepresentants = (cle: CleCible): cle is CleRepresentants => cle in CIBLE_API;
-type CleImport = 'import-chues' | 'import-grand-public';
-const surImport = (cle: CleCible): cle is CleImport => cle.startsWith('import-');
-const projetDe = (cle: CleCible): Projet => CIBLES.find((c) => c.cle === cle)?.projet ?? 'CHUES';
+const surImport = (cle: CleCible): cle is 'import' => cle === 'import';
 
 const TOUS = 'TOUS';
 const PROSPECTS_VIVANTS = { includeDeleted: false } as const;
@@ -152,17 +130,15 @@ const ETAPES: readonly { id: Etape; titre: string }[] = [
 
 interface Choix {
   cle: CleCible;
-  segment: BddSegment;
   type: ProspectType | typeof TOUS;
   departementId: string;
   iefId: string;
   nonQualifies: boolean;
-  importe: LotExportImport | null;
+  importe: ImportChoisi | null;
 }
 
 const choixInitial = (cle: CleCible): Choix => ({
   cle,
-  segment: 'BDD1',
   type: TOUS,
   departementId: TOUS,
   iefId: TOUS,
@@ -239,13 +215,13 @@ function critereRepresentants(
   };
 }
 
-function critereImport(projet: Projet, importe: LotExportImport | null): Critere {
+function critereImport(importe: ImportChoisi | null): Critere {
   return {
     corps: {
       cible: 'PROSPECTS',
       prospects: {
         ...PROSPECTS_VIVANTS,
-        projet,
+        projet: importe === null ? 'CHUES' : importe.projet,
         ...(importe === null
           ? {}
           : {
@@ -265,7 +241,7 @@ function critereDuChoix(
 ): Critere {
   if (surRepresentants(choix.cle))
     return critereRepresentants(choix.cle, choix, nomDepartement, nomIef);
-  if (surImport(choix.cle)) return critereImport(projetDe(choix.cle), choix.importe);
+  if (surImport(choix.cle)) return critereImport(choix.importe);
 
   if (choix.cle === 'grand-public') {
     const typeLabel = choix.type === TOUS ? '' : `, ${PROSPECT_TYPE_LABELS[choix.type]}`;
@@ -279,16 +255,6 @@ function critereDuChoix(
         },
       },
       etiquette: `Prospects Grand Public${typeLabel}`,
-    };
-  }
-
-  if (choix.cle === 'chues-segment') {
-    return {
-      corps: {
-        cible: 'PROSPECTS',
-        prospects: { ...PROSPECTS_VIVANTS, projet: 'CHUES', segment: choix.segment },
-      },
-      etiquette: `Prospects CHUES, segment ${choix.segment}`,
     };
   }
 
@@ -375,7 +341,7 @@ export function LotCreateDialog({
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  projet: Projet;
+  projet: Projet | null;
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -466,26 +432,6 @@ function ChampsCritere({
   departements: readonly Departement[];
   iefs: readonly Ief[];
 }) {
-  if (choix.cle === 'chues-segment') {
-    return (
-      <Field label="Segment">
-        {(props) => (
-          <Liste
-            id={props.id}
-            describedBy={props['aria-describedby']}
-            items={BDD_SEGMENTS.map((segment) => ({
-              value: segment,
-              label: SEGMENT_LABELS[segment],
-            }))}
-            value={choix.segment}
-            placeholder="Segment"
-            onChange={(value) => onChange({ ...choix, segment: value as BddSegment })}
-          />
-        )}
-      </Field>
-    );
-  }
-
   if (choix.cle === 'grand-public') {
     return (
       <Field label="Type de prospect">
@@ -509,7 +455,6 @@ function ChampsCritere({
   if (surImport(choix.cle)) {
     return (
       <ChampImport
-        projet={projetDe(choix.cle)}
         valeur={choix.importe === null ? '' : cleImport(choix.importe)}
         onChange={(importe) => onChange({ ...choix, importe })}
       />
@@ -877,8 +822,8 @@ function Step3Resume({
   );
 }
 
-function useLotFormState(projet: Projet) {
-  const cibles = CIBLES.filter((c) => c.projet === projet);
+function useLotFormState(projet: Projet | null) {
+  const cibles = CIBLES.filter((c) => projet === null || c.projet === null || c.projet === projet);
   const [step, setStep] = useState<Etape>(1);
   const [choix, setChoix] = useState<Choix>(() => choixInitial(cibles[0]?.cle ?? 'chues'));
   const [decoches, setDecoches] = useState<readonly string[]>([]);
@@ -930,12 +875,11 @@ function computeDistribution(
 
 function computeCleCritere(
   cle: CleCible,
-  segment: BddSegment,
   type: ProspectType | typeof TOUS,
   departementId: string,
   iefId: string,
   nonQualifies: boolean,
-  importId: string | undefined,
+  importe: ImportChoisi | null,
   teleconseillerIds: readonly string[],
   fichesParJour: number,
   jours: number,
@@ -944,12 +888,11 @@ function computeCleCritere(
   const objStr = objectifs.map((o) => `${o.teleconseillerId}:${String(o.fichesParJour)}`).join(',');
   return [
     cle,
-    segment,
     type,
     departementId,
     iefId,
     String(nonQualifies),
-    importId ?? '',
+    importe === null ? '' : cleImport(importe),
     teleconseillerIds.join(','),
     fichesParJour,
     jours,
@@ -983,12 +926,11 @@ function useLotFormQueries(
 
   const cleCritere = computeCleCritere(
     state.choix.cle,
-    state.choix.segment,
     state.choix.type,
     state.choix.departementId,
     state.choix.iefId,
     state.choix.nonQualifies,
-    state.choix.importe?.id,
+    state.choix.importe,
     distribution.distribution.teleconseillerIds,
     distribution.fichesParJour,
     distribution.jours,
@@ -1003,7 +945,7 @@ function useLotFormQueries(
 }
 
 function useLotFormMutationAndQueries(
-  projet: Projet,
+  projet: Projet | null,
   state: ReturnType<typeof useLotFormState>,
   onCree: () => void,
 ) {
@@ -1081,7 +1023,7 @@ function FormulaireDeLot({
   onCree,
   onAnnule,
 }: {
-  projet: Projet;
+  projet: Projet | null;
   onCree: () => void;
   onAnnule: () => void;
 }) {

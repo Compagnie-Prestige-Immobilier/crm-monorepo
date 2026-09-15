@@ -5,6 +5,8 @@ import { tanstackRouter } from '@tanstack/router-plugin/vite';
 import react from '@vitejs/plugin-react';
 import { defineConfig } from 'vite';
 
+const apiPort = process.env.PORT ?? '4000';
+
 export default defineConfig({
   plugins: [
     tanstackRouter({
@@ -56,7 +58,7 @@ export default defineConfig({
     proxy: {
       // `Host` reste celui du navigateur : l'API compare `Origin` à `Host` sur chaque écriture.
       '/api': {
-        target: 'http://localhost:4000',
+        target: `http://localhost:${apiPort}`,
         changeOrigin: false,
       },
     },

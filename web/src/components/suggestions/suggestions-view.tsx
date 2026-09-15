@@ -166,8 +166,8 @@ export function SuggestionsView() {
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-center justify-between gap-4">
         <p className="max-w-2xl text-[0.9375rem] text-muted-foreground">
-          Numéros recommandés par un représentant qui décline. Les fiches suspectes ou invalides
-          sont automatiquement détectées pour vous éviter de perdre du temps.
+          Ce sont des contacts recommandés par un représentant, pas encore des prospects. Les fiches
+          suspectes ou invalides sont automatiquement détectées pour vous éviter de perdre du temps.
         </p>
 
         {suspiciousItems.length > 0 ? (
@@ -387,7 +387,7 @@ function SuggestionCard({
             <Badge variant="info">{sameNumberCount} fois dans cette liste</Badge>
           ) : null}
           {known === null ? null : (
-            <Badge variant="success" render={<Link href={`/chues/representants/${known}`} />}>
+            <Badge variant="success" render={<Link href={`/teleconseil/representants/${known}`} />}>
               <LinkIcon aria-hidden="true" />
               Déjà une fiche
             </Badge>
@@ -460,7 +460,7 @@ function SuggestionCard({
           </Button>
         ) : (
           <Link
-            href={`/chues/representants/${known}`}
+            href={`/teleconseil/representants/${known}`}
             className="self-center text-[0.8125rem] underline underline-offset-4"
           >
             Ouvrir la fiche existante
@@ -512,7 +512,7 @@ function BulleParrain({ suggestion, onFermer }: { suggestion: Suggestion; onFerm
       </div>
       {suggestion.sourceRepresentantId ? (
         <Link
-          href={`/chues/representants/${suggestion.sourceRepresentantId}`}
+          href={`/teleconseil/representants/${suggestion.sourceRepresentantId}`}
           className="mt-1 text-center text-[0.75rem] font-[600] text-primary hover:underline"
         >
           Consulter la fiche complète du parrain →

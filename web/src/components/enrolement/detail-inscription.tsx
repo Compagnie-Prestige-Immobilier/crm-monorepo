@@ -36,7 +36,7 @@ function texte(valeur: string | null, format?: (v: string) => string): string {
 }
 
 function ficheProspect(projet: Projet, id: string): string {
-  return projet === 'GRAND_PUBLIC' ? `/grand-public/${id}` : `/chues/prospects/${id}`;
+  return `/teleconseil/prospects/${id}`;
 }
 
 function Normalise({

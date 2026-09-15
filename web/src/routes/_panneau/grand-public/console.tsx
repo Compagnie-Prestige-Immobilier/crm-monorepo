@@ -29,5 +29,7 @@ function GrandPublicConsolePage() {
   const { user } = Route.useRouteContext();
   const canCreateProspect = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
 
-  return <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />;
+  return (
+    <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />
+  );
 }

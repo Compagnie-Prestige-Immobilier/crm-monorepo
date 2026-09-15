@@ -53,6 +53,7 @@ type QualificationRappelDTO struct {
 	ProspectID     string  `json:"prospectId" format:"uuid"`
 	ShortCode      string  `json:"shortCode"`
 	ProspectName   string  `json:"prospectName"`
+	Projet         string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	PhoneE164      *string `json:"phoneE164"`
 	ScheduledAt    string  `json:"scheduledAt" format:"date-time"`
 	Comment        *string `json:"comment"`
@@ -62,16 +63,17 @@ type QualificationRappelDTO struct {
 }
 
 type qualificationRappelLigne struct {
-	ID, ProspectID, Prenom, Nom, AssigneID, AssigneNom string
-	Phone                                              *string
-	Comment                                            *string
-	Quand                                              time.Time
+	ID, ProspectID, Prenom, Nom, Projet, AssigneID, AssigneNom string
+	Phone                                                      *string
+	Comment                                                    *string
+	Quand                                                      time.Time
 }
 
 func qualificationRappelDTO(l *qualificationRappelLigne, maintenant time.Time) QualificationRappelDTO {
 	return QualificationRappelDTO{
 		ID: l.ID, ProspectID: l.ProspectID, ShortCode: qualificationCodeCourt(l.ProspectID),
 		ProspectName: strings.TrimSpace(l.Prenom + " " + l.Nom), PhoneE164: l.Phone,
+		Projet:      l.Projet,
 		ScheduledAt: qualificationISO(l.Quand), Comment: l.Comment, AssignedToID: l.AssigneID,
 		AssignedToName: l.AssigneNom, Overdue: l.Quand.Before(maintenant),
 	}
@@ -126,7 +128,7 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
 			ID: r.ID, ProspectID: r.ProspectId, Prenom: r.Prenom, Nom: r.Nom, Phone: r.PhoneE164,
-			Comment: r.Comment, AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
+			Projet: string(r.Projet), Comment: r.Comment, AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
 		}, maintenant))
 	}
 	return out, nil
@@ -138,6 +140,33 @@ type QualificationIDInput struct {
 
 type QualificationRappelOutput struct {
 	Body QualificationRappelDTO
+}
+
+const qualificationReportRappel = 15 * time.Minute
+
+func (s *service) qualificationReporterRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	row, err := s.Q.RappelParId(ctx, in.ID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusNotFound, "CALLBACK_NOT_FOUND", "Rappel introuvable.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if u.Role != socle.Admin && row.AssignedToId != u.ID {
+		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
+	}
+	maintenant := time.Now().UTC()
+	if row.Status == db.ScheduledCallbackStatusPENDING {
+		row.ScheduledAt = maintenant.Add(qualificationReportRappel)
+		if err := s.Q.ReporterRappel(ctx, db.ReporterRappelParams{ID: row.ID, ScheduledAt: row.ScheduledAt}); err != nil {
+			return nil, err
+		}
+	}
+	return &QualificationRappelOutput{Body: qualificationRappelDTO(&qualificationRappelLigne{
+		ID: row.ID, ProspectID: row.ProspectId, Prenom: row.Prenom, Nom: row.Nom, Phone: row.PhoneE164,
+		Projet: string(row.Projet), Comment: row.Comment, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
+	}, maintenant)}, nil
 }
 
 func (s *service) qualificationAnnulerRappel(ctx context.Context, in *QualificationIDInput) (*QualificationRappelOutput, error) {
@@ -160,7 +189,7 @@ func (s *service) qualificationAnnulerRappel(ctx context.Context, in *Qualificat
 	}
 	return &QualificationRappelOutput{Body: qualificationRappelDTO(&qualificationRappelLigne{
 		ID: row.ID, ProspectID: row.ProspectId, Prenom: row.Prenom, Nom: row.Nom, Phone: row.PhoneE164,
-		Comment: row.Comment, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
+		Projet: string(row.Projet), Comment: row.Comment, AssigneID: row.AssignedToId, AssigneNom: row.AssignedToName, Quand: row.ScheduledAt,
 	}, maintenant)}, nil
 }
 

@@ -74,6 +74,16 @@ export const statutsDeLaBranche = (
   abouti: boolean,
 ): StatutQualification[] => statuts.filter((statut) => estAbouti(statut.effect) === abouti);
 
+/** Les statuts que le script propose en premier ; les sous-statuts se choisissent ensuite. */
+export const statutsRacine = (statuts: readonly StatutQualification[]): StatutQualification[] =>
+  statuts.filter((statut) => statut.parentId === null);
+
+export const sousStatutsDe = (
+  statuts: readonly StatutQualification[],
+  parentId: string | null,
+): StatutQualification[] =>
+  parentId === null ? [] : statuts.filter((statut) => statut.parentId === parentId);
+
 /**
  * En base, le libellé porte sa famille parce qu'il y est unique. À l'écran,
  * l'en-tête de branche la dit déjà.

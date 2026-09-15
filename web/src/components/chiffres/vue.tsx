@@ -232,17 +232,24 @@ function blocsDesWidgets(
   return blocs;
 }
 
+function libelleNomProjet(projet: string | null): string {
+  if (projet === null || projet === 'tous') return 'Tous les projets';
+  if (projet === 'CHUES') return 'CHUES';
+  return 'Grand Public';
+}
+
 function classeurDesChiffres(input: {
-  projet: Projet;
+  projet: Projet | null;
   periode: string;
   plage: { du: string; au: string };
   equipe: readonly { id: string; fullName: string }[];
   teleconseiller: string | null;
   blocs: BlocTableauDeBord[];
 }): ClasseurTableauDeBord {
-  const nomProjet = input.projet === 'CHUES' ? 'CHUES' : 'Grand Public';
+  const nomProjet = libelleNomProjet(input.projet);
+  const tagFichier = input.projet === null ? 'tous' : input.projet.toLowerCase();
   return {
-    fichier: `cpi-tableau-de-bord-${input.projet.toLowerCase()}-${input.plage.du}-${input.plage.au}`,
+    fichier: `cpi-tableau-de-bord-${tagFichier}-${input.plage.du}-${input.plage.au}`,
     titre: `Tableau de bord ${nomProjet}`,
     sousTitre: input.periode,
     reperes: [
@@ -276,18 +283,18 @@ function LienRappels({
   projet,
   teleconseiller,
 }: {
-  projet: Projet;
+  projet: Projet | null;
   teleconseiller: string | null;
 }) {
   const rappels = useQuery({
     queryKey: [...callbackKeys.list('today', teleconseiller), projet],
-    queryFn: () => fetchCallbacks('today', teleconseiller, undefined, projet),
+    queryFn: () => fetchCallbacks('today', teleconseiller, undefined, projet ?? undefined),
     retry: false,
   });
 
   return (
     <Link
-      href={`${projet === 'CHUES' ? '/chues' : '/grand-public'}/rappels`}
+      href="/teleconseil/rappels"
       className={buttonVariants({ variant: 'outline', size: 'sm' })}
     >
       À rappeler
@@ -303,9 +310,9 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
   const live = useLive();
   const queryClient = useQueryClient();
 
-  const projet: Projet = ecran === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
+  const projet: Projet | null = filters.projet;
   const voitLesMontants = role === 'ADMIN' || role === 'DIRECTION';
-  const catalogue = catalogueDe({ chues: ecran === 'chues', voitLesMontants, role });
+  const catalogue = catalogueDe({ chues: true, voitLesMontants, role, projet });
 
   const plage = plageDeFiltres(filters);
   const perimetre: PerimetreChiffres = {
@@ -569,7 +576,7 @@ function ChiffresToolbar({
   filters: ChiffresFilters;
   onFiltersChange: (patch: Partial<ChiffresFilters>) => void;
   equipe: readonly { id: string; fullName: string }[];
-  projet: Projet;
+  projet: Projet | null;
   live: ReturnType<typeof useLive>;
   enErreur: boolean;
   dataUpdatedAt: number;
@@ -597,6 +604,22 @@ function ChiffresToolbar({
         <p className="text-[0.9375rem] font-[600] text-foreground" aria-live="polite">
           {periodeAffichee(filters)}
         </p>
+        <Select
+          value={filters.projet ?? 'tous'}
+          onValueChange={(value) => {
+            if (value === null) return;
+            onFiltersChange({ projet: value === 'tous' ? null : (value as Projet) });
+          }}
+        >
+          <SelectTrigger size="sm" aria-label="Projet regardé" className="w-40">
+            <SelectValue>{(valeur: string) => libelleNomProjet(valeur)}</SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="tous">Tous les projets</SelectItem>
+            <SelectItem value="CHUES">CHUES</SelectItem>
+            <SelectItem value="GRAND_PUBLIC">Grand Public</SelectItem>
+          </SelectContent>
+        </Select>
         {equipe.length > 0 ? (
           <Select
             value={filters.teleconseiller ?? 'tous'}

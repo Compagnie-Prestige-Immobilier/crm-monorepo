@@ -824,6 +824,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/supervision/representants":         socle.Encadrement,
 	"GET /api/v1/supervision/representants/qualite": socle.Encadrement,
 	"GET /api/v1/supervision/prospects/marketing":   socle.Encadrement,
+	"GET /api/v1/supervision/leads-importes":        socle.Encadrement,
 	"GET /api/v1/supervision/campagnes":             socle.Encadrement,
 	"GET /api/v1/supervision/activite":              socle.Encadrement,
 	"GET /api/v1/supervision/creneaux":              socle.Encadrement,

@@ -6,18 +6,18 @@
  * tombe en 404 le jour du déploiement.
  */
 const MOVED_ROUTES: Readonly<Record<string, string>> = {
-  'tableau-de-bord': '/chues/tableau-de-bord',
-  statistiques: '/chues/statistiques',
-  prospects: '/chues/prospects',
-  campagnes: '/chues/campagnes',
-  console: '/chues/console',
-  rappels: '/chues/rappels',
-  representants: '/chues/representants',
-  suggestions: '/chues/suggestions',
-  banque: '/chues/banque',
-  dossiers: '/chues/dossiers',
-  'demandes-clients': '/chues/demandes-clients',
-  supervision: '/chues/supervision',
+  'tableau-de-bord': '/teleconseil/tableau-de-bord',
+  statistiques: '/teleconseil/tableau-de-bord',
+  prospects: '/teleconseil/prospects',
+  campagnes: '/teleconseil/campagnes',
+  console: '/teleconseil/console',
+  rappels: '/teleconseil/rappels',
+  representants: '/teleconseil/representants',
+  suggestions: '/teleconseil/suggestions',
+  banque: '/finance',
+  dossiers: '/finance/dossiers',
+  'demandes-clients': '/finance/demandes-clients',
+  supervision: '/teleconseil/supervision',
   commerciaux: '/admin/commerciaux',
   referentiels: '/admin/referentiels',
   imports: '/admin/imports',
@@ -26,19 +26,15 @@ const MOVED_ROUTES: Readonly<Record<string, string>> = {
 
   // Adresses des rappels quotidiens d'avant le retrait des campagnes : plus rien
   // ne les émet, mais des notifications déjà envoyées les portent.
-  phase2: '/chues/campagnes',
-  'rep-campaigns': '/chues/campagnes',
+  phase2: '/teleconseil/campagnes',
+  'rep-campaigns': '/teleconseil/campagnes',
 };
 
 /**
  * Adresses COMPLÈTES dont la racine seule mènerait ailleurs.
- *
- * `/phase2/callbacks` est l'écran des rappels, pas une sous-page des lots : la
- * règle de préfixe l'enverrait sur `/chues/campagnes/callbacks`, qui n'existe
- * pas.
  */
 const MOVED_PATHS: Readonly<Record<string, string>> = {
-  '/phase2/callbacks': '/chues/rappels',
+  '/phase2/callbacks': '/teleconseil/rappels',
 };
 
 export type SearchParams = Record<string, string | string[] | undefined>;
@@ -59,17 +55,37 @@ function buildQueryString(search: SearchParams): string {
   return query.size === 0 ? '' : `?${query.toString()}`;
 }
 
+const BANK_SUBROUTES = new Set(['banque', 'dossiers', 'demandes-clients']);
+
+function buildSubPath(segments: readonly string[]): string {
+  if (segments.length === 0) return '';
+  return `/${segments.map(encodeURIComponent).join('/')}`;
+}
+
+function movedCoqueTarget(segments: readonly string[], search: SearchParams): string {
+  const head = segments[0];
+  if (head === undefined) return `/teleconseil${buildQueryString(search)}`;
+  const tail = buildSubPath(segments.slice(1));
+  const query = buildQueryString(search);
+  if (head === 'banque') return `/finance${query}`;
+  const targetCoque = BANK_SUBROUTES.has(head) ? '/finance' : '/teleconseil';
+  return `${targetCoque}/${head}${tail}${query}`;
+}
+
 /**
  * Destination d'une ancienne adresse, ou `null` si la racine n'a jamais
- * existé. Le reste du chemin et la requête suivent : un lien de notification
- * vise un dossier précis, et une barre de filtres se partage avec sa requête.
+ * existé. Le reste du chemin et la requête suivent.
  */
 export function movedTarget(
   root: string,
   segments: readonly string[] = [],
   search: SearchParams = {},
 ): string | null {
-  const tail = segments.map((segment) => `/${encodeURIComponent(segment)}`).join('');
+  if (root === 'chues' || root === 'grand-public') {
+    return movedCoqueTarget(segments, search);
+  }
+
+  const tail = buildSubPath(segments);
   const exact = MOVED_PATHS[`/${root}${tail}`];
 
   const base = exact ?? MOVED_ROUTES[root];

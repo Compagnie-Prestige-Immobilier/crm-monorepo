@@ -35,6 +35,10 @@ test.describe('parcours 1, connexion et session', () => {
     await page.goto('/');
     await expect(page).toHaveURL(/\/connexion(\?suite=.*)?$/);
     await expect(page.getByRole('heading', { name: 'Connexion', level: 1 })).toBeVisible();
+
+    await remplir(page, MOT_DE_PASSE);
+    await expect(page.getByRole('button', { name: `Compte de ${compte.nom}` })).toBeVisible();
+    await page.context().storageState({ path: compte.etat });
   });
 });
 

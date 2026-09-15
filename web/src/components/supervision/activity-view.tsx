@@ -108,7 +108,7 @@ const TUILES: Record<ActivityFamille, { key: ActivityKey; icon: LucideIcon }[]> 
 
 const PRESETS: Exclude<PeriodPreset, 'custom'>[] = ['today', 'week', 'last7'];
 
-export function ActivityView({ projet }: { projet: Projet }) {
+export function ActivityView({ projet }: { projet: Projet | null }) {
   const familles = famillesDuProjet(projet);
   const [famille, setFamille] = useState<ActivityFamille>(familles[0] ?? 'prospects');
   const colonnes = ACTIVITY_COLUMNS[famille];
@@ -683,7 +683,7 @@ function ShiftComparison({
 }: {
   range: ActivityRange;
   granularity: SupervisionGranularity;
-  projet: Projet;
+  projet: Projet | null;
   famille: ActivityFamille;
 }) {
   const queryClient = useQueryClient();

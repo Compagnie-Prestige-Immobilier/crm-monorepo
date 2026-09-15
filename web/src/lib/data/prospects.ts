@@ -38,7 +38,7 @@ const A_QUALIFIER_PAGE_SIZE = 20;
  */
 export async function fetchProspectsAQualifier(
   criteres: {
-    projet: Projet;
+    projet: Projet | null;
     search: string;
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
@@ -48,7 +48,7 @@ export async function fetchProspectsAQualifier(
   const origine = criteres.origine ?? 'TOUS';
   const query: ProspectQuery = {
     mesFiches: true,
-    projet: criteres.projet,
+    ...(criteres.projet === null ? {} : { projet: criteres.projet }),
     search: criteres.search,
     sortBy: 'nom',
     sortOrder: 'asc',
@@ -65,7 +65,7 @@ export async function fetchProspectsAQualifier(
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchProspectsAppeles(
   lastCallById: string,
-  projet: Projet,
+  projet: Projet | null | undefined,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const payload = unwrap(
@@ -73,7 +73,7 @@ export async function fetchProspectsAppeles(
       params: {
         query: {
           lastCallById,
-          projet,
+          ...(projet === null || projet === undefined ? {} : { projet }),
           sortBy: 'lastCallAt',
           sortOrder: 'desc',
           page: 1,

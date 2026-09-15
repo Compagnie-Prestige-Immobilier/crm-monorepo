@@ -92,8 +92,9 @@ function cartesDe(dossiers: BankCase[], inscriptions: InscriptionAOuvrir[]): Car
 }
 
 /** Une colonne par étape active, précédée des dossiers complets de la plateforme. Ordinateur seulement. */
-export function BankKanban({ projet }: { projet: Projet }) {
-  const filtres = { ...EMPTY_BANK_FILTERS, projet, pageSize: PLAFOND_CARTES };
+export function BankKanban({ projet }: { projet?: Projet | null | undefined } = {}) {
+  const p = projet ?? null;
+  const filtres = { ...EMPTY_BANK_FILTERS, projet: p, pageSize: PLAFOND_CARTES };
   const dossiers = useQuery({
     queryKey: queryKeys.bankCases(filtres),
     queryFn: () => fetchBankCases(filtres),
@@ -103,8 +104,8 @@ export function BankKanban({ projet }: { projet: Projet }) {
     queryFn: () => fetchBankStages(false),
   });
   const aOuvrir = useQuery({
-    queryKey: queryKeys.bankAOuvrir(projet),
-    queryFn: () => fetchInscriptionsAOuvrir(projet),
+    queryKey: queryKeys.bankAOuvrir(p),
+    queryFn: () => fetchInscriptionsAOuvrir(p),
   });
 
   if (dossiers.isPending || etapes.isPending) return <BankKanbanSkeleton />;
@@ -119,7 +120,7 @@ export function BankKanban({ projet }: { projet: Projet }) {
         </p>
       ) : null}
       <Tableau
-        projet={projet}
+        projet={p}
         dossiers={dossiers.data.items}
         etapes={[...etapes.data].sort((a, b) => a.position - b.position)}
         inscriptions={aOuvrir.data ?? []}
@@ -134,7 +135,7 @@ function Tableau({
   etapes,
   inscriptions,
 }: {
-  projet: Projet;
+  projet: Projet | null;
   dossiers: BankCase[];
   etapes: BankCaseStage[];
   inscriptions: InscriptionAOuvrir[];

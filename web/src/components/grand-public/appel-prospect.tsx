@@ -23,7 +23,7 @@ export function AppelProspect({ prospect }: { prospect: ProspectRow }) {
   const queryClient = useQueryClient();
 
   const retour = (): void => {
-    router.push('/grand-public');
+    router.push('/teleconseil');
   };
 
   const ouvrir = useMutation({

@@ -20,7 +20,7 @@ function vueMemorisee(): Vue {
 }
 
 /** Kanban sur ordinateur, liste sur téléphone : le glisser-déposer n'a pas de sens au pouce. */
-export function BankDossiers({ projet }: { projet: Projet }) {
+export function BankDossiers({ projet }: { projet?: Projet | null | undefined } = {}) {
   const [vue, setVue] = useState<Vue>(vueMemorisee);
 
   function choisir(suivante: string): void {
@@ -51,11 +51,11 @@ export function BankDossiers({ projet }: { projet: Projet }) {
       </div>
       {vue === 'kanban' ? (
         <div className="hidden lg:block">
-          <BankKanban projet={projet} />
+          <BankKanban projet={projet ?? null} />
         </div>
       ) : null}
       <div className={vue === 'kanban' ? 'lg:hidden' : ''}>
-        <BankCasesView projet={projet} />
+        <BankCasesView projet={projet ?? null} />
       </div>
     </div>
   );

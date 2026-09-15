@@ -46,6 +46,8 @@ import {
   exigeMotif,
   fetchAllStatutsQualification,
   setStatutQualificationActive,
+  sousStatutsDe,
+  statutsRacine,
   updateStatutQualification,
   type PrioriteTraitement,
   type StatutQualification,
@@ -64,6 +66,8 @@ interface Draft {
   reessai: string;
   priorite: PrioriteTraitement;
   relation: RelationChoisie;
+  /** Identifiant du statut parent, ou la sentinelle `AUCUNE`. */
+  parent: string;
 }
 
 /** Les délais proposés d'office après un numéro qui n'a pas répondu. */
@@ -100,7 +104,37 @@ const EMPTY: Draft = {
   reessai: '',
   priorite: 'NORMALE',
   relation: AUCUNE,
+  parent: AUCUNE,
 };
+
+/** Chaque statut racine, suivi de ses sous-statuts. */
+function parBranche(statuts: StatutQualification[]): StatutQualification[] {
+  return statutsRacine(statuts).flatMap((racine) => [racine, ...sousStatutsDe(statuts, racine.id)]);
+}
+
+const classeLibelle = (statut: StatutQualification): string =>
+  statut.parentId === null ? 'font-[600]' : 'pl-8';
+
+/** Le parent choisi impose son effet ; sans parent, l'effet est celui du formulaire. */
+function deriverParent(
+  racines: StatutQualification[],
+  parent: string,
+  effect: StatutQualificationEffect,
+) {
+  const parentChoisi = racines.find((racine) => racine.id === parent) ?? null;
+  return {
+    parentChoisi,
+    effetRetenu: parentChoisi === null ? effect : parentChoisi.effect,
+    descriptionEffet:
+      parentChoisi === null
+        ? 'Il décide de la branche et de l’issue enregistrée.'
+        : `Hérité de « ${parentChoisi.label} ».`,
+    parents: [
+      { value: AUCUNE, label: 'Aucun, statut de premier niveau' },
+      ...racines.map((racine) => ({ value: racine.id, label: racine.label })),
+    ],
+  };
+}
 
 const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'outline'> = {
   HAUTE: 'warning',
@@ -142,8 +176,8 @@ export function StatutsQualificationView() {
   }
 
   const lignes = statuts.data ?? [];
-  const abouti = lignes.filter((statut) => estAbouti(statut.effect));
-  const nonAbouti = lignes.filter((statut) => !estAbouti(statut.effect));
+  const abouti = parBranche(lignes.filter((statut) => estAbouti(statut.effect)));
+  const nonAbouti = parBranche(lignes.filter((statut) => !estAbouti(statut.effect)));
 
   return (
     <div className="flex flex-col gap-6">
@@ -196,6 +230,7 @@ export function StatutsQualificationView() {
 
       <FormulaireStatut
         statut={edite}
+        racines={statutsRacine(lignes).filter((statut) => statut.isActive)}
         open={ouvert}
         onOpenChange={setOuvert}
         onSaved={() => {
@@ -238,7 +273,7 @@ function Branche({
         <TableBody>
           {statuts.map((statut) => (
             <TableRow key={statut.id}>
-              <TableCell className="font-[600]">
+              <TableCell className={classeLibelle(statut)}>
                 {statut.label}
                 {statut.requiresCallback ? (
                   <Badge variant="outline" className="ml-2">
@@ -315,11 +350,13 @@ function Branche({
 
 function FormulaireStatut({
   statut,
+  racines,
   open,
   onOpenChange,
   onSaved,
 }: {
   statut: StatutQualification | null;
+  racines: StatutQualification[];
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
@@ -345,6 +382,7 @@ function FormulaireStatut({
             reessai: statut.retryAfterMinutes === null ? '' : String(statut.retryAfterMinutes),
             priorite: statut.priorite,
             relation: statut.relationStatus ?? AUCUNE,
+            parent: statut.parentId ?? AUCUNE,
           },
     );
   }, [open, statut, reset]);
@@ -354,6 +392,12 @@ function FormulaireStatut({
   const priorite = watch('priorite');
   const relation = watch('relation');
   const reessai = watch('reessai');
+  const parent = watch('parent');
+  const { parentChoisi, effetRetenu, descriptionEffet, parents } = deriverParent(
+    racines,
+    parent,
+    effect,
+  );
 
   const save = useMutation({
     mutationFn: (values: Draft) =>
@@ -367,7 +411,7 @@ function FormulaireStatut({
           })
         : createStatutQualification({
             label: values.label.trim(),
-            effect: values.effect,
+            ...(values.parent === AUCUNE ? { effect: values.effect } : { parentId: values.parent }),
             requiresCallback: values.requiresCallback,
             // Cet écran ne pose pas la question : seuls les statuts système
             // exigent un motif, et ils ne se créent pas d'ici.
@@ -415,19 +459,50 @@ function FormulaireStatut({
             )}
           </Field>
 
-          <Field label="Effet" description="Il décide de la branche et de l’issue enregistrée.">
+          <Field
+            label="Sous-statut de"
+            description="Un sous-statut se propose après son parent et en garde l’effet."
+          >
+            {(props) => (
+              <Select
+                items={[...parents]}
+                value={parent}
+                onValueChange={(value) => {
+                  setValue('parent', value ?? AUCUNE);
+                  const racine = racines.find((r) => r.id === value);
+                  if (racine && racine.effect !== 'SCHEDULE_CALLBACK') {
+                    setValue('requiresCallback', false);
+                  }
+                }}
+                disabled={modification}
+              >
+                <SelectTrigger id={props.id}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {parents.map((choix) => (
+                    <SelectItem key={choix.value} value={choix.value}>
+                      {choix.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </Field>
+
+          <Field label="Effet" description={descriptionEffet}>
             {(props) => (
               <Select
                 items={STATUT_QUALIFICATION_EFFECTS.map((valeur) => ({
                   value: valeur,
                   label: STATUT_QUALIFICATION_EFFECT_LABELS[valeur],
                 }))}
-                value={effect}
+                value={effetRetenu}
                 onValueChange={(value) => {
                   setValue('effect', value as StatutQualificationEffect);
                   if (value !== 'SCHEDULE_CALLBACK') setValue('requiresCallback', false);
                 }}
-                disabled={modification}
+                disabled={modification || parentChoisi !== null}
               >
                 <SelectTrigger id={props.id}>
                   <SelectValue />
@@ -503,7 +578,7 @@ function FormulaireStatut({
           <label className="flex items-center gap-2 text-[0.9375rem]">
             <input
               type="checkbox"
-              disabled={regleFigee || effect !== 'SCHEDULE_CALLBACK'}
+              disabled={regleFigee || effetRetenu !== 'SCHEDULE_CALLBACK'}
               {...register('requiresCallback')}
             />
             Exige la date du rappel

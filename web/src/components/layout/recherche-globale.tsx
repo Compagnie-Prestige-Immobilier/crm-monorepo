@@ -38,7 +38,7 @@ export function RechercheGlobale({ role }: { role: Role }) {
         evenement.preventDefault();
         const cherche = terme.trim();
         if (cherche === '') return;
-        router.push(`/chues/prospects?search=${encodeURIComponent(cherche)}`);
+        router.push(`/teleconseil/prospects?search=${encodeURIComponent(cherche)}`);
       }}
     >
       <SearchIcon

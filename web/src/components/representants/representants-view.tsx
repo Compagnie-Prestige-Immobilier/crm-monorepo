@@ -322,7 +322,7 @@ export function RepresentantsView({
             // Un LIEN habillé en bouton : la primitive `Button` de Base UI
             // poserait `role="button"` sur le `<a>`.
             <Link
-              href="/chues/representants/import"
+              href="/teleconseil/representants/import"
               className={buttonVariants({ variant: 'outline' })}
             >
               <UploadIcon aria-hidden="true" />
@@ -414,7 +414,7 @@ export function RepresentantsView({
                         <TableRow key={representant.id}>
                           <TableCell className="font-[600]">
                             <Link
-                              href={`/chues/representants/${representant.id}`}
+                              href={`/teleconseil/representants/${representant.id}`}
                               className="hover:underline focus-visible:underline"
                             >
                               {representant.fullName}
@@ -521,7 +521,7 @@ function RepresentantCard({
         <div className="min-w-0">
           <p className="truncate font-[600]">
             <Link
-              href={`/chues/representants/${representant.id}`}
+              href={`/teleconseil/representants/${representant.id}`}
               className="hover:underline focus-visible:underline"
             >
               {representant.fullName}

@@ -42,6 +42,7 @@ const (
 	referentielsNomPriorite    = "priorite"
 	referentielsNomRelation    = "relationStatus"
 	referentielsNomRang        = "sortOrder"
+	referentielsNomParent      = "parentId"
 	referentielsNomCouleur     = "color"
 	referentielsNomJoint       = "countsAsReached"
 
@@ -797,6 +798,7 @@ type ReferentielsStatut struct {
 	RetryAfterMinutes *int32    `json:"retryAfterMinutes"`
 	Priorite          string    `json:"priorite" enum:"HAUTE,NORMALE,BASSE"`
 	RelationStatus    *string   `json:"relationStatus" enum:"INCONNU,CONTACTE,AMBASSADEUR,REFUS"`
+	ParentID          *string   `json:"parentId"`
 	IsActive          bool      `json:"isActive"`
 	IsSystem          bool      `json:"isSystem"`
 	MinPayloadVersion int32     `json:"minPayloadVersion"`
@@ -848,7 +850,7 @@ func referentielsVersStatut(r *db.StatutsQualification) ReferentielsStatut {
 	s := ReferentielsStatut{
 		ID: r.ID, Code: r.Code, Label: r.Label, Effect: string(r.Effect),
 		RequiresCallback: r.RequiresCallback, RequiresComment: r.RequiresComment,
-		RetryAfterMinutes: r.RetryAfterMinutes, Priorite: string(r.Priorite),
+		RetryAfterMinutes: r.RetryAfterMinutes, Priorite: string(r.Priorite), ParentID: r.ParentId,
 		IsActive: r.IsActive, IsSystem: r.IsSystem,
 		MinPayloadVersion: r.MinPayloadVersion, UpdatedAt: r.UpdatedAt,
 	}
@@ -882,7 +884,8 @@ func (s *service) referentielsStatutsAdmin(ctx context.Context, _ *struct{}) (*R
 type ReferentielsCreerStatutInput struct {
 	Body struct {
 		Label             string  `json:"label" minLength:"2" maxLength:"120"`
-		Effect            string  `json:"effect" enum:"REACHED,REFUSED,SCHEDULE_CALLBACK,UNREACHABLE,WRONG_NUMBER"`
+		Effect            *string `json:"effect,omitempty" enum:"REACHED,REFUSED,SCHEDULE_CALLBACK,UNREACHABLE,WRONG_NUMBER"`
+		ParentID          *string `json:"parentId,omitempty" format:"uuid"`
 		RequiresCallback  *bool   `json:"requiresCallback,omitempty"`
 		RequiresComment   *bool   `json:"requiresComment,omitempty"`
 		RetryAfterMinutes *int32  `json:"retryAfterMinutes,omitempty" minimum:"0" maximum:"10080"`
@@ -925,12 +928,40 @@ func referentielsLibreOuConflit(id, code, message string, err error) error {
 	return p
 }
 
+// Un sous-statut hérite l'effet de son parent : résultat, statut, sous-statut,
+// jamais plus profond.
+func (s *service) referentielsEffetDuStatut(ctx context.Context, in *ReferentielsCreerStatutInput) (db.StatutQualificationEffect, error) {
+	if in.Body.ParentID == nil {
+		if in.Body.Effect == nil {
+			return "", socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_EFFECT_REQUIRED",
+				"Un statut sans parent doit dire son effet.")
+		}
+		return db.StatutQualificationEffect(*in.Body.Effect), nil
+	}
+	parent, err := s.Q.StatutQualificationParID(ctx, *in.Body.ParentID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return "", socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_PARENT_NOT_FOUND", "Statut parent introuvable.")
+	}
+	if err != nil {
+		return "", err
+	}
+	if parent.ParentId != nil {
+		return "", socle.Problem(http.StatusConflict, "STATUT_QUALIFICATION_PARENT_TOO_DEEP",
+			"« "+parent.Label+" » est déjà un sous-statut : il ne peut pas en porter un autre.")
+	}
+	return parent.Effect, nil
+}
+
 func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsCreerStatutInput) (*ReferentielsStatutOutput, error) {
 	label := strings.TrimSpace(in.Body.Label)
 	code := referentielsCodeDepuisLibelle(label)
 	if !referentielsCodeValide.MatchString(code) {
 		return nil, socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_LABEL_UNUSABLE",
 			"« "+label+" » ne donne aucun code utilisable : commencez par une lettre et n'employez que des lettres, des chiffres et des espaces.")
+	}
+	effet, err := s.referentielsEffetDuStatut(ctx, in)
+	if err != nil {
+		return nil, err
 	}
 	clashLabel, err := s.Q.StatutQualificationParLabel(ctx, label)
 	if err := referentielsLibreOuConflit(clashLabel.ID, "STATUT_QUALIFICATION_LABEL_CONFLICT",
@@ -943,10 +974,9 @@ func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsC
 		return nil, err
 	}
 	requiresCallback := referentielsVaut(in.Body.RequiresCallback, false)
-	if err := referentielsRappelAutorise(in.Body.Effect, "STATUT_QUALIFICATION_CALLBACK_NOT_ALLOWED", requiresCallback); err != nil {
+	if err := referentielsRappelAutorise(string(effet), "STATUT_QUALIFICATION_CALLBACK_NOT_ALLOWED", requiresCallback); err != nil {
 		return nil, err
 	}
-	effet := db.StatutQualificationEffect(in.Body.Effect)
 	rang, err := s.Q.RangSuivantStatutQualification(ctx, referentielsBranche(effet))
 	if err != nil {
 		return nil, err
@@ -969,6 +999,7 @@ func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsC
 				RetryAfterMinutes: referentielsReessai(in.Body.RetryAfterMinutes),
 				Priorite:          db.PrioriteTraitement(referentielsVaut(in.Body.Priorite, "NORMALE")),
 				RelationStatus:    relation, SortOrder: rang, MinPayloadVersion: referentielsVersionStatut,
+				ParentId: in.Body.ParentID,
 			})
 			if err != nil {
 				return nil, nil, err
