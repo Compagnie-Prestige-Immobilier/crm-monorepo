@@ -310,6 +310,77 @@ func TestQualificationModifierUnAppelEstTraceSurLaFiche(t *testing.T) {
 	}
 }
 
+func TestQualificationGrandPublicConsigneSansCommentaireNiDate(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	chues, grandPublic := qualificationProspect(b), uuid.NewString()
+	qualificationExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","projet","clientCreatedAt","updatedAt")
+	                      VALUES ($1,'Sarr','Mame',$2,$3,'GRAND_PUBLIC',now(),now())`, grandPublic, qualificationNumero(), b.userID)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, grandPublic)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" = $1`, grandPublic)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, grandPublic)
+	})
+	rdv := map[string]any{"outcome": "CALLBACK", "reasonCode": "RDV_TELEPHONIQUE"}
+
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(grandPublic, rdv))
+	b.attend(statut, http.StatusOK, "RDV téléphonique Grand Public sans commentaire ni date", body)
+	qualificationExigeCompte(b, 0, "rappel planifié sans date", `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1`, grandPublic)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(grandPublic, map[string]any{"outcome": "OTHER", "reasonCode": "DEMANDE_INFORMATION"}))
+	b.attend(statut, http.StatusOK, "demande d’information Grand Public sans commentaire", body)
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(chues, rdv))
+	b.attend(statut, http.StatusBadRequest, "RDV téléphonique CHUES sans commentaire ni date", body)
+	if body["code"] != "PHASE2_COMMENT_REQUIRED" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+func TestQualificationFicheConfieeSeModifieTantQueLaCampagneTourne(t *testing.T) {
+	createur := qualificationConnecte(t, "COMMERCIAL")
+	confie := qualificationConnecte(t, "COMMERCIAL")
+	prospect, lot := qualificationProspect(createur), uuid.NewString()
+	t.Cleanup(func() {
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1
+		  OR "entityId" IN (SELECT "id" FROM "call_attempts" WHERE "prospectId" = $1)`, prospect)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+	qualificationExec(createur, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                             VALUES ($1,'Campagne confiée','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, createur.userID)
+	qualificationExec(createur, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, prospect, confie.userID)
+	corps := qualificationCorpsTentative(prospect, nil)
+	statut, body := qualificationEnvoi(createur, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	createur.attend(statut, http.StatusOK, "appel du créateur", body)
+	appel, fiche := "/api/v1/phase2/call-attempts/"+fmt.Sprint(corps["id"]), "/api/v1/prospects/"+prospect
+	correction := map[string]any{"outcome": "UNREACHABLE", "comment": "Messagerie pleine"}
+	profession := map[string]any{"profession": "Enseignant"}
+
+	statut, body = qualificationEnvoi(confie, http.MethodGet, fiche+"/call-attempts", nil)
+	confie.attend(statut, http.StatusOK, "appels de la fiche confiée", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("un seul appel attendu : %v", body)
+	}
+	if editable, _ := items[0].(map[string]any)["editable"].(bool); !editable {
+		t.Fatalf("l’appel d’un collègue doit être modifiable sur la fiche confiée : %v", body)
+	}
+	statut, body = qualificationEnvoi(confie, http.MethodPatch, appel, correction)
+	confie.attend(statut, http.StatusOK, "appel d’un collègue sur une fiche confiée", body)
+	statut, body = qualificationEnvoi(confie, http.MethodPatch, fiche, profession)
+	confie.attend(statut, http.StatusOK, "fiche confiée par une campagne active", body)
+
+	qualificationExec(createur, `UPDATE "lots_export" SET "pausedAt" = now() WHERE "id" = $1`, lot)
+	statut, body = qualificationEnvoi(confie, http.MethodPatch, appel, correction)
+	confie.attend(statut, http.StatusForbidden, "appel après la pause de la campagne", body)
+	if body["code"] != "PHASE2_ATTEMPT_NOT_OWNER" {
+		t.Fatalf("code : %v", body["code"])
+	}
+	statut, body = qualificationEnvoi(confie, http.MethodPatch, fiche, profession)
+	confie.attend(statut, http.StatusForbidden, "fiche après la pause de la campagne", body)
+}
+
 // Sans verrou depuis le 10 septembre 2026 : plusieurs fiches restent en main,
 // et chaque console reprend la plus récente des siennes.
 func TestQualificationPlusieursFichesEnMainUneParConsole(t *testing.T) {

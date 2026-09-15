@@ -30,7 +30,7 @@ type ProspectConsentementInput struct {
 
 func (s *service) prospectConsentement(ctx context.Context, in *ProspectConsentementInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	if _, err := s.prospectModifiable(ctx, &u, in.ID); err != nil {
+	if _, err := s.prospectModifiable(ctx, &u, in.ID, true); err != nil {
 		return nil, err
 	}
 	journeyID, err := uuid.NewV7()
@@ -79,7 +79,7 @@ func (s *service) prospectConvertir(ctx context.Context, in *ProspectConversionI
 	if err := prospectPaiementCoherent(corps.PaymentMode, corps.DurationMonths); err != nil {
 		return nil, err
 	}
-	if _, err := s.prospectModifiable(ctx, &u, in.ID); err != nil {
+	if _, err := s.prospectModifiable(ctx, &u, in.ID, true); err != nil {
 		return nil, err
 	}
 	journey, err := s.Q.JourneyParProjet(ctx, db.JourneyParProjetParams{ProspectId: in.ID, Projet: db.ProjetGRANDPUBLIC})

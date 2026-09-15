@@ -154,9 +154,13 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
     }) as MotifAppel,
 );
 
-/** Le statut qui propose la date sans l'exiger se consigne aussi sans elle. */
-const sansDateDeRappel = (motif: MotifAppel | null, saisie: string): motif is MotifAppel =>
-  motif !== null && !motif.requiresCallback && saisie.trim() === '';
+/** Sur Grand Public, ou sur un statut qui propose la date sans l'exiger, l'appel se consigne sans elle. */
+const sansDateDeRappel = (
+  motif: MotifAppel | null,
+  saisie: string,
+  projet: Projet,
+): motif is MotifAppel =>
+  motif !== null && (projet === 'GRAND_PUBLIC' || !motif.requiresCallback) && saisie.trim() === '';
 
 const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   'UNREACHABLE',
@@ -682,7 +686,11 @@ export function PanneauDossier({
         telephone={telephone}
         disabled={disabled}
         reglages={formulaire.champs}
-        libres={formulaire.libres}
+        libres={
+          conversion.projet === 'CHUES'
+            ? formulaire.libres
+            : formulaire.libres.map((champ) => ({ ...champ, obligatoire: false }))
+        }
         seulement={seulement}
         onChange={onChange}
       />
@@ -935,14 +943,18 @@ export function Consignation({
         ...(renseignements === undefined ? {} : { conversion: renseignements }),
         ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
       };
-      const problem = validateAttempt(draft, Date.now(), choisi.requiresComment);
+      const problem = validateAttempt(
+        draft,
+        Date.now(),
+        projet === 'CHUES' && choisi.requiresComment,
+      );
       if (problem !== null) {
         toast.error(problem);
         return;
       }
       send.mutate(draft);
     },
-    [send, comment, ouverture],
+    [send, comment, ouverture, projet],
   );
 
   const ouvrirDossier = useCallback(() => {
@@ -1003,7 +1015,7 @@ export function Consignation({
   // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
     if (slots !== null) {
-      if (sansDateDeRappel(motif, freeCallback)) {
+      if (sansDateDeRappel(motif, freeCallback, projet)) {
         record(motif, null);
         return;
       }
@@ -1020,7 +1032,7 @@ export function Consignation({
       return;
     }
     if (motif !== null) record(motif, null);
-  }, [conversion, submitConversion, slots, freeCallback, motif, record]);
+  }, [conversion, submitConversion, slots, freeCallback, motif, record, projet]);
 
   const etape = etapeCourante(conversion, slots, groupe);
   const saisieEnCours = saisieCommencee(conversion, slots, motif, comment);
@@ -1167,7 +1179,7 @@ export function Consignation({
             now={now}
             freeCallback={freeCallback}
             surDossier={conversion !== null}
-            facultative={motif?.requiresCallback === false}
+            facultative={projet === 'GRAND_PUBLIC' || motif?.requiresCallback === false}
             titre={titreEcheance(motif?.code)}
             disabled={send.isPending}
             inputRef={callbackRef}
@@ -1197,7 +1209,7 @@ export function Consignation({
           <Commentaire
             value={comment}
             titre={rappelOuvert ? 'Commentaire du rappel' : 'Commentaire'}
-            obligatoirePour={commentaireExigePar(motif)}
+            obligatoirePour={projet === 'CHUES' ? commentaireExigePar(motif) : null}
             inputRef={commentRef}
             onChange={setComment}
             onValidate={validate}

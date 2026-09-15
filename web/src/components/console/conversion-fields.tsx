@@ -9,6 +9,7 @@ import { Liste } from '@/components/forms/liste';
 import { Input } from '@/components/ui/input';
 import {
   reglesChamps,
+  type ReglesChamps,
   type ChampReglable,
   type ConversionDraft,
   type ConversionErrors,
@@ -98,6 +99,10 @@ function ChampTelephone({
   );
 }
 
+/** À l'ajout, le nom reste exigé avec le numéro, même sur Grand Public. */
+const nomRequis = (regles: ReglesChamps, telephone: SaisieTelephone | undefined): boolean =>
+  telephone !== undefined || regles.requis('nom', true);
+
 /**
  * L'ordre, la visibilité et le caractère obligatoire viennent de
  * `reglages` : sans réglage chargé, le formulaire reste celui du projet.
@@ -126,7 +131,7 @@ export function ConversionFields({
   onChange: (patch: Partial<ConversionDraft>) => void;
 }) {
   const complet = draft.projet === 'CHUES';
-  const regles = reglesChamps(reglages);
+  const regles = reglesChamps(reglages, draft.projet);
 
   const banques = useQuery({
     queryKey: queryKeys.banques,
@@ -159,7 +164,7 @@ export function ConversionFields({
 
   const noeuds: Readonly<Record<ChampReglable, ReactNode>> = {
     nom: (
-      <Field label="Nom" required={regles.requis('nom', true)} error={errors.nom}>
+      <Field label="Nom" required={nomRequis(regles, telephone)} error={errors.nom}>
         {(props) => (
           <Input
             {...props}
@@ -442,7 +447,7 @@ export function ConversionFields({
             <div className="mt-2">
               <Field
                 label="Date et heure du rendez-vous en agence"
-                required
+                required={complet}
                 error={errors.rendezVousAt}
                 description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
               >

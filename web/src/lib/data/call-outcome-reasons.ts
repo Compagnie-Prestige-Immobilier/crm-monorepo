@@ -92,8 +92,7 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
 /**
  * KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien. Envoyé en
  * UNREACHABLE, « Intéressé » s'afficherait « Injoignable » et sortirait des
- * appels aboutis, que les chiffres comptent par issue. OTHER exige un
- * commentaire en base : son motif le réclame donc aussi.
+ * appels aboutis, que les chiffres comptent par issue.
  */
 const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
   INTERESSE: 'OTHER',
