@@ -1,12 +1,5 @@
 # Migration vers un CRM unifié
 
-Statut : proposition du 14 septembre 2026. Elle contredit la décision du 10
-septembre (panneau v1 repris à l’identique, aucune refonte d’écran sans accord
-écrit, `CLAUDE.md`, « Cap v2 »). Rien ne se code avant que le propriétaire ait
-inscrit son accord daté ci-dessous.
-
-Accord du propriétaire : à compléter.
-
 ## Décision d’architecture
 
 Le CRM devient une seule application pour tous les rôles. CHUES et Grand
@@ -361,7 +354,8 @@ sur son premier écran :
 
 - Accueil : registre des visites ;
 - téléconseiller et chargé de clientèle : Mon travail ;
-- superviseur, direction, admin : tableau de bord Téléconseil ;
+- direction : leads importés (fiches très intéressées et qualité des classeurs) ;
+- superviseur, admin : tableau de bord Téléconseil ;
 - Banque & Finance : vue d’ensemble.
 
 Différé : une page transversale (rappels du jour, campagnes, dossiers en
@@ -382,20 +376,19 @@ citées aux sections 6 et 8 acceptent un `projet` vide. Les gardes de
 
 ## 12. Ordre d’implémentation
 
-1. accord écrit du propriétaire ;
-2. décision sur la lecture Finance par l’encadrement ;
-3. coques et navigation ;
-4. routes Téléconseil et Finance, préfixes dans `moved-routes.ts` ;
-5. requêtes SQL d’indicateurs avec `projet` vide ;
-6. prospects ;
-7. représentants ;
-8. rappels ;
-9. campagnes d’appels ;
-10. tableau de bord ;
-11. Banque & Finance ;
-12. page après connexion ;
-13. suppression des fichiers de routes `chues/` et `grand-public/` ;
-14. e2e, puis bascule.
+1. décision sur la lecture Finance par l’encadrement ;
+2. coques et navigation ;
+3. routes Téléconseil et Finance, préfixes dans `moved-routes.ts` ;
+4. requêtes SQL d’indicateurs avec `projet` vide ;
+5. prospects ;
+6. représentants ;
+7. rappels ;
+8. campagnes d’appels ;
+9. tableau de bord ;
+10. Banque & Finance ;
+11. page après connexion ;
+12. suppression des fichiers de routes `chues/` et `grand-public/` ;
+13. e2e, puis bascule.
 
 ## 13. Validation
 

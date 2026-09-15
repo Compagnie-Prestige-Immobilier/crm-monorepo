@@ -84,13 +84,22 @@ async function chercher(page: Page, libelle: string): Promise<void> {
   await expect(page).toHaveURL(new RegExp(`search=${cle}`));
 }
 
+async function fermerRappelIntrusif(page: Page): Promise<void> {
+  const plusTard = page.getByRole('button', { name: 'Plus tard', exact: true });
+  await plusTard.waitFor({ state: 'visible', timeout: 3_000 }).catch(() => undefined);
+  if (await plusTard.isVisible().catch(() => false)) {
+    await plusTard.click();
+    await expect(plusTard).toBeHidden();
+  }
+}
+
 test.describe('parcours 7, les listes CHUES', () => {
   test.use({ storageState: compteDe('ADMIN').etat });
 
   test('la recherche, le tri et la page vivent dans l’URL et survivent au rechargement', async ({
     page,
   }) => {
-    await page.goto('/chues/representants');
+    await page.goto('/teleconseil/representants');
     await chercher(page, 'Recherche');
 
     const affichage = page.getByRole('status').filter({ hasText: 'Représentants affichés' });
@@ -129,8 +138,8 @@ test.describe('parcours 7, les listes CHUES', () => {
     );
     expect(enBase, 'le représentant a disparu de la base').not.toBeNull();
 
-    await page.goto(`/chues/representants/${porteur}`);
-    await expect(page.getByRole('heading', { level: 2 })).toContainText(nomRepresentant(1));
+    await page.goto(`/teleconseil/representants/${porteur}`);
+    await expect(page.getByRole('heading', { name: new RegExp(nomRepresentant(1)) })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
     await expect(page.getByText(String(enBase?.etablissement))).toBeVisible();
 
@@ -138,20 +147,20 @@ test.describe('parcours 7, les listes CHUES', () => {
     await expect(histoire.getByRole('button', { name: /Fiche créée/ })).toBeVisible();
 
     await page.getByRole('link', { name: new RegExp(`CHUES ${cle}`) }).click();
-    await expect(page).toHaveURL(new RegExp(`/chues/prospects/${prospectChues}$`));
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${prospectChues}$`));
     await expect(page.getByRole('heading', { level: 2 })).toContainText(`CHUES ${cle}`);
     await expect(page.getByRole('link', { name: 'Ouvrir la fiche du représentant' })).toBeVisible();
   });
 
   test('la liste des prospects CHUES retrouve la fiche par son nom', async ({ page }) => {
-    await page.goto('/chues/prospects');
+    await page.goto('/teleconseil/prospects?projet=CHUES');
     await chercher(page, 'Recherche');
 
     await expect(page.getByRole('link', { name: new RegExp(`CHUES ${cle}`) })).toHaveCount(1);
   });
 
   test('la liste des prospects CHUES ne montre pas les fiches Grand Public', async ({ page }) => {
-    await page.goto('/chues/prospects');
+    await page.goto('/teleconseil/prospects?projet=CHUES');
     await chercher(page, 'Recherche');
 
     await expect(page.getByRole('link', { name: new RegExp(`GP ${cle}`) })).toHaveCount(0);
@@ -170,11 +179,12 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     );
     expect(enBase?.projet, 'le parcours Grand Public manque en base').toBe('GRAND_PUBLIC');
 
-    await page.goto('/grand-public/nouveau');
+    await page.goto('/teleconseil/prospects/nouveau?projet=GRAND_PUBLIC');
+    await fermerRappelIntrusif(page);
     await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: '2 Situation', exact: true })).toBeDisabled();
+    await expect(page.locator('button').filter({ hasText: 'Situation' })).toBeDisabled();
 
-    await page.goto('/grand-public');
+    await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Rechercher');
 
     const ligneGp = page.getByRole('row').filter({ hasText: `GP ${cle}` });
@@ -182,14 +192,14 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(page.getByRole('row').filter({ hasText: `CHUES ${cle}` })).toHaveCount(0);
 
     await ligneGp.getByRole('link').first().click();
-    await expect(page).toHaveURL(new RegExp(`/grand-public/appel/${prospectGrandPublic}$`));
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/appel/${prospectGrandPublic}$`));
     await expect(page.getByRole('heading', { name: `GP ${cle} Ousmane`, level: 2 })).toBeVisible();
 
     await page.getByRole('group').getByRole('button', { name: '1 Joignable', exact: true }).click();
     await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
     await expect(page.getByRole('button', { name: '2 Dossier', exact: true })).toBeDisabled();
     await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/grand-public/appel/${prospectGrandPublic}$`));
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/appel/${prospectGrandPublic}$`));
     await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
     await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
@@ -207,7 +217,7 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await page.getByRole('textbox').fill('Souhaite recevoir les informations.');
     await page.getByRole('button', { name: /Enregistrer l’appel/ }).click();
-    await expect(page).toHaveURL(/\/grand-public$/);
+    await expect(page).toHaveURL(/\/teleconseil$/);
     const appel = await ligne<{ code: string; nom: string }>(
       `SELECT r.code, o.draft->'conversion'->>'nom' AS nom
          FROM call_attempts a
@@ -225,7 +235,7 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await chercher(page, 'Rechercher');
     await expect(page.getByRole('row').filter({ hasText: `GP ${cle}` })).toContainText('Contacté');
 
-    await page.goto(`/grand-public/${prospectGrandPublic}`);
+    await page.goto(`/teleconseil/prospects/${prospectGrandPublic}`);
     await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
   });
@@ -240,7 +250,7 @@ test.describe('parcours 7 en 390 px, les listes passent en cartes', () => {
   });
 
   test('le tableau des représentants cède la place à une carte par fiche', async ({ page }) => {
-    await page.goto(`/chues/representants?search=${cle}`);
+    await page.goto(`/teleconseil/representants?search=${cle}`);
     await expect(page.getByRole('status')).toHaveText(new RegExp(`sur ${String(REPRESENTANTS)}`));
 
     await expect(page.getByRole('table')).toBeHidden();

@@ -147,7 +147,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     page,
     browser,
   }) => {
-    await page.goto('/chues/campagnes');
+    await page.goto('/teleconseil/campagnes');
     await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
     const dialogue = page.getByRole('dialog');
     await dialogue.getByText('Fiches importées', { exact: true }).click();
@@ -160,7 +160,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Créer la campagne' }).click();
 
-    await expect(page).toHaveURL(/\/chues\/campagnes\/[0-9a-f-]+$/u);
+    await expect(page).toHaveURL(/\/teleconseil\/campagnes\/[0-9a-f-]+$/u);
     lotId = page.url().split('/').at(-1) ?? null;
     await expect(
       page.getByRole('heading', { level: 2, name: new RegExp(`^${ONGLET}, `, 'u') }),
@@ -170,7 +170,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     const contexte = await browser.newContext({ storageState: teleconseiller.etat });
     const console = await contexte.newPage();
     const chercher = async () => {
-      await console.goto('/chues/console');
+      await console.goto('/teleconseil/console');
       await console.getByLabel('Quel prospect avez-vous appelé ?').fill(NOM);
     };
     await chercher();

@@ -23,12 +23,13 @@ const (
 )
 
 var (
-	Tous        = []Role{Admin, Commercial, BanqueFinance, Superviseur, Direction, Accueil, ChargeClientele}
-	Parcours    = []Role{Admin, Commercial, ChargeClientele, Superviseur, Direction}
-	Encadrement = []Role{Admin, Superviseur, Direction}
-	Registre    = []Role{Admin, Direction, Accueil}
-	Banque      = []Role{Admin, BanqueFinance}
-	AdminSeul   = []Role{Admin}
+	Tous          = []Role{Admin, Commercial, BanqueFinance, Superviseur, Direction, Accueil, ChargeClientele}
+	Parcours      = []Role{Admin, Commercial, ChargeClientele, Superviseur, Direction}
+	Encadrement   = []Role{Admin, Superviseur, Direction}
+	Registre      = []Role{Admin, Direction, Accueil}
+	Banque        = []Role{Admin, BanqueFinance}
+	BanqueLecture = []Role{Admin, BanqueFinance, Superviseur, Direction}
+	AdminSeul     = []Role{Admin}
 )
 
 // Une entrée par route, clé "METHODE chemin huma", fusion des gardes de chaque

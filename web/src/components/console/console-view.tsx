@@ -20,6 +20,7 @@ import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire'
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -110,10 +111,25 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'REFUS_MEFIANT', label: 'Méfiant', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_NE_VEUT_PAS', label: 'Ne veut pas', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_PAS_POUR_LE_MOMENT', label: 'Pas pour le moment', effect: 'CLOSE_REFUSED' },
-  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
-  { code: 'RDV_TELEPHONIQUE', label: 'RDV téléphonique', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  {
+    code: 'DEMANDE_INFORMATION',
+    label: 'Demande d’information',
+    effect: 'KEEP_OPEN',
+    requiresComment: true,
+  },
+  {
+    code: 'RDV_TELEPHONIQUE',
+    label: 'RDV téléphonique',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresComment: true,
+  },
   { code: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement', effect: 'CLOSE_METHOD' },
-  { code: 'CONSTRUCTION', label: 'Construction', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  {
+    code: 'CONSTRUCTION',
+    label: 'Construction',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresComment: true,
+  },
   { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN', requiresComment: true },
   { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED', requiresComment: true },
   { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN', requiresComment: true },
@@ -151,12 +167,7 @@ const statutAdhesion = (
 
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
 
-const nouveauHref = (projet: Projet): string =>
-  projet === 'GRAND_PUBLIC' ? '/grand-public/nouveau' : '/chues/prospects/nouveau';
-
-/** Grand Public consigne l'appel sur son propre écran, le même que depuis la liste des fiches. */
-const appelHref = (projet: Projet, id: string): string | null =>
-  projet === 'GRAND_PUBLIC' ? `/grand-public/appel/${id}` : null;
+const nouveauHref = (): string => '/teleconseil/prospects';
 
 const CLASSE_CHOIX = cn(
   'flex min-h-11 w-full items-center gap-2 rounded-sm text-left text-[0.9375rem] font-[600]',
@@ -169,12 +180,12 @@ const CLASSE_CHOIX = cn(
  * les rappels) ouvre directement la fiche visée.
  */
 export function ConsoleView({
-  projet = 'CHUES',
+  projet = null,
   viewerId,
   origineFiltrable = false,
   canCreateProspect = false,
 }: {
-  projet?: Projet;
+  projet?: Projet | null;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
   viewerId?: string | undefined;
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
@@ -239,7 +250,7 @@ export function ConsoleView({
         key={consultee.prospect.id}
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
-        projet={projet}
+        projet={consultee.prospect.projet}
         canCreateProspect={canCreateProspect}
         onAbandon={revenir}
         onEnregistre={(nom, detailStatut) => {
@@ -261,6 +272,7 @@ export function ConsoleView({
 
   return (
     <div className="flex w-full flex-col gap-5">
+      <ContexteFile projet={projet} />
       <EnTeteAnnuaire
         lienEnEchec={demandee !== null && parLien.isError}
         confirme={confirme}
@@ -275,7 +287,6 @@ export function ConsoleView({
       <ListeAnnuaire
         annuaire={annuaire}
         cherche={cherche}
-        projet={projet}
         canCreateProspect={canCreateProspect}
         onChoisir={(row) => {
           setConfirme(null);
@@ -303,6 +314,24 @@ export function ConsoleView({
   );
 }
 
+function ContexteFile({ projet }: { projet: Projet | null }) {
+  if (projet !== null) {
+    return (
+      <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+        <ProjetBadge projet={projet} />
+        <span className="text-sm text-muted-foreground">File de conversion de ce projet</span>
+      </div>
+    );
+  }
+  return (
+    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+      <ProjetBadge projet="CHUES" />
+      <ProjetBadge projet="GRAND_PUBLIC" />
+      <span className="text-sm text-muted-foreground">File de conversion unifiée</span>
+    </div>
+  );
+}
+
 /**
  * Ce qui précède la liste : l'avis d'un lien mort, la confirmation du dernier
  * appel, la recherche et la provenance.
@@ -321,7 +350,7 @@ function EnTeteAnnuaire({
   confirme: string | null;
   cherche: string;
   search: string;
-  projet: Projet;
+  projet: Projet | null;
   /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
   origine: OrigineFiche | null;
   onSearch: (value: string) => void;
@@ -329,6 +358,8 @@ function EnTeteAnnuaire({
 }) {
   let texteAide: string;
   if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
+  else if (projet === null)
+    texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
   else if (projet === 'GRAND_PUBLIC')
     texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
   else
@@ -379,7 +410,7 @@ interface Ouverte {
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
 
-const origineInitialePour = (projet: Projet): OrigineFiche =>
+const origineInitialePour = (projet: Projet | null): OrigineFiche =>
   projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
 
 const texteConfirmationAppel = (nom: string, detailStatut?: string): string =>
@@ -436,13 +467,11 @@ function saisieCommencee(
 function ListeAnnuaire({
   annuaire,
   cherche,
-  projet,
   canCreateProspect,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
-  projet: Projet;
   canCreateProspect: boolean;
   onChoisir: (row: ProspectRow) => void;
 }) {
@@ -469,7 +498,7 @@ function ListeAnnuaire({
             : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
         </p>
         {canCreateProspect ? (
-          <Link href={nouveauHref(projet)} className={cn(buttonVariants(), 'self-start')}>
+          <Link href={nouveauHref()} className={cn(buttonVariants(), 'self-start')}>
             Ajouter un prospect
           </Link>
         ) : null}
@@ -482,6 +511,7 @@ function ListeAnnuaire({
       <TableHeader>
         <TableRow>
           <TableHead>Nom et prénom</TableHead>
+          <TableHead>Projet</TableHead>
           <TableHead>Numéro</TableHead>
           <TableHead>Statut / Qualification</TableHead>
           <TableHead>Dernier appel</TableHead>
@@ -489,25 +519,21 @@ function ListeAnnuaire({
       </TableHeader>
       <TableBody>
         {annuaire.data.items.map((row) => {
-          const href = appelHref(projet, row.id);
           return (
             <TableRow key={row.id}>
               <TableCell>
-                {href === null ? (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onChoisir(row);
-                    }}
-                    className={CLASSE_CHOIX}
-                  >
-                    <NomProspect row={row} />
-                  </button>
-                ) : (
-                  <Link href={href} className={CLASSE_CHOIX}>
-                    <NomProspect row={row} />
-                  </Link>
-                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChoisir(row);
+                  }}
+                  className={CLASSE_CHOIX}
+                >
+                  <NomProspect row={row} />
+                </button>
+              </TableCell>
+              <TableCell>
+                <ProjetBadge projet={row.projet} />
               </TableCell>
               <TableCell className="whitespace-nowrap font-mono text-[0.875rem]">
                 {formatPhone(row.phoneE164)}
@@ -651,6 +677,7 @@ export function PanneauDossier({
         reglages={formulaire.champs}
         libres={formulaire.libres}
         seulement={seulement}
+        champsFacultatifs
         onChange={onChange}
       />
     </>
@@ -660,12 +687,11 @@ export function PanneauDossier({
 /** Les statuts de qualification disponibles pour la fiche. */
 function ChoixIssue({
   etape,
-  groupe: _groupe,
+  groupe,
   proposes,
   motif,
   disabled,
   onGroupe,
-  onRetour,
   onMotif,
 }: {
   etape: Etape;
@@ -674,43 +700,50 @@ function ChoixIssue({
   motif: MotifAppel | null;
   disabled: boolean;
   onGroupe: (groupe: Groupe) => void;
-  onRetour: () => void;
   onMotif: (motif: MotifAppel) => void;
 }) {
-  if (etape === 'issues') {
-    return (
-      <fieldset className="flex flex-col gap-2" disabled={disabled}>
-        <LegendeIssue>Avez-vous eu la personne au téléphone ?</LegendeIssue>
-        <div className="flex flex-wrap gap-2">
-          {GROUPES.map((item) => (
-            <Button
-              key={item.cle}
-              variant="outline"
-              onClick={() => {
-                onGroupe(item.cle);
-              }}
-            >
-              <Kbd>{item.touche}</Kbd>
-              {item.label}
-            </Button>
-          ))}
-        </div>
-      </fieldset>
-    );
-  }
-
-  if (etape !== 'motifs') return null;
+  if (etape !== 'issues' && etape !== 'motifs') return null;
 
   return (
-    <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-          Qualification de l’appel
-        </p>
-        <Button type="button" variant="ghost" size="sm" onClick={onRetour}>
-          Changer de statut
-        </Button>
+    <fieldset className="flex flex-col gap-2" disabled={disabled}>
+      <LegendeIssue>Avez-vous eu la personne au téléphone ?</LegendeIssue>
+      <div className="flex flex-wrap gap-2">
+        {GROUPES.map((item) => (
+          <Button
+            key={item.cle}
+            variant={groupe === item.cle ? 'default' : 'outline'}
+            aria-pressed={groupe === item.cle}
+            onClick={() => {
+              onGroupe(item.cle);
+            }}
+          >
+            {groupe === null ? <Kbd>{item.touche}</Kbd> : null}
+            {item.label}
+          </Button>
+        ))}
       </div>
+
+      {groupe === null ? null : (
+        <MotifsDuGroupe proposes={proposes} motif={motif} onMotif={onMotif} />
+      )}
+    </fieldset>
+  );
+}
+
+function MotifsDuGroupe({
+  proposes,
+  motif,
+  onMotif,
+}: {
+  proposes: readonly MotifAppel[];
+  motif: MotifAppel | null;
+  onMotif: (motif: MotifAppel) => void;
+}) {
+  return (
+    <div className={cn('flex flex-col gap-2 pt-3', REVELE)}>
+      <p className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        Qualification de l’appel
+      </p>
       {proposes.length === 0 ? (
         <p role="alert" className="text-[0.875rem] text-warning">
           Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de
@@ -733,7 +766,7 @@ function ChoixIssue({
           ))}
         </div>
       )}
-    </fieldset>
+    </div>
   );
 }
 
@@ -825,8 +858,8 @@ export function Consignation({
   const [comment, setComment] = useState(repris.comment);
   // Un brouillon repris vient d'un appel où la personne répondait : la question
   // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
-  const [groupe, setGroupe] = useState<Groupe | null>(
-    'joignable',
+  const [groupe, setGroupe] = useState<Groupe | null>(() =>
+    repris.conversion === null ? null : 'joignable',
   );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
@@ -926,6 +959,7 @@ export function Consignation({
       Date.now(),
       formulaire.champs,
       formulaire.libres,
+      true,
     );
     setConversionErrors(problems);
     const adhesion = statutAdhesion(motif, catalogue);
@@ -988,7 +1022,7 @@ export function Consignation({
       onAbandon();
       return;
     }
-    setGroupe('joignable');
+    setGroupe(null);
     setMotif(null);
     setComment('');
     setConversion(null);
@@ -1002,15 +1036,6 @@ export function Consignation({
     setMotif(null);
     setSlots(null);
     setFreeCallback('');
-    setConversionErrors({});
-  };
-
-  const retourAuxIssues = (): void => {
-    setGroupe('joignable');
-    setMotif(null);
-    setSlots(null);
-    setFreeCallback('');
-    setConversion(null);
     setConversionErrors({});
   };
 
@@ -1070,11 +1095,11 @@ export function Consignation({
     n: () => {
       if (!canCreateProspect) return;
       const rep = prospect.representantId;
-      if (rep) router.push(`/chues/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
+      if (rep) router.push(`/teleconseil/prospects/nouveau?rep=${encodeURIComponent(rep)}`);
     },
     r: () => {
       const rep = prospect.representantId;
-      if (rep) router.push(`/chues/representants/${encodeURIComponent(rep)}`);
+      if (rep) router.push(`/teleconseil/representants/${encodeURIComponent(rep)}`);
     },
     '?': () => {
       setHelpOpen((open) => !open);
@@ -1103,7 +1128,6 @@ export function Consignation({
           motif={motif}
           disabled={send.isPending}
           onGroupe={choisirGroupe}
-          onRetour={retourAuxIssues}
           onMotif={choisir}
         />
 
@@ -1297,6 +1321,10 @@ function EnTeteFiche({
 }) {
   return (
     <>
+      <div className="flex flex-wrap items-center gap-2">
+        <ProjetBadge projet={projet} />
+        <span className="text-sm font-semibold text-muted-foreground">Fiche à consigner</span>
+      </div>
       <h2 className="font-display text-[1.25rem] font-[700] tracking-[-0.02em]">{nomComplet}</h2>
 
       <div className="flex flex-wrap items-center gap-3">
@@ -1336,10 +1364,12 @@ function EnTeteRappel({
   prospect,
   nomComplet,
   motif,
+  projet,
 }: {
   prospect: ProspectRow;
   nomComplet: string;
   motif: MotifAppel | null;
+  projet: Projet;
 }) {
   return (
     <div className="rounded-xl border-2 border-amber-500/40 bg-amber-500/[0.06] p-4">
@@ -1348,9 +1378,12 @@ function EnTeteRappel({
           <CalendarClockIcon aria-hidden="true" />
         </div>
         <div className="min-w-0">
-          <p className="text-[0.75rem] font-[700] tracking-[0.08em] text-amber-700 uppercase dark:text-amber-300">
-            {motif?.code === 'RDV_AGENCE' ? 'Rendez-vous d’information' : 'Rappel téléphonique'}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[0.75rem] font-[700] tracking-[0.08em] text-amber-700 uppercase dark:text-amber-300">
+              {motif?.code === 'RDV_AGENCE' ? 'Rendez-vous d’information' : 'Rappel téléphonique'}
+            </p>
+            <ProjetBadge projet={projet} />
+          </div>
           <h2 className="mt-0.5 font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
             {nomComplet}
           </h2>
@@ -1385,7 +1418,9 @@ function EnTeteConsignation({
   surDossier: boolean;
 }) {
   if (rappelOuvert)
-    return <EnTeteRappel prospect={prospect} nomComplet={nomComplet} motif={motif} />;
+    return (
+      <EnTeteRappel prospect={prospect} nomComplet={nomComplet} motif={motif} projet={projet} />
+    );
   return (
     <EnTeteFiche
       prospect={prospect}
@@ -1407,7 +1442,6 @@ function ChoixConsignation({
   motif: MotifAppel | null;
   disabled: boolean;
   onGroupe: (groupe: Groupe) => void;
-  onRetour: () => void;
   onMotif: (motif: MotifAppel) => void;
 }) {
   if (rappelOuvert) return null;

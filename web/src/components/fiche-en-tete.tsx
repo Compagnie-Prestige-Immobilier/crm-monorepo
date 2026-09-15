@@ -1,7 +1,9 @@
 import type { ReactNode } from 'react';
 
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { formatPhone, initials, SANS_NUMERO } from '@/lib/format';
+import type { Projet } from '@/lib/types';
 
 export interface ChiffreDeFiche {
   label: string;
@@ -15,6 +17,7 @@ export function FicheEnTete({
   complement,
   phoneE164,
   badges,
+  projet,
   actions,
   chiffres,
 }: {
@@ -22,6 +25,7 @@ export function FicheEnTete({
   complement?: string | null;
   phoneE164: string | null;
   badges: ReactNode;
+  projet?: Projet;
   actions?: ReactNode;
   chiffres: readonly ChiffreDeFiche[];
 }) {
@@ -50,7 +54,10 @@ export function FicheEnTete({
               {formatPhone(phoneE164)}
             </a>
           )}
-          <div className="mt-2 flex flex-wrap items-center gap-2">{badges}</div>
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            {projet === undefined ? null : <ProjetBadge projet={projet} />}
+            {badges}
+          </div>
         </div>
         {actions === undefined ? null : (
           <div className="flex flex-wrap items-center gap-2">{actions}</div>

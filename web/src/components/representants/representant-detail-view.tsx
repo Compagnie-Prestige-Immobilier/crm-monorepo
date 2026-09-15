@@ -320,7 +320,7 @@ function evenementProspect(prospect: ProspectRow): EvenementHistorique {
     variant: 'success',
     resume: `${prospect.prenom} ${prospect.nom} · ${formatPhone(prospect.phoneE164)}`,
     acteur: prospect.ownedByCommercialName,
-    lien: { href: `/chues/prospects/${prospect.id}`, label: 'Ouvrir la fiche du prospect' },
+    lien: { href: `/teleconseil/prospects/${prospect.id}`, label: 'Ouvrir la fiche du prospect' },
     detail: (
       <dl className="grid gap-3 sm:grid-cols-2">
         <Champ label="Prospect">
@@ -433,7 +433,7 @@ export function RepresentantDetailView({
   if (fiche.isPending) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
+        <DetailBackLink href="/teleconseil/representants">Tous les représentants</DetailBackLink>
         <Skeleton className="h-44 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -443,7 +443,7 @@ export function RepresentantDetailView({
   if (fiche.isError) {
     return (
       <div className="flex flex-col gap-6">
-        <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
+        <DetailBackLink href="/teleconseil/representants">Tous les représentants</DetailBackLink>
         <QueryErrorState
           error={fiche.error}
           onRetry={() => {
@@ -469,12 +469,13 @@ export function RepresentantDetailView({
 
   return (
     <div className="flex flex-col gap-6">
-      <DetailBackLink href="/chues/representants">Tous les représentants</DetailBackLink>
+      <DetailBackLink href="/teleconseil/representants">Tous les représentants</DetailBackLink>
 
       <FicheEnTete
         nom={representant.fullName}
         complement={representant.prenom}
         phoneE164={representant.phoneE164}
+        projet="CHUES"
         badges={
           <RelationBadge
             status={representant.relationStatus}
@@ -610,7 +611,7 @@ function ProspectsApportes({ prospects }: { prospects: UseQueryResult<Paginated<
             {prospects.data.items.map((prospect) => (
               <li key={prospect.id}>
                 <Link
-                  href={`/chues/prospects/${prospect.id}`}
+                  href={`/teleconseil/prospects/${prospect.id}`}
                   className="flex items-center gap-3 rounded-md px-2 py-2.5 transition-colors hover:bg-secondary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <span className="min-w-0 grow">

@@ -198,7 +198,7 @@ export function presetRange(
 export function supervisionActivityKey(
   range: ActivityRange,
   granularity: SupervisionGranularity,
-  projet: Schemas['Projet'],
+  projet: Schemas['Projet'] | null,
   shift?: { start: string; end: string },
 ): readonly unknown[] {
   return ['supervision', 'activite', range.from, range.to, granularity, projet, shift];
@@ -209,7 +209,7 @@ export async function fetchSupervisionActivite(
   input: {
     range: ActivityRange;
     granularity: SupervisionGranularity;
-    projet: Schemas['Projet'];
+    projet: Schemas['Projet'] | null;
     shift?: { start: string; end: string };
   },
   client: ApiClient = getApiClient(),
@@ -221,7 +221,7 @@ export async function fetchSupervisionActivite(
           actFrom: `${input.range.from}T00:00:00.000Z`,
           actTo: `${input.range.to}T23:59:59.999Z`,
           granularity: input.granularity,
-          projet: input.projet,
+          ...(input.projet === null ? {} : { projet: input.projet }),
           ...(input.shift === undefined
             ? {}
             : { timeFrom: input.shift.start, timeTo: input.shift.end }),
@@ -359,8 +359,8 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   ],
 };
 
-export function famillesDuProjet(projet: Schemas['Projet']): ActivityFamille[] {
-  return projet === 'CHUES' ? ['representants', 'prospects'] : ['prospects'];
+export function famillesDuProjet(projet: Schemas['Projet'] | null): ActivityFamille[] {
+  return projet === 'GRAND_PUBLIC' ? ['prospects'] : ['representants', 'prospects'];
 }
 
 function rate(part: number, whole: number): number | null {
@@ -488,9 +488,10 @@ export function sortActivityLines(
   });
 }
 
-const PROJET_LABELS: Record<Schemas['Projet'], string> = {
+const PROJET_LABELS: Record<Schemas['Projet'] | 'TOUS', string> = {
   CHUES: 'CHUES',
   GRAND_PUBLIC: 'Grand Public',
+  TOUS: 'tous les projets',
 };
 
 export function activityCsv(input: {
@@ -498,7 +499,7 @@ export function activityCsv(input: {
   totals: ActivityTotals;
   range: ActivityRange;
   granularity: SupervisionGranularity;
-  projet: Schemas['Projet'];
+  projet: Schemas['Projet'] | null;
   famille: ActivityFamille;
 }): string {
   const colonnes = ACTIVITY_COLUMNS[input.famille];
@@ -509,7 +510,7 @@ export function activityCsv(input: {
 
   const rows: (string | number | null)[][] = [
     [
-      `Activité des téléconseillers ${PROJET_LABELS[input.projet]} du ${input.range.from} au ${input.range.to}`,
+      `Activité des téléconseillers ${PROJET_LABELS[input.projet ?? 'TOUS']} du ${input.range.from} au ${input.range.to}`,
       FAMILLE_LABELS[input.famille],
       input.granularity === 'week' ? 'Par semaine' : 'Par jour',
     ],
@@ -534,10 +535,12 @@ export function activityCsv(input: {
 /** Le projet est dans le nom : les deux coques exportent la même période sur des chiffres différents. */
 export function activityCsvFileName(
   range: ActivityRange,
-  projet: Schemas['Projet'],
+  projet: Schemas['Projet'] | null,
   famille: ActivityFamille,
 ): string {
-  const suffixe = projet === 'GRAND_PUBLIC' ? 'grand-public' : 'chues';
+  let suffixe = 'chues';
+  if (projet === null) suffixe = 'tous';
+  if (projet === 'GRAND_PUBLIC') suffixe = 'grand-public';
   const periode = range.from === range.to ? range.from : `${range.from}_${range.to}`;
   return `cpi-supervision-activite-${suffixe}-${famille}-${periode}.csv`;
 }

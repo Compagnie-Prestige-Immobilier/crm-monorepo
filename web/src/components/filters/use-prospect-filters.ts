@@ -18,8 +18,9 @@ export function useProspectFilters(): {
 
   const filters = useMemo(() => {
     const parsed = parseProspectFilters(new URLSearchParams(searchParams.toString()));
-    if (pathname.startsWith('/grand-public')) parsed.projet = 'GRAND_PUBLIC';
-    else if (pathname.startsWith('/chues')) parsed.projet = 'CHUES';
+    if (parsed.projet === null) {
+      if (pathname.startsWith('/grand-public')) parsed.projet = 'GRAND_PUBLIC';
+    }
     return parsed;
   }, [pathname, searchParams]);
 

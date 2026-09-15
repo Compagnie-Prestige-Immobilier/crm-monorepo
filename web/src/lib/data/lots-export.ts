@@ -20,9 +20,10 @@ export type LotExportFichesQuery = NonNullable<
   operations['listLotExportFiches']['parameters']['query']
 >;
 
-/** Une campagne reste dans la coque de son projet ; un lot de représentants porte `CHUES`. */
-export function campagnesPath(projet: Projet): string {
-  return projet === 'GRAND_PUBLIC' ? '/grand-public/campagnes' : '/chues/campagnes';
+export const TELECONSEIL_CAMPAGNES_PATH = '/teleconseil/campagnes';
+
+export function campagnesPath(_projet?: Projet | null): string {
+  return TELECONSEIL_CAMPAGNES_PATH;
 }
 
 export async function fetchLotsExport(
@@ -131,11 +132,14 @@ export async function deleteLotExport(
 }
 
 export async function fetchDerniereCampagne(
-  projet: Schemas['Projet'],
+  projet: Schemas['Projet'] | null,
   teleconseillerId: string | null,
   client: ApiClient = getApiClient(),
 ): Promise<CampagnePerformance | null> {
-  const liste = await fetchLotsExport({ projet, page: 1, pageSize: 1 }, client);
+  const liste = await fetchLotsExport(
+    { page: 1, pageSize: 1, ...(projet === null ? {} : { projet }) },
+    client,
+  );
   const resume = liste.items[0];
   if (resume === undefined) return null;
 

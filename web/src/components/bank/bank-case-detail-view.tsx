@@ -284,7 +284,7 @@ export function BankCaseDetailView({
 }: {
   caseId: string;
   role: Role;
-  projet: Projet;
+  projet?: Projet | null | undefined;
 }) {
   const queryClient = useQueryClient();
   const listHref = `${bankBasePath(projet)}/dossiers`;

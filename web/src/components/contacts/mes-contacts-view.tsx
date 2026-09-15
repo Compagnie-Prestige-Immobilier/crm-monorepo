@@ -8,6 +8,7 @@ import { useState, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { Badge } from '@/components/ui/badge';
@@ -52,12 +53,10 @@ const SANS_VALEUR = <span className="text-muted-foreground">–</span>;
 /** Section « Appels » des fiches CHUES. Grand Public n'en a pas encore. */
 const ANCRE_APPELS = '#appels';
 
-const ficheProspect = (projet: Projet, prospect: ProspectRow): string =>
-  projet === 'GRAND_PUBLIC'
-    ? `/grand-public/${prospect.id}`
-    : `/chues/prospects/${prospect.id}${ANCRE_APPELS}`;
+const ficheProspect = (projet: Projet | null | undefined, prospect: ProspectRow): string =>
+  `/teleconseil/prospects/${prospect.id}${projet === 'GRAND_PUBLIC' ? '' : ANCRE_APPELS}`;
 
-const ficheRepresentant = (id: string): string => `/chues/representants/${id}${ANCRE_APPELS}`;
+const ficheRepresentant = (id: string): string => `/teleconseil/representants/${id}${ANCRE_APPELS}`;
 
 function LigneVersFiche({ href, children }: { href: string; children: ReactNode }) {
   const router = useRouter();
@@ -81,23 +80,25 @@ export function MesContactsView({
   userId,
   canFilter,
 }: {
-  projet: Projet;
+  projet?: Projet | null | undefined;
   userId: string;
   canFilter: boolean;
 }) {
   const [onglet, setOnglet] = useState<Onglet>('PROSPECTS');
   const [filtreId, setFiltreId] = useState<string | null>(null);
 
+  const proj = projet ?? null;
+
   // L'API ne borne ces listes ni au demandeur ni aux fiches appelées : sans
   // identifiant, elle rendrait aussi les fiches que personne n'a jamais appelées.
   const lastCallById = canFilter ? (filtreId ?? userId) : userId;
 
-  const avecRepresentants = projet === 'CHUES';
+  const avecRepresentants = proj !== 'GRAND_PUBLIC';
   const vueRepresentants = avecRepresentants && onglet === 'REPRESENTANTS';
 
   const prospects = useQuery({
-    queryKey: ['mes-contacts', 'prospects', projet, lastCallById],
-    queryFn: () => fetchProspectsAppeles(lastCallById, projet),
+    queryKey: ['mes-contacts', 'prospects', proj, lastCallById],
+    queryFn: () => fetchProspectsAppeles(lastCallById, proj),
     enabled: !vueRepresentants,
     placeholderData: (previous) => previous,
   });
@@ -119,6 +120,10 @@ export function MesContactsView({
 
   return (
     <section className="flex flex-col gap-4">
+      <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+        Mes contacts regroupe les personnes déjà appelées par vous. Le projet est affiché sur chaque
+        fiche.
+      </p>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[0.875rem] text-muted-foreground">
           Les personnes appelées, de l’appel le plus récent au plus ancien.
@@ -171,7 +176,7 @@ export function MesContactsView({
           vide="Un prospect apparaît ici dès que vous consignez un appel sur sa fiche."
           echec="Les prospects appelés n’ont pas pu être lus."
         >
-          {(items) => <TableProspects items={items} projet={projet} />}
+          {(items) => <TableProspects items={items} projet={proj} />}
         </Liste>
       )}
     </section>
@@ -239,6 +244,21 @@ function EnTete() {
   );
 }
 
+function EnTeteProspects() {
+  return (
+    <TableHeader>
+      <TableRow>
+        <TableHead>Projet</TableHead>
+        <TableHead>Nom</TableHead>
+        <TableHead>Téléphone</TableHead>
+        <TableHead>Dernier appel</TableHead>
+        <TableHead>Issue</TableHead>
+        <TableHead>Statut</TableHead>
+      </TableRow>
+    </TableHeader>
+  );
+}
+
 function Quand({ at }: { at: string | null }) {
   if (at === null) return SANS_VALEUR;
   return <time dateTime={at}>{formatDateTime(at)}</time>;
@@ -287,13 +307,16 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
   );
 }
 
-function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Projet }) {
+function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Projet | null }) {
   return (
     <Table>
-      <EnTete />
+      <EnTeteProspects />
       <TableBody>
         {items.map((prospect) => (
           <LigneVersFiche key={prospect.id} href={ficheProspect(projet, prospect)}>
+            <TableCell>
+              <ProjetBadge projet={prospect.projet} />
+            </TableCell>
             <TableCell>
               <Link
                 href={ficheProspect(projet, prospect)}

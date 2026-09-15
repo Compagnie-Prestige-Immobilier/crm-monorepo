@@ -29,7 +29,10 @@ export const callbackKeys = {
   teleconseillers: ['callbacks', 'teleconseillers'] as const,
 };
 
-export type Callback = components['schemas']['CallbackDto'];
+export type Callback = components['schemas']['CallbackDto'] & {
+  prospectName: string;
+  projet: Projet;
+};
 export type CallbackScope = components['schemas']['CallbackScope'];
 
 export interface CallbackList {
@@ -62,7 +65,7 @@ export async function fetchCallbacks(
         },
       },
     }),
-  );
+  ) as unknown as CallbackList;
   return { items: sortCallbacks(list.items), serverTime: list.serverTime };
 }
 
@@ -72,7 +75,16 @@ export async function cancelCallback(
 ): Promise<Callback> {
   return unwrap(
     await client.POST('/api/v1/phase2/callbacks/{id}/cancel', { params: { path: { id } } }),
-  );
+  ) as unknown as Callback;
+}
+
+export async function snoozeCallback(id: string): Promise<Callback> {
+  const response = await fetch(`/api/v1/phase2/callbacks/${encodeURIComponent(id)}/snooze`, {
+    method: 'POST',
+    credentials: 'same-origin',
+  });
+  if (!response.ok) throw new Error('Le rappel n’a pas pu être reporté.');
+  return (await response.json()) as Callback;
 }
 
 const HOUR_MS = 3_600_000;
@@ -397,10 +409,14 @@ export function validateConversion(
   now: number = Date.now(),
   reglages: readonly ReglageChamp[] = [],
   libres: readonly ChampLibre[] = [],
+  champsFacultatifs = false,
 ): ConversionErrors {
   const complet = draft.projet === 'CHUES';
-  const regles = reglesChamps(reglages);
-  const manquantes = libresManquants(draft, libres);
+  const configurees = reglesChamps(reglages);
+  const regles: ReglesChamps = champsFacultatifs
+    ? { visible: configurees.visible, requis: () => false }
+    : configurees;
+  const manquantes = champsFacultatifs ? {} : libresManquants(draft, libres);
   return {
     ...identiteErreurs(draft, complet, regles),
     ...dossierErreurs(draft, complet, regles),
@@ -701,7 +717,7 @@ export function validateAttempt(
   const commentErr = commentAttemptErreur(draft, exigeCommentaire);
   if (commentErr !== null) return commentErr;
   if (draft.conversion !== undefined) {
-    const problems = validateConversion(draft.conversion, now);
+    const problems = validateConversion(draft.conversion, now, [], [], true);
     return Object.values(problems).find((message) => typeof message === 'string') ?? null;
   }
   return null;

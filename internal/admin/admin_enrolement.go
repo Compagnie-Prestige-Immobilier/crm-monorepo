@@ -1221,7 +1221,12 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 	out.Body.Entonnoir.Inscriptions = out.Body.Inscriptions
 	out.Body.TauxRapprochement = tauxEnrolement(out.Body.Rapprochees, out.Body.Inscriptions)
 
-	conversion, err := s.Q.ConversionEnrolement(ctx, db.Projet(in.Projet))
+	var p *db.Projet
+	if in.Projet != "" {
+		v := db.Projet(in.Projet)
+		p = &v
+	}
+	conversion, err := s.Q.ConversionEnrolement(ctx, p)
 	if err != nil {
 		return nil, err
 	}

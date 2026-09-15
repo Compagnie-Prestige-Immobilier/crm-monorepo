@@ -201,7 +201,8 @@ WHERE "id" = @id;
 
 -- name: ListerRappels :many
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
-       p."phoneE164", p."prenom", p."nom", u."fullName" AS "assignedToName"
+       p."phoneE164", p."prenom", p."nom", p."projet",
+       u."fullName" AS "assignedToName"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 JOIN "users" u ON u."id" = c."assignedToId"
@@ -218,7 +219,8 @@ LIMIT 500;
 
 -- name: RappelParId :one
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
-       c."status", p."phoneE164", p."prenom", p."nom", u."fullName" AS "assignedToName"
+       c."status", p."phoneE164", p."prenom", p."nom", p."projet",
+       u."fullName" AS "assignedToName"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 JOIN "users" u ON u."id" = c."assignedToId"
@@ -227,6 +229,10 @@ WHERE c."id" = $1;
 -- name: AnnulerRappel :exec
 UPDATE "scheduled_callbacks" SET "status" = 'CANCELLED'
 WHERE "id" = $1 AND "status" = 'PENDING';
+
+-- name: ReporterRappel :exec
+UPDATE "scheduled_callbacks" SET "scheduledAt" = @scheduled_at
+WHERE "id" = @id AND "status" = 'PENDING';
 
 -- name: ListerOuvertures :many
 SELECT o."id", o."openedById", u."fullName" AS "openedByName",

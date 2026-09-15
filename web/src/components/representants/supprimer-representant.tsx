@@ -27,7 +27,7 @@ export function SupprimerRepresentant({ representantId }: { representantId: stri
     onSuccess: () => {
       void client.invalidateQueries();
       toast.success('Fiche supprimée.');
-      void navigate({ to: '/chues/representants' });
+      void navigate({ to: '/teleconseil/representants' });
     },
     onError: (erreur: unknown) => {
       if (erreur instanceof ApiError && erreur.status === 409) {

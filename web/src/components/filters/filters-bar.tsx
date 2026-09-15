@@ -30,9 +30,15 @@ import {
   type EnrollmentMethod,
   type FilterOption,
   type Phase2Status,
+  type Projet,
   type ProspectStatut,
 } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
+
+const PROJET_OPTIONS: FilterOption[] = [
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
+];
 
 const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
   value: statut,
@@ -135,6 +141,18 @@ export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean
           onChange={setSearchDraft}
           placeholder="Nom, téléphone, représentant…"
         />
+
+        <div className="flex min-w-[11rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
+          <FilterCombobox
+            label="Projet"
+            placeholder="Tous les projets"
+            options={PROJET_OPTIONS}
+            value={filters.projet}
+            onChange={(value) => {
+              setFilters({ projet: (value as Projet) || null });
+            }}
+          />
+        </div>
 
         <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
           {/* Le seul critère de liste resté visible : c'est celui qu'on change

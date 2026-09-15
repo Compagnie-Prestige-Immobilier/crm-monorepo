@@ -60,6 +60,15 @@ function readSortBy(params: RawSearchParams | URLSearchParams): ProspectSortFiel
   );
 }
 
+function readProjet(params: RawSearchParams | URLSearchParams): (typeof PROJETS)[number] | null {
+  const raw = readString(params, 'projet');
+  if (raw === null) return null;
+  const upper = raw.toUpperCase().replaceAll(/[\s+]+/gu, '_');
+  if (upper === 'GRAND_PUBLIC' || upper === 'GRANDPUBLIC') return 'GRAND_PUBLIC';
+  if (upper === 'CHUES') return 'CHUES';
+  return null;
+}
+
 function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
   return readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc';
 }
@@ -67,7 +76,7 @@ function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
 export function parseProspectFilters(params: RawSearchParams | URLSearchParams): ProspectFilters {
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
-    projet: readEnum(params, 'projet', PROJETS),
+    projet: readProjet(params),
     search: readString(params, 'search') ?? '',
     commercialId: readString(params, 'commercialId'),
     representantId: readString(params, 'representantId'),

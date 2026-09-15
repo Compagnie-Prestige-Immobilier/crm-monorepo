@@ -30,20 +30,19 @@ function AccueilIcon() {
   );
 }
 
-function ChuesIcon() {
+function TeleconseilIcon() {
   return (
     <svg {...FRAME} className="size-full">
       <path d="M24 8 7 15l17 7 17-7z" />
       <path d="M14 18.5V27c0 3.3 4.5 5.5 10 5.5s10-2.2 10-5.5v-8.5" />
       <path d="M41 15v9.5" />
       <circle cx="41" cy="27" r="1.8" fill="currentColor" stroke="none" />
-      {/* Le filet bleu sous le « UES » du logo. */}
       <path className={MARK} strokeWidth={3} d="M13 39h22" />
     </svg>
   );
 }
 
-function GrandPublicIcon() {
+function FinanceIcon() {
   return (
     <svg {...FRAME} className="size-full">
       <circle cx="13" cy="20" r="3.5" />
@@ -71,8 +70,8 @@ function AdminIcon() {
 
 export const COQUE_ICONS: Record<Coque, () => React.JSX.Element> = {
   accueil: AccueilIcon,
-  chues: ChuesIcon,
-  'grand-public': GrandPublicIcon,
+  teleconseil: TeleconseilIcon,
+  finance: FinanceIcon,
   admin: AdminIcon,
 };
 
@@ -85,13 +84,13 @@ export function CoqueArt({ coque }: { coque: Coque }) {
         <path d="m109 29 7 7 13-17" />
       </>
     ),
-    chues: (
+    teleconseil: (
       <>
         <path d="m26 35 55-22 55 22-55 22zM46 49v28c18 13 52 13 70 0V49" />
         <path d="M137 35v41M128 83h18" />
       </>
     ),
-    'grand-public': (
+    finance: (
       <>
         <circle cx="48" cy="35" r="16" />
         <circle cx="108" cy="35" r="16" />

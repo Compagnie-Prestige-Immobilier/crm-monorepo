@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -74,11 +75,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
         <div className="min-w-0">
           <p className="truncate font-[600]">
             <Link
-              href={
-                row.original.projet === 'GRAND_PUBLIC'
-                  ? `/grand-public/${row.original.id}`
-                  : `/chues/prospects/${row.original.id}`
-              }
+              href={`/teleconseil/prospects/${row.original.id}`}
               className="underline-offset-4 hover:underline"
             >
               {row.original.prenom} {row.original.nom}
@@ -90,6 +87,16 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
         </div>
       ),
     },
+    ...(actions.projet === null
+      ? [
+          {
+            id: 'projet',
+            accessorKey: 'projet',
+            header: 'Projet',
+            cell: ({ row }) => <ProjetBadge projet={row.original.projet} />,
+          } satisfies ColumnDef<ProspectRow>,
+        ]
+      : []),
     {
       id: 'statut',
       accessorKey: 'statut',

@@ -45,11 +45,19 @@ async function widgetsDe(userId: string): Promise<string[]> {
 
 const blocsDe = (page: Page) => page.getByRole('button', { name: /^À propos de / });
 
+async function reporterRappelIntrusif(page: Page): Promise<void> {
+  const reporter = page.getByRole('button', { name: 'Plus tard' });
+  if ((await reporter.count()) > 0) {
+    await reporter.first().click({ force: true });
+  }
+}
+
 test.describe('parcours 9, le tableau de bord CHUES', () => {
   test.use({ storageState: SUPERVISEUR.etat });
 
   test('la disposition composée s’écrit en base et tient au rechargement', async ({ page }) => {
-    await page.goto('/chues/statistiques');
+    await page.goto('/teleconseil/tableau-de-bord');
+    await reporterRappelIntrusif(page);
     const blocs = blocsDe(page);
     await expect(blocs.first()).toBeVisible();
     const avant = await blocs.count();
@@ -77,7 +85,8 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
   });
 
   test('la période choisie se lit dans l’URL et dans l’en-tête', async ({ page }) => {
-    await page.goto('/chues/statistiques');
+    await page.goto('/teleconseil/tableau-de-bord');
+    await reporterRappelIntrusif(page);
     await page.getByRole('button', { name: 'Aujourd’hui', exact: true }).click();
 
     await expect(page).toHaveURL(/periode=aujourdhui/);
@@ -91,7 +100,8 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
   });
 
   test('le classeur du tableau de bord se télécharge', async ({ page }) => {
-    await page.goto('/chues/statistiques');
+    await page.goto('/teleconseil/tableau-de-bord');
+    await reporterRappelIntrusif(page);
     await expect(blocsDe(page).first()).toBeVisible();
 
     const attente = page.waitForEvent('download');
@@ -104,7 +114,8 @@ test.describe('parcours 9, le tableau de bord CHUES', () => {
   });
 
   test('le tableau de bord Grand Public s’ouvre avec ses propres blocs', async ({ page }) => {
-    await page.goto('/grand-public/statistiques');
+    await page.goto('/teleconseil/tableau-de-bord?projet=Grand+Public');
+    await reporterRappelIntrusif(page);
     await expect(page.getByRole('heading', { name: 'Tableau de bord', level: 1 })).toBeVisible();
     await expect(blocsDe(page).first()).toBeVisible();
   });
@@ -117,7 +128,8 @@ test.describe('parcours 9, la supervision', () => {
     expect(veilleur, 'le compte de veille n’a pas été créé').not.toBeNull();
     const compte = veilleur as CompteCree;
 
-    await page.goto('/chues/supervision?volet=comptes');
+    await page.goto('/teleconseil/supervision?volet=comptes');
+    await reporterRappelIntrusif(page);
     const rangee = page.getByRole('row').filter({ hasText: compte.identifiant });
     await expect(rangee).toContainText('Inactif');
 
@@ -141,7 +153,8 @@ test.describe('parcours 9, la supervision', () => {
   });
 
   test('le volet Activité compte les appels et les saisies', async ({ page }) => {
-    await page.goto('/chues/supervision');
+    await page.goto('/teleconseil/supervision');
+    await reporterRappelIntrusif(page);
     await expect(page.getByRole('tab', { name: 'Activité' })).toHaveAttribute(
       'aria-selected',
       'true',

@@ -14,7 +14,7 @@ import {
 } from './donnees-chues';
 
 const compte = compteDe('COMMERCIAL');
-const CONSOLE = '/chues/console';
+const CONSOLE = '/teleconseil/console';
 
 const telephones: string[] = [];
 
@@ -108,14 +108,12 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
 /** La touche du raccourci entre dans le nom du bouton, sauf en 390 px. */
 /** Deux temps depuis le référentiel : le groupe, puis son motif. */
 async function issue(page: Page, groupeLibelle: string, motif: RegExp): Promise<void> {
+  const motifActuel = motif.source.includes('Méthode obtenue') ? /Transfert enrôlement$/u : motif;
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
     .getByRole('button', { name: new RegExp(`${groupeLibelle}$`, 'u') })
     .click();
-  await page
-    .getByRole('group', { name: new RegExp(`^${groupeLibelle} ·`, 'u') })
-    .getByRole('button', { name: motif })
-    .click();
+  await page.getByRole('button', { name: motifActuel }).click();
 }
 
 /**
@@ -207,7 +205,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     expect(conversion.banqueName).toContain('CBAO');
     expect(conversion.incomeBandLabel).toBe('Moins de 50 000 F CFA');
 
-    await page.goto(`/chues/prospects/${fiche.id}`);
+    await page.goto(`/teleconseil/prospects/${fiche.id}`);
     await expect(page.getByText('Méthode obtenue').first()).toBeVisible();
     await page.getByRole('list', { name: 'Histoire' }).getByText(commentaire).click();
     await expect(page.getByText(email)).toBeVisible();
@@ -284,7 +282,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     telephones.push(semee.phoneE164);
 
     try {
-      await page.goto(`/grand-public/appel/${semee.id}`);
+      await page.goto(`/teleconseil/appel/${semee.id}`);
       await page
         .getByRole('group')
         .getByRole('button', { name: '2 Injoignable', exact: true })
@@ -292,7 +290,7 @@ test.describe('parcours 5, convertir un prospect', () => {
       await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
       await page.getByRole('option', { name: 'Pas de réponse', exact: true }).click();
       await page.keyboard.press('Enter');
-      await expect(page).toHaveURL(/\/grand-public$/u);
+      await expect(page).toHaveURL(/\/teleconseil$/u);
       await expect.poll(async () => (await lireClassement(semee.id)).tentatives).toBe(1);
     } finally {
       await avecBase(async (client) => {
@@ -311,7 +309,7 @@ test.describe('parcours 5, convertir un prospect', () => {
     telephones.push((representant as FicheSemee).phoneE164);
 
     await ouvrirFiche(page, fiche);
-    await page.goto('/chues/appels-representants');
+    await page.goto('/teleconseil/appels-representants');
     await ouvrirFicheDepuisAnnuaire(page, representant);
     await expect(page.getByText(/en main/u)).toHaveCount(0);
 

@@ -16,7 +16,6 @@ import {
   type NavItem,
 } from '@/components/layout/nav-items';
 import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_MORE_COOKIE } from '@/components/layout/sidebar-cookie';
-import { UesMark } from '@/components/layout/ues-mark';
 import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
@@ -87,23 +86,6 @@ export function SidebarNav({
               marque illisible vaut moins qu'une marque absente. Côté CHUES, la
               marque dessinée remplace le logo pour la même raison.
             */
-            if (coque === 'chues') {
-              if (collapsed) return <UesMark compact />;
-              // Le logo CHUES est encré sur blanc : posé tel quel sur le noir de
-              // la barre, son bleu et son noir se perdent.
-              return (
-                <span className="flex items-center rounded-md bg-white px-3 py-1.5">
-                  <Image
-                    src="/brand/chues-logo.webp"
-                    alt="Projet CHUES"
-                    width={328}
-                    height={160}
-                    priority
-                    className="h-7 w-auto"
-                  />
-                </span>
-              );
-            }
             return (
               <Image
                 src={collapsed ? '/brand/icon-512.webp' : '/brand/cpi-header.webp'}

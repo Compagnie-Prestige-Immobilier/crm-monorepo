@@ -189,7 +189,7 @@ function Corps({
             <TableRow key={representant.id}>
               <TableCell>
                 <Link
-                  href={`/chues/representants/${representant.id}`}
+                  href={`/teleconseil/representants/${representant.id}`}
                   className="font-[600] underline underline-offset-4"
                 >
                   {representant.fullName}

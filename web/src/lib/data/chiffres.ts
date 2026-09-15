@@ -30,7 +30,7 @@ export interface ChiffresCreneaux {
 
 /** Le périmètre commun à toutes les requêtes de l'écran. */
 export interface PerimetreChiffres {
-  projet: Projet;
+  projet: Projet | null;
   plage: ActivityRange;
   /** Un seul téléconseiller, ou tous. */
   commercialId: string | null;
@@ -48,8 +48,8 @@ const bornes = (plage: ActivityRange): { actFrom: string; actTo: string } => ({
  */
 const filtresProspect = (
   perimetre: PerimetreChiffres,
-): { projet: Projet; dateFrom: string; dateTo: string; commercialId?: string } => ({
-  projet: perimetre.projet,
+): { projet?: Projet; dateFrom: string; dateTo: string; commercialId?: string } => ({
+  ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
   dateFrom: perimetre.plage.from,
   dateTo: perimetre.plage.to,
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
@@ -57,9 +57,9 @@ const filtresProspect = (
 
 const filtresSupervision = (
   perimetre: PerimetreChiffres,
-): { actFrom: string; actTo: string; projet: Projet; commercialId?: string } => ({
+): { actFrom: string; actTo: string; projet?: Projet; commercialId?: string } => ({
   ...bornes(perimetre.plage),
-  projet: perimetre.projet,
+  ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
 });
 
@@ -198,7 +198,7 @@ export async function fetchChiffresEnrolement(
   return unwrap(
     await client.GET('/api/v1/enrolement/{projet}/indicateurs', {
       params: {
-        path: { projet: perimetre.projet },
+        path: { projet: perimetre.projet ?? 'CHUES' },
         query: { dateFrom: perimetre.plage.from, dateTo: perimetre.plage.to },
       },
     }),

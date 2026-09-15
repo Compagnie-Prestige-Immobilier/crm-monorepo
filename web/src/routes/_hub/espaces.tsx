@@ -1,6 +1,5 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { ArrowLeftIcon, LockIcon } from 'lucide-react';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -92,19 +91,9 @@ function EspacesPage() {
                 className="animate-rise relative flex h-full min-h-[14rem] flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-elev-sm transition-shadow duration-(--dur-2) ease-(--ease-out-cpi) hover:shadow-elev-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <CoqueArt coque={entry.id} />
-                {entry.id === 'chues' ? (
-                  <Image
-                    src="/brand/chues-logo.webp"
-                    alt=""
-                    width={328}
-                    height={160}
-                    className="relative z-10 h-10 w-auto shrink-0 self-start object-contain"
-                  />
-                ) : (
-                  <span className="relative z-10 size-12 shrink-0 text-primary-text">
-                    <Icon />
-                  </span>
-                )}
+                <span className="relative z-10 size-12 shrink-0 text-primary-text">
+                  <Icon />
+                </span>
                 <span className="relative z-10 max-w-[58%] font-display text-h3 font-[700] tracking-[-0.02em]">
                   {entry.label}
                 </span>

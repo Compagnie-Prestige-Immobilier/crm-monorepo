@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { avecBase, compteDe } from './comptes';
@@ -10,8 +12,8 @@ import {
 } from './donnees-chues';
 
 const compte = compteDe('COMMERCIAL');
-const CONSOLE = '/chues/console';
-const RAPPELS = '/chues/rappels';
+const CONSOLE = '/teleconseil/console';
+const RAPPELS = '/teleconseil/rappels';
 
 const telephones: string[] = [];
 
@@ -99,6 +101,26 @@ async function ouvrirRappelsProspects(page: Page): Promise<void> {
   await page.getByRole('tab', { name: 'Prospects', exact: true }).click();
 }
 
+async function semerRappelsEnRetard(fiches: readonly FicheSemee[]): Promise<void> {
+  await avecBase(async (client) => {
+    for (const fiche of fiches) {
+      const tentative = randomUUID();
+      await client.query(
+        `INSERT INTO call_attempts
+           (id, "prospectId", "performedById", outcome, "clientCreatedAt", "createdAt")
+         VALUES ($1, $2, $3, 'CALLBACK', now() - interval '2 days', now())`,
+        [tentative, fiche.id, compte.id],
+      );
+      await client.query(
+        `INSERT INTO scheduled_callbacks
+           (id, "prospectId", "assignedToId", "scheduledAt", comment, "sourceAttemptId", "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, now() - interval '1 day', 'Rappel E2E', $4, now(), now())`,
+        [randomUUID(), fiche.id, compte.id, tentative],
+      );
+    }
+  });
+}
+
 test.use({ storageState: compte.etat });
 
 test.afterAll(async () => {
@@ -136,6 +158,31 @@ test.describe('parcours 6, rappels promis', () => {
 
     const traite = await lireRappel(fiche.id);
     expect(traite.status).toBe('CANCELLED');
+  });
+
+  test('fermer la fenêtre masque toute la file sans annuler les rappels', async ({ page }) => {
+    const fiches = [await semer('Popup-1'), await semer('Popup-2')];
+    await semerRappelsEnRetard(fiches);
+
+    await page.goto('/teleconseil');
+    const popup = page.getByRole('dialog');
+    await expect(popup).toBeVisible();
+    await expect(popup).toContainText(/autre en attente/u);
+
+    await popup.getByRole('button', { name: 'Fermer' }).click();
+    await expect(popup).toHaveCount(0);
+    await page.waitForTimeout(500);
+    await expect(page.getByRole('dialog')).toHaveCount(0);
+
+    await avecBase(async (client) => {
+      const { rows } = await client.query<{ status: string }>(
+        `SELECT status::text AS status FROM scheduled_callbacks
+         WHERE "prospectId" = ANY($1::text[])`,
+        [fiches.map((fiche) => fiche.id)],
+      );
+      expect(rows).toHaveLength(2);
+      expect(rows.every((row) => row.status === 'PENDING')).toBe(true);
+    });
   });
 });
 

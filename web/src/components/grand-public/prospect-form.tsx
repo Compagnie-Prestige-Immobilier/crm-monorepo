@@ -359,7 +359,7 @@ const actives = <T extends { isActive: boolean }>(items: readonly T[] | undefine
   (items ?? []).filter((item) => item.isActive);
 
 function searchHrefPourConflit(phone: string, callingCode: string): string {
-  return `/grand-public?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
+  return `/teleconseil/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
 }
 
 function paysDisponibles(reference: ReferenceData | undefined) {
@@ -645,7 +645,11 @@ export function GrandPublicProspectForm({
         // La boîte de création se referme, PUIS l'écran demandé s'ouvre : s'arrêter
         // à `onSaved` laissait « ouvrir la fiche » n'ouvrir rien.
         onSaved?.(prospect);
-        router.push(variables.suite === 'fiche' ? `/grand-public/${prospect.id}` : '/grand-public');
+        router.push(
+          variables.suite === 'fiche'
+            ? `/teleconseil/prospects/${prospect.id}`
+            : '/teleconseil/prospects',
+        );
         return;
       }
 

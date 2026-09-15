@@ -68,7 +68,7 @@ test.describe('parité courriels, réglés par l’administrateur', () => {
   test('les paramètres CHUES gardent les messages aux prospects, avec leurs variables', async ({
     page,
   }) => {
-    await page.goto('/chues/parametres-chues');
+    await page.goto('/teleconseil/parametres-chues');
     await expect(page.getByText('Messages envoyés aux prospects')).toBeVisible();
     await expect(page.getByText('Courriels automatiques')).toHaveCount(0);
     await expect(page.getByRole('button', { name: '{prenomNom}' }).first()).toBeVisible();

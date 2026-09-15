@@ -30,12 +30,12 @@ test.describe('recherche depuis la barre du haut', () => {
     test.use({ storageState: teleconseiller.etat, viewport: { width: 1600, height: 900 } });
 
     test('le champ emmène à la liste, le terme dans l’URL', async ({ page }) => {
-      await page.goto('/chues/console');
+      await page.goto('/teleconseil/console');
       const champ = page.getByRole('searchbox', { name: 'Chercher un prospect' });
       await champ.fill(NOM);
       await champ.press('Enter');
 
-      await expect(page).toHaveURL(new RegExp(`/chues/prospects\\?search=${NOM}`, 'u'));
+      await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects\\?search=${NOM}`, 'u'));
       // Le terme n'est pas seulement dans l'URL : la liste l'a repris, donc la
       // recherche est réellement en cours et non juste annoncée.
       await expect(page.getByPlaceholder('Nom, téléphone, représentant…')).toHaveValue(NOM);

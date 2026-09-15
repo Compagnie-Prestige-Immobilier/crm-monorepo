@@ -1,7 +1,6 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import Image from 'next/image';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 
@@ -23,7 +22,7 @@ import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-fi
  * Téléconseil, supervision et direction y lisent le MÊME écran : les trois
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
-export function HubView({ prenom, canCreateProspect }: { prenom: string; canCreateProspect: boolean }) {
+export function HubView({ canCreateProspect }: { prenom: string; canCreateProspect: boolean }) {
   const [nouveauRepresentant, setNouveauRepresentant] = useState(false);
   const nonQualifies = useQuery({
     queryKey: queryKeys.representants(NON_QUALIFIES),
@@ -56,28 +55,10 @@ export function HubView({ prenom, canCreateProspect }: { prenom: string; canCrea
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-col items-start gap-2">
-        {/* `alt` VIDE : le titre suit dans le même `h1`, et un texte de
-            remplacement identique le ferait annoncer deux fois. */}
-        <h1 className="flex items-center gap-3 font-display text-h1 font-[800]">
-          <Image
-            src="/brand/chues-logo.webp"
-            alt=""
-            width={328}
-            height={160}
-            priority
-            className="h-10 w-auto"
-          />
-          Projet CHUES
-        </h1>
-        <div className="flex w-full flex-wrap items-center justify-between gap-3">
-          <p className="text-[0.9375rem] text-muted-foreground">
-            Bonjour {prenom}. Quatre étapes dans l’ordre du parcours d’appel, puis ce qui revient.
-          </p>
-          <Button variant="outline" size="sm" onClick={() => setNouveauRepresentant(true)}>
-            Ajouter un représentant
-          </Button>
-        </div>
+      <div className="flex justify-end">
+        <Button variant="outline" size="sm" onClick={() => setNouveauRepresentant(true)}>
+          Ajouter un représentant
+        </Button>
       </div>
 
       <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
@@ -93,7 +74,9 @@ export function HubView({ prenom, canCreateProspect }: { prenom: string; canCrea
               legende="pas encore qualifiés"
             />
           }
-          action={<Geste href="/chues/appels-representants" label="Qualifier un représentant" />}
+          action={
+            <Geste href="/teleconseil/appels-representants" label="Qualifier un représentant" />
+          }
         />
 
         <Etape
@@ -110,7 +93,10 @@ export function HubView({ prenom, canCreateProspect }: { prenom: string; canCrea
           }
           action={
             canCreateProspect ? (
-              <Geste href="/chues/prospects/nouveau" label="Ajouter un prospect" />
+              <Geste
+                href="/teleconseil/prospects/nouveau?projet=CHUES"
+                label="Ajouter un prospect"
+              />
             ) : null
           }
         />
@@ -127,7 +113,7 @@ export function HubView({ prenom, canCreateProspect }: { prenom: string; canCrea
               legende="pas encore convertis"
             />
           }
-          action={<Geste href="/chues/console" label="Convertir un prospect" primary />}
+          action={<Geste href="/teleconseil/console" label="Convertir un prospect" primary />}
         />
 
         <Etape
@@ -143,7 +129,7 @@ export function HubView({ prenom, canCreateProspect }: { prenom: string; canCrea
               enRetard={enRetard}
             />
           }
-          action={<Geste href="/chues/rappels" label="Voir les rappels" />}
+          action={<Geste href="/teleconseil/rappels" label="Voir les rappels" />}
         />
       </ol>
 

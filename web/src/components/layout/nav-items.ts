@@ -2,7 +2,6 @@ import {
   ActivityIcon,
   ArchiveIcon,
   BellIcon,
-  ChartColumnIcon,
   ClipboardListIcon,
   ClockIcon,
   ContactRoundIcon,
@@ -64,7 +63,7 @@ export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
 export const inboxPathFor = (role: Role): string =>
   role === 'ADMIN' ? '/admin/notifications?onglet=reception' : INBOX_PATH;
 
-export type Coque = 'accueil' | 'chues' | 'grand-public' | 'admin';
+export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'admin';
 
 export interface CoqueEntry {
   id: Coque;
@@ -76,10 +75,7 @@ export interface CoqueEntry {
 }
 
 /**
- * Les quatre entrées de l'application. CHUES et Grand Public visent la même
- * vente et ne partagent NI écran NI route : le processus d'acquisition et le
- * programme d'appels diffèrent, et un prospect de l'un n'est pas du travail
- * pour l'autre.
+ * Les quatre entrées de l'application unifiée.
  */
 export const COQUES: readonly CoqueEntry[] = [
   {
@@ -90,40 +86,24 @@ export const COQUES: readonly CoqueEntry[] = [
     roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
   },
   {
-    id: 'chues',
-    label: 'Projet CHUES',
-    path: '/chues',
-    description: 'Enrôlement des enseignants syndiqués',
-    roles: [
-      'ADMIN',
-      'DIRECTION',
-      'SUPERVISEUR',
-      'COMMERCIAL',
-      'CHARGE_CLIENTELE',
-      'BANQUE_FINANCE',
-    ],
+    id: 'teleconseil',
+    label: 'Commercial',
+    path: '/teleconseil',
+    description: 'Prospection, qualification, rappels et campagnes d’appels',
+    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
   },
   {
-    id: 'grand-public',
-    label: 'Projet Grand Public',
-    path: '/grand-public',
-    description: 'Prospection, appels et conversion hors CHUES',
-    roles: [
-      'ADMIN',
-      'DIRECTION',
-      'SUPERVISEUR',
-      'COMMERCIAL',
-      'CHARGE_CLIENTELE',
-      'BANQUE_FINANCE',
-    ],
+    id: 'finance',
+    label: 'Banque & Finance',
+    path: '/finance',
+    description: 'Dossiers bancaires et demandes de création de client',
+    roles: ['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION'],
   },
   {
     id: 'admin',
     label: 'Admin',
     path: '/admin',
     description: 'Comptes, listes de référence, imports et paramètres',
-    // La supervision et la direction atteignent les listes de référence par un
-    // lien direct depuis CHUES et Grand Public : elles n'ouvrent pas la coque.
     roles: ['ADMIN'],
   },
 ];
@@ -163,11 +143,15 @@ export interface NavSection {
  * mêmes intitulés dans le même ordre : une seule suite d'entrées les sert tous,
  * et on n'explique qu'un seul parcours au téléphone.
  */
-const TERRAIN: readonly Role[] = ['COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION'];
-const CREATION_PROSPECT: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
-
+const TERRAIN: readonly Role[] = [
+  'ADMIN',
+  'COMMERCIAL',
+  'CHARGE_CLIENTELE',
+  'SUPERVISEUR',
+  'DIRECTION',
+];
 /** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
-const ENCADREMENT: readonly Role[] = ['SUPERVISEUR', 'DIRECTION'];
+const ENCADREMENT: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
 
 /**
  * Navigation filtrée par coque puis par rôle ; l'autorisation serveur reste la
@@ -234,27 +218,32 @@ const SECTIONS: readonly NavSection[] = [
     ],
   },
   {
-    coque: 'chues',
+    coque: 'teleconseil',
     title: null,
     items: [
-      // L'encadrement ouvre sur les chiffres ; le téléconseiller sur ses
-      // trois étapes.
       {
-        href: '/chues/statistiques',
+        href: '/teleconseil/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Appels, adhésions et encaissements',
         roles: ENCADREMENT,
       },
       {
-        href: '/chues',
+        href: '/teleconseil/leads-importes',
+        label: 'Leads importés',
+        icon: UploadIcon,
+        description: 'Fiches très intéressées et qualité des classeurs',
+        roles: ENCADREMENT,
+      },
+      {
+        href: '/teleconseil',
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
-        href: '/chues',
+        href: '/teleconseil',
         label: 'Les trois étapes',
         icon: HouseIcon,
         description: 'Qualifier, ajouter, convertir',
@@ -262,45 +251,37 @@ const SECTIONS: readonly NavSection[] = [
         hidden: true,
       },
       {
-        href: '/chues/appels-representants',
+        href: '/teleconseil/appels-representants',
         label: 'Qualifier un représentant',
         icon: PhoneCallIcon,
         description: 'Première étape',
         roles: TERRAIN,
       },
       {
-        href: '/chues/prospects/nouveau',
-        label: 'Ajouter un prospect',
-        icon: PlusCircleIcon,
-        description: 'Deuxième étape',
-        roles: CREATION_PROSPECT,
-      },
-      {
-        href: '/chues/console',
-        label: 'Convertir un prospect',
+        href: '/teleconseil/console',
+        label: 'Fiches',
         icon: HeadsetIcon,
         description: 'Dernière étape',
         roles: TERRAIN,
       },
       {
-        href: '/chues/rappels',
+        href: '/teleconseil/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
         roles: TERRAIN,
       },
       {
-        // Onglets Activité et Présence du pilotage : même titre que le tableau de bord.
-        href: '/chues/supervision',
+        href: '/teleconseil/supervision',
         label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         roles: ENCADREMENT,
         hidden: true,
-        onglet: '/chues/statistiques',
+        onglet: '/teleconseil/tableau-de-bord',
       },
       {
-        href: '/chues/mes-contacts',
+        href: '/teleconseil/mes-contacts',
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées',
@@ -308,7 +289,7 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/chues/suggestions',
+        href: '/teleconseil/suggestions',
         label: 'Contacts recommandés',
         icon: PhoneForwardedIcon,
         description: 'Numéros donnés par les représentants',
@@ -316,9 +297,7 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        // Sans « Mes » : l'API borne la liste au périmètre de qui la demande
-        // (`scope.ts`), et l'encadrement y lit tout le portefeuille.
-        href: '/chues/representants',
+        href: '/teleconseil/representants',
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Les enseignants déjà appelés',
@@ -326,7 +305,7 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/chues/prospects',
+        href: '/teleconseil/prospects',
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Les fiches déjà notées',
@@ -334,457 +313,76 @@ const SECTIONS: readonly NavSection[] = [
         secondary: true,
       },
       {
-        href: '/chues/campagnes',
+        href: '/teleconseil/campagnes',
         label: 'Campagnes d’appels',
         icon: MegaphoneIcon,
         description: 'Fiches exportées et distribution',
         roles: ENCADREMENT,
       },
       {
-        href: '/chues/parametres-chues',
-        label: 'Paramètres CHUES',
+        href: '/teleconseil/parametres-chues',
+        label: 'Paramètres téléconseil',
         icon: SlidersHorizontalIcon,
-        description: 'Liens, contacts et messages envoyés',
-        // Pas `ENCADREMENT` : l'administrateur règle TOUT, la supervision et la
-        // direction seulement les deux textes envoyés aux prospects.
+        description: 'Réglages CHUES et Grand Public',
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
         secondary: true,
       },
       {
-        // Lien direct vers l'écran de l'Admin : la supervision et la direction
-        // n'ouvrent pas la coque Admin pour cette seule entrée.
-        href: '/admin/referentiels',
-        label: 'Listes de référence',
-        icon: LibraryIcon,
-        description: 'Départements, banques, syndicats',
-        roles: ENCADREMENT,
-        secondary: true,
-      },
-
-      // ─── Administration ───────────────────────────────────────────────────
-      {
-        href: '/chues/statistiques',
-        label: 'Tableau de bord',
-        icon: LayoutDashboardIcon,
-        description: 'Appels, adhésions et encaissements',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/chues',
-        label: 'Les trois étapes',
-        icon: HouseIcon,
-        description: 'Qualifier, ajouter, convertir',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/chues/prospects',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Liste filtrable et export',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/chues/representants',
-        label: 'Représentants',
-        icon: UsersRoundIcon,
-        description: 'Enseignants qui donnent les contacts',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/chues/campagnes',
-        label: 'Campagnes d’appels',
-        icon: MegaphoneIcon,
-        description: 'Fiches exportées et distribution',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/chues/dossiers',
-        label: 'Dossiers bancaires',
-        icon: FolderOpenIcon,
-        description: 'Dossiers déposés en banque',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/chues/supervision',
-        label: 'Tableau de bord',
-        icon: ActivityIcon,
-        description: 'Activité et présence des téléconseillers',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
-      },
-      {
-        href: '/chues/rappels',
-        label: 'Rappels',
-        icon: ClockIcon,
-        description: 'Échéances promises et retards',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/chues/mes-contacts',
-        label: 'Mes contacts',
-        icon: ContactRoundIcon,
-        description: 'Les personnes que j’ai appelées',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/chues/suggestions',
-        label: 'Contacts recommandés',
-        icon: PhoneForwardedIcon,
-        description: 'Numéros donnés par les représentants',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        // Onglet « Banque » du pilotage : un tableau de bord, pas une entrée de plus.
-        href: '/chues/banque',
-        label: 'Tableau de bord',
-        icon: ChartColumnIcon,
-        description: 'Encaissements, rejets et délais',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
-      },
-      {
-        // Onglet « Pôle déploiement » du pilotage : la qualité de la base que
-        // les représentants nous remettent, pas une entrée de plus.
-        href: '/chues/pole-deploiement',
-        label: 'Pôle déploiement',
-        icon: UsersRoundIcon,
-        description: 'Véracité de la base représentants',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
-      },
-      {
-        href: '/chues/pole-enrolement',
-        label: 'Pôle enrôlement',
-        icon: PlugZapIcon,
-        description: 'Inscriptions CHUES et Grand Public',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
-      },
-      {
-        href: '/chues/pole-marketing',
-        label: 'Pôle marketing',
-        icon: MegaphoneIcon,
-        description: 'Qualité des prospects par canal de provenance',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/chues/statistiques',
-      },
-      {
-        // L'arbitrage des demandes déposées par les banques. Sans entrée de
-        // menu, l'écran n'était atteignable qu'en tapant son URL, et la
-        // demande d'une banque restait en attente indéfiniment.
-        href: '/chues/demandes-clients',
-        label: 'Créations de client à valider',
-        icon: UserPlusIcon,
-        description: 'Créations demandées par les banques',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/chues/dossiers/export',
-        label: 'Exporter les dossiers',
-        icon: FileSpreadsheetIcon,
-        description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      {
-        href: '/chues/dossiers/etapes',
-        label: 'Étapes des dossiers',
-        icon: ListOrderedIcon,
-        description: 'Flux de traitement',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-      // Écrans atteints depuis celui qui les motive : les trois appels depuis
-      // l'écran d'ouverture du projet, les saisies depuis leur liste.
-      {
-        href: '/chues/appels-representants',
-        label: 'Qualifier un représentant',
-        icon: PhoneCallIcon,
-        description: 'Première des trois étapes',
-        roles: ['ADMIN'],
-        hidden: true,
-      },
-      {
-        href: '/chues/console',
-        label: 'Convertir un prospect',
-        icon: HeadsetIcon,
-        description: 'Dernière des trois étapes',
-        roles: ['ADMIN'],
-        hidden: true,
-      },
-      {
-        href: '/chues/prospects/nouveau',
-        label: 'Ajouter un prospect',
-        icon: PlusCircleIcon,
-        description: 'Deuxième des trois étapes',
-        roles: ['ADMIN'],
-        hidden: true,
-      },
-      {
-        href: '/chues/dossiers/nouveau',
-        label: 'À ouvrir (plateforme)',
-        icon: PlusCircleIcon,
-        description: 'Ouverture de dossier',
-        roles: ['ADMIN'],
-        hidden: true,
-      },
-      {
-        href: '/chues/representants/import',
+        href: '/teleconseil/representants/import',
         label: 'Importer des représentants',
         icon: UploadIcon,
         description: 'Classeur de représentants',
         roles: ['ADMIN'],
         hidden: true,
       },
-
-      // ─── Banque & Finance ─────────────────────────────────────────────────
-      {
-        href: '/chues/banque',
-        label: 'Vue d’ensemble',
-        icon: LayoutDashboardIcon,
-        description: 'Encaissements, rejets et délais',
-        roles: ['BANQUE_FINANCE'],
-      },
-      {
-        href: '/chues/dossiers',
-        label: 'Dossiers bancaires',
-        icon: FolderOpenIcon,
-        description: 'Dossiers déposés en banque',
-        roles: ['BANQUE_FINANCE'],
-      },
-      {
-        href: '/chues/dossiers/nouveau',
-        label: 'À ouvrir (plateforme)',
-        icon: PlusCircleIcon,
-        description: 'Ouverture de dossier',
-        roles: ['BANQUE_FINANCE'],
-      },
-      {
-        /**
-         * Le SUIVI de ses propres demandes, pour un agent bancaire.
-         *
-         * Refuser une demande lui envoie une notification dont la route est
-         * `/chues/demandes-clients` : sans cette entrée, le seul chemin vers
-         * l'écran était ce lien-là, et rien ne permettait d'y revenir ensuite.
-         * L'API restreint la liste à `requestedById = user.id` : il n'y voit
-         * que ses demandes, et l'écran ne lui propose aucun arbitrage.
-         */
-        href: '/chues/demandes-clients',
-        label: 'Mes demandes de création',
-        icon: UserPlusIcon,
-        description: 'Créations de client demandées',
-        roles: ['BANQUE_FINANCE'],
-      },
-      {
-        href: '/chues/dossiers/export',
-        label: 'Exporter les dossiers',
-        icon: FileSpreadsheetIcon,
-        description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['BANQUE_FINANCE'],
-        secondary: true,
-      },
     ],
   },
   {
-    coque: 'grand-public',
+    coque: 'finance',
     title: null,
     items: [
-      // ─── Téléconseiller ───────────────────────────────────────────────────
       {
-        href: '/grand-public/console',
-        label: 'Appeler les prospects',
-        icon: PhoneCallIcon,
-        description: 'Les fiches de campagne à appeler',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
-      },
-      {
-        href: '/grand-public/rappels',
-        label: 'Rappels promis',
-        icon: ClockIcon,
-        description: 'Ce qu’on a promis de rappeler',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
-      },
-      {
-        href: '/grand-public/mes-contacts',
-        label: 'Mes contacts',
-        icon: ContactRoundIcon,
-        description: 'Les personnes que j’ai appelées',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Créer, retrouver et suivre les prospects',
-        roles: ['CHARGE_CLIENTELE'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Créer, retrouver et suivre les prospects',
-        roles: ['COMMERCIAL'],
-        hidden: true,
-      },
-      {
-        href: '/grand-public/nouveau',
-        label: 'Nouveau prospect',
-        icon: PlusCircleIcon,
-        description: 'Créer une fiche',
-        roles: CREATION_PROSPECT,
-        secondary: true,
-      },
-
-      /*
-       * PAS de « Contacts recommandés » ici. Une suggestion est le numéro d'un
-       * tiers nommé par un REPRÉSENTANT syndical : `GET /api/v1/suggestions`
-       * n'accepte aucun filtre de projet et la notion n'existe pas hors CHUES.
-       * L'entrée servait la file CHUES sous une étiquette Grand Public.
-       */
-
-      // ─── Pilotage ─────────────────────────────────────────────────────────
-      {
-        href: '/grand-public/statistiques',
-        label: 'Tableau de bord',
-        icon: LayoutDashboardIcon,
-        description: 'Activité et conversion',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
-        href: '/grand-public',
-        label: 'Prospects',
-        icon: UsersIcon,
-        description: 'Liste filtrable des prospects',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
-        href: '/grand-public/supervision',
-        label: 'Tableau de bord',
-        icon: ActivityIcon,
-        description: 'Activité et présence des téléconseillers',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        hidden: true,
-        onglet: '/grand-public/statistiques',
-      },
-      {
-        href: '/grand-public/dossiers',
-        label: 'Dossiers bancaires',
-        icon: FolderOpenIcon,
-        description: 'Dossiers déposés en banque',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/grand-public/rappels',
-        label: 'Rappels',
-        icon: ClockIcon,
-        description: 'Échéances promises et retards',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public/mes-contacts',
-        label: 'Mes contacts',
-        icon: ContactRoundIcon,
-        description: 'Les personnes que j’ai appelées',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public/campagnes',
-        label: 'Campagnes d’appels',
-        icon: MegaphoneIcon,
-        description: 'Fiches exportées et distribution',
-        roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR'],
-      },
-      {
-        // Lien direct vers l'écran de l'Admin : la supervision et la direction
-        // n'ouvrent pas la coque Admin pour cette seule entrée.
-        href: '/admin/referentiels',
-        label: 'Listes de référence',
-        icon: LibraryIcon,
-        description: 'Départements, banques, syndicats',
-        roles: ENCADREMENT,
-        secondary: true,
-      },
-      {
-        href: '/grand-public/banque',
-        label: 'Tableau de bord',
-        icon: ChartColumnIcon,
-        description: 'Encaissements, rejets et délais',
-        roles: ['ADMIN'],
-        hidden: true,
-        onglet: '/grand-public/statistiques',
-      },
-      {
-        href: '/grand-public/dossiers/export',
-        label: 'Exporter les dossiers',
-        icon: FileSpreadsheetIcon,
-        description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['ADMIN', 'SUPERVISEUR'],
-        secondary: true,
-      },
-      {
-        href: '/grand-public/dossiers/nouveau',
-        label: 'À ouvrir (plateforme)',
-        icon: PlusCircleIcon,
-        description: 'Ouverture de dossier',
-        roles: ['ADMIN'],
-        hidden: true,
-      },
-      {
-        // Le SEUL lien qui sort de la coque : l'écran de dépôt vit chez l'Admin,
-        // et le paramètre y présélectionne le classeur Grand Public.
-        href: '/admin/imports?kind=PROSPECTS_GRAND_PUBLIC',
-        label: 'Importer des prospects',
-        icon: UploadIcon,
-        description: 'Classeur de prospects Grand Public',
-        roles: ['ADMIN'],
-        secondary: true,
-      },
-
-      // ─── Banque & Finance ─────────────────────────────────────────────────
-      // Les mêmes écrans qu'en CHUES, bornés au projet Grand Public. Ni les
-      // étapes du flux ni les demandes de création n'ont ici d'équivalent :
-      // elles ignorent la notion de projet et restent en CHUES.
-      {
-        href: '/grand-public/banque',
+        href: '/finance',
         label: 'Vue d’ensemble',
         icon: LayoutDashboardIcon,
         description: 'Encaissements, rejets et délais',
-        roles: ['BANQUE_FINANCE'],
+        roles: ['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        href: '/grand-public/dossiers',
+        href: '/finance/dossiers',
         label: 'Dossiers bancaires',
         icon: FolderOpenIcon,
         description: 'Dossiers déposés en banque',
-        roles: ['BANQUE_FINANCE'],
+        roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
-        href: '/grand-public/dossiers/nouveau',
+        href: '/finance/dossiers/nouveau',
         label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
-        roles: ['BANQUE_FINANCE'],
+        roles: ['ADMIN', 'BANQUE_FINANCE'],
       },
       {
-        href: '/grand-public/dossiers/export',
+        href: '/finance/demandes-clients',
+        label: 'Demandes de création de client',
+        icon: UserPlusIcon,
+        description: 'Créations de client demandées',
+        roles: ['ADMIN', 'BANQUE_FINANCE'],
+      },
+      {
+        href: '/finance/dossiers/export',
         label: 'Exporter les dossiers',
         icon: FileSpreadsheetIcon,
         description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['BANQUE_FINANCE'],
+        roles: ['ADMIN', 'BANQUE_FINANCE'],
+        secondary: true,
+      },
+      {
+        href: '/finance/dossiers/etapes',
+        label: 'Étapes des dossiers',
+        icon: ListOrderedIcon,
+        description: 'Flux de traitement',
+        roles: ['ADMIN'],
         secondary: true,
       },
     ],
@@ -883,7 +481,20 @@ export function coqueOf(pathname: string): Coque | null {
   const match = COQUES.find(
     (coque) => pathname === coque.path || pathname.startsWith(`${coque.path}/`),
   );
-  return match?.id ?? null;
+  if (match) return match.id;
+  if (
+    pathname.startsWith('/chues/banque') ||
+    pathname.startsWith('/chues/dossiers') ||
+    pathname.startsWith('/chues/demandes-clients') ||
+    pathname.startsWith('/grand-public/banque') ||
+    pathname.startsWith('/grand-public/dossiers')
+  ) {
+    return 'finance';
+  }
+  if (pathname.startsWith('/chues') || pathname.startsWith('/grand-public')) {
+    return 'teleconseil';
+  }
+  return null;
 }
 
 /**
@@ -927,15 +538,31 @@ export function coqueHomePath(role: Role, coque: Coque): string {
 }
 
 /**
- * Écran d'atterrissage après connexion : le hub, pour TOUT LE MONDE.
+ * Écran d'atterrissage après connexion : premier écran selon le rôle.
  *
- * Y compris un compte d'accueil, qui n'a qu'une tuile ouverte : le détour
- * coûte un clic et donne à tous le même point de départ, donc la même
- * explication au téléphone. Un rôle sans aucune coque n'a rien à faire dans le
- * panel et retombe sur la connexion.
+ * - Accueil : registre des visites (`/accueil`) ;
+ * - téléconseiller et chargé de clientèle : Mon travail (`/teleconseil`) ;
+ * - direction : leads importés (`/teleconseil/leads-importes`) ;
+ * - superviseur, admin : tableau de bord Téléconseil (`/teleconseil/tableau-de-bord`) ;
+ * - Banque & Finance : vue d’ensemble (`/finance`).
  */
 export function homePathForRole(role: Role): string {
-  return coquesForRole(role).some(({ allowed }) => allowed) ? HUB_PATH : '/connexion';
+  switch (role) {
+    case 'ACCUEIL':
+      return '/accueil';
+    case 'COMMERCIAL':
+    case 'CHARGE_CLIENTELE':
+      return '/teleconseil';
+    case 'DIRECTION':
+      return '/teleconseil/leads-importes';
+    case 'SUPERVISEUR':
+    case 'ADMIN':
+      return '/teleconseil/tableau-de-bord';
+    case 'BANQUE_FINANCE':
+      return '/finance';
+    default:
+      return '/connexion';
+  }
 }
 
 /**

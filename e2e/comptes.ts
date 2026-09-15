@@ -110,7 +110,60 @@ export async function creerComptes(): Promise<void> {
 export async function supprimerComptes(): Promise<void> {
   const identifiants = TOUS_LES_COMPTES.map((compte) => compte.id);
   await avecBase(async (client) => {
-    await client.query('DELETE FROM refresh_tokens WHERE "userId" = ANY($1)', [identifiants]);
-    await client.query('DELETE FROM users WHERE id = ANY($1)', [identifiants]);
+    await client.query('BEGIN');
+    try {
+      await client.query('CREATE TEMP TABLE e2e_users (id text PRIMARY KEY) ON COMMIT DROP');
+      await client.query('INSERT INTO e2e_users (id) SELECT unnest($1::text[])', [identifiants]);
+      await client.query(`
+        DO $cleanup$
+        DECLARE
+          contrainte record;
+          supprimees integer;
+          total integer;
+        BEGIN
+          LOOP
+            total := 0;
+            FOR contrainte IN
+              SELECT DISTINCT kcu.table_name, kcu.column_name
+              FROM information_schema.table_constraints tc
+              JOIN information_schema.key_column_usage kcu
+                ON kcu.constraint_name = tc.constraint_name
+               AND kcu.constraint_schema = tc.constraint_schema
+              JOIN information_schema.constraint_column_usage ccu
+                ON ccu.constraint_name = tc.constraint_name
+               AND ccu.constraint_schema = tc.constraint_schema
+              JOIN information_schema.referential_constraints rc
+                ON rc.constraint_name = tc.constraint_name
+               AND rc.constraint_schema = tc.constraint_schema
+              WHERE tc.constraint_type = 'FOREIGN KEY'
+                AND tc.table_schema = 'public'
+                AND ccu.table_schema = 'public'
+                AND ccu.table_name = 'users'
+                AND rc.delete_rule = 'RESTRICT'
+                AND kcu.table_name <> 'users'
+            LOOP
+              BEGIN
+                EXECUTE format(
+                  'DELETE FROM public.%I WHERE %I IN (SELECT id FROM e2e_users)',
+                  contrainte.table_name,
+                  contrainte.column_name
+                );
+                GET DIAGNOSTICS supprimees = ROW_COUNT;
+                total := total + supprimees;
+              EXCEPTION WHEN foreign_key_violation THEN
+                NULL;
+              END;
+            END LOOP;
+            EXIT WHEN total = 0;
+          END LOOP;
+        END
+        $cleanup$;
+      `);
+      await client.query('DELETE FROM users WHERE id IN (SELECT id FROM e2e_users)');
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    }
   });
 }

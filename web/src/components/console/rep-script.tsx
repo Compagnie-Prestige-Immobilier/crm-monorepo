@@ -56,7 +56,9 @@ import {
   libelleStatut,
   statutDuSouhait,
   souhaitDuStatut,
+  sousStatutsDe,
   statutsDeLaBranche,
+  statutsRacine,
   type StatutQualification,
   type StatutQualificationEffect,
 } from '@/lib/data/statuts-qualification';
@@ -716,42 +718,68 @@ function ChoixStatut({
   onFerme: () => void;
   pose: StatutQualification | null;
 }) {
+  const { racines, valeurRacine, sousStatuts, sousStatutId } = deriverChoixStatut(
+    statuts,
+    value,
+    pose,
+  );
   return (
     <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-      <label
-        htmlFor="rep-statut"
-        className="text-[1rem] font-[600] flex items-center justify-between"
-      >
-        <span>Statut de qualification</span>
-        <span className="text-[0.75rem] font-normal text-destructive">* obligatoire</span>
-      </label>
-      {/* `items` n'est pas décoratif : sans lui, le déclencheur affiche la
-          VALEUR, donc l'identifiant, au lieu du libellé de la ligne choisie. */}
-      <Select
-        items={statuts.map((statut) => ({ value: statut.id, label: libelleStatut(statut) }))}
-        value={value}
-        onValueChange={onChange}
-        onOpenChangeComplete={(ouvert) => {
-          if (!ouvert) onFerme();
-        }}
-      >
-        <SelectTrigger id="rep-statut">
-          <SelectValue placeholder={pose === null ? 'Choisir un statut' : libelleStatut(pose)} />
-        </SelectTrigger>
-        <SelectContent>
-          {statuts.map((statut) => (
-            <SelectItem key={statut.id} value={statut.id}>
-              {libelleStatut(statut)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <FilterCombobox
+        label="Statut de qualification"
+        placeholder={pose === null ? 'Choisir un statut' : libelleStatut(pose)}
+        options={racines.map((statut) => ({
+          value: statut.id,
+          label: libelleStatut(statut),
+        }))}
+        value={valeurRacine}
+        onChange={onChange}
+        onBlur={onFerme}
+      />
       {pose === null || value !== null ? null : (
         <p className="text-[0.8125rem] text-muted-foreground">
           Posé par votre réponse. Choisissez-en un autre s’il y a lieu.
         </p>
       )}
+      <ChoixSousStatut sousStatuts={sousStatuts} value={sousStatutId} onChange={onChange} />
     </div>
+  );
+}
+
+/** Le premier niveau se choisit toujours ; la précision n'apparaît que s'il en porte. */
+function deriverChoixStatut(
+  statuts: readonly StatutQualification[],
+  value: string | null,
+  pose: StatutQualification | null,
+) {
+  const choisi = statuts.find((statut) => statut.id === value) ?? null;
+  const valeurRacine = choisi === null ? null : (choisi.parentId ?? choisi.id);
+  return {
+    racines: statutsRacine(statuts),
+    valeurRacine,
+    sousStatuts: sousStatutsDe(statuts, valeurRacine ?? pose?.id ?? null),
+    sousStatutId: choisi?.parentId === null ? null : value,
+  };
+}
+
+function ChoixSousStatut({
+  sousStatuts,
+  value,
+  onChange,
+}: {
+  sousStatuts: readonly StatutQualification[];
+  value: string | null;
+  onChange: (valeur: string | null) => void;
+}) {
+  if (sousStatuts.length === 0) return null;
+  return (
+    <FilterCombobox
+      label="Précision (facultatif)"
+      placeholder="Sans précision"
+      options={sousStatuts.map((statut) => ({ value: statut.id, label: statut.label }))}
+      value={value}
+      onChange={onChange}
+    />
   );
 }
 
@@ -1051,12 +1079,6 @@ interface EtatManque {
 /** Les questions qui précèdent, exigées par le seul statut qui n'a pas clos l'appel. */
 function manqueScript(etat: EtatManque): string | null {
   if (etat.statut !== null && !scriptExige(etat.statut.effect)) return null;
-  if (etat.etablissementConfirme === null) return 'Dites si l’établissement est confirmé';
-  if (etat.etablissementConfirme === false && etat.nouvelEtablissement.trim() === '') {
-    return 'Écrivez le nouvel établissement';
-  }
-  if (etat.contacte === null) return 'Dites s’il a déjà été contacté';
-  if (etat.connaitUES === null) return 'Dites s’il connaît l’UES';
   return null;
 }
 
@@ -1067,11 +1089,6 @@ function manqueJoignable(etat: EtatManque): string | null {
   // Sans statut retenu à part, c'est la réponse à la question qui le pose.
   if (etat.statutChoisi === null && etat.ambassadeur === null) {
     return 'Dites s’il souhaite être représentant CHUES';
-  }
-  if (etat.ambassadeur !== true) return null;
-  if (etat.memeWhatsapp === null) return 'Dites s’il a WhatsApp sur ce numéro';
-  if (etat.memeWhatsapp === false && digitsOf(etat.whatsapp) < 9) {
-    return 'Écrivez le numéro WhatsApp';
   }
   return null;
 }
@@ -1084,12 +1101,6 @@ function manqueResultatOuScript(etat: EtatManque): string | null {
 
 // Le serveur jette une suggestion sans numéro : plutôt que d'effacer en
 // silence ce qui vient d'être dicté, l'enregistrement attend le numéro.
-function manqueSuggestion(etat: EtatManque): string | null {
-  if (!etat.proposeQuelquUn || !etat.suggestionCommencee) return null;
-  if (digitsOf(etat.sugPhone) < 9) return 'Écrivez le numéro de la personne proposée';
-  return null;
-}
-
 /** Ce qui empêche encore d'enregistrer, en une phrase, ou rien. */
 function manqueDe(etat: EtatManque): string | null {
   const avantStatut = manqueResultatOuScript(etat);
@@ -1097,7 +1108,7 @@ function manqueDe(etat: EtatManque): string | null {
   if (etat.statut === null) return 'Choisissez un statut de qualification';
   if (exigeMotif(etat.statut) && etat.commentaire.trim() === '') return 'Écrivez le motif';
   if (dateDemandee(etat.statut) && etat.rappelAt === null) return 'Choisissez quand rappeler';
-  return manqueSuggestion(etat);
+  return null;
 }
 
 interface EtatReponse {
@@ -1136,7 +1147,7 @@ function champsRelation(etat: EtatReponse): Partial<RepAnswer> {
 }
 
 function champsWhatsapp(etat: EtatReponse): Partial<RepAnswer> {
-  if (!etat.joignable || etat.ambassadeur !== true) return {};
+  if (!etat.joignable || etat.ambassadeur !== true || etat.memeWhatsapp === null) return {};
   const meme = etat.memeWhatsapp === true;
   return {
     whatsappStatus: meme ? ('MEME_NUMERO' as const) : ('AUTRE_NUMERO' as const),
@@ -1145,7 +1156,7 @@ function champsWhatsapp(etat: EtatReponse): Partial<RepAnswer> {
 }
 
 function champsSuggestion(etat: EtatReponse): Partial<RepAnswer> {
-  if (!etat.proposeQuelquUn || !etat.suggestionCommencee) return {};
+  if (!etat.proposeQuelquUn || !etat.suggestionCommencee || digitsOf(etat.sugPhone) < 9) return {};
   return {
     suggestedPhone: etat.sugPhone.trim(),
     ...(etat.sugName.trim() === '' ? {} : { suggestedName: etat.sugName.trim() }),

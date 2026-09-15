@@ -2,13 +2,14 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { ChampTexteVariables } from '@/components/forms/champ-texte-variables';
 import { Field } from '@/components/forms/field';
 import { QueryErrorState } from '@/components/query-error-state';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -140,7 +141,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
         onRetry={() => {
           void parametres.refetch();
         }}
-        fallback="Les paramètres CHUES n’ont pas pu être lus."
+        fallback="Les paramètres du téléconseil n’ont pas pu être lus."
       />
     );
 
@@ -171,6 +172,19 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
 
   return (
     <div className="flex flex-col gap-6">
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="font-display text-h2 font-[800] tracking-[-0.03em]">
+            Paramètres téléconseil
+          </h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Réglages communs à CHUES et Grand Public.
+          </p>
+        </div>
+        <Link href="/admin/referentiels" className={buttonVariants({ variant: 'outline' })}>
+          Listes de référence
+        </Link>
+      </div>
       {peutToutRegler ? <CartePlateformes valeur={valeur} saisir={saisir} /> : null}
 
       <Card>

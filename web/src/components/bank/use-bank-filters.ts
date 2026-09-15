@@ -13,8 +13,8 @@ import {
 } from '@/lib/bank-filters';
 import type { Projet } from '@/lib/types';
 
-/** `projet` vient de la page : l'URL ne le porte pas et ne peut donc pas le changer. */
-export function useBankFilters(projet: Projet | null = null): {
+/** `projet` vient de la page ou de l'URL si omis. */
+export function useBankFilters(explicitProjet?: Projet | null): {
   filters: BankCaseFilters;
   setFilters: (patch: Partial<BankCaseFilters>) => void;
   resetFilters: () => void;
@@ -24,10 +24,11 @@ export function useBankFilters(projet: Projet | null = null): {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
-  const filters = useMemo(
-    () => ({ ...parseBankFilters(new URLSearchParams(searchParams.toString())), projet }),
-    [searchParams, projet],
-  );
+  const filters = useMemo(() => {
+    const parsed = parseBankFilters(new URLSearchParams(searchParams.toString()));
+    const projet = explicitProjet !== undefined ? explicitProjet : parsed.projet;
+    return { ...parsed, projet };
+  }, [searchParams, explicitProjet]);
 
   const buildHref = useCallback(
     (patch: Partial<BankCaseFilters>, target?: string): string => {

@@ -281,6 +281,41 @@ func TestReferentielsStatutCodeDeduitDuLibelle(t *testing.T) {
 	}
 }
 
+func TestReferentielsSousStatutHeriteEffetEtResteAUnNiveau(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.referentielsConnexion("ADMIN")
+	jeton := b.referentielsJeton()
+
+	statut, body := b.referentielsEnvoi(http.MethodPost, "/api/v1/statuts-qualification",
+		map[string]any{"label": "Parent " + jeton, "effect": "REFUSED"})
+	b.attend(statut, http.StatusCreated, "création du parent", body)
+	parent, _ := body["id"].(string)
+	b.referentielsPurge("statuts_qualification", parent)
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/statuts-qualification",
+		map[string]any{"label": "Enfant " + jeton, "parentId": parent})
+	b.attend(statut, http.StatusCreated, "création du sous-statut", body)
+	enfant, _ := body["id"].(string)
+	b.referentielsPurge("statuts_qualification", enfant)
+	if body["effect"] != "REFUSED" || body["parentId"] != parent {
+		t.Fatalf("effet hérité et parent posé : %v", body)
+	}
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/statuts-qualification",
+		map[string]any{"label": "Petit enfant " + jeton, "parentId": enfant})
+	b.attend(statut, http.StatusConflict, "sous-statut d'un sous-statut", body)
+	if body["code"] != "STATUT_QUALIFICATION_PARENT_TOO_DEEP" {
+		t.Fatalf("code d'erreur : %v", body["code"])
+	}
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/statuts-qualification",
+		map[string]any{"label": "Sans effet " + jeton})
+	b.attend(statut, http.StatusBadRequest, "premier niveau sans effet", body)
+	if body["code"] != "STATUT_QUALIFICATION_EFFECT_REQUIRED" {
+		t.Fatalf("code d'erreur : %v", body["code"])
+	}
+}
+
 func TestReferentielsMotifSystemeNiDesactivableNiReconfigurable(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	b.referentielsConnexion("ADMIN")

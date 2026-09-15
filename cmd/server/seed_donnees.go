@@ -20,16 +20,17 @@ const (
 	seedNomTambacounda = "Tambacounda"
 	seedNomZiguinchor  = "Ziguinchor"
 
-	seedCodeDakar      = "DK-DAK"
-	seedCodePikine     = "DK-PIK"
-	seedCodeRufisque   = "DK-RUF"
-	seedCodeFatick     = "FK-FAT"
-	seedCodeKaolack    = "KL-KAO"
-	seedCodePodor      = "SL-POD"
-	seedCodeMbour      = "TH-MBO"
-	seedCodeBignona    = "ZG-BIG"
-	seedCodeSaintLouis = "SL-STL"
-	seedCodeThies      = "TH-THI"
+	seedCodeDakar       = "DK-DAK"
+	seedCodePikine      = "DK-PIK"
+	seedCodeRufisque    = "DK-RUF"
+	seedCodeFatick      = "FK-FAT"
+	seedCodeKaolack     = "KL-KAO"
+	seedCodePodor       = "SL-POD"
+	seedCodeMbour       = "TH-MBO"
+	seedCodePartenariat = "PARTENARIAT"
+	seedCodeBignona     = "ZG-BIG"
+	seedCodeSaintLouis  = "SL-STL"
+	seedCodeThies       = "TH-THI"
 
 	seedLibelleAutre             = "Autre"
 	seedSecteurCentraleSyndicale = "Centrale syndicale"
@@ -294,11 +295,11 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"REFUS_MEFIANT", "Méfiant", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 12, 9},
 	{"REFUS_NE_VEUT_PAS", "Ne veut pas", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 13, 9},
 	{"REFUS_PAS_POUR_LE_MOMENT", "Pas pour le moment", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 14, 9},
-	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 20, 9},
+	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 20, 9},
 	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 21, 9},
 	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
 	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 23, 9},
-	{"PARTENARIAT", "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
+	{seedCodePartenariat, "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
 	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, true, false, true, 25, 9},
 	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 26, 9},
 }
@@ -909,7 +910,7 @@ var seedVisiteObjets = []seedVisiteReferentiel{
 	{"ENTRETIENS_RECRUTEMENT", "ENTRETIENS DE RECRUTEMENT", 8},
 	{"ENTRETIENS_TRAVAUX", "ENTRETIENS OU TRAVAUX", 9},
 	{"LOCATION_VERSEMENT_LOYER", "LOCATION ET VERSEMENT LOYER", 10},
-	{"PARTENARIAT", "PARTENARIAT", 11},
+	{seedCodePartenariat, seedCodePartenariat, 11},
 	{"PERSONNEL", "PERSONNEL", 12},
 	{"PROPRIETAIRE_BAILLEUR", "PROPRIETAIRE SITES ET/OU BAILLEUR", 13},
 	{"RECLAMATIONS", "RECLAMATIONS", 14},

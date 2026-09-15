@@ -74,8 +74,8 @@ function buildFiltres(page: number, teleconseillerId: string, etat: string) {
 const ficheHref = (fiche: LotExportFiche, cible: LotExportDetail['cible']): string | null => {
   if (fiche.ficheId === null) return null;
   return cible === 'PROSPECTS'
-    ? `/chues/prospects/${fiche.ficheId}`
-    : `/chues/representants/${fiche.ficheId}`;
+    ? `/teleconseil/prospects/${fiche.ficheId}`
+    : `/teleconseil/representants/${fiche.ficheId}`;
 };
 
 function destinatairesPossibles(

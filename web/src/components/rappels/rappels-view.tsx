@@ -3,13 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ClockIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { QueryErrorState } from '@/components/query-error-state';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,6 +35,12 @@ import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import type { Projet } from '@/lib/types';
+
+const PROJET_OPTIONS = [
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
+];
 
 const SCOPES: readonly { value: CallbackScope; label: string }[] = [
   { value: 'overdue', label: 'En retard' },
@@ -58,22 +64,20 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
 };
 
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
-  const pathname = usePathname();
-  const grandPublic = pathname.startsWith('/grand-public');
-  const projet = grandPublic ? 'GRAND_PUBLIC' : 'CHUES';
-  const racine = grandPublic ? '/grand-public' : '/chues';
+  const racine = '/teleconseil';
   const queryClient = useQueryClient();
   const [scope, setScope] = useState<CallbackScope>('overdue');
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
+  const [projet, setProjet] = useState<Projet | null>(null);
 
   const overdue = useQuery({
     queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
-    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet),
+    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet ?? undefined),
   });
 
   const list = useQuery({
     queryKey: [...callbackKeys.list(scope, assignedToId), projet],
-    queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet),
+    queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
   });
 
   const teleconseillers = useQuery({
@@ -126,6 +130,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Prospect</TableHead>
+                    <TableHead>Projet</TableHead>
                     <TableHead>Échéance</TableHead>
                     <TableHead>Retard</TableHead>
                     <TableHead>Commentaire</TableHead>
@@ -143,6 +148,9 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                         <span className="block text-[0.75rem] text-muted-foreground">
                           Fiche {callback.shortCode}
                         </span>
+                      </TableCell>
+                      <TableCell>
+                        <ProjetBadge projet={callback.projet} />
                       </TableCell>
                       <TableCell>
                         <time dateTime={callback.scheduledAt}>
@@ -198,6 +206,10 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
   return (
     <div className="flex flex-col gap-6">
+      <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
+        Tous les rappels promis des prospects sont ici. Utilisez « Projet » pour distinguer CHUES et
+        Grand Public.
+      </p>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[0.9375rem]" role="status">
           {overdue.isSuccess ? (
@@ -212,19 +224,28 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
           )}
         </p>
 
-        {canFilter ? (
+        <div className="flex flex-wrap gap-3">
           <FilterCombobox
-            label="Téléconseiller"
-            placeholder="Tous les téléconseillers"
-            className="w-72"
-            options={(teleconseillers.data?.items ?? []).map((user) => ({
-              value: user.id,
-              label: user.fullName,
-            }))}
-            value={assignedToId}
-            onChange={setAssignedToId}
+            label="Projet"
+            placeholder="Tous les projets"
+            options={PROJET_OPTIONS}
+            value={projet}
+            onChange={(value) => setProjet((value as Projet) || null)}
           />
-        ) : null}
+          {canFilter ? (
+            <FilterCombobox
+              label="Téléconseiller"
+              placeholder="Tous les téléconseillers"
+              className="w-72"
+              options={(teleconseillers.data?.items ?? []).map((user) => ({
+                value: user.id,
+                label: user.fullName,
+              }))}
+              value={assignedToId}
+              onChange={setAssignedToId}
+            />
+          ) : null}
+        </div>
       </div>
 
       <Tabs

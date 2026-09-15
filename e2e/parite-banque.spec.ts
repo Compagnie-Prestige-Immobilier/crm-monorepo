@@ -98,19 +98,19 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   test.use({ storageState: banquier.etat });
   test.describe.configure({ mode: 'serial' });
 
-  test('« Projet CHUES » mène la banque à sa vue d’ensemble', async ({ page }) => {
+  test('« Banque & Finance » mène la banque à sa vue d’ensemble', async ({ page }) => {
     await page.goto('/espaces');
-    const tuile = page.getByRole('link', { name: /^Projet CHUES/u });
-    await expect(tuile).toHaveAttribute('href', '/chues/banque');
+    const tuile = page.getByRole('link', { name: /^Banque & Finance/u });
+    await expect(tuile).toHaveAttribute('href', '/finance');
 
-    await page.goto('/chues');
-    await expect(page).toHaveURL(/\/chues\/banque$/u);
+    await page.goto('/finance');
+    await expect(page).toHaveURL(/\/finance$/u);
     await expect(page.getByRole('heading', { name: 'Vue d’ensemble', level: 1 })).toBeVisible();
     await expect(etatVide(page, 'Accès refusé')).toHaveCount(0);
   });
 
   test('les deux listes vides ne disent pas la même chose', async ({ page }) => {
-    await page.goto('/chues/dossiers');
+    await page.goto('/finance/dossiers');
     await page.getByRole('tab', { name: 'Liste' }).click();
     await expect(page.getByRole('heading', { name: 'Dossiers bancaires', level: 1 })).toBeVisible();
     // D'autres parcours ouvrent des dossiers en même temps : l'état « rien du tout » ne se voit
@@ -133,7 +133,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   test('un dossier complet de la plateforme s’ouvre en un clic, référence générée', async ({
     page,
   }) => {
-    await page.goto('/chues/dossiers/nouveau');
+    await page.goto('/finance/dossiers/nouveau');
     const carte = page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` });
     await expect(carte.getByText('Validé', { exact: true })).toBeVisible();
     await carte.getByRole('button', { name: 'Ouvrir le dossier' }).click();
@@ -154,7 +154,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   test('une inscription déjà ouverte disparaît, une sans prospect reste fermée', async ({
     page,
   }) => {
-    await page.goto('/chues/dossiers/nouveau');
+    await page.goto('/finance/dossiers/nouveau');
     await expect(page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` })).toHaveCount(
       0,
     );
@@ -170,7 +170,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   });
 
   test('le tableau glisse le dossier vers l’étape suivante', async ({ page }) => {
-    await page.goto('/chues/dossiers');
+    await page.goto('/finance/dossiers');
     await page.getByRole('tab', { name: 'Tableau' }).click();
     const carte = page.getByRole('button', { name: new RegExp(reference, 'u') });
     await expect(carte).toBeVisible();
@@ -187,7 +187,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   });
 
   test('l’encaissement refuse un montant nul puis verrouille le dossier', async ({ page }) => {
-    await page.goto(`/chues/dossiers/${dossierId}`);
+    await page.goto(`/finance/dossiers/${dossierId}`);
     await page.getByRole('button', { name: 'Déclarer l’encaissement' }).click();
     const boite = page.getByRole('dialog');
     const montant = boite.getByLabel('Montant encaissé');
@@ -226,7 +226,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   });
 
   test('les vues rapides vivent dans l’URL et survivent au rechargement', async ({ page }) => {
-    await page.goto('/chues/dossiers');
+    await page.goto('/finance/dossiers');
     await page.getByRole('tab', { name: 'Liste' }).click();
     const decompte = page.getByRole('status').filter({ hasText: 'Dossiers affichés' });
     const encaisses = page.getByRole('button', { name: 'Encaissés', exact: true });
@@ -248,7 +248,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   });
 
   test('la vue d’ensemble chiffre l’encaissement et nomme une période vide', async ({ page }) => {
-    await page.goto('/chues/banque');
+    await page.goto('/finance');
     for (const indicateur of ['Dossiers', 'Encaissés', 'Taux de rejet', 'Délai moyen']) {
       await expect(page.getByText(indicateur, { exact: true }).first()).toBeVisible();
     }
@@ -257,7 +257,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     await expect(page.getByRole('rowheader', { name: new RegExp(cle, 'u') })).toBeVisible();
 
     // Le sélecteur de date du panneau v1 n'est pas un champ texte : la période vit dans l'URL.
-    await page.goto('/chues/banque?dateFrom=2031-01-01');
+    await page.goto('/finance?dateFrom=2031-01-01');
     await expect(page).toHaveURL(/dateFrom=2031-01-01/u);
     await expect(page.getByText('Aucun dossier rejeté sur la période filtrée.')).toBeVisible();
     await expect(page.getByText('Aucune activité d’agent sur la période filtrée.')).toBeVisible();
@@ -275,7 +275,7 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   });
 
   test('le classeur annonce son périmètre et emporte les critères', async ({ page }) => {
-    await page.goto('/chues/dossiers/export');
+    await page.goto('/finance/dossiers/export');
     await expect(page.getByText('Classeur des dossiers bancaires', { exact: true })).toBeVisible();
     await expect(page.getByText('Aucun filtre : tous les dossiers.')).toBeVisible();
     // Le panneau v1 génère le classeur par requête, pas par lien : le bouton suffit.
@@ -290,12 +290,12 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
 
 type Ecran = readonly [route: string, familleApi: string];
 
-const DOSSIERS: Ecran = ['/chues/dossiers', '/api/v1/bank-cases'];
-const CLASSEUR: Ecran = ['/chues/dossiers/export', '/api/v1/bank-case-stages'];
-const TABLEAU: Ecran = ['/chues/banque', '/api/v1/bank-cases'];
-const DEMANDES: Ecran = ['/chues/demandes-clients', '/api/v1/client-requests'];
-const ETAPES: Ecran = ['/chues/dossiers/etapes', '/api/v1/bank-case-stages'];
-const ETAPE1: Ecran = ['/chues/appels-representants', '/api/v1/representants'];
+const DOSSIERS: Ecran = ['/finance/dossiers', '/api/v1/bank-cases'];
+const CLASSEUR: Ecran = ['/finance/dossiers/export', '/api/v1/bank-case-stages'];
+const TABLEAU: Ecran = ['/finance', '/api/v1/bank-cases'];
+const DEMANDES: Ecran = ['/finance/demandes-clients', '/api/v1/client-requests'];
+const ETAPES: Ecran = ['/finance/dossiers/etapes', '/api/v1/bank-case-stages'];
+const ETAPE1: Ecran = ['/teleconseil/appels-representants', '/api/v1/representants'];
 
 const FERMES: readonly { role: RoleCompte; libelle: string; ecrans: readonly Ecran[] }[] = [
   {
@@ -303,8 +303,8 @@ const FERMES: readonly { role: RoleCompte; libelle: string; ecrans: readonly Ecr
     libelle: 'Téléconseiller',
     ecrans: [DOSSIERS, CLASSEUR, TABLEAU, DEMANDES],
   },
-  { role: 'SUPERVISEUR', libelle: 'Supervision', ecrans: [DOSSIERS, TABLEAU, DEMANDES] },
-  { role: 'DIRECTION', libelle: 'Direction', ecrans: [DOSSIERS, DEMANDES] },
+  { role: 'SUPERVISEUR', libelle: 'Supervision', ecrans: [CLASSEUR, ETAPES] },
+  { role: 'DIRECTION', libelle: 'Direction', ecrans: [CLASSEUR, ETAPES] },
   { role: 'BANQUE_FINANCE', libelle: 'Banque & Finance', ecrans: [ETAPES, ETAPE1] },
 ];
 
@@ -324,7 +324,7 @@ async function attendreRefus(page: Page, ecran: Ecran, libelle: string): Promise
     `Cet écran est réservé à un autre rôle. Rôle en cours : ${libelle}.`,
   );
   const retour = refus.getByRole('link', { name: 'Retour à l’accueil' });
-  await expect(retour).toHaveAttribute('href', '/espaces');
+  await expect(retour).toHaveAttribute('href', /^\/(teleconseil|finance|accueil)/);
   expect(chargees, `${route} a chargé des données métier pour ${libelle}`).toEqual([]);
 }
 
@@ -345,13 +345,13 @@ test.describe('parité banque, les demandes de création de client', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('le dépôt exige un téléphone, et la banque n’arbitre pas', async ({ page }) => {
-    await page.goto('/chues/demandes-clients');
-    const suivi = page.getByRole('heading', { name: 'Mes demandes de création', level: 1 });
+    await page.goto('/finance/demandes-clients');
+    const suivi = page.getByRole('heading', { name: /Demandes de création/, level: 1 });
     const valider = page.getByRole('heading', { name: 'Créations de client à valider', level: 1 });
     await expect(suivi).toBeVisible();
     await expect(valider).toHaveCount(0);
 
-    await page.goto('/chues/dossiers/nouveau');
+    await page.goto('/finance/dossiers/nouveau');
     await page.getByRole('button', { name: 'Demander la création du client' }).click();
 
     const depot = page.getByRole('dialog');
@@ -377,7 +377,7 @@ test.describe('parité banque, les demandes de création de client', () => {
     await expect(confirme).toBeVisible();
     await depot.getByRole('button', { name: 'Fermer' }).first().click();
 
-    await page.goto('/chues/demandes-clients');
+    await page.goto('/finance/demandes-clients');
     const carte = carteDemande(page);
     await expect(carte).toContainText('En attente d’arbitrage par l’administration.');
     await sansGesteDArbitrage(carte);
@@ -396,7 +396,7 @@ test.describe('parité banque, les demandes de création de client', () => {
     const siege = await browser.newContext({ storageState: administrateur.etat });
     try {
       const arbitre = await siege.newPage();
-      await arbitre.goto('/chues/demandes-clients');
+      await arbitre.goto('/finance/demandes-clients');
       const titre = { name: 'Créations de client à valider', level: 1 };
       await expect(arbitre.getByRole('heading', titre)).toBeVisible();
       await arbitre.getByLabel('Recherche').fill(NOM_DEMANDE);
@@ -421,7 +421,7 @@ test.describe('parité banque, les demandes de création de client', () => {
     expect(arbitree.status).toBe('REJECTED');
     expect(arbitree.rejectionNote).toBe(MOTIF_REFUS);
 
-    await page.goto('/chues/demandes-clients');
+    await page.goto('/finance/demandes-clients');
     await page.getByRole('button', { name: 'Refusées', exact: true }).click();
     await expect(page).toHaveURL(/statut=REJECTED/u);
     const carte = carteDemande(page);

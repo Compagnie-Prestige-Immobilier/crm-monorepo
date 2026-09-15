@@ -23,7 +23,7 @@ import type {
 import type { ComptageOuvertures } from '@/lib/data/ouvertures';
 import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
-import type { Role } from '@/lib/types';
+import type { Projet, Role } from '@/lib/types';
 
 type ChiffreSource = components['schemas']['DashboardSource'];
 
@@ -428,7 +428,7 @@ const SOURCES_CHIFFRES = {
     description:
       'Un camembert par campagne : fiches traitées ÷ fiches de la campagne. Le camembert ouvre sa campagne.',
     groupe: 'Campagnes',
-    lien: (id) => `/chues/campagnes/${id}`,
+    lien: (id) => `/teleconseil/campagnes/${id}`,
     extraire: ({ campagnes }) =>
       campagnes === undefined
         ? null
@@ -928,11 +928,13 @@ export function catalogueDe(input: {
   chues: boolean;
   voitLesMontants: boolean;
   role: Role;
+  projet: Projet | null;
 }): Record<string, SourceChiffre> {
   const entrees = Object.entries(SOURCES_CHIFFRES).filter(([cle]) => {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
     if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
+    if (input.projet === null && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });
   const catalogue = Object.fromEntries(entrees);

@@ -41,8 +41,8 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 		obtenuLe = *r.EnrollmentCapturedAt
 	}
 	// Un rendez-vous se prépare, un enrôlement à distance se suit : le courriel
-	// change de titre et dit la date quand il y en a une.
-	titre, objet, rendezVous := "Enrôlement à distance", "Prospect transmis à l’enrôlement : ", "sans rendez-vous"
+	// change de titre et ne parle du rendez-vous que s'il y en a un.
+	titre, objet, rendezVous := "Enrôlement à distance", "Prospect transmis à l’enrôlement : ", ""
 	if methodesRendezVous[r.Methode] {
 		titre, objet = "Rendez-vous d’enrôlement", "Rendez-vous d’enrôlement : "
 		rendezVous = "date à fixer"
@@ -50,28 +50,33 @@ func (s *service) signalerEnrolement(ctx context.Context, u *socle.Utilisateur, 
 	if r.RendezVousAt != nil {
 		rendezVous = r.RendezVousAt.In(s.Cfg.TimeZone).Format(formatDateEnrolement)
 	}
+	intro := notifications.IntroCourriel(&reglages.Enrolement, notifications.AideEnrolement(), map[string]string{
+		notifications.VariableClient: client, "telephone": qualificationNumero(r.PhoneE164), "methode": methode, "rendezVous": rendezVous,
+		notifications.VariableTeleconseiller: u.FullName, notifications.VariableBanque: texteOuNonRenseigne(r.BanqueName),
+		notifications.VariableProjet: projet,
+	})
+	lignes := [][2]string{
+		{"Client", client},
+		{"Téléphone", texteOuNonRenseigne(r.PhoneE164)},
+		{"Courriel", texteOuNonRenseigne(r.Email)},
+		{"Banque", texteOuNonRenseigne(r.BanqueName)},
+		{"Méthode d’enrôlement", methode},
+	}
+	if rendezVous != "" {
+		intro += " Rendez-vous : " + rendezVous + "."
+		lignes = append(lignes, [2]string{"Rendez-vous", rendezVous})
+	}
+	lignes = append(lignes,
+		[2]string{"Téléconseiller", u.FullName},
+		[2]string{"Obtenue le", obtenuLe.In(s.Cfg.TimeZone).Format(formatDateEnrolement)},
+	)
 	chemin := "/" + coque + "/prospects/" + r.ID
 	err = notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          notifications.CourrielProspectEnrolement,
 		Sujet:         "[" + projet + "] " + objet + client,
 		Destinataires: reglages.Enrolement.Destinataires, Copies: reglages.Enrolement.Copies,
 		ObjetType: "prospect", ObjetID: r.ID,
-		Titre: titre,
-		Intro: notifications.IntroCourriel(&reglages.Enrolement, notifications.AideEnrolement(), map[string]string{
-			notifications.VariableClient: client, "telephone": qualificationNumero(r.PhoneE164), "methode": methode, "rendezVous": rendezVous,
-			notifications.VariableTeleconseiller: u.FullName, notifications.VariableBanque: texteOuNonRenseigne(r.BanqueName),
-			notifications.VariableProjet: projet,
-		}),
-		Lignes: [][2]string{
-			{"Client", client},
-			{"Téléphone", texteOuNonRenseigne(r.PhoneE164)},
-			{"Courriel", texteOuNonRenseigne(r.Email)},
-			{"Banque", texteOuNonRenseigne(r.BanqueName)},
-			{"Méthode d’enrôlement", methode},
-			{"Rendez-vous", rendezVous},
-			{"Téléconseiller", u.FullName},
-			{"Obtenue le", obtenuLe.In(s.Cfg.TimeZone).Format(formatDateEnrolement)},
-		},
+		Titre: titre, Intro: intro, Lignes: lignes,
 		Lien: socle.Env("PUBLIC_WEB_URL", "") + chemin, LibelleLien: "Voir le prospect dans CPI GO",
 		NomPieceJointe: "prospect-enrolement-" + r.ID + ".pdf",
 	})

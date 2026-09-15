@@ -1,19 +1,12 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import {
-  BellRingIcon,
-  CalendarClockIcon,
-  ClockIcon,
-  PhoneCallIcon,
-  UserRoundIcon,
-  XCircleIcon,
-} from 'lucide-react';
+import { BellIcon, CalendarClockIcon, ClockIcon, PhoneCallIcon, XCircleIcon } from 'lucide-react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -30,12 +23,14 @@ import {
   fetchCallbacks,
   formatCallbackAt,
   formatDelay,
+  snoozeCallback,
   type Callback,
 } from '@/lib/data/console';
+import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
-type Rappel = Callback & { readonly prospectName?: string };
+type Rappel = Callback;
 const EMPTY_CALLBACKS: Callback[] = [];
 
 /** Synthétise un carillon sonore de rappel à trois notes via Web Audio API. */
@@ -80,7 +75,9 @@ interface ContenuRappelProps {
   readonly racine: string;
   readonly onIgnorer: () => void;
   readonly onAnnuler: (id: string) => void;
+  readonly onReporter: (id: string) => void;
   readonly isPendingCancel: boolean;
+  readonly isPendingSnooze: boolean;
   readonly enAttente: number;
 }
 
@@ -90,7 +87,9 @@ function ContenuRappelPopUp({
   racine,
   onIgnorer,
   onAnnuler,
+  onReporter,
   isPendingCancel,
+  isPendingSnooze,
   enAttente,
 }: ContenuRappelProps) {
   const retardMs = serverTimeMs - Date.parse(callback.scheduledAt);
@@ -98,51 +97,47 @@ function ContenuRappelPopUp({
 
   return (
     <Dialog open onOpenChange={(open) => !open && onIgnorer()}>
-      <DialogContent showCloseButton className="border-2 border-amber-500/50 sm:max-w-lg">
+      <DialogContent showCloseButton className="w-[calc(100%-1rem)] max-w-lg overflow-x-hidden">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-30" />
-              <BellRingIcon className="h-6 w-6 animate-bounce text-amber-600" />
+          <div className="flex min-w-0 items-start gap-3 pr-8">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground">
+              <BellIcon className="size-4" aria-hidden="true" />
             </div>
-            <div>
-              <DialogTitle className="flex items-center gap-2 text-lg font-bold text-amber-900 dark:text-amber-200">
-                Rappel à passer maintenant
-                <Badge variant="destructive" className="ml-1 uppercase">
-                  Urgent
-                </Badge>
+            <div className="min-w-0 flex-1">
+              <DialogTitle className="flex min-w-0 flex-wrap items-center gap-2">
+                Rappel à passer
+                <ProjetBadge projet={callback.projet} />
               </DialogTitle>
-              <DialogDescription className="text-sm text-muted-foreground">
-                Le créneau est atteint. Toutes les informations utiles sont ci-dessous.
-                {enAttente > 1 ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.` : ''}
+              <DialogDescription className="break-words">
+                {formatCallbackAt(callback.scheduledAt, serverTimeMs)}
+                {enAttente > 1
+                  ? ` · ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente`
+                  : ''}
               </DialogDescription>
             </div>
           </div>
         </DialogHeader>
 
-        <div className="mt-2 space-y-3 rounded-lg border bg-muted/40 p-4">
-          <div className="grid gap-3 border-b pb-3 sm:grid-cols-[1fr_auto]">
+        <div className="space-y-4 rounded-lg border p-4">
+          <div className="grid gap-3 sm:grid-cols-[1fr_auto]">
             <div>
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
-                <UserRoundIcon className="size-3.5" aria-hidden="true" />
-                Prospect
-              </p>
-              <p className="text-xl font-bold tracking-tight text-foreground">
+              <p className="text-xs font-medium text-muted-foreground">Prospect</p>
+              <p className="text-lg font-semibold text-foreground">
                 {callback.prospectName ?? `Prospect · ${callback.shortCode}`}
               </p>
             </div>
             <div className="sm:text-right">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">Téléphone</p>
-              <p className="text-lg font-bold tracking-tight text-foreground">
+              <p className="text-xs font-medium text-muted-foreground">Téléphone</p>
+              <p className="font-mono text-base font-semibold text-foreground">
                 {formatPhone(callback.phoneE164)}
               </p>
               <p className="font-mono text-xs text-muted-foreground">Fiche {callback.shortCode}</p>
             </div>
           </div>
 
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-sm">
             <div>
-              <p className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground uppercase">
+              <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                 <CalendarClockIcon className="size-3.5" aria-hidden="true" />
                 Prévu
               </p>
@@ -150,28 +145,47 @@ function ContenuRappelPopUp({
                 {formatCallbackAt(callback.scheduledAt, serverTimeMs)}
               </time>
             </div>
-            {retardTxt ? (
-              <div className="sm:text-right">
-                <p className="text-xs font-semibold text-muted-foreground uppercase">Retard</p>
-                <span className="font-semibold text-destructive">{retardTxt}</span>
-              </div>
-            ) : null}
+            {retardTxt ? <Badge variant="destructive">Retard {retardTxt}</Badge> : null}
           </div>
 
           {callback.comment ? (
-            <div className="mt-2 rounded border bg-background p-2.5 text-xs text-foreground">
-              <span className="mb-0.5 block font-semibold text-muted-foreground">
-                Commentaire du rappel
-              </span>
-              <p className="whitespace-pre-wrap italic">&laquo; {callback.comment} &raquo;</p>
+            <div className="rounded-md bg-muted px-3 py-2 text-sm text-foreground">
+              <p className="whitespace-pre-wrap">{callback.comment}</p>
             </div>
           ) : null}
         </div>
 
-        <DialogFooter className="mt-4 flex-col gap-2 sm:flex-row sm:justify-end">
-          <Button variant="outline" size="sm" onClick={onIgnorer} className="gap-1.5">
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end">
+          <a
+            href={`tel:${callback.phoneE164}`}
+            className={buttonVariants({
+              variant: 'outline',
+              size: 'sm',
+              className: 'w-full gap-1.5 sm:w-auto',
+            })}
+          >
+            <PhoneCallIcon className="h-4 w-4" />
+            Appeler
+          </a>
+
+          <BoutonWhatsApp
+            prospect={{
+              prenom: callback.prospectName ?? '',
+              phoneE164: callback.phoneE164,
+              whatsappStatus: 'MEME_NUMERO',
+              whatsappNumber: callback.phoneE164,
+            }}
+          />
+
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={isPendingSnooze}
+            onClick={() => onReporter(callback.id)}
+            className="w-full gap-1.5 sm:w-auto"
+          >
             <ClockIcon className="h-4 w-4" />
-            Plus tard
+            Reporter de 15 min
           </Button>
 
           <Button
@@ -179,7 +193,7 @@ function ContenuRappelPopUp({
             size="sm"
             disabled={isPendingCancel}
             onClick={() => onAnnuler(callback.id)}
-            className="gap-1.5 text-destructive hover:bg-destructive/10"
+            className="w-full gap-1.5 text-destructive hover:bg-destructive/10 sm:w-auto"
           >
             <XCircleIcon className="h-4 w-4" />
             Annuler ce rappel
@@ -188,7 +202,11 @@ function ContenuRappelPopUp({
           <Link
             href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
             onClick={onIgnorer}
-            className={buttonVariants({ variant: 'default', size: 'sm', className: 'gap-1.5' })}
+            className={buttonVariants({
+              variant: 'default',
+              size: 'sm',
+              className: 'w-full gap-1.5 sm:w-auto',
+            })}
           >
             <PhoneCallIcon className="h-4 w-4" />
             Consigner l’appel
@@ -200,22 +218,48 @@ function ContenuRappelPopUp({
 }
 
 export function RappelPopUpIntrusif() {
-  const pathname = usePathname();
-  const grandPublic = pathname.startsWith('/grand-public');
-  const projet = grandPublic ? 'GRAND_PUBLIC' : 'CHUES';
-  const racine = grandPublic ? '/grand-public' : '/chues';
+  const projet = undefined;
+  const racine = '/teleconseil';
   const queryClient = useQueryClient();
 
-  const [dismissedIds, setDismissedIds] = useState<Set<string>>(() => new Set());
-  const [triggeredIds, setTriggeredIds] = useState<Set<string>>(() => new Set());
-  const initializedRef = useRef(false);
-  const overdueIdsRef = useRef<Set<string>>(new Set());
+  // Un rappel reporté change d'heure : c'est une nouvelle échéance, à signaler à son tour.
+  const echeance = (callback: Rappel) => `${callback.id}@${callback.scheduledAt}`;
+  const [aSignaler, setASignaler] = useState<Set<string>>(() => new Set());
+  const [ecartees, setEcartees] = useState<Set<string>>(() => new Set());
+  const echeancesConnuesRef = useRef<Set<string> | null>(null);
 
   const overdueQuery = useQuery({
     queryKey: [...callbackKeys.list('overdue', null), projet, 'intrusif'],
     queryFn: () => fetchCallbacks('overdue', null, undefined, projet),
     refetchInterval: 15_000,
   });
+
+  const callbacks = overdueQuery.data?.items ?? EMPTY_CALLBACKS;
+  const serverTimeStr = overdueQuery.data?.serverTime ?? new Date().toISOString();
+  const serverTimeMs = Date.parse(serverTimeStr);
+
+  // L'arriéré au chargement reste sur la page Rappels ; seule une échéance qui
+  // arrive pendant que le panneau est ouvert interrompt le téléconseiller.
+  useEffect(() => {
+    if (!overdueQuery.isSuccess) return;
+    const enRetard = new Set(callbacks.filter((callback) => callback.overdue).map(echeance));
+    const connues = echeancesConnuesRef.current;
+    echeancesConnuesRef.current = enRetard;
+    if (connues === null) return;
+    const nouvelles = [...enRetard].filter((cle) => !connues.has(cle));
+    if (nouvelles.length === 0) return;
+    setASignaler((previous) => new Set([...previous, ...nouvelles]));
+  }, [callbacks, overdueQuery.isSuccess]);
+
+  const enAttente = callbacks.filter(
+    (callback) =>
+      callback.overdue && aSignaler.has(echeance(callback)) && !ecartees.has(echeance(callback)),
+  );
+  const activeCallback = enAttente[0] ?? null;
+
+  const masquerRappelsEnAttente = () => {
+    setEcartees((previous) => new Set([...previous, ...aSignaler]));
+  };
 
   const cancelMutation = useMutation({
     mutationFn: (id: string) => cancelCallback(id),
@@ -228,56 +272,28 @@ export function RappelPopUpIntrusif() {
     },
   });
 
-  const callbacks = overdueQuery.data?.items ?? EMPTY_CALLBACKS;
-  const serverTimeStr = overdueQuery.data?.serverTime ?? new Date().toISOString();
-  const serverTimeMs = Date.parse(serverTimeStr);
+  const snoozeMutation = useMutation({
+    mutationFn: (id: string) => snoozeCallback(id),
+    onSuccess: () => {
+      toast.success('Rappel reporté de 15 minutes.');
+      masquerRappelsEnAttente();
+      void queryClient.invalidateQueries({ queryKey: callbackKeys.root });
+    },
+    onError: (error) => {
+      toastApiError(error, 'Le rappel n’a pas pu être reporté.');
+    },
+  });
 
   useEffect(() => {
-    if (!overdueQuery.isSuccess) return;
-
-    const overdueIds = new Set(
-      callbacks.filter((callback) => callback.overdue).map(({ id }) => id),
-    );
-    if (!initializedRef.current) {
-      initializedRef.current = true;
-      overdueIdsRef.current = overdueIds;
-      setTriggeredIds(overdueIds);
-      return;
-    }
-
-    const newlyOverdue = callbacks.filter(
-      (callback) => callback.overdue && !overdueIdsRef.current.has(callback.id),
-    );
-    overdueIdsRef.current = overdueIds;
-    if (newlyOverdue.length === 0) return;
-    setTriggeredIds((previous) => new Set([...previous, ...newlyOverdue.map(({ id }) => id)]));
-  }, [callbacks, overdueQuery.isSuccess]);
-
-  const activeCallback: Rappel | null =
-    callbacks.find((c) => triggeredIds.has(c.id) && !dismissedIds.has(c.id) && c.overdue) ?? null;
-  const enAttente = callbacks.filter(
-    (callback) => triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
-  ).length;
-
-  useEffect(() => {
-    if (!activeCallback) return;
-
+    if (activeCallback === null) return;
     jouerSonnerieRappel();
-    const interval = window.setInterval(jouerSonnerieRappel, 8_000);
-    return () => {
-      window.clearInterval(interval);
-    };
   }, [activeCallback]);
 
-  if (!activeCallback) return null;
-
-  const ignorerRappel = () => {
-    setDismissedIds((prev) => new Set([...prev, activeCallback.id]));
-  };
+  if (activeCallback === null) return null;
 
   const annulerRappel = (id: string) => {
     cancelMutation.mutate(id);
-    ignorerRappel();
+    masquerRappelsEnAttente();
   };
 
   return (
@@ -285,10 +301,12 @@ export function RappelPopUpIntrusif() {
       callback={activeCallback}
       serverTimeMs={serverTimeMs}
       racine={racine}
-      onIgnorer={ignorerRappel}
+      onIgnorer={masquerRappelsEnAttente}
       onAnnuler={annulerRappel}
+      onReporter={(id) => snoozeMutation.mutate(id)}
       isPendingCancel={cancelMutation.isPending}
-      enAttente={enAttente}
+      isPendingSnooze={snoozeMutation.isPending}
+      enAttente={enAttente.length}
     />
   );
 }

@@ -118,6 +118,7 @@ export function serializeBankFilters(filters: BankCaseFilters): URLSearchParams 
     if (value !== null && value !== '') params.set(key, value);
   };
 
+  put('projet', filters.projet);
   put('search', filters.search.trim());
   put('stageId', filters.stageId);
   put('stageType', filters.stageType);
@@ -143,13 +144,16 @@ export function bankFiltersQueryKey(filters: BankCaseFilters): string {
   return params.toString();
 }
 
-/** Racine de la coque qui porte les écrans bancaires de ce projet. */
-export function bankBasePath(projet: Projet | null): string {
-  return projet === 'GRAND_PUBLIC' ? '/grand-public' : '/chues';
+export const FINANCE_BASE_PATH = '/finance';
+
+/** Racine de la coque qui porte les écrans bancaires. */
+export function bankBasePath(_projet?: Projet | null): string {
+  return FINANCE_BASE_PATH;
 }
 
 export function countActiveBankFilters(filters: BankCaseFilters): number {
   const activeFlags = [
+    filters.projet !== null,
     filters.search.trim() !== '',
     filters.stageId !== null,
     filters.stageType !== null,

@@ -54,7 +54,7 @@ function isSortField(id: string): id is BankCaseSortField {
   return (BANK_CASE_SORT_FIELDS as readonly string[]).includes(id);
 }
 
-export function BankCasesView({ projet }: { projet: Projet }) {
+export function BankCasesView({ projet }: { projet?: Projet | null | undefined } = {}) {
   const { filters, setFilters } = useBankFilters(projet);
   const router = useRouter();
   const base = bankBasePath(projet);
