@@ -286,6 +286,7 @@ const (
 	seedCouleurSuccess = "success"
 	seedCouleurDanger  = "danger"
 	seedCouleurInfo    = "info"
+	seedPartenariat    = "PARTENARIAT"
 )
 
 var seedCallOutcomeReasons = []seedCallOutcomeReason{
@@ -298,7 +299,7 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 21, 9},
 	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
 	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 23, 9},
-	{"PARTENARIAT", "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
+	{seedPartenariat, "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
 	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, true, false, true, 25, 9},
 	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 26, 9},
 }
@@ -909,7 +910,7 @@ var seedVisiteObjets = []seedVisiteReferentiel{
 	{"ENTRETIENS_RECRUTEMENT", "ENTRETIENS DE RECRUTEMENT", 8},
 	{"ENTRETIENS_TRAVAUX", "ENTRETIENS OU TRAVAUX", 9},
 	{"LOCATION_VERSEMENT_LOYER", "LOCATION ET VERSEMENT LOYER", 10},
-	{"PARTENARIAT", "PARTENARIAT", 11},
+	{seedPartenariat, seedPartenariat, 11},
 	{"PERSONNEL", "PERSONNEL", 12},
 	{"PROPRIETAIRE_BAILLEUR", "PROPRIETAIRE SITES ET/OU BAILLEUR", 13},
 	{"RECLAMATIONS", "RECLAMATIONS", 14},
