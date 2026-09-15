@@ -112,7 +112,7 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'REFUS_MEFIANT', label: 'Méfiant', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_NE_VEUT_PAS', label: 'Ne veut pas', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_PAS_POUR_LE_MOMENT', label: 'Pas pour le moment', effect: 'CLOSE_REFUSED' },
-  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'KEEP_OPEN', requiresComment: true },
   { code: 'RDV_TELEPHONIQUE', label: 'RDV téléphonique', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
   { code: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement', effect: 'CLOSE_METHOD' },
   { code: 'CONSTRUCTION', label: 'Construction', effect: 'SCHEDULE_CALLBACK', requiresComment: true },

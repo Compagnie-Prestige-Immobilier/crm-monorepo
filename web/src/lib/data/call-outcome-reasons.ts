@@ -94,6 +94,7 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
  */
 const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
   INTERESSE: 'OTHER',
+  DEMANDE_INFORMATION: 'OTHER',
   RDV_AGENCE: 'CALLBACK',
 };
 
