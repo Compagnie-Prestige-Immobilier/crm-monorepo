@@ -253,14 +253,14 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/teleconseil/appels-representants',
-        label: 'Appels représentants',
+        label: 'Fiche représentant',
         icon: PhoneCallIcon,
         description: 'Première étape',
         roles: TERRAIN,
       },
       {
         href: '/teleconseil/console',
-        label: 'Fiches',
+        label: 'Fiche prospect',
         icon: HeadsetIcon,
         description: 'Dernière étape',
         roles: ['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
