@@ -209,7 +209,6 @@ export function ConsoleView({
   const [resteAAppeler, setResteAAppeler] = useState(true);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
-  const seulementARappeler = filtreResteAAppeler(resteAAppeler, cherche);
 
   const parLien = useQuery({
     queryKey: queryKeys.prospect(demandee ?? ''),
@@ -226,7 +225,7 @@ export function ConsoleView({
     cherche,
     origine,
     viewerId,
-    seulementARappeler,
+    seulementARappeler: resteAAppeler,
     plateforme,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
   });
@@ -302,7 +301,7 @@ export function ConsoleView({
         annuaire={annuaire}
         cherche={cherche}
         canCreateProspect={canCreateProspect}
-        seulementARappeler={seulementARappeler}
+        seulementARappeler={resteAAppeler}
         plateforme={plateforme}
         onChoisir={(row) => {
           setConfirme(null);
@@ -552,16 +551,13 @@ function chargementParLien(demandee: string | null, isPending: boolean): boolean
   return demandee !== null && isPending;
 }
 
-/** Une recherche vise une fiche précise, déjà appelée ou non. */
 function totalAffiche(page: { total: number } | undefined): number | null {
   return page === undefined ? null : page.total;
 }
 
-function filtreResteAAppeler(resteAAppeler: boolean, cherche: string): boolean {
-  return resteAAppeler && cherche === '';
-}
-
 function texteListeVide(cherche: string, seulementARappeler: boolean): string {
+  if (cherche !== '' && seulementARappeler)
+    return 'Aucun résultat parmi vos fiches restant à appeler. Affichez toutes vos fiches.';
   if (cherche !== '') return 'Aucun résultat. Vérifiez le nom ou le numéro.';
   if (seulementARappeler)
     return 'Rien ne reste à appeler. Affichez toutes vos fiches, ou demandez une campagne à votre superviseur.';
