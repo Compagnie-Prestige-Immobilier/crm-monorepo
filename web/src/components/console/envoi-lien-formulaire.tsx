@@ -53,9 +53,7 @@ export function EnvoiLienFormulaire({
 
   return (
     <fieldset className="flex flex-col gap-2">
-      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Envoyer le lien du formulaire
-      </legend>
+      <legend className="pb-1 text-[0.875rem] font-[600]">Envoyer le lien du formulaire</legend>
       <div className="flex flex-wrap items-center gap-2">
         <BoutonWhatsApp prospect={prospect} />
         <a

@@ -88,7 +88,7 @@ export const COQUES: readonly CoqueEntry[] = [
   },
   {
     id: 'teleconseil',
-    label: 'Commercial',
+    label: 'Téléconseil',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
     roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'CCP'],

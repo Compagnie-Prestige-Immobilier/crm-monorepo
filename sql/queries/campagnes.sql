@@ -69,7 +69,7 @@ SELECT MAX("jobId")::text AS "id",
 FROM fiches
 GROUP BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille"
 ORDER BY MAX("finishedAt") DESC, MAX("jobId") DESC
-LIMIT 100;
+LIMIT 1000;
 
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;
@@ -301,12 +301,15 @@ WHERE i."lotId" = $1
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
        (p."plateformeDepuis" IS NOT NULL)::boolean AS plateforme,
+       (p."projet" <> l."projet" AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
+          WHERE j."prospectId" = p."id" AND j."projet" = l."projet"))::boolean AS hors_projet,
        COALESCE(p."lastCallOutcome"::text, '')::text AS "lastCallOutcome",
        (SELECT cr."label" FROM "call_attempts" a
         LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
         WHERE a."prospectId" = p."id"
         ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "lastReasonLabel"
 FROM "lot_export_items" i
+JOIN "lots_export" l ON l."id" = i."lotId"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1
@@ -314,6 +317,10 @@ WHERE i."lotId" = $1
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
         WHEN EXISTS (SELECT 1 FROM "prospects" pp
                      WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
+        WHEN EXISTS (SELECT 1 FROM "prospects" pp JOIN "lots_export" ll ON ll."id" = i."lotId"
+                     WHERE pp."id" = i."prospectId" AND pp."projet" <> ll."projet"
+                       AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
+                                       WHERE j."prospectId" = pp."id" AND j."projet" = ll."projet")) THEN 'HORS_PROJET'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -328,6 +335,10 @@ WHERE i."lotId" = $1
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
         WHEN EXISTS (SELECT 1 FROM "prospects" pp
                      WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
+        WHEN EXISTS (SELECT 1 FROM "prospects" pp JOIN "lots_export" ll ON ll."id" = i."lotId"
+                     WHERE pp."id" = i."prospectId" AND pp."projet" <> ll."projet"
+                       AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
+                                       WHERE j."prospectId" = pp."id" AND j."projet" = ll."projet")) THEN 'HORS_PROJET'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'

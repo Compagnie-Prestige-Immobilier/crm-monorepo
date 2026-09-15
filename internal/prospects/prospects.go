@@ -219,6 +219,8 @@ type Prospect struct {
 	LastCallByID             *string           `json:"lastCallById"`
 	LastCallByName           *string           `json:"lastCallByName"`
 	PlateformeDepuis         *string           `json:"plateformeDepuis" doc:"Inscription sur une plateforme d'enrôlement : la fiche revient aux chargés de clientèle plateforme."`
+	PlateformeInscrite       bool              `json:"plateformeInscrite" doc:"Une inscription présente sur la plateforme est rapprochée de la fiche. Sans elle, la fiche vient d'un classeur qui cite le site."`
+	RemarqueImport           *string           `json:"remarqueImport" doc:"Réponse du prospect notée dans le classeur importé."`
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
@@ -315,7 +317,8 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
 		LastCallOutcome: prospectEnum(p.LastCallOutcome), LastCallAt: prospectISOPtr(p.LastCallAt),
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
-		PlateformeDepuis: prospectISOPtr(p.PlateformeDepuis), EnCoursPar: prospectVide(l.EnCoursPar),
+		PlateformeDepuis: prospectISOPtr(p.PlateformeDepuis), PlateformeInscrite: l.PlateformeInscrite,
+		RemarqueImport: p.RemarqueImport, EnCoursPar: prospectVide(l.EnCoursPar),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
@@ -1462,6 +1465,7 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
 	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
 	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,
+	"GET /api/v1/prospects/{id}/journal":                              prospectLecture,
 	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
 	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
 	"GET /api/v1/champs-conversion/{projet}":                          socle.Tous,
@@ -1483,5 +1487,6 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "reassignProspects", Method: http.MethodPost, Path: "/api/v1/prospects/reassign"}, s.prospectReaffecter)
 	huma.Register(api, huma.Operation{OperationID: "marquerProspectRevue", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/revue"}, s.prospectRevue)
 	prospectMonterSegment(api, s)
+	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)
 }

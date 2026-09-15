@@ -134,11 +134,10 @@ export async function tentativesDuProspect(
 }
 
 /** Une reponse du script de qualification, designee par la question posee. */
+/** Le bouton commence par la reponse : l'aide sous le libelle ne compte pas. */
 export async function repondre(page: Page, question: string, reponse: string): Promise<void> {
-  await page
-    .getByRole('group', { name: question })
-    .getByRole('button', { name: reponse, exact: true })
-    .click();
+  const debut = new RegExp(`^${reponse.replaceAll(/[.*+?^${}()|[\]\\]/gu, '\\$&')}(\\s|$)`, 'u');
+  await page.getByRole('group', { name: question }).getByRole('button', { name: debut }).click();
 }
 
 /** Le bandeau que l'annuaire pose apres une qualification enregistree. */

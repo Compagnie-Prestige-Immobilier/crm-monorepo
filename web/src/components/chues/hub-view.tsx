@@ -61,10 +61,9 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
         </Button>
       </div>
 
-      <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <ol className="grid gap-4 [counter-reset:etape] md:grid-cols-2 xl:grid-cols-4">
         <Etape
-          numero="01"
-          titre="Appels représentants"
+          titre="Fiche représentant"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
           chiffre={
             <Chiffre
@@ -74,34 +73,36 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
               legende="pas encore qualifiés"
             />
           }
-          action={<Geste href="/teleconseil/appels-representants" label="Appels représentants" />}
+          action={
+            <Geste href="/teleconseil/appels-representants" label="Appeler un représentant" />
+          }
         />
 
-        <Etape
-          numero="02"
-          titre="Ajouter un prospect"
-          explication="Le représentant a donné des noms : on les note un par un."
-          chiffre={
-            <Chiffre
-              pending={sansProspect.isPending}
-              failed={sansProspect.isError}
-              valeur={sansProspect.data?.total}
-              legende="ont dit oui, sans contacts notés"
-            />
-          }
-          action={
-            canCreateProspect ? (
+        {/* Seuls l'encadrement et l'admin saisissent les prospects ; aux autres,
+            une carte sans geste n'apprendrait rien. */}
+        {canCreateProspect ? (
+          <Etape
+            titre="Ajouter un prospect"
+            explication="Le représentant a donné des noms : on les note un par un."
+            chiffre={
+              <Chiffre
+                pending={sansProspect.isPending}
+                failed={sansProspect.isError}
+                valeur={sansProspect.data?.total}
+                legende="ont dit oui, sans contacts notés"
+              />
+            }
+            action={
               <Geste
                 href="/teleconseil/prospects/nouveau?projet=CHUES"
                 label="Ajouter un prospect"
               />
-            ) : null
-          }
-        />
+            }
+          />
+        ) : null}
 
         <Etape
-          numero="03"
-          titre="Convertir un prospect"
+          titre="Fiche prospect"
           explication="Chaque prospect est rappelé jusqu’à son adhésion."
           chiffre={
             <Chiffre
@@ -111,11 +112,10 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
               legende="pas encore convertis"
             />
           }
-          action={<Geste href="/teleconseil/console" label="Convertir un prospect" primary />}
+          action={<Geste href="/teleconseil/console" label="Appeler un prospect" primary />}
         />
 
         <Etape
-          numero="04"
           titre="À rappeler"
           explication="Les rappels promis et ceux que le référentiel a reprogrammés."
           chiffre={
@@ -140,24 +140,23 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
   );
 }
 
+/** Le numéro vient du compteur CSS : une carte retirée ne laisse pas de trou. */
 function Etape({
-  numero,
   titre,
   explication,
   chiffre,
   action,
 }: {
-  numero: string;
   titre: string;
   explication: string;
   chiffre: ReactNode;
   action: ReactNode;
 }) {
   return (
-    <li className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm transition-all hover:border-primary/40">
+    <li className="relative flex flex-col gap-3 rounded-lg border border-border bg-card p-5 shadow-elev-sm transition-all [counter-increment:etape] hover:border-primary/40">
       <div className="flex items-center justify-between">
-        <span className="font-display text-xs font-[800] tracking-wider text-muted-foreground/60 uppercase">
-          Étape {numero}
+        <span className="font-display text-xs font-[800] tracking-wider text-muted-foreground/60 uppercase before:content-[counter(etape,decimal-leading-zero)]">
+          <span className="sr-only">Étape</span>
         </span>
       </div>
       <h2 className="font-display text-h4 font-[700] tracking-[-0.02em]">{titre}</h2>

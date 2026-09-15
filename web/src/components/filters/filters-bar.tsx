@@ -154,19 +154,22 @@ export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean
           />
         </div>
 
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
-          {/* Le seul critère de liste resté visible : c'est celui qu'on change
-              à chaque session, quand on regarde le travail d'une personne. */}
-          <FilterCombobox
-            label="Téléconseiller"
-            placeholder="Tous les téléconseillers"
-            options={reference.commerciaux}
-            value={filters.commercialId}
-            onChange={(value) => {
-              setFilters({ commercialId: value });
-            }}
-          />
-        </div>
+        {/* Le seul critère de liste resté visible : c'est celui qu'on change
+            à chaque session, quand on regarde le travail d'une personne. Vide
+            pour qui n'a pas le droit de lister les comptes : il ne voit que ses fiches. */}
+        {reference.commerciaux.length === 0 ? null : (
+          <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
+            <FilterCombobox
+              label="Téléconseiller"
+              placeholder="Tous les téléconseillers"
+              options={reference.commerciaux}
+              value={filters.commercialId}
+              onChange={(value) => {
+                setFilters({ commercialId: value });
+              }}
+            />
+          </div>
+        )}
       </div>
 
       {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
@@ -312,15 +315,17 @@ export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean
               setFilters({ enrollmentMethod: value as EnrollmentMethod | null });
             }}
           />
-          <FilterCombobox
-            label="Adhésion obtenue par"
-            placeholder="Tous les téléconseillers"
-            options={reference.commerciaux}
-            value={filters.enrollmentCapturedById}
-            onChange={(value) => {
-              setFilters({ enrollmentCapturedById: value });
-            }}
-          />
+          {reference.commerciaux.length === 0 ? null : (
+            <FilterCombobox
+              label="Adhésion obtenue par"
+              placeholder="Tous les téléconseillers"
+              options={reference.commerciaux}
+              value={filters.enrollmentCapturedById}
+              onChange={(value) => {
+                setFilters({ enrollmentCapturedById: value });
+              }}
+            />
+          )}
           <FilterCombobox
             label="Revue de la demande"
             placeholder="Toutes les demandes"

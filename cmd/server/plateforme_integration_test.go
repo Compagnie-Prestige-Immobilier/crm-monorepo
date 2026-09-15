@@ -26,6 +26,36 @@ func plateformeOuverture(prospectID string) map[string]any {
 	}
 }
 
+// Un rappel promis par le téléconseiller, encore à venir.
+func plateformeRappelPromis(b *banc, prospectID, teleconseillerID string) string {
+	b.t.Helper()
+	tentative, rappel := uuid.NewString(), uuid.NewString()
+	adminExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt")
+		VALUES ($1,$2,$3,'CALLBACK',now())`, tentative, prospectID, teleconseillerID)
+	adminExec(b, `INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","sourceAttemptId","updatedAt")
+		VALUES ($1,$2,$3,now() + interval '1 day',$4,now())`, rappel, prospectID, teleconseillerID, tentative)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, rappel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "id" = $1`, rappel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, tentative)
+	})
+	return rappel
+}
+
+// Le CCP le moins chargé de la base reçoit le rappel : n'importe lequel, mais un CCP, avec sa trace.
+func plateformeAttendRappelChezUnCCP(b *banc, rappelID string) {
+	b.t.Helper()
+	var role string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT u."role"::text FROM "scheduled_callbacks" c JOIN "users" u ON u."id" = c."assignedToId" WHERE c."id" = $1`,
+		rappelID).Scan(&role); err != nil {
+		b.t.Fatal(err)
+	}
+	if role != "CCP" || adminCompterAudit(b, "rappel.reattribue", rappelID) != 1 {
+		b.t.Fatalf("le rappel promis doit passer à un CCP avec sa trace : rôle %s", role)
+	}
+}
+
 func plateformeAttendFiches(b *banc, telephone string, attendu int, quoi string) []any {
 	b.t.Helper()
 	items := plateformeFiches(b, telephone, quoi)
@@ -45,6 +75,7 @@ func TestFichesPlateformeReserveesAuxCCP(t *testing.T) {
 	_, ccpEmail := adminCompte(b, "CCP")
 	_, autreCCPEmail := adminCompte(b, "CCP")
 	prospectID := adminProspect(b, commercialID, "GRAND_PUBLIC", telephone)
+	rappelID := plateformeRappelPromis(b, prospectID, commercialID)
 	adminExec(b, `INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,'GRAND_PUBLIC',now())`,
 		uuid.NewString(), prospectID)
 	lotID := uuid.NewString()
@@ -81,6 +112,7 @@ func TestFichesPlateformeReserveesAuxCCP(t *testing.T) {
 	if depuis == nil || assignee != nil {
 		t.Fatalf("après le tirage : marque %v, attribution %v", depuis, assignee)
 	}
+	plateformeAttendRappelChezUnCCP(b, rappelID)
 
 	plateformeAttendFiches(commercial, telephone, 0, "après le tirage, le téléconseiller ne la voit plus")
 	statut, body := adminAppel(commercial, http.MethodGet, "/api/v1/prospects/"+prospectID, nil)
@@ -130,5 +162,48 @@ func TestFichesPlateformeReserveesAuxCCP(t *testing.T) {
 		if tirees != 0 {
 			t.Fatal("une nouvelle campagne a tiré la fiche plateforme")
 		}
+	}
+}
+
+// Chaude : une inscription vivante sur la plateforme est rapprochée. Froide :
+// seul le classeur cite le site. Les deux vont au CCP, la note du classeur suit.
+func TestFichesPlateformeChaudeEtFroide(t *testing.T) {
+	b := adminConnecte(t)
+	_, ccpEmail := adminCompte(b, "CCP")
+	telChaud, telFroid := adminTelephone(), adminTelephone()
+	chaud := adminProspect(b, b.userID, "GRAND_PUBLIC", telChaud)
+	froid := adminProspect(b, b.userID, "GRAND_PUBLIC", telFroid)
+	adminExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" IN ($1, $2)`, chaud, froid)
+	adminExec(b, `UPDATE "prospects" SET "remarqueImport" = 'Rappeler après 18 h' WHERE "id" = $1`, froid)
+	inscription := uuid.NewString()
+	adminExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","phoneE164","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'GRAND_PUBLIC',$1,'Diop','Awa',$2,'etape-2',$3,'{}'::jsonb,now(),now())`, inscription, telChaud, chaud)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "id" = $1`, inscription)
+	})
+
+	ccp := adminSession(b, ccpEmail)
+	inscrite := func(vue map[string]any) bool {
+		v, _ := vue["plateformeInscrite"].(bool)
+		return v
+	}
+	vueChaude, _ := plateformeAttendFiches(ccp, telChaud, 1, "le CCP voit la fiche chaude")[0].(map[string]any)
+	vueFroide, _ := plateformeAttendFiches(ccp, telFroid, 1, "le CCP voit la fiche froide")[0].(map[string]any)
+	if !inscrite(vueChaude) || vueChaude["remarqueImport"] != nil {
+		t.Fatalf("fiche chaude : %v", vueChaude)
+	}
+	if inscrite(vueFroide) || vueFroide["remarqueImport"] != "Rappeler après 18 h" {
+		t.Fatalf("fiche froide : %v", vueFroide)
+	}
+	statut, body := adminAppel(ccp, http.MethodGet, "/api/v1/prospects/"+froid, nil)
+	ccp.attend(statut, http.StatusOK, "le détail de la fiche froide", body)
+	if body["remarqueImport"] != "Rappeler après 18 h" {
+		t.Fatalf("la note du classeur manque au détail : %v", body["remarqueImport"])
+	}
+
+	adminExec(b, `UPDATE "inscriptions_plateforme" SET "disparueLe" = now() WHERE "id" = $1`, inscription)
+	vueChaude, _ = plateformeAttendFiches(ccp, telChaud, 1, "la fiche reste au CCP")[0].(map[string]any)
+	if inscrite(vueChaude) {
+		t.Fatal("une inscription disparue ne vaut plus une étoile")
 	}
 }

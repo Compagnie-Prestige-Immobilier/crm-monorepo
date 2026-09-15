@@ -38,6 +38,8 @@ export type CallbackScope = components['schemas']['CallbackScope'];
 export interface CallbackList {
   readonly items: Callback[];
   readonly serverTime: string;
+  /** La liste s'arrête à 500 rappels : le total dit ce qu'elle ne montre pas. */
+  readonly total?: number | undefined;
 }
 
 /** L'heure promise croissante : le retard étant une heure dépassée, il vient en tête. */
@@ -66,7 +68,7 @@ export async function fetchCallbacks(
       },
     }),
   ) as unknown as CallbackList;
-  return { items: sortCallbacks(list.items), serverTime: list.serverTime };
+  return { items: sortCallbacks(list.items), serverTime: list.serverTime, total: list.total };
 }
 
 export async function cancelCallback(

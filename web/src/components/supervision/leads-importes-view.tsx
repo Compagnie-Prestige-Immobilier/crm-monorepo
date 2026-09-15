@@ -39,7 +39,7 @@ export function LeadsImportesView() {
         Transfert enrôlement ou Construction. Chaque classeur dit ce qu’il a rapporté.
       </p>
       <Imports imports={leads.data.imports} />
-      <Fiches fiches={leads.data.fiches} />
+      <Fiches fiches={leads.data.fiches} total={leads.data.totalFiches} />
     </div>
   );
 }
@@ -92,10 +92,16 @@ function Imports({ imports }: { imports: ImportDeLeads[] }) {
   );
 }
 
-function Fiches({ fiches }: { fiches: LeadTresInteresse[] }) {
+function Fiches({ fiches, total }: { fiches: LeadTresInteresse[]; total: number }) {
   return (
     <section className="flex flex-col gap-2">
       <h2 className="eyebrow rail text-muted-foreground">Fiches très intéressées</h2>
+      {total > fiches.length ? (
+        <p className="text-[0.875rem] text-muted-foreground">
+          {formatNumber(total)} fiches au total, les {formatNumber(fiches.length)} appelées le plus
+          récemment affichées.
+        </p>
+      ) : null}
       <Table>
         <TableHeader>
           <TableRow>

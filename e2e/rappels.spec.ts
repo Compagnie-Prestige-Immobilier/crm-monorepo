@@ -74,18 +74,20 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
-    .getByRole('button', { name: /Joignable$/u })
+    .getByRole('button', { name: /Oui, elle a répondu/u })
     .click();
+  await page.getByRole('button', { name: 'Passer le formulaire' }).click();
   await page
-    .getByRole('group', { name: 'Quel statut de qualification ?' })
-    .getByRole('button', { name: /À rappeler$/u })
+    .getByRole('group', { name: 'Qu’a dit la personne ?' })
+    .getByRole('button', { name: /À rappeler/u })
     .click();
   await page
     .getByRole('group', { name: 'Échéance du rappel' })
     .getByRole('button', { name: /Dans 1 h/u })
     .click();
+  await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: `Appel enregistré pour ${fiche.nom}.` }),
+    page.getByRole('status').filter({ hasText: `Appel consigné pour ${fiche.nom}` }),
   ).toBeVisible();
 }
 

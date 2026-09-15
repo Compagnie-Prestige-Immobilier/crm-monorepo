@@ -1048,7 +1048,7 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 	if err := qualificationInsererTentative(ctx, q, u, b, t); err != nil {
 		return "", vide, err
 	}
-	if err := qualificationMarquerContacte(ctx, q, b.ProspectID, parcours.ID); err != nil {
+	if err := qualificationMarquerContacte(ctx, q, u, b.ProspectID, parcours.ID); err != nil {
 		return "", vide, err
 	}
 	corrige, err := s.qualificationCorrigerProspect(ctx, q, u, b, &prospect)
@@ -1095,12 +1095,33 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 }
 
 // Un premier appel sort la fiche et son parcours de « Nouveau » : c'est
-// l'appel qui fait progresser le statut, pas une saisie manuelle.
-func qualificationMarquerContacte(ctx context.Context, q *db.Queries, prospectID, journeyID string) error {
-	if err := q.MarquerProspectContacte(ctx, prospectID); err != nil {
+// l'appel qui fait progresser le statut, pas une saisie manuelle. Le journal
+// de la fiche le dit.
+func qualificationMarquerContacte(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID, journeyID string) error {
+	rangs, err := q.MarquerProspectContacte(ctx, prospectID)
+	if err != nil {
 		return err
 	}
+	if rangs == 1 {
+		if err := qualificationAuditerStatut(ctx, q, u, prospectID, db.ProspectStatutNOUVEAU, db.ProspectStatutCONTACTE, "premier appel"); err != nil {
+			return err
+		}
+	}
 	return q.MarquerParcoursContacte(ctx, journeyID)
+}
+
+// « À supprimer » ferme la fiche au statut PERDU, sans la détruire ; le journal dit le motif.
+func qualificationMarquerPerdu(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospect *db.CorrigerProspectParTentativeRow, motif string) error {
+	rangs, err := q.MarquerProspectPerdu(ctx, prospect.ID)
+	if err != nil || rangs == 0 {
+		return err
+	}
+	return qualificationAuditerStatut(ctx, q, u, prospect.ID, prospect.Statut, db.ProspectStatutPERDU, motif)
+}
+
+func qualificationAuditerStatut(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID string, avant, apres db.ProspectStatut, motif string) error {
+	return database.Auditer(ctx, q, u.ID, "prospect.statut", "prospect", prospectID,
+		map[string]any{"statut": avant}, map[string]any{"statut": apres, "motif": motif})
 }
 
 func qualificationFicheModifiee(p *db.CorrigerProspectParTentativeParams) bool {
@@ -1232,7 +1253,7 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 		return "", vide, err
 	}
 	if t.motif.effet == db.CallOutcomeEffectCLOSELOST {
-		if err := q.MarquerProspectPerdu(ctx, b.ProspectID); err != nil {
+		if err := qualificationMarquerPerdu(ctx, q, u, prospect, t.motif.label); err != nil {
 			return "", vide, err
 		}
 	}

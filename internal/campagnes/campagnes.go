@@ -33,6 +33,7 @@ const (
 	lotEtatNonTraitee = "NON_TRAITEE"
 	lotEtatTraitee    = "TRAITEE"
 	lotEtatPlateforme = "PLATEFORME"
+	lotEtatHorsProjet = "HORS_PROJET"
 
 	LotSegmentBDD1 = "BDD1"
 	LotSegmentBDD2 = "BDD2"
@@ -125,6 +126,7 @@ type CampagneResume struct {
 	PausedAt       *string `json:"pausedAt"`
 	CallsSince     int     `json:"callsSince"`
 	FichesAppelees int     `json:"fichesAppelees"`
+	FichesRetirees int     `json:"fichesRetirees" doc:"Lignes rendues par la campagne : fiche passée plateforme ou hors projet."`
 }
 
 type CampagneTentative struct {
@@ -201,7 +203,7 @@ type CampagneFiche struct {
 	PhoneE164          string  `json:"phoneE164"`
 	TeleconseillerID   *string `json:"teleconseillerId"`
 	TeleconseillerName string  `json:"teleconseillerName"`
-	Etat               string  `json:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME"`
+	Etat               string  `json:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME,HORS_PROJET"`
 	StatutLabel        *string `json:"statutLabel"`
 }
 
@@ -724,17 +726,17 @@ func lotValeurTexte(valeur *string) string {
 	return *valeur
 }
 
-func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, depuis time.Time) (calls, fiches int, err error) {
+func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, depuis time.Time) (calls, fiches, retirees int, err error) {
 	if lotSurRepresentants(string(cible)) {
 		row, err := s.Q.LotStatsRepresentants(ctx, db.LotStatsRepresentantsParams{LotId: id, ClientCreatedAt: depuis})
-		return int(row.Calls), int(row.Fiches), err
+		return int(row.Calls), int(row.Fiches), 0, err
 	}
 	row, err := s.Q.LotStatsProspects(ctx, db.LotStatsProspectsParams{LotId: id, ClientCreatedAt: depuis})
-	return int(row.Calls), int(row.Fiches), err
+	return int(row.Calls), int(row.Fiches), int(row.Retirees), err
 }
 
 func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneResume, error) {
-	calls, fiches, err := s.lotStats(ctx, row.ID, row.Cible, row.CreatedAt)
+	calls, fiches, retirees, err := s.lotStats(ctx, row.ID, row.Cible, row.CreatedAt)
 	if err != nil {
 		return CampagneResume{}, err
 	}
@@ -743,7 +745,7 @@ func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneR
 		ScopeLabel: lotScopeLabel(string(row.Cible), lotLireFiltres(row.Filters)),
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
-		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches,
+		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches, FichesRetirees: retirees,
 	}, nil
 }
 

@@ -5,11 +5,14 @@ package main
 import (
 	"bytes"
 	"cpi-go/internal/imports"
+	"cpi-go/sql/migrations"
 	"fmt"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
 )
 
@@ -112,6 +115,76 @@ func rattrapageRelitLeClasseur(b *banc, onglets []ongletLeadsTest, nomClasseur s
 
 type ongletLeadsTest struct{ nom, telephone string }
 
+// La migration des dates rejoue la règle de l'onglet en SQL. Elle a déjà tourné
+// ici : son texte Up se relance, et une seconde passe ne change rien.
+type casDateOngletTest struct {
+	feuille string
+	avant   time.Time
+	attendu time.Time
+	regle   string
+}
+
+func TestMigrationCorrigeLesDatesDesLeadsDepuisLOnglet(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	base := time.Now().UnixNano() % 10_000_000
+	quand := func(y int, m time.Month, d, h, mn int) time.Time { return time.Date(y, m, d, h, mn, 0, 0, time.UTC) }
+	cas := []casDateOngletTest{
+		{"Leads 12 sept 2026", quand(2026, time.December, 9, 8, 30), quand(2026, time.September, 12, 8, 30), "inversion"},
+		{"Leads 12 sept", quand(2026, time.November, 9, 0, 0), quand(2026, time.September, 12, 12, 0), "onglet"},
+		{"DEBUT CAMPAGNE 10 SEPT 26", quand(2026, time.September, 10, 15, 0), quand(2026, time.September, 10, 15, 0), ""},
+		{"Feuil1", time.Now().UTC().AddDate(0, 0, 400), quand(2026, time.September, 13, 9, 0), "sans_onglet"},
+	}
+	ids := make([]string, len(cas))
+	for i, c := range cas {
+		ids[i] = uuid.NewString()
+		adminExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","createdAt","importFeuille","updatedAt")
+			VALUES ($1,'Diop','Awa',$2,$3,$4,$5,$6,now())`,
+			ids[i], fmt.Sprintf("+22178%07d", (base+int64(i))%10_000_000), b.userID, c.avant, quand(2026, time.September, 13, 9, 0), c.feuille)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = ANY($1::text[])`, ids)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = ANY($1::text[])`, ids)
+	})
+	texte, err := migrations.FS.ReadFile("20260915200100_dates_leads_corrigees.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	up, _, _ := strings.Cut(string(texte), "-- +goose Down")
+
+	for passe := 1; passe <= 2; passe++ {
+		if _, err := b.pool.Exec(b.ctx, up); err != nil {
+			t.Fatalf("passe %d : %v", passe, err)
+		}
+		for i := range cas {
+			verifierDateOngletTest(b, ids[i], &cas[i], passe)
+		}
+	}
+	if n := adminCompterAudit(b, "prospect.date_corrigee", ids[0]); n != 1 {
+		t.Fatalf("une seule trace par fiche, même après deux passes : %d", n)
+	}
+}
+
+func verifierDateOngletTest(b *banc, id string, c *casDateOngletTest, passe int) {
+	b.t.Helper()
+	var apres time.Time
+	var rev int
+	if err := b.pool.QueryRow(b.ctx, `SELECT "clientCreatedAt", "rev" FROM "prospects" WHERE "id" = $1`, id).Scan(&apres, &rev); err != nil {
+		b.t.Fatal(err)
+	}
+	revAttendu := 1
+	if c.regle != "" {
+		revAttendu = 2
+	}
+	if !apres.Equal(c.attendu) || rev != revAttendu {
+		b.t.Fatalf("passe %d, onglet %q : %v (rev %d), attendu %v (rev %d)", passe, c.feuille, apres, rev, c.attendu, revAttendu)
+	}
+	var regle *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "after"->>'regle' FROM "audit_logs" WHERE "action" = 'prospect.date_corrigee' AND "entityId" = $1`, id).Scan(&regle)
+	if (regle == nil && c.regle != "") || (regle != nil && *regle != c.regle) {
+		b.t.Fatalf("onglet %q : règle %v, attendue %q", c.feuille, regle, c.regle)
+	}
+}
+
 // Les libellés des lots du classeur, par nom, avec leur nombre de fiches.
 func libellesDesImports(b *banc, body map[string]any, nomClasseur string) map[string]int {
 	b.t.Helper()
@@ -143,7 +216,8 @@ func classeurLeadsOnglets(t *testing.T, onglets []ongletLeadsTest) []byte {
 		}
 		lignes := [][]string{
 			{"Date", "Nom complet", "Email", "Téléphone", "Canal"},
-			{"10/09/2026", "Fatou Onglet", "fatou." + onglet.telephone[5:] + "@example.sn", onglet.telephone, "https://monespace.cpi.sn/"},
+			// Un lead plateforme n'entre dans aucune campagne : celui-ci vient de Meta.
+			{"10/09/2026", "Fatou Onglet", "fatou." + onglet.telephone[5:] + "@example.sn", onglet.telephone, "Meta CPI GRAND PUBLIC ( Facebook & Instagram )"},
 		}
 		for rang, ligne := range lignes {
 			for colonne, valeur := range ligne {
