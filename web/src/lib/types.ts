@@ -111,6 +111,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
   CHARGE_CLIENTELE: 'Chargé de clientèle',
+  CCP: 'Chargé de clientèle plateforme',
 };
 
 /**
@@ -125,7 +126,11 @@ export const readsOnly = (role: Role | undefined): boolean =>
  * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'CCP' ||
+  role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
@@ -135,6 +140,7 @@ export const peutTenirUneFiche = (role: Role | undefined): boolean =>
   role === 'ADMIN' ||
   role === 'COMMERCIAL' ||
   role === 'CHARGE_CLIENTELE' ||
+  role === 'CCP' ||
   role === 'SUPERVISEUR' ||
   role === 'DIRECTION';
 
@@ -167,6 +173,7 @@ export const PROSPECT_SORT_FIELDS = [
   'prenom',
   'statut',
   'lastCallAt',
+  'plateformeDepuis',
 ] as const satisfies readonly Schemas['ProspectSortField'][];
 
 export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];

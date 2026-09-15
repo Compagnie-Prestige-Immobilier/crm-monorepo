@@ -24,6 +24,7 @@ const DEV_ROLES = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
+  'CCP',
 ] as const satisfies readonly Role[];
 
 /** Les comptes que `make db` sème : l'administrateur et les fixtures. */
@@ -34,6 +35,7 @@ const FIXTURE_IDENTIFIERS: Record<Exclude<Role, 'ADMIN'>, string> = {
   DIRECTION: 'fixture.direction@cpi.sn',
   ACCUEIL: 'fixture.accueil@cpi.sn',
   CHARGE_CLIENTELE: 'fixture.clientele@cpi.sn',
+  CCP: 'fixture.plateforme@cpi.sn',
 };
 
 function accountForRole(role: Role): { identifier: string; password: string } {

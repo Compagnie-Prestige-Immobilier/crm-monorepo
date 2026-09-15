@@ -34,8 +34,8 @@ var Garde = map[string][]socle.Role{
 	"POST /api/v1/phase2/call-attempts":         socle.Parcours,
 	"GET /api/v1/phase2/callbacks":              socle.Parcours,
 	"GET /api/v1/phase2/directory":              socle.Parcours,
-	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele},
-	"POST /api/v1/phase2/callbacks/{id}/snooze": {socle.Admin, socle.Commercial, socle.ChargeClientele},
+	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
+	"POST /api/v1/phase2/callbacks/{id}/snooze": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
 	"POST /api/v1/ouvertures":                   socle.Parcours,
 	"GET /api/v1/ouvertures/courante":           socle.Parcours,
 	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.Parcours,
@@ -126,6 +126,9 @@ func qualificationInstant(t time.Time) *time.Time {
 func qualificationVoitTout(role socle.Role) bool {
 	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
 }
+
+// Seul le CCP ouvre et consigne une fiche plateforme ; l'encadrement la lit.
+func qualificationTientLaPlateforme(role socle.Role) bool { return role == socle.CCP }
 
 var qualificationTransitionsRelation = map[string][]string{
 	"INCONNU":                {"CONTACTE", qualificationAmbassadeur, qualificationRefus},
@@ -781,14 +784,32 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_INACTIVE",
 			"Le motif « "+row.Label+" » a été retiré du référentiel.")
 	}
-	if demande && row.Effect != systeme.effet {
-		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_OUTCOME_MISMATCH",
-			"Le motif « "+row.Label+" » ne produit pas l’issue "+b.Outcome+".")
-	}
+	// Le motif commande la famille, jamais le panneau : KEEP_OPEN vaut
+	// « Autre » quand le motif compte comme joint, « Injoignable » sinon.
+	b.Outcome = qualificationFamilleDuMotif(row.Effect, row.CountsAsReached)
 	return qualificationMotifIssue{
 		id: &row.ID, label: row.Label, effet: row.Effect,
-		exigeCommentaire: row.RequiresComment, exigeRappel: row.RequiresCallback,
+		exigeCommentaire: row.RequiresComment || b.Outcome == string(db.CallOutcomeOTHER),
+		exigeRappel:      row.RequiresCallback,
 	}, nil
+}
+
+func qualificationFamilleDuMotif(effet db.CallOutcomeEffect, joint bool) string {
+	switch effet {
+	case db.CallOutcomeEffectCLOSEMETHOD:
+		return exports.ExportCleMethodeObtenue
+	case db.CallOutcomeEffectCLOSEREFUSED:
+		return qualificationRefusee
+	case db.CallOutcomeEffectCLOSEWRONGNUMBER:
+		return qualificationFauxNumero
+	case db.CallOutcomeEffectSCHEDULECALLBACK:
+		return qualificationCallback
+	case db.CallOutcomeEffectKEEPOPEN:
+		if joint {
+			return string(db.CallOutcomeOTHER)
+		}
+	}
+	return string(db.CallOutcomeUNREACHABLE)
 }
 
 func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qualificationMotifIssue) (qualificationTentative, error) {
@@ -961,10 +982,10 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 
 // Un téléconseiller n'appelle que ses campagnes ; l'encadrement n'est pas borné.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
-	if qualificationVoitTout(u.Role) {
-		return nil
-	}
-	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{ID: prospectID, Agent: u.ID})
+	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
+		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP,
+		Plateforme: qualificationTientLaPlateforme(u.Role),
+	})
 	if err != nil {
 		return err
 	}

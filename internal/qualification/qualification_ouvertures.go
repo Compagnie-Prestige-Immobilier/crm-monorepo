@@ -111,12 +111,13 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		p.Projet = &in.Projet
 	}
 	assigne := in.AssignedToID
-	if !qualificationVoitTout(u.Role) {
+	if !qualificationVoitTout(u.Role) && u.Role != socle.CCP {
 		assigne = u.ID
 	}
 	if assigne != "" {
 		p.AssignedToID = &assigne
 	}
+	p.Plateforme = socle.PorteePlateforme(u.Role)
 	rows, err := s.Q.ListerRappels(ctx, p)
 	if err != nil {
 		return nil, err
@@ -323,8 +324,8 @@ func (s *service) qualificationFicheOuvrable(ctx context.Context, u *socle.Utili
 		return err
 	}
 	ouvrable, err := s.Q.ProspectOuvrable(ctx, db.ProspectOuvrableParams{
-		ID: *prospectID, Tous: qualificationVoitTout(u.Role), Agent: u.ID,
-		ConvertiVisible: u.Role == socle.ChargeClientele,
+		ID: *prospectID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP, Agent: u.ID,
+		ConvertiVisible: u.Role == socle.ChargeClientele, Plateforme: qualificationTientLaPlateforme(u.Role),
 	})
 	if err != nil {
 		return err

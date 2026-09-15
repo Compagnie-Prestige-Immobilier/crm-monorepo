@@ -17,6 +17,7 @@ export const ROLES = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
+  'CCP',
 ] as const;
 
 export type RoleCompte = (typeof ROLES)[number];

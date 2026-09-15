@@ -56,12 +56,16 @@ func exportPorteeDeLecture(p *exportPredicat, u *socle.Utilisateur) {
 	if u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction {
 		return
 	}
+	if u.Role == socle.CCP {
+		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NOT NULL`)
+		return
+	}
 	enMain := `(p."createdById" = ` + p.valeur(u.ID) +
 		` OR EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id" AND li."assigneeId" = ` + p.valeur(u.ID) + ")"
 	if u.Role == socle.ChargeClientele {
 		enMain += ` OR p."statut" = 'CONVERTI'`
 	}
-	p.clauses = append(p.clauses, enMain+")")
+	p.clauses = append(p.clauses, enMain+")", `p."plateformeDepuis" IS NULL`)
 }
 
 func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {

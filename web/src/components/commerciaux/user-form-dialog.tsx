@@ -61,6 +61,7 @@ const ROLE_HINTS: Record<Role, string> = {
   DIRECTION: 'Passe les trois appels, lit tout le téléconseil et tient le registre des visites.',
   ACCUEIL: 'Tient le registre des visites, et rien d’autre.',
   CHARGE_CLIENTELE: 'Passe les trois appels, relit et revoit toute demande convertie.',
+  CCP: 'Appelle toutes les fiches venues des plateformes d’enrôlement, jamais celles des campagnes.',
 };
 
 export function UserFormDialog({

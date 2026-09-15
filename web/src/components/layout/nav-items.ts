@@ -91,7 +91,7 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Commercial',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
+    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'CCP'],
   },
   {
     id: 'finance',
@@ -266,11 +266,18 @@ const SECTIONS: readonly NavSection[] = [
         roles: TERRAIN,
       },
       {
+        href: '/teleconseil/plateforme',
+        label: 'Fiches plateforme',
+        icon: HeadsetIcon,
+        description: 'Les inscrits des plateformes d’enrôlement',
+        roles: ['CCP', ...ENCADREMENT],
+      },
+      {
         href: '/teleconseil/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
-        roles: TERRAIN,
+        roles: [...TERRAIN, 'CCP'],
       },
       {
         href: '/teleconseil/supervision',
@@ -561,6 +568,8 @@ export function homePathForRole(role: Role): string {
     case 'COMMERCIAL':
     case 'CHARGE_CLIENTELE':
       return '/teleconseil';
+    case 'CCP':
+      return '/teleconseil/plateforme';
     case 'DIRECTION':
       return '/teleconseil/leads-importes';
     case 'SUPERVISEUR':

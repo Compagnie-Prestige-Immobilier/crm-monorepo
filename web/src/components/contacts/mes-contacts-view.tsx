@@ -334,7 +334,7 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
                 SANS_VALEUR
               ) : (
                 <Badge variant={CALL_OUTCOME_VARIANTS[prospect.lastCallOutcome]}>
-                  {CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
+                  {prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
                 </Badge>
               )}
             </TableCell>

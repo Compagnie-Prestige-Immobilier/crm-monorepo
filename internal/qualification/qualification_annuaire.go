@@ -84,12 +84,13 @@ func (s *service) qualificationAnnuaire(ctx context.Context, in *AnnuaireInput) 
 	}
 	taille := annuaireTaille(in.Limit)
 	lignes, err := s.Q.AnnuairePhase2(ctx, db.AnnuairePhase2Params{
-		ScopeAll:      qualificationVoitTout(u.Role),
-		ScopeUserID:   u.ID,
-		ScopeConverti: u.Role == socle.ChargeClientele,
-		DepuisAt:      depuisAt,
-		DepuisID:      depuisID,
-		Taille:        taille + 1,
+		ScopeAll:        qualificationVoitTout(u.Role) || u.Role == socle.CCP,
+		ScopeUserID:     u.ID,
+		ScopeConverti:   u.Role == socle.ChargeClientele,
+		ScopePlateforme: socle.PorteePlateforme(u.Role),
+		DepuisAt:        depuisAt,
+		DepuisID:        depuisID,
+		Taille:          taille + 1,
 	})
 	if err != nil {
 		return nil, err

@@ -21,6 +21,22 @@ func PlateformeConfiguree(projet string) (base, jeton string) {
 	return strings.TrimSpace(Env("PLATEFORME_CHUES_URL", "")), strings.TrimSpace(Env("PLATEFORME_CHUES_TOKEN", ""))
 }
 
+// Zéro : l'encadrement n'est jamais prévenu du retard des fiches plateforme.
+func SeuilAttentePlateforme(ctx context.Context, q *db.Queries, projet string) (int, error) {
+	ligne, err := q.GetSetting(ctx, CleReglagesEnrolement(projet))
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, nil
+	}
+	if err != nil {
+		return 0, err
+	}
+	var valeurs struct {
+		Seuil int `json:"seuilAttentePlateforme"`
+	}
+	_ = json.Unmarshal([]byte(ligne.Value), &valeurs)
+	return max(0, valeurs.Seuil), nil
+}
+
 // Liste vide : un dossier est complet dès que la plateforme a daté sa décision.
 // Sinon, seuls les statuts distants listés par l'administrateur comptent.
 func StatutsDossierComplet(ctx context.Context, q *db.Queries, projet string) ([]string, error) {

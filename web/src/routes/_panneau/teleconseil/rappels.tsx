@@ -7,7 +7,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/rappels')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardRoles([
+    'ADMIN',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'CCP',
+    'SUPERVISEUR',
+    'DIRECTION',
+  ]),
   component: TeleconseilRappelsPage,
   pendingComponent: Loading,
 });

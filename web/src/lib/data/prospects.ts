@@ -43,6 +43,8 @@ export async function fetchProspectsAQualifier(
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
     resteAAppeler?: boolean | undefined;
+    /** Les fiches plateforme se prennent dans l'ordre d'arrivée, la plus récente d'abord. */
+    plateforme?: boolean | undefined;
   },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
@@ -52,8 +54,8 @@ export async function fetchProspectsAQualifier(
     ...(criteres.resteAAppeler === true ? { resteAAppeler: true } : {}),
     ...(criteres.projet === null ? {} : { projet: criteres.projet }),
     search: criteres.search,
-    sortBy: 'nom',
-    sortOrder: 'asc',
+    sortBy: criteres.plateforme === true ? 'plateformeDepuis' : 'nom',
+    sortOrder: criteres.plateforme === true ? 'desc' : 'asc',
     page: 1,
     pageSize: A_QUALIFIER_PAGE_SIZE,
     ...(origine === 'MOI' && criteres.viewerId !== undefined

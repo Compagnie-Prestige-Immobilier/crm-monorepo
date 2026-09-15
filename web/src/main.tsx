@@ -11,6 +11,7 @@ import { z } from 'zod';
 
 import { EcranErreur, EcranIntrouvable } from '@/components/etats-router';
 import { ExactAmountsProvider } from '@/components/money/exact-amounts';
+import { installerRechargementPanneau } from '@/lib/api/version-panneau';
 import { Toaster } from '@/components/ui/sonner';
 import { initTheme } from '@/lib/theme';
 import { routeTree } from '@/routeTree.gen';
@@ -42,6 +43,8 @@ const router = createRouter({
   parseSearch: parseSearchWith((valeur) => valeur),
   stringifySearch: stringifySearchWith(String),
 });
+
+installerRechargementPanneau(router);
 
 declare module '@tanstack/react-router' {
   interface Register {

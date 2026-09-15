@@ -12,6 +12,7 @@ const CHERCHEURS: readonly Role[] = [
   'ADMIN',
   'COMMERCIAL',
   'CHARGE_CLIENTELE',
+  'CCP',
   'SUPERVISEUR',
   'DIRECTION',
 ];

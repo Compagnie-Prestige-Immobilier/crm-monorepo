@@ -275,7 +275,9 @@ function DernierAppel({ prospect }: { prospect: ProspectRow }) {
 
   return (
     <span className="flex flex-col gap-0.5">
-      <span className="font-[600]">{CALL_OUTCOME_LABELS[prospect.lastOutcome]}</span>
+      <span className="font-[600]">
+        {prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastOutcome]}
+      </span>
       {prospect.lastComment !== null && prospect.lastComment !== '' ? (
         <span className="text-[0.8125rem] text-muted-foreground">{prospect.lastComment}</span>
       ) : null}

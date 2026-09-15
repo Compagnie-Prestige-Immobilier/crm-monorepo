@@ -118,7 +118,7 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN' },
   { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED' },
   { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN' },
-].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
+].map((motif) => ({ requiresComment: false, countsAsReached: true, ...motif }) as MotifAppel);
 
 const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'PAS_DE_REPONSE', label: 'Pas de réponse' },
@@ -127,7 +127,15 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'TELEPHONE_INDISPONIBLE', label: 'Téléphone indisponible' },
   { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' },
   { code: 'AUTRE_NON_JOINT', label: 'Autre' },
-].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
+].map(
+  (motif) =>
+    ({
+      effect: 'KEEP_OPEN',
+      requiresComment: false,
+      countsAsReached: false,
+      ...motif,
+    }) as MotifAppel,
+);
 
 const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   'UNREACHABLE',
@@ -169,6 +177,7 @@ export function ConsoleView({
   viewerId,
   origineFiltrable = false,
   canCreateProspect = false,
+  plateforme = false,
 }: {
   projet?: Projet | null;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
@@ -176,6 +185,8 @@ export function ConsoleView({
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
   origineFiltrable?: boolean | undefined;
   canCreateProspect?: boolean | undefined;
+  /** Les fiches venues des plateformes, partagées entre les CCP, la plus récente d'abord. */
+  plateforme?: boolean | undefined;
 }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -201,25 +212,14 @@ export function ConsoleView({
   const venuDesRappels = fichePendante(demandee, parLien.data);
   const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
-  const annuaire = useQuery({
-    queryKey: [
-      ...queryKeys.prospectsRoot,
-      'a-qualifier',
-      projet,
-      cherche,
-      origine,
-      seulementARappeler,
-    ] as const,
-    queryFn: () =>
-      fetchProspectsAQualifier({
-        projet,
-        search: cherche,
-        origine,
-        viewerId,
-        resteAAppeler: seulementARappeler,
-      }),
+  const annuaire = useAnnuaireAQualifier({
+    projet,
+    cherche,
+    origine,
+    viewerId,
+    seulementARappeler,
+    plateforme,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
-    placeholderData: (previous) => previous,
   });
 
   const revenir = useCallback(() => {
@@ -280,7 +280,8 @@ export function ConsoleView({
         cherche={cherche}
         search={search}
         projet={projet}
-        origine={origineFiltrable ? origine : null}
+        plateforme={plateforme}
+        origine={origineAffichee(origineFiltrable, origine)}
         resteAAppeler={resteAAppeler}
         total={totalAffiche(annuaire.data)}
         onSearch={setSearch}
@@ -293,6 +294,7 @@ export function ConsoleView({
         cherche={cherche}
         canCreateProspect={canCreateProspect}
         seulementARappeler={seulementARappeler}
+        plateforme={plateforme}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -307,7 +309,7 @@ export function ConsoleView({
           setDemandee(null);
         }}
         title={`Ouvrir la fiche de ${aConfirmer === null ? '' : nomDe(aConfirmer)} ?`}
-        description={null}
+        description={texteEnCours(aConfirmer)}
         confirmLabel="Ouvrir"
         confirmVariant="default"
         pending={ouvrir.isPending}
@@ -347,6 +349,7 @@ function EnTeteAnnuaire({
   cherche,
   search,
   projet,
+  plateforme,
   origine,
   resteAAppeler,
   total,
@@ -359,6 +362,7 @@ function EnTeteAnnuaire({
   cherche: string;
   search: string;
   projet: Projet | null;
+  plateforme: boolean;
   /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
   origine: OrigineFiche | null;
   resteAAppeler: boolean;
@@ -370,6 +374,9 @@ function EnTeteAnnuaire({
 }) {
   let texteAide: string;
   if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
+  else if (plateforme)
+    texteAide =
+      'Tous les inscrits des plateformes, les plus récents d’abord. Une fiche « en cours » est déjà au téléphone chez un collègue.';
   else if (projet === null)
     texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
   else if (projet === 'GRAND_PUBLIC')
@@ -449,6 +456,48 @@ interface Ouverte {
 
 const nomDe = (prospect: ProspectRow): string => `${prospect.nom} ${prospect.prenom}`;
 
+const texteEnCours = (row: ProspectRow | null): string | null =>
+  row?.enCoursPar == null ? null : `${row.enCoursPar} a cette fiche ouverte en ce moment.`;
+
+const origineAffichee = (filtrable: boolean, origine: OrigineFiche): OrigineFiche | null =>
+  filtrable ? origine : null;
+
+function useAnnuaireAQualifier(criteres: {
+  projet: Projet | null;
+  cherche: string;
+  origine: OrigineFiche;
+  viewerId: string | undefined;
+  seulementARappeler: boolean;
+  plateforme: boolean;
+  enabled: boolean;
+}) {
+  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme } = criteres;
+  return useQuery({
+    queryKey: [
+      ...queryKeys.prospectsRoot,
+      'a-qualifier',
+      projet,
+      cherche,
+      origine,
+      seulementARappeler,
+      plateforme,
+    ] as const,
+    queryFn: () =>
+      fetchProspectsAQualifier({
+        projet,
+        search: cherche,
+        origine,
+        viewerId,
+        resteAAppeler: seulementARappeler,
+        plateforme,
+      }),
+    enabled: criteres.enabled,
+    placeholderData: (previous) => previous,
+    // Deux CCP sur le même lot : « en cours par » doit se voir sans recharger.
+    refetchInterval: plateforme ? 30_000 : false,
+  });
+}
+
 const origineInitialePour = (projet: Projet | null): OrigineFiche =>
   projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
 
@@ -524,12 +573,14 @@ function ListeAnnuaire({
   cherche,
   canCreateProspect,
   seulementARappeler,
+  plateforme,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   canCreateProspect: boolean;
   seulementARappeler: boolean;
+  plateforme: boolean;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -566,6 +617,7 @@ function ListeAnnuaire({
           <TableHead>Nom et prénom</TableHead>
           <TableHead>Projet</TableHead>
           <TableHead>Numéro</TableHead>
+          {plateforme ? <TableHead>Inscrit le</TableHead> : null}
           <TableHead>Statut / Qualification</TableHead>
           <TableHead>Dernier appel</TableHead>
         </TableRow>
@@ -584,6 +636,9 @@ function ListeAnnuaire({
                 >
                   <NomProspect row={row} />
                 </button>
+                {row.enCoursPar == null ? null : (
+                  <Badge variant="warning">En cours · {row.enCoursPar}</Badge>
+                )}
               </TableCell>
               <TableCell>
                 <ProjetBadge projet={row.projet} />
@@ -591,6 +646,11 @@ function ListeAnnuaire({
               <TableCell className="whitespace-nowrap font-mono text-[0.875rem]">
                 {formatPhone(row.phoneE164)}
               </TableCell>
+              {plateforme ? (
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {row.plateformeDepuis == null ? '' : formatDateTime(row.plateformeDepuis)}
+                </TableCell>
+              ) : null}
               <TableCell>
                 <StatutAnnuaire row={row} />
               </TableCell>

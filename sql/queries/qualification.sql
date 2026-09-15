@@ -98,7 +98,9 @@ FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
-    AND (p."createdById" = @agent
+    AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
+    AND (@tous::bool
+         OR p."createdById" = @agent
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)));
@@ -107,6 +109,7 @@ SELECT EXISTS (
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
+    AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
     AND (@tous::bool
          OR p."createdById" = @agent
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
@@ -126,7 +129,7 @@ FROM "prospect_journeys"
 WHERE "prospectId" = @prospect_id AND "projet" = CAST(@projet AS text)::"Projet";
 
 -- name: MotifIssueParCode :one
-SELECT "id", "label", "effect", "requiresComment", "requiresCallback", "isActive"
+SELECT "id", "label", "effect", "requiresComment", "requiresCallback", "isActive", "countsAsReached"
 FROM "call_outcome_reasons" WHERE "code" = $1;
 
 -- name: InsererCallAttempt :execrows
@@ -210,6 +213,8 @@ WHERE c."status" = 'PENDING'
   AND c."scheduledAt" <= @avant
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
        OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
+  AND (sqlc.narg('plateforme')::boolean IS NULL
+       OR sqlc.narg('plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL))
   AND (CAST(sqlc.narg('projet') AS text) IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id"
@@ -392,6 +397,10 @@ WHERE p."deletedAt" IS NULL
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
+  )
+  AND (
+    sqlc.narg('scope_plateforme')::boolean IS NULL
+    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
   )
   AND (
     sqlc.narg('depuis_at')::timestamp IS NULL

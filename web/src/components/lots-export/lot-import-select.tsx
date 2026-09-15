@@ -7,27 +7,22 @@ import { Liste } from '@/components/forms/liste';
 import { fetchLotExportImports, type LotExportImport } from '@/lib/data/lots-export';
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import type { Projet } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-export type ImportChoisi = LotExportImport & { projet: Projet };
-
-// Le relevé tourne tous les quarts d'heure : sans l'heure, trois imports du même
-// jour portent le même nom et le superviseur ne peut plus les distinguer.
-export function etiquetteImport(projet: Projet, importedAt: string): string {
-  return `Import ${projet === 'CHUES' ? 'CHUES' : 'GP'} du ${formatDateTime(importedAt)}`;
-}
+export type ImportChoisi = LotExportImport;
 
 // Un classeur de leads porte un onglet par jour et garde le nom de fichier du
 // premier : deux lignes partagent donc l'identifiant du classeur, et seule
 // l'adjonction de l'onglet les distingue.
 export function cleImport(lot: ImportChoisi): string {
-  return `${lot.projet}::${lot.id}::${lot.feuille ?? ''}`;
+  return `${lot.id}::${lot.feuille ?? ''}`;
 }
 
+// Le relevé tourne tous les quarts d'heure : sans l'heure, trois imports du même
+// jour portent le même nom et le superviseur ne peut plus les distinguer.
 function libelle(lot: ImportChoisi): string {
   const pluriel = lot.fiches > 1 ? 's' : '';
-  return `${etiquetteImport(lot.projet, lot.importedAt)} · ${formatNumber(lot.fiches)} fiche${pluriel} · ${lot.libelle}`;
+  return `${lot.libelle} · ${formatNumber(lot.fiches)} fiche${pluriel} · relevé le ${formatDateTime(lot.importedAt)}`;
 }
 
 const RAYON = 8;
@@ -84,14 +79,6 @@ function placeholder(chargement: boolean, vide: boolean): string {
   return 'Choisir un import';
 }
 
-function useImports(projet: Projet) {
-  return useQuery({
-    queryKey: queryKeys.lotsExportImports(projet),
-    queryFn: () => fetchLotExportImports(projet),
-    select: (lots): ImportChoisi[] => lots.map((lot) => ({ ...lot, projet })),
-  });
-}
-
 export function ChampImport({
   valeur,
   onChange,
@@ -99,14 +86,14 @@ export function ChampImport({
   valeur: string;
   onChange: (lot: ImportChoisi) => void;
 }) {
-  const chues = useImports('CHUES');
-  const grandPublic = useImports('GRAND_PUBLIC');
-  const lots = [...(chues.data ?? []), ...(grandPublic.data ?? [])].sort((a, b) =>
-    b.importedAt.localeCompare(a.importedAt),
-  );
+  const imports = useQuery({
+    queryKey: queryKeys.lotsExportImports,
+    queryFn: () => fetchLotExportImports(),
+  });
+  const lots = imports.data ?? [];
 
   return (
-    <Field label="Import" description="Du plus récent au plus ancien, CHUES et Grand Public.">
+    <Field label="Import" description="Un onglet par ligne, du plus récent au plus ancien.">
       {(props) => (
         <Liste
           id={props.id}
@@ -117,7 +104,7 @@ export function ChampImport({
             avant: <AnneauCompletion lot={lot} />,
           }))}
           value={valeur}
-          placeholder={placeholder(chues.isPending || grandPublic.isPending, lots.length === 0)}
+          placeholder={placeholder(imports.isPending, lots.length === 0)}
           onChange={(cle) => {
             const lot = lots.find((candidat) => cleImport(candidat) === cle);
             if (lot !== undefined) onChange(lot);
