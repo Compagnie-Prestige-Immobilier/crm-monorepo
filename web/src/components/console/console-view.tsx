@@ -136,7 +136,7 @@ const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
 ]);
 
 /** Le catalogue affiché avant la réponse du référentiel : joignables et injoignables. */
-const CATALOGUE_SECOURS: readonly MotifAppel[] = [...MOTIFS_SYSTEME, ...MOTIFS_INJOIGNABLE];
+export const CATALOGUE_SECOURS: readonly MotifAppel[] = [...MOTIFS_SYSTEME, ...MOTIFS_INJOIGNABLE];
 
 /** « Méthode obtenue » n'y figure pas : c'est « Enregistrer l'adhésion » qui la pose. */
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
