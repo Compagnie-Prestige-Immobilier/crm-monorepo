@@ -22,6 +22,10 @@ WHERE r."deletedAt" IS NULL
     sqlc.arg('reads_everyone')::boolean
     OR r."createdById" = sqlc.arg('owner_id')::text
     OR EXISTS (
+      SELECT 1 FROM "rep_call_attempts" a
+      WHERE a."representantId" = r."id" AND a."performedById" = sqlc.arg('owner_id')::text
+    )
+    OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."representantId" = r."id" AND li."assigneeId" = sqlc.arg('owner_id')::text
@@ -84,6 +88,10 @@ WHERE r."deletedAt" IS NULL
   AND (
     sqlc.arg('reads_everyone')::boolean
     OR r."createdById" = sqlc.arg('owner_id')::text
+    OR EXISTS (
+      SELECT 1 FROM "rep_call_attempts" a
+      WHERE a."representantId" = r."id" AND a."performedById" = sqlc.arg('owner_id')::text
+    )
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
