@@ -281,6 +281,40 @@ func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 	}
 }
 
+// Réaffecter une fiche déjà appelée la remet dans la file de celui qui la
+// reçoit : la borne suit la date d'affectation, pas la création de la campagne.
+func TestQualificationReaffectationRemetLaFicheDansLaFile(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	lot := uuid.Must(uuid.NewV7()).String()
+	qualificationExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById","createdAt")
+	                      VALUES ($1,'Campagne reaffectation','PROSPECTS','GRAND_PUBLIC','{}'::jsonb,1,$2,now() - interval '2 hours')`, lot, b.userID)
+	qualificationExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day")
+	                      VALUES ($1,$2,1,$3,1)`, lot, fiche, b.userID)
+	appel := qualificationCorpsTentative(fiche, nil)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_reaffectations" WHERE "lotId" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_items" WHERE "lotId" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+	b.attend(statut, http.StatusOK, "fiche appelée", body)
+
+	_, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
+	if slices.Contains(ids, fiche) {
+		t.Fatalf("une fiche appelée sort de la file : %v", ids)
+	}
+
+	qualificationExec(b, `INSERT INTO "lot_export_reaffectations" ("id","lotId","toAssigneeId","fiches","performedById","createdAt","positions")
+	                      VALUES ($1,$2,$3,1,$3,now(),'{1}')`, uuid.Must(uuid.NewV7()).String(), lot, b.userID)
+
+	_, ids = qualificationTotalProspects(b, "&resteAAppeler=true")
+	if !slices.Contains(ids, fiche) {
+		t.Fatalf("réaffectée, la fiche revient dans la file : %v", ids)
+	}
+}
+
 // Sans verrou depuis le 10 septembre 2026 : plusieurs fiches restent en main,
 // et chaque console reprend la plus récente des siennes.
 func TestQualificationPlusieursFichesEnMainUneParConsole(t *testing.T) {
