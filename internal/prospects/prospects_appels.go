@@ -86,6 +86,10 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 	if err != nil {
 		return nil, err
 	}
+	confie, err := qualification.QualificationProspectConfie(ctx, s.Q, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
 	out := &ProspectCallAttemptsOutput{}
 	out.Body.Items = make([]ProspectCallAttempt, 0, len(lignes))
 	for i := range lignes {
@@ -99,7 +103,7 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 			DeviceCallAt: prospectISOPtr(l.DeviceCallAt), PerformedByID: l.PerformedById,
 			PerformedByName: l.PerformedByName, ClientCreatedAt: prospectISO(l.ClientCreatedAt),
 			DureeTraitementSecondes: prospectDureeTraitement(l.OuvertureFirstInputAt, l.OuvertureClosedAt),
-			Editable:                qualification.QualificationAppelModifiable(&u, l.PerformedById, string(l.Outcome)),
+			Editable:                qualification.QualificationAppelModifiable(&u, l.PerformedById, confie, string(l.Outcome)),
 			Modifications:           append([]ProspectAppelModification{}, parAppel[l.ID]...),
 		})
 	}

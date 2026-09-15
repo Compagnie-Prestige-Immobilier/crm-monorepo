@@ -34,10 +34,18 @@ type QualificationModifierAppelInput struct {
 
 type QualificationModifierAppelOutput struct{ Body QualificationAppelEtat }
 
-func qualificationRefusDeModifier(u *socle.Utilisateur, auteurID, outcome, nouvelOutcome string) error {
-	if u.ID != auteurID && u.Role != socle.Admin && u.Role != socle.Superviseur {
+// Même règle que la consignation d'un appel : la fiche créée par le téléconseiller, ou confiée par une campagne active.
+func QualificationProspectConfie(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID string) (bool, error) {
+	if u.Role != socle.Commercial && u.Role != socle.ChargeClientele {
+		return false, nil
+	}
+	return q.ProspectAttribue(ctx, db.ProspectAttribueParams{ID: prospectID, Agent: u.ID})
+}
+
+func qualificationRefusDeModifier(u *socle.Utilisateur, auteurID string, confie bool, outcome, nouvelOutcome string) error {
+	if u.ID != auteurID && !confie && u.Role != socle.Admin && u.Role != socle.Superviseur {
 		return socle.Problem(http.StatusForbidden, "PHASE2_ATTEMPT_NOT_OWNER",
-			"Seuls l’auteur de l’appel, un administrateur ou un superviseur peuvent le modifier.")
+			"Seuls l’auteur de l’appel, un téléconseiller à qui la fiche est confiée, un administrateur ou un superviseur peuvent le modifier.")
 	}
 	if outcome == exports.ExportCleMethodeObtenue || nouvelOutcome == exports.ExportCleMethodeObtenue {
 		return socle.Problem(http.StatusConflict, "PHASE2_ATTEMPT_ENROLMENT",
@@ -46,8 +54,8 @@ func qualificationRefusDeModifier(u *socle.Utilisateur, auteurID, outcome, nouve
 	return nil
 }
 
-func QualificationAppelModifiable(u *socle.Utilisateur, auteurID, outcome string) bool {
-	return qualificationRefusDeModifier(u, auteurID, outcome, outcome) == nil
+func QualificationAppelModifiable(u *socle.Utilisateur, auteurID string, confie bool, outcome string) bool {
+	return qualificationRefusDeModifier(u, auteurID, confie, outcome, outcome) == nil
 }
 
 func qualificationEtatAppel(r *db.TentativeAModifierRow) QualificationAppelEtat {
@@ -57,18 +65,27 @@ func qualificationEtatAppel(r *db.TentativeAModifierRow) QualificationAppelEtat 
 	}
 }
 
+func qualificationAppelAModifier(ctx context.Context, q *db.Queries, u *socle.Utilisateur, id, nouvelOutcome string) (db.TentativeAModifierRow, error) {
+	avant, err := q.TentativeAModifier(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return avant, socle.Problem(http.StatusNotFound, "PHASE2_ATTEMPT_NOT_FOUND", "Appel introuvable.")
+	}
+	if err != nil {
+		return avant, err
+	}
+	confie, err := QualificationProspectConfie(ctx, q, u, avant.ProspectId)
+	if err != nil {
+		return avant, err
+	}
+	return avant, qualificationRefusDeModifier(u, avant.PerformedById, confie, string(avant.Outcome), nouvelOutcome)
+}
+
 func (s *service) qualificationModifierAppel(ctx context.Context, in *QualificationModifierAppelInput) (*QualificationModifierAppelOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	out := &QualificationModifierAppelOutput{}
 	err := qualificationTx(ctx, s, func(q *db.Queries) error {
-		avant, err := q.TentativeAModifier(ctx, in.ID)
-		if errors.Is(err, pgx.ErrNoRows) {
-			return socle.Problem(http.StatusNotFound, "PHASE2_ATTEMPT_NOT_FOUND", "Appel introuvable.")
-		}
+		avant, err := qualificationAppelAModifier(ctx, q, &u, in.ID, in.Body.Outcome)
 		if err != nil {
-			return err
-		}
-		if err := qualificationRefusDeModifier(&u, avant.PerformedById, string(avant.Outcome), in.Body.Outcome); err != nil {
 			return err
 		}
 		// La date de rappel se juge contre l'appel d'origine, comme à sa création.
@@ -82,6 +99,9 @@ func (s *service) qualificationModifierAppel(ctx context.Context, in *Qualificat
 		}
 		t, err := qualificationNormaliserTentative(&b, &motif)
 		if err != nil {
+			return err
+		}
+		if err := qualificationExigencesChues(&b, &t, avant.Projet); err != nil {
 			return err
 		}
 		if err := qualificationAppliquerModification(ctx, q, &u, &b, &t, &avant); err != nil {

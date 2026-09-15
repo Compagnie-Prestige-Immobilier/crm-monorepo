@@ -435,9 +435,8 @@ CREATE TABLE public.call_attempts (
     CONSTRAINT call_attempts_duree_etablissement_range CHECK ((("dureeEtablissementMois" IS NULL) OR (("dureeEtablissementMois" >= 0) AND ("dureeEtablissementMois" <= 600)))),
     CONSTRAINT call_attempts_email_max_length CHECK (((email IS NULL) OR (length(email) <= 160))),
     CONSTRAINT call_attempts_method_matches_outcome CHECK ((((outcome = 'METHOD_OBTAINED'::public."CallOutcome") AND (method IS NOT NULL)) OR ((outcome <> 'METHOD_OBTAINED'::public."CallOutcome") AND (method IS NULL)))),
-    CONSTRAINT call_attempts_other_requires_comment CHECK (((outcome <> 'OTHER'::public."CallOutcome") OR ((comment IS NOT NULL) AND (length(btrim(comment)) > 0)))),
     CONSTRAINT call_attempts_preuve_appareil_toutes_ou_aucune CHECK (((("deviceCallType" IS NULL) AND ("deviceCallDurationSeconds" IS NULL) AND ("deviceCallAt" IS NULL)) OR (("deviceCallType" IS NOT NULL) AND ("deviceCallDurationSeconds" IS NOT NULL) AND ("deviceCallAt" IS NOT NULL)))),
-    CONSTRAINT call_attempts_rendez_vous_matches_method CHECK ((((method)::text = 'RDV_CPI'::text) OR ((method = 'APPOINTMENT'::public."EnrollmentMethod") AND ("rendezVousAt" IS NOT NULL)) OR ((method IS DISTINCT FROM 'APPOINTMENT'::public."EnrollmentMethod") AND ("rendezVousAt" IS NULL))))
+    CONSTRAINT call_attempts_rendez_vous_matches_method CHECK ((((method)::text = ANY (ARRAY['APPOINTMENT'::text, 'RDV_CPI'::text])) OR ("rendezVousAt" IS NULL)))
 );
 
 CREATE TABLE public.call_outcome_reasons (

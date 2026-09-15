@@ -3,6 +3,7 @@ package prospects
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/qualification"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
@@ -420,7 +421,8 @@ func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id str
 	return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 }
 
-func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, id string) (db.ProspectVivantRow, error) {
+// Supprimer et fusionner restent au créateur ; modifier s'ouvre au téléconseiller à qui une campagne active confie la fiche.
+func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, id string, confieeSuffit bool) (db.ProspectVivantRow, error) {
 	row, err := s.Q.ProspectVivant(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return row, socle.Problem(http.StatusNotFound, prospectCodeIntrouvable, prospectIntrouvable)
@@ -428,10 +430,17 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 	if err != nil {
 		return row, err
 	}
-	if u.Role != socle.Admin && row.CreatedById != u.ID {
-		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
+	if u.Role == socle.Admin || row.CreatedById == u.ID {
+		return row, nil
 	}
-	return row, nil
+	confiee := false
+	if confieeSuffit {
+		confiee, err = qualification.QualificationProspectConfie(ctx, s.Q, u, id)
+	}
+	if err == nil && !confiee {
+		err = socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
+	}
+	return row, err
 }
 
 type ProspectListInput struct {
@@ -972,7 +981,7 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 
 func (s *service) prospectModifier(ctx context.Context, in *ProspectModifierInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	existant, err := s.prospectModifiable(ctx, &u, in.ID)
+	existant, err := s.prospectModifiable(ctx, &u, in.ID, true)
 	if err != nil {
 		return nil, err
 	}
@@ -1222,7 +1231,7 @@ type ProspectOkOutput struct {
 // redevient immédiatement ressaisissable.
 func (s *service) prospectSupprimer(ctx context.Context, in *ProspectIDInput) (*ProspectOkOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	existant, err := s.prospectModifiable(ctx, &u, in.ID)
+	existant, err := s.prospectModifiable(ctx, &u, in.ID, false)
 	if err != nil {
 		return nil, err
 	}
@@ -1288,11 +1297,11 @@ func (s *service) prospectFusionner(ctx context.Context, in *ProspectFusionInput
 	if corps.SourceID == corps.TargetID {
 		return nil, socle.Problem(http.StatusBadRequest, "MERGE_SAME_PROSPECT", "Impossible de fusionner une fiche avec elle-même.")
 	}
-	cible, err := s.prospectModifiable(ctx, &u, corps.TargetID)
+	cible, err := s.prospectModifiable(ctx, &u, corps.TargetID, false)
 	if err != nil {
 		return nil, err
 	}
-	source, err := s.prospectModifiable(ctx, &u, corps.SourceID)
+	source, err := s.prospectModifiable(ctx, &u, corps.SourceID, false)
 	if err != nil {
 		return nil, err
 	}
