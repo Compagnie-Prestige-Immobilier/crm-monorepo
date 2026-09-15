@@ -139,6 +139,7 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   motifDeRepli('FORMALITES_DOMANIALES', 'Formalités domaniales', 'KEEP_OPEN', {
     parentId: 'INTERESSE',
   }),
+  motifDeRepli('PAS_INTERESSE', 'Pas intéressé', 'CLOSE_REFUSED'),
   motifDeRepli('HESITANT', 'Hésitant', 'KEEP_OPEN'),
   motifDeRepli('CALLBACK', 'À rappeler', 'SCHEDULE_CALLBACK', AVEC_DATE),
   motifDeRepli('DEMANDE_INFORMATION', 'Demande d’information', 'KEEP_OPEN'),
