@@ -30,6 +30,15 @@ Vérifier que l'API répond (401 attendu tant que non connecté) :
 curl -s -o /dev/null -w "%{http_code}" http://localhost:4000/api/v1/auth/me
 ```
 
+### Recharger le serveur après une modification
+
+`go run` ne recharge pas automatiquement le serveur. Dans le terminal où il
+tourne, arrêter le processus avec `Ctrl+C`, puis relancer la commande :
+
+```powershell
+$env:DATABASE_URL='postgres://cpi:cpi@localhost:5434/cpi_v2_dev?sslmode=disable'; $env:PORT='4000'; $env:LOG_FORMAT='text'; go run ./cmd/server
+```
+
 ## 3. Démarrer le web (Vite)
 
 Dans un autre terminal :

@@ -807,11 +807,7 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 		return t, socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_NOT_ALLOWED",
 			"Une méthode d’enrôlement n’est admise que pour une issue qui clôt sur la méthode obtenue.")
 	}
-	if motif.exigeCommentaire && t.comment == nil {
-		return t, socle.Problem(http.StatusBadRequest, "PHASE2_COMMENT_REQUIRED",
-			"L’issue « "+motif.label+" » exige un commentaire : sans lui, la case ne dit rien.")
-	}
-	rappel, err := qualificationRappelPromis(b, motif, &t.regle)
+	rappel, err := qualificationRappelPromis(b, &t.regle)
 	if err != nil {
 		return t, err
 	}
@@ -828,13 +824,9 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 }
 
 // Le futur se juge sur l'horodatage TERRAIN, jamais sur l'heure du serveur.
-func qualificationRappelPromis(b *QualificationCallAttemptBody, motif *qualificationMotifIssue, regle *qualificationRegleIssue) (time.Time, error) {
+func qualificationRappelPromis(b *QualificationCallAttemptBody, regle *qualificationRegleIssue) (time.Time, error) {
 	var absent time.Time
 	if b.CallbackAt == nil {
-		if motif.exigeRappel {
-			return absent, socle.Problem(http.StatusBadRequest, "PHASE2_CALLBACK_AT_REQUIRED",
-				"L’issue « "+motif.label+" » exige la date du rappel promis.")
-		}
 		return absent, nil
 	}
 	if !regle.accepteCallbackAt {
@@ -863,15 +855,10 @@ func qualificationCourrielRecueilli(b *QualificationCallAttemptBody) (string, er
 
 func qualificationRendezVousFixe(b *QualificationCallAttemptBody) (time.Time, error) {
 	var absent time.Time
-	pris := b.Method != nil && *b.Method == string(db.EnrollmentMethodAPPOINTMENT)
 	if b.RendezVousAt == nil {
-		if pris {
-			return absent, socle.Problem(http.StatusBadRequest, "PHASE2_RENDEZ_VOUS_REQUIRED",
-				"Le RDV CPI exige la date et l’heure du rendez-vous.")
-		}
 		return absent, nil
 	}
-	if !pris {
+	if b.Method == nil || *b.Method != string(db.EnrollmentMethodAPPOINTMENT) {
 		return absent, socle.Problem(http.StatusBadRequest, "PHASE2_RENDEZ_VOUS_NOT_ALLOWED",
 			"Une date de rendez-vous n’est admise que pour la méthode « RDV CPI ».")
 	}
@@ -881,6 +868,26 @@ func qualificationRendezVousFixe(b *QualificationCallAttemptBody) (time.Time, er
 			"La date du rendez-vous précède l’appel qui l’a fixé.")
 	}
 	return quand, nil
+}
+
+// Grand Public consigne un appel sans commentaire ni date, quels que soient les drapeaux du motif.
+func qualificationExigencesChues(b *QualificationCallAttemptBody, t *qualificationTentative, projet db.Projet) error {
+	if projet != db.ProjetCHUES {
+		return nil
+	}
+	if t.motif.exigeCommentaire && t.comment == nil {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_COMMENT_REQUIRED",
+			"L’issue « "+t.motif.label+" » exige un commentaire : sans lui, la case ne dit rien.")
+	}
+	if t.motif.exigeRappel && t.callbackAt == nil {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_CALLBACK_AT_REQUIRED",
+			"L’issue « "+t.motif.label+" » exige la date du rappel promis.")
+	}
+	if b.Method != nil && *b.Method == string(db.EnrollmentMethodAPPOINTMENT) && t.rendezVousAt == nil {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_RENDEZ_VOUS_REQUIRED",
+			"Le RDV CPI exige la date et l’heure du rendez-vous.")
+	}
+	return nil
 }
 
 func qualificationConversionChues(b *QualificationCallAttemptBody, projet db.Projet, revenu *string) error {
@@ -1013,6 +1020,9 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 	}
 	if duplicate {
 		return "duplicate", qualificationEtatPhase2(prospect.ID, prospect.Rev, prospect.UpdatedAt, &parcours), nil
+	}
+	if err := qualificationExigencesChues(b, t, prospect.Projet); err != nil {
+		return "", vide, err
 	}
 	if err := qualificationInsererTentative(ctx, q, u, b, t); err != nil {
 		return "", vide, err

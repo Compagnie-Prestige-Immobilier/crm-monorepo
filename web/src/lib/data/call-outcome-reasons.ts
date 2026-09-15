@@ -57,6 +57,8 @@ export interface MotifAppel {
   readonly label: string;
   readonly effect: CallOutcomeEffect;
   readonly requiresComment: boolean;
+  /** Faux : un statut de rappel propose la date sans l'exiger. */
+  readonly requiresCallback: boolean;
 }
 
 /** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
@@ -71,6 +73,7 @@ export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Prom
     label: motif.label,
     effect: motif.effect,
     requiresComment: motif.requiresComment,
+    requiresCallback: motif.requiresCallback,
   }));
 }
 
@@ -89,8 +92,7 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
 /**
  * KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien. Envoyé en
  * UNREACHABLE, « Intéressé » s'afficherait « Injoignable » et sortirait des
- * appels aboutis, que les chiffres comptent par issue. OTHER exige un
- * commentaire en base : son motif le réclame donc aussi.
+ * appels aboutis, que les chiffres comptent par issue.
  */
 const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
   INTERESSE: 'OTHER',

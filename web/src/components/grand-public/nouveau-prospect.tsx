@@ -20,12 +20,7 @@ import { toInternationalE164 } from '@/components/forms/international-phone-fiel
 import { ETAPES_SAISIE, EtapesProgression, PiedEtapes } from '@/components/grand-public/etapes';
 import type { FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { Button } from '@/components/ui/button';
-import {
-  commentaireExigePar,
-  fetchMotifsAppel,
-  issueDuMotif,
-  type MotifAppel,
-} from '@/lib/data/call-outcome-reasons';
+import { fetchMotifsAppel, issueDuMotif, type MotifAppel } from '@/lib/data/call-outcome-reasons';
 import { useChampsConversion } from '@/lib/data/champs-conversion';
 import {
   AttemptRefused,
@@ -271,12 +266,23 @@ export function NouveauProspect({
     });
   }
 
+  /** Grand Public n'exige rien du dossier : le nom reste exigé, avec le numéro, pour créer la fiche. */
+  function erreursSaisie(): ConversionErrors {
+    const problemes = validateConversion(
+      conversion,
+      maintenant(),
+      formulaire.champs,
+      formulaire.libres,
+    );
+    return conversion.nom.trim() === ''
+      ? { ...problemes, nom: 'Le nom est obligatoire.' }
+      : problemes;
+  }
+
   /** Le numéro et l'identité, que toute saisie exige. Un refus rouvre son étape. */
   function identiteBloquee(): boolean {
     const erreurTel = erreurTelephone(phone, e164);
-    const identite = erreursIdentite(
-      validateConversion(conversion, maintenant(), formulaire.champs, formulaire.libres),
-    );
+    const identite = erreursIdentite(erreursSaisie());
     setPhoneError(erreurTel);
     setErrors(identite);
     const bloque = erreurTel !== undefined || Object.keys(identite).length > 0;
@@ -290,12 +296,7 @@ export function NouveauProspect({
 
   function adherer(choisi: MotifAppel): void {
     setSlots(null);
-    const problemes = validateConversion(
-      conversion,
-      maintenant(),
-      formulaire.champs,
-      formulaire.libres,
-    );
+    const problemes = erreursSaisie();
     const erreurTel = erreurTelephone(phone, e164);
     setErrors(problemes);
     setPhoneError(erreurTel);
@@ -304,7 +305,7 @@ export function NouveauProspect({
       return;
     }
     if (conversion.method === null) return;
-    verifierPuisEnvoyer(choisi, {
+    verifierPuisEnvoyer({
       outcome: issueDuMotif(choisi),
       reasonCode: choisi.code,
       method: conversion.method,
@@ -316,7 +317,7 @@ export function NouveauProspect({
 
   function consigner(choisi: MotifAppel, callbackAt: string | null = null): void {
     if (identiteBloquee()) return;
-    verifierPuisEnvoyer(choisi, {
+    verifierPuisEnvoyer({
       outcome: issueDuMotif(choisi),
       reasonCode: choisi.code,
       method: null,
@@ -325,14 +326,10 @@ export function NouveauProspect({
     });
   }
 
-  function verifierPuisEnvoyer(choisi: MotifAppel, appel: AttemptDraft): void {
-    const probleme = validateAttempt(appel, maintenant(), choisi.requiresComment);
-    if (probleme === null) {
-      envoyer(appel);
-      return;
-    }
-    toast.error(probleme);
-    if (choisi.requiresComment) commentRef.current?.focus();
+  function verifierPuisEnvoyer(appel: AttemptDraft): void {
+    const probleme = validateAttempt(appel, maintenant());
+    if (probleme === null) envoyer(appel);
+    else toast.error(probleme);
   }
 
   function ouvrirEcheance(): void {
@@ -359,12 +356,7 @@ export function NouveauProspect({
       else consigner(motif);
       return;
     }
-    const iso = dakarLocalToIso(freeCallback);
-    if (iso === null) {
-      toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
-      return;
-    }
-    if (motif !== null) consigner(motif, iso);
+    if (motif !== null) consigner(motif, dakarLocalToIso(freeCallback));
   }
 
   useRaccourcisEcheance(
@@ -381,12 +373,7 @@ export function NouveauProspect({
   );
 
   const pending = save.isPending;
-  const problemes = validateConversion(
-    conversion,
-    maintenant(),
-    formulaire.champs,
-    formulaire.libres,
-  );
+  const problemes = erreursSaisie();
   const maximumEtape = etapePourErreurs(problemes, erreurTelephone(phone, e164) !== undefined);
 
   return (
@@ -462,6 +449,7 @@ export function NouveauProspect({
                 now={now}
                 freeCallback={freeCallback}
                 surDossier
+                facultative
                 disabled={pending}
                 inputRef={callbackRef}
                 onChoisir={(at) => {
@@ -474,7 +462,7 @@ export function NouveauProspect({
 
             <Commentaire
               value={comment}
-              obligatoirePour={commentaireExigePar(motif)}
+              obligatoirePour={null}
               inputRef={commentRef}
               onChange={setComment}
               onValidate={valider}

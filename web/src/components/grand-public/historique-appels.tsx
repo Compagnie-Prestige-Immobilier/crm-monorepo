@@ -24,7 +24,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import { fetchMotifsAppel, issueDuMotif, type MotifAppel } from '@/lib/data/call-outcome-reasons';
+import { fetchMotifsAppel, issueDuMotif } from '@/lib/data/call-outcome-reasons';
 import {
   fetchProspect,
   fetchProspectCallAttempts,
@@ -51,7 +51,8 @@ const rappelDe = (callbackAt: string | null): string =>
 
 const auteurDe = (modification: Modification): string => modification.userName ?? 'Auteur inconnu';
 
-const cleAppels = (prospectId: string) => ['prospects', 'call-attempts', prospectId] as const;
+export const cleAppels = (prospectId: string) =>
+  ['prospects', 'call-attempts', prospectId] as const;
 
 function Changements({ modification }: { modification: Modification }) {
   const { avant, apres } = modification;
@@ -131,23 +132,15 @@ const evenementsModification = (appel: ProspectCallAttempt): EvenementHistorique
     detail: <Changements modification={modification} />,
   }));
 
-function problemeDe(motif: MotifAppel, commentaire: string, callbackAt: string | null) {
-  if (motif.requiresComment && commentaire === '') {
-    return `Le statut « ${motif.label} » exige un commentaire.`;
-  }
-  if (motif.effect === 'SCHEDULE_CALLBACK' && callbackAt === null) {
-    return 'Saisissez la date et l’heure du rappel.';
-  }
-  return null;
-}
-
-function ModifierAppel({
+export function ModifierAppel({
   appel,
   prospectId,
+  libelle = 'Modifier l’appel',
   onFicheModifiee,
 }: {
   appel: ProspectCallAttempt;
   prospectId: string;
+  libelle?: string;
   onFicheModifiee: (fiche: ProspectRow) => void;
 }) {
   const queryClient = useQueryClient();
@@ -163,7 +156,6 @@ function ModifierAppel({
   const [code, setCode] = useState<string | null>(null);
   const [commentaire, setCommentaire] = useState('');
   const [rappel, setRappel] = useState('');
-  const [erreur, setErreur] = useState<string | null>(null);
   const motif = proposes.find((item) => item.code === code) ?? null;
   const avecRappel = motif?.effect === 'SCHEDULE_CALLBACK';
 
@@ -191,22 +183,17 @@ function ModifierAppel({
     setRappel(
       appel.callbackAt === null ? '' : new Date(appel.callbackAt).toISOString().slice(0, 16),
     );
-    setErreur(null);
     setOuvert(true);
   };
 
   const enregistrer = () => {
     if (motif === null || envoi.isPending) return;
     const texte = commentaire.trim();
-    const callbackAt = avecRappel ? dakarLocalToIso(rappel) : null;
-    const probleme = problemeDe(motif, texte, callbackAt);
-    setErreur(probleme);
-    if (probleme !== null) return;
     envoi.mutate({
       outcome: issueDuMotif(motif),
       reasonCode: motif.code,
       comment: texte === '' ? null : texte,
-      callbackAt,
+      callbackAt: avecRappel ? dakarLocalToIso(rappel) : null,
     });
   };
 
@@ -214,7 +201,7 @@ function ModifierAppel({
     <>
       <Button size="sm" onClick={ouvrir}>
         <PencilIcon aria-hidden="true" />
-        Modifier l’appel
+        {libelle}
       </Button>
       <Dialog
         open={ouvert}
@@ -240,10 +227,9 @@ function ModifierAppel({
               disabled={envoi.isPending}
               onChange={(choisi) => {
                 setCode(choisi.code);
-                setErreur(null);
               }}
             />
-            <Field label="Commentaire" required={motif?.requiresComment === true}>
+            <Field label="Commentaire">
               {(props) => (
                 <Textarea
                   {...props}
@@ -256,7 +242,7 @@ function ModifierAppel({
               )}
             </Field>
             {avecRappel ? (
-              <Field label="Date du rappel" description="Heure de Dakar." required>
+              <Field label="Date du rappel" description="Heure de Dakar.">
                 {(props) => (
                   <Input
                     {...props}
@@ -271,11 +257,6 @@ function ModifierAppel({
                 )}
               </Field>
             ) : null}
-            {erreur === null ? null : (
-              <p role="alert" className="text-[0.8125rem] text-destructive">
-                {erreur}
-              </p>
-            )}
             <DialogFooter>
               <Button
                 type="button"

@@ -372,18 +372,19 @@ export type ChampReglable =
 /**
  * Les réglages de l'administrateur, appliqués champ par champ : masqué, un
  * champ n'est plus exigé ; sans réglage, la règle du projet reste celle du
- * serveur.
+ * serveur. Grand Public n'exige aucun champ, quel que soit le réglage.
  */
 export interface ReglesChamps {
   readonly visible: (champ: ChampReglable, defaut: boolean) => boolean;
   readonly requis: (champ: ChampReglable, defaut: boolean) => boolean;
 }
 
-export function reglesChamps(reglages: readonly ReglageChamp[]): ReglesChamps {
+export function reglesChamps(reglages: readonly ReglageChamp[], projet: Projet): ReglesChamps {
   const parChamp = new Map(reglages.map((regle) => [regle.champ, regle]));
   return {
     visible: (champ, defaut) => parChamp.get(champ)?.visible ?? defaut,
     requis: (champ, defaut) => {
+      if (projet === 'GRAND_PUBLIC') return false;
       const regle = parChamp.get(champ);
       if (regle === undefined) return defaut;
       return regle.visible && regle.obligatoire;
@@ -399,8 +400,8 @@ export function validateConversion(
   libres: readonly ChampLibre[] = [],
 ): ConversionErrors {
   const complet = draft.projet === 'CHUES';
-  const regles = reglesChamps(reglages);
-  const manquantes = libresManquants(draft, libres);
+  const regles = reglesChamps(reglages, draft.projet);
+  const manquantes = complet ? libresManquants(draft, libres) : {};
   return {
     ...identiteErreurs(draft, complet, regles),
     ...dossierErreurs(draft, complet, regles),
@@ -582,17 +583,19 @@ function methodeErreurs(
 
   const rendezVous = draft.rendezVousAt.trim();
   if (!regles.visible('rendezVousAt', true)) return errors;
-  if (draft.method === 'APPOINTMENT') {
-    const iso = dakarLocalToIso(rendezVous);
-    if (rendezVous === '') {
+  if (rendezVous === '') {
+    if (draft.method === 'APPOINTMENT' && draft.projet === 'CHUES') {
       errors.rendezVousAt = 'Le RDV CPI exige la date et l’heure du rendez-vous.';
-    } else if (iso === null) {
-      errors.rendezVousAt = 'La date du rendez-vous est illisible.';
-    } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
-      errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
     }
-  } else if (rendezVous !== '') {
+    return errors;
+  }
+  const iso = dakarLocalToIso(rendezVous);
+  if (draft.method !== 'APPOINTMENT') {
     errors.rendezVousAt = 'Une date de rendez-vous n’est admise que sur « RDV CPI ».';
+  } else if (iso === null) {
+    errors.rendezVousAt = 'La date du rendez-vous est illisible.';
+  } else if (Date.parse(iso) < now - RENDEZ_VOUS_SKEW_MS) {
+    errors.rendezVousAt = 'Le rendez-vous ne peut pas précéder l’appel.';
   }
 
   return errors;

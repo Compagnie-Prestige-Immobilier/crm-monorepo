@@ -57,7 +57,12 @@ function GrandPublicProspectPage() {
     <GrandPublicProspectDetail
       prospect={chargement.prospect}
       offers={chargement.offers}
-      canEdit={user.role === 'ADMIN' || user.role === 'COMMERCIAL' || user.role === 'SUPERVISEUR'}
+      canEdit={
+        user.role === 'ADMIN' ||
+        user.role === 'COMMERCIAL' ||
+        user.role === 'CHARGE_CLIENTELE' ||
+        user.role === 'SUPERVISEUR'
+      }
     />
   );
 }

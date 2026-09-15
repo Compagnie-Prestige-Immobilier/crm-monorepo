@@ -195,8 +195,6 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
     await page.getByRole('button', { name: 'Continuer', exact: true }).click();
     await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
-    await page.getByRole('textbox', { name: /^Nom/ }).fill('');
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: 'Retour', exact: true }).click();
     await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
