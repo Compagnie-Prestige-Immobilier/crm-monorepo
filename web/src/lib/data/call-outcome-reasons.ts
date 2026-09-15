@@ -16,6 +16,7 @@ export const CALL_OUTCOME_EFFECTS = [
   'CLOSE_METHOD',
   'CLOSE_REFUSED',
   'CLOSE_WRONG_NUMBER',
+  'CLOSE_LOST',
   'KEEP_OPEN',
   'SCHEDULE_CALLBACK',
 ] as const satisfies readonly CallOutcomeEffect[];
@@ -24,6 +25,7 @@ export const CALL_OUTCOME_EFFECT_LABELS: Record<CallOutcomeEffect, string> = {
   CLOSE_METHOD: 'Clôt, méthode obtenue',
   CLOSE_REFUSED: 'Clôt, refus',
   CLOSE_WRONG_NUMBER: 'Clôt, faux numéro',
+  CLOSE_LOST: 'Clôt, fiche à supprimer',
   KEEP_OPEN: 'Laisse le prospect à rappeler',
   SCHEDULE_CALLBACK: 'Planifie un rappel daté',
 };
@@ -53,11 +55,15 @@ export async function fetchCallOutcomeReasons(
 
 /** Ce que l'écran d'appel lit d'un motif ; le reste ne sert qu'à l'administration. */
 export interface MotifAppel {
+  readonly id: string;
   readonly code: string;
   readonly label: string;
   readonly effect: CallOutcomeEffect;
   readonly requiresComment: boolean;
+  readonly requiresCallback: boolean;
   readonly countsAsReached: boolean;
+  /** Le motif de premier niveau que celui-ci précise. */
+  readonly parentId: string | null;
 }
 
 /** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
@@ -68,13 +74,22 @@ export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Prom
     }),
   ).items;
   return items.map((motif) => ({
+    id: motif.id,
     code: motif.code,
     label: motif.label,
     effect: motif.effect,
     requiresComment: motif.requiresComment,
+    requiresCallback: motif.requiresCallback,
     countsAsReached: motif.countsAsReached,
+    parentId: motif.parentId ?? null,
   }));
 }
+
+export const motifsRacine = (motifs: readonly MotifAppel[]): MotifAppel[] =>
+  motifs.filter((motif) => motif.parentId === null);
+
+export const sousMotifsDe = (motifs: readonly MotifAppel[], parentId: string): MotifAppel[] =>
+  motifs.filter((motif) => motif.parentId === parentId);
 
 /**
  * L'effet commande tout : le groupe où le motif s'affiche et l'issue envoyée.
@@ -84,6 +99,7 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
   CLOSE_METHOD: 'METHOD_OBTAINED',
   CLOSE_REFUSED: 'REFUSED',
   CLOSE_WRONG_NUMBER: 'WRONG_NUMBER',
+  CLOSE_LOST: 'REFUSED',
   SCHEDULE_CALLBACK: 'CALLBACK',
   KEEP_OPEN: 'UNREACHABLE',
 };

@@ -195,6 +195,9 @@ UPDATE "prospect_journeys" SET
   "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by
 WHERE "id" = @id;
 
+-- name: MarquerProspectPerdu :exec
+UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id;
+
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",

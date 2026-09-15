@@ -64,8 +64,8 @@ SELECT "id", "code", "label" FROM "call_outcome_reasons" WHERE "label" = $1;
 -- name: InsertCallOutcomeReason :one
 INSERT INTO "call_outcome_reasons" (
   "id", "code", "label", "effect", "requiresComment", "requiresCallback",
-  "countsAsReached", "color", "sortOrder", "isActive", "isSystem", "minPayloadVersion"
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false, $10)
+  "countsAsReached", "color", "sortOrder", "isActive", "isSystem", "minPayloadVersion", "parentId"
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, true, false, $10, $11)
 RETURNING *;
 
 -- name: UpdateCallOutcomeReason :one

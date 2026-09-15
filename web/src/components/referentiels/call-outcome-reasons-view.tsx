@@ -60,6 +60,31 @@ const REASONS_KEY = [...queryKeys.referentielsRoot, 'issues-appel'] as const;
 const onFieldPhones = (reason: CallOutcomeReason): boolean =>
   reason.minPayloadVersion <= DEPLOYED_PAYLOAD_VERSION;
 
+const estRacine = (reason: CallOutcomeReason): boolean => reason.parentId == null;
+
+const classeLibelle = (reason: CallOutcomeReason): string =>
+  estRacine(reason) ? 'font-[600]' : 'pl-8';
+
+/** Le parent choisi impose son effet ; sans parent, l'effet est celui du formulaire. */
+function deriverParent(racines: CallOutcomeReason[], parent: string, effect: CallOutcomeEffect) {
+  const parentChoisi = racines.find((racine) => racine.id === parent) ?? null;
+  return {
+    parentChoisi,
+    effetRetenu: parentChoisi === null ? effect : parentChoisi.effect,
+    descriptionEffet: parentChoisi === null ? undefined : `Hérité de « ${parentChoisi.label} ».`,
+    parents: [
+      { value: AUCUN_PARENT, label: 'Aucun, motif de premier niveau' },
+      ...racines.map((racine) => ({ value: racine.id, label: racine.label })),
+    ],
+  };
+}
+
+/** Chaque motif racine, suivi de ses précisions. */
+const parBranche = (reasons: CallOutcomeReason[]): CallOutcomeReason[] =>
+  reasons
+    .filter(estRacine)
+    .flatMap((racine) => [racine, ...reasons.filter((r) => r.parentId === racine.id)]);
+
 export function CallOutcomeReasonsView() {
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<CallOutcomeReason | null>(null);
@@ -117,7 +142,7 @@ export function CallOutcomeReasonsView() {
                 </TableCell>
               </TableRow>
             ) : null}
-            {query.data.map((reason) => (
+            {parBranche(query.data).map((reason) => (
               <ReasonRow
                 key={reason.id}
                 reason={reason}
@@ -134,6 +159,7 @@ export function CallOutcomeReasonsView() {
         open={creating}
         onOpenChange={setCreating}
         reason={undefined}
+        racines={(query.data ?? []).filter((r) => estRacine(r) && r.isActive)}
         queryKey={REASONS_KEY}
       />
       <ReasonFormDialog
@@ -142,6 +168,7 @@ export function CallOutcomeReasonsView() {
           if (!open) setEditing(null);
         }}
         reason={editing ?? undefined}
+        racines={[]}
         queryKey={REASONS_KEY}
       />
     </div>
@@ -192,7 +219,7 @@ function ReasonRow({ reason, onEdit }: { reason: CallOutcomeReason; onEdit: () =
   return (
     <TableRow data-inactive={!reason.isActive}>
       <TableCell className="font-mono text-[0.8125rem]">{reason.code}</TableCell>
-      <TableCell>
+      <TableCell className={classeLibelle(reason)}>
         {reason.label}
         {reason.isSystem ? (
           <Badge variant="secondary" className="ml-2">
@@ -261,7 +288,12 @@ interface ReasonFormValues {
   requiresCallback: boolean;
   countsAsReached: boolean;
   sortOrder: number;
+  /** Identifiant du motif parent, ou la sentinelle `AUCUN_PARENT`. */
+  parent: string;
 }
+
+/** La valeur d'un `Select` est une chaîne : la sentinelle devient `null` à l'enregistrement. */
+const AUCUN_PARENT = 'AUCUN';
 
 const EMPTY: ReasonFormValues = {
   code: '',
@@ -272,6 +304,7 @@ const EMPTY: ReasonFormValues = {
   requiresCallback: false,
   countsAsReached: true,
   sortOrder: 100,
+  parent: AUCUN_PARENT,
 };
 
 const AUCUNE_COULEUR = '';
@@ -298,11 +331,14 @@ function ReasonFormDialog({
   open,
   onOpenChange,
   reason,
+  racines,
   queryKey,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   reason: CallOutcomeReason | undefined;
+  /** Les motifs de premier niveau qu'un nouveau motif peut préciser. */
+  racines: CallOutcomeReason[];
   queryKey: readonly unknown[];
 }) {
   const queryClient = useQueryClient();
@@ -327,6 +363,7 @@ function ReasonFormDialog({
             requiresCallback: reason.requiresCallback,
             countsAsReached: reason.countsAsReached,
             sortOrder: reason.sortOrder,
+            parent: reason.parentId ?? AUCUN_PARENT,
           },
     );
   }, [open, reason, reset]);
@@ -334,6 +371,11 @@ function ReasonFormDialog({
   // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
   const effect = watch('effect');
   const color = watch('color');
+  const { parentChoisi, effetRetenu, descriptionEffet, parents } = deriverParent(
+    racines,
+    watch('parent'),
+    effect,
+  );
 
   const mutation = useMutation({
     mutationFn: (values: ReasonFormValues) =>
@@ -353,7 +395,9 @@ function ReasonFormDialog({
         : createCallOutcomeReason({
             code: values.code.trim().toUpperCase(),
             label: values.label.trim(),
-            effect: values.effect,
+            ...(values.parent === AUCUN_PARENT
+              ? { effect: values.effect }
+              : { parentId: values.parent }),
             ...(values.color === AUCUNE_COULEUR ? {} : { color: values.color }),
             requiresComment: values.requiresComment,
             requiresCallback: values.requiresCallback,
@@ -430,10 +474,39 @@ function ReasonFormDialog({
           </Field>
 
           {isEdit ? null : (
-            <Field label="Effet sur le prospect" required>
+            <Field
+              label="Précise le motif"
+              description="Une précision hérite de l’effet de son motif."
+            >
               {(props) => (
                 <Select
-                  value={effect}
+                  items={parents}
+                  value={parentChoisi === null ? AUCUN_PARENT : parentChoisi.id}
+                  onValueChange={(value) => {
+                    if (value !== null) setValue('parent', value);
+                  }}
+                >
+                  <SelectTrigger id={props.id}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {parents.map((item) => (
+                      <SelectItem key={item.value} value={item.value}>
+                        {item.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </Field>
+          )}
+
+          {isEdit ? null : (
+            <Field label="Effet sur le prospect" required description={descriptionEffet}>
+              {(props) => (
+                <Select
+                  value={effetRetenu}
+                  disabled={parentChoisi !== null}
                   onValueChange={(value) => {
                     setValue('effect', value as CallOutcomeEffect);
                     if (value !== 'SCHEDULE_CALLBACK') setValue('requiresCallback', false);

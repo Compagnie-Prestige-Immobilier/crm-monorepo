@@ -410,6 +410,7 @@ SELECT COUNT(*)::int
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."plateformeDepuis" IS NULL
+  AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
@@ -427,6 +428,7 @@ SELECT p."id"
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."plateformeDepuis" IS NULL
+  AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))

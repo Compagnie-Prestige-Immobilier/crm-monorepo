@@ -217,7 +217,6 @@ export function NouveauProspect({
     staleTime: 300_000,
   });
   const catalogue = motifs.data ?? MOTIFS_SYSTEME;
-  const motifAdhesion = catalogue.find((item) => item.effect === 'CLOSE_METHOD');
   const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
 
@@ -304,8 +303,9 @@ export function NouveauProspect({
       return;
     }
     if (conversion.method === null) return;
+    // L'adhésion se consigne par le formulaire : la méthode clôt, le statut reste le motif.
     verifierPuisEnvoyer(choisi, {
-      outcome: issueDuMotif(choisi),
+      outcome: 'METHOD_OBTAINED',
       reasonCode: choisi.code,
       method: conversion.method,
       comment,
@@ -498,13 +498,12 @@ export function NouveauProspect({
                 </>
               }
               onAdhesion={() => {
-                if (motifAdhesion === undefined) {
-                  toast.error(
-                    'Le statut « Méthode obtenue » est désactivé dans les listes de référence.',
-                  );
+                const statut = motif ?? statutsJoignables(catalogue)[0];
+                if (statut === undefined) {
+                  toast.error('Aucun statut de qualification actif dans les listes de référence.');
                   return;
                 }
-                adherer(motifAdhesion);
+                adherer(statut);
               }}
               onRefus={(refus) => {
                 setMotif(refus);

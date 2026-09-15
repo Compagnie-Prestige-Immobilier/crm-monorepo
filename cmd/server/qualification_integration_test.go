@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"net/http"
 	"net/url"
 	"slices"
@@ -590,6 +591,76 @@ func TestAnnuairePhase2PagineDansLaPorteeDuTeleconseiller(t *testing.T) {
 	statut, body := appelJSON(b, http.MethodGet, "/api/v1/phase2/directory?since=hier", nil, nil)
 	b.attend(statut, http.StatusBadRequest, "curseur illisible", body)
 	if body["code"] != "PHASE2_DIRECTORY_CURSOR_INVALID" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+// La codification des leads (docs/decisions/codification-leads.md) : la précision
+// consigne l'appel sans commentaire, le rendez-vous devient un rappel promis, la
+// méthode du formulaire vaut adhésion quel que soit le statut, et « À supprimer »
+// sort la fiche du reste à appeler sans la détruire.
+func TestCodificationLeads(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	revenu := uuid.NewString()
+	qualificationExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "income_bands" WHERE "id" = $1`, revenu) })
+	dansUneHeure := time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano)
+
+	cas := []struct {
+		motif    string
+		extra    map[string]any
+		issue    string
+		phase2   string
+		perdu    bool
+		rappels  int
+		prenom   string
+		aAppeler bool
+	}{
+		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, issue: "OTHER", phase2: "PENDING", prenom: "Aminata"},
+		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "PENDING", rappels: 1, prenom: "Awa", aAppeler: true},
+		{
+			motif: "HESITANT", extra: map[string]any{"method": "APPOINTMENT", "rendezVousAt": dansUneHeure, "incomeBandId": revenu, "dureeEtablissementMois": 12},
+			issue: "METHOD_OBTAINED", phase2: "METHOD_OBTAINED", prenom: "Awa",
+		},
+		{motif: "A_SUPPRIMER", issue: "REFUSED", phase2: "REFUSED", perdu: true, prenom: "Awa"},
+	}
+	for _, c := range cas {
+		prospect := qualificationProspect(b)
+		corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "reasonCode": c.motif})
+		maps.Copy(corps, c.extra)
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospect)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+		b.attend(statut, http.StatusOK, "appel "+c.motif, body)
+
+		var issue, phase2, statutFiche, prenom string
+		if err := b.pool.QueryRow(b.ctx,
+			`SELECT a."outcome"::text, p."phase2Status"::text, p."statut"::text, p."prenom"
+			   FROM "call_attempts" a JOIN "prospects" p ON p."id" = a."prospectId" WHERE a."id" = $1`,
+			corps["id"]).Scan(&issue, &phase2, &statutFiche, &prenom); err != nil {
+			t.Fatal(err)
+		}
+		if issue != c.issue || phase2 != c.phase2 || (statutFiche == "PERDU") != c.perdu || prenom != c.prenom {
+			t.Fatalf("%s : issue %s, phase 2 %s, statut %s, prénom %s ; attendu %+v", c.motif, issue, phase2, statutFiche, prenom, c)
+		}
+		rappels := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, prospect)
+		if rappels != c.rappels {
+			t.Fatalf("%s : %d rappel(s) promis, attendu %d", c.motif, rappels, c.rappels)
+		}
+		_, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
+		if slices.Contains(ids, prospect) != c.aAppeler {
+			t.Fatalf("%s : dans le reste à appeler %v, attendu %v", c.motif, !c.aAppeler, c.aAppeler)
+		}
+	}
+
+	corps := qualificationCorpsTentative(qualificationProspect(b), map[string]any{
+		"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE", "method": "WHATSAPP",
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	b.attend(statut, http.StatusBadRequest, "méthode sur un appel non joint", body)
+	if body["code"] != "PHASE2_METHOD_NOT_ALLOWED" {
 		t.Fatalf("code : %v", body["code"])
 	}
 }

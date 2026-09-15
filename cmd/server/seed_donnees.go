@@ -278,30 +278,41 @@ type seedCallOutcomeReason struct {
 	effect                                             db.CallOutcomeEffect
 	requiresComment, requiresCallback, countsAsReached bool
 	sortOrder, minPayloadVersion                       int32
+	// Code du motif de premier niveau que celui-ci précise ; vide pour une racine.
+	parent string
 }
 
-// Ces motifs sont le référentiel actif de qualification des prospects. Les
+// La codification des leads (docs/decisions/codification-leads.md). Les
 // anciens motifs restent en base pour préserver l'historique, mais sont désactivés.
 const (
 	seedCouleurWarning = "warning"
 	seedCouleurSuccess = "success"
 	seedCouleurDanger  = "danger"
 	seedCouleurInfo    = "info"
+	seedCodeInteresse  = "INTERESSE"
+	seedCodeRendezVous = "RENDEZ_VOUS"
 )
 
 var seedCallOutcomeReasons = []seedCallOutcomeReason{
-	{"REFUS_DEJA_ENGAGE", "Déjà engagé", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 10, 9},
-	{"REFUS_PAS_CONFIANCE", "Pas confiance", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 11, 9},
-	{"REFUS_MEFIANT", "Méfiant", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 12, 9},
-	{"REFUS_NE_VEUT_PAS", "Ne veut pas", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 13, 9},
-	{"REFUS_PAS_POUR_LE_MOMENT", "Pas pour le moment", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 14, 9},
-	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 20, 9},
-	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 21, 9},
-	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
-	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 23, 9},
-	{seedCodePartenariat, "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 24, 9},
-	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 25, 9},
-	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, false, false, true, 26, 9},
+	{"MESSAGERIE", "Boîte vocale", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 10, 9, ""},
+	{"PAS_DE_REPONSE", "NRP", seedCouleurWarning, db.CallOutcomeEffectKEEPOPEN, false, false, false, 11, 9, ""},
+	{"WRONG_NUMBER", "Faux numéro", seedCouleurDanger, db.CallOutcomeEffectCLOSEWRONGNUMBER, false, false, false, 12, 9, ""},
+	{"AUTRE_NON_JOINT", "Autre injoignable", "neutral", db.CallOutcomeEffectKEEPOPEN, false, false, false, 13, 9, ""},
+	{seedCodeInteresse, "Intéressé", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 20, 9, ""},
+	{"TERRAIN", "Terrain", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 21, 9, seedCodeInteresse},
+	{"VILLA", "Villa", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 22, 9, seedCodeInteresse},
+	{"CONSTRUCTION", "Construction", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 23, 9, seedCodeInteresse},
+	{"FORMALITES_DOMANIALES", "Formalités domaniales", seedCouleurSuccess, db.CallOutcomeEffectKEEPOPEN, false, false, true, 24, 9, seedCodeInteresse},
+	{"HESITANT", "Hésitant", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 30, 9, ""},
+	{"CALLBACK", "À rappeler", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 31, 9, ""},
+	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 32, 9, ""},
+	{seedCodePartenariat, "Demande de partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 33, 9, ""},
+	{"A_SUPPRIMER", "À supprimer", seedCouleurDanger, db.CallOutcomeEffectCLOSELOST, false, false, true, 34, 9, ""},
+	{seedCodeRendezVous, "Rendez-vous", seedCouleurSuccess, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 40, 9, ""},
+	{"RV_CPI", "RV CPI", seedCouleurSuccess, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 41, 9, seedCodeRendezVous},
+	{"RV_SITE", "RV site", seedCouleurSuccess, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 42, 9, seedCodeRendezVous},
+	{"RV_EXTERNE", "RV externe", seedCouleurSuccess, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 43, 9, seedCodeRendezVous},
+	{"RDV_TELEPHONIQUE", "RV téléphonique", seedCouleurSuccess, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 44, 9, seedCodeRendezVous},
 }
 
 type seedCanalProvenance struct {

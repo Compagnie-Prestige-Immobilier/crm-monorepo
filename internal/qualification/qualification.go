@@ -679,6 +679,7 @@ var qualificationReglesEffet = map[db.CallOutcomeEffect]qualificationRegleIssue{
 	db.CallOutcomeEffectCLOSEMETHOD:      {clot: true, phase2Status: exports.ExportCleMethodeObtenue, exigeMethode: true},
 	db.CallOutcomeEffectCLOSEREFUSED:     {clot: true, phase2Status: qualificationRefusee},
 	db.CallOutcomeEffectCLOSEWRONGNUMBER: {clot: true, phase2Status: qualificationFauxNumero},
+	db.CallOutcomeEffectCLOSELOST:        {clot: true, phase2Status: qualificationRefusee},
 	db.CallOutcomeEffectKEEPOPEN:         {},
 	db.CallOutcomeEffectSCHEDULECALLBACK: {accepteCallbackAt: true},
 }
@@ -787,9 +788,10 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 	// Le motif commande la famille, jamais le panneau : KEEP_OPEN vaut
 	// « Autre » quand le motif compte comme joint, « Injoignable » sinon.
 	b.Outcome = qualificationFamilleDuMotif(row.Effect, row.CountsAsReached)
+	// Sans motif nommé, « Autre » ne dit rien : le commentaire le remplace.
 	return qualificationMotifIssue{
 		id: &row.ID, label: row.Label, effet: row.Effect,
-		exigeCommentaire: row.RequiresComment || b.Outcome == string(db.CallOutcomeOTHER),
+		exigeCommentaire: row.RequiresComment || (!demande && b.Outcome == string(db.CallOutcomeOTHER)),
 		exigeRappel:      row.RequiresCallback,
 	}, nil
 }
@@ -798,7 +800,7 @@ func qualificationFamilleDuMotif(effet db.CallOutcomeEffect, joint bool) string 
 	switch effet {
 	case db.CallOutcomeEffectCLOSEMETHOD:
 		return exports.ExportCleMethodeObtenue
-	case db.CallOutcomeEffectCLOSEREFUSED:
+	case db.CallOutcomeEffectCLOSEREFUSED, db.CallOutcomeEffectCLOSELOST:
 		return qualificationRefusee
 	case db.CallOutcomeEffectCLOSEWRONGNUMBER:
 		return qualificationFauxNumero
@@ -820,15 +822,14 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 		return t, socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_REQUIRED",
 			"Une méthode d’enrôlement est obligatoire quand la méthode a été obtenue.")
 	}
-	if !t.regle.exigeMethode && b.Method != nil {
-		return t, socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_NOT_ALLOWED",
-			"Une méthode d’enrôlement n’est admise que pour une issue qui clôt sur la méthode obtenue.")
+	if err := qualificationAdhesionParFormulaire(b, &t); err != nil {
+		return t, err
 	}
 	if motif.exigeCommentaire && t.comment == nil {
 		return t, socle.Problem(http.StatusBadRequest, "PHASE2_COMMENT_REQUIRED",
 			"L’issue « "+motif.label+" » exige un commentaire : sans lui, la case ne dit rien.")
 	}
-	rappel, err := qualificationRappelPromis(b, motif, &t.regle)
+	rappel, err := qualificationRappelPromis(b, &t.motif, &t.regle)
 	if err != nil {
 		return t, err
 	}
@@ -842,6 +843,23 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 		t.email = &courriel
 	}
 	return t, err
+}
+
+// L'adhésion se consigne par le formulaire : une méthode d'enrôlement sur un
+// appel joint clôt la fiche sur la méthode obtenue, quel que soit le statut
+// choisi, qui reste le motif de la tentative. Un appel non joint la refuse.
+func qualificationAdhesionParFormulaire(b *QualificationCallAttemptBody, t *qualificationTentative) error {
+	if b.Method == nil || t.regle.exigeMethode {
+		return nil
+	}
+	if b.Outcome == string(db.CallOutcomeUNREACHABLE) || t.motif.effet == db.CallOutcomeEffectCLOSEWRONGNUMBER {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_NOT_ALLOWED",
+			"Une méthode d’enrôlement n’est admise que sur un appel où la personne a répondu.")
+	}
+	b.Outcome = exports.ExportCleMethodeObtenue
+	t.regle = qualificationReglesEffet[db.CallOutcomeEffectCLOSEMETHOD]
+	t.motif.exigeRappel = false
+	return nil
 }
 
 // Le futur se juge sur l'horodatage TERRAIN, jamais sur l'heure du serveur.
@@ -1216,6 +1234,11 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 	}
 	if err := q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID}); err != nil {
 		return "", vide, err
+	}
+	if t.motif.effet == db.CallOutcomeEffectCLOSELOST {
+		if err := q.MarquerProspectPerdu(ctx, b.ProspectID); err != nil {
+			return "", vide, err
+		}
 	}
 	final, err := q.ProspectPourTentative(ctx, b.ProspectID)
 	if err != nil {
