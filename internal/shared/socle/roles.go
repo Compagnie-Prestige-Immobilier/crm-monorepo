@@ -60,11 +60,11 @@ func cleGarde(method, path string) string {
 	return strings.ToUpper(method) + " " + path
 }
 
-// Borne « plateforme » d'une fiche prospect : nil, l'encadrement lit tout ;
+// Borne « plateforme » d'une fiche prospect : nil, l'administrateur lit tout ;
 // vrai, le CCP ne voit que les fiches venues des plateformes ; faux, personne
-// d'autre ne les voit jamais.
+// d'autre ne les voit jamais, superviseur et direction compris.
 func PorteePlateforme(r Role) *bool {
-	if r == Admin || r == Superviseur || r == Direction {
+	if r == Admin {
 		return nil
 	}
 	if r == CCP {
