@@ -112,14 +112,30 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'REFUS_MEFIANT', label: 'Méfiant', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_NE_VEUT_PAS', label: 'Ne veut pas', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_PAS_POUR_LE_MOMENT', label: 'Pas pour le moment', effect: 'CLOSE_REFUSED' },
-  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'KEEP_OPEN', requiresComment: true },
-  { code: 'RDV_TELEPHONIQUE', label: 'RDV téléphonique', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  {
+    code: 'DEMANDE_INFORMATION',
+    label: 'Demande d’information',
+    effect: 'KEEP_OPEN',
+    requiresComment: true,
+  },
+  {
+    code: 'RDV_TELEPHONIQUE',
+    label: 'RDV téléphonique',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresComment: true,
+    requiresCallback: true,
+  },
   { code: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement', effect: 'CLOSE_METHOD' },
-  { code: 'CONSTRUCTION', label: 'Construction', effect: 'SCHEDULE_CALLBACK', requiresComment: true },
+  {
+    code: 'CONSTRUCTION',
+    label: 'Construction',
+    effect: 'SCHEDULE_CALLBACK',
+    requiresComment: true,
+  },
   { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN', requiresComment: true },
   { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED', requiresComment: true },
   { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN', requiresComment: true },
-].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
+].map((motif) => ({ requiresComment: false, requiresCallback: false, ...motif }) as MotifAppel);
 
 const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'PAS_DE_REPONSE', label: 'Pas de réponse' },
@@ -128,7 +144,19 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'TELEPHONE_INDISPONIBLE', label: 'Téléphone indisponible' },
   { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' },
   { code: 'AUTRE_NON_JOINT', label: 'Autre', requiresComment: true },
-].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
+].map(
+  (motif) =>
+    ({
+      effect: 'KEEP_OPEN',
+      requiresComment: false,
+      requiresCallback: false,
+      ...motif,
+    }) as MotifAppel,
+);
+
+/** Le statut qui propose la date sans l'exiger se consigne aussi sans elle. */
+const sansDateDeRappel = (motif: MotifAppel | null, saisie: string): motif is MotifAppel =>
+  motif !== null && !motif.requiresCallback && saisie.trim() === '';
 
 const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
   'UNREACHABLE',
@@ -975,6 +1003,10 @@ export function Consignation({
   // le téléconseiller est en train de choisir.
   const validate = useCallback(() => {
     if (slots !== null) {
+      if (sansDateDeRappel(motif, freeCallback)) {
+        record(motif, null);
+        return;
+      }
       const iso = dakarLocalToIso(freeCallback);
       if (iso === null) {
         toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
@@ -1135,6 +1167,7 @@ export function Consignation({
             now={now}
             freeCallback={freeCallback}
             surDossier={conversion !== null}
+            facultative={motif?.requiresCallback === false}
             titre={titreEcheance(motif?.code)}
             disabled={send.isPending}
             inputRef={callbackRef}
@@ -1499,6 +1532,7 @@ export function PanneauEcheance({
   now,
   freeCallback,
   surDossier,
+  facultative = false,
   titre,
   disabled,
   inputRef,
@@ -1510,6 +1544,7 @@ export function PanneauEcheance({
   now: number;
   freeCallback: string;
   surDossier: boolean;
+  facultative?: boolean;
   titre?: string;
   disabled: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
@@ -1522,6 +1557,11 @@ export function PanneauEcheance({
       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
         {titre ?? 'Quand rappeler'}
       </legend>
+      {facultative ? (
+        <p className="text-[0.8125rem] text-muted-foreground">
+          Date facultative : « Enregistrer l’appel » consigne l’appel sans rendez-vous.
+        </p>
+      ) : null}
       {surDossier ? (
         <p className="text-[0.8125rem] text-muted-foreground">
           Vous retrouverez le dossier déjà rempli au prochain appel.

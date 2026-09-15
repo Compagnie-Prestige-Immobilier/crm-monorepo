@@ -57,6 +57,8 @@ export interface MotifAppel {
   readonly label: string;
   readonly effect: CallOutcomeEffect;
   readonly requiresComment: boolean;
+  /** Faux : un statut de rappel propose la date sans l'exiger. */
+  readonly requiresCallback: boolean;
 }
 
 /** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
@@ -71,6 +73,7 @@ export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Prom
     label: motif.label,
     effect: motif.effect,
     requiresComment: motif.requiresComment,
+    requiresCallback: motif.requiresCallback,
   }));
 }
 

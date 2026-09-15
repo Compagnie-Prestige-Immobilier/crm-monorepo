@@ -135,7 +135,7 @@ function problemeDe(motif: MotifAppel, commentaire: string, callbackAt: string |
   if (motif.requiresComment && commentaire === '') {
     return `Le statut « ${motif.label} » exige un commentaire.`;
   }
-  if (motif.effect === 'SCHEDULE_CALLBACK' && callbackAt === null) {
+  if (motif.requiresCallback && callbackAt === null) {
     return 'Saisissez la date et l’heure du rappel.';
   }
   return null;
@@ -256,7 +256,11 @@ function ModifierAppel({
               )}
             </Field>
             {avecRappel ? (
-              <Field label="Date du rappel" description="Heure de Dakar." required>
+              <Field
+                label="Date du rappel"
+                description="Heure de Dakar."
+                required={motif?.requiresCallback === true}
+              >
                 {(props) => (
                   <Input
                     {...props}
