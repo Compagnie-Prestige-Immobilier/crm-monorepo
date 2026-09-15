@@ -53,11 +53,12 @@ func exportBorneDeJournee(brut string, fin bool) (time.Time, error) {
 }
 
 func exportPorteeDeLecture(p *exportPredicat, u *socle.Utilisateur) {
-	if u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction {
-		return
-	}
-	if u.Role == socle.CCP {
+	if borne := socle.PorteePlateforme(u.Role); borne != nil && *borne {
 		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NOT NULL`)
+	} else if borne != nil {
+		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NULL`)
+	}
+	if u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction || u.Role == socle.CCP {
 		return
 	}
 	enMain := `(p."createdById" = ` + p.valeur(u.ID) +
@@ -65,7 +66,7 @@ func exportPorteeDeLecture(p *exportPredicat, u *socle.Utilisateur) {
 	if u.Role == socle.ChargeClientele {
 		enMain += ` OR p."statut" = 'CONVERTI'`
 	}
-	p.clauses = append(p.clauses, enMain+")", `p."plateformeDepuis" IS NULL`)
+	p.clauses = append(p.clauses, enMain+")")
 }
 
 func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {
