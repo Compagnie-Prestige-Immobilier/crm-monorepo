@@ -108,6 +108,18 @@ export async function fetchProspectCallAttempts(
   return payload.items;
 }
 
+export type ProspectRequalification = components['schemas']['ProspectRequalificationDto'];
+
+export async function fetchProspectRequalifications(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRequalification[]> {
+  const payload = unwrap(
+    await client.GET('/api/v1/prospects/{id}/requalifications', { params: { path: { id } } }),
+  );
+  return payload.items;
+}
+
 export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
 
 /** Les relevés du téléphone venaient de l'application mobile, abandonnée : la liste reste vide. */

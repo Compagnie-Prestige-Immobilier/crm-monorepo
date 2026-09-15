@@ -563,3 +563,11 @@ SELECT "shortName" FROM "banques" WHERE "id" = $1;
 
 -- name: SyndicatSigleSegment :one
 SELECT "sigle" FROM "syndicats" WHERE "id" = $1;
+
+-- name: ListerRequalifications :many
+SELECT a."id", a."before", a."after", a."at", u."fullName" AS changed_by_name
+FROM "audit_logs" a
+LEFT JOIN "users" u ON u."id" = a."userId"
+WHERE a."entity" = 'prospect' AND a."entityId" = $1 AND a."action" = 'prospect.requalification'
+ORDER BY a."at" DESC, a."id" DESC
+LIMIT 50;

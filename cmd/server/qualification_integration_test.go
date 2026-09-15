@@ -237,6 +237,15 @@ func TestQualificationRappelPlanifieEtListe(t *testing.T) {
 	}
 }
 
+func qualificationStatutPhase2(b *banc, prospectID string) string {
+	b.t.Helper()
+	var statut string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "phase2Status"::text FROM "prospects" WHERE "id" = $1`, prospectID).Scan(&statut); err != nil {
+		b.t.Fatal(err)
+	}
+	return statut
+}
+
 func qualificationTotalProspects(b *banc, requete string) (total int, ids []string) {
 	b.t.Helper()
 	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects?mesFiches=true"+requete, nil)
@@ -278,6 +287,41 @@ func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
 	if total != 2 || slices.Contains(ids, traitee) || !slices.Contains(ids, intacte) || !slices.Contains(ids, rappelee) {
 		t.Fatalf("reste à appeler = la fiche jamais appelée et celle à rappeler : total %d, %v", total, ids)
+	}
+}
+
+// Une fiche classée que l'on requalifie revient en cours, et le changement
+// laisse une trace lisible sur la fiche.
+func TestQualificationRequalificationRouvreLeStatutEtLaisseUneTrace(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	refus := qualificationCorpsTentative(fiche, map[string]any{"outcome": "REFUSED"})
+	reprise := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "comment": "Rappelle demain"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2)`, refus["id"], reprise["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", refus)
+	b.attend(statut, http.StatusOK, "refus consigné", body)
+	if lu := qualificationStatutPhase2(b, fiche); lu != "REFUSED" {
+		t.Fatalf("un refus classe la fiche : %s", lu)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", reprise)
+	b.attend(statut, http.StatusOK, "requalification consignée", body)
+	if lu := qualificationStatutPhase2(b, fiche); lu != "PENDING" {
+		t.Fatalf("requalifiée, la fiche revient en cours : %s", lu)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/requalifications", nil)
+	b.attend(statut, http.StatusOK, "historique des requalifications", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("une requalification, une ligne d'historique : %v", items)
+	}
+	ligne, _ := items[0].(map[string]any)
+	if ligne["de"] != "REFUSED" || ligne["vers"] != "PENDING" {
+		t.Fatalf("l'historique dit d'où vient la fiche et où elle va : %v", ligne)
 	}
 }
 
