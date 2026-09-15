@@ -212,13 +212,26 @@ func seedSemerBankRejectionReasons(ctx context.Context, q *db.Queries) error {
 }
 
 func seedSemerCallOutcomeReasons(ctx context.Context, q *db.Queries) error {
-	return seedSemerListe(ctx, seedCallOutcomeReasons, func(ctx context.Context, id string, r seedCallOutcomeReason) error {
+	err := seedSemerListe(ctx, seedCallOutcomeReasons, func(ctx context.Context, id string, r seedCallOutcomeReason) error {
 		return q.SeedUpsertCallOutcomeReason(ctx, db.SeedUpsertCallOutcomeReasonParams{
 			ID: id, Code: r.code, Label: r.label, Effect: r.effect, RequiresComment: r.requiresComment,
 			RequiresCallback: r.requiresCallback, CountsAsReached: r.countsAsReached, Color: &r.color,
 			SortOrder: r.sortOrder, IsSystem: true, MinPayloadVersion: r.minPayloadVersion,
 		})
 	})
+	if err != nil {
+		return err
+	}
+	// Les parents existent tous après le premier passage : le lien se pose ensuite.
+	for _, r := range seedCallOutcomeReasons {
+		if r.parent == "" {
+			continue
+		}
+		if err := q.SeedLierParentMotif(ctx, db.SeedLierParentMotifParams{Code: r.code, ParentCode: r.parent}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func seedSemerStatutsQualification(ctx context.Context, q *db.Queries) error {

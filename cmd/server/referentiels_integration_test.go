@@ -342,3 +342,38 @@ func TestReferentielsMotifSystemeNiDesactivableNiReconfigurable(t *testing.T) {
 		map[string]any{"label": "Motif renommé " + code})
 	b.attend(statut, http.StatusOK, "renommage d'un motif système", body)
 }
+
+func TestReferentielsPrecisionDeMotifHeriteEffetEtResteAUnNiveau(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.referentielsConnexion("ADMIN")
+	jeton := b.referentielsJeton()
+
+	statut, body := b.referentielsEnvoi(http.MethodPost, "/api/v1/call-outcome-reasons",
+		map[string]any{"code": "PARENT_" + jeton, "label": "Parent " + jeton, "effect": "CLOSE_LOST"})
+	b.attend(statut, http.StatusCreated, "création du motif parent", body)
+	parent, _ := body["id"].(string)
+	b.referentielsPurge("call_outcome_reasons", parent)
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/call-outcome-reasons",
+		map[string]any{"code": "ENFANT_" + jeton, "label": "Enfant " + jeton, "parentId": parent})
+	b.attend(statut, http.StatusCreated, "création de la précision", body)
+	enfant, _ := body["id"].(string)
+	b.referentielsPurge("call_outcome_reasons", enfant)
+	if body["effect"] != "CLOSE_LOST" || body["parentId"] != parent {
+		t.Fatalf("effet hérité et parent posé : %v", body)
+	}
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/call-outcome-reasons",
+		map[string]any{"code": "PETIT_" + jeton, "label": "Petit enfant " + jeton, "parentId": enfant})
+	b.attend(statut, http.StatusConflict, "précision d'une précision", body)
+	if body["code"] != "OUTCOME_REASON_PARENT_TOO_DEEP" {
+		t.Fatalf("code d'erreur : %v", body["code"])
+	}
+
+	statut, body = b.referentielsEnvoi(http.MethodPost, "/api/v1/call-outcome-reasons",
+		map[string]any{"code": "SEUL_" + jeton, "label": "Sans effet " + jeton})
+	b.attend(statut, http.StatusBadRequest, "premier niveau sans effet", body)
+	if body["code"] != "OUTCOME_REASON_EFFECT_REQUIRED" {
+		t.Fatalf("code d'erreur : %v", body["code"])
+	}
+}

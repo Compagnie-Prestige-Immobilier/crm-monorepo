@@ -263,7 +263,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Fiches',
         icon: HeadsetIcon,
         description: 'Dernière étape',
-        roles: TERRAIN,
+        roles: ['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/teleconseil/plateforme',

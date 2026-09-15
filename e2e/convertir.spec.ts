@@ -105,15 +105,23 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await expect(page.getByRole('group', { name: 'Phase 3 · Conversion' })).toHaveCount(0);
 }
 
-/** La touche du raccourci entre dans le nom du bouton, sauf en 390 px. */
-/** Deux temps depuis le référentiel : le groupe, puis son motif. */
-async function issue(page: Page, groupeLibelle: string, motif: RegExp): Promise<void> {
-  const motifActuel = motif.source.includes('Méthode obtenue') ? /Transfert enrôlement$/u : motif;
+/**
+ * Les paliers de la codification des leads : le groupe, puis le statut. La touche
+ * du raccourci entre dans le nom du bouton, d'où l'ancre en fin de libellé.
+ */
+async function issue(page: Page, groupeLibelle: string, ...statuts: RegExp[]): Promise<void> {
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
     .getByRole('button', { name: new RegExp(`${groupeLibelle}$`, 'u') })
     .click();
-  await page.getByRole('button', { name: motifActuel }).click();
+  await qualifier(page, ...statuts);
+}
+
+/** Le statut, puis sa précision quand il en porte. */
+async function qualifier(page: Page, ...statuts: RegExp[]): Promise<void> {
+  for (const statut of statuts) {
+    await page.getByRole('button', { name: statut }).click();
+  }
 }
 
 /**
@@ -181,12 +189,13 @@ test.describe('parcours 5, convertir un prospect', () => {
     const rendezVous = rendezVousProchain();
 
     await ouvrirFiche(page, fiche);
-    await issue(page, 'Joignable', /Méthode obtenue$/u);
+    await issue(page, 'Joignable');
     await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
+    await qualifier(page, /Intéressé$/u, /Terrain$/u);
     await page.getByLabel('Commentaire').fill(commentaire);
 
-    await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
+    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     const conversion = await lireConversion(fiche.id);
@@ -219,13 +228,14 @@ test.describe('parcours 5, convertir un prospect', () => {
     const suffixe = marque();
 
     await ouvrirFiche(page, fiche);
-    await issue(page, 'Joignable', /Méthode obtenue$/u);
+    await issue(page, 'Joignable');
     await remplirDossier(page, {
       profession: `Greffier ${suffixe}`,
       email: `omar.${suffixe}@ecole.sn`,
       methode: 'Mail',
     });
-    await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
+    await qualifier(page, /Hésitant$/u);
+    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     await ouvrirFiche(page, fiche);
@@ -233,7 +243,7 @@ test.describe('parcours 5, convertir un prospect', () => {
       page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
     ).toBeVisible();
     await revenirAuxIssues(page);
-    await issue(page, 'Injoignable', /Injoignable$/u);
+    await issue(page, 'Injoignable', /NRP$/u);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 2,
@@ -283,12 +293,7 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     try {
       await page.goto(`/teleconseil/appel/${semee.id}`);
-      await page
-        .getByRole('group')
-        .getByRole('button', { name: '2 Injoignable', exact: true })
-        .click();
-      await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
-      await page.getByRole('option', { name: 'Pas de réponse', exact: true }).click();
+      await issue(page, 'Injoignable', /NRP$/u);
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/teleconseil$/u);
       await expect.poll(async () => (await lireClassement(semee.id)).tentatives).toBe(1);
@@ -333,14 +338,15 @@ test.describe('parcours 5 en 390 px', () => {
 
     await ouvrirFiche(page, fiche);
     await sansDebordementHorizontal(page);
-    await issue(page, 'Joignable', /Méthode obtenue$/u);
+    await issue(page, 'Joignable');
 
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,
       email: `pape.${suffixe}@ecole.sn`,
       methode: 'Mail',
     });
-    await page.getByRole('button', { name: 'Enregistrer l’adhésion' }).click();
+    await qualifier(page, /Intéressé$/u);
+    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
     await expect(consigne(page, fiche.nom)).toBeVisible();
     await sansDebordementHorizontal(page);
 

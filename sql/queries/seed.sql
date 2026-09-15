@@ -76,6 +76,12 @@ INSERT INTO "call_outcome_reasons" ("id", "code", "label", "effect", "requiresCo
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, now())
 ON CONFLICT ("code") DO UPDATE SET "label" = $3, "effect" = $4, "requiresComment" = $5, "requiresCallback" = $6, "countsAsReached" = $7, "color" = $8, "sortOrder" = $9, "isSystem" = $10, "minPayloadVersion" = $11, "updatedAt" = now();
 
+-- name: SeedLierParentMotif :exec
+UPDATE "call_outcome_reasons" AS enfant
+SET "parentId" = parent."id"
+FROM "call_outcome_reasons" AS parent
+WHERE parent."code" = sqlc.arg('parent_code') AND enfant."code" = sqlc.arg('code');
+
 -- name: SeedUpsertStatutQualification :exec
 INSERT INTO "statuts_qualification" ("id", "code", "label", "effect", "requiresCallback", "requiresComment", "retryAfterMinutes", "priorite", "relationStatus", "sortOrder", "isSystem", "minPayloadVersion", "updatedAt")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, now())

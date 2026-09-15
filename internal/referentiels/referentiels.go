@@ -928,28 +928,50 @@ func referentielsLibreOuConflit(id, code, message string, err error) error {
 	return p
 }
 
-// Un sous-statut hérite l'effet de son parent : résultat, statut, sous-statut,
-// jamais plus profond.
-func (s *service) referentielsEffetDuStatut(ctx context.Context, in *ReferentielsCreerStatutInput) (db.StatutQualificationEffect, error) {
-	if in.Body.ParentID == nil {
-		if in.Body.Effect == nil {
-			return "", socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_EFFECT_REQUIRED",
-				"Un statut sans parent doit dire son effet.")
+type referentielsParent struct {
+	label   string
+	effet   string
+	profond bool
+}
+
+func referentielsParentStatut(r *db.StatutsQualification) referentielsParent {
+	return referentielsParent{label: r.Label, effet: string(r.Effect), profond: r.ParentId != nil}
+}
+
+func referentielsParentMotif(r *db.CallOutcomeReason) referentielsParent {
+	return referentielsParent{label: r.Label, effet: string(r.Effect), profond: r.ParentId != nil}
+}
+
+// Un enfant hérite l'effet de son parent : racine, enfant, jamais plus profond.
+func referentielsEffetHerite[T any](ctx context.Context, parentID, effet *string, famille, nom string,
+	lire func(context.Context, string) (T, error), vers func(*T) referentielsParent,
+) (string, error) {
+	if parentID == nil {
+		if effet == nil {
+			return "", socle.Problem(http.StatusBadRequest, famille+"_EFFECT_REQUIRED",
+				"Un "+nom+" sans parent doit dire son effet.")
 		}
-		return db.StatutQualificationEffect(*in.Body.Effect), nil
+		return *effet, nil
 	}
-	parent, err := s.Q.StatutQualificationParID(ctx, *in.Body.ParentID)
+	ligne, err := lire(ctx, *parentID)
+	parent := vers(&ligne)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return "", socle.Problem(http.StatusBadRequest, "STATUT_QUALIFICATION_PARENT_NOT_FOUND", "Statut parent introuvable.")
+		return "", socle.Problem(http.StatusBadRequest, famille+"_PARENT_NOT_FOUND", "Le "+nom+" parent est introuvable.")
 	}
 	if err != nil {
 		return "", err
 	}
-	if parent.ParentId != nil {
-		return "", socle.Problem(http.StatusConflict, "STATUT_QUALIFICATION_PARENT_TOO_DEEP",
-			"« "+parent.Label+" » est déjà un sous-statut : il ne peut pas en porter un autre.")
+	if parent.profond {
+		return "", socle.Problem(http.StatusConflict, famille+"_PARENT_TOO_DEEP",
+			"« "+parent.label+" » est déjà un sous-"+nom+" : il ne peut pas en porter un autre.")
 	}
-	return parent.Effect, nil
+	return parent.effet, nil
+}
+
+func (s *service) referentielsEffetDuStatut(ctx context.Context, in *ReferentielsCreerStatutInput) (db.StatutQualificationEffect, error) {
+	effet, err := referentielsEffetHerite(ctx, in.Body.ParentID, in.Body.Effect, "STATUT_QUALIFICATION", "statut",
+		s.Q.StatutQualificationParID, referentielsParentStatut)
+	return db.StatutQualificationEffect(effet), err
 }
 
 func (s *service) referentielsStatutCreer(ctx context.Context, in *ReferentielsCreerStatutInput) (*ReferentielsStatutOutput, error) {
@@ -1144,7 +1166,8 @@ type ReferentielsMotif struct {
 	ID                string    `json:"id"`
 	Code              string    `json:"code"`
 	Label             string    `json:"label"`
-	Effect            string    `json:"effect" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,KEEP_OPEN,SCHEDULE_CALLBACK"`
+	Effect            string    `json:"effect" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,KEEP_OPEN,SCHEDULE_CALLBACK"`
+	ParentID          *string   `json:"parentId" doc:"Motif de premier niveau que celui-ci précise ; l'effet est hérité."`
 	RequiresComment   bool      `json:"requiresComment"`
 	RequiresCallback  bool      `json:"requiresCallback"`
 	CountsAsReached   bool      `json:"countsAsReached"`
@@ -1168,7 +1191,7 @@ type ReferentielsMotifOutput struct {
 
 func referentielsVersMotif(r *db.CallOutcomeReason) ReferentielsMotif {
 	return ReferentielsMotif{
-		ID: r.ID, Code: r.Code, Label: r.Label, Effect: string(r.Effect),
+		ID: r.ID, Code: r.Code, Label: r.Label, Effect: string(r.Effect), ParentID: r.ParentId,
 		RequiresComment: r.RequiresComment, RequiresCallback: r.RequiresCallback,
 		CountsAsReached: r.CountsAsReached, IsActive: r.IsActive, IsSystem: r.IsSystem,
 		SortOrder: r.SortOrder, Color: r.Color, MinPayloadVersion: r.MinPayloadVersion,
@@ -1198,7 +1221,8 @@ type ReferentielsCreerMotifInput struct {
 	Body struct {
 		Code             string  `json:"code" minLength:"2" maxLength:"40"`
 		Label            string  `json:"label" minLength:"2" maxLength:"80"`
-		Effect           string  `json:"effect" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,KEEP_OPEN,SCHEDULE_CALLBACK"`
+		Effect           *string `json:"effect,omitempty" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,KEEP_OPEN,SCHEDULE_CALLBACK"`
+		ParentID         *string `json:"parentId,omitempty" format:"uuid" doc:"Motif de premier niveau que celui-ci précise ; l'effet est alors hérité."`
 		RequiresComment  *bool   `json:"requiresComment,omitempty"`
 		RequiresCallback *bool   `json:"requiresCallback,omitempty"`
 		CountsAsReached  *bool   `json:"countsAsReached,omitempty"`
@@ -1223,8 +1247,12 @@ func (s *service) referentielsMotifCreer(ctx context.Context, in *ReferentielsCr
 		"Le libellé « "+label+" » est déjà porté par le motif « "+clashLabel.Code+" ».", err); err != nil {
 		return nil, err
 	}
+	effet, err := s.referentielsEffetDuMotif(ctx, in)
+	if err != nil {
+		return nil, err
+	}
 	requiresCallback := referentielsVaut(in.Body.RequiresCallback, false)
-	if err := referentielsRappelAutorise(in.Body.Effect, "OUTCOME_REASON_CALLBACK_NOT_ALLOWED", requiresCallback); err != nil {
+	if err := referentielsRappelAutorise(string(effet), "OUTCOME_REASON_CALLBACK_NOT_ALLOWED", requiresCallback); err != nil {
 		return nil, err
 	}
 	id, err := uuid.NewV7()
@@ -1240,7 +1268,7 @@ func (s *service) referentielsMotifCreer(ctx context.Context, in *ReferentielsCr
 	if err := s.referentielTracer(ctx, referentielsActionCreer, referentielsFamilleMotifs, id.String(),
 		func(q *db.Queries) (map[string]any, map[string]any, error) {
 			pose, err := q.InsertCallOutcomeReason(ctx, db.InsertCallOutcomeReasonParams{
-				ID: id.String(), Code: code, Label: label, Effect: db.CallOutcomeEffect(in.Body.Effect),
+				ID: id.String(), Code: code, Label: label, Effect: effet, ParentId: in.Body.ParentID,
 				RequiresComment: referentielsVaut(in.Body.RequiresComment, false), RequiresCallback: requiresCallback,
 				CountsAsReached: referentielsVaut(in.Body.CountsAsReached, true), Color: couleur,
 				SortOrder: referentielsVaut(in.Body.SortOrder, 100), MinPayloadVersion: referentielsVersionMotif,
@@ -1255,6 +1283,12 @@ func (s *service) referentielsMotifCreer(ctx context.Context, in *ReferentielsCr
 	}
 	s.Live.Emettre(referentielsSujet)
 	return &ReferentielsMotifOutput{Body: referentielsVersMotif(&row)}, nil
+}
+
+func (s *service) referentielsEffetDuMotif(ctx context.Context, in *ReferentielsCreerMotifInput) (db.CallOutcomeEffect, error) {
+	effet, err := referentielsEffetHerite(ctx, in.Body.ParentID, in.Body.Effect, "OUTCOME_REASON", "motif",
+		s.Q.CallOutcomeReasonParID, referentielsParentMotif)
+	return db.CallOutcomeEffect(effet), err
 }
 
 type ReferentielsModifierMotifInput struct {

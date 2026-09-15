@@ -74,14 +74,14 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
-    .getByRole('button', { name: /Injoignable$/u })
+    .getByRole('button', { name: /Joignable$/u })
     .click();
   await page
-    .getByRole('group', { name: /^Injoignable ·/u })
+    .getByRole('group', { name: 'Quel statut de qualification ?' })
     .getByRole('button', { name: /À rappeler$/u })
     .click();
   await page
-    .getByRole('group', { name: 'Quand rappeler' })
+    .getByRole('group', { name: 'Échéance du rappel' })
     .getByRole('button', { name: /Dans 1 h/u })
     .click();
   await expect(
