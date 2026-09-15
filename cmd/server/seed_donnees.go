@@ -295,7 +295,7 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"REFUS_MEFIANT", "Méfiant", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 12, 9},
 	{"REFUS_NE_VEUT_PAS", "Ne veut pas", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 13, 9},
 	{"REFUS_PAS_POUR_LE_MOMENT", "Pas pour le moment", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 14, 9},
-	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 20, 9},
+	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 20, 9},
 	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 21, 9},
 	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
 	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 23, 9},
