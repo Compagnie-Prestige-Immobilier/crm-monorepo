@@ -8,6 +8,7 @@ import { fetchLotExportImports, type LotExportImport } from '@/lib/data/lots-exp
 import { formatDateTime, formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import type { Projet } from '@/lib/types';
+import { cn } from '@/lib/utils';
 
 export type ImportChoisi = LotExportImport & { projet: Projet };
 
@@ -27,6 +28,54 @@ export function cleImport(lot: ImportChoisi): string {
 function libelle(lot: ImportChoisi): string {
   const pluriel = lot.fiches > 1 ? 's' : '';
   return `${etiquetteImport(lot.projet, lot.importedAt)} · ${formatNumber(lot.fiches)} fiche${pluriel} · ${lot.libelle}`;
+}
+
+const RAYON = 8;
+const CIRCONFERENCE = 2 * Math.PI * RAYON;
+
+function couleurCompletion(ratio: number): string {
+  if (ratio >= 2 / 3) return 'text-success';
+  if (ratio >= 1 / 3) return 'text-warning';
+  return 'text-destructive';
+}
+
+/** La part des fiches déjà appelées : un import vert n'a presque plus rien à donner. */
+function AnneauCompletion({ lot }: { lot: ImportChoisi }) {
+  const ratio = lot.fiches === 0 ? 0 : lot.appelees / lot.fiches;
+  const pourcent = Math.round(ratio * 100);
+  return (
+    <span
+      role="img"
+      aria-label={`${String(pourcent)} % des fiches déjà appelées`}
+      className="flex shrink-0 items-center gap-1.5"
+    >
+      <svg viewBox="0 0 20 20" className={cn('size-5 -rotate-90', couleurCompletion(ratio))}>
+        <circle
+          cx="10"
+          cy="10"
+          r={RAYON}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          className="opacity-20"
+        />
+        <circle
+          cx="10"
+          cy="10"
+          r={RAYON}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          strokeLinecap="round"
+          strokeDasharray={CIRCONFERENCE}
+          strokeDashoffset={CIRCONFERENCE * (1 - ratio)}
+        />
+      </svg>
+      <span className="w-9 text-right text-[0.75rem] text-muted-foreground tabular-nums">
+        {pourcent} %
+      </span>
+    </span>
+  );
 }
 
 function placeholder(chargement: boolean, vide: boolean): string {
@@ -62,7 +111,11 @@ export function ChampImport({
         <Liste
           id={props.id}
           describedBy={props['aria-describedby']}
-          items={lots.map((lot) => ({ value: cleImport(lot), label: libelle(lot) }))}
+          items={lots.map((lot) => ({
+            value: cleImport(lot),
+            label: libelle(lot),
+            avant: <AnneauCompletion lot={lot} />,
+          }))}
           value={valeur}
           placeholder={placeholder(chues.isPending || grandPublic.isPending, lots.length === 0)}
           onChange={(cle) => {

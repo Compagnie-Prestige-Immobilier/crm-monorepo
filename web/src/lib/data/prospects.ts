@@ -42,12 +42,14 @@ export async function fetchProspectsAQualifier(
     search: string;
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
+    resteAAppeler?: boolean | undefined;
   },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const origine = criteres.origine ?? 'TOUS';
   const query: ProspectQuery = {
     mesFiches: true,
+    ...(criteres.resteAAppeler === true ? { resteAAppeler: true } : {}),
     ...(criteres.projet === null ? {} : { projet: criteres.projet }),
     search: criteres.search,
     sortBy: 'nom',

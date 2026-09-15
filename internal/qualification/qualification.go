@@ -190,11 +190,7 @@ var qualificationOutcomeParEffet = map[db.StatutQualificationEffect]string{
 
 var qualificationReponsesRattachement = []string{qualificationAmbassadeur, qualificationRefus}
 
-func qualificationReglesRepIssue(b *QualificationRepAttemptBody, comment *string) error {
-	if b.Outcome == string(db.CallOutcomeOTHER) && comment == nil {
-		return socle.Problem(http.StatusBadRequest, "REP_CAMPAIGN_COMMENT_REQUIRED",
-			"L’issue « Autre » exige un commentaire : sans lui, la case ne dit rien.")
-	}
+func qualificationReglesRepIssue(b *QualificationRepAttemptBody) error {
 	if b.PromisedProspects != nil && b.Outcome != "PROSPECTS_PROMISED" {
 		return socle.Problem(http.StatusBadRequest, "REP_CAMPAIGN_PROMISED_NOT_ALLOWED",
 			"Un nombre de fiches promises n’est admis que pour l’issue PROSPECTS_PROMISED.")
@@ -423,7 +419,7 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 	u := socle.UtilisateurCourant(ctx)
 	b := &in.Body
 	comment := qualificationRogne(b.Comment)
-	if err := qualificationReglesRepIssue(b, comment); err != nil {
+	if err := qualificationReglesRepIssue(b); err != nil {
 		return nil, err
 	}
 	deja, err := s.Q.RepAttemptExiste(ctx, b.ID)
@@ -700,7 +696,7 @@ var qualificationMotifsSysteme = map[string]qualificationMotifIssue{
 	string(db.CallOutcomeUNREACHABLE): {label: exports.ExportLibelleInjoignable, effet: db.CallOutcomeEffectKEEPOPEN},
 	qualificationRefusee:              {label: exports.ExportLibelleRefus, effet: db.CallOutcomeEffectCLOSEREFUSED},
 	qualificationFauxNumero:           {label: exports.ExportLibelleFauxNumero, effet: db.CallOutcomeEffectCLOSEWRONGNUMBER},
-	string(db.CallOutcomeOTHER):       {label: exports.ExportLibelleAutre, effet: db.CallOutcomeEffectKEEPOPEN, exigeCommentaire: true},
+	string(db.CallOutcomeOTHER):       {label: exports.ExportLibelleAutre, effet: db.CallOutcomeEffectKEEPOPEN},
 }
 
 type QualificationCallAttemptBody struct {

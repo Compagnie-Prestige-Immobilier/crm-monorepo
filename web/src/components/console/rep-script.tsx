@@ -42,10 +42,9 @@ import {
   repRelationSettled,
   type RepAnswer,
 } from '@/lib/data/console';
-import { fetchOuvertureCourante, ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
+import { ouvrirFiche, type OuvertureFiche } from '@/lib/data/ouvertures';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
-  fetchRepresentant,
   fetchRepresentantCallAttempts,
   fetchRepresentantsAQualifier,
   type ScriptedRepresentant,
@@ -204,20 +203,6 @@ export function RepScript() {
   const liste = annuaire.data?.items ?? [];
   const pageCount = annuaire.data?.pageCount ?? 1;
 
-  const reprendre = useCallback((ouverte: Ouverte) => {
-    setAConfirmer(null);
-    setChoisi(ouverte);
-  }, []);
-
-  // L'ouverture vit sur le serveur, l'écran non : sans cette reprise, un
-  // rechargement perdrait le brouillon et le chronomètre de la fiche en cours.
-  const repriseFaite = useRef(false);
-  useEffect(() => {
-    if (repriseFaite.current) return;
-    repriseFaite.current = true;
-    void reprendreOuverte(reprendre);
-  }, [reprendre]);
-
   const ouvrir = useMutation({
     mutationFn: async (row: ScriptedRepresentant): Promise<Ouverte> => ({
       representant: row,
@@ -323,18 +308,6 @@ export function RepScript() {
 interface Ouverte {
   representant: ScriptedRepresentant;
   ouverture: OuvertureFiche;
-}
-
-/**
- * La fiche que le serveur tient encore pour cette console, remise à l'écran
- * telle quelle : au montage, elle répare un rechargement.
- */
-async function reprendreOuverte(ouvrir: (ouverte: Ouverte) => void): Promise<void> {
-  const courante = await fetchOuvertureCourante('representant').catch(() => null);
-  if (courante === null || courante.representantId === null) return;
-  const representant = await fetchRepresentant(courante.representantId).catch(() => null);
-  if (representant === null) return;
-  ouvrir({ representant, ouverture: courante });
 }
 
 function ResultatsAnnuaire({
@@ -704,18 +677,19 @@ function QuestionSuggestion({
   );
 }
 
-/** Le vocabulaire du référentiel, borné à la branche que le résultat ouvre. */
+/**
+ * Le vocabulaire du référentiel, borné à la branche que le résultat ouvre.
+ * Deux paliers de tuiles : le statut, puis sa précision quand il en porte.
+ */
 function ChoixStatut({
   statuts,
   value,
   onChange,
-  onFerme,
   pose,
 }: {
   statuts: readonly StatutQualification[];
   value: string | null;
   onChange: (valeur: string | null) => void;
-  onFerme: () => void;
   pose: StatutQualification | null;
 }) {
   const { racines, valeurRacine, sousStatuts, sousStatutId } = deriverChoixStatut(
@@ -724,23 +698,19 @@ function ChoixStatut({
     pose,
   );
   return (
-    <div className={cn('flex max-w-80 flex-col gap-1.5', REVELE)}>
-      <FilterCombobox
-        label="Statut de qualification"
-        placeholder={pose === null ? 'Choisir un statut' : libelleStatut(pose)}
-        options={racines.map((statut) => ({
-          value: statut.id,
-          label: libelleStatut(statut),
-        }))}
-        value={valeurRacine}
-        onChange={onChange}
-        onBlur={onFerme}
-      />
-      {pose === null || value !== null ? null : (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          Posé par votre réponse. Choisissez-en un autre s’il y a lieu.
-        </p>
-      )}
+    <div className="flex flex-col gap-5 md:col-span-2">
+      <Question titre="Quel statut de qualification ?" anime>
+        <Choix
+          options={racines.map((statut) => ({ valeur: statut.id, label: libelleStatut(statut) }))}
+          value={valeurRacine ?? pose?.id ?? null}
+          onChange={onChange}
+        />
+        {pose === null || value !== null ? null : (
+          <p className="text-[0.8125rem] text-muted-foreground">
+            Posé par votre réponse. Choisissez-en un autre s’il y a lieu.
+          </p>
+        )}
+      </Question>
       <ChoixSousStatut sousStatuts={sousStatuts} value={sousStatutId} onChange={onChange} />
     </div>
   );
@@ -773,13 +743,15 @@ function ChoixSousStatut({
 }) {
   if (sousStatuts.length === 0) return null;
   return (
-    <FilterCombobox
-      label="Précision (facultatif)"
-      placeholder="Sans précision"
-      options={sousStatuts.map((statut) => ({ value: statut.id, label: statut.label }))}
-      value={value}
-      onChange={onChange}
-    />
+    <Question titre="Une précision ? (facultatif)" anime>
+      <Choix
+        options={sousStatuts.map((statut) => ({ valeur: statut.id, label: statut.label }))}
+        value={value}
+        onChange={(id) => {
+          onChange(id === value ? (sousStatuts[0]?.parentId ?? null) : id);
+        }}
+      />
+    </Question>
   );
 }
 
@@ -789,7 +761,6 @@ interface EtapeQuestionsProps {
   statuts: readonly StatutQualification[];
   statutId: string | null;
   onStatut: (valeur: string | null) => void;
-  onStatutFerme: () => void;
   statutPose: StatutQualification | null;
   exigeRappel: boolean;
   joignable: boolean;
@@ -828,7 +799,6 @@ function EtapeQuestions({ inputRef, ...props }: EtapeQuestionsProps) {
           statuts={props.statuts}
           value={props.statutId}
           onChange={props.onStatut}
-          onFerme={props.onStatutFerme}
           pose={props.statutPose}
         />
       )}
@@ -1369,12 +1339,6 @@ function Qualification({
     !edit,
   );
 
-  // Le curseur part sur le motif, une fois le sélecteur refermé : sans cela
-  // l'obligation ne se voit pas. Il rend le focus en dernier.
-  function fermerStatut(): void {
-    if (motifObligatoire) commentaireRef.current?.focus();
-  }
-
   function corpsEtape(): React.ReactNode {
     if (etape === 1) {
       return (
@@ -1384,7 +1348,6 @@ function Qualification({
           statuts={statuts}
           statutId={statutId}
           onStatut={choisirStatut}
-          onStatutFerme={fermerStatut}
           statutPose={statutPose}
           exigeRappel={statut !== null && dateDemandee(statut)}
           joignable={joignable}

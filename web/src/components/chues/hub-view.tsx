@@ -64,7 +64,7 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
       <ol className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <Etape
           numero="01"
-          titre="Qualifier un représentant"
+          titre="Appels représentants"
           explication="Un enseignant relais accepte de transmettre les contacts de ses collègues."
           chiffre={
             <Chiffre
@@ -74,9 +74,7 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
               legende="pas encore qualifiés"
             />
           }
-          action={
-            <Geste href="/teleconseil/appels-representants" label="Qualifier un représentant" />
-          }
+          action={<Geste href="/teleconseil/appels-representants" label="Appels représentants" />}
         />
 
         <Etape

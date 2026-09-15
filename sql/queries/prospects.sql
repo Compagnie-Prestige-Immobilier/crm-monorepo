@@ -51,6 +51,22 @@ WHERE p."deletedAt" IS NULL
       WHERE la."prospectId" = p."id" AND la."assigneeId" = sqlc.arg('scope_user_id')::text
     )
   )
+  AND (
+    NOT sqlc.arg('reste_a_appeler')::boolean
+    OR EXISTS (
+      SELECT 1 FROM "scheduled_callbacks" sc
+      WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM "call_attempts" ra
+      WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
+        AND ra."createdAt" >= COALESCE((
+          SELECT max(rl."createdAt") FROM "lot_export_items" rli
+          JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+          WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
+        ), '-infinity'::timestamp)
+    )
+  )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type')::"ProspectType")
   AND (sqlc.narg('canal_provenance_id')::text IS NULL OR p."canalProvenanceId" = sqlc.narg('canal_provenance_id')::text)
@@ -140,6 +156,22 @@ WHERE p."deletedAt" IS NULL
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" la
       WHERE la."prospectId" = p."id" AND la."assigneeId" = sqlc.arg('scope_user_id')::text
+    )
+  )
+  AND (
+    NOT sqlc.arg('reste_a_appeler')::boolean
+    OR EXISTS (
+      SELECT 1 FROM "scheduled_callbacks" sc
+      WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
+    )
+    OR NOT EXISTS (
+      SELECT 1 FROM "call_attempts" ra
+      WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
+        AND ra."createdAt" >= COALESCE((
+          SELECT max(rl."createdAt") FROM "lot_export_items" rli
+          JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+          WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
+        ), '-infinity'::timestamp)
     )
   )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)

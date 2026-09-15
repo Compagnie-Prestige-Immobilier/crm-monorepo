@@ -87,8 +87,8 @@ type Projet = 'CHUES' | 'GRAND_PUBLIC';
 const RAPPEL_KEY = '2';
 
 const GROUPES = [
-  { cle: 'joignable', touche: '1', label: 'Joignable' },
-  { cle: 'injoignable', touche: '2', label: 'Injoignable' },
+  { cle: 'joignable', label: 'Joignable' },
+  { cle: 'injoignable', label: 'Injoignable' },
 ] as const;
 
 type Groupe = (typeof GROUPES)[number]['cle'];
@@ -111,28 +111,13 @@ export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
   { code: 'REFUS_MEFIANT', label: 'Méfiant', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_NE_VEUT_PAS', label: 'Ne veut pas', effect: 'CLOSE_REFUSED' },
   { code: 'REFUS_PAS_POUR_LE_MOMENT', label: 'Pas pour le moment', effect: 'CLOSE_REFUSED' },
-  {
-    code: 'DEMANDE_INFORMATION',
-    label: 'Demande d’information',
-    effect: 'KEEP_OPEN',
-    requiresComment: true,
-  },
-  {
-    code: 'RDV_TELEPHONIQUE',
-    label: 'RDV téléphonique',
-    effect: 'SCHEDULE_CALLBACK',
-    requiresComment: true,
-  },
+  { code: 'DEMANDE_INFORMATION', label: 'Demande d’information', effect: 'KEEP_OPEN' },
+  { code: 'RDV_TELEPHONIQUE', label: 'RDV téléphonique', effect: 'SCHEDULE_CALLBACK' },
   { code: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement', effect: 'CLOSE_METHOD' },
-  {
-    code: 'CONSTRUCTION',
-    label: 'Construction',
-    effect: 'SCHEDULE_CALLBACK',
-    requiresComment: true,
-  },
-  { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN', requiresComment: true },
-  { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED', requiresComment: true },
-  { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN', requiresComment: true },
+  { code: 'CONSTRUCTION', label: 'Construction', effect: 'SCHEDULE_CALLBACK' },
+  { code: 'PARTENARIAT', label: 'Partenariat', effect: 'KEEP_OPEN' },
+  { code: 'HORS_CIBLE', label: 'Hors cible', effect: 'CLOSE_REFUSED' },
+  { code: 'AUTRES', label: 'Autres', effect: 'KEEP_OPEN' },
 ].map((motif) => ({ requiresComment: false, ...motif }) as MotifAppel);
 
 const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
@@ -141,7 +126,7 @@ const MOTIFS_INJOIGNABLE: readonly MotifAppel[] = [
   { code: 'MESSAGERIE', label: 'Messagerie' },
   { code: 'TELEPHONE_INDISPONIBLE', label: 'Téléphone indisponible' },
   { code: 'INJOIGNABLE_DEFINITIF', label: 'Injoignable définitif' },
-  { code: 'AUTRE_NON_JOINT', label: 'Autre', requiresComment: true },
+  { code: 'AUTRE_NON_JOINT', label: 'Autre' },
 ].map((motif) => ({ effect: 'KEEP_OPEN', requiresComment: false, ...motif }) as MotifAppel);
 
 const CODES_INJOIGNABLE: ReadonlySet<string> = new Set([
@@ -201,8 +186,10 @@ export function ConsoleView({
   const [search, setSearch] = useState('');
   const origineInitiale = origineInitialePour(projet);
   const [origine, setOrigine] = useState<OrigineFiche>(origineInitiale);
+  const [resteAAppeler, setResteAAppeler] = useState(true);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
+  const seulementARappeler = filtreResteAAppeler(resteAAppeler, cherche);
 
   const parLien = useQuery({
     queryKey: queryKeys.prospect(demandee ?? ''),
@@ -215,8 +202,22 @@ export function ConsoleView({
   const { aConfirmer, consultee } = deriverFiches(vise, ouverte, venuDesRappels);
 
   const annuaire = useQuery({
-    queryKey: [...queryKeys.prospectsRoot, 'a-qualifier', projet, cherche, origine] as const,
-    queryFn: () => fetchProspectsAQualifier({ projet, search: cherche, origine, viewerId }),
+    queryKey: [
+      ...queryKeys.prospectsRoot,
+      'a-qualifier',
+      projet,
+      cherche,
+      origine,
+      seulementARappeler,
+    ] as const,
+    queryFn: () =>
+      fetchProspectsAQualifier({
+        projet,
+        search: cherche,
+        origine,
+        viewerId,
+        resteAAppeler: seulementARappeler,
+      }),
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
     placeholderData: (previous) => previous,
   });
@@ -280,14 +281,18 @@ export function ConsoleView({
         search={search}
         projet={projet}
         origine={origineFiltrable ? origine : null}
+        resteAAppeler={resteAAppeler}
+        total={totalAffiche(annuaire.data)}
         onSearch={setSearch}
         onOrigine={setOrigine}
+        onResteAAppeler={setResteAAppeler}
       />
 
       <ListeAnnuaire
         annuaire={annuaire}
         cherche={cherche}
         canCreateProspect={canCreateProspect}
+        seulementARappeler={seulementARappeler}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -317,18 +322,18 @@ export function ConsoleView({
 function ContexteFile({ projet }: { projet: Projet | null }) {
   if (projet !== null) {
     return (
-      <div className="flex items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+      <p className="flex items-center gap-2 text-[0.8125rem] text-muted-foreground">
         <ProjetBadge projet={projet} />
-        <span className="text-sm text-muted-foreground">File de conversion de ce projet</span>
-      </div>
+        <span>Les fiches de ce projet</span>
+      </p>
     );
   }
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3">
+    <p className="flex flex-wrap items-center gap-2 text-[0.8125rem] text-muted-foreground">
       <ProjetBadge projet="CHUES" />
       <ProjetBadge projet="GRAND_PUBLIC" />
-      <span className="text-sm text-muted-foreground">File de conversion unifiée</span>
-    </div>
+      <span>Une seule file pour les deux projets</span>
+    </p>
   );
 }
 
@@ -343,8 +348,11 @@ function EnTeteAnnuaire({
   search,
   projet,
   origine,
+  resteAAppeler,
+  total,
   onSearch,
   onOrigine,
+  onResteAAppeler,
 }: {
   lienEnEchec: boolean;
   confirme: string | null;
@@ -353,8 +361,12 @@ function EnTeteAnnuaire({
   projet: Projet | null;
   /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
   origine: OrigineFiche | null;
+  resteAAppeler: boolean;
+  /** Le nombre de fiches de la liste affichée, nul tant qu'elle n'est pas lue. */
+  total: number | null;
   onSearch: (value: string) => void;
   onOrigine: (value: OrigineFiche) => void;
+  onResteAAppeler: (value: boolean) => void;
 }) {
   let texteAide: string;
   if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
@@ -395,9 +407,36 @@ function EnTeteAnnuaire({
 
       <ChampAnnuaire value={search} onChange={onSearch} />
 
-      {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
-
-      <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
+      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
+        <div className="flex flex-wrap gap-2" role="group" aria-label="Fiches affichées">
+          {(
+            [
+              [true, 'Reste à appeler'],
+              [false, 'Toutes'],
+            ] as const
+          ).map(([valeur, libelle]) => (
+            <Button
+              key={libelle}
+              type="button"
+              size="sm"
+              variant={resteAAppeler === valeur ? 'default' : 'outline'}
+              aria-pressed={resteAAppeler === valeur}
+              onClick={() => {
+                onResteAAppeler(valeur);
+              }}
+            >
+              {libelle}
+              {resteAAppeler === valeur && total !== null && cherche === '' ? (
+                <span className="ml-1.5 rounded-full bg-background/20 px-1.5 text-[0.75rem] tabular-nums">
+                  {total}
+                </span>
+              ) : null}
+            </Button>
+          ))}
+        </div>
+        {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
+        <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
+      </div>
     </>
   );
 }
@@ -464,15 +503,33 @@ function saisieCommencee(
   return conversion !== null || slots !== null || motif !== null || comment !== '';
 }
 
+/** Une recherche vise une fiche précise, déjà appelée ou non. */
+function totalAffiche(page: { total: number } | undefined): number | null {
+  return page === undefined ? null : page.total;
+}
+
+function filtreResteAAppeler(resteAAppeler: boolean, cherche: string): boolean {
+  return resteAAppeler && cherche === '';
+}
+
+function texteListeVide(cherche: string, seulementARappeler: boolean): string {
+  if (cherche !== '') return 'Aucun résultat. Vérifiez le nom ou le numéro.';
+  if (seulementARappeler)
+    return 'Rien ne reste à appeler. Affichez toutes vos fiches, ou demandez une campagne à votre superviseur.';
+  return 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.';
+}
+
 function ListeAnnuaire({
   annuaire,
   cherche,
   canCreateProspect,
+  seulementARappeler,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
   cherche: string;
   canCreateProspect: boolean;
+  seulementARappeler: boolean;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -492,11 +549,7 @@ function ListeAnnuaire({
   if (annuaire.data.items.length === 0) {
     return (
       <div className="flex flex-col gap-3">
-        <p className="text-[0.9375rem]">
-          {cherche === ''
-            ? 'Aucune fiche ne vous est attribuée. Ajoutez un prospect, ou demandez une campagne à votre superviseur.'
-            : 'Aucun résultat. Vérifiez le nom ou le numéro.'}
-        </p>
+        <p className="text-[0.9375rem]">{texteListeVide(cherche, seulementARappeler)}</p>
         {canCreateProspect ? (
           <Link href={nouveauHref()} className={cn(buttonVariants(), 'self-start')}>
             Ajouter un prospect
@@ -684,97 +737,108 @@ export function PanneauDossier({
   );
 }
 
-/** Les statuts de qualification disponibles pour la fiche. */
-function ChoixIssue({
-  etape,
-  groupe,
-  proposes,
-  motif,
-  disabled,
-  onGroupe,
-  onMotif,
-}: {
-  etape: Etape;
-  groupe: Groupe | null;
-  proposes: readonly MotifAppel[];
-  motif: MotifAppel | null;
-  disabled: boolean;
-  onGroupe: (groupe: Groupe) => void;
-  onMotif: (motif: MotifAppel) => void;
-}) {
-  if (etape !== 'issues' && etape !== 'motifs') return null;
-
-  return (
-    <fieldset className="flex flex-col gap-2" disabled={disabled}>
-      <LegendeIssue>Avez-vous eu la personne au téléphone ?</LegendeIssue>
-      <div className="flex flex-wrap gap-2">
-        {GROUPES.map((item) => (
-          <Button
-            key={item.cle}
-            variant={groupe === item.cle ? 'default' : 'outline'}
-            aria-pressed={groupe === item.cle}
-            onClick={() => {
-              onGroupe(item.cle);
-            }}
-          >
-            {groupe === null ? <Kbd>{item.touche}</Kbd> : null}
-            {item.label}
-          </Button>
-        ))}
-      </div>
-
-      {groupe === null ? null : (
-        <MotifsDuGroupe proposes={proposes} motif={motif} onMotif={onMotif} />
-      )}
-    </fieldset>
-  );
+interface Choix {
+  readonly cle: string;
+  readonly label: string;
+  readonly actif: boolean;
+  readonly choisir: () => void;
 }
 
-function MotifsDuGroupe({
-  proposes,
-  motif,
-  onMotif,
+/** Un palier de la qualification : une question, ses réponses, la réponse retenue en surbrillance. */
+function Palier({
+  question,
+  choix,
+  raccourcis,
+  vide,
+  disabled,
 }: {
-  proposes: readonly MotifAppel[];
-  motif: MotifAppel | null;
-  onMotif: (motif: MotifAppel) => void;
+  question: string;
+  choix: readonly Choix[];
+  raccourcis: boolean;
+  vide: string;
+  disabled: boolean;
 }) {
   return (
-    <div className={cn('flex flex-col gap-2 pt-3', REVELE)}>
-      <p className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Qualification de l’appel
-      </p>
-      {proposes.length === 0 ? (
+    <fieldset className={cn('flex flex-col gap-2', REVELE)} disabled={disabled}>
+      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
+        {question}
+      </legend>
+      {choix.length === 0 ? (
         <p role="alert" className="text-[0.875rem] text-warning">
-          Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de
-          référence.
+          {vide}
         </p>
       ) : (
         <div className="flex flex-wrap gap-2">
-          {proposes.map((item, rang) => (
+          {choix.map((item, rang) => (
             <Button
-              key={item.code}
-              variant={motif?.code === item.code ? 'default' : 'outline'}
-              aria-pressed={motif?.code === item.code}
-              onClick={() => {
-                onMotif(item);
-              }}
+              key={item.cle}
+              variant={item.actif ? 'default' : 'outline'}
+              aria-pressed={item.actif}
+              onClick={item.choisir}
             >
-              {rang < 9 ? <Kbd>{String(rang + 1)}</Kbd> : null}
+              {raccourcis && rang < 9 ? <Kbd>{String(rang + 1)}</Kbd> : null}
               {item.label}
             </Button>
           ))}
         </div>
       )}
-    </div>
+    </fieldset>
   );
 }
 
-function LegendeIssue({ children }: { children: ReactNode }) {
+const AUCUN_MOTIF =
+  'Aucun motif réglé pour ce cas. Demandez à l’administrateur d’en ajouter dans les listes de référence.';
+
+/**
+ * Trois paliers, chacun visible et modifiable une fois franchi : joignable ou
+ * non, l'issue de l'appel, puis le motif quand l'issue est un refus.
+ */
+function ChoixIssue({
+  paliers,
+  groupe,
+  refusOuvert,
+  raccourcis,
+  disabled,
+}: {
+  paliers: PaliersQualification;
+  groupe: Groupe | null;
+  refusOuvert: boolean;
+  /** Les chiffres ne visent le dernier palier que tant qu'aucune échéance ni dossier ne les prend. */
+  raccourcis: boolean;
+  disabled: boolean;
+}) {
+  const questionIssue =
+    groupe === 'joignable'
+      ? 'Comment l’appel s’est-il conclu ?'
+      : 'Pourquoi n’a-t-elle pas répondu ?';
   return (
-    <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-      {children}
-    </legend>
+    <div className="flex flex-col gap-5">
+      <Palier
+        question="Avez-vous eu la personne au téléphone ?"
+        choix={paliers.groupes}
+        raccourcis={groupe === null}
+        vide=""
+        disabled={disabled}
+      />
+      {groupe === null ? null : (
+        <Palier
+          question={questionIssue}
+          choix={paliers.issues}
+          raccourcis={raccourcis && !refusOuvert}
+          vide={AUCUN_MOTIF}
+          disabled={disabled}
+        />
+      )}
+      {refusOuvert ? (
+        <Palier
+          question="Quel est le motif du refus ?"
+          choix={paliers.refus}
+          raccourcis={raccourcis}
+          vide={AUCUN_MOTIF}
+          disabled={disabled}
+        />
+      ) : null}
+    </div>
   );
 }
 
@@ -818,17 +882,27 @@ function etapeCourante(
   return groupe === null ? 'issues' : 'motifs';
 }
 
-/** Les boutons de motif pour le groupe ouvert (joignable / injoignable). */
-function motifsDuGroupe(
+interface PaliersQualification {
+  readonly groupes: readonly Choix[];
+  readonly issues: readonly Choix[];
+  readonly refus: readonly Choix[];
+}
+
+const estInjoignable = (item: MotifAppel): boolean =>
+  CODES_INJOIGNABLE.has(item.code) || item.effect === 'CLOSE_WRONG_NUMBER';
+
+/** Les motifs du groupe ouvert ; joignable, les refus forment leur propre palier. */
+function motifsParPalier(
   catalogue: readonly MotifAppel[],
   groupe: Groupe | null,
-): readonly MotifAppel[] {
-  return catalogue.filter(
-    (item) =>
-      (CODES_INJOIGNABLE.has(item.code) || item.effect === 'CLOSE_WRONG_NUMBER'
-        ? 'injoignable'
-        : 'joignable') === groupe,
-  );
+): { issues: readonly MotifAppel[]; refus: readonly MotifAppel[] } {
+  if (groupe === null) return { issues: [], refus: [] };
+  if (groupe === 'injoignable') return { issues: catalogue.filter(estInjoignable), refus: [] };
+  const joignables = catalogue.filter((item) => !estInjoignable(item));
+  return {
+    issues: joignables.filter((item) => item.effect !== 'CLOSE_REFUSED'),
+    refus: joignables.filter((item) => item.effect === 'CLOSE_REFUSED'),
+  };
 }
 
 /**
@@ -862,6 +936,7 @@ export function Consignation({
     repris.conversion === null ? null : 'joignable',
   );
   const [motif, setMotif] = useState<MotifAppel | null>(null);
+  const [refusOuvert, setRefusOuvert] = useState(false);
   const [conversion, setConversion] = useState<ConversionDraft | null>(repris.conversion);
   const dossierMisDeCote = useRef<ConversionDraft | null>(null);
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
@@ -978,12 +1053,24 @@ export function Consignation({
     setSlots(callbackSlots(Date.now()));
   }, []);
 
+  // Les motifs restent affichés sous l'échéance ou le dossier : en changer
+  // referme ce que le motif précédent avait ouvert.
   const choisir = useCallback(
     (choisi: MotifAppel) => {
       if (send.isPending) return;
       setMotif(choisi);
-      if (choisi.effect === 'CLOSE_METHOD') ouvrirDossier();
-      else if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
+      if (choisi.effect === 'CLOSE_METHOD') {
+        ouvrirDossier();
+        return;
+      }
+      setSlots(null);
+      setFreeCallback('');
+      setConversion((draft) => {
+        if (draft !== null) dossierMisDeCote.current = draft;
+        return null;
+      });
+      setConversionErrors({});
+      if (choisi.effect === 'SCHEDULE_CALLBACK') startCallback();
       else if (choisi.requiresComment) commentRef.current?.focus();
     },
     [send.isPending, ouvrirDossier, startCallback],
@@ -1033,33 +1120,56 @@ export function Consignation({
 
   const choisirGroupe = (choisi: Groupe): void => {
     setGroupe(choisi);
+    setRefusOuvert(false);
     setMotif(null);
     setSlots(null);
     setFreeCallback('');
     setConversionErrors({});
   };
 
-  const proposes = motifsDuGroupe(catalogue, groupe);
+  const ouvrirRefus = (): void => {
+    setRefusOuvert(true);
+    setMotif(null);
+    setSlots(null);
+    setFreeCallback('');
+    setConversionErrors({});
+  };
+
+  const parPalier = motifsParPalier(catalogue, groupe);
   const motifRappel = catalogue.find((item) => item.effect === 'SCHEDULE_CALLBACK');
   const motifRefus = catalogue.find((item) => item.effect === 'CLOSE_REFUSED');
 
-  const groupeShortcuts: Record<string, () => void> = Object.fromEntries(
-    GROUPES.map((item) => [
-      item.touche,
-      () => {
+  const choixMotif = (item: MotifAppel, ouvreRefus: boolean): Choix => ({
+    cle: item.code,
+    label: item.label,
+    actif: motif?.code === item.code,
+    choisir: () => {
+      setRefusOuvert(ouvreRefus);
+      choisir(item);
+    },
+  });
+  const paliers: PaliersQualification = {
+    groupes: GROUPES.map((item) => ({
+      cle: item.cle,
+      label: item.label,
+      actif: groupe === item.cle,
+      choisir: () => {
         choisirGroupe(item.cle);
       },
-    ]),
-  );
+    })),
+    issues: [
+      ...(parPalier.refus.length === 0
+        ? []
+        : [{ cle: 'refus', label: 'Refus', actif: refusOuvert, choisir: ouvrirRefus }]),
+      ...parPalier.issues.map((item) => choixMotif(item, false)),
+    ],
+    refus: parPalier.refus.map((item) => choixMotif(item, true)),
+  };
 
-  const motifShortcuts: Record<string, () => void> = Object.fromEntries(
-    proposes.slice(0, 9).map((item, rang) => [
-      String(rang + 1),
-      () => {
-        choisir(item);
-      },
-    ]),
-  );
+  const raccourcisDe = (choix: readonly Choix[]): Record<string, () => void> =>
+    Object.fromEntries(choix.slice(0, 9).map((item, rang) => [String(rang + 1), item.choisir]));
+  const groupeShortcuts = raccourcisDe(paliers.groupes);
+  const motifShortcuts = raccourcisDe(refusOuvert ? paliers.refus : paliers.issues);
 
   const slotShortcuts: Record<string, () => void> = Object.fromEntries(
     (slots ?? []).map((slot) => [
@@ -1120,15 +1230,12 @@ export function Consignation({
           surDossier={etape === 'dossier'}
         />
 
-        <ChoixConsignation
-          rappelOuvert={rappelOuvert}
-          etape={etape}
+        <ChoixIssue
+          paliers={paliers}
           groupe={groupe}
-          proposes={proposes}
-          motif={motif}
+          refusOuvert={refusOuvert}
+          raccourcis={etape === 'motifs'}
           disabled={send.isPending}
-          onGroupe={choisirGroupe}
-          onMotif={choisir}
         />
 
         <MotifSelectionne motif={motif} rappelOuvert={rappelOuvert} conversion={conversion} />
@@ -1203,7 +1310,7 @@ export function Consignation({
   }
 
   return (
-    <div className="flex w-full max-w-3xl flex-col gap-5">
+    <div className="flex w-full max-w-5xl flex-col gap-5">
       <Button variant="ghost" className="self-start px-0" onClick={onAbandon}>
         <ArrowLeftIcon aria-hidden="true" />
         Revenir à la liste
@@ -1429,23 +1536,6 @@ function EnTeteConsignation({
       surDossier={surDossier}
     />
   );
-}
-
-function ChoixConsignation({
-  rappelOuvert,
-  ...props
-}: {
-  rappelOuvert: boolean;
-  etape: Etape;
-  groupe: Groupe | null;
-  proposes: readonly MotifAppel[];
-  motif: MotifAppel | null;
-  disabled: boolean;
-  onGroupe: (groupe: Groupe) => void;
-  onMotif: (motif: MotifAppel) => void;
-}) {
-  if (rappelOuvert) return null;
-  return <ChoixIssue {...props} />;
 }
 
 function MotifSelectionne({

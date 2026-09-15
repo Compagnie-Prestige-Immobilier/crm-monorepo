@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useId, type ReactNode } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { ChampAjoute } from '@/components/forms/champ-ajoute';
@@ -294,26 +294,18 @@ export function ConversionFields({
       />
     ),
     type: (
-      <fieldset className="flex min-w-0 flex-col gap-2">
-        <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">Situation</legend>
-        <div className="flex flex-wrap gap-2">
-          {PROSPECT_TYPES.map((option) => (
-            <ChoixSituation
-              key={option}
-              option={option}
-              checked={draft.type === option}
-              onSelect={() => {
-                onChange({ type: draft.type === option ? null : option });
-              }}
-            />
-          ))}
-        </div>
-        {errors.type === undefined ? null : (
-          <p role="alert" className="text-[0.75rem] text-destructive">
-            {errors.type}
-          </p>
-        )}
-      </fieldset>
+      <GroupeEnLigne label="Situation" error={errors.type}>
+        {PROSPECT_TYPES.map((option) => (
+          <ChoixSituation
+            key={option}
+            option={option}
+            checked={draft.type === option}
+            onSelect={() => {
+              onChange({ type: draft.type === option ? null : option });
+            }}
+          />
+        ))}
+      </GroupeEnLigne>
     ),
     syndicatId: (
       <Field
@@ -430,55 +422,42 @@ export function ConversionFields({
       ) : null,
     method: (
       <>
-        <fieldset className="flex min-w-0 flex-col gap-2 sm:col-span-2">
-          <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">
-            Méthode d’enrôlement
-          </legend>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {ENROLLMENT_METHOD_ORDER.map((method) => (
-              <MethodChoice
-                key={method}
-                method={method}
-                checked={draft.method === method}
-                onSelect={() => {
-                  // Changer de méthode efface la date : le serveur refuse un
-                  // rendez-vous sur toute autre méthode que la prise de rendez-vous.
-                  onChange({
-                    method,
-                    ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
-                  });
+        <GroupeEnLigne label="Méthode d’enrôlement" error={errors.method}>
+          {ENROLLMENT_METHOD_ORDER.map((method) => (
+            <MethodChoice
+              key={method}
+              method={method}
+              checked={draft.method === method}
+              onSelect={() => {
+                // Changer de méthode efface la date : le serveur refuse un
+                // rendez-vous sur toute autre méthode que la prise de rendez-vous.
+                onChange({
+                  method,
+                  ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
+                });
+              }}
+            />
+          ))}
+        </GroupeEnLigne>
+        {draft.method === 'APPOINTMENT' ? (
+          <Field
+            label="Date et heure du rendez-vous en agence"
+            required
+            error={errors.rendezVousAt}
+            description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="datetime-local"
+                value={draft.rendezVousAt}
+                onChange={(event) => {
+                  onChange({ rendezVousAt: event.target.value });
                 }}
               />
-            ))}
-          </div>
-          {draft.method === 'APPOINTMENT' ? (
-            <div className="mt-2">
-              <Field
-                label="Date et heure du rendez-vous en agence"
-                required
-                error={errors.rendezVousAt}
-                description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
-              >
-                {(props) => (
-                  <Input
-                    {...props}
-                    type="datetime-local"
-                    className="max-w-64"
-                    value={draft.rendezVousAt}
-                    onChange={(event) => {
-                      onChange({ rendezVousAt: event.target.value });
-                    }}
-                  />
-                )}
-              </Field>
-            </div>
-          ) : null}
-          {errors.method === undefined ? null : (
-            <p role="alert" className="text-[0.75rem] text-destructive">
-              {errors.method}
-            </p>
-          )}
-        </fieldset>
+            )}
+          </Field>
+        ) : null}
         <CoordonneeChues method={draft.method} />
       </>
     ),
@@ -495,7 +474,7 @@ export function ConversionFields({
   );
 
   return (
-    <fieldset className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" disabled={disabled}>
+    <fieldset className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3" disabled={disabled}>
       <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
         Phase 3 · Conversion
       </legend>
@@ -578,7 +557,7 @@ function MethodChoice({
   return (
     <label
       className={cn(
-        'flex min-h-11 cursor-pointer items-center gap-3 rounded-md border p-3 text-[0.875rem]',
+        'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
         'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
         checked
           ? 'border-primary bg-secondary text-secondary-foreground'
@@ -656,38 +635,58 @@ function ChoixOuiNon({
   ];
 
   return (
-    <fieldset className="flex min-w-0 flex-col gap-2">
-      <legend className="pb-1.5 text-[0.8125rem] font-[600] text-foreground">{label}</legend>
-      <div className="flex flex-wrap gap-2">
-        {choix.map((choice) => (
-          <label
-            key={choice.label}
-            className={cn(
-              'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
-              'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-              value !== null && value === choice.value
-                ? 'border-primary bg-secondary text-secondary-foreground'
-                : 'border-border hover:bg-secondary/60',
-            )}
-          >
-            <input
-              type="radio"
-              name={name}
-              checked={value !== null && value === choice.value}
-              className="size-4 accent-[var(--primary)]"
-              onChange={() => {
-                onChange(choice.value);
-              }}
-            />
-            {choice.label}
-          </label>
-        ))}
+    <GroupeEnLigne label={label} error={error}>
+      {choix.map((choice) => (
+        <label
+          key={choice.label}
+          className={cn(
+            'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
+            'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+            value !== null && value === choice.value
+              ? 'border-primary bg-secondary text-secondary-foreground'
+              : 'border-border hover:bg-secondary/60',
+          )}
+        >
+          <input
+            type="radio"
+            name={name}
+            checked={value !== null && value === choice.value}
+            className="size-4 accent-[var(--primary)]"
+            onChange={() => {
+              onChange(choice.value);
+            }}
+          />
+          {choice.label}
+        </label>
+      ))}
+    </GroupeEnLigne>
+  );
+}
+
+/** Une question à choix sur toute la largeur : le libellé et ses réponses tiennent sur une ligne. */
+function GroupeEnLigne({
+  label,
+  error,
+  children,
+}: {
+  label: string;
+  error?: string | undefined;
+  children: ReactNode;
+}) {
+  const id = useId();
+  return (
+    <div role="group" aria-labelledby={id} className="col-span-full flex min-w-0 flex-col gap-1.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+        <span id={id} className="text-[0.8125rem] font-[600] text-foreground">
+          {label}
+        </span>
+        <div className="flex flex-wrap gap-2">{children}</div>
       </div>
       {error === undefined ? null : (
         <p role="alert" className="text-[0.75rem] text-destructive">
           {error}
         </p>
       )}
-    </fieldset>
+    </div>
   );
 }

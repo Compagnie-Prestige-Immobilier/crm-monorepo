@@ -832,6 +832,7 @@ type ligneChues struct {
 	Dossier   *struct {
 		Status      string   `json:"status"`
 		SubmittedAt *float64 `json:"submittedAt"`
+		DecideAt    *float64 `json:"decideAt"`
 	} `json:"dossier"`
 }
 
@@ -907,14 +908,14 @@ func versInscriptionChues(ligne *ligneChues, brut json.RawMessage, decisions map
 	if ligne.Approved {
 		statutDistant = "compte-valide"
 	}
-	var soumise *time.Time
+	var soumise, decidee *time.Time
 	if ligne.Dossier != nil {
 		statutDistant = ligne.Dossier.Status
 		soumise = dateDistanteEpoch(ligne.Dossier.SubmittedAt)
+		decidee = dateDistanteEpoch(ligne.Dossier.DecideAt)
 	}
 	courriel := texteDistant(ligne.Email)
-	var decidee *time.Time
-	if courriel != nil {
+	if decidee == nil && courriel != nil {
 		decidee = decisions[strings.ToLower(*courriel)]
 	}
 	return inscriptionDistante{
@@ -968,6 +969,7 @@ type ligneGrandPublicDistante struct {
 	DateInscription *string      `json:"dateInscription"`
 	Demande         *struct {
 		SubmittedAt *string `json:"submittedAt"`
+		DecideAt    *string `json:"decideAt"`
 	} `json:"demande"`
 }
 
@@ -1049,9 +1051,10 @@ func versInscriptionGrandPublic(ligne *ligneGrandPublicDistante, brut json.RawMe
 			statut = "etape-" + strconv.FormatInt(n, 10)
 		}
 	}
-	var soumise *time.Time
+	var soumise, decidee *time.Time
 	if ligne.Demande != nil {
 		soumise = dateDistanteTexte(ligne.Demande.SubmittedAt)
+		decidee = dateDistanteTexte(ligne.Demande.DecideAt)
 	}
 	return inscriptionDistante{
 		IdentifiantDistant: string(ligne.ID),
@@ -1063,6 +1066,7 @@ func versInscriptionGrandPublic(ligne *ligneGrandPublicDistante, brut json.RawMe
 		EtapeDistante:      etape,
 		InscriteLe:         dateDistanteTexte(ligne.DateInscription),
 		SoumiseLe:          soumise,
+		DecideeLe:          decidee,
 		ChargeUtile:        brut,
 	}
 }

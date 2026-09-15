@@ -295,13 +295,13 @@ var seedCallOutcomeReasons = []seedCallOutcomeReason{
 	{"REFUS_MEFIANT", "Méfiant", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 12, 9},
 	{"REFUS_NE_VEUT_PAS", "Ne veut pas", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 13, 9},
 	{"REFUS_PAS_POUR_LE_MOMENT", "Pas pour le moment", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 14, 9},
-	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 20, 9},
-	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 21, 9},
+	{"DEMANDE_INFORMATION", "Demande d’information", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 20, 9},
+	{"RDV_TELEPHONIQUE", "RDV téléphonique", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 21, 9},
 	{"TRANSFERT_ENROLEMENT", "Transfert enrôlement", seedCouleurSuccess, db.CallOutcomeEffectCLOSEMETHOD, false, false, true, 22, 9},
-	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, true, true, true, 23, 9},
-	{seedCodePartenariat, "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, true, false, true, 24, 9},
-	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, true, false, true, 25, 9},
-	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, true, false, true, 26, 9},
+	{"CONSTRUCTION", "Construction", seedCouleurInfo, db.CallOutcomeEffectSCHEDULECALLBACK, false, true, true, 23, 9},
+	{seedCodePartenariat, "Partenariat", seedCouleurInfo, db.CallOutcomeEffectKEEPOPEN, false, false, true, 24, 9},
+	{"HORS_CIBLE", "Hors cible", seedCouleurDanger, db.CallOutcomeEffectCLOSEREFUSED, false, false, true, 25, 9},
+	{"AUTRES", "Autres", "neutral", db.CallOutcomeEffectKEEPOPEN, false, false, true, 26, 9},
 }
 
 type seedCanalProvenance struct {
@@ -840,13 +840,13 @@ var seedStatutsQualification = []seedStatutQualification{
 	{"HORS_CIBLE", "Hors cible", db.StatutQualificationEffectREFUSED, false, false, nil, db.PrioriteTraitementBASSE, nil, 60, 6},
 	{"AFFECTE_AILLEURS", "Affecté ailleurs", db.StatutQualificationEffectREFUSED, false, false, nil, db.PrioriteTraitementBASSE, nil, 70, 6},
 	{"FAUX_NUMERO", "Faux numéro", db.StatutQualificationEffectWRONGNUMBER, false, false, nil, db.PrioriteTraitementBASSE, nil, 80, 6},
-	{"AUTRE_JOINT", "Autre joint", db.StatutQualificationEffectREACHED, false, true, nil, db.PrioriteTraitementNORMALE, nil, 90, 7},
+	{"AUTRE_JOINT", "Autre joint", db.StatutQualificationEffectREACHED, false, false, nil, db.PrioriteTraitementNORMALE, nil, 90, 7},
 	{"PAS_DE_REPONSE", "Pas de réponse", db.StatutQualificationEffectUNREACHABLE, false, false, seedMinutes(120), db.PrioriteTraitementNORMALE, nil, 110, 6},
 	{"NUMERO_OCCUPE", "Occupé", db.StatutQualificationEffectUNREACHABLE, false, false, seedMinutes(30), db.PrioriteTraitementNORMALE, nil, 120, 6},
 	{"MESSAGERIE", "Messagerie", db.StatutQualificationEffectUNREACHABLE, false, false, seedMinutes(240), db.PrioriteTraitementNORMALE, nil, 130, 6},
 	{"TELEPHONE_INDISPONIBLE", "Téléphone indisponible", db.StatutQualificationEffectUNREACHABLE, false, false, seedMinutes(1440), db.PrioriteTraitementNORMALE, nil, 140, 6},
 	{"INJOIGNABLE_DEFINITIF", "Injoignable définitif", db.StatutQualificationEffectUNREACHABLE, false, false, nil, db.PrioriteTraitementBASSE, nil, 150, 6},
-	{"AUTRE_NON_JOINT", "Autre non joint", db.StatutQualificationEffectUNREACHABLE, false, true, seedMinutes(1440), db.PrioriteTraitementNORMALE, nil, 160, 7},
+	{"AUTRE_NON_JOINT", "Autre non joint", db.StatutQualificationEffectUNREACHABLE, false, false, seedMinutes(1440), db.PrioriteTraitementNORMALE, nil, 160, 7},
 }
 
 type seedVisiteReferentiel struct {
