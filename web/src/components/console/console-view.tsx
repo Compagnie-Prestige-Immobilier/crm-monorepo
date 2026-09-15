@@ -873,7 +873,9 @@ function draftDe(
     method,
     comment,
     callbackAt,
-    ...(conversion === null ? {} : { conversion }),
+    // EB-10 : sans méthode d'enrôlement le dossier reste un brouillon. Joint à
+    // la tentative, incomplet, il la ferait refuser et emporterait l'appel.
+    ...(method === null || conversion === null ? {} : { conversion }),
     ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
   };
 }
@@ -942,6 +944,7 @@ export function Consignation({
   const [conversionErrors, setConversionErrors] = useState<ConversionErrors>({});
   const [slots, setSlots] = useState<readonly CallbackSlot[] | null>(null);
   const [freeCallback, setFreeCallback] = useState('');
+  const [creneauChoisi, setCreneauChoisi] = useState<string | null>(null);
   const [helpOpen, setHelpOpen] = useState(false);
 
   const formulaire = useChampsConversion(projet);
@@ -1003,7 +1006,8 @@ export function Consignation({
         toast.error(problem);
         return;
       }
-      const problems = problemesDuDossier(conversion, formulaire);
+      const problems =
+        draft.conversion === undefined ? {} : problemesDuDossier(conversion, formulaire);
       setConversionErrors(problems);
       if (Object.keys(problems).length > 0) return;
       send.mutate(draft);
@@ -1013,7 +1017,15 @@ export function Consignation({
 
   const startCallback = useCallback(() => {
     setFreeCallback('');
+    setCreneauChoisi(null);
     setSlots(callbackSlots(Date.now()));
+  }, []);
+
+  // Le créneau se retient et ne part qu'à la validation : envoyé au clic, un
+  // refus du serveur le perdait et l'écran redemandait une échéance.
+  const choisirCreneau = useCallback((at: string) => {
+    setCreneauChoisi(at);
+    setFreeCallback('');
   }, []);
 
   const poser = useCallback(
@@ -1030,9 +1042,17 @@ export function Consignation({
       return;
     }
     if (slots !== null && !adhesion) {
-      const iso = dakarLocalToIso(freeCallback);
+      const iso = creneauChoisi ?? dakarLocalToIso(freeCallback);
       if (iso === null) {
         toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
+        return;
+      }
+      // Les créneaux datent de l'ouverture du panneau : celui retenu a pu être
+      // rattrapé par l'horloge pendant la saisie du commentaire.
+      if (creneauChoisi !== null && Date.parse(creneauChoisi) <= Date.now()) {
+        setCreneauChoisi(null);
+        setSlots(callbackSlots(Date.now()));
+        toast.error('Ce créneau est passé, choisissez-en un autre.');
         return;
       }
       record(motif, iso);
@@ -1043,7 +1063,7 @@ export function Consignation({
       return;
     }
     record(motif);
-  }, [motif, slots, adhesion, freeCallback, record, rappelDemande, startCallback]);
+  }, [motif, slots, adhesion, freeCallback, creneauChoisi, record, rappelDemande, startCallback]);
 
   const { echeanceOuverte, etape, saisieEnCours } = etatDe(
     slots,
@@ -1081,6 +1101,7 @@ export function Consignation({
     setPrecision(null);
     setSlots(null);
     setFreeCallback('');
+    setCreneauChoisi(null);
     setConversionErrors({});
     if (choisi === 'joignable') {
       setConversion(conversion ?? dossierMisDeCote ?? conversionFrom(prospect));
@@ -1124,7 +1145,7 @@ export function Consignation({
     (slots ?? []).map((slot) => [
       slot.key,
       () => {
-        if (motif !== null) record(motif, slot.at);
+        choisirCreneau(slot.at);
       },
     ]),
   );
@@ -1207,13 +1228,12 @@ export function Consignation({
             slots={slots}
             now={now}
             freeCallback={freeCallback}
+            choisi={creneauChoisi}
             surDossier={conversion !== null}
             titre={titreEcheance(motif?.code)}
             disabled={send.isPending}
             inputRef={callbackRef}
-            onChoisir={(at) => {
-              if (motif !== null) record(motif, at);
-            }}
+            onChoisir={choisirCreneau}
             onFreeCallback={setFreeCallback}
             onValidate={validate}
           />
@@ -1532,6 +1552,7 @@ export function PanneauEcheance({
   slots,
   now,
   freeCallback,
+  choisi,
   surDossier,
   titre,
   disabled,
@@ -1543,6 +1564,8 @@ export function PanneauEcheance({
   slots: readonly CallbackSlot[];
   now: number;
   freeCallback: string;
+  /** Le créneau retenu, en attente de validation. */
+  choisi?: string | null;
   surDossier: boolean;
   titre?: string;
   disabled: boolean;
@@ -1565,7 +1588,8 @@ export function PanneauEcheance({
         {slots.map((slot) => (
           <Button
             key={slot.key}
-            variant="outline"
+            variant={slot.at === choisi ? 'default' : 'outline'}
+            aria-pressed={slot.at === choisi}
             className="h-auto flex-col items-start gap-0.5 py-2"
             onClick={() => {
               onChoisir(slot.at);
@@ -1575,7 +1599,12 @@ export function PanneauEcheance({
               <Kbd>{slot.key}</Kbd>
               {slot.label}
             </span>
-            <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
+            <span
+              className={cn(
+                'pl-7 text-[0.75rem] font-[400]',
+                slot.at === choisi ? 'opacity-80' : 'text-muted-foreground',
+              )}
+            >
               {formatCallbackAt(slot.at, now)}
             </span>
           </Button>

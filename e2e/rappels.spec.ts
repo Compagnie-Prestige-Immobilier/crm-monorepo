@@ -33,13 +33,14 @@ interface RappelEnBase {
   scheduledAt: Date;
   assignedToId: string;
   outcome: string;
+  comment: string | null;
 }
 
 async function lireRappel(prospectId: string): Promise<RappelEnBase> {
   let lu: RappelEnBase | null = null;
   await avecBase(async (client) => {
     const { rows } = await client.query<RappelEnBase>(
-      `SELECT c.status::text AS status, c."scheduledAt", c."assignedToId",
+      `SELECT c.status::text AS status, c."scheduledAt", c."assignedToId", c.comment,
               a.outcome::text AS outcome
          FROM scheduled_callbacks c
          JOIN call_attempts a ON a.id = c."sourceAttemptId"
@@ -67,6 +68,8 @@ function ligneRappel(page: Page, telephoneE164: string) {
     );
 }
 
+const COMMENTAIRE = 'Le prospect demande un rappel dans l’heure.';
+
 async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.goto(CONSOLE);
   await page.getByLabel('Quel prospect avez-vous appelé ?').fill(fiche.nom);
@@ -80,12 +83,17 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
     .getByRole('group', { name: 'Quel statut de qualification ?' })
     .getByRole('button', { name: /À rappeler$/u })
     .click();
-  await page
+  const creneau = page
     .getByRole('group', { name: 'Échéance du rappel' })
-    .getByRole('button', { name: /Dans 1 h/u })
-    .click();
+    .getByRole('button', { name: /Dans 1 h/u });
+  await creneau.click();
+  // Le creneau se retient et ne part qu'a la validation : le commentaire se
+  // saisit APRES le clic sans que l'heure choisie soit perdue.
+  await expect(creneau).toHaveAttribute('aria-pressed', 'true');
+  await page.getByLabel('Commentaire du rappel').fill(COMMENTAIRE);
+  await page.getByRole('button', { name: /Enregistrer l’appel/u }).click();
   await expect(
-    page.getByRole('status').filter({ hasText: `Appel enregistré pour ${fiche.nom}.` }),
+    page.getByRole('status').filter({ hasText: `Appel consigné pour ${fiche.nom}` }),
   ).toBeVisible();
 }
 
@@ -130,6 +138,7 @@ test.afterAll(async () => {
 test.describe('parcours 6, rappels promis', () => {
   test('l’echeance promise arrive au bon jour, se traite et disparait', async ({ page }) => {
     const fiche = await semer('Rappel');
+    const avant = Date.now();
 
     await promettreUnRappel(page, fiche);
 
@@ -137,7 +146,12 @@ test.describe('parcours 6, rappels promis', () => {
     expect(promis.status).toBe('PENDING');
     expect(promis.outcome).toBe('CALLBACK');
     expect(promis.assignedToId).toBe(compte.id);
-    // « Dans 1 h » : l'echeance est devant nous, elle n'est donc pas en retard.
+    expect(promis.comment).toBe(COMMENTAIRE);
+    // « Dans 1 h » : le creneau clique est bien celui enregistre, une heure
+    // apres l'ouverture du panneau, et il est devant nous.
+    const ecart = promis.scheduledAt.getTime() - avant;
+    expect(ecart).toBeGreaterThan(59 * 60_000);
+    expect(ecart).toBeLessThan(70 * 60_000);
     expect(promis.scheduledAt.getTime()).toBeGreaterThan(Date.now());
 
     await ouvrirRappelsProspects(page);
