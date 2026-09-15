@@ -235,6 +235,81 @@ func TestQualificationRappelPlanifieEtListe(t *testing.T) {
 	}
 }
 
+func qualificationExigeCompte(b *banc, attendu int, quoi, requete string, args ...any) {
+	b.t.Helper()
+	if n := qualificationCompte(b, requete, args...); n != attendu {
+		b.t.Fatalf("%s : %d lignes, attendu %d", quoi, n, attendu)
+	}
+}
+
+func TestQualificationModifierUnAppelEstTraceSurLaFiche(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(b)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entity" = 'call_attempt'
+		  AND "entityId" IN (SELECT "id" FROM "call_attempts" WHERE "prospectId" = $1)`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect)
+	})
+	corps := qualificationCorpsTentative(prospect, map[string]any{"reasonCode": "PAS_DE_REPONSE"})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	b.attend(statut, http.StatusOK, "appel à corriger", body)
+	appelID := fmt.Sprint(corps["id"])
+	chemin := "/api/v1/phase2/call-attempts/" + appelID
+
+	statut, body = qualificationEnvoi(b, http.MethodPatch, chemin,
+		map[string]any{"outcome": "REFUSED", "comment": "Ne souhaite pas donner suite"})
+	b.attend(statut, http.StatusOK, "l’auteur passe son appel en refus", body)
+	qualificationExigeCompte(b, 1, "appel corrigé", `SELECT count(*) FROM "call_attempts"
+	  WHERE "id" = $1 AND "outcome" = 'REFUSED' AND "comment" = 'Ne souhaite pas donner suite'`, appelID)
+	qualificationExigeCompte(b, 1, "fiche classée en refus", `SELECT count(*) FROM "prospects"
+	  WHERE "id" = $1 AND "lastCallOutcome" = 'REFUSED' AND "phase2Status" = 'REFUSED'`, prospect)
+
+	statut, body = qualificationEnvoi(b, http.MethodPatch, chemin, map[string]any{
+		"outcome": "CALLBACK", "comment": "Rappeler après la paie",
+		"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano),
+	})
+	b.attend(statut, http.StatusOK, "le refus devient un rappel", body)
+	qualificationExigeCompte(b, 1, "rappel planifié par l’appel corrigé", `SELECT count(*) FROM "scheduled_callbacks"
+	  WHERE "sourceAttemptId" = $1 AND "status" = 'PENDING'`, appelID)
+	qualificationExigeCompte(b, 1, "fiche rouverte", `SELECT count(*) FROM "prospects"
+	  WHERE "id" = $1 AND "lastCallOutcome" = 'CALLBACK' AND "phase2Status" = 'PENDING'`, prospect)
+	qualificationExigeCompte(b, 2, "traces d’audit", `SELECT count(*) FROM "audit_logs"
+	  WHERE "entity" = 'call_attempt' AND "action" = 'call_attempt.update' AND "entityId" = $1`, appelID)
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+prospect+"/call-attempts", nil)
+	b.attend(statut, http.StatusOK, "appels de la fiche", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("un seul appel attendu : %v", body)
+	}
+	appel, _ := items[0].(map[string]any)
+	modifications, _ := appel["modifications"].([]any)
+	editable, _ := appel["editable"].(bool)
+	if len(modifications) != 2 || !editable || appel["callbackAt"] == nil {
+		t.Fatalf("la fiche doit montrer l’appel modifiable, son rappel et ses deux corrections : %v", appel)
+	}
+
+	autre := qualificationConnecte(t, "COMMERCIAL")
+	statut, body = qualificationEnvoi(autre, http.MethodPatch, chemin, map[string]any{"outcome": "UNREACHABLE"})
+	autre.attend(statut, http.StatusForbidden, "appel d’un autre téléconseiller", body)
+	if body["code"] != "PHASE2_ATTEMPT_NOT_OWNER" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPatch, chemin, map[string]any{"outcome": "METHOD_OBTAINED"})
+	b.attend(statut, http.StatusConflict, "passage à l’enrôlement", body)
+	enrolement := uuid.NewString()
+	qualificationExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","method","clientCreatedAt")
+	                      VALUES ($1,$2,$3,'METHOD_OBTAINED','WHATSAPP',now() - interval '1 hour')`, enrolement, prospect, b.userID)
+	statut, body = qualificationEnvoi(b, http.MethodPatch, "/api/v1/phase2/call-attempts/"+enrolement,
+		map[string]any{"outcome": "UNREACHABLE"})
+	b.attend(statut, http.StatusConflict, "appel d’enrôlement", body)
+	if body["code"] != "PHASE2_ATTEMPT_ENROLMENT" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
 // Sans verrou depuis le 10 septembre 2026 : plusieurs fiches restent en main,
 // et chaque console reprend la plus récente des siennes.
 func TestQualificationPlusieursFichesEnMainUneParConsole(t *testing.T) {

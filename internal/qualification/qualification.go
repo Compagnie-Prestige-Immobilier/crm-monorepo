@@ -32,6 +32,7 @@ const (
 var Garde = map[string][]socle.Role{
 	"POST /api/v1/rep-campaigns/attempts":       socle.Parcours,
 	"POST /api/v1/phase2/call-attempts":         socle.Parcours,
+	"PATCH /api/v1/phase2/call-attempts/{id}":   socle.Parcours,
 	"GET /api/v1/phase2/callbacks":              socle.Parcours,
 	"GET /api/v1/phase2/directory":              socle.Parcours,
 	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele},
@@ -53,6 +54,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
 	huma.Register(api, qualificationRoute("recordRepCallAttempt", http.MethodPost, "/api/v1/rep-campaigns/attempts"), s.qualificationRepAppel)
 	huma.Register(api, qualificationRoute("recordCallAttempt", http.MethodPost, "/api/v1/phase2/call-attempts"), s.qualificationTentativeProspect)
+	huma.Register(api, qualificationRoute("updateCallAttempt", http.MethodPatch, "/api/v1/phase2/call-attempts/{id}"), s.qualificationModifierAppel)
 	huma.Register(api, qualificationRoute("listScheduledCallbacks", http.MethodGet, "/api/v1/phase2/callbacks"), s.qualificationListerRappels)
 	huma.Register(api, qualificationRoute("cancelScheduledCallback", http.MethodPost, "/api/v1/phase2/callbacks/{id}/cancel"), s.qualificationAnnulerRappel)
 	huma.Register(api, qualificationRoute("ouvrirFiche", http.MethodPost, "/api/v1/ouvertures"), s.qualificationOuvrirFiche)

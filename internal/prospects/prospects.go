@@ -621,67 +621,6 @@ func (s *service) prospectHandlerLire(ctx context.Context, in *ProspectIDInput) 
 	return &ProspectOutput{Body: *item}, nil
 }
 
-type ProspectCallAttempt struct {
-	ID                        string  `json:"id"`
-	Outcome                   string  `json:"outcome"`
-	ReasonLabel               *string `json:"reasonLabel"`
-	Method                    *string `json:"method"`
-	Comment                   *string `json:"comment"`
-	Email                     *string `json:"email"`
-	Fonctionnaire             *bool   `json:"fonctionnaire"`
-	EngagementEnCours         *bool   `json:"engagementEnCours"`
-	DureeEtablissementMois    *int32  `json:"dureeEtablissementMois"`
-	RendezVousAt              *string `json:"rendezVousAt"`
-	DeviceCallType            *string `json:"deviceCallType"`
-	DeviceCallDurationSeconds *int32  `json:"deviceCallDurationSeconds"`
-	DeviceCallAt              *string `json:"deviceCallAt"`
-	PerformedByID             string  `json:"performedById"`
-	PerformedByName           string  `json:"performedByName"`
-	ClientCreatedAt           string  `json:"clientCreatedAt"`
-	DureeTraitementSecondes   *int32  `json:"dureeTraitementSecondes"`
-}
-
-type ProspectCallAttemptsOutput struct {
-	Body struct {
-		Items []ProspectCallAttempt `json:"items"`
-	}
-}
-
-func prospectDureeTraitement(premiereSaisie, fermeture *time.Time) *int32 {
-	if premiereSaisie == nil || fermeture == nil {
-		return nil
-	}
-	return prospectPtr(int32(fermeture.Sub(*premiereSaisie).Round(time.Second).Seconds()))
-}
-
-// Même portée que la fiche : qui peut la lire peut relire ses appels.
-func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (*ProspectCallAttemptsOutput, error) {
-	u := socle.UtilisateurCourant(ctx)
-	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
-		return nil, err
-	}
-	lignes, err := s.Q.TentativesDuProspect(ctx, in.ID)
-	if err != nil {
-		return nil, err
-	}
-	out := &ProspectCallAttemptsOutput{}
-	out.Body.Items = make([]ProspectCallAttempt, 0, len(lignes))
-	for i := range lignes {
-		l := &lignes[i]
-		out.Body.Items = append(out.Body.Items, ProspectCallAttempt{
-			ID: l.ID, Outcome: string(l.Outcome), ReasonLabel: l.ReasonLabel, Method: prospectEnum(l.Method),
-			Comment: l.Comment, Email: l.Email, Fonctionnaire: l.Fonctionnaire,
-			EngagementEnCours: l.EngagementEnCours, DureeEtablissementMois: l.DureeEtablissementMois,
-			RendezVousAt: prospectISOPtr(l.RendezVousAt), DeviceCallType: l.DeviceCallType,
-			DeviceCallDurationSeconds: l.DeviceCallDurationSeconds, DeviceCallAt: prospectISOPtr(l.DeviceCallAt),
-			PerformedByID: l.PerformedById, PerformedByName: l.PerformedByName,
-			ClientCreatedAt:         prospectISO(l.ClientCreatedAt),
-			DureeTraitementSecondes: prospectDureeTraitement(l.OuvertureFirstInputAt, l.OuvertureClosedAt),
-		})
-	}
-	return out, nil
-}
-
 type ProspectBody struct {
 	ID                string                    `json:"id,omitempty" format:"uuid" required:"false"`
 	Nom               *string                   `json:"nom,omitempty" minLength:"1" maxLength:"120" required:"false"`
