@@ -602,7 +602,7 @@ const SECTIONS: readonly NavSection[] = [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
         href: '/grand-public/console',
-        label: 'Appeler les prospects',
+        label: 'Mes fiches',
         icon: PhoneCallIcon,
         description: 'Les fiches de campagne à appeler',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
