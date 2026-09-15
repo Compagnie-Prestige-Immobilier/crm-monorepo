@@ -79,6 +79,7 @@ interface ContenuRappelProps {
   readonly serverTimeMs: number;
   readonly racine: string;
   readonly onIgnorer: () => void;
+  readonly onFermerTout: () => void;
   readonly onAnnuler: (id: string) => void;
   readonly isPendingCancel: boolean;
   readonly enAttente: number;
@@ -89,6 +90,7 @@ function ContenuRappelPopUp({
   serverTimeMs,
   racine,
   onIgnorer,
+  onFermerTout,
   onAnnuler,
   isPendingCancel,
   enAttente,
@@ -114,7 +116,9 @@ function ContenuRappelPopUp({
               </DialogTitle>
               <DialogDescription className="text-sm text-muted-foreground">
                 Le créneau est atteint. Toutes les informations utiles sont ci-dessous.
-                {enAttente > 1 ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.` : ''}
+                {enAttente > 1
+                  ? ` ${enAttente - 1} autre${enAttente > 2 ? 's' : ''} en attente.`
+                  : ''}
               </DialogDescription>
             </div>
           </div>
@@ -173,6 +177,12 @@ function ContenuRappelPopUp({
             <ClockIcon className="h-4 w-4" />
             Plus tard
           </Button>
+
+          {enAttente > 1 ? (
+            <Button variant="outline" size="sm" onClick={onFermerTout}>
+              Fermer tout ({enAttente})
+            </Button>
+          ) : null}
 
           <Button
             variant="ghost"
@@ -253,11 +263,15 @@ export function RappelPopUpIntrusif() {
     setTriggeredIds((previous) => new Set([...previous, ...newlyOverdue.map(({ id }) => id)]));
   }, [callbacks, overdueQuery.isSuccess]);
 
+  const enAttenteIds = callbacks
+    .filter(
+      (callback) =>
+        triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
+    )
+    .map(({ id }) => id);
   const activeCallback: Rappel | null =
-    callbacks.find((c) => triggeredIds.has(c.id) && !dismissedIds.has(c.id) && c.overdue) ?? null;
-  const enAttente = callbacks.filter(
-    (callback) => triggeredIds.has(callback.id) && !dismissedIds.has(callback.id) && callback.overdue,
-  ).length;
+    callbacks.find((callback) => callback.id === enAttenteIds[0]) ?? null;
+  const enAttente = enAttenteIds.length;
 
   useEffect(() => {
     if (!activeCallback) return;
@@ -275,9 +289,13 @@ export function RappelPopUpIntrusif() {
     setDismissedIds((prev) => new Set([...prev, activeCallback.id]));
   };
 
+  const fermerTout = () => {
+    setDismissedIds((prev) => new Set([...prev, ...enAttenteIds]));
+  };
+
   const annulerRappel = (id: string) => {
     cancelMutation.mutate(id);
-    ignorerRappel();
+    setDismissedIds((prev) => new Set([...prev, id]));
   };
 
   return (
@@ -286,6 +304,7 @@ export function RappelPopUpIntrusif() {
       serverTimeMs={serverTimeMs}
       racine={racine}
       onIgnorer={ignorerRappel}
+      onFermerTout={fermerTout}
       onAnnuler={annulerRappel}
       isPendingCancel={cancelMutation.isPending}
       enAttente={enAttente}
