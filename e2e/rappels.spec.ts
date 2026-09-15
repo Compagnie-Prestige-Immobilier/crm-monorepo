@@ -142,7 +142,7 @@ test.describe('parcours 6, rappels promis', () => {
 });
 
 test.describe('parcours 6, rappels en retard', () => {
-  test('« Plus tard » écarte toute la file des rappels en retard', async ({ page }) => {
+  test('« Fermer tout » écarte toute la file des rappels en retard', async ({ page }) => {
     const premiere = await semer('RetardUn');
     const seconde = await semer('RetardDeux');
     await avecBase(async (client) => {
@@ -165,7 +165,7 @@ test.describe('parcours 6, rappels en retard', () => {
     await page.goto(RAPPELS);
     const modale = page.getByRole('dialog', { name: /Rappel à passer maintenant/u });
     await expect(modale).toBeVisible();
-    await modale.getByRole('button', { name: 'Plus tard' }).click();
+    await modale.getByRole('button', { name: /^Fermer tout/u }).click();
     await expect(modale).toHaveCount(0);
     await page.waitForTimeout(1_000);
     await expect(modale).toHaveCount(0);

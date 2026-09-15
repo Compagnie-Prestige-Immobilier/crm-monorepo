@@ -79,6 +79,7 @@ interface ContenuRappelProps {
   readonly serverTimeMs: number;
   readonly racine: string;
   readonly onIgnorer: () => void;
+  readonly onFermerTout: () => void;
   readonly onAnnuler: (id: string) => void;
   readonly isPendingCancel: boolean;
   readonly enAttente: number;
@@ -89,6 +90,7 @@ function ContenuRappelPopUp({
   serverTimeMs,
   racine,
   onIgnorer,
+  onFermerTout,
   onAnnuler,
   isPendingCancel,
   enAttente,
@@ -175,6 +177,12 @@ function ContenuRappelPopUp({
             <ClockIcon className="h-4 w-4" />
             Plus tard
           </Button>
+
+          {enAttente > 1 ? (
+            <Button variant="outline" size="sm" onClick={onFermerTout}>
+              Fermer tout ({enAttente})
+            </Button>
+          ) : null}
 
           <Button
             variant="ghost"
@@ -277,8 +285,11 @@ export function RappelPopUpIntrusif() {
 
   if (!activeCallback) return null;
 
-  // Une file de rappels en retard ne doit pas bloquer l'écran : « Plus tard » les écarte tous.
-  const reporterTout = () => {
+  const ignorerRappel = () => {
+    setDismissedIds((prev) => new Set([...prev, activeCallback.id]));
+  };
+
+  const fermerTout = () => {
     setDismissedIds((prev) => new Set([...prev, ...enAttenteIds]));
   };
 
@@ -292,7 +303,8 @@ export function RappelPopUpIntrusif() {
       callback={activeCallback}
       serverTimeMs={serverTimeMs}
       racine={racine}
-      onIgnorer={reporterTout}
+      onIgnorer={ignorerRappel}
+      onFermerTout={fermerTout}
       onAnnuler={annulerRappel}
       isPendingCancel={cancelMutation.isPending}
       enAttente={enAttente}
