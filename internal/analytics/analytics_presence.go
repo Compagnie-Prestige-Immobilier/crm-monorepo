@@ -329,13 +329,13 @@ func (perimetre perimetreSupervision) actes(p *parametresSQL) string {
 	  0                                                 AS prospect,
 	  NULL::text                                        AS representant
 	FROM "call_attempts" ca
-	WHERE ` + perimetre.parcoursDuProjet(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT p."createdById", ` + perimetre.tronque(`p."clientCreatedAt"`) + `,
 	  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
 	FROM "prospects" p
-	WHERE p."deletedAt" IS NULL AND ` + perimetre.parcoursDuProjet(p, `p."id"`) + etSQL + perimetre.fenetre(p, `p."clientCreatedAt"`) + `
+	WHERE p."deletedAt" IS NULL AND ` + perimetre.ficheDuPerimetre(p, `p."id"`) + etSQL + perimetre.fenetre(p, `p."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT rca."performedById", ` + perimetre.tronque(`rca."clientCreatedAt"`) + `,
@@ -349,7 +349,7 @@ func (perimetre perimetreSupervision) actes(p *parametresSQL) string {
 	FROM "device_call_detections" d
 	WHERE ` + perimetre.fenetre(p, `d."deviceCallAt"`) + ` AND CASE
 	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles() + `
-	  ELSE ` + perimetre.parcoursDuProjet(p, `d."prospectId"`) + ` END`
+	  ELSE ` + perimetre.ficheDuPerimetre(p, `d."prospectId"`) + ` END`
 }
 
 func (perimetre perimetreSupervision) tentativesRepresentants(p *parametresSQL) string {
@@ -405,7 +405,7 @@ func (perimetre perimetreSupervision) fichesProspects(p *parametresSQL) string {
 	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
 	  (ca."outcome" NOT IN ` + IssuesNonJointes + `)::int AS joint
 	FROM "call_attempts" ca
-	WHERE ` + perimetre.parcoursDuProjet(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 	ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
 }
 
@@ -426,7 +426,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	FROM "device_call_detections" d
 	WHERE ` + perimetre.fenetre(p, `d."deviceCallAt"`) + ` AND CASE
 	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles() + `
-	  ELSE ` + perimetre.parcoursDuProjet(p, `d."prospectId"`) + ` END
+	  ELSE ` + perimetre.ficheDuPerimetre(p, `d."prospectId"`) + ` END
 
 	UNION ALL
 	SELECT ca."performedById", ` + perimetre.tronque(`ca."clientCreatedAt"`) + `,
@@ -439,7 +439,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	  0, 0, 0, 0, 0, 0
 	FROM "call_attempts" ca
 	WHERE (ca."deviceCallType" IS NOT NULL OR ca."deviceCallAt" IS NOT NULL)
-	  AND ` + perimetre.parcoursDuProjet(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	  AND ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT rca."performedById", ` + perimetre.tronque(`rca."clientCreatedAt"`) + `,
@@ -462,7 +462,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	  (sc."status" = 'PENDING' AND sc."scheduledAt" > now())::int,
 	  0, 0, 0
 	FROM "scheduled_callbacks" sc
-	WHERE ` + perimetre.fenetre(p, `sc."scheduledAt"`) + etSQL + perimetre.parcoursDuProjet(p, `sc."prospectId"`) + `
+	WHERE ` + perimetre.fenetre(p, `sc."scheduledAt"`) + etSQL + perimetre.ficheDuPerimetre(p, `sc."prospectId"`) + `
 
 	UNION ALL
 	SELECT h."performedById", ` + perimetre.tronque(`h."callbackAt"`) + `,
@@ -673,7 +673,7 @@ func (s *service) histogrammesDesProspects(ctx context.Context, perimetre perime
 	LEFT JOIN "prospects" p
 	  ON p."createdById" = u."id"
 	  AND p."deletedAt" IS NULL
-	  AND `+perimetre.parcoursDuProjet(agents, `p."id"`)+`
+	  AND `+perimetre.ficheDuPerimetre(agents, `p."id"`)+`
 	  AND `+perimetre.fenetre(agents, `p."clientCreatedAt"`)+`
 	WHERE `+perimetre.teleconseiller(agents)+`
 	GROUP BY u."id", u."fullName"
@@ -688,7 +688,7 @@ func (s *service) histogrammesDesProspects(ctx context.Context, perimetre perime
 	INNER JOIN "prospects" p
 	  ON p."representantId" = r."id"
 	  AND p."deletedAt" IS NULL
-	  AND `+perimetre.parcoursDuProjet(representants, `p."id"`)+`
+	  AND `+perimetre.ficheDuPerimetre(representants, `p."id"`)+`
 	  AND `+perimetre.fenetre(representants, `p."clientCreatedAt"`)+`
 	GROUP BY r."id", r."fullName"
 	ORDER BY prospects DESC, label ASC`, representants.args)
@@ -766,7 +766,7 @@ func (perimetre perimetreSupervision) appelsSituesDansLeCreneau(p *parametresSQL
 	  (ca."outcome" NOT IN ` + IssuesNonJointes + `)::int AS joint,
 	  (ca."outcome" = 'METHOD_OBTAINED')::int      AS qualifie
 	FROM "call_attempts" ca
-	WHERE ` + perimetre.parcoursDuProjet(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
+	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT rca."performedById", rca."clientCreatedAt", 'representant',

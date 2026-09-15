@@ -33,6 +33,7 @@ import {
   type Jeux,
   type SourceChiffre,
 } from '@/components/chiffres/sources';
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -62,6 +63,7 @@ import {
   type PerimetreChiffres,
   type Projet,
 } from '@/lib/data/chiffres';
+import { fetchLotsExport } from '@/lib/data/lots-export';
 import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
 import {
   fetchDisposition,
@@ -109,6 +111,7 @@ const clefDeJeu = (jeu: Jeu, perimetre: PerimetreChiffres): readonly unknown[] =
   perimetre.plage.from,
   perimetre.plage.to,
   perimetre.commercialId,
+  perimetre.lotId,
 ];
 
 /**
@@ -305,6 +308,43 @@ function LienRappels({
   );
 }
 
+/** Les campagnes d'appels prospects : les autres ne portent que des actes représentants. */
+function SelecteurCampagne({
+  projet,
+  value,
+  onChange,
+}: {
+  projet: Projet | null;
+  value: string | null;
+  onChange: (campagne: string | null) => void;
+}) {
+  const query = {
+    page: 1,
+    pageSize: 50,
+    cible: 'PROSPECTS' as const,
+    ...(projet === null ? {} : { projet }),
+  };
+  const campagnes = useQuery({
+    queryKey: ['chiffres', 'campagnes-du-filtre', projet],
+    queryFn: () => fetchLotsExport(query),
+  });
+
+  return (
+    <FilterCombobox
+      className="w-64"
+      label="Campagne"
+      placeholder="Toutes les campagnes"
+      options={(campagnes.data?.items ?? []).map((lot) => ({
+        value: lot.id,
+        label: lot.name,
+        hint: formatDate(lot.createdAt),
+      }))}
+      value={value}
+      onChange={onChange}
+    />
+  );
+}
+
 export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Role }) {
   const { filters, setFilters } = useUrlFilters(chiffresFiltersAdapter);
   const live = useLive();
@@ -319,6 +359,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
     projet,
     plage: { from: plage.du, to: plage.au },
     commercialId: filters.teleconseiller,
+    lotId: filters.campagne,
   };
 
   const dispositionQuery = useQuery({
@@ -643,6 +684,13 @@ function ChiffresToolbar({
             </SelectContent>
           </Select>
         ) : null}
+        <SelecteurCampagne
+          projet={projet}
+          value={filters.campagne}
+          onChange={(campagne) => {
+            onFiltersChange({ campagne });
+          }}
+        />
         <LienRappels projet={projet} teleconseiller={filters.teleconseiller} />
       </div>
       <div className="flex flex-wrap items-center gap-2">

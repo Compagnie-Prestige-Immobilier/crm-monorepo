@@ -10,7 +10,10 @@ export type LotExportSummary = Schemas['LotExportSummaryDto'];
 export type LotExportDetail = Schemas['LotExportDetailDto'];
 export type CreateLotExportInput = Schemas['CreateLotExportDto'];
 export type LotExportPreview = Schemas['LotExportPreviewDto'];
-export type CampagnePerformance = Pick<LotExportDetail, 'name' | 'performance'>;
+export type CampagnePerformance = Pick<
+  LotExportDetail,
+  'name' | 'performance' | 'fichesAppelees' | 'itemCount' | 'callsSince'
+>;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
 export type LotExportFiche = Schemas['LotExportFicheDto'];
 export type LotExportFicheEtat = Schemas['LotExportFicheEtat'];
@@ -129,21 +132,29 @@ export async function deleteLotExport(
   unwrap(await client.DELETE('/api/v1/lots-export/{id}', { params: { path: { id } } }));
 }
 
-export async function fetchDerniereCampagne(
+/** La campagne choisie au filtre, ou la dernière lancée tant qu'aucune n'est choisie. */
+export async function fetchCampagneRegardee(
+  lotId: string | null,
   projet: Schemas['Projet'] | null,
   teleconseillerId: string | null,
   client: ApiClient = getApiClient(),
 ): Promise<CampagnePerformance | null> {
-  const liste = await fetchLotsExport(
-    { page: 1, pageSize: 1, ...(projet === null ? {} : { projet }) },
-    client,
-  );
-  const resume = liste.items[0];
-  if (resume === undefined) return null;
+  let id = lotId;
+  if (id === null) {
+    const liste = await fetchLotsExport(
+      { page: 1, pageSize: 1, ...(projet === null ? {} : { projet }) },
+      client,
+    );
+    id = liste.items[0]?.id ?? null;
+  }
+  if (id === null) return null;
 
-  const campagne = await fetchLotExport(resume.id, client);
+  const campagne = await fetchLotExport(id, client);
   return {
     name: campagne.name,
+    itemCount: campagne.itemCount,
+    fichesAppelees: campagne.fichesAppelees,
+    callsSince: campagne.callsSince,
     performance:
       teleconseillerId === null
         ? campagne.performance
