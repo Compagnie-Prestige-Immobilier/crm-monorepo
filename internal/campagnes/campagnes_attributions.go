@@ -8,6 +8,7 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+	"time"
 
 	"golang.org/x/text/transform"
 )
@@ -23,13 +24,15 @@ type CampagneImport struct {
 	Libelle    string `json:"libelle"`
 	ImportedAt string `json:"importedAt"`
 	Fiches     int    `json:"fiches"`
+	Appelees   int    `json:"appelees" doc:"Fiches de l'import déjà appelées au moins une fois."`
 }
 
-var dateFeuilleImport = regexp.MustCompile(`(?i)(\d{1,2})\s+([a-z]{3,10})\.?\s+(\d{2,4})`)
+var dateFeuilleImport = regexp.MustCompile(`(?i)(\d{1,2})\s+([a-z]{3,10})\.?(?:\s+(\d{2,4}))?`)
 
-// Le marketing nomme ses onglets « DEBUT CAMPAGNE 10 SEPT 26 » ou « Leads 11
-// sept 2026 » : seule la date compte, et elle doit se lire pareil partout. Un
-// onglet sans date lisible garde son nom, plutôt qu'une date inventée.
+// Le marketing nomme ses onglets « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 11
+// sept 2026 » ou « Leads 13 sept » : seule la date compte, et elle doit se lire
+// pareil partout. Sans année, c'est celle en cours. Un onglet sans date lisible
+// garde son nom, plutôt qu'une date inventée.
 func libelleFeuilleImport(feuille string) string {
 	nom := strings.TrimSpace(feuille)
 	if nom == "" {
@@ -44,7 +47,10 @@ func libelleFeuilleImport(feuille string) string {
 		return nom
 	}
 	jour, _ := strconv.Atoi(trouve[1])
-	annee, _ := strconv.Atoi(trouve[3])
+	annee := time.Now().Year()
+	if trouve[3] != "" {
+		annee, _ = strconv.Atoi(trouve[3])
+	}
 	if annee < 100 {
 		annee += 2000
 	}
@@ -94,7 +100,7 @@ func (s *service) campagneImports(ctx context.Context, in *CampagneImportsInput)
 		}
 		out.Body.Items = append(out.Body.Items, CampagneImport{
 			ID: rows[i].ID, FileName: rows[i].FileName, Feuille: feuille, Libelle: libelle,
-			ImportedAt: lotISO(importeLe), Fiches: int(rows[i].Fiches),
+			ImportedAt: lotISO(importeLe), Fiches: int(rows[i].Fiches), Appelees: int(rows[i].Appelees),
 		})
 	}
 	return out, nil

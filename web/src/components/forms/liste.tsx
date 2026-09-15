@@ -1,5 +1,7 @@
 'use client';
 
+import type { ReactNode } from 'react';
+
 import {
   Select,
   SelectContent,
@@ -11,6 +13,8 @@ import {
 export interface OptionListe {
   readonly value: string;
   readonly label: string;
+  /** Un repère visuel devant le libellé, dans la liste seulement. */
+  readonly avant?: ReactNode;
 }
 
 export function Liste({
@@ -49,7 +53,7 @@ export function Liste({
       </SelectTrigger>
       <SelectContent>
         {items.map((item) => (
-          <SelectItem key={item.value} value={item.value}>
+          <SelectItem key={item.value} value={item.value} avant={item.avant}>
             {item.label}
           </SelectItem>
         ))}

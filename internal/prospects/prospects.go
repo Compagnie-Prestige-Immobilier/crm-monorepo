@@ -457,6 +457,7 @@ type ProspectListInput struct {
 	Revue                  string `query:"revue" enum:"true,false"`
 	MesFiches              bool   `query:"mesFiches"`
 	Attribue               bool   `query:"attribue"`
+	ResteAAppeler          bool   `query:"resteAAppeler"`
 	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
@@ -544,6 +545,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		AppelePar:              prospectVide(in.AppelePar),
 		Search:                 prospectVide(strings.TrimSpace(in.Search)),
 		Attribue:               in.Attribue,
+		ResteAAppeler:          in.ResteAAppeler,
 	}
 	if in.Revue != "" {
 		arg.Revue = prospectPtr(in.Revue == prospectVrai)
@@ -571,6 +573,7 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
 		Search: arg.Search, PhoneSearch: arg.PhoneSearch, Attribue: arg.Attribue,
+		ResteAAppeler: arg.ResteAAppeler,
 	}
 }
 

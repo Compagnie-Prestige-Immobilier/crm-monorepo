@@ -52,7 +52,8 @@ SELECT MAX(j."id")::text AS "id",
        p."importFeuille",
        MIN(j."createdAt")::timestamp AS "createdAt",
        MAX(j."finishedAt")::timestamp AS "finishedAt",
-       COUNT(*)::int AS fiches
+       COUNT(*)::int AS fiches,
+       COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS appelees
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj

@@ -2,6 +2,7 @@
 
 import { Select as SelectPrimitive } from '@base-ui/react/select';
 import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -108,9 +109,11 @@ function SelectContent({
 
 type SelectItemProps = Omit<SelectPrimitive.Item.Props, 'className'> & {
   className?: string | undefined;
+  /** Rendu devant le libellé de l'option, hors du texte que le déclencheur reprend. */
+  avant?: ReactNode;
 };
 
-function SelectItem({ className, children, ...props }: SelectItemProps) {
+function SelectItem({ className, children, avant, ...props }: SelectItemProps) {
   return (
     <SelectPrimitive.Item
       data-slot="select-item"
@@ -124,6 +127,7 @@ function SelectItem({ className, children, ...props }: SelectItemProps) {
       )}
       {...props}
     >
+      {avant}
       <SelectPrimitive.ItemText className="shrink-0 whitespace-nowrap">
         {children}
       </SelectPrimitive.ItemText>

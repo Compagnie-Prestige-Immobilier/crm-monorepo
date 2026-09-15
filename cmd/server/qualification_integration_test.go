@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"slices"
 	"testing"
 	"time"
 
@@ -232,6 +233,50 @@ func TestQualificationRappelPlanifieEtListe(t *testing.T) {
 	}
 	if !trouve {
 		t.Fatalf("un rappel en retard doit remonter dans la file du jour : %v", body)
+	}
+}
+
+func qualificationTotalProspects(b *banc, requete string) (total int, ids []string) {
+	b.t.Helper()
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects?mesFiches=true"+requete, nil)
+	b.attend(statut, http.StatusOK, "liste des prospects", body)
+	meta, _ := body["meta"].(map[string]any)
+	n, _ := meta["total"].(float64)
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		ligne, _ := item.(map[string]any)
+		id, _ := ligne["id"].(string)
+		ids = append(ids, id)
+	}
+	return int(n), ids
+}
+
+// Une téléconseillère qui a fini sa campagne ne doit plus voir ses fiches
+// appelées dans la file, sauf celles qui attendent un rappel.
+func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	traitee, intacte, rappelee := qualificationProspect(b), qualificationProspect(b), qualificationProspect(b)
+	appel := qualificationCorpsTentative(traitee, nil)
+	rappel := qualificationCorpsTentative(rappelee, map[string]any{
+		"outcome":    "CALLBACK",
+		"callbackAt": time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano),
+	})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, rappelee)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2)`, appel["id"], rappel["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+	b.attend(statut, http.StatusOK, "fiche traitée", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rappel)
+	b.attend(statut, http.StatusOK, "fiche à rappeler", body)
+
+	total, _ := qualificationTotalProspects(b, "")
+	if total != 3 {
+		t.Fatalf("sans filtre, les trois fiches restent visibles : %d", total)
+	}
+	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
+	if total != 2 || slices.Contains(ids, traitee) || !slices.Contains(ids, intacte) || !slices.Contains(ids, rappelee) {
+		t.Fatalf("reste à appeler = la fiche jamais appelée et celle à rappeler : total %d, %v", total, ids)
 	}
 }
 
