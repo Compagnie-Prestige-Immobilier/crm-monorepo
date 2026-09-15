@@ -51,7 +51,8 @@ const rappelDe = (callbackAt: string | null): string =>
 
 const auteurDe = (modification: Modification): string => modification.userName ?? 'Auteur inconnu';
 
-const cleAppels = (prospectId: string) => ['prospects', 'call-attempts', prospectId] as const;
+export const cleAppels = (prospectId: string) =>
+  ['prospects', 'call-attempts', prospectId] as const;
 
 function Changements({ modification }: { modification: Modification }) {
   const { avant, apres } = modification;
@@ -131,13 +132,15 @@ const evenementsModification = (appel: ProspectCallAttempt): EvenementHistorique
     detail: <Changements modification={modification} />,
   }));
 
-function ModifierAppel({
+export function ModifierAppel({
   appel,
   prospectId,
+  libelle = 'Modifier l’appel',
   onFicheModifiee,
 }: {
   appel: ProspectCallAttempt;
   prospectId: string;
+  libelle?: string;
   onFicheModifiee: (fiche: ProspectRow) => void;
 }) {
   const queryClient = useQueryClient();
@@ -198,7 +201,7 @@ function ModifierAppel({
     <>
       <Button size="sm" onClick={ouvrir}>
         <PencilIcon aria-hidden="true" />
-        Modifier l’appel
+        {libelle}
       </Button>
       <Dialog
         open={ouvert}
