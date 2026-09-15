@@ -270,7 +270,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Fiches plateforme',
         icon: HeadsetIcon,
         description: 'Les inscrits des plateformes d’enrôlement',
-        roles: ['CCP', ...ENCADREMENT],
+        roles: ['CCP'],
       },
       {
         href: '/teleconseil/rappels',

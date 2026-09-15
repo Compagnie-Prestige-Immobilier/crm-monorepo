@@ -8,7 +8,11 @@ import (
 	"time"
 )
 
-const routeFichesPlateforme = "/teleconseil/plateforme"
+const (
+	routeFichesPlateforme = "/teleconseil/plateforme"
+	// L'encadrement n'a pas la page des CCP : il lit les fiches dans la liste.
+	routeListeProspects = "/teleconseil/prospects"
+)
 
 // Chaque matin, les CCP apprennent ce qui est arrivé la veille et ce qui
 // attend encore un premier appel ; au-delà du seuil réglé pour le projet,
@@ -54,5 +58,5 @@ func (s *service) signalerAttentePlateforme(ctx context.Context, maintenant time
 	return s.emettreRappelNotification(ctx, notificationCleAttentePlateforme+":"+projet, maintenant, candidats,
 		"Fiches plateforme en attente",
 		"{{fiches}} fiche(s) {{projet}} venue(s) de la plateforme attendent un premier appel, au-delà du seuil de {{seuil}}. Les chargés de clientèle plateforme ont besoin de renfort.",
-		routeFichesPlateforme, "RAPPEL")
+		routeListeProspects, "RAPPEL")
 }
