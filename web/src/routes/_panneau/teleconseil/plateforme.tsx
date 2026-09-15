@@ -4,11 +4,11 @@ import { ConsoleView } from '@/components/console/console-view';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/plateforme')({
-  beforeLoad: guardRoles(['CCP', 'ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardRoles(['CCP']),
   component: PlateformePage,
 });
 
-/** Les fiches venues des plateformes d'enrôlement : les CCP les appellent, l'encadrement les lit. */
+/** Les fiches venues des plateformes d'enrôlement : seuls les CCP les appellent. */
 function PlateformePage() {
   const { user } = Route.useRouteContext();
   return <ConsoleView viewerId={user.id} plateforme />;
