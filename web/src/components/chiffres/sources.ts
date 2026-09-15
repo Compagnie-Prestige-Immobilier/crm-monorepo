@@ -277,6 +277,17 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
   extraire: ({ activite }) => (activite === undefined ? null : tableauEquipe(activite, chues)),
 });
 
+/** La même phrase que le détail d'une campagne : appelées sur confiées, appels consignés. */
+function couvertureDeLaCampagne(campagne: NonNullable<ChiffresCampagne>): string {
+  const pluriel = (nombre: number): string => (nombre > 1 ? 's' : '');
+  return (
+    `${formatNumber(campagne.fichesAppelees)} fiche${pluriel(campagne.fichesAppelees)} ` +
+    `appelée${pluriel(campagne.fichesAppelees)} sur ${formatNumber(campagne.itemCount)}, ` +
+    `${formatNumber(campagne.callsSince)} appel${pluriel(campagne.callsSince)} ` +
+    `consigné${pluriel(campagne.callsSince)}.`
+  );
+}
+
 /**
  * Le catalogue de l'écran « Chiffres ». Une entrée par carte, et rien qui ne
  * soit pas une carte : tout ce qui s'affiche se déplace et se retire.
@@ -619,17 +630,18 @@ const SOURCES_CHIFFRES = {
     extraire: ({ ouvertures }) => (ouvertures === undefined ? null : matriceOuvertures(ouvertures)),
   },
   'couverture-derniere-campagne': {
-    label: 'Couverture de la dernière campagne',
+    label: 'Couverture de la campagne',
     forme: 'composition',
     jeu: 'campagne',
     description:
-      'Fiches appelées et fiches restantes par téléconseiller, sur la dernière campagne quelle que soit la période.',
+      'Fiches appelées et fiches restantes par téléconseiller, sur la campagne choisie ou sur la dernière lancée, quelle que soit la période.',
     groupe: 'Campagnes',
     extraire: ({ campagne }) =>
       campagne == null
         ? null
         : {
             forme: 'composition',
+            resume: couvertureDeLaCampagne(campagne),
             donnee: campagne.performance.map((ligne) => ({
               ligne: ligne.teleconseillerName,
               segments: [
@@ -648,7 +660,7 @@ const SOURCES_CHIFFRES = {
     forme: 'classement',
     jeu: 'campagne',
     description:
-      'Appels sur la fiche d’un collègue, sur la dernière campagne quelle que soit la période.',
+      'Appels sur la fiche d’un collègue, sur la campagne choisie ou sur la dernière lancée, quelle que soit la période.',
     groupe: 'Campagnes',
     extraire: ({ campagne }) =>
       campagne == null
