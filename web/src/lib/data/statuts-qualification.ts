@@ -17,7 +17,7 @@ export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationD
  * déclare quand même la sienne, comme le fera le terrain. En 8, il consent
  * aussi aux refus de conversion CHUES d'EB-21, EB-22 et EB-24.
  */
-export const PANEL_PAYLOAD_VERSION = 8;
+export const PANEL_PAYLOAD_VERSION = 9;
 
 export const STATUT_QUALIFICATION_EFFECTS = [
   'REACHED',

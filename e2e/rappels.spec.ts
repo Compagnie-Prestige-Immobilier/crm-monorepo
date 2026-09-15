@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { expect, test, type Page } from '@playwright/test';
 
 import { avecBase, compteDe } from './comptes';
@@ -136,6 +138,44 @@ test.describe('parcours 6, rappels promis', () => {
 
     const traite = await lireRappel(fiche.id);
     expect(traite.status).toBe('CANCELLED');
+  });
+});
+
+test.describe('parcours 6, rappels en retard', () => {
+  test('« Fermer tout » écarte toute la file des rappels en retard', async ({ page }) => {
+    const premiere = await semer('RetardUn');
+    const seconde = await semer('RetardDeux');
+    await avecBase(async (client) => {
+      for (const fiche of [premiere, seconde]) {
+        const tentative = randomUUID();
+        await client.query(
+          `INSERT INTO call_attempts (id, "prospectId", "performedById", outcome, "clientCreatedAt")
+           VALUES ($1, $2, $3, 'CALLBACK', now())`,
+          [tentative, fiche.id, compte.id],
+        );
+        await client.query(
+          `INSERT INTO scheduled_callbacks
+             (id, "prospectId", "assignedToId", "scheduledAt", "sourceAttemptId", "updatedAt")
+           VALUES ($1, $2, $3, now() - interval '2 hours', $4, now())`,
+          [randomUUID(), fiche.id, compte.id, tentative],
+        );
+      }
+    });
+
+    await page.goto(RAPPELS);
+    const modale = page.getByRole('dialog', { name: /Rappel à passer maintenant/u });
+    await expect(modale).toBeVisible();
+    await modale.getByRole('button', { name: /^Fermer tout/u }).click();
+    await expect(modale).toHaveCount(0);
+    await page.waitForTimeout(1_000);
+    await expect(modale).toHaveCount(0);
+
+    await avecBase(async (client) => {
+      await client.query(
+        `UPDATE scheduled_callbacks SET status = 'CANCELLED' WHERE "prospectId" = ANY($1)`,
+        [[premiere.id, seconde.id]],
+      );
+    });
   });
 });
 

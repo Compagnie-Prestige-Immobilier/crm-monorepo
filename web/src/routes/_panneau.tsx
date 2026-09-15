@@ -10,6 +10,7 @@ import { SIDEBAR_COOKIE } from '@/components/layout/sidebar-cookie';
 import { SidebarShell } from '@/components/layout/sidebar-shell';
 import { Topbar } from '@/components/layout/topbar';
 import { LiveStream } from '@/components/live/live-stream';
+import { RappelPopUpIntrusif } from '@/components/rappels/rappel-pop-up-intrusif';
 
 export const Route = createFileRoute('/_panneau')({
   beforeLoad: async ({ context, location }) => {
@@ -41,6 +42,7 @@ function Panneau() {
   return (
     <CoqueShell>
       <LiveStream />
+      <RappelPopUpIntrusif />
       <SidebarShell role={user.role} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">

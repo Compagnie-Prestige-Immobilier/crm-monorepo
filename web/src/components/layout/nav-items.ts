@@ -164,6 +164,7 @@ export interface NavSection {
  * et on n'explique qu'un seul parcours au téléphone.
  */
 const TERRAIN: readonly Role[] = ['COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION'];
+const CREATION_PROSPECT: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
 
 /** Ceux qui, en plus de leurs propres appels, suivent le travail des autres. */
 const ENCADREMENT: readonly Role[] = ['SUPERVISEUR', 'DIRECTION'];
@@ -272,7 +273,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Ajouter un prospect',
         icon: PlusCircleIcon,
         description: 'Deuxième étape',
-        roles: TERRAIN,
+        roles: CREATION_PROSPECT,
       },
       {
         href: '/chues/console',
@@ -601,7 +602,7 @@ const SECTIONS: readonly NavSection[] = [
       // ─── Téléconseiller ───────────────────────────────────────────────────
       {
         href: '/grand-public/console',
-        label: 'Appeler les prospects',
+        label: 'Mes fiches',
         icon: PhoneCallIcon,
         description: 'Les fiches de campagne à appeler',
         roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
@@ -642,7 +643,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Nouveau prospect',
         icon: PlusCircleIcon,
         description: 'Créer une fiche',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        roles: CREATION_PROSPECT,
         secondary: true,
       },
 

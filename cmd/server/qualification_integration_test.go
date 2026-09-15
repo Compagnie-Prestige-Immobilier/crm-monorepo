@@ -435,6 +435,42 @@ func TestSyncPushConsigneLaTentativeEtRendLesRefusDansLeCorps(t *testing.T) {
 	}
 }
 
+// Un appel injoignable avec son motif consigne la tentative et sort la fiche
+// de Nouveau : c'est l'appel qui fait progresser le statut.
+func TestSyncPushInjoignableAvecMotifContacteLaFiche(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(b)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect) })
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "id" = $1 AND "statut" = 'NOUVEAU'`, prospect); n != 1 {
+		t.Fatalf("la fiche doit naître Nouveau : %d lignes", n)
+	}
+
+	attemptID := uuid.Must(uuid.NewV7()).String()
+	resultats := qualificationResultatsSync(b, qualificationLotSync(
+		qualificationOperationSync("call_attempt", "create", attemptID, map[string]any{
+			"prospectId": prospect, "outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE",
+			"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		})), "appel injoignable")
+	if resultat, _ := resultats[0].(map[string]any); resultat["status"] != "applied" {
+		t.Fatalf("la tentative injoignable doit être appliquée : %v", resultats[0])
+	}
+
+	var raison, issue, statut string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT r."code", a."outcome"::text, p."statut"::text FROM "call_attempts" a
+		 JOIN "prospects" p ON p."id" = a."prospectId"
+		 LEFT JOIN "call_outcome_reasons" r ON r."id" = a."reasonId"
+		 WHERE a."id" = $1`, attemptID).Scan(&raison, &issue, &statut); err != nil {
+		t.Fatal(err)
+	}
+	if raison != "PAS_DE_REPONSE" || issue != "UNREACHABLE" || statut != "CONTACTE" {
+		t.Fatalf("tentative %s, issue %s, statut %s : la fiche doit porter son motif et être Contacté", raison, issue, statut)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospect_journeys" WHERE "prospectId" = $1 AND "statut" = 'CONTACTE'`, prospect); n != 1 {
+		t.Fatalf("le parcours doit sortir de Nouveau : %d lignes", n)
+	}
+}
+
 func TestQualificationAppelRepresentantRendLaSuggestionRecueillie(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	rep := qualificationRepresentant(b)

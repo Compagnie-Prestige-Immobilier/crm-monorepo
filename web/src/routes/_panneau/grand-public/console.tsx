@@ -6,7 +6,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/console')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR']),
+  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
   component: GrandPublicConsolePage,
   pendingComponent: Loading,
 });
@@ -27,6 +27,7 @@ function Loading() {
 /** La page `(panel)/grand-public/console` de la v1. */
 function GrandPublicConsolePage() {
   const { user } = Route.useRouteContext();
+  const canCreateProspect = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
 
-  return <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} />;
+  return <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />;
 }

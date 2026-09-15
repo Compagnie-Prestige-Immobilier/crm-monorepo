@@ -66,7 +66,7 @@ import {
   type ProspectType,
 } from '@/lib/data/grand-public';
 import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
-import { formatDate, formatNumber, formatPhone, withRetired } from '@/lib/format';
+import { formatDate, formatDateTime, formatNumber, formatPhone, withRetired } from '@/lib/format';
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
@@ -575,9 +575,37 @@ function EmptyState({
   );
 }
 
+function StatutCell({ prospect }: { prospect: ProspectRow }) {
+  const statut = statutForProjet(prospect, 'GRAND_PUBLIC');
+  return (
+    <TableCell>
+      <div className="flex flex-col gap-0.5">
+        <Badge variant={STATUT_VARIANT[statut]} className="w-fit">
+          {prospect.lastReasonLabel ?? PROSPECT_STATUT_LABELS[statut]}
+        </Badge>
+        {prospect.lastAttemptAt ? (
+          <span className="text-[0.75rem] text-muted-foreground tabular-nums">
+            {formatDateTime(prospect.lastAttemptAt)}
+            {prospect.callAttemptCount > 1 ? ` · ${prospect.callAttemptCount} appels` : ''}
+          </span>
+        ) : (
+          <span className="text-[0.75rem] text-muted-foreground">Non appelé</span>
+        )}
+        {prospect.lastComment ? (
+          <span
+            className="max-w-xs truncate text-[0.75rem] italic text-muted-foreground"
+            title={prospect.lastComment}
+          >
+            « {prospect.lastComment} »
+          </span>
+        ) : null}
+      </div>
+    </TableCell>
+  );
+}
+
 function Row({ prospect }: { prospect: ProspectRow }) {
   const name = `${prospect.prenom} ${prospect.nom}`.trim();
-  const statut = statutForProjet(prospect, 'GRAND_PUBLIC');
 
   return (
     <TableRow>
@@ -594,14 +622,7 @@ function Row({ prospect }: { prospect: ProspectRow }) {
           </span>
         </Link>
       </TableCell>
-      <TableCell>
-        <Badge variant={STATUT_VARIANT[statut]}>{PROSPECT_STATUT_LABELS[statut]}</Badge>
-        {prospect.lastReasonLabel ? (
-          <span className="block truncate text-[0.75rem] text-muted-foreground">
-            {prospect.lastReasonLabel}
-          </span>
-        ) : null}
-      </TableCell>
+      <StatutCell prospect={prospect} />
       <TableCell>
         {prospect.type === null ? <Absent /> : PROSPECT_TYPE_LABELS[prospect.type]}
       </TableCell>
