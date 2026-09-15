@@ -6,6 +6,8 @@ import (
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"cpi-go/web"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"flag"
@@ -72,6 +74,10 @@ func nouvelleAPI(mux *http.ServeMux, d *socle.Deps, pool *pgxpool.Pool, reg *reg
 
 func servirPanneau(mux *http.ServeMux) {
 	dist, _ := fs.Sub(web.Dist, "dist")
+	if index, err := fs.ReadFile(dist, "index.html"); err == nil {
+		empreinte := sha256.Sum256(index)
+		socle.VersionPanneau = hex.EncodeToString(empreinte[:8])
+	}
 	fichiers := http.FileServerFS(dist)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		if strings.HasPrefix(r.URL.Path, "/api/") {

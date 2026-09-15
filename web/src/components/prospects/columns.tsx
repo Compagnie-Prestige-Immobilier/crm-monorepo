@@ -148,11 +148,13 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'lastOutcome',
       header: 'Dernier appel',
       cell: ({ row }) => {
-        const { lastOutcome, lastComment, lastAttemptAt } = row.original;
+        const { lastOutcome, lastReasonLabel, lastComment, lastAttemptAt } = row.original;
         if (lastOutcome === null) return <Empty />;
         return (
           <div className="min-w-0 max-w-[16rem]">
-            <p className="truncate font-[600]">{CALL_OUTCOME_LABELS[lastOutcome]}</p>
+            <p className="truncate font-[600]">
+              {lastReasonLabel ?? CALL_OUTCOME_LABELS[lastOutcome]}
+            </p>
             {lastComment !== null && lastComment !== '' ? (
               <p className="truncate text-[0.75rem] text-muted-foreground" title={lastComment}>
                 {lastComment}

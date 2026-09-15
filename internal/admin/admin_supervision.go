@@ -27,7 +27,7 @@ type CompteSupervise struct {
 	FullName               string                    `json:"fullName"`
 	Username               string                    `json:"username"`
 	Email                  string                    `json:"email"`
-	Role                   socle.Role                `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+	Role                   socle.Role                `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
 	IsActive               bool                      `json:"isActive"`
 	Presence               string                    `json:"presence" enum:"ONLINE,RECENT,AWAY"`
 	HasLiveSession         bool                      `json:"hasLiveSession"`

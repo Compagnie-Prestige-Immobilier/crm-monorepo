@@ -32,6 +32,7 @@ const (
 
 	lotEtatNonTraitee = "NON_TRAITEE"
 	lotEtatTraitee    = "TRAITEE"
+	lotEtatPlateforme = "PLATEFORME"
 
 	LotSegmentBDD1 = "BDD1"
 	LotSegmentBDD2 = "BDD2"
@@ -131,6 +132,7 @@ type CampagneTentative struct {
 	PhoneE164              *string `json:"phoneE164"`
 	ShortCode              string  `json:"shortCode"`
 	Outcome                string  `json:"outcome"`
+	ReasonLabel            *string `json:"reasonLabel"`
 	Method                 *string `json:"method"`
 	Comment                *string `json:"comment"`
 	PerformedByName        string  `json:"performedByName"`
@@ -199,7 +201,7 @@ type CampagneFiche struct {
 	PhoneE164          string  `json:"phoneE164"`
 	TeleconseillerID   *string `json:"teleconseillerId"`
 	TeleconseillerName string  `json:"teleconseillerName"`
-	Etat               string  `json:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER"`
+	Etat               string  `json:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME"`
 	StatutLabel        *string `json:"statutLabel"`
 }
 
@@ -1055,7 +1057,7 @@ func (s *service) lotTentativesRecentes(ctx context.Context, row *db.LotParIdRow
 	for index := range lignes {
 		ligne := &lignes[index]
 		tentatives = append(tentatives, CampagneTentative{
-			ID: ligne.ID, PhoneE164: ligne.PhoneE164, Outcome: ligne.Outcome,
+			ID: ligne.ID, PhoneE164: ligne.PhoneE164, Outcome: ligne.Outcome, ReasonLabel: ligne.ReasonLabel,
 			Method: lotPointeurTexte(ligne.Method), Comment: ligne.Comment,
 			PerformedByName: ligne.PerformedByName, CreatedAt: lotISO(ligne.CreatedAt),
 			Email: ligne.Email, Fonctionnaire: ligne.Fonctionnaire,

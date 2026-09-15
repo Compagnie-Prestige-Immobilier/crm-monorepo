@@ -299,17 +299,21 @@ type reglagesEnrolement struct {
 	RepriseDepuis    *string      `json:"repriseDepuis"`
 	StatutsComplets  []string     `json:"statutsComplets"`
 	DernierTirage    *BilanTirage `json:"dernierTirage"`
+	// Fiches plateforme sans premier appel au-delà desquelles l'encadrement est
+	// prévenu que les CCP ont besoin de renfort. Zéro : jamais.
+	SeuilAttentePlateforme int `json:"seuilAttentePlateforme"`
 }
 
 type ReglagesOutput struct {
 	Body struct {
-		Projet           string       `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-		FrequenceMinutes int          `json:"frequenceMinutes"`
-		RepriseDepuis    *string      `json:"repriseDepuis"`
-		StatutsComplets  []string     `json:"statutsComplets"`
-		Configuree       bool         `json:"configuree"`
-		DernierTirage    *BilanTirage `json:"dernierTirage"`
-		UpdatedAt        *time.Time   `json:"updatedAt"`
+		Projet                 string       `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+		FrequenceMinutes       int          `json:"frequenceMinutes"`
+		RepriseDepuis          *string      `json:"repriseDepuis"`
+		StatutsComplets        []string     `json:"statutsComplets"`
+		SeuilAttentePlateforme int          `json:"seuilAttentePlateforme"`
+		Configuree             bool         `json:"configuree"`
+		DernierTirage          *BilanTirage `json:"dernierTirage"`
+		UpdatedAt              *time.Time   `json:"updatedAt"`
 	}
 }
 
@@ -327,6 +331,7 @@ func reglagesStockes(valeur string) reglagesEnrolement {
 		valeurs.FrequenceMinutes = stockees.FrequenceMinutes
 	}
 	valeurs.RepriseDepuis, valeurs.DernierTirage = stockees.RepriseDepuis, stockees.DernierTirage
+	valeurs.SeuilAttentePlateforme = max(0, stockees.SeuilAttentePlateforme)
 	if stockees.StatutsComplets != nil {
 		valeurs.StatutsComplets = stockees.StatutsComplets
 	}
@@ -361,6 +366,7 @@ func (s *service) reponseReglagesEnrolement(ctx context.Context, projet string) 
 	out.Body.FrequenceMinutes = valeurs.FrequenceMinutes
 	out.Body.RepriseDepuis = valeurs.RepriseDepuis
 	out.Body.StatutsComplets = valeurs.StatutsComplets
+	out.Body.SeuilAttentePlateforme = valeurs.SeuilAttentePlateforme
 	out.Body.Configuree = base != "" && jeton != ""
 	out.Body.DernierTirage = valeurs.DernierTirage
 	out.Body.UpdatedAt = quand
@@ -374,9 +380,10 @@ func (s *service) lireReglagesEnrolement(ctx context.Context, in *ProjetEnroleme
 type EcrireReglagesInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Body   struct {
-		FrequenceMinutes *int      `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
-		RepriseDepuis    *string   `json:"repriseDepuis,omitempty" maxLength:"40"`
-		StatutsComplets  *[]string `json:"statutsComplets,omitempty" maxItems:"20"`
+		FrequenceMinutes       *int      `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
+		RepriseDepuis          *string   `json:"repriseDepuis,omitempty" maxLength:"40"`
+		StatutsComplets        *[]string `json:"statutsComplets,omitempty" maxItems:"20"`
+		SeuilAttentePlateforme *int      `json:"seuilAttentePlateforme,omitempty" minimum:"0" maximum:"100000"`
 	}
 }
 
@@ -402,7 +409,7 @@ func repriseNormalisee(valeur, courant *string) *string {
 func reglagesJournal(r *reglagesEnrolement) map[string]any {
 	return map[string]any{
 		"frequenceMinutes": r.FrequenceMinutes, "repriseDepuis": r.RepriseDepuis,
-		"statutsComplets": r.StatutsComplets,
+		"statutsComplets": r.StatutsComplets, "seuilAttentePlateforme": r.SeuilAttentePlateforme,
 	}
 }
 
@@ -415,6 +422,9 @@ func (s *service) ecrireReglagesEnrolement(ctx context.Context, in *EcrireReglag
 	avant := valeurs
 	if in.Body.FrequenceMinutes != nil {
 		valeurs.FrequenceMinutes = *in.Body.FrequenceMinutes
+	}
+	if in.Body.SeuilAttentePlateforme != nil {
+		valeurs.SeuilAttentePlateforme = *in.Body.SeuilAttentePlateforme
 	}
 	valeurs.RepriseDepuis = repriseNormalisee(in.Body.RepriseDepuis, valeurs.RepriseDepuis)
 	if in.Body.StatutsComplets != nil {
@@ -556,16 +566,8 @@ func (s *service) executerTirage(ctx context.Context, projet string) (BilanTirag
 	vus := make([]string, 0, len(retenues))
 	for i := range retenues {
 		ligne := &retenues[i]
-		prospectID := index.choisir(ligne.PhoneE164, ligne.Email)
-		if prospectID != nil {
-			bilan.Rapproches++
-		}
-		if slices.Contains(connus, ligne.IdentifiantDistant) {
-			bilan.MisAJour++
-		} else {
-			bilan.Crees++
-		}
-		if err := s.deposerInscription(ctx, projet, ligne, prospectID, tirageAt); err != nil {
+		candidat := index.choisir(ligne.PhoneE164, ligne.Email)
+		if err := s.tirerLigne(ctx, projet, base, ligne, candidat, connus, tirageAt, &bilan); err != nil {
 			return bilan, err
 		}
 		vus = append(vus, ligne.IdentifiantDistant)

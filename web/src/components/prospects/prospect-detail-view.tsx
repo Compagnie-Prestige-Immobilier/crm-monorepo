@@ -256,7 +256,7 @@ function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
       precision:
         prospect.lastCallOutcome === null
           ? 'Jamais appelé'
-          : `Dernier : ${CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}`,
+          : `Dernier : ${prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}`,
     },
     {
       label: 'Dernier appel',

@@ -218,6 +218,8 @@ type Prospect struct {
 	LastCallAt               *string           `json:"lastCallAt"`
 	LastCallByID             *string           `json:"lastCallById"`
 	LastCallByName           *string           `json:"lastCallByName"`
+	PlateformeDepuis         *string           `json:"plateformeDepuis" doc:"Inscription sur une plateforme d'enrôlement : la fiche revient aux chargés de clientèle plateforme."`
+	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
@@ -313,6 +315,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
 		LastCallOutcome: prospectEnum(p.LastCallOutcome), LastCallAt: prospectISOPtr(p.LastCallAt),
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
+		PlateformeDepuis: prospectISOPtr(p.PlateformeDepuis), EnCoursPar: prospectVide(l.EnCoursPar),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
@@ -331,18 +334,21 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 }
 
 type prospectPortee struct {
-	tout     bool
-	converti bool
-	userID   string
+	tout       bool
+	converti   bool
+	plateforme *bool
+	userID     string
 }
 
 // Le chargé de clientèle voit TOUTE demande convertie : c'est lui qui la relit
-// avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait.
+// avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait. Le
+// CCP voit tout, mais la borne plateforme ne lui laisse que ses fiches.
 func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 	return prospectPortee{
-		tout:     u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction,
-		converti: u.Role == socle.ChargeClientele,
-		userID:   u.ID,
+		tout:       u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction || u.Role == socle.CCP,
+		converti:   u.Role == socle.ChargeClientele,
+		plateforme: socle.PorteePlateforme(u.Role),
+		userID:     u.ID,
 	}
 }
 
@@ -402,7 +408,8 @@ func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id str
 	p := prospectPorteeDe(u)
 	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
 		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
-		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
+		ScopePlateforme: p.plateforme,
+		SortBy:          prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
 	})
 	if err != nil {
 		return nil, err
@@ -458,7 +465,7 @@ type ProspectListInput struct {
 	MesFiches              bool   `query:"mesFiches"`
 	Attribue               bool   `query:"attribue"`
 	ResteAAppeler          bool   `query:"resteAAppeler"`
-	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
+	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt,plateformeDepuis"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
 	PageSize               int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
@@ -524,12 +531,13 @@ func prospectRechercheTelephone(recherche, region string) *string {
 func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (db.ListProspectsParams, error) {
 	p := prospectPorteeDe(u)
 	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
-	// compose que les numéros qui lui reviennent.
-	if in.MesFiches {
+	// compose que les numéros qui lui reviennent. Les fiches plateforme
+	// reviennent toutes aux CCP, sans partage.
+	if in.MesFiches && u.Role != socle.CCP {
 		p.tout, p.converti = false, false
 	}
 	arg := db.ListProspectsParams{
-		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
+		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopePlateforme: p.plateforme,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
@@ -573,7 +581,7 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
 		Search: arg.Search, PhoneSearch: arg.PhoneSearch, Attribue: arg.Attribue,
-		ResteAAppeler: arg.ResteAAppeler,
+		ResteAAppeler: arg.ResteAAppeler, ScopePlateforme: arg.ScopePlateforme,
 	}
 }
 
@@ -1440,7 +1448,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	return out, nil
 }
 
-var prospectLecture = []socle.Role{socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur, socle.Direction}
+var prospectLecture = []socle.Role{socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Admin, socle.Superviseur, socle.Direction}
 
 var Garde = map[string][]socle.Role{
 	"GET /api/v1/prospects":                                           prospectLecture,

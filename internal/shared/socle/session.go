@@ -39,7 +39,7 @@ type Utilisateur struct {
 	Email     string  `json:"email"`
 	Username  string  `json:"username"`
 	FullName  string  `json:"fullName"`
-	Role      Role    `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
+	Role      Role    `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
 	PhoneE164 *string `json:"phoneE164"`
 }
 

@@ -116,7 +116,7 @@ const (
 
 var Garde = map[string][]socle.Role{
 	"GET /api/v1/export/global.xlsx":                        socle.Encadrement,
-	"GET /api/v1/export/prospects.xlsx":                     {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.Superviseur, socle.Direction},
+	"GET /api/v1/export/prospects.xlsx":                     {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Superviseur, socle.Direction},
 	"GET /api/v1/export/representants.xlsx":                 socle.Parcours,
 	"GET /api/v1/export/visites.xlsx":                       socle.Registre,
 	"GET /api/v1/export/bank-cases.xlsx":                    {socle.Admin, socle.BanqueFinance, socle.Superviseur},

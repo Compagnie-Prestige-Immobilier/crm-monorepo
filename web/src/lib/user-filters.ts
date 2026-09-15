@@ -11,6 +11,7 @@ export const ROLES: readonly Role[] = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
+  'CCP',
 ];
 
 export interface UserFilters {

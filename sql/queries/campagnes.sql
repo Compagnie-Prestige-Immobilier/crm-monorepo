@@ -47,19 +47,28 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 -- Un classeur de leads porte un onglet par jour et garde le nom de fichier du
 -- premier : le lot se compte par onglet, sinon les trois jours se confondent.
 -- name: ImportsAvecFiches :many
-SELECT MAX(j."id")::text AS "id",
-       MAX(j."fileName")::text AS "fileName",
-       p."importFeuille",
-       MIN(j."createdAt")::timestamp AS "createdAt",
-       MAX(j."finishedAt")::timestamp AS "finishedAt",
-       COUNT(*)::int AS fiches,
-       COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS appelees
-FROM "import_jobs" j
-JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
-WHERE EXISTS (SELECT 1 FROM "prospect_journeys" pj
-              WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.arg('projet')::"Projet")
-GROUP BY COALESCE(p."importFeuille", j."id"), p."importFeuille"
-ORDER BY MAX(j."finishedAt") DESC, MAX(j."id") DESC
+WITH fiches AS (
+  SELECT j."id" AS "jobId", j."fileName", j."createdAt", j."finishedAt", p."importFeuille",
+         p."lastCallAt" IS NOT NULL AS appelee,
+         EXISTS (SELECT 1 FROM "prospect_journeys" pj
+                 WHERE pj."prospectId" = p."id" AND pj."projet" = 'GRAND_PUBLIC') AS gp,
+         EXISTS (SELECT 1 FROM "prospect_journeys" pj
+                 WHERE pj."prospectId" = p."id" AND pj."projet" = 'CHUES') AS chues
+  FROM "import_jobs" j
+  JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL AND p."plateformeDepuis" IS NULL
+)
+SELECT MAX("jobId")::text AS "id",
+       MAX("fileName")::text AS "fileName",
+       "importFeuille",
+       MIN("createdAt")::timestamp AS "createdAt",
+       MAX("finishedAt")::timestamp AS "finishedAt",
+       COUNT(*) FILTER (WHERE gp)::int AS "fichesGp",
+       COUNT(*) FILTER (WHERE gp AND appelee)::int AS "appeleesGp",
+       COUNT(*) FILTER (WHERE chues)::int AS "fichesChues",
+       COUNT(*) FILTER (WHERE chues AND appelee)::int AS "appeleesChues"
+FROM fiches
+GROUP BY "fileName", COALESCE("importFeuille", "jobId"), "importFeuille"
+ORDER BY MAX("finishedAt") DESC, MAX("jobId") DESC
 LIMIT 100;
 
 -- name: EcrireFiltresLot :exec
@@ -239,13 +248,14 @@ ORDER BY a."clientCreatedAt" DESC, a."id" DESC
 LIMIT 50;
 
 -- name: LotAttemptsProspects :many
-SELECT a."id", p."phoneE164", a."outcome"::text AS outcome,
+SELECT a."id", p."phoneE164", a."outcome"::text AS outcome, cr."label" AS "reasonLabel",
        COALESCE(a."method"::text, '')::text AS method,
        a."comment", u."fullName" AS "performedByName", a."createdAt", a."email",
        a."fonctionnaire", a."engagementEnCours", a."dureeEtablissementMois", a."rendezVousAt"
 FROM "call_attempts" a
 INNER JOIN "prospects" p ON p."id" = a."prospectId"
 INNER JOIN "users" u ON u."id" = a."performedById"
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE a."clientCreatedAt" >= $2
   AND EXISTS (
     SELECT 1 FROM "lot_export_items" i
@@ -290,13 +300,20 @@ WHERE i."lotId" = $1
 -- name: LotFichesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
-       COALESCE(p."lastCallOutcome"::text, '')::text AS "lastCallOutcome"
+       (p."plateformeDepuis" IS NOT NULL)::boolean AS plateforme,
+       COALESCE(p."lastCallOutcome"::text, '')::text AS "lastCallOutcome",
+       (SELECT cr."label" FROM "call_attempts" a
+        LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
+        WHERE a."prospectId" = p."id"
+        ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "lastReasonLabel"
 FROM "lot_export_items" i
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "prospects" pp
+                     WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -309,6 +326,8 @@ SELECT COUNT(*)::int FROM "lot_export_items" i
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
+        WHEN EXISTS (SELECT 1 FROM "prospects" pp
+                     WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -390,6 +409,7 @@ LIMIT sqlc.arg('places');
 SELECT COUNT(*)::int
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
+  AND p."plateformeDepuis" IS NULL
   AND (sqlc.narg('projet')::"Projet" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
@@ -406,6 +426,7 @@ WHERE p."deletedAt" IS NULL
 SELECT p."id"
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
+  AND p."plateformeDepuis" IS NULL
   AND (sqlc.narg('projet')::"Projet" IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))

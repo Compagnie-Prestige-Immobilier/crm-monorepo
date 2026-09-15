@@ -267,6 +267,7 @@ function CarteReglages({ projet }: { projet: Projet }) {
       frequenceMinutes?: number;
       repriseDepuis?: string;
       statutsComplets?: string[];
+      seuilAttentePlateforme?: number;
     }) => saveReglagesEnrolement(projet, body),
     onSuccess: async () => {
       toast.success('Réglages enregistrés.');
@@ -388,6 +389,29 @@ function CarteReglages({ projet }: { projet: Projet }) {
                   }
                 }}
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={`seuil-plateforme-${projet}`}>Alerter l’encadrement au-delà de</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id={`seuil-plateforme-${projet}`}
+                  type="number"
+                  min={0}
+                  max={100000}
+                  className="w-24"
+                  defaultValue={donnees.seuilAttentePlateforme}
+                  onBlur={(event) => {
+                    const seuil = Number(event.target.value);
+                    if (Number.isInteger(seuil) && seuil !== donnees.seuilAttentePlateforme) {
+                      enregistrer.mutate({ seuilAttentePlateforme: seuil });
+                    }
+                  }}
+                />
+                <span className="text-[0.875rem] text-muted-foreground">
+                  fiches plateforme sans premier appel. Zéro : jamais.
+                </span>
+              </div>
             </div>
           </div>
 

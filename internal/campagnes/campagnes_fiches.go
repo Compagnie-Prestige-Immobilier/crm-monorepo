@@ -10,7 +10,7 @@ import (
 type CampagneFichesInput struct {
 	ID               string `path:"id" format:"uuid"`
 	TeleconseillerID string `query:"teleconseillerId" format:"uuid"`
-	Etat             string `query:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER"`
+	Etat             string `query:"etat" enum:"NON_TRAITEE,TRAITEE,A_RAPPELER,PLATEFORME"`
 	Page             int    `query:"page" minimum:"1" default:"1"`
 	PageSize         int    `query:"pageSize" minimum:"1" maximum:"200" default:"50"`
 }
@@ -111,8 +111,12 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traite
 			TeleconseillerID:   ligne.AssigneeId,
 			TeleconseillerName: lotSiVide(lotValeurTexte(ligne.AssigneeName), "Non attribuée"),
 			Etat:               lotEtatDe(traitees[ligne.Position], false),
-			StatutLabel:        lotPointeurTexte(lotLibellesIssueAppel[ligne.LastCallOutcome]),
+			StatutLabel:        lotStatutFiche(ligne.LastReasonLabel, ligne.LastCallOutcome),
 		})
+		if ligne.Plateforme {
+			fiches[len(fiches)-1].Etat = lotEtatPlateforme
+			fiches[len(fiches)-1].TeleconseillerName = "Retirée : plateforme"
+		}
 	}
 	return fiches, nil
 }
@@ -137,4 +141,12 @@ func lotNomEtPrenom(nom, prenom *string) string {
 		}
 	}
 	return strings.Join(parties, " ")
+}
+
+// Le statut choisi par le téléconseiller, à défaut la famille de l'issue.
+func lotStatutFiche(libelleMotif *string, issue string) *string {
+	if libelleMotif != nil && *libelleMotif != "" {
+		return libelleMotif
+	}
+	return lotPointeurTexte(lotLibellesIssueAppel[issue])
 }

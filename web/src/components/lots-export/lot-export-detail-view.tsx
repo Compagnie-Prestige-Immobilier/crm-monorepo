@@ -23,6 +23,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -424,7 +425,7 @@ function RecentAttemptsList({
         <li key={tentative.id} className="flex flex-col gap-1 py-3">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="secondary">
-              {ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}
+              {tentative.reasonLabel ?? ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}
             </Badge>
             <span className="font-[600]">{tentative.shortCode}</span>
             <span className="text-[0.8125rem] text-muted-foreground tabular-nums">
@@ -526,31 +527,43 @@ export function LotExportDetailView({
         <LotDownloads id={id} name={name} telechargement={telechargement} />
       </div>
 
-      <ProgrammesCard
-        repartition={repartition}
-        colonnes={colonnes}
-        distribution={distribution}
-        id={id}
-        telechargement={telechargement}
-      />
-
-      <ReaffectationsCard
-        id={id}
-        reaffectations={lot.data.reaffectations}
-        telechargement={telechargement}
-      />
-
-      <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
-
-      <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
-
-      <AppelsCard
-        fichesAppelees={fichesAppelees}
-        itemCount={itemCount}
-        callsSince={callsSince}
-        parTeleconseiller={parTeleconseiller}
-        recentAttempts={lot.data.recentAttempts}
-      />
+      <Tabs defaultValue="fiches">
+        <TabsList aria-label="Sections de la campagne" className="max-w-full overflow-x-auto">
+          <TabsTrigger value="fiches">Fiches</TabsTrigger>
+          <TabsTrigger value="programmes">Programmes</TabsTrigger>
+          <TabsTrigger value="performance">Performance</TabsTrigger>
+          <TabsTrigger value="appels">Appels</TabsTrigger>
+        </TabsList>
+        <TabsContent value="fiches" className="mt-4">
+          <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
+        </TabsContent>
+        <TabsContent value="programmes" className="mt-4 flex flex-col gap-6">
+          <ProgrammesCard
+            repartition={repartition}
+            colonnes={colonnes}
+            distribution={distribution}
+            id={id}
+            telechargement={telechargement}
+          />
+          <ReaffectationsCard
+            id={id}
+            reaffectations={lot.data.reaffectations}
+            telechargement={telechargement}
+          />
+        </TabsContent>
+        <TabsContent value="performance" className="mt-4">
+          <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
+        </TabsContent>
+        <TabsContent value="appels" className="mt-4">
+          <AppelsCard
+            fichesAppelees={fichesAppelees}
+            itemCount={itemCount}
+            callsSince={callsSince}
+            parTeleconseiller={parTeleconseiller}
+            recentAttempts={lot.data.recentAttempts}
+          />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

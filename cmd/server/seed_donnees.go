@@ -931,4 +931,5 @@ var seedFixtureUsers = []seedFixtureUser{
 	{"fixture.direction@cpi.sn", "fixture.direction", "Direction Fixture", db.RoleDIRECTION},
 	{"fixture.accueil@cpi.sn", "fixture.accueil", "Accueil Fixture", db.RoleACCUEIL},
 	{"fixture.clientele@cpi.sn", "fixture.clientele", "Clientèle Fixture", db.RoleCHARGECLIENTELE},
+	{"fixture.plateforme@cpi.sn", "fixture.plateforme", "Plateforme Fixture", db.RoleCCP},
 }

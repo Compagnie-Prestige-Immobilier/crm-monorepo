@@ -40,13 +40,11 @@ export async function createLotExport(
   return unwrap(await client.POST('/api/v1/lots-export', { body }));
 }
 
-/** Les imports qui ont créé des fiches du projet : les sources d'une campagne « fiches importées ». */
+/** Les onglets importés qui ont créé des fiches : les sources d'une campagne « fiches importées ». */
 export async function fetchLotExportImports(
-  projet: Projet,
   client: ApiClient = getApiClient(),
 ): Promise<LotExportImport[]> {
-  return unwrap(await client.GET('/api/v1/lots-export/imports', { params: { query: { projet } } }))
-    .items;
+  return unwrap(await client.GET('/api/v1/lots-export/imports')).items;
 }
 
 /**

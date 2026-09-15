@@ -47,6 +47,7 @@ const userBaseSchema = z.object({
       'DIRECTION',
       'ACCUEIL',
       'CHARGE_CLIENTELE',
+      'CCP',
     ],
     { message: 'Choisissez le rôle du compte.' },
   ),

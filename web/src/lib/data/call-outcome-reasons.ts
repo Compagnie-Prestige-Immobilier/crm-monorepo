@@ -57,6 +57,7 @@ export interface MotifAppel {
   readonly label: string;
   readonly effect: CallOutcomeEffect;
   readonly requiresComment: boolean;
+  readonly countsAsReached: boolean;
 }
 
 /** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
@@ -71,6 +72,7 @@ export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Prom
     label: motif.label,
     effect: motif.effect,
     requiresComment: motif.requiresComment,
+    countsAsReached: motif.countsAsReached,
   }));
 }
 
@@ -86,22 +88,9 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
   KEEP_OPEN: 'UNREACHABLE',
 };
 
-/**
- * KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien. Envoyé en
- * UNREACHABLE, « Intéressé » s'afficherait « Injoignable » et sortirait des
- * appels aboutis, que les chiffres comptent par issue. OTHER exige un
- * commentaire en base : son motif le réclame donc aussi.
- */
-const ISSUE_DU_CODE: Readonly<Record<string, CallOutcome>> = {
-  INTERESSE: 'OTHER',
-  RDV_AGENCE: 'CALLBACK',
-  DEMANDE_INFORMATION: 'OTHER',
-  PARTENARIAT: 'OTHER',
-  AUTRES: 'OTHER',
-};
-
-export const issueDuMotif = (motif: Pick<MotifAppel, 'code' | 'effect'>): CallOutcome =>
-  ISSUE_DU_CODE[motif.code] ?? EFFET_ISSUE[motif.effect];
+/** KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien : joint, il vaut « Autre ». */
+export const issueDuMotif = (motif: Pick<MotifAppel, 'effect' | 'countsAsReached'>): CallOutcome =>
+  motif.effect === 'KEEP_OPEN' && motif.countsAsReached ? 'OTHER' : EFFET_ISSUE[motif.effect];
 
 /** Le libellé du statut qui réclame un commentaire, nul quand aucun ne le réclame. */
 export const commentaireExigePar = (motif: MotifAppel | null): string | null =>

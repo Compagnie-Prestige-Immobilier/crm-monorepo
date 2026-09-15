@@ -70,7 +70,7 @@ export const queryKeys = {
   parametresChues: ['parametres-chues'] as const,
   parametresChuesJournal: ['parametres-chues', 'journal'] as const,
   lotsExportTeleconseillers: ['lots-export', 'teleconseillers'] as const,
-  lotsExportImports: (projet: string) => ['lots-export', 'imports', projet] as const,
+  lotsExportImports: ['lots-export', 'imports'] as const,
   lotsExportFiches: (id: string, filtres: Record<string, unknown> = {}) =>
     ['lots-export', 'detail', id, 'fiches', filtres] as const,
 

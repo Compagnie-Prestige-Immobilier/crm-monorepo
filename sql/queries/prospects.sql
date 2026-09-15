@@ -17,7 +17,13 @@ SELECT
   pf."isTeaching" AS profession_is_teaching,
   ib.label AS income_band_label,
   ep.label AS employeur_label,
-  pa.label AS pays_label
+  pa.label AS pays_label,
+  COALESCE((SELECT u2."fullName" FROM "ouvertures_fiche" o
+   JOIN "users" u2 ON u2."id" = o."openedById"
+   WHERE o."prospectId" = p."id" AND o."closedAt" IS NULL
+     AND o."openedById" <> sqlc.arg('scope_user_id')::text
+     AND o."openedAt" > (now() AT TIME ZONE 'UTC') - interval '2 hours'
+   ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
@@ -45,6 +51,10 @@ WHERE p."deletedAt" IS NULL
     )
   )
   AND (
+    sqlc.narg('scope_plateforme')::boolean IS NULL
+    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
+  )
+  AND (
     NOT sqlc.arg('attribue')::boolean
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" la
@@ -53,19 +63,23 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR EXISTS (
-      SELECT 1 FROM "scheduled_callbacks" sc
-      WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
-    )
-    OR NOT EXISTS (
-      SELECT 1 FROM "call_attempts" ra
-      WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
-        AND ra."createdAt" >= COALESCE((
-          SELECT max(rl."createdAt") FROM "lot_export_items" rli
-          JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
-          WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
-        ), '-infinity'::timestamp)
-    )
+    OR (sqlc.narg('scope_plateforme')::boolean IS TRUE
+        AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
+    OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
+      EXISTS (
+        SELECT 1 FROM "scheduled_callbacks" sc
+        WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
+      )
+      OR NOT EXISTS (
+        SELECT 1 FROM "call_attempts" ra
+        WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
+          AND ra."createdAt" >= COALESCE((
+            SELECT max(rl."createdAt") FROM "lot_export_items" rli
+            JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+            WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
+          ), '-infinity'::timestamp)
+      )
+    ))
   )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type')::"ProspectType")
@@ -128,9 +142,11 @@ ORDER BY
   CASE WHEN sqlc.arg('sort_order')::text = 'desc' THEN CASE sqlc.arg('sort_by')::text
     WHEN 'nom' THEN p."nom" WHEN 'prenom' THEN p."prenom" WHEN 'statut' THEN p."statut"::text END END DESC,
   CASE WHEN sqlc.arg('sort_order')::text = 'asc' THEN CASE sqlc.arg('sort_by')::text
-    WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt" ELSE p."clientCreatedAt" END END ASC,
+    WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt"
+    WHEN 'plateformeDepuis' THEN p."plateformeDepuis" ELSE p."clientCreatedAt" END END ASC,
   CASE WHEN sqlc.arg('sort_order')::text = 'desc' THEN CASE sqlc.arg('sort_by')::text
-    WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt" ELSE p."clientCreatedAt" END END DESC,
+    WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt"
+    WHEN 'plateformeDepuis' THEN p."plateformeDepuis" ELSE p."clientCreatedAt" END END DESC,
   p."id" DESC
 LIMIT sqlc.arg('taille')::int OFFSET sqlc.arg('saut')::int;
 
@@ -152,6 +168,10 @@ WHERE p."deletedAt" IS NULL
     )
   )
   AND (
+    sqlc.narg('scope_plateforme')::boolean IS NULL
+    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
+  )
+  AND (
     NOT sqlc.arg('attribue')::boolean
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" la
@@ -160,19 +180,23 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR EXISTS (
-      SELECT 1 FROM "scheduled_callbacks" sc
-      WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
-    )
-    OR NOT EXISTS (
-      SELECT 1 FROM "call_attempts" ra
-      WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
-        AND ra."createdAt" >= COALESCE((
-          SELECT max(rl."createdAt") FROM "lot_export_items" rli
-          JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
-          WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
-        ), '-infinity'::timestamp)
-    )
+    OR (sqlc.narg('scope_plateforme')::boolean IS TRUE
+        AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
+    OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
+      EXISTS (
+        SELECT 1 FROM "scheduled_callbacks" sc
+        WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
+      )
+      OR NOT EXISTS (
+        SELECT 1 FROM "call_attempts" ra
+        WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
+          AND ra."createdAt" >= COALESCE((
+            SELECT max(rl."createdAt") FROM "lot_export_items" rli
+            JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+            WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
+          ), '-infinity'::timestamp)
+      )
+    ))
   )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type')::"ProspectType")

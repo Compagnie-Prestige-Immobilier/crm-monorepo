@@ -12,6 +12,7 @@ export const PANEL_ROLES: readonly Role[] = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
+  'CCP',
 ];
 
 interface AuthTokens {

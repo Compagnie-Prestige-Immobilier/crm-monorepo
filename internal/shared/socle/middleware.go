@@ -43,6 +43,10 @@ const cheminImports = "/api/v1/imports"
 
 var idRequeteValide = regexp.MustCompile(`^[\w-]{1,64}$`)
 
+// Empreinte du panneau embarqué : un onglet ouvert avant un déploiement la
+// voit changer et se recharge, au lieu de parler à l'API avec un vieux code.
+var VersionPanneau string
+
 type reponse struct {
 	http.ResponseWriter
 	statut int
@@ -94,6 +98,9 @@ func JournalEtRecuperation(mux *http.ServeMux, next http.Handler, cfg *Config) h
 			id = uuid.NewString()
 		}
 		w.Header().Set("X-Request-Id", id)
+		if VersionPanneau != "" {
+			w.Header().Set("X-Cpi-Panneau", VersionPanneau)
+		}
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("Referrer-Policy", "strict-origin-when-cross-origin")
 		w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
