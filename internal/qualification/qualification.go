@@ -818,10 +818,6 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 	t := qualificationTentative{
 		motif: *motif, regle: qualificationReglesEffet[motif.effet], comment: qualificationRogne(b.Comment),
 	}
-	if t.regle.exigeMethode && b.Method == nil {
-		return t, socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_REQUIRED",
-			"Une méthode d’enrôlement est obligatoire quand la méthode a été obtenue.")
-	}
 	if err := qualificationAdhesionParFormulaire(b, &t); err != nil {
 		return t, err
 	}

@@ -594,8 +594,6 @@ function methodeErreurs(
 ): ConversionErrors {
   const errors: ConversionErrors = {};
 
-  if (draft.method === null) errors.method = 'Choisissez la méthode d’enrôlement.';
-
   const rendezVous = draft.rendezVousAt.trim();
   if (!regles.visible('rendezVousAt', true)) return errors;
   if (draft.method === 'APPOINTMENT') {
@@ -678,9 +676,6 @@ export interface AttemptDraft {
 }
 
 function methodeAttemptErreur(draft: AttemptDraft): string | null {
-  if (draft.outcome === 'METHOD_OBTAINED' && draft.method === null) {
-    return 'Choisissez la méthode obtenue.';
-  }
   if (draft.outcome !== 'METHOD_OBTAINED' && draft.method !== null) {
     return 'Une méthode ne s’enregistre que sur « Méthode obtenue ».';
   }
