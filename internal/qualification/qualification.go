@@ -1066,7 +1066,11 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 		return "", vide, err
 	}
 	if !t.regle.clot {
-		return tentativeAppliquee, qualificationEtatPhase2(corrige.ID, corrige.Rev, corrige.UpdatedAt, &parcours), nil
+		etat, err := qualificationRouvrirFiche(ctx, q, u, b, &corrige, &parcours)
+		if err != nil {
+			return "", vide, err
+		}
+		return tentativeAppliquee, etat, nil
 	}
 	return qualificationCloturerParcours(ctx, q, u, b, t, &corrige, &parcours)
 }

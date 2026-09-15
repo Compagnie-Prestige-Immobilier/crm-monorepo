@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
+import { HistoriqueStatuts } from '@/components/grand-public/historique-statuts';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
 import { Badge } from '@/components/ui/badge';
@@ -473,6 +474,8 @@ export function GrandPublicProspectDetail({
           </dl>
         </CardContent>
       </Card>
+
+      <HistoriqueStatuts prospectId={prospect.id} />
 
       <ChampsAjoutes prospect={prospect} />
 
