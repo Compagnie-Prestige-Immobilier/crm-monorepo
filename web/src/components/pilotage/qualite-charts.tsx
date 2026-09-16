@@ -81,7 +81,7 @@ export function BarresHorizontales({
         keys={['value']}
         indexBy="label"
         layout="horizontal"
-        margin={{ top: 8, right: 24, bottom: 24, left: gauche }}
+        margin={{ top: 8, right: 24, bottom: 28, left: gauche }}
         padding={0.32}
         borderRadius={6}
         colors={(datum) =>
@@ -95,6 +95,7 @@ export function BarresHorizontales({
         axisBottom={{
           tickSize: 0,
           tickPadding: 8,
+          tickValues: 5,
           format: (valeur: number) => `${String(valeur)}${suffixe ?? ''}`,
         }}
         axisLeft={
@@ -167,14 +168,14 @@ export function BarresEtCourbe({ lignes, vide }: { lignes: LigneCroisee[]; vide:
         keys={['Joints', 'Non joints']}
         indexBy="label"
         groupMode="grouped"
-        margin={{ top: 12, right: 16, bottom: 72, left: 44 }}
+        margin={{ top: 12, right: 16, bottom: 84, left: 44 }}
         padding={0.28}
         innerPadding={2}
         borderRadius={4}
         colors={[theme.series[2] ?? '#1A6B44', theme.series[3] ?? '#B05070']}
         enableLabel={false}
         enableGridX={false}
-        axisBottom={{ tickRotation: -38, tickSize: 0, tickPadding: 8 }}
+        axisBottom={{ tickRotation: -30, tickSize: 0, tickPadding: 8 }}
         axisLeft={{ tickSize: 0, tickPadding: 8 }}
         layers={['grid', 'axes', 'bars', (props) => CourbeSurSonEchelle(props, trait), 'legends']}
         legends={[
@@ -182,7 +183,7 @@ export function BarresEtCourbe({ lignes, vide }: { lignes: LigneCroisee[]; vide:
             dataFrom: 'keys',
             anchor: 'bottom',
             direction: 'row',
-            translateY: 64,
+            translateY: 76,
             itemWidth: 96,
             itemHeight: 16,
             symbolSize: 9,
@@ -231,11 +232,10 @@ export function AnneauDesFamilles({ parts, vide }: { parts: Part[]; vide: string
         innerRadius={0.64}
         padAngle={1.5}
         cornerRadius={5}
-        colors={(datum) =>
-          visibles.find((part) => part.label === String(datum.id))?.couleur ??
-          theme.series[0] ??
-          '#630210'
-        }
+        colors={(datum) => {
+          const index = visibles.findIndex((part) => part.label === String(datum.id));
+          return visibles[index]?.couleur ?? theme.series[index % theme.series.length] ?? '#630210';
+        }}
         enableArcLinkLabels={false}
         enableArcLabels={false}
         layers={['arcs', 'legends', (props) => TotalAuCentre(props, theme.tooltipForeground)]}
