@@ -222,6 +222,8 @@ type Prospect struct {
 	PlateformeInscrite       bool              `json:"plateformeInscrite" doc:"Une inscription présente sur la plateforme est rapprochée de la fiche. Sans elle, la fiche vient d'un classeur qui cite le site."`
 	RemarqueImport           *string           `json:"remarqueImport" doc:"Réponse du prospect notée dans le classeur importé."`
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
+	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
+	RepresentantAppelePar    *string           `json:"representantAppelePar" doc:"Auteur de ce dernier appel au représentant."`
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
@@ -293,8 +295,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RepresentantID: p.RepresentantId, RepresentantName: l.RepresentantName,
 		RepresentantPhoneE164: l.RepresentantPhone,
 		DepartementID:         l.DepartementID, DepartementName: l.DepartementName,
-		OwnedByCommercialID: p.CreatedById, OwnedByCommercialName: l.OwnerName,
-		Type:       prospectEnum(p.Type),
+		OwnedByCommercialID: p.CreatedById, OwnedByCommercialName: l.OwnerName, Type: prospectEnum(p.Type),
 		Profession: prospectPremier(l.ProfessionLabel, p.Profession), ProfessionID: p.ProfessionId,
 		ProfessionIsTeaching: l.ProfessionIsTeaching,
 		IncomeBandID:         p.IncomeBandId, IncomeBandLabel: l.IncomeBandLabel,
@@ -316,9 +317,9 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		EnrollmentCapturedAt: prospectISOPtr(p.EnrollmentCapturedAt),
 		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
 		LastCallOutcome: prospectEnum(p.LastCallOutcome), LastCallAt: prospectISOPtr(p.LastCallAt),
-		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
+		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
 		PlateformeDepuis: prospectISOPtr(p.PlateformeDepuis), PlateformeInscrite: l.PlateformeInscrite,
-		RemarqueImport: p.RemarqueImport, EnCoursPar: prospectVide(l.EnCoursPar),
+		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),

@@ -1730,6 +1730,16 @@ function EnTeteFiche({
         </p>
       )}
 
+      {prospect.representantAppeleAt == null ? null : (
+        <div
+          role="status"
+          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
+        >
+          Déjà appelée comme représentant le {formatDateTime(prospect.representantAppeleAt)}
+          {prospect.representantAppelePar == null ? '' : ` par ${prospect.representantAppelePar}`}.
+        </div>
+      )}
+
       {prospect.phase2Status !== 'PENDING' ? (
         <div
           role="status"
