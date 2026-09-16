@@ -66,3 +66,22 @@ SELECT p."projet",
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL AND p."plateformeDepuis" IS NOT NULL
 GROUP BY p."projet";
+
+-- Ce que chaque CCP a fait aujourd'hui et depuis le début de la semaine :
+-- l'encadrement le lit, le CCP s'y compare.
+-- name: EquipeCCP :many
+SELECT u."id", u."fullName",
+       (SELECT count(*) FROM "call_attempts" a
+        WHERE a."performedById" = u."id" AND a."clientCreatedAt" >= @debut_jour::timestamp)::int AS appels_jour,
+       (SELECT count(DISTINCT a."prospectId") FROM "call_attempts" a
+        WHERE a."performedById" = u."id" AND a."clientCreatedAt" >= @debut_jour::timestamp
+          AND a."outcome" <> 'UNREACHABLE')::int AS joints_jour,
+       (SELECT count(*) FROM "call_attempts" a
+        WHERE a."performedById" = u."id" AND a."clientCreatedAt" >= @debut_semaine::timestamp)::int AS appels_semaine,
+       (SELECT count(*) FROM "scheduled_callbacks" c
+        WHERE c."assignedToId" = u."id" AND c."status" = 'PENDING')::int AS rappels_en_attente,
+       COALESCE((SELECT max(a."clientCreatedAt") FROM "call_attempts" a WHERE a."performedById" = u."id"),
+                '1970-01-01'::timestamp)::timestamp AS dernier_appel
+FROM "users" u
+WHERE u."role" = 'CCP' AND u."isActive" AND u."deletedAt" IS NULL
+ORDER BY u."fullName", u."id";
