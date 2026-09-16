@@ -36,6 +36,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -45,6 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import { toastApiError } from '@/lib/mutation-feedback';
 import {
   countActiveNotificationFilters,
@@ -70,6 +72,7 @@ import {
   STATUS_LABELS,
   type NotificationCategory,
   type NotificationDeliveryStatus,
+  type NotificationDetail,
   type NotificationRow,
   type NotificationStatus,
 } from './types';
@@ -631,12 +634,25 @@ function DeliverySummary({ row }: { row: NotificationRow }) {
   );
 }
 
+const COLONNES_DESTINATAIRES = {
+  destinataire: (recipient: NotificationDetail['recipients'][number]) => recipient.fullName,
+  etat: (recipient: NotificationDetail['recipients'][number]) => DELIVERY_LABELS[recipient.status],
+  lueLe: (recipient: NotificationDetail['recipients'][number]) => recipient.readAt,
+};
+
+const ENTETES_DESTINATAIRES = [
+  { id: 'destinataire', label: 'Destinataire' },
+  { id: 'etat', label: 'État' },
+  { id: 'lueLe', label: 'Lue le' },
+] as const;
+
 function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
   const detail = useQuery({
     queryKey: notificationKeys.detail(id ?? ''),
     queryFn: () => fetchNotification(id ?? ''),
     enabled: id !== null,
   });
+  const tri = useTriLocal(detail.data?.recipients ?? [], COLONNES_DESTINATAIRES);
 
   return (
     <Dialog
@@ -678,17 +694,36 @@ function NotificationDetailDialog({ id, onClose }: { id: string | null; onClose:
                     <p className="text-[0.9375rem] text-muted-foreground">
                       {detail.data.notification.body}
                     </p>
+                    <RechercheTableau
+                      recherche={tri.recherche}
+                      setRecherche={tri.setRecherche}
+                      total={tri.total}
+                      affichees={tri.lignes.length}
+                    />
                     <div className="overflow-hidden rounded-lg border border-border">
                       <Table>
                         <TableHeader>
                           <TableRow className="hover:bg-transparent">
-                            <TableHead>Destinataire</TableHead>
-                            <TableHead>État</TableHead>
-                            <TableHead>Lue le</TableHead>
+                            {ENTETES_DESTINATAIRES.map((colonne) => (
+                              <SortableTableHead
+                                key={colonne.id}
+                                column={colonne}
+                                sortBy={tri.sortBy}
+                                sortDir={tri.sortDir}
+                                onToggle={tri.toggle}
+                              />
+                            ))}
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {detail.data.recipients.map((recipient) => (
+                          {detail.data.recipients.length > 0 && tri.lignes.length === 0 ? (
+                            <TableRow>
+                              <TableCell colSpan={3} className="text-muted-foreground">
+                                Aucun destinataire ne correspond à la recherche.
+                              </TableCell>
+                            </TableRow>
+                          ) : null}
+                          {tri.lignes.map((recipient) => (
                             <TableRow key={recipient.userId}>
                               <TableCell>
                                 <span className="block font-[600]">{recipient.fullName}</span>

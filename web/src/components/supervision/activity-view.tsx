@@ -40,6 +40,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -49,6 +50,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   ACTIVITY_COLUMNS,
   FAMILLE_LABELS,
@@ -84,7 +86,7 @@ import {
   type UpdateWorkShifts,
   type WorkShifts,
 } from '@/lib/data/admin';
-import { fetchComptageOuvertures } from '@/lib/data/ouvertures';
+import { fetchComptageOuvertures, type ComptageOuvertures } from '@/lib/data/ouvertures';
 import { downloadCsv } from '@/lib/csv';
 import { formatDecimal, formatNumber, formatRateOrNone, formatShortDate } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
@@ -511,6 +513,20 @@ function BucketsSection({
   );
 }
 
+const COLONNES_FICHES_OUVERTES = {
+  teleconseiller: (ligne: ComptageOuvertures) => ligne.openedByName,
+  jour: (ligne: ComptageOuvertures) => ligne.jour,
+  ouvertures: (ligne: ComptageOuvertures) => ligne.ouvertures,
+  duree: (ligne: ComptageOuvertures) => ligne.dureeMoyenneSecondes,
+};
+
+const ENTETES_FICHES_OUVERTES = [
+  { id: 'teleconseiller', label: 'Téléconseiller' },
+  { id: 'jour', label: 'Jour' },
+  { id: 'ouvertures', label: 'Fiches ouvertes', className: 'text-right' },
+  { id: 'duree', label: 'Traitement moyen', className: 'text-right' },
+] as const;
+
 /**
  * Section à part, et non une colonne du tableau d'activité : une ouverture ne
  * suit pas la famille d'appel, et son compte se lit par jour, pas par période.
@@ -520,27 +536,49 @@ function FichesOuvertes({ range }: { range: ActivityRange }) {
     queryKey: ['ouvertures', 'comptage', range.from, range.to] as const,
     queryFn: () => fetchComptageOuvertures({ from: range.from, to: range.to }),
   });
+  const tri = useTriLocal(comptage.data ?? [], COLONNES_FICHES_OUVERTES);
 
   if (comptage.isPending) return <Skeleton className="h-40 w-full" />;
   if (comptage.isError) return null;
 
   return (
     <Card>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-col gap-3 p-0">
+        <div className="px-3 pt-3">
+          <RechercheTableau
+            recherche={tri.recherche}
+            setRecherche={tri.setRecherche}
+            total={tri.total}
+            affichees={tri.lignes.length}
+          />
+        </div>
         <Table>
           <caption className="px-3 py-3 text-left font-display text-[1.0625rem] font-[700] tracking-[-0.02em]">
             Fiches ouvertes, par téléconseiller et par jour
           </caption>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Téléconseiller</TableHead>
-              <TableHead>Jour</TableHead>
-              <TableHead className="text-right">Fiches ouvertes</TableHead>
-              <TableHead className="text-right">Traitement moyen</TableHead>
+              {ENTETES_FICHES_OUVERTES.map((colonne) => (
+                <SortableTableHead
+                  key={colonne.id}
+                  column={colonne}
+                  className={'className' in colonne ? colonne.className : undefined}
+                  sortBy={tri.sortBy}
+                  sortDir={tri.sortDir}
+                  onToggle={tri.toggle}
+                />
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {comptage.data.map((ligne) => (
+            {comptage.data.length > 0 && tri.lignes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={4} className="py-8 text-center">
+                  Aucune fiche ne correspond à la recherche.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {tri.lignes.map((ligne) => (
               <TableRow key={`${ligne.openedById}-${ligne.jour}`}>
                 <TableCell className="font-[600]">{ligne.openedByName}</TableCell>
                 <TableCell>{formatShortDate(ligne.jour)}</TableCell>
@@ -566,6 +604,18 @@ function FichesOuvertes({ range }: { range: ActivityRange }) {
   );
 }
 
+const COLONNES_SCORES = {
+  teleconseiller: (row: SupervisionScore) => row.teleconseillerName,
+  rendement: (row: SupervisionScore) => row.score.value,
+  appels: (row: SupervisionScore) => row.calls,
+};
+
+const ENTETES_SCORES = [
+  { id: 'teleconseiller', label: 'Téléconseiller' },
+  { id: 'rendement', label: 'Rendement' },
+  { id: 'appels', label: 'Appels', className: 'text-right' },
+] as const;
+
 /** Section à part, et non une colonne du tableau d'activité : la note ne suit ni
     le tri par colonne, ni le filtre par famille, ni le découpage par jour. */
 function ScoreSection({ scores }: { scores: SupervisionScore[] }) {
@@ -574,6 +624,7 @@ function ScoreSection({ scores }: { scores: SupervisionScore[] }) {
     queryFn: () => fetchWorkShifts(),
   });
   const [openId, setOpenId] = useState<string | null>(null);
+  const tri = useTriLocal(byScoreDesc(scores), COLONNES_SCORES);
 
   const creneaux = (shiftsQuery.data?.shifts ?? []).map(
     (shift) => `${shift.label} ${shift.start}-${shift.end}`,
@@ -599,16 +650,39 @@ function ScoreSection({ scores }: { scores: SupervisionScore[] }) {
           </p>
         </div>
 
+        <div className="px-5 pb-3">
+          <RechercheTableau
+            recherche={tri.recherche}
+            setRecherche={tri.setRecherche}
+            total={tri.total}
+            affichees={tri.lignes.length}
+          />
+        </div>
+
         <Table aria-labelledby="rendement-periode">
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead>Téléconseiller</TableHead>
-              <TableHead>Rendement</TableHead>
-              <TableHead className="text-right">Appels</TableHead>
+              {ENTETES_SCORES.map((colonne) => (
+                <SortableTableHead
+                  key={colonne.id}
+                  column={colonne}
+                  className={'className' in colonne ? colonne.className : undefined}
+                  sortBy={tri.sortBy}
+                  sortDir={tri.sortDir}
+                  onToggle={tri.toggle}
+                />
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {byScoreDesc(scores).map((row) => {
+            {scores.length > 0 && tri.lignes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="py-8 text-center">
+                  Aucun téléconseiller ne correspond à la recherche.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {tri.lignes.map((row) => {
               const open = openId === row.teleconseillerId;
               return (
                 <Fragment key={row.teleconseillerId}>

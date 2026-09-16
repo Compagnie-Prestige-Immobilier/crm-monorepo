@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { ClockIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
@@ -22,6 +22,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { useTriLocal } from '@/components/ui/tri-local';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   callbackKeys,
@@ -30,6 +32,7 @@ import {
   formatCallbackAt,
   formatDelay,
   type Callback,
+  type CallbackList,
   type CallbackScope,
 } from '@/lib/data/console';
 import { fetchUsers } from '@/lib/data/users';
@@ -85,6 +88,15 @@ function filterCallbackBySearch(cb: Callback, search: string): boolean {
   );
 }
 
+const COLONNES_RAPPELS = {
+  prospect: (cb: Callback) => (cb.prospectName === '' ? cb.phoneE164 : cb.prospectName),
+  projet: (cb: Callback) => cb.projet,
+  echeance: (cb: Callback) => cb.scheduledAt,
+  retard: (cb: Callback) => cb.overdue,
+  commentaire: (cb: Callback) => cb.comment,
+  teleconseiller: (cb: Callback) => cb.assignedToName,
+};
+
 function RappelsTable({
   list,
   filteredItems,
@@ -94,7 +106,7 @@ function RappelsTable({
   cancelPending,
   onCancel,
 }: {
-  list: UseQueryResult<{ items: Callback[]; total: number; serverTime: string }>;
+  list: UseQueryResult<CallbackList>;
   filteredItems: Callback[];
   canFilter: boolean;
   racine: string;
@@ -102,6 +114,7 @@ function RappelsTable({
   cancelPending: boolean;
   onCancel: (callback: Callback) => void;
 }) {
+  const tri = useTriLocal(filteredItems, COLONNES_RAPPELS);
   if (list.isPending) return <Skeleton className="h-64" />;
   if (list.isError) {
     return (
@@ -128,19 +141,51 @@ function RappelsTable({
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Prospect</TableHead>
-            <TableHead>Projet</TableHead>
-            <TableHead>Échéance</TableHead>
-            <TableHead>Retard</TableHead>
-            <TableHead>Commentaire</TableHead>
-            {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
+            <SortableTableHead
+              column={{ id: 'prospect', label: 'Prospect' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'projet', label: 'Projet' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'echeance', label: 'Échéance' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'retard', label: 'Retard' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'commentaire', label: 'Commentaire' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            {canFilter ? (
+              <SortableTableHead
+                column={{ id: 'teleconseiller', label: 'Téléconseiller' }}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ) : null}
             <TableHead>
               <span className="sr-only">Actions</span>
             </TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {filteredItems.map((callback) => (
+          {tri.lignes.map((callback) => (
             <TableRow key={callback.id}>
               <TableCell>
                 <Link
@@ -208,6 +253,81 @@ function RappelsTable({
   );
 }
 
+function OverdueStatusCount({
+  isSuccess,
+  count,
+  canFilter,
+}: {
+  isSuccess: boolean;
+  count: number;
+  canFilter: boolean;
+}) {
+  if (!isSuccess)
+    return <span className="text-muted-foreground">Retards en cours de lecture.</span>;
+  return (
+    <>
+      <span className="font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
+        {formatNumber(count)}
+      </span>{' '}
+      rappel{count > 1 ? 's' : ''} en retard
+      {canFilter ? ' chez les téléconseillers' : ''}
+    </>
+  );
+}
+
+function RappelsFilterControls({
+  search,
+  setSearch,
+  projet,
+  setProjet,
+  canFilter,
+  teleconseillers,
+  assignedToId,
+  setAssignedToId,
+}: {
+  search: string;
+  setSearch: (search: string) => void;
+  projet: Projet | null;
+  setProjet: (projet: Projet | null) => void;
+  canFilter: boolean;
+  teleconseillers: { id: string; fullName: string }[];
+  assignedToId: string | null;
+  setAssignedToId: (id: string | null) => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-3">
+      <SearchField
+        value={search}
+        onChange={setSearch}
+        placeholder="Nom, téléphone…"
+        className="w-64"
+      />
+      <FilterCombobox
+        label="Projet"
+        placeholder="Tous les projets"
+        options={PROJET_OPTIONS}
+        value={projet}
+        onChange={(value) => {
+          setProjet((value as Projet) || null);
+        }}
+      />
+      {canFilter ? (
+        <FilterCombobox
+          label="Téléconseiller"
+          placeholder="Tous les téléconseillers"
+          className="w-72"
+          options={teleconseillers.map((user) => ({
+            value: user.id,
+            label: user.fullName,
+          }))}
+          value={assignedToId}
+          onChange={setAssignedToId}
+        />
+      ) : null}
+    </div>
+  );
+}
+
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const racine = '/teleconseil';
   const queryClient = useQueryClient();
@@ -264,47 +384,23 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
       </p>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[0.9375rem]" role="status">
-          {overdue.isSuccess ? (
-            <>
-              <span className="font-display text-[2rem] font-[700] tracking-[-0.02em] tabular-nums">
-                {formatNumber(overdueCount)}
-              </span>{' '}
-              rappel{overdueCount > 1 ? 's' : ''} en retard
-              {canFilter ? ' chez les téléconseillers' : ''}
-            </>
-          ) : (
-            <span className="text-muted-foreground">Retards en cours de lecture.</span>
-          )}
+          <OverdueStatusCount
+            isSuccess={overdue.isSuccess}
+            count={overdueCount}
+            canFilter={canFilter}
+          />
         </p>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <SearchField
-            value={search}
-            onChange={setSearch}
-            placeholder="Nom, téléphone…"
-            className="w-64"
-          />
-          <FilterCombobox
-            label="Projet"
-            placeholder="Tous les projets"
-            options={PROJET_OPTIONS}
-            value={projet}
-            onChange={(value) => setProjet((value as Projet) || null)}
-          />
-          {canFilter ? (
-            <FilterCombobox
-              label="Téléconseiller"
-              placeholder="Tous les téléconseillers"
-              className="w-72"
-              options={(teleconseillers.data?.items ?? []).map((user) => ({
-                value: user.id,
-                label: user.fullName,
-              }))}
-              value={assignedToId}
-              onChange={setAssignedToId}
-            />
-          ) : null}
-        </div>
+        <RappelsFilterControls
+          search={search}
+          setSearch={setSearch}
+          projet={projet}
+          setProjet={setProjet}
+          canFilter={canFilter}
+          teleconseillers={teleconseillers.data?.items ?? []}
+          assignedToId={assignedToId}
+          setAssignedToId={setAssignedToId}
+        />
       </div>
 
       <Tabs

@@ -11,7 +11,7 @@ export function SortableTableHead<F extends string>({
   className,
 }: {
   column: { id: F; label: ReactNode };
-  sortBy: F;
+  sortBy: F | null;
   sortDir: 'asc' | 'desc';
   onToggle: (id: string) => void;
   className?: string | undefined;
