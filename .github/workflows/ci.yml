@@ -23,6 +23,9 @@ jobs:
     name: go — plafonds, sqlc, lint, panneau, intégration, Playwright
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      packages: write
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
       TEST_DATABASE_URL: postgresql://crm:crm@localhost:5432/crm?sslmode=disable
@@ -107,8 +110,32 @@ jobs:
         working-directory: e2e
       - run: pnpm test
         working-directory: e2e
-      # L'image que Dokploy construira : un COPY oublié se voit ici, pas le jour J.
-      - run: docker build -t cpi-go:ci .
+      # Le même cache BuildKit sert aux PR et à prod. Sur prod, l'image vérifiée
+      # est aussi publiée dans GHCR afin que Dokploy puisse la tirer sans
+      # reconstruire le dépôt sur le serveur.
+      - name: Connexion GHCR (prod)
+        if: github.event_name == 'push' && github.ref == 'refs/heads/prod'
+        env:
+          CR_PAT: ${{ secrets.GITHUB_TOKEN }}
+        run: echo "${CR_PAT}" | docker login ghcr.io --username "${GITHUB_ACTOR}" --password-stdin
+      - name: Construire l'image avec cache BuildKit
+        env:
+          IMAGE: ghcr.io/compagnie-prestige-immobilier/crm-monorepo/cpi-go
+        run: |
+          if [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF}" = "refs/heads/prod" ]; then
+            docker buildx build . \
+              --tag "${IMAGE}:${GITHUB_SHA}" \
+              --tag "${IMAGE}:prod" \
+              --cache-from type=gha,scope=cpi-go \
+              --cache-to type=gha,mode=max,scope=cpi-go \
+              --push
+          else
+            docker buildx build . \
+              --tag cpi-go:ci \
+              --cache-from type=gha,scope=cpi-go \
+              --cache-to type=gha,mode=max,scope=cpi-go \
+              --load
+          fi
 
   # Appelés ici et non déclenchés à côté : `needs` ne franchit pas la frontière
   # d'un workflow, et `deploy` doit pouvoir les attendre.
@@ -183,4 +210,5 @@ jobs:
         env:
           DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
+          DOKPLOY_IMAGE: ghcr.io/compagnie-prestige-immobilier/crm-monorepo/cpi-go:${{ github.sha }}
         run: python3 infra/dokploy/deploy.py redeploy cpi-go

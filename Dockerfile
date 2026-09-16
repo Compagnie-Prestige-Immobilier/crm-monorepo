@@ -8,10 +8,13 @@ ARG PG_MAJOR=18
 FROM golang:${GO_VERSION}-bookworm AS contrat
 WORKDIR /src
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 COPY . ./
 # `web/embed.go` exige un dossier `dist` : un fichier vide suffit pour écrire le contrat.
-RUN mkdir -p web/dist && touch web/dist/index.html \
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    mkdir -p web/dist && touch web/dist/index.html \
     && go run github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 generate \
     && go run ./cmd/server -openapi > /openapi.json
 
@@ -20,7 +23,9 @@ RUN corepack enable
 WORKDIR /repo
 COPY pnpm-workspace.yaml pnpm-lock.yaml package.json ./
 COPY web/package.json web/
-RUN pnpm install --frozen-lockfile --filter @crm/panel
+RUN --mount=type=cache,id=cpi-pnpm,target=/pnpm/store \
+    pnpm config set store-dir /pnpm/store \
+    && pnpm install --frozen-lockfile --filter @crm/panel
 COPY web web
 COPY tsconfig.base.json ./
 COPY --from=contrat /openapi.json ./
@@ -28,7 +33,9 @@ RUN pnpm --filter @crm/panel gen && pnpm --filter @crm/panel build
 
 FROM contrat AS binaire
 COPY --from=panneau /repo/web/dist ./web/dist
-RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /cpi-go ./cmd/server
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /cpi-go ./cmd/server
 
 # pg_dump 18 depuis PGDG : la version de Bookworm refuse un serveur 18.
 FROM debian:bookworm-slim AS runner
