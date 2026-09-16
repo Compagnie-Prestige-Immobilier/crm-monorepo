@@ -57,6 +57,7 @@ const SCOPES: readonly { value: CallbackScope; label: string }[] = [
   { value: 'overdue', label: 'En retard' },
   { value: 'today', label: 'Aujourd’hui' },
   { value: 'week', label: 'Cette semaine' },
+  { value: 'all', label: 'Tous' },
 ];
 
 const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> = {
@@ -70,6 +71,10 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
   },
   week: {
     title: 'Aucun rappel cette semaine',
+    description: 'Une échéance se promet en consignant un appel.',
+  },
+  all: {
+    title: 'Aucun rappel promis',
     description: 'Une échéance se promet en consignant un appel.',
   },
 };
@@ -150,6 +155,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                     <TableRow>
                       <TableHead>Prospect</TableHead>
                       <TableHead>Projet</TableHead>
+                      <TableHead>Qualification</TableHead>
                       <TableHead>Échéance</TableHead>
                       <TableHead>Retard</TableHead>
                       <TableHead>Commentaire</TableHead>
@@ -177,6 +183,11 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                         </TableCell>
                         <TableCell>
                           <ProjetBadge projet={callback.projet} />
+                        </TableCell>
+                        <TableCell>
+                          {callback.reasonLabel === null ? null : (
+                            <Badge variant="secondary">{callback.reasonLabel}</Badge>
+                          )}
                         </TableCell>
                         <TableCell>
                           <time dateTime={callback.scheduledAt}>
