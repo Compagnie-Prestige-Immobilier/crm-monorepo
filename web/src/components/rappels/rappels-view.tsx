@@ -8,6 +8,7 @@ import { toast } from 'sonner';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { SearchField } from '@/components/filters/search-field';
 import { QueryErrorState } from '@/components/query-error-state';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { Badge } from '@/components/ui/badge';
@@ -85,6 +86,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const [scope, setScope] = useState<CallbackScope>('overdue');
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
   const [projet, setProjet] = useState<Projet | null>(null);
+  const [search, setSearch] = useState('');
 
   const overdue = useQuery({
     queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
@@ -94,6 +96,15 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const list = useQuery({
     queryKey: [...callbackKeys.list(scope, assignedToId), projet],
     queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
+  });
+
+  const filteredItems = (list.data?.items ?? []).filter((cb) => {
+    if (search.trim() === '') return true;
+    const q = search.trim().toLowerCase();
+    const nameMatch = cb.prospectName.toLowerCase().includes(q);
+    const phoneMatch = (cb.phoneE164 ?? '').toLowerCase().includes(q);
+    const commentMatch = (cb.comment ?? '').toLowerCase().includes(q);
+    return nameMatch || phoneMatch || commentMatch;
   });
 
   // Les CCP promettent aussi des rappels, sur les fiches plateforme.
@@ -166,7 +177,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {list.data.items.map((callback) => (
+                    {filteredItems.map((callback) => (
                       <TableRow key={callback.id}>
                         <TableCell>
                           <Link
@@ -268,7 +279,13 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
           )}
         </p>
 
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-wrap items-end gap-3">
+          <SearchField
+            value={search}
+            onChange={setSearch}
+            placeholder="Nom, téléphone…"
+            className="w-64"
+          />
           <FilterCombobox
             label="Projet"
             placeholder="Tous les projets"

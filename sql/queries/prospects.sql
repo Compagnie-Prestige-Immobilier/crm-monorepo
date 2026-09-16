@@ -80,7 +80,7 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND (
+    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
@@ -210,7 +210,7 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND (
+    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
