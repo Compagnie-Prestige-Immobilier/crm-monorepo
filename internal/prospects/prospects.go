@@ -1457,29 +1457,29 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	return out, nil
 }
 
-var prospectLecture = []socle.Role{socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Admin, socle.Superviseur, socle.Direction}
+var prospectLecture = socle.PermissionProspectsLire
 
-var Garde = map[string][]socle.Role{
+var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects":                                           prospectLecture,
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
 	"GET /api/v1/prospects/{id}/requalifications":                     prospectLecture,
-	"POST /api/v1/prospects":                                          socle.Parcours,
-	"PATCH " + prospectCheminID:                                       socle.Parcours,
-	"DELETE " + prospectCheminID:                                      socle.Parcours,
-	"POST /api/v1/prospects/merge":                                    {socle.Commercial, socle.ChargeClientele, socle.Admin},
-	"POST /api/v1/prospects/reassign":                                 {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
-	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
-	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,
+	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
+	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
+	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,
+	"POST /api/v1/prospects/merge":                                    socle.PermissionProspectsFusionner,
+	"POST /api/v1/prospects/reassign":                                 socle.PermissionProspectsReaffecter,
+	"POST /api/v1/prospects/{id}/revue":                               socle.PermissionProspectsRevoir,
+	"PATCH " + prospectCheminSegment:                                  socle.PermissionProspectsSuperviser,
+	"GET /api/v1/prospects/{id}/segment-history":                      socle.PermissionFichesTenir,
 	"GET /api/v1/prospects/{id}/journal":                              prospectLecture,
-	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"GET /api/v1/champs-conversion/{projet}":                          socle.Tous,
-	"PUT /api/v1/champs-conversion/{projet}":                          socle.AdminSeul,
-	"GET /api/v1/parametres-chues":                                    socle.Parcours,
-	"PATCH /api/v1/parametres-chues":                                  socle.Encadrement,
-	"GET /api/v1/parametres-chues/journal":                            socle.Encadrement,
+	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": socle.PermissionProspectsConvertir,
+	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    socle.PermissionProspectsConvertir,
+	"GET /api/v1/champs-conversion/{projet}":                          socle.PermissionPanneauAcceder,
+	"PUT /api/v1/champs-conversion/{projet}":                          socle.PermissionFormulairesAdministrer,
+	"GET /api/v1/parametres-chues":                                    socle.PermissionFichesTenir,
+	"PATCH /api/v1/parametres-chues":                                  socle.PermissionProspectsSuperviser,
+	"GET /api/v1/parametres-chues/journal":                            socle.PermissionProspectsSuperviser,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

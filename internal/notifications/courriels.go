@@ -572,11 +572,11 @@ func (s *service) monterCourriels(api huma.API) {
 	huma.Register(api, huma.Operation{OperationID: "brevoWebhook", Method: http.MethodPost, Path: "/api/v1/webhooks/brevo"}, s.evenementBrevo)
 }
 
-var GardeCourriels = map[string][]socle.Role{
-	"GET /api/v1/courriels":                             socle.AdminSeul,
-	"GET /api/v1/courriels/reglages":                    socle.AdminSeul,
-	"PUT /api/v1/courriels/reglages":                    socle.AdminSeul,
-	"GET /api/v1/courriels/objet/{objetType}/{objetId}": socle.Banque,
-	"POST /api/v1/courriels/{id}/renvoyer":              socle.Banque,
-	"POST /api/v1/webhooks/brevo":                       {socle.Public},
+var GardeCourriels = map[string]socle.Permission{
+	"GET /api/v1/courriels":                             socle.PermissionCourrielsAdministrer,
+	"GET /api/v1/courriels/reglages":                    socle.PermissionCourrielsAdministrer,
+	"PUT /api/v1/courriels/reglages":                    socle.PermissionCourrielsAdministrer,
+	"GET /api/v1/courriels/objet/{objetType}/{objetId}": socle.PermissionBanqueDossiers,
+	"POST /api/v1/courriels/{id}/renvoyer":              socle.PermissionBanqueDossiers,
+	"POST /api/v1/webhooks/brevo":                       socle.Publique,
 }

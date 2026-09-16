@@ -295,14 +295,14 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 	})
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /health/ready":            {socle.Public},
-	"GET /health/live":             {socle.Public},
-	"POST /api/v1/auth/login":      {socle.Public},
-	"POST /api/v1/auth/demo-login": {socle.Public},
-	"GET /api/v1/auth/bases":       {socle.Public},
-	"POST /api/v1/auth/logout":     socle.Tous,
-	"GET /api/v1/auth/me":          socle.Tous,
-	"POST /api/v1/auth/password":   socle.Tous,
-	"PUT /api/v1/auth/me/password": socle.Tous,
+var Garde = map[string]socle.Permission{
+	"GET /health/ready":            socle.Publique,
+	"GET /health/live":             socle.Publique,
+	"POST /api/v1/auth/login":      socle.Publique,
+	"POST /api/v1/auth/demo-login": socle.Publique,
+	"GET /api/v1/auth/bases":       socle.Publique,
+	"POST /api/v1/auth/logout":     socle.PermissionPanneauAcceder,
+	"GET /api/v1/auth/me":          socle.PermissionPanneauAcceder,
+	"POST /api/v1/auth/password":   socle.PermissionPanneauAcceder,
+	"PUT /api/v1/auth/me/password": socle.PermissionPanneauAcceder,
 }

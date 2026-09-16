@@ -29,10 +29,10 @@ const (
 // `max_connections` à 100 partagé avec la production, le nombre se plafonne.
 var nomBaseValide = regexp.MustCompile(`^[a-z][a-z0-9-]{2,20}$`)
 
-var GardeBases = map[string][]socle.Role{
-	"GET " + cheminBases:               socle.AdminSeul,
-	"POST " + cheminBases:              socle.AdminSeul,
-	"DELETE " + cheminBases + "/{nom}": socle.AdminSeul,
+var GardeBases = map[string]socle.Permission{
+	"GET " + cheminBases:               socle.PermissionBasesAdministrer,
+	"POST " + cheminBases:              socle.PermissionBasesAdministrer,
+	"DELETE " + cheminBases + "/{nom}": socle.PermissionBasesAdministrer,
 }
 
 type BaseDemoDto struct {

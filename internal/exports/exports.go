@@ -114,15 +114,15 @@ const (
 	exportExempleTelephone        = "77 123 45 67"
 )
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/export/global.xlsx":                        socle.Encadrement,
-	"GET /api/v1/export/prospects.xlsx":                     {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Superviseur, socle.Direction},
-	"GET /api/v1/export/representants.xlsx":                 socle.Parcours,
-	"GET /api/v1/export/visites.xlsx":                       socle.Registre,
-	"GET /api/v1/export/bank-cases.xlsx":                    {socle.Admin, socle.BanqueFinance, socle.Superviseur},
-	"GET /api/v1/export/prospects-modele.xlsx":              socle.AdminSeul,
-	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.AdminSeul,
-	"GET /api/v1/export/representants-modele.xlsx":          socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/export/global.xlsx":                        socle.PermissionExportsGlobaux,
+	"GET /api/v1/export/prospects.xlsx":                     socle.PermissionExportsProspects,
+	"GET /api/v1/export/representants.xlsx":                 socle.PermissionFichesTenir,
+	"GET /api/v1/export/visites.xlsx":                       socle.PermissionAccueilRegistre,
+	"GET /api/v1/export/bank-cases.xlsx":                    socle.PermissionExportsBanque,
+	"GET /api/v1/export/prospects-modele.xlsx":              socle.PermissionExportsModeles,
+	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.PermissionExportsModeles,
+	"GET /api/v1/export/representants-modele.xlsx":          socle.PermissionExportsModeles,
 }
 
 // LibellePaiement nomme un mode de paiement, ici comme dans les classeurs.

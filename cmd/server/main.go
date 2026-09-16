@@ -279,7 +279,11 @@ func ecrireRoles(cfg *socle.Config) error {
 	if _, _, err := serveur(cfg, nil); err != nil {
 		return err
 	}
-	doc, err := json.MarshalIndent(socle.Garde, "", "  ")
+	roles := make(map[string][]socle.Role, len(socle.Garde))
+	for route, permission := range socle.Garde {
+		roles[route] = socle.RolesAutorises(permission)
+	}
+	doc, err := json.MarshalIndent(roles, "", "  ")
 	if err != nil {
 		return err
 	}

@@ -1371,19 +1371,19 @@ func (s *service) representantEffacer(ctx context.Context, auteur, id string, ex
 	})
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/representants":                              socle.Parcours,
-	"GET /api/v1/representants/lookup":                       socle.Parcours,
-	"POST /api/v1/representants":                             socle.Parcours,
-	"GET /api/v1/representants/{id}":                         socle.Parcours,
-	"PATCH /api/v1/representants/{id}":                       socle.Parcours,
-	"DELETE /api/v1/representants/{id}":                      socle.Parcours,
-	"GET /api/v1/representants/{id}/relation-history":        socle.Parcours,
-	"GET /api/v1/representants/{id}/call-attempts":           socle.Parcours,
-	"GET /api/v1/representants/{id}/fiche-history":           socle.Parcours,
-	"GET /api/v1/representants/{id}/comments":                socle.Parcours,
-	"POST /api/v1/representants/{id}/comments":               socle.Parcours,
-	"DELETE /api/v1/representants/{id}/comments/{commentId}": socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/representants":                              socle.PermissionFichesTenir,
+	"GET /api/v1/representants/lookup":                       socle.PermissionFichesTenir,
+	"POST /api/v1/representants":                             socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}":                         socle.PermissionFichesTenir,
+	"PATCH /api/v1/representants/{id}":                       socle.PermissionFichesTenir,
+	"DELETE /api/v1/representants/{id}":                      socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}/relation-history":        socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}/call-attempts":           socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}/fiche-history":           socle.PermissionFichesTenir,
+	"GET /api/v1/representants/{id}/comments":                socle.PermissionFichesTenir,
+	"POST /api/v1/representants/{id}/comments":               socle.PermissionFichesTenir,
+	"DELETE /api/v1/representants/{id}/comments/{commentId}": socle.PermissionComptesAdministrer,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

@@ -55,7 +55,7 @@ func (l *Live) abonner() (sujets chan string, quitter func()) {
 	}
 }
 
-var GardeLive = map[string][]Role{"GET /api/v1/live": Tous}
+var GardeLive = map[string]Permission{"GET /api/v1/live": PermissionPanneauAcceder}
 
 func (l *Live) diffuser(ctx huma.Context) {
 	ctx.SetHeader("Content-Type", "text/event-stream")
