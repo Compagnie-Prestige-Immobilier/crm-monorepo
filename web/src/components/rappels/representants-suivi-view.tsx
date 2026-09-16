@@ -11,14 +11,9 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import { callbackKeys, formatCallbackAt } from '@/lib/data/console';
 import {
   SUIVI_PAGE_SIZE,
@@ -134,6 +129,13 @@ export function RepresentantsSuiviView({
   );
 }
 
+const COLONNES_SUIVI = {
+  representant: (r: RepresentantRow) => r.fullName,
+  etablissement: (r: RepresentantRow) => r.etablissement,
+  quand: (r: RepresentantRow) => r.nextCallbackAt ?? r.lastCallAt,
+  appelePar: (r: RepresentantRow) => r.lastCallByName,
+};
+
 function Corps({
   liste,
   suivi,
@@ -175,17 +177,74 @@ function Corps({
         </p>
       ) : null}
 
+      <SuiviTable items={data.items} suivi={suivi} canFilter={canFilter} now={now} />
+    </div>
+  );
+}
+
+function SuiviTable({
+  items,
+  suivi,
+  canFilter,
+  now,
+}: {
+  items: RepresentantRow[];
+  suivi: RepresentantSuivi;
+  canFilter: boolean;
+  now: number;
+}) {
+  const tri = useTriLocal(items, COLONNES_SUIVI);
+  const colSpan = canFilter ? 4 : 3;
+
+  return (
+    <>
+      <RechercheTableau
+        recherche={tri.recherche}
+        setRecherche={tri.setRecherche}
+        total={tri.total}
+        affichees={tri.lignes.length}
+      />
+
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Représentant</TableHead>
-            <TableHead>Établissement</TableHead>
-            <TableHead>{suivi === 'A_RAPPELER' ? 'Échéance' : 'Dernier appel'}</TableHead>
-            {canFilter ? <TableHead>Appelé par</TableHead> : null}
+            <SortableTableHead
+              column={{ id: 'representant', label: 'Représentant' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'etablissement', label: 'Établissement' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            <SortableTableHead
+              column={{ id: 'quand', label: suivi === 'A_RAPPELER' ? 'Échéance' : 'Dernier appel' }}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+            {canFilter ? (
+              <SortableTableHead
+                column={{ id: 'appelePar', label: 'Appelé par' }}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ) : null}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {data.items.map((representant) => (
+          {tri.lignes.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={colSpan} className="text-muted-foreground">
+                Aucun représentant ne correspond à la recherche.
+              </TableCell>
+            </TableRow>
+          ) : null}
+          {tri.lignes.map((representant) => (
             <TableRow key={representant.id}>
               <TableCell>
                 <Link
@@ -209,7 +268,7 @@ function Corps({
           ))}
         </TableBody>
       </Table>
-    </div>
+    </>
   );
 }
 

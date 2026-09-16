@@ -26,6 +26,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { BoutonAjoutTeleconseiller } from '@/components/lots-export/lot-ajout-teleconseiller';
 import { LotExportFiches } from '@/components/lots-export/lot-export-fiches';
@@ -37,6 +38,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   campagnesPath,
   fetchLotExport,
@@ -810,6 +812,24 @@ function BoutonRetrait({
   );
 }
 
+const COLONNES_PERFORMANCE = {
+  teleconseiller: (ligne: LotExportDetail['performance'][number]) => ligne.teleconseillerName,
+  objectif: (ligne: LotExportDetail['performance'][number]) => ligne.objectif,
+  traitees: (ligne: LotExportDetail['performance'][number]) => ligne.treated,
+  couverture: (ligne: LotExportDetail['performance'][number]) => ligne.completionRate,
+  appelsAttribues: (ligne: LotExportDetail['performance'][number]) => ligne.assignedCalls,
+  horsAttribution: (ligne: LotExportDetail['performance'][number]) => ligne.outsideAssignmentCalls,
+};
+
+const ENTETES_PERFORMANCE = [
+  { id: 'teleconseiller', label: 'Téléconseiller' },
+  { id: 'objectif', label: 'Objectif par jour', className: 'text-right' },
+  { id: 'traitees', label: 'Traitées', className: 'text-right' },
+  { id: 'couverture', label: 'Couverture', className: 'text-right' },
+  { id: 'appelsAttribues', label: 'Appels attribués', className: 'text-right' },
+  { id: 'horsAttribution', label: 'Hors attribution', className: 'text-right' },
+] as const;
+
 function CartePerformance({
   id,
   lot,
@@ -821,6 +841,7 @@ function CartePerformance({
   peutRegler: boolean;
   onVoirFiches: (teleconseillerId: string) => void;
 }) {
+  const tri = useTriLocal(lot.performance, COLONNES_PERFORMANCE);
   return (
     <Card>
       <CardHeader>
@@ -835,26 +856,26 @@ function CartePerformance({
           hors attribution vise une fiche confiée à un collègue dans cette campagne.
         </p>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-3">
+        <RechercheTableau
+          recherche={tri.recherche}
+          setRecherche={tri.setRecherche}
+          total={tri.total}
+          affichees={tri.lignes.length}
+        />
         <Table aria-label="Performance de la campagne">
           <TableHeader>
             <TableRow>
-              <TableHead scope="col">Téléconseiller</TableHead>
-              <TableHead scope="col" className="text-right">
-                Objectif par jour
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                Traitées
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                Couverture
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                Appels attribués
-              </TableHead>
-              <TableHead scope="col" className="text-right">
-                Hors attribution
-              </TableHead>
+              {ENTETES_PERFORMANCE.map((colonne) => (
+                <SortableTableHead
+                  key={colonne.id}
+                  column={colonne}
+                  className={'className' in colonne ? colonne.className : undefined}
+                  sortBy={tri.sortBy}
+                  sortDir={tri.sortDir}
+                  onToggle={tri.toggle}
+                />
+              ))}
               {peutRegler ? (
                 <TableHead scope="col" className="text-right">
                   <span className="sr-only">Retirer de la campagne</span>
@@ -863,7 +884,17 @@ function CartePerformance({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lot.performance.map((ligne) => (
+            {lot.performance.length > 0 && tri.lignes.length === 0 ? (
+              <TableRow>
+                <TableCell
+                  colSpan={ENTETES_PERFORMANCE.length + (peutRegler ? 1 : 0)}
+                  className="text-muted-foreground"
+                >
+                  Aucun téléconseiller ne correspond à la recherche.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {tri.lignes.map((ligne) => (
               <TableRow key={ligne.teleconseillerId}>
                 <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
                   {ligne.teleconseillerName}

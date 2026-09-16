@@ -349,7 +349,8 @@ const SECTIONS: readonly NavSection[] = [
         icon: UsersRoundIcon,
         description: 'Qualité de la base représentants et rendement départemental',
         roles: ENCADREMENT,
-        secondary: true,
+        hidden: true,
+        onglet: '/teleconseil/tableau-de-bord',
       },
       {
         href: '/teleconseil/pole-marketing',
@@ -357,7 +358,8 @@ const SECTIONS: readonly NavSection[] = [
         icon: ActivityIcon,
         description: 'Qualité des prospects amenés et conversion par canal',
         roles: ENCADREMENT,
-        secondary: true,
+        hidden: true,
+        onglet: '/teleconseil/tableau-de-bord',
       },
       {
         href: '/teleconseil/parametres-chues',

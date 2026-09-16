@@ -1,24 +1,27 @@
 'use client';
 
 import { ResponsiveBar } from '@nivo/bar';
-import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import {
+  useMutation,
+  useQueries,
+  useQuery,
+  useQueryClient,
+  type UseQueryResult,
+} from '@tanstack/react-query';
 import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   fetchPlateformeEquipe,
   plateformeEquipeKey,
   updatePlateformeObjectif,
+  type PlateformeCcp,
+  type PlateformeEquipe,
 } from '@/lib/data/plateforme';
 import { fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { formatDateTime, formatNumber } from '@/lib/format';
@@ -150,6 +153,24 @@ function avancement(appels: number, objectif: number): string {
   return ` sur ${formatNumber(objectif)}, ${String(Math.round((appels / objectif) * 100))} %`;
 }
 
+const COLONNES_CCP = {
+  fullName: (ccp: PlateformeCcp) => ccp.fullName,
+  appelsJour: (ccp: PlateformeCcp) => ccp.appelsJour,
+  jointsJour: (ccp: PlateformeCcp) => ccp.jointsJour,
+  appelsSemaine: (ccp: PlateformeCcp) => ccp.appelsSemaine,
+  rappelsEnAttente: (ccp: PlateformeCcp) => ccp.rappelsEnAttente,
+  dernierAppel: (ccp: PlateformeCcp) => ccp.dernierAppel,
+};
+
+const ENTETES_CCP = [
+  { id: 'fullName', label: 'CCP' },
+  { id: 'appelsJour', label: 'Appels du jour', className: 'text-right' },
+  { id: 'jointsJour', label: 'Joints', className: 'text-right' },
+  { id: 'appelsSemaine', label: 'Semaine', className: 'text-right' },
+  { id: 'rappelsEnAttente', label: 'Rappels promis', className: 'text-right' },
+  { id: 'dernierAppel', label: 'Dernier appel' },
+] as const;
+
 function EquipeCCP({ regleObjectif }: { regleObjectif: boolean }) {
   const queryClient = useQueryClient();
   const equipe = useQuery({
@@ -197,66 +218,94 @@ function EquipeCCP({ regleObjectif }: { regleObjectif: boolean }) {
         ) : null}
       </CardHeader>
       <CardContent>
-        {equipe.isPending ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
-        {equipe.isError ? (
-          <p role="alert" className="text-sm text-destructive">
-            {apiErrorText(equipe.error, 'L’équipe n’a pas pu être chargée.')}
-          </p>
-        ) : null}
-        {equipe.data !== undefined && equipe.data.ccps.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            Aucun CCP actif. Donnez ce rôle à un compte dans Utilisateurs.
-          </p>
-        ) : null}
-        {equipe.data !== undefined && equipe.data.ccps.length > 0 ? (
-          <Table aria-label="Activité des CCP">
-            <TableHeader>
-              <TableRow>
-                <TableHead scope="col">CCP</TableHead>
-                <TableHead scope="col" className="text-right">
-                  Appels du jour
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Joints
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Semaine
-                </TableHead>
-                <TableHead scope="col" className="text-right">
-                  Rappels promis
-                </TableHead>
-                <TableHead scope="col">Dernier appel</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {equipe.data.ccps.map((ccp) => (
-                <TableRow key={ccp.id}>
-                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
-                    {ccp.fullName}
-                  </th>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ccp.appelsJour)}
-                    {avancement(ccp.appelsJour, cible)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ccp.jointsJour)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ccp.appelsSemaine)}
-                  </TableCell>
-                  <TableCell className="text-right tabular-nums">
-                    {formatNumber(ccp.rappelsEnAttente)}
-                  </TableCell>
-                  <TableCell>
-                    {ccp.dernierAppel === null ? 'Jamais' : formatDateTime(ccp.dernierAppel)}
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        ) : null}
+        <EquipeCorps equipe={equipe} cible={cible} />
       </CardContent>
     </Card>
+  );
+}
+
+function EquipeCorps({
+  equipe,
+  cible,
+}: {
+  equipe: UseQueryResult<PlateformeEquipe>;
+  cible: number;
+}) {
+  const tri = useTriLocal(equipe.data?.ccps ?? [], COLONNES_CCP);
+
+  if (equipe.isPending) return <p className="text-sm text-muted-foreground">Chargement…</p>;
+  if (equipe.isError) {
+    return (
+      <p role="alert" className="text-sm text-destructive">
+        {apiErrorText(equipe.error, 'L’équipe n’a pas pu être chargée.')}
+      </p>
+    );
+  }
+  if (equipe.data.ccps.length === 0) {
+    return (
+      <p className="text-sm text-muted-foreground">
+        Aucun CCP actif. Donnez ce rôle à un compte dans Utilisateurs.
+      </p>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-2">
+      <RechercheTableau
+        recherche={tri.recherche}
+        setRecherche={tri.setRecherche}
+        total={tri.total}
+        affichees={tri.lignes.length}
+      />
+      <Table aria-label="Activité des CCP">
+        <TableHeader>
+          <TableRow>
+            {ENTETES_CCP.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                className={'className' in colonne ? colonne.className : undefined}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ))}
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {tri.lignes.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-muted-foreground">
+                Aucun CCP ne correspond à la recherche.
+              </TableCell>
+            </TableRow>
+          ) : null}
+          {tri.lignes.map((ccp) => (
+            <TableRow key={ccp.id}>
+              <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                {ccp.fullName}
+              </th>
+              <TableCell className="text-right tabular-nums">
+                {formatNumber(ccp.appelsJour)}
+                {avancement(ccp.appelsJour, cible)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatNumber(ccp.jointsJour)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatNumber(ccp.appelsSemaine)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums">
+                {formatNumber(ccp.rappelsEnAttente)}
+              </TableCell>
+              <TableCell>
+                {ccp.dernierAppel === null ? 'Jamais' : formatDateTime(ccp.dernierAppel)}
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }
 

@@ -1,10 +1,10 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { CheckCircle2Icon, CopyIcon, StarIcon } from 'lucide-react';
+import { CopyIcon, StarIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
@@ -15,14 +15,12 @@ import { ConversionFields, type SaisieTelephone } from '@/components/console/con
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { PanneauEcheance } from '@/components/console/panneau-echeance';
 import { useShortcuts } from '@/components/console/use-shortcuts';
-import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -67,6 +65,8 @@ import {
   type ReglageChamp,
 } from '@/lib/data/champs-conversion';
 import type { OrigineFiche } from '@/lib/data/grand-public';
+import { fetchCanauxProvenance } from '@/lib/data/grand-public';
+import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -74,14 +74,17 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
+  PROSPECT_STATUT_LABELS,
   type ProspectRow,
+  type ProspectStatut,
   type Role,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
+import { EnTeteAnnuaire } from '@/components/console/console-annuaire-header';
 
-type Projet = 'CHUES' | 'GRAND_PUBLIC';
+export type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
 /** Seule issue encore atteignable au clavier une fois le dossier ouvert (EB-10). */
 const RAPPEL_KEY = '2';
@@ -170,8 +173,6 @@ const estInjoignable = (item: MotifAppel): boolean => !item.countsAsReached;
 export const statutsJoignables = (catalogue: readonly MotifAppel[]): MotifAppel[] =>
   motifsRacine(catalogue).filter((item) => !estInjoignable(item) && item.effect !== 'CLOSE_METHOD');
 
-const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
-
 const nouveauHref = (): string => '/teleconseil/prospects';
 
 const CLASSE_CHOIX = cn(
@@ -217,6 +218,20 @@ export function ConsoleView({
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
+  const consoleFilters = useConsoleFilters();
+
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
+  const canaux = useQuery({
+    queryKey: ['referentiels', 'canaux-provenance'] as const,
+    queryFn: () => fetchCanauxProvenance(),
+    staleTime: 5 * 60_000,
+  });
+
   const parLien = useQuery({
     queryKey: queryKeys.prospect(demandee ?? ''),
     queryFn: () => fetchProspect(demandee ?? ''),
@@ -236,6 +251,14 @@ export function ConsoleView({
     plateforme,
     page,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
+    representantId: consoleFilters.values.representantId,
+    departementId: consoleFilters.values.departementId,
+    banqueId: consoleFilters.values.banqueId,
+    syndicatId: consoleFilters.values.syndicatId,
+    statut: consoleFilters.values.statut,
+    canalProvenanceId: consoleFilters.values.canalProvenanceId,
+    dateFrom: consoleFilters.values.dateFrom,
+    dateTo: consoleFilters.values.dateTo,
   });
 
   const revenir = useCallback(() => {
@@ -301,6 +324,9 @@ export function ConsoleView({
         origine={origineAffichee(origineFiltrable, origine)}
         resteAAppeler={resteAAppeler}
         total={totalAffiche(annuaire.data)}
+        reference={reference.data}
+        canaux={canaux.data}
+        advancedChips={consoleFilters.chips}
         onSearch={(value) => {
           setSearch(value);
           setPage(1);
@@ -313,6 +339,48 @@ export function ConsoleView({
           setResteAAppeler(value);
           setPage(1);
         }}
+        onRemoveFilter={consoleFilters.remove}
+        onClearFilters={consoleFilters.clear}
+        onRepresentantChange={(value) => {
+          consoleFilters.set.representantId(value);
+          setPage(1);
+        }}
+        onDepartementChange={(value) => {
+          consoleFilters.set.departementId(value);
+          setPage(1);
+        }}
+        onBanqueChange={(value) => {
+          consoleFilters.set.banqueId(value);
+          setPage(1);
+        }}
+        onSyndicatChange={(value) => {
+          consoleFilters.set.syndicatId(value);
+          setPage(1);
+        }}
+        onStatutChange={(value) => {
+          consoleFilters.set.statut(value);
+          setPage(1);
+        }}
+        onCanalChange={(value) => {
+          consoleFilters.set.canalProvenanceId(value);
+          setPage(1);
+        }}
+        onDateFromChange={(value) => {
+          consoleFilters.set.dateFrom(value);
+          setPage(1);
+        }}
+        onDateToChange={(value) => {
+          consoleFilters.set.dateTo(value);
+          setPage(1);
+        }}
+        representantId={consoleFilters.values.representantId}
+        departementId={consoleFilters.values.departementId}
+        banqueId={consoleFilters.values.banqueId}
+        syndicatId={consoleFilters.values.syndicatId}
+        statut={consoleFilters.values.statut}
+        canalProvenanceId={consoleFilters.values.canalProvenanceId}
+        dateFrom={consoleFilters.values.dateFrom}
+        dateTo={consoleFilters.values.dateTo}
       />
 
       <ListeAnnuaire
@@ -367,115 +435,6 @@ function ContexteFile({ projet }: { projet: Projet | null }) {
   );
 }
 
-/**
- * Ce qui précède la liste : l'avis d'un lien mort, la confirmation du dernier
- * appel, la recherche et la provenance.
- */
-function EnTeteAnnuaire({
-  lienEnEchec,
-  confirme,
-  cherche,
-  search,
-  projet,
-  plateforme,
-  origine,
-  resteAAppeler,
-  total,
-  onSearch,
-  onOrigine,
-  onResteAAppeler,
-}: {
-  lienEnEchec: boolean;
-  confirme: string | null;
-  cherche: string;
-  search: string;
-  projet: Projet | null;
-  plateforme: boolean;
-  /** Nul quand rien n'est confié au lecteur : il n'a qu'une provenance. */
-  origine: OrigineFiche | null;
-  resteAAppeler: boolean;
-  /** Le nombre de fiches de la liste affichée, nul tant qu'elle n'est pas lue. */
-  total: number | null;
-  onSearch: (value: string) => void;
-  onOrigine: (value: OrigineFiche) => void;
-  onResteAAppeler: (value: boolean) => void;
-}) {
-  let texteAide: string;
-  if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
-  else if (plateforme)
-    texteAide =
-      'Les contacts transmis par les plateformes, y compris les parcours interrompus. Les plus récents d’abord.';
-  else if (projet === null)
-    texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
-  else if (projet === 'GRAND_PUBLIC')
-    texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
-  else
-    texteAide =
-      'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
-
-  return (
-    <>
-      {lienEnEchec ? (
-        <p
-          role="alert"
-          className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
-        >
-          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
-        </p>
-      ) : null}
-
-      {confirme === null ? null : (
-        <div
-          role="status"
-          className={cn(
-            'flex items-center gap-2 rounded-md border border-emerald-500/30 bg-emerald-50 px-4 py-3 text-[0.875rem] font-[600] text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
-            REVELE,
-          )}
-        >
-          <CheckCircle2Icon
-            className="size-5 shrink-0 text-emerald-600 dark:text-emerald-400"
-            aria-hidden="true"
-          />
-          <span>{confirme}</span>
-        </div>
-      )}
-
-      <ChampAnnuaire value={search} onChange={onSearch} />
-
-      <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Fiches affichées">
-          {(
-            [
-              [true, 'Reste à appeler'],
-              [false, 'Toutes'],
-            ] as const
-          ).map(([valeur, libelle]) => (
-            <Button
-              key={libelle}
-              type="button"
-              size="sm"
-              variant={resteAAppeler === valeur ? 'default' : 'outline'}
-              aria-pressed={resteAAppeler === valeur}
-              onClick={() => {
-                onResteAAppeler(valeur);
-              }}
-            >
-              {libelle}
-              {resteAAppeler === valeur && total !== null && cherche === '' ? (
-                <span className="ml-1.5 rounded-full bg-background/20 px-1.5 text-[0.75rem] tabular-nums">
-                  {total}
-                </span>
-              ) : null}
-            </Button>
-          ))}
-        </div>
-        {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
-        <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
-      </div>
-    </>
-  );
-}
-
 /** La fiche et l'ouverture qui la mesure. Nulle quand la fiche est close. */
 interface Ouverte {
   prospect: ProspectRow;
@@ -499,8 +458,17 @@ function useAnnuaireAQualifier(criteres: {
   plateforme: boolean;
   page: number;
   enabled: boolean;
+  representantId?: string | null | undefined;
+  departementId?: string | null | undefined;
+  banqueId?: string | null | undefined;
+  syndicatId?: string | null | undefined;
+  statut?: string | null | undefined;
+  canalProvenanceId?: string | null | undefined;
+  dateFrom?: string | null | undefined;
+  dateTo?: string | null | undefined;
 }) {
-  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme, page } = criteres;
+  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme, page, ...filters } =
+    criteres;
   return useQuery({
     queryKey: [
       ...queryKeys.prospectsRoot,
@@ -511,6 +479,14 @@ function useAnnuaireAQualifier(criteres: {
       seulementARappeler,
       plateforme,
       page,
+      filters.representantId,
+      filters.departementId,
+      filters.banqueId,
+      filters.syndicatId,
+      filters.statut,
+      filters.canalProvenanceId,
+      filters.dateFrom,
+      filters.dateTo,
     ] as const,
     queryFn: () =>
       fetchProspectsAQualifier({
@@ -521,6 +497,14 @@ function useAnnuaireAQualifier(criteres: {
         resteAAppeler: seulementARappeler,
         plateforme,
         page,
+        representantId: filters.representantId ?? null,
+        departementId: filters.departementId ?? null,
+        banqueId: filters.banqueId ?? null,
+        syndicatId: filters.syndicatId ?? null,
+        statut: filters.statut ?? null,
+        canalProvenanceId: filters.canalProvenanceId ?? null,
+        dateFrom: filters.dateFrom ?? null,
+        dateTo: filters.dateTo ?? null,
       }),
     enabled: criteres.enabled,
     placeholderData: (previous) => previous,
@@ -531,6 +515,101 @@ function useAnnuaireAQualifier(criteres: {
 
 const origineInitialePour = (projet: Projet | null): OrigineFiche =>
   projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+
+type ConsoleFilters = {
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  statut: string | null;
+  canalProvenanceId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+};
+
+function useConsoleFilters() {
+  const [representantId, setRepresentantId] = useState<string | null>(null);
+  const [departementId, setDepartementId] = useState<string | null>(null);
+  const [banqueId, setBanqueId] = useState<string | null>(null);
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [statut, setStatut] = useState<string | null>(null);
+  const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+
+  const clear = useCallback(() => {
+    setRepresentantId(null);
+    setDepartementId(null);
+    setBanqueId(null);
+    setSyndicatId(null);
+    setStatut(null);
+    setCanalProvenanceId(null);
+    setDateFrom(null);
+    setDateTo(null);
+  }, []);
+
+  const remove = useCallback((key: string) => {
+    const setters: Record<string, (v: string | null) => void> = {
+      representantId: setRepresentantId,
+      departementId: setDepartementId,
+      banqueId: setBanqueId,
+      syndicatId: setSyndicatId,
+      statut: setStatut,
+      canalProvenanceId: setCanalProvenanceId,
+      dateFrom: setDateFrom,
+      dateTo: setDateTo,
+    };
+    setters[key]?.(null);
+  }, []);
+
+  const chips = [
+    ...(representantId
+      ? [{ key: 'representantId' as const, field: 'Représentant', value: representantId }]
+      : []),
+    ...(departementId
+      ? [{ key: 'departementId' as const, field: 'Département', value: departementId }]
+      : []),
+    ...(banqueId ? [{ key: 'banqueId' as const, field: 'Banque', value: banqueId }] : []),
+    ...(syndicatId ? [{ key: 'syndicatId' as const, field: 'Syndicat', value: syndicatId }] : []),
+    ...(statut
+      ? [
+          {
+            key: 'statut' as const,
+            field: 'Statut',
+            value: PROSPECT_STATUT_LABELS[statut as ProspectStatut],
+          },
+        ]
+      : []),
+  ];
+
+  const values: ConsoleFilters = {
+    representantId,
+    departementId,
+    banqueId,
+    syndicatId,
+    statut,
+    canalProvenanceId,
+    dateFrom,
+    dateTo,
+  };
+
+  return {
+    values,
+    chips,
+    clear,
+    remove,
+    set: {
+      representantId: setRepresentantId,
+      departementId: setDepartementId,
+      banqueId: setBanqueId,
+      syndicatId: setSyndicatId,
+      statut: setStatut,
+      canalProvenanceId: setCanalProvenanceId,
+      dateFrom: setDateFrom,
+      dateTo: setDateTo,
+    },
+  };
+}
 
 const texteConfirmationAppel = (nom: string, detailStatut?: string): string =>
   detailStatut
@@ -789,34 +868,6 @@ function NomProspect({ row }: { row: ProspectRow }) {
   );
 }
 
-function ChampAnnuaire({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const champ = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    champ.current?.focus();
-  }, []);
-
-  return (
-    <div className="flex flex-col gap-1.5">
-      <label htmlFor="console-annuaire" className="text-[0.875rem] font-[600]">
-        Quel prospect avez-vous appelé ?
-      </label>
-      <Input
-        id="console-annuaire"
-        ref={champ}
-        type="search"
-        autoComplete="off"
-        placeholder="Chercher un prospect : nom ou numéro"
-        className="h-12 text-[1rem]"
-        value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
-      />
-    </div>
-  );
-}
-
 /** Le dossier d'adhésion, une fois la personne dite joignable. */
 export function PanneauDossier({
   ouvert,
@@ -930,7 +981,7 @@ function aideDe(item: MotifAppel, catalogue: readonly MotifAppel[]): string | un
   return undefined;
 }
 
-const choixDe = (
+export const choixDe = (
   item: MotifAppel,
   catalogue: readonly MotifAppel[],
   actif: boolean,
@@ -954,7 +1005,7 @@ const precisionsDe = (catalogue: readonly MotifAppel[], statut: MotifAppel | nul
  * méthode d'enrôlement renseignée dans le formulaire vaut adhésion : elle clôt
  * la fiche et dispense de l'échéance.
  */
-function qualificationDe(
+export function qualificationDe(
   statut: MotifAppel | null,
   precision: MotifAppel | null,
   conversion: ConversionDraft | null,
@@ -964,7 +1015,7 @@ function qualificationDe(
   return { motif, adhesion, rappelDemande: !adhesion && motif?.requiresCallback === true };
 }
 
-function draftDe(
+export function draftDe(
   choisi: MotifAppel,
   callbackAt: string | null,
   conversion: ConversionDraft | null,
@@ -1701,7 +1752,7 @@ function EnTeteFiche({
   );
 }
 
-const titreEcheance = (code: string | undefined): string => {
+export const titreEcheance = (code: string | undefined): string => {
   if (code === 'RDV_TELEPHONIQUE') return 'Date et heure du rendez-vous téléphonique';
   if (code === 'RV_CPI' || code === 'RV_SITE' || code === 'RV_EXTERNE' || code === 'RENDEZ_VOUS') {
     return 'Date et heure du rendez-vous';
@@ -1735,9 +1786,7 @@ export function Commentaire({
         id="console-comment"
         ref={inputRef}
         value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
+        onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey) return;
           event.preventDefault();
