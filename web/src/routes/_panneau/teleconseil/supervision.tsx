@@ -32,7 +32,7 @@ function TeleconseilSupervisionPage() {
     <Suspense fallback={<SupervisionSkeleton />}>
       <div className="flex flex-col gap-6">
         <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-          Supervision téléconseil :
+          Supervision :
           <ProjetBadge projet="CHUES" />
           <ProjetBadge projet="GRAND_PUBLIC" />
         </div>

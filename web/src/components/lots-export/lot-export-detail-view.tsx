@@ -349,29 +349,19 @@ function ReaffectationsCard({
   );
 }
 
-/** Une fiche passée plateforme ou hors projet a quitté la campagne : elle se compte à part. */
-function phraseRetirees(n: number): string {
-  if (n === 0) return '';
-  const s = n > 1 ? 's' : '';
-  return ` ${formatNumber(n)} fiche${s} retirée${s} de la campagne : passée${s} plateforme ou hors projet.`;
-}
-
 function AppelsCard({
   fichesAppelees,
-  fichesRetirees,
   itemCount,
   callsSince,
   parTeleconseiller,
   recentAttempts,
 }: {
   fichesAppelees: number;
-  fichesRetirees: number;
   itemCount: number;
   callsSince: number;
   parTeleconseiller: readonly (readonly [string, number])[];
   recentAttempts: LotExportDetail['recentAttempts'];
 }) {
-  const aAppeler = itemCount - fichesRetirees;
   return (
     <Card>
       <CardHeader>
@@ -383,10 +373,9 @@ function AppelsCard({
         <p className="text-[0.9375rem]">
           <span className="tabular-nums">{formatNumber(fichesAppelees)}</span> fiche
           {fichesAppelees > 1 ? 's' : ''} appelée{fichesAppelees > 1 ? 's' : ''} sur{' '}
-          <span className="tabular-nums">{formatNumber(aAppeler)}</span> à appeler,{' '}
+          <span className="tabular-nums">{formatNumber(itemCount)}</span>,{' '}
           <span className="tabular-nums">{formatNumber(callsSince)}</span> appel
           {callsSince > 1 ? 's' : ''} consigné{callsSince > 1 ? 's' : ''}.
-          {phraseRetirees(fichesRetirees)}
         </p>
 
         <ParTeleconseillerBlock parTeleconseiller={parTeleconseiller} />
@@ -568,7 +557,6 @@ export function LotExportDetailView({
         <TabsContent value="appels" className="mt-4">
           <AppelsCard
             fichesAppelees={fichesAppelees}
-            fichesRetirees={lot.data.fichesRetirees ?? 0}
             itemCount={itemCount}
             callsSince={callsSince}
             parTeleconseiller={parTeleconseiller}

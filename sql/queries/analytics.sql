@@ -47,8 +47,7 @@ WHERE i."lotId" = $1 AND a."clientCreatedAt" >= $2;
 -- Les lignes rendues (fiche plateforme ou hors projet) n'ont plus de téléconseiller :
 -- elles sortent du dénominateur de la campagne.
 -- name: LotStatsProspects :one
-SELECT COUNT(a."id")::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches,
-       (SELECT COUNT(*) FROM "lot_export_items" r WHERE r."lotId" = $1 AND r."assigneeId" IS NULL)::int AS retirees
+SELECT COUNT(a."id")::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches
 FROM "lot_export_items" i
 LEFT JOIN "call_attempts" a ON a."prospectId" = i."prospectId" AND a."clientCreatedAt" >= $2
 WHERE i."lotId" = $1;

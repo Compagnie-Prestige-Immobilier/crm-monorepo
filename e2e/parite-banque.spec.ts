@@ -397,7 +397,7 @@ test.describe('parité banque, les demandes de création de client', () => {
     try {
       const arbitre = await siege.newPage();
       await arbitre.goto('/finance/demandes-clients');
-      const titre = { name: 'Créations de client à valider', level: 1 };
+      const titre = { name: 'Demandes de création de client', level: 1 };
       await expect(arbitre.getByRole('heading', titre)).toBeVisible();
       await arbitre.getByLabel('Recherche').fill(NOM_DEMANDE);
       await carteDemande(arbitre).getByRole('button', { name: 'Refuser' }).click();

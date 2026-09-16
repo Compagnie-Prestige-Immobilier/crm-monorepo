@@ -51,14 +51,12 @@ import { apiErrorText } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
 const TOUS = 'TOUS';
-const PAGE_SIZE = 50;
+const PAGE_SIZE = 25;
 
 const ETAT_LABELS: Record<LotExportFicheEtat, string> = {
   NON_TRAITEE: 'Non traitée',
   TRAITEE: 'Traitée',
   A_RAPPELER: 'À rappeler',
-  PLATEFORME: 'Plateforme',
-  HORS_PROJET: 'Hors projet',
 };
 
 /** Une fiche traitée ne se déplace pas : le travail resterait au compteur d'un autre. */

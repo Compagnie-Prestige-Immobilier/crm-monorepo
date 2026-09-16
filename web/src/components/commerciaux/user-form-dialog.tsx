@@ -58,7 +58,7 @@ const ROLE_HINTS: Record<Role, string> = {
   COMMERCIAL: 'Saisit les prospects et passe les appels depuis sa console.',
   BANQUE_FINANCE: 'Accède aux dossiers bancaires, pas aux prospects.',
   SUPERVISEUR: 'Passe lui-même les trois appels et suit le travail de son équipe.',
-  DIRECTION: 'Passe les trois appels, lit tout le téléconseil et tient le registre des visites.',
+  DIRECTION: 'Passe les trois appels, suit toute l’activité et tient le registre des visites.',
   ACCUEIL: 'Tient le registre des visites, et rien d’autre.',
   CHARGE_CLIENTELE: 'Passe les trois appels, relit et revoit toute demande convertie.',
   CCP: 'Appelle toutes les fiches venues des plateformes d’enrôlement, jamais celles des campagnes.',

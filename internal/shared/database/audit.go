@@ -74,11 +74,11 @@ func PasserAuxCCP(ctx context.Context, q *db.Queries, demandeur, prospectID stri
 	return nil
 }
 
-// Une fiche qui quitte le périmètre d'une campagne en sort à l'instant : seule
-// l'attribution disparaît, la position et l'historique restent, chaque lot en
-// garde la trace.
+// Une fiche qui quitte le périmètre d'une campagne en sort à l'instant : la
+// ligne disparaît et la campagne se recompte seule. Le journal garde la
+// position et l'attribution, l'historique des appels reste sur la fiche.
 func RetirerDesCampagnes(ctx context.Context, q *db.Queries, demandeur, action, prospectID string) error {
-	lots, err := q.LotsAttribuesDuProspect(ctx, &prospectID)
+	lots, err := q.LotsDuProspect(ctx, &prospectID)
 	if err != nil || len(lots) == 0 {
 		return err
 	}
