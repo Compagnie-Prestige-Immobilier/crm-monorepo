@@ -257,6 +257,48 @@ func TestEncadrementLitLaFichePlateformeSansYToucher(t *testing.T) {
 	superviseur.attend(statut, http.StatusForbidden, "consignation refusée au superviseur", body)
 }
 
+// L'équipe CCP se lit par l'encadrement et par le CCP lui-même, jamais par un
+// téléconseiller ; l'administrateur seul règle l'objectif du jour.
+func TestEquipeCCPEtObjectifDuJour(t *testing.T) {
+	b := adminConnecte(t)
+	ccpID, ccpEmail := adminCompte(b, "CCP")
+	_, superviseurEmail := adminCompte(b, "SUPERVISEUR")
+	_, commercialEmail := adminCompte(b, "COMMERCIAL")
+	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", adminTelephone())
+	adminExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, prospectID)
+	plateformeRappelPromis(b, prospectID, ccpID)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'plateforme.objectifAppelsParJour'`) })
+
+	statut, body := adminAppel(b, http.MethodPut, "/api/v1/plateforme/objectif", map[string]any{"objectifAppelsParJour": 40})
+	b.attend(statut, http.StatusOK, "objectif réglé", body)
+	if body["objectifAppelsParJour"] != float64(40) {
+		t.Fatalf("objectif : %v", body["objectifAppelsParJour"])
+	}
+
+	superviseur := adminSession(b, superviseurEmail)
+	statut, body = adminAppel(superviseur, http.MethodGet, "/api/v1/plateforme/equipe", nil)
+	superviseur.attend(statut, http.StatusOK, "équipe lue par le superviseur", body)
+	var ligne map[string]any
+	for _, c := range body["ccps"].([]any) {
+		if candidat, _ := c.(map[string]any); candidat["id"] == ccpID {
+			ligne = candidat
+		}
+	}
+	if ligne == nil || ligne["appelsJour"] != float64(1) || ligne["jointsJour"] != float64(1) ||
+		ligne["rappelsEnAttente"] != float64(1) || ligne["dernierAppel"] == nil || ligne["appelsSemaine"] != float64(1) {
+		t.Fatalf("ligne du CCP : %v", ligne)
+	}
+
+	ccp := adminSession(b, ccpEmail)
+	statut, body = adminAppel(ccp, http.MethodGet, "/api/v1/plateforme/equipe", nil)
+	ccp.attend(statut, http.StatusOK, "le CCP lit l'équipe", body)
+	commercial := adminSession(b, commercialEmail)
+	statut, body = adminAppel(commercial, http.MethodGet, "/api/v1/plateforme/equipe", nil)
+	commercial.attend(statut, http.StatusForbidden, "équipe refusée au téléconseiller", body)
+	statut, body = adminAppel(superviseur, http.MethodPut, "/api/v1/plateforme/objectif", map[string]any{"objectifAppelsParJour": 10})
+	superviseur.attend(statut, http.StatusForbidden, "objectif refusé au superviseur", body)
+}
+
 // Un rappel promis sur une fiche plateforme alors qu'aucun CCP n'existait :
 // le premier tirage qui suit l'arrivée d'un CCP le lui remet, avec sa trace.
 func TestRappelsPlateformeRattrapesParLeTirage(t *testing.T) {

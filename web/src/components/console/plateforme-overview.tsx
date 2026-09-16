@@ -1,11 +1,28 @@
 'use client';
 
 import { ResponsiveBar } from '@nivo/bar';
-import { useQueries } from '@tanstack/react-query';
+import { useMutation, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { toast } from 'sonner';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  fetchPlateformeEquipe,
+  plateformeEquipeKey,
+  updatePlateformeObjectif,
+} from '@/lib/data/plateforme';
 import { fetchProspectsAQualifier } from '@/lib/data/prospects';
-import { formatNumber } from '@/lib/format';
+import { formatDateTime, formatNumber } from '@/lib/format';
+import { apiErrorText, toastApiError } from '@/lib/mutation-feedback';
 import { useChartTheme } from '@/lib/chart-theme';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
@@ -27,7 +44,13 @@ function themePour(theme: ReturnType<typeof useChartTheme>) {
   };
 }
 
-export function PlateformeOverview({ encadrement }: { encadrement: boolean }) {
+export function PlateformeOverview({
+  encadrement,
+  regleObjectif,
+}: {
+  encadrement: boolean;
+  regleObjectif: boolean;
+}) {
   const resultats = useQueries({
     queries: projets.map((projet) => ({
       queryKey: ['plateforme-overview', projet.value, encadrement],
@@ -61,9 +84,10 @@ export function PlateformeOverview({ encadrement }: { encadrement: boolean }) {
         <p className="text-sm font-semibold uppercase tracking-[0.16em] text-primary">
           Pilotage CCP
         </p>
-        <h1 id="plateforme-apercu-titre" className="mt-1 font-display text-3xl font-bold">
+        {/* `h2` : la barre du panel porte déjà l'unique `h1` de la page. */}
+        <h2 id="plateforme-apercu-titre" className="mt-1 font-display text-3xl font-bold">
           Suivi de la file plateforme
-        </h1>
+        </h2>
         <p className="mt-2 text-muted-foreground">
           Les contacts transmis par les plateformes, y compris les parcours interrompus.
         </p>
@@ -89,6 +113,8 @@ export function PlateformeOverview({ encadrement }: { encadrement: boolean }) {
           loading={charge}
         />
       </div>
+
+      <EquipeCCP regleObjectif={regleObjectif} />
 
       <Card>
         <CardHeader>
@@ -116,6 +142,121 @@ export function PlateformeOverview({ encadrement }: { encadrement: boolean }) {
         </CardContent>
       </Card>
     </section>
+  );
+}
+
+function avancement(appels: number, objectif: number): string {
+  if (objectif === 0) return '';
+  return ` sur ${formatNumber(objectif)}, ${String(Math.round((appels / objectif) * 100))} %`;
+}
+
+function EquipeCCP({ regleObjectif }: { regleObjectif: boolean }) {
+  const queryClient = useQueryClient();
+  const equipe = useQuery({
+    queryKey: plateformeEquipeKey,
+    queryFn: () => fetchPlateformeEquipe(),
+    refetchInterval: 60_000,
+  });
+  const objectif = useMutation({
+    mutationFn: (valeur: number) => updatePlateformeObjectif(valeur),
+    onSuccess: (donnees) => {
+      queryClient.setQueryData(plateformeEquipeKey, donnees);
+      toast.success('Objectif enregistré.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'L’objectif n’a pas été enregistré.');
+    },
+  });
+  const cible = equipe.data?.objectifAppelsParJour ?? 0;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Les CCP aujourd’hui</CardTitle>
+        <CardDescription>
+          Appels passés et fiches jointes depuis ce matin, appels depuis lundi, rappels encore
+          promis.
+        </CardDescription>
+        {regleObjectif ? (
+          <div className="mt-2 flex items-center gap-2">
+            <Label htmlFor="objectif-ccp">Objectif par CCP et par jour</Label>
+            <Input
+              id="objectif-ccp"
+              type="number"
+              min={0}
+              max={1000}
+              className="w-24"
+              defaultValue={cible}
+              onBlur={(event) => {
+                const valeur = Number(event.target.value);
+                if (Number.isInteger(valeur) && valeur !== cible) objectif.mutate(valeur);
+              }}
+            />
+            <span className="text-[0.875rem] text-muted-foreground">appels. Zéro : aucun.</span>
+          </div>
+        ) : null}
+      </CardHeader>
+      <CardContent>
+        {equipe.isPending ? <p className="text-sm text-muted-foreground">Chargement…</p> : null}
+        {equipe.isError ? (
+          <p role="alert" className="text-sm text-destructive">
+            {apiErrorText(equipe.error, 'L’équipe n’a pas pu être chargée.')}
+          </p>
+        ) : null}
+        {equipe.data !== undefined && equipe.data.ccps.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            Aucun CCP actif. Donnez ce rôle à un compte dans Utilisateurs.
+          </p>
+        ) : null}
+        {equipe.data !== undefined && equipe.data.ccps.length > 0 ? (
+          <Table aria-label="Activité des CCP">
+            <TableHeader>
+              <TableRow>
+                <TableHead scope="col">CCP</TableHead>
+                <TableHead scope="col" className="text-right">
+                  Appels du jour
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Joints
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Semaine
+                </TableHead>
+                <TableHead scope="col" className="text-right">
+                  Rappels promis
+                </TableHead>
+                <TableHead scope="col">Dernier appel</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {equipe.data.ccps.map((ccp) => (
+                <TableRow key={ccp.id}>
+                  <th scope="row" className="px-3 py-2.5 text-left align-middle font-[600]">
+                    {ccp.fullName}
+                  </th>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ccp.appelsJour)}
+                    {avancement(ccp.appelsJour, cible)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ccp.jointsJour)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ccp.appelsSemaine)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums">
+                    {formatNumber(ccp.rappelsEnAttente)}
+                  </TableCell>
+                  <TableCell>
+                    {ccp.dernierAppel === null ? 'Jamais' : formatDateTime(ccp.dernierAppel)}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        ) : null}
+      </CardContent>
+    </Card>
   );
 }
 

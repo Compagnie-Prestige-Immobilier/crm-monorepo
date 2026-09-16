@@ -26,5 +26,7 @@ function Loading() {
 
 function PlateformeOverviewPage() {
   const { user } = Route.useRouteContext();
-  return <PlateformeOverview encadrement={user.role !== 'CCP'} />;
+  return (
+    <PlateformeOverview encadrement={user.role !== 'CCP'} regleObjectif={user.role === 'ADMIN'} />
+  );
 }
