@@ -154,6 +154,8 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await expect(dialogue.getByRole('radio', { name: /Fiches importées/u })).toBeChecked();
     await dialogue.getByRole('combobox', { name: 'Import', exact: true }).click();
     await page.getByRole('option', { name: ONGLET }).click();
+    await expect(dialogue.getByRole('radio', { name: /Tous les prospects/u })).toBeChecked();
+    await dialogue.getByText('Prospects Grand Public', { exact: true }).click();
     await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Tout décocher' }).click();
     await dialogue.getByRole('checkbox', { name: teleconseiller.nom, exact: true }).check();
@@ -163,7 +165,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await expect(page).toHaveURL(/\/teleconseil\/campagnes\/[0-9a-f-]+$/u);
     lotId = page.url().split('/').at(-1) ?? null;
     await expect(
-      page.getByRole('heading', { level: 2, name: new RegExp(`^${ONGLET}, `, 'u') }),
+      page.getByRole('heading', {
+        level: 2,
+        name: new RegExp(`^${ONGLET}, Prospects Grand Public, `, 'u'),
+      }),
     ).toBeVisible();
     await expect(page.getByText(`GRAND_PUBLIC, ${ONGLET}`)).toBeVisible();
 
