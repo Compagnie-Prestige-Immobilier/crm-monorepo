@@ -87,7 +87,7 @@ func (s *service) qualificationAnnuaire(ctx context.Context, in *AnnuaireInput) 
 		ScopeAll:        qualificationVoitTout(u.Role) || u.Role == socle.CCP,
 		ScopeUserID:     u.ID,
 		ScopeConverti:   u.Role == socle.ChargeClientele,
-		ScopePlateforme: socle.PorteePlateforme(u.Role),
+		ScopePlateforme: socle.PorteeSaisiePlateforme(u.Role),
 		DepuisAt:        depuisAt,
 		DepuisID:        depuisID,
 		Taille:          taille + 1,

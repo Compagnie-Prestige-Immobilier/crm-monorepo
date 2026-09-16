@@ -468,6 +468,7 @@ type ProspectListInput struct {
 	MesFiches              bool   `query:"mesFiches"`
 	Attribue               bool   `query:"attribue"`
 	ResteAAppeler          bool   `query:"resteAAppeler"`
+	Plateforme             bool   `query:"plateforme" doc:"true : seulement les fiches venues des plateformes. Sans effet sur un rôle qui ne les lit pas."`
 	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt,plateformeDepuis"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
@@ -538,6 +539,10 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	// reviennent toutes aux CCP, sans partage.
 	if in.MesFiches && u.Role != socle.CCP {
 		p.tout, p.converti = false, false
+	}
+	if in.Plateforme && p.plateforme == nil {
+		plateforme := true
+		p.plateforme = &plateforme
 	}
 	arg := db.ListProspectsParams{
 		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopePlateforme: p.plateforme,

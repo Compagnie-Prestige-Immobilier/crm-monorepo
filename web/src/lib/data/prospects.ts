@@ -43,21 +43,25 @@ export async function fetchProspectsAQualifier(
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
     resteAAppeler?: boolean | undefined;
-    /** Les fiches plateforme se prennent dans l'ordre d'arrivée, la plus récente d'abord. */
+    /** Les fiches plateforme seulement, dans l'ordre d'arrivée, la plus récente d'abord. */
     plateforme?: boolean | undefined;
+    /** L'encadrement regarde le travail de tous, il ne compose aucun numéro. */
+    tous?: boolean | undefined;
     /** La page demandée : la liste entière se parcourt, vingt fiches à la fois. */
     page: number;
   },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const origine = criteres.origine ?? 'TOUS';
+  const plateforme = criteres.plateforme === true;
   const query: ProspectQuery = {
-    mesFiches: true,
+    mesFiches: criteres.tous !== true,
+    plateforme,
     ...(criteres.resteAAppeler === true ? { resteAAppeler: true } : {}),
     ...(criteres.projet === null ? {} : { projet: criteres.projet }),
     search: criteres.search,
-    sortBy: criteres.plateforme === true ? 'plateformeDepuis' : 'nom',
-    sortOrder: criteres.plateforme === true ? 'desc' : 'asc',
+    sortBy: plateforme ? 'plateformeDepuis' : 'nom',
+    sortOrder: plateforme ? 'desc' : 'asc',
     page: criteres.page,
     pageSize: A_QUALIFIER_PAGE_SIZE,
     ...(origine === 'MOI' && criteres.viewerId !== undefined

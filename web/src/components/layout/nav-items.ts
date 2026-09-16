@@ -270,7 +270,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Aperçu plateforme',
         icon: LayoutDashboardIcon,
         description: 'Volume des inscriptions et appels à faire',
-        roles: ['CCP'],
+        roles: [...ENCADREMENT, 'CCP'],
       },
       {
         href: '/teleconseil/plateforme',
