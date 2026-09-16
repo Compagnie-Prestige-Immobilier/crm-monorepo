@@ -560,6 +560,22 @@ func (b *banc) bilanDuReleveEnCourriel(travail string) {
 	}
 }
 
+func (b *banc) courrielsDuBilanLeads(travail string) int {
+	b.t.Helper()
+	var courriels int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "courriels" WHERE "type" = 'IMPORT_LEADS' AND "objetId" = $1`, travail).Scan(&courriels); err != nil {
+		b.t.Fatal(err)
+	}
+	return courriels
+}
+
+func (b *banc) signalerBilanLeads() {
+	b.t.Helper()
+	if err := imports.SignalerBilanLeads(b.ctx, serviceDesImports(b)); err != nil {
+		b.t.Fatal(err)
+	}
+}
+
 func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	b.canalSiteWeb()
@@ -570,35 +586,43 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 	// L'empreinte est un réglage unique : celle du vrai relevé est remise après.
 	var empreinteAvant *string
 	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`).Scan(&empreinteAvant)
+	var bilanAvant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'imports.leadsBilan'`).Scan(&bilanAvant)
+	_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsBilan'`)
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = $1)`, telephone)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, telephone)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "fileName" = $1`, nomClasseurLeads)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" IN ('imports.leadsEmpreinte', 'imports.leadsBilan')`)
 		if empreinteAvant != nil {
 			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('imports.leadsEmpreinte', $1, now())`, *empreinteAvant)
 		}
+		if bilanAvant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('imports.leadsBilan', $1, now())`, *bilanAvant)
+		}
 	})
-	moteur := serviceDesImports(b)
-
-	if err := imports.ReleverLeads(b.ctx, moteur); err != nil {
-		t.Fatal(err)
+	travail := b.releverLeadsTest(classeurLeads(t, telephone), nomClasseurLeads)
+	projet, canal, travailFiche := b.ficheDuLead(telephone)
+	if projet != "GRAND_PUBLIC" || canal != "Site web" || travailFiche == nil {
+		t.Fatalf("fiche %s, canal %q, import %v", projet, canal, travailFiche)
 	}
-	projet, canal, travail := b.ficheDuLead(telephone)
-	if projet != "GRAND_PUBLIC" || canal != "Site web" || travail == nil {
-		t.Fatalf("fiche %s, canal %q, import %v", projet, canal, travail)
-	}
-	if statut, creees, _ := b.etatTravailImport(*travail); statut != "succeeded" || creees != 1 {
+	if statut, creees, _ := b.etatTravailImport(travail); statut != "succeeded" || creees != 1 {
 		t.Fatalf("travail %s, %d créée(s)", statut, creees)
 	}
-	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" = $1`, *travail)
-	})
-	b.bilanDuReleveEnCourriel(*travail)
-
-	if err := imports.ReleverLeads(b.ctx, moteur); err != nil {
-		t.Fatal(err)
+	if courriels := b.courrielsDuBilanLeads(travail); courriels != 0 {
+		t.Fatalf("le relevé horaire doit rester silencieux : %d courriel(s)", courriels)
 	}
+	b.signalerBilanLeads()
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" = $1`, travail)
+	})
+	b.bilanDuReleveEnCourriel(travail)
+	b.signalerBilanLeads()
+	if courriels := b.courrielsDuBilanLeads(travail); courriels != 1 {
+		t.Fatalf("un bilan ne doit partir qu'une fois : %d courriel(s)", courriels)
+	}
+
+	b.releverLeadsTest(classeurLeads(t, telephone), nomClasseurLeads)
 	if travaux := b.travauxDuClasseur(nomClasseurLeads); travaux != 1 {
 		t.Fatalf("un classeur inchangé ne se rejoue pas : %d travaux", travaux)
 	}

@@ -88,7 +88,7 @@ export const COQUES: readonly CoqueEntry[] = [
   },
   {
     id: 'teleconseil',
-    label: 'Commercial',
+    label: 'Téléconseil',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
     roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'CCP'],
@@ -439,12 +439,25 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
+        href: '/admin/enrolement',
+        label: 'Plateformes d’enrôlement',
+        icon: PlugZapIcon,
+        description: 'Inscriptions CHUES et Grand Public',
+        roles: ['ADMIN'],
+      },
+      {
         href: '/admin/commerciaux',
         label: 'Utilisateurs',
         icon: UsersIcon,
         description: 'Comptes, rôles et accès',
         roles: ['ADMIN'],
       },
+    ],
+  },
+  {
+    coque: 'admin',
+    title: 'Référentiels & Données',
+    items: [
       {
         href: '/admin/referentiels',
         label: 'Listes de référence',
@@ -453,8 +466,6 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
       },
       {
-        // Après les listes de référence : un classeur ne peut nommer que des
-        // banques, syndicats, départements et IEF déjà enregistrés.
         href: '/admin/imports',
         label: 'Importer un fichier Excel',
         icon: UploadIcon,
@@ -462,7 +473,20 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN'],
       },
       {
-        // La cloche montre ce qu'on REÇOIT ; cet écran sert à ÉMETTRE.
+        href: '/admin/champs-conversion',
+        label: 'Champs de la conversion',
+        icon: ListChecksIcon,
+        description: 'Ordre, visibilité et champs ajoutés',
+        roles: ['ADMIN'],
+        secondary: true,
+      },
+    ],
+  },
+  {
+    coque: 'admin',
+    title: 'Communication',
+    items: [
+      {
         href: '/admin/notifications',
         label: 'Envoyer une notification',
         icon: BellIcon,
@@ -476,30 +500,12 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Destinataires et textes des envois automatiques',
         roles: ['ADMIN'],
       },
-      {
-        // Le suivi de l'enrôlement, tenu par la cellule pilotage et
-        // performance. Elle est le seul usage du rôle ADMIN, et rien de ce que
-        // rendent les plateformes n'est lisible ailleurs dans l'application.
-        href: '/admin/enrolement',
-        label: 'Plateformes d’enrôlement',
-        icon: PlugZapIcon,
-        description: 'Inscriptions CHUES et Grand Public',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/teleconseil/pole-deploiement',
-        label: 'Pôle déploiement',
-        icon: UsersRoundIcon,
-        description: 'Qualité de la base représentants et rendement départemental',
-        roles: ['ADMIN'],
-      },
-      {
-        href: '/teleconseil/pole-marketing',
-        label: 'Pôle marketing',
-        icon: ActivityIcon,
-        description: 'Qualité des prospects amenés et conversion par canal',
-        roles: ['ADMIN'],
-      },
+    ],
+  },
+  {
+    coque: 'admin',
+    title: 'Système & Audit',
+    items: [
       {
         href: '/admin/journal',
         label: 'Journal des actions',
@@ -513,16 +519,6 @@ const SECTIONS: readonly NavSection[] = [
         icon: SettingsIcon,
         description: 'Démonstration et suppression',
         roles: ['ADMIN'],
-      },
-      {
-        // Sous « Plus » : on règle le formulaire une fois, on ne le rouvre pas
-        // chaque jour, et la barre tient à six entrées.
-        href: '/admin/champs-conversion',
-        label: 'Champs de la conversion',
-        icon: ListChecksIcon,
-        description: 'Ordre, visibilité et champs ajoutés',
-        roles: ['ADMIN'],
-        secondary: true,
       },
       {
         href: '/admin/exploitation',

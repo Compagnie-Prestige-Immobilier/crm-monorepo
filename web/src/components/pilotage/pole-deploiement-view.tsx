@@ -76,9 +76,17 @@ export function PoleDeploiementView() {
   }));
 
   const partsJoignabilite: Part[] = [
-    { label: 'Fiches jointes', value: data.joints },
-    { label: 'Non jointes (NRP / Erronées)', value: Math.max(0, data.eprouves - data.joints) },
-    { label: 'Non appelées (Jamais testées)', value: Math.max(0, data.total - data.eprouves) },
+    { label: 'Fiches jointes', value: data.joints, couleur: '#1A6B44' },
+    {
+      label: 'Non jointes (NRP / Erronées)',
+      value: Math.max(0, data.eprouves - data.joints),
+      couleur: '#B05070',
+    },
+    {
+      label: 'Non appelées (Jamais testées)',
+      value: Math.max(0, data.total - data.eprouves),
+      couleur: '#C8921A',
+    },
   ];
 
   return (
