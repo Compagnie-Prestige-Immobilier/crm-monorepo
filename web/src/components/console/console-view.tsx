@@ -7,6 +7,10 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import { AdvancedPanel } from '@/components/filters/advanced-panel';
+import { type AdvancedChip } from '@/components/filters/advanced-chips';
+import { DatePicker } from '@/components/filters/date-picker';
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { HistoriqueFiche } from '@/components/console/historique-fiche';
@@ -67,14 +71,19 @@ import {
   type ReglageChamp,
 } from '@/lib/data/champs-conversion';
 import type { OrigineFiche } from '@/lib/data/grand-public';
+import { fetchCanauxProvenance } from '@/lib/data/grand-public';
+import { fetchReferenceData } from '@/lib/data/reference';
 import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
-import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
+import { dakarLocalToIso, formatDateTime, formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
+  PROSPECT_STATUTS,
+  PROSPECT_STATUT_LABELS,
   type ProspectRow,
+  type ProspectStatut,
   type Role,
 } from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
@@ -217,6 +226,20 @@ export function ConsoleView({
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
 
+  const consoleFilters = useConsoleFilters();
+
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
+  const canaux = useQuery({
+    queryKey: ['referentiels', 'canaux-provenance'] as const,
+    queryFn: () => fetchCanauxProvenance(),
+    staleTime: 5 * 60_000,
+  });
+
   const parLien = useQuery({
     queryKey: queryKeys.prospect(demandee ?? ''),
     queryFn: () => fetchProspect(demandee ?? ''),
@@ -236,6 +259,14 @@ export function ConsoleView({
     plateforme,
     page,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
+    representantId: consoleFilters.values.representantId,
+    departementId: consoleFilters.values.departementId,
+    banqueId: consoleFilters.values.banqueId,
+    syndicatId: consoleFilters.values.syndicatId,
+    statut: consoleFilters.values.statut,
+    canalProvenanceId: consoleFilters.values.canalProvenanceId,
+    dateFrom: consoleFilters.values.dateFrom,
+    dateTo: consoleFilters.values.dateTo,
   });
 
   const revenir = useCallback(() => {
@@ -301,6 +332,9 @@ export function ConsoleView({
         origine={origineAffichee(origineFiltrable, origine)}
         resteAAppeler={resteAAppeler}
         total={totalAffiche(annuaire.data)}
+        reference={reference.data}
+        canaux={canaux.data}
+        advancedChips={consoleFilters.chips}
         onSearch={(value) => {
           setSearch(value);
           setPage(1);
@@ -313,6 +347,48 @@ export function ConsoleView({
           setResteAAppeler(value);
           setPage(1);
         }}
+        onRemoveFilter={consoleFilters.remove}
+        onClearFilters={consoleFilters.clear}
+        onRepresentantChange={(value) => {
+          consoleFilters.set.representantId(value);
+          setPage(1);
+        }}
+        onDepartementChange={(value) => {
+          consoleFilters.set.departementId(value);
+          setPage(1);
+        }}
+        onBanqueChange={(value) => {
+          consoleFilters.set.banqueId(value);
+          setPage(1);
+        }}
+        onSyndicatChange={(value) => {
+          consoleFilters.set.syndicatId(value);
+          setPage(1);
+        }}
+        onStatutChange={(value) => {
+          consoleFilters.set.statut(value);
+          setPage(1);
+        }}
+        onCanalChange={(value) => {
+          consoleFilters.set.canalProvenanceId(value);
+          setPage(1);
+        }}
+        onDateFromChange={(value) => {
+          consoleFilters.set.dateFrom(value);
+          setPage(1);
+        }}
+        onDateToChange={(value) => {
+          consoleFilters.set.dateTo(value);
+          setPage(1);
+        }}
+        representantId={consoleFilters.values.representantId}
+        departementId={consoleFilters.values.departementId}
+        banqueId={consoleFilters.values.banqueId}
+        syndicatId={consoleFilters.values.syndicatId}
+        statut={consoleFilters.values.statut}
+        canalProvenanceId={consoleFilters.values.canalProvenanceId}
+        dateFrom={consoleFilters.values.dateFrom}
+        dateTo={consoleFilters.values.dateTo}
       />
 
       <ListeAnnuaire
@@ -367,6 +443,127 @@ function ContexteFile({ projet }: { projet: Projet | null }) {
   );
 }
 
+function FiltresConsole({
+  reference,
+  canaux,
+  representantId,
+  departementId,
+  banqueId,
+  syndicatId,
+  statut,
+  canalProvenanceId,
+  dateFrom,
+  dateTo,
+  onRepresentantChange,
+  onDepartementChange,
+  onBanqueChange,
+  onSyndicatChange,
+  onStatutChange,
+  onCanalChange,
+  onDateFromChange,
+  onDateToChange,
+}: {
+  reference: ReturnType<typeof useQuery<Awaited<ReturnType<typeof fetchReferenceData>>>>['data'];
+  canaux: { id: string; label: string }[] | undefined;
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  statut: string | null;
+  canalProvenanceId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+  onRepresentantChange: (value: string | null) => void;
+  onDepartementChange: (value: string | null) => void;
+  onBanqueChange: (value: string | null) => void;
+  onSyndicatChange: (value: string | null) => void;
+  onStatutChange: (value: string | null) => void;
+  onCanalChange: (value: string | null) => void;
+  onDateFromChange: (value: string | null) => void;
+  onDateToChange: (value: string | null) => void;
+}) {
+  return (
+    <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+      {reference && reference.representants.length > 0 ? (
+        <FilterCombobox
+          label="Représentant"
+          placeholder="Tous les représentants"
+          options={reference.representants}
+          value={representantId}
+          onChange={onRepresentantChange}
+        />
+      ) : null}
+      <FilterCombobox
+        label="Département"
+        placeholder="Tous les départements"
+        options={(reference?.departements ?? []).map((d) => ({
+          value: d.id,
+          label: withRetired(d.name, d.isActive),
+          hint: d.regionName,
+        }))}
+        value={departementId}
+        onChange={onDepartementChange}
+      />
+      <FilterCombobox
+        label="Banque"
+        placeholder="Toutes les banques"
+        options={(reference?.banques ?? []).map((b) => ({
+          value: b.id,
+          label: withRetired(b.shortName, b.isActive),
+          hint: b.name,
+        }))}
+        value={banqueId}
+        onChange={onBanqueChange}
+      />
+      <FilterCombobox
+        label="Syndicat"
+        placeholder="Tous les syndicats"
+        options={(reference?.syndicats ?? []).map((s) => ({
+          value: s.id,
+          label: withRetired(s.sigle, s.isActive),
+          hint: s.secteur ?? undefined,
+        }))}
+        value={syndicatId}
+        onChange={onSyndicatChange}
+      />
+      <FilterCombobox
+        label="Statut"
+        placeholder="Tous les statuts"
+        options={PROSPECT_STATUTS.map((s) => ({
+          value: s,
+          label: PROSPECT_STATUT_LABELS[s],
+        }))}
+        value={statut}
+        onChange={onStatutChange}
+      />
+      <FilterCombobox
+        label="Canal de provenance"
+        placeholder="Tous les canaux"
+        options={(canaux ?? []).map((c) => ({
+          value: c.id,
+          label: c.label,
+        }))}
+        value={canalProvenanceId}
+        onChange={onCanalChange}
+      />
+      <DatePicker
+        id="console-date-from"
+        label="Saisi à partir du"
+        value={dateFrom}
+        max={dateTo}
+        onChange={onDateFromChange}
+      />
+      <DatePicker
+        id="console-date-to"
+        label="Saisi jusqu'au"
+        value={dateTo}
+        min={dateFrom}
+        onChange={onDateToChange}
+      />
+    </div>
+  );
+}
+
 /**
  * Ce qui précède la liste : l'avis d'un lien mort, la confirmation du dernier
  * appel, la recherche et la provenance.
@@ -381,9 +578,30 @@ function EnTeteAnnuaire({
   origine,
   resteAAppeler,
   total,
+  reference,
+  canaux,
+  advancedChips,
   onSearch,
   onOrigine,
   onResteAAppeler,
+  onRemoveFilter,
+  onClearFilters,
+  onRepresentantChange,
+  onDepartementChange,
+  onBanqueChange,
+  onSyndicatChange,
+  onStatutChange,
+  onCanalChange,
+  onDateFromChange,
+  onDateToChange,
+  representantId,
+  departementId,
+  banqueId,
+  syndicatId,
+  statut,
+  canalProvenanceId,
+  dateFrom,
+  dateTo,
 }: {
   lienEnEchec: boolean;
   confirme: string | null;
@@ -396,22 +614,43 @@ function EnTeteAnnuaire({
   resteAAppeler: boolean;
   /** Le nombre de fiches de la liste affichée, nul tant qu'elle n'est pas lue. */
   total: number | null;
+  reference: ReturnType<typeof useQuery<Awaited<ReturnType<typeof fetchReferenceData>>>>['data'];
+  canaux: { id: string; label: string }[] | undefined;
+  advancedChips: AdvancedChip[];
   onSearch: (value: string) => void;
   onOrigine: (value: OrigineFiche) => void;
   onResteAAppeler: (value: boolean) => void;
+  onRemoveFilter: (key: string) => void;
+  onClearFilters: () => void;
+  onRepresentantChange: (value: string | null) => void;
+  onDepartementChange: (value: string | null) => void;
+  onBanqueChange: (value: string | null) => void;
+  onSyndicatChange: (value: string | null) => void;
+  onStatutChange: (value: string | null) => void;
+  onCanalChange: (value: string | null) => void;
+  onDateFromChange: (value: string | null) => void;
+  onDateToChange: (value: string | null) => void;
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  statut: string | null;
+  canalProvenanceId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
 }) {
   let texteAide: string;
-  if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
+  if (cherche !== '') texteAide = 'Choisissez qui vous venez d\'appeler.';
   else if (plateforme)
     texteAide =
-      'Les contacts transmis par les plateformes, y compris les parcours interrompus. Les plus récents d’abord.';
+      'Les contacts transmis par les plateformes, y compris les parcours interrompus. Les plus récents d\'abord.';
   else if (projet === null)
     texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
   else if (projet === 'GRAND_PUBLIC')
     texteAide = 'Les fiches que vos campagnes vous ont confiées. Cherchez un nom ou un numéro.';
   else
     texteAide =
-      'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d’autres.';
+      'Vos fiches et celles que vos campagnes vous ont confiées. Cherchez un nom ou un numéro pour en voir d\'autres.';
 
   return (
     <>
@@ -420,7 +659,7 @@ function EnTeteAnnuaire({
           role="alert"
           className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"
         >
-          La fiche ouverte depuis les rappels n’a pas pu être chargée. Cherchez-la ci-dessous.
+          La fiche ouverte depuis les rappels n'a pas pu être chargée. Cherchez-la ci-dessous.
         </p>
       ) : null}
 
@@ -472,6 +711,35 @@ function EnTeteAnnuaire({
         {origine === null ? null : <FiltreOrigine value={origine} onChange={onOrigine} />}
         <p className="text-[0.8125rem] text-muted-foreground">{texteAide}</p>
       </div>
+
+      <AdvancedPanel
+        module="console"
+        startCollapsed
+        chips={advancedChips}
+        onRemove={onRemoveFilter}
+        onClearAll={onClearFilters}
+      >
+        <FiltresConsole
+          reference={reference}
+          canaux={canaux}
+          representantId={representantId}
+          departementId={departementId}
+          banqueId={banqueId}
+          syndicatId={syndicatId}
+          statut={statut}
+          canalProvenanceId={canalProvenanceId}
+          dateFrom={dateFrom}
+          dateTo={dateTo}
+          onRepresentantChange={onRepresentantChange}
+          onDepartementChange={onDepartementChange}
+          onBanqueChange={onBanqueChange}
+          onSyndicatChange={onSyndicatChange}
+          onStatutChange={onStatutChange}
+          onCanalChange={onCanalChange}
+          onDateFromChange={onDateFromChange}
+          onDateToChange={onDateToChange}
+        />
+      </AdvancedPanel>
     </>
   );
 }
@@ -499,8 +767,17 @@ function useAnnuaireAQualifier(criteres: {
   plateforme: boolean;
   page: number;
   enabled: boolean;
+  representantId?: string | null | undefined;
+  departementId?: string | null | undefined;
+  banqueId?: string | null | undefined;
+  syndicatId?: string | null | undefined;
+  statut?: string | null | undefined;
+  canalProvenanceId?: string | null | undefined;
+  dateFrom?: string | null | undefined;
+  dateTo?: string | null | undefined;
 }) {
-  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme, page } = criteres;
+  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme, page, ...filters } =
+    criteres;
   return useQuery({
     queryKey: [
       ...queryKeys.prospectsRoot,
@@ -511,6 +788,14 @@ function useAnnuaireAQualifier(criteres: {
       seulementARappeler,
       plateforme,
       page,
+      filters.representantId,
+      filters.departementId,
+      filters.banqueId,
+      filters.syndicatId,
+      filters.statut,
+      filters.canalProvenanceId,
+      filters.dateFrom,
+      filters.dateTo,
     ] as const,
     queryFn: () =>
       fetchProspectsAQualifier({
@@ -521,6 +806,14 @@ function useAnnuaireAQualifier(criteres: {
         resteAAppeler: seulementARappeler,
         plateforme,
         page,
+        representantId: filters.representantId ?? null,
+        departementId: filters.departementId ?? null,
+        banqueId: filters.banqueId ?? null,
+        syndicatId: filters.syndicatId ?? null,
+        statut: filters.statut ?? null,
+        canalProvenanceId: filters.canalProvenanceId ?? null,
+        dateFrom: filters.dateFrom ?? null,
+        dateTo: filters.dateTo ?? null,
       }),
     enabled: criteres.enabled,
     placeholderData: (previous) => previous,
@@ -531,6 +824,85 @@ function useAnnuaireAQualifier(criteres: {
 
 const origineInitialePour = (projet: Projet | null): OrigineFiche =>
   projet === 'GRAND_PUBLIC' ? 'CAMPAGNE' : 'TOUS';
+
+type ConsoleFilters = {
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
+  statut: string | null;
+  canalProvenanceId: string | null;
+  dateFrom: string | null;
+  dateTo: string | null;
+};
+
+function useConsoleFilters() {
+  const [representantId, setRepresentantId] = useState<string | null>(null);
+  const [departementId, setDepartementId] = useState<string | null>(null);
+  const [banqueId, setBanqueId] = useState<string | null>(null);
+  const [syndicatId, setSyndicatId] = useState<string | null>(null);
+  const [statut, setStatut] = useState<string | null>(null);
+  const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+
+  const clear = useCallback(() => {
+    setRepresentantId(null);
+    setDepartementId(null);
+    setBanqueId(null);
+    setSyndicatId(null);
+    setStatut(null);
+    setCanalProvenanceId(null);
+    setDateFrom(null);
+    setDateTo(null);
+  }, []);
+
+  const remove = useCallback(
+    (key: string) => {
+      const setters: Record<string, (v: string | null) => void> = {
+        representantId: setRepresentantId,
+        departementId: setDepartementId,
+        banqueId: setBanqueId,
+        syndicatId: setSyndicatId,
+        statut: setStatut,
+        canalProvenanceId: setCanalProvenanceId,
+        dateFrom: setDateFrom,
+        dateTo: setDateTo,
+      };
+      setters[key]?.(null);
+    },
+    [],
+  );
+
+  const chips: AdvancedChip[] = [
+    ...(representantId
+      ? [{ key: 'representantId' as const, field: 'Représentant', value: representantId }]
+      : []),
+    ...(departementId
+      ? [{ key: 'departementId' as const, field: 'Département', value: departementId }]
+      : []),
+    ...(banqueId ? [{ key: 'banqueId' as const, field: 'Banque', value: banqueId }] : []),
+    ...(syndicatId
+      ? [{ key: 'syndicatId' as const, field: 'Syndicat', value: syndicatId }]
+      : []),
+    ...(statut
+      ? [{ key: 'statut' as const, field: 'Statut', value: PROSPECT_STATUT_LABELS[statut as ProspectStatut] }]
+      : []),
+  ];
+
+  const values: ConsoleFilters = {
+    representantId,
+    departementId,
+    banqueId,
+    syndicatId,
+    statut,
+    canalProvenanceId,
+    dateFrom,
+    dateTo,
+  };
+
+  return { values, chips, clear, remove, set: { representantId: setRepresentantId, departementId: setDepartementId, banqueId: setBanqueId, syndicatId: setSyndicatId, statut: setStatut, canalProvenanceId: setCanalProvenanceId, dateFrom: setDateFrom, dateTo: setDateTo } };
+}
 
 const texteConfirmationAppel = (nom: string, detailStatut?: string): string =>
   detailStatut
