@@ -80,6 +80,16 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
   },
 };
 
+function filterCallbackBySearch(cb: Callback, search: string): boolean {
+  if (search.trim() === '') return true;
+  const q = search.trim().toLowerCase();
+  return (
+    cb.prospectName.toLowerCase().includes(q) ||
+    (cb.phoneE164 ?? '').toLowerCase().includes(q) ||
+    (cb.comment ?? '').toLowerCase().includes(q)
+  );
+}
+
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const racine = '/teleconseil';
   const queryClient = useQueryClient();
@@ -98,14 +108,9 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
     queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
   });
 
-  const filteredItems = (list.data?.items ?? []).filter((cb) => {
-    if (search.trim() === '') return true;
-    const q = search.trim().toLowerCase();
-    const nameMatch = cb.prospectName.toLowerCase().includes(q);
-    const phoneMatch = (cb.phoneE164 ?? '').toLowerCase().includes(q);
-    const commentMatch = (cb.comment ?? '').toLowerCase().includes(q);
-    return nameMatch || phoneMatch || commentMatch;
-  });
+  const filteredItems = (list.data?.items ?? []).filter((cb) =>
+    filterCallbackBySearch(cb, search),
+  );
 
   // Les CCP promettent aussi des rappels, sur les fiches plateforme.
   const teleconseillers = useQuery({
