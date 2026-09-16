@@ -27,6 +27,16 @@ WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
 -- name: ReattribuerRappel :exec
 UPDATE "scheduled_callbacks" SET "assignedToId" = @vers, "updatedAt" = now() WHERE "id" = @id;
 
+-- Les fiches plateforme dont un rappel promis est encore chez un autre rôle
+-- qu'un CCP : rien tant qu'aucun CCP actif n'existe pour les reprendre.
+-- name: ProspectsPlateformeAuxRappelsHorsCCP :many
+SELECT DISTINCT c."prospectId"
+FROM "scheduled_callbacks" c
+JOIN "prospects" p ON p."id" = c."prospectId"
+JOIN "users" a ON a."id" = c."assignedToId"
+WHERE c."status" = 'PENDING' AND p."plateformeDepuis" IS NOT NULL AND a."role" <> 'CCP'
+  AND EXISTS (SELECT 1 FROM "users" u WHERE u."role" = 'CCP' AND u."isActive" AND u."deletedAt" IS NULL);
+
 -- name: CreerProspectPlateforme :one
 INSERT INTO "prospects" (
   "id", "nom", "prenom", "phoneE164", "email", "createdById", "clientCreatedAt", "updatedAt",
