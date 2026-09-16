@@ -17,6 +17,7 @@ import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
+import { HistoriqueFiche } from '@/components/console/historique-fiche';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
@@ -1272,6 +1273,8 @@ export function Consignation({
       <BrouillonEnAttente enAttente={brouillonEnAttente} />
 
       {corpsFiche()}
+
+      <HistoriqueFiche prospectId={prospect.id} />
 
       <details
         open={helpOpen}
