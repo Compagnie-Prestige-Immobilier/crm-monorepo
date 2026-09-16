@@ -34,6 +34,14 @@ Le corps du message explique le POURQUOI: ce qui cassait, dans quelles
 conditions, et ce que le lecteur perdrait si la ligne disparaissait. Le QUOI se
 lit dans le diff.
 
+**`git stash` est INTERDIT**, sous toutes ses formes. D'autres sessions
+travaillent en parallele dans le meme arbre : un stash deplace leur travail
+hors de vue. Ne jamais toucher aux modifications qu'on n'a pas faites.
+
+Une fonctionnalite terminee se commite AVANT les tests et les verifications,
+en ne prenant que ses propres fichiers (`git add <fichiers>`, jamais
+`git add .`). Une correction issue des tests fait un commit suivant.
+
 ## Texte destine a l'utilisateur
 
 Le francais de l'interface est sobre et direct. Ce qu'un redacteur competent
