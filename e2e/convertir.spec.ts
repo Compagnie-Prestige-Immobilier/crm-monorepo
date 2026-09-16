@@ -105,14 +105,24 @@ async function ouvrirFiche(page: Page, fiche: FicheSemee): Promise<void> {
   await expect(page.getByRole('group', { name: 'Phase 3 · Conversion' })).toHaveCount(0);
 }
 
+const REPONSES = {
+  Joignable: /Oui, elle a répondu/u,
+  Injoignable: /Non, elle n’a pas répondu/u,
+} as const;
+
 /**
- * Les paliers de la codification des leads : le groupe, puis le statut. La touche
- * du raccourci entre dans le nom du bouton, d'où l'ancre en fin de libellé.
+ * La consignation pas à pas : la réponse, le formulaire quand la personne a
+ * répondu, puis le statut et sa précision. Le nom d'un bouton porte aussi sa
+ * touche et son aide : on cherche le libellé, pas la fin du nom.
  */
-async function issue(page: Page, groupeLibelle: string, ...statuts: RegExp[]): Promise<void> {
+async function issue(
+  page: Page,
+  reponse: keyof typeof REPONSES,
+  ...statuts: RegExp[]
+): Promise<void> {
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
-    .getByRole('button', { name: new RegExp(`${groupeLibelle}$`, 'u') })
+    .getByRole('button', { name: REPONSES[reponse] })
     .click();
   await qualifier(page, ...statuts);
 }
@@ -123,6 +133,9 @@ async function qualifier(page: Page, ...statuts: RegExp[]): Promise<void> {
     await page.getByRole('button', { name: statut }).click();
   }
 }
+
+const enregistrer = (page: Page) =>
+  page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
 
 /**
  * Une fiche rouverte reprend le brouillon de sa dernière ouverture : quand le
@@ -139,7 +152,7 @@ async function revenirAuxIssues(page: Page): Promise<void> {
 }
 
 const consigne = (page: Page, nom: string) =>
-  page.getByRole('status').filter({ hasText: `Appel enregistré pour ${nom}.` });
+  page.getByRole('status').filter({ hasText: `Appel consigné pour ${nom}` });
 
 const groupe = (page: Page, legende: string) => page.getByRole('group', { name: legende });
 
@@ -149,15 +162,17 @@ async function remplirDossier(
 ): Promise<void> {
   await page.getByRole('textbox', { name: /^Profession/u }).fill(dossier.profession);
   await page.getByRole('spinbutton', { name: /^Durée dans la fonction/u }).fill('84');
-  await groupe(page, 'Fonctionnaire').getByRole('radio', { name: 'Oui' }).check();
+  await groupe(page, 'Fonctionnaire').getByRole('radio', { name: 'Oui', exact: true }).check();
   await groupe(page, 'Ce numéro est-il un numéro WhatsApp ?')
-    .getByRole('radio', { name: 'Oui' })
+    .getByRole('radio', { name: 'Oui', exact: true })
     .check();
   await page.getByRole('textbox', { name: /^E-mail/u }).fill(dossier.email);
   // Le dossier de conversion nomme syndicat et banque par leur sigle.
   await choisirDansListe(page.getByRole('combobox', { name: /^Syndicat/u }), 'CUSEMS');
   await choisirDansListe(page.getByRole('combobox', { name: /^Banque/u }), 'CBAO');
-  await groupe(page, 'Engagement en cours à la banque').getByRole('radio', { name: 'Non' }).check();
+  await groupe(page, 'Engagement en cours à la banque')
+    .getByRole('radio', { name: 'Non', exact: true })
+    .check();
   await choisirDansListe(
     page.getByRole('combobox', { name: /^Revenu mensuel/u }),
     'Moins de 50 000 F CFA',
@@ -190,12 +205,13 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     await ouvrirFiche(page, fiche);
     await issue(page, 'Joignable');
-    await remplirDossier(page, { profession, email, methode: 'RDV CPI' });
+    await remplirDossier(page, { profession, email, methode: 'RDV en agence (Adhésion)' });
     await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
-    await qualifier(page, /Intéressé$/u, /Terrain$/u);
-    await page.getByLabel('Commentaire').fill(commentaire);
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await qualifier(page, /Intéressé/u, /Terrain/u);
+    await page.getByLabel(/^Commentaire/u).fill(commentaire);
 
-    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
+    await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     const conversion = await lireConversion(fiche.id);
@@ -232,10 +248,11 @@ test.describe('parcours 5, convertir un prospect', () => {
     await remplirDossier(page, {
       profession: `Greffier ${suffixe}`,
       email: `omar.${suffixe}@ecole.sn`,
-      methode: 'Mail',
+      methode: 'Par e-mail',
     });
-    await qualifier(page, /Hésitant$/u);
-    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await qualifier(page, /Hésitant/u);
+    await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     await ouvrirFiche(page, fiche);
@@ -243,7 +260,8 @@ test.describe('parcours 5, convertir un prospect', () => {
       page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
     ).toBeVisible();
     await revenirAuxIssues(page);
-    await issue(page, 'Injoignable', /NRP$/u);
+    await issue(page, 'Injoignable', /NRP/u);
+    await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 2,
@@ -252,7 +270,8 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     await ouvrirFiche(page, fiche);
     await revenirAuxIssues(page);
-    await issue(page, 'Injoignable', /Faux numéro$/u);
+    await issue(page, 'Injoignable', /Faux numéro/u);
+    await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 3,
@@ -293,7 +312,7 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     try {
       await page.goto(`/teleconseil/appel/${semee.id}`);
-      await issue(page, 'Injoignable', /NRP$/u);
+      await issue(page, 'Injoignable', /NRP/u);
       await page.keyboard.press('Enter');
       await expect(page).toHaveURL(/\/teleconseil$/u);
       await expect.poll(async () => (await lireClassement(semee.id)).tentatives).toBe(1);
@@ -343,10 +362,12 @@ test.describe('parcours 5 en 390 px', () => {
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,
       email: `pape.${suffixe}@ecole.sn`,
-      methode: 'Mail',
+      methode: 'Par e-mail',
     });
-    await qualifier(page, /Intéressé$/u);
-    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
+    await page.getByRole('button', { name: 'Continuer' }).click();
+    await qualifier(page, /Intéressé/u);
+    await page.getByRole('button', { name: 'Sans précision' }).click();
+    await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
     await sansDebordementHorizontal(page);
 

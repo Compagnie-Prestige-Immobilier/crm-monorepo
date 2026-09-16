@@ -94,6 +94,7 @@ SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
        "phoneE164", "whatsappStatus", "whatsappE164"
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 
+-- Un rappel promis se tient, même quand la campagne a rendu la fiche.
 -- name: ProspectAttribue :one
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
@@ -103,7 +104,9 @@ SELECT EXISTS (
          OR p."createdById" = @agent
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
-                    WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)));
+                    WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
+         OR EXISTS (SELECT 1 FROM "scheduled_callbacks" c
+                    WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')));
 
 -- name: ProspectOuvrable :one
 SELECT EXISTS (
@@ -115,6 +118,8 @@ SELECT EXISTS (
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
+         OR EXISTS (SELECT 1 FROM "scheduled_callbacks" c
+                    WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')
          OR (@converti_visible::bool AND p."statut" = 'CONVERTI')));
 
 -- name: OuvrirParcours :one
@@ -165,7 +170,7 @@ UPDATE "prospects" SET
   "lastCallById" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_by_id') ELSE "lastCallById" END,
   "rev" = "rev" + CASE WHEN @maj_fiche::bool THEN 1 ELSE 0 END
 WHERE "id" = @id
-RETURNING "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
+RETURNING "id", "projet", "statut", "rev", "updatedAt", "lastCallAt", "incomeBandId",
           "phoneE164", "whatsappStatus", "whatsappE164";
 
 -- name: SupplanterRappels :exec
@@ -182,7 +187,7 @@ ON CONFLICT DO NOTHING;
 UPDATE "scheduled_callbacks" SET "status" = 'DONE', "closedAttemptId" = @attempt_id
 WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
 
--- name: MarquerProspectContacte :exec
+-- name: MarquerProspectContacte :execrows
 UPDATE "prospects" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOUVEAU';
 
 -- name: MarquerParcoursContacte :exec
@@ -195,8 +200,8 @@ UPDATE "prospect_journeys" SET
   "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by
 WHERE "id" = @id;
 
--- name: MarquerProspectPerdu :exec
-UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id;
+-- name: MarquerProspectPerdu :execrows
+UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id AND "statut" <> 'PERDU';
 
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
@@ -224,6 +229,22 @@ WHERE c."status" = 'PENDING'
                     AND j."projet"::text = CAST(sqlc.narg('projet') AS text)))
 ORDER BY c."scheduledAt" ASC, c."id" ASC
 LIMIT 500;
+
+-- La liste s'arrête à 500 rappels : le total dit ce qu'elle ne montre pas.
+-- name: CompterRappels :one
+SELECT COUNT(*)::int
+FROM "scheduled_callbacks" c
+JOIN "prospects" p ON p."id" = c."prospectId"
+WHERE c."status" = 'PENDING'
+  AND c."scheduledAt" <= @avant
+  AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
+       OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
+  AND (sqlc.narg('plateforme')::boolean IS NULL
+       OR sqlc.narg('plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL))
+  AND (CAST(sqlc.narg('projet') AS text) IS NULL
+       OR EXISTS (SELECT 1 FROM "prospect_journeys" j
+                  WHERE j."prospectId" = p."id"
+                    AND j."projet"::text = CAST(sqlc.narg('projet') AS text)));
 
 -- name: RappelParId :one
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",

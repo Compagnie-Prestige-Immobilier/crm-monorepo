@@ -65,21 +65,22 @@ test.describe('parcours 5, qualification des representants', () => {
 
     await page.goto(ANNUAIRE);
     await ouvrirFicheDepuisAnnuaire(page, semee);
-    await repondre(page, 'Comment s’est passé l’appel ?', 'Joignable');
-    await repondre(page, 'L’établissement de la fiche est-il confirmé ?', 'Oui');
-    await repondre(page, 'A-t-il déjà été contacté ?', 'Non');
+    await repondre(page, 'Avez-vous eu la personne au téléphone ?', 'Oui, elle a répondu');
+    await repondre(page, 'L’école de la fiche est-elle la bonne ?', 'Oui');
+    await repondre(page, 'A-t-il déjà été contacté par CPI ?', 'Non');
     await repondre(page, 'Connaît-il l’UES ?', 'Non');
-    await repondre(page, 'Souhaite-t-il être représentant CHUES ?', 'Non');
+    await page.getByRole('button', { name: 'Sans syndicat' }).click();
+    await repondre(page, 'Accepte-t-il d’être représentant CHUES ?', 'Non');
 
-    await expect(page.getByRole('combobox', { name: 'Précision' })).toHaveCount(0);
-    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
-    await expect(page.getByRole('option', { name: SOUS_STATUT, exact: true })).toHaveCount(0);
-    await page.getByRole('option', { name: 'Retraité', exact: true }).click();
-    await page.getByRole('combobox', { name: 'Précision' }).click();
-    await page.getByRole('option', { name: SOUS_STATUT, exact: true }).click();
+    // Le sous-statut ne se propose qu'apres son parent, jamais au premier palier.
+    const statuts = page.getByRole('group', { name: 'Quel statut de qualification ?' });
+    await expect(statuts.getByRole('button', { name: SOUS_STATUT })).toHaveCount(0);
+    await repondre(page, 'Quel statut de qualification ?', 'Retraité');
+    await repondre(page, 'Quelle précision ?', SOUS_STATUT);
 
-    await page.getByRole('button', { name: 'Continuer' }).click();
-    await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+    // Il a refusé : le script demande quelqu'un d'autre, on n'a personne.
+    await page.getByRole('button', { name: 'Personne à proposer' }).click();
+    await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
     await expect(appelEnregistre(page, semee.nom)).toBeVisible();
 
     await expect.poll(() => statutConsigne(semee.id)).toBe(sousStatutId);

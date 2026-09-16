@@ -87,8 +87,10 @@ type QualificationRappelsInput struct {
 
 type QualificationRappelsOutput struct {
 	Body struct {
-		Items      []QualificationRappelDTO `json:"items"`
+		Items      []QualificationRappelDTO `json:"items" doc:"Les 500 plus proches au plus."`
 		ServerTime string                   `json:"serverTime" format:"date-time"`
+		// La liste s'arrête à 500 rappels : ce nombre dit ce qu'elle ne montre pas.
+		Total int `json:"total"`
 	}
 }
 
@@ -122,9 +124,14 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	if err != nil {
 		return nil, err
 	}
+	total, err := s.Q.CompterRappels(ctx, db.CompterRappelsParams(p))
+	if err != nil {
+		return nil, err
+	}
 	out := &QualificationRappelsOutput{}
 	out.Body.Items = make([]QualificationRappelDTO, 0, len(rows))
 	out.Body.ServerTime = qualificationISO(maintenant)
+	out.Body.Total = int(total)
 	for i := range rows {
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{

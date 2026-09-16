@@ -1,7 +1,7 @@
 'use client';
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { ChevronRightIcon, Trash2Icon } from 'lucide-react';
+import { ChevronRightIcon, PhoneCallIcon, Trash2Icon } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -21,7 +21,7 @@ import {
 } from '@/components/representants/representant-comments';
 import { SupprimerRepresentant } from '@/components/representants/supprimer-representant';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDuration } from '@/lib/data/admin';
@@ -387,6 +387,26 @@ function evenementsDe(donnees: {
   ];
 }
 
+/** Vers la fiche représentant de la console, ouverte sur cette personne. */
+function LienConsigner({
+  representantId,
+  readOnly,
+}: {
+  representantId: string;
+  readOnly: boolean;
+}) {
+  if (readOnly) return null;
+  return (
+    <Link
+      href={`/teleconseil/appels-representants?fiche=${encodeURIComponent(representantId)}`}
+      className={buttonVariants({ variant: 'default' })}
+    >
+      <PhoneCallIcon aria-hidden="true" />
+      Consigner un appel
+    </Link>
+  );
+}
+
 export function RepresentantDetailView({
   representantId,
   author,
@@ -484,6 +504,7 @@ export function RepresentantDetailView({
             lastCallOutcome={representant.lastCallOutcome}
           />
         }
+        actions={<LienConsigner representantId={representant.id} readOnly={readOnly} />}
         chiffres={chiffresDe(representant)}
       />
 

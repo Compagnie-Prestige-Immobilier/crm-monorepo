@@ -22,21 +22,23 @@ func (s *service) rappelerFichesPlateformeNotification(ctx context.Context, main
 	if err != nil || len(groupes) == 0 {
 		return err
 	}
-	nouvelles, aAppeler := 0, 0
+	nouvelles, inscrites, aAppeler := 0, 0, 0
 	for _, groupe := range groupes {
 		nouvelles += int(groupe.Nouvelles)
+		inscrites += int(groupe.NouvellesInscrites)
 		aAppeler += int(groupe.AAppeler)
 	}
 	var erreurs []error
 	if nouvelles > 0 || aAppeler > 0 {
 		candidats, err := s.candidatsParRolesNotification(ctx, []string{string(socle.CCP)}, map[string]string{
-			"nouvelles": strconv.Itoa(nouvelles), "aAppeler": strconv.Itoa(aAppeler),
+			"nouvelles": strconv.Itoa(nouvelles), "inscrites": strconv.Itoa(inscrites), "aAppeler": strconv.Itoa(aAppeler),
 		})
 		if err != nil {
 			return err
 		}
 		erreurs = append(erreurs, s.emettreRappelNotification(ctx, notificationCleFichesPlateforme, maintenant, candidats,
-			"Fiches plateforme", "{{nouvelles}} nouvelle(s) fiche(s) depuis hier, {{aAppeler}} attendent un premier appel.",
+			"Fiches plateforme",
+			"{{nouvelles}} nouvelle(s) fiche(s) depuis hier, dont {{inscrites}} inscrite(s) sur la plateforme ; {{aAppeler}} attendent un premier appel.",
 			routeFichesPlateforme, "RAPPEL"))
 	}
 	for _, groupe := range groupes {

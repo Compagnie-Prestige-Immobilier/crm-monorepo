@@ -603,3 +603,272 @@ func TestImportReleveLesLeadsDepuisLeLien(t *testing.T) {
 		t.Fatalf("un classeur inchangé ne se rejoue pas : %d travaux", travaux)
 	}
 }
+
+type ongletLeadsBrutTest struct {
+	nom    string
+	lignes [][]any
+}
+
+// Le classeur tel que le marketing le rend : un en-tête libre, une cellule `float64`
+// vaut un rang Excel, comme une date saisie dans une cellule au format date.
+func classeurLeadsBrut(t *testing.T, entete []string, onglets []ongletLeadsBrutTest) []byte {
+	t.Helper()
+	fichier := excelize.NewFile()
+	for index, onglet := range onglets {
+		if index == 0 {
+			_ = fichier.SetSheetName(fichier.GetSheetName(0), onglet.nom)
+		} else if _, err := fichier.NewSheet(onglet.nom); err != nil {
+			t.Fatal(err)
+		}
+		for colonne, valeur := range entete {
+			cellule, _ := excelize.CoordinatesToCellName(colonne+1, 1)
+			_ = fichier.SetCellValue(onglet.nom, cellule, valeur)
+		}
+		for rang, ligne := range onglet.lignes {
+			for colonne, valeur := range ligne {
+				cellule, _ := excelize.CoordinatesToCellName(colonne+1, rang+2)
+				_ = fichier.SetCellValue(onglet.nom, cellule, valeur)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := fichier.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func rangExcelTest(quand time.Time) float64 {
+	return quand.Sub(time.Date(1899, time.December, 30, 0, 0, 0, 0, time.UTC)).Hours() / 24
+}
+
+// Un relevé du classeur donné, puis l'identifiant du travail appliqué.
+func (b *banc) releverLeadsTest(classeur []byte, nomClasseur string) string {
+	b.t.Helper()
+	b.t.Setenv("IMPORT_LEADS_URL", b.lienDesLeads(classeur, nomClasseur))
+	if err := imports.ReleverLeads(b.ctx, serviceDesImports(b)); err != nil {
+		b.t.Fatal(err)
+	}
+	var travail string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "id" FROM "import_jobs" WHERE "fileName" = $1 AND "mode" = 'APPLY' ORDER BY "createdAt" DESC LIMIT 1`,
+		nomClasseur).Scan(&travail); err != nil {
+		b.t.Fatalf("le relevé doit laisser un travail appliqué : %v", err)
+	}
+	return travail
+}
+
+type ficheLeadTest struct {
+	id, projet, canal string
+	creeLe            time.Time
+	remarque          *string
+	plateforme        *time.Time
+}
+
+func (b *banc) ficheLeadTest(telephone string) ficheLeadTest {
+	b.t.Helper()
+	var f ficheLeadTest
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT p."id", p."projet"::text, COALESCE(c."label", ''), p."clientCreatedAt", p."remarqueImport", p."plateformeDepuis"
+		   FROM "prospects" p LEFT JOIN "canaux_provenance" c ON c."id" = p."canalProvenanceId"
+		  WHERE p."phoneE164" = $1`, telephone).Scan(&f.id, &f.projet, &f.canal, &f.creeLe, &f.remarque, &f.plateforme); err != nil {
+		b.t.Fatalf("la fiche %s doit exister : %v", telephone, err)
+	}
+	return f
+}
+
+// Le rapport du travail, tel que l'écran Imports le lit.
+func (b *banc) rapportImportTest(travail string) (rapport map[string]any, compteurs map[string]float64) {
+	b.t.Helper()
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/imports/"+travail, nil, nil)
+	b.attend(statut, http.StatusOK, "le travail d'import", body)
+	rapport, _ = body["report"].(map[string]any)
+	compteurs = map[string]float64{}
+	for code, n := range mapDe(rapport["compteurs"]) {
+		compteurs[code], _ = n.(float64)
+	}
+	return rapport, compteurs
+}
+
+func mapDe(v any) map[string]any {
+	m, _ := v.(map[string]any)
+	return m
+}
+
+func entierDuRapport(rapport map[string]any, cle string) int {
+	n, _ := rapport[cle].(float64)
+	return int(n)
+}
+
+func (b *banc) nettoyerLeadsTest(telephones []string, nomClasseur string) {
+	b.t.Helper()
+	var empreinteAvant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`).Scan(&empreinteAvant)
+	b.t.Cleanup(func() {
+		for _, telephone := range telephones {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_items" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = $1)`, telephone)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = $1)`, telephone)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, telephone)
+		}
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" IN (SELECT "id" FROM "import_jobs" WHERE "fileName" = $1)`, nomClasseur)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "fileName" = $1`, nomClasseur)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`)
+		if empreinteAvant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('imports.leadsEmpreinte', $1, now())`, *empreinteAvant)
+		}
+	})
+}
+
+const (
+	canalMetaChuesTest = "Meta CPI-CHUES ( Facebook & Instagram )"
+	canalMetaGPTest    = "Meta CPI GRAND PUBLIC ( Facebook & Instagram )"
+	libelleMetaTest    = "Meta (Facebook et Instagram)"
+)
+
+// La codification du classeur des leads (docs/decisions/import-leads.md) : le
+// jour de l'onglet corrige la date, « Canal » décide du projet, une ligne sans
+// identité se signale, le classeur relu met la fiche à jour et la sort de sa
+// campagne quand son projet change.
+func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	base := time.Now().UnixNano() % 10_000_000
+	tels := []string{
+		fmt.Sprintf("+22177%07d", base), fmt.Sprintf("+22177%07d", (base+1)%10_000_000), fmt.Sprintf("+22177%07d", (base+2)%10_000_000),
+	}
+	nomClasseur := fmt.Sprintf("Leads du 12 sept 2026 %d.xlsx", base)
+	b.nettoyerLeadsTest(tels, nomClasseur)
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	douze := ongletLeadsBrutTest{nom: "Leads 12 sept 2026", lignes: [][]any{
+		// Excel en réglage US a rangé « 12/09/2026 08:30 » au 9 décembre.
+		{rangExcelTest(time.Date(2026, time.December, 9, 8, 30, 0, 0, time.UTC)), "Aminata Diop", "aminata." + tels[0][5:] + "@example.sn", "Payé", tels[0], canalMetaChuesTest, "à rappeler"},
+		{"12/09/2026", "Moussa Ndiaye", "", "Direct", tels[1], "https://monespace.cpi.sn/", ""},
+		{"", "Awa Sow", "", "fb", tels[2], "", ""},
+		{"", "", "seule." + tels[0][5:] + "@example.sn", "", "", "", ""},
+	}}
+
+	travail := b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{douze}), nomClasseur)
+	a := verifierPremierReleveLeadsTest(b, travail, tels)
+
+	lotID := uuid.NewString()
+	adminExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+		VALUES ($1,'Campagne CHUES test','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lotID, b.userID)
+	adminExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`, lotID, a.id, b.userID)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, lotID)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID)
+	})
+
+	// Le téléconseiller de la campagne a promis un rappel : il le tient, fiche hors projet ou non.
+	commercialID, commercialEmail := adminCompte(b, "COMMERCIAL")
+	plateformeRappelPromis(b, a.id, commercialID)
+
+	treize := ongletLeadsBrutTest{nom: "Leads 13 sept 2026", lignes: [][]any{
+		{"13/09/2026", "Aminata Diop", "", "Payé", tels[0], canalMetaGPTest, "oui"},
+	}}
+	travail = b.releverLeadsTest(classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{douze, treize}), nomClasseur)
+	verifierSecondReleveLeadsTest(b, travail, tels[0], lotID)
+
+	commercial := adminSession(b, commercialEmail)
+	statut, body := adminAppel(commercial, http.MethodPost, "/api/v1/ouvertures", plateformeOuverture(a.id))
+	if statut/100 != 2 {
+		t.Fatalf("le rappel promis doit rester ouvrable par le téléconseiller : %d %v", statut, body)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
+}
+
+// « projet | canal | créée le | note | plateforme depuis », lisible d'un coup dans l'échec.
+func (f *ficheLeadTest) resume() string {
+	remarque, plateforme := "", ""
+	if f.remarque != nil {
+		remarque = *f.remarque
+	}
+	if f.plateforme != nil {
+		plateforme = f.plateforme.UTC().Format(time.RFC3339)
+	}
+	return strings.Join([]string{f.projet, f.canal, f.creeLe.UTC().Format(time.RFC3339), remarque, plateforme}, " | ")
+}
+
+func resumeRapportTest(rapport map[string]any) string {
+	return fmt.Sprintf("total=%d created=%d updated=%d skipped=%d errors=%d warnings=%d",
+		entierDuRapport(rapport, "totalRows"), entierDuRapport(rapport, "createdRows"), entierDuRapport(rapport, "updatedRows"),
+		entierDuRapport(rapport, "skippedRows"), entierDuRapport(rapport, "errorRows"), entierDuRapport(rapport, "warningRows"))
+}
+
+func (b *banc) attendRapportTest(travail, attendu string, compteursAttendus map[string]float64) {
+	b.t.Helper()
+	rapport, compteurs := b.rapportImportTest(travail)
+	if resume := resumeRapportTest(rapport); resume != attendu {
+		b.t.Fatalf("rapport : %s, attendu %s", resume, attendu)
+	}
+	for code, n := range compteursAttendus {
+		if compteurs[code] != n {
+			b.t.Fatalf("compteur %s : %v, attendu %v (%v)", code, compteurs[code], n, compteurs)
+		}
+	}
+}
+
+func verifierPremierReleveLeadsTest(b *banc, travail string, tels []string) ficheLeadTest {
+	b.t.Helper()
+	a, bb, c := b.ficheLeadTest(tels[0]), b.ficheLeadTest(tels[1]), b.ficheLeadTest(tels[2])
+	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | à rappeler | " {
+		b.t.Fatalf("A : %s", a.resume())
+	}
+	if bb.resume() != "GRAND_PUBLIC | Site web | 2026-09-12T00:00:00Z |  | 2026-09-12T00:00:00Z" {
+		b.t.Fatalf("B : %s", bb.resume())
+	}
+	if c.resume() != "GRAND_PUBLIC | "+libelleMetaTest+" | 2026-09-12T00:00:00Z |  | " {
+		b.t.Fatalf("C : %s", c.resume())
+	}
+	b.attendRapportTest(travail, "total=4 created=3 updated=0 skipped=1 errors=0 warnings=3", map[string]float64{
+		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1, "PROSPECT_GP_IMPORT_LIGNE_SANS_IDENTITE": 1,
+	})
+	return a
+}
+
+func verifierSecondReleveLeadsTest(b *banc, travail, telephone, lotID string) {
+	b.t.Helper()
+	a := b.ficheLeadTest(telephone)
+	if a.resume() != "GRAND_PUBLIC | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | oui | " {
+		b.t.Fatalf("A relue : %s", a.resume())
+	}
+	if parcours := projetsDesParcoursTest(b, a.id); strings.Join(parcours, ",") != "GRAND_PUBLIC" {
+		b.t.Fatalf("le parcours suit la dernière ligne : %v", parcours)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1 AND "assigneeId" IS NOT NULL`, lotID); n != 0 {
+		b.t.Fatalf("la fiche hors projet reste attribuée : %d", n)
+	}
+	if adminCompterAudit(b, "lot_export.hors_projet", lotID) != 1 {
+		b.t.Fatal("le retrait de campagne doit laisser une trace")
+	}
+	statut, body := appelJSON(b, http.MethodGet, "/api/v1/lots-export/"+lotID+"/fiches", nil, nil)
+	b.attend(statut, http.StatusOK, "fiches de la campagne", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 || mapDe(items[0])["etat"] != "HORS_PROJET" {
+		b.t.Fatalf("la campagne doit marquer la fiche « Hors projet » : %v", body["items"])
+	}
+	// Quatre lignes ignorées, plus la date de A et le canal de C signalés une seconde fois.
+	b.attendRapportTest(travail, "total=5 created=0 updated=1 skipped=4 errors=0 warnings=6", map[string]float64{
+		"PROSPECT_GP_IMPORT_DEJA_EN_BASE": 3, "PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1,
+	})
+}
+
+func projetsDesParcoursTest(b *banc, prospectID string) []string {
+	b.t.Helper()
+	rows, err := b.pool.Query(b.ctx, `SELECT "projet"::text FROM "prospect_journeys" WHERE "prospectId" = $1`, prospectID)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	defer rows.Close()
+	var parcours []string
+	for rows.Next() {
+		var projet string
+		if err := rows.Scan(&projet); err != nil {
+			b.t.Fatal(err)
+		}
+		parcours = append(parcours, projet)
+	}
+	return parcours
+}

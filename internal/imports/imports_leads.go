@@ -28,10 +28,11 @@ import (
 // Le classeur des leads du marketing, relevé sur son lien SharePoint « toute
 // personne disposant du lien » : IMPORT_LEADS_URL. Sans lien, la tâche ne fait rien.
 const (
-	cleEmpreinteLeads = "imports.leadsEmpreinte"
-	nomLeadsParDefaut = "leads-marketing.xlsx"
-	delaiReleveLeads  = 2 * time.Minute
-	libelleChampDate  = "Date"
+	cleEmpreinteLeads        = "imports.leadsEmpreinte"
+	cleReleveSilencieuxLeads = "imports.leadsReleveSilencieux"
+	nomLeadsParDefaut        = "leads-marketing.xlsx"
+	delaiReleveLeads         = 2 * time.Minute
+	libelleChampDate         = "Date"
 )
 
 var releveLeadsEnCours atomic.Bool
@@ -93,7 +94,21 @@ func (s *service) simulerPuisAppliquerLeads(ctx context.Context, jobID, nom stri
 	} else {
 		slog.Warn("relevé des leads : simulation refusée, voir l’écran Imports", "job", jobID, "fichier", nom)
 	}
+	if s.releveSilencieux(ctx) {
+		return nil
+	}
 	return s.signalerReleveLeads(ctx, jobID)
+}
+
+// Un relevé forcé après un déploiement relit un classeur déjà connu : il ne
+// vaut pas un courriel. Le réglage ne sert qu'une fois.
+func (s *service) releveSilencieux(ctx context.Context) bool {
+	supprimes, err := s.Q.SupprimerAppSetting(ctx, cleReleveSilencieuxLeads)
+	if err != nil {
+		slog.Warn("relevé des leads : réglage de silence illisible", "err", err)
+		return false
+	}
+	return supprimes > 0
 }
 
 // Le bilan du relevé part aux adresses réglées côté admin, appliqué ou refusé :
@@ -136,6 +151,7 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 	// copie. Le nom du fichier ne bouge jamais d'un jour à l'autre : en objet, il
 	// donnait chaque matin le même message.
 	if estSucces {
+		rapport := rapportDuTravailImport(job.Report)
 		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 			Type:          notifications.CourrielImportLeads,
 			Sujet:         fmt.Sprintf("[Leads] %s, %s", fichesCreeesLeads(job.CreatedRows), time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
@@ -148,6 +164,11 @@ func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
 			Lignes: [][2]string{
 				{libelleChampDate, dateStr},
 				{"Leads créés", valeurs["creees"]},
+				{"Fiches mises à jour", strconv.Itoa(int(job.UpdatedRows))},
+				{"Dates corrigées", strconv.Itoa(rapport.Compteurs[codeDateCorrigeeImport])},
+				{"Canaux à vérifier", strconv.Itoa(rapport.Compteurs[codeCanalAVerifierImport])},
+				{"Lignes ignorées", strconv.Itoa(int(job.SkippedRows))},
+				{"Lignes refusées", valeurs["refusees"]},
 			},
 			Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
 			LibelleLien: "Voir le détail dans CPI GO",

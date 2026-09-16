@@ -1,5 +1,8 @@
 'use client';
 
+import { CheckIcon } from 'lucide-react';
+import { useEffect, useRef } from 'react';
+
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -8,6 +11,26 @@ export const ETAPES_SAISIE: readonly string[] = ['Identité', 'Situation', 'Reve
 
 export const ETAPES_APPEL: readonly string[] = ['Joignable', 'Dossier', 'Issue'];
 
+type EtatEtape = 'faite' | 'active' | 'a_venir';
+
+const etatDe = (rang: number, courante: number): EtatEtape => {
+  if (rang < courante) return 'faite';
+  return rang === courante ? 'active' : 'a_venir';
+};
+
+const CLASSE_LIBELLE: Readonly<Record<EtatEtape, string>> = {
+  faite: 'text-foreground',
+  active: 'text-primary',
+  a_venir: 'text-muted-foreground',
+};
+
+const CLASSE_PASTILLE: Readonly<Record<EtatEtape, string>> = {
+  faite: 'border-primary bg-primary text-primary-foreground',
+  active: 'border-primary text-primary',
+  a_venir: 'border-border text-muted-foreground',
+};
+
+/** Les étapes en pastilles reliées : faites cochées, l'active en couleur, la suite grisée. */
 export function EtapesProgression({
   etapes,
   courante,
@@ -19,45 +42,65 @@ export function EtapesProgression({
   maximum?: number;
   onChoisir: (etape: number) => void;
 }) {
+  const barre = useRef<HTMLElement>(null);
+
+  // Sur téléphone, la rangée déborde : l'étape en cours se ramène dans le cadre.
+  useEffect(() => {
+    barre.current
+      ?.querySelector('[aria-current="step"]')
+      ?.scrollIntoView({ inline: 'center', block: 'nearest' });
+  }, [courante]);
+
   return (
-    <nav aria-label="Progression du formulaire">
+    <nav ref={barre} aria-label="Progression du formulaire" className="overflow-x-auto">
       <p className="sr-only">
         Étape {courante + 1} sur {etapes.length} : {etapes[courante]}
       </p>
-      <ol className="flex flex-wrap items-center gap-2">
+      <ol className="flex items-end">
         {etapes.map((libelle, rang) => {
-          const active = rang === courante;
+          const etat = etatDe(rang, courante);
           return (
-            <li key={libelle} className="flex items-center gap-2">
-              {rang > 0 ? (
-                <span aria-hidden="true" className="text-muted-foreground">
-                  ·
-                </span>
-              ) : null}
+            <li key={libelle} className="flex items-end">
               <button
                 type="button"
                 disabled={rang > maximum}
-                aria-current={active ? 'step' : undefined}
+                aria-current={etat === 'active' ? 'step' : undefined}
                 onClick={() => {
                   onChoisir(rang);
                 }}
-                className={cn(
-                  'flex min-h-11 items-center gap-2 rounded-md border px-3 text-[0.875rem] disabled:cursor-not-allowed disabled:opacity-50',
-                  active
-                    ? 'border-primary bg-secondary font-[600] text-secondary-foreground'
-                    : 'border-border text-muted-foreground hover:bg-secondary/60',
-                )}
+                className="flex flex-col items-center gap-1 rounded-md px-1 disabled:cursor-not-allowed"
               >
                 <span
                   className={cn(
-                    'flex size-6 items-center justify-center rounded-full text-[0.75rem] tabular-nums',
-                    active ? 'bg-primary text-primary-foreground' : 'bg-muted',
+                    'text-[0.75rem] font-[600] whitespace-nowrap',
+                    CLASSE_LIBELLE[etat],
+                    etat === 'active' ? '' : 'hidden sm:inline',
                   )}
                 >
-                  {rang + 1}
+                  {libelle}
                 </span>
-                {libelle}
+                <span
+                  className={cn(
+                    'flex size-7 items-center justify-center rounded-full border-2 text-[0.75rem] font-[600] tabular-nums',
+                    CLASSE_PASTILLE[etat],
+                  )}
+                >
+                  {etat === 'faite' ? (
+                    <CheckIcon className="size-4" aria-hidden="true" />
+                  ) : (
+                    rang + 1
+                  )}
+                </span>
               </button>
+              {rang < etapes.length - 1 ? (
+                <span
+                  aria-hidden="true"
+                  className={cn(
+                    'mb-[13px] h-0.5 w-5 sm:w-12',
+                    etat === 'faite' ? 'bg-primary' : 'bg-border',
+                  )}
+                />
+              ) : null}
             </li>
           );
         })}

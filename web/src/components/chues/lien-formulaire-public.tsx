@@ -2,10 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CopyIcon, MessageCircleIcon, RotateCcwIcon } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { monLienFormulaireQuery, regenererMonLienFormulaire } from '@/lib/data/lien-formulaire';
@@ -18,6 +20,7 @@ import { lienFormulairePublic } from '@/lib/formulaire-public';
  */
 export function LienFormulairePublic() {
   const client = useQueryClient();
+  const [confirmation, setConfirmation] = useState(false);
   const jeton = useQuery(monLienFormulaireQuery());
   const rotation = useMutation({
     mutationFn: regenererMonLienFormulaire,
@@ -78,12 +81,28 @@ export function LienFormulairePublic() {
             variant="outline"
             disabled={rotation.isPending}
             onClick={() => {
-              rotation.mutate();
+              setConfirmation(true);
             }}
           >
             <RotateCcwIcon className="size-4" aria-hidden="true" />
             Générer un nouveau lien
           </Button>
+          <ConfirmDialog
+            open={confirmation}
+            onOpenChange={setConfirmation}
+            title="Générer un nouveau lien ?"
+            description="Le lien déjà partagé ne fonctionnera plus. Les personnes qui l’ont reçu devront recevoir le nouveau."
+            confirmLabel="Générer"
+            confirmVariant="destructive"
+            pending={rotation.isPending}
+            onConfirm={() => {
+              rotation.mutate(undefined, {
+                onSettled: () => {
+                  setConfirmation(false);
+                },
+              });
+            }}
+          />
           <a
             href={urlWhatsapp}
             target="_blank"

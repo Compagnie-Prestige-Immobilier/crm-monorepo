@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import {
   ajouterTeleconseiller,
-  fetchLotExportFiches,
+  fetchLotExportFichesToutes,
   fetchTeleconseillers,
   type LotExportDetail,
   type LotExportFiche,
@@ -75,7 +75,7 @@ function FormulaireAjout({ lot, onFermer }: { lot: LotExportDetail; onFermer: ()
   });
   const fiches = useQuery({
     queryKey: queryKeys.lotsExportFiches(lot.id, FICHES_NON_TRAITEES),
-    queryFn: () => fetchLotExportFiches(lot.id, FICHES_NON_TRAITEES),
+    queryFn: () => fetchLotExportFichesToutes(lot.id, FICHES_NON_TRAITEES.etat),
   });
 
   const membres = new Set(lot.performance.map((ligne) => ligne.teleconseillerId));
@@ -114,7 +114,7 @@ function FormulaireAjout({ lot, onFermer }: { lot: LotExportDetail; onFermer: ()
       />
 
       <ListeFiches
-        fiches={fiches.data?.items ?? []}
+        fiches={fiches.data ?? []}
         chargement={fiches.isPending}
         cochees={cochees}
         onCochees={setCochees}

@@ -10,10 +10,10 @@ import {
   Commentaire,
   MOTIFS_SYSTEME,
   PanneauDossier,
-  PanneauEcheance,
   PiedDossier,
   statutsJoignables,
 } from '@/components/console/console-view';
+import { PanneauEcheance } from '@/components/console/panneau-echeance';
 import { SelectStatut } from '@/components/console/select-statut';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
