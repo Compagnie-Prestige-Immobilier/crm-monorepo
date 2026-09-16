@@ -207,3 +207,34 @@ func TestFichesPlateformeChaudeEtFroide(t *testing.T) {
 		t.Fatal("une inscription disparue ne vaut plus une étoile")
 	}
 }
+
+// La liste des prospects ne montre une fiche plateforme qu'au CCP et à
+// l'administrateur : le superviseur et la direction lisent tout le reste.
+func TestListeProspectsCacheLaFichePlateformeAlEncadrement(t *testing.T) {
+	b := adminConnecte(t)
+	telephone := adminTelephone()
+	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
+	adminExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, prospectID)
+	_, ccpEmail := adminCompte(b, "CCP")
+	_, superviseurEmail := adminCompte(b, "SUPERVISEUR")
+	_, directionEmail := adminCompte(b, "DIRECTION")
+
+	cas := []struct {
+		quoi    string
+		session *banc
+		attendu int
+	}{
+		{"l’administrateur", b, 1},
+		{"le CCP", adminSession(b, ccpEmail), 1},
+		{"le superviseur", adminSession(b, superviseurEmail), 0},
+		{"la direction", adminSession(b, directionEmail), 0},
+	}
+	for _, c := range cas {
+		statut, body := adminAppel(c.session, http.MethodGet, "/api/v1/prospects?search="+url.QueryEscape(telephone), nil)
+		c.session.attend(statut, http.StatusOK, c.quoi+" liste les prospects", body)
+		items, _ := body["items"].([]any)
+		if len(items) != c.attendu {
+			t.Fatalf("%s : %d fiche(s) plateforme dans la liste, attendu %d", c.quoi, len(items), c.attendu)
+		}
+	}
+}

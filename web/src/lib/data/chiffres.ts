@@ -3,7 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { fetchWorkShifts, type ActivityRange, type WorkShifts } from '@/lib/data/admin';
-import { fetchDerniereCampagne, type CampagnePerformance } from '@/lib/data/lots-export';
+import { fetchCampagneRegardee, type CampagnePerformance } from '@/lib/data/lots-export';
 
 type Schemas = components['schemas'];
 
@@ -34,6 +34,8 @@ export interface PerimetreChiffres {
   plage: ActivityRange;
   /** Un seul téléconseiller, ou tous. */
   commercialId: string | null;
+  /** Une seule campagne d'appels prospects, ou toutes. */
+  lotId: string | null;
 }
 
 const bornes = (plage: ActivityRange): { actFrom: string; actTo: string } => ({
@@ -57,10 +59,11 @@ const filtresProspect = (
 
 const filtresSupervision = (
   perimetre: PerimetreChiffres,
-): { actFrom: string; actTo: string; projet?: Projet; commercialId?: string } => ({
+): { actFrom: string; actTo: string; projet?: Projet; commercialId?: string; lotId?: string } => ({
   ...bornes(perimetre.plage),
   ...(perimetre.projet === null ? {} : { projet: perimetre.projet }),
   ...(perimetre.commercialId === null ? {} : { commercialId: perimetre.commercialId }),
+  ...(perimetre.lotId === null ? {} : { lotId: perimetre.lotId }),
 });
 
 export async function fetchChiffresActivite(
@@ -183,7 +186,7 @@ export async function fetchChiffresBanques(
 export async function fetchChiffresCampagne(
   perimetre: PerimetreChiffres,
 ): Promise<ChiffresCampagne> {
-  return fetchDerniereCampagne(perimetre.projet, perimetre.commercialId);
+  return fetchCampagneRegardee(perimetre.lotId, perimetre.projet, perimetre.commercialId);
 }
 
 /**

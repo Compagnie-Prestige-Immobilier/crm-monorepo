@@ -12,6 +12,7 @@ import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
 import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
+import { PanneauEcheance } from '@/components/console/panneau-echeance';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
@@ -37,7 +38,6 @@ import {
   callbackSlots,
   conversionErrorFor,
   conversionFrom,
-  formatCallbackAt,
   lireBrouillon,
   newAttemptInput,
   pushCallAttempt,
@@ -207,7 +207,6 @@ export function ConsoleView({
   const [page, setPage] = useState(1);
   const [confirme, setConfirme] = useState<string | null>(null);
   const cherche = useDebouncedValue(search).trim();
-  const seulementARappeler = filtreResteAAppeler(resteAAppeler, cherche);
 
   const parLien = useQuery({
     queryKey: queryKeys.prospect(demandee ?? ''),
@@ -224,7 +223,7 @@ export function ConsoleView({
     cherche,
     origine,
     viewerId,
-    seulementARappeler,
+    seulementARappeler: resteAAppeler,
     plateforme,
     page,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
@@ -312,7 +311,7 @@ export function ConsoleView({
         page={page}
         onPage={setPage}
         canCreateProspect={canCreateProspect}
-        seulementARappeler={seulementARappeler}
+        seulementARappeler={resteAAppeler}
         plateforme={plateforme}
         onChoisir={(row) => {
           setConfirme(null);
@@ -565,16 +564,13 @@ function chargementParLien(demandee: string | null, isPending: boolean): boolean
   return demandee !== null && isPending;
 }
 
-/** Une recherche vise une fiche précise, déjà appelée ou non. */
 function totalAffiche(page: { total: number } | undefined): number | null {
   return page === undefined ? null : page.total;
 }
 
-function filtreResteAAppeler(resteAAppeler: boolean, cherche: string): boolean {
-  return resteAAppeler && cherche === '';
-}
-
 function texteListeVide(cherche: string, seulementARappeler: boolean): string {
+  if (cherche !== '' && seulementARappeler)
+    return 'Aucun résultat parmi vos fiches restant à appeler. Affichez toutes vos fiches.';
   if (cherche !== '') return 'Aucun résultat. Vérifiez le nom ou le numéro.';
   if (seulementARappeler)
     return 'Rien ne reste à appeler. Affichez toutes vos fiches, ou demandez une campagne à votre superviseur.';
@@ -969,7 +965,9 @@ function draftDe(
     method,
     comment,
     callbackAt,
-    ...(conversion === null ? {} : { conversion }),
+    // EB-10 : sans méthode d'enrôlement le dossier reste un brouillon. Joint à
+    // la tentative, incomplet, il la ferait refuser et emporterait l'appel.
+    ...(method === null || conversion === null ? {} : { conversion }),
     ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
   };
 }
@@ -1124,6 +1122,13 @@ export function Consignation({
     }
     if (rappelDemande && callbackAt === null) {
       allerA('echeance');
+      return;
+    }
+    // Le créneau retenu a pu être rattrapé par l'horloge pendant la note.
+    if (callbackAt !== null && Date.parse(callbackAt) <= maintenant()) {
+      setCallbackAt(null);
+      allerA('echeance');
+      toast.error('Ce créneau est passé, choisissez-en un autre.');
       return;
     }
     const draft = draftDe(motif, callbackAt, conversion, comment, ouverture);
@@ -1318,6 +1323,7 @@ export function Consignation({
           slots={slots}
           now={now}
           freeCallback={freeCallback}
+          callbackAt={callbackAt}
           titreEcheance={titreEcheance(motif?.code)}
           comment={comment}
           commentaireObligatoirePour={commentaireExigePar(motif)}
@@ -1383,6 +1389,7 @@ function CorpsPas({
   slots,
   now,
   freeCallback,
+  callbackAt,
   titreEcheance: titre,
   comment,
   commentaireObligatoirePour,
@@ -1408,6 +1415,7 @@ function CorpsPas({
   slots: readonly CallbackSlot[] | null;
   now: number;
   freeCallback: string;
+  callbackAt: string | null;
   titreEcheance: string;
   comment: string;
   commentaireObligatoirePour: string | null;
@@ -1471,6 +1479,7 @@ function CorpsPas({
           slots={slots ?? []}
           now={now}
           freeCallback={freeCallback}
+          choisi={callbackAt}
           surDossier={conversion !== null}
           titre={titre}
           disabled={disabled}
@@ -1671,92 +1680,6 @@ const titreEcheance = (code: string | undefined): string => {
   }
   return 'Échéance du rappel';
 };
-
-/** L'échéance d'EB-10 : elle s'ouvre aussi PAR-DESSUS un dossier déjà rempli. */
-export function PanneauEcheance({
-  slots,
-  now,
-  freeCallback,
-  surDossier,
-  titre,
-  disabled,
-  inputRef,
-  onChoisir,
-  onFreeCallback,
-  onValidate,
-}: {
-  slots: readonly CallbackSlot[];
-  now: number;
-  freeCallback: string;
-  surDossier: boolean;
-  titre?: string;
-  disabled: boolean;
-  inputRef: React.RefObject<HTMLInputElement | null>;
-  onChoisir: (at: string) => void;
-  onFreeCallback: (value: string) => void;
-  onValidate: () => void;
-}) {
-  return (
-    <fieldset className="flex flex-col gap-3" disabled={disabled}>
-      <legend className="pb-1 font-display text-[1.0625rem] font-[700]">
-        {titre ?? 'Quand rappeler ?'}
-      </legend>
-      {surDossier ? (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          Vous retrouverez le dossier déjà rempli au prochain appel.
-        </p>
-      ) : null}
-      <div className="flex flex-wrap gap-2">
-        {slots.map((slot) => (
-          <Button
-            key={slot.key}
-            variant="outline"
-            className="h-auto flex-col items-start gap-0.5 py-2"
-            onClick={() => {
-              onChoisir(slot.at);
-            }}
-          >
-            <span className="flex items-center gap-2">
-              <Kbd>{slot.key}</Kbd>
-              {slot.label}
-            </span>
-            <span className="pl-7 text-[0.75rem] font-[400] text-muted-foreground">
-              {formatCallbackAt(slot.at, now)}
-            </span>
-          </Button>
-        ))}
-      </div>
-
-      <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="console-callback-at"
-          className="flex items-center gap-2 text-[0.875rem] font-[600]"
-        >
-          <Kbd>0</Kbd>
-          Autre échéance
-        </label>
-        <Input
-          id="console-callback-at"
-          ref={inputRef}
-          type="datetime-local"
-          className="max-w-64"
-          value={freeCallback}
-          onChange={(event) => {
-            onFreeCallback(event.target.value);
-          }}
-          onKeyDown={(event) => {
-            if (event.key !== 'Enter') return;
-            event.preventDefault();
-            onValidate();
-          }}
-        />
-        <p className="text-[0.75rem] text-muted-foreground">
-          Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste. Échap revient en arrière.
-        </p>
-      </div>
-    </fieldset>
-  );
-}
 
 export function Commentaire({
   value,

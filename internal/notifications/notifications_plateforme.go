@@ -10,7 +10,7 @@ import (
 
 const (
 	routeFichesPlateforme = "/teleconseil/plateforme"
-	// L'encadrement n'a pas la page des CCP : il lit les fiches dans la liste.
+	// Le renfort se décide depuis la liste des prospects, pas sur la page des CCP.
 	routeListeProspects = "/teleconseil/prospects"
 )
 

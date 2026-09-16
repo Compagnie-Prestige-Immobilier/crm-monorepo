@@ -73,12 +73,17 @@ WHERE p."deletedAt" IS NULL
           SELECT 1 FROM "scheduled_callbacks" sc
           WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
         )
+        -- Une reaffectation remet la fiche dans la file : la borne suit la date
+        -- d'affectation, pas celle de creation du lot.
         OR NOT EXISTS (
           SELECT 1 FROM "call_attempts" ra
           WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
             AND ra."createdAt" >= COALESCE((
-              SELECT max(rl."createdAt") FROM "lot_export_items" rli
+              SELECT max(GREATEST(rl."createdAt", COALESCE(rr."createdAt", '-infinity'::timestamp)))
+              FROM "lot_export_items" rli
               JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+              LEFT JOIN "lot_export_reaffectations" rr ON rr."lotId" = rli."lotId"
+                AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
         )
@@ -192,12 +197,17 @@ WHERE p."deletedAt" IS NULL
           SELECT 1 FROM "scheduled_callbacks" sc
           WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
         )
+        -- Une reaffectation remet la fiche dans la file : la borne suit la date
+        -- d'affectation, pas celle de creation du lot.
         OR NOT EXISTS (
           SELECT 1 FROM "call_attempts" ra
           WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
             AND ra."createdAt" >= COALESCE((
-              SELECT max(rl."createdAt") FROM "lot_export_items" rli
+              SELECT max(GREATEST(rl."createdAt", COALESCE(rr."createdAt", '-infinity'::timestamp)))
+              FROM "lot_export_items" rli
               JOIN "lots_export" rl ON rl."id" = rli."lotId" AND rl."pausedAt" IS NULL
+              LEFT JOIN "lot_export_reaffectations" rr ON rr."lotId" = rli."lotId"
+                AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
         )
@@ -570,3 +580,11 @@ SELECT "shortName" FROM "banques" WHERE "id" = $1;
 
 -- name: SyndicatSigleSegment :one
 SELECT "sigle" FROM "syndicats" WHERE "id" = $1;
+
+-- name: ListerRequalifications :many
+SELECT a."id", a."before", a."after", a."at", u."fullName" AS changed_by_name
+FROM "audit_logs" a
+LEFT JOIN "users" u ON u."id" = a."userId"
+WHERE a."entity" = 'prospect' AND a."entityId" = $1 AND a."action" = 'prospect.requalification'
+ORDER BY a."at" DESC, a."id" DESC
+LIMIT 50;

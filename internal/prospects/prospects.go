@@ -1457,6 +1457,7 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/prospects":                                           prospectLecture,
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
+	"GET /api/v1/prospects/{id}/requalifications":                     prospectLecture,
 	"POST /api/v1/prospects":                                          {socle.Admin, socle.Superviseur, socle.Direction},
 	"PATCH " + prospectCheminID:                                       socle.Parcours,
 	"DELETE " + prospectCheminID:                                      socle.Parcours,
@@ -1486,6 +1487,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "mergeProspects", Method: http.MethodPost, Path: "/api/v1/prospects/merge"}, s.prospectFusionner)
 	huma.Register(api, huma.Operation{OperationID: "reassignProspects", Method: http.MethodPost, Path: "/api/v1/prospects/reassign"}, s.prospectReaffecter)
 	huma.Register(api, huma.Operation{OperationID: "marquerProspectRevue", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/revue"}, s.prospectRevue)
+	prospectMonterRequalifications(api, s)
 	prospectMonterSegment(api, s)
 	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)

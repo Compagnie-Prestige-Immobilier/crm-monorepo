@@ -74,13 +74,14 @@ type FiltreDeSupervision struct {
 	Granularity  string `query:"granularity" enum:"day,week"`
 	Projet       string `query:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	CommercialID string `query:"commercialId"`
+	LotID        string `query:"lotId"`
 	TimeFrom     string `query:"timeFrom" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$"`
 	TimeTo       string `query:"timeTo" pattern:"^([01][0-9]|2[0-3]):[0-5][0-9]$"`
 }
 
 func (s *service) cleDeCacheSupervision(ctx context.Context, route string, f *FiltreDeSupervision) string {
 	return s.Cfg.Base + ":" + route + ":" + porteeDeCache(ctx) + ":" + strings.Join([]string{
-		f.ActFrom, f.ActTo, f.Granularity, f.Projet, f.CommercialID, f.TimeFrom, f.TimeTo,
+		f.ActFrom, f.ActTo, f.Granularity, f.Projet, f.CommercialID, f.LotID, f.TimeFrom, f.TimeTo,
 	}, "|")
 }
 
@@ -147,20 +148,31 @@ func (perimetre perimetreSupervision) teleconseiller(p *parametresSQL) string {
 	return rolesDuPlateau + etSQL + `u."id" = ` + p.marque(perimetre.filtre.CommercialID)
 }
 
-// Un représentant est CHUES par construction : filtrer Grand Public le sort.
+// Un représentant est CHUES par construction : filtrer Grand Public le sort. Une
+// campagne d'appels prospects non plus n'a d'actes représentants.
 func (perimetre perimetreSupervision) representantsVisibles() string {
-	if perimetre.filtre.Projet == socle.ProjetGrandPublic {
+	if perimetre.filtre.Projet == socle.ProjetGrandPublic || perimetre.filtre.LotID != "" {
 		return clauseJamaisVraie
 	}
 	return clauseToujoursVraie
 }
 
-func (perimetre perimetreSupervision) parcoursDuProjet(p *parametresSQL, colonne string) string {
-	if perimetre.filtre.Projet == "" {
+// La fiche regardée : son parcours porte le projet filtré, et la campagne
+// filtrée la compte parmi ses fiches.
+func (perimetre perimetreSupervision) ficheDuPerimetre(p *parametresSQL, colonne string) string {
+	clauses := []string{}
+	if perimetre.filtre.Projet != "" {
+		clauses = append(clauses, `EXISTS (SELECT 1 FROM "prospect_journeys" pj
+	  WHERE pj."prospectId" = `+colonne+` AND pj."projet" = `+p.marque(perimetre.filtre.Projet)+`::"Projet")`)
+	}
+	if perimetre.filtre.LotID != "" {
+		clauses = append(clauses, `EXISTS (SELECT 1 FROM "lot_export_items" li
+	  WHERE li."prospectId" = `+colonne+` AND li."lotId" = `+p.marque(perimetre.filtre.LotID)+`)`)
+	}
+	if len(clauses) == 0 {
 		return clauseToujoursVraie
 	}
-	return `EXISTS (SELECT 1 FROM "prospect_journeys" pj
-	  WHERE pj."prospectId" = ` + colonne + ` AND pj."projet" = ` + p.marque(perimetre.filtre.Projet) + `::"Projet")`
+	return strings.Join(clauses, etSQL)
 }
 
 // La ligne d'équipe se relit sur les mêmes faits que les lignes d'agents, sinon
@@ -413,6 +425,10 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 	if perimetre.filtre.CommercialID != "" {
 		assignee = `i."assigneeId" = ` + p.marque(perimetre.filtre.CommercialID)
 	}
+	campagne := clauseToujoursVraie
+	if perimetre.filtre.LotID != "" {
+		campagne = `l."id" = ` + p.marque(perimetre.filtre.LotID)
+	}
 	jourProgramme := `(date_trunc('day', l."createdAt") + (i."day" - 1) * interval '1 day')`
 	fenetre := []string{}
 	if perimetre.depuis != nil {
@@ -448,7 +464,7 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 	    EXISTS (SELECT 1 FROM tentatives t WHERE t.traite AND ` + viseLaFiche + `) AS traitee
 	  FROM "lots_export" l
 	  INNER JOIN "lot_export_items" i ON i."lotId" = l."id"
-	  WHERE i."assigneeId" IS NOT NULL AND ` + projet + etSQL + assignee +
+	  WHERE i."assigneeId" IS NOT NULL AND ` + projet + etSQL + assignee + etSQL + campagne +
 		etSQL + strings.Join(fenetre, etSQL) + `
 	)
 	SELECT

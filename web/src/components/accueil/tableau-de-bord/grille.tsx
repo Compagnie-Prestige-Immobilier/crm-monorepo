@@ -266,8 +266,23 @@ function renderMark(
   if (donneesVides(donnees)) return <EmptyChart message={messageVide} />;
   if (donnees.forme === 'matrice')
     return marqueMatrice(donnees.donnee, marque, titre, presentation, messageVide);
-  if (donnees.forme === 'composition')
-    return marqueComposition(donnees.donnee, marque, titre, presentation, messageVide, ouvrir);
+  if (donnees.forme === 'composition') {
+    const chart = marqueComposition(
+      donnees.donnee,
+      marque,
+      titre,
+      presentation,
+      messageVide,
+      ouvrir,
+    );
+    if (donnees.resume === undefined) return chart;
+    return (
+      <div className="flex h-full min-h-0 flex-col gap-2">
+        <p className="text-[0.9375rem] tabular-nums">{donnees.resume}</p>
+        <div className="min-h-0 flex-1">{chart}</div>
+      </div>
+    );
+  }
 
   // Le tri et le regroupement en « Autres » n'ont de sens que pour un
   // classement : réordonner une série chronologique ou un cycle la rendrait

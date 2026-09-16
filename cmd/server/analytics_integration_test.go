@@ -450,3 +450,42 @@ func TestAnalyticsCacheParFiltreEtExpiration(t *testing.T) {
 	b.attend(statut, http.StatusOK, "après expiration", body)
 	analyticsEgal(b, "l'entrée périmée est relue", body["total"], 2)
 }
+
+// Le filtre par campagne borne l'écran entier : deux fiches appelées, une seule
+// dans la campagne regardée.
+func TestSupervisionActiviteParCampagne(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	fiches := []string{
+		analyticsProspect(b, &jeu, b.userID, instantAnalytics, true),
+		analyticsProspect(b, &jeu, b.userID, instantAnalytics, true),
+	}
+	lots := []string{uuid.NewString(), uuid.NewString()}
+	for indice, lot := range lots {
+		analyticsExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById","createdAt")
+			VALUES ($1,'Campagne prospects','PROSPECTS','CHUES','{}'::jsonb,1,$2,$3::timestamp)`, lot, b.userID, instantAnalytics)
+		analyticsExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day")
+			VALUES ($1,$2,1,$3,1)`, lot, fiches[indice], b.userID)
+		analyticsAppel(b, fiches[indice], "METHOD_OBTAINED")
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_items" WHERE "lotId" = ANY($1)`, lots)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = ANY($1)`, lots)
+	})
+
+	fenetre := "?commercialId=" + b.userID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre, nil, false)
+	b.attend(statut, http.StatusOK, "activité sans campagne", body)
+	analyticsEgal(b, "les deux campagnes confondues", analyticsObjet(b, "totaux", body["totals"])["calls"], 2)
+
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre+"&lotId="+lots[0], nil, false)
+	b.attend(statut, http.StatusOK, "activité d'une campagne", body)
+	totaux := analyticsObjet(b, "totaux de la campagne", body["totals"])
+	analyticsEgal(b, "appels de la campagne regardée", totaux["calls"], 1)
+	analyticsEgal(b, "fiches de la campagne regardée", totaux["fiches"], 1)
+
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/campagnes"+fenetre+"&lotId="+lots[0], nil, false)
+	b.attend(statut, http.StatusOK, "campagnes", body)
+	campagne := analyticsObjet(b, "campagne", analyticsListe(b, "la campagne regardée seule", body["items"], 1)[0])
+	analyticsTexte(b, "identifiant du lot", campagne["id"], lots[0])
+}
