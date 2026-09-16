@@ -53,6 +53,8 @@ export interface ProspectRowActions {
   /** Projet de l'écran : la colonne « Statut » lit le parcours correspondant. */
   projet: Projet | null;
   canAdminister: boolean;
+  /** Le SUPERVISEUR garde ce seul geste malgré la lecture seule du reste. */
+  canReassign: boolean;
   /** Le SUPERVISEUR lit les fiches d'autrui : la colonne d'actions disparaît. */
   readOnly: boolean;
   onEdit: (prospect: ProspectRow) => void;
@@ -251,24 +253,28 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
             <MoreHorizontalIcon className="size-4" aria-hidden="true" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuItem
-              onClick={() => {
-                actions.onEdit(row.original);
-              }}
-            >
-              <PencilIcon aria-hidden="true" />
-              Modifier
-            </DropdownMenuItem>
+            {actions.readOnly ? null : (
+              <DropdownMenuItem
+                onClick={() => {
+                  actions.onEdit(row.original);
+                }}
+              >
+                <PencilIcon aria-hidden="true" />
+                Modifier
+              </DropdownMenuItem>
+            )}
+            {actions.canAdminister || actions.canReassign ? (
+              <DropdownMenuItem
+                onClick={() => {
+                  actions.onReassign(row.original);
+                }}
+              >
+                <ArrowLeftRightIcon aria-hidden="true" />
+                Réaffecter
+              </DropdownMenuItem>
+            ) : null}
             {actions.canAdminister ? (
               <>
-                <DropdownMenuItem
-                  onClick={() => {
-                    actions.onReassign(row.original);
-                  }}
-                >
-                  <ArrowLeftRightIcon aria-hidden="true" />
-                  Réaffecter
-                </DropdownMenuItem>
                 <DropdownMenuItem
                   onClick={() => {
                     actions.onMerge(row.original);
@@ -295,5 +301,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
     },
   ];
 
-  return actions.readOnly ? columns.filter((column) => column.id !== 'actions') : columns;
+  return actions.readOnly && !actions.canReassign
+    ? columns.filter((column) => column.id !== 'actions')
+    : columns;
 }

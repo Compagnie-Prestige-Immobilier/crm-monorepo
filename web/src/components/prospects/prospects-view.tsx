@@ -22,10 +22,11 @@ import {
 import { fetchProspects } from '@/lib/data/prospects';
 import { formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import type { Projet } from '@/lib/types';
+import type { Projet, ProspectFilters } from '@/lib/types';
 
 export function ProspectsView({
   canAdminister,
+  canReassign = false,
   canExport = false,
   readOnly = false,
   canCreate = false,
@@ -34,6 +35,8 @@ export function ProspectsView({
   viewerId,
 }: {
   canAdminister: boolean;
+  /** SUPERVISEUR : réaffecter une fiche malgré la lecture seule du reste. */
+  canReassign?: boolean;
   canExport?: boolean;
   readOnly?: boolean;
   canCreate?: boolean;
@@ -54,28 +57,18 @@ export function ProspectsView({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        {/* Le chiffre réel remplace « Filtrables et exportables. », qui décrivait
-            l'écran à qui l'avait déjà sous les yeux. Pas de `role="status"` ici :
-            celui du pied de tableau annonce déjà la page affichée. */}
-        <p className="text-[0.9375rem] text-muted-foreground">
-          <span aria-live="polite" className="font-[600] text-foreground tabular-nums">
-            {data === undefined ? '–' : formatNumber(data.total)}
-          </span>{' '}
-          prospect{data !== undefined && data.total > 1 ? 's' : ''}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {canExport ? <ProspectExportMenu filters={filters} /> : null}
-          <CreateProspectButton
-            visible={peutCreerProjet(filters.projet, canCreate, canCreateGrandPublic)}
-            onClick={() => setCreateOpen(true)}
-          />
-        </div>
-      </div>
+      <ProspectsEntete
+        total={data?.total}
+        canExport={canExport}
+        filters={filters}
+        peutCreer={peutCreerProjet(filters.projet, canCreate, canCreateGrandPublic)}
+        onCreer={() => setCreateOpen(true)}
+      />
 
       <FiltersBar viewerId={viewerId} />
       <ProspectsTable
         canAdminister={canAdminister}
+        canReassign={canReassign}
         readOnly={readOnly}
         campaignScoped={campaignScoped}
       />
@@ -87,6 +80,38 @@ export function ProspectsView({
           canCreateGrandPublic={canCreateGrandPublic}
         />
       </Dialog>
+    </div>
+  );
+}
+
+function ProspectsEntete({
+  total,
+  canExport,
+  filters,
+  peutCreer,
+  onCreer,
+}: {
+  total: number | undefined;
+  canExport: boolean;
+  filters: ProspectFilters;
+  peutCreer: boolean;
+  onCreer: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      {/* Le chiffre réel remplace « Filtrables et exportables. », qui décrivait
+          l'écran à qui l'avait déjà sous les yeux. Pas de `role="status"` ici :
+          celui du pied de tableau annonce déjà la page affichée. */}
+      <p className="text-[0.9375rem] text-muted-foreground">
+        <span aria-live="polite" className="font-[600] text-foreground tabular-nums">
+          {total === undefined ? '–' : formatNumber(total)}
+        </span>{' '}
+        prospect{total !== undefined && total > 1 ? 's' : ''}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        {canExport ? <ProspectExportMenu filters={filters} /> : null}
+        <CreateProspectButton visible={peutCreer} onClick={onCreer} />
+      </div>
     </div>
   );
 }

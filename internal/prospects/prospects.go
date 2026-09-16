@@ -1414,8 +1414,7 @@ type ProspectReaffectationOutput struct {
 	}
 }
 
-// Le cloisonnement est dans le `WHERE` : les identifiants qui n'appartiennent
-// pas à l'appelant sortent de l'ensemble au lieu de faire échouer le lot.
+// Le cloisonnement est dans le `WHERE` : les identifiants hors périmètre sortent de l'ensemble au lieu de faire échouer le lot.
 func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectationInput) (*ProspectReaffectationOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	corps := in.Body
@@ -1427,11 +1426,12 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	if corps.RepresentantID == nil && corps.CommercialID == nil {
 		return nil, socle.Problem(http.StatusBadRequest, "REASSIGN_NO_TARGET", "Indiquez au moins un représentant ou un commercial de destination.")
 	}
-	if corps.CommercialID != nil && u.Role != socle.Admin {
-		return nil, socle.Problem(http.StatusForbidden, "REASSIGN_OWNER_FORBIDDEN", "Seul un administrateur peut changer le commercial propriétaire.")
+	portee := u.Role == socle.Admin || u.Role == socle.Superviseur
+	if err := prospectReaffecterOwnerAutorise(corps.CommercialID, portee); err != nil {
+		return nil, err
 	}
 	ids, err := s.Q.ProspectsAReaffecter(ctx, db.ProspectsAReaffecterParams{
-		Ids: corps.ProspectIDs, ScopeAll: u.Role == socle.Admin, ScopeUserID: u.ID,
+		Ids: corps.ProspectIDs, ScopeAll: portee, ScopeUserID: u.ID,
 	})
 	if err != nil || len(ids) == 0 {
 		return out, err
@@ -1468,7 +1468,7 @@ var Garde = map[string][]socle.Role{
 	"PATCH " + prospectCheminID:                                       socle.Parcours,
 	"DELETE " + prospectCheminID:                                      socle.Parcours,
 	"POST /api/v1/prospects/merge":                                    {socle.Commercial, socle.ChargeClientele, socle.Admin},
-	"POST /api/v1/prospects/reassign":                                 {socle.Commercial, socle.ChargeClientele, socle.Admin},
+	"POST /api/v1/prospects/reassign":                                 {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
 	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
 	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
 	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,

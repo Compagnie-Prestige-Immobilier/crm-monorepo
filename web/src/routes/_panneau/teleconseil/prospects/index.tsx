@@ -33,6 +33,7 @@ function TeleconseilProspectsPage() {
   return (
     <ProspectsView
       canAdminister={user.role === 'ADMIN'}
+      canReassign={user.role === 'ADMIN' || user.role === 'SUPERVISEUR'}
       canExport={canExportProspects(user.role)}
       readOnly={readsOnly(user.role)}
       canCreate={['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role)}
