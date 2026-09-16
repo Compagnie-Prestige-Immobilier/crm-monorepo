@@ -52,7 +52,7 @@ import { queryKeys } from '@/lib/query-keys';
 import type { ProspectRow } from '@/lib/types';
 
 /** Le numéro se tape comme au téléphone : sans indicatif, il est sénégalais. */
-const INDICATIF = '221';
+export const INDICATIF = '221';
 
 /** L'heure du geste, lue quand le téléconseiller enregistre et non au rendu. */
 const maintenant = (): number => Date.now();
@@ -77,7 +77,7 @@ function renseignes<T extends Record<string, unknown>>(valeurs: T): Renseignes<T
  * l'engagement bancaire et la méthode n'existent que sur une adhésion : ils
  * partent avec elle, comme depuis la page d'appel.
  */
-function creationDepuis(dossier: ConversionDraft, phone: string): GrandPublicProspectInput {
+export function creationDepuis(dossier: ConversionDraft, phone: string): GrandPublicProspectInput {
   const systeme = dossier.dureeSystemeMois.trim();
   return {
     nom: dossier.nom.trim(),
@@ -99,7 +99,7 @@ function creationDepuis(dossier: ConversionDraft, phone: string): GrandPublicPro
 }
 
 /** Sans adhésion, seule l'identité compte : le reste du dossier est une conversion. */
-function erreursIdentite({ nom, prenom, libres }: ConversionErrors): ConversionErrors {
+export function erreursIdentite({ nom, prenom, libres }: ConversionErrors): ConversionErrors {
   return {
     ...(nom === undefined ? {} : { nom }),
     ...(prenom === undefined ? {} : { prenom }),
@@ -107,13 +107,13 @@ function erreursIdentite({ nom, prenom, libres }: ConversionErrors): ConversionE
   };
 }
 
-function erreurTelephone(saisi: string, e164: string | null): string | undefined {
+export function erreurTelephone(saisi: string, e164: string | null): string | undefined {
   if (saisi.trim() === '') return 'Le numéro est obligatoire.';
   return e164 === null ? 'Numéro invalide.' : undefined;
 }
 
 /** Le dossier découpé en trois tranches, dans l'ordre des étapes. */
-const TRANCHES: readonly (readonly ChampReglable[])[] = [
+export const TRANCHES: readonly (readonly ChampReglable[])[] = [
   ['nom', 'prenom', 'phoneE164', 'whatsappStatus', 'whatsappE164', 'email'],
   ['profession', 'dureeEtablissementMois', 'type', 'syndicatId', 'banqueId', 'engagementEnCours'],
   ['incomeBandId', 'paymentMode', 'dureeSystemeMois', 'method', 'rendezVousAt'],
@@ -132,7 +132,7 @@ const ERREURS_SITUATION: readonly (keyof ConversionErrors)[] = [
 ];
 
 /** Un envoi refusé rouvre l'étape qui porte la première erreur : elle est invisible d'ici. */
-function etapePourErreurs(problemes: ConversionErrors, telephoneInvalide = false): number {
+export function etapePourErreurs(problemes: ConversionErrors, telephoneInvalide = false): number {
   if (telephoneInvalide) return 0;
   if (ERREURS_IDENTITE.some((cle) => problemes[cle] !== undefined)) return 0;
   if (ERREURS_SITUATION.some((cle) => problemes[cle] !== undefined)) return 1;
@@ -144,7 +144,7 @@ const sansBouton = (motif: MotifAppel | null, refus: MotifAppel | undefined): bo
   motif !== null && motif.code !== refus?.code;
 
 /** « À rappeler » garde le dossier : l'ouverture le porte jusqu'au prochain appel. */
-async function consignerSur(
+export async function consignerSur(
   prospectId: string,
   appel: AttemptDraft,
   brouillon: Record<string, unknown>,

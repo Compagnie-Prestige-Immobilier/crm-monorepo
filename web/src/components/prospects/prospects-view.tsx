@@ -8,6 +8,7 @@ import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { ProspectExportMenu } from '@/components/prospects/export-menu';
+import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
 import { ProspectsTable } from '@/components/prospects/prospects-table';
 import { Button } from '@/components/ui/button';
@@ -109,35 +110,6 @@ function projetImpose(canCreateChues: boolean, canCreateGrandPublic: boolean): P
   return null;
 }
 
-function ChoixDuProjet({ onChoisir }: { onChoisir: (projet: Projet) => void }) {
-  return (
-    <DialogContent className="sm:max-w-md">
-      <DialogHeader>
-        <DialogTitle>Nouveau prospect</DialogTitle>
-        <DialogDescription>Pour quel projet ?</DialogDescription>
-      </DialogHeader>
-      <div className="flex flex-col gap-2">
-        <Button
-          variant="outline"
-          onClick={() => {
-            onChoisir('CHUES');
-          }}
-        >
-          CHUES
-        </Button>
-        <Button
-          variant="outline"
-          onClick={() => {
-            onChoisir('GRAND_PUBLIC');
-          }}
-        >
-          Grand Public
-        </Button>
-      </div>
-    </DialogContent>
-  );
-}
-
 function CreationDialogContent({
   projet,
   onClose,
@@ -149,9 +121,17 @@ function CreationDialogContent({
   canCreate: boolean;
   canCreateGrandPublic: boolean;
 }) {
-  const [choisi, setChoisi] = useState<Projet | null>(null);
-  const vise = projet ?? choisi ?? projetImpose(canCreate, canCreateGrandPublic);
-  if (vise === null) return <ChoixDuProjet onChoisir={setChoisi} />;
+  const vise = projet ?? projetImpose(canCreate, canCreateGrandPublic);
+  if (vise === null) {
+    return (
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Nouveau prospect</DialogTitle>
+        </DialogHeader>
+        <NouveauProspectConsole onSaved={onClose} onAnnuler={onClose} />
+      </DialogContent>
+    );
+  }
   const grandPublic = vise === 'GRAND_PUBLIC';
 
   return (
