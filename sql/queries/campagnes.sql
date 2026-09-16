@@ -148,6 +148,11 @@ FROM "users" u
 WHERE u."id" = ANY($1::text[]) AND u."isActive" AND u."deletedAt" IS NULL
   AND u."role" IN ('COMMERCIAL', 'SUPERVISEUR', 'DIRECTION');
 
+-- name: LotsDeLEquipe :many
+SELECT l."id", l."name" FROM "lots_export" l
+WHERE jsonb_exists(l."filters"->'distribution'->'teleconseillerIds', @teleconseiller_id::text)
+ORDER BY l."createdAt", l."id";
+
 -- name: NomsUtilisateurs :many
 SELECT u."id", u."fullName" FROM "users" u WHERE u."id" = ANY($1::text[]);
 

@@ -8,6 +8,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"net/http"
@@ -377,6 +378,50 @@ func (s *service) lotEquipe(ctx context.Context, ids []string) ([]lotTeleconseil
 		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName, role: row.Role})
 	}
 	return equipe, nil
+}
+
+// Au retrait, seuls les membres encore téléconseillers reprennent des fiches :
+// un compte dont le rôle a changé ne bloque pas la sortie d'un autre.
+func (s *service) lotEquipeRestante(ctx context.Context, ids []string) ([]lotTeleconseiller, error) {
+	rows, err := s.Q.Teleconseillers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
+			"Une campagne garde au moins un téléconseiller.")
+	}
+	equipe := make([]lotTeleconseiller, 0, len(rows))
+	for _, row := range rows {
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName, role: row.Role})
+	}
+	return equipe, nil
+}
+
+// Les rôles qui siègent dans l'équipe d'une campagne, ceux de la requête Teleconseillers.
+var RolesEquipe = []socle.Role{socle.Commercial, socle.Superviseur, socle.Direction}
+
+// Un compte qui cesse d'être téléconseiller sort de chaque campagne où il
+// siège, ses fiches non traitées reprises par le reste de l'équipe.
+func RetirerDesEquipes(ctx context.Context, d *socle.Deps, teleconseillerID string) error {
+	s := &service{d}
+	lots, err := s.Q.LotsDeLEquipe(ctx, teleconseillerID)
+	if err != nil {
+		return err
+	}
+	for _, lot := range lots {
+		in := &CampagneRetraitInput{ID: lot.ID}
+		in.Body.TeleconseillerID = teleconseillerID
+		if _, err := s.campagneRetrait(ctx, in); err != nil {
+			var probleme *socle.ProblemError
+			if errors.As(err, &probleme) && probleme.Code == "LOT_EXPORT_EQUIPE_VIDE" {
+				return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE", fmt.Sprintf(
+					"La campagne « %s » n’aurait plus aucun téléconseiller : renforcez son équipe ou supprimez-la avant de changer ce rôle.", lot.Name))
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func lotObjectifsDe(saisis []CampagneObjectif) map[string]int {
