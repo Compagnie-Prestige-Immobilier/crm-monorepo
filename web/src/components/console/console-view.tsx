@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
+import { HistoriqueFiche } from '@/components/console/historique-fiche';
 import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
@@ -70,7 +71,12 @@ import { fetchProspect, fetchProspectsAQualifier } from '@/lib/data/prospects';
 import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { CALL_OUTCOME_LABELS, PHASE2_STATUS_LABELS, type ProspectRow } from '@/lib/types';
+import {
+  CALL_OUTCOME_LABELS,
+  PHASE2_STATUS_LABELS,
+  type ProspectRow,
+  type Role,
+} from '@/lib/types';
 import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
@@ -181,6 +187,7 @@ const CLASSE_CHOIX = cn(
 export function ConsoleView({
   projet = null,
   viewerId,
+  role,
   origineFiltrable = false,
   canCreateProspect = false,
   plateforme = false,
@@ -188,6 +195,8 @@ export function ConsoleView({
   projet?: Projet | null;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
   viewerId?: string | undefined;
+  /** L'historique de la fiche cache ce que ce rôle n'a pas le droit de lire. */
+  role?: Role | undefined;
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
   origineFiltrable?: boolean | undefined;
   canCreateProspect?: boolean | undefined;
@@ -259,6 +268,7 @@ export function ConsoleView({
         prospect={consultee.prospect}
         ouverture={consultee.ouverture}
         projet={consultee.prospect.projet}
+        role={role}
         canCreateProspect={canCreateProspect}
         onAbandon={revenir}
         onEnregistre={(nom, detailStatut) => {
@@ -1009,6 +1019,7 @@ export function Consignation({
   prospect,
   ouverture,
   projet,
+  role,
   canCreateProspect,
   onAbandon,
   onEnregistre,
@@ -1016,6 +1027,7 @@ export function Consignation({
   prospect: ProspectRow;
   ouverture: OuvertureFiche | null;
   projet: Projet;
+  role?: Role | undefined;
   canCreateProspect: boolean;
   onAbandon: () => void;
   onEnregistre: (nom: string, detailStatut?: string) => void;
@@ -1347,6 +1359,8 @@ export function Consignation({
           onSuite={entree[pasCourant]}
         />
       </section>
+
+      {role === undefined ? null : <HistoriqueFiche prospect={prospect} role={role} />}
 
       <details
         open={helpOpen}
