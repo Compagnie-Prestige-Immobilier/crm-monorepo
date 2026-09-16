@@ -1,13 +1,14 @@
 'use client';
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { PhoneCallIcon } from 'lucide-react';
+import { PhoneCallIcon, RotateCcwIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import { SearchField } from '@/components/filters/search-field';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
@@ -31,6 +32,7 @@ import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import {
   CALL_OUTCOME_LABELS,
   CALL_OUTCOME_VARIANTS,
+  PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
   REP_CALL_OUTCOME_LABELS,
   REP_CALL_OUTCOME_VARIANTS,
@@ -46,6 +48,42 @@ type Onglet = 'PROSPECTS' | 'REPRESENTANTS';
 const ONGLETS: readonly { value: Onglet; label: string }[] = [
   { value: 'PROSPECTS', label: 'Prospects' },
   { value: 'REPRESENTANTS', label: 'Représentants' },
+];
+
+const PROJET_OPTIONS = [
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
+];
+
+const PROSPECT_ISSUE_OPTIONS = [
+  { value: 'NRP', label: 'NRP' },
+  { value: 'A_RAPPELER', label: 'À rappeler' },
+  { value: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement' },
+  { value: 'REFUS', label: 'Refus' },
+  { value: 'FAUX_NUMERO', label: 'Faux numéro' },
+  { value: 'DECES', label: 'Décès' },
+  { value: 'AUTRE', label: 'Autre' },
+];
+
+const REP_ISSUE_OPTIONS = [
+  { value: 'NRP', label: 'NRP' },
+  { value: 'A_RAPPELER', label: 'À rappeler' },
+  { value: 'ACCORD', label: 'Accord' },
+  { value: 'REFUS', label: 'Refus' },
+  { value: 'FAUX_NUMERO', label: 'Faux numéro' },
+  { value: 'DECES', label: 'Décès' },
+];
+
+const PROSPECT_STATUT_OPTIONS = PHASE2_STATUSES.map((status) => ({
+  value: status,
+  label: PHASE2_STATUS_LABELS[status],
+}));
+
+const REP_STATUT_OPTIONS = [
+  { value: 'EN_ATTENTE', label: 'En attente' },
+  { value: 'METHODE_OBTENUE', label: 'Méthode obtenue' },
+  { value: 'AMBASSADEUR', label: 'Ambassadeur' },
+  { value: 'ARCHIVE', label: 'Archivé' },
 ];
 
 const SANS_VALEUR = <span className="text-muted-foreground">–</span>;
@@ -85,12 +123,14 @@ export function MesContactsView({
   canFilter: boolean;
 }) {
   const [onglet, setOnglet] = useState<Onglet>('PROSPECTS');
+  const [search, setSearch] = useState('');
+  const [projetFiltre, setProjetFiltre] = useState<string | null>(null);
+  const [issueFiltre, setIssueFiltre] = useState<string | null>(null);
+  const [statutFiltre, setStatutFiltre] = useState<string | null>(null);
   const [filtreId, setFiltreId] = useState<string | null>(null);
 
   const proj = projet ?? null;
 
-  // L'API ne borne ces listes ni au demandeur ni aux fiches appelées : sans
-  // identifiant, elle rendrait aussi les fiches que personne n'a jamais appelées.
   const lastCallById = canFilter ? (filtreId ?? userId) : userId;
 
   const avecRepresentants = proj !== 'GRAND_PUBLIC';
@@ -118,29 +158,121 @@ export function MesContactsView({
     staleTime: 300_000,
   });
 
+  const hasActiveFilters =
+    search.trim() !== '' ||
+    projetFiltre !== null ||
+    issueFiltre !== null ||
+    statutFiltre !== null ||
+    filtreId !== null;
+
+  const resetFilters = () => {
+    setSearch('');
+    setProjetFiltre(null);
+    setIssueFiltre(null);
+    setStatutFiltre(null);
+    setFiltreId(null);
+  };
+
+  const filteredProspects = (prospects.data?.items ?? []).filter((item) => {
+    if (search.trim() !== '') {
+      const q = search.trim().toLowerCase();
+      const nom = `${item.prenom} ${item.nom}`.toLowerCase();
+      const phone = (item.phoneE164 ?? '').toLowerCase();
+      if (!nom.includes(q) && !phone.includes(q)) return false;
+    }
+    const currentProjet = proj ?? (projetFiltre as Projet | null);
+    if (currentProjet !== null && item.projet !== currentProjet) return false;
+    if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+    if (statutFiltre !== null && item.phase2Status !== statutFiltre) return false;
+    return true;
+  });
+
+  const filteredRepresentants = (representants.data?.items ?? []).filter((item) => {
+    if (search.trim() !== '') {
+      const q = search.trim().toLowerCase();
+      const nom = item.fullName.toLowerCase();
+      const phone = (item.phoneE164 ?? '').toLowerCase();
+      if (!nom.includes(q) && !phone.includes(q)) return false;
+    }
+    if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+    if (
+      statutFiltre !== null &&
+      item.relationStatus !== statutFiltre &&
+      item.statutQualificationLabel !== statutFiltre
+    ) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <section className="flex flex-col gap-4">
       <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
         Mes contacts regroupe les personnes déjà appelées par vous. Le projet est affiché sur chaque
         fiche.
       </p>
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-[0.875rem] text-muted-foreground">
-          Les personnes appelées, de l’appel le plus récent au plus ancien.
-        </p>
+
+      {/* ─── Barre de recherche et de filtres ──────────────────────────── */}
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+        <SearchField
+          value={search}
+          onChange={setSearch}
+          placeholder="Nom, prénom, téléphone…"
+          className="min-w-[14rem] flex-1"
+        />
+
+        {proj === null ? (
+          <div className="flex min-w-[10rem] flex-col gap-1.5 sm:max-w-xs">
+            <FilterCombobox
+              label="Projet"
+              placeholder="Tous les projets"
+              options={PROJET_OPTIONS}
+              value={projetFiltre}
+              onChange={setProjetFiltre}
+            />
+          </div>
+        ) : null}
 
         {canFilter ? (
+          <div className="flex min-w-[12rem] flex-col gap-1.5 sm:max-w-xs">
+            <FilterCombobox
+              label="Appelé par"
+              placeholder="Mes appels"
+              options={(teleconseillers.data?.items ?? []).map((user) => ({
+                value: user.id,
+                label: user.fullName,
+              }))}
+              value={filtreId}
+              onChange={setFiltreId}
+            />
+          </div>
+        ) : null}
+
+        <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
           <FilterCombobox
-            label="Appelé par"
-            placeholder="Mes appels"
-            className="w-72"
-            options={(teleconseillers.data?.items ?? []).map((user) => ({
-              value: user.id,
-              label: user.fullName,
-            }))}
-            value={filtreId}
-            onChange={setFiltreId}
+            label="Issue de l’appel"
+            placeholder="Toutes les issues"
+            options={vueRepresentants ? REP_ISSUE_OPTIONS : PROSPECT_ISSUE_OPTIONS}
+            value={issueFiltre}
+            onChange={setIssueFiltre}
           />
+        </div>
+
+        <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
+          <FilterCombobox
+            label="Statut"
+            placeholder="Tous les statuts"
+            options={vueRepresentants ? REP_STATUT_OPTIONS : PROSPECT_STATUT_OPTIONS}
+            value={statutFiltre}
+            onChange={setStatutFiltre}
+          />
+        </div>
+
+        {hasActiveFilters ? (
+          <Button variant="ghost" onClick={resetFilters} className="h-11 gap-1.5">
+            <RotateCcwIcon className="size-4" aria-hidden="true" />
+            Réinitialiser
+          </Button>
         ) : null}
       </div>
 
@@ -165,6 +297,9 @@ export function MesContactsView({
       {vueRepresentants ? (
         <Liste
           liste={representants}
+          itemsFiltered={filteredRepresentants}
+          hasFilters={hasActiveFilters}
+          onResetFilters={resetFilters}
           vide="Un représentant apparaît ici dès que vous consignez un appel sur sa fiche."
           echec="Les représentants appelés n’ont pas pu être lus."
         >
@@ -173,6 +308,9 @@ export function MesContactsView({
       ) : (
         <Liste
           liste={prospects}
+          itemsFiltered={filteredProspects}
+          hasFilters={hasActiveFilters}
+          onResetFilters={resetFilters}
           vide="Un prospect apparaît ici dès que vous consignez un appel sur sa fiche."
           echec="Les prospects appelés n’ont pas pu être lus."
         >
@@ -185,11 +323,17 @@ export function MesContactsView({
 
 function Liste<T>({
   liste,
+  itemsFiltered,
+  hasFilters,
+  onResetFilters,
   vide,
   echec,
   children,
 }: {
   liste: UseQueryResult<Paginated<T>>;
+  itemsFiltered: T[];
+  hasFilters: boolean;
+  onResetFilters: () => void;
   vide: string;
   echec: string;
   children: (items: T[]) => ReactNode;
@@ -217,15 +361,30 @@ function Liste<T>({
     return <EmptyState icon={PhoneCallIcon} title="Aucun appel enregistré" description={vide} />;
   }
 
+  if (itemsFiltered.length === 0 && hasFilters) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-8 text-center">
+        <p className="text-sm text-muted-foreground">
+          Aucun contact ne correspond aux critères de filtre sélectionnés.
+        </p>
+        <Button variant="outline" size="sm" onClick={onResetFilters}>
+          <RotateCcwIcon className="mr-2 size-4" aria-hidden="true" />
+          Réinitialiser les filtres
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-3">
-      {data.total > data.items.length ? (
-        <p className="text-[0.8125rem] text-muted-foreground">
-          {formatNumber(data.total)} au total, les {formatNumber(SUIVI_PAGE_SIZE)} plus récents sont
-          affichés.
-        </p>
-      ) : null}
-      {children(data.items)}
+      <p className="text-[0.8125rem] text-muted-foreground">
+        {hasFilters
+          ? `${formatNumber(itemsFiltered.length)} affiché${itemsFiltered.length > 1 ? 's' : ''} sur ${formatNumber(data.items.length)}`
+          : data.total > data.items.length
+            ? `${formatNumber(data.total)} au total, les ${formatNumber(SUIVI_PAGE_SIZE)} plus récents sont affichés.`
+            : `${formatNumber(data.items.length)} contact${data.items.length > 1 ? 's' : ''}`}
+      </p>
+      {children(itemsFiltered)}
     </div>
   );
 }
