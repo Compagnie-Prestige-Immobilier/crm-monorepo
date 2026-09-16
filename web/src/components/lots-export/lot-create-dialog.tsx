@@ -501,7 +501,7 @@ function Step1Cibles({
           onChange={(importe) => onChange({ ...choix, importe })}
         />
       ) : null}
-      {choix.famille === 'import' && choix.importe !== null ? (
+      {choix.famille === 'import' ? (
         <Tuiles
           legende="Quel projet ?"
           groupe={`${groupe}-projet`}
