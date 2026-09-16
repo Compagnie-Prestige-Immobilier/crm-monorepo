@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/campagnes"
 	"cpi-go/internal/referentiels"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
@@ -422,6 +423,9 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 		return Compte{}, err
 	}
 	roleChange := chg.role != nil && socle.Role(existant.Role) != *chg.role
+	if err := s.quitterLesEquipes(ctx, roleChange, chg.role, id); err != nil {
+		return Compte{}, err
+	}
 
 	var modifie Compte
 	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
@@ -439,6 +443,14 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 		}
 	}
 	return modifie, nil
+}
+
+// Un rôle qui ne siège plus dans une équipe de campagne en sort avant d'être écrit.
+func (s *service) quitterLesEquipes(ctx context.Context, roleChange bool, role *socle.Role, id string) error {
+	if !roleChange || slices.Contains(campagnes.RolesEquipe, *role) {
+		return nil
+	}
+	return campagnes.RetirerDesEquipes(ctx, s.Deps, id)
 }
 
 func ecrireChangement(ctx context.Context, q *db.Queries, id string, chg changementCompte, existant db.UserRoleForUpdateRow, acteurID string) (Compte, error) {

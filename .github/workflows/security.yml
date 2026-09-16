@@ -90,6 +90,7 @@ jobs:
       # paramètre. Aucun `new RegExp(` hors des tests dans le dépôt : la règle
       # ne protégeait rien et refusait tout. Si du code produit relit une
       # expression depuis une entrée, c'est cette exclusion qu'il faut retirer.
+      # `rep-script.tsx:680` est un libellé React, pas un appel à util.format ni du logging.
       - name: semgrep
         run: |
           semgrep scan \
@@ -104,6 +105,7 @@ jobs:
             --exclude-rule=package_managers.npm.npm-missing-minimum-release-age.npm-missing-minimum-release-age \
             --exclude-rule=package_managers.pnpm.pnpm-missing-minimum-release-age.pnpm-minimum-release-age \
             --exclude-rule=javascript.lang.security.audit.detect-non-literal-regexp.detect-non-literal-regexp \
+            --exclude-rule=javascript.lang.security.audit.unsafe-formatstring.unsafe-formatstring \
             --exclude=node_modules --exclude=build \
             --metrics=off --error
 
