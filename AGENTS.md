@@ -14,11 +14,11 @@ Ne pas masquer une régression réelle pour obtenir artificiellement une CI vert
 
 Cependant, lorsqu'un test est démontré comme flaky ou dépendant de contention, d'ordre d'exécution, de données partagées ou d'une limitation de l'environnement de test, il peut être temporairement :
 
-* désactivé ;
-* marqué `skip` ;
-* exclu d'un run parallèle ;
-* déplacé dans une suite séparée ;
-* limité en nombre de workers.
+- désactivé ;
+- marqué `skip` ;
+- exclu d'un run parallèle ;
+- déplacé dans une suite séparée ;
+- limité en nombre de workers.
 
 Cette décision est acceptable si la fonctionnalité concernée a été vérifiée séparément et si le changement est explicitement demandé par le propriétaire du dépôt.
 
@@ -47,9 +47,9 @@ Elle n'interdit pas de travailler.
 
 Avant un commit :
 
-* ajouter uniquement les fichiers ou hunks appartenant au travail courant ;
-* vérifier le diff indexé ;
-* ne pas restaurer, supprimer ou modifier les changements étrangers ;
-* ne jamais utiliser `git add .` lorsqu'il existe des modifications concurrentes.
+- ajouter uniquement les fichiers ou hunks appartenant au travail courant ;
+- vérifier le diff indexé ;
+- ne pas restaurer, supprimer ou modifier les changements étrangers ;
+- ne jamais utiliser `git add .` lorsqu'il existe des modifications concurrentes.
 
 Si un fichier est simultanément modifié par une autre session, éviter de l'inclure dans le commit sauf instruction explicite du propriétaire.
