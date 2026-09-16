@@ -321,6 +321,16 @@ export function MesContactsView({
   );
 }
 
+function suiviTextLabel<T>(hasFilters: boolean, itemsFiltered: T[], data: Paginated<T>): string {
+  if (hasFilters) {
+    return `${formatNumber(itemsFiltered.length)} affiché${itemsFiltered.length > 1 ? 's' : ''} sur ${formatNumber(data.items.length)}`;
+  }
+  if (data.total > data.items.length) {
+    return `${formatNumber(data.total)} au total, les ${formatNumber(SUIVI_PAGE_SIZE)} plus récents sont affichés.`;
+  }
+  return `${formatNumber(data.items.length)} contact${data.items.length > 1 ? 's' : ''}`;
+}
+
 function Liste<T>({
   liste,
   itemsFiltered,
@@ -378,11 +388,7 @@ function Liste<T>({
   return (
     <div className="flex flex-col gap-3">
       <p className="text-[0.8125rem] text-muted-foreground">
-        {hasFilters
-          ? `${formatNumber(itemsFiltered.length)} affiché${itemsFiltered.length > 1 ? 's' : ''} sur ${formatNumber(data.items.length)}`
-          : data.total > data.items.length
-            ? `${formatNumber(data.total)} au total, les ${formatNumber(SUIVI_PAGE_SIZE)} plus récents sont affichés.`
-            : `${formatNumber(data.items.length)} contact${data.items.length > 1 ? 's' : ''}`}
+        {suiviTextLabel(hasFilters, itemsFiltered, data)}
       </p>
       {children(itemsFiltered)}
     </div>
