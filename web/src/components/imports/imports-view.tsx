@@ -23,6 +23,7 @@ import { useLive } from '@/components/live/use-live';
 import { QueryErrorInline } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { FeuillesDuClasseur } from '@/components/imports/feuilles-du-classeur';
 import { RattraperFeuilles } from '@/components/imports/rattraper-feuilles';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -524,6 +525,7 @@ function JobPanel({
       </Card>
 
       <AppliedBanner job={job} />
+      <FeuillesDuClasseur job={job} />
       <ErrorsCard job={job} />
       <WarningsCard job={job} />
       <JobActions
