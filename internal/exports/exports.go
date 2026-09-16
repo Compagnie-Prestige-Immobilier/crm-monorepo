@@ -409,13 +409,13 @@ type ExportRepresentantsInput struct {
 
 func exportConditionsRepresentants(u *socle.Utilisateur, in *ExportRepresentantsInput) (*exportPredicat, error) {
 	p := &exportPredicat{clauses: []string{`r."deletedAt" IS NULL`}}
-	if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction {
+	if !u.Peut(socle.PermissionPortefeuilleVoirTout) {
 		p.clauses = append(p.clauses, `(r."createdById" = `+p.valeur(u.ID)+
 			` OR EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."representantId" = r."id" AND li."assigneeId" = `+p.valeur(u.ID)+"))")
 	}
 	if in.CommercialId != "" {
 		cible := in.CommercialId
-		if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction && cible != u.ID {
+		if !u.Peut(socle.PermissionExportsVoirTout) && cible != u.ID {
 			cible = cleAucunAuteur
 		}
 		p.ajouter(`r."createdById"`, "=", cible)

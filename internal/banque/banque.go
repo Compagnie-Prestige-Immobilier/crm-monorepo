@@ -1077,7 +1077,7 @@ func banqueDemandeDTO(row *db.ClientRequestListRow) DemandeClientBanque {
 // Un agent bancaire ne voit que ses propres demandes : les autres révéleraient à
 // une banque les clients qu'une concurrente cherche à faire créer.
 func banquePortefeuilleDemandes(u *socle.Utilisateur) *string {
-	if u.Role == socle.Admin {
+	if u.Peut(socle.PermissionBanqueVoirTousPortefeuilles) {
 		return nil
 	}
 	return &u.ID

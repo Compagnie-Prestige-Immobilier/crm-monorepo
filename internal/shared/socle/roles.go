@@ -60,11 +60,11 @@ func cleGarde(method, path string) string {
 // Lecture d'une fiche plateforme : nil, l'encadrement lit tout ; vrai, le CCP
 // ne voit que les fiches venues des plateformes ; faux, personne d'autre ne
 // les voit jamais. Lire n'est pas toucher : voir PorteeSaisiePlateforme.
-func PorteePlateforme(r Role) *bool {
-	if r == Admin || r == Superviseur || r == Direction {
+func PorteePlateforme(u *Utilisateur) *bool {
+	if u.Peut(PermissionPlateformeVoir) {
 		return nil
 	}
-	if r == CCP {
+	if u.Peut(PermissionPlateformeSaisir) {
 		return &vrai
 	}
 	return &faux
@@ -72,8 +72,8 @@ func PorteePlateforme(r Role) *bool {
 
 // Saisie sur une fiche plateforme, annuaire d'appel compris : seul le CCP.
 // L'encadrement suit le travail des CCP sans jamais composer leurs numéros.
-func PorteeSaisiePlateforme(r Role) *bool {
-	if r == CCP {
+func PorteeSaisiePlateforme(u *Utilisateur) *bool {
+	if u.Peut(PermissionPlateformeSaisir) {
 		return &vrai
 	}
 	return &faux

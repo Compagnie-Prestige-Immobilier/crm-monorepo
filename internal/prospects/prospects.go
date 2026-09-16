@@ -349,9 +349,9 @@ type prospectPortee struct {
 // CCP voit tout, mais la borne plateforme ne lui laisse que ses fiches.
 func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 	return prospectPortee{
-		tout:       u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction || u.Role == socle.CCP,
-		converti:   u.Role == socle.ChargeClientele,
-		plateforme: socle.PorteePlateforme(u.Role),
+		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout) || u.Peut(socle.PermissionPlateformeSaisir),
+		converti:   u.Peut(socle.PermissionFichesVoirConverties),
+		plateforme: socle.PorteePlateforme(u),
 		userID:     u.ID,
 	}
 }
@@ -439,7 +439,7 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 	if err != nil {
 		return row, err
 	}
-	if !socle.Autorise(socle.Encadrement, u.Role) && row.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.CreatedById != u.ID {
 		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	return row, nil
@@ -538,7 +538,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
 	// compose que les numéros qui lui reviennent. Les fiches plateforme
 	// reviennent toutes aux CCP, sans partage.
-	if in.MesFiches && u.Role != socle.CCP {
+	if in.MesFiches && !u.Peut(socle.PermissionPlateformeSaisir) {
 		p.tout, p.converti = false, false
 	}
 	if in.Plateforme && p.plateforme == nil {
@@ -814,7 +814,7 @@ func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisate
 		return err
 	}
 	existante := ProspectConflictExisting{OwnedByCommercialName: clash.OwnerName}
-	if u.Role == socle.Admin || clash.CreatedById == u.ID {
+	if u.Peut(socle.PermissionFichesIgnorerPropriete) || clash.CreatedById == u.ID {
 		existante = ProspectConflictExisting{
 			ID: clash.ID, Nom: clash.Nom, Prenom: clash.Prenom,
 			RepresentantID: clash.RepresentantId, RepresentantName: clash.RepresentantName,
@@ -835,7 +835,7 @@ func (s *service) prospectIdentifiantLibre(ctx context.Context, u *socle.Utilisa
 	if err != nil {
 		return err
 	}
-	if u.Role != socle.Admin && row.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.CreatedById != u.ID {
 		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre téléconseiller.")
 	}
 	p := socle.Problem(http.StatusConflict, "PROSPECT_ALREADY_EXISTS", "Un prospect porte déjà cet identifiant.")
@@ -1017,7 +1017,7 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 	if err != nil || existant.ALeParcours {
 		return aucune, err
 	}
-	if u.Role != socle.Admin && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
 		return aucune, nil
 	}
 	journeyID, err := uuid.NewV7()
@@ -1129,7 +1129,7 @@ var prospectTransitions = map[db.ProspectStatut][]db.ProspectStatut{
 // confirmation dédiée, sinon un simple PATCH y menait depuis n'importe quel
 // état, sans consentement et sans auteur.
 func prospectStatutModifiable(u *socle.Utilisateur, courant db.ProspectStatut, demande *string) error {
-	if demande == nil || *demande == string(courant) || u.Role == socle.Admin {
+	if demande == nil || *demande == string(courant) || u.Peut(socle.PermissionFichesForcerTransition) {
 		return nil
 	}
 	suivant := db.ProspectStatut(*demande)
@@ -1426,7 +1426,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	if corps.RepresentantID == nil && corps.CommercialID == nil {
 		return nil, socle.Problem(http.StatusBadRequest, "REASSIGN_NO_TARGET", "Indiquez au moins un représentant ou un commercial de destination.")
 	}
-	portee := u.Role == socle.Admin || u.Role == socle.Superviseur
+	portee := u.Peut(socle.PermissionProspectsReaffecterTout)
 	if err := prospectReaffecterOwnerAutorise(corps.CommercialID, portee); err != nil {
 		return nil, err
 	}

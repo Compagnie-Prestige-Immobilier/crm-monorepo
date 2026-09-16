@@ -1235,7 +1235,7 @@ func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*D
 			return rendre(d, "defaut", &defaut.UpdatedAt), nil
 		}
 	}
-	montants := u.Role == socle.Admin || u.Role == socle.Direction
+	montants := u.Peut(socle.PermissionChiffresVoirMontants)
 	return rendre(dispositionUsine(in.Ecran, montants), "usine", nil), nil
 }
 

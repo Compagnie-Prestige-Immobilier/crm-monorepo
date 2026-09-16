@@ -273,7 +273,8 @@ func (f *FiltresVisites) where() (clause string, args []any) {
 func (s *service) listerVisites(ctx context.Context, in *FiltresVisites) (*ListeVisitesOutput, error) {
 	// L'accueil ne voit pas les archives : lui rendre ce qu'il vient de retirer
 	// annulerait le geste à ses yeux.
-	if in.Archivees && socle.UtilisateurCourant(ctx).Role != socle.Direction {
+	u := socle.UtilisateurCourant(ctx)
+	if in.Archivees && !u.Peut(socle.PermissionVisitesVoirArchivees) {
 		return nil, socle.Problem(http.StatusForbidden, "FORBIDDEN",
 			"Seule la direction consulte les visites archivées.")
 	}

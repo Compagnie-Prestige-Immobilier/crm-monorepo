@@ -81,7 +81,7 @@ func (s *service) mesAttributions(ctx context.Context, _ *struct{}) (*MesAttribu
 	out := &MesAttributionsOutput{}
 	out.Body.RepresentantIds, out.Body.ProspectIds = []string{}, []string{}
 	u := socle.UtilisateurCourant(ctx)
-	if u.Role != socle.Commercial && u.Role != socle.ChargeClientele && u.Role != socle.CCP {
+	if u.Peut(socle.PermissionCampagnesAttributionsToutes) {
 		out.Body.Tout = true
 		return out, nil
 	}
