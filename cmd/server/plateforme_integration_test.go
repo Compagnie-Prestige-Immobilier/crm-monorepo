@@ -206,9 +206,10 @@ func TestFichesPlateformeChaudeEtFroide(t *testing.T) {
 	}
 }
 
-// La liste des prospects ne montre une fiche plateforme qu'au CCP et à
-// l'administrateur : le superviseur et la direction lisent tout le reste.
-func TestListeProspectsCacheLaFichePlateformeAlEncadrement(t *testing.T) {
+// L'encadrement lit une fiche plateforme, liste, détail et filtre
+// « plateforme », sans pouvoir l'ouvrir ni y consigner ; le téléconseiller ne
+// la voit pas, même en la demandant.
+func TestEncadrementLitLaFichePlateformeSansYToucher(t *testing.T) {
 	b := adminConnecte(t)
 	telephone := adminTelephone()
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", telephone)
@@ -216,6 +217,8 @@ func TestListeProspectsCacheLaFichePlateformeAlEncadrement(t *testing.T) {
 	_, ccpEmail := adminCompte(b, "CCP")
 	_, superviseurEmail := adminCompte(b, "SUPERVISEUR")
 	_, directionEmail := adminCompte(b, "DIRECTION")
+	_, commercialEmail := adminCompte(b, "COMMERCIAL")
+	superviseur := adminSession(b, superviseurEmail)
 
 	cas := []struct {
 		quoi    string
@@ -224,17 +227,34 @@ func TestListeProspectsCacheLaFichePlateformeAlEncadrement(t *testing.T) {
 	}{
 		{"l’administrateur", b, 1},
 		{"le CCP", adminSession(b, ccpEmail), 1},
-		{"le superviseur", adminSession(b, superviseurEmail), 0},
-		{"la direction", adminSession(b, directionEmail), 0},
+		{"le superviseur", superviseur, 1},
+		{"la direction", adminSession(b, directionEmail), 1},
+		{"le téléconseiller", adminSession(b, commercialEmail), 0},
 	}
 	for _, c := range cas {
-		statut, body := adminAppel(c.session, http.MethodGet, "/api/v1/prospects?search="+url.QueryEscape(telephone), nil)
-		c.session.attend(statut, http.StatusOK, c.quoi+" liste les prospects", body)
+		chemin := "/api/v1/prospects?plateforme=true&search=" + url.QueryEscape(telephone)
+		statut, body := adminAppel(c.session, http.MethodGet, chemin, nil)
+		c.session.attend(statut, http.StatusOK, c.quoi+" liste les fiches plateforme", body)
 		items, _ := body["items"].([]any)
 		if len(items) != c.attendu {
 			t.Fatalf("%s : %d fiche(s) plateforme dans la liste, attendu %d", c.quoi, len(items), c.attendu)
 		}
 	}
+
+	statut, body := adminAppel(superviseur, http.MethodGet, "/api/v1/prospects/"+prospectID, nil)
+	superviseur.attend(statut, http.StatusOK, "le superviseur lit le détail", body)
+	statut, body = adminAppel(superviseur, http.MethodGet, "/api/v1/phase2/directory?limit=50", nil)
+	superviseur.attend(statut, http.StatusOK, "annuaire du superviseur", body)
+	entrees, _ := body["entries"].([]any)
+	for _, ligne := range entrees {
+		if fiche, _ := ligne.(map[string]any); fiche["prospectId"] == prospectID {
+			t.Fatal("la fiche plateforme ne doit pas paraître dans l’annuaire d’appel du superviseur")
+		}
+	}
+	statut, body = adminAppel(superviseur, http.MethodPost, "/api/v1/ouvertures", plateformeOuverture(prospectID))
+	superviseur.attend(statut, http.StatusNotFound, "ouverture refusée au superviseur", body)
+	statut, body = adminAppel(superviseur, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospectID, nil))
+	superviseur.attend(statut, http.StatusForbidden, "consignation refusée au superviseur", body)
 }
 
 // Un rappel promis sur une fiche plateforme alors qu'aucun CCP n'existait :

@@ -91,10 +91,17 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
     queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
   });
 
+  // Les CCP promettent aussi des rappels, sur les fiches plateforme.
   const teleconseillers = useQuery({
     queryKey: callbackKeys.teleconseillers,
-    queryFn: () =>
-      fetchUsers({ ...EMPTY_USER_FILTERS, role: 'COMMERCIAL', isActive: true, pageSize: 200 }),
+    queryFn: async () => {
+      const pages = await Promise.all(
+        (['COMMERCIAL', 'CCP'] as const).map((role) =>
+          fetchUsers({ ...EMPTY_USER_FILTERS, role, isActive: true, pageSize: 200 }),
+        ),
+      );
+      return { items: pages.flatMap((page) => page.items) };
+    },
     enabled: canFilter,
     staleTime: 300_000,
   });
