@@ -3,7 +3,12 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { fetchWorkShifts, type ActivityRange, type WorkShifts } from '@/lib/data/admin';
-import { fetchCampagneRegardee, type CampagnePerformance } from '@/lib/data/lots-export';
+import {
+  fetchCampagneRegardee,
+  fetchLotsExport,
+  type CampagnePerformance,
+  type LotExportSummary,
+} from '@/lib/data/lots-export';
 
 type Schemas = components['schemas'];
 
@@ -16,7 +21,17 @@ export type ChiffresRendement = Schemas['DepartementYieldListDto'];
 export type ChiffresMethodes = Schemas['EnrollmentMethodListDto'];
 export type ChiffresBanques = Schemas['NamedCountListDto'];
 export type ChiffresCampagne = CampagnePerformance | null;
-export type ChiffresCampagnes = Schemas['SupervisionCampagnesDto'];
+
+/** Les compteurs d'une campagne depuis sa création, hors fenêtre regardée. */
+export type CouvertureCampagne = Pick<
+  LotExportSummary,
+  'itemCount' | 'fichesAppelees' | 'callsSince'
+>;
+
+/** Le rendement de la fenêtre, et pour chaque campagne sa couverture depuis la création. */
+export type ChiffresCampagnes = Omit<Schemas['SupervisionCampagnesDto'], 'items'> & {
+  items: (Schemas['SupervisionCampagneDto'] & { couverture?: CouvertureCampagne })[];
+};
 export type ChiffresRepresentants = Schemas['StockRepresentantsDto'];
 export type QualiteDeLaBase = Schemas['QualiteDeLaBase'];
 export type QualiteDuMarketing = Schemas['QualiteDuMarketing'];
@@ -95,15 +110,34 @@ export async function fetchChiffresCreneaux(
   return { creneaux, activites };
 }
 
+/**
+ * La couverture « depuis la création » ne se lit pas dans le rendement, qui est
+ * borné à la fenêtre : elle vient de la liste des campagnes, comme sur le détail
+ * d'une campagne.
+ */
 export async function fetchChiffresCampagnes(
   perimetre: PerimetreChiffres,
   client: ApiClient = getApiClient(),
 ): Promise<ChiffresCampagnes> {
-  return unwrap(
+  const rendement = unwrap(
     await client.GET('/api/v1/supervision/campagnes', {
       params: { query: filtresSupervision(perimetre) },
     }),
   );
+  const liste = await fetchLotsExport(
+    { page: 1, pageSize: 50, ...(perimetre.projet === null ? {} : { projet: perimetre.projet }) },
+    client,
+  );
+  const couvertures = new Map(liste.items.map((lot) => [lot.id, lot]));
+  return {
+    ...rendement,
+    items: rendement.items.map((campagne) => {
+      const lot = couvertures.get(campagne.id);
+      if (lot === undefined) return campagne;
+      const { itemCount, fichesAppelees, callsSince } = lot;
+      return { ...campagne, couverture: { itemCount, fichesAppelees, callsSince } };
+    }),
+  };
 }
 
 /** Le stock ne se borne ni à une période ni à un téléconseiller. */

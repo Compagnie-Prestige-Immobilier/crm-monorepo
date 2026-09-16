@@ -489,3 +489,40 @@ func TestSupervisionActiviteParCampagne(t *testing.T) {
 	campagne := analyticsObjet(b, "campagne", analyticsListe(b, "la campagne regardée seule", body["items"], 1)[0])
 	analyticsTexte(b, "identifiant du lot", campagne["id"], lots[0])
 }
+
+// Une campagne d'appels représentants borne aussi l'écran : l'appel du
+// représentant confié compte, celui d'un représentant hors campagne non.
+func TestSupervisionActiviteParCampagneRepresentants(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	horsCampagne := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt","updatedAt")
+		VALUES ($1,'Representant hors campagne',$2,$3,$4,$5::timestamp,now())`,
+		horsCampagne, telephoneAnalytics(), jeu.departement, b.userID, instantAnalytics)
+	lot := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById","createdAt")
+		VALUES ($1,'Campagne representants','REPRESENTANTS','CHUES','{}'::jsonb,1,$2,$3::timestamp)`, lot, b.userID, instantAnalytics)
+	analyticsExec(b, `INSERT INTO "lot_export_items" ("lotId","representantId","position","assigneeId","day")
+		VALUES ($1,$2,1,$3,1)`, lot, jeu.representant, b.userID)
+	for _, representant := range []string{jeu.representant, horsCampagne} {
+		analyticsExec(b, `INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
+			VALUES ($1,$2,$3,'REACHED'::"RepCallOutcome",$4::timestamp)`,
+			uuid.NewString(), representant, b.userID, instantAnalytics)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_items" WHERE "lotId" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "representants" WHERE "id" = $1`, horsCampagne)
+	})
+
+	fenetre := "?commercialId=" + b.userID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
+	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre, nil, false)
+	b.attend(statut, http.StatusOK, "activité sans campagne", body)
+	analyticsEgal(b, "les deux appels représentants", analyticsObjet(b, "totaux", body["totals"])["repCalls"], 2)
+
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre+"&lotId="+lot, nil, false)
+	b.attend(statut, http.StatusOK, "activité de la campagne représentants", body)
+	totaux := analyticsObjet(b, "totaux de la campagne", body["totals"])
+	analyticsEgal(b, "appels représentants de la campagne regardée", totaux["repCalls"], 1)
+	analyticsEgal(b, "fiches représentants de la campagne regardée", totaux["repFiches"], 1)
+}

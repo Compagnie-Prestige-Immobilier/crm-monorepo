@@ -8,7 +8,7 @@ import { guardRoles } from '@/lib/guard';
 import { canExportProspects, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/prospects/')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
   component: TeleconseilProspectsPage,
   pendingComponent: Loading,
 });
