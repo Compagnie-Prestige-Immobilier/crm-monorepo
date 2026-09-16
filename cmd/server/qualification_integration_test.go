@@ -304,28 +304,31 @@ func qualificationTotalProspects(b *banc, requete string) (total int, ids []stri
 // appelées dans la file, sauf celles qui attendent un rappel.
 func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
-	traitee, intacte, rappelee := qualificationProspect(b), qualificationProspect(b), qualificationProspect(b)
+	traitee, intacte, rappelee, injoignable := qualificationProspect(b), qualificationProspect(b), qualificationProspect(b), qualificationProspect(b)
 	appel := qualificationCorpsTentative(traitee, nil)
 	rappel := qualificationCorpsTentative(rappelee, map[string]any{
 		"outcome":    "CALLBACK",
 		"callbackAt": time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano),
 	})
+	nonJoint := qualificationCorpsTentative(injoignable, map[string]any{"outcome": "UNREACHABLE"})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, rappelee)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2)`, appel["id"], rappel["id"])
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2, $3)`, appel["id"], rappel["id"], nonJoint["id"])
 	})
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
 	b.attend(statut, http.StatusOK, "fiche traitée", body)
 	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rappel)
 	b.attend(statut, http.StatusOK, "fiche à rappeler", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", nonJoint)
+	b.attend(statut, http.StatusOK, "fiche injoignable", body)
 
 	total, _ := qualificationTotalProspects(b, "")
-	if total != 3 {
-		t.Fatalf("sans filtre, les trois fiches restent visibles : %d", total)
+	if total != 4 {
+		t.Fatalf("sans filtre, les quatre fiches restent visibles : %d", total)
 	}
 	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
-	if total != 2 || slices.Contains(ids, traitee) || !slices.Contains(ids, intacte) || !slices.Contains(ids, rappelee) {
-		t.Fatalf("reste à appeler = la fiche jamais appelée et celle à rappeler : total %d, %v", total, ids)
+	if total != 2 || slices.Contains(ids, traitee) || slices.Contains(ids, injoignable) || !slices.Contains(ids, intacte) || !slices.Contains(ids, rappelee) {
+		t.Fatalf("reste à appeler exclut les fiches traitées et injoignables : total %d, %v", total, ids)
 	}
 }
 
