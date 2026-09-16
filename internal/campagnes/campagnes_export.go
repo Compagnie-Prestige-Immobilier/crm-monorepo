@@ -46,11 +46,6 @@ var (
 	lotTeteTablePDF = props.Color{Red: 237, Green: 231, Blue: 232}
 	lotBlancPDF     = props.WhiteColor
 
-	lotMoisEnLettres = [...]string{
-		"janvier", "février", "mars", "avril", "mai", "juin",
-		"juillet", "août", "septembre", "octobre", "novembre", "décembre",
-	}
-
 	lotHorsAlphanum   = regexp.MustCompile(`[^a-z0-9]+`)
 	lotPlieurAccents  = transform.Chain(norm.NFD, runes.Remove(runes.In(unicode.Mn)), norm.NFC)
 	lotMotifTelephone = regexp.MustCompile(`^(\+221)(\d{2})(\d{3})(\d{2})(\d{2})$`)
@@ -71,7 +66,7 @@ func lotTelephoneEspace(phoneE164 string) string {
 
 func lotDateEnLettres(t time.Time, tz *time.Location) string {
 	l := t.In(tz)
-	return strconv.Itoa(l.Day()) + " " + lotMoisEnLettres[l.Month()-1] + " " + strconv.Itoa(l.Year())
+	return strconv.Itoa(l.Day()) + " " + socle.MoisEnLettres[l.Month()-1] + " " + strconv.Itoa(l.Year())
 }
 
 func lotInstantEnLettres(t time.Time, tz *time.Location) string {

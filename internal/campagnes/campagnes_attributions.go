@@ -5,12 +5,8 @@ import (
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
 	"fmt"
-	"regexp"
-	"strconv"
 	"strings"
 	"time"
-
-	"golang.org/x/text/transform"
 )
 
 type CampagneImport struct {
@@ -24,51 +20,16 @@ type CampagneImport struct {
 	Appelees   int    `json:"appelees" doc:"Fiches de l'import déjà appelées au moins une fois."`
 }
 
-var dateFeuilleImport = regexp.MustCompile(`(?i)(\d{1,2})\s+([a-z]{3,10})\.?(?:\s+(\d{2,4}))?`)
-
 // Le marketing nomme ses onglets « DEBUT CAMPAGNE 10 SEPT 26 », « Leads 11
 // sept 2026 » ou « Leads 13 sept » : seule la date compte, et elle doit se lire
-// pareil partout. Sans année, c'est celle en cours. Un onglet sans date lisible
-// garde son nom, plutôt qu'une date inventée.
+// pareil partout. Un onglet sans date lisible garde son nom.
 func libelleFeuilleImport(feuille string) string {
 	nom := strings.TrimSpace(feuille)
-	if nom == "" {
-		return ""
-	}
-	plat, _, err := transform.String(lotPlieurAccents, strings.ToLower(nom))
-	if err != nil {
+	date, ok := socle.DateDuNomDeFeuille(nom, time.Now())
+	if !ok {
 		return nom
 	}
-	trouve := dateFeuilleImport.FindStringSubmatch(plat)
-	if trouve == nil {
-		return nom
-	}
-	jour, _ := strconv.Atoi(trouve[1])
-	annee := time.Now().Year()
-	if trouve[3] != "" {
-		annee, _ = strconv.Atoi(trouve[3])
-	}
-	if annee < 100 {
-		annee += 2000
-	}
-	if jour < 1 || jour > 31 {
-		return nom
-	}
-	for i, mois := range lotMoisEnLettres {
-		if strings.HasPrefix(trouve[2], abregeMoisImport(mois)) {
-			return fmt.Sprintf("Leads %d %s %d", jour, lotMoisEnLettres[i], annee)
-		}
-	}
-	return nom
-}
-
-// « septembre » se reconnaît à « sept », « mai » n'a que trois lettres.
-func abregeMoisImport(mois string) string {
-	plat, _, err := transform.String(lotPlieurAccents, mois)
-	if err != nil {
-		return mois
-	}
-	return plat[:min(4, len(plat))]
+	return fmt.Sprintf("Leads %d %s %d", date.Day(), socle.MoisEnLettres[date.Month()-1], date.Year())
 }
 
 type CampagneImportsOutput struct {

@@ -38,6 +38,39 @@ function listeFacultative<TItem>(
   }
 }
 
+const REPRESENTANTS_PAR_PAGE = 200;
+
+const optionRepresentant = (representant: {
+  id: string;
+  fullName: string;
+  phoneE164: string;
+  departementName: string | null;
+}): FilterOption => ({
+  value: representant.id,
+  label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
+  hint: representant.departementName ?? undefined,
+});
+
+/**
+ * Le serveur sert 200 représentants par page et la base en porte plus de 3 000 :
+ * toutes les pages se lisent, sinon la liste déroulante cacherait les autres sans le dire.
+ */
+async function representantsComplets(client: ApiClient): Promise<FilterOption[]> {
+  const premiere = await client.GET('/api/v1/representants', {
+    params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: 1 } },
+  });
+  const options = listeFacultative(premiere, optionRepresentant);
+  const pageCount = premiere.data?.meta.pageCount ?? 1;
+  const suites = await Promise.all(
+    Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) =>
+      client.GET('/api/v1/representants', {
+        params: { query: { pageSize: REPRESENTANTS_PAR_PAGE, page: index + 2 } },
+      }),
+    ),
+  );
+  return options.concat(...suites.map((suite) => listeFacultative(suite, optionRepresentant)));
+}
+
 export async function fetchReferenceData(
   client: ApiClient = getApiClient(),
 ): Promise<ReferenceData> {
@@ -45,7 +78,7 @@ export async function fetchReferenceData(
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
-    client.GET('/api/v1/representants', { params: { query: { pageSize: 200 } } }),
+    representantsComplets(client),
   ]);
 
   const referentiels = unwrap(bundle);
@@ -66,11 +99,7 @@ export async function fetchReferenceData(
       label: user.fullName,
       hint: user.isActive ? undefined : 'Compte désactivé',
     })),
-    representants: listeFacultative(representants, (representant) => ({
-      value: representant.id,
-      label: `${representant.fullName} - ${formatPhone(representant.phoneE164)}`,
-      hint: representant.departementName,
-    })),
+    representants,
   };
 }
 

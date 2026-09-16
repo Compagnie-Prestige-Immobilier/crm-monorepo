@@ -473,31 +473,83 @@ export function ConversionFields({
     seulement,
   );
 
+  const visibles = ordre.filter((champ) =>
+    regles.visible(champ as ChampReglable, visibleParDefaut(champ, complet)),
+  );
+
   return (
-    <fieldset className="grid gap-x-4 gap-y-3 sm:grid-cols-2 lg:grid-cols-3" disabled={disabled}>
-      <legend className="pb-2 text-[0.75rem] font-[600] tracking-[0.08em] text-muted-foreground uppercase">
-        Phase 3 · Conversion
-      </legend>
-
-      {ordre.map((champ) =>
-        regles.visible(champ as ChampReglable, visibleParDefaut(champ, complet)) ? (
-          <Fragment key={champ}>{noeuds[champ as ChampReglable]}</Fragment>
-        ) : null,
-      )}
-
-      {libresVus.map((champ) => (
-        <ChampAjoute
-          key={champ.id}
-          champ={regleChampLibre(champ, champsFacultatifs)}
-          value={draft.champsLibres[champ.id] ?? ''}
-          error={errors.libres?.[champ.id]}
-          onChange={(valeur) => {
-            onChange({ champsLibres: { ...draft.champsLibres, [champ.id]: valeur } });
-          }}
-        />
-      ))}
+    <fieldset className="flex flex-col gap-6" disabled={disabled}>
+      {SECTIONS.map((section) => {
+        const champs = visibles.filter((champ) => sectionDe(champ) === section.cle);
+        const ajoutes = section.cle === 'situation' ? libresVus : [];
+        if (champs.length === 0 && ajoutes.length === 0) return null;
+        return (
+          <section
+            key={section.cle}
+            aria-labelledby={`conversion-${section.cle}`}
+            className="flex flex-col gap-3"
+          >
+            <div className="flex flex-col gap-0.5">
+              <h3
+                id={`conversion-${section.cle}`}
+                className="font-display text-[1.0625rem] font-[700]"
+              >
+                {section.titre}
+              </h3>
+              {section.aide === undefined ? null : (
+                <p className="text-[0.8125rem] text-muted-foreground">{section.aide}</p>
+              )}
+            </div>
+            <div className="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+              {champs.map((champ) => (
+                <Fragment key={champ}>{noeuds[champ as ChampReglable]}</Fragment>
+              ))}
+              {ajoutes.map((champ) => (
+                <ChampAjoute
+                  key={champ.id}
+                  champ={regleChampLibre(champ, champsFacultatifs)}
+                  value={draft.champsLibres[champ.id] ?? ''}
+                  error={errors.libres?.[champ.id]}
+                  onChange={(valeur) => {
+                    onChange({ champsLibres: { ...draft.champsLibres, [champ.id]: valeur } });
+                  }}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
     </fieldset>
   );
+}
+
+type SectionCle = 'identite' | 'situation' | 'enrolement';
+
+/** Le formulaire se lit en trois blocs, dans l'ordre où la conversation les amène. */
+const SECTIONS: readonly { cle: SectionCle; titre: string; aide?: string }[] = [
+  { cle: 'identite', titre: 'Qui est-ce ?' },
+  { cle: 'situation', titre: 'Sa situation' },
+  {
+    cle: 'enrolement',
+    titre: 'Accepte-t-elle de s’enrôler ?',
+    aide: 'Choisir une méthode enregistre l’adhésion et ferme la fiche.',
+  },
+];
+
+const CHAMPS_IDENTITE: ReadonlySet<string> = new Set([
+  'nom',
+  'prenom',
+  'phoneE164',
+  'email',
+  'whatsappStatus',
+  'whatsappE164',
+]);
+const CHAMPS_ENROLEMENT: ReadonlySet<string> = new Set(['method', 'rendezVousAt']);
+
+function sectionDe(champ: string): SectionCle {
+  if (CHAMPS_IDENTITE.has(champ)) return 'identite';
+  if (CHAMPS_ENROLEMENT.has(champ)) return 'enrolement';
+  return 'situation';
 }
 
 /** Posé : seuls ces champs se rendent, les champs ajoutés suivant la tranche des revenus. */
@@ -555,25 +607,13 @@ function MethodChoice({
   onSelect: () => void;
 }) {
   return (
-    <label
-      className={cn(
-        'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
-        'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-        checked
-          ? 'border-primary bg-secondary text-secondary-foreground'
-          : 'border-border hover:bg-secondary/60',
-      )}
-    >
-      <input
-        type="radio"
-        name="console-method"
-        value={method}
-        checked={checked}
-        className="size-4 accent-[var(--primary)]"
-        onChange={onSelect}
-      />
-      <span className="min-w-0">{ENROLLMENT_METHOD_LABELS[method]}</span>
-    </label>
+    <Pastille
+      type="radio"
+      name="console-method"
+      checked={checked}
+      label={ENROLLMENT_METHOD_LABELS[method]}
+      onChange={onSelect}
+    />
   );
 }
 
@@ -587,24 +627,48 @@ function ChoixSituation({
   onSelect: () => void;
 }) {
   return (
+    <Pastille
+      type="checkbox"
+      name="console-situation"
+      checked={checked}
+      label={PROSPECT_TYPE_LABELS[option]}
+      onChange={onSelect}
+    />
+  );
+}
+
+/** Une réponse en pastille : la case reste au clavier, le pourtour dit l'état. */
+function Pastille({
+  type,
+  name,
+  checked,
+  label,
+  onChange,
+}: {
+  type: 'radio' | 'checkbox';
+  name: string;
+  checked: boolean;
+  label: string;
+  onChange: () => void;
+}) {
+  return (
     <label
       className={cn(
-        'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
+        'relative inline-flex min-h-10 cursor-pointer items-center rounded-full border px-3.5 text-[0.875rem] font-[500]',
         'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
         checked
-          ? 'border-primary bg-secondary text-secondary-foreground'
-          : 'border-border hover:bg-secondary/60',
+          ? 'border-primary bg-primary text-primary-foreground'
+          : 'border-border bg-background hover:bg-secondary/60',
       )}
     >
       <input
-        type="checkbox"
-        name="console-situation"
-        value={option}
+        type={type}
+        name={name}
         checked={checked}
-        className="size-4 accent-[var(--primary)]"
-        onChange={onSelect}
+        className="absolute inset-0 size-full cursor-pointer opacity-0"
+        onChange={onChange}
       />
-      {PROSPECT_TYPE_LABELS[option]}
+      {label}
     </label>
   );
 }
@@ -637,33 +701,22 @@ function ChoixOuiNon({
   return (
     <GroupeEnLigne label={label} error={error}>
       {choix.map((choice) => (
-        <label
+        <Pastille
           key={choice.label}
-          className={cn(
-            'flex min-h-11 cursor-pointer items-center gap-2 rounded-md border px-3 text-[0.875rem]',
-            'transition-colors focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-            value !== null && value === choice.value
-              ? 'border-primary bg-secondary text-secondary-foreground'
-              : 'border-border hover:bg-secondary/60',
-          )}
-        >
-          <input
-            type="radio"
-            name={name}
-            checked={value !== null && value === choice.value}
-            className="size-4 accent-[var(--primary)]"
-            onChange={() => {
-              onChange(choice.value);
-            }}
-          />
-          {choice.label}
-        </label>
+          type="radio"
+          name={name}
+          checked={value !== null && value === choice.value}
+          label={choice.label}
+          onChange={() => {
+            onChange(choice.value);
+          }}
+        />
       ))}
     </GroupeEnLigne>
   );
 }
 
-/** Une question à choix sur toute la largeur : le libellé et ses réponses tiennent sur une ligne. */
+/** Une question à choix, libellé au-dessus, réponses en pastilles : la même silhouette qu'un champ. */
 function GroupeEnLigne({
   label,
   error,
@@ -675,13 +728,11 @@ function GroupeEnLigne({
 }) {
   const id = useId();
   return (
-    <div role="group" aria-labelledby={id} className="col-span-full flex min-w-0 flex-col gap-1.5">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-        <span id={id} className="text-[0.8125rem] font-[600] text-foreground">
-          {label}
-        </span>
-        <div className="flex flex-wrap gap-2">{children}</div>
-      </div>
+    <div role="group" aria-labelledby={id} className="flex min-w-0 flex-col gap-1.5 sm:col-span-2">
+      <span id={id} className="text-[0.875rem] font-[600] leading-none">
+        {label}
+      </span>
+      <div className="flex flex-wrap gap-2">{children}</div>
       {error === undefined ? null : (
         <p role="alert" className="text-[0.75rem] text-destructive">
           {error}

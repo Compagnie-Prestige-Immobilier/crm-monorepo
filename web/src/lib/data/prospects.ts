@@ -45,6 +45,8 @@ export async function fetchProspectsAQualifier(
     resteAAppeler?: boolean | undefined;
     /** Les fiches plateforme se prennent dans l'ordre d'arrivée, la plus récente d'abord. */
     plateforme?: boolean | undefined;
+    /** La page demandée : la liste entière se parcourt, vingt fiches à la fois. */
+    page: number;
   },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
@@ -56,7 +58,7 @@ export async function fetchProspectsAQualifier(
     search: criteres.search,
     sortBy: criteres.plateforme === true ? 'plateformeDepuis' : 'nom',
     sortOrder: criteres.plateforme === true ? 'desc' : 'asc',
-    page: 1,
+    page: criteres.page,
     pageSize: A_QUALIFIER_PAGE_SIZE,
     ...(origine === 'MOI' && criteres.viewerId !== undefined
       ? { commercialId: criteres.viewerId }
@@ -258,6 +260,29 @@ export async function fetchProspectSegmentHistory(
 ): Promise<SegmentChangeRow[]> {
   const page = await callRelay<{ items: SegmentChangeRow[] }>(
     `/api/v1/prospects/${encodeURIComponent(id)}/segment-history`,
+    { method: 'GET' },
+    fetchImpl,
+  );
+  return page.items;
+}
+
+/** Une ligne du journal de la fiche : qui, quand, quoi, avec l'avant et l'après. */
+export interface ProspectJournalEntry {
+  id: string;
+  action: string;
+  entite: string;
+  at: string;
+  auteur: string;
+  avant: Record<string, unknown>;
+  apres: Record<string, unknown>;
+}
+
+export async function fetchProspectJournal(
+  id: string,
+  fetchImpl: typeof globalThis.fetch = globalThis.fetch,
+): Promise<ProspectJournalEntry[]> {
+  const page = await callRelay<{ items: ProspectJournalEntry[] }>(
+    `/api/v1/prospects/${encodeURIComponent(id)}/journal`,
     { method: 'GET' },
     fetchImpl,
   );

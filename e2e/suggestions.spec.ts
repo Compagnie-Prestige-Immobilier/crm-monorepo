@@ -68,18 +68,21 @@ async function declinerEnProposant(
   await page.goto(ANNUAIRE);
   await ouvrirFicheDepuisAnnuaire(page, fiche);
 
-  await repondre(page, 'Comment s’est passé l’appel ?', 'Joignable');
-  await repondre(page, 'L’établissement de la fiche est-il confirmé ?', 'Oui');
-  await repondre(page, 'A-t-il déjà été contacté ?', 'Non');
+  await repondre(page, 'Avez-vous eu la personne au téléphone ?', 'Oui, elle a répondu');
+  await repondre(page, 'L’école de la fiche est-elle la bonne ?', 'Oui');
+  await repondre(page, 'A-t-il déjà été contacté par CPI ?', 'Non');
   await repondre(page, 'Connaît-il l’UES ?', 'Non');
-  await repondre(page, 'Souhaite-t-il être représentant CHUES ?', 'Non');
+  await page.getByRole('button', { name: 'Sans syndicat' }).click();
+  await repondre(page, 'Accepte-t-il d’être représentant CHUES ?', 'Non');
 
+  // Le refus pose le statut : on le garde et on passe a la personne recommandee.
+  await page.getByRole('button', { name: 'Continuer' }).click();
   await page.getByLabel('Son numéro').fill(nationalDe(propose.phoneE164));
   await page.getByLabel('Son nom et prénom').fill(propose.nom);
   await page.getByLabel('Sa remarque').fill(propose.remarque);
-
   await page.getByRole('button', { name: 'Continuer' }).click();
-  await page.getByRole('button', { name: 'Enregistrer', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
   await expect(appelEnregistre(page, fiche.nom)).toBeVisible();
 }
 

@@ -44,11 +44,14 @@ FROM "lot_export_items" i
 INNER JOIN "rep_call_attempts" a ON a."representantId" = i."representantId"
 WHERE i."lotId" = $1 AND a."clientCreatedAt" >= $2;
 
+-- Les lignes rendues (fiche plateforme ou hors projet) n'ont plus de téléconseiller :
+-- elles sortent du dénominateur de la campagne.
 -- name: LotStatsProspects :one
-SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches
+SELECT COUNT(a."id")::int AS calls, COUNT(DISTINCT a."prospectId")::int AS fiches,
+       (SELECT COUNT(*) FROM "lot_export_items" r WHERE r."lotId" = $1 AND r."assigneeId" IS NULL)::int AS retirees
 FROM "lot_export_items" i
-INNER JOIN "call_attempts" a ON a."prospectId" = i."prospectId"
-WHERE i."lotId" = $1 AND a."clientCreatedAt" >= $2;
+LEFT JOIN "call_attempts" a ON a."prospectId" = i."prospectId" AND a."clientCreatedAt" >= $2
+WHERE i."lotId" = $1;
 
 -- name: LotAppelsParAgentRepresentants :many
 SELECT u."fullName" AS name, COUNT(*)::int AS calls
@@ -228,6 +231,21 @@ LEFT JOIN LATERAL (
 LEFT JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId"
 GROUP BY j."id", j."fileName", j."createdAt"
 ORDER BY j."createdAt" DESC;
+
+-- Le tableau s'arrête à 500 lignes : le total dit ce qu'il ne montre pas.
+-- name: LeadsImportesInteressesTotal :one
+SELECT COUNT(*)::int
+FROM "prospects" p
+JOIN "import_jobs" j ON j."id" = p."importJobId" AND p."plateformeDepuis" IS NULL
+JOIN LATERAL (
+  SELECT c."reasonId"
+  FROM "call_attempts" c
+  WHERE c."prospectId" = p."id"
+  ORDER BY c."createdAt" DESC
+  LIMIT 1
+) dernier ON TRUE
+JOIN "call_outcome_reasons" r ON r."id" = dernier."reasonId" AND r."code" = ANY(@motifs::text[])
+WHERE p."deletedAt" IS NULL;
 
 -- name: LeadsImportesInteresses :many
 SELECT

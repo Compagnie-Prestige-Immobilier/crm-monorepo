@@ -185,39 +185,32 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(page.locator('button').filter({ hasText: 'Situation' })).toBeDisabled();
 
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
-    await chercher(page, 'Rechercher');
+    await chercher(page, 'Recherche');
 
     const ligneGp = page.getByRole('row').filter({ hasText: `GP ${cle}` });
     await expect(ligneGp).toHaveCount(1);
     await expect(page.getByRole('row').filter({ hasText: `CHUES ${cle}` })).toHaveCount(0);
 
     await ligneGp.getByRole('link').first().click();
-    await expect(page).toHaveURL(new RegExp(`/teleconseil/appel/${prospectGrandPublic}$`));
+    await expect(page).toHaveURL(new RegExp(`/teleconseil/prospects/${prospectGrandPublic}$`));
+    await page.goto(`/teleconseil/appel/${prospectGrandPublic}`);
     await expect(page.getByRole('heading', { name: `GP ${cle} Ousmane`, level: 2 })).toBeVisible();
 
-    await page.getByRole('group').getByRole('button', { name: '1 Joignable', exact: true }).click();
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
-    await expect(page.getByRole('button', { name: '2 Dossier', exact: true })).toBeDisabled();
-    await page.keyboard.press('Enter');
-    await expect(page).toHaveURL(new RegExp(`/teleconseil/appel/${prospectGrandPublic}$`));
-    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
-    await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
-    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    // Pas à pas : la réponse, le formulaire, le statut, sa précision, la note.
+    // Un Retour ne perd pas ce qui a été saisi dans le formulaire.
+    await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
     await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
-    await page.getByRole('textbox', { name: /^Nom/ }).fill('');
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
-    await page.getByRole('button', { name: 'Retour', exact: true }).click();
-    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
-    await page.getByRole('option', { name: 'Autre', exact: true }).click();
-    await page.getByRole('combobox', { name: 'Statut de qualification' }).click();
-    await page.getByRole('option', { name: 'Intéressé', exact: true }).click();
-    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await page.getByRole('button', { name: /^Retour/u }).click();
+    await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
     await expect(page.getByRole('textbox', { name: /^Nom/ })).toHaveValue(`Dossier ${cle}`);
-    await page.getByRole('button', { name: 'Continuer', exact: true }).click();
+    await page.getByRole('button', { name: /^Continuer/u }).click();
+    await page.getByRole('button', { name: /Intéressé/u }).click();
+    await page.getByRole('button', { name: /^Sans précision/u }).click();
     await page.getByRole('textbox').fill('Souhaite recevoir les informations.');
     await page.getByRole('button', { name: /Enregistrer l’appel/ }).click();
-    await expect(page).toHaveURL(/\/teleconseil$/);
+    // L'ADMIN atterrit sur son tableau de bord, le téléconseiller sur Mon travail.
+    await expect(page).toHaveURL(/\/teleconseil(\/tableau-de-bord)?$/u);
     const appel = await ligne<{ code: string; nom: string }>(
       `SELECT r.code, o.draft->'conversion'->>'nom' AS nom
          FROM call_attempts a
@@ -232,11 +225,16 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
       [prospectGrandPublic],
     );
     console.log('Diagnostic après appel Intéressé :', statutApresAppel);
-    await chercher(page, 'Rechercher');
-    await expect(page.getByRole('row').filter({ hasText: `GP ${cle}` })).toContainText('Contacté');
+    await page.goto('/teleconseil/prospects?projet=Grand+Public');
+    await chercher(page, 'Recherche');
+    // Le formulaire de l'appel a renommé la fiche ; la liste montre le statut choisi à l'appel.
+    const ligneRenommee = page.getByRole('row').filter({ hasText: `Dossier ${cle}` });
+    await expect(ligneRenommee).toContainText('Intéressé');
 
     await page.goto(`/teleconseil/prospects/${prospectGrandPublic}`);
-    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: `Ousmane Dossier ${cle}`, level: 1 }),
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
   });
 });

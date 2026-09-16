@@ -77,20 +77,21 @@ async function promettreUnRappel(page: Page, fiche: FicheSemee): Promise<void> {
   await page.getByRole('button', { name: 'Ouvrir', exact: true }).click();
   await page
     .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
-    .getByRole('button', { name: /Joignable$/u })
+    .getByRole('button', { name: /Oui, elle a répondu/u })
+    .click();
+  await page.getByRole('button', { name: 'Passer le formulaire' }).click();
+  await page
+    .getByRole('group', { name: 'Qu’a dit la personne ?' })
+    .getByRole('button', { name: /À rappeler/u })
     .click();
   await page
-    .getByRole('group', { name: 'Quel statut de qualification ?' })
-    .getByRole('button', { name: /À rappeler$/u })
-    .click();
-  const creneau = page
     .getByRole('group', { name: 'Échéance du rappel' })
-    .getByRole('button', { name: /Dans 1 h/u });
-  await creneau.click();
+    .getByRole('button', { name: /Dans 1 h/u })
+    .click();
   // Le creneau se retient et ne part qu'a la validation : le commentaire se
   // saisit APRES le clic sans que l'heure choisie soit perdue.
-  await expect(creneau).toHaveAttribute('aria-pressed', 'true');
-  await page.getByLabel('Commentaire du rappel').fill(COMMENTAIRE);
+  await expect(page.getByRole('status').filter({ hasText: /Rappel le/u })).toBeVisible();
+  await page.getByLabel('Commentaire, facultatif').fill(COMMENTAIRE);
   await page.getByRole('button', { name: /Enregistrer l’appel/u }).click();
   await expect(
     page.getByRole('status').filter({ hasText: `Appel consigné pour ${fiche.nom}` }),

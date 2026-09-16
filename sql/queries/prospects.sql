@@ -23,7 +23,9 @@ SELECT
    WHERE o."prospectId" = p."id" AND o."closedAt" IS NULL
      AND o."openedById" <> sqlc.arg('scope_user_id')::text
      AND o."openedAt" > (now() AT TIME ZONE 'UTC') - interval '2 hours'
-   ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par
+   ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par,
+  (EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+   WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL))::boolean AS plateforme_inscrite
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
@@ -473,6 +475,21 @@ SELECT "key", "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;
 
 -- name: AppSettingsParCles :many
 SELECT "key", "value" FROM "app_settings" WHERE "key" = ANY(sqlc.arg('keys')::text[]);
+
+-- Tout ce que le journal sait d'une fiche : ses propres lignes, et celles des
+-- campagnes et rappels qui la nomment. « CPI GO » signe ce qu'une migration a fait.
+-- name: JournalDeLaFiche :many
+SELECT a."id", a."action", a."entity", a."before", a."after", a."at",
+       COALESCE(u."fullName", 'CPI GO')::text AS auteur
+FROM "audit_logs" a
+LEFT JOIN "users" u ON u."id" = a."userId"
+WHERE (a."entity" = 'prospect' AND a."entityId" = @prospect_id::text)
+   OR (a."entity" IN ('lot_export', 'scheduled_callback') AND a."after"->>'prospectId' = @prospect_id::text)
+ORDER BY a."at" DESC, a."id" DESC
+LIMIT 500;
+
+-- name: SupprimerAppSetting :execrows
+DELETE FROM "app_settings" WHERE "key" = $1;
 
 -- name: UpsertAppSetting :exec
 INSERT INTO "app_settings" ("key", "value", "updatedById", "updatedAt")

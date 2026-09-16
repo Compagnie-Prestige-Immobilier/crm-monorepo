@@ -58,6 +58,7 @@ function TeleconseilProspectDetailPage() {
         prospect={prospect}
         offers={chargement.offers}
         canEdit={user.role === 'ADMIN' || user.role === 'COMMERCIAL' || user.role === 'SUPERVISEUR'}
+        role={user.role}
       />
     );
   }

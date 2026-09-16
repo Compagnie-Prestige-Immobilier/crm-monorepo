@@ -34,8 +34,19 @@ import {
 import { fetchUsers } from '@/lib/data/users';
 import { formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
-import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 import type { Projet } from '@/lib/types';
+import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+
+/** La liste s'arrête à 500 rappels : le reste se dit, il ne se devine pas. */
+function NoteListeTronquee({ affichees, total }: { affichees: number; total: number | undefined }) {
+  if (total === undefined || total <= affichees) return null;
+  return (
+    <p className="text-[0.875rem] text-muted-foreground">
+      {formatNumber(total)} rappels au total, les {formatNumber(affichees)} plus proches affichés.
+      Réduisez la liste avec les filtres.
+    </p>
+  );
+}
 
 const PROJET_OPTIONS = [
   { value: 'CHUES', label: 'CHUES' },
@@ -126,77 +137,90 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 />
               );
             return (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Prospect</TableHead>
-                    <TableHead>Projet</TableHead>
-                    <TableHead>Échéance</TableHead>
-                    <TableHead>Retard</TableHead>
-                    <TableHead>Commentaire</TableHead>
-                    {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
-                    <TableHead>
-                      <span className="sr-only">Actions</span>
-                    </TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.data.items.map((callback) => (
-                    <TableRow key={callback.id}>
-                      <TableCell>
-                        <span className="font-[600]">{formatPhone(callback.phoneE164)}</span>
-                        <span className="block text-[0.75rem] text-muted-foreground">
-                          Fiche {callback.shortCode}
-                        </span>
-                      </TableCell>
-                      <TableCell>
-                        <ProjetBadge projet={callback.projet} />
-                      </TableCell>
-                      <TableCell>
-                        <time dateTime={callback.scheduledAt}>
-                          {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
-                        </time>
-                      </TableCell>
-                      <TableCell>
-                        {callback.overdue ? (
-                          <Badge variant="destructive">
-                            {formatDelay(
-                              Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
-                            )}
-                          </Badge>
-                        ) : (
-                          <Badge variant="secondary">À venir</Badge>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-80 text-muted-foreground">
-                        {callback.comment ?? ''}
-                      </TableCell>
-                      {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
-                      <TableCell>
-                        <div className="flex justify-end gap-2">
+              <>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Prospect</TableHead>
+                      <TableHead>Projet</TableHead>
+                      <TableHead>Échéance</TableHead>
+                      <TableHead>Retard</TableHead>
+                      <TableHead>Commentaire</TableHead>
+                      {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
+                      <TableHead>
+                        <span className="sr-only">Actions</span>
+                      </TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {list.data.items.map((callback) => (
+                      <TableRow key={callback.id}>
+                        <TableCell>
                           <Link
                             href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                            className={buttonVariants({ variant: 'default', size: 'sm' })}
+                            className="font-[600] underline-offset-4 hover:underline"
                           >
-                            <PhoneCallIcon aria-hidden="true" />
-                            Consigner l’appel
+                            {callback.prospectName === ''
+                              ? formatPhone(callback.phoneE164)
+                              : callback.prospectName}
                           </Link>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            disabled={cancel.isPending}
-                            onClick={() => {
-                              cancel.mutate(callback);
-                            }}
-                          >
-                            Annuler
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
+                          <span className="block text-[0.8125rem] tabular-nums text-muted-foreground">
+                            {formatPhone(callback.phoneE164)}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <ProjetBadge projet={callback.projet} />
+                        </TableCell>
+                        <TableCell>
+                          <time dateTime={callback.scheduledAt}>
+                            {formatCallbackAt(
+                              callback.scheduledAt,
+                              Date.parse(list.data.serverTime),
+                            )}
+                          </time>
+                        </TableCell>
+                        <TableCell>
+                          {callback.overdue ? (
+                            <Badge variant="destructive">
+                              {formatDelay(
+                                Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
+                              )}
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary">À venir</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="max-w-80 text-muted-foreground">
+                          {callback.comment ?? ''}
+                        </TableCell>
+                        {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
+                        <TableCell>
+                          <div className="flex justify-end gap-2">
+                            <Link
+                              href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                              className={buttonVariants({ variant: 'default', size: 'sm' })}
+                            >
+                              <PhoneCallIcon aria-hidden="true" />
+                              Consigner l’appel
+                            </Link>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cancel.isPending}
+                              onClick={() => {
+                                cancel.mutate(callback);
+                              }}
+                            >
+                              Annuler
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+                <NoteListeTronquee affichees={list.data.items.length} total={list.data.total} />
+              </>
             );
           })();
         })();
