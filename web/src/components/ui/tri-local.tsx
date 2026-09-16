@@ -47,7 +47,8 @@ export function useTriLocal<T, F extends string>(
             cles.some((cle) => {
               const valeur = colonnes[cle](ligne);
               if (valeur === null || valeur === undefined) return false;
-              const texte = valeur instanceof Date ? valeur.toLocaleDateString('fr') : String(valeur);
+              const texte =
+                valeur instanceof Date ? valeur.toLocaleDateString('fr') : String(valeur);
               return normaliser(texte).includes(terme);
             }),
           );
@@ -71,7 +72,15 @@ export function useTriLocal<T, F extends string>(
     setSortBy(null);
   }
 
-  return { lignes: visibles, total: lignes.length, sortBy, sortDir, toggle, recherche, setRecherche };
+  return {
+    lignes: visibles,
+    total: lignes.length,
+    sortBy,
+    sortDir,
+    toggle,
+    recherche,
+    setRecherche,
+  };
 }
 
 export function RechercheTableau({

@@ -76,6 +76,10 @@ const EMPTY_TEXT: Record<CallbackScope, { title: string; description: string }> 
     title: 'Aucun rappel cette semaine',
     description: 'Une échéance se promet en consignant un appel.',
   },
+  all: {
+    title: 'Aucun rappel promis',
+    description: 'Aucun rappel ne correspond aux critères sélectionnés.',
+  },
 };
 
 function filterCallbackBySearch(cb: Callback, search: string): boolean {

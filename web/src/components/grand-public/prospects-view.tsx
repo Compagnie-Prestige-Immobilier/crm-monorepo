@@ -296,11 +296,7 @@ export function GrandPublicProspectsView({
             ) : null
           }
         >
-          <FiltresAvances
-            filters={filters}
-            setFilters={setFilters}
-            reference={reference.data}
-          />
+          <FiltresAvances filters={filters} setFilters={setFilters} reference={reference.data} />
         </AdvancedPanel>
       </section>
 

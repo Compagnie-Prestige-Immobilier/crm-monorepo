@@ -100,10 +100,8 @@ function buildAQualifierQuery(
     pageSize: A_QUALIFIER_PAGE_SIZE,
   };
 
-  const projectFilter =
-    criteres.projet === null ? {} : { projet: criteres.projet };
-  const resteFilter =
-    criteres.resteAAppeler === true ? { resteAAppeler: true } : {};
+  const projectFilter = criteres.projet === null ? {} : { projet: criteres.projet };
+  const resteFilter = criteres.resteAAppeler === true ? { resteAAppeler: true } : {};
   const origineFilter = buildOrigineFilter(origine, criteres.viewerId);
   const extraFilters = buildExtraFilters(criteres);
 

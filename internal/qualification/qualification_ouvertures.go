@@ -99,21 +99,20 @@ type QualificationRappelsOutput struct {
 }
 
 // « Tous » ne borne rien : un rappel promis dans trois semaines se voit quand même.
-func qualificationBorneRappels(portee string, maintenant time.Time, zone *time.Location) *time.Time {
+func qualificationBorneRappels(portee string, maintenant time.Time, zone *time.Location) time.Time {
 	if portee == "all" {
-		return nil
+		return time.Date(9999, 12, 31, 23, 59, 59, 0, time.UTC)
 	}
 	if portee == "overdue" {
-		return &maintenant
+		return maintenant
 	}
 	jours := 0
 	if portee == analytics.CleSemaine {
 		jours = 6
 	}
 	local := maintenant.In(zone)
-	fin := time.Date(local.Year(), local.Month(), local.Day()+jours, 23, 59, 59,
+	return time.Date(local.Year(), local.Month(), local.Day()+jours, 23, 59, 59,
 		int(999*time.Millisecond), zone).UTC()
-	return &fin
 }
 
 // Le RETARD n'est pas un statut : un rappel de la veille reste PENDING et
@@ -149,7 +148,7 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
 			ID: r.ID, ProspectID: r.ProspectId, Prenom: r.Prenom, Nom: r.Nom, Phone: r.PhoneE164,
-			Projet: string(r.Projet), Comment: r.Comment, Motif: r.ReasonLabel,
+			Projet: string(r.Projet), Comment: r.Comment, Motif: nil,
 			AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
 		}, maintenant))
 	}

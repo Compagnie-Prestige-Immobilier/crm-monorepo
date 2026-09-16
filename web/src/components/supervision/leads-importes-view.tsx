@@ -5,13 +5,7 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   leadsImportesQuery,
