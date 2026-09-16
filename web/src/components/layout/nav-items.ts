@@ -331,7 +331,9 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Prospects',
         icon: UsersIcon,
         description: 'Les fiches déjà notées',
-        roles: TERRAIN,
+        // Le téléconseiller et le chargé de clientèle appellent depuis leur
+        // console : cette liste suit le travail des autres.
+        roles: ENCADREMENT,
         secondary: true,
       },
       {
