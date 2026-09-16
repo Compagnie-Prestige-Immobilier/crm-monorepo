@@ -124,6 +124,8 @@ type RapportImportDTO struct {
 	Warnings    []erreurLigneImport `json:"warnings"`
 	// Le compte exact par code, que le plafond des lignes rapportées ne borne pas.
 	Compteurs map[string]int `json:"compteurs"`
+	// Un onglet par jour dans le classeur des leads : ce que chaque jour a livré.
+	Feuilles []StatsFeuilleImportDTO `json:"feuilles"`
 }
 
 type ImportJobDTO struct {
@@ -401,6 +403,7 @@ type contexteImport struct {
 	demandeur string
 	region    string
 	appliquer bool
+	feuilles  *statsFeuillesImport
 }
 
 type bilanTrancheImport struct {
@@ -412,6 +415,7 @@ type totauxImport struct {
 	traitees, crees, misAJour, ignorees, refusees, avertis int32
 	erreurs, avertissements                                []erreurLigneImport
 	compteurs                                              map[string]int
+	feuilles                                               *statsFeuillesImport
 }
 
 type adaptateurImport struct {
@@ -510,6 +514,7 @@ func (s *service) consommerImport(ctx context.Context, job *db.ImportJob, jeton 
 		totaux: totauxRepris(job),
 		saut:   int(job.ProcessedRows), tranche: reglagesImports().tranche,
 	}
+	course.contexte.feuilles = course.totaux.feuilles
 	if course.etat, err = a.preparer(ctx, s.Q, course.contexte); err != nil {
 		return err
 	}
@@ -535,6 +540,12 @@ func (c *courseImport) consommerLigne(ctx context.Context, numero int, cellules 
 		return nil
 	}
 	valeur, refus := c.adaptateur.lire(cellules, numero, c.etat)
+	if feuille := c.totaux.feuilles.pour(cellules[feuilleImport]); feuille != nil {
+		feuille.Lignes++
+		if refus != nil {
+			feuille.Inexploitables++
+		}
+	}
 	if refus != nil {
 		c.totaux.refusees++
 		c.totaux.erreurs = bornerErreursImport(c.totaux.erreurs, []erreurLigneImport{*refus})
@@ -609,6 +620,7 @@ func (s *service) terminerImport(ctx context.Context, job *db.ImportJob, jeton s
 		ErrorRows: int(totaux.refusees), Truncated: int(totaux.refusees) > len(totaux.erreurs),
 		MaxReportedErrors: maxErreursImport, Errors: totaux.erreurs,
 		WarningRows: int(totaux.avertis), Warnings: totaux.avertissements, Compteurs: totaux.compteurs,
+		Feuilles: totaux.feuilles.liste(),
 	})
 	if err != nil {
 		return err
@@ -681,6 +693,7 @@ func totauxRepris(job *db.ImportJob) totauxImport {
 		traitees: job.ProcessedRows, crees: job.CreatedRows, misAJour: job.UpdatedRows,
 		ignorees: job.SkippedRows, refusees: job.ErrorRows, erreurs: rapport.Errors,
 		avertis: entier32Import(int64(rapport.WarningRows)), avertissements: rapport.Warnings, compteurs: compteurs,
+		feuilles: statsFeuillesReprises(rapport.Feuilles),
 	}
 }
 

@@ -232,3 +232,127 @@ func classeurLeadsOnglets(t *testing.T, onglets []ongletLeadsTest) []byte {
 	}
 	return buf.Bytes()
 }
+
+// Le marketing annonce un volume de lignes, le plateau appelle des numeros :
+// sans un compte par onglet, l'ecart entre les deux se discute de memoire.
+func TestRapportDImportCompteChaqueOnglet(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+
+	base := time.Now().UnixNano() % 10_000_000
+	treize := fmt.Sprintf("+22177%07d", base)
+	quatorze := fmt.Sprintf("+22177%07d", (base+1)%10_000_000)
+	nomClasseur := fmt.Sprintf("Leads onglets %d.xlsx", base)
+
+	onglets := []ongletLignesTest{
+		{nom: "Leads 13 sept 2026", lignes: []ligneLeadTest{
+			{nom: "Fatou Treize", telephone: treize},
+			{nom: "Fatou Treize", telephone: treize},
+			{nom: "Mamadou Illisible", telephone: "07"},
+		}},
+		{nom: "Leads 14 sept 2026", lignes: []ligneLeadTest{
+			{nom: "Fatou Treize", telephone: treize},
+			{nom: "Awa Quatorze", telephone: quatorze},
+		}},
+	}
+	t.Setenv("IMPORT_LEADS_URL", b.lienDesLeads(classeurLeadsLignes(t, onglets), nomClasseur))
+	nettoyerClasseurTest(b, nomClasseur, []string{treize, quatorze})
+
+	if err := imports.ReleverLeads(b.ctx, serviceDesImports(b)); err != nil {
+		t.Fatal(err)
+	}
+
+	attendus := map[string]string{
+		"Leads 13 sept 2026": "lignes=3 inedits=1 reLivres=0 doublons=1 inexploitables=1",
+		"Leads 14 sept 2026": "lignes=2 inedits=1 reLivres=1 doublons=0 inexploitables=0",
+	}
+	vus := feuillesDuRapportTest(b, nomClasseur)
+	for feuille, attendu := range attendus {
+		if vus[feuille] != attendu {
+			b.t.Fatalf("onglet %q : %q, attendu %q", feuille, vus[feuille], attendu)
+		}
+	}
+	if len(vus) != len(attendus) {
+		b.t.Fatalf("un onglet par jour attendu, vu %v", vus)
+	}
+}
+
+func nettoyerClasseurTest(b *banc, nomClasseur string, telephones []string) {
+	b.t.Helper()
+	var empreinteAvant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`).Scan(&empreinteAvant)
+	b.t.Cleanup(func() {
+		for _, telephone := range telephones {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "phoneE164" = $1)`, telephone)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, telephone)
+		}
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetType" = 'import' AND "objetId" IN (SELECT "id" FROM "import_jobs" WHERE "fileName" = $1)`, nomClasseur)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "fileName" = $1`, nomClasseur)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`)
+		if empreinteAvant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('imports.leadsEmpreinte', $1, now())`, *empreinteAvant)
+		}
+	})
+}
+
+// Le panneau lit ce tableau : le rapport est relu par l'API, pas dans la base.
+func feuillesDuRapportTest(b *banc, nomClasseur string) map[string]string {
+	b.t.Helper()
+	var travail string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "id" FROM "import_jobs" WHERE "fileName" = $1 ORDER BY "createdAt" DESC LIMIT 1`, nomClasseur).Scan(&travail); err != nil {
+		b.t.Fatal(err)
+	}
+	rapport, _ := b.rapportImportTest(travail)
+	feuilles, ok := rapport["feuilles"].([]any)
+	if !ok {
+		b.t.Fatalf("le rapport doit porter ses onglets : %v", rapport)
+	}
+	vus := map[string]string{}
+	for _, brut := range feuilles {
+		ligne := mapDe(brut)
+		nom, _ := ligne["feuille"].(string)
+		vus[nom] = fmt.Sprintf("lignes=%d inedits=%d reLivres=%d doublons=%d inexploitables=%d",
+			entierDuRapport(ligne, "lignes"), entierDuRapport(ligne, "inedits"), entierDuRapport(ligne, "reLivres"),
+			entierDuRapport(ligne, "doublons"), entierDuRapport(ligne, "inexploitables"))
+	}
+	return vus
+}
+
+type ligneLeadTest struct{ nom, telephone string }
+
+type ongletLignesTest struct {
+	nom    string
+	lignes []ligneLeadTest
+}
+
+func classeurLeadsLignes(t *testing.T, onglets []ongletLignesTest) []byte {
+	t.Helper()
+	fichier := excelize.NewFile()
+	for index, onglet := range onglets {
+		if index == 0 {
+			_ = fichier.SetSheetName(fichier.GetSheetName(0), onglet.nom)
+		} else if _, err := fichier.NewSheet(onglet.nom); err != nil {
+			t.Fatal(err)
+		}
+		lignes := [][]string{{"Date", "Nom complet", "Email", "Téléphone", "Canal"}}
+		for _, ligne := range onglet.lignes {
+			lignes = append(lignes, []string{
+				"", ligne.nom, "", ligne.telephone, "Meta CPI GRAND PUBLIC ( Facebook & Instagram )",
+			})
+		}
+		for rang, ligne := range lignes {
+			for colonne, valeur := range ligne {
+				cellule, _ := excelize.CoordinatesToCellName(colonne+1, rang+1)
+				_ = fichier.SetCellValue(onglet.nom, cellule, valeur)
+			}
+		}
+	}
+	var buf bytes.Buffer
+	if err := fichier.Write(&buf); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
