@@ -3,13 +3,11 @@ import { expect, test } from '@playwright/test';
 import { compteDe } from './comptes';
 import { ecrire, marque } from './donnees-admin';
 
+const superviseur = compteDe('SUPERVISEUR');
 const teleconseiller = compteDe('COMMERCIAL');
-const accueil = compteDe('ACCUEIL');
 const cle = marque();
 const NOM = `Cherchable${cle}`;
 
-// La fiche appartient au téléconseiller qui la cherche : la liste est cloisonnée
-// par propriétaire, une fiche d'autrui ne lui reviendrait pas.
 test.beforeAll(async () => {
   await ecrire(
     `INSERT INTO prospects (id, nom, prenom, "phoneE164", "createdById",
@@ -26,11 +24,11 @@ test.afterAll(async () => {
 test.describe('recherche depuis la barre du haut', () => {
   // Le champ n'apparaît qu'au-delà de 1 536 px : sous cette largeur la barre du
   // haut n'a plus la place, et le titre de l'écran passe avant.
-  test.describe('téléconseiller', () => {
-    test.use({ storageState: teleconseiller.etat, viewport: { width: 1600, height: 900 } });
+  test.describe('superviseur', () => {
+    test.use({ storageState: superviseur.etat, viewport: { width: 1600, height: 900 } });
 
     test('le champ emmène à la liste, le terme dans l’URL', async ({ page }) => {
-      await page.goto('/teleconseil/console');
+      await page.goto('/teleconseil/tableau-de-bord');
       const champ = page.getByRole('searchbox', { name: 'Chercher un prospect' });
       await champ.fill(NOM);
       await champ.press('Enter');
@@ -42,11 +40,14 @@ test.describe('recherche depuis la barre du haut', () => {
     });
   });
 
-  test.describe('accueil', () => {
-    test.use({ storageState: accueil.etat });
+  // La liste des prospects refuse le téléconseiller : un champ qui l'y
+  // emmènerait finirait sur « Accès refusé ».
+  test.describe('téléconseiller', () => {
+    test.use({ storageState: teleconseiller.etat, viewport: { width: 1600, height: 900 } });
 
-    test('un rôle sans prospects ne voit pas le champ', async ({ page }) => {
-      await page.goto('/accueil');
+    test('un rôle sans la liste des prospects ne voit pas le champ', async ({ page }) => {
+      await page.goto('/teleconseil/console');
+      await expect(page.getByRole('heading', { name: 'Fiche prospect' })).toBeVisible();
       await expect(page.getByRole('searchbox', { name: 'Chercher un prospect' })).toBeHidden();
     });
   });

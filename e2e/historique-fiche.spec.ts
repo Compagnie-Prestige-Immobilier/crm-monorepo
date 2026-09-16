@@ -41,10 +41,10 @@ test.describe('parcours, historique de la fiche prospect', () => {
     await ouvrirFiche(page, fiche);
     await page
       .getByRole('group', { name: 'Avez-vous eu la personne au téléphone ?' })
-      .getByRole('button', { name: /Injoignable$/u })
+      .getByRole('button', { name: /Non, elle n’a pas répondu/u })
       .click();
-    await page.getByRole('button', { name: /NRP$/u }).click();
-    await page.getByLabel('Commentaire').fill(commentaire);
+    await page.getByRole('button', { name: /NRP/u }).click();
+    await page.getByLabel(/^Commentaire/u).fill(commentaire);
     await page.getByRole('button', { name: 'Enregistrer l’appel' }).click();
     await expect(
       page.getByRole('status').filter({ hasText: `Appel consigné pour ${fiche.nom}` }),
@@ -52,18 +52,18 @@ test.describe('parcours, historique de la fiche prospect', () => {
 
     const lectures: string[] = [];
     page.on('request', (requete) => {
-      if (requete.url().includes(`${fiche.id}/requalifications`)) lectures.push(requete.url());
+      if (requete.url().includes(`${fiche.id}/segment-history`)) lectures.push(requete.url());
     });
 
     await ouvrirFiche(page, fiche);
-    const historique = page.getByRole('list', { name: 'Historique de la fiche' });
+    const historique = page.getByRole('list', { name: 'Histoire' });
     await expect(historique).toBeHidden();
     expect(lectures, 'le repli ne lit rien').toHaveLength(0);
 
     await page.locator('summary').filter({ hasText: 'Historique de la fiche' }).click();
     await expect(historique.getByText('NRP')).toBeVisible();
     await expect(historique.getByText(commentaire)).toBeVisible();
-    await expect(historique.getByText(compte.nom)).toBeVisible();
+    await expect(historique.getByText(compte.nom).first()).toBeVisible();
     expect(lectures.length, 'deplie, il lit les changements de statut').toBeGreaterThan(0);
   });
 });
