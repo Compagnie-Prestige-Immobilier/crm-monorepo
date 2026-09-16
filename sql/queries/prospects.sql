@@ -44,7 +44,12 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('id')::text IS NULL OR p."id" = sqlc.narg('id')::text)
   AND (
     sqlc.arg('scope_all')::boolean
-    OR p."createdById" = sqlc.arg('scope_user_id')::text
+    OR (p."createdById" = sqlc.arg('scope_user_id')::text
+        AND NOT EXISTS (
+          SELECT 1 FROM "lot_export_items" lc
+          WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+            AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
+        ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
@@ -168,7 +173,12 @@ LEFT JOIN "representants" r ON r."id" = p."representantId"
 WHERE p."deletedAt" IS NULL
   AND (
     sqlc.arg('scope_all')::boolean
-    OR p."createdById" = sqlc.arg('scope_user_id')::text
+    OR (p."createdById" = sqlc.arg('scope_user_id')::text
+        AND NOT EXISTS (
+          SELECT 1 FROM "lot_export_items" lc
+          WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+            AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
+        ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li

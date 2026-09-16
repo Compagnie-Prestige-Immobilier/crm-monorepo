@@ -416,6 +416,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
+  -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
+  -- ne se retire pas : deux attributaires appelleraient la même personne.
+  AND (sqlc.arg('injoignables')::boolean
+       OR (p."lastCallAt" IS NULL
+           AND NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)
@@ -433,6 +438,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
+  -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
+  -- ne se retire pas : deux attributaires appelleraient la même personne.
+  AND (sqlc.arg('injoignables')::boolean
+       OR (p."lastCallAt" IS NULL
+           AND NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")))
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)
