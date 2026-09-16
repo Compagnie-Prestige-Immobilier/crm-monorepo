@@ -64,7 +64,7 @@ export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
 export const inboxPathFor = (role: Role): string =>
   role === 'ADMIN' ? '/admin/notifications?onglet=reception' : INBOX_PATH;
 
-export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'admin';
+export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
 
 export interface CoqueEntry {
   id: Coque;
@@ -99,6 +99,13 @@ export const COQUES: readonly CoqueEntry[] = [
     path: '/finance',
     description: 'Dossiers bancaires et demandes de création de client',
     roles: ['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION'],
+  },
+  {
+    id: 'ventes',
+    label: 'Ventes',
+    path: '/ventes',
+    description: 'Tableau des ventes, échéances et encaissements par site',
+    roles: ['ADMIN', 'DIRECTION'],
   },
   {
     id: 'admin',
@@ -426,6 +433,19 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Flux de traitement',
         roles: ['ADMIN'],
         secondary: true,
+      },
+    ],
+  },
+  {
+    coque: 'ventes',
+    title: null,
+    items: [
+      {
+        href: '/ventes',
+        label: 'Tableau des ventes',
+        icon: FileSpreadsheetIcon,
+        description: 'Ventes, échéances et sites',
+        roles: ['ADMIN', 'DIRECTION'],
       },
     ],
   },

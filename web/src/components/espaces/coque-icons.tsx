@@ -68,10 +68,21 @@ function AdminIcon() {
   );
 }
 
+function VentesIcon() {
+  return (
+    <svg {...FRAME} className="size-full">
+      <path d="M9 39V9h30v30z" />
+      <path d="M9 18h30M19 9v30" />
+      <path className={MARK} strokeWidth={3} d="m24 33 5-6 4 3 5-7" />
+    </svg>
+  );
+}
+
 export const COQUE_ICONS: Record<Coque, () => React.JSX.Element> = {
   accueil: AccueilIcon,
   teleconseil: TeleconseilIcon,
   finance: FinanceIcon,
+  ventes: VentesIcon,
   admin: AdminIcon,
 };
 
@@ -96,6 +107,12 @@ export function CoqueArt({ coque }: { coque: Coque }) {
         <circle cx="108" cy="35" r="16" />
         <circle cx="78" cy="26" r="18" />
         <path d="M22 82c3-23 20-35 42-29M134 82c-3-23-20-35-42-29M45 88c2-28 15-43 33-43s31 15 33 43" />
+      </>
+    ),
+    ventes: (
+      <>
+        <path d="M24 12h108v84H24zM24 36h108M60 12v84" />
+        <path d="m72 78 20-22 16 12 20-26" />
       </>
     ),
     admin: (
