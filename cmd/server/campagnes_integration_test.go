@@ -584,8 +584,9 @@ func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut st
 	id := uuid.NewString()
 	if _, err := b.pool.Exec(b.ctx,
 		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","projet","updatedAt",
-		                          "importFeuille","lastCallOutcome","statut")
-		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,$6::"CallOutcome",$7::"ProspectStatut")`,
+		                          "importFeuille","lastCallOutcome","lastCallAt","statut")
+		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,$6::"CallOutcome",
+		         CASE WHEN $6::"CallOutcome" IS NULL THEN NULL ELSE now() END,$7::"ProspectStatut")`,
 		id, "+2217"+id[:8], b.userID, projet, feuille, issue, statut); err != nil {
 		b.t.Fatal(err)
 	}
@@ -600,13 +601,16 @@ func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut st
 
 // Quatre fiches : CHUES jamais appelée, CHUES injoignable, CHUES injoignable
 // puis close par un faux numéro, Grand Public jamais appelée. Sans projet, la
-// campagne prend CHUES et Grand Public ensemble ; « injoignables » ne garde que
-// la deuxième. Un superviseur coché compte pour autant qu'un téléconseiller.
+// campagne prend CHUES et Grand Public ensemble, mais seulement ce qui n'a
+// jamais été appelé ; « injoignables » ne garde que la deuxième. Une fiche
+// distribuée ne se retire plus : recréer la campagne ne la donne pas à un
+// second téléconseiller. Un superviseur coché compte pour autant qu'un
+// téléconseiller.
 func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	feuille := "Feuille " + uuid.NewString()
 	injoignable := "UNREACHABLE"
-	b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	jamaisAppelee := b.prospect(feuille, "CHUES", nil, "NOUVEAU")
 	aRelancer := b.prospect(feuille, "CHUES", &injoignable, "NOUVEAU")
 	b.prospect(feuille, "CHUES", &injoignable, "PERDU")
 	b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
@@ -623,30 +627,48 @@ func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 			},
 		}
 	}
-	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", false))
-	b.attend(statut, http.StatusOK, "aperçu tous projets", body)
-	if body["eligible"] != float64(3) || body["places"] != float64(6) || body["scopeLabel"] != "Tous projets" {
-		t.Fatalf("3 fiches des deux projets et 6 places attendues : %v", body)
+	body := b.apercuEligible(corps("", false), 2, "aperçu tous projets")
+	if body["places"] != float64(6) || body["scopeLabel"] != "Tous projets" {
+		t.Fatalf("6 places sur tous les projets attendues : %v", body)
 	}
-	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("CHUES", false))
-	b.attend(statut, http.StatusOK, "aperçu CHUES", body)
-	if body["eligible"] != float64(2) {
-		t.Fatalf("2 fiches CHUES attendues : %v", body)
-	}
-	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", true))
-	b.attend(statut, http.StatusOK, "aperçu des injoignables", body)
-	if body["eligible"] != float64(1) || body["scopeLabel"] != "Tous projets, injoignables" {
-		t.Fatalf("une seule fiche à relancer attendue : %v", body)
+	b.apercuEligible(corps("CHUES", false), 1, "aperçu CHUES")
+	body = b.apercuEligible(corps("", true), 1, "aperçu des injoignables")
+	if body["scopeLabel"] != "Tous projets, injoignables" {
+		t.Fatalf("libellé des injoignables : %v", body)
 	}
 
-	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps("", false))
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps("", false))
 	b.attend(statut, http.StatusCreated, "création de la campagne", body)
 	lotID, _ := body["id"].(string)
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
-	if body["itemCount"] != float64(3) || body["projet"] != nil {
-		t.Fatalf("campagne sans projet à 3 fiches attendue : %v", body)
+	if body["itemCount"] != float64(2) || body["projet"] != nil {
+		t.Fatalf("campagne sans projet à 2 fiches attendue : %v", body)
 	}
-	if fiches := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, aRelancer); fiches != 1 {
-		t.Fatalf("la fiche à relancer doit être dans la campagne : %d", fiches)
+	if b.dansLeLot(lotID, aRelancer) || !b.dansLeLot(lotID, jamaisAppelee) {
+		t.Fatal("la campagne prend la fiche jamais appelée et laisse la fiche déjà appelée")
 	}
+
+	b.apercuEligible(corps("", false), 0, "aperçu après distribution : une fiche distribuée ne se retire plus")
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps("", true))
+	b.attend(statut, http.StatusCreated, "campagne des injoignables", body)
+	relance, _ := body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, relance) })
+	if !b.dansLeLot(relance, aRelancer) {
+		t.Fatal("la relance des injoignables reprend la fiche déjà appelée")
+	}
+}
+
+func (b *bancCampagne) apercuEligible(corps map[string]any, attendu int, etape string) map[string]any {
+	b.t.Helper()
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps)
+	b.attend(statut, http.StatusOK, etape, body)
+	if body["eligible"] != float64(attendu) {
+		b.t.Fatalf("%s : %d fiches éligibles attendues, %v", etape, attendu, body)
+	}
+	return body
+}
+
+func (b *bancCampagne) dansLeLot(lotID, prospectID string) bool {
+	b.t.Helper()
+	return b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, prospectID) == 1
 }

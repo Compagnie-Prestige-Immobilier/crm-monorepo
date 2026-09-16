@@ -727,8 +727,8 @@ const (
 
 // La codification du classeur des leads (docs/decisions/import-leads.md) : le
 // jour de l'onglet corrige la date, « Canal » décide du projet, une ligne sans
-// identité se signale, le classeur relu met la fiche à jour et la sort de sa
-// campagne quand son projet change.
+// identité se signale, le classeur relu met la fiche à jour sans toucher à son
+// projet ni à sa campagne.
 func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
@@ -831,22 +831,19 @@ func verifierPremierReleveLeadsTest(b *banc, travail string, tels []string) fich
 func verifierSecondReleveLeadsTest(b *banc, travail, telephone, lotID string) {
 	b.t.Helper()
 	a := b.ficheLeadTest(telephone)
-	if a.resume() != "GRAND_PUBLIC | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | oui | " {
+	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | oui | " {
 		b.t.Fatalf("A relue : %s", a.resume())
 	}
-	if parcours := projetsDesParcoursTest(b, a.id); strings.Join(parcours, ",") != "GRAND_PUBLIC" {
-		b.t.Fatalf("le parcours suit la dernière ligne : %v", parcours)
+	if parcours := projetsDesParcoursTest(b, a.id); strings.Join(parcours, ",") != "CHUES" {
+		b.t.Fatalf("le parcours garde son projet : %v", parcours)
 	}
-	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1`, lotID); n != 0 {
-		b.t.Fatalf("la fiche hors projet reste dans la campagne : %d", n)
-	}
-	if adminCompterAudit(b, "lot_export.hors_projet", lotID) != 1 {
-		b.t.Fatal("le retrait de campagne doit laisser une trace")
+	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1`, lotID); n != 1 {
+		b.t.Fatalf("la fiche recodifiée doit rester dans sa campagne : %d", n)
 	}
 	statut, body := appelJSON(b, http.MethodGet, "/api/v1/lots-export/"+lotID+"/fiches", nil, nil)
 	b.attend(statut, http.StatusOK, "fiches de la campagne", body)
-	if items, _ := body["items"].([]any); len(items) != 0 {
-		b.t.Fatalf("la fiche hors projet ne doit plus paraître dans la campagne : %v", body["items"])
+	if items, _ := body["items"].([]any); len(items) != 1 {
+		b.t.Fatalf("la fiche recodifiée doit paraître dans sa campagne : %v", body["items"])
 	}
 	// Quatre lignes ignorées, plus la date de A et le canal de C signalés une seconde fois.
 	b.attendRapportTest(travail, "total=5 created=0 updated=1 skipped=4 errors=0 warnings=6", map[string]float64{

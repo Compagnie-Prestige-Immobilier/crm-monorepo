@@ -25,7 +25,9 @@ SELECT
      AND o."openedAt" > (now() AT TIME ZONE 'UTC') - interval '2 hours'
    ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par,
   (EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
-   WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL))::boolean AS plateforme_inscrite
+   WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL))::boolean AS plateforme_inscrite,
+  ra."lastCallAt" AS representant_appele_at,
+  ru."fullName" AS representant_appele_par
 FROM "prospects" p
 JOIN "users" o ON o."id" = p."createdById"
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
@@ -40,6 +42,14 @@ LEFT JOIN "professions" pf ON pf."id" = p."professionId"
 LEFT JOIN "income_bands" ib ON ib."id" = p."incomeBandId"
 LEFT JOIN "employeurs" ep ON ep."id" = p."employeurId"
 LEFT JOIN "pays" pa ON pa."id" = p."paysResidenceId"
+-- Le même numéro figure parfois dans les représentants, déjà appelés en
+-- campagne : la fiche le dit, pour ne pas rappeler la même personne.
+LEFT JOIN LATERAL (
+  SELECT r2."lastCallAt", r2."lastCallById" FROM "representants" r2
+  WHERE r2."phoneE164" = p."phoneE164" AND r2."deletedAt" IS NULL AND r2."lastCallAt" IS NOT NULL
+  ORDER BY r2."lastCallAt" DESC LIMIT 1
+) ra ON true
+LEFT JOIN "users" ru ON ru."id" = ra."lastCallById"
 WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('id')::text IS NULL OR p."id" = sqlc.narg('id')::text)
   AND (

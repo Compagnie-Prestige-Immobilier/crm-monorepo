@@ -320,7 +320,7 @@ func (s *service) qualificationOuvertureConcurrente(ctx context.Context, u *socl
 
 func (s *service) qualificationFicheOuvrable(ctx context.Context, u *socle.Utilisateur, representantID, prospectID *string) error {
 	introuvable := socle.Problem(http.StatusNotFound, "OUVERTURE_FICHE_INTROUVABLE",
-		"Cette fiche n’existe pas, ou elle n’est pas dans vos campagnes.")
+		"Cette fiche n’existe pas, elle n’est pas dans vos campagnes, ou elle est attribuée à quelqu’un d’autre.")
 	if representantID != nil {
 		_, err := s.Q.RepresentantAQualifier(ctx, db.RepresentantAQualifierParams{
 			ID: *representantID, Tous: qualificationVoitTout(u.Role), Agent: u.ID,

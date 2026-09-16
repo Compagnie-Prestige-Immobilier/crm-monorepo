@@ -344,6 +344,22 @@ const SECTIONS: readonly NavSection[] = [
         roles: ENCADREMENT,
       },
       {
+        href: '/teleconseil/pole-deploiement',
+        label: 'Pôle déploiement',
+        icon: UsersRoundIcon,
+        description: 'Qualité de la base représentants et rendement départemental',
+        roles: ENCADREMENT,
+        secondary: true,
+      },
+      {
+        href: '/teleconseil/pole-marketing',
+        label: 'Pôle marketing',
+        icon: ActivityIcon,
+        description: 'Qualité des prospects amenés et conversion par canal',
+        roles: ENCADREMENT,
+        secondary: true,
+      },
+      {
         href: '/teleconseil/parametres-chues',
         label: 'Paramètres',
         icon: SlidersHorizontalIcon,
@@ -416,6 +432,13 @@ const SECTIONS: readonly NavSection[] = [
     title: null,
     items: [
       {
+        href: '/admin/tableau-de-bord',
+        label: 'Tableau de bord',
+        icon: LayoutDashboardIcon,
+        description: 'Vue d’ensemble globale : enrôlement, CCP, déploiement et marketing',
+        roles: ['ADMIN'],
+      },
+      {
         href: '/admin/commerciaux',
         label: 'Utilisateurs',
         icon: UsersIcon,
@@ -461,6 +484,20 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Plateformes d’enrôlement',
         icon: PlugZapIcon,
         description: 'Inscriptions CHUES et Grand Public',
+        roles: ['ADMIN'],
+      },
+      {
+        href: '/teleconseil/pole-deploiement',
+        label: 'Pôle déploiement',
+        icon: UsersRoundIcon,
+        description: 'Qualité de la base représentants et rendement départemental',
+        roles: ['ADMIN'],
+      },
+      {
+        href: '/teleconseil/pole-marketing',
+        label: 'Pôle marketing',
+        icon: ActivityIcon,
+        description: 'Qualité des prospects amenés et conversion par canal',
         roles: ['ADMIN'],
       },
       {
