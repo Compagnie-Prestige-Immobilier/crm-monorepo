@@ -19,6 +19,7 @@ import type {
   ChiffresRendement,
   ChiffresRepresentants,
   ChiffresTotaux,
+  CouvertureCampagne,
 } from '@/lib/data/chiffres';
 import type { ComptageOuvertures } from '@/lib/data/ouvertures';
 import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
@@ -278,7 +279,7 @@ const parTeleconseiller = (chues: boolean): SourceChiffre => ({
 });
 
 /** La même phrase que le détail d'une campagne : appelées sur confiées, appels consignés. */
-function couvertureDeLaCampagne(campagne: NonNullable<ChiffresCampagne>): string {
+function couvertureDeLaCampagne(campagne: CouvertureCampagne): string {
   const pluriel = (nombre: number): string => (nombre > 1 ? 's' : '');
   return (
     `${formatNumber(campagne.fichesAppelees)} fiche${pluriel(campagne.fichesAppelees)} ` +
@@ -286,6 +287,15 @@ function couvertureDeLaCampagne(campagne: NonNullable<ChiffresCampagne>): string
     `${formatNumber(campagne.callsSince)} appel${pluriel(campagne.callsSince)} ` +
     `consigné${pluriel(campagne.callsSince)}.`
   );
+}
+
+/** Le rendement de la fenêtre, puis la couverture de la campagne depuis sa création. */
+function detailDeLaCampagne(campagne: ChiffresCampagnes['items'][number]): string {
+  const rendement =
+    `${formatNumber(campagne.traitees)} traitées sur ${formatNumber(campagne.prevues)} · ` +
+    `${taux(part(campagne.traitees, campagne.prevues))}`;
+  if (campagne.couverture === undefined) return rendement;
+  return `${rendement} · ${couvertureDeLaCampagne(campagne.couverture)}`;
 }
 
 /**
@@ -437,7 +447,7 @@ const SOURCES_CHIFFRES = {
     forme: 'composition',
     jeu: 'campagnes',
     description:
-      'Un camembert par campagne : fiches traitées ÷ fiches de la campagne. Le camembert ouvre sa campagne.',
+      'Un camembert par campagne : fiches traitées ÷ fiches de la campagne, et sa couverture depuis la création. Le camembert ouvre sa campagne.',
     groupe: 'Campagnes',
     lien: (id) => `/teleconseil/campagnes/${id}`,
     extraire: ({ campagnes }) =>
@@ -448,7 +458,7 @@ const SOURCES_CHIFFRES = {
             donnee: campagnes.items.map((campagne) => ({
               id: campagne.id,
               ligne: campagne.name,
-              detail: `${formatNumber(campagne.traitees)} traitées sur ${formatNumber(campagne.prevues)} · ${taux(part(campagne.traitees, campagne.prevues))}`,
+              detail: detailDeLaCampagne(campagne),
               segments: [
                 { id: 'traitees', label: 'Traitées', value: campagne.traitees },
                 {

@@ -341,14 +341,14 @@ func (perimetre perimetreSupervision) actes(p *parametresSQL) string {
 	SELECT rca."performedById", ` + perimetre.tronque(`rca."clientCreatedAt"`) + `,
 	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
 	FROM "rep_call_attempts" rca
-	WHERE ` + perimetre.representantsVisibles() + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
+	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT d."performedById", ` + perimetre.tronque(`d."deviceCallAt"`) + `,
 	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL::text
 	FROM "device_call_detections" d
 	WHERE ` + perimetre.fenetre(p, `d."deviceCallAt"`) + ` AND CASE
-	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles() + `
+	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles(p, `d."representantId"`) + `
 	  ELSE ` + perimetre.ficheDuPerimetre(p, `d."prospectId"`) + ` END`
 }
 
@@ -365,7 +365,7 @@ func (perimetre perimetreSupervision) tentativesRepresentants(p *parametresSQL) 
 	  (rca."outcome" = 'UNREACHABLE')::int               AS injoignable,
 	  (rca."outcome" NOT IN ` + issuesRepresentantSaisissables + `)::int AS autre
 	FROM "rep_call_attempts" rca
-	WHERE ` + perimetre.representantsVisibles() + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
+	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
 }
 
 // Un représentant ne se qualifie qu'une fois : c'est sa DERNIÈRE réponse de la
@@ -379,7 +379,7 @@ func (perimetre perimetreSupervision) reponsesDesRepresentants(p *parametresSQL)
 	  (` + ArbitrageDeLAdhesion + ` = 'AMBASSADEUR')::int AS qualifie
 	FROM "rep_call_attempts" rca
 	` + JointureStatutQualification + `
-	WHERE ` + ArbitrageDeLAdhesion + ` IS NOT NULL AND ` + perimetre.representantsVisibles() +
+	WHERE ` + ArbitrageDeLAdhesion + ` IS NOT NULL AND ` + perimetre.representantsVisibles(p, `rca."representantId"`) +
 		etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 	ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC`
 }
@@ -393,7 +393,7 @@ func (perimetre perimetreSupervision) fichesRepresentants(p *parametresSQL) stri
 	  ` + perimetre.tronque(`rca."clientCreatedAt"`) + ` AS bucket,` + colonnesFicheRepresentant + `
 	FROM "rep_call_attempts" rca
 	` + JointureStatutQualification + `
-	WHERE rca."outcome" IN ` + issuesRepresentantSaisissables + etSQL + perimetre.representantsVisibles() +
+	WHERE rca."outcome" IN ` + issuesRepresentantSaisissables + etSQL + perimetre.representantsVisibles(p, `rca."representantId"`) +
 		etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 	ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC`
 }
@@ -425,7 +425,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	  0 AS "repRappelHonore", 0 AS "repRappelRetard", 0 AS "repRappelAVenir"
 	FROM "device_call_detections" d
 	WHERE ` + perimetre.fenetre(p, `d."deviceCallAt"`) + ` AND CASE
-	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles() + `
+	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles(p, `d."representantId"`) + `
 	  ELSE ` + perimetre.ficheDuPerimetre(p, `d."prospectId"`) + ` END
 
 	UNION ALL
@@ -452,7 +452,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	  0, 0, 0, 0, 0, 0
 	FROM "rep_call_attempts" rca
 	WHERE (rca."deviceCallType" IS NOT NULL OR rca."deviceCallAt" IS NOT NULL)
-	  AND ` + perimetre.representantsVisibles() + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
+	  AND ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT sc."assignedToId", ` + perimetre.tronque(`sc."scheduledAt"`) + `,
@@ -480,7 +480,7 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	        AND x."clientCreatedAt" > rca."callbackAt"
 	    ) AS honore
 	  FROM "rep_call_attempts" rca
-	  WHERE rca."callbackAt" IS NOT NULL AND ` + perimetre.representantsVisibles() + etSQL + perimetre.fenetre(p, `rca."callbackAt"`) + `
+	  WHERE rca."callbackAt" IS NOT NULL AND ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."callbackAt"`) + `
 	) h`
 }
 
@@ -773,7 +773,7 @@ func (perimetre perimetreSupervision) appelsSituesDansLeCreneau(p *parametresSQL
 	  rca."representantId"::text,
 	  (rca."outcome" IN ` + IssuesRepresentantJointes + `)::int, 0
 	FROM "rep_call_attempts" rca
-	WHERE ` + perimetre.representantsVisibles() + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
+	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
 	return `
 	SELECT a.*, ` + creneauDe + ` AS creneau, date_trunc('day', a.quand) AS jour
 	FROM (` + tentatives + `) a
