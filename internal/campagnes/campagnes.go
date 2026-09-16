@@ -1276,7 +1276,7 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 			arendre = append(arendre, position)
 		}
 	}
-	equipe, err := s.lotEquipe(ctx, restants)
+	equipe, err := s.lotEquipeRestante(ctx, restants)
 	if err != nil {
 		return nil, err
 	}
