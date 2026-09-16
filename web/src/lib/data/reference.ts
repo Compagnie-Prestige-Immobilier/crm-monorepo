@@ -26,6 +26,35 @@ import type {
  * Un refus de rôle rend donc une liste vide — c'est ce que ce rôle est censé
  * voir. Toute autre panne continue de remonter.
  */
+interface CompteFiltre {
+  id: string;
+  fullName: string;
+  role: string;
+  isActive: boolean;
+}
+
+/** Une fiche n'est pas creee que par un teleconseiller : le filtre les porte tous. */
+function optionCompte(compte: CompteFiltre): FilterOption {
+  return {
+    value: compte.id,
+    label: compte.fullName,
+    hint: compte.isActive ? undefined : 'Compte désactivé',
+  };
+}
+
+function comptesFacultatifs(result: {
+  data?: { items: CompteFiltre[] };
+  error?: unknown;
+  response: Response;
+}): CompteFiltre[] {
+  try {
+    return unwrap(result).items;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 403) return [];
+    throw error;
+  }
+}
+
 function listeFacultative<TItem>(
   result: { data?: { items: TItem[] }; error?: unknown; response: Response },
   map: (item: TItem) => FilterOption,
@@ -77,11 +106,12 @@ export async function fetchReferenceData(
   const [bundle, iefs, users, representants] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
     client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
-    client.GET('/api/v1/users', { params: { query: { role: 'COMMERCIAL', pageSize: 200 } } }),
+    client.GET('/api/v1/users', { params: { query: { pageSize: 200 } } }),
     representantsComplets(client),
   ]);
 
   const referentiels = unwrap(bundle);
+  const comptes = comptesFacultatifs(users);
 
   return {
     regions: referentiels.regions,
@@ -94,11 +124,8 @@ export async function fetchReferenceData(
     offers: referentiels.offers,
     employeurs: referentiels.employeurs,
     pays: referentiels.pays,
-    commerciaux: listeFacultative(users, (user) => ({
-      value: user.id,
-      label: user.fullName,
-      hint: user.isActive ? undefined : 'Compte désactivé',
-    })),
+    commerciaux: comptes.filter((compte) => compte.role === 'COMMERCIAL').map(optionCompte),
+    utilisateurs: comptes.map(optionCompte),
     representants,
   };
 }
