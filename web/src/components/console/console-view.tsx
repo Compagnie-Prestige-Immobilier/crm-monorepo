@@ -981,7 +981,7 @@ function aideDe(item: MotifAppel, catalogue: readonly MotifAppel[]): string | un
   return undefined;
 }
 
-const choixDe = (
+export const choixDe = (
   item: MotifAppel,
   catalogue: readonly MotifAppel[],
   actif: boolean,
@@ -1005,7 +1005,7 @@ const precisionsDe = (catalogue: readonly MotifAppel[], statut: MotifAppel | nul
  * méthode d'enrôlement renseignée dans le formulaire vaut adhésion : elle clôt
  * la fiche et dispense de l'échéance.
  */
-function qualificationDe(
+export function qualificationDe(
   statut: MotifAppel | null,
   precision: MotifAppel | null,
   conversion: ConversionDraft | null,
@@ -1015,7 +1015,7 @@ function qualificationDe(
   return { motif, adhesion, rappelDemande: !adhesion && motif?.requiresCallback === true };
 }
 
-function draftDe(
+export function draftDe(
   choisi: MotifAppel,
   callbackAt: string | null,
   conversion: ConversionDraft | null,
@@ -1752,7 +1752,7 @@ function EnTeteFiche({
   );
 }
 
-const titreEcheance = (code: string | undefined): string => {
+export const titreEcheance = (code: string | undefined): string => {
   if (code === 'RDV_TELEPHONIQUE') return 'Date et heure du rendez-vous téléphonique';
   if (code === 'RV_CPI' || code === 'RV_SITE' || code === 'RV_EXTERNE' || code === 'RENDEZ_VOUS') {
     return 'Date et heure du rendez-vous';
@@ -1786,9 +1786,7 @@ export function Commentaire({
         id="console-comment"
         ref={inputRef}
         value={value}
-        onChange={(event) => {
-          onChange(event.target.value);
-        }}
+        onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key !== 'Enter' || event.shiftKey) return;
           event.preventDefault();
