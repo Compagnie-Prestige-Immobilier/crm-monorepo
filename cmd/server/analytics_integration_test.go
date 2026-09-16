@@ -387,6 +387,20 @@ func TestSupervisionActiviteDeLaFenetre(t *testing.T) {
 	totaux = analyticsObjet(b, "totaux hors fenêtre", body["totals"])
 	analyticsEgal(b, "appels hors fenêtre", totaux["calls"], 0)
 	analyticsNul(b, "sans appel le taux est nul, jamais 0", totaux["reachRate"])
+
+	ccpID, _ := adminCompte(b, "CCP")
+	plateforme := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	analyticsExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, plateforme)
+	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt")
+		VALUES ($1,$2,$3,'OTHER'::"CallOutcome",$4::timestamp)`, uuid.NewString(), plateforme, ccpID, instantAnalytics)
+	analyticsViderCache()
+	parCCP := "?commercialId=" + ccpID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/activite"+parCCP, nil, false)
+	b.attend(statut, http.StatusOK, "activité d'un CCP", body)
+	totaux = analyticsObjet(b, "totaux du CCP", body["totals"])
+	analyticsEgal(b, "l'appel du CCP sur une fiche plateforme compte", totaux["calls"], 1)
+	ligne = analyticsObjet(b, "ligne du CCP", analyticsListe(b, "une ligne pour le CCP", body["items"], 1)[0])
+	analyticsTexte(b, "le CCP est de l'équipe", ligne["teleconseillerId"], ccpID)
 }
 
 func TestSupervisionCampagnesEtStock(t *testing.T) {
