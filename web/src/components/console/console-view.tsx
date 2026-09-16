@@ -1201,6 +1201,7 @@ export function Consignation({
   const choisirPrecision = (choisie: MotifAppel | null): void => {
     if (statut === null) return;
     setPrecision(choisie);
+    setCallbackAt(null);
     allerA(pasApresMotif(choisie ?? statut));
   };
 
@@ -1210,6 +1211,10 @@ export function Consignation({
   };
 
   const validerEcheance = (): void => {
+    if (callbackAt !== null) {
+      setPas('note');
+      return;
+    }
     const iso = dakarLocalToIso(freeCallback);
     if (iso === null) {
       toast.error('Choisissez une échéance, ou saisissez sa date et son heure.');
