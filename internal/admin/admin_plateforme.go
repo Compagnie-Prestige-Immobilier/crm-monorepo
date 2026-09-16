@@ -4,12 +4,16 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/database"
+	"cpi-go/internal/shared/socle"
 	"errors"
 	"log/slog"
+	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"time"
 
+	"github.com/danielgtaylor/huma/v2"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 )
@@ -121,6 +125,87 @@ func (s *service) remettreRappelsPlateformeAuxCCP(ctx context.Context) error {
 		slog.Info("rappels plateforme remis aux CCP", "fiches", len(prospects))
 	}
 	return nil
+}
+
+const cleObjectifCCP = "plateforme.objectifAppelsParJour"
+
+type PlateformeCCP struct {
+	ID              string  `json:"id"`
+	FullName        string  `json:"fullName"`
+	AppelsJour      int     `json:"appelsJour"`
+	JointsJour      int     `json:"jointsJour"`
+	AppelsSemaine   int     `json:"appelsSemaine"`
+	RappelsEnAttente int    `json:"rappelsEnAttente"`
+	DernierAppel    *string `json:"dernierAppel"`
+}
+
+type PlateformeEquipeOutput struct {
+	Body struct {
+		ObjectifAppelsParJour int             `json:"objectifAppelsParJour" doc:"Appels attendus par CCP et par jour. Zéro : aucun objectif."`
+		Ccps                  []PlateformeCCP `json:"ccps"`
+	}
+}
+
+type PlateformeObjectifInput struct {
+	Body struct {
+		ObjectifAppelsParJour int `json:"objectifAppelsParJour" minimum:"0" maximum:"1000"`
+	}
+}
+
+func (s *service) objectifCCP(ctx context.Context) (int, error) {
+	ligne, existe, err := s.reglage(ctx, cleObjectifCCP)
+	if err != nil || !existe {
+		return 0, err
+	}
+	objectif, _ := strconv.Atoi(ligne.Value)
+	return max(0, objectif), nil
+}
+
+// La journée et la semaine se comptent à l'heure de Dakar, du lundi.
+func (s *service) equipePlateforme(ctx context.Context, _ *struct{}) (*PlateformeEquipeOutput, error) {
+	local := time.Now().In(s.Cfg.TimeZone)
+	debutJour := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.Cfg.TimeZone)
+	depuisLundi := (int(local.Weekday()) + 6) % 7
+	debutSemaine := debutJour.AddDate(0, 0, -depuisLundi)
+	rows, err := s.Q.EquipeCCP(ctx, db.EquipeCCPParams{DebutJour: debutJour.UTC(), DebutSemaine: debutSemaine.UTC()})
+	if err != nil {
+		return nil, err
+	}
+	objectif, err := s.objectifCCP(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := &PlateformeEquipeOutput{}
+	out.Body.ObjectifAppelsParJour = objectif
+	out.Body.Ccps = make([]PlateformeCCP, 0, len(rows))
+	for _, r := range rows {
+		// 1970 : jamais appelé, la requête remplace le NULL que sqlc ne sait pas typer.
+		var dernier *string
+		if r.DernierAppel.Year() > 1970 {
+			iso := r.DernierAppel.UTC().Format(time.RFC3339)
+			dernier = &iso
+		}
+		out.Body.Ccps = append(out.Body.Ccps, PlateformeCCP{
+			ID: r.ID, FullName: r.FullName, AppelsJour: int(r.AppelsJour), JointsJour: int(r.JointsJour),
+			AppelsSemaine: int(r.AppelsSemaine), RappelsEnAttente: int(r.RappelsEnAttente), DernierAppel: dernier,
+		})
+	}
+	return out, nil
+}
+
+func (s *service) ecrireObjectifCCP(ctx context.Context, in *PlateformeObjectifInput) (*PlateformeEquipeOutput, error) {
+	acteur := socle.UtilisateurCourant(ctx).ID
+	if _, err := s.Q.UpsertSetting(ctx, db.UpsertSettingParams{
+		Key: cleObjectifCCP, Value: strconv.Itoa(in.Body.ObjectifAppelsParJour), UpdatedById: &acteur,
+	}); err != nil {
+		return nil, err
+	}
+	return s.equipePlateforme(ctx, nil)
+}
+
+func monterPlateforme(api huma.API, s *service) {
+	huma.Register(api, huma.Operation{OperationID: "getPlateformeEquipe", Method: http.MethodGet, Path: "/api/v1/plateforme/equipe"}, s.equipePlateforme)
+	huma.Register(api, huma.Operation{OperationID: "putPlateformeObjectif", Method: http.MethodPut, Path: "/api/v1/plateforme/objectif"}, s.ecrireObjectifCCP)
 }
 
 func hoteDe(base string) *string {

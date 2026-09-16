@@ -154,7 +154,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await expect(dialogue.getByRole('radio', { name: /Fiches importées/u })).toBeChecked();
     await dialogue.getByRole('combobox', { name: 'Import', exact: true }).click();
     await page.getByRole('option', { name: ONGLET }).click();
-    await expect(dialogue.getByRole('radio', { name: /Tous les prospects/u })).toBeChecked();
+    await expect(dialogue.getByRole('radio', { name: /CHUES et Grand Public/u })).toBeChecked();
     await dialogue.getByText('Prospects Grand Public', { exact: true }).click();
     await dialogue.getByRole('button', { name: 'Continuer' }).click();
     await dialogue.getByRole('button', { name: 'Tout décocher' }).click();
