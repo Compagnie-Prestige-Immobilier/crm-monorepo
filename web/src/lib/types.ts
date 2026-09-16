@@ -398,5 +398,7 @@ export interface ReferenceData {
   pays: Pays[];
   regions: Region[];
   commerciaux: FilterOption[];
+  /** Une fiche n'est pas creee que par un teleconseiller : le filtre les porte tous. */
+  utilisateurs: FilterOption[];
   representants: FilterOption[];
 }
