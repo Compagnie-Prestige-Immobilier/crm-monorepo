@@ -275,11 +275,13 @@ test.describe('parcours 5, la liste des prospects reste à l’encadrement', () 
 });
 
 test.describe('parcours 7, creer un prospect depuis la liste', () => {
-  test.use({ storageState: compteDe('ADMIN').etat });
+  // Le superviseur ne modifie pas les lignes du tableau, mais il cree des
+  // fiches : la lecture seule effaçait pourtant son bouton.
+  test.use({ storageState: compteDe('SUPERVISEUR').etat });
 
-  // Sans filtre de projet, le bouton disparaissait : l'ecran n'offrait plus
-  // aucun geste a qui arrivait dessus.
-  test('le bouton reste offert sans filtre de projet, et demande lequel', async ({ page }) => {
+  test('le superviseur garde le bouton sans filtre de projet, et choisit lequel', async ({
+    page,
+  }) => {
     await page.goto('/teleconseil/prospects');
 
     const bouton = page.getByRole('button', { name: 'Nouveau prospect' });
