@@ -120,15 +120,19 @@ function regrouperProspects(
 
 export function ProspectsTable({
   canAdminister,
+  canReassign: canReassignProp,
   readOnly: readOnlyProp,
   campaignScoped: campaignScopedProp,
 }: {
   canAdminister: boolean;
+  /** SUPERVISEUR : réaffecter une fiche malgré la lecture seule du reste. */
+  canReassign?: boolean;
   readOnly?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
 }) {
   const readOnly = Boolean(readOnlyProp);
+  const canReassign = Boolean(canReassignProp);
   const campaignScoped = Boolean(campaignScopedProp);
   const { filters, setFilters } = useProspectFilters();
   const queryClient = useQueryClient();
@@ -163,6 +167,7 @@ export function ProspectsTable({
     const toutes = prospectColumns({
       projet: filters.projet,
       canAdminister: canAdminister && !readOnly,
+      canReassign,
       readOnly,
       onEdit: setEditing,
       onMerge: setMerging,
@@ -170,7 +175,7 @@ export function ProspectsTable({
       onDelete: setDeleting,
     });
     return regroupement === 'projet' ? toutes.filter((column) => column.id !== 'projet') : toutes;
-  }, [canAdminister, filters.projet, readOnly, regroupement]);
+  }, [canAdminister, canReassign, filters.projet, readOnly, regroupement]);
 
   const source = tableSourceData(data);
 

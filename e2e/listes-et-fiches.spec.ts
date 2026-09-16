@@ -279,7 +279,7 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
   // fiches : la lecture seule effaçait pourtant son bouton.
   test.use({ storageState: compteDe('SUPERVISEUR').etat });
 
-  test('le superviseur garde le bouton sans filtre de projet, et choisit lequel', async ({
+  test('le superviseur garde le bouton sans filtre de projet, et choisit ensuite', async ({
     page,
   }) => {
     await page.goto('/teleconseil/prospects');
@@ -289,10 +289,17 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
     await bouton.click();
 
     const fenetre = page.getByRole('dialog');
-    await expect(fenetre.getByText('Pour quel projet ?')).toBeVisible();
-    await fenetre.getByRole('button', { name: 'Grand Public', exact: true }).click();
-    await expect(
-      fenetre.getByRole('heading', { name: 'Nouveau prospect Grand Public' }),
-    ).toBeVisible();
+    await expect(fenetre.getByRole('heading', { name: 'Nouveau prospect' })).toBeVisible();
+
+    // Le projet se choisit au dernier pas de la console : les etapes suivantes
+    // restent fermees tant que la fiche n'est pas saisie.
+    const etapes = fenetre.getByRole('navigation', { name: 'Progression du formulaire' });
+    await expect(etapes.getByRole('button', { name: 'Identité' })).toHaveAttribute(
+      'aria-current',
+      'step',
+    );
+    const dernier = etapes.getByRole('listitem').last().getByRole('button');
+    await expect(dernier).toHaveAccessibleName(/Projet/u);
+    await expect(dernier).toBeDisabled();
   });
 });
