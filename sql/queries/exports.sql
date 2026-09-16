@@ -137,7 +137,7 @@ LIMIT 1000;
 
 -- name: ExportGlobalCampagnes :many
 SELECT
-  l."id", l."name", l."cible"::text AS cible, l."projet"::text AS projet,
+  l."id", l."name", l."cible"::text AS cible, COALESCE(l."projet"::text, '')::text AS projet,
   l."itemCount", l."filters", u."fullName" AS cree_par, l."createdById", l."createdAt"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"

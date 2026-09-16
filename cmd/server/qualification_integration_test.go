@@ -4,6 +4,7 @@ package main
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/json"
 	"fmt"
 	"maps"
@@ -98,7 +99,8 @@ func qualificationProspect(b *banc) string {
 // Distinct par fiche : l'index unique partiel sur `phoneE164` refuserait deux
 // fiches de test au même numéro.
 func qualificationNumero() string {
-	return fmt.Sprintf("+2217%08d", time.Now().UnixNano()%100000000)
+	u := uuid.New()
+	return fmt.Sprintf("+2217%08d", binary.BigEndian.Uint32(u[:4])%100000000)
 }
 
 func qualificationCompte(b *banc, requete string, args ...any) int {
@@ -739,7 +741,7 @@ func TestCodificationLeads(t *testing.T) {
 		aAppeler bool
 	}{
 		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, issue: "OTHER", phase2: "PENDING", prenom: "Aminata"},
-		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "PENDING", rappels: 1, prenom: "Awa", aAppeler: true},
+		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "PENDING", rappels: 1, prenom: "Awa"},
 		{
 			motif: "HESITANT", extra: map[string]any{"method": "APPOINTMENT", "rendezVousAt": dansUneHeure, "incomeBandId": revenu, "dureeEtablissementMois": 12},
 			issue: "METHOD_OBTAINED", phase2: "METHOD_OBTAINED", prenom: "Awa",
