@@ -422,7 +422,15 @@ WHERE p."deletedAt" IS NULL
   AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
-  AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
+  -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
+  -- l'onglet du jour se repartit entre eux. Le selecteur les groupe par onglet
+  -- et ne peut rendre qu'un identifiant : borner sur ce seul travail ne tirait
+  -- que sa part, parfois aucune fiche.
+  AND (sqlc.narg('import_job_id')::text IS NULL
+       OR p."importJobId" = sqlc.narg('import_job_id')
+       OR (sqlc.narg('import_feuille')::text IS NOT NULL
+           AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+                       WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
@@ -444,7 +452,15 @@ WHERE p."deletedAt" IS NULL
   AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
-  AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
+  -- Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
+  -- l'onglet du jour se repartit entre eux. Le selecteur les groupe par onglet
+  -- et ne peut rendre qu'un identifiant : borner sur ce seul travail ne tirait
+  -- que sa part, parfois aucune fiche.
+  AND (sqlc.narg('import_job_id')::text IS NULL
+       OR p."importJobId" = sqlc.narg('import_job_id')
+       OR (sqlc.narg('import_feuille')::text IS NOT NULL
+           AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
+                       WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
   AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée

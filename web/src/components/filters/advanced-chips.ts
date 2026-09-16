@@ -75,7 +75,7 @@ const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
   enrollmentCapturedById: (filters, reference) =>
     filters.enrollmentCapturedById === null
       ? null
-      : optionLabel(reference?.commerciaux ?? [], filters.enrollmentCapturedById),
+      : optionLabel(reference?.utilisateurs ?? [], filters.enrollmentCapturedById),
 
   revue: (filters) => {
     if (filters.revue === null) return null;
