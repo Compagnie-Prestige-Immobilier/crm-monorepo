@@ -254,3 +254,22 @@ test.describe('parcours 7 en 390 px, les listes passent en cartes', () => {
     ).toBeLessThanOrEqual(mesure.ecran + 1);
   });
 });
+
+// La liste des prospects suit le travail des autres : le téléconseiller et le
+// chargé de clientèle appellent depuis leur console, pas depuis cet écran.
+test.describe('parcours 5, la liste des prospects reste à l’encadrement', () => {
+  test.use({ storageState: compteDe('COMMERCIAL').etat });
+
+  test('le téléconseiller n’a ni l’onglet ni l’écran', async ({ page }) => {
+    await page.goto('/teleconseil/console');
+    const menu = page.getByRole('navigation', { name: 'Navigation principale' });
+    // L'entrée vit sous le repli « Plus » : fermé, il masquerait aussi bien un
+    // onglet resté visible qu'un onglet correctement retiré.
+    await menu.getByText('Plus', { exact: true }).click();
+    await expect(menu.getByRole('link', { name: 'Prospects', exact: true })).toHaveCount(0);
+
+    await page.goto('/teleconseil/prospects');
+    const refus = page.getByRole('alert').filter({ hasText: 'Accès refusé' });
+    await expect(refus.getByRole('heading', { name: 'Accès refusé', level: 2 })).toBeVisible();
+  });
+});

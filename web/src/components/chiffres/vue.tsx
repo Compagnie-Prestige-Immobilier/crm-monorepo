@@ -307,7 +307,6 @@ function LienRappels({
   );
 }
 
-/** Les campagnes d'appels prospects : les autres ne portent que des actes représentants. */
 function SelecteurCampagne({
   projet,
   value,
@@ -320,7 +319,6 @@ function SelecteurCampagne({
   const query = {
     page: 1,
     pageSize: 50,
-    cible: 'PROSPECTS' as const,
     ...(projet === null ? {} : { projet }),
   };
   const campagnes = useQuery({

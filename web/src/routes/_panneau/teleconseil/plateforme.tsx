@@ -11,5 +11,5 @@ export const Route = createFileRoute('/_panneau/teleconseil/plateforme')({
 /** Les fiches venues des plateformes d'enrôlement : seuls les CCP les appellent. */
 function PlateformePage() {
   const { user } = Route.useRouteContext();
-  return <ConsoleView viewerId={user.id} plateforme />;
+  return <ConsoleView viewerId={user.id} role={user.role} plateforme />;
 }

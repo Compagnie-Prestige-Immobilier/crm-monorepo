@@ -180,7 +180,7 @@ function PetitsMultiples({
               <figcaption className="text-center">
                 <span className="line-clamp-2 text-[0.8125rem] font-[600]">{ligne.ligne}</span>
                 {ligne.detail === undefined ? null : (
-                  <span className="block truncate text-[0.75rem] text-muted-foreground">
+                  <span className="block line-clamp-2 text-[0.75rem] text-muted-foreground">
                     {ligne.detail}
                   </span>
                 )}

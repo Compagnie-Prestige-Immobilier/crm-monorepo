@@ -148,13 +148,23 @@ func (perimetre perimetreSupervision) teleconseiller(p *parametresSQL) string {
 	return rolesDuPlateau + etSQL + `u."id" = ` + p.marque(perimetre.filtre.CommercialID)
 }
 
+// Un item de campagne vise UN représentant ou UN prospect : l'acte se borne par
+// la colonne de sa propre cible, comme le rendement des campagnes.
+func (perimetre perimetreSupervision) fichesDeLaCampagne(p *parametresSQL, cible, colonne string) string {
+	return `EXISTS (SELECT 1 FROM "lot_export_items" li
+	  WHERE li."` + cible + `" = ` + colonne + ` AND li."lotId" = ` + p.marque(perimetre.filtre.LotID) + `)`
+}
+
 // Un représentant est CHUES par construction : filtrer Grand Public le sort. Une
-// campagne d'appels prospects non plus n'a d'actes représentants.
-func (perimetre perimetreSupervision) representantsVisibles() string {
-	if perimetre.filtre.Projet == socle.ProjetGrandPublic || perimetre.filtre.LotID != "" {
+// campagne d'appels prospects n'a aucun item représentant, l'EXISTS le dit seul.
+func (perimetre perimetreSupervision) representantsVisibles(p *parametresSQL, colonne string) string {
+	if perimetre.filtre.Projet == socle.ProjetGrandPublic {
 		return clauseJamaisVraie
 	}
-	return clauseToujoursVraie
+	if perimetre.filtre.LotID == "" {
+		return clauseToujoursVraie
+	}
+	return perimetre.fichesDeLaCampagne(p, "representantId", colonne)
 }
 
 // La fiche regardée : son parcours porte le projet filtré, et la campagne
@@ -166,8 +176,7 @@ func (perimetre perimetreSupervision) ficheDuPerimetre(p *parametresSQL, colonne
 	  WHERE pj."prospectId" = `+colonne+` AND pj."projet" = `+p.marque(perimetre.filtre.Projet)+`::"Projet")`)
 	}
 	if perimetre.filtre.LotID != "" {
-		clauses = append(clauses, `EXISTS (SELECT 1 FROM "lot_export_items" li
-	  WHERE li."prospectId" = `+colonne+` AND li."lotId" = `+p.marque(perimetre.filtre.LotID)+`)`)
+		clauses = append(clauses, perimetre.fichesDeLaCampagne(p, "prospectId", colonne))
 	}
 	if len(clauses) == 0 {
 		return clauseToujoursVraie

@@ -30,6 +30,11 @@ function GrandPublicConsolePage() {
   const canCreateProspect = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
 
   return (
-    <ConsoleView projet="GRAND_PUBLIC" viewerId={user.id} canCreateProspect={canCreateProspect} />
+    <ConsoleView
+      projet="GRAND_PUBLIC"
+      viewerId={user.id}
+      role={user.role}
+      canCreateProspect={canCreateProspect}
+    />
   );
 }
