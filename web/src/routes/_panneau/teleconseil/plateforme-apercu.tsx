@@ -5,7 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/plateforme-apercu')({
-  beforeLoad: guardRoles(['CCP']),
+  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CCP']),
   component: PlateformeOverviewPage,
   pendingComponent: Loading,
 });
@@ -25,5 +25,6 @@ function Loading() {
 }
 
 function PlateformeOverviewPage() {
-  return <PlateformeOverview />;
+  const { user } = Route.useRouteContext();
+  return <PlateformeOverview encadrement={user.role !== 'CCP'} />;
 }

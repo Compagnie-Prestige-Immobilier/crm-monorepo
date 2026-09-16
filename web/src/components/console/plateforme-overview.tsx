@@ -27,20 +27,15 @@ function themePour(theme: ReturnType<typeof useChartTheme>) {
   };
 }
 
-export function PlateformeOverview() {
+export function PlateformeOverview({ encadrement }: { encadrement: boolean }) {
   const resultats = useQueries({
     queries: projets.map((projet) => ({
-      queryKey: ['plateforme-overview', projet.value],
+      queryKey: ['plateforme-overview', projet.value, encadrement],
       queryFn: async () => {
+        const base = { projet: projet.value, search: '', plateforme: true, tous: encadrement };
         const [tous, aAppeler] = await Promise.all([
-          fetchProspectsAQualifier({ projet: projet.value, search: '', plateforme: true, page: 1 }),
-          fetchProspectsAQualifier({
-            projet: projet.value,
-            search: '',
-            plateforme: true,
-            resteAAppeler: true,
-            page: 1,
-          }),
+          fetchProspectsAQualifier({ ...base, page: 1 }),
+          fetchProspectsAQualifier({ ...base, resteAAppeler: true, page: 1 }),
         ]);
         return { total: tous.total, aAppeler: aAppeler.total };
       },
@@ -67,16 +62,16 @@ export function PlateformeOverview() {
           Pilotage CCP
         </p>
         <h1 id="plateforme-apercu-titre" className="mt-1 font-display text-3xl font-bold">
-          Aperçu plateforme
+          Suivi de la file plateforme
         </h1>
         <p className="mt-2 text-muted-foreground">
-          Un point rapide sur les inscriptions à traiter.
+          Les contacts transmis par les plateformes, y compris les parcours interrompus.
         </p>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
         <Metric
-          title="Inscriptions"
+          title="Fiches de la file"
           value={total}
           detail="CHUES et Grand Public"
           loading={charge}
@@ -88,17 +83,17 @@ export function PlateformeOverview() {
           loading={charge}
         />
         <Metric
-          title="Déjà appelées"
+          title="Déjà traitées"
           value={appelees}
-          detail="Depuis leur inscription"
+          detail="Depuis leur arrivée dans la file"
           loading={charge}
         />
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>État de la file</CardTitle>
-          <CardDescription>Les inscriptions les plus récentes, par projet.</CardDescription>
+          <CardTitle>Progression de la file</CardTitle>
+          <CardDescription>Les fiches à appeler et déjà traitées, par projet.</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="h-72" aria-label="Graphique des inscriptions par projet">

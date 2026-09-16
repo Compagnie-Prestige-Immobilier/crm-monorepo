@@ -210,7 +210,7 @@ LEFT JOIN LATERAL (
 ) la ON TRUE`
 
 const exportSelectProspects = `
-SELECT p."id", p."nom", p."prenom", p."phoneE164",
+SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
   COALESCE(bq."name", '')::text, COALESCE(bq."shortName", '')::text, COALESCE(sy."sigle", '')::text,
   COALESCE(r."id", '')::text, COALESCE(r."fullName", '')::text, COALESCE(r."phoneE164", '')::text,
   COALESCE(d."name", '')::text, COALESCE(rc."fullName", '')::text, r."clientCreatedAt",
