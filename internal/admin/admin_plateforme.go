@@ -130,13 +130,13 @@ func (s *service) remettreRappelsPlateformeAuxCCP(ctx context.Context) error {
 const cleObjectifCCP = "plateforme.objectifAppelsParJour"
 
 type PlateformeCCP struct {
-	ID              string  `json:"id"`
-	FullName        string  `json:"fullName"`
-	AppelsJour      int     `json:"appelsJour"`
-	JointsJour      int     `json:"jointsJour"`
-	AppelsSemaine   int     `json:"appelsSemaine"`
-	RappelsEnAttente int    `json:"rappelsEnAttente"`
-	DernierAppel    *string `json:"dernierAppel"`
+	ID               string  `json:"id"`
+	FullName         string  `json:"fullName"`
+	AppelsJour       int     `json:"appelsJour"`
+	JointsJour       int     `json:"jointsJour"`
+	AppelsSemaine    int     `json:"appelsSemaine"`
+	RappelsEnAttente int     `json:"rappelsEnAttente"`
+	DernierAppel     *string `json:"dernierAppel"`
 }
 
 type PlateformeEquipeOutput struct {

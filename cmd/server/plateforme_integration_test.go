@@ -267,7 +267,9 @@ func TestEquipeCCPEtObjectifDuJour(t *testing.T) {
 	prospectID := adminProspect(b, b.userID, "GRAND_PUBLIC", adminTelephone())
 	adminExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, prospectID)
 	plateformeRappelPromis(b, prospectID, ccpID)
-	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'plateforme.objectifAppelsParJour'`) })
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'plateforme.objectifAppelsParJour'`)
+	})
 
 	statut, body := adminAppel(b, http.MethodPut, "/api/v1/plateforme/objectif", map[string]any{"objectifAppelsParJour": 40})
 	b.attend(statut, http.StatusOK, "objectif réglé", body)
