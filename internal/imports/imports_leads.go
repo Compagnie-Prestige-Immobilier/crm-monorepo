@@ -8,6 +8,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 const (
 	cleEmpreinteLeads        = "imports.leadsEmpreinte"
 	cleReleveSilencieuxLeads = "imports.leadsReleveSilencieux"
+	cleBilanLeads            = "imports.leadsBilan"
 	nomLeadsParDefaut        = "leads-marketing.xlsx"
 	delaiReleveLeads         = 2 * time.Minute
 	libelleChampDate         = "Date"
@@ -97,7 +99,14 @@ func (s *service) simulerPuisAppliquerLeads(ctx context.Context, jobID, nom stri
 	if s.releveSilencieux(ctx) {
 		return nil
 	}
-	return s.signalerReleveLeads(ctx, jobID)
+	job, err := s.Q.ImportJobByID(ctx, jobID)
+	if err != nil {
+		return err
+	}
+	if job.Status != db.ImportStatusSucceeded || job.Mode != db.ImportModeAPPLY {
+		return nil
+	}
+	return s.noterBilanLeads(ctx, &job)
 }
 
 // Un relevé forcé après un déploiement relit un classeur déjà connu : il ne
@@ -111,100 +120,89 @@ func (s *service) releveSilencieux(ctx context.Context) bool {
 	return supprimes > 0
 }
 
-// Le bilan du relevé part aux adresses réglées côté admin, appliqué ou refusé :
-// un classeur refusé se corrige d'autant plus vite qu'on le sait.
 func fichesCreeesLeads(creees int32) string {
-	if creees <= 1 {
+	if creees == 1 {
 		return fmt.Sprintf("%d nouvelle fiche", creees)
 	}
 	return fmt.Sprintf("%d nouvelles fiches", creees)
 }
 
-func (s *service) signalerReleveLeads(ctx context.Context, jobID string) error {
-	job, err := s.Q.ImportJobByID(ctx, jobID)
+func resumeBilanLeads(bilan bilanLeads) string {
+	if bilan.Creees > 0 {
+		return fichesCreeesLeads(bilan.Creees)
+	}
+	if bilan.MisesAJour == 1 {
+		return "1 fiche mise à jour"
+	}
+	return fmt.Sprintf("%d fiches mises à jour", bilan.MisesAJour)
+}
+
+type bilanLeads struct {
+	Creees     int32  `json:"creees"`
+	MisesAJour int32  `json:"misesAJour"`
+	Travail    string `json:"travail"`
+}
+
+func (s *service) noterBilanLeads(ctx context.Context, job *db.ImportJob) error {
+	bilan := bilanLeads{Travail: job.ID}
+	existant, err := s.Q.AppSettingParCle(ctx, cleBilanLeads)
+	if err == nil {
+		if err := json.Unmarshal([]byte(existant.Value), &bilan); err != nil {
+			return fmt.Errorf("bilan des leads illisible : %w", err)
+		}
+	}
+	if err != nil && !errors.Is(err, pgx.ErrNoRows) {
+		return err
+	}
+	bilan.Creees += job.CreatedRows
+	bilan.MisesAJour += job.UpdatedRows
+	bilan.Travail = job.ID
+	valeur, err := json.Marshal(bilan)
 	if err != nil {
 		return err
+	}
+	return s.Q.UpsertAppSetting(ctx, db.UpsertAppSettingParams{Key: cleBilanLeads, Value: string(valeur), UpdatedById: &job.RequestedById})
+}
+
+func (s *service) signalerBilanLeads(ctx context.Context) error {
+	existant, err := s.Q.AppSettingParCle(ctx, cleBilanLeads)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	var bilan bilanLeads
+	if err := json.Unmarshal([]byte(existant.Value), &bilan); err != nil {
+		return fmt.Errorf("bilan des leads illisible : %w", err)
+	}
+	if bilan.Creees == 0 && bilan.MisesAJour == 0 {
+		return nil
 	}
 	reglages, err := notifications.LireReglagesCourriels(ctx, s.Deps)
 	if err != nil {
 		return err
 	}
-	lues := int32(0)
-	if job.TotalRows != nil {
-		lues = *job.TotalRows
-	}
-	dateStr := time.Now().In(s.Cfg.TimeZone).Format("02/01/2006 à 15:04")
-	valeurs := map[string]string{
-		"fichier": job.FileName, "date": dateStr,
-		"lues": strconv.Itoa(int(lues)), "creees": strconv.Itoa(int(job.CreatedRows)),
-		"refusees": strconv.Itoa(int(job.ErrorRows)),
-	}
-
-	// Une ligne sans téléphone suffit à faire monter ErrorRows, et le classeur du
-	// marketing en porte toujours une : exiger zéro anomalie titrait « Échec » un
-	// relevé qui avait créé 167 fiches, et le privait de ses destinataires.
-	estSucces := job.Status == db.ImportStatusSucceeded && job.Mode == db.ImportModeAPPLY
-
-	// Le lecteur de ce relevé lance des campagnes, il ne corrige pas de classeur :
-	// les lignes lues et refusées ne lui servent qu'à s'inquiéter. Elles restent
-	// dans l'écran Imports et dans le courriel d'échec, qui part aux personnes en
-	// copie. Le nom du fichier ne bouge jamais d'un jour à l'autre : en objet, il
-	// donnait chaque matin le même message.
-	if estSucces {
-		rapport := rapportDuTravailImport(job.Report)
-		return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
-			Type:          notifications.CourrielImportLeads,
-			Sujet:         fmt.Sprintf("[Leads] %s, %s", fichesCreeesLeads(job.CreatedRows), time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
-			Destinataires: reglages.ImportLeads.Destinataires,
-			Copies:        reglages.ImportLeads.Copies,
-			ObjetType:     "import",
-			ObjetID:       job.ID,
-			Titre:         "Relevé des leads",
-			Intro:         "Les nouveaux leads sont disponibles pour le lancement d’une campagne.",
-			Lignes: [][2]string{
-				{libelleChampDate, dateStr},
-				{"Leads créés", valeurs["creees"]},
-				{"Fiches mises à jour", strconv.Itoa(int(job.UpdatedRows))},
-				{"Dates corrigées", strconv.Itoa(rapport.Compteurs[codeDateCorrigeeImport])},
-				{"Canaux à vérifier", strconv.Itoa(rapport.Compteurs[codeCanalAVerifierImport])},
-				{"Lignes ignorées", strconv.Itoa(int(job.SkippedRows))},
-				{"Lignes refusées", valeurs["refusees"]},
-			},
-			Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
-			LibelleLien: "Voir le détail dans CPI GO",
-		})
-	}
-
-	// Rien n'a été appliqué : seules les personnes en Cc sont prévenues, ce sont
-	// elles qui corrigent le classeur.
-	raisonErreur := "Simulation refusée ou anomalies détectées sur le fichier."
-	if job.FailureMsg != nil && *job.FailureMsg != "" {
-		raisonErreur = *job.FailureMsg
-	} else if job.ErrorRows > 0 {
-		raisonErreur = fmt.Sprintf("%d ligne(s) d'anomalie détectée(s) dans le classeur.", job.ErrorRows)
-	}
-
-	return notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
+	if err := notifications.EnvoyerCourriel(ctx, s.Deps, &notifications.Courriel{
 		Type:          notifications.CourrielImportLeads,
-		Sujet:         "[Leads] Échec du relevé des leads : " + job.FileName,
-		Destinataires: reglages.ImportLeads.Copies, // Envoi uniquement aux personnes en Cc
-		Copies:        nil,
+		Sujet:         fmt.Sprintf("[Leads] %s, %s", resumeBilanLeads(bilan), time.Now().In(s.Cfg.TimeZone).Format("02/01/2006")),
+		Destinataires: reglages.ImportLeads.Destinataires,
+		Copies:        reglages.ImportLeads.Copies,
 		ObjetType:     "import",
-		ObjetID:       job.ID,
-		Titre:         "Échec du relevé des leads",
-		Intro: fmt.Sprintf("Le traitement du fichier %s du %s n’a pas permis d’importer correctement le classeur des leads. Aucune campagne ne doit pouvoir être lancée à partir de ce fichier tant que l’import n’a pas été effectué avec succès.",
-			job.FileName, dateStr),
+		ObjetID:       bilan.Travail,
+		Titre:         "Bilan des leads",
+		Intro:         "Les nouveaux leads sont disponibles pour le lancement d’une campagne.",
 		Lignes: [][2]string{
-			{"Fichier", job.FileName},
-			{libelleChampDate, dateStr},
-			{"Leads lus", valeurs["lues"]},
-			{"Leads créés", valeurs["creees"]},
-			{"Statut", "Échec / Refusé"},
-			{"Erreur", raisonErreur},
+			{"Leads créés", strconv.Itoa(int(bilan.Creees))},
+			{"Fiches mises à jour", strconv.Itoa(int(bilan.MisesAJour))},
 		},
 		Lien:        socle.Env("PUBLIC_WEB_URL", "") + "/admin/imports",
-		LibelleLien: "Consulter l'échec dans CPI GO",
-	})
+		LibelleLien: "Voir le détail dans CPI GO",
+	}); err != nil {
+		return err
+	}
+	_, err = s.Q.SupprimerAppSetting(ctx, cleBilanLeads)
+	return err
 }
 
 // SharePoint pose un cookie au premier passage et sert le classeur au second :
