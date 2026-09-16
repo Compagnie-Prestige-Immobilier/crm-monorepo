@@ -94,12 +94,14 @@ function destinatairesPossibles(
 export function LotExportFiches({
   lot,
   peutReaffecter,
+  teleconseillerInitial,
 }: {
   lot: LotExportDetail;
   peutReaffecter: boolean;
+  teleconseillerInitial: string;
 }) {
   const queryClient = useQueryClient();
-  const [teleconseillerId, setTeleconseillerId] = useState<string>(TOUS);
+  const [teleconseillerId, setTeleconseillerId] = useState<string>(teleconseillerInitial);
   const [etat, setEtat] = useState<string>(TOUS);
   const [page, setPage] = useState(1);
   const [cochees, setCochees] = useState<readonly number[]>([]);
