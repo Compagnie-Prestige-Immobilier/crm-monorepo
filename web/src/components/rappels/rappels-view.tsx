@@ -85,6 +85,129 @@ function filterCallbackBySearch(cb: Callback, search: string): boolean {
   );
 }
 
+function RappelsTable({
+  list,
+  filteredItems,
+  canFilter,
+  racine,
+  scope,
+  cancelPending,
+  onCancel,
+}: {
+  list: UseQueryResult<{ items: Callback[]; total: number; serverTime: string }>;
+  filteredItems: Callback[];
+  canFilter: boolean;
+  racine: string;
+  scope: CallbackScope;
+  cancelPending: boolean;
+  onCancel: (callback: Callback) => void;
+}) {
+  if (list.isPending) return <Skeleton className="h-64" />;
+  if (list.isError) {
+    return (
+      <QueryErrorState
+        error={list.error}
+        fallback="Les rappels n’ont pas pu être lus."
+        onRetry={() => {
+          void list.refetch();
+        }}
+      />
+    );
+  }
+  if (list.data.items.length === 0) {
+    return (
+      <EmptyState
+        icon={ClockIcon}
+        title={EMPTY_TEXT[scope].title}
+        description={EMPTY_TEXT[scope].description}
+      />
+    );
+  }
+  return (
+    <>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Prospect</TableHead>
+            <TableHead>Projet</TableHead>
+            <TableHead>Échéance</TableHead>
+            <TableHead>Retard</TableHead>
+            <TableHead>Commentaire</TableHead>
+            {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
+            <TableHead>
+              <span className="sr-only">Actions</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {filteredItems.map((callback) => (
+            <TableRow key={callback.id}>
+              <TableCell>
+                <Link
+                  href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                  className="font-[600] underline-offset-4 hover:underline"
+                >
+                  {callback.prospectName === ''
+                    ? formatPhone(callback.phoneE164)
+                    : callback.prospectName}
+                </Link>
+                <span className="block text-[0.8125rem] tabular-nums text-muted-foreground">
+                  {formatPhone(callback.phoneE164)}
+                </span>
+              </TableCell>
+              <TableCell>
+                <ProjetBadge projet={callback.projet} />
+              </TableCell>
+              <TableCell>
+                <time dateTime={callback.scheduledAt}>
+                  {formatCallbackAt(callback.scheduledAt, Date.parse(list.data.serverTime))}
+                </time>
+              </TableCell>
+              <TableCell>
+                {callback.overdue ? (
+                  <Badge variant="destructive">
+                    {formatDelay(
+                      Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
+                    )}
+                  </Badge>
+                ) : (
+                  <Badge variant="secondary">À venir</Badge>
+                )}
+              </TableCell>
+              <TableCell className="max-w-80 text-muted-foreground">
+                {callback.comment ?? ''}
+              </TableCell>
+              {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
+              <TableCell>
+                <div className="flex justify-end gap-2">
+                  <Link
+                    href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
+                    className={buttonVariants({ variant: 'default', size: 'sm' })}
+                  >
+                    <PhoneCallIcon aria-hidden="true" />
+                    Consigner l’appel
+                  </Link>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    disabled={cancelPending}
+                    onClick={() => {
+                      onCancel(callback);
+                    }}
+                  >
+                    Annuler
+                  </Button>
+                </div>
+              </TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+      <NoteListeTronquee affichees={list.data.items.length} total={list.data.total} />
+    </>
+  );
+}
+
 export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const racine = '/teleconseil';
   const queryClient = useQueryClient();
@@ -103,11 +226,8 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
     queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
   });
 
-  const filteredItems = (list.data?.items ?? []).filter((cb) =>
-    filterCallbackBySearch(cb, search),
-  );
+  const filteredItems = (list.data?.items ?? []).filter((cb) => filterCallbackBySearch(cb, search));
 
-  // Les CCP promettent aussi des rappels, sur les fiches plateforme.
   const teleconseillers = useQuery({
     queryKey: callbackKeys.teleconseillers,
     queryFn: async () => {
@@ -134,116 +254,6 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   });
 
   const overdueCount = overdue.data?.items.length ?? 0;
-
-  const renderBody = () => {
-    if (list.isPending) return <Skeleton className="h-64" />;
-    if (list.isError) {
-      return (
-        <QueryErrorState
-          error={list.error}
-          fallback="Les rappels n’ont pas pu être lus."
-          onRetry={() => {
-            void list.refetch();
-          }}
-        />
-      );
-    }
-    if (list.data.items.length === 0) {
-      return (
-        <EmptyState
-          icon={ClockIcon}
-          title={EMPTY_TEXT[scope].title}
-          description={EMPTY_TEXT[scope].description}
-        />
-      );
-    }
-    return (
-      <>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Prospect</TableHead>
-              <TableHead>Projet</TableHead>
-              <TableHead>Échéance</TableHead>
-              <TableHead>Retard</TableHead>
-              <TableHead>Commentaire</TableHead>
-              {canFilter ? <TableHead>Téléconseiller</TableHead> : null}
-              <TableHead>
-                <span className="sr-only">Actions</span>
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredItems.map((callback) => (
-              <TableRow key={callback.id}>
-                <TableCell>
-                  <Link
-                    href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                    className="font-[600] underline-offset-4 hover:underline"
-                  >
-                    {callback.prospectName === ''
-                      ? formatPhone(callback.phoneE164)
-                      : callback.prospectName}
-                  </Link>
-                  <span className="block text-[0.8125rem] tabular-nums text-muted-foreground">
-                    {formatPhone(callback.phoneE164)}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <ProjetBadge projet={callback.projet} />
-                </TableCell>
-                <TableCell>
-                  <time dateTime={callback.scheduledAt}>
-                    {formatCallbackAt(
-                      callback.scheduledAt,
-                      Date.parse(list.data.serverTime),
-                    )}
-                  </time>
-                </TableCell>
-                <TableCell>
-                  {callback.overdue ? (
-                    <Badge variant="destructive">
-                      {formatDelay(
-                        Date.parse(list.data.serverTime) - Date.parse(callback.scheduledAt),
-                      )}
-                    </Badge>
-                  ) : (
-                    <Badge variant="secondary">À venir</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="max-w-80 text-muted-foreground">
-                  {callback.comment ?? ''}
-                </TableCell>
-                {canFilter ? <TableCell>{callback.assignedToName}</TableCell> : null}
-                <TableCell>
-                  <div className="flex justify-end gap-2">
-                    <Link
-                      href={`${racine}/console?fiche=${encodeURIComponent(callback.prospectId)}`}
-                      className={buttonVariants({ variant: 'default', size: 'sm' })}
-                    >
-                      <PhoneCallIcon aria-hidden="true" />
-                      Consigner l’appel
-                    </Link>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      disabled={cancel.isPending}
-                      onClick={() => {
-                        cancel.mutate(callback);
-                      }}
-                    >
-                      Annuler
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-        <NoteListeTronquee affichees={list.data.items.length} total={list.data.total} />
-      </>
-    );
-  };
 
   return (
     <div className="flex flex-col gap-6">
@@ -317,7 +327,19 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
         {SCOPES.map((tab) => (
           <TabsContent key={tab.value} value={tab.value}>
-            {scope === tab.value ? renderBody() : null}
+            {scope === tab.value ? (
+              <RappelsTable
+                list={list}
+                filteredItems={filteredItems}
+                canFilter={canFilter}
+                racine={racine}
+                scope={scope}
+                cancelPending={cancel.isPending}
+                onCancel={(cb) => {
+                  cancel.mutate(cb);
+                }}
+              />
+            ) : null}
           </TabsContent>
         ))}
       </Tabs>
