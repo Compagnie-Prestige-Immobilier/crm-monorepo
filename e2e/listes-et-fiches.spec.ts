@@ -273,3 +273,26 @@ test.describe('parcours 5, la liste des prospects reste à l’encadrement', () 
     await expect(refus.getByRole('heading', { name: 'Accès refusé', level: 2 })).toBeVisible();
   });
 });
+
+test.describe('parcours 7, creer un prospect depuis la liste', () => {
+  // Le superviseur ne modifie pas les lignes du tableau, mais il cree des
+  // fiches : la lecture seule effaçait pourtant son bouton.
+  test.use({ storageState: compteDe('SUPERVISEUR').etat });
+
+  test('le superviseur garde le bouton sans filtre de projet, et choisit lequel', async ({
+    page,
+  }) => {
+    await page.goto('/teleconseil/prospects');
+
+    const bouton = page.getByRole('button', { name: 'Nouveau prospect' });
+    await expect(bouton).toBeVisible();
+    await bouton.click();
+
+    const fenetre = page.getByRole('dialog');
+    await expect(fenetre.getByText('Pour quel projet ?')).toBeVisible();
+    await fenetre.getByRole('button', { name: 'Grand Public', exact: true }).click();
+    await expect(
+      fenetre.getByRole('heading', { name: 'Nouveau prospect Grand Public' }),
+    ).toBeVisible();
+  });
+});
