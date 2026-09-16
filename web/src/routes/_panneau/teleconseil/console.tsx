@@ -13,6 +13,7 @@ function ConsolePage() {
   return (
     <ConsoleView
       viewerId={user.id}
+      role={user.role}
       canCreateProspect={user.role === 'ADMIN' || user.role === 'SUPERVISEUR'}
     />
   );
