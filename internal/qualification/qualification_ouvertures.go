@@ -120,7 +120,8 @@ func qualificationBorneRappels(portee string, maintenant time.Time, zone *time.L
 func (s *service) qualificationListerRappels(ctx context.Context, in *QualificationRappelsInput) (*QualificationRappelsOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	maintenant := time.Now().UTC()
-	p := db.ListerRappelsParams{Avant: qualificationBorneRappels(in.Scope, maintenant, s.Cfg.TimeZone)}
+	borne := qualificationBorneRappels(in.Scope, maintenant, s.Cfg.TimeZone)
+	p := db.ListerRappelsParams{Avant: &borne}
 	if in.Projet != "" {
 		p.Projet = &in.Projet
 	}
