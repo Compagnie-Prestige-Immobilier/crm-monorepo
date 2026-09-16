@@ -2,22 +2,11 @@
 UPDATE "prospects" SET "plateformeDepuis" = @depuis::timestamp, "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL AND "plateformeDepuis" IS NULL;
 
--- `toutes` : une fiche plateforme quitte toutes ses campagnes ; une fiche qui
--- change de projet ne quitte que celles d'un autre projet, la campagne « Tous
--- les prospects » la garde.
 -- name: LotsDuProspect :many
-SELECT i."lotId", i."position", i."assigneeId"
-FROM "lot_export_items" i
-JOIN "lots_export" l ON l."id" = i."lotId"
-JOIN "prospects" p ON p."id" = i."prospectId"
-WHERE i."prospectId" = @prospect_id
-  AND (@toutes::boolean OR (l."projet" IS NOT NULL AND l."projet" <> p."projet"));
+SELECT "lotId", "position", "assigneeId" FROM "lot_export_items" WHERE "prospectId" = @prospect_id;
 
 -- name: RetirerProspectDesCampagnes :exec
-DELETE FROM "lot_export_items" i
-USING "lots_export" l, "prospects" p
-WHERE i."prospectId" = @prospect_id AND l."id" = i."lotId" AND p."id" = i."prospectId"
-  AND (@toutes::boolean OR (l."projet" IS NOT NULL AND l."projet" <> p."projet"));
+DELETE FROM "lot_export_items" WHERE "prospectId" = @prospect_id;
 
 -- Le CCP qui porte le moins de rappels en attente, puis le plus ancien : deux
 -- transferts le même jour se répartissent.

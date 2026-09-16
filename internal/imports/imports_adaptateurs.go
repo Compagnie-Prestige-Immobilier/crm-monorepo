@@ -1332,43 +1332,30 @@ func mettreAJourGrandPublicImport(ctx context.Context, q *db.Queries, c contexte
 	return misAJour, inchangees, nil
 }
 
-// La dernière ligne lue fait foi. Le parcours du projet lu s'assure toujours ;
-// l'ancien est reprojeté avant, sinon son NOT EXISTS le retiendrait. Un projet
-// qui change ou une marque plateforme neuve sortent la fiche des campagnes.
+// Une fiche connue garde son projet : le classeur recodifie parfois le même
+// numéro d'un onglet à l'autre, et chaque relevé la sortait de sa campagne.
+// Canal, note du classeur et marque plateforme suivent la dernière ligne lue.
 func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,
 	ligne *ligneGrandPublicImport, connue connuImport,
 ) (bool, error) {
-	if connue.projet != ligne.projet {
-		if _, err := q.ImportReprojeterParcours(ctx, db.ImportReprojeterParcoursParams{
-			ProspectID: connue.id, Ancien: connue.projet, Nouveau: ligne.projet,
-		}); err != nil {
-			return false, err
-		}
-	}
 	maintenant := time.Now()
-	parcours := []db.InsertImportProspectJourneyParams{{ID: identifiantImport(), ProspectID: connue.id, Projet: ligne.projet, ConsentAt: &maintenant}}
+	parcours := []db.InsertImportProspectJourneyParams{{ID: identifiantImport(), ProspectID: connue.id, Projet: connue.projet, ConsentAt: &maintenant}}
 	if err := executerLotImport(q.InsertImportProspectJourney(ctx, parcours).Exec); err != nil {
 		return false, err
 	}
 	rangs, err := q.ImportMettreAJourProspectGrandPublic(ctx, db.ImportMettreAJourProspectGrandPublicParams{
-		ID: connue.id, Projet: ligne.projet, CanalProvenanceID: ligne.canalID, RemarqueImport: ligne.remarque,
+		ID: connue.id, CanalProvenanceID: ligne.canalID, RemarqueImport: ligne.remarque,
 		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email, PlateformeDepuis: ligne.plateformeDepuis,
 	})
 	if err != nil || rangs == 0 {
 		return false, err
 	}
-	if err := database.Auditer(ctx, q, c.demandeur, "prospect.import", "prospect", connue.id,
-		map[string]any{"projet": connue.projet},
+	if err := database.Auditer(ctx, q, c.demandeur, "prospect.import", "prospect", connue.id, nil,
 		map[string]any{
-			"projet": ligne.projet, "canalProvenanceId": ligne.canalID, "remarqueImport": ligne.remarque,
+			"canalProvenanceId": ligne.canalID, "remarqueImport": ligne.remarque,
 			"plateformeDepuis": ligne.plateformeDepuis, "onglet": ligne.feuille,
 		}); err != nil {
 		return false, err
-	}
-	if connue.projet != ligne.projet {
-		if err := database.RetirerDesCampagnes(ctx, q, c.demandeur, "lot_export.hors_projet", connue.id, false); err != nil {
-			return false, err
-		}
 	}
 	if ligne.plateformeDepuis != nil && !connue.plateforme {
 		return true, database.PasserAuxCCP(ctx, q, c.demandeur, connue.id)
