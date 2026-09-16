@@ -423,7 +423,7 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 		return Compte{}, err
 	}
 	roleChange := chg.role != nil && socle.Role(existant.Role) != *chg.role
-	if err := s.quitterLesEquipes(ctx, roleChange, chg.role, id); err != nil {
+	if err := s.quitterLesEquipes(ctx, roleChange, chg.role, chg.actif, id); err != nil {
 		return Compte{}, err
 	}
 
@@ -446,8 +446,10 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 }
 
 // Un rôle qui ne siège plus dans une équipe de campagne en sort avant d'être écrit.
-func (s *service) quitterLesEquipes(ctx context.Context, roleChange bool, role *socle.Role, id string) error {
-	if !roleChange || slices.Contains(campagnes.RolesEquipe, *role) {
+func (s *service) quitterLesEquipes(ctx context.Context, roleChange bool, role *socle.Role, actif *bool, id string) error {
+	quitteParRole := roleChange && !slices.Contains(campagnes.RolesEquipe, *role)
+	quitteParInactivation := actif != nil && !*actif
+	if !quitteParRole && !quitteParInactivation {
 		return nil
 	}
 	return campagnes.RetirerDesEquipes(ctx, s.Deps, id)
@@ -619,6 +621,9 @@ func (s *service) supprimerCompte(ctx context.Context, in *SupprimerCompteInput)
 		return nil, socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Compte introuvable.")
 	}
 	if err != nil {
+		return nil, err
+	}
+	if err := campagnes.RetirerDesEquipes(ctx, s.Deps, in.ID); err != nil {
 		return nil, err
 	}
 	if err := s.reprisePortefeuille(ctx, in.ID, texteAdmin(in.HandoverToID), acteur.ID); err != nil {
