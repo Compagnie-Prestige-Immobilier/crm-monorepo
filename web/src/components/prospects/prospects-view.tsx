@@ -64,7 +64,7 @@ export function ProspectsView({
         <div className="flex flex-wrap gap-2">
           {canExport ? <ProspectExportMenu filters={filters} /> : null}
           <CreateProspectButton
-            visible={peutCreerProjet(filters.projet, readOnly, canCreate, canCreateGrandPublic)}
+            visible={peutCreerProjet(filters.projet, canCreate, canCreateGrandPublic)}
             onClick={() => setCreateOpen(true)}
           />
         </div>
@@ -88,13 +88,14 @@ export function ProspectsView({
   );
 }
 
+// La lecture seule du tableau ne vaut pas pour ce bouton : le superviseur et la
+// direction ne modifient pas les lignes, mais ils creent des fiches, et le
+// serveur le leur accorde.
 function peutCreerProjet(
   projet: Projet | null,
-  readOnly: boolean,
   canCreateChues: boolean,
   canCreateGrandPublic: boolean,
 ): boolean {
-  if (readOnly) return false;
   // Sans filtre de projet, le bouton restait cache : la fenetre demande le
   // projet plutot que de faire disparaitre le seul geste de l'ecran.
   if (projet === null) return canCreateChues || canCreateGrandPublic;
