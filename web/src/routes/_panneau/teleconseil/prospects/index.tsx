@@ -40,6 +40,7 @@ function TeleconseilProspectsPage() {
         user.role,
       )}
       campaignScoped={user.role === 'COMMERCIAL'}
+      viewerId={['ADMIN', 'DIRECTION'].includes(user.role) ? user.id : undefined}
     />
   );
 }

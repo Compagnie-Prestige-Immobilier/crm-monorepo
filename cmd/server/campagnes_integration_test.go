@@ -672,3 +672,53 @@ func (b *bancCampagne) dansLeLot(lotID, prospectID string) bool {
 	b.t.Helper()
 	return b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, prospectID) == 1
 }
+
+// Un classeur releve plusieurs fois donne plusieurs travaux d'import, et
+// l'onglet du jour se repartit entre eux. Le selecteur de campagne groupe les
+// releves par onglet et ne peut rendre qu'un identifiant, le plus recent : le
+// 16 septembre 2026, l'onglet « Leads 13 sept » annoncait 93 fiches et la
+// creation repondait « Aucune fiche ne correspond aux criteres ».
+func TestCampagneOngletReparitiEntrePlusieursReleves(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Leads 13 sept " + uuid.NewString()
+	classeur := "Leads du 10 sept 2026 " + uuid.NewString() + ".xlsx"
+	premier, dernier := b.travailDImport(classeur), b.travailDImport(classeur)
+	if dernier < premier {
+		premier, dernier = dernier, premier
+	}
+	fiche := b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "importJobId" = $2 WHERE "id" = $1`, fiche, premier); err != nil {
+		t.Fatal(err)
+	}
+
+	// Le panneau envoie l'identifiant que le selecteur lui a donne.
+	corps := map[string]any{
+		"name": "Campagne onglet", "cible": "PROSPECTS",
+		"prospects": map[string]any{"importFeuille": feuille, "importJobId": dernier, "projet": "GRAND_PUBLIC"},
+		"distribution": map[string]any{
+			"teleconseillerIds": []string{b.agentA}, "fichesParJour": 3, "jours": 1,
+		},
+	}
+	b.apercuEligible(corps, 1, "apercu de l'onglet")
+
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps)
+	b.attend(statut, http.StatusCreated, "creation de la campagne", body)
+	lotID, _ := body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
+	if !b.dansLeLot(lotID, fiche) {
+		t.Fatalf("la fiche de l'onglet entre dans la campagne : %v", body)
+	}
+}
+
+func (b *bancCampagne) travailDImport(classeur string) string {
+	b.t.Helper()
+	id := uuid.Must(uuid.NewV7()).String()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "import_jobs" ("id","kind","status","mode","requestedById","fileName","fileBytes","storagePath","expiresAt","updatedAt")
+		 VALUES ($1,'PROSPECTS_GRAND_PUBLIC','succeeded','APPLY',$2,$3,1,'/tmp/x',now() + interval '1 day',now())`,
+		id, b.userID, classeur); err != nil {
+		b.t.Fatal(err)
+	}
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "id" = $1`, id) })
+	return id
+}
