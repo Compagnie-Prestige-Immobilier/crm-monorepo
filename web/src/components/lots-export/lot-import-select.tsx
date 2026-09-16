@@ -98,7 +98,10 @@ export function ChampImport({
   const lots = imports.data ?? [];
 
   return (
-    <Field label="Import" description="Un onglet par ligne, du plus récent au plus ancien.">
+    <Field
+      label="Import"
+      description="Un onglet par ligne. Le choix du projet détermine les fiches retenues."
+    >
       {(props) => (
         <Liste
           id={props.id}

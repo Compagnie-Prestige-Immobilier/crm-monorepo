@@ -641,7 +641,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	items := make([]db.InsertLotItemsParams, 0, len(lotAffectations))
 	for index, a := range lotAffectations {
 		item := db.InsertLotItemsParams{
-			LotId: lotID.String(), Position: lotInt32(index),
+			LotId: lotID.String(), Position: lotInt32(index + 1),
 			AssigneeId: lotPointeurTexte(a.assigneeID), Day: lotInt32(a.jour),
 		}
 		if lotSurRepresentants(in.Body.Cible) {
@@ -1346,6 +1346,11 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 	}
 	filtres := lotLireFiltres(row.Filters)
 	filtres.Distribution.TeleconseillerIds = equipe
+	for id := range filtres.Distribution.Objectifs {
+		if !slices.Contains(equipe, id) {
+			delete(filtres.Distribution.Objectifs, id)
+		}
+	}
 	if err := s.lotEcrireFiltres(ctx, q, row.ID, filtres); err != nil {
 		return err
 	}
