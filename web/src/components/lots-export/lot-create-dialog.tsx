@@ -368,7 +368,7 @@ export function LotCreateDialog({
 }) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col gap-0 overflow-hidden p-0 sm:max-w-2xl">
+      <DialogContent className="flex flex-col gap-0 p-0 sm:max-w-2xl">
         <FormulaireDeLot
           projet={projet}
           onCree={() => onOpenChange(false)}
