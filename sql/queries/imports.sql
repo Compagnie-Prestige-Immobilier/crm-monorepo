@@ -172,13 +172,12 @@ WHERE lower("email") = ANY(@emails::text[]) AND "deletedAt" IS NULL;
 -- name: ImportProspectsGrandPublicEcrits :many
 SELECT "id" FROM "prospects" WHERE "id" = ANY(@ids::text[]);
 
--- La dernière ligne lue l'emporte : projet, canal, note du classeur, marque
--- plateforme. Nom, prénom et courriel ne se posent que s'ils manquent, la date
--- de création et l'historique d'appels ne bougent pas. Zéro ligne : la fiche
--- était déjà telle que le classeur la dit.
+-- La dernière ligne lue l'emporte : canal, note du classeur, marque plateforme.
+-- Nom, prénom et courriel ne se posent que s'ils manquent ; projet, date de
+-- création et historique d'appels ne bougent pas. Zéro ligne : la fiche était
+-- déjà telle que le classeur la dit.
 -- name: ImportMettreAJourProspectGrandPublic :execrows
 UPDATE "prospects" SET
-  "projet" = @projet,
   "canalProvenanceId" = COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),
   "remarqueImport" = COALESCE(sqlc.narg('remarque_import'), "remarqueImport"),
   "nom" = CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
@@ -187,25 +186,14 @@ UPDATE "prospects" SET
   "plateformeDepuis" = COALESCE("plateformeDepuis", sqlc.narg('plateforme_depuis')),
   "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL
-  AND ("projet", "canalProvenanceId", "remarqueImport", "nom", "prenom", "email", "plateformeDepuis")
+  AND ("canalProvenanceId", "remarqueImport", "nom", "prenom", "email", "plateformeDepuis")
       IS DISTINCT FROM
-      (@projet, COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),
+      (COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),
        COALESCE(sqlc.narg('remarque_import'), "remarqueImport"),
        CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
        CASE WHEN "prenom" = '' THEN @prenom::text ELSE "prenom" END,
        COALESCE("email", sqlc.narg('email')),
        COALESCE("plateformeDepuis", sqlc.narg('plateforme_depuis')));
-
--- Le ciblage des campagnes lit prospect_journeys.projet : le parcours suit la
--- dernière ligne. Un parcours déjà travaillé garde son projet, la fiche gagne
--- l'autre parcours à côté.
--- name: ImportReprojeterParcours :execrows
-UPDATE "prospect_journeys" j SET "projet" = @nouveau::"Projet", "updatedAt" = now()
-WHERE j."prospectId" = @prospect_id AND j."projet" = @ancien::"Projet"
-  AND j."convertedAt" IS NULL AND j."closedAt" IS NULL
-  AND j."enrollmentCapturedAt" IS NULL AND j."consentById" IS NULL
-  AND NOT EXISTS (SELECT 1 FROM "prospect_conversions" c WHERE c."journeyId" = j."id")
-  AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" d WHERE d."prospectId" = j."prospectId" AND d."projet" = @nouveau::"Projet");
 
 -- name: ImportVisitesConnues :many
 SELECT "visitedAt", "timeKnown", "visitorName", "entrepriseId" FROM "visites"

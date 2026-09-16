@@ -94,14 +94,18 @@ SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
        "phoneE164", "whatsappStatus", "whatsappE164"
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 
--- Un rappel promis se tient, même quand la campagne a rendu la fiche.
+-- Un rappel promis se tient, même quand la campagne a rendu la fiche. Une fiche
+-- attribuée à un autre échappe à son créateur et à l'encadrement : deux
+-- personnes appelleraient la même.
 -- name: ProspectAttribue :one
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
     AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
-    AND (@tous::bool
-         OR p."createdById" = @agent
+    AND ((@tous::bool OR p."createdById" = @agent)
+         AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
+                         WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+                           AND lc."assigneeId" <> @agent)
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
@@ -113,8 +117,10 @@ SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
     AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
-    AND (@tous::bool
-         OR p."createdById" = @agent
+    AND ((@tous::bool OR p."createdById" = @agent)
+         AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
+                         WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+                           AND lc."assigneeId" <> @agent)
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
@@ -414,7 +420,12 @@ WHERE p."deletedAt" IS NULL
   AND p."phoneE164" IS NOT NULL
   AND (
     sqlc.arg('scope_all')::boolean
-    OR p."createdById" = sqlc.arg('scope_user_id')::text
+    OR (p."createdById" = sqlc.arg('scope_user_id')::text
+        AND NOT EXISTS (
+          SELECT 1 FROM "lot_export_items" lc
+          WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+            AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
+        ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li

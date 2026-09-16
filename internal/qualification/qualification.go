@@ -996,7 +996,8 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	return statut, etat, nil
 }
 
-// Un téléconseiller n'appelle que ses campagnes ; l'encadrement n'est pas borné.
+// Un téléconseiller n'appelle que ses campagnes ; l'encadrement consigne
+// partout sauf sur une fiche attribuée à quelqu'un d'autre.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
 		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP,
@@ -1006,7 +1007,8 @@ func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Ut
 		return err
 	}
 	if !mien {
-		return socle.Problem(http.StatusForbidden, "PHASE2_NOT_ASSIGNED", "Ce prospect n’est pas dans vos campagnes.")
+		return socle.Problem(http.StatusForbidden, "PHASE2_NOT_ASSIGNED",
+			"Ce prospect n’est pas dans vos campagnes, ou il est attribué à quelqu’un d’autre.")
 	}
 	return nil
 }

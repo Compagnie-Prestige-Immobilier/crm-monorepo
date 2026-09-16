@@ -154,6 +154,45 @@ func TestQualificationProspectGrandPublicNonAttribueRefuse(t *testing.T) {
 	b.attend(statut, http.StatusOK, "prospect Grand Public attribué par une campagne", body)
 }
 
+// La fiche saisie par un téléconseiller puis distribuée à un autre échappe à
+// son créateur et à l'encadrement : deux personnes appelleraient la même.
+func TestQualificationFicheAttribueeAUnAutreEchappeAuCreateurEtALEncadrement(t *testing.T) {
+	createur := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	autre, lot := uuid.NewString(), uuid.NewString()
+	prospect := qualificationProspect(createur)
+	qualificationExec(createur, `INSERT INTO "users" ("id","email","username","passwordHash","fullName","role","updatedAt")
+	                             VALUES ($1,$2,$1,'x','Autre Téléconseiller','COMMERCIAL',now())`, autre, autre+"@cpi.sn")
+	qualificationExec(createur, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                             VALUES ($1,'Prospects CHUES','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, autre)
+	qualificationExec(createur, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, prospect, autre)
+	t.Cleanup(func() {
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, prospect)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "users" WHERE "id" = $1`, autre)
+	})
+
+	for nom, b := range map[string]*banc{"le créateur": createur, "l'encadrement": superviseur} {
+		ouvrir := map[string]any{
+			"id": uuid.Must(uuid.NewV7()).String(), "prospectId": prospect,
+			"openedAt": time.Now().UTC().Format(time.RFC3339Nano),
+		}
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", ouvrir)
+		b.attend(statut, http.StatusNotFound, nom+" n'ouvre pas une fiche attribuée à un autre", body)
+		statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, nil))
+		b.attend(statut, http.StatusForbidden, nom+" ne consigne pas sur une fiche attribuée à un autre", body)
+		if body["code"] != "PHASE2_NOT_ASSIGNED" {
+			t.Fatalf("%s : code %v", nom, body["code"])
+		}
+	}
+
+	qualificationExec(createur, `DELETE FROM "lot_export_items" WHERE "lotId" = $1`, lot)
+	statut, body := qualificationEnvoi(createur, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, nil))
+	createur.attend(statut, http.StatusOK, "rendue par la campagne, la fiche revient à son créateur", body)
+}
+
 func TestQualificationTentativeProspectRejoueeNEcritQuUneLigne(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
