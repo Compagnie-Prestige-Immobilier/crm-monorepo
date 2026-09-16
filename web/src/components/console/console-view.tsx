@@ -562,7 +562,7 @@ function useConsoleFilters() {
     setters[key]?.(null);
   }, []);
 
-  const chips: AdvancedChip[] = [
+  const chips = [
     ...(representantId
       ? [{ key: 'representantId' as const, field: 'Représentant', value: representantId }]
       : []),

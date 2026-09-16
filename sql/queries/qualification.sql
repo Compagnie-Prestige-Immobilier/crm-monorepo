@@ -219,12 +219,17 @@ WHERE "id" = @id;
 -- name: ListerRappels :many
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        p."phoneE164", p."prenom", p."nom", p."projet",
+       cr."label" AS "reasonLabel",
        u."fullName" AS "assignedToName"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 JOIN "users" u ON u."id" = c."assignedToId"
+-- Le statut promis vient de l'appel qui l'a promis : « RV téléphonique » se lit ici.
+LEFT JOIN "call_attempts" a ON a."id" = c."sourceAttemptId"
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE c."status" = 'PENDING'
-  AND c."scheduledAt" <= @avant
+  AND (sqlc.narg('avant')::timestamp IS NULL
+       OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
        OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
   AND (sqlc.narg('plateforme')::boolean IS NULL
@@ -242,7 +247,8 @@ SELECT COUNT(*)::int
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
 WHERE c."status" = 'PENDING'
-  AND c."scheduledAt" <= @avant
+  AND (sqlc.narg('avant')::timestamp IS NULL
+       OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
        OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
   AND (sqlc.narg('plateforme')::boolean IS NULL

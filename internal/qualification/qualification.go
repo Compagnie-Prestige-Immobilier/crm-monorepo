@@ -1217,8 +1217,15 @@ func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 }
 
 func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative) error {
-	if t.callbackAt == nil {
-		return nil
+	quand := t.callbackAt
+	if quand == nil {
+		// Sans date, un statut qui promet un rappel le rend dû tout de suite :
+		// autrement la fiche ne figurerait dans aucune file.
+		if !t.regle.accepteCallbackAt {
+			return nil
+		}
+		au := b.ClientCreatedAt.UTC()
+		quand = &au
 	}
 	if err := q.SupplanterRappels(ctx, b.ProspectID); err != nil {
 		return err
@@ -1229,7 +1236,7 @@ func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.U
 	}
 	return q.InsererRappel(ctx, db.InsererRappelParams{
 		ID: id.String(), ProspectID: b.ProspectID, AssignedToID: u.ID,
-		ScheduledAt: *t.callbackAt, Comment: t.comment, SourceAttemptID: b.ID,
+		ScheduledAt: *quand, Comment: t.comment, SourceAttemptID: b.ID,
 	})
 }
 
