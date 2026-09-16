@@ -309,8 +309,8 @@ func TestCampagneReaffectationDeplaceEtTrace(t *testing.T) {
 
 func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
-	b.creer()
 	oublie := b.agent("Agent Coumba Fall")
+	b.creer()
 	aDonner := b.positionsDe(b.agentA)[:2]
 	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation", map[string]any{
 		"positions": aDonner, "versTeleconseillerId": oublie,
@@ -331,10 +331,10 @@ func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 
 func TestCampagneAjoutTeleconseillerSansPuisAvecFiches(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
+	oublie := b.agent("Agent Coumba Fall")
 	b.creer()
 	chemin := "/api/v1/lots-export/" + b.lotID + "/equipe"
 
-	oublie := b.agent("Agent Coumba Fall")
 	statut, body := b.appelCampagne(http.MethodPost, chemin, map[string]any{"teleconseillerId": oublie})
 	b.attend(statut, http.StatusOK, "ajout sans fiche", body)
 	if !campagneListeMembre(body["repartition"], oublie) || !campagneListeMembre(body["performance"], oublie) {
@@ -406,6 +406,61 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	b.attend(statut, http.StatusUnprocessableEntity, "retrait du dernier téléconseiller", body)
 	if body["code"] != "LOT_EXPORT_EQUIPE_VIDE" {
 		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+// Deux membres passés CCP : le premier se retire même si le second siège encore,
+// seuls ceux restés téléconseillers reprennent ses fiches.
+func TestCampagneRetraitDunMembreDontLeRoleAChange(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	agentC := b.agent("Agent Coumba Fall")
+	b.creer()
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "users" SET "role" = 'CCP' WHERE "id" IN ($1, $2)`, b.agentA, agentC); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "lots_export" SET "filters" = jsonb_set("filters", '{distribution,teleconseillerIds}',
+		   ("filters"->'distribution'->'teleconseillerIds') || to_jsonb($2::text)) WHERE "id" = $1`,
+		b.lotID, agentC); err != nil {
+		t.Fatal(err)
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
+		map[string]any{"teleconseillerId": b.agentA})
+	b.attend(statut, http.StatusOK, "retrait d'un membre devenu CCP", body)
+	if len(b.positionsDe(b.agentA)) != 0 || len(b.positionsDe(b.agentB)) != 10 || len(b.positionsDe(agentC)) != 0 {
+		t.Fatalf("seul le téléconseiller restant reprend : A %v, B %v, C %v",
+			b.positionsDe(b.agentA), b.positionsDe(b.agentB), b.positionsDe(agentC))
+	}
+}
+
+// Changer le rôle d'un téléconseiller le sort de ses campagnes, fiches reprises
+// et trace écrite ; la dernière personne d'une équipe ne change pas de rôle.
+func TestAdminChangementDeRoleRetireDesCampagnes(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+	admin := adminConnecte(t)
+
+	statut, body := adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentA, map[string]any{"role": "CCP"})
+	admin.attend(statut, http.StatusOK, "passage d'un membre de campagne en CCP", body)
+	if len(b.positionsDe(b.agentA)) != 0 || len(b.positionsDe(b.agentB)) != 10 {
+		t.Fatalf("les fiches du nouveau CCP reviennent à l'équipe : A %v, B %v", b.positionsDe(b.agentA), b.positionsDe(b.agentB))
+	}
+	if n := b.compte(`SELECT count(*)::int FROM "audit_logs" WHERE "entity" = 'lot_export' AND "entityId" = $1 AND "action" = 'lot_export.retrait'`,
+		b.lotID); n != 1 {
+		t.Fatalf("retrait non audité, %d entrées", n)
+	}
+	_, detail := b.appelCampagne(http.MethodGet, "/api/v1/lots-export/"+b.lotID, nil)
+	if campagneListeMembre(detail["repartition"], b.agentA) {
+		t.Fatalf("le CCP siège encore dans la campagne : %v", detail["repartition"])
+	}
+
+	statut, body = adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentB, map[string]any{"role": "CCP"})
+	admin.attend(statut, http.StatusUnprocessableEntity, "le dernier téléconseiller d'une campagne", body)
+	if body["code"] != "LOT_EXPORT_EQUIPE_VIDE" || !strings.Contains(texteDe(body["message"]), "Campagne test") {
+		t.Fatalf("refus attendu avec le nom de la campagne : %v", body)
+	}
+	if n := b.compte(`SELECT count(*)::int FROM "users" WHERE "id" = $1 AND "role" = 'COMMERCIAL'`, b.agentB); n != 1 {
+		t.Fatal("le rôle refusé ne doit pas changer")
 	}
 }
 
@@ -521,5 +576,77 @@ func TestCampagneMesAttributions(t *testing.T) {
 		if !slices.Contains(b.fiches, fiche.(string)) {
 			t.Fatalf("fiche étrangère au lot : %v", fiche)
 		}
+	}
+}
+
+func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut string) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","projet","updatedAt",
+		                          "importFeuille","lastCallOutcome","statut")
+		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,$6::"CallOutcome",$7::"ProspectStatut")`,
+		id, "+2217"+id[:8], b.userID, projet, feuille, issue, statut); err != nil {
+		b.t.Fatal(err)
+	}
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,$3::"Projet",now())`,
+		uuid.NewString(), id, projet); err != nil {
+		b.t.Fatal(err)
+	}
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, id) })
+	return id
+}
+
+// Quatre fiches : CHUES jamais appelée, CHUES injoignable, CHUES injoignable
+// puis close par un faux numéro, Grand Public jamais appelée. Sans projet, la
+// campagne prend CHUES et Grand Public ensemble ; « injoignables » ne garde que
+// la deuxième. Un superviseur coché compte pour autant qu'un téléconseiller.
+func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Feuille " + uuid.NewString()
+	injoignable := "UNREACHABLE"
+	b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	aRelancer := b.prospect(feuille, "CHUES", &injoignable, "NOUVEAU")
+	b.prospect(feuille, "CHUES", &injoignable, "PERDU")
+	b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
+
+	corps := func(projet string, injoignables bool) map[string]any {
+		prospects := map[string]any{"importFeuille": feuille, "injoignables": injoignables}
+		if projet != "" {
+			prospects["projet"] = projet
+		}
+		return map[string]any{
+			"name": "Campagne prospects", "cible": "PROSPECTS", "prospects": prospects,
+			"distribution": map[string]any{
+				"teleconseillerIds": []string{b.agentA, b.userID}, "fichesParJour": 3, "jours": 1,
+			},
+		}
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", false))
+	b.attend(statut, http.StatusOK, "aperçu tous projets", body)
+	if body["eligible"] != float64(3) || body["places"] != float64(6) || body["scopeLabel"] != "Tous projets" {
+		t.Fatalf("3 fiches des deux projets et 6 places attendues : %v", body)
+	}
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("CHUES", false))
+	b.attend(statut, http.StatusOK, "aperçu CHUES", body)
+	if body["eligible"] != float64(2) {
+		t.Fatalf("2 fiches CHUES attendues : %v", body)
+	}
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", true))
+	b.attend(statut, http.StatusOK, "aperçu des injoignables", body)
+	if body["eligible"] != float64(1) || body["scopeLabel"] != "Tous projets, injoignables" {
+		t.Fatalf("une seule fiche à relancer attendue : %v", body)
+	}
+
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps("", false))
+	b.attend(statut, http.StatusCreated, "création de la campagne", body)
+	lotID, _ := body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
+	if body["itemCount"] != float64(3) || body["projet"] != nil {
+		t.Fatalf("campagne sans projet à 3 fiches attendue : %v", body)
+	}
+	if fiches := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, aRelancer); fiches != 1 {
+		t.Fatalf("la fiche à relancer doit être dans la campagne : %d", fiches)
 	}
 }

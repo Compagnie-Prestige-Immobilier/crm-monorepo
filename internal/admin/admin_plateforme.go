@@ -105,6 +105,24 @@ func (s *service) retirerDesCampagnes(ctx context.Context, prospectID string) er
 	return database.PasserAuxCCP(ctx, s.Q, demandeur, prospectID)
 }
 
+// Un rappel promis sur une fiche plateforme quand aucun CCP n'existait encore
+// est resté chez le téléconseiller : chaque tirage le rattrape dès qu'un CCP est là.
+func (s *service) remettreRappelsPlateformeAuxCCP(ctx context.Context) error {
+	prospects, err := s.Q.ProspectsPlateformeAuxRappelsHorsCCP(ctx)
+	if err != nil {
+		return err
+	}
+	for _, prospectID := range prospects {
+		if err := s.retirerDesCampagnes(ctx, prospectID); err != nil {
+			return err
+		}
+	}
+	if len(prospects) > 0 {
+		slog.Info("rappels plateforme remis aux CCP", "fiches", len(prospects))
+	}
+	return nil
+}
+
 func hoteDe(base string) *string {
 	u, err := url.Parse(base)
 	if err != nil || u.Host == "" {

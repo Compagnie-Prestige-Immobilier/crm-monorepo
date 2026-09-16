@@ -107,7 +107,7 @@ func (s *service) lotMembresSansFiche(ctx context.Context, performance []Campagn
 	for _, membre := range rows {
 		performance = append(performance, CampagnePerformance{
 			TeleconseillerID: membre.ID, TeleconseillerName: membre.FullName,
-			Objectif: lotObjectifDe(membre.ID, membre.Role, stored),
+			Objectif: lotObjectifDe(membre.ID, stored),
 		})
 	}
 	return performance, nil

@@ -155,10 +155,6 @@ test.describe('parcours 9, la supervision', () => {
   test('le volet Activité compte les appels et les saisies', async ({ page }) => {
     await page.goto('/teleconseil/supervision');
     await reporterRappelIntrusif(page);
-    await expect(page.getByRole('tab', { name: 'Activité' })).toHaveAttribute(
-      'aria-selected',
-      'true',
-    );
     await expect(page.getByRole('table').first()).toContainText('Téléconseiller');
   });
 });

@@ -255,8 +255,11 @@ Un lot n’a pas d’état : ni actif, ni en pause, ni terminé. Ne pas en inven
 
 Le dialogue de création garde ses trois étapes (Fiches, Équipe, Lancement).
 Une seule différence : l’étape Fiches demande le projet quand le filtre est
-sur « Tous », puisque la coque ne le donne plus. Le nom reste automatique. Une
-campagne reste mono-projet : `lots_export.projet` est obligatoire.
+sur « Tous », puisque la coque ne le donne plus. Le nom reste automatique.
+Depuis le 16 septembre 2026, « Tous les prospects » tire CHUES et Grand Public
+ensemble : `lots_export.projet` est alors NULL (migration
+`20260916040000_campagne_tous_projets.sql`), la console lit le projet de chaque
+fiche.
 
 `listLotsExport` accepte déjà l’absence de `projet` ; `mes-attributions` le
 garde obligatoire.
@@ -584,8 +587,8 @@ Fichiers autorisés : `web/src/components/lots-export/`,
 insuffisant.
 
 Objectif : une liste Tous/CHUES/Grand Public et un wizard commun.
-Une campagne prospects reste mono-projet. Ne pas rendre
-`lots_export.projet` nullable sans migration SQL séparée.
+Une campagne prospects sans projet couvre les deux, par la migration
+`20260916040000_campagne_tous_projets.sql`.
 
 Validation : créer une campagne de chaque projet, filtrer Tous, ouvrir les
 détails et vérifier la répartition.

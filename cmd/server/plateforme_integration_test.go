@@ -103,14 +103,14 @@ func TestFichesPlateformeReserveesAuxCCP(t *testing.T) {
 	adminTirage(b, 1, 0)
 
 	var depuis *time.Time
-	var assignee *string
+	var lignes int
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT p."plateformeDepuis", li."assigneeId" FROM "prospects" p
-		 JOIN "lot_export_items" li ON li."prospectId" = p."id" WHERE p."id" = $1`, prospectID).Scan(&depuis, &assignee); err != nil {
+		`SELECT p."plateformeDepuis", (SELECT count(*) FROM "lot_export_items" li WHERE li."prospectId" = p."id")::int
+		 FROM "prospects" p WHERE p."id" = $1`, prospectID).Scan(&depuis, &lignes); err != nil {
 		t.Fatal(err)
 	}
-	if depuis == nil || assignee != nil {
-		t.Fatalf("après le tirage : marque %v, attribution %v", depuis, assignee)
+	if depuis == nil || lignes != 0 {
+		t.Fatalf("après le tirage : marque %v, %d ligne(s) de campagne", depuis, lignes)
 	}
 	plateformeAttendRappelChezUnCCP(b, rappelID)
 
@@ -124,10 +124,8 @@ func TestFichesPlateformeReserveesAuxCCP(t *testing.T) {
 
 	statut, body = adminAppel(b, http.MethodGet, "/api/v1/lots-export/"+lotID+"/fiches", nil)
 	b.attend(statut, http.StatusOK, "fiches de la campagne", body)
-	fiches, _ := body["items"].([]any)
-	premiere, _ := fiches[0].(map[string]any)
-	if len(fiches) != 1 || premiere["etat"] != "PLATEFORME" {
-		t.Fatalf("la campagne doit marquer la fiche « Plateforme » : %v", body["items"])
+	if fiches, _ := body["items"].([]any); len(fiches) != 0 {
+		t.Fatalf("la fiche plateforme ne doit plus paraître dans la campagne : %v", body["items"])
 	}
 
 	ccp := adminSession(b, ccpEmail)
@@ -237,4 +235,30 @@ func TestListeProspectsCacheLaFichePlateformeAlEncadrement(t *testing.T) {
 			t.Fatalf("%s : %d fiche(s) plateforme dans la liste, attendu %d", c.quoi, len(items), c.attendu)
 		}
 	}
+}
+
+// Un rappel promis sur une fiche plateforme alors qu'aucun CCP n'existait :
+// le premier tirage qui suit l'arrivée d'un CCP le lui remet, avec sa trace.
+func TestRappelsPlateformeRattrapesParLeTirage(t *testing.T) {
+	b := adminConnecte(t)
+	commercialID, _ := adminCompte(b, "COMMERCIAL")
+	_, _ = adminCompte(b, "CCP")
+	telephone, autreTelephone := adminTelephone(), adminTelephone()
+	prospectID := adminProspect(b, commercialID, "GRAND_PUBLIC", telephone)
+	rappelID := plateformeRappelPromis(b, prospectID, commercialID)
+	adminExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, prospectID)
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'GRAND_PUBLIC'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.GRAND_PUBLIC'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "phoneE164" = $1`, autreTelephone)
+	})
+
+	plateforme := adminPlateformeGrandPublic(autreTelephone, &appelPlateformeRecu{})
+	t.Cleanup(plateforme.Close)
+	t.Setenv("PLATEFORME_GRAND_PUBLIC_URL", plateforme.URL)
+	t.Setenv("PLATEFORME_GRAND_PUBLIC_TOKEN", "jeton-machine")
+	adminTirage(b, 1, 0)
+
+	plateformeAttendRappelChezUnCCP(b, rappelID)
 }

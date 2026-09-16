@@ -47,59 +47,78 @@ import type { Departement, Ief, Projet, ProspectType } from '@/lib/types';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 
-const CIBLES = [
+interface Tuile<T extends string> {
+  cle: T;
+  titre: string;
+  aide: string;
+  icon: LucideIcon;
+}
+
+type Famille = 'prospects' | 'representants' | 'import';
+type CleRepresentants = 'representants' | 'representants-injoignables' | 'contacts-recommandes';
+
+const FAMILLES: readonly Tuile<Famille>[] = [
   {
-    cle: 'chues',
-    projet: 'CHUES',
-    titre: 'Tous les prospects CHUES',
-    aide: 'Les quatre segments confondus.',
+    cle: 'prospects',
+    titre: 'Prospects',
+    aide: 'CHUES ou Grand Public, tous ou seulement les injoignables.',
     icon: UsersRoundIcon,
   },
   {
-    cle: 'grand-public',
-    projet: 'GRAND_PUBLIC',
-    titre: 'Prospects Grand Public',
-    aide: 'Tous les types ou un seul.',
-    icon: ContactRoundIcon,
+    cle: 'representants',
+    titre: 'Représentants',
+    aide: 'Ceux qui remettent les listes, les injoignables ou leurs contacts.',
+    icon: UserRoundCheckIcon,
   },
   {
     cle: 'import',
-    projet: null,
     titre: 'Fiches importées',
     aide: 'Un classeur importé, CHUES ou Grand Public, choisi par sa date.',
     icon: FileSpreadsheetIcon,
   },
+];
+
+const PROJETS: readonly Tuile<Projet | typeof TOUS>[] = [
+  {
+    cle: 'TOUS',
+    titre: 'Tous les prospects',
+    aide: 'CHUES et Grand Public ensemble.',
+    icon: UsersRoundIcon,
+  },
+  {
+    cle: 'CHUES',
+    titre: 'Prospects CHUES',
+    aide: 'Les quatre segments confondus.',
+    icon: UsersRoundIcon,
+  },
+  {
+    cle: 'GRAND_PUBLIC',
+    titre: 'Prospects Grand Public',
+    aide: 'Tous les types ou un seul.',
+    icon: ContactRoundIcon,
+  },
+];
+
+const REPRESENTANTS: readonly Tuile<CleRepresentants>[] = [
   {
     cle: 'representants',
-    projet: 'CHUES',
-    titre: 'Représentants',
+    titre: 'Tous les représentants',
     aide: 'Les personnes qui remettent les listes.',
     icon: UserRoundCheckIcon,
   },
   {
     cle: 'representants-injoignables',
-    projet: 'CHUES',
-    titre: 'Représentants injoignables',
+    titre: 'Injoignables',
     aide: 'Dernier appel sans échange, hors injoignables définitifs.',
     icon: PhoneMissedIcon,
   },
   {
     cle: 'contacts-recommandes',
-    projet: 'CHUES',
     titre: 'Contacts recommandés',
     aide: 'Les numéros donnés par un représentant qui décline.',
     icon: UserRoundPlusIcon,
   },
-] as const satisfies readonly {
-  cle: string;
-  projet: Projet | null;
-  titre: string;
-  aide: string;
-  icon: LucideIcon;
-}[];
-
-type CleCible = (typeof CIBLES)[number]['cle'];
-type CleRepresentants = 'representants' | 'representants-injoignables' | 'contacts-recommandes';
+];
 
 const CIBLE_API: Record<CleRepresentants, CreateLotExportInput['cible']> = {
   representants: 'REPRESENTANTS',
@@ -112,9 +131,6 @@ const TETE: Record<CleRepresentants, string> = {
   'representants-injoignables': 'Représentants injoignables',
   'contacts-recommandes': 'Contacts recommandés',
 };
-
-const surRepresentants = (cle: CleCible): cle is CleRepresentants => cle in CIBLE_API;
-const surImport = (cle: CleCible): cle is 'import' => cle === 'import';
 
 const TOUS = 'TOUS';
 const PROSPECTS_VIVANTS = { includeDeleted: false } as const;
@@ -129,35 +145,28 @@ const ETAPES: readonly { id: Etape; titre: string }[] = [
 ];
 
 interface Choix {
-  cle: CleCible;
+  famille: Famille;
+  projet: Projet | typeof TOUS;
   type: ProspectType | typeof TOUS;
+  injoignables: boolean;
+  representants: CleRepresentants;
   departementId: string;
   iefId: string;
   nonQualifies: boolean;
   importe: ImportChoisi | null;
 }
 
-const choixInitial = (cle: CleCible): Choix => ({
-  cle,
+const choixInitial = (famille: Famille, projet: Projet | typeof TOUS): Choix => ({
+  famille,
+  projet,
   type: TOUS,
+  injoignables: false,
+  representants: 'representants',
   departementId: TOUS,
   iefId: TOUS,
   nonQualifies: true,
   importe: null,
 });
-
-function objectifsRetenus(
-  equipe: readonly Teleconseiller[],
-  saisies: Readonly<Record<string, string>>,
-): { teleconseillerId: string; fichesParJour: number }[] {
-  return equipe.flatMap((compte) => {
-    const saisi = Number.parseInt(saisies[compte.id] ?? '', 10);
-    if (Number.isFinite(saisi) && saisi >= 1) {
-      return [{ teleconseillerId: compte.id, fichesParJour: Math.min(500, saisi) }];
-    }
-    return [];
-  });
-}
 
 function nomDe(
   lignes: readonly { id: string; name: string }[] | undefined,
@@ -173,30 +182,34 @@ function entierBorne(saisie: string, defaut: number, min: number, max: number): 
   return Math.min(max, Math.max(min, valeur));
 }
 
-function texteApercu(apercu: LotExportPreview, jours: number): string {
-  const { eligible, places, retenues } = apercu;
+const pluriel = (n: number, mot: string) => `${formatNumber(n)} ${mot}${n > 1 ? 's' : ''}`;
+
+function texteApercu(
+  apercu: LotExportPreview,
+  fichesParJour: number,
+  jours: number,
+  equipeCount: number,
+): string {
+  const { eligible, places, parTeleconseiller } = apercu;
   if (eligible === 0) return 'Aucune fiche ne correspond aux critères.';
-
-  const pluriel = eligible > 1 ? 's' : '';
-  const disponibles = `${formatNumber(eligible)} fiche${pluriel} disponible${pluriel}`;
-  const reparties = `${formatNumber(retenues)} seront réparties selon les capacités choisies`;
-  const joursTxt = `${formatNumber(jours)} jour${jours > 1 ? 's' : ''}`;
-
-  if (eligible <= places) {
-    return `${disponibles}. ${formatNumber(places)} places sur ${joursTxt} : les ${reparties}.`;
+  const duree = pluriel(jours, 'jour');
+  if (eligible < places) {
+    const parJour = Math.max(1, Math.ceil(parTeleconseiller / jours));
+    return `Seulement ${pluriel(eligible, 'fiche')} pour ${pluriel(equipeCount, 'personne')} : chacun aura ${parJour} par jour sur ${duree}, pas ${fichesParJour}. Décochez des personnes ou baissez le chiffre.`;
   }
-  const restant = formatNumber(eligible - retenues);
-  return `${disponibles} pour ${formatNumber(places)} places : ${reparties} ; ${restant} attendront la prochaine campagne.`;
+  const rythme = `chacun aura ${fichesParJour} fiches par jour sur ${duree}`;
+  if (eligible === places) return `${pluriel(eligible, 'fiche')} : ${rythme}.`;
+  return `${pluriel(eligible, 'fiche')} disponibles pour ${formatNumber(places)} places : ${rythme}, ${formatNumber(eligible - places)} attendront la prochaine campagne.`;
 }
 
 type Critere = { corps: Omit<CreateLotExportInput, 'name' | 'distribution'>; etiquette: string };
 
 function critereRepresentants(
-  cle: CleRepresentants,
   choix: Choix,
   nomDepartement: string | null,
   nomIef: string | null,
 ): Critere {
+  const cle = choix.representants;
   const lieu = [
     nomDepartement === null ? null : `département ${nomDepartement}`,
     nomIef === null ? null : `IEF ${nomIef}`,
@@ -234,38 +247,42 @@ function critereImport(importe: ImportChoisi | null): Critere {
   };
 }
 
+const TETE_PROSPECTS: Record<Projet | typeof TOUS, string> = {
+  TOUS: 'Tous les prospects',
+  CHUES: 'Prospects CHUES',
+  GRAND_PUBLIC: 'Prospects Grand Public',
+};
+
+function critereProspects(choix: Choix): Critere {
+  const type = choix.projet === 'GRAND_PUBLIC' && choix.type !== TOUS ? choix.type : null;
+  return {
+    corps: {
+      cible: 'PROSPECTS',
+      prospects: {
+        ...PROSPECTS_VIVANTS,
+        ...(choix.projet === TOUS ? {} : { projet: choix.projet }),
+        ...(type === null ? {} : { type }),
+        ...(choix.injoignables ? { injoignables: true } : {}),
+      },
+    },
+    etiquette: [
+      TETE_PROSPECTS[choix.projet],
+      choix.injoignables ? 'injoignables' : null,
+      type === null ? null : PROSPECT_TYPE_LABELS[type],
+    ]
+      .filter((part) => part !== null)
+      .join(choix.injoignables ? ' ' : ', '),
+  };
+}
+
 function critereDuChoix(
   choix: Choix,
   nomDepartement: string | null,
   nomIef: string | null,
 ): Critere {
-  if (surRepresentants(choix.cle))
-    return critereRepresentants(choix.cle, choix, nomDepartement, nomIef);
-  if (surImport(choix.cle)) return critereImport(choix.importe);
-
-  if (choix.cle === 'grand-public') {
-    const typeLabel = choix.type === TOUS ? '' : `, ${PROSPECT_TYPE_LABELS[choix.type]}`;
-    return {
-      corps: {
-        cible: 'PROSPECTS',
-        prospects: {
-          ...PROSPECTS_VIVANTS,
-          projet: 'GRAND_PUBLIC',
-          ...(choix.type === TOUS ? {} : { type: choix.type }),
-        },
-      },
-      etiquette: `Prospects Grand Public${typeLabel}`,
-    };
-  }
-
-  return {
-    corps: { cible: 'PROSPECTS', prospects: { ...PROSPECTS_VIVANTS, projet: 'CHUES' } },
-    etiquette: 'Prospects CHUES',
-  };
-}
-
-function capaciteDeDefaut(role: Teleconseiller['role'], fichesParJour: number): number {
-  return role === 'COMMERCIAL' ? fichesParJour : Math.max(1, Math.ceil(fichesParJour / 5));
+  if (choix.famille === 'representants') return critereRepresentants(choix, nomDepartement, nomIef);
+  if (choix.famille === 'import') return critereImport(choix.importe);
+  return critereProspects(choix);
 }
 
 function roleLabel(role: Teleconseiller['role']): string {
@@ -356,15 +373,96 @@ export function LotCreateDialog({
   );
 }
 
+function Tuiles<T extends string>({
+  legende,
+  groupe,
+  tuiles,
+  valeur,
+  onChange,
+}: {
+  legende: string;
+  groupe: string;
+  tuiles: readonly Tuile<T>[];
+  valeur: T;
+  onChange: (cle: T) => void;
+}) {
+  return (
+    <fieldset className="grid gap-2 sm:grid-cols-2">
+      <legend className="mb-3 text-[0.9375rem] font-[600]">{legende}</legend>
+      {tuiles.map((tuile) => {
+        const Icon = tuile.icon;
+        const choisie = valeur === tuile.cle;
+        return (
+          <label
+            key={tuile.cle}
+            className={cn(
+              'flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
+              'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
+              choisie
+                ? 'border-primary bg-primary/5 ring-1 ring-primary'
+                : 'border-border hover:border-muted-foreground/40 hover:bg-secondary',
+            )}
+          >
+            <input
+              type="radio"
+              name={groupe}
+              value={tuile.cle}
+              checked={choisie}
+              onChange={() => onChange(tuile.cle)}
+              className="sr-only"
+            />
+            <span
+              className={cn(
+                'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm',
+                choisie
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary text-muted-foreground',
+              )}
+            >
+              <Icon className="size-4" aria-hidden="true" />
+            </span>
+            <span className="flex min-w-0 flex-col gap-0.5">
+              <span className="text-[0.875rem] font-[600] text-foreground">{tuile.titre}</span>
+              <span className="text-[0.75rem] text-muted-foreground">{tuile.aide}</span>
+            </span>
+          </label>
+        );
+      })}
+    </fieldset>
+  );
+}
+
+function Case({
+  coche,
+  onChange,
+  children,
+}: {
+  coche: boolean;
+  onChange: (coche: boolean) => void;
+  children: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-3 text-[0.875rem] text-foreground">
+      <input
+        type="checkbox"
+        checked={coche}
+        className="size-4 shrink-0 accent-primary"
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      {children}
+    </label>
+  );
+}
+
 function Step1Cibles({
-  cibles,
+  familles,
   groupe,
   choix,
   onChange,
   departements,
   iefs,
 }: {
-  cibles: readonly (typeof CIBLES)[number][];
+  familles: readonly Tuile<Famille>[];
   groupe: string;
   choix: Choix;
   onChange: (choix: Choix) => void;
@@ -373,102 +471,111 @@ function Step1Cibles({
 }) {
   return (
     <div className="flex flex-col gap-5">
-      <fieldset className="grid gap-2 sm:grid-cols-2">
-        <legend className="mb-3 text-[0.9375rem] font-[600]">Quelles fiches ?</legend>
-        {cibles.map((cible) => {
-          const Icon = cible.icon;
-          const choisie = choix.cle === cible.cle;
-          return (
-            <label
-              key={cible.cle}
-              className={cn(
-                'flex cursor-pointer items-start gap-3 rounded-md border p-3 transition-colors',
-                'focus-within:outline-2 focus-within:outline-offset-2 focus-within:outline-ring',
-                choisie
-                  ? 'border-primary bg-primary/5 ring-1 ring-primary'
-                  : 'border-border hover:border-muted-foreground/40 hover:bg-secondary',
-              )}
-            >
-              <input
-                type="radio"
-                name={groupe}
-                value={cible.cle}
-                checked={choisie}
-                onChange={() => onChange(choixInitial(cible.cle))}
-                className="sr-only"
-              />
-              <span
-                className={cn(
-                  'mt-0.5 flex size-8 shrink-0 items-center justify-center rounded-sm',
-                  choisie
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-secondary text-muted-foreground',
-                )}
-              >
-                <Icon className="size-4" aria-hidden="true" />
-              </span>
-              <span className="flex min-w-0 flex-col gap-0.5">
-                <span className="text-[0.875rem] font-[600] text-foreground">{cible.titre}</span>
-                <span className="text-[0.75rem] text-muted-foreground">{cible.aide}</span>
-              </span>
-            </label>
-          );
-        })}
-      </fieldset>
-
-      <ChampsCritere choix={choix} onChange={onChange} departements={departements} iefs={iefs} />
+      <Tuiles
+        legende="Quelles fiches ?"
+        groupe={`${groupe}-famille`}
+        tuiles={familles}
+        valeur={choix.famille}
+        onChange={(famille) => onChange(choixInitial(famille, choix.projet))}
+      />
+      {choix.famille === 'prospects' ? (
+        <ChampsProspects groupe={groupe} choix={choix} onChange={onChange} />
+      ) : null}
+      {choix.famille === 'representants' ? (
+        <ChampsRepresentants
+          groupe={groupe}
+          choix={choix}
+          onChange={onChange}
+          departements={departements}
+          iefs={iefs}
+        />
+      ) : null}
+      {choix.famille === 'import' ? (
+        <ChampImport
+          valeur={choix.importe === null ? '' : cleImport(choix.importe)}
+          onChange={(importe) => onChange({ ...choix, importe })}
+        />
+      ) : null}
     </div>
   );
 }
 
-function ChampsCritere({
+function ChampsProspects({
+  groupe,
+  choix,
+  onChange,
+}: {
+  groupe: string;
+  choix: Choix;
+  onChange: (choix: Choix) => void;
+}) {
+  return (
+    <>
+      <Tuiles
+        legende="Quel projet ?"
+        groupe={`${groupe}-projet`}
+        tuiles={PROJETS}
+        valeur={choix.projet}
+        onChange={(projet) => onChange({ ...choix, projet, type: TOUS })}
+      />
+      {choix.projet === 'GRAND_PUBLIC' ? (
+        <Field label="Type de prospect">
+          {(props) => (
+            <Liste
+              id={props.id}
+              describedBy={props['aria-describedby']}
+              items={[
+                { value: TOUS, label: 'Tous les types' },
+                ...PROSPECT_TYPES.map((type) => ({
+                  value: type,
+                  label: PROSPECT_TYPE_LABELS[type],
+                })),
+              ]}
+              value={choix.type}
+              placeholder="Type"
+              onChange={(value) =>
+                onChange({ ...choix, type: value as ProspectType | typeof TOUS })
+              }
+            />
+          )}
+        </Field>
+      ) : null}
+      <Case
+        coche={choix.injoignables}
+        onChange={(injoignables) => onChange({ ...choix, injoignables })}
+      >
+        Seulement les injoignables : dernier appel sans échange, hors injoignables définitifs
+      </Case>
+    </>
+  );
+}
+
+function ChampsRepresentants({
+  groupe,
   choix,
   onChange,
   departements,
   iefs,
 }: {
+  groupe: string;
   choix: Choix;
   onChange: (choix: Choix) => void;
   departements: readonly Departement[];
   iefs: readonly Ief[];
 }) {
-  if (choix.cle === 'grand-public') {
-    return (
-      <Field label="Type de prospect">
-        {(props) => (
-          <Liste
-            id={props.id}
-            describedBy={props['aria-describedby']}
-            items={[
-              { value: TOUS, label: 'Tous les types' },
-              ...PROSPECT_TYPES.map((type) => ({ value: type, label: PROSPECT_TYPE_LABELS[type] })),
-            ]}
-            value={choix.type}
-            placeholder="Type"
-            onChange={(value) => onChange({ ...choix, type: value as ProspectType | typeof TOUS })}
-          />
-        )}
-      </Field>
-    );
-  }
-
-  if (surImport(choix.cle)) {
-    return (
-      <ChampImport
-        valeur={choix.importe === null ? '' : cleImport(choix.importe)}
-        onChange={(importe) => onChange({ ...choix, importe })}
-      />
-    );
-  }
-
-  if (!surRepresentants(choix.cle)) return null;
-
   const iefsDuDepartement = iefs.filter(
     (ief) => choix.departementId === TOUS || ief.departementId === choix.departementId,
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <>
+      <Tuiles
+        legende="Lesquels ?"
+        groupe={`${groupe}-representants`}
+        tuiles={REPRESENTANTS}
+        valeur={choix.representants}
+        onChange={(representants) => onChange({ ...choix, representants })}
+      />
       <div className="grid gap-4 sm:grid-cols-2">
         <Field label="Département">
           {(props) => (
@@ -501,19 +608,15 @@ function ChampsCritere({
           )}
         </Field>
       </div>
-
-      {choix.cle === 'representants' ? (
-        <label className="flex cursor-pointer items-center gap-3 text-[0.875rem] text-foreground">
-          <input
-            type="checkbox"
-            checked={choix.nonQualifies}
-            className="size-4 shrink-0 accent-primary"
-            onChange={(event) => onChange({ ...choix, nonQualifies: event.target.checked })}
-          />
+      {choix.representants === 'representants' ? (
+        <Case
+          coche={choix.nonQualifies}
+          onChange={(nonQualifies) => onChange({ ...choix, nonQualifies })}
+        >
           Exclure les représentants déjà qualifiés (ambassadeur ou refus)
-        </label>
+        </Case>
       ) : null}
-    </div>
+    </>
   );
 }
 
@@ -524,9 +627,6 @@ function ListeTeleconseillers({
   liste,
   decoches,
   onChangeDecoches,
-  objectifs,
-  onObjectif,
-  defaut,
 }: {
   chargement: boolean;
   isError: boolean;
@@ -534,9 +634,6 @@ function ListeTeleconseillers({
   liste: readonly Teleconseiller[];
   decoches: readonly string[];
   onChangeDecoches: (decoches: readonly string[]) => void;
-  objectifs: Readonly<Record<string, string>>;
-  onObjectif: (id: string, saisie: string) => void;
-  defaut: number;
 }) {
   if (chargement) {
     return (
@@ -567,11 +664,8 @@ function ListeTeleconseillers({
       {liste.map((compte) => {
         const coche = !decoches.includes(compte.id);
         return (
-          <li
-            key={compte.id}
-            className={cn('flex items-center gap-3 px-3 py-1.5', !coche && 'opacity-60')}
-          >
-            <label className="flex min-h-9 min-w-0 flex-1 cursor-pointer items-center gap-3">
+          <li key={compte.id} className={cn('px-3 py-1.5', !coche && 'opacity-60')}>
+            <label className="flex min-h-9 min-w-0 cursor-pointer items-center gap-3">
               <input
                 type="checkbox"
                 checked={coche}
@@ -592,17 +686,6 @@ function ListeTeleconseillers({
                 </span>
               </span>
             </label>
-            <Input
-              type="number"
-              min={1}
-              max={500}
-              disabled={!coche}
-              aria-label={`Objectif quotidien de ${compte.fullName}`}
-              placeholder={String(capaciteDeDefaut(compte.role, defaut))}
-              value={objectifs[compte.id] ?? ''}
-              className="h-9 w-20 text-right text-[0.875rem] tabular-nums"
-              onChange={(e) => onObjectif(compte.id, e.target.value)}
-            />
           </li>
         );
       })}
@@ -617,13 +700,11 @@ function Step2Equipe({
   erreur,
   decoches,
   onChangeDecoches,
-  objectifs,
-  onObjectif,
   fichesParJourSaisi,
   setFichesParJourSaisi,
   joursSaisi,
   setJoursSaisi,
-  defaut,
+  apercu,
 }: {
   teleconseillers: readonly Teleconseiller[] | undefined;
   chargement: boolean;
@@ -631,22 +712,19 @@ function Step2Equipe({
   erreur: unknown;
   decoches: readonly string[];
   onChangeDecoches: (decoches: readonly string[]) => void;
-  objectifs: Readonly<Record<string, string>>;
-  onObjectif: (id: string, saisie: string) => void;
   fichesParJourSaisi: string;
   setFichesParJourSaisi: (v: string) => void;
   joursSaisi: string;
   setJoursSaisi: (v: string) => void;
-  defaut: number;
+  apercu: React.ReactNode;
 }) {
   const liste = teleconseillers ?? [];
   const equipe = liste.filter((c) => !decoches.includes(c.id));
-  const toutCoche = liste.length > 0 && equipe.length === liste.length;
 
   return (
     <div className="flex flex-col gap-5">
       <div className="grid gap-4 sm:grid-cols-2">
-        <Field label="Fiches par jour" description="Pour qui n’a pas d’objectif propre.">
+        <Field label="Fiches par téléconseiller et par jour">
           {(props) => (
             <Input
               {...props}
@@ -675,27 +753,22 @@ function Step2Equipe({
       <div className="flex flex-col gap-2">
         <div className="flex items-center justify-between gap-3">
           <p className="text-[0.9375rem] font-[600]">
-            Téléconseillers
+            Qui appelle ?
             <span className="ml-2 text-[0.8125rem] font-[500] text-muted-foreground tabular-nums">
               {equipe.length} sur {liste.length}
             </span>
           </p>
-          <div className="flex items-center gap-3">
-            <span className="hidden text-[0.75rem] text-muted-foreground sm:inline">
-              Objectif par jour
-            </span>
-            {liste.length > 0 ? (
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                className="px-0"
-                onClick={() => onChangeDecoches(toutCoche ? liste.map((c) => c.id) : [])}
-              >
-                {toutCoche ? 'Tout décocher' : 'Tout cocher'}
-              </Button>
-            ) : null}
-          </div>
+          {liste.length > 0 ? (
+            <Button
+              type="button"
+              variant="link"
+              size="sm"
+              className="px-0"
+              onClick={() => onChangeDecoches(equipe.length > 0 ? liste.map((c) => c.id) : [])}
+            >
+              {equipe.length > 0 ? 'Tout décocher' : 'Tout cocher'}
+            </Button>
+          ) : null}
         </div>
         <ListeTeleconseillers
           chargement={chargement}
@@ -704,11 +777,10 @@ function Step2Equipe({
           liste={liste}
           decoches={decoches}
           onChangeDecoches={onChangeDecoches}
-          objectifs={objectifs}
-          onObjectif={onObjectif}
-          defaut={defaut}
         />
       </div>
+
+      {apercu}
     </div>
   );
 }
@@ -717,24 +789,26 @@ function Apercu({
   equipeCount,
   apercu,
   critereStable,
+  fichesParJour,
   jours,
 }: {
   equipeCount: number;
   apercu: UseQueryResult<LotExportPreview>;
   critereStable: boolean;
+  fichesParJour: number;
   jours: number;
 }) {
   if (equipeCount === 0) {
     return (
-      <p className="text-[0.875rem] text-destructive">
-        Cochez au moins un téléconseiller à l’étape 2.
+      <p className="text-[0.875rem] text-muted-foreground">
+        Cochez au moins une personne pour voir ce que chacun recevra.
       </p>
     );
   }
   if (apercu.isError) {
     return (
-      <p className="text-[0.875rem] text-destructive">
-        {apiErrorText(apercu.error, 'Le comptage des fiches a échoué.')}
+      <p role="alert" className="text-[0.875rem] text-destructive">
+        {apiErrorText(apercu.error, 'Le comptage a échoué.')}
       </p>
     );
   }
@@ -746,7 +820,12 @@ function Apercu({
       </p>
     );
   }
-  return <p className="text-[0.875rem] text-foreground">{texteApercu(apercu.data, jours)}</p>;
+  const insuffisant = apercu.data.eligible > 0 && apercu.data.eligible < apercu.data.places;
+  return (
+    <p className={cn('text-[0.875rem]', insuffisant ? 'text-warning' : 'text-foreground')}>
+      {texteApercu(apercu.data, fichesParJour, jours, equipeCount)}
+    </p>
+  );
 }
 
 function Step3Resume({
@@ -755,7 +834,6 @@ function Step3Resume({
   fichesParJour,
   jours,
   apercu,
-  critereStable,
   nomSaisi,
   nomPropose,
   setNomSaisi,
@@ -766,8 +844,7 @@ function Step3Resume({
   equipeCount: number;
   fichesParJour: number;
   jours: number;
-  apercu: UseQueryResult<LotExportPreview>;
-  critereStable: boolean;
+  apercu: React.ReactNode;
   nomSaisi: string | null;
   nomPropose: string;
   setNomSaisi: (val: string) => void;
@@ -776,8 +853,8 @@ function Step3Resume({
 }) {
   const lignes = [
     ['Fiches', etiquette],
-    ['Équipe', `${equipeCount} téléconseiller${equipeCount > 1 ? 's' : ''}`],
-    ['Rythme', `${fichesParJour} fiches par jour sur ${jours} jour${jours > 1 ? 's' : ''}`],
+    ['Équipe', pluriel(equipeCount, 'personne')],
+    ['Rythme', `${fichesParJour} fiches par personne et par jour sur ${pluriel(jours, 'jour')}`],
   ];
 
   return (
@@ -800,14 +877,7 @@ function Step3Resume({
             <dd className="min-w-0 flex-1 font-[500] text-foreground">{valeur}</dd>
           </div>
         ))}
-        <div className="px-3 py-2.5">
-          <Apercu
-            equipeCount={equipeCount}
-            apercu={apercu}
-            critereStable={critereStable}
-            jours={jours}
-          />
-        </div>
+        <div className="px-3 py-2.5">{apercu}</div>
       </dl>
 
       {isError ? (
@@ -823,17 +893,16 @@ function Step3Resume({
 }
 
 function useLotFormState(projet: Projet | null) {
-  const cibles = CIBLES.filter((c) => projet === null || c.projet === null || c.projet === projet);
+  const familles = FAMILLES.filter((f) => projet !== 'GRAND_PUBLIC' || f.cle !== 'representants');
   const [step, setStep] = useState<Etape>(1);
-  const [choix, setChoix] = useState<Choix>(() => choixInitial(cibles[0]?.cle ?? 'chues'));
-  const [decoches, setDecoches] = useState<readonly string[]>([]);
+  const [choix, setChoix] = useState<Choix>(() => choixInitial('prospects', projet ?? TOUS));
+  const [decoches, setDecoches] = useState<readonly string[] | null>(null);
   const [fichesParJourSaisi, setFichesParJourSaisi] = useState(String(FICHES_PAR_JOUR_DEFAUT));
   const [joursSaisi, setJoursSaisi] = useState(String(JOURS_DEFAUT));
-  const [objectifsSaisis, setObjectifsSaisis] = useState<Readonly<Record<string, string>>>({});
   const [nomSaisi, setNomSaisi] = useState<string | null>(null);
 
   return {
-    cibles,
+    familles,
     step,
     setStep,
     choix,
@@ -844,67 +913,13 @@ function useLotFormState(projet: Projet | null) {
     setFichesParJourSaisi,
     joursSaisi,
     setJoursSaisi,
-    objectifsSaisis,
-    setObjectifsSaisis,
     nomSaisi,
     setNomSaisi,
   };
 }
 
-function computeDistribution(
-  equipe: readonly Teleconseiller[],
-  fichesParJourSaisi: string,
-  joursSaisi: string,
-  objectifsSaisis: Readonly<Record<string, string>>,
-) {
-  const fichesParJour = entierBorne(fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
-  const jours = entierBorne(joursSaisi, JOURS_DEFAUT, 1, 10);
-  const objectifs = objectifsRetenus(equipe, objectifsSaisis);
-  return {
-    fichesParJour,
-    jours,
-    objectifs,
-    distribution: {
-      teleconseillerIds: equipe.map((c) => c.id),
-      fichesParJour,
-      jours,
-      ...(objectifs.length > 0 ? { objectifs } : {}),
-    },
-  };
-}
-
-function computeCleCritere(
-  cle: CleCible,
-  type: ProspectType | typeof TOUS,
-  departementId: string,
-  iefId: string,
-  nonQualifies: boolean,
-  importe: ImportChoisi | null,
-  teleconseillerIds: readonly string[],
-  fichesParJour: number,
-  jours: number,
-  objectifs: readonly { teleconseillerId: string; fichesParJour: number }[],
-): string {
-  const objStr = objectifs.map((o) => `${o.teleconseillerId}:${String(o.fichesParJour)}`).join(',');
-  return [
-    cle,
-    type,
-    departementId,
-    iefId,
-    String(nonQualifies),
-    importe === null ? '' : cleImport(importe),
-    teleconseillerIds.join(','),
-    fichesParJour,
-    jours,
-    objStr,
-  ].join('|');
-}
-
-function useLotFormQueries(
-  state: ReturnType<typeof useLotFormState>,
-  distribution: ReturnType<typeof computeDistribution>,
-) {
-  const referentielsUtiles = surRepresentants(state.choix.cle);
+function useLotFormQueries(choix: Choix) {
+  const referentielsUtiles = choix.famille === 'representants';
   const departements = useQuery({
     queryKey: queryKeys.departements,
     queryFn: () => fetchDepartements(),
@@ -919,29 +934,24 @@ function useLotFormQueries(
   });
 
   const { corps, etiquette } = critereDuChoix(
-    state.choix,
-    nomDe(departements.data, state.choix.departementId),
-    nomDe(iefs.data, state.choix.iefId),
+    choix,
+    nomDe(departements.data, choix.departementId),
+    nomDe(iefs.data, choix.iefId),
   );
+  const sourceChoisie = choix.famille !== 'import' || choix.importe !== null;
 
-  const cleCritere = computeCleCritere(
-    state.choix.cle,
-    state.choix.type,
-    state.choix.departementId,
-    state.choix.iefId,
-    state.choix.nonQualifies,
-    state.choix.importe,
-    distribution.distribution.teleconseillerIds,
-    distribution.fichesParJour,
-    distribution.jours,
-    distribution.objectifs,
-  );
+  return { departements, iefs, corps, etiquette, sourceChoisie };
+}
 
-  const cleDifferee = useDebouncedValue(cleCritere, 250);
-  const critereStable = cleDifferee === cleCritere;
-  const sourceChoisie = !surImport(state.choix.cle) || state.choix.importe !== null;
-
-  return { departements, iefs, corps, etiquette, cleCritere, critereStable, sourceChoisie };
+// Tant que personne n'a touché la liste, seuls les téléconseillers appellent.
+function equipeCochee(
+  liste: readonly Teleconseiller[] | undefined,
+  saisies: readonly string[] | null,
+): { decoches: readonly string[]; equipe: Teleconseiller[] } {
+  const comptes = liste ?? [];
+  const decoches =
+    saisies ?? comptes.filter((compte) => compte.role !== 'COMMERCIAL').map((c) => c.id);
+  return { decoches, equipe: comptes.filter((compte) => !decoches.includes(compte.id)) };
 }
 
 function useLotFormMutationAndQueries(
@@ -959,27 +969,23 @@ function useLotFormMutationAndQueries(
     staleTime: 5 * 60_000,
   });
 
-  const listeTeleconseillers = teleconseillers.data ?? [];
-  const equipe = listeTeleconseillers.filter((compte) => !state.decoches.includes(compte.id));
-  const distInfo = computeDistribution(
-    equipe,
-    state.fichesParJourSaisi,
-    state.joursSaisi,
-    state.objectifsSaisis,
-  );
+  const { decoches, equipe } = equipeCochee(teleconseillers.data, state.decoches);
+  const fichesParJour = entierBorne(state.fichesParJourSaisi, FICHES_PAR_JOUR_DEFAUT, 1, 500);
+  const jours = entierBorne(state.joursSaisi, JOURS_DEFAUT, 1, 10);
+  const distribution = { teleconseillerIds: equipe.map((c) => c.id), fichesParJour, jours };
 
-  const queryInfo = useLotFormQueries(state, distInfo);
+  const queryInfo = useLotFormQueries(state.choix);
   const equipeChoisie = equipe.length > 0;
 
+  const cleCritere = JSON.stringify([queryInfo.corps, distribution]);
+  const cleDifferee = useDebouncedValue(cleCritere, 250);
+  const critereStable = cleDifferee === cleCritere;
+
   const apercu = useQuery({
-    queryKey: queryKeys.lotsExportApercu({ cle: queryInfo.cleCritere }),
+    queryKey: queryKeys.lotsExportApercu({ cle: cleCritere }),
     queryFn: () =>
-      previewLotExport({
-        ...queryInfo.corps,
-        name: queryInfo.etiquette,
-        distribution: distInfo.distribution,
-      }),
-    enabled: queryInfo.critereStable && equipeChoisie && queryInfo.sourceChoisie,
+      previewLotExport({ ...queryInfo.corps, name: queryInfo.etiquette, distribution }),
+    enabled: critereStable && equipeChoisie && queryInfo.sourceChoisie,
   });
 
   const eligible = apercu.isSuccess ? apercu.data.eligible : null;
@@ -987,8 +993,7 @@ function useLotFormMutationAndQueries(
   const nom = state.nomSaisi === null ? nomPropose.trim() : state.nomSaisi.trim();
 
   const creation = useMutation({
-    mutationFn: () =>
-      createLotExport({ ...queryInfo.corps, distribution: distInfo.distribution, name: nom }),
+    mutationFn: () => createLotExport({ ...queryInfo.corps, distribution, name: nom }),
     onSuccess: (lot) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.lotsExportRoot });
       toast.success(`Campagne créée : ${formatNumber(lot.itemCount)} fiches réparties.`);
@@ -1002,15 +1007,16 @@ function useLotFormMutationAndQueries(
 
   return {
     teleconseillers,
+    decoches,
     equipe,
-    fichesParJour: distInfo.fichesParJour,
-    jours: distInfo.jours,
+    fichesParJour,
+    jours,
     departements: queryInfo.departements,
     iefs: queryInfo.iefs,
     etiquette: queryInfo.etiquette,
     sourceChoisie: queryInfo.sourceChoisie,
     equipeChoisie,
-    critereStable: queryInfo.critereStable,
+    critereStable,
     apercu,
     nomPropose,
     creation,
@@ -1031,6 +1037,15 @@ function FormulaireDeLot({
   const state = useLotFormState(projet);
   const data = useLotFormMutationAndQueries(projet, state, onCree);
   const suivantBloque = state.step === 1 ? !data.sourceChoisie : !data.equipeChoisie;
+  const apercu = (
+    <Apercu
+      equipeCount={data.equipe.length}
+      apercu={data.apercu}
+      critereStable={data.critereStable}
+      fichesParJour={data.fichesParJour}
+      jours={data.jours}
+    />
+  );
 
   return (
     <>
@@ -1050,7 +1065,7 @@ function FormulaireDeLot({
       <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
         {state.step === 1 ? (
           <Step1Cibles
-            cibles={state.cibles}
+            familles={state.familles}
             groupe={groupe}
             choix={state.choix}
             onChange={state.setChoix}
@@ -1064,15 +1079,13 @@ function FormulaireDeLot({
             chargement={data.teleconseillers.isPending}
             isError={data.teleconseillers.isError}
             erreur={data.teleconseillers.error}
-            decoches={state.decoches}
+            decoches={data.decoches}
             onChangeDecoches={state.setDecoches}
-            objectifs={state.objectifsSaisis}
-            onObjectif={(id, s) => state.setObjectifsSaisis((prev) => ({ ...prev, [id]: s }))}
             fichesParJourSaisi={state.fichesParJourSaisi}
             setFichesParJourSaisi={state.setFichesParJourSaisi}
             joursSaisi={state.joursSaisi}
             setJoursSaisi={state.setJoursSaisi}
-            defaut={data.fichesParJour}
+            apercu={apercu}
           />
         ) : null}
         {state.step === 3 ? (
@@ -1081,8 +1094,7 @@ function FormulaireDeLot({
             equipeCount={data.equipe.length}
             fichesParJour={data.fichesParJour}
             jours={data.jours}
-            apercu={data.apercu}
-            critereStable={data.critereStable}
+            apercu={apercu}
             nomSaisi={state.nomSaisi}
             nomPropose={data.nomPropose}
             setNomSaisi={state.setNomSaisi}

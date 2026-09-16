@@ -148,6 +148,11 @@ FROM "users" u
 WHERE u."id" = ANY($1::text[]) AND u."isActive" AND u."deletedAt" IS NULL
   AND u."role" IN ('COMMERCIAL', 'SUPERVISEUR', 'DIRECTION');
 
+-- name: LotsDeLEquipe :many
+SELECT l."id", l."name" FROM "lots_export" l
+WHERE jsonb_exists(l."filters"->'distribution'->'teleconseillerIds', @teleconseiller_id::text)
+ORDER BY l."createdAt", l."id";
+
 -- name: NomsUtilisateurs :many
 SELECT u."id", u."fullName" FROM "users" u WHERE u."id" = ANY($1::text[]);
 
@@ -300,27 +305,17 @@ WHERE i."lotId" = $1
 -- name: LotFichesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
-       (p."plateformeDepuis" IS NOT NULL)::boolean AS plateforme,
-       (p."projet" <> l."projet" AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
-          WHERE j."prospectId" = p."id" AND j."projet" = l."projet"))::boolean AS hors_projet,
        COALESCE(p."lastCallOutcome"::text, '')::text AS "lastCallOutcome",
        (SELECT cr."label" FROM "call_attempts" a
         LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
         WHERE a."prospectId" = p."id"
         ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "lastReasonLabel"
 FROM "lot_export_items" i
-JOIN "lots_export" l ON l."id" = i."lotId"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
-        WHEN EXISTS (SELECT 1 FROM "prospects" pp
-                     WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
-        WHEN EXISTS (SELECT 1 FROM "prospects" pp JOIN "lots_export" ll ON ll."id" = i."lotId"
-                     WHERE pp."id" = i."prospectId" AND pp."projet" <> ll."projet"
-                       AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
-                                       WHERE j."prospectId" = pp."id" AND j."projet" = ll."projet")) THEN 'HORS_PROJET'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -333,12 +328,6 @@ SELECT COUNT(*)::int FROM "lot_export_items" i
 WHERE i."lotId" = $1
   AND (sqlc.narg('assignee_id')::text IS NULL OR i."assigneeId" = sqlc.narg('assignee_id'))
   AND (sqlc.narg('etat')::text IS NULL OR sqlc.narg('etat')::text = CASE
-        WHEN EXISTS (SELECT 1 FROM "prospects" pp
-                     WHERE pp."id" = i."prospectId" AND pp."plateformeDepuis" IS NOT NULL) THEN 'PLATEFORME'
-        WHEN EXISTS (SELECT 1 FROM "prospects" pp JOIN "lots_export" ll ON ll."id" = i."lotId"
-                     WHERE pp."id" = i."prospectId" AND pp."projet" <> ll."projet"
-                       AND NOT EXISTS (SELECT 1 FROM "prospect_journeys" j
-                                       WHERE j."prospectId" = pp."id" AND j."projet" = ll."projet")) THEN 'HORS_PROJET'
         WHEN EXISTS (SELECT 1 FROM "call_attempts" a
                      WHERE a."prospectId" = i."prospectId"
                        AND a."clientCreatedAt" >= sqlc.arg('depuis')) THEN 'TRAITEE'
@@ -428,6 +417,7 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
+  AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)
@@ -446,6 +436,7 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
+  AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
   AND (NOT sqlc.arg('par_segment')::boolean
        OR (EXISTS (SELECT 1 FROM "syndicats" s
                    WHERE s."id" = p."syndicatId" AND (s."sigle" = 'CHUES') = sqlc.arg('chues')::boolean)

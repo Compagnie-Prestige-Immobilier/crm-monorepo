@@ -2,14 +2,14 @@
 UPDATE "prospects" SET "plateformeDepuis" = @depuis::timestamp, "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL AND "plateformeDepuis" IS NULL;
 
--- name: LotsAttribuesDuProspect :many
+-- name: LotsDuProspect :many
 SELECT "lotId", "position", "assigneeId"
 FROM "lot_export_items"
-WHERE "prospectId" = @prospect_id AND "assigneeId" IS NOT NULL;
+WHERE "prospectId" = @prospect_id;
 
 -- name: RetirerProspectDesCampagnes :exec
-UPDATE "lot_export_items" SET "assigneeId" = NULL
-WHERE "prospectId" = @prospect_id AND "assigneeId" IS NOT NULL;
+DELETE FROM "lot_export_items"
+WHERE "prospectId" = @prospect_id;
 
 -- Le CCP qui porte le moins de rappels en attente, puis le plus ancien : deux
 -- transferts le même jour se répartissent.
@@ -26,6 +26,16 @@ WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
 
 -- name: ReattribuerRappel :exec
 UPDATE "scheduled_callbacks" SET "assignedToId" = @vers, "updatedAt" = now() WHERE "id" = @id;
+
+-- Les fiches plateforme dont un rappel promis est encore chez un autre rôle
+-- qu'un CCP : rien tant qu'aucun CCP actif n'existe pour les reprendre.
+-- name: ProspectsPlateformeAuxRappelsHorsCCP :many
+SELECT DISTINCT c."prospectId"
+FROM "scheduled_callbacks" c
+JOIN "prospects" p ON p."id" = c."prospectId"
+JOIN "users" a ON a."id" = c."assignedToId"
+WHERE c."status" = 'PENDING' AND p."plateformeDepuis" IS NOT NULL AND a."role" <> 'CCP'
+  AND EXISTS (SELECT 1 FROM "users" u WHERE u."role" = 'CCP' AND u."isActive" AND u."deletedAt" IS NULL);
 
 -- name: CreerProspectPlateforme :one
 INSERT INTO "prospects" (

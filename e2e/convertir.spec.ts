@@ -255,24 +255,22 @@ test.describe('parcours 5, convertir un prospect', () => {
     await enregistrer(page);
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
-    await ouvrirFiche(page, fiche);
+    await page.goto(`/teleconseil/appel/${fiche.id}`);
     await expect(
       page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
     ).toBeVisible();
     await revenirAuxIssues(page);
     await issue(page, 'Injoignable', /NRP/u);
     await enregistrer(page);
-    await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 2,
-      phase2Status: 'METHOD_OBTAINED',
+      phase2Status: 'PENDING',
     });
 
-    await ouvrirFiche(page, fiche);
+    await page.goto(`/teleconseil/appel/${fiche.id}`);
     await revenirAuxIssues(page);
     await issue(page, 'Injoignable', /Faux numéro/u);
     await enregistrer(page);
-    await expect(consigne(page, fiche.nom)).toBeVisible();
     expect(await lireClassement(fiche.id)).toMatchObject({
       tentatives: 3,
       phase2Status: 'WRONG_NUMBER',

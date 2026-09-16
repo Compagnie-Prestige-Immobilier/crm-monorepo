@@ -837,17 +837,16 @@ func verifierSecondReleveLeadsTest(b *banc, travail, telephone, lotID string) {
 	if parcours := projetsDesParcoursTest(b, a.id); strings.Join(parcours, ",") != "GRAND_PUBLIC" {
 		b.t.Fatalf("le parcours suit la dernière ligne : %v", parcours)
 	}
-	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1 AND "assigneeId" IS NOT NULL`, lotID); n != 0 {
-		b.t.Fatalf("la fiche hors projet reste attribuée : %d", n)
+	if n := qualificationCompte(b, `SELECT count(*) FROM "lot_export_items" WHERE "lotId" = $1`, lotID); n != 0 {
+		b.t.Fatalf("la fiche hors projet reste dans la campagne : %d", n)
 	}
 	if adminCompterAudit(b, "lot_export.hors_projet", lotID) != 1 {
 		b.t.Fatal("le retrait de campagne doit laisser une trace")
 	}
 	statut, body := appelJSON(b, http.MethodGet, "/api/v1/lots-export/"+lotID+"/fiches", nil, nil)
 	b.attend(statut, http.StatusOK, "fiches de la campagne", body)
-	items, _ := body["items"].([]any)
-	if len(items) != 1 || mapDe(items[0])["etat"] != "HORS_PROJET" {
-		b.t.Fatalf("la campagne doit marquer la fiche « Hors projet » : %v", body["items"])
+	if items, _ := body["items"].([]any); len(items) != 0 {
+		b.t.Fatalf("la fiche hors projet ne doit plus paraître dans la campagne : %v", body["items"])
 	}
 	// Quatre lignes ignorées, plus la date de A et le canal de C signalés une seconde fois.
 	b.attendRapportTest(travail, "total=5 created=0 updated=1 skipped=4 errors=0 warnings=6", map[string]float64{

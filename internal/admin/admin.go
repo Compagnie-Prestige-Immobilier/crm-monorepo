@@ -3,6 +3,7 @@ package admin
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/campagnes"
 	"cpi-go/internal/referentiels"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
@@ -422,6 +423,9 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 		return Compte{}, err
 	}
 	roleChange := chg.role != nil && socle.Role(existant.Role) != *chg.role
+	if err := s.quitterLesEquipes(ctx, roleChange, chg.role, id); err != nil {
+		return Compte{}, err
+	}
 
 	var modifie Compte
 	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
@@ -439,6 +443,14 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 		}
 	}
 	return modifie, nil
+}
+
+// Un rôle qui ne siège plus dans une équipe de campagne en sort avant d'être écrit.
+func (s *service) quitterLesEquipes(ctx context.Context, roleChange bool, role *socle.Role, id string) error {
+	if !roleChange || slices.Contains(campagnes.RolesEquipe, *role) {
+		return nil
+	}
+	return campagnes.RetirerDesEquipes(ctx, s.Deps, id)
 }
 
 func ecrireChangement(ctx context.Context, q *db.Queries, id string, chg changementCompte, existant db.UserRoleForUpdateRow, acteurID string) (Compte, error) {
@@ -1042,15 +1054,23 @@ func widgetsDe(liste ...string) []DispositionWidget {
 
 var dispositionsUsine = map[string][]DispositionWidget{
 	ecranVisites: widgetsDe("total-visites", "moyenne-journaliere", "jour-le-plus-charge", "par-jour", "par-entreprise", "par-objet", "par-direction", "par-destinataire", "par-mois", "par-heure", "qualite-de-saisie"),
+	// Les prospects d'abord : c'est le travail de chaque jour. Les représentants
+	// viennent après, sinon l'écran ouvre sur des zéros les semaines sans campagne
+	// de représentants.
 	ecranChues: slices.Concat(
-		widgetsDe("taux-de-contact", "taux-de-joignabilite-representants", "taux-d-acceptation", "taux-de-qualification"),
+		widgetsDe("taux-de-joignabilite", "adhesions", "taux-de-contact", "taux-de-qualification"),
 		[]DispositionWidget{
+			{Source: "appels-par-jour", Taille: taillePleine},
 			{Source: "taux-d-exploitation", Marque: marqueCamembert, Taille: taillePleine},
-			{Source: "repartition-statuts-qualification", Marque: marqueCamembert, Taille: taillePleine},
 			{Source: "par-teleconseiller", Marque: marqueTableau},
 			{Source: sourceFichesOuvertes, Taille: taillePleine},
 		},
-		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "rendement-par-departement", "methodes-d-adhesion", "enrolement-par-jour"),
+		widgetsDe("couverture-derniere-campagne", "hors-attribution-derniere-campagne", "methodes-d-adhesion", "prospects-notes"),
+		widgetsDe("taux-de-joignabilite-representants", "taux-d-acceptation"),
+		[]DispositionWidget{
+			{Source: "repartition-statuts-qualification", Marque: marqueCamembert, Taille: taillePleine},
+		},
+		widgetsDe("rendement-par-departement", "enrolement-par-jour"),
 	),
 	ecranGrandPublic: slices.Concat(
 		widgetsDe("taux-de-joignabilite", "taux-de-qualification", "prospects-notes", "adhesions"),
