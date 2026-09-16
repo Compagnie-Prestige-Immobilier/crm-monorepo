@@ -165,7 +165,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await expect(
       page.getByRole('heading', { level: 2, name: new RegExp(`^${ONGLET}, `, 'u') }),
     ).toBeVisible();
-    await expect(page.getByText(`CHUES, ${ONGLET}`)).toBeVisible();
+    await expect(page.getByText(`GRAND_PUBLIC, ${ONGLET}`)).toBeVisible();
 
     const contexte = await browser.newContext({ storageState: teleconseiller.etat });
     const console = await contexte.newPage();
@@ -179,7 +179,9 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await page.getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(page.getByText(/En pause depuis le/u)).toBeVisible();
     await chercher();
-    await expect(console.getByText('Aucun résultat. Vérifiez le nom ou le numéro.')).toBeVisible();
+    await expect(
+      console.getByText('Aucun résultat parmi vos fiches restant à appeler.'),
+    ).toBeVisible();
 
     await page.getByRole('button', { name: 'Reprendre' }).click();
     await expect(page.getByRole('button', { name: 'Mettre en pause' })).toBeVisible();

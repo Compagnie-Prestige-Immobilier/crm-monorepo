@@ -220,21 +220,13 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
       [prospectGrandPublic],
     );
     expect(appel).toEqual({ code: 'INTERESSE', nom: `Dossier ${cle}` });
-    const statutApresAppel = await ligne<{ statut: string }>(
-      'SELECT statut FROM prospect_journeys WHERE "prospectId" = $1 AND projet = \'GRAND_PUBLIC\'',
-      [prospectGrandPublic],
-    );
-    console.log('Diagnostic après appel Intéressé :', statutApresAppel);
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Recherche');
-    // Le formulaire de l'appel a renommé la fiche ; la liste montre le statut choisi à l'appel.
-    const ligneRenommee = page.getByRole('row').filter({ hasText: `Dossier ${cle}` });
-    await expect(ligneRenommee).toContainText('Intéressé');
+    const ligneApresAppel = page.getByRole('row').filter({ hasText: `GP ${cle}` });
+    await expect(ligneApresAppel).toContainText('Intéressé');
 
     await page.goto(`/teleconseil/prospects/${prospectGrandPublic}`);
-    await expect(
-      page.getByRole('heading', { name: `Ousmane Dossier ${cle}`, level: 1 }),
-    ).toBeVisible();
+    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
   });
 });

@@ -141,7 +141,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
         onRetry={() => {
           void parametres.refetch();
         }}
-        fallback="Les paramètres du téléconseil n’ont pas pu être lus."
+        fallback="Les paramètres n’ont pas pu être lus."
       />
     );
 
@@ -174,9 +174,7 @@ export function ParametresChuesCard({ peutToutRegler }: { peutToutRegler: boolea
     <div className="flex flex-col gap-6">
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="font-display text-h2 font-[800] tracking-[-0.03em]">
-            Paramètres téléconseil
-          </h1>
+          <h1 className="font-display text-h2 font-[800] tracking-[-0.03em]">Paramètres</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             Réglages communs à CHUES et Grand Public.
           </p>

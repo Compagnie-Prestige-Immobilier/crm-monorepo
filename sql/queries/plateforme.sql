@@ -2,14 +2,14 @@
 UPDATE "prospects" SET "plateformeDepuis" = @depuis::timestamp, "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL AND "plateformeDepuis" IS NULL;
 
--- name: LotsAttribuesDuProspect :many
+-- name: LotsDuProspect :many
 SELECT "lotId", "position", "assigneeId"
 FROM "lot_export_items"
-WHERE "prospectId" = @prospect_id AND "assigneeId" IS NOT NULL;
+WHERE "prospectId" = @prospect_id;
 
 -- name: RetirerProspectDesCampagnes :exec
-UPDATE "lot_export_items" SET "assigneeId" = NULL
-WHERE "prospectId" = @prospect_id AND "assigneeId" IS NOT NULL;
+DELETE FROM "lot_export_items"
+WHERE "prospectId" = @prospect_id;
 
 -- Le CCP qui porte le moins de rappels en attente, puis le plus ancien : deux
 -- transferts le même jour se répartissent.

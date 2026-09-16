@@ -88,7 +88,7 @@ export const COQUES: readonly CoqueEntry[] = [
   },
   {
     id: 'teleconseil',
-    label: 'Téléconseil',
+    label: 'Commercial',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
     roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'CCP'],
@@ -329,7 +329,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/teleconseil/parametres-chues',
-        label: 'Paramètres téléconseil',
+        label: 'Paramètres',
         icon: SlidersHorizontalIcon,
         description: 'Réglages CHUES et Grand Public',
         roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
