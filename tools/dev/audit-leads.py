@@ -172,18 +172,20 @@ def afficher(rapport, canaux, uniques):
     print("-" * len(entete))
     print("TOTAL".ljust(largeur) + "".join(f"{totaux[c]:>11}" for c, _ in COLONNES_RAPPORT))
     livrees, nettes = totaux["lignes"], totaux["ok"]
-    perdu = livrees - nettes
     print()
-    print(f"Lignes livrees            : {livrees}")
-    print(f"Numeros uniques appelables: {uniques}" + (f"  ({100 * uniques / livrees:.1f} % du livre)" if livrees else ""))
-    print(f"Ecart                     : {perdu}"
-          f"  (doublons {totaux['doublon_jour'] + totaux['doublon_anterieur']},"
-          f" sans telephone {totaux['vide']},"
-          f" telephone inutilisable {totaux['illisible'] + totaux['tronque']})")
+    print(f"UTILISABLE   {nettes:>6}   numeros uniques appelables"
+          + (f"   {100 * nettes / livrees:.1f} %" if livrees else ""))
+    causes = [("deja livre un jour precedent", totaux["doublon_anterieur"]),
+              ("en double dans le meme onglet", totaux["doublon_jour"]),
+              ("numero tronque par Excel", totaux["tronque"]),
+              ("numero illisible", totaux["illisible"]),
+              ("sans numero", totaux["vide"])]
+    print(f"INUTILISABLE {livrees - nettes:>6}   sur {livrees} lignes livrees")
+    for libelle, nombre in causes:
+        if nombre:
+            print(f"             {nombre:>6}   {libelle}")
     if totaux["etranger"]:
-        print(f"  Dont hors Senegal         : {totaux['etranger']}  (comptes appelables)")
-    if totaux["tronque"]:
-        print("  Numeros tronques par Excel (notation scientifique) : mettre la colonne en Texte a la saisie.")
+        print(f"\nDont hors Senegal {totaux['etranger']}, comptes utilisables.")
     if canaux:
         print("\nCanaux les plus frequents :")
         for canal, nombre in canaux.most_common(8):
