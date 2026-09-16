@@ -7,15 +7,8 @@ import { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import type { Role } from '@/lib/types';
 
-/** Ceux dont le travail part d'une fiche prospect. */
-const CHERCHEURS: readonly Role[] = [
-  'ADMIN',
-  'COMMERCIAL',
-  'CHARGE_CLIENTELE',
-  'CCP',
-  'SUPERVISEUR',
-  'DIRECTION',
-];
+/** Ceux qui ouvrent la liste des prospects, le seul écran où le champ mène. */
+const CHERCHEURS: readonly Role[] = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'];
 
 /**
  * Chercher une fiche depuis n'importe quel écran. Le champ ne fabrique pas un
