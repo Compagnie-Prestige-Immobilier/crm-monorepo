@@ -64,7 +64,7 @@ export function ProspectsView({
         <div className="flex flex-wrap gap-2">
           {canExport ? <ProspectExportMenu filters={filters} /> : null}
           <CreateProspectButton
-            visible={peutCreerProjet(filters.projet, readOnly, canCreate, canCreateGrandPublic)}
+            visible={peutCreerProjet(filters.projet, canCreate, canCreateGrandPublic)}
             onClick={() => setCreateOpen(true)}
           />
         </div>
@@ -80,6 +80,7 @@ export function ProspectsView({
         <CreationDialogContent
           projet={filters.projet}
           onClose={() => setCreateOpen(false)}
+          canCreate={canCreate}
           canCreateGrandPublic={canCreateGrandPublic}
         />
       </Dialog>
@@ -87,26 +88,71 @@ export function ProspectsView({
   );
 }
 
+// La lecture seule du tableau ne vaut pas pour ce bouton : le superviseur et la
+// direction ne modifient pas les lignes, mais ils creent des fiches, et le
+// serveur le leur accorde.
 function peutCreerProjet(
   projet: Projet | null,
-  readOnly: boolean,
   canCreateChues: boolean,
   canCreateGrandPublic: boolean,
 ): boolean {
-  if (readOnly || projet === null) return false;
+  // Sans filtre de projet, le bouton restait cache : la fenetre demande le
+  // projet plutot que de faire disparaitre le seul geste de l'ecran.
+  if (projet === null) return canCreateChues || canCreateGrandPublic;
   return projet === 'CHUES' ? canCreateChues : canCreateGrandPublic;
+}
+
+/** Un seul projet autorise : inutile de le demander. */
+function projetImpose(canCreateChues: boolean, canCreateGrandPublic: boolean): Projet | null {
+  if (canCreateChues && !canCreateGrandPublic) return 'CHUES';
+  if (!canCreateChues && canCreateGrandPublic) return 'GRAND_PUBLIC';
+  return null;
+}
+
+function ChoixDuProjet({ onChoisir }: { onChoisir: (projet: Projet) => void }) {
+  return (
+    <DialogContent className="sm:max-w-md">
+      <DialogHeader>
+        <DialogTitle>Nouveau prospect</DialogTitle>
+        <DialogDescription>Pour quel projet ?</DialogDescription>
+      </DialogHeader>
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="outline"
+          onClick={() => {
+            onChoisir('CHUES');
+          }}
+        >
+          CHUES
+        </Button>
+        <Button
+          variant="outline"
+          onClick={() => {
+            onChoisir('GRAND_PUBLIC');
+          }}
+        >
+          Grand Public
+        </Button>
+      </div>
+    </DialogContent>
+  );
 }
 
 function CreationDialogContent({
   projet,
   onClose,
+  canCreate,
   canCreateGrandPublic,
 }: {
   projet: Projet | null;
   onClose: () => void;
+  canCreate: boolean;
   canCreateGrandPublic: boolean;
 }) {
-  const grandPublic = projet === 'GRAND_PUBLIC';
+  const [choisi, setChoisi] = useState<Projet | null>(null);
+  const vise = projet ?? choisi ?? projetImpose(canCreate, canCreateGrandPublic);
+  if (vise === null) return <ChoixDuProjet onChoisir={setChoisi} />;
+  const grandPublic = vise === 'GRAND_PUBLIC';
 
   return (
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
