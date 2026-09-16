@@ -32,8 +32,11 @@ export const callbackKeys = {
 export type Callback = components['schemas']['CallbackDto'] & {
   prospectName: string;
   projet: Projet;
+  /** Le statut qui a promis le rappel, « RV téléphonique » par exemple. */
+  reasonLabel: string | null;
 };
-export type CallbackScope = components['schemas']['CallbackScope'];
+/** « all » : toute la file promise, sans borne de date ; le contrat v1 figé s'arrête à la semaine. */
+export type CallbackScope = components['schemas']['CallbackScope'] | 'all';
 
 export interface CallbackList {
   readonly items: Callback[];
@@ -61,7 +64,7 @@ export async function fetchCallbacks(
     await client.GET('/api/v1/phase2/callbacks', {
       params: {
         query: {
-          scope,
+          scope: scope as components['schemas']['CallbackScope'],
           ...(assignedToId === null ? {} : { assignedToId }),
           ...(projet ? { projet } : {}),
         },

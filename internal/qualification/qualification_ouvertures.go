@@ -59,13 +59,16 @@ type QualificationRappelDTO struct {
 	Comment        *string `json:"comment"`
 	AssignedToID   string  `json:"assignedToId" format:"uuid"`
 	AssignedToName string  `json:"assignedToName"`
-	Overdue        bool    `json:"overdue"`
+	// Le statut qui a promis le rappel : « RV téléphonique », « RV CPI »…
+	ReasonLabel *string `json:"reasonLabel"`
+	Overdue     bool    `json:"overdue"`
 }
 
 type qualificationRappelLigne struct {
 	ID, ProspectID, Prenom, Nom, Projet, AssigneID, AssigneNom string
 	Phone                                                      *string
 	Comment                                                    *string
+	Motif                                                      *string
 	Quand                                                      time.Time
 }
 
@@ -75,13 +78,14 @@ func qualificationRappelDTO(l *qualificationRappelLigne, maintenant time.Time) Q
 		ProspectName: strings.TrimSpace(l.Prenom + " " + l.Nom), PhoneE164: l.Phone,
 		Projet:      l.Projet,
 		ScheduledAt: qualificationISO(l.Quand), Comment: l.Comment, AssignedToID: l.AssigneID,
+		ReasonLabel:    l.Motif,
 		AssignedToName: l.AssigneNom, Overdue: l.Quand.Before(maintenant),
 	}
 }
 
 type QualificationRappelsInput struct {
 	Projet       string `query:"projet" enum:",CHUES,GRAND_PUBLIC"`
-	Scope        string `query:"scope" enum:"today,overdue,week" default:"today"`
+	Scope        string `query:"scope" enum:"today,overdue,week,all" default:"today"`
 	AssignedToID string `query:"assignedToId" maxLength:"64"`
 }
 
@@ -94,21 +98,30 @@ type QualificationRappelsOutput struct {
 	}
 }
 
+// « Tous » ne borne rien : un rappel promis dans trois semaines se voit quand même.
+func qualificationBorneRappels(portee string, maintenant time.Time, zone *time.Location) *time.Time {
+	if portee == "all" {
+		return nil
+	}
+	if portee == "overdue" {
+		return &maintenant
+	}
+	jours := 0
+	if portee == analytics.CleSemaine {
+		jours = 6
+	}
+	local := maintenant.In(zone)
+	fin := time.Date(local.Year(), local.Month(), local.Day()+jours, 23, 59, 59,
+		int(999*time.Millisecond), zone).UTC()
+	return &fin
+}
+
 // Le RETARD n'est pas un statut : un rappel de la veille reste PENDING et
 // remonte dans la journée courante.
 func (s *service) qualificationListerRappels(ctx context.Context, in *QualificationRappelsInput) (*QualificationRappelsOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	maintenant := time.Now().UTC()
-	p := db.ListerRappelsParams{Avant: maintenant}
-	if in.Scope != "overdue" {
-		jours := 0
-		if in.Scope == analytics.CleSemaine {
-			jours = 6
-		}
-		local := maintenant.In(s.Cfg.TimeZone)
-		p.Avant = time.Date(local.Year(), local.Month(), local.Day()+jours, 23, 59, 59,
-			int(999*time.Millisecond), s.Cfg.TimeZone).UTC()
-	}
+	p := db.ListerRappelsParams{Avant: qualificationBorneRappels(in.Scope, maintenant, s.Cfg.TimeZone)}
 	if in.Projet != "" {
 		p.Projet = &in.Projet
 	}
@@ -136,7 +149,8 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
 			ID: r.ID, ProspectID: r.ProspectId, Prenom: r.Prenom, Nom: r.Nom, Phone: r.PhoneE164,
-			Projet: string(r.Projet), Comment: r.Comment, AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
+			Projet: string(r.Projet), Comment: r.Comment, Motif: r.ReasonLabel,
+			AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
 		}, maintenant))
 	}
 	return out, nil

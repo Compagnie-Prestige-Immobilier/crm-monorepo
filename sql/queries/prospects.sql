@@ -84,13 +84,14 @@ WHERE p."deletedAt" IS NULL
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
-        EXISTS (
+        -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
+        NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
           WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
         )
         -- Une reaffectation remet la fiche dans la file : la borne suit la date
         -- d'affectation, pas celle de creation du lot.
-        OR NOT EXISTS (
+        AND NOT EXISTS (
           SELECT 1 FROM "call_attempts" ra
           WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
             AND ra."createdAt" >= COALESCE((
@@ -213,13 +214,14 @@ WHERE p."deletedAt" IS NULL
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
-        EXISTS (
+        -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
+        NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
           WHERE sc."prospectId" = p."id" AND sc."assignedToId" = sqlc.arg('scope_user_id')::text AND sc."status" = 'PENDING'
         )
         -- Une reaffectation remet la fiche dans la file : la borne suit la date
         -- d'affectation, pas celle de creation du lot.
-        OR NOT EXISTS (
+        AND NOT EXISTS (
           SELECT 1 FROM "call_attempts" ra
           WHERE ra."prospectId" = p."id" AND ra."performedById" = sqlc.arg('scope_user_id')::text
             AND ra."createdAt" >= COALESCE((
