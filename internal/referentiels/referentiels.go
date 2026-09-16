@@ -126,8 +126,8 @@ type referentielsListe struct {
 	champs       []referentielsChamp
 	rang         string
 	filtre       string
-	lecture      []socle.Role
-	ecriture     []socle.Role
+	lecture      socle.Permission
+	ecriture     socle.Permission
 	conflitCode  string
 	conflitLabel string
 	introuvable  string
@@ -152,7 +152,6 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 	codeMajuscule := regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
 	codeVisite := regexp.MustCompile(`^[A-Z0-9_]+$`)
 	codeDept := regexp.MustCompile(`^[A-Z0-9_-]+$`)
-	rolesVisite := []socle.Role{socle.Admin, socle.Direction}
 
 	cCode := referentielsChamp{
 		nom: referentielsNomCode, sel: referentielsSelCode, motif: codeMajuscule,
@@ -279,8 +278,8 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 				cIsActive, cIsSystem, cSortOrder, cUpdatedAt,
 			},
 			rang:         referentielsTriSortLabel,
-			lecture:      socle.Tous,
-			ecriture:     rolesVisite,
+			lecture:      socle.PermissionPanneauAcceder,
+			ecriture:     socle.PermissionAccueilListes,
 			conflitCode:  referentielsVisiteCodePris,
 			conflitLabel: referentielsVisiteLabelPris,
 			introuvable:  referentielsVisiteIntrouvable,
@@ -293,57 +292,57 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 				referentielsRegle(cName, 2, 160, true), referentielsRegle(cShortName, 2, 32, true),
 				cIsActive, cSortOrder, cUpdatedAt,
 			},
-			rang: referentielsTriSortNom, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriSortNom, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomSyndicats: {
 			champs: []referentielsChamp{
 				referentielsRegle(cName, 2, 200, true), referentielsRegle(cSigle, 2, 32, true),
 				referentielsRegle(cSecteur, 0, 120, false), cIsActive, cSortOrder, cUpdatedAt,
 			},
-			rang: referentielsTriSortNom, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriSortNom, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		"canaux-provenance": {
 			champs: []referentielsChamp{
 				referentielsRegle(cCodeCanal, 2, 40, true), referentielsRegle(cLabel, 2, 80, true),
 				cPosition, cIsActive, cUpdatedAt,
 			},
-			rang: referentielsTriPosition, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomProfessions: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 120, true),
 				cIsTeaching, cPosition, cIsActive, cUpdatedAt,
 			},
-			rang: referentielsTriPosition, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomEmployeurs: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 60, true), referentielsRegle(cLabel, 2, 160, true),
 				referentielsRegle(cType, 1, 32, true), cPosition, cIsActive, cUpdatedAt,
 			},
-			rang: referentielsTriPosition, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomPays: {
 			champs: []referentielsChamp{cCodeLu, cLabelLu, cIndicatif, cPosition, cIsActive, cUpdatedAt},
-			rang:   referentielsTriPosition, lecture: socle.Tous,
+			rang:   referentielsTriPosition, lecture: socle.PermissionPanneauAcceder,
 		},
 		NomIncomeBands: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 80, true),
 				cMinXof, cMaxXof, cPosition, cIsActive, cUpdatedAt,
 			},
-			rang: `t."position", t."minXof"`, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: `t."position", t."minXof"`, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomOffers: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 120, true),
 				referentielsRegle(cDescription, 0, 500, false), cPosition, cIsActive, cUpdatedAt,
 			},
-			rang: referentielsTriPosition, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		"bank-rejection-reasons": {
 			champs: []referentielsChamp{cCodeLu, cLabelLu, cSortOrderLu, cIsActive},
-			rang:   referentielsTriSortLabel, lecture: socle.Banque,
+			rang:   referentielsTriSortLabel, lecture: socle.PermissionBanqueDossiers,
 		},
 		"visite-entreprises":   visite(),
 		"visite-directions":    visite(),
@@ -351,7 +350,7 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 		"visite-objets":        visite(),
 		NomRegions: {
 			champs: []referentielsChamp{cCodeLu, cNameLu},
-			rang:   referentielsSelName, lecture: socle.Tous,
+			rang:   referentielsSelName, lecture: socle.PermissionPanneauAcceder,
 		},
 		NomDepartements: {
 			jointure: `JOIN "regions" r ON r."id" = t."regionId"`,
@@ -359,14 +358,14 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 				referentielsRegle(cCodeDept, 2, 16, true), referentielsRegle(cName, 2, 120, true),
 				referentielsRegle(cRegionID, 1, 64, true), cRegionName, cIsActive, cUpdatedAt,
 			},
-			rang: referentielsSelName, lecture: socle.Tous, ecriture: socle.Encadrement,
+			rang: referentielsSelName, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
 		NomIefs: {
 			jointure: `JOIN "departements" d ON d."id" = t."departementId" JOIN "regions" r ON r."id" = d."regionId"`,
 			champs: []referentielsChamp{
 				cCodeLu, cNameLu, cDepartementID, cDepartementName, cRegionName, cIsActive, cUpdatedAt,
 			},
-			rang: `d."name", t."name"`, filtre: "departementId", lecture: socle.Tous,
+			rang: `d."name", t."name"`, filtre: "departementId", lecture: socle.PermissionPanneauAcceder,
 		},
 	}
 	for kind, l := range listes {
@@ -525,7 +524,7 @@ var referentielsAlias = map[string]string{
 	"offres":          NomOffers,
 }
 
-func referentielsAutorisee(kind string, role socle.Role, ecriture bool) (*referentielsListe, error) {
+func referentielsAutorisee(ctx context.Context, kind string, ecriture bool) (*referentielsListe, error) {
 	if nom, alias := referentielsAlias[kind]; alias {
 		kind = nom
 	}
@@ -533,14 +532,14 @@ func referentielsAutorisee(kind string, role socle.Role, ecriture bool) (*refere
 	if !connue {
 		return nil, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Référentiel inconnu.")
 	}
-	roles := l.lecture
+	permission := l.lecture
 	if ecriture {
-		roles = l.ecriture
+		permission = l.ecriture
 	}
-	if roles == nil {
+	if permission == "" {
 		return nil, socle.Problem(http.StatusNotFound, "NOT_FOUND", "Référentiel inconnu.")
 	}
-	if !socle.Autorise(roles, role) {
+	if u := socle.UtilisateurCourant(ctx); !u.Peut(permission) {
 		return nil, socle.Problem(http.StatusForbidden, "FORBIDDEN", "Accès refusé.")
 	}
 	return l, nil
@@ -595,7 +594,7 @@ func (s *service) referentielsItem(ctx context.Context, l *referentielsListe, id
 }
 
 func (s *service) referentielsGet(ctx context.Context, in *ReferentielsListeInput) (*ReferentielsListeOutput, error) {
-	l, err := referentielsAutorisee(in.Kind, socle.UtilisateurCourant(ctx).Role, false)
+	l, err := referentielsAutorisee(ctx, in.Kind, false)
 	if err != nil {
 		return nil, err
 	}
@@ -612,7 +611,7 @@ type ReferentielsCreerInput struct {
 }
 
 func (s *service) referentielsCreer(ctx context.Context, in *ReferentielsCreerInput) (*ReferentielsItemOutput, error) {
-	l, err := referentielsAutorisee(in.Kind, socle.UtilisateurCourant(ctx).Role, true)
+	l, err := referentielsAutorisee(ctx, in.Kind, true)
 	if err != nil {
 		return nil, err
 	}
@@ -687,7 +686,7 @@ func (s *service) referentielsSystemeFige(ctx context.Context, l *referentielsLi
 }
 
 func (s *service) referentielsModifier(ctx context.Context, in *ReferentielsModifierInput) (*ReferentielsItemOutput, error) {
-	l, err := referentielsAutorisee(in.Kind, socle.UtilisateurCourant(ctx).Role, true)
+	l, err := referentielsAutorisee(ctx, in.Kind, true)
 	if err != nil {
 		return nil, err
 	}

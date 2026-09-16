@@ -80,6 +80,8 @@ const (
 	PermissionBanqueVoirTousPortefeuilles Permission = "banque.voir_tous_portefeuilles"
 	PermissionCampagnesAttributionsToutes Permission = "campagnes.attributions_toutes"
 	PermissionExportsVoirTout             Permission = "exports.voir_tout"
+	PermissionFichesModifierToutes        Permission = "fiches.modifier_toutes"
+	PermissionVisitesDetruire             Permission = "visites.detruire"
 )
 
 var Catalogue = map[Permission]definitionPermission{
@@ -134,6 +136,8 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionBanqueVoirTousPortefeuilles: {domaineBanque, "Voir tous les portefeuilles Banque & Finance", AdminSeul},
 	PermissionCampagnesAttributionsToutes: {domaineCampagnes, "Voir toutes les attributions", []Role{Admin, Superviseur, Direction, BanqueFinance, Accueil}},
 	PermissionExportsVoirTout:             {domaineExports, "Exporter tous les portefeuilles", Encadrement},
+	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
+	PermissionVisitesDetruire:             {domaineAccueil, "Détruire définitivement une visite archivée", []Role{Direction}},
 }
 
 var permissionsDePortee = map[Permission]bool{
@@ -150,6 +154,7 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionBanqueVoirTousPortefeuilles: true,
 	PermissionCampagnesAttributionsToutes: true,
 	PermissionExportsVoirTout:             true,
+	PermissionFichesModifierToutes:        true,
 	PermissionProspectsReaffecterTout:     true,
 }
 

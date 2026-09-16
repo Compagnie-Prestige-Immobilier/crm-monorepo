@@ -839,7 +839,7 @@ func (s *service) modifierRepresentant(ctx context.Context, in *RepresentantUpda
 	if err != nil {
 		return nil, err
 	}
-	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesModifierToutes) && existant.CreatedById != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	modifie := existant
@@ -1332,7 +1332,7 @@ func (s *service) supprimerRepresentant(ctx context.Context, in *RepresentantDel
 	if err != nil {
 		return nil, err
 	}
-	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesModifierToutes) && existant.CreatedById != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	prospects, err := s.Q.CompterProspectsVivants(ctx, &in.ID)

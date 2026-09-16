@@ -1212,7 +1212,7 @@ func reponseDisposition(d Disposition, source string, updatedAt *time.Time) *Dis
 func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*DispositionOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	rendre := func(d Disposition, source string, updatedAt *time.Time) *DispositionOutput {
-		if u.Role != socle.Admin {
+		if !u.Peut(socle.PermissionEnrolementAdministrer) {
 			d = sansEnrolement(d)
 		}
 		return reponseDisposition(d, source, updatedAt)

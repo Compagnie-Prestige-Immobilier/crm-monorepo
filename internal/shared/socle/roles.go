@@ -81,15 +81,6 @@ func PorteeSaisiePlateforme(u *Utilisateur) *bool {
 
 var vrai, faux = true, false
 
-func Autorise(roles []Role, role Role) bool {
-	for _, r := range roles {
-		if r == role || r == Public {
-			return true
-		}
-	}
-	return false
-}
-
 func VerifierGarde(api huma.API) error {
 	vues := map[string]bool{}
 	permissionsVues := map[Permission]bool{}
