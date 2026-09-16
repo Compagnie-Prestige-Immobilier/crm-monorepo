@@ -731,9 +731,11 @@ type etatGrandPublicImport struct {
 	clesCanaux  []string
 	canalLabels []string
 	regles      []regleProvenanceImport
-	employeurs  map[string]string
-	pays        map[string]string
-	paysLabels  []string
+	// L'onglet qui a livre un numero le premier : les suivants le re-livrent.
+	premiereFeuille map[string]string
+	employeurs      map[string]string
+	pays            map[string]string
+	paysLabels      []string
 }
 
 type connuImport struct {
@@ -784,7 +786,8 @@ func preparerGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImp
 	}
 	etat := &etatGrandPublicImport{
 		region: c.region, vus: map[string]int{}, emails: map[string]int{},
-		banques: banques.index, banqueLabels: banques.libelles,
+		premiereFeuille: map[string]string{},
+		banques:         banques.index, banqueLabels: banques.libelles,
 		syndicats: syndicats.index, syndicatLabels: syndicats.libelles,
 		canaux: map[string]string{}, employeurs: map[string]string{}, pays: map[string]string{},
 	}
@@ -1105,6 +1108,7 @@ func ecrireGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImpor
 		return bilanTrancheImport{}, err
 	}
 	tri := trierGrandPublicImport(uniques, deja, dejaEmail, etat)
+	compterFeuillesGrandPublicImport(c.feuilles, lignes, uniques, etat.premiereFeuille)
 	bilan := bilanTrancheImport{
 		ignorees: ignoreesDoublons + tri.ignorees, avertissements: append(erreursDoublons, tri.avertissements...),
 	}
