@@ -775,6 +775,7 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 	row, err := s.Q.MotifIssueParCode(ctx, code)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if !demande {
+			systeme.exigeCommentaire = issueSansMotif
 			return systeme, nil
 		}
 		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_UNKNOWN", "Motif d’issue inconnu : "+code+".")
