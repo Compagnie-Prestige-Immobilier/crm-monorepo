@@ -78,7 +78,13 @@ const FAMILLES: readonly Tuile<Famille>[] = [
   },
 ];
 
-const PROJETS: readonly Tuile<Projet>[] = [
+const PROJETS: readonly Tuile<Projet | typeof TOUS>[] = [
+  {
+    cle: 'TOUS',
+    titre: 'Tous les prospects',
+    aide: 'CHUES et Grand Public ensemble.',
+    icon: UsersRoundIcon,
+  },
   {
     cle: 'CHUES',
     titre: 'Prospects CHUES',
@@ -140,7 +146,7 @@ const ETAPES: readonly { id: Etape; titre: string }[] = [
 
 interface Choix {
   famille: Famille;
-  projet: Projet;
+  projet: Projet | typeof TOUS;
   type: ProspectType | typeof TOUS;
   injoignables: boolean;
   representants: CleRepresentants;
@@ -150,7 +156,7 @@ interface Choix {
   importe: ImportChoisi | null;
 }
 
-const choixInitial = (famille: Famille, projet: Projet): Choix => ({
+const choixInitial = (famille: Famille, projet: Projet | typeof TOUS): Choix => ({
   famille,
   projet,
   type: TOUS,
@@ -241,21 +247,26 @@ function critereImport(importe: ImportChoisi | null): Critere {
   };
 }
 
+const TETE_PROSPECTS: Record<Projet | typeof TOUS, string> = {
+  TOUS: 'Tous les prospects',
+  CHUES: 'Prospects CHUES',
+  GRAND_PUBLIC: 'Prospects Grand Public',
+};
+
 function critereProspects(choix: Choix): Critere {
-  const grandPublic = choix.projet === 'GRAND_PUBLIC';
-  const type = grandPublic && choix.type !== TOUS ? choix.type : null;
+  const type = choix.projet === 'GRAND_PUBLIC' && choix.type !== TOUS ? choix.type : null;
   return {
     corps: {
       cible: 'PROSPECTS',
       prospects: {
         ...PROSPECTS_VIVANTS,
-        projet: choix.projet,
+        ...(choix.projet === TOUS ? {} : { projet: choix.projet }),
         ...(type === null ? {} : { type }),
         ...(choix.injoignables ? { injoignables: true } : {}),
       },
     },
     etiquette: [
-      grandPublic ? 'Prospects Grand Public' : 'Prospects CHUES',
+      TETE_PROSPECTS[choix.projet],
       choix.injoignables ? 'injoignables' : null,
       type === null ? null : PROSPECT_TYPE_LABELS[type],
     ]
@@ -884,7 +895,7 @@ function Step3Resume({
 function useLotFormState(projet: Projet | null) {
   const familles = FAMILLES.filter((f) => projet !== 'GRAND_PUBLIC' || f.cle !== 'representants');
   const [step, setStep] = useState<Etape>(1);
-  const [choix, setChoix] = useState<Choix>(() => choixInitial('prospects', projet ?? 'CHUES'));
+  const [choix, setChoix] = useState<Choix>(() => choixInitial('prospects', projet ?? TOUS));
   const [decoches, setDecoches] = useState<readonly string[] | null>(null);
   const [fichesParJourSaisi, setFichesParJourSaisi] = useState(String(FICHES_PAR_JOUR_DEFAUT));
   const [joursSaisi, setJoursSaisi] = useState(String(JOURS_DEFAUT));

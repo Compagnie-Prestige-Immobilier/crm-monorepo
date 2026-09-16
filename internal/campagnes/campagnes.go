@@ -84,7 +84,7 @@ type CampagneCritereRepresentants struct {
 }
 
 type CampagneCritereProspects struct {
-	Projet         string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	Projet         string `json:"projet,omitempty" enum:"CHUES,GRAND_PUBLIC"`
 	Type           string `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	Segment        string `json:"segment,omitempty" enum:"BDD1,BDD2,BDD3,BDD4"`
 	ImportJobID    string `json:"importJobId,omitempty" format:"uuid"`
@@ -117,7 +117,7 @@ type CampagneResume struct {
 	ID             string  `json:"id"`
 	Name           string  `json:"name"`
 	Cible          string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
-	Projet         string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	Projet         *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	ScopeLabel     string  `json:"scopeLabel"`
 	ItemCount      int     `json:"itemCount"`
 	CreatedByID    string  `json:"createdById"`
@@ -657,7 +657,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	if err := database.Auditer(ctx, q, createurID, "lot_export.create", "lot_export", lotID.String(), nil,
 		map[string]any{
 			lotCleNom: strings.TrimSpace(in.Body.Name), "cible": in.Body.Cible,
-			"projet": string(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
+			"projet": lotProjetTexte(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
 			"teleconseillerIds": filtres.Distribution.TeleconseillerIds,
 		}); err != nil {
 		return "", err
@@ -665,13 +665,24 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	return lotID.String(), tx.Commit(ctx)
 }
 
-// Un représentant est CHUES par construction ; un lot de prospects porte le
-// projet exigé à la création.
-func projetDuLot(body *CampagneCreationBody) db.Projet {
-	if lotSurRepresentants(body.Cible) || body.Prospects == nil {
-		return db.Projet("CHUES")
+// Un représentant est CHUES par construction ; un lot de prospects sans projet
+// tire CHUES et Grand Public ensemble.
+func projetDuLot(body *CampagneCreationBody) *db.Projet {
+	projet := db.Projet("CHUES")
+	if !lotSurRepresentants(body.Cible) && body.Prospects != nil {
+		if body.Prospects.Projet == "" {
+			return nil
+		}
+		projet = db.Projet(body.Prospects.Projet)
 	}
-	return db.Projet(body.Prospects.Projet)
+	return &projet
+}
+
+func lotProjetTexte(projet *db.Projet) *string {
+	if projet == nil {
+		return nil
+	}
+	return lotPointeurTexte(string(*projet))
 }
 
 func lotIdsDe(equipe []lotTeleconseiller) []string {
@@ -783,7 +794,7 @@ func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneR
 		return CampagneResume{}, err
 	}
 	return CampagneResume{
-		ID: row.ID, Name: row.Name, Cible: string(row.Cible), Projet: string(row.Projet),
+		ID: row.ID, Name: row.Name, Cible: string(row.Cible), Projet: lotProjetTexte(row.Projet),
 		ScopeLabel: lotScopeLabel(string(row.Cible), lotLireFiltres(row.Filters)),
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
@@ -1354,7 +1365,7 @@ func (s *service) campagneSupprimer(ctx context.Context, in *CampagneIDInput) (*
 	}
 	auteur := socle.UtilisateurCourant(ctx).ID
 	avant := map[string]any{
-		lotCleNom: row.Name, "cible": string(row.Cible), "projet": string(row.Projet),
+		lotCleNom: row.Name, "cible": string(row.Cible), "projet": lotProjetTexte(row.Projet),
 		"fiches": row.ItemCount, "createdById": row.CreatedById,
 		"teleconseillerIds": lotLireFiltres(row.Filters).Distribution.TeleconseillerIds,
 	}
