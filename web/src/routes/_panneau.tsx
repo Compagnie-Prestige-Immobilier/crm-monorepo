@@ -42,7 +42,7 @@ function Panneau() {
   return (
     <CoqueShell>
       <LiveStream />
-      <RappelPopUpIntrusif />
+      <RappelPopUpIntrusif userId={user.id} />
       <SidebarShell role={user.role} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">

@@ -266,8 +266,15 @@ const SECTIONS: readonly NavSection[] = [
         roles: ['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
+        href: '/teleconseil/plateforme-apercu',
+        label: 'Aperçu plateforme',
+        icon: LayoutDashboardIcon,
+        description: 'Volume des inscriptions et appels à faire',
+        roles: ['CCP'],
+      },
+      {
         href: '/teleconseil/plateforme',
-        label: 'Fiches plateforme',
+        label: 'Mon travail',
         icon: HeadsetIcon,
         description: 'Les inscrits des plateformes d’enrôlement',
         roles: ['CCP'],
@@ -295,6 +302,13 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Les personnes que j’ai appelées',
         roles: TERRAIN,
         secondary: true,
+      },
+      {
+        href: '/teleconseil/mes-contacts',
+        label: 'Mes contacts',
+        icon: ContactRoundIcon,
+        description: 'Les personnes que j’ai appelées sur la plateforme',
+        roles: ['CCP'],
       },
       {
         href: '/teleconseil/suggestions',
@@ -569,7 +583,7 @@ export function homePathForRole(role: Role): string {
     case 'CHARGE_CLIENTELE':
       return '/teleconseil';
     case 'CCP':
-      return '/teleconseil/plateforme';
+      return '/teleconseil/plateforme-apercu';
     case 'DIRECTION':
       return '/teleconseil/leads-importes';
     case 'SUPERVISEUR':

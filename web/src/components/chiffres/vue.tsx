@@ -33,7 +33,6 @@ import {
   type Jeux,
   type SourceChiffre,
 } from '@/components/chiffres/sources';
-import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { useUrlFilters } from '@/components/filters/use-url-filters';
 import { LiveIndicator } from '@/components/live/live-indicator';
 import { useLive } from '@/components/live/use-live';
@@ -328,20 +327,35 @@ function SelecteurCampagne({
     queryKey: ['chiffres', 'campagnes-du-filtre', projet],
     queryFn: () => fetchLotsExport(query),
   });
+  const lots = campagnes.data?.items ?? [];
+  const nomDeLaCampagne = (id: string): string =>
+    id === 'toutes' ? 'Toutes les campagnes' : (lots.find((lot) => lot.id === id)?.name ?? '');
 
+  // Même liste que « Projet » et « Équipe » : les trois filtres se lisent d'un
+  // seul regard, même hauteur, même bord, même flèche.
   return (
-    <FilterCombobox
-      className="w-64"
-      label="Campagne"
-      placeholder="Toutes les campagnes"
-      options={(campagnes.data?.items ?? []).map((lot) => ({
-        value: lot.id,
-        label: lot.name,
-        hint: formatDate(lot.createdAt),
-      }))}
-      value={value}
-      onChange={onChange}
-    />
+    <Select
+      value={value ?? 'toutes'}
+      onValueChange={(choix) => {
+        if (choix === null) return;
+        onChange(choix === 'toutes' ? null : choix);
+      }}
+    >
+      <SelectTrigger size="sm" aria-label="Campagne regardée" className="w-64">
+        <SelectValue>{nomDeLaCampagne}</SelectValue>
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value="toutes">Toutes les campagnes</SelectItem>
+        {lots.map((lot) => (
+          <SelectItem key={lot.id} value={lot.id}>
+            {lot.name}
+            <span className="ml-2 text-[0.75rem] text-muted-foreground">
+              {formatDate(lot.createdAt)}
+            </span>
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   );
 }
 
