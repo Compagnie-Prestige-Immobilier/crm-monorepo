@@ -22,7 +22,15 @@ import { NON_QUALIFIES, SANS_PROSPECT, hubKeys } from '@/components/chues/hub-fi
  * Téléconseil, supervision et direction y lisent le MÊME écran : les trois
  * passent eux-mêmes les appels. Les chiffres sont ceux que l'API sert à chacun.
  */
-export function HubView({ canCreateProspect }: { prenom: string; canCreateProspect: boolean }) {
+export function HubView({
+  canCreateProspect,
+  encadrement,
+}: {
+  prenom: string;
+  canCreateProspect: boolean;
+  /** Supervision, direction et administration lisent les rappels des téléconseillers, pas les leurs. */
+  encadrement: boolean;
+}) {
   const [nouveauRepresentant, setNouveauRepresentant] = useState(false);
   const nonQualifies = useQuery({
     queryKey: queryKeys.representants(NON_QUALIFIES),
@@ -116,14 +124,18 @@ export function HubView({ canCreateProspect }: { prenom: string; canCreateProspe
         />
 
         <Etape
-          titre="À rappeler"
-          explication="Les rappels promis et ceux que le référentiel a reprogrammés."
+          titre={encadrement ? 'Rappels des téléconseillers' : 'À rappeler'}
+          explication={
+            encadrement
+              ? 'Ce que les téléconseillers ont promis de rappeler. Les retards se suivent ici.'
+              : 'Les rappels promis et ceux que le référentiel a reprogrammés.'
+          }
           chiffre={
             <Chiffre
               pending={rappels.isPending}
               failed={rappels.isError}
               valeur={rappels.data?.items.length}
-              legende="dus aujourd’hui"
+              legende={encadrement ? 'dus aujourd’hui chez les téléconseillers' : 'dus aujourd’hui'}
               enRetard={enRetard}
             />
           }

@@ -765,6 +765,7 @@ type qualificationTentative struct {
 }
 
 func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *QualificationCallAttemptBody) (qualificationMotifIssue, error) {
+	issueSansMotif := b.Outcome == string(db.CallOutcomeOTHER)
 	systeme := qualificationMotifsSysteme[b.Outcome]
 	code := strings.ToUpper(strings.TrimSpace(qualificationTexte(b.ReasonCode)))
 	demande := code != ""
@@ -774,6 +775,7 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 	row, err := s.Q.MotifIssueParCode(ctx, code)
 	if errors.Is(err, pgx.ErrNoRows) {
 		if !demande {
+			systeme.exigeCommentaire = issueSansMotif
 			return systeme, nil
 		}
 		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_UNKNOWN", "Motif d’issue inconnu : "+code+".")
@@ -791,7 +793,7 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 	// Sans motif nommé, « Autre » ne dit rien : le commentaire le remplace.
 	return qualificationMotifIssue{
 		id: &row.ID, label: row.Label, effet: row.Effect,
-		exigeCommentaire: row.RequiresComment || (!demande && b.Outcome == string(db.CallOutcomeOTHER)),
+		exigeCommentaire: row.RequiresComment || (!demande && issueSansMotif),
 		exigeRappel:      row.RequiresCallback,
 	}, nil
 }

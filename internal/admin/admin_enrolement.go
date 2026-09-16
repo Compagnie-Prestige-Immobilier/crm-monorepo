@@ -527,6 +527,9 @@ func (s *service) tirer(ctx context.Context, projet string) BilanTirage {
 	} else if _, err := banque.SignalerDossiersComplets(ctx, s.Deps, projet); err != nil {
 		slog.Error("tirage d’enrôlement : dossiers complets non signalés", "projet", projet, "err", err)
 	}
+	if err := s.remettreRappelsPlateformeAuxCCP(ctx); err != nil {
+		slog.Error("tirage d’enrôlement : rappels plateforme non remis aux CCP", "projet", projet, "err", err)
+	}
 	valeurs, _, lecture := s.reglagesTirage(ctx, projet)
 	if lecture == nil {
 		valeurs.DernierTirage = &bilan

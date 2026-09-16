@@ -44,6 +44,22 @@ Le job lance `deploy.py redeploy`, et **pas** `deploy` — voir la docstring de
 `cmd_redeploy` : `deploy` engendrerait des secrets dans le journal public de
 l'exécution et redémarrerait Postgres à chaque fusion.
 
+### Image GHCR (build unique)
+
+Le workflow publie l'image vérifiée sur
+`ghcr.io/compagnie-prestige-immobilier/crm-monorepo/cpi-go`
+avec le SHA du commit et le tag `prod`. Pour que Dokploy tire cette image au
+lieu de reconstruire le Dockerfile, rendre le package GHCR public dans GitHub.
+Le workflow fournit alors
+directement le tag SHA à Dokploy, sans identifiant de registre.
+`redeploy cpi-go` configure alors `application.saveDockerProvider` avec le tag
+immuable du commit avant de demander le redémarrage.
+
+Le dépôt Git public ne rend pas automatiquement le package GHCR public : cette
+visibilité doit être réglée une fois dans GitHub Packages. Le cache BuildKit de
+la CI reste séparé du cache du builder Dokploy ; le mode GHCR évite surtout de
+refaire le build sur le VPS.
+
 ### Le seul réglage à faire
 
 ```bash

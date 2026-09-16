@@ -1113,6 +1113,20 @@ def cmd_redeploy() -> None:
         sys.exit(1)
 
     for key, label in couples:
+        image = setting("DOKPLOY_IMAGE", "")
+        if image:
+            step(f"Image Dokploy, {image}")
+            call(
+                "application.saveDockerProvider",
+                {
+                    "applicationId": ids[key],
+                    "dockerImage": image,
+                    "username": "",
+                    "password": "",
+                    "registryUrl": "ghcr.io",
+                },
+            )
+            ok("source Docker configurée")
         step(f"Déploiement, {label}")
         call("application.deploy", {"applicationId": ids[key]})
         ok("demandé")

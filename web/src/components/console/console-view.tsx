@@ -768,11 +768,14 @@ function NomProspect({ row }: { row: ProspectRow }) {
   return (
     <>
       {row.plateformeInscrite === true ? (
-        <StarIcon
+        <span
           role="img"
-          aria-label="Inscription confirmée"
-          className="size-4 shrink-0 fill-current text-warning"
-        />
+          aria-label="Inscription confirmée sur la plateforme"
+          title="Inscription confirmée sur la plateforme"
+          className="inline-flex shrink-0"
+        >
+          <StarIcon aria-hidden="true" className="size-4 fill-current text-warning" />
+        </span>
       ) : null}
       <span className="truncate">
         {row.nom} {row.prenom}

@@ -8,6 +8,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"maps"
 	"math"
 	"net/http"
@@ -32,8 +33,6 @@ const (
 
 	lotEtatNonTraitee = "NON_TRAITEE"
 	lotEtatTraitee    = "TRAITEE"
-	lotEtatPlateforme = "PLATEFORME"
-	lotEtatHorsProjet = "HORS_PROJET"
 
 	LotSegmentBDD1 = "BDD1"
 	LotSegmentBDD2 = "BDD2"
@@ -85,12 +84,13 @@ type CampagneCritereRepresentants struct {
 }
 
 type CampagneCritereProspects struct {
-	Projet         string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	Projet         string `json:"projet,omitempty" enum:"CHUES,GRAND_PUBLIC"`
 	Type           string `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	Segment        string `json:"segment,omitempty" enum:"BDD1,BDD2,BDD3,BDD4"`
 	ImportJobID    string `json:"importJobId,omitempty" format:"uuid"`
 	ImportFeuille  string `json:"importFeuille,omitempty" maxLength:"200"`
 	IncludeDeleted bool   `json:"includeDeleted,omitempty"`
+	Injoignables   bool   `json:"injoignables,omitempty"`
 }
 
 type CampagneObjectif struct {
@@ -117,7 +117,7 @@ type CampagneResume struct {
 	ID             string  `json:"id"`
 	Name           string  `json:"name"`
 	Cible          string  `json:"cible" enum:"REPRESENTANTS,PROSPECTS,REPRESENTANTS_INJOIGNABLES,CONTACTS_RECOMMANDES"`
-	Projet         string  `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+	Projet         *string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	ScopeLabel     string  `json:"scopeLabel"`
 	ItemCount      int     `json:"itemCount"`
 	CreatedByID    string  `json:"createdById"`
@@ -126,7 +126,6 @@ type CampagneResume struct {
 	PausedAt       *string `json:"pausedAt"`
 	CallsSince     int     `json:"callsSince"`
 	FichesAppelees int     `json:"fichesAppelees"`
-	FichesRetirees int     `json:"fichesRetirees" doc:"Lignes rendues par la campagne : fiche passée plateforme ou hors projet."`
 }
 
 type CampagneTentative struct {
@@ -226,6 +225,7 @@ type lotFiltres struct {
 	ImportJobID    string          `json:"importJobId,omitempty"`
 	ImportFeuille  string          `json:"importFeuille,omitempty"`
 	IncludeDeleted *bool           `json:"includeDeleted,omitempty"`
+	Injoignables   bool            `json:"injoignables,omitempty"`
 	Distribution   lotDistribution `json:"distribution"`
 }
 
@@ -247,13 +247,6 @@ type lotMembreCapacite struct {
 type lotAffectation struct {
 	assigneeID string
 	jour       int
-}
-
-func lotCapaciteParJour(role db.Role, fichesParJour int) int {
-	if role == db.Role("COMMERCIAL") {
-		return fichesParJour
-	}
-	return max(1, int(math.Ceil(float64(fichesParJour)/5)))
 }
 
 // Tourniquet pondéré : chacun reçoit une fiche par tour jusqu'à sa capacité,
@@ -321,6 +314,9 @@ func lotScopeLabel(cible string, f *lotFiltres) string {
 	if f.Type != "" {
 		return lotSiVide(f.Projet, "Grand Public") + ", " + strings.Replace(strings.ToLower(f.Type), "_", " ", 1)
 	}
+	if f.Injoignables {
+		return lotSiVide(f.Projet, "Tous projets") + ", injoignables"
+	}
 	return lotSiVide(f.Projet, "Tous projets")
 }
 
@@ -353,7 +349,6 @@ func lotInt32(n int) int32 {
 type lotTeleconseiller struct {
 	id       string
 	fullName string
-	role     db.Role
 }
 
 // Les comptes cochés, dans l'ordre reçu : cet ordre EST le tourniquet.
@@ -374,9 +369,53 @@ func (s *service) lotEquipe(ctx context.Context, ids []string) ([]lotTeleconseil
 	equipe := make([]lotTeleconseiller, 0, len(ids))
 	for _, id := range ids {
 		row := parID[id]
-		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName, role: row.Role})
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
 	}
 	return equipe, nil
+}
+
+// Au retrait, seuls les membres encore téléconseillers reprennent des fiches :
+// un compte dont le rôle a changé ne bloque pas la sortie d'un autre.
+func (s *service) lotEquipeRestante(ctx context.Context, ids []string) ([]lotTeleconseiller, error) {
+	rows, err := s.Q.Teleconseillers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
+			"Une campagne garde au moins un téléconseiller.")
+	}
+	equipe := make([]lotTeleconseiller, 0, len(rows))
+	for _, row := range rows {
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
+	}
+	return equipe, nil
+}
+
+// Les rôles qui siègent dans l'équipe d'une campagne, ceux de la requête Teleconseillers.
+var RolesEquipe = []socle.Role{socle.Commercial, socle.Superviseur, socle.Direction}
+
+// Un compte qui cesse d'être téléconseiller sort de chaque campagne où il
+// siège, ses fiches non traitées reprises par le reste de l'équipe.
+func RetirerDesEquipes(ctx context.Context, d *socle.Deps, teleconseillerID string) error {
+	s := &service{d}
+	lots, err := s.Q.LotsDeLEquipe(ctx, teleconseillerID)
+	if err != nil {
+		return err
+	}
+	for _, lot := range lots {
+		in := &CampagneRetraitInput{ID: lot.ID}
+		in.Body.TeleconseillerID = teleconseillerID
+		if _, err := s.campagneRetrait(ctx, in); err != nil {
+			var probleme *socle.ProblemError
+			if errors.As(err, &probleme) && probleme.Code == "LOT_EXPORT_EQUIPE_VIDE" {
+				return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE", fmt.Sprintf(
+					"La campagne « %s » n’aurait plus aucun téléconseiller : renforcez son équipe ou supprimez-la avant de changer ce rôle.", lot.Name))
+			}
+			return err
+		}
+	}
+	return nil
 }
 
 func lotObjectifsDe(saisis []CampagneObjectif) map[string]int {
@@ -392,7 +431,7 @@ func lotCapacites(equipe []lotTeleconseiller, fichesParJour int, objectifs map[s
 	for _, membre := range equipe {
 		capacite, ok := objectifs[membre.id]
 		if !ok {
-			capacite = lotCapaciteParJour(membre.role, fichesParJour)
+			capacite = fichesParJour
 		}
 		membres = append(membres, lotMembreCapacite{id: membre.id, fichesParJour: capacite})
 	}
@@ -424,6 +463,7 @@ func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
 			ImportJobID:    body.Prospects.ImportJobID,
 			ImportFeuille:  body.Prospects.ImportFeuille,
 			IncludeDeleted: &inclure,
+			Injoignables:   body.Prospects.Injoignables,
 		}
 	}
 	return &lotFiltres{}
@@ -477,6 +517,7 @@ func lotProspectsCible(f *lotFiltres) db.CompterProspectsCibleParams {
 		Type:          typeProspect,
 		ImportJobID:   lotPointeurTexte(f.ImportJobID),
 		ImportFeuille: lotPointeurTexte(f.ImportFeuille),
+		Injoignables:  f.Injoignables,
 		ParSegment:    f.Segment != "",
 		Chues:         f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
 		Cbao:          f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
@@ -616,7 +657,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	if err := database.Auditer(ctx, q, createurID, "lot_export.create", "lot_export", lotID.String(), nil,
 		map[string]any{
 			lotCleNom: strings.TrimSpace(in.Body.Name), "cible": in.Body.Cible,
-			"projet": string(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
+			"projet": lotProjetTexte(projetDuLot(&in.Body)), "fiches": len(lotAffectations),
 			"teleconseillerIds": filtres.Distribution.TeleconseillerIds,
 		}); err != nil {
 		return "", err
@@ -624,13 +665,24 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 	return lotID.String(), tx.Commit(ctx)
 }
 
-// Un représentant est CHUES par construction ; un lot de prospects porte le
-// projet exigé à la création.
-func projetDuLot(body *CampagneCreationBody) db.Projet {
-	if lotSurRepresentants(body.Cible) || body.Prospects == nil {
-		return db.Projet("CHUES")
+// Un représentant est CHUES par construction ; un lot de prospects sans projet
+// tire CHUES et Grand Public ensemble.
+func projetDuLot(body *CampagneCreationBody) *db.Projet {
+	projet := db.Projet("CHUES")
+	if !lotSurRepresentants(body.Cible) && body.Prospects != nil {
+		if body.Prospects.Projet == "" {
+			return nil
+		}
+		projet = db.Projet(body.Prospects.Projet)
 	}
-	return db.Projet(body.Prospects.Projet)
+	return &projet
+}
+
+func lotProjetTexte(projet *db.Projet) *string {
+	if projet == nil {
+		return nil
+	}
+	return lotPointeurTexte(string(*projet))
 }
 
 func lotIdsDe(equipe []lotTeleconseiller) []string {
@@ -659,7 +711,8 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 	p := lotProspectsCible(f)
 	return q.TirerProspectsCible(ctx, db.TirerProspectsCibleParams{
 		Projet: p.Projet, Type: p.Type, ImportJobID: p.ImportJobID, ImportFeuille: p.ImportFeuille,
-		ParSegment: p.ParSegment, Chues: p.Chues, Cbao: p.Cbao, Places: lotInt32(places),
+		Injoignables: p.Injoignables, ParSegment: p.ParSegment, Chues: p.Chues, Cbao: p.Cbao,
+		Places: lotInt32(places),
 	})
 }
 
@@ -726,26 +779,26 @@ func lotValeurTexte(valeur *string) string {
 	return *valeur
 }
 
-func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, depuis time.Time) (calls, fiches, retirees int, err error) {
+func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, depuis time.Time) (calls, fiches int, err error) {
 	if lotSurRepresentants(string(cible)) {
 		row, err := s.Q.LotStatsRepresentants(ctx, db.LotStatsRepresentantsParams{LotId: id, ClientCreatedAt: depuis})
-		return int(row.Calls), int(row.Fiches), 0, err
+		return int(row.Calls), int(row.Fiches), err
 	}
 	row, err := s.Q.LotStatsProspects(ctx, db.LotStatsProspectsParams{LotId: id, ClientCreatedAt: depuis})
-	return int(row.Calls), int(row.Fiches), int(row.Retirees), err
+	return int(row.Calls), int(row.Fiches), err
 }
 
 func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneResume, error) {
-	calls, fiches, retirees, err := s.lotStats(ctx, row.ID, row.Cible, row.CreatedAt)
+	calls, fiches, err := s.lotStats(ctx, row.ID, row.Cible, row.CreatedAt)
 	if err != nil {
 		return CampagneResume{}, err
 	}
 	return CampagneResume{
-		ID: row.ID, Name: row.Name, Cible: string(row.Cible), Projet: string(row.Projet),
+		ID: row.ID, Name: row.Name, Cible: string(row.Cible), Projet: lotProjetTexte(row.Projet),
 		ScopeLabel: lotScopeLabel(string(row.Cible), lotLireFiltres(row.Filters)),
 		ItemCount:  int(row.ItemCount), CreatedByID: row.CreatedById,
 		CreatedByName: row.CreatedByName, CreatedAt: lotISO(row.CreatedAt),
-		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches, FichesRetirees: retirees,
+		PausedAt: lotISOPtr(row.PausedAt), CallsSince: calls, FichesAppelees: fiches,
 	}, nil
 }
 
@@ -1086,16 +1139,14 @@ func lotISOOuNil(t *time.Time) *string {
 	return lotPointeurTexte(lotISO(*t))
 }
 
-// À défaut d'objectif saisi, ce que la répartition a RÉELLEMENT appliqué :
-// annoncer `fichesParJour` brut contredisait la ligne d'à côté.
-func lotObjectifDe(id string, role db.Role, stored lotDistribution) int {
+func lotObjectifDe(id string, stored lotDistribution) int {
 	if explicite, ok := stored.Objectifs[id]; ok {
 		return explicite
 	}
 	if !stored.valide() {
 		return 0
 	}
-	return lotCapaciteParJour(role, stored.FichesParJour)
+	return stored.FichesParJour
 }
 
 func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, stored lotDistribution) ([]CampagnePerformance, error) {
@@ -1112,7 +1163,7 @@ func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, store
 		}
 		performance = append(performance, CampagnePerformance{
 			TeleconseillerID: id, TeleconseillerName: ligne.Name,
-			Objectif: lotObjectifDe(id, ligne.Role, stored), Assigned: int(ligne.Assigned),
+			Objectif: lotObjectifDe(id, stored), Assigned: int(ligne.Assigned),
 			Treated: int(ligne.Treated), CompletionRate: taux,
 			AssignedCalls: int(ligne.AssignedCalls), OutsideAssignmentCalls: int(ligne.OutsideAssignmentCalls),
 		})
@@ -1231,7 +1282,7 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 			arendre = append(arendre, position)
 		}
 	}
-	equipe, err := s.lotEquipe(ctx, restants)
+	equipe, err := s.lotEquipeRestante(ctx, restants)
 	if err != nil {
 		return nil, err
 	}
@@ -1314,7 +1365,7 @@ func (s *service) campagneSupprimer(ctx context.Context, in *CampagneIDInput) (*
 	}
 	auteur := socle.UtilisateurCourant(ctx).ID
 	avant := map[string]any{
-		lotCleNom: row.Name, "cible": string(row.Cible), "projet": string(row.Projet),
+		lotCleNom: row.Name, "cible": string(row.Cible), "projet": lotProjetTexte(row.Projet),
 		"fiches": row.ItemCount, "createdById": row.CreatedById,
 		"teleconseillerIds": lotLireFiltres(row.Filters).Distribution.TeleconseillerIds,
 	}

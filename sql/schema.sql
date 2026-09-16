@@ -636,7 +636,7 @@ CREATE TABLE public.lots_export (
     id text NOT NULL,
     name text NOT NULL,
     cible public."LotExportCible" NOT NULL,
-    projet public."Projet" NOT NULL,
+    projet public."Projet",
     filters jsonb NOT NULL,
     "itemCount" integer NOT NULL,
     "createdById" text NOT NULL,
