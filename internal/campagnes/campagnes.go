@@ -90,6 +90,7 @@ type CampagneCritereProspects struct {
 	ImportJobID    string `json:"importJobId,omitempty" format:"uuid"`
 	ImportFeuille  string `json:"importFeuille,omitempty" maxLength:"200"`
 	IncludeDeleted bool   `json:"includeDeleted,omitempty"`
+	Injoignables   bool   `json:"injoignables,omitempty"`
 }
 
 type CampagneObjectif struct {
@@ -224,6 +225,7 @@ type lotFiltres struct {
 	ImportJobID    string          `json:"importJobId,omitempty"`
 	ImportFeuille  string          `json:"importFeuille,omitempty"`
 	IncludeDeleted *bool           `json:"includeDeleted,omitempty"`
+	Injoignables   bool            `json:"injoignables,omitempty"`
 	Distribution   lotDistribution `json:"distribution"`
 }
 
@@ -245,13 +247,6 @@ type lotMembreCapacite struct {
 type lotAffectation struct {
 	assigneeID string
 	jour       int
-}
-
-func lotCapaciteParJour(role db.Role, fichesParJour int) int {
-	if role == db.Role("COMMERCIAL") {
-		return fichesParJour
-	}
-	return max(1, int(math.Ceil(float64(fichesParJour)/5)))
 }
 
 // Tourniquet pondéré : chacun reçoit une fiche par tour jusqu'à sa capacité,
@@ -319,6 +314,9 @@ func lotScopeLabel(cible string, f *lotFiltres) string {
 	if f.Type != "" {
 		return lotSiVide(f.Projet, "Grand Public") + ", " + strings.Replace(strings.ToLower(f.Type), "_", " ", 1)
 	}
+	if f.Injoignables {
+		return lotSiVide(f.Projet, "Tous projets") + ", injoignables"
+	}
 	return lotSiVide(f.Projet, "Tous projets")
 }
 
@@ -351,7 +349,6 @@ func lotInt32(n int) int32 {
 type lotTeleconseiller struct {
 	id       string
 	fullName string
-	role     db.Role
 }
 
 // Les comptes cochés, dans l'ordre reçu : cet ordre EST le tourniquet.
@@ -372,7 +369,7 @@ func (s *service) lotEquipe(ctx context.Context, ids []string) ([]lotTeleconseil
 	equipe := make([]lotTeleconseiller, 0, len(ids))
 	for _, id := range ids {
 		row := parID[id]
-		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName, role: row.Role})
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
 	}
 	return equipe, nil
 }
@@ -390,7 +387,7 @@ func (s *service) lotEquipeRestante(ctx context.Context, ids []string) ([]lotTel
 	}
 	equipe := make([]lotTeleconseiller, 0, len(rows))
 	for _, row := range rows {
-		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName, role: row.Role})
+		equipe = append(equipe, lotTeleconseiller{id: row.ID, fullName: row.FullName})
 	}
 	return equipe, nil
 }
@@ -434,7 +431,7 @@ func lotCapacites(equipe []lotTeleconseiller, fichesParJour int, objectifs map[s
 	for _, membre := range equipe {
 		capacite, ok := objectifs[membre.id]
 		if !ok {
-			capacite = lotCapaciteParJour(membre.role, fichesParJour)
+			capacite = fichesParJour
 		}
 		membres = append(membres, lotMembreCapacite{id: membre.id, fichesParJour: capacite})
 	}
@@ -466,6 +463,7 @@ func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
 			ImportJobID:    body.Prospects.ImportJobID,
 			ImportFeuille:  body.Prospects.ImportFeuille,
 			IncludeDeleted: &inclure,
+			Injoignables:   body.Prospects.Injoignables,
 		}
 	}
 	return &lotFiltres{}
@@ -519,6 +517,7 @@ func lotProspectsCible(f *lotFiltres) db.CompterProspectsCibleParams {
 		Type:          typeProspect,
 		ImportJobID:   lotPointeurTexte(f.ImportJobID),
 		ImportFeuille: lotPointeurTexte(f.ImportFeuille),
+		Injoignables:  f.Injoignables,
 		ParSegment:    f.Segment != "",
 		Chues:         f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD2,
 		Cbao:          f.Segment == LotSegmentBDD1 || f.Segment == LotSegmentBDD3,
@@ -701,7 +700,8 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 	p := lotProspectsCible(f)
 	return q.TirerProspectsCible(ctx, db.TirerProspectsCibleParams{
 		Projet: p.Projet, Type: p.Type, ImportJobID: p.ImportJobID, ImportFeuille: p.ImportFeuille,
-		ParSegment: p.ParSegment, Chues: p.Chues, Cbao: p.Cbao, Places: lotInt32(places),
+		Injoignables: p.Injoignables, ParSegment: p.ParSegment, Chues: p.Chues, Cbao: p.Cbao,
+		Places: lotInt32(places),
 	})
 }
 
@@ -1128,16 +1128,14 @@ func lotISOOuNil(t *time.Time) *string {
 	return lotPointeurTexte(lotISO(*t))
 }
 
-// À défaut d'objectif saisi, ce que la répartition a RÉELLEMENT appliqué :
-// annoncer `fichesParJour` brut contredisait la ligne d'à côté.
-func lotObjectifDe(id string, role db.Role, stored lotDistribution) int {
+func lotObjectifDe(id string, stored lotDistribution) int {
 	if explicite, ok := stored.Objectifs[id]; ok {
 		return explicite
 	}
 	if !stored.valide() {
 		return 0
 	}
-	return lotCapaciteParJour(role, stored.FichesParJour)
+	return stored.FichesParJour
 }
 
 func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, stored lotDistribution) ([]CampagnePerformance, error) {
@@ -1154,7 +1152,7 @@ func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, store
 		}
 		performance = append(performance, CampagnePerformance{
 			TeleconseillerID: id, TeleconseillerName: ligne.Name,
-			Objectif: lotObjectifDe(id, ligne.Role, stored), Assigned: int(ligne.Assigned),
+			Objectif: lotObjectifDe(id, stored), Assigned: int(ligne.Assigned),
 			Treated: int(ligne.Treated), CompletionRate: taux,
 			AssignedCalls: int(ligne.AssignedCalls), OutsideAssignmentCalls: int(ligne.OutsideAssignmentCalls),
 		})
