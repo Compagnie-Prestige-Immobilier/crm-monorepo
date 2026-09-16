@@ -8,7 +8,12 @@ WHERE l."id" = $1;
 -- name: CompterLots :one
 SELECT COUNT(*)::int
 FROM "lots_export" l
-WHERE (sqlc.narg('search')::text IS NULL OR l."name" ILIKE '%' || sqlc.narg('search')::text || '%')
+INNER JOIN "users" u ON u."id" = l."createdById"
+WHERE (sqlc.narg('search')::text IS NULL OR concat_ws(' ', l."name", u."fullName",
+         'semaine ' || EXTRACT(WEEK FROM l."createdAt")::int, replace(l."projet"::text, '_', ' '),
+         CASE l."cible" WHEN 'PROSPECTS' THEN 'prospects' WHEN 'CONTACTS_RECOMMANDES' THEN 'contacts recommandés'
+           WHEN 'REPRESENTANTS_INJOIGNABLES' THEN 'représentants injoignables' ELSE 'représentants' END
+       ) ILIKE '%' || sqlc.narg('search')::text || '%')
   AND (sqlc.narg('cible')::"LotExportCible" IS NULL OR l."cible" = sqlc.narg('cible'))
   AND (sqlc.narg('projet')::"Projet" IS NULL OR l."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('created_by')::text IS NULL OR l."createdById" = sqlc.narg('created_by'))
@@ -20,7 +25,11 @@ SELECT l."id", l."name", l."cible", l."projet", l."filters", l."itemCount",
        l."createdById", l."createdAt", l."pausedAt", u."fullName" AS "createdByName"
 FROM "lots_export" l
 INNER JOIN "users" u ON u."id" = l."createdById"
-WHERE (sqlc.narg('search')::text IS NULL OR l."name" ILIKE '%' || sqlc.narg('search')::text || '%')
+WHERE (sqlc.narg('search')::text IS NULL OR concat_ws(' ', l."name", u."fullName",
+         'semaine ' || EXTRACT(WEEK FROM l."createdAt")::int, replace(l."projet"::text, '_', ' '),
+         CASE l."cible" WHEN 'PROSPECTS' THEN 'prospects' WHEN 'CONTACTS_RECOMMANDES' THEN 'contacts recommandés'
+           WHEN 'REPRESENTANTS_INJOIGNABLES' THEN 'représentants injoignables' ELSE 'représentants' END
+       ) ILIKE '%' || sqlc.narg('search')::text || '%')
   AND (sqlc.narg('cible')::"LotExportCible" IS NULL OR l."cible" = sqlc.narg('cible'))
   AND (sqlc.narg('projet')::"Projet" IS NULL OR l."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('created_by')::text IS NULL OR l."createdById" = sqlc.narg('created_by'))
