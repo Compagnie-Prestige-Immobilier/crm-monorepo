@@ -62,7 +62,7 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","method","reasonId","clientCreatedAt","createdAt","fonctionnaire","engagementEnCours","deviceCallType","deviceCallDurationSeconds","deviceCallAt")
 		SELECT replace(p.id,'7001','7003'),p.id,p."lastCallById",p."lastCallOutcome",p."enrollmentMethod",r.id,p."lastCallAt",p."lastCallAt",true,true,
 		  'sortant',CASE WHEN p."lastCallOutcome"='UNREACHABLE' THEN 0 ELSE 120+(right(p.id,3)::int%5)*30 END,p."lastCallAt"
-		FROM "prospects" p JOIN "call_outcome_reasons" r ON r.code=p."lastCallOutcome"::text WHERE p.id LIKE '0199f100-0000-7001-8000-%'
+		FROM "prospects" p JOIN "call_outcome_reasons" r ON r.code=CASE p."lastCallOutcome"::text WHEN 'METHOD_OBTAINED' THEN 'TRANSFERT_ENROLEMENT' ELSE p."lastCallOutcome"::text END WHERE p.id LIKE '0199f100-0000-7001-8000-%'
 		ON CONFLICT (id) DO UPDATE SET "prospectId"=EXCLUDED."prospectId","performedById"=EXCLUDED."performedById",outcome=EXCLUDED.outcome,method=EXCLUDED.method,"reasonId"=EXCLUDED."reasonId",
 		  "clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt","deviceCallType"=EXCLUDED."deviceCallType",
 		  "deviceCallDurationSeconds"=EXCLUDED."deviceCallDurationSeconds","deviceCallAt"=EXCLUDED."deviceCallAt"`,
