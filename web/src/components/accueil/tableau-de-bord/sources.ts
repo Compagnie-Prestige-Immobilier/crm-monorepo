@@ -70,7 +70,7 @@ export type DonneesSource =
   | { forme: 'serie-temporelle'; donnee: NamedCount[] }
   | { forme: 'cyclique'; donnee: NamedCount[] }
   | { forme: 'matrice'; donnee: MatriceDatum }
-  | { forme: 'composition'; donnee: CompositionLigne[] }
+  | { forme: 'composition'; donnee: CompositionLigne[]; resume?: string }
   | { forme: 'equipe'; donnee: EquipeDatum };
 
 export interface SourceDefinition {
