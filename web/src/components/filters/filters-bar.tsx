@@ -72,7 +72,14 @@ function revueValue(revue: boolean | null): string | null {
   return revue ? 'oui' : 'non';
 }
 
-export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean }) {
+export function FiltersBar({
+  startCollapsed = true,
+  viewerId,
+}: {
+  startCollapsed?: boolean;
+  /** Pose le bouton « Mes fiches » : l'admin et la direction retrouvent ce qu'ils ont ajouté. */
+  viewerId?: string | undefined;
+}) {
   const { filters, setFilters, resetFilters } = useProspectFilters();
 
   const {
@@ -171,6 +178,14 @@ export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean
               }}
             />
           </div>
+        )}
+        {viewerId === undefined ? null : (
+          <BoutonMesFiches
+            actif={filters.commercialId === viewerId}
+            onBasculer={(actif) => {
+              setFilters({ commercialId: actif ? viewerId : null });
+            }}
+          />
         )}
       </div>
 
@@ -340,6 +355,28 @@ export function FiltersBar({ startCollapsed = true }: { startCollapsed?: boolean
         </div>
       </AdvancedPanel>
     </section>
+  );
+}
+
+function BoutonMesFiches({
+  actif,
+  onBasculer,
+}: {
+  actif: boolean;
+  onBasculer: (actif: boolean) => void;
+}) {
+  return (
+    <Button
+      type="button"
+      variant={actif ? 'default' : 'outline'}
+      aria-pressed={actif}
+      className="min-h-11"
+      onClick={() => {
+        onBasculer(!actif);
+      }}
+    >
+      Mes fiches
+    </Button>
   );
 }
 

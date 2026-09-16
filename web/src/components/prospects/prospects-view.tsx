@@ -30,6 +30,7 @@ export function ProspectsView({
   canCreate = false,
   canCreateGrandPublic = false,
   campaignScoped = false,
+  viewerId,
 }: {
   canAdminister: boolean;
   canExport?: boolean;
@@ -38,6 +39,7 @@ export function ProspectsView({
   canCreateGrandPublic?: boolean;
   /** Téléconseiller : l'API ne lui rend que ses fiches et celles de ses campagnes. */
   campaignScoped?: boolean;
+  viewerId?: string | undefined;
 }) {
   const { filters } = useProspectFilters();
   const [createOpen, setCreateOpen] = useState(false);
@@ -70,7 +72,7 @@ export function ProspectsView({
         </div>
       </div>
 
-      <FiltersBar />
+      <FiltersBar viewerId={viewerId} />
       <ProspectsTable
         canAdminister={canAdminister}
         readOnly={readOnly}
