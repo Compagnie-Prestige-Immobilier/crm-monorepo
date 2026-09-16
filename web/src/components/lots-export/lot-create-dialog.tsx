@@ -73,7 +73,7 @@ const FAMILLES: readonly Tuile<Famille>[] = [
   {
     cle: 'import',
     titre: 'Fiches importées',
-    aide: 'Un classeur importé, CHUES ou Grand Public, choisi par sa date.',
+    aide: 'Un classeur importé, puis CHUES, Grand Public ou les deux.',
     icon: FileSpreadsheetIcon,
   },
 ];
@@ -81,8 +81,8 @@ const FAMILLES: readonly Tuile<Famille>[] = [
 const PROJETS: readonly Tuile<Projet | typeof TOUS>[] = [
   {
     cle: 'TOUS',
-    titre: 'Tous les prospects',
-    aide: 'CHUES et Grand Public ensemble.',
+    titre: 'CHUES et Grand Public',
+    aide: 'Les deux projets ensemble.',
     icon: UsersRoundIcon,
   },
   {
@@ -229,12 +229,13 @@ function critereRepresentants(
 }
 
 const TETE_PROSPECTS: Record<Projet | typeof TOUS, string> = {
-  TOUS: 'Tous les prospects',
+  TOUS: 'CHUES et Grand Public',
   CHUES: 'Prospects CHUES',
   GRAND_PUBLIC: 'Prospects Grand Public',
 };
 
-// Un onglet du classeur mêle CHUES et Grand Public : le projet se choisit après l'onglet.
+// Un onglet du classeur peut mêler CHUES et Grand Public : le projet choisi
+// détermine les fiches retenues, ou les deux si « CHUES et Grand Public » est choisi.
 function critereImport(choix: Choix): Critere {
   const importe = choix.importe;
   const projet = choix.projet === TOUS ? null : choix.projet;
@@ -496,18 +497,18 @@ function Step1Cibles({
         />
       ) : null}
       {choix.famille === 'import' ? (
-        <ChampImport
-          valeur={choix.importe === null ? '' : cleImport(choix.importe)}
-          onChange={(importe) => onChange({ ...choix, importe })}
-        />
-      ) : null}
-      {choix.famille === 'import' ? (
         <Tuiles
           legende="Quel projet ?"
           groupe={`${groupe}-projet`}
           tuiles={PROJETS}
           valeur={choix.projet}
           onChange={(projet) => onChange({ ...choix, projet })}
+        />
+      ) : null}
+      {choix.famille === 'import' ? (
+        <ChampImport
+          valeur={choix.importe === null ? '' : cleImport(choix.importe)}
+          onChange={(importe) => onChange({ ...choix, importe })}
         />
       ) : null}
     </div>
