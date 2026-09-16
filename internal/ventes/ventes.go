@@ -23,9 +23,9 @@ import (
 
 type service struct{ *socle.Deps }
 
-var lecteurs = []socle.Role{socle.Admin, socle.Direction}
+var lecteurs = socle.PermissionVentesLire
 
-var Garde = map[string][]socle.Role{
+var Garde = map[string]socle.Permission{
 	"GET /api/v1/ventes":                  lecteurs,
 	"POST /api/v1/ventes/classeur":        lecteurs,
 	"GET /api/v1/ventes/classeur/fichier": lecteurs,

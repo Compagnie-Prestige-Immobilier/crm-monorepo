@@ -1399,21 +1399,21 @@ func (s *service) referentielsMotifActiver(ctx context.Context, in *Referentiels
 	return &ReferentielsMotifOutput{Body: referentielsVersMotif(&row)}, nil
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/referentiels":                         socle.Tous,
-	"GET /api/v1/referentiels/{kind}":                  socle.Tous,
-	"POST /api/v1/referentiels/{kind}":                 socle.Encadrement,
-	"PATCH /api/v1/referentiels/{kind}/{id}":           socle.Encadrement,
-	"GET /api/v1/statuts-qualification":                socle.Tous,
-	"GET /api/v1/statuts-qualification/administration": socle.Encadrement,
-	"POST /api/v1/statuts-qualification":               socle.Encadrement,
-	"PATCH /api/v1/statuts-qualification/{id}":         socle.Encadrement,
-	"POST /api/v1/statuts-qualification/{id}/active":   socle.Encadrement,
-	"GET /api/v1/call-outcome-reasons":                 socle.Tous,
-	"GET /api/v1/call-outcome-reasons/administration":  socle.Encadrement,
-	"POST /api/v1/call-outcome-reasons":                socle.Encadrement,
-	"PATCH /api/v1/call-outcome-reasons/{id}":          socle.Encadrement,
-	"POST /api/v1/call-outcome-reasons/{id}/active":    socle.Encadrement,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/referentiels":                         socle.PermissionPanneauAcceder,
+	"GET /api/v1/referentiels/{kind}":                  socle.PermissionPanneauAcceder,
+	"POST /api/v1/referentiels/{kind}":                 socle.PermissionReferentielsSuperviser,
+	"PATCH /api/v1/referentiels/{kind}/{id}":           socle.PermissionReferentielsSuperviser,
+	"GET /api/v1/statuts-qualification":                socle.PermissionPanneauAcceder,
+	"GET /api/v1/statuts-qualification/administration": socle.PermissionReferentielsSuperviser,
+	"POST /api/v1/statuts-qualification":               socle.PermissionReferentielsSuperviser,
+	"PATCH /api/v1/statuts-qualification/{id}":         socle.PermissionReferentielsSuperviser,
+	"POST /api/v1/statuts-qualification/{id}/active":   socle.PermissionReferentielsSuperviser,
+	"GET /api/v1/call-outcome-reasons":                 socle.PermissionPanneauAcceder,
+	"GET /api/v1/call-outcome-reasons/administration":  socle.PermissionReferentielsSuperviser,
+	"POST /api/v1/call-outcome-reasons":                socle.PermissionReferentielsSuperviser,
+	"PATCH /api/v1/call-outcome-reasons/{id}":          socle.PermissionReferentielsSuperviser,
+	"POST /api/v1/call-outcome-reasons/{id}/active":    socle.PermissionReferentielsSuperviser,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

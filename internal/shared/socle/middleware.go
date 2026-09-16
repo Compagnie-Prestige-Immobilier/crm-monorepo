@@ -212,8 +212,8 @@ func origineAutorisee(r *http.Request, motif string) bool {
 func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, motif := mux.Handler(r)
-		roles, gardee := Garde[motif]
-		publique := gardee && Autorise(roles, Public)
+		permission, gardee := Garde[motif]
+		publique := gardee && permission == Publique
 		// Une route publique n'a pas de session à protéger : un webhook n'envoie pas d'origine.
 		if !publique && !origineAutorisee(r, motif) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Origine refusée."))
@@ -233,7 +233,7 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
 			return
 		}
-		if !Autorise(roles, u.Role) {
+		if !u.Peut(permission) {
 			EcrireProblem(w, r, Problem(http.StatusForbidden, "FORBIDDEN", "Accès refusé."))
 			return
 		}

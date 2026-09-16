@@ -20,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var rolesChiffres = []socle.Role{socle.Admin, socle.Direction, socle.Superviseur, socle.Accueil}
+var rolesChiffres = socle.PermissionChiffresDisposer
 
 // Vocabulaire figé du domaine : clés d'audit, chemins montés deux fois,
 // tables purgées sous deux noms, et les valeurs de disposition citées par les
@@ -51,38 +51,38 @@ const (
 	sourceFichesOuvertes   = "fiches-ouvertes"
 )
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/users":                                           {socle.Admin, socle.Superviseur, socle.Direction},
-	"POST /api/v1/users":                                          socle.AdminSeul,
-	"GET /api/v1/users/{id}":                                      socle.AdminSeul,
-	"PATCH /api/v1/users/{id}":                                    socle.AdminSeul,
-	"PUT /api/v1/users/{id}/active":                               socle.AdminSeul,
-	"PUT /api/v1/users/{id}/password":                             socle.AdminSeul,
-	"DELETE /api/v1/users/{id}":                                   socle.AdminSeul,
-	"GET /api/v1/admin/supervision":                               socle.Encadrement,
-	"GET /api/v1/admin/exploitation":                              socle.AdminSeul,
-	"GET /api/v1/admin/journal":                                   socle.AdminSeul,
-	"GET /api/v1/admin/exploitation/routes":                       socle.AdminSeul,
-	"GET /api/v1/admin/purge":                                     socle.AdminSeul,
-	"POST /api/v1/admin/purge":                                    socle.AdminSeul,
-	"GET /api/v1/admin/database-dump":                             socle.AdminSeul,
-	"POST /api/v1/admin/database-dump":                            socle.AdminSeul,
-	"GET /api/v1/admin/database-dump/download":                    socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/inscriptions":                socle.AdminSeul,
-	"DELETE /api/v1/enrolement/{projet}/inscriptions":             socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/inscriptions/{id}":           socle.AdminSeul,
-	"DELETE /api/v1/enrolement/{projet}/inscriptions/{id}":        socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/indicateurs":                 socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
-	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
-	"POST /api/v1/enrolement/{projet}/tirage":                     socle.AdminSeul,
-	"GET /api/v1/plateforme/equipe":                               {socle.Admin, socle.Superviseur, socle.Direction, socle.CCP},
-	"PUT /api/v1/plateforme/objectif":                             socle.AdminSeul,
-	"POST /api/v1/webhooks/enrolement/{projet}":                   {socle.Public},
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/users":                                           socle.PermissionComptesLister,
+	"POST /api/v1/users":                                          socle.PermissionComptesAdministrer,
+	"GET /api/v1/users/{id}":                                      socle.PermissionComptesAdministrer,
+	"PATCH /api/v1/users/{id}":                                    socle.PermissionComptesAdministrer,
+	"PUT /api/v1/users/{id}/active":                               socle.PermissionComptesAdministrer,
+	"PUT /api/v1/users/{id}/password":                             socle.PermissionComptesAdministrer,
+	"DELETE /api/v1/users/{id}":                                   socle.PermissionComptesAdministrer,
+	"GET /api/v1/admin/supervision":                               socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/admin/exploitation":                              socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/journal":                                   socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/exploitation/routes":                       socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/purge":                                     socle.PermissionExploitationAdministrer,
+	"POST /api/v1/admin/purge":                                    socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/database-dump":                             socle.PermissionExploitationAdministrer,
+	"POST /api/v1/admin/database-dump":                            socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/database-dump/download":                    socle.PermissionExploitationAdministrer,
+	"GET /api/v1/enrolement/{projet}/inscriptions":                socle.PermissionEnrolementAdministrer,
+	"DELETE /api/v1/enrolement/{projet}/inscriptions":             socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/inscriptions/{id}":           socle.PermissionEnrolementAdministrer,
+	"DELETE /api/v1/enrolement/{projet}/inscriptions/{id}":        socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/indicateurs":                 socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
+	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
+	"POST /api/v1/enrolement/{projet}/tirage":                     socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/plateforme/equipe":                               socle.PermissionPlateformeEquipe,
+	"PUT /api/v1/plateforme/objectif":                             socle.PermissionParametresAdministrer,
+	"POST /api/v1/webhooks/enrolement/{projet}":                   socle.Publique,
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"DELETE /api/v1/tableaux-de-bord/{ecran}/disposition":         rolesChiffres,
-	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": socle.AdminSeul,
+	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": socle.PermissionParametresAdministrer,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

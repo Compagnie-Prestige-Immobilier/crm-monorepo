@@ -47,25 +47,25 @@ const (
 	lotCleNom           = "name"
 )
 
-var campagnesEcriture = []socle.Role{socle.Admin, socle.Superviseur}
+var campagnesEcriture = socle.PermissionCampagnesGerer
 
-var Garde = map[string][]socle.Role{
+var Garde = map[string]socle.Permission{
 	"POST /api/v1/lots-export":                       campagnesEcriture,
 	"POST /api/v1/lots-export/apercu":                campagnesEcriture,
-	"GET /api/v1/lots-export":                        socle.Encadrement,
-	"GET /api/v1/lots-export/mes-attributions":       socle.Parcours,
+	"GET /api/v1/lots-export":                        socle.PermissionCampagnesSuperviser,
+	"GET /api/v1/lots-export/mes-attributions":       socle.PermissionFichesTenir,
 	"GET /api/v1/lots-export/imports":                campagnesEcriture,
-	"GET /api/v1/lots-export/{id}":                   socle.Encadrement,
+	"GET /api/v1/lots-export/{id}":                   socle.PermissionCampagnesSuperviser,
 	"PATCH /api/v1/lots-export/{id}":                 campagnesEcriture,
-	"DELETE /api/v1/lots-export/{id}":                socle.AdminSeul,
-	"GET /api/v1/lots-export/{id}/fiches":            socle.Encadrement,
+	"DELETE /api/v1/lots-export/{id}":                socle.PermissionCampagnesAdministrer,
+	"GET /api/v1/lots-export/{id}/fiches":            socle.PermissionCampagnesSuperviser,
 	"POST /api/v1/lots-export/{id}/reaffectation":    campagnesEcriture,
 	"POST /api/v1/lots-export/{id}/retrait":          campagnesEcriture,
 	"POST /api/v1/lots-export/{id}/equipe":           campagnesEcriture,
-	"GET /api/v1/lots-export/{id}/export.xlsx":       socle.Encadrement,
-	"GET /api/v1/lots-export/{id}/programme.pdf":     socle.Encadrement,
-	"GET /api/v1/lots-export/{id}/fiches-recues.pdf": socle.Encadrement,
-	"GET /api/v1/lots-export/{id}/programmes.zip":    socle.Encadrement,
+	"GET /api/v1/lots-export/{id}/export.xlsx":       socle.PermissionCampagnesSuperviser,
+	"GET /api/v1/lots-export/{id}/programme.pdf":     socle.PermissionCampagnesSuperviser,
+	"GET /api/v1/lots-export/{id}/fiches-recues.pdf": socle.PermissionCampagnesSuperviser,
+	"GET /api/v1/lots-export/{id}/programmes.zip":    socle.PermissionCampagnesSuperviser,
 }
 
 var lotLibellesIssueAppel = map[string]string{

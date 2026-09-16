@@ -29,21 +29,21 @@ const (
 	qualificationFauxNumero  = "WRONG_NUMBER"
 )
 
-var Garde = map[string][]socle.Role{
-	"POST /api/v1/rep-campaigns/attempts":       socle.Parcours,
-	"POST /api/v1/phase2/call-attempts":         socle.Parcours,
-	"GET /api/v1/phase2/callbacks":              socle.Parcours,
-	"GET /api/v1/phase2/directory":              socle.Parcours,
-	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
-	"POST /api/v1/phase2/callbacks/{id}/snooze": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
-	"POST /api/v1/ouvertures":                   socle.Parcours,
-	"GET /api/v1/ouvertures/courante":           socle.Parcours,
-	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.Parcours,
-	"GET /api/v1/ouvertures/comptage":           socle.Parcours,
-	"GET /api/v1/suggestions":                   socle.Parcours,
-	"PATCH /api/v1/suggestions/{id}":            socle.Parcours,
-	"POST /api/v1/sync/push":                    socle.Parcours,
-	"POST /api/v1/presence/beat":                socle.Tous,
+var Garde = map[string]socle.Permission{
+	"POST /api/v1/rep-campaigns/attempts":       socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/call-attempts":         socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/callbacks":              socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/directory":              socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/callbacks/{id}/cancel": socle.PermissionQualificationRappels,
+	"POST /api/v1/phase2/callbacks/{id}/snooze": socle.PermissionQualificationRappels,
+	"POST /api/v1/ouvertures":                   socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/courante":           socle.PermissionFichesTenir,
+	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/comptage":           socle.PermissionFichesTenir,
+	"GET /api/v1/suggestions":                   socle.PermissionFichesTenir,
+	"PATCH /api/v1/suggestions/{id}":            socle.PermissionFichesTenir,
+	"POST /api/v1/sync/push":                    socle.PermissionFichesTenir,
+	"POST /api/v1/presence/beat":                socle.PermissionPanneauAcceder,
 }
 
 func qualificationRoute(id, methode, chemin string) huma.Operation {
