@@ -217,7 +217,8 @@ function ContenuRappelPopUp({
   );
 }
 
-export function RappelPopUpIntrusif() {
+/** Ne sonne que pour les rappels que la personne connectée a promis elle-même. */
+export function RappelPopUpIntrusif({ userId }: { userId: string }) {
   const projet = undefined;
   const racine = '/teleconseil';
   const queryClient = useQueryClient();
@@ -229,8 +230,8 @@ export function RappelPopUpIntrusif() {
   const echeancesConnuesRef = useRef<Set<string> | null>(null);
 
   const overdueQuery = useQuery({
-    queryKey: [...callbackKeys.list('overdue', null), projet, 'intrusif'],
-    queryFn: () => fetchCallbacks('overdue', null, undefined, projet),
+    queryKey: [...callbackKeys.list('overdue', userId), projet, 'intrusif'],
+    queryFn: () => fetchCallbacks('overdue', userId, undefined, projet),
     refetchInterval: 15_000,
   });
 

@@ -5,7 +5,14 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/mes-contacts')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardRoles([
+    'ADMIN',
+    'SUPERVISEUR',
+    'DIRECTION',
+    'COMMERCIAL',
+    'CHARGE_CLIENTELE',
+    'CCP',
+  ]),
   component: MesContactsPage,
   pendingComponent: Loading,
 });
