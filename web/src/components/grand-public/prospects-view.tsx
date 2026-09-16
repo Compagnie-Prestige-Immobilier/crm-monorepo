@@ -2,7 +2,6 @@
 
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
 import {
-  ChevronDownIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClockIcon,
@@ -11,11 +10,12 @@ import {
   LoaderIcon,
   PlusIcon,
   RotateCcwIcon,
-  SlidersHorizontalIcon,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 
+import { buildAdvancedChips } from '@/components/filters/advanced-chips';
+import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { useFileDownload } from '@/components/exports/download-button';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
@@ -65,8 +65,10 @@ import {
   type GrandPublicFilters,
   type ProspectType,
 } from '@/lib/data/grand-public';
-import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
+import { fetchReferenceData } from '@/lib/data/reference';
+import { clearAdvancedFilters, PAGE_SIZE_OPTIONS, type AdvancedFilterKey } from '@/lib/filters';
 import { formatDate, formatDateTime, formatNumber, formatPhone, withRetired } from '@/lib/format';
+import { queryKeys } from '@/lib/query-keys';
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
@@ -74,6 +76,7 @@ import {
   type Paginated,
   type ProspectRow,
   type ProspectStatut,
+  type ReferenceData,
 } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 import { cn } from '@/lib/utils';
@@ -138,10 +141,6 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
   label: PROSPECT_STATUT_LABELS[statut],
 }));
 
-function filtresLabel(activeCount: number): string {
-  return activeCount > 0 ? `Filtres (${String(activeCount)})` : 'Filtres';
-}
-
 export function GrandPublicProspectsView({
   viewerId,
   canCreate,
@@ -171,6 +170,12 @@ export function GrandPublicProspectsView({
     },
   );
 
+  const reference = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
   const canaux = useQuery({
     queryKey: grandPublicKeys.canaux,
     queryFn: () => fetchCanauxProvenance(),
@@ -188,8 +193,43 @@ export function GrandPublicProspectsView({
     label: withRetired(canal.label, canal.isActive),
   }));
 
+  const removeAdvanced = useCallback(
+    (key: AdvancedFilterKey) => {
+      const patch: Partial<Record<AdvancedFilterKey, null>> = { [key]: null };
+      setFilters(patch);
+    },
+    [setFilters],
+  );
+
+  const clearAdvanced = useCallback(() => {
+    setFilters(clearAdvancedFilters());
+  }, [setFilters]);
+
   const activeCount = countGrandPublicFilters(filters);
-  const [filtersOpen, setFiltersOpen] = useState(activeCount > 0);
+  const advancedChips = buildAdvancedChips(
+    {
+      projet: 'GRAND_PUBLIC',
+      search: '',
+      commercialId: null,
+      representantId: filters.representantId,
+      departementId: filters.departementId,
+      banqueId: filters.banqueId,
+      syndicatId: filters.syndicatId,
+      statut: filters.statut,
+      segment: null,
+      phase2Status: null,
+      enrollmentMethod: null,
+      enrollmentCapturedById: null,
+      revue: null,
+      dateFrom: null,
+      dateTo: null,
+      page: 1,
+      pageSize: 25,
+      sortBy: 'clientCreatedAt',
+      sortDir: 'desc',
+    },
+    reference.data,
+  );
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
@@ -213,7 +253,7 @@ export function GrandPublicProspectsView({
 
       <section
         aria-label="Filtres"
-        className="rounded-lg border border-border bg-card p-4 shadow-elev-sm"
+        className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
       >
         <div className="flex flex-wrap items-end gap-3">
           <SearchField
@@ -222,88 +262,46 @@ export function GrandPublicProspectsView({
             value={searchDraft}
             onChange={setSearchDraft}
           />
-          <Button
-            type="button"
-            variant="outline"
-            aria-expanded={filtersOpen}
-            onClick={() => {
-              setFiltersOpen((open) => !open);
-            }}
-          >
-            <SlidersHorizontalIcon aria-hidden="true" />
-            {filtresLabel(activeCount)}
-            <ChevronDownIcon
-              aria-hidden="true"
-              className={cn('transition-transform', filtersOpen && 'rotate-180')}
-            />
-          </Button>
-        </div>
-
-        {filtersOpen ? (
-          <div className="mt-5 flex flex-col gap-5 border-t border-border pt-5">
-            {origineFiltrable ? (
-              <FiltreOrigine
-                value={filters.origine}
-                onChange={(origine) => {
-                  setFilters({ origine });
-                }}
-              />
-            ) : null}
-            <FilterCombobox
-              label="Canal de provenance"
-              placeholder="Tous les canaux"
-              value={filters.canalProvenanceId}
-              options={canalOptions}
-              onChange={(value) => {
-                setFilters({ canalProvenanceId: value });
+          {origineFiltrable ? (
+            <FiltreOrigine
+              value={filters.origine}
+              onChange={(origine) => {
+                setFilters({ origine });
               }}
             />
-            <div className="grid gap-5 lg:grid-cols-2">
-              <ChoiceRow<ProspectType>
-                legend="Situation"
-                options={TYPE_OPTIONS}
-                value={filters.type}
-                onChange={(value) => {
-                  setFilters({ type: value });
-                }}
-              />
-              <ChoiceRow<ProspectStatut>
-                legend="Statut"
-                options={STATUT_OPTIONS}
-                value={filters.statut}
-                onChange={(value) => {
-                  setFilters({ statut: value });
-                }}
-              />
-            </div>
-            <div className="flex flex-wrap items-end gap-4">
-              <DatePicker
-                id="gp-date-from"
-                label="Saisi à partir du"
-                value={filters.dateFrom}
-                max={filters.dateTo}
-                onChange={(value) => {
-                  setFilters({ dateFrom: value });
-                }}
-              />
-              <DatePicker
-                id="gp-date-to"
-                label="Saisi jusqu’au"
-                value={filters.dateTo}
-                min={filters.dateFrom}
-                onChange={(value) => {
-                  setFilters({ dateTo: value });
-                }}
-              />
-              {activeCount > 0 ? (
-                <Button type="button" variant="ghost" onClick={resetFilters}>
-                  <RotateCcwIcon aria-hidden="true" />
-                  Tout effacer
-                </Button>
-              ) : null}
-            </div>
-          </div>
-        ) : null}
+          ) : null}
+          <FilterCombobox
+            label="Canal de provenance"
+            placeholder="Tous les canaux"
+            value={filters.canalProvenanceId}
+            options={canalOptions}
+            onChange={(value) => {
+              setFilters({ canalProvenanceId: value });
+            }}
+          />
+        </div>
+
+        <AdvancedPanel
+          module="grand-public"
+          startCollapsed
+          chips={advancedChips}
+          onRemove={removeAdvanced}
+          onClearAll={clearAdvanced}
+          actions={
+            activeCount > 0 ? (
+              <Button variant="ghost" onClick={resetFilters}>
+                <RotateCcwIcon aria-hidden="true" />
+                Tout effacer
+              </Button>
+            ) : null
+          }
+        >
+          <FiltresAvances
+            filters={filters}
+            setFilters={setFilters}
+            reference={reference.data}
+          />
+        </AdvancedPanel>
       </section>
 
       {canaux.isError ? (
@@ -393,6 +391,105 @@ function ActionsEnTete({
           Exporter
         </Button>
       ) : null}
+    </div>
+  );
+}
+
+function FiltresAvances({
+  filters,
+  setFilters,
+  reference,
+}: {
+  filters: GrandPublicFilters;
+  setFilters: (patch: Partial<GrandPublicFilters>) => void;
+  reference: ReferenceData | undefined;
+}) {
+  return (
+    <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+      <ChoiceRow<ProspectType>
+        legend="Situation"
+        options={TYPE_OPTIONS}
+        value={filters.type}
+        onChange={(value) => {
+          setFilters({ type: value });
+        }}
+      />
+      <ChoiceRow<ProspectStatut>
+        legend="Statut"
+        options={STATUT_OPTIONS}
+        value={filters.statut}
+        onChange={(value) => {
+          setFilters({ statut: value });
+        }}
+      />
+      {reference && reference.representants.length > 0 ? (
+        <FilterCombobox
+          label="Représentant"
+          placeholder="Tous les représentants"
+          options={reference.representants}
+          value={filters.representantId}
+          onChange={(value) => {
+            setFilters({ representantId: value });
+          }}
+        />
+      ) : null}
+      <FilterCombobox
+        label="Département"
+        placeholder="Tous les départements"
+        options={(reference?.departements ?? []).map((d) => ({
+          value: d.id,
+          label: withRetired(d.name, d.isActive),
+          hint: d.regionName,
+        }))}
+        value={filters.departementId}
+        onChange={(value) => {
+          setFilters({ departementId: value });
+        }}
+      />
+      <FilterCombobox
+        label="Banque"
+        placeholder="Toutes les banques"
+        options={(reference?.banques ?? []).map((b) => ({
+          value: b.id,
+          label: withRetired(b.shortName, b.isActive),
+          hint: b.name,
+        }))}
+        value={filters.banqueId}
+        onChange={(value) => {
+          setFilters({ banqueId: value });
+        }}
+      />
+      <FilterCombobox
+        label="Syndicat"
+        placeholder="Tous les syndicats"
+        options={(reference?.syndicats ?? []).map((s) => ({
+          value: s.id,
+          label: withRetired(s.sigle, s.isActive),
+          hint: s.secteur ?? undefined,
+        }))}
+        value={filters.syndicatId}
+        onChange={(value) => {
+          setFilters({ syndicatId: value });
+        }}
+      />
+      <DatePicker
+        id="gp-date-from"
+        label="Saisi à partir du"
+        value={filters.dateFrom}
+        max={filters.dateTo}
+        onChange={(value) => {
+          setFilters({ dateFrom: value });
+        }}
+      />
+      <DatePicker
+        id="gp-date-to"
+        label="Saisi jusqu'au"
+        value={filters.dateTo}
+        min={filters.dateFrom}
+        onChange={(value) => {
+          setFilters({ dateTo: value });
+        }}
+      />
     </div>
   );
 }

@@ -70,6 +70,10 @@ export interface GrandPublicFilters {
   origine: OrigineFiche;
   type: ProspectType | null;
   canalProvenanceId: string | null;
+  representantId: string | null;
+  departementId: string | null;
+  banqueId: string | null;
+  syndicatId: string | null;
   statut: ProspectStatut | null;
   dateFrom: string | null;
   dateTo: string | null;
@@ -82,6 +86,10 @@ export const EMPTY_GRAND_PUBLIC_FILTERS: GrandPublicFilters = {
   origine: 'TOUS',
   type: null,
   canalProvenanceId: null,
+  representantId: null,
+  departementId: null,
+  banqueId: null,
+  syndicatId: null,
   statut: null,
   dateFrom: null,
   dateTo: null,
@@ -98,6 +106,10 @@ export function parseGrandPublicFilters(
     origine: readEnum<OrigineFiche>(params, 'origine', ORIGINES_FICHE) ?? 'TOUS',
     type: readEnum<ProspectType>(params, 'type', PROSPECT_TYPES),
     canalProvenanceId: readString(params, 'canalProvenanceId'),
+    representantId: readString(params, 'representantId'),
+    departementId: readString(params, 'departementId'),
+    banqueId: readString(params, 'banqueId'),
+    syndicatId: readString(params, 'syndicatId'),
     statut: readEnum<ProspectStatut>(params, 'statut', PROSPECT_STATUTS),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
@@ -118,6 +130,10 @@ export function serializeGrandPublicFilters(filters: GrandPublicFilters): URLSea
   if (filters.origine !== 'TOUS') put('origine', filters.origine);
   put('type', filters.type);
   put('canalProvenanceId', filters.canalProvenanceId);
+  put('representantId', filters.representantId);
+  put('departementId', filters.departementId);
+  put('banqueId', filters.banqueId);
+  put('syndicatId', filters.syndicatId);
   put('statut', filters.statut);
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
@@ -132,14 +148,18 @@ function grandPublicFiltersKey(filters: GrandPublicFilters): string {
 }
 
 export function countGrandPublicFilters(filters: GrandPublicFilters): number {
-  let count = 0;
-  if (filters.search.trim() !== '') count += 1;
-  if (filters.origine !== 'TOUS') count += 1;
-  if (filters.type !== null) count += 1;
-  if (filters.canalProvenanceId !== null) count += 1;
-  if (filters.statut !== null) count += 1;
-  if (filters.dateFrom !== null || filters.dateTo !== null) count += 1;
-  return count;
+  return [
+    filters.search.trim() !== '',
+    filters.origine !== 'TOUS',
+    filters.type !== null,
+    filters.canalProvenanceId !== null,
+    filters.representantId !== null,
+    filters.departementId !== null,
+    filters.banqueId !== null,
+    filters.syndicatId !== null,
+    filters.statut !== null,
+    filters.dateFrom !== null || filters.dateTo !== null,
+  ].filter(Boolean).length;
 }
 
 /**
@@ -152,6 +172,10 @@ function toGrandPublicQuery(filters: GrandPublicFilters, viewerId: string): Pros
     ...EMPTY_FILTERS,
     search: filters.search,
     statut: filters.statut,
+    representantId: filters.representantId,
+    departementId: filters.departementId,
+    banqueId: filters.banqueId,
+    syndicatId: filters.syndicatId,
     dateFrom: filters.dateFrom,
     dateTo: filters.dateTo,
   });
