@@ -309,8 +309,8 @@ func TestCampagneReaffectationDeplaceEtTrace(t *testing.T) {
 
 func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
-	b.creer()
 	oublie := b.agent("Agent Coumba Fall")
+	b.creer()
 	aDonner := b.positionsDe(b.agentA)[:2]
 	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation", map[string]any{
 		"positions": aDonner, "versTeleconseillerId": oublie,
@@ -331,10 +331,10 @@ func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 
 func TestCampagneAjoutTeleconseillerSansPuisAvecFiches(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
+	oublie := b.agent("Agent Coumba Fall")
 	b.creer()
 	chemin := "/api/v1/lots-export/" + b.lotID + "/equipe"
 
-	oublie := b.agent("Agent Coumba Fall")
 	statut, body := b.appelCampagne(http.MethodPost, chemin, map[string]any{"teleconseillerId": oublie})
 	b.attend(statut, http.StatusOK, "ajout sans fiche", body)
 	if !campagneListeMembre(body["repartition"], oublie) || !campagneListeMembre(body["performance"], oublie) {
@@ -413,8 +413,8 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 // seuls ceux restés téléconseillers reprennent ses fiches.
 func TestCampagneRetraitDunMembreDontLeRoleAChange(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
-	b.creer()
 	agentC := b.agent("Agent Coumba Fall")
+	b.creer()
 	if _, err := b.pool.Exec(b.ctx, `UPDATE "users" SET "role" = 'CCP' WHERE "id" IN ($1, $2)`, b.agentA, agentC); err != nil {
 		t.Fatal(err)
 	}
@@ -576,5 +576,66 @@ func TestCampagneMesAttributions(t *testing.T) {
 		if !slices.Contains(b.fiches, fiche.(string)) {
 			t.Fatalf("fiche étrangère au lot : %v", fiche)
 		}
+	}
+}
+
+func (b *bancCampagne) prospectCHUES(feuille string, issue *string, statut string) string {
+	b.t.Helper()
+	id := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","projet","updatedAt",
+		                          "importFeuille","lastCallOutcome","statut")
+		 VALUES ($1,'Sarr','Mame',$2,$3,now(),'CHUES',now(),$4,$5::"CallOutcome",$6::"ProspectStatut")`,
+		id, "+2217"+id[:8], b.userID, feuille, issue, statut); err != nil {
+		b.t.Fatal(err)
+	}
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,'CHUES',now())`,
+		uuid.NewString(), id); err != nil {
+		b.t.Fatal(err)
+	}
+	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, id) })
+	return id
+}
+
+// Trois fiches : jamais appelée, injoignable, injoignable puis close par un faux
+// numéro. Seule la deuxième entre dans une campagne « injoignables ». Un
+// superviseur coché compte pour autant de fiches qu'un téléconseiller.
+func TestCampagneProspectsInjoignables(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Feuille " + uuid.NewString()
+	injoignable := "UNREACHABLE"
+	b.prospectCHUES(feuille, nil, "NOUVEAU")
+	aRelancer := b.prospectCHUES(feuille, &injoignable, "NOUVEAU")
+	b.prospectCHUES(feuille, &injoignable, "PERDU")
+
+	corps := func(injoignables bool) map[string]any {
+		return map[string]any{
+			"name":      "Campagne injoignables",
+			"cible":     "PROSPECTS",
+			"prospects": map[string]any{"projet": "CHUES", "importFeuille": feuille, "injoignables": injoignables},
+			"distribution": map[string]any{
+				"teleconseillerIds": []string{b.agentA, b.userID}, "fichesParJour": 3, "jours": 1,
+			},
+		}
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps(false))
+	b.attend(statut, http.StatusOK, "aperçu sans filtre", body)
+	if body["eligible"] != float64(2) || body["places"] != float64(6) {
+		t.Fatalf("2 fiches et 6 places attendues : %v", body)
+	}
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps(true))
+	b.attend(statut, http.StatusOK, "aperçu des injoignables", body)
+	if body["eligible"] != float64(1) || body["scopeLabel"] != "CHUES, injoignables" {
+		t.Fatalf("une seule fiche à relancer attendue : %v", body)
+	}
+
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps(true))
+	b.attend(statut, http.StatusCreated, "création de la campagne", body)
+	lotID, _ := body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
+	fiches := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, aRelancer)
+	if body["itemCount"] != float64(1) || fiches != 1 {
+		t.Fatalf("la fiche à relancer seule dans la campagne : %v, %d", body["itemCount"], fiches)
 	}
 }

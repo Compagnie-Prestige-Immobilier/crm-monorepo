@@ -199,9 +199,8 @@ function ProgrammesCard({
         </h3>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
           Chacun reçoit son objectif quotidien, réglable plus bas. À défaut,{' '}
-          {formatNumber(distribution.fichesParJour)} fiches par jour, dont 20 % pour la supervision
-          et la direction. « Reçues » : les fiches arrivées après impression, à imprimer en
-          complément.
+          {formatNumber(distribution.fichesParJour)} fiches par jour. « Reçues » : les fiches
+          arrivées après impression, à imprimer en complément.
         </p>
       </CardHeader>
       <CardContent>
