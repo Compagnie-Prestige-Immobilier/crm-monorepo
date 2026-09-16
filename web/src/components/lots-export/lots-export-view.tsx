@@ -24,6 +24,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import {
   deleteLotExport,
   fetchLotsExport,
+  periodeCampagne,
   TELECONSEIL_CAMPAGNES_PATH,
   type LotExportQuery,
   type LotExportSummary,
@@ -117,7 +118,7 @@ function LotsFilterBar({
         <Input
           id="lots-recherche"
           value={recherche}
-          placeholder="Nom de la campagne"
+          placeholder="Nom, auteur, « semaine 38 », CHUES…"
           onChange={(event) => onRechercheChange(event.target.value)}
         />
       </div>
@@ -391,7 +392,8 @@ function LotsContent({
               </h2>
               <div className="flex items-center gap-2">
                 <p className="text-[0.8125rem] text-muted-foreground">
-                  {formatDate(lot.createdAt)}, par {lot.createdByName}
+                  {periodeCampagne(lot.createdAt)} · {formatDate(lot.createdAt)}, par{' '}
+                  {lot.createdByName}
                 </p>
                 {canDelete ? (
                   <Button

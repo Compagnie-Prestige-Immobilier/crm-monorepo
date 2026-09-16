@@ -34,6 +34,7 @@ import {
   campagnesPath,
   createLotExport,
   fetchTeleconseillers,
+  periodeCampagne,
   previewLotExport,
   type CreateLotExportInput,
   type LotExportPreview,
@@ -851,6 +852,7 @@ function Step3Resume({
   apercu,
   nomSaisi,
   nomPropose,
+  titresProposes,
   setNomSaisi,
   error,
   isError,
@@ -862,6 +864,7 @@ function Step3Resume({
   apercu: React.ReactNode;
   nomSaisi: string | null;
   nomPropose: string;
+  titresProposes: readonly string[];
   setNomSaisi: (val: string) => void;
   error: unknown;
   isError: boolean;
@@ -884,6 +887,19 @@ function Step3Resume({
           />
         )}
       </Field>
+      <div className="-mt-3 flex flex-wrap gap-2" aria-label="Titres proposés">
+        {titresProposes.map((titre) => (
+          <Button
+            key={titre}
+            type="button"
+            size="sm"
+            variant={(nomSaisi ?? nomPropose) === titre ? 'default' : 'outline'}
+            onClick={() => setNomSaisi(titre)}
+          >
+            {titre}
+          </Button>
+        ))}
+      </div>
 
       <dl className="divide-y divide-border rounded-md border border-border text-[0.875rem]">
         {lignes.map(([titre, valeur]) => (
@@ -1004,7 +1020,11 @@ function useLotFormMutationAndQueries(
   });
 
   const eligible = apercu.isSuccess ? apercu.data.eligible : null;
-  const nomPropose = `${queryInfo.etiquette}, ${formatDateTime(maintenant)}`.slice(0, 120);
+  const titresProposes = [
+    `${queryInfo.etiquette}, ${periodeCampagne(maintenant).toLowerCase()}`,
+    `${queryInfo.etiquette}, ${formatDateTime(maintenant)}`,
+  ].map((titre) => titre.slice(0, 120));
+  const nomPropose = titresProposes[0] ?? '';
   const nom = state.nomSaisi === null ? nomPropose.trim() : state.nomSaisi.trim();
 
   const creation = useMutation({
@@ -1034,6 +1054,7 @@ function useLotFormMutationAndQueries(
     critereStable,
     apercu,
     nomPropose,
+    titresProposes,
     creation,
     pretACreer,
   };
@@ -1112,6 +1133,7 @@ function FormulaireDeLot({
             apercu={apercu}
             nomSaisi={state.nomSaisi}
             nomPropose={data.nomPropose}
+            titresProposes={data.titresProposes}
             setNomSaisi={state.setNomSaisi}
             error={data.creation.error}
             isError={data.creation.isError}

@@ -11,6 +11,7 @@ import type {
   Projet,
   ProspectFilters,
   ProspectRow,
+  ProspectStatut,
   UpdateProspectInput,
 } from '@/lib/types';
 
@@ -36,6 +37,77 @@ const A_QUALIFIER_PAGE_SIZE = 20;
  * pas un critère que l'utilisateur pose, c'est la portée de l'écran, et elle
  * vaut pour tous les rôles, encadrement compris.
  */
+function buildOrigineFilter(
+  origine: OrigineFiche,
+  viewerId: string | undefined,
+): Record<string, unknown> {
+  if (origine === 'MOI' && viewerId !== undefined) return { commercialId: viewerId };
+  if (origine === 'CAMPAGNE') return { attribue: true };
+  return {};
+}
+
+function buildExtraFilters(criteres: {
+  representantId?: string | null;
+  departementId?: string | null;
+  banqueId?: string | null;
+  syndicatId?: string | null;
+  statut?: string | null;
+  canalProvenanceId?: string | null;
+  dateFrom?: string | null;
+  dateTo?: string | null;
+}): Partial<ProspectQuery> {
+  return {
+    ...(criteres.representantId ? { representantId: criteres.representantId } : {}),
+    ...(criteres.departementId ? { departementId: criteres.departementId } : {}),
+    ...(criteres.banqueId ? { banqueId: criteres.banqueId } : {}),
+    ...(criteres.syndicatId ? { syndicatId: criteres.syndicatId } : {}),
+    ...(criteres.statut ? { statut: criteres.statut as ProspectStatut } : {}),
+    ...(criteres.canalProvenanceId ? { canalProvenanceId: criteres.canalProvenanceId } : {}),
+    ...(criteres.dateFrom ? { dateFrom: criteres.dateFrom } : {}),
+    ...(criteres.dateTo ? { dateTo: criteres.dateTo } : {}),
+  };
+}
+
+function buildAQualifierQuery(
+  criteres: {
+    projet: Projet | null;
+    search: string;
+    origine?: OrigineFiche | undefined;
+    viewerId?: string | undefined;
+    resteAAppeler?: boolean | undefined;
+    plateforme?: boolean | undefined;
+    tous?: boolean | undefined;
+    page: number;
+    representantId?: string | null;
+    departementId?: string | null;
+    banqueId?: string | null;
+    syndicatId?: string | null;
+    statut?: string | null;
+    canalProvenanceId?: string | null;
+    dateFrom?: string | null;
+    dateTo?: string | null;
+  },
+  origine: OrigineFiche,
+  plateforme: boolean,
+): ProspectQuery {
+  const base: ProspectQuery = {
+    mesFiches: criteres.tous !== true,
+    plateforme,
+    search: criteres.search,
+    sortBy: plateforme ? 'plateformeDepuis' : 'nom',
+    sortOrder: plateforme ? 'desc' : 'asc',
+    page: criteres.page,
+    pageSize: A_QUALIFIER_PAGE_SIZE,
+  };
+
+  const projectFilter = criteres.projet === null ? {} : { projet: criteres.projet };
+  const resteFilter = criteres.resteAAppeler === true ? { resteAAppeler: true } : {};
+  const origineFilter = buildOrigineFilter(origine, criteres.viewerId);
+  const extraFilters = buildExtraFilters(criteres);
+
+  return { ...base, ...projectFilter, ...resteFilter, ...origineFilter, ...extraFilters };
+}
+
 export async function fetchProspectsAQualifier(
   criteres: {
     projet: Projet | null;
@@ -49,26 +121,20 @@ export async function fetchProspectsAQualifier(
     tous?: boolean | undefined;
     /** La page demandée : la liste entière se parcourt, vingt fiches à la fois. */
     page: number;
+    representantId?: string | null;
+    departementId?: string | null;
+    banqueId?: string | null;
+    syndicatId?: string | null;
+    statut?: string | null;
+    canalProvenanceId?: string | null;
+    dateFrom?: string | null;
+    dateTo?: string | null;
   },
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const origine = criteres.origine ?? 'TOUS';
   const plateforme = criteres.plateforme === true;
-  const query: ProspectQuery = {
-    mesFiches: criteres.tous !== true,
-    plateforme,
-    ...(criteres.resteAAppeler === true ? { resteAAppeler: true } : {}),
-    ...(criteres.projet === null ? {} : { projet: criteres.projet }),
-    search: criteres.search,
-    sortBy: plateforme ? 'plateformeDepuis' : 'nom',
-    sortOrder: plateforme ? 'desc' : 'asc',
-    page: criteres.page,
-    pageSize: A_QUALIFIER_PAGE_SIZE,
-    ...(origine === 'MOI' && criteres.viewerId !== undefined
-      ? { commercialId: criteres.viewerId }
-      : {}),
-    ...(origine === 'CAMPAGNE' ? { attribue: true } : {}),
-  };
+  const query = buildAQualifierQuery(criteres, origine, plateforme);
   return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
 }
 

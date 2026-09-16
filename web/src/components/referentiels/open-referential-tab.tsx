@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -25,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useTriLocal } from '@/components/ui/tri-local';
 import {
   fetchEmployeurs,
   fetchIncomeBands,
@@ -74,6 +76,20 @@ const EMPLOYEUR_TYPES = Object.keys(EMPLOYEUR_TYPE_LABELS) as EmployeurType[];
 function employeurTypeLabel(row: Row): string {
   return 'type' in row ? EMPLOYEUR_TYPE_LABELS[row.type] : '';
 }
+
+const COLONNES_OPEN = {
+  code: (row: Row) => row.code,
+  label: (row: Row) => row.label,
+  type: (row: Row) => employeurTypeLabel(row),
+  isActive: (row: Row) => row.isActive,
+};
+
+const ENTETES_OPEN = [
+  { id: 'code', label: 'Code' },
+  { id: 'label', label: 'Libellé' },
+  { id: 'type', label: 'Type' },
+  { id: 'isActive', label: 'État' },
+] as const;
 
 interface Draft {
   id?: string;
@@ -259,6 +275,8 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
   const rows = (query.data ?? []).filter((row) =>
     `${row.code} ${row.label}`.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr')),
   );
+  const tri = useTriLocal(rows, COLONNES_OPEN);
+  const entetes = ENTETES_OPEN.filter((entete) => entete.id !== 'type' || kind === 'employeurs');
 
   function edit(row: Row): void {
     setDraft({
@@ -295,17 +313,22 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Code</TableHead>
-              <TableHead>Libellé</TableHead>
-              {kind === 'employeurs' ? <TableHead>Type</TableHead> : null}
-              <TableHead>État</TableHead>
+              {entetes.map((colonne) => (
+                <SortableTableHead
+                  key={colonne.id}
+                  column={colonne}
+                  sortBy={tri.sortBy}
+                  sortDir={tri.sortDir}
+                  onToggle={tri.toggle}
+                />
+              ))}
               <TableHead>
                 <span className="sr-only">Actions</span>
               </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((row) => (
+            {tri.lignes.map((row) => (
               <TableRow key={row.id}>
                 <TableCell className="font-[600]">{row.code}</TableCell>
                 <TableCell>{row.label}</TableCell>

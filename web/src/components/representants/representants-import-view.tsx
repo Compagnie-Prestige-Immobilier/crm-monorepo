@@ -17,14 +17,9 @@ import { toast } from 'sonner';
 import { useFileDownload } from '@/components/exports/download-button';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   importRepresentants,
   REPRESENTANTS_TEMPLATE_FILE_NAME,
@@ -259,7 +254,22 @@ function celluleDate(value: string | null): string {
   return formatDate(value);
 }
 
+type ErreurImport = ImportReport['errors'][number];
+
+const COLONNES_ERREURS = {
+  line: (error: ErreurImport) => error.line,
+  message: (error: ErreurImport) => error.message,
+  value: (error: ErreurImport) => error.value,
+};
+
+const ENTETES_ERREURS = [
+  { id: 'line', label: 'Ligne', className: 'w-20' },
+  { id: 'message', label: 'Motif' },
+  { id: 'value', label: 'Valeur fautive' },
+] as const;
+
 function LignesRejetees({ errors }: { errors: ImportReport['errors'] }) {
+  const tri = useTriLocal(errors, COLONNES_ERREURS);
   if (errors.length === 0) return null;
 
   return (
@@ -274,18 +284,40 @@ function LignesRejetees({ errors }: { errors: ImportReport['errors'] }) {
           d’y aller.
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-col gap-3 p-0">
+        <div className="px-5">
+          <RechercheTableau
+            recherche={tri.recherche}
+            setRecherche={tri.setRecherche}
+            total={tri.total}
+            affichees={tri.lignes.length}
+          />
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-20">Ligne</TableHead>
-                <TableHead>Motif</TableHead>
-                <TableHead>Valeur fautive</TableHead>
+                {ENTETES_ERREURS.map((colonne) => (
+                  <SortableTableHead
+                    key={colonne.id}
+                    column={colonne}
+                    className={'className' in colonne ? colonne.className : undefined}
+                    sortBy={tri.sortBy}
+                    sortDir={tri.sortDir}
+                    onToggle={tri.toggle}
+                  />
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {errors.map((error) => (
+              {tri.lignes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={3} className="text-muted-foreground">
+                    Aucune ligne ne correspond à la recherche.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {tri.lignes.map((error) => (
                 <TableRow key={`${String(error.line)}-${error.code}`}>
                   <TableCell className="tabular-nums">{error.line}</TableCell>
                   <TableCell>{error.message}</TableCell>
@@ -302,6 +334,30 @@ function LignesRejetees({ errors }: { errors: ImportReport['errors'] }) {
   );
 }
 
+type LignePreview = ImportReport['preview'][number];
+
+const COLONNES_PREVIEW = {
+  line: (row: LignePreview) => row.line,
+  fullName: (row: LignePreview) => row.fullName,
+  phoneE164: (row: LignePreview) => row.phoneE164,
+  departementName: (row: LignePreview) => row.departementName,
+  iefName: (row: LignePreview) => row.iefName,
+  etablissement: (row: LignePreview) => row.etablissement,
+  relationStatus: (row: LignePreview) => row.relationStatus,
+  calledAt: (row: LignePreview) => row.calledAt,
+};
+
+const ENTETES_PREVIEW = [
+  { id: 'line', label: 'Ligne', className: 'w-20' },
+  { id: 'fullName', label: 'Représentant' },
+  { id: 'phoneE164', label: 'Téléphone' },
+  { id: 'departementName', label: 'Département' },
+  { id: 'iefName', label: 'IEF' },
+  { id: 'etablissement', label: 'Établissement' },
+  { id: 'relationStatus', label: 'Qualification' },
+  { id: 'calledAt', label: 'Dernier appel' },
+] as const;
+
 function ApercuLignesValides({
   preview,
   validCount,
@@ -309,6 +365,7 @@ function ApercuLignesValides({
   preview: ImportReport['preview'];
   validCount: number;
 }) {
+  const tri = useTriLocal(preview, COLONNES_PREVIEW);
   if (preview.length === 0) return null;
 
   return (
@@ -324,23 +381,40 @@ function ApercuLignesValides({
           {formatNumber(validCount)}. Le téléphone est celui que le serveur a normalisé.
         </CardDescription>
       </CardHeader>
-      <CardContent className="p-0">
+      <CardContent className="flex flex-col gap-3 p-0">
+        <div className="px-5">
+          <RechercheTableau
+            recherche={tri.recherche}
+            setRecherche={tri.setRecherche}
+            total={tri.total}
+            affichees={tri.lignes.length}
+          />
+        </div>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow className="hover:bg-transparent">
-                <TableHead className="w-20">Ligne</TableHead>
-                <TableHead>Représentant</TableHead>
-                <TableHead>Téléphone</TableHead>
-                <TableHead>Département</TableHead>
-                <TableHead>IEF</TableHead>
-                <TableHead>Établissement</TableHead>
-                <TableHead>Qualification</TableHead>
-                <TableHead>Dernier appel</TableHead>
+                {ENTETES_PREVIEW.map((colonne) => (
+                  <SortableTableHead
+                    key={colonne.id}
+                    column={colonne}
+                    className={'className' in colonne ? colonne.className : undefined}
+                    sortBy={tri.sortBy}
+                    sortDir={tri.sortDir}
+                    onToggle={tri.toggle}
+                  />
+                ))}
               </TableRow>
             </TableHeader>
             <TableBody>
-              {preview.map((row) => (
+              {tri.lignes.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={8} className="text-muted-foreground">
+                    Aucune ligne ne correspond à la recherche.
+                  </TableCell>
+                </TableRow>
+              ) : null}
+              {tri.lignes.map((row) => (
                 <TableRow key={row.line}>
                   <TableCell className="tabular-nums">{row.line}</TableCell>
                   <TableCell className="font-[600]">{row.fullName}</TableCell>

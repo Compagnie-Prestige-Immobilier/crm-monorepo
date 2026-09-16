@@ -43,6 +43,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -51,6 +52,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   applyImportJob,
   createImportJob,
@@ -649,19 +651,55 @@ function WarningsCard({ job }: { job: ImportJob }) {
   );
 }
 
+const COLONNES_LIGNES_IMPORT = {
+  ligne: (ligne: ImportJobReport['errors'][number]) => ligne.rowNumber,
+  colonne: (ligne: ImportJobReport['errors'][number]) => ligne.column,
+  motif: (ligne: ImportJobReport['errors'][number]) => ligne.message,
+};
+
+const ENTETES_LIGNES_IMPORT = [
+  { id: 'ligne', label: 'Ligne', className: 'w-24' },
+  { id: 'colonne', label: 'Colonne', className: 'w-56' },
+  { id: 'motif', label: 'Motif' },
+] as const;
+
 function TableLignes({ lignes }: { lignes: ImportJobReport['errors'] }) {
+  const tri = useTriLocal(lignes, COLONNES_LIGNES_IMPORT);
+
   return (
-    <CardContent className="p-0">
+    <CardContent className="flex flex-col gap-3 p-0">
+      <div className="px-5">
+        <RechercheTableau
+          recherche={tri.recherche}
+          setRecherche={tri.setRecherche}
+          total={tri.total}
+          affichees={tri.lignes.length}
+        />
+      </div>
       <Table>
         <TableHeader>
           <TableRow className="hover:bg-transparent">
-            <TableHead className="w-24">Ligne</TableHead>
-            <TableHead className="w-56">Colonne</TableHead>
-            <TableHead>Motif</TableHead>
+            {ENTETES_LIGNES_IMPORT.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                className={'className' in colonne ? colonne.className : undefined}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
-          {lignes.map((ligne, index) => (
+          {lignes.length > 0 && tri.lignes.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={3} className="text-muted-foreground">
+                Aucune ligne ne correspond à la recherche.
+              </TableCell>
+            </TableRow>
+          ) : null}
+          {tri.lignes.map((ligne, index) => (
             <TableRow key={`${String(ligne.rowNumber)}-${ligne.code}-${String(index)}`}>
               <TableCell className="tabular-nums">{ligne.rowNumber}</TableCell>
               <TableCell className="text-muted-foreground">{ligne.column ?? '–'}</TableCell>

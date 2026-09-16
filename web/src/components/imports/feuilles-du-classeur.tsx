@@ -15,9 +15,22 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-type Feuille = NonNullable<ImportJobReport['feuilles']>[number];
+export interface Feuille {
+  feuille: string;
+  lignes: number;
+  inedits: number;
+  reLivres: number;
+  doublons: number;
+  inexploitables: number;
+}
 
-const COLONNES: { cle: keyof Omit<Feuille, 'feuille'>; titre: string }[] = [
+export type CleFeuille = keyof Omit<Feuille, 'feuille'>;
+
+type ImportJobReportAvecFeuilles = ImportJobReport & {
+  feuilles?: Feuille[];
+};
+
+const COLONNES: { cle: CleFeuille; titre: string }[] = [
   { cle: 'lignes', titre: 'Lignes livrées' },
   { cle: 'inedits', titre: 'Numéros inédits' },
   { cle: 'reLivres', titre: 'Re-livrés' },
@@ -25,8 +38,8 @@ const COLONNES: { cle: keyof Omit<Feuille, 'feuille'>; titre: string }[] = [
   { cle: 'inexploitables', titre: 'Inexploitables' },
 ];
 
-function total(feuilles: Feuille[], cle: keyof Omit<Feuille, 'feuille'>): number {
-  return feuilles.reduce((somme, feuille) => somme + feuille[cle], 0);
+function total(feuilles: Feuille[], cle: CleFeuille): number {
+  return feuilles.reduce((somme, feuille) => somme + (feuille[cle] ?? 0), 0);
 }
 
 /**
@@ -34,7 +47,8 @@ function total(feuilles: Feuille[], cle: keyof Omit<Feuille, 'feuille'>): number
  * entier : le compte global ne dit pas quel jour a livré quoi.
  */
 export function FeuillesDuClasseur({ job }: { job: ImportJob }) {
-  const feuilles = job.report?.feuilles ?? [];
+  const report = job.report as ImportJobReportAvecFeuilles | null;
+  const feuilles = report?.feuilles ?? [];
   if (feuilles.length < 2) return null;
   const lignes = total(feuilles, 'lignes');
   const inedits = total(feuilles, 'inedits');

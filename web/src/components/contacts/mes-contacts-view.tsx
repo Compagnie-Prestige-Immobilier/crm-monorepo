@@ -14,15 +14,10 @@ import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { useTriLocal } from '@/components/ui/tri-local';
 import { callbackKeys } from '@/lib/data/console';
 import { fetchProspectsAppeles } from '@/lib/data/prospects';
 import { SUIVI_PAGE_SIZE, fetchRepresentantsAppeles } from '@/lib/data/representants';
@@ -113,6 +108,233 @@ function LigneVersFiche({ href, children }: { href: string; children: ReactNode 
   );
 }
 
+function matchesSearch(nom: string, phone: string, search: string): boolean {
+  if (search.trim() === '') return true;
+  const q = search.trim().toLowerCase();
+  return nom.toLowerCase().includes(q) || phone.toLowerCase().includes(q);
+}
+
+function filterProspectItem(
+  item: ProspectRow,
+  search: string,
+  targetProjet: Projet | null,
+  issueFiltre: string | null,
+  statutFiltre: string | null,
+): boolean {
+  if (!matchesSearch(`${item.prenom} ${item.nom}`, item.phoneE164 ?? '', search)) return false;
+  if (targetProjet !== null && item.projet !== targetProjet) return false;
+  if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+  return statutFiltre === null || item.phase2Status === statutFiltre;
+}
+
+function filterRepresentantItem(
+  item: RepresentantRow,
+  search: string,
+  issueFiltre: string | null,
+  statutFiltre: string | null,
+): boolean {
+  if (!matchesSearch(item.fullName, item.phoneE164 ?? '', search)) return false;
+  if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+  if (statutFiltre === null) return true;
+  return item.relationStatus === statutFiltre || item.statutQualificationLabel === statutFiltre;
+}
+
+function checkActiveFilters(
+  search: string,
+  projetFiltre: string | null,
+  issueFiltre: string | null,
+  statutFiltre: string | null,
+  filtreId: string | null,
+): boolean {
+  if (search.trim() !== '') return true;
+  if (projetFiltre !== null) return true;
+  if (issueFiltre !== null) return true;
+  if (statutFiltre !== null) return true;
+  return filtreId !== null;
+}
+
+function MesContactsListContent({
+  vueRepresentants,
+  representants,
+  filteredRepresentants,
+  prospects,
+  filteredProspects,
+  hasActiveFilters,
+  resetFilters,
+  proj,
+}: {
+  vueRepresentants: boolean;
+  representants: UseQueryResult<Paginated<RepresentantRow>>;
+  filteredRepresentants: RepresentantRow[];
+  prospects: UseQueryResult<Paginated<ProspectRow>>;
+  filteredProspects: ProspectRow[];
+  hasActiveFilters: boolean;
+  resetFilters: () => void;
+  proj: Projet | null;
+}) {
+  if (vueRepresentants) {
+    return (
+      <Liste
+        liste={representants}
+        itemsFiltered={filteredRepresentants}
+        hasFilters={hasActiveFilters}
+        onResetFilters={resetFilters}
+        vide="Un représentant apparaît ici dès que vous consignez un appel sur sa fiche."
+        echec="Les représentants appelés n’ont pas pu être lus."
+      >
+        {(items) => <TableRepresentants items={items} />}
+      </Liste>
+    );
+  }
+  return (
+    <Liste
+      liste={prospects}
+      itemsFiltered={filteredProspects}
+      hasFilters={hasActiveFilters}
+      onResetFilters={resetFilters}
+      vide="Un prospect apparaît ici dès que vous consignez un appel sur sa fiche."
+      echec="Les prospects appelés n’ont pas pu être lus."
+    >
+      {(items) => <TableProspects items={items} projet={proj} />}
+    </Liste>
+  );
+}
+
+function MesContactsFilterBar({
+  search,
+  setSearch,
+  proj,
+  projetFiltre,
+  setProjetFiltre,
+  canFilter,
+  teleconseillers,
+  filtreId,
+  setFiltreId,
+  vueRepresentants,
+  issueFiltre,
+  setIssueFiltre,
+  statutFiltre,
+  setStatutFiltre,
+  hasActiveFilters,
+  resetFilters,
+}: {
+  search: string;
+  setSearch: (search: string) => void;
+  proj: Projet | null;
+  projetFiltre: string | null;
+  setProjetFiltre: (val: string | null) => void;
+  canFilter: boolean;
+  teleconseillers: { id: string; fullName: string }[];
+  filtreId: string | null;
+  setFiltreId: (val: string | null) => void;
+  vueRepresentants: boolean;
+  issueFiltre: string | null;
+  setIssueFiltre: (val: string | null) => void;
+  statutFiltre: string | null;
+  setStatutFiltre: (val: string | null) => void;
+  hasActiveFilters: boolean;
+  resetFilters: () => void;
+}) {
+  return (
+    <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
+      <SearchField
+        value={search}
+        onChange={setSearch}
+        placeholder="Nom, prénom, téléphone…"
+        className="min-w-[14rem] flex-1"
+      />
+
+      {proj === null ? (
+        <div className="flex min-w-[10rem] flex-col gap-1.5 sm:max-w-xs">
+          <FilterCombobox
+            label="Projet"
+            placeholder="Tous les projets"
+            options={PROJET_OPTIONS}
+            value={projetFiltre}
+            onChange={setProjetFiltre}
+          />
+        </div>
+      ) : null}
+
+      {canFilter ? (
+        <div className="flex min-w-[12rem] flex-col gap-1.5 sm:max-w-xs">
+          <FilterCombobox
+            label="Appelé par"
+            placeholder="Mes appels"
+            options={teleconseillers.map((user) => ({
+              value: user.id,
+              label: user.fullName,
+            }))}
+            value={filtreId}
+            onChange={setFiltreId}
+          />
+        </div>
+      ) : null}
+
+      <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
+        <FilterCombobox
+          label="Issue de l’appel"
+          placeholder="Toutes les issues"
+          options={vueRepresentants ? REP_ISSUE_OPTIONS : PROSPECT_ISSUE_OPTIONS}
+          value={issueFiltre}
+          onChange={setIssueFiltre}
+        />
+      </div>
+
+      <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
+        <FilterCombobox
+          label="Statut"
+          placeholder="Tous les statuts"
+          options={vueRepresentants ? REP_STATUT_OPTIONS : PROSPECT_STATUT_OPTIONS}
+          value={statutFiltre}
+          onChange={setStatutFiltre}
+        />
+      </div>
+
+      {hasActiveFilters ? (
+        <Button variant="ghost" onClick={resetFilters} className="h-11 gap-1.5">
+          <RotateCcwIcon className="size-4" aria-hidden="true" />
+          Réinitialiser
+        </Button>
+      ) : null}
+    </div>
+  );
+}
+
+function computeLastCallId(canFilter: boolean, filtreId: string | null, userId: string): string {
+  if (!canFilter) return userId;
+  return filtreId ?? userId;
+}
+
+function MesContactsTabsToggle({
+  avecRepresentants,
+  onglet,
+  setOnglet,
+}: {
+  avecRepresentants: boolean;
+  onglet: Onglet;
+  setOnglet: (val: Onglet) => void;
+}) {
+  if (!avecRepresentants) return null;
+  return (
+    <div className="flex flex-wrap gap-2" role="group" aria-label="Type de contact">
+      {ONGLETS.map((entree) => (
+        <Button
+          key={entree.value}
+          type="button"
+          variant={entree.value === onglet ? 'default' : 'outline'}
+          aria-pressed={entree.value === onglet}
+          onClick={() => {
+            setOnglet(entree.value);
+          }}
+        >
+          {entree.label}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 export function MesContactsView({
   projet,
   userId,
@@ -130,8 +352,7 @@ export function MesContactsView({
   const [filtreId, setFiltreId] = useState<string | null>(null);
 
   const proj = projet ?? null;
-
-  const lastCallById = canFilter ? (filtreId ?? userId) : userId;
+  const lastCallById = computeLastCallId(canFilter, filtreId, userId);
 
   const avecRepresentants = proj !== 'GRAND_PUBLIC';
   const vueRepresentants = avecRepresentants && onglet === 'REPRESENTANTS';
@@ -158,12 +379,13 @@ export function MesContactsView({
     staleTime: 300_000,
   });
 
-  const hasActiveFilters =
-    search.trim() !== '' ||
-    projetFiltre !== null ||
-    issueFiltre !== null ||
-    statutFiltre !== null ||
-    filtreId !== null;
+  const hasActiveFilters = checkActiveFilters(
+    search,
+    projetFiltre,
+    issueFiltre,
+    statutFiltre,
+    filtreId,
+  );
 
   const resetFilters = () => {
     setSearch('');
@@ -173,37 +395,14 @@ export function MesContactsView({
     setFiltreId(null);
   };
 
-  const filteredProspects = (prospects.data?.items ?? []).filter((item) => {
-    if (search.trim() !== '') {
-      const q = search.trim().toLowerCase();
-      const nom = `${item.prenom} ${item.nom}`.toLowerCase();
-      const phone = (item.phoneE164 ?? '').toLowerCase();
-      if (!nom.includes(q) && !phone.includes(q)) return false;
-    }
-    const currentProjet = proj ?? (projetFiltre as Projet | null);
-    if (currentProjet !== null && item.projet !== currentProjet) return false;
-    if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
-    if (statutFiltre !== null && item.phase2Status !== statutFiltre) return false;
-    return true;
-  });
+  const targetProjet = proj ?? (projetFiltre as Projet | null);
+  const filteredProspects = (prospects.data?.items ?? []).filter((item) =>
+    filterProspectItem(item, search, targetProjet, issueFiltre, statutFiltre),
+  );
 
-  const filteredRepresentants = (representants.data?.items ?? []).filter((item) => {
-    if (search.trim() !== '') {
-      const q = search.trim().toLowerCase();
-      const nom = item.fullName.toLowerCase();
-      const phone = (item.phoneE164 ?? '').toLowerCase();
-      if (!nom.includes(q) && !phone.includes(q)) return false;
-    }
-    if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
-    if (
-      statutFiltre !== null &&
-      item.relationStatus !== statutFiltre &&
-      item.statutQualificationLabel !== statutFiltre
-    ) {
-      return false;
-    }
-    return true;
-  });
+  const filteredRepresentants = (representants.data?.items ?? []).filter((item) =>
+    filterRepresentantItem(item, search, issueFiltre, statutFiltre),
+  );
 
   return (
     <section className="flex flex-col gap-4">
@@ -212,111 +411,41 @@ export function MesContactsView({
         fiche.
       </p>
 
-      {/* ─── Barre de recherche et de filtres ──────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4 shadow-elev-sm">
-        <SearchField
-          value={search}
-          onChange={setSearch}
-          placeholder="Nom, prénom, téléphone…"
-          className="min-w-[14rem] flex-1"
-        />
+      <MesContactsFilterBar
+        search={search}
+        setSearch={setSearch}
+        proj={proj}
+        projetFiltre={projetFiltre}
+        setProjetFiltre={setProjetFiltre}
+        canFilter={canFilter}
+        teleconseillers={teleconseillers.data?.items ?? []}
+        filtreId={filtreId}
+        setFiltreId={setFiltreId}
+        vueRepresentants={vueRepresentants}
+        issueFiltre={issueFiltre}
+        setIssueFiltre={setIssueFiltre}
+        statutFiltre={statutFiltre}
+        setStatutFiltre={setStatutFiltre}
+        hasActiveFilters={hasActiveFilters}
+        resetFilters={resetFilters}
+      />
 
-        {proj === null ? (
-          <div className="flex min-w-[10rem] flex-col gap-1.5 sm:max-w-xs">
-            <FilterCombobox
-              label="Projet"
-              placeholder="Tous les projets"
-              options={PROJET_OPTIONS}
-              value={projetFiltre}
-              onChange={setProjetFiltre}
-            />
-          </div>
-        ) : null}
+      <MesContactsTabsToggle
+        avecRepresentants={avecRepresentants}
+        onglet={onglet}
+        setOnglet={setOnglet}
+      />
 
-        {canFilter ? (
-          <div className="flex min-w-[12rem] flex-col gap-1.5 sm:max-w-xs">
-            <FilterCombobox
-              label="Appelé par"
-              placeholder="Mes appels"
-              options={(teleconseillers.data?.items ?? []).map((user) => ({
-                value: user.id,
-                label: user.fullName,
-              }))}
-              value={filtreId}
-              onChange={setFiltreId}
-            />
-          </div>
-        ) : null}
-
-        <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
-          <FilterCombobox
-            label="Issue de l’appel"
-            placeholder="Toutes les issues"
-            options={vueRepresentants ? REP_ISSUE_OPTIONS : PROSPECT_ISSUE_OPTIONS}
-            value={issueFiltre}
-            onChange={setIssueFiltre}
-          />
-        </div>
-
-        <div className="flex min-w-[11rem] flex-col gap-1.5 sm:max-w-xs">
-          <FilterCombobox
-            label="Statut"
-            placeholder="Tous les statuts"
-            options={vueRepresentants ? REP_STATUT_OPTIONS : PROSPECT_STATUT_OPTIONS}
-            value={statutFiltre}
-            onChange={setStatutFiltre}
-          />
-        </div>
-
-        {hasActiveFilters ? (
-          <Button variant="ghost" onClick={resetFilters} className="h-11 gap-1.5">
-            <RotateCcwIcon className="size-4" aria-hidden="true" />
-            Réinitialiser
-          </Button>
-        ) : null}
-      </div>
-
-      {avecRepresentants ? (
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Type de contact">
-          {ONGLETS.map((entree) => (
-            <Button
-              key={entree.value}
-              type="button"
-              variant={entree.value === onglet ? 'default' : 'outline'}
-              aria-pressed={entree.value === onglet}
-              onClick={() => {
-                setOnglet(entree.value);
-              }}
-            >
-              {entree.label}
-            </Button>
-          ))}
-        </div>
-      ) : null}
-
-      {vueRepresentants ? (
-        <Liste
-          liste={representants}
-          itemsFiltered={filteredRepresentants}
-          hasFilters={hasActiveFilters}
-          onResetFilters={resetFilters}
-          vide="Un représentant apparaît ici dès que vous consignez un appel sur sa fiche."
-          echec="Les représentants appelés n’ont pas pu être lus."
-        >
-          {(items) => <TableRepresentants items={items} />}
-        </Liste>
-      ) : (
-        <Liste
-          liste={prospects}
-          itemsFiltered={filteredProspects}
-          hasFilters={hasActiveFilters}
-          onResetFilters={resetFilters}
-          vide="Un prospect apparaît ici dès que vous consignez un appel sur sa fiche."
-          echec="Les prospects appelés n’ont pas pu être lus."
-        >
-          {(items) => <TableProspects items={items} projet={proj} />}
-        </Liste>
-      )}
+      <MesContactsListContent
+        vueRepresentants={vueRepresentants}
+        representants={representants}
+        filteredRepresentants={filteredRepresentants}
+        prospects={prospects}
+        filteredProspects={filteredProspects}
+        hasActiveFilters={hasActiveFilters}
+        resetFilters={resetFilters}
+        proj={proj}
+      />
     </section>
   );
 }
@@ -395,34 +524,39 @@ function Liste<T>({
   );
 }
 
-function EnTete() {
-  return (
-    <TableHeader>
-      <TableRow>
-        <TableHead>Nom</TableHead>
-        <TableHead>Téléphone</TableHead>
-        <TableHead>Dernier appel</TableHead>
-        <TableHead>Issue</TableHead>
-        <TableHead>Statut</TableHead>
-      </TableRow>
-    </TableHeader>
-  );
-}
+const COLONNES_REPRESENTANTS_CONTACTS = {
+  nom: (representant: RepresentantRow) => representant.fullName,
+  telephone: (representant: RepresentantRow) => representant.phoneE164,
+  appel: (representant: RepresentantRow) => representant.lastCallAt,
+  issue: (representant: RepresentantRow) => representant.lastCallOutcome,
+  statut: (representant: RepresentantRow) => representant.statutQualificationLabel,
+};
 
-function EnTeteProspects() {
-  return (
-    <TableHeader>
-      <TableRow>
-        <TableHead>Projet</TableHead>
-        <TableHead>Nom</TableHead>
-        <TableHead>Téléphone</TableHead>
-        <TableHead>Dernier appel</TableHead>
-        <TableHead>Issue</TableHead>
-        <TableHead>Statut</TableHead>
-      </TableRow>
-    </TableHeader>
-  );
-}
+const ENTETES_REPRESENTANTS_CONTACTS = [
+  { id: 'nom', label: 'Nom' },
+  { id: 'telephone', label: 'Téléphone' },
+  { id: 'appel', label: 'Dernier appel' },
+  { id: 'issue', label: 'Issue' },
+  { id: 'statut', label: 'Statut' },
+] as const;
+
+const COLONNES_PROSPECTS_CONTACTS = {
+  projet: (prospect: ProspectRow) => prospect.projet,
+  nom: (prospect: ProspectRow) => `${prospect.prenom} ${prospect.nom}`,
+  telephone: (prospect: ProspectRow) => prospect.phoneE164,
+  appel: (prospect: ProspectRow) => prospect.lastCallAt,
+  issue: (prospect: ProspectRow) => prospect.lastCallOutcome,
+  statut: (prospect: ProspectRow) => prospect.phase2Status,
+};
+
+const ENTETES_PROSPECTS_CONTACTS = [
+  { id: 'projet', label: 'Projet' },
+  { id: 'nom', label: 'Nom' },
+  { id: 'telephone', label: 'Téléphone' },
+  { id: 'appel', label: 'Dernier appel' },
+  { id: 'issue', label: 'Issue' },
+  { id: 'statut', label: 'Statut' },
+] as const;
 
 function Quand({ at }: { at: string | null }) {
   if (at === null) return SANS_VALEUR;
@@ -430,11 +564,24 @@ function Quand({ at }: { at: string | null }) {
 }
 
 function TableRepresentants({ items }: { items: RepresentantRow[] }) {
+  const tri = useTriLocal(items, COLONNES_REPRESENTANTS_CONTACTS);
   return (
     <Table>
-      <EnTete />
+      <TableHeader>
+        <TableRow>
+          {ENTETES_REPRESENTANTS_CONTACTS.map((colonne) => (
+            <SortableTableHead
+              key={colonne.id}
+              column={colonne}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+          ))}
+        </TableRow>
+      </TableHeader>
       <TableBody>
-        {items.map((representant) => (
+        {tri.lignes.map((representant) => (
           <LigneVersFiche key={representant.id} href={ficheRepresentant(representant.id)}>
             <TableCell>
               <Link
@@ -473,11 +620,24 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
 }
 
 function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Projet | null }) {
+  const tri = useTriLocal(items, COLONNES_PROSPECTS_CONTACTS);
   return (
     <Table>
-      <EnTeteProspects />
+      <TableHeader>
+        <TableRow>
+          {ENTETES_PROSPECTS_CONTACTS.map((colonne) => (
+            <SortableTableHead
+              key={colonne.id}
+              column={colonne}
+              sortBy={tri.sortBy}
+              sortDir={tri.sortDir}
+              onToggle={tri.toggle}
+            />
+          ))}
+        </TableRow>
+      </TableHeader>
       <TableBody>
-        {items.map((prospect) => (
+        {tri.lignes.map((prospect) => (
           <LigneVersFiche key={prospect.id} href={ficheProspect(projet, prospect)}>
             <TableCell>
               <ProjetBadge projet={prospect.projet} />

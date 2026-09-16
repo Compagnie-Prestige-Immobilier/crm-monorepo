@@ -301,7 +301,7 @@ func qualificationTotalProspects(b *banc, requete string) (total int, ids []stri
 }
 
 // Une téléconseillère qui a fini sa campagne ne doit plus voir ses fiches
-// appelées dans la file, sauf celles qui attendent un rappel.
+// appelées dans la file : celle qui attend un rappel se tient depuis « Rappels ».
 func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	traitee, intacte, rappelee, injoignable := qualificationProspect(b), qualificationProspect(b), qualificationProspect(b), qualificationProspect(b)
@@ -327,8 +327,8 @@ func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 		t.Fatalf("sans filtre, les quatre fiches restent visibles : %d", total)
 	}
 	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
-	if total != 2 || slices.Contains(ids, traitee) || slices.Contains(ids, injoignable) || !slices.Contains(ids, intacte) || !slices.Contains(ids, rappelee) {
-		t.Fatalf("reste à appeler exclut les fiches traitées et injoignables : total %d, %v", total, ids)
+	if total != 1 || !slices.Contains(ids, intacte) || slices.Contains(ids, traitee) || slices.Contains(ids, rappelee) {
+		t.Fatalf("reste à appeler = la seule fiche jamais appelée : total %d, %v", total, ids)
 	}
 }
 
@@ -400,44 +400,6 @@ func TestQualificationReaffectationRemetLaFicheDansLaFile(t *testing.T) {
 	_, ids = qualificationTotalProspects(b, "&resteAAppeler=true")
 	if !slices.Contains(ids, fiche) {
 		t.Fatalf("réaffectée, la fiche revient dans la file : %v", ids)
-	}
-}
-
-// Un rappel promis remet la fiche dans la file jusqu'a ce que l'agent la
-// rappelle. Le 16 septembre 2026, huit fiches y campaient : l'agent avait
-// rappele, mais son motif ne cloturait pas la fiche (NRP, terrain), le rappel
-// restait ouvert et la fiche reprenait sa place a chaque chargement.
-func TestQualificationRappelRepondQuitteLaFile(t *testing.T) {
-	b := qualificationConnecte(t, "COMMERCIAL")
-	fiche := qualificationProspect(b)
-	rendezVous := qualificationCorpsTentative(fiche, map[string]any{
-		"outcome": "OTHER", "reasonCode": "RV_CPI",
-		"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano),
-	})
-	rappelSansReponse := qualificationCorpsTentative(fiche, map[string]any{
-		"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE",
-	})
-	t.Cleanup(func() {
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
-		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = ANY($1)`,
-			[]string{rendezVous["id"].(string), rappelSansReponse["id"].(string)})
-	})
-
-	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rendezVous)
-	b.attend(statut, http.StatusOK, "rendez-vous promis", body)
-	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); !slices.Contains(ids, fiche) {
-		t.Fatalf("un rendez-vous promis garde la fiche dans la file : %v", ids)
-	}
-
-	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rappelSansReponse)
-	b.attend(statut, http.StatusOK, "fiche rappelee sans reponse", body)
-	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); slices.Contains(ids, fiche) {
-		t.Fatalf("rappelee, la fiche quitte la file meme sans reponse : %v", ids)
-	}
-	// Le rendez-vous survit a l'appel manque : il vaut pour son heure.
-	if rappels := qualificationCompte(b,
-		`SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, fiche); rappels != 1 {
-		t.Fatalf("%d rappel en attente, un attendu", rappels)
 	}
 }
 
@@ -822,5 +784,56 @@ func TestCodificationLeads(t *testing.T) {
 	b.attend(statut, http.StatusBadRequest, "méthode sur un appel non joint", body)
 	if body["code"] != "PHASE2_METHOD_NOT_ALLOWED" {
 		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+// Le libellé du statut qui a promis le rappel, nul quand la file ignore la fiche.
+func qualificationRappelDansFile(b *banc, portee, prospectID string) *string {
+	b.t.Helper()
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/callbacks?scope="+portee, nil)
+	b.attend(statut, http.StatusOK, "file des rappels", body)
+	items, _ := body["items"].([]any)
+	for _, item := range items {
+		ligne, _ := item.(map[string]any)
+		if ligne["prospectId"] != prospectID {
+			continue
+		}
+		label, _ := ligne["reasonLabel"].(string)
+		return &label
+	}
+	return nil
+}
+
+// « RV téléphonique » promet un rappel : la fiche quitte « Reste à appeler »
+// pour la file des rappels, que « Tous » montre même promise pour dans un mois.
+func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(b)
+	quand := time.Now().UTC().AddDate(0, 0, 30)
+	corps := qualificationCorpsTentative(prospect, map[string]any{
+		"outcome":    "CALLBACK",
+		"reasonCode": "RDV_TELEPHONIQUE",
+		"callbackAt": quand.Format(time.RFC3339Nano),
+	})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	b.attend(statut, http.StatusOK, "RV téléphonique consigné", body)
+
+	if motif := qualificationRappelDansFile(b, "week", prospect); motif != nil {
+		t.Fatalf("un rappel promis dans un mois ne tient pas dans la semaine : %q", *motif)
+	}
+	motif := qualificationRappelDansFile(b, "all", prospect)
+	if motif == nil {
+		t.Fatal("« Tous » montre le rappel promis, quelle que soit sa date")
+	}
+	if *motif != "RV téléphonique" {
+		t.Fatalf("la file nomme la qualification qui a promis le rappel : %q", *motif)
+	}
+	total, ids := qualificationTotalProspects(b, "&resteAAppeler=true")
+	if total != 0 || slices.Contains(ids, prospect) {
+		t.Fatalf("la fiche promise quitte « Reste à appeler » : total %d, %v", total, ids)
 	}
 }
