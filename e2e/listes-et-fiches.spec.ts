@@ -273,3 +273,24 @@ test.describe('parcours 5, la liste des prospects reste à l’encadrement', () 
     await expect(refus.getByRole('heading', { name: 'Accès refusé', level: 2 })).toBeVisible();
   });
 });
+
+test.describe('parcours 7, creer un prospect depuis la liste', () => {
+  test.use({ storageState: compteDe('ADMIN').etat });
+
+  // Sans filtre de projet, le bouton disparaissait : l'ecran n'offrait plus
+  // aucun geste a qui arrivait dessus.
+  test('le bouton reste offert sans filtre de projet, et demande lequel', async ({ page }) => {
+    await page.goto('/teleconseil/prospects');
+
+    const bouton = page.getByRole('button', { name: 'Nouveau prospect' });
+    await expect(bouton).toBeVisible();
+    await bouton.click();
+
+    const fenetre = page.getByRole('dialog');
+    await expect(fenetre.getByText('Pour quel projet ?')).toBeVisible();
+    await fenetre.getByRole('button', { name: 'Grand Public', exact: true }).click();
+    await expect(
+      fenetre.getByRole('heading', { name: 'Nouveau prospect Grand Public' }),
+    ).toBeVisible();
+  });
+});
