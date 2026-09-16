@@ -10,5 +10,15 @@ USING public.prospects p, public.lots_export l
 WHERE p."id" = i."prospectId" AND l."id" = i."lotId"
   AND l."projet" IS NOT NULL AND p."projet" <> l."projet";
 
+UPDATE public.lots_export l
+SET "itemCount" = (
+    SELECT COUNT(*)::integer
+    FROM public.lot_export_items i
+    WHERE i."lotId" = l."id"
+);
+
+ALTER TABLE public.lot_export_items
+    VALIDATE CONSTRAINT lot_export_items_une_seule_cible;
+
 -- +goose Down
 -- Pas de revert : les lignes retirées ne se recréent pas.
