@@ -228,13 +228,22 @@ function critereRepresentants(
   };
 }
 
-function critereImport(importe: ImportChoisi | null): Critere {
+const TETE_PROSPECTS: Record<Projet | typeof TOUS, string> = {
+  TOUS: 'Tous les prospects',
+  CHUES: 'Prospects CHUES',
+  GRAND_PUBLIC: 'Prospects Grand Public',
+};
+
+// Un onglet du classeur mêle CHUES et Grand Public : le projet se choisit après l'onglet.
+function critereImport(choix: Choix): Critere {
+  const importe = choix.importe;
+  const projet = choix.projet === TOUS ? null : choix.projet;
   return {
     corps: {
       cible: 'PROSPECTS',
       prospects: {
         ...PROSPECTS_VIVANTS,
-        projet: importe === null ? 'CHUES' : importe.projet,
+        ...(projet === null ? {} : { projet }),
         ...(importe === null
           ? {}
           : {
@@ -243,15 +252,11 @@ function critereImport(importe: ImportChoisi | null): Critere {
             }),
       },
     },
-    etiquette: importe === null ? 'Fiches importées' : importe.libelle,
+    etiquette: [importe === null ? 'Fiches importées' : importe.libelle]
+      .concat(projet === null ? [] : [TETE_PROSPECTS[projet]])
+      .join(', '),
   };
 }
-
-const TETE_PROSPECTS: Record<Projet | typeof TOUS, string> = {
-  TOUS: 'Tous les prospects',
-  CHUES: 'Prospects CHUES',
-  GRAND_PUBLIC: 'Prospects Grand Public',
-};
 
 function critereProspects(choix: Choix): Critere {
   const type = choix.projet === 'GRAND_PUBLIC' && choix.type !== TOUS ? choix.type : null;
@@ -281,7 +286,7 @@ function critereDuChoix(
   nomIef: string | null,
 ): Critere {
   if (choix.famille === 'representants') return critereRepresentants(choix, nomDepartement, nomIef);
-  if (choix.famille === 'import') return critereImport(choix.importe);
+  if (choix.famille === 'import') return critereImport(choix);
   return critereProspects(choix);
 }
 
@@ -494,6 +499,15 @@ function Step1Cibles({
         <ChampImport
           valeur={choix.importe === null ? '' : cleImport(choix.importe)}
           onChange={(importe) => onChange({ ...choix, importe })}
+        />
+      ) : null}
+      {choix.famille === 'import' && choix.importe !== null ? (
+        <Tuiles
+          legende="Quel projet ?"
+          groupe={`${groupe}-projet`}
+          tuiles={PROJETS}
+          valeur={choix.projet}
+          onChange={(projet) => onChange({ ...choix, projet })}
         />
       ) : null}
     </div>
