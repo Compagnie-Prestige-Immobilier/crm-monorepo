@@ -262,21 +262,25 @@ test.describe('parcours 5, convertir un prospect', () => {
     await revenirAuxIssues(page);
     await issue(page, 'Injoignable', /NRP/u);
     await enregistrer(page);
-    expect(await lireClassement(fiche.id)).toMatchObject({
-      tentatives: 2,
-      phase2Status: 'PENDING',
-    });
+    await expect
+      .poll(() => lireClassement(fiche.id))
+      .toMatchObject({
+        tentatives: 2,
+        phase2Status: 'PENDING',
+      });
 
     await page.goto(`/teleconseil/appel/${fiche.id}`);
     await revenirAuxIssues(page);
     await issue(page, 'Injoignable', /Faux numéro/u);
     await enregistrer(page);
-    expect(await lireClassement(fiche.id)).toMatchObject({
-      tentatives: 3,
-      phase2Status: 'WRONG_NUMBER',
-      enrollmentMethod: null,
-      parcoursStatut: 'WRONG_NUMBER',
-    });
+    await expect
+      .poll(() => lireClassement(fiche.id))
+      .toMatchObject({
+        tentatives: 3,
+        phase2Status: 'WRONG_NUMBER',
+        enrollmentMethod: null,
+        parcoursStatut: 'WRONG_NUMBER',
+      });
   });
 
   test('un prospect Grand Public importe se qualifie par le teleconseiller a qui il est attribue', async ({

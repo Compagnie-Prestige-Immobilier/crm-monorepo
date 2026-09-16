@@ -124,8 +124,14 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
       ).toBeVisible();
     }
 
+    // La liste garde les dossiers précédents tant que la réponse filtrée n'est
+    // pas arrivée : l'attendre, sinon l'état vide se cherche sur l'ancienne page.
+    const filtree = page.waitForResponse(
+      (reponse) => reponse.url().includes(`search=ZZZ-${cle}`) && reponse.status() === 200,
+    );
     await page.getByLabel('Recherche').fill(`ZZZ-${cle}`);
     await expect(page).toHaveURL(new RegExp(`search=ZZZ-${cle}`, 'u'));
+    await filtree;
     await expect(etatVide(page, 'Aucun dossier ne correspond à ces filtres')).toBeVisible();
     await expect(page.getByText('Élargissez la période ou retirez un critère.')).toBeVisible();
   });

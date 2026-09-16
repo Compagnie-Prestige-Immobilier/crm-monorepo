@@ -21,8 +21,13 @@ export function cleImport(lot: ImportChoisi): string {
 // Le relevé tourne tous les quarts d'heure : sans l'heure, trois imports du même
 // jour portent le même nom et le superviseur ne peut plus les distinguer.
 function libelle(lot: ImportChoisi): string {
-  const pluriel = lot.fiches > 1 ? 's' : '';
-  return `${lot.libelle} · ${formatNumber(lot.fiches)} fiche${pluriel} · relevé le ${formatDateTime(lot.importedAt)}`;
+  const parts = [
+    lot.libelle,
+    `${formatNumber(lot.fichesChues)} CHUES`,
+    `${formatNumber(lot.fichesGrandPublic)} Grand Public`,
+    `relevé le ${formatDateTime(lot.importedAt)}`,
+  ];
+  return parts.join(' · ');
 }
 
 const RAYON = 8;
