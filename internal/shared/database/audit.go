@@ -43,7 +43,7 @@ func Auditer(ctx context.Context, q *db.Queries, userID, action, entite, entiteI
 // Une fiche devenue plateforme passe aux CCP tout entière : hors des campagnes,
 // et ses rappels promis avec elle, au CCP le moins chargé.
 func PasserAuxCCP(ctx context.Context, q *db.Queries, demandeur, prospectID string) error {
-	if err := RetirerDesCampagnes(ctx, q, demandeur, "lot_export.plateforme", prospectID); err != nil {
+	if err := RetirerDesCampagnes(ctx, q, demandeur, "lot_export.plateforme", prospectID, true); err != nil {
 		return err
 	}
 	rappels, err := q.RappelsPendantsDuProspect(ctx, prospectID)
@@ -77,12 +77,12 @@ func PasserAuxCCP(ctx context.Context, q *db.Queries, demandeur, prospectID stri
 // Une fiche qui quitte le périmètre d'une campagne en sort à l'instant : la
 // ligne disparaît et la campagne se recompte seule. Le journal garde la
 // position et l'attribution, l'historique des appels reste sur la fiche.
-func RetirerDesCampagnes(ctx context.Context, q *db.Queries, demandeur, action, prospectID string) error {
-	lots, err := q.LotsDuProspect(ctx, &prospectID)
+func RetirerDesCampagnes(ctx context.Context, q *db.Queries, demandeur, action, prospectID string, toutes bool) error {
+	lots, err := q.LotsDuProspect(ctx, db.LotsDuProspectParams{ProspectID: &prospectID, Toutes: toutes})
 	if err != nil || len(lots) == 0 {
 		return err
 	}
-	if err := q.RetirerProspectDesCampagnes(ctx, &prospectID); err != nil {
+	if err := q.RetirerProspectDesCampagnes(ctx, db.RetirerProspectDesCampagnesParams{ProspectID: &prospectID, Toutes: toutes}); err != nil {
 		return err
 	}
 	for _, lot := range lots {

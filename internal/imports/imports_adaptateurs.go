@@ -1366,7 +1366,7 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 		return false, err
 	}
 	if connue.projet != ligne.projet {
-		if err := database.RetirerDesCampagnes(ctx, q, c.demandeur, "lot_export.hors_projet", connue.id); err != nil {
+		if err := database.RetirerDesCampagnes(ctx, q, c.demandeur, "lot_export.hors_projet", connue.id, false); err != nil {
 			return false, err
 		}
 	}

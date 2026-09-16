@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
+import { CalendarIcon, CopyIcon, PencilIcon } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
 import { useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
@@ -1470,11 +1470,7 @@ function EcranPas({
 }) {
   return (
     <div className="flex w-full flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" className="-ml-2 px-2" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         {departChrono === null ? null : <Chrono firstInputAt={departChrono} />}
       </div>
       <BrouillonEnAttente enAttente={brouillonEnAttente} />

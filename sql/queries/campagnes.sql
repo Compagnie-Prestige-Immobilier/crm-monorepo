@@ -50,10 +50,8 @@ UPDATE "lots_export" SET "pausedAt" = sqlc.narg('at') WHERE "id" = $1;
 WITH fiches AS (
   SELECT j."id" AS "jobId", j."fileName", j."createdAt", j."finishedAt", p."importFeuille",
          p."lastCallAt" IS NOT NULL AS appelee,
-         EXISTS (SELECT 1 FROM "prospect_journeys" pj
-                 WHERE pj."prospectId" = p."id" AND pj."projet" = 'GRAND_PUBLIC') AS gp,
-         EXISTS (SELECT 1 FROM "prospect_journeys" pj
-                 WHERE pj."prospectId" = p."id" AND pj."projet" = 'CHUES') AS chues
+         p."projet" = 'GRAND_PUBLIC' AS gp,
+         p."projet" = 'CHUES' AS chues
   FROM "import_jobs" j
   JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL AND p."plateformeDepuis" IS NULL
 )
@@ -405,15 +403,15 @@ WHERE r."deletedAt" IS NULL
 ORDER BY r."id" ASC
 LIMIT sqlc.arg('places');
 
+-- Une fiche appartient à UN projet, celui qu'elle porte aujourd'hui. Un ancien
+-- parcours dans l'autre projet ne la rend pas à ses campagnes.
 -- name: CompterProspectsCible :one
 SELECT COUNT(*)::int
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."plateformeDepuis" IS NULL
   AND p."statut" <> 'PERDU'
-  AND (sqlc.narg('projet')::"Projet" IS NULL
-       OR EXISTS (SELECT 1 FROM "prospect_journeys" j
-                  WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
+  AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
@@ -430,9 +428,7 @@ FROM "prospects" p
 WHERE p."deletedAt" IS NULL
   AND p."plateformeDepuis" IS NULL
   AND p."statut" <> 'PERDU'
-  AND (sqlc.narg('projet')::"Projet" IS NULL
-       OR EXISTS (SELECT 1 FROM "prospect_journeys" j
-                  WHERE j."prospectId" = p."id" AND j."projet" = sqlc.narg('projet')))
+  AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
   AND (sqlc.narg('import_job_id')::text IS NULL OR p."importJobId" = sqlc.narg('import_job_id'))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
