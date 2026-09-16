@@ -108,8 +108,8 @@ export function EnrolementView() {
   return (
     <div className="flex flex-col gap-6">
       <p className="max-w-3xl text-[0.9375rem] text-muted-foreground">
-        Les inscriptions lues sur les plateformes d’enrôlement, un projet par onglet. La lecture est
-        à sens unique : rien n’est écrit sur les fiches prospects.
+        Les inscriptions actives lues sur les plateformes d’enrôlement, un projet par onglet. Une
+        inscription rapprochée rejoint la file du projet correspondant.
       </p>
 
       <Tabs value={onglet} onValueChange={changerOnglet}>

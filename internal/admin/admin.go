@@ -76,6 +76,8 @@ var Garde = map[string][]socle.Role{
 	"GET /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
 	"POST /api/v1/enrolement/{projet}/tirage":                     socle.AdminSeul,
+	"GET /api/v1/plateforme/equipe":                               {socle.Admin, socle.Superviseur, socle.Direction, socle.CCP},
+	"PUT /api/v1/plateforme/objectif":                             socle.AdminSeul,
 	"POST /api/v1/webhooks/enrolement/{projet}":                   {socle.Public},
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
@@ -104,6 +106,7 @@ func Monter(api huma.API, d *socle.Deps) {
 
 	monterDump(api, s)
 	monterEnrolement(api, s)
+	monterPlateforme(api, s)
 	monterExploitation(api, s)
 }
 
