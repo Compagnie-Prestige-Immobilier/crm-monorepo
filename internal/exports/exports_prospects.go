@@ -53,17 +53,17 @@ func exportBorneDeJournee(brut string, fin bool) (time.Time, error) {
 }
 
 func exportPorteeDeLecture(p *exportPredicat, u *socle.Utilisateur) {
-	if borne := socle.PorteePlateforme(u.Role); borne != nil && *borne {
+	if borne := socle.PorteePlateforme(u); borne != nil && *borne {
 		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NOT NULL`)
 	} else if borne != nil {
 		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NULL`)
 	}
-	if u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction || u.Role == socle.CCP {
+	if u.Peut(socle.PermissionPortefeuilleVoirTout) || u.Peut(socle.PermissionPlateformeSaisir) {
 		return
 	}
 	enMain := `(p."createdById" = ` + p.valeur(u.ID) +
 		` OR EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id" AND li."assigneeId" = ` + p.valeur(u.ID) + ")"
-	if u.Role == socle.ChargeClientele {
+	if u.Peut(socle.PermissionFichesVoirConverties) {
 		enMain += ` OR p."statut" = 'CONVERTI'`
 	}
 	p.clauses = append(p.clauses, enMain+")")
@@ -172,12 +172,12 @@ func exportConditionsProspects(u *socle.Utilisateur, in *ExportProspectsInput, s
 	exportPorteeDeLecture(p, u)
 	if in.CommercialId != "" {
 		cible := in.CommercialId
-		if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction && cible != u.ID {
+		if !u.Peut(socle.PermissionExportsVoirTout) && cible != u.ID {
 			cible = "__aucun__"
 		}
 		p.ajouter(`p."createdById"`, "=", cible)
 	}
-	if in.IncludeDeleted != exportFiltreVrai || u.Role != socle.Admin {
+	if in.IncludeDeleted != exportFiltreVrai || !u.Peut(socle.PermissionDonneesVoirSupprimees) {
 		p.clauses = append(p.clauses, `p."deletedAt" IS NULL`)
 	}
 	p.clauses = append(p.clauses, `r."deletedAt" IS NULL`)

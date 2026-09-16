@@ -123,12 +123,14 @@ func qualificationInstant(t time.Time) *time.Time {
 	return &utc
 }
 
-func qualificationVoitTout(role socle.Role) bool {
-	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
+func qualificationVoitTout(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
 // Seul le CCP ouvre et consigne une fiche plateforme ; l'encadrement la lit.
-func qualificationTientLaPlateforme(role socle.Role) bool { return role == socle.CCP }
+func qualificationTientLaPlateforme(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPlateformeSaisir)
+}
 
 var qualificationTransitionsRelation = map[string][]string{
 	"INCONNU":                {"CONTACTE", qualificationAmbassadeur, qualificationRefus},
@@ -433,7 +435,7 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 		return qualificationRepResultat("duplicate", b.ID), nil
 	}
 	rep, err := s.Q.RepresentantAQualifier(ctx, db.RepresentantAQualifierParams{
-		ID: b.RepresentantID, Tous: qualificationVoitTout(u.Role), Agent: u.ID,
+		ID: b.RepresentantID, Tous: qualificationVoitTout(&u), Agent: u.ID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, s.qualificationRepAbsent(ctx, b.RepresentantID)
@@ -1000,8 +1002,8 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 // partout sauf sur une fiche attribuée à quelqu'un d'autre.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
-		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP,
-		Plateforme: qualificationTientLaPlateforme(u.Role),
+		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u) || u.Peut(socle.PermissionPlateformeSaisir),
+		Plateforme: qualificationTientLaPlateforme(u),
 	})
 	if err != nil {
 		return err

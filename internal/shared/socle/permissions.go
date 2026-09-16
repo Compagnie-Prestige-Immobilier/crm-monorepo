@@ -38,6 +38,7 @@ const (
 	PermissionProspectsLire            Permission = "prospects.lire"
 	PermissionProspectsFusionner       Permission = "prospects.fusionner"
 	PermissionProspectsReaffecter      Permission = "prospects.reaffecter"
+	PermissionProspectsReaffecterTout  Permission = "prospects.reaffecter_tout"
 	PermissionProspectsRevoir          Permission = "prospects.revoir"
 	PermissionProspectsConvertir       Permission = "prospects.convertir"
 	PermissionComptesAdministrer       Permission = "comptes.administrer"
@@ -93,6 +94,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, CCP, Admin, Superviseur, Direction}},
 	PermissionProspectsFusionner:       {domaineFiches, "Fusionner des fiches", []Role{Commercial, ChargeClientele, Admin}},
 	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
+	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter toutes les fiches", []Role{Admin, Superviseur}},
 	PermissionProspectsRevoir:          {domaineFiches, "Revoir une demande", []Role{ChargeClientele, Superviseur, Admin}},
 	PermissionProspectsConvertir:       {domaineFiches, "Convertir les parcours grand public", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
 	PermissionComptesAdministrer:       {"Comptes", "Administrer les comptes", AdminSeul},
@@ -148,6 +150,7 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionBanqueVoirTousPortefeuilles: true,
 	PermissionCampagnesAttributionsToutes: true,
 	PermissionExportsVoirTout:             true,
+	PermissionProspectsReaffecterTout:     true,
 }
 
 var attributions atomic.Pointer[map[Role]map[Permission]bool]

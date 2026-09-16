@@ -47,22 +47,22 @@ var (
 )
 
 // Qui voit le travail de tous, `readsEveryone` de common/scope.ts.
-func litToutLeTravail(role socle.Role) bool {
-	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
+func litToutLeTravail(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
 // Même entrée de cache pour tous ceux qui voient tout ; un téléconseiller n'a
 // que la sienne.
 func porteeDeCache(ctx context.Context) string {
 	u := socle.UtilisateurCourant(ctx)
-	if litToutLeTravail(u.Role) {
+	if litToutLeTravail(&u) {
 		return string(u.Role)
 	}
 	return u.ID
 }
 
 func teleconseillerLisible(u *socle.Utilisateur, demande string) string {
-	if litToutLeTravail(u.Role) || demande == u.ID {
+	if litToutLeTravail(u) || demande == u.ID {
 		return demande
 	}
 	return "__aucun__"
@@ -150,13 +150,13 @@ func borneDuJour(iso string, tz *time.Location, fin bool) (time.Time, bool) {
 
 func porteeDeLecture(u *socle.Utilisateur, f *FiltreDesAnalyses, p *parametresSQL) []string {
 	conditions := []string{}
-	if !litToutLeTravail(u.Role) {
+	if !litToutLeTravail(u) {
 		conditions = append(conditions, `p."createdById" = `+p.marque(u.ID))
 	}
 	if f.CommercialID != "" {
 		conditions = append(conditions, `p."createdById" = `+p.marque(teleconseillerLisible(u, f.CommercialID)))
 	}
-	if !f.IncludeDeleted || u.Role != socle.Admin {
+	if !f.IncludeDeleted || !u.Peut(socle.PermissionDonneesVoirSupprimees) {
 		conditions = append(conditions, `p."deletedAt" IS NULL`)
 	}
 	// Sans ce filtre un total « par département » dépasse le total global.

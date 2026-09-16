@@ -223,11 +223,11 @@ func representantIntrouvable() error {
 
 // Qui lit le travail de tous. `mesFiches` borne aussi l'encadrement : sur
 // l'écran d'appel, un superviseur ne compose que les numéros qui lui reviennent.
-func representantLitTout(role socle.Role, mesFiches bool) bool {
+func representantLitTout(u *socle.Utilisateur, mesFiches bool) bool {
 	if mesFiches {
 		return false
 	}
-	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
+	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
 type RepresentantListInput struct {
@@ -384,7 +384,7 @@ func representantFiltres(u *socle.Utilisateur, in *RepresentantListInput) (db.Li
 		return db.ListRepresentantsParams{}, err
 	}
 	p := db.ListRepresentantsParams{
-		ReadsEveryone:         representantLitTout(u.Role, in.MesFiches),
+		ReadsEveryone:         representantLitTout(u, in.MesFiches),
 		OwnerID:               u.ID,
 		CommercialID:          representantNarg(in.CommercialID),
 		DepartementID:         representantNarg(in.DepartementID),
@@ -477,7 +477,7 @@ func representantFicheLue(ctx context.Context, q *db.Queries, id string, litTout
 
 func (s *service) lireRepresentant(ctx context.Context, in *RepresentantIDInput) (*RepresentantOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	dto, err := representantFicheLue(ctx, s.Q, in.ID, representantLitTout(u.Role, false), u.ID)
+	dto, err := representantFicheLue(ctx, s.Q, in.ID, representantLitTout(&u, false), u.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -525,7 +525,7 @@ func (s *service) chercherRepresentant(ctx context.Context, in *RepresentantLook
 	// La recherche reste globale, sinon le doublon d'un collègue échappe au
 	// contrôle. La fiche elle-même ne part qu'à qui a le droit de la lire : le
 	// nom du propriétaire suffit à dire « ce numéro est déjà pris ».
-	if u := socle.UtilisateurCourant(ctx); representantLitTout(u.Role, false) || dto.CreatedByID == u.ID {
+	if u := socle.UtilisateurCourant(ctx); representantLitTout(&u, false) || dto.CreatedByID == u.ID {
 		out.Body.Representant = &dto
 	}
 	return out, nil
@@ -565,7 +565,7 @@ func (s *service) verifierIdentifiantRepresentantLibre(ctx context.Context, u *s
 	if err != nil {
 		return err
 	}
-	if u.Role != socle.Admin && proprietaire != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && proprietaire != u.ID {
 		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre téléconseiller.")
 	}
 	p := socle.Problem(http.StatusConflict, "REPRESENTANT_ALREADY_EXISTS", "Un représentant porte déjà cet identifiant.")
@@ -582,7 +582,7 @@ func (s *service) verifierTelephoneRepresentantLibre(ctx context.Context, u *soc
 		return err
 	}
 	existante := map[string]any{RepresentantChampTel: clash.PhoneE164, "ownedByCommercialName": clash.CreatedByName}
-	if u.Role == socle.Admin || clash.CreatedById == u.ID {
+	if u.Peut(socle.PermissionFichesIgnorerPropriete) || clash.CreatedById == u.ID {
 		existante = map[string]any{
 			"id": clash.ID, RepresentantChampNom: clash.FullName, RepresentantChampTel: clash.PhoneE164,
 			"ownedByCommercialId": clash.CreatedById, "ownedByCommercialName": clash.CreatedByName,
@@ -839,7 +839,7 @@ func (s *service) modifierRepresentant(ctx context.Context, in *RepresentantUpda
 	if err != nil {
 		return nil, err
 	}
-	if !socle.Autorise(socle.Encadrement, u.Role) && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	modifie := existant
@@ -957,7 +957,7 @@ type RepresentantRelationHistoryOutput struct {
 // le nom et le téléphone de la fiche. La portée du lecteur s'applique ici.
 func (s *service) exigerRepresentant(ctx context.Context, id string) error {
 	u := socle.UtilisateurCourant(ctx)
-	_, err := representantFicheLue(ctx, s.Q, id, representantLitTout(u.Role, false), u.ID)
+	_, err := representantFicheLue(ctx, s.Q, id, representantLitTout(&u, false), u.ID)
 	return err
 }
 
@@ -1332,7 +1332,7 @@ func (s *service) supprimerRepresentant(ctx context.Context, in *RepresentantDel
 	if err != nil {
 		return nil, err
 	}
-	if !socle.Autorise(socle.Encadrement, u.Role) && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	prospects, err := s.Q.CompterProspectsVivants(ctx, &in.ID)
