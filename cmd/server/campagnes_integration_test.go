@@ -579,63 +579,74 @@ func TestCampagneMesAttributions(t *testing.T) {
 	}
 }
 
-func (b *bancCampagne) prospectCHUES(feuille string, issue *string, statut string) string {
+func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut string) string {
 	b.t.Helper()
 	id := uuid.NewString()
 	if _, err := b.pool.Exec(b.ctx,
 		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","projet","updatedAt",
 		                          "importFeuille","lastCallOutcome","statut")
-		 VALUES ($1,'Sarr','Mame',$2,$3,now(),'CHUES',now(),$4,$5::"CallOutcome",$6::"ProspectStatut")`,
-		id, "+2217"+id[:8], b.userID, feuille, issue, statut); err != nil {
+		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,$6::"CallOutcome",$7::"ProspectStatut")`,
+		id, "+2217"+id[:8], b.userID, projet, feuille, issue, statut); err != nil {
 		b.t.Fatal(err)
 	}
 	if _, err := b.pool.Exec(b.ctx,
-		`INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,'CHUES',now())`,
-		uuid.NewString(), id); err != nil {
+		`INSERT INTO "prospect_journeys" ("id","prospectId","projet","updatedAt") VALUES ($1,$2,$3::"Projet",now())`,
+		uuid.NewString(), id, projet); err != nil {
 		b.t.Fatal(err)
 	}
 	b.t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, id) })
 	return id
 }
 
-// Trois fiches : jamais appelée, injoignable, injoignable puis close par un faux
-// numéro. Seule la deuxième entre dans une campagne « injoignables ». Un
-// superviseur coché compte pour autant de fiches qu'un téléconseiller.
-func TestCampagneProspectsInjoignables(t *testing.T) {
+// Quatre fiches : CHUES jamais appelée, CHUES injoignable, CHUES injoignable
+// puis close par un faux numéro, Grand Public jamais appelée. Sans projet, la
+// campagne prend CHUES et Grand Public ensemble ; « injoignables » ne garde que
+// la deuxième. Un superviseur coché compte pour autant qu'un téléconseiller.
+func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	feuille := "Feuille " + uuid.NewString()
 	injoignable := "UNREACHABLE"
-	b.prospectCHUES(feuille, nil, "NOUVEAU")
-	aRelancer := b.prospectCHUES(feuille, &injoignable, "NOUVEAU")
-	b.prospectCHUES(feuille, &injoignable, "PERDU")
+	b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	aRelancer := b.prospect(feuille, "CHUES", &injoignable, "NOUVEAU")
+	b.prospect(feuille, "CHUES", &injoignable, "PERDU")
+	b.prospect(feuille, "GRAND_PUBLIC", nil, "NOUVEAU")
 
-	corps := func(injoignables bool) map[string]any {
+	corps := func(projet string, injoignables bool) map[string]any {
+		prospects := map[string]any{"importFeuille": feuille, "injoignables": injoignables}
+		if projet != "" {
+			prospects["projet"] = projet
+		}
 		return map[string]any{
-			"name":      "Campagne injoignables",
-			"cible":     "PROSPECTS",
-			"prospects": map[string]any{"projet": "CHUES", "importFeuille": feuille, "injoignables": injoignables},
+			"name": "Campagne prospects", "cible": "PROSPECTS", "prospects": prospects,
 			"distribution": map[string]any{
 				"teleconseillerIds": []string{b.agentA, b.userID}, "fichesParJour": 3, "jours": 1,
 			},
 		}
 	}
-	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps(false))
-	b.attend(statut, http.StatusOK, "aperçu sans filtre", body)
-	if body["eligible"] != float64(2) || body["places"] != float64(6) {
-		t.Fatalf("2 fiches et 6 places attendues : %v", body)
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", false))
+	b.attend(statut, http.StatusOK, "aperçu tous projets", body)
+	if body["eligible"] != float64(3) || body["places"] != float64(6) || body["scopeLabel"] != "Tous projets" {
+		t.Fatalf("3 fiches des deux projets et 6 places attendues : %v", body)
 	}
-	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps(true))
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("CHUES", false))
+	b.attend(statut, http.StatusOK, "aperçu CHUES", body)
+	if body["eligible"] != float64(2) {
+		t.Fatalf("2 fiches CHUES attendues : %v", body)
+	}
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/apercu", corps("", true))
 	b.attend(statut, http.StatusOK, "aperçu des injoignables", body)
-	if body["eligible"] != float64(1) || body["scopeLabel"] != "CHUES, injoignables" {
+	if body["eligible"] != float64(1) || body["scopeLabel"] != "Tous projets, injoignables" {
 		t.Fatalf("une seule fiche à relancer attendue : %v", body)
 	}
 
-	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps(true))
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps("", false))
 	b.attend(statut, http.StatusCreated, "création de la campagne", body)
 	lotID, _ := body["id"].(string)
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
-	fiches := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, aRelancer)
-	if body["itemCount"] != float64(1) || fiches != 1 {
-		t.Fatalf("la fiche à relancer seule dans la campagne : %v, %d", body["itemCount"], fiches)
+	if body["itemCount"] != float64(3) || body["projet"] != nil {
+		t.Fatalf("campagne sans projet à 3 fiches attendue : %v", body)
+	}
+	if fiches := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`, lotID, aRelancer); fiches != 1 {
+		t.Fatalf("la fiche à relancer doit être dans la campagne : %d", fiches)
 	}
 }
