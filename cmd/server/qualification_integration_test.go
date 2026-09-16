@@ -377,7 +377,9 @@ func TestQualificationReaffectationRemetLaFicheDansLaFile(t *testing.T) {
 	                      VALUES ($1,'Campagne reaffectation','PROSPECTS','GRAND_PUBLIC','{}'::jsonb,1,$2,now() - interval '2 hours')`, lot, b.userID)
 	qualificationExec(b, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day")
 	                      VALUES ($1,$2,1,$3,1)`, lot, fiche, b.userID)
-	appel := qualificationCorpsTentative(fiche, nil)
+	// Pas d'injoignable ici : depuis le 16 septembre 2026 la file exclut toute
+	// fiche dont le dernier appel n'a pas abouti, ce que ce parcours ne teste pas.
+	appel := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "TERRAIN"})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_reaffectations" WHERE "lotId" = $1`, lot)
