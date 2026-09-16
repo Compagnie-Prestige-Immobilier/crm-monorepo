@@ -458,6 +458,8 @@ export function LotExportDetailView({
   peutRegler: boolean;
 }) {
   const telechargement = useFileDownload();
+  const [onglet, setOnglet] = useState('fiches');
+  const [teleconseillerFiltre, setTeleconseillerFiltre] = useState<string | null>(null);
   const lot = useQuery({
     queryKey: queryKeys.lotsExportDetail(id),
     queryFn: () => fetchLotExport(id),
@@ -526,7 +528,7 @@ export function LotExportDetailView({
         <LotDownloads id={id} name={name} telechargement={telechargement} />
       </div>
 
-      <Tabs defaultValue="fiches">
+      <Tabs value={onglet} onValueChange={setOnglet}>
         <TabsList aria-label="Sections de la campagne" className="max-w-full overflow-x-auto">
           <TabsTrigger value="fiches">Fiches</TabsTrigger>
           <TabsTrigger value="programmes">Programmes</TabsTrigger>
@@ -534,7 +536,12 @@ export function LotExportDetailView({
           <TabsTrigger value="appels">Appels</TabsTrigger>
         </TabsList>
         <TabsContent value="fiches" className="mt-4">
-          <LotExportFiches lot={lot.data} peutReaffecter={peutRegler} />
+          <LotExportFiches
+            key={teleconseillerFiltre ?? 'tous'}
+            lot={lot.data}
+            peutReaffecter={peutRegler}
+            teleconseillerInitial={teleconseillerFiltre ?? 'TOUS'}
+          />
         </TabsContent>
         <TabsContent value="programmes" className="mt-4 flex flex-col gap-6">
           <ProgrammesCard
@@ -551,7 +558,15 @@ export function LotExportDetailView({
           />
         </TabsContent>
         <TabsContent value="performance" className="mt-4">
-          <CartePerformance id={id} lot={lot.data} peutRegler={peutRegler} />
+          <CartePerformance
+            id={id}
+            lot={lot.data}
+            peutRegler={peutRegler}
+            onVoirFiches={(teleconseillerId) => {
+              setTeleconseillerFiltre(teleconseillerId);
+              setOnglet('fiches');
+            }}
+          />
         </TabsContent>
         <TabsContent value="appels" className="mt-4">
           <AppelsCard
@@ -799,10 +814,12 @@ function CartePerformance({
   id,
   lot,
   peutRegler,
+  onVoirFiches,
 }: {
   id: string;
   lot: LotExportDetail;
   peutRegler: boolean;
+  onVoirFiches: (teleconseillerId: string) => void;
 }) {
   return (
     <Card>
@@ -865,7 +882,17 @@ function CartePerformance({
                   {formatRate(ligne.completionRate)}
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
-                  {formatNumber(ligne.assignedCalls)}
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto p-0 font-[400] tabular-nums"
+                    aria-label={`Voir les fiches attribuées à ${ligne.teleconseillerName}`}
+                    onClick={() => {
+                      onVoirFiches(ligne.teleconseillerId);
+                    }}
+                  >
+                    {formatNumber(ligne.assignedCalls)}
+                  </Button>
                 </TableCell>
                 <TableCell className="text-right tabular-nums">
                   {ligne.outsideAssignmentCalls === 0 ? (

@@ -404,7 +404,7 @@ function EnTeteAnnuaire({
   if (cherche !== '') texteAide = 'Choisissez qui vous venez d’appeler.';
   else if (plateforme)
     texteAide =
-      'Tous les inscrits des plateformes, les plus récents d’abord. Une fiche « en cours » est déjà au téléphone chez un collègue.';
+      'Les contacts transmis par les plateformes, y compris les parcours interrompus. Les plus récents d’abord.';
   else if (projet === null)
     texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
   else if (projet === 'GRAND_PUBLIC')
