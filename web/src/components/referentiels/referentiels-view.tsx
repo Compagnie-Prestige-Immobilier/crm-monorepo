@@ -28,6 +28,7 @@ import { Badge } from '@/components/ui/badge';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -37,6 +38,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useTriLocal } from '@/components/ui/tri-local';
 import { fetchBanques, fetchDepartements, fetchSyndicats } from '@/lib/data/reference';
 import {
   fetchReferentielUsage,
@@ -286,6 +288,12 @@ function UsageCell({ count }: { count: number | null }) {
   );
 }
 
+const COLONNES_BANQUES = {
+  shortName: (banque: Banque) => banque.shortName,
+  name: (banque: Banque) => banque.name,
+  sortOrder: (banque: Banque) => banque.sortOrder,
+};
+
 function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
   const usage = useUsage();
@@ -349,6 +357,7 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
     (a, b) => a.sortOrder - b.sortOrder || a.shortName.localeCompare(b.shortName, 'fr'),
   );
   const rows = allRows.filter((banque) => matches(search, banque.shortName, banque.name));
+  const tri = useTriLocal(rows, COLONNES_BANQUES);
 
   return (
     <TabShell
@@ -381,24 +390,40 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Abréviation</TableHead>
-                    <TableHead>Nom complet</TableHead>
+                    <SortableTableHead
+                      column={{ id: 'shortName', label: 'Abréviation' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
+                    <SortableTableHead
+                      column={{ id: 'name', label: 'Nom complet' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
                     <TableHead className="text-right">Prospects</TableHead>
-                    <TableHead className="text-right">Ordre</TableHead>
+                    <SortableTableHead
+                      column={{ id: 'sortOrder', label: 'Ordre' }}
+                      className="text-right"
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
                     <TableHead>
                       <span className="sr-only">Actions</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
+                  {tri.lignes.length === 0 ? (
                     <EmptyRow colSpan={6}>
                       {search.trim() === ''
                         ? 'Aucune banque enregistrée.'
                         : 'Aucune banque ne correspond à cette recherche.'}
                     </EmptyRow>
                   ) : null}
-                  {rows.map((banque) => {
+                  {tri.lignes.map((banque) => {
                     const index = allRows.indexOf(banque);
                     return (
                       <TableRow
@@ -516,6 +541,13 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
   );
 }
 
+const COLONNES_SYNDICATS = {
+  sigle: (syndicat: Syndicat) => syndicat.sigle,
+  name: (syndicat: Syndicat) => syndicat.name,
+  secteur: (syndicat: Syndicat) => syndicat.secteur,
+  sortOrder: (syndicat: Syndicat) => syndicat.sortOrder,
+};
+
 function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: string) => void }) {
   const queryClient = useQueryClient();
   const usage = useUsage();
@@ -572,6 +604,7 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
   const rows = allRows.filter((syndicat) =>
     matches(search, syndicat.sigle, syndicat.name, syndicat.secteur),
   );
+  const tri = useTriLocal(rows, COLONNES_SYNDICATS);
 
   return (
     <TabShell
@@ -604,25 +637,46 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Sigle</TableHead>
-                    <TableHead>Nom complet</TableHead>
-                    <TableHead>Secteur</TableHead>
+                    <SortableTableHead
+                      column={{ id: 'sigle', label: 'Sigle' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
+                    <SortableTableHead
+                      column={{ id: 'name', label: 'Nom complet' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
+                    <SortableTableHead
+                      column={{ id: 'secteur', label: 'Secteur' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
                     <TableHead className="text-right">Prospects</TableHead>
-                    <TableHead className="text-right">Ordre</TableHead>
+                    <SortableTableHead
+                      column={{ id: 'sortOrder', label: 'Ordre' }}
+                      className="text-right"
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
                     <TableHead>
                       <span className="sr-only">Actions</span>
                     </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
+                  {tri.lignes.length === 0 ? (
                     <EmptyRow colSpan={7}>
                       {search.trim() === ''
                         ? 'Aucun syndicat enregistré.'
                         : 'Aucun syndicat ne correspond à cette recherche.'}
                     </EmptyRow>
                   ) : null}
-                  {rows.map((syndicat) => {
+                  {tri.lignes.map((syndicat) => {
                     const index = allRows.indexOf(syndicat);
                     return (
                       <TableRow
@@ -744,6 +798,12 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
   );
 }
 
+const COLONNES_DEPARTEMENTS = {
+  name: (departement: Departement) => departement.name,
+  code: (departement: Departement) => departement.code,
+  regionName: (departement: Departement) => departement.regionName,
+};
+
 function DepartementsTab({
   search,
   onSearch,
@@ -790,6 +850,7 @@ function DepartementsTab({
     .filter((departement) =>
       matches(search, departement.name, departement.code, departement.regionName),
     );
+  const tri = useTriLocal(rows, COLONNES_DEPARTEMENTS);
 
   return (
     <TabShell
@@ -822,9 +883,24 @@ function DepartementsTab({
               <Table>
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    <TableHead>Département</TableHead>
-                    <TableHead>Code</TableHead>
-                    <TableHead>Région</TableHead>
+                    <SortableTableHead
+                      column={{ id: 'name', label: 'Département' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
+                    <SortableTableHead
+                      column={{ id: 'code', label: 'Code' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
+                    <SortableTableHead
+                      column={{ id: 'regionName', label: 'Région' }}
+                      sortBy={tri.sortBy}
+                      sortDir={tri.sortDir}
+                      onToggle={tri.toggle}
+                    />
                     <TableHead className="text-right">Prospects</TableHead>
                     <TableHead>
                       <span className="sr-only">Actions</span>
@@ -832,14 +908,14 @@ function DepartementsTab({
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {rows.length === 0 ? (
+                  {tri.lignes.length === 0 ? (
                     <EmptyRow colSpan={6}>
                       {search.trim() === ''
                         ? 'Aucun département enregistré.'
                         : 'Aucun département ne correspond à cette recherche.'}
                     </EmptyRow>
                   ) : null}
-                  {rows.map((departement) => (
+                  {tri.lignes.map((departement) => (
                     <TableRow
                       key={departement.id}
                       className={cn(!departement.isActive && inactiveRowClass)}

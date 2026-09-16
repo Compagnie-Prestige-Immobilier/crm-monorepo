@@ -32,14 +32,9 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   applyVisitesImportJob,
   buildVisitesExportUrl,
@@ -652,8 +647,23 @@ function AnalysePanel({ job, onReset }: { job: VisitesImportJob; onReset: () => 
   );
 }
 
+type ErreurImportVisites = NonNullable<VisitesImportJob['report']>['errors'][number];
+
+const COLONNES_ERREURS_VISITES = {
+  ligne: (erreur: ErreurImportVisites) => erreur.rowNumber,
+  colonne: (erreur: ErreurImportVisites) => erreur.column,
+  motif: (erreur: ErreurImportVisites) => erreur.message,
+};
+
+const ENTETES_ERREURS_VISITES = [
+  { id: 'ligne', label: 'Ligne', className: 'w-24' },
+  { id: 'colonne', label: 'Colonne', className: 'w-56' },
+  { id: 'motif', label: 'Motif' },
+] as const;
+
 function RapportErreurs({ report }: { report: NonNullable<VisitesImportJob['report']> }) {
   const pluriel = report.errorRows > 1 ? 's' : '';
+  const tri = useTriLocal(report.errors, COLONNES_ERREURS_VISITES);
 
   return (
     <div className="flex flex-col gap-2">
@@ -668,17 +678,37 @@ function RapportErreurs({ report }: { report: NonNullable<VisitesImportJob['repo
           : '.'}{' '}
         Le numéro est celui de la ligne dans le classeur, en-tête compris.
       </p>
+      <RechercheTableau
+        recherche={tri.recherche}
+        setRecherche={tri.setRecherche}
+        total={tri.total}
+        affichees={tri.lignes.length}
+      />
       <div className="rounded-lg border border-border">
         <Table>
           <TableHeader>
             <TableRow className="hover:bg-transparent">
-              <TableHead className="w-24">Ligne</TableHead>
-              <TableHead className="w-56">Colonne</TableHead>
-              <TableHead>Motif</TableHead>
+              {ENTETES_ERREURS_VISITES.map((colonne) => (
+                <SortableTableHead
+                  key={colonne.id}
+                  column={colonne}
+                  className={'className' in colonne ? colonne.className : undefined}
+                  sortBy={tri.sortBy}
+                  sortDir={tri.sortDir}
+                  onToggle={tri.toggle}
+                />
+              ))}
             </TableRow>
           </TableHeader>
           <TableBody>
-            {report.errors.map((error, index) => (
+            {report.errors.length > 0 && tri.lignes.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="text-muted-foreground">
+                  Aucune ligne refusée ne correspond à la recherche.
+                </TableCell>
+              </TableRow>
+            ) : null}
+            {tri.lignes.map((error, index) => (
               <TableRow key={`${String(error.rowNumber)}-${error.code}-${String(index)}`}>
                 <TableCell className="tabular-nums">{error.rowNumber}</TableCell>
                 <TableCell className="text-muted-foreground">{error.column ?? '–'}</TableCell>

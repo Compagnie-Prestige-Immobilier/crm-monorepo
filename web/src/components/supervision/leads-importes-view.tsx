@@ -4,14 +4,15 @@ import { Link } from '@tanstack/react-router';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
   TableCell,
-  TableHead,
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
 import {
   leadsImportesQuery,
   type ImportDeLeads,
@@ -44,23 +45,60 @@ export function LeadsImportesView() {
   );
 }
 
+const COLONNES_IMPORTS = {
+  fichier: (lot: ImportDeLeads) => lot.fichier,
+  importeLe: (lot: ImportDeLeads) => lot.importeLe,
+  importes: (lot: ImportDeLeads) => lot.importes,
+  appeles: (lot: ImportDeLeads) => lot.appeles,
+  joints: (lot: ImportDeLeads) => lot.joints,
+  interesses: (lot: ImportDeLeads) => lot.interesses,
+  part: (lot: ImportDeLeads) => (lot.importes === 0 ? null : lot.interesses / lot.importes),
+};
+
+const ENTETES_IMPORTS = [
+  { id: 'fichier', label: 'Classeur' },
+  { id: 'importeLe', label: 'Importé le' },
+  { id: 'importes', label: 'Fiches', className: 'text-right' },
+  { id: 'appeles', label: 'Appelées', className: 'text-right' },
+  { id: 'joints', label: 'Jointes', className: 'text-right' },
+  { id: 'interesses', label: 'Très intéressées', className: 'text-right' },
+  { id: 'part', label: 'Part des fiches', className: 'text-right' },
+] as const;
+
 function Imports({ imports }: { imports: ImportDeLeads[] }) {
+  const tri = useTriLocal(imports, COLONNES_IMPORTS);
   return (
     <section className="flex flex-col gap-2">
       <h2 className="eyebrow rail text-muted-foreground">Qualité des imports</h2>
+      <RechercheTableau
+        recherche={tri.recherche}
+        setRecherche={tri.setRecherche}
+        total={tri.total}
+        affichees={tri.lignes.length}
+      />
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Classeur</TableHead>
-            <TableHead>Importé le</TableHead>
-            <TableHead className="text-right">Fiches</TableHead>
-            <TableHead className="text-right">Appelées</TableHead>
-            <TableHead className="text-right">Jointes</TableHead>
-            <TableHead className="text-right">Très intéressées</TableHead>
-            <TableHead className="text-right">Part des fiches</TableHead>
+            {ENTETES_IMPORTS.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                className={'className' in colonne ? colonne.className : undefined}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
+          {imports.length > 0 && tri.lignes.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={7} className="text-muted-foreground">
+                Aucun classeur ne correspond à la recherche.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {imports.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-muted-foreground">
@@ -69,7 +107,7 @@ function Imports({ imports }: { imports: ImportDeLeads[] }) {
               </TableCell>
             </TableRow>
           ) : null}
-          {imports.map((lot) => (
+          {tri.lignes.map((lot) => (
             <TableRow key={lot.id}>
               <TableCell className="font-[600]">{lot.fichier}</TableCell>
               <TableCell>{formatDate(lot.importeLe)}</TableCell>
@@ -92,7 +130,27 @@ function Imports({ imports }: { imports: ImportDeLeads[] }) {
   );
 }
 
+const COLONNES_FICHES = {
+  nom: (fiche: LeadTresInteresse) => `${fiche.prenom} ${fiche.nom}`,
+  telephone: (fiche: LeadTresInteresse) => fiche.phoneE164,
+  classeur: (fiche: LeadTresInteresse) => `${fiche.fichier} ${fiche.feuille ?? ''}`,
+  appeleLe: (fiche: LeadTresInteresse) => fiche.appeleLe,
+  appelePar: (fiche: LeadTresInteresse) => fiche.appelePar,
+  motif: (fiche: LeadTresInteresse) => fiche.motif,
+  commentaire: (fiche: LeadTresInteresse) => fiche.commentaire,
+};
+
+const ENTETES_FICHES = [
+  { id: 'nom', label: 'Nom' },
+  { id: 'telephone', label: 'Téléphone' },
+  { id: 'classeur', label: 'Classeur' },
+  { id: 'appeleLe', label: 'Dernier appel' },
+  { id: 'motif', label: 'Motif' },
+  { id: 'commentaire', label: 'Commentaire' },
+] as const;
+
 function Fiches({ fiches, total }: { fiches: LeadTresInteresse[]; total: number }) {
+  const tri = useTriLocal(fiches, COLONNES_FICHES);
   return (
     <section className="flex flex-col gap-2">
       <h2 className="eyebrow rail text-muted-foreground">Fiches très intéressées</h2>
@@ -102,18 +160,34 @@ function Fiches({ fiches, total }: { fiches: LeadTresInteresse[]; total: number 
           récemment affichées.
         </p>
       ) : null}
+      <RechercheTableau
+        recherche={tri.recherche}
+        setRecherche={tri.setRecherche}
+        total={tri.total}
+        affichees={tri.lignes.length}
+      />
       <Table>
         <TableHeader>
           <TableRow>
-            <TableHead>Nom</TableHead>
-            <TableHead>Téléphone</TableHead>
-            <TableHead>Classeur</TableHead>
-            <TableHead>Dernier appel</TableHead>
-            <TableHead>Motif</TableHead>
-            <TableHead>Commentaire</TableHead>
+            {ENTETES_FICHES.map((colonne) => (
+              <SortableTableHead
+                key={colonne.id}
+                column={colonne}
+                sortBy={tri.sortBy}
+                sortDir={tri.sortDir}
+                onToggle={tri.toggle}
+              />
+            ))}
           </TableRow>
         </TableHeader>
         <TableBody>
+          {fiches.length > 0 && tri.lignes.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={6} className="text-muted-foreground">
+                Aucune fiche ne correspond à la recherche.
+              </TableCell>
+            </TableRow>
+          ) : null}
           {fiches.length === 0 ? (
             <TableRow>
               <TableCell colSpan={6} className="text-muted-foreground">
@@ -122,7 +196,7 @@ function Fiches({ fiches, total }: { fiches: LeadTresInteresse[]; total: number 
               </TableCell>
             </TableRow>
           ) : null}
-          {fiches.map((fiche) => (
+          {tri.lignes.map((fiche) => (
             <TableRow key={fiche.id}>
               <TableCell>
                 <Link
