@@ -398,6 +398,44 @@ func TestQualificationReaffectationRemetLaFicheDansLaFile(t *testing.T) {
 	}
 }
 
+// Un rappel promis remet la fiche dans la file jusqu'a ce que l'agent la
+// rappelle. Le 16 septembre 2026, huit fiches y campaient : l'agent avait
+// rappele, mais son motif ne cloturait pas la fiche (NRP, terrain), le rappel
+// restait ouvert et la fiche reprenait sa place a chaque chargement.
+func TestQualificationRappelRepondQuitteLaFile(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	rendezVous := qualificationCorpsTentative(fiche, map[string]any{
+		"outcome": "OTHER", "reasonCode": "RV_CPI",
+		"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano),
+	})
+	rappelSansReponse := qualificationCorpsTentative(fiche, map[string]any{
+		"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE",
+	})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = ANY($1)`,
+			[]string{rendezVous["id"].(string), rappelSansReponse["id"].(string)})
+	})
+
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rendezVous)
+	b.attend(statut, http.StatusOK, "rendez-vous promis", body)
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); !slices.Contains(ids, fiche) {
+		t.Fatalf("un rendez-vous promis garde la fiche dans la file : %v", ids)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rappelSansReponse)
+	b.attend(statut, http.StatusOK, "fiche rappelee sans reponse", body)
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); slices.Contains(ids, fiche) {
+		t.Fatalf("rappelee, la fiche quitte la file meme sans reponse : %v", ids)
+	}
+	// Le rendez-vous survit a l'appel manque : il vaut pour son heure.
+	if rappels := qualificationCompte(b,
+		`SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, fiche); rappels != 1 {
+		t.Fatalf("%d rappel en attente, un attendu", rappels)
+	}
+}
+
 // Sans verrou depuis le 10 septembre 2026 : plusieurs fiches restent en main,
 // et chaque console reprend la plus récente des siennes.
 func TestQualificationPlusieursFichesEnMainUneParConsole(t *testing.T) {
