@@ -439,7 +439,7 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 	if err != nil {
 		return row, err
 	}
-	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesModifierToutes) && row.CreatedById != u.ID {
 		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	return row, nil

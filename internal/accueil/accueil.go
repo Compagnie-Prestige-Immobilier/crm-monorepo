@@ -64,7 +64,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/visites/{id}":                             socle.PermissionAccueilRegistre,
 	"PATCH /api/v1/visites/{id}":                           socle.PermissionAccueilRegistre,
 	"DELETE /api/v1/visites/{id}":                          socle.PermissionAccueilRegistre,
-	"DELETE /api/v1/visites/{id}/definitif":                socle.PermissionVisitesVoirArchivees,
+	"DELETE /api/v1/visites/{id}/definitif":                socle.PermissionVisitesDetruire,
 	"POST /api/v1/visites/import":                          socle.PermissionAccueilListes,
 	"GET /api/v1/visites/import/{id}":                      socle.PermissionAccueilListes,
 	"GET /api/v1/visites/import/{id}/revue":                socle.PermissionAccueilListes,
