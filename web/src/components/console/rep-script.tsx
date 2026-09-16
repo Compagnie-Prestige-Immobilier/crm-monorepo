@@ -1347,7 +1347,6 @@ function Qualification({
       pending={send.isPending}
       helpOpen={helpOpen}
       edit={edit}
-      onAbandon={onAbandon}
       onAllerA={(cible) => {
         setPas(parcours[cible] ?? 'reponse');
       }}
@@ -1440,7 +1439,6 @@ function EcranPas({
   pending,
   helpOpen,
   edit,
-  onAbandon,
   onAllerA,
   onHelp,
   onEdit,
@@ -1462,7 +1460,6 @@ function EcranPas({
   pending: boolean;
   helpOpen: boolean;
   edit: boolean;
-  onAbandon: () => void;
   onAllerA: (rang: number) => void;
   onHelp: (open: boolean) => void;
   onEdit: (open: boolean) => void;
