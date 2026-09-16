@@ -210,5 +210,4 @@ jobs:
         env:
           DOKPLOY_KEY: ${{ secrets.DOKPLOY_KEY }}
           DOKPLOY_URL: ${{ vars.DOKPLOY_URL }}
-          DOKPLOY_IMAGE: ghcr.io/compagnie-prestige-immobilier/crm-monorepo/cpi-go:${{ github.sha }}
         run: python3 infra/dokploy/deploy.py redeploy cpi-go
