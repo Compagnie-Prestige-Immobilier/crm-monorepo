@@ -149,7 +149,7 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
 			ID: r.ID, ProspectID: r.ProspectId, Prenom: r.Prenom, Nom: r.Nom, Phone: r.PhoneE164,
-			Projet: string(r.Projet), Comment: r.Comment, Motif: nil,
+			Projet: string(r.Projet), Comment: r.Comment, Motif: r.ReasonLabel,
 			AssigneID: r.AssignedToId, AssigneNom: r.AssignedToName, Quand: r.ScheduledAt,
 		}, maintenant))
 	}
