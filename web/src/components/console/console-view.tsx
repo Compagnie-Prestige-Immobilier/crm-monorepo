@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { ArrowLeftIcon, CheckCircle2Icon, CopyIcon, StarIcon } from 'lucide-react';
+import { CheckCircle2Icon, CopyIcon, StarIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
@@ -1286,11 +1286,7 @@ export function Consignation({
 
   return (
     <div className="flex w-full max-w-5xl flex-col gap-3">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <Button variant="ghost" className="px-0" onClick={onAbandon}>
-          <ArrowLeftIcon aria-hidden="true" />
-          Revenir à la liste
-        </Button>
+      <div className="flex flex-wrap items-center justify-end gap-2">
         <ChronoDemarre demarre={departChrono} />
       </div>
       <BrouillonEnAttente enAttente={brouillonEnAttente} />
