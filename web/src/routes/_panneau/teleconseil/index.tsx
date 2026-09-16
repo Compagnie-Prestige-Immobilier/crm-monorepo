@@ -40,12 +40,14 @@ function Loading() {
 /** Écran Mon travail de la coque Téléconseil. */
 function TeleconseilPage() {
   const { user } = Route.useRouteContext();
+  const encadrement = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
 
   return (
     <div className="flex flex-col gap-6">
       <HubView
         prenom={user.fullName.split(' ')[0] ?? user.fullName}
-        canCreateProspect={['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role)}
+        canCreateProspect={encadrement}
+        encadrement={encadrement}
       />
       <LienFormulairePublic />
     </div>

@@ -231,8 +231,9 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   return (
     <div className="flex flex-col gap-6">
       <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-        Tous les rappels promis des prospects sont ici. Utilisez « Projet » pour distinguer CHUES et
-        Grand Public.
+        {canFilter
+          ? 'Ces rappels sont ceux que les téléconseillers ont promis : chacun rappelle les siens, vous suivez les retards. Filtrez par téléconseiller ou par projet.'
+          : 'Tous vos rappels promis sont ici. Utilisez « Projet » pour distinguer CHUES et Grand Public.'}
       </p>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[0.9375rem]" role="status">
@@ -242,6 +243,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 {formatNumber(overdueCount)}
               </span>{' '}
               rappel{overdueCount > 1 ? 's' : ''} en retard
+              {canFilter ? ' chez les téléconseillers' : ''}
             </>
           ) : (
             <span className="text-muted-foreground">Retards en cours de lecture.</span>
