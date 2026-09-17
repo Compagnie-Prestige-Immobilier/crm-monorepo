@@ -987,3 +987,38 @@ func TestRappelConsommeParTentativeSansNouvelleEcheance(t *testing.T) {
 		t.Fatalf("la fiche traitée ne se lit plus dans « Rappels promis » : %q", *motif)
 	}
 }
+
+// L'enrôlement acquis est un fait : un appel ultérieur sans méthode pose son
+// statut sans effacer la méthode ni rendre la fiche à qualifier.
+func TestQualificationMethodeAcquiseSurvitAuxAppelsSuivants(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	revenu := uuid.NewString()
+	qualificationExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
+	adhesion := qualificationCorpsTentative(fiche, map[string]any{
+		"outcome": "OTHER", "reasonCode": "INTERESSE", "method": "WHATSAPP",
+		"incomeBandId": revenu, "dureeEtablissementMois": 12,
+	})
+	suivant := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "DEMANDE_INFORMATION"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "income_bands" WHERE "id" = $1`, revenu) })
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", adhesion)
+	b.attend(statut, http.StatusOK, "adhésion consignée", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", suivant)
+	b.attend(statut, http.StatusOK, "appel suivant sans méthode", body)
+
+	var phase2 string
+	var methode *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "phase2Status"::text, "enrollmentMethod"::text FROM "prospects" WHERE "id" = $1`, fiche).Scan(&phase2, &methode); err != nil {
+		t.Fatal(err)
+	}
+	if phase2 != "METHOD_OBTAINED" || methode == nil || *methode != "WHATSAPP" {
+		t.Fatalf("la méthode acquise doit rester : phase 2 %s, méthode %v", phase2, methode)
+	}
+	if lu := qualificationCompte(b, `SELECT count(*)::int FROM "prospect_journeys" WHERE "prospectId" = $1 AND "enrollmentMethod" = 'WHATSAPP'`, fiche); lu != 1 {
+		t.Fatalf("le parcours garde la méthode : %d", lu)
+	}
+}
