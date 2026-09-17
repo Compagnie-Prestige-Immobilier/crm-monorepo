@@ -202,16 +202,11 @@ UPDATE "prospects" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOU
 -- name: MarquerParcoursContacte :exec
 UPDATE "prospect_journeys" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOUVEAU';
 
--- Une méthode d'enrôlement acquise ne s'efface pas : un appel ultérieur sans
--- méthode pose son propre statut, il ne rend pas la fiche à qualifier.
 -- name: CloreParcours :exec
 UPDATE "prospect_journeys" SET
-  "phase2Status" = CASE
-    WHEN sqlc.narg('method')::text IS NULL AND "enrollmentMethod" IS NOT NULL THEN "phase2Status"
-    ELSE CAST(@phase2_status AS text)::"Phase2Status" END,
-  "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
-  "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
-  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById")
+  "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
+  "enrollmentMethod" = CAST(sqlc.narg('method') AS text)::"EnrollmentMethod",
+  "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by
 WHERE "id" = @id;
 
 -- name: MarquerProspectPerdu :execrows
@@ -219,12 +214,9 @@ UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id AND "statut" <> 'PERD
 
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
-  "phase2Status" = CASE
-    WHEN sqlc.narg('method')::text IS NULL AND "enrollmentMethod" IS NOT NULL THEN "phase2Status"
-    ELSE CAST(@phase2_status AS text)::"Phase2Status" END,
-  "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
-  "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
-  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById"), "rev" = "rev" + 1
+  "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
+  "enrollmentMethod" = CAST(sqlc.narg('method') AS text)::"EnrollmentMethod",
+  "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by, "rev" = "rev" + 1
 WHERE "id" = @id;
 
 -- name: ListerRappels :many
