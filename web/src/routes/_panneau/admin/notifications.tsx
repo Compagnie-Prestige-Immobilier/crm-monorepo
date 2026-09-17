@@ -3,14 +3,14 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { hasInbox, INBOX_PATH } from '@/components/layout/nav-items';
 import { NotificationsView } from '@/components/notifications/notifications-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/notifications')({
   beforeLoad: ({ context }) => {
     if (context.user.role !== 'ADMIN' && hasInbox(context.user.role)) {
       throw redirect({ href: INBOX_PATH });
     }
-    guardRoles(['ADMIN'])({ context });
+    guardPermission('notifications.administrer')({ context });
   },
   component: NotificationsPage,
   pendingComponent: Loading,

@@ -26,7 +26,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { initials } from '@/lib/format';
-import { ROLE_LABELS, type SessionUser } from '@/lib/types';
+import type { SessionUser } from '@/lib/types';
 
 export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const router = useRouter();
@@ -105,7 +105,7 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         <DropdownMenuSeparator />
         <DropdownMenuItem disabled>
           <UserIcon aria-hidden="true" />
-          {ROLE_LABELS[user.role]}
+          {user.roleLibelle}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem render={<Link href="/compte" />}>

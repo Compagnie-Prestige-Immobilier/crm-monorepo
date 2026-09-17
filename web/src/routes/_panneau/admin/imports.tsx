@@ -4,11 +4,11 @@ import { useSearchParams } from 'next/navigation';
 import { ImportsView } from '@/components/imports/imports-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UPLOADABLE_IMPORT_KINDS } from '@/lib/data/imports';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { readEnum } from '@/lib/search-params';
 
 export const Route = createFileRoute('/_panneau/admin/imports')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('imports.administrer'),
   component: ImportsPage,
   pendingComponent: Loading,
 });

@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { BasesView } from '@/components/bases/bases-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/bases')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('bases.administrer'),
   component: BasesView,
   pendingComponent: Loading,
 });

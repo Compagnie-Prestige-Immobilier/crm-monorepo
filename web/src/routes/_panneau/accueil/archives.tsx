@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { ArchivesView } from '@/components/accueil/archives-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil/archives')({
-  beforeLoad: guardRoles(['DIRECTION']),
+  beforeLoad: guardPermission('visites.voir_archivees'),
   component: ArchivesView,
   pendingComponent: Loading,
 });

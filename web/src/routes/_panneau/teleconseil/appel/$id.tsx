@@ -5,11 +5,11 @@ import { AppelProspect } from '@/components/grand-public/appel-prospect';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchProspect } from '@/lib/data/prospects';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { queryKeys } from '@/lib/query-keys';
 
 export const Route = createFileRoute('/_panneau/teleconseil/appel/$id')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardPermission('prospects.convertir'),
   component: AppelProspectPage,
   pendingComponent: Loading,
 });

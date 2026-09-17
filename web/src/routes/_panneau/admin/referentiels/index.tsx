@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { ReferentielsView } from '@/components/referentiels/referentiels-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/referentiels/')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('referentiels.superviser'),
   component: ReferentielsPage,
   pendingComponent: Loading,
 });

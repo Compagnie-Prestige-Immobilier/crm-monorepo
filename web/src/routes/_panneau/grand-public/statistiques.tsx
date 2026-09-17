@@ -4,10 +4,10 @@ import { ChiffresView } from '@/components/chiffres/vue';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/statistiques')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: ChiffresGrandPublicPage,
   pendingComponent: Loading,
 });
@@ -32,7 +32,7 @@ function ChiffresGrandPublicPage() {
   return (
     <div className="flex flex-col gap-6">
       <OngletsPilotage coque="grand-public" role={user.role} />
-      <ChiffresView ecran="grand-public" role={user.role} />
+      <ChiffresView ecran="grand-public" />
     </div>
   );
 }

@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { RepresentantDetailView } from '@/components/representants/representant-detail-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
-import { readsOnly } from '@/lib/types';
+import { peut, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/representants/$id')({
   beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
@@ -33,7 +33,7 @@ function TeleconseilRepresentantPage() {
     <RepresentantDetailView
       representantId={id}
       author={{ id: user.id, fullName: user.fullName }}
-      canAdminister={user.role === 'ADMIN'}
+      canAdminister={peut(user, 'comptes.administrer')}
       readOnly={readsOnly(user.role)}
     />
   );
