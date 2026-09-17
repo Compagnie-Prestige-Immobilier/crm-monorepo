@@ -582,3 +582,24 @@ func TestLeadsImportesComptentLesFichesPasseesPlateforme(t *testing.T) {
 	}
 	analyticsEgal(b, "fiches visibles du classeur plateforme", lignes[plateformeSeule]["importes"], 0)
 }
+
+// Les appels d'avant le référentiel du 7 septembre 2026 n'ont posé aucun
+// statut : la qualité de la base lit alors l'issue de l'appel, sinon elle
+// compte un représentant joint comme jamais atteint.
+func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
+	b := analyticsConnexion(t, "SUPERVISEUR")
+	jeu := analyticsSemer(b)
+	chemin := "/api/v1/supervision/representants/qualite"
+
+	analytics.PerimerCache()
+	statut, body := b.appel(http.MethodGet, chemin, nil, false)
+	b.attend(statut, http.StatusOK, "qualité de la base", body)
+	avant := analyticsNombre(b, body["joints"], "joints avant l'appel")
+
+	analyticsExec(b, `UPDATE "representants" SET "lastCallAt" = now(), "lastCallById" = $2, "lastCallOutcome" = 'REACHED'
+	                  WHERE "id" = $1`, jeu.representant, b.userID)
+	analytics.PerimerCache()
+	statut, body = b.appel(http.MethodGet, chemin, nil, false)
+	b.attend(statut, http.StatusOK, "qualité après l'appel", body)
+	analyticsEgal(b, "un appel abouti sans statut compte comme joint", body["joints"], avant+1)
+}
