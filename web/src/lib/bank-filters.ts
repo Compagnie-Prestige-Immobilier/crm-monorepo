@@ -15,9 +15,9 @@ import {
   type SortDirection,
 } from '@/lib/types';
 
-export type BankCaseQuery = NonNullable<operations['listBankCases']['parameters']['query']>;
+export type BankCaseQuery = NonNullable<operations['get-api-v1-bank-cases']['parameters']['query']>;
 export type BankAnalyticsQuery = NonNullable<
-  operations['getBankCaseAnalytics']['parameters']['query']
+  operations['get-api-v1-bank-cases-analytics']['parameters']['query']
 >;
 
 const BANK_DEFAULT_PAGE_SIZE = 25;

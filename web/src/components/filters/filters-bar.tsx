@@ -238,7 +238,7 @@ export function FiltersBar({
             placeholder="Toutes les régions"
             options={reference.regions.map((region) => ({
               value: region.id,
-              label: region.name,
+              label: region.name ?? '',
             }))}
             value={regionId}
             onChange={(value) => {
@@ -254,8 +254,8 @@ export function FiltersBar({
               .filter((d) => regionId === null || d.regionId === regionId)
               .map((d) => ({
                 value: d.id,
-                label: withRetired(d.name, d.isActive),
-                hint: d.regionName,
+                label: withRetired(d.name ?? '', d.isActive ?? false),
+                hint: d.regionName ?? undefined,
               }))}
             value={filters.departementId}
             onChange={(value) => {
@@ -267,8 +267,8 @@ export function FiltersBar({
             placeholder="Toutes les banques"
             options={reference.banques.map((b) => ({
               value: b.id,
-              label: withRetired(b.shortName, b.isActive),
-              hint: b.name,
+              label: withRetired(b.shortName ?? '', b.isActive ?? false),
+              hint: b.name ?? undefined,
             }))}
             value={filters.banqueId}
             onChange={(value) => {
@@ -280,7 +280,7 @@ export function FiltersBar({
             placeholder="Tous les syndicats"
             options={reference.syndicats.map((s) => ({
               value: s.id,
-              label: withRetired(s.sigle, s.isActive),
+              label: withRetired(s.sigle ?? '', s.isActive ?? false),
               hint: s.secteur ?? undefined,
             }))}
             value={filters.syndicatId}

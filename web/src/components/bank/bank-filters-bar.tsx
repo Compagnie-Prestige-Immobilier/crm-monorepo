@@ -175,8 +175,8 @@ export function BankFiltersBar({
 
   const banqueOptions: FilterOption[] = optionsOrEmpty(banques.data).map((banque) => ({
     value: banque.id,
-    label: withRetired(banque.shortName, banque.isActive),
-    hint: banque.name,
+    label: withRetired(banque.shortName ?? '', banque.isActive ?? false),
+    hint: banque.name ?? undefined,
   }));
   const reasonOptions: FilterOption[] = optionsOrEmpty(reasons.data).map((reason) => ({
     value: reason.id,

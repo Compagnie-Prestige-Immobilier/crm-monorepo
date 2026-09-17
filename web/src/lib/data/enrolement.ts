@@ -2,16 +2,17 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
+import type { Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type Projet = Schemas['Projet'];
-export type InscriptionsPage = Schemas['InscriptionsPageDto'];
-export type EnrolementReglages = Schemas['EnrolementReglagesDto'];
-export type EnrolementIndicateurs = Schemas['EnrolementIndicateursDto'];
-export type Tirage = Schemas['TirageDto'];
-export type Suppression = Schemas['SuppressionDto'];
-export type InscriptionDetail = Schemas['InscriptionPlateformeDetailDto'];
+export type { Projet };
+export type InscriptionsPage = Schemas['ListerInscriptionsOutputBody'];
+export type EnrolementReglages = Schemas['ReglagesOutputBody'];
+export type EnrolementIndicateurs = Schemas['IndicateursOutputBody'];
+export type Tirage = Schemas['TirageOutputBody'];
+export type Suppression = Schemas['SuppressionInscriptionsOutputBody'];
+export type InscriptionDetail = Schemas['InscriptionOutputBody'];
 
 /** L'onglet de l'écran, et le projet qu'il tire. Les deux ne se mélangent jamais. */
 export const ONGLETS_ENROLEMENT = ['chues', 'grand-public'] as const;
@@ -90,7 +91,7 @@ export async function fetchReglagesEnrolement(
 
 export async function saveReglagesEnrolement(
   projet: Projet,
-  body: Schemas['UpdateEnrolementReglagesDto'],
+  body: Schemas['EcrireReglagesInputBody'],
   client: ApiClient = getApiClient(),
 ): Promise<EnrolementReglages> {
   return unwrap(

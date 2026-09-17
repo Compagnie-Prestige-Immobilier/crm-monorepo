@@ -5,8 +5,8 @@ import { getApiClient } from '@/lib/api/browser';
 
 type Schemas = components['schemas'];
 
-export type PlateformeEquipe = Schemas['PlateformeEquipeDto'];
-export type PlateformeCcp = Schemas['PlateformeCcpDto'];
+export type PlateformeEquipe = Schemas['PlateformeEquipeOutputBody'];
+export type PlateformeCcp = Schemas['PlateformeCCP'];
 
 export const plateformeEquipeKey = ['plateforme', 'equipe'] as const;
 

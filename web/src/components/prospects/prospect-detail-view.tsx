@@ -27,8 +27,8 @@ import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/for
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
+  callOutcomeLabel,
+  enrollmentMethodLabel,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
@@ -48,7 +48,7 @@ function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
       precision:
         prospect.lastCallOutcome === null
           ? 'Jamais appelé'
-          : `Dernier : ${prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}`,
+          : `Dernier : ${prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastCallOutcome)}`,
     },
     {
       label: 'Dernier appel',
@@ -174,7 +174,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
             <Champ label="Méthode d’enrôlement">
               {prospect.enrollmentMethod === null
                 ? NO_VALUE
-                : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+                : enrollmentMethodLabel(prospect.enrollmentMethod)}
             </Champ>
           </dl>
         </section>

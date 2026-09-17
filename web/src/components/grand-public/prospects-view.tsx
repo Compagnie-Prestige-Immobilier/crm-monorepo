@@ -190,7 +190,7 @@ export function GrandPublicProspectsView({
 
   const canalOptions = (canaux.data ?? []).map((canal) => ({
     value: canal.id,
-    label: withRetired(canal.label, canal.isActive),
+    label: withRetired(canal.label ?? '', canal.isActive ?? false),
   }));
 
   const removeAdvanced = useCallback(
@@ -434,8 +434,8 @@ function FiltresAvances({
         placeholder="Tous les départements"
         options={(reference?.departements ?? []).map((d) => ({
           value: d.id,
-          label: withRetired(d.name, d.isActive),
-          hint: d.regionName,
+          label: withRetired(d.name ?? '', d.isActive ?? false),
+          hint: d.regionName ?? undefined,
         }))}
         value={filters.departementId}
         onChange={(value) => {
@@ -447,8 +447,8 @@ function FiltresAvances({
         placeholder="Toutes les banques"
         options={(reference?.banques ?? []).map((b) => ({
           value: b.id,
-          label: withRetired(b.shortName, b.isActive),
-          hint: b.name,
+          label: withRetired(b.shortName ?? '', b.isActive ?? false),
+          hint: b.name ?? undefined,
         }))}
         value={filters.banqueId}
         onChange={(value) => {
@@ -460,7 +460,7 @@ function FiltresAvances({
         placeholder="Tous les syndicats"
         options={(reference?.syndicats ?? []).map((s) => ({
           value: s.id,
-          label: withRetired(s.sigle, s.isActive),
+          label: withRetired(s.sigle ?? '', s.isActive ?? false),
           hint: s.secteur ?? undefined,
         }))}
         value={filters.syndicatId}

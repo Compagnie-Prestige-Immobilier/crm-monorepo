@@ -3,7 +3,8 @@ import type { operations } from '@crm/api-client';
 import type { Paginated, ProspectFilters } from '@/lib/types';
 
 export type ProspectQuery = NonNullable<operations['listProspects']['parameters']['query']>;
-export type AnalyticsQuery = NonNullable<operations['getAnalyticsTotals']['parameters']['query']>;
+/** `/api/v1/analytics/totals` a disparu côté Go : les filtres restent ceux, partagés, de `by-banque`. */
+export type AnalyticsQuery = NonNullable<operations['getProspectsByBanque']['parameters']['query']>;
 
 // Bornes explicitees: `dateTo=2026-08-12` nu vaut minuit pile et exclut la journee du 12.
 // L'heure metier est `Africa/Dakar`, UTC+0 toute l'annee: le `Z` est exact, sans conversion.
@@ -34,7 +35,7 @@ function applyStatusFilters(query: AnalyticsQuery, filters: ProspectFilters): vo
   if (filters.enrollmentCapturedById !== null) {
     query.enrollmentCapturedById = filters.enrollmentCapturedById;
   }
-  if (filters.revue !== null) query.revue = filters.revue;
+  if (filters.revue !== null) query.revue = filters.revue ? 'true' : 'false';
 }
 
 function applyDateFilters(query: AnalyticsQuery, filters: ProspectFilters): void {

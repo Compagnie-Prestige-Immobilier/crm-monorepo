@@ -506,7 +506,7 @@ function LigneFiche({
       <TableCell className="tabular-nums">{fiche.jour}</TableCell>
       <TableCell>
         <Badge variant={fiche.etat === 'NON_TRAITEE' ? 'outline' : 'secondary'}>
-          {ETAT_LABELS[fiche.etat]}
+          {ETAT_LABELS[fiche.etat as LotExportFicheEtat] ?? fiche.etat}
         </Badge>
       </TableCell>
       <TableCell>{fiche.statutLabel ?? '—'}</TableCell>

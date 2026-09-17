@@ -326,7 +326,7 @@ function ChoixBanqueDialog({
             <SelectContent>
               {(banques.data ?? []).map((banque) => (
                 <SelectItem key={banque.id} value={banque.id}>
-                  {withRetired(banque.shortName, banque.isActive)}, {banque.name}
+                  {withRetired(banque.shortName ?? '', banque.isActive ?? false)}, {banque.name}
                 </SelectItem>
               ))}
             </SelectContent>

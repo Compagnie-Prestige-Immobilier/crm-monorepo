@@ -52,7 +52,7 @@ sql/                   schema.sql (référence), queries/ (sqlc), migrations/ (g
 web/                   panneau React repris de la v1, SPA Vite embarquée
 e2e/                   parcours Playwright, un par métier
 infra/dokploy/         deploy.py et son mode d'emploi
-tools/dev/             plafonds.sh, contrat-ecarts.cjs, charge.sh
+tools/dev/             plafonds.sh, charge.sh
 docs/                  QUALITY.md, decisions/, v2-refonte/ (plan et audits)
 ```
 

@@ -5,11 +5,11 @@ import { getApiClient } from '@/lib/api/browser';
 
 type Schemas = components['schemas'];
 
-export type StatutQualificationEffect = Schemas['StatutQualificationEffect'];
-export type PrioriteTraitement = Schemas['PrioriteTraitement'];
-export type StatutQualification = Schemas['StatutQualificationDto'];
-export type CreateStatutQualificationInput = Schemas['CreateStatutQualificationDto'];
-export type UpdateStatutQualificationInput = Schemas['UpdateStatutQualificationDto'];
+export type StatutQualification = Schemas['ReferentielsStatut'];
+export type StatutQualificationEffect = StatutQualification['effect'];
+export type PrioriteTraitement = StatutQualification['priorite'];
+export type CreateStatutQualificationInput = Schemas['ReferentielsCreerStatutInputBody'];
+export type UpdateStatutQualificationInput = Schemas['ReferentielsModifierStatutInputBody'];
 
 /**
  * Version de charge utile du PANEL. Le serveur ne sert que les statuts qu'un
@@ -130,11 +130,7 @@ export const souhaitDuStatut = (
 export async function fetchStatutsQualification(
   client: ApiClient = getApiClient(),
 ): Promise<StatutQualification[]> {
-  return unwrap(
-    await client.GET('/api/v1/statuts-qualification', {
-      params: { query: { payloadVersion: PANEL_PAYLOAD_VERSION } },
-    }),
-  ).items;
+  return unwrap(await client.GET('/api/v1/statuts-qualification')).items;
 }
 
 /** Vocabulaire d'ADMINISTRATION : tout, désactivés compris. */

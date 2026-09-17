@@ -1,22 +1,23 @@
-import type { ApiClient, components } from '@crm/api-client';
+import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 import { csvRows } from '@/lib/csv';
+import type { Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type PurgeDomainKey = Schemas['PurgeDomainKey'];
-export type PurgeDomain = Schemas['PurgeDomainDto'];
-export type PurgeCatalog = Schemas['PurgeCatalogDto'];
-export type PurgeResult = Schemas['PurgeResultDto'];
+export type PurgeDomainKey = Schemas['DomainePurge']['key'];
+export type PurgeDomain = Schemas['DomainePurge'];
+export type PurgeCatalog = Schemas['CataloguePurgeOutputBody'];
+export type PurgeResult = Schemas['PurgerOutputBody'];
 
 export async function fetchPurgeCatalog(client: ApiClient = getApiClient()): Promise<PurgeCatalog> {
   return unwrap(await client.GET('/api/v1/admin/purge'));
 }
 
 export async function runPurge(
-  input: Schemas['PurgeRequestDto'],
+  input: Schemas['PurgerInputBody'],
   client: ApiClient = getApiClient(),
 ): Promise<PurgeResult> {
   return unwrap(await client.POST('/api/v1/admin/purge', { body: input }));
@@ -76,13 +77,13 @@ function matchesHint(typed: string, hint: string): boolean {
   return normalized === hint.trim().toLocaleLowerCase();
 }
 
-export type PresenceState = Schemas['PresenceState'];
-export type PerformanceScore = Schemas['PerformanceScore'];
-export type SupervisionScore = Schemas['SupervisionScoreDto'];
-export type SupervisedUser = Schemas['SupervisedUserDto'];
-export type Supervision = Schemas['SupervisionDto'];
-export type WorkShifts = Schemas['WorkShiftsDto'];
-export type UpdateWorkShifts = Schemas['UpdateWorkShiftsDto'];
+export type SupervisedUser = Schemas['CompteSupervise'];
+export type PresenceState = SupervisedUser['presence'];
+export type PerformanceScore = Schemas['NoteDeRendement'];
+export type SupervisionScore = Schemas['RendementDunTeleconseiller'];
+export type Supervision = Schemas['SupervisionOutputBody'];
+export type WorkShifts = Schemas['CreneauxDeTravail'];
+export type UpdateWorkShifts = Schemas['MajCreneauxInputBody'];
 
 export async function fetchSupervision(client: ApiClient = getApiClient()): Promise<Supervision> {
   return unwrap(await client.GET('/api/v1/admin/supervision'));
@@ -158,9 +159,12 @@ export function formatActiveDuration(seconds: number): string {
     : `${String(hours)} h ${String(rest).padStart(2, '0')}`;
 }
 
-export type SupervisionGranularity = Schemas['SupervisionGranularity'];
-export type ActivityRow = Schemas['SupervisionActivityRowDto'];
-export type SupervisionActivity = Schemas['SupervisionActivityDto'];
+export type SupervisionGranularity = Exclude<
+  NonNullable<operations['getSupervisionActivite']['parameters']['query']>['granularity'],
+  undefined
+>;
+export type ActivityRow = Schemas['LigneDActivite'];
+export type SupervisionActivity = Schemas['ActiviteDesTeleconseillers'];
 
 /** Bornes en AAAA-MM-JJ, incluses, journée d'Africa/Dakar. */
 export type ActivityRange = { from: string; to: string };
@@ -198,7 +202,7 @@ export function presetRange(
 export function supervisionActivityKey(
   range: ActivityRange,
   granularity: SupervisionGranularity,
-  projet: Schemas['Projet'] | null,
+  projet: Projet | null,
   shift?: { start: string; end: string },
 ): readonly unknown[] {
   return ['supervision', 'activite', range.from, range.to, granularity, projet, shift];
@@ -209,7 +213,7 @@ export async function fetchSupervisionActivite(
   input: {
     range: ActivityRange;
     granularity: SupervisionGranularity;
-    projet: Schemas['Projet'] | null;
+    projet: Projet | null;
     shift?: { start: string; end: string };
   },
   client: ApiClient = getApiClient(),
@@ -359,7 +363,7 @@ export const ACTIVITY_COLUMNS: Record<ActivityFamille, ActivityColumn[]> = {
   ],
 };
 
-export function famillesDuProjet(projet: Schemas['Projet'] | null): ActivityFamille[] {
+export function famillesDuProjet(projet: Projet | null): ActivityFamille[] {
   return projet === 'GRAND_PUBLIC' ? ['prospects'] : ['representants', 'prospects'];
 }
 
@@ -488,7 +492,7 @@ export function sortActivityLines(
   });
 }
 
-const PROJET_LABELS: Record<Schemas['Projet'] | 'TOUS', string> = {
+const PROJET_LABELS: Record<Projet | 'TOUS', string> = {
   CHUES: 'CHUES',
   GRAND_PUBLIC: 'Grand Public',
   TOUS: 'tous les projets',
@@ -499,7 +503,7 @@ export function activityCsv(input: {
   totals: ActivityTotals;
   range: ActivityRange;
   granularity: SupervisionGranularity;
-  projet: Schemas['Projet'] | null;
+  projet: Projet | null;
   famille: ActivityFamille;
 }): string {
   const colonnes = ACTIVITY_COLUMNS[input.famille];
@@ -535,7 +539,7 @@ export function activityCsv(input: {
 /** Le projet est dans le nom : les deux coques exportent la même période sur des chiffres différents. */
 export function activityCsvFileName(
   range: ActivityRange,
-  projet: Schemas['Projet'] | null,
+  projet: Projet | null,
   famille: ActivityFamille,
 ): string {
   let suffixe = 'chues';

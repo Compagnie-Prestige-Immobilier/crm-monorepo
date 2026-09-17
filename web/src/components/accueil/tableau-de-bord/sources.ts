@@ -6,12 +6,13 @@ import type { Role } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type DashboardSource = Schemas['DashboardSource'];
-export type DashboardMarque = Schemas['DashboardMarque'];
-export type DashboardTaille = Schemas['DashboardTaille'];
-export type DashboardPreset = Schemas['DashboardPreset'];
-export type DispositionPresentation = Schemas['DispositionPresentationDto'];
-export type VisiteStats = Schemas['VisiteStatsDto'];
+/** Go ne type pas `DispositionWidget.source` au delà de `string` : chaque catalogue valide les siennes. */
+export type DashboardSource = string;
+export type DashboardMarque = Exclude<Schemas['DispositionWidget']['marque'], undefined>;
+export type DashboardTaille = Exclude<Schemas['DispositionWidget']['taille'], undefined>;
+export type DashboardPreset = Schemas['DispositionOutputBody']['preset'];
+export type DispositionPresentation = Schemas['DispositionPresentation'];
+export type VisiteStats = Schemas['StatsVisitesOutputBody'];
 
 export type Forme =
   | 'scalaire'

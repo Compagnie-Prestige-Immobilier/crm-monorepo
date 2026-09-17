@@ -4,9 +4,9 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 import type { Role } from '@/lib/types';
 
-export type RoleCompte = components['schemas']['RoleDto'];
-export type PermissionCatalogue = components['schemas']['PermissionDto'];
-export type Roles = components['schemas']['RolesDto'];
+export type RoleCompte = components['schemas']['RoleDTO'];
+export type PermissionCatalogue = components['schemas']['PermissionDTO'];
+export type Roles = components['schemas']['RolesOutputBody'];
 
 export async function fetchRoles(client: ApiClient = getApiClient()): Promise<Roles> {
   return unwrap(await client.GET('/api/v1/roles'));

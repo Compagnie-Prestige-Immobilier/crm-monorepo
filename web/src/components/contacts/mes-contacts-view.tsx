@@ -25,12 +25,12 @@ import { fetchUsers } from '@/lib/data/users';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import {
-  CALL_OUTCOME_LABELS,
-  CALL_OUTCOME_VARIANTS,
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
   REP_CALL_OUTCOME_LABELS,
   REP_CALL_OUTCOME_VARIANTS,
+  callOutcomeLabel,
+  callOutcomeVariant,
   type Paginated,
   type Projet,
   type ProspectRow,
@@ -658,8 +658,8 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
               {prospect.lastCallOutcome === null ? (
                 SANS_VALEUR
               ) : (
-                <Badge variant={CALL_OUTCOME_VARIANTS[prospect.lastCallOutcome]}>
-                  {prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}
+                <Badge variant={callOutcomeVariant(prospect.lastCallOutcome)}>
+                  {prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastCallOutcome)}
                 </Badge>
               )}
             </TableCell>

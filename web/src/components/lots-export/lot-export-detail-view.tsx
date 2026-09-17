@@ -55,11 +55,7 @@ import {
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { formatDate, formatDateTime, formatNumber, formatPhone, formatRate } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import {
-  CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
-  REP_CALL_OUTCOME_LABELS,
-} from '@/lib/types';
+import { CALL_OUTCOME_LABELS, enrollmentMethodLabel, REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 
 /**
  * L'API rend l'issue brute d'un appel de prospect OU de représentant, dans un
@@ -434,7 +430,7 @@ function RecentAttemptsList({
             </span>
             {tentative.method === null ? null : (
               <span className="text-[0.8125rem] text-muted-foreground">
-                {ENROLLMENT_METHOD_LABELS[tentative.method]}
+                {enrollmentMethodLabel(tentative.method)}
               </span>
             )}
           </div>

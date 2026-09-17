@@ -1,7 +1,6 @@
-import type { components } from '@crm/api-client';
-
 import type {
   CatalogueEntree,
+  DashboardSource,
   DonneesSource,
   EquipeLigne,
 } from '@/components/accueil/tableau-de-bord/sources';
@@ -26,7 +25,7 @@ import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import type { Projet } from '@/lib/types';
 
-type ChiffreSource = components['schemas']['DashboardSource'];
+type ChiffreSource = DashboardSource;
 
 /** Une requête, et les cartes qui en vivent. Rien d'autre n'est lancé. */
 export type Jeu =

@@ -72,9 +72,9 @@ import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
+  callOutcomeLabel,
   type ProspectRow,
   type ProspectStatut,
   type Role,
@@ -803,7 +803,7 @@ function StatutAnnuaire({ row }: { row: ProspectRow }) {
   if (row.lastAttemptAt === null)
     return <span className="text-[0.8125rem] text-muted-foreground">Non qualifié</span>;
   const label =
-    row.lastReasonLabel ?? (row.lastOutcome ? CALL_OUTCOME_LABELS[row.lastOutcome] : 'Qualifié');
+    row.lastReasonLabel ?? (row.lastOutcome ? callOutcomeLabel(row.lastOutcome) : 'Qualifié');
   const variant = variantDuCode(
     row.phase2Status === 'METHOD_OBTAINED' ? row.phase2Status : row.lastOutcome,
   );
@@ -938,8 +938,7 @@ function rattachements(prospect: ProspectRow, projet: Projet): string {
 function resumeDernierAppel(prospect: ProspectRow): string {
   const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
   if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
-  const issue =
-    prospect.lastOutcome === null ? '' : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`;
+  const issue = prospect.lastOutcome === null ? '' : ` · ${callOutcomeLabel(prospect.lastOutcome)}`;
   return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
 }
 

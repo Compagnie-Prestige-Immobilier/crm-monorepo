@@ -22,8 +22,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import {
-  CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
+  callOutcomeLabel,
+  enrollmentMethodLabel,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
@@ -142,7 +142,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       cell: ({ row }) => {
         const method = row.original.enrollmentMethod;
         if (method === null) return <Empty />;
-        return <span className="truncate">{ENROLLMENT_METHOD_LABELS[method]}</span>;
+        return <span className="truncate">{enrollmentMethodLabel(method)}</span>;
       },
     },
     {
@@ -155,7 +155,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
         return (
           <div className="min-w-0 max-w-[16rem]">
             <p className="truncate font-[600]">
-              {lastReasonLabel ?? CALL_OUTCOME_LABELS[lastOutcome]}
+              {lastReasonLabel ?? callOutcomeLabel(lastOutcome)}
             </p>
             {lastComment !== null && lastComment !== '' ? (
               <p className="truncate text-[0.75rem] text-muted-foreground" title={lastComment}>

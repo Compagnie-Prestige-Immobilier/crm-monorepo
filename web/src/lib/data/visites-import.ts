@@ -7,8 +7,8 @@ import type { Paginated } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type VisitesImportJob = Schemas['ImportJobDto'];
-export type VisitesImportChange = Schemas['VisiteImportChangeDto'];
+export type VisitesImportJob = Schemas['ImportJobSortie'];
+export type VisitesImportChange = Schemas['ChangeImportSortie'];
 
 /** Aligné sur `IMPORTS_MAX_BYTES` de l'API : refuser ici évite un 413. */
 export const VISITES_IMPORT_MAX_BYTES = 25 * 1024 * 1024;

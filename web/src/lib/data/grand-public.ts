@@ -16,13 +16,14 @@ import {
 import {
   PROSPECT_STATUTS,
   type Paginated,
+  type Projet,
   type ProspectRow,
   type ProspectStatut,
+  type ProspectType,
 } from '@/lib/types';
 
-export type CanalProvenance = components['schemas']['CanalProvenanceDto'];
-export type ProspectType = components['schemas']['ProspectType'];
-type Projet = components['schemas']['Projet'];
+export type { ProspectType };
+export type CanalProvenance = components['schemas']['ReferentielsItem'];
 
 const GRAND_PUBLIC: Projet = 'GRAND_PUBLIC';
 
@@ -253,8 +254,8 @@ export async function fetchCanauxProvenance(
   client: ApiClient = getApiClient(),
 ): Promise<CanalProvenance[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/canaux-provenance', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'canaux-provenance' }, query: { activeOnly: false } },
     }),
   );
 }
@@ -271,7 +272,7 @@ export async function createGrandPublicProspect(
 
 export async function updateGrandPublicConsent(
   id: string,
-  consent: components['schemas']['GrandPublicConsent'],
+  consent: components['schemas']['ProspectConsentementInputBody']['consent'],
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
   return unwrap(
@@ -284,7 +285,7 @@ export async function updateGrandPublicConsent(
 
 export async function confirmGrandPublicConversion(
   id: string,
-  body: components['schemas']['ConfirmGrandPublicConversionDto'],
+  body: components['schemas']['ProspectConversionBody'],
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
   return unwrap(

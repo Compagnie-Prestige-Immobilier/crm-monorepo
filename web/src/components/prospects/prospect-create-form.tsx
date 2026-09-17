@@ -73,15 +73,23 @@ function shouldSearchRepresentants(representantId: string | null, repSearch: str
 function activeBankOptions(reference: ReferenceData | undefined): FilterOption[] {
   const banques = reference?.banques ?? [];
   return banques
-    .filter((banque) => banque.isActive)
-    .map((banque) => ({ value: banque.id, label: banque.name, hint: banque.shortName }));
+    .filter((banque) => banque.isActive === true)
+    .map((banque) => ({
+      value: banque.id,
+      label: banque.name ?? '',
+      hint: banque.shortName ?? undefined,
+    }));
 }
 
 function activeSyndicatOptions(reference: ReferenceData | undefined): FilterOption[] {
   const syndicats = reference?.syndicats ?? [];
   return syndicats
-    .filter((syndicat) => syndicat.isActive)
-    .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle }));
+    .filter((syndicat) => syndicat.isActive === true)
+    .map((syndicat) => ({
+      value: syndicat.id,
+      label: syndicat.name ?? '',
+      hint: syndicat.sigle ?? undefined,
+    }));
 }
 
 function representantLabelFor(options: FilterOption[], repId: string | null): string | undefined {
@@ -174,7 +182,8 @@ function PhoneConflictCard({
           </p>
           <p className="text-[0.8125rem] text-muted-foreground">
             Rattaché à {conflict.representantName}, saisi par le téléconseiller{' '}
-            {conflict.ownedByCommercialName} le {formatDateTime(conflict.createdAt)}.
+            {conflict.ownedByCommercialName}
+            {conflict.createdAt === undefined ? '' : ` le ${formatDateTime(conflict.createdAt)}`}.
           </p>
           <Link
             href={`/teleconseil/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`}

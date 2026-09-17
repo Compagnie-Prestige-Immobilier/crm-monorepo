@@ -41,7 +41,7 @@ import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
+  callOutcomeLabel,
   MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
@@ -278,7 +278,7 @@ function DernierAppel({ prospect }: { prospect: ProspectRow }) {
   return (
     <span className="flex flex-col gap-0.5">
       <span className="font-[600]">
-        {prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastOutcome]}
+        {prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastOutcome)}
       </span>
       {prospect.lastComment !== null && prospect.lastComment !== '' ? (
         <span className="text-[0.8125rem] text-muted-foreground">{prospect.lastComment}</span>
