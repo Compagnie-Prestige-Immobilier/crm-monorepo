@@ -148,7 +148,8 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     browser,
   }) => {
     await page.goto('/teleconseil/campagnes');
-    await page.getByRole('button', { name: 'Nouvelle campagne' }).click();
+    // L'etat vide propose le meme bouton que l'en-tete : sur une base sans campagne, les deux repondent.
+    await page.getByRole('button', { name: 'Nouvelle campagne' }).first().click();
     const dialogue = page.getByRole('dialog');
     await dialogue.getByText('Fiches importées', { exact: true }).click();
     await expect(dialogue.getByRole('radio', { name: /Fiches importées/u })).toBeChecked();
