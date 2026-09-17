@@ -1261,10 +1261,10 @@ ALTER TABLE ONLY public.representant_suggestions
     ADD CONSTRAINT representant_suggestions_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.representants
-    ADD CONSTRAINT representants_pkey PRIMARY KEY (id);
+ADD CONSTRAINT representants_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.scheduled_callbacks
-    ADD CONSTRAINT scheduled_callbacks_pkey PRIMARY KEY (id);
+ADD CONSTRAINT scheduled_callbacks_pkey PRIMARY KEY (id);
 
 ALTER TABLE ONLY public.segment_changes
     ADD CONSTRAINT segment_changes_pkey PRIMARY KEY (id);
@@ -2036,4 +2036,3 @@ ALTER TABLE ONLY public.visites
 
 ALTER TABLE ONLY public.visites
     ADD CONSTRAINT "visites_objetId_fkey" FOREIGN KEY ("objetId") REFERENCES public.visite_objets(id) ON UPDATE CASCADE ON DELETE RESTRICT;
-
