@@ -51,7 +51,9 @@ jobs:
           path: ~/go/bin
           key: outils-${{ runner.os }}-sqlc-1.31.1-goose-3.28.0
       - if: steps.outils.outputs.cache-hit != 'true'
-        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 github.com/pressly/goose/v3/cmd/goose@v3.28.0
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
       - run: sqlc generate
       # `web/embed.go` embarque `web/dist`, construit plus bas : sans dossier, le lint refuse de typer.
       - run: mkdir -p web/dist && touch web/dist/.keep
@@ -101,7 +103,9 @@ jobs:
           path: ~/go/bin
           key: outils-${{ runner.os }}-sqlc-1.31.1-goose-3.28.0
       - if: steps.deja.outputs.cache-hit != 'true' && steps.outils.outputs.cache-hit != 'true'
-        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 github.com/pressly/goose/v3/cmd/goose@v3.28.0
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
       - if: steps.deja.outputs.cache-hit != 'true'
         run: |
           sqlc generate
@@ -150,7 +154,9 @@ jobs:
           path: ~/go/bin
           key: outils-${{ runner.os }}-sqlc-1.31.1-goose-3.28.0
       - if: steps.outils.outputs.cache-hit != 'true'
-        run: go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1 github.com/pressly/goose/v3/cmd/goose@v3.28.0
+        run: |
+          go install github.com/sqlc-dev/sqlc/cmd/sqlc@v1.31.1
+          go install github.com/pressly/goose/v3/cmd/goose@v3.28.0
       # Le binaire applique goose au démarrage : une base qui n'a que
       # `schema.sql` n'est PAS celle de production. Sans les migrations ici,
       # `sqlc vet` échouait sur chaque colonne ajoutée depuis le dernier gel du schéma.
