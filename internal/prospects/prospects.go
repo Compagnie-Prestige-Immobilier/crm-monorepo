@@ -628,10 +628,6 @@ func (s *service) prospectLister(ctx context.Context, in *ProspectListInput) (*P
 	return out, nil
 }
 
-type ProspectIDInput struct {
-	ID string `path:"id" format:"uuid"`
-}
-
 func (s *service) prospectHandlerLire(ctx context.Context, in *ProspectIDInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	item, err := s.prospectLire(ctx, &u, in.ID)
@@ -1288,7 +1284,7 @@ func prospectDeduireWhatsapp(numero, phoneE164 *string) db.WhatsappStatus {
 func prospectChampsJournal(p *db.ProspectVivantRow) map[string]any {
 	return map[string]any{
 		prospectChampNom: p.Nom, socle.ProspectChampPrenom: p.Prenom, socle.ProspectChampPhone: p.PhoneE164,
-		"statut": string(p.Statut), prospectChampBanque: p.BanqueId, prospectChampSyndicat: p.SyndicatId,
+		prospectChampStatut: string(p.Statut), prospectChampBanque: p.BanqueId, prospectChampSyndicat: p.SyndicatId,
 		"representantId": p.RepresentantId, "email": p.Email,
 	}
 }
@@ -1464,6 +1460,7 @@ var Garde = map[string]socle.Permission{
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
 	"GET /api/v1/prospects/{id}/requalifications":                     prospectLecture,
+	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
 	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,

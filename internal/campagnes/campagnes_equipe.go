@@ -35,7 +35,7 @@ func (s *service) campagneAjouterTeleconseiller(ctx context.Context, in *Campagn
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_DEJA_DANS_EQUIPE",
 			"Ce téléconseiller fait déjà partie de la campagne.")
 	}
-	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers)
+	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers, false)
 	if err != nil {
 		return nil, err
 	}
@@ -55,9 +55,9 @@ func lotReaffectationVide() error {
 		"Aucune de ces fiches n’est déplaçable : elles sont traitées, ou déjà à ce compte.")
 }
 
-// Une fiche déjà appelée reste où elle est : la déplacer ferait porter le
-// travail d'un téléconseiller au compteur d'un autre.
-func (s *service) lotMouvementsVers(ctx context.Context, row *db.LotParIdRow, positions []int, vers string) ([]lotMouvement, error) {
+// L'ajout ne prend que des fiches non traitées ; la réaffectation choisie par
+// l'encadrement peut aussi confier une fiche traitée, ses appels restant à leur auteur.
+func (s *service) lotMouvementsVers(ctx context.Context, row *db.LotParIdRow, positions []int, vers string, avecTraitees bool) ([]lotMouvement, error) {
 	if len(positions) == 0 {
 		return nil, nil
 	}
@@ -67,7 +67,7 @@ func (s *service) lotMouvementsVers(ctx context.Context, row *db.LotParIdRow, po
 	}
 	var candidates []int32
 	for _, position := range positions {
-		if !traitees[lotInt32(position)] {
+		if avecTraitees || !traitees[lotInt32(position)] {
 			candidates = append(candidates, lotInt32(position))
 		}
 	}

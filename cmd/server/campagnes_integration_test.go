@@ -307,6 +307,30 @@ func TestCampagneReaffectationDeplaceEtTrace(t *testing.T) {
 	}
 }
 
+func TestCampagneReaffectationConfieUneFicheTraitee(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	b.creer()
+	appelee := b.positionsDe(b.agentA)[0]
+	tentative := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
+		 SELECT $1, "representantId", $2, 'REACHED', now() FROM "lot_export_items" WHERE "lotId" = $3 AND "position" = $4`,
+		tentative, b.agentA, b.lotID, appelee); err != nil {
+		t.Fatal(err)
+	}
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation", map[string]any{
+		"positions": []int{appelee}, "versTeleconseillerId": b.agentB,
+	})
+	b.attend(statut, http.StatusOK, "réaffectation d'une fiche traitée", body)
+	if b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "position" = $2 AND "assigneeId" = $3`,
+		b.lotID, appelee, b.agentB) != 1 {
+		t.Fatal("la fiche traitée doit suivre")
+	}
+	if b.compte(`SELECT count(*)::int FROM "rep_call_attempts" WHERE "id" = $1 AND "performedById" = $2`, tentative, b.agentA) != 1 {
+		t.Fatal("l'appel reste à son auteur")
+	}
+}
+
 func TestCampagneReaffectationFaitEntrerUnTeleconseillerOublie(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	oublie := b.agent("Agent Coumba Fall")

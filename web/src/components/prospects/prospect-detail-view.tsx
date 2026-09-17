@@ -10,6 +10,7 @@ import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import {
   HistoireDeLaFiche,
   NO_VALUE,
@@ -39,7 +40,7 @@ import {
   type SessionUser,
 } from '@/lib/types';
 
-function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
+export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
   const dernierPar = prospect.lastCallByName === null ? '' : ` · ${prospect.lastCallByName}`;
   return [
     {
@@ -126,6 +127,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
               </Link>
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
+            <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
           </>
         }
         chiffres={chiffresDe(prospect)}
