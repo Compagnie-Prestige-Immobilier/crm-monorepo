@@ -4,11 +4,11 @@ Le panneau d'administration v1 (React, Base UI, Tailwind, React Query), repris
 tel quel le 10 septembre 2026 et servi par le binaire Go comme SPA Vite. `pnpm
 dev` relaie `/api` vers 4000.
 
-- `src/components/` et `src/lib/` sont le code v1, écran par écran. Il parle le
-  contrat v1 : `contrat-v1.openapi.json` est ce contrat figé, `pnpm gen` en
-  tire `src/api/schema-v1.d.ts`, et `@crm/api-client` pointe sur
-  `src/api/compat/`. Le binaire Go sert ce contrat ; l'écart se mesure en
-  comparant les deux fichiers OpenAPI, pas avec des casts.
+- `src/components/` et `src/lib/` sont le code v1, écran par écran. Ses types
+  viennent du contrat engendré par le binaire Go : `make gen` écrit
+  `openapi.json`, `pnpm gen` en tire `src/api/schema.d.ts`, et
+  `@crm/api-client` pointe sur `src/api/compat/`. Aucun contrat n'est écrit à
+  la main.
 - Les imports Next (`next/link`, `next/navigation`, `next/image`, `next/script`,
   `next-themes`) sont des cales de `src/shims/`, branchées dans `tsconfig.json`
   et `vite.config.ts`.
@@ -28,4 +28,4 @@ dev` relaie `/api` vers 4000.
 - Disparus avec le mobile et l'espace démo : relevés d'appels du téléphone,
   versions Android, bandeau démo.
 - Rien de généré ne se commite (`routeTree.gen.ts`, `schema.d.ts`,
-  `schema-v1.d.ts`, `dist/`).
+  `dist/`).

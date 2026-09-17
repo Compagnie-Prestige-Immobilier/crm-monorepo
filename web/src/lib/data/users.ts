@@ -13,7 +13,7 @@ export async function fetchUsers(
   const query: {
     search?: string;
     role?: Role;
-    isActive?: boolean;
+    isActive?: 'true' | 'false';
     page?: number;
     pageSize?: number;
   } = { page: filters.page, pageSize: filters.pageSize };
@@ -21,7 +21,7 @@ export async function fetchUsers(
   const search = filters.search.trim();
   if (search !== '') query.search = search;
   if (filters.role !== null) query.role = filters.role;
-  if (filters.isActive !== null) query.isActive = filters.isActive;
+  if (filters.isActive !== null) query.isActive = filters.isActive ? 'true' : 'false';
 
   return flattenPage(unwrap(await client.GET('/api/v1/users', { params: { query } })));
 }

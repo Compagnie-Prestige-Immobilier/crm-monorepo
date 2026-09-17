@@ -105,7 +105,9 @@ export async function fetchReferenceData(
 ): Promise<ReferenceData> {
   const [bundle, iefs, users, representants] = await Promise.all([
     client.GET('/api/v1/referentiels', { params: { query: { activeOnly: false } } }),
-    client.GET('/api/v1/referentiels/iefs', { params: { query: { activeOnly: false } } }),
+    client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'iefs' }, query: { activeOnly: false } },
+    }),
     client.GET('/api/v1/users', { params: { query: { pageSize: 200 } } }),
     representantsComplets(client),
   ]);
@@ -135,8 +137,9 @@ export async function fetchIefs(
   client: ApiClient = getApiClient(),
 ): Promise<Ief[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/iefs', {
+    await client.GET('/api/v1/referentiels/{kind}', {
       params: {
+        path: { kind: 'iefs' },
         query: { activeOnly: false, ...(departementId === undefined ? {} : { departementId }) },
       },
     }),
@@ -147,58 +150,62 @@ export async function fetchDepartements(
   client: ApiClient = getApiClient(),
 ): Promise<Departement[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/departements', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'departements' }, query: { activeOnly: false } },
     }),
   );
 }
 
 export async function fetchBanques(client: ApiClient = getApiClient()): Promise<Banque[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/banques', { params: { query: { activeOnly: false } } }),
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'banques' }, query: { activeOnly: false } },
+    }),
   );
 }
 
 export async function fetchSyndicats(client: ApiClient = getApiClient()): Promise<Syndicat[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/syndicats', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'syndicats' }, query: { activeOnly: false } },
     }),
   );
 }
 
 export async function fetchRegions(client: ApiClient = getApiClient()): Promise<Region[]> {
-  return unwrap(await client.GET('/api/v1/referentiels/regions'));
+  return unwrap(
+    await client.GET('/api/v1/referentiels/{kind}', { params: { path: { kind: 'regions' } } }),
+  );
 }
 
 export async function fetchProfessions(client: ApiClient = getApiClient()): Promise<Profession[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/professions', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'professions' }, query: { activeOnly: false } },
     }),
   );
 }
 
 export async function fetchIncomeBands(client: ApiClient = getApiClient()): Promise<IncomeBand[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/tranches-revenu', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'tranches-revenu' }, query: { activeOnly: false } },
     }),
   );
 }
 
 export async function fetchEmployeurs(client: ApiClient = getApiClient()): Promise<Employeur[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/employeurs', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'employeurs' }, query: { activeOnly: false } },
     }),
   );
 }
 
 export async function fetchOffers(client: ApiClient = getApiClient()): Promise<Offer[]> {
   return unwrap(
-    await client.GET('/api/v1/referentiels/offres', {
-      params: { query: { activeOnly: false } },
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'offres' }, query: { activeOnly: false } },
     }),
   );
 }

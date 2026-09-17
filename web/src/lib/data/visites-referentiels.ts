@@ -1,12 +1,14 @@
-import type { ApiClient, components } from '@crm/api-client';
+import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 
-export type VisiteReferentielKind = components['schemas']['VisiteReferentielKind'];
-export type VisiteReferentielEntry = components['schemas']['VisiteReferentielDto'];
-export type CreateVisiteReferentielInput = components['schemas']['CreateVisiteReferentielDto'];
-export type UpdateVisiteReferentielInput = components['schemas']['UpdateVisiteReferentielDto'];
+export type VisiteReferentielKind =
+  operations['listVisiteReferentiel']['parameters']['path']['kind'];
+export type VisiteReferentielEntry = components['schemas']['EntreeReferentielVisite'];
+export type CreateVisiteReferentielInput = components['schemas']['CreationEntreeVisiteInputBody'];
+export type UpdateVisiteReferentielInput =
+  components['schemas']['ModificationEntreeVisiteInputBody'];
 
 export const VISITE_REFERENTIEL_KINDS: readonly VisiteReferentielKind[] = [
   'entreprises',

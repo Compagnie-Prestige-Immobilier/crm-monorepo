@@ -2,15 +2,14 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import { PANEL_PAYLOAD_VERSION } from '@/lib/data/statuts-qualification';
 import type { CallOutcome } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type CallOutcomeEffect = Schemas['CallOutcomeEffect'];
-export type CallOutcomeReason = Schemas['CallOutcomeReasonDto'];
-export type CreateCallOutcomeReasonInput = Schemas['CreateCallOutcomeReasonDto'];
-export type UpdateCallOutcomeReasonInput = Schemas['UpdateCallOutcomeReasonDto'];
+export type CallOutcomeReason = Schemas['ReferentielsMotif'];
+export type CallOutcomeEffect = CallOutcomeReason['effect'];
+export type CreateCallOutcomeReasonInput = Schemas['ReferentielsCreerMotifInputBody'];
+export type UpdateCallOutcomeReasonInput = Schemas['ReferentielsModifierMotifInputBody'];
 
 export const CALL_OUTCOME_EFFECTS = [
   'CLOSE_METHOD',
@@ -68,11 +67,7 @@ export interface MotifAppel {
 
 /** Les motifs que l'écran d'appel propose : les actifs, dans l'ordre de l'ADMIN. */
 export async function fetchMotifsAppel(client: ApiClient = getApiClient()): Promise<MotifAppel[]> {
-  const items = unwrap(
-    await client.GET('/api/v1/call-outcome-reasons', {
-      params: { query: { payloadVersion: PANEL_PAYLOAD_VERSION } },
-    }),
-  ).items;
+  const items = unwrap(await client.GET('/api/v1/call-outcome-reasons')).items;
   return items.map((motif) => ({
     id: motif.id,
     code: motif.code,

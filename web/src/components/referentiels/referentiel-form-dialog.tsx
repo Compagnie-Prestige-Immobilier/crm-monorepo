@@ -75,7 +75,7 @@ export function BanqueFormDialog({
   const mutation = useMutation({
     mutationFn: (values: BanqueFormInput) =>
       isEdit
-        ? updateBanque(banque.id, { ...values, isActive: banque.isActive })
+        ? updateBanque(banque.id, { ...values, isActive: banque.isActive ?? true })
         : createBanque({ ...values, isActive: true }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.referentielsRoot });
@@ -200,7 +200,7 @@ export function SyndicatFormDialog({
         ? updateSyndicat(syndicat.id, {
             ...body,
             secteur: values.secteur,
-            isActive: syndicat.isActive,
+            isActive: syndicat.isActive ?? true,
           })
         : createSyndicat({
             ...body,
@@ -318,7 +318,7 @@ export function DepartementFormDialog({
   const mutation = useMutation({
     mutationFn: (values: DepartementFormInput) =>
       isEdit
-        ? updateDepartement(departement.id, { ...values, isActive: departement.isActive })
+        ? updateDepartement(departement.id, { ...values, isActive: departement.isActive ?? true })
         : createDepartement({ ...values, isActive: true }),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.referentielsRoot });

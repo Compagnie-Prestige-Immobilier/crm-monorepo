@@ -21,10 +21,10 @@ import {
 } from '@/lib/data/prospects';
 import { formatDateTime, formatDetectedCall, formatDeviceCall, formatNumber } from '@/lib/format';
 import {
-  CALL_OUTCOME_LABELS,
-  CALL_OUTCOME_VARIANTS,
-  ENROLLMENT_METHOD_LABELS,
   SEGMENT_LABELS,
+  callOutcomeLabel,
+  callOutcomeVariant,
+  enrollmentMethodLabel,
   type ProspectRow,
   type Role,
 } from '@/lib/types';
@@ -78,7 +78,7 @@ function evenementCreation(prospect: ProspectRow): EvenementHistorique {
 
 function resumeAppel(appel: ProspectCallAttempt): string {
   if (appel.comment !== null && appel.comment !== '') return appel.comment;
-  if (appel.method !== null) return `Méthode : ${ENROLLMENT_METHOD_LABELS[appel.method]}`;
+  if (appel.method !== null) return `Méthode : ${enrollmentMethodLabel(appel.method)}`;
   if (appel.rendezVousAt !== null) return `Rendez-vous le ${formatDateTime(appel.rendezVousAt)}`;
   return '';
 }
@@ -88,15 +88,15 @@ function evenementAppel(appel: ProspectCallAttempt): EvenementHistorique {
     id: appel.id,
     categorie: 'appel',
     at: appel.clientCreatedAt,
-    titre: appel.reasonLabel ?? CALL_OUTCOME_LABELS[appel.outcome],
-    variant: CALL_OUTCOME_VARIANTS[appel.outcome],
+    titre: appel.reasonLabel ?? callOutcomeLabel(appel.outcome),
+    variant: callOutcomeVariant(appel.outcome),
     resume: resumeAppel(appel),
     acteur: appel.performedByName,
     source: appel.deviceCallAt === null ? 'Non confirmé par le téléphone' : formatDeviceCall(appel),
     detail: (
       <>
         <dl className="grid gap-3 sm:grid-cols-2">
-          <Champ label="Issue">{CALL_OUTCOME_LABELS[appel.outcome]}</Champ>
+          <Champ label="Issue">{callOutcomeLabel(appel.outcome)}</Champ>
           <Champ label="Motif retenu">{ouVide(appel.reasonLabel, 'Aucun')}</Champ>
           <Champ label="Téléphone">{formatDeviceCall(appel).replace('Téléphone : ', '')}</Champ>
           <Champ label="Temps de traitement">
@@ -105,7 +105,7 @@ function evenementAppel(appel: ProspectCallAttempt): EvenementHistorique {
               : formatDuration(appel.dureeTraitementSecondes)}
           </Champ>
           <Champ label="Méthode d’enrôlement">
-            {appel.method === null ? NO_VALUE : ENROLLMENT_METHOD_LABELS[appel.method]}
+            {appel.method === null ? NO_VALUE : enrollmentMethodLabel(appel.method)}
           </Champ>
           <Champ label="Rendez-vous">
             {appel.rendezVousAt === null ? 'Aucun' : formatDateTime(appel.rendezVousAt)}
@@ -191,12 +191,12 @@ function evenementsDeLaFiche(prospect: ProspectRow): EvenementHistorique[] {
       at: prospect.enrollmentCapturedAt,
       titre: 'Méthode obtenue',
       variant: 'success',
-      resume: ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod],
+      resume: enrollmentMethodLabel(prospect.enrollmentMethod),
       acteur: prospect.enrollmentCapturedByName ?? prospect.ownedByCommercialName,
       detail: (
         <dl className="grid gap-3 sm:grid-cols-2">
           <Champ label="Méthode d’enrôlement">
-            {ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+            {enrollmentMethodLabel(prospect.enrollmentMethod)}
           </Champ>
           <Champ label="Le">{formatDateTime(prospect.enrollmentCapturedAt)}</Champ>
         </dl>

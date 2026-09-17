@@ -128,8 +128,8 @@ export function ClientRequestsView() {
                 value={filters.banqueId}
                 options={(reference?.banques ?? []).map((banque) => ({
                   value: banque.id,
-                  label: banque.name,
-                  hint: banque.shortName,
+                  label: banque.name ?? '',
+                  hint: banque.shortName ?? undefined,
                 }))}
                 onChange={(value) => {
                   setFilters({ banqueId: value });

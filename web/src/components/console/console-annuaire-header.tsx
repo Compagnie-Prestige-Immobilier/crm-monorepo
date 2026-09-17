@@ -29,7 +29,7 @@ type EnTeteAnnuaireProps = {
   resteAAppeler: boolean;
   total: number | null;
   reference: ReferenceData | undefined;
-  canaux: { id: string; label: string }[] | undefined;
+  canaux: { id: string; label: string | null }[] | undefined;
   advancedChips: AdvancedChip[];
   onSearch: (value: string) => void;
   onOrigine: (value: OrigineFiche) => void;
@@ -243,8 +243,8 @@ function FiltresConsole({
         placeholder="Tous les départements"
         options={(reference?.departements ?? []).map((d) => ({
           value: d.id,
-          label: withRetired(d.name, d.isActive),
-          hint: d.regionName,
+          label: withRetired(d.name ?? '', d.isActive ?? false),
+          hint: d.regionName ?? undefined,
         }))}
         value={departementId}
         onChange={onDepartementChange}
@@ -254,8 +254,8 @@ function FiltresConsole({
         placeholder="Toutes les banques"
         options={(reference?.banques ?? []).map((b) => ({
           value: b.id,
-          label: withRetired(b.shortName, b.isActive),
-          hint: b.name,
+          label: withRetired(b.shortName ?? '', b.isActive ?? false),
+          hint: b.name ?? undefined,
         }))}
         value={banqueId}
         onChange={onBanqueChange}
@@ -265,7 +265,7 @@ function FiltresConsole({
         placeholder="Tous les syndicats"
         options={(reference?.syndicats ?? []).map((s) => ({
           value: s.id,
-          label: withRetired(s.sigle, s.isActive),
+          label: withRetired(s.sigle ?? '', s.isActive ?? false),
           hint: s.secteur ?? undefined,
         }))}
         value={syndicatId}
@@ -281,7 +281,7 @@ function FiltresConsole({
       <FilterCombobox
         label="Canal de provenance"
         placeholder="Tous les canaux"
-        options={(canaux ?? []).map((c) => ({ value: c.id, label: c.label }))}
+        options={(canaux ?? []).map((c) => ({ value: c.id, label: c.label ?? '' }))}
         value={canalProvenanceId}
         onChange={onCanalChange}
       />

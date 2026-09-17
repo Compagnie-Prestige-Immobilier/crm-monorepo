@@ -5,9 +5,9 @@ import { getApiClient } from '@/lib/api/browser';
 
 type Schemas = components['schemas'];
 
-export type ImportJob = Schemas['ImportJobDto'];
-export type ImportJobReport = Schemas['ImportJobReportDto'];
-export type ImportKind = Schemas['ImportKind'];
+export type ImportJob = Schemas['ImportJobDTO'];
+export type ImportJobReport = Schemas['RapportImportDTO'];
+export type ImportKind = ImportJob['kind'];
 
 export interface ImportJobPage {
   items: ImportJob[];
@@ -102,7 +102,7 @@ const UPLOAD_PATHS: Readonly<Record<Exclude<ImportKind, 'VISITES_REGISTRE'>, str
   VISITES: '/api/v1/imports/visites',
 };
 
-export type RattrapageFeuilles = Schemas['RattrapageFeuillesDto'];
+export type RattrapageFeuilles = Schemas['RattrapageOutputBody'];
 
 /** RATTRAPAGE PONCTUEL, à retirer avec `rattraper-feuilles.tsx`. */
 export async function rattraperFeuillesImport(

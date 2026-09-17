@@ -258,8 +258,8 @@ Next, Prisma, Flutter, clients generes) a ete purgee de ce depot et `apps/go`
 en est devenu la racine : `cmd/server`, `internal/`, `sql/`, `web/`, `e2e/`.
 Le 10 septembre le proprietaire a exige le panneau v1 a l'identique : `web/`
 est le code React de la v1 repris tel quel (composants, donnees, ecrans), avec
-des cales pour Next et le contrat v1 fige dans `web/contrat-v1.openapi.json` ;
-le binaire Go sert ce contrat. Aucune refonte d'ecran sans son accord ecrit.
+des cales pour Next. Depuis le 17 septembre ses types viennent du seul
+`openapi.json` engendre par le Go ; aucun contrat ecrit a la main. Aucune refonte d'ecran sans son accord ecrit.
 Pas de stockage local ni de sync dans le panneau : une perte de donnees hors
 ligne nous serait imputee. Toute proposition qui contredit ces decisions se
 signale en une ligne au proprietaire avant d'etre codee.

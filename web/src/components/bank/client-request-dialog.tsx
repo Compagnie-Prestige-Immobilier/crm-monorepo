@@ -286,7 +286,7 @@ export function ClientRequestDialog({
               <Select
                 items={(banques.data ?? []).map((item) => ({
                   value: item.id,
-                  label: `${withRetired(item.shortName, item.isActive)}, ${item.name}`,
+                  label: `${withRetired(item.shortName ?? '', item.isActive ?? false)}, ${item.name}`,
                 }))}
                 value={banque ?? ''}
                 onValueChange={(value) => {
@@ -300,7 +300,7 @@ export function ClientRequestDialog({
                 <SelectContent>
                   {(banques.data ?? []).map((item) => (
                     <SelectItem key={item.id} value={item.id}>
-                      {withRetired(item.shortName, item.isActive)}, {item.name}
+                      {withRetired(item.shortName ?? '', item.isActive ?? false)}, {item.name}
                     </SelectItem>
                   ))}
                 </SelectContent>

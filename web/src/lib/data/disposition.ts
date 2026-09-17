@@ -1,4 +1,4 @@
-import type { ApiClient, components } from '@crm/api-client';
+import type { ApiClient, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
@@ -10,7 +10,7 @@ import type {
   DispositionPresentation,
 } from '@/components/accueil/tableau-de-bord/sources';
 
-export type DashboardEcran = components['schemas']['DashboardEcran'];
+export type DashboardEcran = operations['getDashboardLayout']['parameters']['path']['ecran'];
 
 export interface DashboardWidget {
   id: string;

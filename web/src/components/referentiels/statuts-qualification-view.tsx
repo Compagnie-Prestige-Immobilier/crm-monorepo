@@ -145,6 +145,14 @@ const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'o
 const relationPosee = (relation: RelationChoisie): StatutRelationPosee =>
   relation === AUCUNE ? null : relation;
 
+/** Absente du corps, jamais nulle : Go n'a pas de valeur qui efface une relation déjà posée. */
+const relationPoseeChamp = (
+  relation: RelationChoisie,
+): { relationStatus: Exclude<StatutRelationPosee, null> } | Record<string, never> => {
+  const posee = relationPosee(relation);
+  return posee === null ? {} : { relationStatus: posee };
+};
+
 export function StatutsQualificationView() {
   const queryClient = useQueryClient();
   const [edite, setEdite] = useState<StatutQualification | null>(null);
@@ -405,8 +413,8 @@ function FormulaireStatut({
         ? updateStatutQualification(statut.id, {
             label: values.label.trim(),
             priorite: values.priorite,
-            relationStatus: relationPosee(values.relation),
-            retryAfterMinutes: values.reessai === '' ? null : Number(values.reessai),
+            ...relationPoseeChamp(values.relation),
+            ...(values.reessai === '' ? {} : { retryAfterMinutes: Number(values.reessai) }),
             ...(regleFigee ? {} : { requiresCallback: values.requiresCallback }),
           })
         : createStatutQualification({
@@ -416,9 +424,9 @@ function FormulaireStatut({
             // Cet écran ne pose pas la question : seuls les statuts système
             // exigent un motif, et ils ne se créent pas d'ici.
             requiresComment: false,
-            retryAfterMinutes: values.reessai === '' ? null : Number(values.reessai),
+            ...(values.reessai === '' ? {} : { retryAfterMinutes: Number(values.reessai) }),
             priorite: values.priorite,
-            relationStatus: relationPosee(values.relation),
+            ...relationPoseeChamp(values.relation),
           }),
     onSuccess: () => {
       toast.success(modification ? 'Statut modifié.' : 'Statut ajouté.');

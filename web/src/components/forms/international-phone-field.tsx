@@ -45,10 +45,10 @@ function drapeau(iso2: string): string {
  */
 export function callingCountriesFrom(pays: readonly Pays[]): CallingCountry[] {
   return pays
-    .filter((entry) => entry.isActive)
+    .filter((entry) => entry.isActive === true)
     .map((entry) => ({
-      code: entry.indicatif,
-      label: `${drapeau(entry.code)} +${entry.indicatif}`,
+      code: entry.indicatif ?? '',
+      label: `${drapeau(entry.code ?? '')} +${entry.indicatif ?? ''}`,
     }));
 }
 

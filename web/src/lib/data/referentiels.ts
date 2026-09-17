@@ -14,82 +14,71 @@ import type {
   Syndicat,
 } from '@/lib/types';
 
-export type CreateBanqueInput = components['schemas']['CreateBanqueDto'];
-export type UpdateBanqueInput = components['schemas']['UpdateBanqueDto'];
-export type CreateSyndicatInput = components['schemas']['CreateSyndicatDto'];
-export type UpdateSyndicatInput = components['schemas']['UpdateSyndicatDto'];
-export type CreateDepartementInput = components['schemas']['CreateDepartementDto'];
-export type UpdateDepartementInput = components['schemas']['UpdateDepartementDto'];
+type ReferentielEntree = components['schemas']['ReferentielsEntree'];
+export type CreateBanqueInput = ReferentielEntree;
+export type UpdateBanqueInput = ReferentielEntree;
+export type CreateSyndicatInput = ReferentielEntree;
+export type UpdateSyndicatInput = ReferentielEntree;
+export type CreateDepartementInput = ReferentielEntree;
+export type UpdateDepartementInput = ReferentielEntree;
 
-export async function saveProfession(
-  input: components['schemas']['CreateProfessionDto'] & { id?: string },
-  client: ApiClient = getApiClient(),
-): Promise<Profession> {
+async function saveReferentiel(
+  kind: string,
+  input: ReferentielEntree & { id?: string },
+  client: ApiClient,
+): Promise<components['schemas']['ReferentielsItem']> {
   const { id, ...body } = input;
-  if (id) {
+  if (id !== undefined) {
     return unwrap(
-      await client.PATCH('/api/v1/referentiels/professions/{id}', {
-        params: { path: { id } },
+      await client.PATCH('/api/v1/referentiels/{kind}/{id}', {
+        params: { path: { kind, id } },
         body,
       }),
     );
   }
-  return unwrap(await client.POST('/api/v1/referentiels/professions', { body }));
+  return unwrap(
+    await client.POST('/api/v1/referentiels/{kind}', { params: { path: { kind } }, body }),
+  );
+}
+
+export async function saveProfession(
+  input: ReferentielEntree & { id?: string },
+  client: ApiClient = getApiClient(),
+): Promise<Profession> {
+  return saveReferentiel('professions', input, client);
 }
 
 export async function saveIncomeBand(
-  input: components['schemas']['CreateIncomeBandDto'] & { id?: string },
+  input: ReferentielEntree & { id?: string },
   client: ApiClient = getApiClient(),
 ): Promise<IncomeBand> {
-  const { id, ...body } = input;
-  if (id) {
-    return unwrap(
-      await client.PATCH('/api/v1/referentiels/tranches-revenu/{id}', {
-        params: { path: { id } },
-        body,
-      }),
-    );
-  }
-  return unwrap(await client.POST('/api/v1/referentiels/tranches-revenu', { body }));
+  return saveReferentiel('tranches-revenu', input, client);
 }
 
 export async function saveEmployeur(
-  input: components['schemas']['CreateEmployeurDto'] & { id?: string },
+  input: ReferentielEntree & { id?: string },
   client: ApiClient = getApiClient(),
 ): Promise<Employeur> {
-  const { id, ...body } = input;
-  if (id) {
-    return unwrap(
-      await client.PATCH('/api/v1/referentiels/employeurs/{id}', {
-        params: { path: { id } },
-        body,
-      }),
-    );
-  }
-  return unwrap(await client.POST('/api/v1/referentiels/employeurs', { body }));
+  return saveReferentiel('employeurs', input, client);
 }
 
 export async function saveOffer(
-  input: components['schemas']['CreateOfferDto'] & { id?: string },
+  input: ReferentielEntree & { id?: string },
   client: ApiClient = getApiClient(),
 ): Promise<Offer> {
-  const { id, ...body } = input;
-  if (id) {
-    return unwrap(
-      await client.PATCH('/api/v1/referentiels/offres/{id}', {
-        params: { path: { id } },
-        body,
-      }),
-    );
-  }
-  return unwrap(await client.POST('/api/v1/referentiels/offres', { body }));
+  return saveReferentiel('offres', input, client);
 }
 
 export async function createBanque(
   input: CreateBanqueInput,
   client: ApiClient = getApiClient(),
 ): Promise<Banque> {
-  return unwrap(await client.POST('/api/v1/referentiels/banques', { body: input }));
+  return unwrap(
+    await client.POST('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'banques' } },
+      body: input,
+    }),
+  );
 }
 
 export async function updateBanque(
@@ -98,8 +87,8 @@ export async function updateBanque(
   client: ApiClient = getApiClient(),
 ): Promise<Banque> {
   return unwrap(
-    await client.PATCH('/api/v1/referentiels/banques/{id}', {
-      params: { path: { id } },
+    await client.PATCH('/api/v1/referentiels/{kind}/{id}', {
+      params: { path: { kind: 'banques', id } },
       body: patch,
     }),
   );
@@ -109,7 +98,12 @@ export async function createSyndicat(
   input: CreateSyndicatInput,
   client: ApiClient = getApiClient(),
 ): Promise<Syndicat> {
-  return unwrap(await client.POST('/api/v1/referentiels/syndicats', { body: input }));
+  return unwrap(
+    await client.POST('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'syndicats' } },
+      body: input,
+    }),
+  );
 }
 
 export async function updateSyndicat(
@@ -118,8 +112,8 @@ export async function updateSyndicat(
   client: ApiClient = getApiClient(),
 ): Promise<Syndicat> {
   return unwrap(
-    await client.PATCH('/api/v1/referentiels/syndicats/{id}', {
-      params: { path: { id } },
+    await client.PATCH('/api/v1/referentiels/{kind}/{id}', {
+      params: { path: { kind: 'syndicats', id } },
       body: patch,
     }),
   );
@@ -129,7 +123,12 @@ export async function createDepartement(
   input: CreateDepartementInput,
   client: ApiClient = getApiClient(),
 ): Promise<Departement> {
-  return unwrap(await client.POST('/api/v1/referentiels/departements', { body: input }));
+  return unwrap(
+    await client.POST('/api/v1/referentiels/{kind}', {
+      params: { path: { kind: 'departements' } },
+      body: input,
+    }),
+  );
 }
 
 export async function updateDepartement(
@@ -138,8 +137,8 @@ export async function updateDepartement(
   client: ApiClient = getApiClient(),
 ): Promise<Departement> {
   return unwrap(
-    await client.PATCH('/api/v1/referentiels/departements/{id}', {
-      params: { path: { id } },
+    await client.PATCH('/api/v1/referentiels/{kind}/{id}', {
+      params: { path: { kind: 'departements', id } },
       body: patch,
     }),
   );

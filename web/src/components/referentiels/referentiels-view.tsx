@@ -315,9 +315,9 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
   const setActive = useMutation({
     mutationFn: ({ banque, isActive }: { banque: Banque; isActive: boolean }) =>
       updateBanque(banque.id, {
-        name: banque.name,
-        shortName: banque.shortName,
-        sortOrder: banque.sortOrder,
+        ...(banque.name === null ? {} : { name: banque.name }),
+        ...(banque.shortName === null ? {} : { shortName: banque.shortName }),
+        ...(banque.sortOrder === null ? {} : { sortOrder: banque.sortOrder }),
         isActive,
       }),
     onSuccess: (saved) => {
@@ -335,16 +335,16 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
   const swap = useMutation({
     mutationFn: async ({ a, b }: { a: Banque; b: Banque }) => {
       await updateBanque(a.id, {
-        name: a.name,
-        shortName: a.shortName,
-        isActive: a.isActive,
-        sortOrder: b.sortOrder,
+        ...(a.name === null ? {} : { name: a.name }),
+        ...(a.shortName === null ? {} : { shortName: a.shortName }),
+        ...(a.isActive === null ? {} : { isActive: a.isActive }),
+        ...(b.sortOrder === null ? {} : { sortOrder: b.sortOrder }),
       });
       await updateBanque(b.id, {
-        name: b.name,
-        shortName: b.shortName,
-        isActive: b.isActive,
-        sortOrder: a.sortOrder,
+        ...(b.name === null ? {} : { name: b.name }),
+        ...(b.shortName === null ? {} : { shortName: b.shortName }),
+        ...(b.isActive === null ? {} : { isActive: b.isActive }),
+        ...(a.sortOrder === null ? {} : { sortOrder: a.sortOrder }),
       });
     },
     onSuccess: invalidate,
@@ -354,7 +354,9 @@ function BanquesTab({ search, onSearch }: { search: string; onSearch: (value: st
   });
 
   const allRows = [...(data ?? [])].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.shortName.localeCompare(b.shortName, 'fr'),
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) ||
+      (a.shortName ?? '').localeCompare(b.shortName ?? '', 'fr'),
   );
   const rows = allRows.filter((banque) => matches(search, banque.shortName, banque.name));
   const tri = useTriLocal(rows, COLONNES_BANQUES);
@@ -567,10 +569,10 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
   };
 
   const patchOf = (syndicat: Syndicat) => ({
-    name: syndicat.name,
-    sigle: syndicat.sigle,
-    sortOrder: syndicat.sortOrder,
-    isActive: syndicat.isActive,
+    ...(syndicat.name === null ? {} : { name: syndicat.name }),
+    ...(syndicat.sigle === null ? {} : { sigle: syndicat.sigle }),
+    ...(syndicat.sortOrder === null ? {} : { sortOrder: syndicat.sortOrder }),
+    ...(syndicat.isActive === null ? {} : { isActive: syndicat.isActive }),
     ...(syndicat.secteur === null ? {} : { secteur: syndicat.secteur }),
   });
 
@@ -589,8 +591,14 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
 
   const swap = useMutation({
     mutationFn: async ({ a, b }: { a: Syndicat; b: Syndicat }) => {
-      await updateSyndicat(a.id, { ...patchOf(a), sortOrder: b.sortOrder });
-      await updateSyndicat(b.id, { ...patchOf(b), sortOrder: a.sortOrder });
+      await updateSyndicat(a.id, {
+        ...patchOf(a),
+        ...(b.sortOrder === null ? {} : { sortOrder: b.sortOrder }),
+      });
+      await updateSyndicat(b.id, {
+        ...patchOf(b),
+        ...(a.sortOrder === null ? {} : { sortOrder: a.sortOrder }),
+      });
     },
     onSuccess: invalidate,
     onError: (error) => {
@@ -599,7 +607,8 @@ function SyndicatsTab({ search, onSearch }: { search: string; onSearch: (value: 
   });
 
   const allRows = [...(data ?? [])].sort(
-    (a, b) => a.sortOrder - b.sortOrder || a.sigle.localeCompare(b.sigle, 'fr'),
+    (a, b) =>
+      (a.sortOrder ?? 0) - (b.sortOrder ?? 0) || (a.sigle ?? '').localeCompare(b.sigle ?? '', 'fr'),
   );
   const rows = allRows.filter((syndicat) =>
     matches(search, syndicat.sigle, syndicat.name, syndicat.secteur),
@@ -826,9 +835,9 @@ function DepartementsTab({
   const setActive = useMutation({
     mutationFn: ({ departement, isActive }: { departement: Departement; isActive: boolean }) =>
       updateDepartement(departement.id, {
-        code: departement.code,
-        name: departement.name,
-        regionId: departement.regionId,
+        ...(departement.code === null ? {} : { code: departement.code }),
+        ...(departement.name === null ? {} : { name: departement.name }),
+        ...(departement.regionId === null ? {} : { regionId: departement.regionId }),
         isActive,
       }),
     onSuccess: (saved) => {
@@ -845,7 +854,8 @@ function DepartementsTab({
   const rows = [...(data ?? [])]
     .sort(
       (a, b) =>
-        a.regionName.localeCompare(b.regionName, 'fr') || a.name.localeCompare(b.name, 'fr'),
+        (a.regionName ?? '').localeCompare(b.regionName ?? '', 'fr') ||
+        (a.name ?? '').localeCompare(b.name ?? '', 'fr'),
     )
     .filter((departement) =>
       matches(search, departement.name, departement.code, departement.regionName),

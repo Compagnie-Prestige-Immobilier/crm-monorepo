@@ -1,4 +1,4 @@
-import type { components } from '@crm/api-client';
+import type { operations } from '@crm/api-client';
 
 import {
   readEnum,
@@ -12,7 +12,12 @@ import type { SortDirection } from '@/lib/types';
 
 const REPRESENTANT_PAGE_SIZE = 25;
 
-export type RepresentantRelation = components['schemas']['RepresentantRelation'];
+type ListeRepresentantsQuery = NonNullable<operations['listRepresentants']['parameters']['query']>;
+
+export type RepresentantRelation = Exclude<
+  ListeRepresentantsQuery['relationStatus'],
+  undefined
+>[number];
 
 const REPRESENTANT_RELATIONS = [
   'INCONNU',

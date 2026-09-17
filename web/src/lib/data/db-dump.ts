@@ -3,7 +3,7 @@ import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 
-export type DatabaseDump = components['schemas']['DatabaseDumpJobDto'];
+export type DatabaseDump = components['schemas']['EtatDump'];
 
 export async function fetchDatabaseDump(client: ApiClient = getApiClient()): Promise<DatabaseDump> {
   return unwrap(await client.GET('/api/v1/admin/database-dump'));
