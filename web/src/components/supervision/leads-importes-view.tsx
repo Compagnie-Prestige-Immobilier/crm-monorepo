@@ -47,6 +47,7 @@ const COLONNES_IMPORTS = {
   joints: (lot: ImportDeLeads) => lot.joints,
   interesses: (lot: ImportDeLeads) => lot.interesses,
   part: (lot: ImportDeLeads) => (lot.importes === 0 ? null : lot.interesses / lot.importes),
+  plateforme: (lot: ImportDeLeads) => lot.plateforme,
 };
 
 const ENTETES_IMPORTS = [
@@ -57,6 +58,7 @@ const ENTETES_IMPORTS = [
   { id: 'joints', label: 'Jointes', className: 'text-right' },
   { id: 'interesses', label: 'Très intéressées', className: 'text-right' },
   { id: 'part', label: 'Part des fiches', className: 'text-right' },
+  { id: 'plateforme', label: 'Passées plateforme', className: 'text-right' },
 ] as const;
 
 function Imports({ imports }: { imports: ImportDeLeads[] }) {
@@ -88,14 +90,14 @@ function Imports({ imports }: { imports: ImportDeLeads[] }) {
         <TableBody>
           {imports.length > 0 && tri.lignes.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={8} className="text-muted-foreground">
                 Aucun classeur ne correspond à la recherche.
               </TableCell>
             </TableRow>
           ) : null}
           {imports.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={7} className="text-muted-foreground">
+              <TableCell colSpan={8} className="text-muted-foreground">
                 Aucun classeur de leads importé. Le marketing dépose le sien sur SharePoint, il est
                 relevé tous les quarts d’heure.
               </TableCell>
@@ -115,6 +117,9 @@ function Imports({ imports }: { imports: ImportDeLeads[] }) {
               </TableCell>
               <TableCell className="text-right tabular-nums">
                 {taux(lot.interesses, lot.importes)}
+              </TableCell>
+              <TableCell className="text-right tabular-nums text-muted-foreground">
+                {formatNumber(lot.plateforme)}
               </TableCell>
             </TableRow>
           ))}
