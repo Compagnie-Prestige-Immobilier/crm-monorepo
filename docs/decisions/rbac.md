@@ -811,3 +811,27 @@ reçoit les rapports quotidiens des téléconseillers, pas ceux des superviseurs
 déjà présentes (export plus large que la liste, `canFilter` divergent entre
 écrans) sont conservées à l'identique et listées dans le rapport de la phase
 concernée ; les corriger est une décision séparée.
+
+## 5. Exécuté
+
+Branche `v3`, 16 et 17 septembre 2026.
+
+| Phase | Commit     | Preuve                                                                                                                                                                                                                                                                   |
+| ----- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 0     | `be094205` | matrice gelée, 221 routes                                                                                                                                                                                                                                                |
+| 1     | `9d0a367e` | `TestMatriceRolesInchangee`                                                                                                                                                                                                                                              |
+| 2     | `62df5a4a` | régression trouvée en revue : `Encadrement` converti en `fiches.ignorer_propriete` (ADMIN seul), corrigée par `e548ae9b` (`fiches.modifier_toutes`) ; `portees_integration_test.go` passe sur `a5484c66` comme après, chaque test rougit quand sa permission est faussée |
+| 3     | `88c826d9` | tables `roles` et `role_permissions`, `users."roleId"`, trigger qui tient `role` égal au rôle de base, 13 tests d'intégration cassés un à un                                                                                                                             |
+| 4     | `c862787f` | 167 sites relus : ensemble de rôles identique avant et après pour les huit rôles                                                                                                                                                                                         |
+| 5     | `89e57071` | `roles-ecran.spec.ts` rougit si l'écran n'envoie pas la permission décochée ; suite Playwright complète verte à 4 travailleurs                                                                                                                                           |
+
+Suite d'intégration : mêmes résultats qu'à `a5484c66`, tests ajoutés en plus.
+
+Écarts au plan, voulus :
+
+- Pas de global : les attributions sont chargées par base (`Deps.Attributions`), chaque base de démonstration a sa table.
+- Garde-fou ajouté après revue : sans `roles.administrer`, on ne donne ni ne touche un compte dont le rôle dépasse ses propres permissions (`ROLE_HORS_DROITS`) ; sinon `comptes.administrer` suffisait à se faire ADMIN.
+- Deux permissions de plus : `fiches.modifier_toutes` et `visites.detruire` (la destruction d'une visite archivée ne suit plus la lecture des archives).
+- Web : un site ne passe à la permission que si un ensemble de rôles identique existe **et** que le sens correspond. Restent sur le rôle de base : `readsOnly`, `canExportProspects`, `canExportRepresentants`, boîte de réception (`INBOX_ROLES`), `canCreateProspect` de la console Téléconseil, les écrans du terrain (`TERRAIN`), l'onglet admin des pilotages, les redirections d'accueil. Un rôle personnalisé y suit sa base.
+- Écran : cases à cocher natives plutôt qu'un `switch` ajouté ; rôle choisi en état local, pas dans l'URL ; le filtre de la liste des comptes reste sur le rôle de base.
+- Le cache des analyses (60 s) garde l'ancienne portée d'un rôle système dont on vient de changer les permissions, au plus une minute.
