@@ -892,3 +892,62 @@ func projetsDesParcoursTest(b *banc, prospectID string) []string {
 	}
 	return parcours
 }
+
+// Une ligne de lead sans téléphone n'écrit aucune fiche : personne ne pourrait
+// l'appeler, et le relevé horaire la recréait à chaque passage. Le rapport la dit.
+func TestImportLeadsIgnoreEtSignaleUneLigneSansTelephone(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	b.canalSiteWeb()
+	t.Setenv("IMPORTS_DIR", t.TempDir())
+	base := time.Now().UnixNano() % 10_000_000
+	courriel := fmt.Sprintf("serigne.%d@example.sn", base)
+	nomClasseur := fmt.Sprintf("Leads du 14 sept 2026 %d.xlsx", base)
+	b.nettoyerLeadsTest(nil, nomClasseur)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" IN (SELECT "id" FROM "prospects" WHERE "email" = $1)`, courriel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "email" = $1`, courriel)
+	})
+
+	entete := []string{"Date", "Nom complet", "Email", "Provenance", "Téléphone", "Canal", "Réponse du prospect"}
+	classeur := classeurLeadsBrut(t, entete, []ongletLeadsBrutTest{{nom: "Leads 14 sept 2026", lignes: [][]any{
+		{"14/09/2026", "Serigne Mbaye Dramé", courriel, "Payé", "", canalMetaChuesTest, ""},
+	}}})
+
+	travail := b.releverLeadsTest(classeur, nomClasseur)
+	if n := importCompterParCourriel(b, courriel); n != 0 {
+		t.Fatalf("une ligne sans téléphone n'écrit rien : %d fiche(s)", n)
+	}
+	b.attendRapportTest(travail, "total=1 created=0 updated=0 skipped=1 errors=0 warnings=1",
+		map[string]float64{"PROSPECT_GP_IMPORT_LIGNE_SANS_TELEPHONE": 1})
+}
+
+func importCompterParCourriel(b *banc, courriel string) int {
+	b.t.Helper()
+	var n int
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT count(*)::int FROM "prospects" WHERE "email" = $1 AND "deletedAt" IS NULL`, courriel).Scan(&n); err != nil {
+		b.t.Fatal(err)
+	}
+	return n
+}
+
+// Deux fiches vivantes sans numéro ne peuvent pas porter la même adresse sur un
+// projet : la base le refuse, comme elle refuse deux fois le même numéro.
+func TestProspectSansNumeroUneSeuleFicheParAdresseEtProjet(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	courriel := fmt.Sprintf("garde.%d@example.sn", time.Now().UnixNano()%10_000_000)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "email" = $1`, courriel) })
+	ecrire := func() error {
+		_, err := b.pool.Exec(b.ctx,
+			`INSERT INTO "prospects" ("id","nom","prenom","email","projet","createdById","clientCreatedAt","updatedAt")
+			 VALUES (gen_random_uuid()::text,'Dramé','Serigne',$1,'CHUES',$2,now(),now())`, courriel, b.userID)
+		return err
+	}
+	if err := ecrire(); err != nil {
+		t.Fatalf("la première fiche sans numéro s'écrit : %v", err)
+	}
+	if err := ecrire(); err == nil {
+		t.Fatal("la seconde fiche sans numéro au même courriel doit être refusée")
+	}
+}

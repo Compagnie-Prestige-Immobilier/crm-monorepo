@@ -623,6 +623,7 @@ const (
 	codeDateCorrigeeImport   = "PROSPECT_GP_IMPORT_DATE_CORRIGEE"
 	codeCanalAVerifierImport = "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER"
 	codeSansIdentiteImport   = "PROSPECT_GP_IMPORT_LIGNE_SANS_IDENTITE"
+	codeSansTelephoneImport  = "PROSPECT_GP_IMPORT_LIGNE_SANS_TELEPHONE"
 	codeDejaEnBaseImport     = "PROSPECT_GP_IMPORT_DEJA_EN_BASE"
 	codePerdueImport         = "PROSPECT_GP_IMPORT_PERDUE_A_L_ECRITURE"
 	codeRemplaceeImport      = "PROSPECT_GP_IMPORT_LIGNE_REMPLACEE"
@@ -1155,7 +1156,11 @@ func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
 			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansIdentiteImport,
 				"Ni nom ni téléphone : rien à rattacher, la ligne est ignorée."))
 			continue
-		case ligne.telephone != nil && deja[telephoneConnuImport(ligne.telephone)].id != "":
+		case ligne.telephone == nil:
+			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansTelephoneImport,
+				"Sans téléphone, personne ne peut appeler cette fiche : la ligne est ignorée."))
+			continue
+		case deja[telephoneConnuImport(ligne.telephone)].id != "":
 			tri.connues = append(tri.connues, ligne)
 		default:
 			if refus := doublonEmailGrandPublicImport(&ligne, etat, dejaEmail); refus != nil {
@@ -1215,10 +1220,24 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 			return nil, nil, err
 		}
 		for _, ligne := range connus {
-			emails[ligne.Email] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
+			cumulerProjetsPortesImport(emails, ligne.Email, projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues))
 		}
 	}
 	return telephones, emails, nil
+}
+
+// Deux fiches peuvent partager une adresse, une par projet : écraser la carte
+// laissait repasser la ligne du projet lu en premier, et le relevé horaire des
+// leads recréait la même personne à chaque passage.
+func cumulerProjetsPortesImport(connus map[string]map[db.Projet]bool, email string, portes map[db.Projet]bool) {
+	cumul, deja := connus[email]
+	if !deja {
+		connus[email] = portes
+		return
+	}
+	for projet, porte := range portes {
+		cumul[projet] = cumul[projet] || porte
+	}
 }
 
 func projetsPortesImport(projet db.Projet, parcoursGp, parcoursChues bool) map[db.Projet]bool {
