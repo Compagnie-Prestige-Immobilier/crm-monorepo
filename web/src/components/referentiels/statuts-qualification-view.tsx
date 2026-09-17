@@ -145,7 +145,7 @@ const PRIORITE_VARIANTS: Record<PrioriteTraitement, 'warning' | 'secondary' | 'o
 const relationPosee = (relation: RelationChoisie): StatutRelationPosee =>
   relation === AUCUNE ? null : relation;
 
-/** Absente du corps, jamais nulle : Go n'a pas de valeur qui efface une relation déjà posée. */
+/** Le schéma refuse null : une relation absente du corps efface celle déjà posée. */
 const relationPoseeChamp = (
   relation: RelationChoisie,
 ): { relationStatus: Exclude<StatutRelationPosee, null> } | Record<string, never> => {
