@@ -36,7 +36,8 @@ SELECT COUNT(*)::int AS convertis,
 FROM "prospects" p
 WHERE (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet')::"Projet")
   AND p."deletedAt" IS NULL
-  AND p."phase2Status" = 'METHOD_OBTAINED';
+  -- L'enrôlement compte dès qu'une méthode est acquise, quel que soit le dernier statut posé.
+  AND p."enrollmentMethod" IS NOT NULL;
 
 -- name: LotStatsRepresentants :one
 SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches

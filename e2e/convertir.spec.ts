@@ -278,7 +278,8 @@ test.describe('parcours 5, convertir un prospect', () => {
       .toMatchObject({
         tentatives: 3,
         phase2Status: 'WRONG_NUMBER',
-        enrollmentMethod: null,
+        // L'enrolement obtenu plus tot reste acquis : seul un appel avec methode le remplace.
+        enrollmentMethod: 'VOICE_OR_ELECTRONIC_MESSAGING',
         parcoursStatut: 'WRONG_NUMBER',
       });
   });
