@@ -1,8 +1,10 @@
 -- name: UserForLogin :one
-SELECT "id", "email", "username", "fullName", "role", "phoneE164", "isActive", "passwordHash"
-FROM "users"
-WHERE "deletedAt" IS NULL
-  AND (lower("email") = lower(@identifier) OR lower("username") = lower(@identifier))
+SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."isActive", u."passwordHash",
+       u."roleId", r."libelle" AS role_libelle
+FROM "users" u
+JOIN "roles" r ON r."id" = u."roleId"
+WHERE u."deletedAt" IS NULL
+  AND (lower(u."email") = lower(@identifier) OR lower(u."username") = lower(@identifier))
 LIMIT 1;
 
 -- name: TouchLastLogin :exec
@@ -13,9 +15,10 @@ INSERT INTO "refresh_tokens" ("id", "userId", "tokenHash", "familyId", "expiresA
 VALUES ($1, $2, $3, $1, $4, $5);
 
 -- name: UserBySession :one
-SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164"
+SELECT u."id", u."email", u."username", u."fullName", u."role", u."phoneE164", u."roleId", r."libelle" AS role_libelle
 FROM "refresh_tokens" rt
 JOIN "users" u ON u."id" = rt."userId"
+JOIN "roles" r ON r."id" = u."roleId"
 WHERE rt."tokenHash" = $1
   AND rt."revokedAt" IS NULL
   AND rt."expiresAt" > now()
