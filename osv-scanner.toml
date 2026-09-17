@@ -1,3 +1,7 @@
 [[IgnoredVulns]]
 id = "GO-2026-5932"
 reason = "Vise seulement golang.org/x/crypto/openpgp, que le binaire n'importe pas (go list -deps). Aucune version corrigee n'existe."
+
+[[IgnoredVulns]]
+id = "GO-2026-6452"
+reason = "Panique en lisant une cellule dont l'index de chaine partagee est negatif, dans github.com/xuri/excelize/v2. Aucune version corrigee n'existe (2.11.0 est la derniere). Les classeurs ne sont lus que pour un compte interne authentifie, et le middleware recupere la panique en 500 sans arreter le serveur. A relire a la sortie du correctif amont."
