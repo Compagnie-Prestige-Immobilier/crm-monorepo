@@ -479,7 +479,7 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/admin/commerciaux',
-        label: 'Utilisateurs',
+        label: 'Utilisateurs et rôles',
         icon: UsersIcon,
         description: 'Comptes, rôles et accès',
         acces: 'comptes.administrer',
