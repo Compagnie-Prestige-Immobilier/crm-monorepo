@@ -1215,10 +1215,24 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 			return nil, nil, err
 		}
 		for _, ligne := range connus {
-			emails[ligne.Email] = projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues)
+			cumulerProjetsPortesImport(emails, ligne.Email, projetsPortesImport(ligne.Projet, ligne.ParcoursGp, ligne.ParcoursChues))
 		}
 	}
 	return telephones, emails, nil
+}
+
+// Deux fiches peuvent partager une adresse, une par projet : écraser la carte
+// laissait repasser la ligne du projet lu en premier, et le relevé horaire des
+// leads recréait la même personne à chaque passage.
+func cumulerProjetsPortesImport(connus map[string]map[db.Projet]bool, email string, portes map[db.Projet]bool) {
+	cumul, deja := connus[email]
+	if !deja {
+		connus[email] = portes
+		return
+	}
+	for projet, porte := range portes {
+		cumul[projet] = cumul[projet] || porte
+	}
 }
 
 func projetsPortesImport(projet db.Projet, parcoursGp, parcoursChues bool) map[db.Projet]bool {
