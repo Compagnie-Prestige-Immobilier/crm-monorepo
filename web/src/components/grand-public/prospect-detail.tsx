@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { DetailBackLink } from '@/components/detail-back-link';
+import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { FicheEnTete } from '@/components/fiche-en-tete';
 import { chiffresDe } from '@/components/prospects/prospect-detail-view';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
@@ -385,9 +386,12 @@ export function GrandPublicProspectDetail({
         phoneE164={prospect.phoneE164}
         projet="GRAND_PUBLIC"
         badges={
-          <Badge variant={STATUT_VARIANT[journey.statut]}>
-            {PROSPECT_STATUT_LABELS[journey.statut]}
-          </Badge>
+          <>
+            <Badge variant={STATUT_VARIANT[journey.statut]}>
+              {PROSPECT_STATUT_LABELS[journey.statut]}
+            </Badge>
+            <EtiquettesStatut prospect={prospect} />
+          </>
         }
         actions={
           <>

@@ -906,11 +906,11 @@ func referentielsVaut[T any](p *T, defaut T) T {
 }
 
 func referentielsRappelAutorise(effet, code string, requiresCallback bool) error {
-	if !requiresCallback || effet == "SCHEDULE_CALLBACK" {
+	if !requiresCallback || effet == "SCHEDULE_CALLBACK" || effet == "CLOSE_APPOINTMENT" {
 		return nil
 	}
 	return socle.Problem(http.StatusConflict, code,
-		"Seul l'effet SCHEDULE_CALLBACK planifie un rappel : « "+effet+" » ne peut pas en exiger la date.")
+		"Seuls un rappel ou un rendez-vous planifient une date : « "+effet+" » ne peut pas en exiger une.")
 }
 
 // L'appelant a déjà lu la ligne homonyme : `err` distingue « libre » de
@@ -1165,7 +1165,7 @@ type ReferentielsMotif struct {
 	ID                string    `json:"id"`
 	Code              string    `json:"code"`
 	Label             string    `json:"label"`
-	Effect            string    `json:"effect" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,KEEP_OPEN,SCHEDULE_CALLBACK"`
+	Effect            string    `json:"effect" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,CLOSE_UNREACHABLE,CLOSE_INTERESTED,CLOSE_HESITANT,CLOSE_APPOINTMENT,CLOSE_REACHED,KEEP_OPEN,SCHEDULE_CALLBACK"`
 	ParentID          *string   `json:"parentId" doc:"Motif de premier niveau que celui-ci précise ; l'effet est hérité."`
 	RequiresComment   bool      `json:"requiresComment"`
 	RequiresCallback  bool      `json:"requiresCallback"`
@@ -1220,7 +1220,7 @@ type ReferentielsCreerMotifInput struct {
 	Body struct {
 		Code             string  `json:"code" minLength:"2" maxLength:"40"`
 		Label            string  `json:"label" minLength:"2" maxLength:"80"`
-		Effect           *string `json:"effect,omitempty" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,KEEP_OPEN,SCHEDULE_CALLBACK"`
+		Effect           *string `json:"effect,omitempty" enum:"CLOSE_METHOD,CLOSE_REFUSED,CLOSE_WRONG_NUMBER,CLOSE_LOST,CLOSE_UNREACHABLE,CLOSE_INTERESTED,CLOSE_HESITANT,CLOSE_APPOINTMENT,CLOSE_REACHED,KEEP_OPEN,SCHEDULE_CALLBACK"`
 		ParentID         *string `json:"parentId,omitempty" format:"uuid" doc:"Motif de premier niveau que celui-ci précise ; l'effet est alors hérité."`
 		RequiresComment  *bool   `json:"requiresComment,omitempty"`
 		RequiresCallback *bool   `json:"requiresCallback,omitempty"`

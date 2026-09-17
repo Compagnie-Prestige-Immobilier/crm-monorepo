@@ -740,8 +740,8 @@ func TestCodificationLeads(t *testing.T) {
 		prenom   string
 		aAppeler bool
 	}{
-		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, issue: "OTHER", phase2: "PENDING", prenom: "Aminata"},
-		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "PENDING", rappels: 1, prenom: "Awa"},
+		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, issue: "OTHER", phase2: "INTERESTED", prenom: "Aminata"},
+		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "APPOINTMENT", rappels: 1, prenom: "Awa"},
 		{
 			motif: "HESITANT", extra: map[string]any{"method": "APPOINTMENT", "rendezVousAt": dansUneHeure, "incomeBandId": revenu, "dureeEtablissementMois": 12},
 			issue: "METHOD_OBTAINED", phase2: "METHOD_OBTAINED", prenom: "Awa",
@@ -838,4 +838,102 @@ func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
 	if total != 0 || slices.Contains(ids, prospect) {
 		t.Fatalf("la fiche promise quitte « Reste à appeler » : total %d, %v", total, ids)
 	}
+}
+
+// Arbitrage du 17 septembre 2026 : tout statut posé ferme la fiche sur son
+// statut ; « À rappeler » seul la laisse ouverte, un rendez-vous garde son rappel.
+func TestQualificationUnStatutPoseFermeLaFiche(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	dans := time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano)
+	cas := []struct {
+		motif, issue, phase2 string
+		rappel               bool
+	}{
+		{"PAS_DE_REPONSE", "UNREACHABLE", "UNREACHABLE", false},
+		{"HESITANT", "OTHER", "HESITANT", false},
+		{"VILLA", "OTHER", "INTERESTED", false},
+		{"DEMANDE_INFORMATION", "OTHER", "REACHED", false},
+		{"RV_CPI", "CALLBACK", "APPOINTMENT", true},
+		{"CALLBACK", "CALLBACK", "PENDING", true},
+	}
+	for _, c := range cas {
+		fiche := qualificationProspect(b)
+		extra := map[string]any{"outcome": c.issue, "reasonCode": c.motif}
+		if c.rappel {
+			extra["callbackAt"] = dans
+		}
+		corps := qualificationCorpsTentative(fiche, extra)
+		t.Cleanup(func() {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
+		})
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+		b.attend(statut, http.StatusOK, c.motif, body)
+		if lu := qualificationStatutPhase2(b, fiche); lu != c.phase2 {
+			t.Fatalf("%s : phase 2 %s, attendu %s", c.motif, lu, c.phase2)
+		}
+		rappels := qualificationCompte(b, `SELECT count(*)::int FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, fiche)
+		if (rappels == 1) != c.rappel {
+			t.Fatalf("%s : %d rappel(s) en attente", c.motif, rappels)
+		}
+	}
+}
+
+// « Requalifier → À traiter » par l'encadrement remet dans la file une fiche
+// que le téléconseiller avait déjà appelée.
+func TestQualificationRemiseATraiterRameneLaFicheDansLaFile(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	fiche := qualificationProspect(b)
+	appel := qualificationCorpsTentative(fiche, map[string]any{"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+	b.attend(statut, http.StatusOK, "NRP consigné", body)
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); slices.Contains(ids, fiche) {
+		t.Fatalf("fermée, la fiche sort de la file : %v", ids)
+	}
+
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, "/api/v1/prospects/"+fiche+"/requalifier",
+		map[string]any{"projet": "CHUES", "statut": "NOUVEAU"})
+	superviseur.attend(statut, http.StatusOK, "remise à traiter", body)
+	if lu := qualificationStatutPhase2(b, fiche); lu != "PENDING" {
+		t.Fatalf("remise à traiter, la fiche rouvre : %s", lu)
+	}
+	if _, ids := qualificationTotalProspects(b, "&resteAAppeler=true"); !slices.Contains(ids, fiche) {
+		t.Fatalf("remise à traiter, la fiche revient dans la file : %v", ids)
+	}
+}
+
+// Le dernier à avoir appelé requalifie depuis « Mes contacts », même quand la
+// campagne a confié la fiche à un collègue ; un tiers reste refusé.
+func TestQualificationLeDernierAppelantRequalifieSaFiche(t *testing.T) {
+	appelant := qualificationConnecte(t, "COMMERCIAL")
+	tiers := qualificationConnecte(t, "COMMERCIAL")
+	createur := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(createur)
+	lot := uuid.NewString()
+	qualificationExec(createur, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                             VALUES ($1,'Campagne contacts','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, createur.userID)
+	qualificationExec(createur, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, fiche, appelant.userID)
+	premier := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "HESITANT"})
+	reprise := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "INTERESSE"})
+	t.Cleanup(func() {
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+	statut, body := qualificationEnvoi(appelant, http.MethodPost, "/api/v1/phase2/call-attempts", premier)
+	appelant.attend(statut, http.StatusOK, "premier appel", body)
+	qualificationExec(createur, `UPDATE "lot_export_items" SET "assigneeId" = $1 WHERE "lotId" = $2`, createur.userID, lot)
+
+	statut, body = qualificationEnvoi(appelant, http.MethodPost, "/api/v1/phase2/call-attempts", reprise)
+	appelant.attend(statut, http.StatusOK, "le dernier appelant requalifie", body)
+	if lu := qualificationStatutPhase2(appelant, fiche); lu != "INTERESTED" {
+		t.Fatalf("requalifiée en Intéressé : %s", lu)
+	}
+	statut, body = qualificationEnvoi(tiers, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, nil))
+	tiers.attend(statut, http.StatusForbidden, "un tiers ne requalifie pas", body)
 }

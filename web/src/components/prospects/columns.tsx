@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 
 import { Badge } from '@/components/ui/badge';
+import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,12 +25,9 @@ import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import {
   callOutcomeLabel,
   enrollmentMethodLabel,
-  PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   statutForProjet,
-  type BadgeVariant,
-  type Phase2Status,
   type Projet,
   type ProspectRow,
   type ProspectStatut,
@@ -40,13 +38,6 @@ const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 
   CONTACTE: 'info',
   CONVERTI: 'success',
   PERDU: 'destructive',
-};
-
-const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
-  PENDING: 'secondary',
-  METHOD_OBTAINED: 'success',
-  REFUSED: 'destructive',
-  WRONG_NUMBER: 'warning',
 };
 
 export interface ProspectRowActions {
@@ -129,11 +120,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       id: 'phase2Status',
       accessorKey: 'phase2Status',
       header: 'Résultat de l’appel',
-      cell: ({ row }) => (
-        <Badge variant={PHASE2_VARIANT[row.original.phase2Status]}>
-          {PHASE2_STATUS_LABELS[row.original.phase2Status]}
-        </Badge>
-      ),
+      cell: ({ row }) => <EtiquettesStatut prospect={row.original} />,
     },
     {
       id: 'enrollmentMethod',

@@ -682,8 +682,27 @@ var qualificationReglesEffet = map[db.CallOutcomeEffect]qualificationRegleIssue{
 	db.CallOutcomeEffectCLOSEREFUSED:     {clot: true, phase2Status: qualificationRefusee},
 	db.CallOutcomeEffectCLOSEWRONGNUMBER: {clot: true, phase2Status: qualificationFauxNumero},
 	db.CallOutcomeEffectCLOSELOST:        {clot: true, phase2Status: qualificationRefusee},
+	db.CallOutcomeEffectCLOSEUNREACHABLE: {clot: true, phase2Status: string(db.Phase2StatusUNREACHABLE)},
+	db.CallOutcomeEffectCLOSEINTERESTED:  {clot: true, phase2Status: string(db.Phase2StatusINTERESTED)},
+	db.CallOutcomeEffectCLOSEHESITANT:    {clot: true, phase2Status: string(db.Phase2StatusHESITANT)},
+	db.CallOutcomeEffectCLOSEREACHED:     {clot: true, phase2Status: string(db.Phase2StatusREACHED)},
+	db.CallOutcomeEffectCLOSEAPPOINTMENT: {clot: true, phase2Status: string(db.Phase2StatusAPPOINTMENT), accepteCallbackAt: true},
 	db.CallOutcomeEffectKEEPOPEN:         {},
 	db.CallOutcomeEffectSCHEDULECALLBACK: {accepteCallbackAt: true},
+}
+
+// La famille de l'appel suit l'effet du motif ; KEEP_OPEN la tient de « compte comme joint ».
+var qualificationFamilles = map[db.CallOutcomeEffect]string{
+	db.CallOutcomeEffectCLOSEMETHOD:      exports.ExportCleMethodeObtenue,
+	db.CallOutcomeEffectCLOSEREFUSED:     qualificationRefusee,
+	db.CallOutcomeEffectCLOSELOST:        qualificationRefusee,
+	db.CallOutcomeEffectCLOSEWRONGNUMBER: qualificationFauxNumero,
+	db.CallOutcomeEffectSCHEDULECALLBACK: qualificationCallback,
+	db.CallOutcomeEffectCLOSEAPPOINTMENT: qualificationCallback,
+	db.CallOutcomeEffectCLOSEUNREACHABLE: string(db.CallOutcomeUNREACHABLE),
+	db.CallOutcomeEffectCLOSEINTERESTED:  string(db.CallOutcomeOTHER),
+	db.CallOutcomeEffectCLOSEHESITANT:    string(db.CallOutcomeOTHER),
+	db.CallOutcomeEffectCLOSEREACHED:     string(db.CallOutcomeOTHER),
 }
 
 type qualificationMotifIssue struct {
@@ -741,7 +760,7 @@ type QualificationCallAttemptInput struct{ Body QualificationCallAttemptBody }
 
 type QualificationProspectPhase2StateDTO struct {
 	ProspectID       string  `json:"prospectId" format:"uuid"`
-	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod *string `json:"enrollmentMethod"`
 	Rev              int32   `json:"rev"`
 	UpdatedAt        string  `json:"updatedAt" format:"date-time"`
@@ -801,19 +820,11 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 }
 
 func qualificationFamilleDuMotif(effet db.CallOutcomeEffect, joint bool) string {
-	switch effet {
-	case db.CallOutcomeEffectCLOSEMETHOD:
-		return exports.ExportCleMethodeObtenue
-	case db.CallOutcomeEffectCLOSEREFUSED, db.CallOutcomeEffectCLOSELOST:
-		return qualificationRefusee
-	case db.CallOutcomeEffectCLOSEWRONGNUMBER:
-		return qualificationFauxNumero
-	case db.CallOutcomeEffectSCHEDULECALLBACK:
-		return qualificationCallback
-	case db.CallOutcomeEffectKEEPOPEN:
-		if joint {
-			return string(db.CallOutcomeOTHER)
-		}
+	if famille, ok := qualificationFamilles[effet]; ok {
+		return famille
+	}
+	if effet == db.CallOutcomeEffectKEEPOPEN && joint {
+		return string(db.CallOutcomeOTHER)
 	}
 	return string(db.CallOutcomeUNREACHABLE)
 }
@@ -1266,7 +1277,7 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 	}); err != nil {
 		return "", vide, err
 	}
-	if err := q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID}); err != nil {
+	if err := qualificationCloreRappels(ctx, q, b, t); err != nil {
 		return "", vide, err
 	}
 	if t.motif.effet == db.CallOutcomeEffectCLOSELOST {
@@ -1283,4 +1294,12 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 		return "", vide, err
 	}
 	return tentativeAppliquee, qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
+}
+
+// Un rendez-vous ferme la fiche mais garde le rappel qu'il vient de poser.
+func qualificationCloreRappels(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody, t *qualificationTentative) error {
+	if t.regle.accepteCallbackAt {
+		return nil
+	}
+	return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
 }

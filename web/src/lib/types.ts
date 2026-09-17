@@ -289,14 +289,24 @@ export const SEGMENT_LABELS: Record<BddSegment, string> = {
 export const PHASE2_STATUSES = [
   'PENDING',
   'METHOD_OBTAINED',
+  'INTERESTED',
+  'HESITANT',
+  'APPOINTMENT',
+  'REACHED',
   'REFUSED',
+  'UNREACHABLE',
   'WRONG_NUMBER',
 ] as const satisfies readonly Phase2Status[];
 
 export const PHASE2_STATUS_LABELS: Record<Phase2Status, string> = {
   PENDING: 'En attente',
   METHOD_OBTAINED: 'Méthode obtenue',
+  INTERESTED: 'Intéressé',
+  HESITANT: 'Hésitant',
+  APPOINTMENT: 'Rendez-vous',
+  REACHED: 'Joint, sans suite',
   REFUSED: 'Refus',
+  UNREACHABLE: 'Injoignable',
   WRONG_NUMBER: 'Faux numéro',
 };
 

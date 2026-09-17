@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   ArchiveIcon,
   BellIcon,
+  HeartHandshakeIcon,
   ClipboardListIcon,
   ClockIcon,
   ContactRoundIcon,
@@ -352,6 +353,13 @@ const SECTIONS: readonly NavSection[] = [
         // console : cette liste suit le travail des autres.
         acces: 'prospects.superviser',
         secondary: true,
+      },
+      {
+        href: '/teleconseil/interesses',
+        label: 'Intéressés, hésitants et RDV',
+        icon: HeartHandshakeIcon,
+        description: 'Fiches fermées à suivre',
+        acces: 'prospects.superviser',
       },
       {
         href: '/teleconseil/campagnes',

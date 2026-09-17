@@ -42,6 +42,7 @@ import {
   CALL_OUTCOME_EFFECT_LABELS,
   createCallOutcomeReason,
   fetchCallOutcomeReasons,
+  planifieUneDate,
   setCallOutcomeReasonActive,
   updateCallOutcomeReason,
   type CallOutcomeColor,
@@ -509,7 +510,8 @@ function ReasonFormDialog({
                   disabled={parentChoisi !== null}
                   onValueChange={(value) => {
                     setValue('effect', value as CallOutcomeEffect);
-                    if (value !== 'SCHEDULE_CALLBACK') setValue('requiresCallback', false);
+                    if (!planifieUneDate(value as CallOutcomeEffect))
+                      setValue('requiresCallback', false);
                   }}
                 >
                   <SelectTrigger id={props.id}>
@@ -536,7 +538,7 @@ function ReasonFormDialog({
             <CheckboxRow label="Un commentaire" {...register('requiresComment')} />
             <CheckboxRow
               label="Une date de rappel"
-              disabled={effect !== 'SCHEDULE_CALLBACK'}
+              disabled={!planifieUneDate(effect)}
               {...register('requiresCallback')}
             />
             <CheckboxRow

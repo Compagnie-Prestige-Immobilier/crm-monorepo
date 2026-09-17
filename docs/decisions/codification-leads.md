@@ -9,3 +9,5 @@ Joignable : le formulaire s'ouvre d'abord, tous ses champs facultatifs, on peut 
 Trois règles en découlent. Une méthode d'enrôlement renseignée dans le formulaire vaut adhésion : la fiche passe en méthode obtenue quel que soit le statut choisi, qui reste le motif de la tentative ; il n'y a plus de motif « transfert enrôlement ». « À supprimer » ferme la fiche au statut PERDU, sans la détruire : elle sort du reste à appeler et des campagnes, garde son historique. Chaque rendez-vous et « À rappeler » créent un rappel daté dans « Rappels promis », et la fiche remonte ce jour-là.
 
 Les motifs d'avant restent en base, éteints, pour que les appels déjà consignés gardent leur libellé.
+
+Depuis le 17 septembre 2026, tout statut posé ferme la fiche, sauf « À rappeler » : voir `plan-de-migration-et-de-reaffectation.md`.
