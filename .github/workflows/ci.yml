@@ -169,7 +169,8 @@ jobs:
           goose -dir sql/migrations postgres "$DATABASE_URL_DEMO" up
       # `vet` prépare chaque requête sur la base réelle : une colonne absente rougit ici, pas en production.
       - run: sqlc generate && sqlc vet
-      - run: mkdir -p web/dist && touch web/dist/.keep
+      # Les tests du service de fichiers lisent `robots.txt` dans le panneau embarqué.
+      - run: mkdir -p web/dist && cp web/public/robots.txt web/dist/
       # L'export de la base appelle `pg_dump`, qui refuse un serveur plus récent que lui.
       - name: pg_dump 18
         run: |
@@ -230,8 +231,11 @@ jobs:
       - if: steps.navigateur.outputs.cache-hit != 'true'
         run: pnpm exec playwright install --with-deps chromium
         working-directory: e2e
-      # Le parcours « seconde base » se connecte à un profil démo : sans semis, la base démo le refuse.
-      - run: DATABASE_URL="$DATABASE_URL_DEMO" ./cpi-go -seed
+      # Les parcours sèment leurs fiches sur les référentiels (départements, syndicats,
+      # entreprises de visite) ; le parcours « seconde base » se connecte à un profil démo.
+      - run: |
+          ./cpi-go -seed
+          DATABASE_URL="$DATABASE_URL_DEMO" ./cpi-go -seed
       - run: pnpm test --shard=${{ matrix.part }}/4
         working-directory: e2e
 
