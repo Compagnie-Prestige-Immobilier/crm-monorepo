@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+.yolo
 *.pem
 *.key
 *.p12
