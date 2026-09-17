@@ -6,6 +6,7 @@ import (
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
 	"errors"
+	"fmt"
 	"io"
 	"math"
 	"net/http"
@@ -261,7 +262,32 @@ func lireClasseur(contenu []byte, depuis pgtype.Date) ([]venteLue, error) {
 		}
 		lues = append(lues, venteLue{ligne: lignes[i], versements: versements[lignes[i].Numero]})
 	}
+	// Un dépôt qui ne garde rien remplacerait le classeur en place par un tableau vide.
+	if len(lues) == 0 {
+		return nil, socle.Problem(http.StatusBadRequest, "VENTES_AUCUNE_VENTE", aucuneVente(lignes, depuis))
+	}
 	return lues, nil
+}
+
+func aucuneVente(lignes []db.InsererVenteParams, depuis pgtype.Date) string {
+	var premiere, derniere time.Time
+	for i := range lignes {
+		date := lignes[i].DateSouscription
+		if !date.Valid {
+			continue
+		}
+		if premiere.IsZero() || date.Time.Before(premiere) {
+			premiere = date.Time
+		}
+		if date.Time.After(derniere) {
+			derniere = date.Time
+		}
+	}
+	if !depuis.Valid || premiere.IsZero() {
+		return "Aucune vente lue dans l’onglet « Tableau des ventes »."
+	}
+	return fmt.Sprintf("Aucune vente souscrite depuis le %s : ce classeur va du %s au %s.",
+		depuis.Time.Format("02/01/2006"), premiere.Format("02/01/2006"), derniere.Format("02/01/2006"))
 }
 
 func lireOnglet(classeur *excelize.File, fragment string) ([][]string, error) {
