@@ -41,6 +41,14 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 		t.Fatalf("trois ventes attendues, dont une sans date : %v", toutes)
 	}
 
+	// Une date de début postérieure à toutes les ventes vidait l'espace sans prévenir.
+	statut, reponse = b.deposerClasseur("/api/v1/ventes/classeur?depuis=2030-01-01", "ventes.xlsx", contenu)
+	b.attend(statut, http.StatusBadRequest, "dépôt qui ne garderait aucune vente", reponse)
+	statut, reponse = b.appel(http.MethodGet, "/api/v1/ventes", nil, false)
+	if toutes, _ := reponse["ventes"].([]any); statut != http.StatusOK || len(toutes) != 3 {
+		t.Fatalf("le classeur en place doit rester intact : %d %v", statut, reponse)
+	}
+
 	req, _ := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+"/api/v1/ventes/classeur/fichier", http.NoBody)
 	resp, err := b.client.Do(req)
 	if err != nil {
