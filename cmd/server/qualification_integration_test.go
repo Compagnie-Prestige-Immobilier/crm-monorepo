@@ -967,3 +967,23 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 		t.Fatalf("onglet Intéressés : %v", ids)
 	}
 }
+
+// L'appel promis a eu lieu : sans nouvelle échéance, la fiche quitte
+// « Rappels promis » au lieu d'y rester jusqu'en retard.
+func TestRappelConsommeParTentativeSansNouvelleEcheance(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	prospect := qualificationProspect(b)
+	plateformeRappelPromis(b, prospect, b.userID)
+	corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "reasonCode": "TERRAIN"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+	b.attend(statut, http.StatusOK, "appel TERRAIN consigné", body)
+	if restants := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, prospect); restants != 0 {
+		t.Fatalf("le rappel tenu doit quitter la file : %d rappel(s) encore promis", restants)
+	}
+	if motif := qualificationRappelDansFile(b, "all", prospect); motif != nil {
+		t.Fatalf("la fiche traitée ne se lit plus dans « Rappels promis » : %q", *motif)
+	}
+}
