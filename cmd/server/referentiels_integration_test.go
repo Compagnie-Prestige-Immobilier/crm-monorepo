@@ -316,6 +316,29 @@ func TestReferentielsSousStatutHeriteEffetEtResteAUnNiveau(t *testing.T) {
 	}
 }
 
+// Le panneau efface la relation et le délai de réessai en les omettant du corps.
+func TestReferentielsStatutEffaceRelationEtReessai(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.referentielsConnexion("ADMIN")
+	jeton := b.referentielsJeton()
+
+	statut, body := b.referentielsEnvoi(http.MethodPost, "/api/v1/statuts-qualification",
+		map[string]any{"label": "Effacable " + jeton, "effect": "REACHED", "retryAfterMinutes": 60, "relationStatus": "CONTACTE"})
+	b.attend(statut, http.StatusCreated, "création", body)
+	id, _ := body["id"].(string)
+	b.referentielsPurge("statuts_qualification", id)
+	if body["relationStatus"] != "CONTACTE" || body["retryAfterMinutes"] != float64(60) {
+		t.Fatalf("relation et réessai posés : %v", body)
+	}
+
+	statut, body = b.referentielsEnvoi(http.MethodPatch, "/api/v1/statuts-qualification/"+id,
+		map[string]any{"label": "Effacable " + jeton, "priorite": "NORMALE"})
+	b.attend(statut, http.StatusOK, "modification sans relation ni réessai", body)
+	if body["relationStatus"] != nil || body["retryAfterMinutes"] != nil {
+		t.Fatalf("relation et réessai effacés : %v", body)
+	}
+}
+
 func TestReferentielsMotifSystemeNiDesactivableNiReconfigurable(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	b.referentielsConnexion("ADMIN")
