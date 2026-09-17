@@ -110,7 +110,7 @@ SELECT p."id", p."nom", p."prenom", p."phoneE164",
 FROM "prospects" p
 INNER JOIN "banques" b ON b."id" = p."banqueId"
 WHERE p."deletedAt" IS NULL
-  AND p."phase2Status" = 'METHOD_OBTAINED'
+  AND p."enrollmentMethod" IS NOT NULL
   AND (sqlc.narg('projet')::"Projet" IS NULL OR EXISTS (
         SELECT 1 FROM "prospect_journeys" pj
         WHERE pj."prospectId" = p."id" AND pj."projet" = sqlc.narg('projet')::"Projet"))
