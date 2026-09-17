@@ -159,12 +159,14 @@ function PetitsMultiples({
           </li>
         ))}
       </ul>
-      <div className="grid auto-rows-[13rem] grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
+      <div className="grid grid-cols-[repeat(auto-fill,minmax(11rem,1fr))] gap-3">
         {lignes.map((ligne) => {
           const id = ligne.id;
           return (
-            <figure key={id ?? ligne.ligne} className="flex min-h-0 flex-col gap-1">
-              <div className="min-h-0 flex-1">
+            // Rangée libre et diagramme à hauteur fixe : 13 rem imposés plus
+            // 10 rem minimum faisaient déborder le camembert sur sa légende.
+            <figure key={id ?? ligne.ligne} className="flex flex-col gap-1">
+              <div className="h-40">
                 <Diagramme
                   items={ligne.segments}
                   presentation={sansLegende}
