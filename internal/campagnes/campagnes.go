@@ -1227,7 +1227,7 @@ func (s *service) campagneReaffecter(ctx context.Context, in *CampagneReaffecter
 	if _, err := s.lotEquipe(ctx, []string{vers}); err != nil {
 		return nil, err
 	}
-	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers)
+	mouvements, err := s.lotMouvementsVers(ctx, row, in.Body.Positions, vers, true)
 	if err != nil {
 		return nil, err
 	}

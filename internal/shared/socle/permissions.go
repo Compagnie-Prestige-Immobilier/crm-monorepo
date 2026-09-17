@@ -94,7 +94,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionAnalyticsSuperviser:      {domaineChiffres, "Consulter les tableaux de bord de supervision", Encadrement},
 	PermissionImportsAdministrer:       {"Imports", "Importer des fichiers", AdminSeul},
 	PermissionReferentielsSuperviser:   {"Référentiels", "Modifier les référentiels métier", Encadrement},
-	PermissionProspectsSuperviser:      {domaineFiches, "Régler les segments et les paramètres CHUES", Encadrement},
+	PermissionProspectsSuperviser:      {domaineFiches, "Régler segments et paramètres CHUES, requalifier une fiche", Encadrement},
 	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, CCP, Admin, Superviseur, Direction}},
 	PermissionProspectsFusionner:       {domaineFiches, "Fusionner des fiches", []Role{Commercial, ChargeClientele, Admin}},
 	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},

@@ -610,3 +610,20 @@ LEFT JOIN "users" u ON u."id" = a."userId"
 WHERE a."entity" = 'prospect' AND a."entityId" = $1 AND a."action" = 'prospect.requalification'
 ORDER BY a."at" DESC, a."id" DESC
 LIMIT 50;
+
+-- name: RequalifierJourney :execrows
+UPDATE "prospect_journeys" SET
+  "statut" = @statut::"ProspectStatut",
+  "consent" = CASE WHEN @statut = 'NOUVEAU' THEN 'NON_DEMANDE' ELSE "consent" END,
+  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
+WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';
+
+-- name: RequalifierProspect :exec
+UPDATE "prospects" SET
+  "statut" = @statut::"ProspectStatut",
+  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "rev" = "rev" + 1, "updatedAt" = now()
+WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';

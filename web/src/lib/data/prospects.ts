@@ -390,3 +390,13 @@ export async function reassignProspects(
 
   return unwrap(await client.POST('/api/v1/prospects/reassign', { body }));
 }
+
+export async function requalifierProspect(
+  id: string,
+  body: { projet: 'CHUES' | 'GRAND_PUBLIC'; statut: 'NOUVEAU' | 'CONTACTE' | 'PERDU' },
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.POST('/api/v1/prospects/{id}/requalifier', { params: { path: { id } }, body }),
+  );
+}

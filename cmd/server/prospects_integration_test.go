@@ -293,6 +293,38 @@ func TestProspectConversionGrandPublicExigeLeConsentement(t *testing.T) {
 	}
 }
 
+func TestProspectRequalificationParLEncadrement(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	superviseur := autreCompte(b, "SUPERVISEUR")
+	nettoyerProspects(b, b.userID, superviseur.userID)
+	id := creerProspect(b, "Sow", numeroSenegalais(21))["id"].(string)
+	consentement := "/api/v1/prospects/" + id + "/parcours/grand-public/consentement"
+	statut, body := appelJSON(b, http.MethodPatch, consentement, map[string]any{"consent": "REFUSE"}, nil)
+	b.attend(statut, http.StatusOK, "refus consigné", body)
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "prospect_journeys" SET "statut" = 'PERDU' WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	chemin := "/api/v1/prospects/" + id + "/requalifier"
+	corps := map[string]any{"projet": "GRAND_PUBLIC", "statut": "NOUVEAU"}
+	statut, body = appelJSON(b, http.MethodPost, chemin, corps, nil)
+	b.attend(statut, http.StatusForbidden, "requalification hors encadrement", body)
+	statut, body = appelJSON(superviseur, http.MethodPost, chemin, corps, nil)
+	superviseur.attend(statut, http.StatusOK, "requalification par le superviseur", body)
+
+	var etat, consent string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "statut"::text, "consent"::text FROM "prospect_journeys" WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`,
+		id).Scan(&etat, &consent); err != nil {
+		t.Fatal(err)
+	}
+	if etat != "NOUVEAU" || consent != "NON_DEMANDE" {
+		t.Fatalf("la fiche doit revenir à traiter : %s, %s", etat, consent)
+	}
+}
+
 func TestProspectFusionDeplaceLesTentatives(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)

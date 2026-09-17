@@ -60,7 +60,6 @@ const ETAT_LABELS: Record<LotExportFicheEtat, string> = {
 };
 
 /** Une fiche traitée ne se déplace pas : le travail resterait au compteur d'un autre. */
-const deplacable = (fiche: LotExportFiche): boolean => fiche.etat === 'NON_TRAITEE';
 
 function buildFiltres(page: number, teleconseillerId: string, etat: string) {
   return {
@@ -161,7 +160,6 @@ export function LotExportFiches({
   const lignes = fiches.data?.items ?? [];
   const total = fiches.data?.total ?? 0;
   const pageCount = fiches.data?.pageCount ?? 1;
-  const cochables = lignes.filter(deplacable);
 
   const changerLeFiltre = (appliquer: () => void) => {
     appliquer();
@@ -176,8 +174,8 @@ export function LotExportFiches({
           Fiches de la campagne
         </h3>
         <p className="mt-1 text-[0.875rem] text-muted-foreground">
-          Une fiche traitée reste à celui qui l’a appelée. Seules les fiches non traitées
-          s’attribuent à quelqu’un d’autre.
+          Une fiche traitée peut être confiée à un autre téléconseiller ; ses appels restent à celui
+          qui les a passés.
         </p>
       </CardHeader>
       <CardContent className="flex flex-col gap-4">
@@ -255,10 +253,10 @@ export function LotExportFiches({
           peutReaffecter={peutReaffecter}
           cible={lot.cible}
           lignes={lignes}
-          cochables={cochables}
+          cochables={lignes}
           cochees={cochees}
           onCocherTout={(toutes) => {
-            setCochees(toutes ? cochables.map((fiche) => fiche.position) : []);
+            setCochees(toutes ? lignes.map((fiche) => fiche.position) : []);
           }}
           onCocherUne={(position, coche) => {
             setCochees((courantes) =>
@@ -386,7 +384,7 @@ function TableFiches({
               <input
                 type="checkbox"
                 className="size-4 accent-primary"
-                aria-label="Cocher toutes les fiches non traitées de la page"
+                aria-label="Cocher toutes les fiches de la page"
                 checked={cochables.length > 0 && cochees.length === cochables.length}
                 disabled={cochables.length === 0}
                 onChange={(event) => {
@@ -484,7 +482,6 @@ function LigneFiche({
             type="checkbox"
             className="size-4 accent-primary"
             aria-label={`Attribuer la fiche de ${fiche.fullName}`}
-            disabled={!deplacable(fiche)}
             checked={cochee}
             onChange={(event) => {
               onCocher(event.target.checked);
