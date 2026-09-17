@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { LeadsImportesView } from '@/components/supervision/leads-importes-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/leads-importes')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: LeadsImportesView,
   pendingComponent: Loading,
 });

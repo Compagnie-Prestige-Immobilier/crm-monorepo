@@ -9,17 +9,18 @@ import {
   type CampagnePerformance,
   type LotExportSummary,
 } from '@/lib/data/lots-export';
+import type { Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
-export type Projet = Schemas['Projet'];
-export type ChiffresActivite = Schemas['SupervisionActivityDto'];
-export type ChiffresTotaux = Schemas['SupervisionActivityCountsDto'];
-export type ChiffresEntonnoir = Schemas['AnalyticsFunnelDto'];
-export type ChiffresDelais = Schemas['AnalyticsDelaysDto'];
-export type ChiffresRendement = Schemas['DepartementYieldListDto'];
-export type ChiffresMethodes = Schemas['EnrollmentMethodListDto'];
-export type ChiffresBanques = Schemas['NamedCountListDto'];
+export type { Projet };
+export type ChiffresActivite = Schemas['ActiviteDesTeleconseillers'];
+export type ChiffresTotaux = Schemas['CompteursDActivite'];
+export type ChiffresEntonnoir = Schemas['EntonnoirDesConversions'];
+export type ChiffresDelais = Schemas['DelaisDeLaChaine'];
+export type ChiffresRendement = Schemas['RendementParDepartement'];
+export type ChiffresMethodes = Schemas['RepartitionParMethodeEnrolement'];
+export type ChiffresBanques = Schemas['RepartitionDesProspects'];
 export type ChiffresCampagne = CampagnePerformance | null;
 
 /** Les compteurs d'une campagne depuis sa création, hors fenêtre regardée. */
@@ -29,13 +30,13 @@ export type CouvertureCampagne = Pick<
 >;
 
 /** Le rendement de la fenêtre, et pour chaque campagne sa couverture depuis la création. */
-export type ChiffresCampagnes = Omit<Schemas['SupervisionCampagnesDto'], 'items'> & {
-  items: (Schemas['SupervisionCampagneDto'] & { couverture?: CouvertureCampagne })[];
+export type ChiffresCampagnes = Omit<Schemas['RendementDesCampagnes'], 'items'> & {
+  items: (Schemas['CampagneSupervisee'] & { couverture?: CouvertureCampagne })[];
 };
-export type ChiffresRepresentants = Schemas['StockRepresentantsDto'];
+export type ChiffresRepresentants = Schemas['StockDesRepresentants'];
 export type QualiteDeLaBase = Schemas['QualiteDeLaBase'];
 export type QualiteDuMarketing = Schemas['QualiteDuMarketing'];
-export type ChiffresEnrolement = Schemas['EnrolementIndicateursDto'];
+export type ChiffresEnrolement = Schemas['IndicateursOutputBody'];
 
 /** L'activité relue créneau par créneau, dans l'ordre des créneaux. */
 export interface ChiffresCreneaux {

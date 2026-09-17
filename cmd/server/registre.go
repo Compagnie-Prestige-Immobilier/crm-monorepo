@@ -27,7 +27,7 @@ func nouveauRegistre(annuaire *socle.Annuaire) *registre {
 
 func (r *registre) monter(nom string, i *instance, pool *pgxpool.Pool) {
 	r.mu.Lock()
-	r.gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q)
+	r.gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q, i.deps.Attributions)
 	r.pools[nom] = pool
 	r.mu.Unlock()
 	r.annuaire.Ajouter(nom)

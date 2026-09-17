@@ -2,10 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { PlateformeOverview } from '@/components/console/plateforme-overview';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/plateforme-apercu')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION', 'CCP']),
+  beforeLoad: guardPermission('plateforme.equipe'),
   component: PlateformeOverviewPage,
   pendingComponent: Loading,
 });
@@ -27,6 +28,9 @@ function Loading() {
 function PlateformeOverviewPage() {
   const { user } = Route.useRouteContext();
   return (
-    <PlateformeOverview encadrement={user.role !== 'CCP'} regleObjectif={user.role === 'ADMIN'} />
+    <PlateformeOverview
+      encadrement={user.role !== 'CCP'}
+      regleObjectif={peut(user, 'parametres.administrer')}
+    />
   );
 }

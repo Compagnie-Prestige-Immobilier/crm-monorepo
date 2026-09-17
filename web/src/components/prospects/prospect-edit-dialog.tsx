@@ -54,6 +54,20 @@ const MIN_REASON_LENGTH = 5;
 const memeChoix = (saisi: string, enregistre: string | null): boolean =>
   (saisi === '' ? null : saisi) === enregistre;
 
+const referentielLabel = (nom: string | null, actif: boolean | null): string =>
+  withRetired(nom ?? '', actif ?? false);
+
+function segmentSuivant(
+  banque: { shortName: string | null } | undefined,
+  syndicat: { sigle: string | null } | undefined,
+): BddSegment | null {
+  if (banque === undefined || syndicat === undefined) return null;
+  return classifySegment({
+    syndicatSigle: syndicat.sigle ?? '',
+    banqueShortName: banque.shortName ?? '',
+  });
+}
+
 function choixReferentiels(
   reference: Awaited<ReturnType<typeof fetchReferenceData>> | undefined,
   banqueId: string,
@@ -63,22 +77,18 @@ function choixReferentiels(
   const syndicats = reference?.syndicats ?? [];
   const banque = banques.find((item) => item.id === banqueId);
   const syndicat = syndicats.find((item) => item.id === syndicatId);
-  const nextSegment: BddSegment | null =
-    banque === undefined || syndicat === undefined
-      ? null
-      : classifySegment({ syndicatSigle: syndicat.sigle, banqueShortName: banque.shortName });
 
   return {
     banqueItems: banques.map((item) => ({
       value: item.id,
-      label: withRetired(item.shortName, item.isActive),
+      label: referentielLabel(item.shortName, item.isActive),
     })),
     syndicatItems: syndicats.map((item) => ({
       value: item.id,
-      label: withRetired(item.sigle, item.isActive),
+      label: referentielLabel(item.sigle, item.isActive),
     })),
     representantItems: reference?.representants ?? [],
-    nextSegment,
+    nextSegment: segmentSuivant(banque, syndicat),
   };
 }
 

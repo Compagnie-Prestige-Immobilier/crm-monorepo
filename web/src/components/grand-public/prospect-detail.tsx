@@ -1,13 +1,18 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeftIcon, PencilIcon, PhoneCallIcon, PhoneIcon } from 'lucide-react';
+import { PencilIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
+import { DetailBackLink } from '@/components/detail-back-link';
+import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
+import { FicheEnTete } from '@/components/fiche-en-tete';
+import { chiffresDe } from '@/components/prospects/prospect-detail-view';
+import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { HistoireDeLaFiche } from '@/components/prospects/histoire-fiche';
 import { GrandPublicProspectForm } from '@/components/grand-public/prospect-form';
@@ -41,7 +46,7 @@ import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
+  callOutcomeLabel,
   MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
@@ -278,7 +283,7 @@ function DernierAppel({ prospect }: { prospect: ProspectRow }) {
   return (
     <span className="flex flex-col gap-0.5">
       <span className="font-[600]">
-        {prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastOutcome]}
+        {prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastOutcome)}
       </span>
       {prospect.lastComment !== null && prospect.lastComment !== '' ? (
         <span className="text-[0.8125rem] text-muted-foreground">{prospect.lastComment}</span>
@@ -372,125 +377,131 @@ export function GrandPublicProspectDetail({
     );
   }
 
-  const name = `${prospect.prenom} ${prospect.nom}`.trim();
-
   return (
-    <div className="mx-auto flex w-full max-w-3xl flex-col gap-6">
-      <Link href="/teleconseil" className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}>
-        <ArrowLeftIcon aria-hidden="true" />
-        Prospects Grand Public
-      </Link>
+    <div className="flex flex-col gap-6">
+      <DetailBackLink href="/teleconseil">Prospects Grand Public</DetailBackLink>
 
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0">
-          <h1 className="font-display text-h2 font-[700] tracking-[-0.02em]">{name}</h1>
-          <a
-            href={`tel:${prospect.phoneE164}`}
-            className="mt-1 inline-flex min-h-11 items-center gap-2 rounded-sm text-[1.0625rem] tabular-nums underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-          >
-            <PhoneIcon className="size-4 text-muted-foreground" aria-hidden="true" />
-            {formatPhone(prospect.phoneE164)}
-          </a>
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          <Badge variant={STATUT_VARIANT[journey.statut]} className="text-[0.8125rem]">
-            {PROSPECT_STATUT_LABELS[journey.statut]}
-          </Badge>
-          {canEdit ? (
-            <Link
-              href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
-              className={buttonVariants({ variant: 'default' })}
-            >
-              <PhoneCallIcon aria-hidden="true" />
-              Consigner un appel
-            </Link>
-          ) : null}
-          <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
-          <ActionsConsentement
-            canEdit={canEdit}
-            statut={journey.statut}
-            consentement={journey.consent}
-            pending={consent.isPending}
-            onConsent={(value) => {
-              consent.mutate(value);
-            }}
-            onConvertir={() => {
-              setConversionOpen(true);
-            }}
-          />
+      <FicheEnTete
+        nom={`${prospect.prenom} ${prospect.nom}`}
+        phoneE164={prospect.phoneE164}
+        projet="GRAND_PUBLIC"
+        badges={
+          <>
+            <Badge variant={STATUT_VARIANT[journey.statut]}>
+              {PROSPECT_STATUT_LABELS[journey.statut]}
+            </Badge>
+            <EtiquettesStatut prospect={prospect} />
+          </>
+        }
+        actions={
+          <>
+            {canEdit ? (
+              <Link
+                href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
+                className={buttonVariants({ variant: 'default' })}
+              >
+                <PhoneCallIcon aria-hidden="true" />
+                Consigner un appel
+              </Link>
+            ) : null}
+            <ModifierLaFiche canEdit={canEdit} prospect={prospect} onEnregistre={refresh} />
+            <ActionsConsentement
+              canEdit={canEdit}
+              statut={journey.statut}
+              consentement={journey.consent}
+              pending={consent.isPending}
+              onConsent={(value) => {
+                consent.mutate(value);
+              }}
+              onConvertir={() => {
+                setConversionOpen(true);
+              }}
+            />
+            <RequalifierFiche
+              prospect={prospect}
+              projet="GRAND_PUBLIC"
+              statut={journey.statut}
+              onRequalifiee={refresh}
+            />
+          </>
+        }
+        chiffres={chiffresDe(prospect)}
+      />
+
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
+        <HistoireDeLaFiche prospect={prospect} role={role} />
+
+        <div className="flex min-w-0 flex-col gap-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Le prospect</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl>
+                <Ligne label="Situation">{situationLigne(prospect)}</Ligne>
+                <Ligne label={libelleMetier(prospect.type)}>
+                  <Texte value={prospect.profession} absent="Non renseignée" />
+                </Ligne>
+                <Ligne label="Revenu mensuel">
+                  <Texte value={prospect.incomeBandLabel} absent="Non renseigné" />
+                </Ligne>
+                <Ligne label="Paiement">{paiementLigne(prospect)}</Ligne>
+                <LignesSituation prospect={prospect} />
+                <Ligne label="Canal de provenance">
+                  {prospect.canalProvenanceLabel === null ? (
+                    <Texte value={null} absent="Non renseigné" />
+                  ) : (
+                    <CanalProvenance label={prospect.canalProvenanceLabel} />
+                  )}
+                </Ligne>
+                <Ligne label="Durée du système">{dureeSystemeLigne(prospect)}</Ligne>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Rattachements</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl>
+                <Ligne label="Banque de domiciliation">
+                  <Texte value={prospect.banqueName} absent="Non renseignée" />
+                </Ligne>
+                <Ligne label="Syndicat">
+                  <Texte value={prospect.syndicatSigle} absent="Aucun" />
+                </Ligne>
+                <Ligne label="Représentant">
+                  <Texte value={prospect.representantName} absent="Sans représentant" />
+                </Ligne>
+                <Ligne label="Segment">{segmentLigne(prospect)}</Ligne>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Suivi</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl>
+                <Ligne label="Téléconseiller">{prospect.ownedByCommercialName}</Ligne>
+                <Ligne label="Saisi le">
+                  <time dateTime={prospect.clientCreatedAt} className="tabular-nums">
+                    {formatDate(prospect.clientCreatedAt)}
+                  </time>
+                </Ligne>
+                <Ligne label="Dernier appel">
+                  <DernierAppel prospect={prospect} />
+                </Ligne>
+                <LigneSi label="Note du classeur" value={prospect.remarqueImport ?? null} />
+              </dl>
+            </CardContent>
+          </Card>
+
+          <ChampsAjoutes prospect={prospect} />
         </div>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Le prospect</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl>
-            <Ligne label="Situation">{situationLigne(prospect)}</Ligne>
-            <Ligne label={libelleMetier(prospect.type)}>
-              <Texte value={prospect.profession} absent="Non renseignée" />
-            </Ligne>
-            <Ligne label="Revenu mensuel">
-              <Texte value={prospect.incomeBandLabel} absent="Non renseigné" />
-            </Ligne>
-            <Ligne label="Paiement">{paiementLigne(prospect)}</Ligne>
-            <LignesSituation prospect={prospect} />
-            <Ligne label="Canal de provenance">
-              {prospect.canalProvenanceLabel === null ? (
-                <Texte value={null} absent="Non renseigné" />
-              ) : (
-                <CanalProvenance label={prospect.canalProvenanceLabel} />
-              )}
-            </Ligne>
-            <Ligne label="Durée du système">{dureeSystemeLigne(prospect)}</Ligne>
-          </dl>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Rattachements</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl>
-            <Ligne label="Banque de domiciliation">
-              <Texte value={prospect.banqueName} absent="Non renseignée" />
-            </Ligne>
-            <Ligne label="Syndicat">
-              <Texte value={prospect.syndicatSigle} absent="Aucun" />
-            </Ligne>
-            <Ligne label="Représentant">
-              <Texte value={prospect.representantName} absent="Sans représentant" />
-            </Ligne>
-            <Ligne label="Segment">{segmentLigne(prospect)}</Ligne>
-          </dl>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Suivi</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl>
-            <Ligne label="Téléconseiller">{prospect.ownedByCommercialName}</Ligne>
-            <Ligne label="Saisi le">
-              <time dateTime={prospect.clientCreatedAt} className="tabular-nums">
-                {formatDate(prospect.clientCreatedAt)}
-              </time>
-            </Ligne>
-            <Ligne label="Dernier appel">
-              <DernierAppel prospect={prospect} />
-            </Ligne>
-            <LigneSi label="Note du classeur" value={prospect.remarqueImport ?? null} />
-          </dl>
-        </CardContent>
-      </Card>
-
-      <ChampsAjoutes prospect={prospect} />
-
-      <HistoireDeLaFiche prospect={prospect} role={role} />
 
       <Dialog open={conversionOpen} onOpenChange={setConversionOpen}>
         <DialogContent>

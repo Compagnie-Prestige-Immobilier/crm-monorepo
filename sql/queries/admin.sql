@@ -12,8 +12,10 @@ WHERE "deletedAt" IS NULL
 SELECT u."id", u."email", u."username", u."fullName", u."role", u."isActive",
        u."phoneE164", u."lastLoginAt", u."createdAt",
        (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = u."id")::int AS prospect_count,
-       (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count
+       (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count,
+       u."roleId", ro."libelle" AS role_libelle
 FROM "users" u
+JOIN "roles" ro ON ro."id" = u."roleId"
 WHERE u."deletedAt" IS NULL
   AND (sqlc.narg('role')::"Role" IS NULL OR u."role" = sqlc.narg('role')::"Role")
   AND (sqlc.narg('is_active')::boolean IS NULL OR u."isActive" = sqlc.narg('is_active')::boolean)
@@ -28,12 +30,14 @@ LIMIT sqlc.arg('page_size')::int OFFSET sqlc.arg('page_offset')::int;
 SELECT u."id", u."email", u."username", u."fullName", u."role", u."isActive",
        u."phoneE164", u."lastLoginAt", u."createdAt",
        (SELECT COUNT(*) FROM "prospects" p WHERE p."createdById" = u."id")::int AS prospect_count,
-       (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count
+       (SELECT COUNT(*) FROM "representants" r WHERE r."createdById" = u."id")::int AS representant_count,
+       u."roleId", ro."libelle" AS role_libelle
 FROM "users" u
+JOIN "roles" ro ON ro."id" = u."roleId"
 WHERE u."id" = $1 AND u."deletedAt" IS NULL;
 
 -- name: UserRoleForUpdate :one
-SELECT "id", "role", "isActive", "email", "username" FROM "users"
+SELECT "id", "role", "isActive", "email", "username", "roleId" FROM "users"
 WHERE "id" = $1 AND "deletedAt" IS NULL;
 
 -- name: UserIdentifierTaken :one
@@ -51,15 +55,15 @@ ORDER BY "id"
 FOR UPDATE;
 
 -- name: InsertUser :exec
-INSERT INTO "users" ("id", "email", "username", "fullName", "passwordHash", "role", "phoneE164", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, now());
+INSERT INTO "users" ("id", "email", "username", "fullName", "passwordHash", "role", "phoneE164", "roleId", "updatedAt")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, now());
 
 -- name: UpdateUser :exec
 UPDATE "users" SET
   "email" = COALESCE(sqlc.narg('email')::text, "email"),
   "username" = COALESCE(sqlc.narg('username')::text, "username"),
   "fullName" = COALESCE(sqlc.narg('full_name')::text, "fullName"),
-  "role" = COALESCE(sqlc.narg('role')::"Role", "role"),
+  "roleId" = COALESCE(sqlc.narg('role_id')::text, "roleId"),
   "isActive" = COALESCE(sqlc.narg('is_active')::boolean, "isActive"),
   "phoneE164" = CASE WHEN sqlc.arg('phone_touched')::boolean THEN sqlc.narg('phone')::text ELSE "phoneE164" END,
   "updatedAt" = now()

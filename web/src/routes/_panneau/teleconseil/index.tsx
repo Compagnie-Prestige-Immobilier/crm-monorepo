@@ -4,6 +4,7 @@ import { HubView } from '@/components/chues/hub-view';
 import { LienFormulairePublic } from '@/components/chues/lien-formulaire-public';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/')({
   beforeLoad: ({ context }) => {
@@ -40,7 +41,7 @@ function Loading() {
 /** Écran Mon travail de la coque Téléconseil. */
 function TeleconseilPage() {
   const { user } = Route.useRouteContext();
-  const encadrement = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
+  const encadrement = peut(user, 'portefeuille.voir_tout');
 
   return (
     <div className="flex flex-col gap-6">

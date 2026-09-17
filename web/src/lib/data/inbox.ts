@@ -5,8 +5,8 @@ import { getApiClient } from '@/lib/api/browser';
 
 type Schemas = components['schemas'];
 
-export type InboxItem = Schemas['InboxItemDto'];
-export type Inbox = Schemas['InboxDto'];
+export type Inbox = Schemas['NotificationBoiteOutputBody'];
+export type InboxItem = Schemas['NotificationRecue'];
 
 const INBOX_PAGE_SIZE = 20;
 

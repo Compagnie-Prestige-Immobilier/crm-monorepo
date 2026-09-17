@@ -8,19 +8,22 @@ import { flattenPage } from '@/lib/api/query-params';
 import type { Paginated, Projet } from '@/lib/types';
 
 type Schemas = components['schemas'];
-export type LotExportSummary = Schemas['LotExportSummaryDto'];
-export type LotExportDetail = Schemas['LotExportDetailDto'];
-export type CreateLotExportInput = Schemas['CreateLotExportDto'];
-export type LotExportPreview = Schemas['LotExportPreviewDto'];
+export type LotExportSummary = Schemas['CampagneResume'];
+export type LotExportDetail = Schemas['CampagneDetail'];
+export type CreateLotExportInput = Schemas['CampagneCreationBody'];
+export type LotExportPreview = Schemas['CampagneApercuOutputBody'];
 export type CampagnePerformance = Pick<
   LotExportDetail,
   'name' | 'performance' | 'fichesAppelees' | 'itemCount' | 'callsSince'
 >;
 export type LotExportQuery = NonNullable<operations['listLotsExport']['parameters']['query']>;
-export type LotExportFiche = Schemas['LotExportFicheDto'];
-export type LotExportFicheEtat = Schemas['LotExportFicheEtat'];
-export type UpdateLotExportInput = Schemas['UpdateLotExportDto'];
-export type LotExportImport = Schemas['LotExportImportDto'];
+export type LotExportFiche = Schemas['CampagneFiche'];
+export type LotExportFicheEtat = Exclude<
+  NonNullable<operations['listLotExportFiches']['parameters']['query']>['etat'],
+  undefined
+>;
+export type UpdateLotExportInput = Schemas['CampagneMajInputBody'];
+export type LotExportImport = Schemas['CampagneImport'];
 export type LotExportFichesQuery = NonNullable<
   operations['listLotExportFiches']['parameters']['query']
 >;
@@ -162,7 +165,7 @@ export async function deleteLotExport(
 /** La campagne choisie au filtre, ou la dernière lancée tant qu'aucune n'est choisie. */
 export async function fetchCampagneRegardee(
   lotId: string | null,
-  projet: Schemas['Projet'] | null,
+  projet: Projet | null,
   teleconseillerId: string | null,
   client: ApiClient = getApiClient(),
 ): Promise<CampagnePerformance | null> {
@@ -245,7 +248,9 @@ export async function fetchTeleconseillers(
 ): Promise<Teleconseiller[]> {
   const pages = await Promise.all(
     (['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const).map((role) =>
-      client.GET('/api/v1/users', { params: { query: { role, isActive: true, pageSize: 50 } } }),
+      client.GET('/api/v1/users', {
+        params: { query: { role, isActive: 'true', pageSize: 50 } },
+      }),
     ),
   );
 

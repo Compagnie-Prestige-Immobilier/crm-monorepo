@@ -41,6 +41,21 @@ type Utilisateur struct {
 	FullName  string  `json:"fullName"`
 	Role      Role    `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
 	PhoneE164 *string `json:"phoneE164"`
+	// Role reste le rôle de base, qui porte les données ; RoleID donne les permissions.
+	RoleID      string `json:"roleId"`
+	RoleLibelle string `json:"roleLibelle"`
+	permissions map[Permission]bool
+}
+
+// Le démarrage charge chaque base ; un serveur d'essai charge à la première session.
+func (a *Attributions) Attribuer(ctx context.Context, q *db.Queries, u *Utilisateur) error {
+	if a.parRole.Load() == nil {
+		if err := a.Charger(ctx, q); err != nil {
+			return err
+		}
+	}
+	u.permissions = a.duRole(u.RoleID)
+	return nil
 }
 
 func Empreinte(jeton string) string {
@@ -48,12 +63,19 @@ func Empreinte(jeton string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func utilisateurParSession(ctx context.Context, q *db.Queries, jeton string) (Utilisateur, error) {
+func utilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, jeton string) (Utilisateur, error) {
 	row, err := q.UserBySession(ctx, Empreinte(jeton))
 	if err != nil {
 		return Utilisateur{}, err
 	}
-	return Utilisateur{ID: row.ID, Email: row.Email, Username: row.Username, FullName: row.FullName, Role: Role(row.Role), PhoneE164: row.PhoneE164}, nil
+	u := Utilisateur{
+		ID: row.ID, Email: row.Email, Username: row.Username, FullName: row.FullName, Role: Role(row.Role),
+		PhoneE164: row.PhoneE164, RoleID: row.RoleId, RoleLibelle: row.RoleLibelle,
+	}
+	if err := a.Attribuer(ctx, q, &u); err != nil {
+		return Utilisateur{}, err
+	}
+	return u, nil
 }
 
 func UtilisateurCourant(ctx context.Context) Utilisateur {

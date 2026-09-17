@@ -35,10 +35,7 @@ var (
 	AdminSeul     = []Role{Admin}
 )
 
-// Une entrée par route, clé "METHODE chemin huma", fusion des gardes de chaque
-// domaine (domaines.go). Toute route sans entrée, ou toute entrée sans route,
-// arrête le démarrage (verifierGarde).
-var Garde map[string][]Role
+var Garde map[string]Permission
 
 // Construite UNE fois. Toutes les instances montent les mêmes routes, donc la
 // carte est identique à chaque appel ; la reconstruire écrivait dans une map que
@@ -47,9 +44,9 @@ var Garde map[string][]Role
 // write ».
 var gardesConstruites sync.Once
 
-func FusionnerGardes(gardes ...map[string][]Role) {
+func FusionnerGardes(gardes ...map[string]Permission) {
 	gardesConstruites.Do(func() {
-		Garde = make(map[string][]Role)
+		Garde = make(map[string]Permission)
 		for _, g := range gardes {
 			maps.Copy(Garde, g)
 		}
@@ -63,11 +60,11 @@ func cleGarde(method, path string) string {
 // Lecture d'une fiche plateforme : nil, l'encadrement lit tout ; vrai, le CCP
 // ne voit que les fiches venues des plateformes ; faux, personne d'autre ne
 // les voit jamais. Lire n'est pas toucher : voir PorteeSaisiePlateforme.
-func PorteePlateforme(r Role) *bool {
-	if r == Admin || r == Superviseur || r == Direction {
+func PorteePlateforme(u *Utilisateur) *bool {
+	if u.Peut(PermissionPlateformeVoir) {
 		return nil
 	}
-	if r == CCP {
+	if u.Peut(PermissionPlateformeSaisir) {
 		return &vrai
 	}
 	return &faux
@@ -75,8 +72,8 @@ func PorteePlateforme(r Role) *bool {
 
 // Saisie sur une fiche plateforme, annuaire d'appel compris : seul le CCP.
 // L'encadrement suit le travail des CCP sans jamais composer leurs numéros.
-func PorteeSaisiePlateforme(r Role) *bool {
-	if r == CCP {
+func PorteeSaisiePlateforme(u *Utilisateur) *bool {
+	if u.Peut(PermissionPlateformeSaisir) {
 		return &vrai
 	}
 	return &faux
@@ -84,17 +81,29 @@ func PorteeSaisiePlateforme(r Role) *bool {
 
 var vrai, faux = true, false
 
-func Autorise(roles []Role, role Role) bool {
-	for _, r := range roles {
-		if r == role || r == Public {
-			return true
-		}
-	}
-	return false
-}
-
 func VerifierGarde(api huma.API) error {
 	vues := map[string]bool{}
+	permissionsVues := map[Permission]bool{}
+	if err := verifierRoutesGardees(api, vues, permissionsVues); err != nil {
+		return err
+	}
+	for cle := range Garde {
+		if !vues[cle] {
+			return fmt.Errorf("entrée de garde sans route : %s", cle)
+		}
+	}
+	for p := range permissionsDePortee {
+		permissionsVues[p] = true
+	}
+	for p := range Catalogue {
+		if !permissionsVues[p] {
+			return fmt.Errorf("permission jamais référencée : %s", p)
+		}
+	}
+	return nil
+}
+
+func verifierRoutesGardees(api huma.API, vues map[string]bool, permissionsVues map[Permission]bool) error {
 	for path, item := range api.OpenAPI().Paths {
 		ops := map[string]*huma.Operation{
 			"GET": item.Get, "POST": item.Post, "PUT": item.Put, "PATCH": item.Patch,
@@ -104,17 +113,24 @@ func VerifierGarde(api huma.API) error {
 			if op == nil {
 				continue
 			}
-			cle := cleGarde(method, path)
-			if _, ok := Garde[cle]; !ok {
-				return fmt.Errorf("route sans entrée dans garde : %s", cle)
+			if err := verifierRouteGardee(method, path, vues, permissionsVues); err != nil {
+				return err
 			}
-			vues[cle] = true
 		}
 	}
-	for cle := range Garde {
-		if !vues[cle] {
-			return fmt.Errorf("entrée de garde sans route : %s", cle)
-		}
+	return nil
+}
+
+func verifierRouteGardee(method, path string, vues map[string]bool, permissionsVues map[Permission]bool) error {
+	cle := cleGarde(method, path)
+	p, ok := Garde[cle]
+	if !ok {
+		return fmt.Errorf("route sans entrée dans garde : %s", cle)
 	}
+	if !permissionConnue(p) {
+		return fmt.Errorf("permission de garde absente du catalogue : %s", p)
+	}
+	vues[cle] = true
+	permissionsVues[p] = true
 	return nil
 }

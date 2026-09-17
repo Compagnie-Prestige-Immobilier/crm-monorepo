@@ -35,17 +35,11 @@ import {
 } from '@/lib/data/reference';
 import { saveEmployeur, saveIncomeBand, saveOffer, saveProfession } from '@/lib/data/referentiels';
 import { toastApiError } from '@/lib/mutation-feedback';
-import {
-  EMPLOYEUR_TYPE_LABELS,
-  type Employeur,
-  type EmployeurType,
-  type IncomeBand,
-  type Offer,
-  type Profession,
-} from '@/lib/types';
+import { EMPLOYEUR_TYPE_LABELS, type EmployeurType, type Profession } from '@/lib/types';
 
 type Kind = 'professions' | 'incomeBands' | 'offers' | 'employeurs';
-type Row = Profession | IncomeBand | Offer | Employeur;
+/** Profession, tranche de revenu, offre et employeur partagent le même `ReferentielsItem` côté Go. */
+type Row = Profession;
 
 /** Les intitulés sont écrits, pas fabriqués : « Nouvelle employeur » se lisait. */
 const CONFIG = {
@@ -74,7 +68,8 @@ const CONFIG = {
 const EMPLOYEUR_TYPES = Object.keys(EMPLOYEUR_TYPE_LABELS) as EmployeurType[];
 
 function employeurTypeLabel(row: Row): string {
-  return 'type' in row ? EMPLOYEUR_TYPE_LABELS[row.type] : '';
+  if (!('type' in row) || row.type === null) return '';
+  return EMPLOYEUR_TYPE_LABELS[row.type as EmployeurType] ?? '';
 }
 
 const COLONNES_OPEN = {
@@ -281,14 +276,14 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
   function edit(row: Row): void {
     setDraft({
       id: row.id,
-      code: row.code,
-      label: row.label,
-      isActive: row.isActive,
-      isTeaching: 'isTeaching' in row ? row.isTeaching : false,
-      minXof: 'minXof' in row && row.minXof !== null ? String(row.minXof) : '',
-      maxXof: 'maxXof' in row && row.maxXof !== null ? String(row.maxXof) : '',
-      description: 'description' in row ? (row.description ?? '') : '',
-      type: 'type' in row ? row.type : 'MINISTERE',
+      code: row.code ?? '',
+      label: row.label ?? '',
+      isActive: row.isActive ?? false,
+      isTeaching: row.isTeaching === true,
+      minXof: row.minXof === null ? '' : String(row.minXof),
+      maxXof: row.maxXof === null ? '' : String(row.maxXof),
+      description: row.description ?? '',
+      type: (row.type as EmployeurType | null) ?? 'MINISTERE',
     });
   }
 

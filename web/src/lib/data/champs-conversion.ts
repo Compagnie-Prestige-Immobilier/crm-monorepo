@@ -6,10 +6,10 @@ import { getApiClient } from '@/lib/api/browser';
 import { queryKeys } from '@/lib/query-keys';
 import type { Projet } from '@/lib/types';
 
-export type ReglagesConversion = components['schemas']['ReglagesConversionDto'];
-export type ReglageChamp = components['schemas']['ReglageChampDto'];
-export type ChampLibre = components['schemas']['ChampLibreDto'];
-export type UpdateReglagesConversion = components['schemas']['UpdateReglagesConversionDto'];
+export type ReglagesConversion = components['schemas']['ProspectReglagesConversion'];
+export type ReglageChamp = components['schemas']['ProspectReglageChamp'];
+export type ChampLibre = components['schemas']['ProspectChampLibre'];
+export type UpdateReglagesConversion = components['schemas']['ProspectMajChampsInputBody'];
 export type TypeChampLibre = ChampLibre['type'];
 
 export const TYPE_CHAMP_LIBRE_LABELS: Readonly<Record<TypeChampLibre, string>> = {

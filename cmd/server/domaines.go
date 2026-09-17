@@ -47,8 +47,8 @@ func monterDomaines(api huma.API, d *socle.Deps) error {
 	return nil
 }
 
-func gardesDomaines() []map[string][]socle.Role {
-	return []map[string][]socle.Role{
+func gardesDomaines() []map[string]socle.Permission {
+	return []map[string]socle.Permission{
 		auth.Garde,
 		socle.GardeLive,
 		referentiels.Garde,
@@ -57,6 +57,7 @@ func gardesDomaines() []map[string][]socle.Role {
 		notifications.GardeCourriels,
 		imports.Garde,
 		admin.Garde,
+		admin.GardeRoles,
 		analytics.Garde,
 		prospects.Garde,
 		prospects.GardeFormulairePublic,

@@ -25,7 +25,7 @@ type AnnuaireInput struct {
 type AnnuaireEntree struct {
 	ProspectID       string  `json:"prospectId"`
 	PhoneE164        string  `json:"phoneE164"`
-	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod *string `json:"enrollmentMethod"`
 	Rev              int32   `json:"rev"`
 	UpdatedAt        string  `json:"updatedAt"`
@@ -84,10 +84,10 @@ func (s *service) qualificationAnnuaire(ctx context.Context, in *AnnuaireInput) 
 	}
 	taille := annuaireTaille(in.Limit)
 	lignes, err := s.Q.AnnuairePhase2(ctx, db.AnnuairePhase2Params{
-		ScopeAll:        qualificationVoitTout(u.Role) || u.Role == socle.CCP,
+		ScopeAll:        qualificationVoitTout(&u) || u.Peut(socle.PermissionPlateformeSaisir),
 		ScopeUserID:     u.ID,
-		ScopeConverti:   u.Role == socle.ChargeClientele,
-		ScopePlateforme: socle.PorteeSaisiePlateforme(u.Role),
+		ScopeConverti:   u.Peut(socle.PermissionFichesVoirConverties),
+		ScopePlateforme: socle.PorteeSaisiePlateforme(&u),
 		DepuisAt:        depuisAt,
 		DepuisID:        depuisID,
 		Taille:          taille + 1,

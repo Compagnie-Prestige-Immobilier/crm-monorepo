@@ -810,9 +810,9 @@ func formulaireSiteverifyAppel(ctx context.Context, corps url.Values) (bool, err
 	return charge.Success, nil
 }
 
-var GardeFormulairePublic = map[string][]socle.Role{
-	"GET /api/v1/formulaire-public/formulaire": {socle.Public},
-	"POST /api/v1/formulaire-public/{jeton}":   {socle.Public},
+var GardeFormulairePublic = map[string]socle.Permission{
+	"GET /api/v1/formulaire-public/formulaire": socle.Publique,
+	"POST /api/v1/formulaire-public/{jeton}":   socle.Publique,
 }
 
 func MonterFormulairePublic(api huma.API, d *socle.Deps) {

@@ -4,10 +4,10 @@ import { BankCasesSkeleton } from '@/components/bank/bank-cases-view';
 import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
 import { BankStagesView } from '@/components/bank/bank-stages-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/dossiers/etapes')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('banque.administrer'),
   component: EtapesBancairesPage,
   pendingComponent: Loading,
 });

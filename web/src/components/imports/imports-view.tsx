@@ -943,6 +943,7 @@ function History({
                         <TableHead>Entité</TableHead>
                         <TableHead>État</TableHead>
                         <TableHead className="text-right">Créées</TableHead>
+                        <TableHead className="text-right">Mises à jour</TableHead>
                         <TableHead className="text-right">Ignorées</TableHead>
                         <TableHead className="text-right">Erreurs</TableHead>
                         <TableHead>Déposé le</TableHead>
@@ -964,6 +965,9 @@ function History({
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-success">
                             {formatNumber(row.createdRows)}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums">
+                            {formatNumber(row.updatedRows)}
                           </TableCell>
                           <TableCell className="text-right tabular-nums text-muted-foreground">
                             {formatNumber(row.skippedRows)}

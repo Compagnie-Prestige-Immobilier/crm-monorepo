@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { CallOutcomeReasonsView } from '@/components/referentiels/call-outcome-reasons-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/referentiels/issues-appel')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('referentiels.superviser'),
   component: IssuesAppelPage,
   pendingComponent: Loading,
 });

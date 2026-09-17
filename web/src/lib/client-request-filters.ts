@@ -2,7 +2,7 @@ import type { components } from '@crm/api-client';
 
 import { readPositiveInt, readString, type RawSearchParams } from '@/lib/search-params';
 
-export type ClientRequestStatus = components['schemas']['ClientRequestStatus'];
+export type ClientRequestStatus = components['schemas']['DemandeClientBanque']['status'];
 
 const CLIENT_REQUEST_STATUSES: readonly ClientRequestStatus[] = ['PENDING', 'APPROVED', 'REJECTED'];
 

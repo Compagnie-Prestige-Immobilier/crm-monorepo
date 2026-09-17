@@ -278,8 +278,8 @@ function referentielsDe(
   return {
     departements,
     syndicatOptions: syndicats
-      .filter((item) => item.isActive)
-      .map((item) => ({ value: item.id, label: item.name, hint: item.sigle })),
+      .filter((item) => item.isActive === true)
+      .map((item) => ({ value: item.id, label: item.name ?? '', hint: item.sigle ?? '' })),
     // Le champ stocke le NOM du syndicat ; le combobox choisit par id, résolu ici.
     syndicatId: syndicats.find((item) => item.name === choix.syndicat)?.id ?? null,
     regionId:
@@ -289,13 +289,20 @@ function referentielsDe(
 }
 
 function regionOptionsDe(reference: Referentiels) {
-  return (reference?.regions ?? []).map((region) => ({ value: region.id, label: region.name }));
+  return (reference?.regions ?? []).map((region) => ({
+    value: region.id,
+    label: region.name ?? '',
+  }));
 }
 
 function iefOptionsDe(reference: Referentiels, departementId: string | null) {
   return (reference?.iefs ?? [])
     .filter((ief) => (departementId === null ? true : ief.departementId === departementId))
-    .map((ief) => ({ value: ief.id, label: ief.name, hint: ief.departementName }));
+    .map((ief) => ({
+      value: ief.id,
+      label: ief.name ?? '',
+      hint: ief.departementName ?? undefined,
+    }));
 }
 
 function ariaDescribedByDe(
@@ -538,8 +545,8 @@ function corpsDeCreation(saisie: SaisieFiche): Parameters<typeof createRepresent
 function patchDuScript(
   saisie: SaisieFiche,
   savedScript: RepresentantScript | null,
-): UpdateRepresentantPatch {
-  const patch: UpdateRepresentantPatch = {};
+): Partial<UpdateRepresentantPatch> {
+  const patch: Partial<UpdateRepresentantPatch> = {};
   if (saisie.whatsappStatus !== savedScript?.whatsappStatus) {
     patch.whatsappStatus = saisie.whatsappStatus;
   }
@@ -595,6 +602,7 @@ function patchDeFiche(
   savedScript: RepresentantScript | null,
 ): UpdateRepresentantPatch {
   const patch: UpdateRepresentantPatch = {
+    rev: representant.rev,
     fullName: saisie.fullName.trim(),
     phone: saisie.phone.trim(),
     departementId: saisie.departementId,
@@ -919,8 +927,8 @@ export function RepresentantFormDialog({
                 .filter((departement) => regionId === null || departement.regionId === regionId)
                 .map((departement) => ({
                   value: departement.id,
-                  label: departement.name,
-                  hint: departement.regionName,
+                  label: departement.name ?? '',
+                  hint: departement.regionName ?? undefined,
                 }))}
               onChange={(value) => {
                 setDepartementId(value);

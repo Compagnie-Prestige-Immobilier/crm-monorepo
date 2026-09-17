@@ -1,11 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { CommerciauxView } from '@/components/commerciaux/commerciaux-view';
+import { UtilisateursEtRoles } from '@/components/commerciaux/utilisateurs-et-roles';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/commerciaux')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('comptes.administrer'),
   component: CommerciauxPage,
   pendingComponent: Loading,
 });
@@ -27,5 +27,5 @@ function Loading() {
 function CommerciauxPage() {
   const { user } = Route.useRouteContext();
 
-  return <CommerciauxView currentUserId={user.id} />;
+  return <UtilisateursEtRoles user={user} />;
 }

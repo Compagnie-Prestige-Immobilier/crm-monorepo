@@ -226,7 +226,7 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     await expect(ligneApresAppel).toContainText('Intéressé');
 
     await page.goto(`/teleconseil/prospects/${prospectGrandPublic}`);
-    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 1 })).toBeVisible();
+    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 2 })).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
   });
 });

@@ -8,12 +8,19 @@ import {
   type RepresentantFilters,
   type RepresentantRelation,
 } from '@/lib/representant-filters';
-import type { Paginated, RepresentantRow, UpdateRepresentantInput } from '@/lib/types';
+import type {
+  DeviceCallDetection,
+  Paginated,
+  RepresentantRow,
+  UpdateRepresentantInput,
+} from '@/lib/types';
+
+export type { DeviceCallDetection };
 
 type RepresentantQuery = NonNullable<operations['listRepresentants']['parameters']['query']>;
 
-export type CreateRepresentantInput = components['schemas']['CreateRepresentantDto'];
-export type RepresentantLookup = components['schemas']['RepresentantLookupDto'];
+export type CreateRepresentantInput = components['schemas']['RepresentantCreateInputBody'];
+export type RepresentantLookup = components['schemas']['RepresentantLookupOutputBody'];
 export type RepresentantRelationChange = components['schemas']['RepresentantRelationChangeDto'];
 
 export const WHATSAPP_STATUSES = ['NON_DEMANDE', 'MEME_NUMERO', 'AUTRE_NUMERO', 'AUCUN'] as const;
@@ -94,8 +101,8 @@ function localisationQuery(filters: RepresentantFilters): Partial<RepresentantQu
 function critereQuery(filters: RepresentantFilters): Partial<RepresentantQuery> {
   const query: Partial<RepresentantQuery> = {};
   if (filters.dateTo !== null) query.dateTo = endOfDay(filters.dateTo);
-  if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects;
-  if (filters.relationStatus !== null) query.relationStatus = filters.relationStatus;
+  if (filters.hasProspects !== null) query.hasProspects = filters.hasProspects ? 'true' : 'false';
+  if (filters.relationStatus !== null) query.relationStatus = [filters.relationStatus];
   if (filters.statutQualificationId !== null) {
     query.statutQualificationId = filters.statutQualificationId;
   }
@@ -126,7 +133,7 @@ export async function fetchRepresentants(
   );
 }
 
-export type RepresentantSuivi = components['schemas']['RepresentantSuivi'];
+export type RepresentantSuivi = Exclude<RepresentantQuery['suivi'], undefined>;
 
 export const SUIVI_PAGE_SIZE = 100;
 
@@ -159,9 +166,7 @@ export async function fetchRepresentantsAQualifier(
   const query: RepresentantQuery = {
     mesFiches: true,
     search: criteres.search,
-    ...(criteres.relationStatus === null
-      ? {}
-      : { relationStatus: criteres.relationStatus.join(',') }),
+    ...(criteres.relationStatus === null ? {} : { relationStatus: criteres.relationStatus }),
     sortBy: 'fullName',
     sortOrder: 'asc',
     page: criteres.page,
@@ -203,8 +208,6 @@ export async function fetchRepresentantCallAttempts(
   );
   return payload.items;
 }
-
-export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
 
 /** Les relevés du téléphone venaient de l'application mobile, abandonnée : la liste reste vide. */
 export async function fetchRepresentantDeviceCalls(_id: string): Promise<DeviceCallDetection[]> {

@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { PoleDeploiementView } from '@/components/pilotage/pole-deploiement-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/pole-deploiement')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: PoleDeploiementPage,
   pendingComponent: Loading,
 });

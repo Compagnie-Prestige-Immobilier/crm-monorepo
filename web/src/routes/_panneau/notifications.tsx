@@ -4,11 +4,12 @@ import { INBOX_ROLES } from '@/components/layout/nav-items';
 import { NotificationsView } from '@/components/notifications/notifications-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/notifications')({
   beforeLoad: ({ context }) => {
     guardRoles(INBOX_ROLES)({ context });
-    if (context.user.role === 'ADMIN') {
+    if (peut(context.user, 'notifications.administrer')) {
       throw redirect({ href: '/admin/notifications?onglet=reception' });
     }
   },

@@ -201,7 +201,7 @@ type Prospect struct {
 	CanalProvenanceID        *string           `json:"canalProvenanceId"`
 	CanalProvenanceLabel     *string           `json:"canalProvenanceLabel"`
 	Segment                  *string           `json:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status             string            `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status             string            `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod         *string           `json:"enrollmentMethod"`
 	EnrollmentCapturedByID   *string           `json:"enrollmentCapturedById"`
 	EnrollmentCapturedByName *string           `json:"enrollmentCapturedByName"`
@@ -349,9 +349,9 @@ type prospectPortee struct {
 // CCP voit tout, mais la borne plateforme ne lui laisse que ses fiches.
 func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 	return prospectPortee{
-		tout:       u.Role == socle.Admin || u.Role == socle.Superviseur || u.Role == socle.Direction || u.Role == socle.CCP,
-		converti:   u.Role == socle.ChargeClientele,
-		plateforme: socle.PorteePlateforme(u.Role),
+		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout) || u.Peut(socle.PermissionPlateformeSaisir),
+		converti:   u.Peut(socle.PermissionFichesVoirConverties),
+		plateforme: socle.PorteePlateforme(u),
 		userID:     u.ID,
 	}
 }
@@ -439,7 +439,7 @@ func (s *service) prospectModifiable(ctx context.Context, u *socle.Utilisateur, 
 	if err != nil {
 		return row, err
 	}
-	if !socle.Autorise(socle.Encadrement, u.Role) && row.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesModifierToutes) && row.CreatedById != u.ID {
 		return row, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Cette fiche appartient à un autre téléconseiller.")
 	}
 	return row, nil
@@ -457,7 +457,7 @@ type ProspectListInput struct {
 	CanalProvenanceID      string `query:"canalProvenanceId" format:"uuid"`
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar" format:"uuid"`
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
@@ -538,7 +538,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
 	// compose que les numéros qui lui reviennent. Les fiches plateforme
 	// reviennent toutes aux CCP, sans partage.
-	if in.MesFiches && u.Role != socle.CCP {
+	if in.MesFiches && !u.Peut(socle.PermissionPlateformeSaisir) {
 		p.tout, p.converti = false, false
 	}
 	if in.Plateforme && p.plateforme == nil {
@@ -626,10 +626,6 @@ func (s *service) prospectLister(ctx context.Context, in *ProspectListInput) (*P
 		PageCount: max(1, (total+in.PageSize-1)/in.PageSize),
 	}
 	return out, nil
-}
-
-type ProspectIDInput struct {
-	ID string `path:"id" format:"uuid"`
 }
 
 func (s *service) prospectHandlerLire(ctx context.Context, in *ProspectIDInput) (*ProspectOutput, error) {
@@ -814,7 +810,7 @@ func (s *service) prospectTelephoneLibre(ctx context.Context, u *socle.Utilisate
 		return err
 	}
 	existante := ProspectConflictExisting{OwnedByCommercialName: clash.OwnerName}
-	if u.Role == socle.Admin || clash.CreatedById == u.ID {
+	if u.Peut(socle.PermissionFichesIgnorerPropriete) || clash.CreatedById == u.ID {
 		existante = ProspectConflictExisting{
 			ID: clash.ID, Nom: clash.Nom, Prenom: clash.Prenom,
 			RepresentantID: clash.RepresentantId, RepresentantName: clash.RepresentantName,
@@ -835,7 +831,7 @@ func (s *service) prospectIdentifiantLibre(ctx context.Context, u *socle.Utilisa
 	if err != nil {
 		return err
 	}
-	if u.Role != socle.Admin && row.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.CreatedById != u.ID {
 		return socle.Problem(http.StatusForbidden, "ENTITY_ID_OWNED_BY_ANOTHER_USER", "Cet identifiant appartient à un autre téléconseiller.")
 	}
 	p := socle.Problem(http.StatusConflict, "PROSPECT_ALREADY_EXISTS", "Un prospect porte déjà cet identifiant.")
@@ -1017,7 +1013,7 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 	if err != nil || existant.ALeParcours {
 		return aucune, err
 	}
-	if u.Role != socle.Admin && existant.CreatedById != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && existant.CreatedById != u.ID {
 		return aucune, nil
 	}
 	journeyID, err := uuid.NewV7()
@@ -1129,7 +1125,7 @@ var prospectTransitions = map[db.ProspectStatut][]db.ProspectStatut{
 // confirmation dédiée, sinon un simple PATCH y menait depuis n'importe quel
 // état, sans consentement et sans auteur.
 func prospectStatutModifiable(u *socle.Utilisateur, courant db.ProspectStatut, demande *string) error {
-	if demande == nil || *demande == string(courant) || u.Role == socle.Admin {
+	if demande == nil || *demande == string(courant) || u.Peut(socle.PermissionFichesForcerTransition) {
 		return nil
 	}
 	suivant := db.ProspectStatut(*demande)
@@ -1288,7 +1284,7 @@ func prospectDeduireWhatsapp(numero, phoneE164 *string) db.WhatsappStatus {
 func prospectChampsJournal(p *db.ProspectVivantRow) map[string]any {
 	return map[string]any{
 		prospectChampNom: p.Nom, socle.ProspectChampPrenom: p.Prenom, socle.ProspectChampPhone: p.PhoneE164,
-		"statut": string(p.Statut), prospectChampBanque: p.BanqueId, prospectChampSyndicat: p.SyndicatId,
+		prospectChampStatut: string(p.Statut), prospectChampBanque: p.BanqueId, prospectChampSyndicat: p.SyndicatId,
 		"representantId": p.RepresentantId, "email": p.Email,
 	}
 }
@@ -1426,7 +1422,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	if corps.RepresentantID == nil && corps.CommercialID == nil {
 		return nil, socle.Problem(http.StatusBadRequest, "REASSIGN_NO_TARGET", "Indiquez au moins un représentant ou un commercial de destination.")
 	}
-	portee := u.Role == socle.Admin || u.Role == socle.Superviseur
+	portee := u.Peut(socle.PermissionProspectsReaffecterTout)
 	if err := prospectReaffecterOwnerAutorise(corps.CommercialID, portee); err != nil {
 		return nil, err
 	}
@@ -1457,29 +1453,30 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 	return out, nil
 }
 
-var prospectLecture = []socle.Role{socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Admin, socle.Superviseur, socle.Direction}
+var prospectLecture = socle.PermissionProspectsLire
 
-var Garde = map[string][]socle.Role{
+var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects":                                           prospectLecture,
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
 	"GET /api/v1/prospects/{id}/requalifications":                     prospectLecture,
-	"POST /api/v1/prospects":                                          socle.Parcours,
-	"PATCH " + prospectCheminID:                                       socle.Parcours,
-	"DELETE " + prospectCheminID:                                      socle.Parcours,
-	"POST /api/v1/prospects/merge":                                    {socle.Commercial, socle.ChargeClientele, socle.Admin},
-	"POST /api/v1/prospects/reassign":                                 {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"POST /api/v1/prospects/{id}/revue":                               {socle.ChargeClientele, socle.Superviseur, socle.Admin},
-	"PATCH " + prospectCheminSegment:                                  socle.Encadrement,
-	"GET /api/v1/prospects/{id}/segment-history":                      socle.Parcours,
+	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
+	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
+	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
+	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,
+	"POST /api/v1/prospects/merge":                                    socle.PermissionProspectsFusionner,
+	"POST /api/v1/prospects/reassign":                                 socle.PermissionProspectsReaffecter,
+	"POST /api/v1/prospects/{id}/revue":                               socle.PermissionProspectsRevoir,
+	"PATCH " + prospectCheminSegment:                                  socle.PermissionProspectsSuperviser,
+	"GET /api/v1/prospects/{id}/segment-history":                      socle.PermissionFichesTenir,
 	"GET /api/v1/prospects/{id}/journal":                              prospectLecture,
-	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    {socle.Commercial, socle.ChargeClientele, socle.Admin, socle.Superviseur},
-	"GET /api/v1/champs-conversion/{projet}":                          socle.Tous,
-	"PUT /api/v1/champs-conversion/{projet}":                          socle.AdminSeul,
-	"GET /api/v1/parametres-chues":                                    socle.Parcours,
-	"PATCH /api/v1/parametres-chues":                                  socle.Encadrement,
-	"GET /api/v1/parametres-chues/journal":                            socle.Encadrement,
+	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": socle.PermissionProspectsConvertir,
+	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    socle.PermissionProspectsConvertir,
+	"GET /api/v1/champs-conversion/{projet}":                          socle.PermissionPanneauAcceder,
+	"PUT /api/v1/champs-conversion/{projet}":                          socle.PermissionFormulairesAdministrer,
+	"GET /api/v1/parametres-chues":                                    socle.PermissionFichesTenir,
+	"PATCH /api/v1/parametres-chues":                                  socle.PermissionProspectsSuperviser,
+	"GET /api/v1/parametres-chues/journal":                            socle.PermissionProspectsSuperviser,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

@@ -2,11 +2,11 @@ import type { components } from '@crm/api-client';
 
 type Schemas = components['schemas'];
 
-export type FormulairePublic = Schemas['FormulairePublicDto'];
-export type OptionPublique = Schemas['OptionPubliqueDto'];
-export type ReglageChampPublic = Schemas['ReglageChampDto'];
-export type ChampLibrePublic = Schemas['ChampLibreDto'];
-type WhatsappStatus = Schemas['WhatsappStatus'];
+export type FormulairePublic = Schemas['FormulairePublicOutputBody'];
+export type OptionPublique = Schemas['FormulaireOption'];
+export type ReglageChampPublic = Schemas['ProspectReglageChamp'];
+export type ChampLibrePublic = Schemas['ProspectChampLibre'];
+type WhatsappStatus = NonNullable<Schemas['Prospect']['whatsappStatus']>;
 
 export type Saisie = Readonly<Record<string, string>>;
 

@@ -842,7 +842,7 @@ func (s *service) prospectMajParametres(ctx context.Context, in *ProspectMajPara
 	demandees := in.demandees()
 	for _, cle := range prospectClesParametres {
 		_, demandee := demandees[cle]
-		if demandee && u.Role != socle.Admin && !slices.Contains(prospectTextesPartages, cle) {
+		if demandee && !u.Peut(socle.PermissionFichesParametresReserves) && !slices.Contains(prospectTextesPartages, cle) {
 			return nil, socle.Problem(http.StatusForbidden, "PARAMETRE_RESERVE_ADMIN",
 				"Seul l’administrateur règle les liens, l’adresse, le numéro et les destinataires.")
 		}

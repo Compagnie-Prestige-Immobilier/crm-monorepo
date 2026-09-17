@@ -59,7 +59,9 @@ export function describeAudience(
     case 'ALL':
       return AUDIENCE_LABELS.ALL;
     case 'ROLE':
-      return row.audienceRole === null ? AUDIENCE_LABELS.ROLE : ROLE_LABELS[row.audienceRole];
+      return row.audienceRole === null
+        ? AUDIENCE_LABELS.ROLE
+        : (ROLE_LABELS[row.audienceRole as Role] ?? row.audienceRole);
     case 'DEPARTEMENT':
       return AUDIENCE_LABELS.DEPARTEMENT;
     case 'USERS': {

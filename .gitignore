@@ -1,6 +1,7 @@
 .env
 .env.*
 !.env.example
+.yolo
 *.pem
 *.key
 *.p12
@@ -21,7 +22,6 @@ packages/*
 !web/dist/.gitkeep
 web/src/routeTree.gen.ts
 web/src/api/schema.d.ts
-web/src/api/schema-v1.d.ts
 e2e/.auth/
 e2e/.roles.json
 e2e/fixtures/

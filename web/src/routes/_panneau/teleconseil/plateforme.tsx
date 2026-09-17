@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { ConsoleView } from '@/components/console/console-view';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/plateforme')({
-  beforeLoad: guardRoles(['CCP']),
+  beforeLoad: guardPermission('plateforme.saisir'),
   component: PlateformePage,
 });
 

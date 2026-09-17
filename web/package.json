@@ -10,7 +10,7 @@
     "lint": "oxlint --config ../.oxlintrc.json --report-unused-disable-directives src",
     "preview": "vite preview",
     "e2e": "pnpm --dir ../e2e test",
-    "gen": "openapi-typescript ../openapi.json -o src/api/schema.d.ts && openapi-typescript contrat-v1.openapi.json -o src/api/schema-v1.d.ts && prettier src/api/schema.d.ts src/api/schema-v1.d.ts --write"
+    "gen": "openapi-typescript ../openapi.json -o src/api/schema.d.ts && prettier src/api/schema.d.ts --write"
   },
   "dependencies": {
     "@base-ui/react": "catalog:",

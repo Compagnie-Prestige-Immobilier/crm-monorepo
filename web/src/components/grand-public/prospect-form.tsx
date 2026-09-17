@@ -355,8 +355,8 @@ function pourSituation(type: ProspectType | null, actuel: Situation): Situation 
   return result as unknown as Situation;
 }
 
-const actives = <T extends { isActive: boolean }>(items: readonly T[] | undefined): T[] =>
-  (items ?? []).filter((item) => item.isActive);
+const actives = <T extends { isActive: boolean | null }>(items: readonly T[] | undefined): T[] =>
+  (items ?? []).filter((item) => item.isActive === true);
 
 function searchHrefPourConflit(phone: string, callingCode: string): string {
   return `/teleconseil/prospects?search=${encodeURIComponent(toInternationalE164(phone, callingCode) ?? phone)}`;
@@ -425,8 +425,8 @@ function PhoneConflictCard({
             Ce numéro est déjà celui de {conflict.prenom} {conflict.nom}.
           </p>
           <p className="text-[0.8125rem] text-muted-foreground">
-            Saisi par le téléconseiller {conflict.ownedByCommercialName} le{' '}
-            {formatDateTime(conflict.createdAt)}.
+            Saisi par le téléconseiller {conflict.ownedByCommercialName}
+            {conflict.createdAt === undefined ? '' : ` le ${formatDateTime(conflict.createdAt)}`}.
           </p>
           <Link
             href={searchHref}
@@ -458,7 +458,7 @@ function ProfessionField({
       value={professionId}
       options={actives(reference?.professions).map((profession) => ({
         value: profession.id,
-        label: profession.label,
+        label: profession.label ?? '',
       }))}
       onChange={(value) => {
         const profession = reference?.professions.find((item) => item.id === value);
@@ -489,7 +489,7 @@ function MontantsFields({
   canalId: string | null;
   onCanalChange: (value: string | null) => void;
   reference: ReferenceData | undefined;
-  canaux: readonly { id: string; label: string; isActive: boolean }[] | undefined;
+  canaux: readonly { id: string; label: string | null; isActive: boolean | null }[] | undefined;
 }) {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -499,7 +499,7 @@ function MontantsFields({
         value={incomeBandId}
         options={actives(reference?.incomeBands).map((band) => ({
           value: band.id,
-          label: band.label,
+          label: band.label ?? '',
         }))}
         onChange={onIncomeBandChange}
       />
@@ -530,7 +530,7 @@ function MontantsFields({
         label="Canal de provenance"
         placeholder="Choisir un canal"
         value={canalId}
-        options={actives(canaux).map((canal) => ({ value: canal.id, label: canal.label }))}
+        options={actives(canaux).map((canal) => ({ value: canal.id, label: canal.label ?? '' }))}
         onChange={onCanalChange}
       />
     </div>
@@ -1070,8 +1070,8 @@ function BanqueField({ type, valeurs, reference, onPatch }: ChampSituationProps)
       value={valeurs.banqueId}
       options={actives(reference?.banques).map((banque) => ({
         value: banque.id,
-        label: banque.name,
-        hint: banque.shortName,
+        label: banque.name ?? '',
+        hint: banque.shortName ?? undefined,
       }))}
       onChange={(banqueId) => {
         onPatch({ banqueId });
@@ -1095,8 +1095,8 @@ function SyndicatField({
       value={valeurs.syndicatId}
       options={actives(reference?.syndicats).map((syndicat) => ({
         value: syndicat.id,
-        label: syndicat.name,
-        hint: syndicat.sigle,
+        label: syndicat.name ?? '',
+        hint: syndicat.sigle ?? undefined,
       }))}
       onChange={(syndicatId) => {
         onPatch({ syndicatId });
@@ -1186,13 +1186,13 @@ function PaysField({
         value={valeurs.paysResidenceId}
         options={actives(reference?.pays).map((pays) => ({
           value: pays.id,
-          label: pays.label,
-          hint: `+${pays.indicatif}`,
+          label: pays.label ?? '',
+          hint: `+${pays.indicatif ?? ''}`,
         }))}
         onChange={(paysResidenceId) => {
           onPatch({ paysResidenceId });
           const choisi = reference?.pays.find((pays) => pays.id === paysResidenceId);
-          if (choisi !== undefined) onIndicatifResidence(choisi.indicatif);
+          if (choisi !== undefined) onIndicatifResidence(choisi.indicatif ?? '');
         }}
       />
       <Field label="Ville de résidence">
@@ -1353,7 +1353,7 @@ function ChampEmployeur({
   const attendu = type === 'FONCTIONNAIRE' ? 'MINISTERE' : 'ENTREPRISE';
   const options = actives(reference?.employeurs)
     .filter((employeur) => employeur.type === attendu)
-    .map((employeur) => ({ value: employeur.id, label: employeur.label }));
+    .map((employeur) => ({ value: employeur.id, label: employeur.label ?? '' }));
 
   const libre = valeurs.employeur.trim() !== '' && valeurs.employeurId === null;
 

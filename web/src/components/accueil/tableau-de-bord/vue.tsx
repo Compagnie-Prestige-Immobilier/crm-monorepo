@@ -4,6 +4,7 @@ import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tansta
 import { FileSpreadsheetIcon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
 import { marqueRecommandee } from '@/components/accueil/tableau-de-bord/recommandation';
@@ -45,7 +46,7 @@ import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/li
 import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-bord-xlsx';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
-import type { Role } from '@/lib/types';
+import { peut, type Role } from '@/lib/types';
 
 function exportCsv(stats: VisiteStats, plage: { du: string; au: string }): void {
   const bloc = (
@@ -243,6 +244,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
   const tropLarge = plageTropLarge(plage);
   const comparaisonPlage = plageComparaison(plage, filters.comparaison);
   const catalogue = catalogueVisitesDe(role);
+  const { data: user } = useQuery(meQueryOptions);
 
   const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });
   const queryClient = useQueryClient();
@@ -407,7 +409,7 @@ export function DashboardVisitesView({ role }: { role: Role }) {
             editing={editing}
             dirty={dirty}
             pending={saveMutation.isPending}
-            isAdmin={role === 'ADMIN'}
+            isAdmin={peut(user, 'parametres.administrer')}
             onEnter={enterEdition}
             onSave={() => {
               if (brouillon !== null) saveMutation.mutate(brouillon);

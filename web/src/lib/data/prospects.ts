@@ -7,6 +7,7 @@ import type { OrigineFiche } from '@/lib/data/grand-public';
 import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
+  DeviceCallDetection,
   Paginated,
   Projet,
   ProspectFilters,
@@ -15,8 +16,8 @@ import type {
   UpdateProspectInput,
 } from '@/lib/types';
 
-export type CreateProspectInput = components['schemas']['CreateProspectDto'];
-export type ProspectPhoneConflict = components['schemas']['ProspectConflictExistingDto'];
+export type { DeviceCallDetection };
+export type CreateProspectInput = components['schemas']['ProspectBody'];
 
 export async function fetchProspects(
   filters: ProspectFilters,
@@ -168,7 +169,7 @@ export async function fetchProspect(
   return unwrap(await client.GET('/api/v1/prospects/{id}', { params: { path: { id } } }));
 }
 
-export type ProspectCallAttempt = components['schemas']['ProspectCallAttemptDto'];
+export type ProspectCallAttempt = components['schemas']['ProspectCallAttempt'];
 
 export async function fetchProspectCallAttempts(
   id: string,
@@ -180,7 +181,7 @@ export async function fetchProspectCallAttempts(
   return payload.items;
 }
 
-export type ProspectRequalification = components['schemas']['ProspectRequalificationDto'];
+export type ProspectRequalification = components['schemas']['ProspectRequalification'];
 
 export async function fetchProspectRequalifications(
   id: string,
@@ -191,8 +192,6 @@ export async function fetchProspectRequalifications(
   );
   return payload.items;
 }
-
-export type DeviceCallDetection = components['schemas']['DeviceCallDetectionDto'];
 
 /** Les relevés du téléphone venaient de l'application mobile, abandonnée : la liste reste vide. */
 export async function fetchProspectDeviceCalls(_id: string): Promise<DeviceCallDetection[]> {
@@ -206,13 +205,31 @@ export async function createProspect(
   return unwrap(await client.POST('/api/v1/prospects', { body: input }));
 }
 
-/** La fiche que le 409 nomme, ou `null` si l'échec est d'une autre nature. */
+/** Absent du contrat Go : `huma.ErrorDetail.value` n'est pas typé au delà de `unknown`. */
+export interface ProspectPhoneConflict {
+  id?: string;
+  nom?: string;
+  prenom?: string;
+  representantId?: string | null;
+  representantName?: string | null;
+  ownedByCommercialId?: string;
+  ownedByCommercialName: string;
+  createdAt?: string;
+}
+
+/**
+ * La fiche que le 409 nomme, ou `null` si l'échec est d'une autre nature.
+ * Le Go la place dans `errors[].value` à `location: "existing"`, jamais à la
+ * racine du corps (`prospectTelephoneLibre` dans `internal/prospects/prospects.go`).
+ */
 export function prospectPhoneConflict(error: unknown): ProspectPhoneConflict | null {
   if (!(error instanceof ApiError) || error.status !== 409) return null;
-  const body = error.body as Partial<components['schemas']['ProspectConflictDto']> | null;
-  if (typeof body !== 'object' || body === null) return null;
-  if (body.code !== 'PROSPECT_PHONE_CONFLICT' || body.existing === undefined) return null;
-  return body.existing;
+  const body = error.body as components['schemas']['ProblemError'] | null;
+  if (typeof body !== 'object' || body === null || body.code !== 'PROSPECT_PHONE_CONFLICT') {
+    return null;
+  }
+  const detail = body.errors?.find((entry) => entry.location === 'existing');
+  return (detail?.value as ProspectPhoneConflict | undefined) ?? null;
 }
 
 export async function updateProspect(
@@ -372,4 +389,14 @@ export async function reassignProspects(
   if (input.commercialId !== undefined) body.commercialId = input.commercialId;
 
   return unwrap(await client.POST('/api/v1/prospects/reassign', { body }));
+}
+
+export async function requalifierProspect(
+  id: string,
+  body: { projet: 'CHUES' | 'GRAND_PUBLIC'; statut: 'NOUVEAU' | 'CONTACTE' | 'PERDU' },
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.POST('/api/v1/prospects/{id}/requalifier', { params: { path: { id } }, body }),
+  );
 }

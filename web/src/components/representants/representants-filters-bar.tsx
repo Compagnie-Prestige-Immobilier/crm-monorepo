@@ -217,7 +217,7 @@ export function RepresentantsFiltersBar() {
               value={regionId}
               options={regionsDe(reference).map((region) => ({
                 value: region.id,
-                label: region.name,
+                label: region.name ?? '',
               }))}
               onChange={(value) => {
                 setRegionDraft(value);
@@ -236,8 +236,8 @@ export function RepresentantsFiltersBar() {
                 .filter((departement) => regionId === null || departement.regionId === regionId)
                 .map((departement) => ({
                   value: departement.id,
-                  label: departement.name,
-                  hint: departement.regionName,
+                  label: departement.name ?? '',
+                  hint: departement.regionName ?? undefined,
                 }))}
               onChange={(value) => {
                 setFilters({ departementId: value, iefId: null });
@@ -258,8 +258,8 @@ export function RepresentantsFiltersBar() {
                 )
                 .map((ief) => ({
                   value: ief.id,
-                  label: ief.name,
-                  hint: ief.departementName,
+                  label: ief.name ?? '',
+                  hint: ief.departementName ?? undefined,
                 }))}
               onChange={(value) => {
                 setFilters({ iefId: value });
@@ -404,13 +404,13 @@ function chipsDesReferentiels(
       key: 'departementId',
       field: 'Département',
       id: filters.departementId,
-      options: departementsDe(reference).map((d) => ({ id: d.id, label: d.name })),
+      options: departementsDe(reference).map((d) => ({ id: d.id, label: d.name ?? '' })),
     },
     {
       key: 'iefId',
       field: 'IEF',
       id: filters.iefId,
-      options: iefsDe(reference).map((i) => ({ id: i.id, label: i.name })),
+      options: iefsDe(reference).map((i) => ({ id: i.id, label: i.name ?? '' })),
     },
     {
       key: 'commercialId',

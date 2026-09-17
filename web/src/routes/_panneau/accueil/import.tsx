@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { RegistreImportView } from '@/components/accueil/registre-import-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil/import')({
-  beforeLoad: guardRoles(['ADMIN', 'DIRECTION']),
+  beforeLoad: guardPermission('accueil.listes'),
   component: RegistreImportPage,
   pendingComponent: Loading,
 });

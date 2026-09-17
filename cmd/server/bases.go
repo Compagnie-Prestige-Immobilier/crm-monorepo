@@ -29,10 +29,10 @@ const (
 // `max_connections` à 100 partagé avec la production, le nombre se plafonne.
 var nomBaseValide = regexp.MustCompile(`^[a-z][a-z0-9-]{2,20}$`)
 
-var GardeBases = map[string][]socle.Role{
-	"GET " + cheminBases:               socle.AdminSeul,
-	"POST " + cheminBases:              socle.AdminSeul,
-	"DELETE " + cheminBases + "/{nom}": socle.AdminSeul,
+var GardeBases = map[string]socle.Permission{
+	"GET " + cheminBases:               socle.PermissionBasesAdministrer,
+	"POST " + cheminBases:              socle.PermissionBasesAdministrer,
+	"DELETE " + cheminBases + "/{nom}": socle.PermissionBasesAdministrer,
 }
 
 type BaseDemoDto struct {
@@ -292,7 +292,7 @@ func monterBaseDemo(ctx context.Context, principal *socle.Config, reg *registre,
 			return nil, nil, fmt.Errorf("semis de %s : %w", nom, err)
 		}
 	}
-	i, err := instancier(&cfg, pool, reg)
+	i, err := instancierBase(ctx, &cfg, pool, reg)
 	if err != nil {
 		pool.Close()
 		return nil, nil, err

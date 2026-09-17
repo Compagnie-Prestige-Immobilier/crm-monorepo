@@ -111,7 +111,7 @@ func cachePanneau(chemin string) string {
 }
 
 func nouveauDeps(pool *pgxpool.Pool, cfg *socle.Config, annuaire *socle.Annuaire) *socle.Deps {
-	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive(), Annuaire: annuaire}
+	return &socle.Deps{Q: db.New(pool), Pool: pool, Cfg: cfg, Live: socle.NouveauLive(), Annuaire: annuaire, Attributions: &socle.Attributions{}}
 }
 
 // Une instance par base : ses requêtes, son bus SSE, ses routes montées sur
@@ -138,6 +138,16 @@ func instancier(cfg *socle.Config, pool *pgxpool.Pool, reg *registre) (*instance
 	}
 	servirPanneau(mux)
 	return &instance{mux: mux, api: api, deps: d}, nil
+}
+
+// Une base sans ses attributions de rôles refuse de démarrer plutôt que de
+// servir des permissions par défaut que personne n'a choisies.
+func instancierBase(ctx context.Context, cfg *socle.Config, pool *pgxpool.Pool, reg *registre) (*instance, error) {
+	i, err := instancier(cfg, pool, reg)
+	if err != nil {
+		return nil, err
+	}
+	return i, i.deps.Attributions.Charger(ctx, i.deps.Q)
 }
 
 // Le cookie `cpi_base` choisit l'instance ; absent ou inconnu, la base
@@ -279,7 +289,11 @@ func ecrireRoles(cfg *socle.Config) error {
 	if _, _, err := serveur(cfg, nil); err != nil {
 		return err
 	}
-	doc, err := json.MarshalIndent(socle.Garde, "", "  ")
+	roles := make(map[string][]socle.Role, len(socle.Garde))
+	for route, permission := range socle.Garde {
+		roles[route] = socle.RolesAutorises(permission)
+	}
+	doc, err := json.MarshalIndent(roles, "", "  ")
 	if err != nil {
 		return err
 	}
@@ -368,7 +382,7 @@ func servir(ctx context.Context, cfg *socle.Config) error {
 		if err != nil {
 			return fmt.Errorf("base %s : %w", base.Base, err)
 		}
-		i, err := instancier(base, pool, reg)
+		i, err := instancierBase(ctx, base, pool, reg)
 		if err != nil {
 			pool.Close()
 			return err

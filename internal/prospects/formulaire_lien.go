@@ -12,9 +12,9 @@ const cheminLienFormulaire = "/api/v1/formulaire-public/mon-lien"
 
 // Le lien portait l'identifiant du compte : il ne se révoquait qu'en désactivant
 // le compte. Le jeton se régénère, l'ancien lien meurt, le compte reste ouvert.
-var GardeLienFormulaire = map[string][]socle.Role{
-	"GET " + cheminLienFormulaire:                socle.Tous,
-	"POST " + cheminLienFormulaire + "/rotation": socle.Tous,
+var GardeLienFormulaire = map[string]socle.Permission{
+	"GET " + cheminLienFormulaire:                socle.PermissionPanneauAcceder,
+	"POST " + cheminLienFormulaire + "/rotation": socle.PermissionPanneauAcceder,
 }
 
 type LienFormulaireOutput struct {

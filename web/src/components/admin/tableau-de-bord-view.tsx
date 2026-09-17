@@ -67,7 +67,7 @@ export function AdminTableauDeBordView() {
         </TabsContent>
 
         <TabsContent value="teleconseil" className="pt-4">
-          <ChiffresView ecran="chues" role="ADMIN" />
+          <ChiffresView ecran="chues" />
         </TabsContent>
 
         <TabsContent value="deploiement" className="pt-4">

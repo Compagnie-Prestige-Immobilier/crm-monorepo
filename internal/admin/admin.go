@@ -20,7 +20,7 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-var rolesChiffres = []socle.Role{socle.Admin, socle.Direction, socle.Superviseur, socle.Accueil}
+var rolesChiffres = socle.PermissionChiffresDisposer
 
 // Vocabulaire figé du domaine : clés d'audit, chemins montés deux fois,
 // tables purgées sous deux noms, et les valeurs de disposition citées par les
@@ -30,8 +30,9 @@ const (
 	cheminDisposition = "/api/v1/tableaux-de-bord/{ecran}/disposition"
 	cheminDump        = "/api/v1/admin/database-dump"
 
-	cleRole  = "role"
-	cleEmail = "email"
+	cleRole   = "role"
+	cleRoleID = "roleId"
+	cleEmail  = "email"
 
 	nomUsers         = "users"
 	nomVisites       = "visites"
@@ -51,38 +52,38 @@ const (
 	sourceFichesOuvertes   = "fiches-ouvertes"
 )
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/users":                                           {socle.Admin, socle.Superviseur, socle.Direction},
-	"POST /api/v1/users":                                          socle.AdminSeul,
-	"GET /api/v1/users/{id}":                                      socle.AdminSeul,
-	"PATCH /api/v1/users/{id}":                                    socle.AdminSeul,
-	"PUT /api/v1/users/{id}/active":                               socle.AdminSeul,
-	"PUT /api/v1/users/{id}/password":                             socle.AdminSeul,
-	"DELETE /api/v1/users/{id}":                                   socle.AdminSeul,
-	"GET /api/v1/admin/supervision":                               socle.Encadrement,
-	"GET /api/v1/admin/exploitation":                              socle.AdminSeul,
-	"GET /api/v1/admin/journal":                                   socle.AdminSeul,
-	"GET /api/v1/admin/exploitation/routes":                       socle.AdminSeul,
-	"GET /api/v1/admin/purge":                                     socle.AdminSeul,
-	"POST /api/v1/admin/purge":                                    socle.AdminSeul,
-	"GET /api/v1/admin/database-dump":                             socle.AdminSeul,
-	"POST /api/v1/admin/database-dump":                            socle.AdminSeul,
-	"GET /api/v1/admin/database-dump/download":                    socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/inscriptions":                socle.AdminSeul,
-	"DELETE /api/v1/enrolement/{projet}/inscriptions":             socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/inscriptions/{id}":           socle.AdminSeul,
-	"DELETE /api/v1/enrolement/{projet}/inscriptions/{id}":        socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/indicateurs":                 socle.AdminSeul,
-	"GET /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
-	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.AdminSeul,
-	"POST /api/v1/enrolement/{projet}/tirage":                     socle.AdminSeul,
-	"GET /api/v1/plateforme/equipe":                               {socle.Admin, socle.Superviseur, socle.Direction, socle.CCP},
-	"PUT /api/v1/plateforme/objectif":                             socle.AdminSeul,
-	"POST /api/v1/webhooks/enrolement/{projet}":                   {socle.Public},
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/users":                                           socle.PermissionComptesLister,
+	"POST /api/v1/users":                                          socle.PermissionComptesAdministrer,
+	"GET /api/v1/users/{id}":                                      socle.PermissionComptesAdministrer,
+	"PATCH /api/v1/users/{id}":                                    socle.PermissionComptesAdministrer,
+	"PUT /api/v1/users/{id}/active":                               socle.PermissionComptesAdministrer,
+	"PUT /api/v1/users/{id}/password":                             socle.PermissionComptesAdministrer,
+	"DELETE /api/v1/users/{id}":                                   socle.PermissionComptesAdministrer,
+	"GET /api/v1/admin/supervision":                               socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/admin/exploitation":                              socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/journal":                                   socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/exploitation/routes":                       socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/purge":                                     socle.PermissionExploitationAdministrer,
+	"POST /api/v1/admin/purge":                                    socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/database-dump":                             socle.PermissionExploitationAdministrer,
+	"POST /api/v1/admin/database-dump":                            socle.PermissionExploitationAdministrer,
+	"GET /api/v1/admin/database-dump/download":                    socle.PermissionExploitationAdministrer,
+	"GET /api/v1/enrolement/{projet}/inscriptions":                socle.PermissionEnrolementAdministrer,
+	"DELETE /api/v1/enrolement/{projet}/inscriptions":             socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/inscriptions/{id}":           socle.PermissionEnrolementAdministrer,
+	"DELETE /api/v1/enrolement/{projet}/inscriptions/{id}":        socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/indicateurs":                 socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
+	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
+	"POST /api/v1/enrolement/{projet}/tirage":                     socle.PermissionEnrolementAdministrer,
+	"GET /api/v1/plateforme/equipe":                               socle.PermissionPlateformeEquipe,
+	"PUT /api/v1/plateforme/objectif":                             socle.PermissionParametresAdministrer,
+	"POST /api/v1/webhooks/enrolement/{projet}":                   socle.Publique,
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"DELETE /api/v1/tableaux-de-bord/{ecran}/disposition":         rolesChiffres,
-	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": socle.AdminSeul,
+	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": socle.PermissionParametresAdministrer,
 }
 
 func Monter(api huma.API, d *socle.Deps) {
@@ -104,6 +105,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "deleteDashboardLayout", Method: http.MethodDelete, Path: cheminDisposition}, s.effacerDisposition)
 	huma.Register(api, huma.Operation{OperationID: "putDashboardDefaultLayout", Method: http.MethodPut, Path: cheminDisposition + "/par-defaut"}, s.ecrireDispositionParDefaut)
 
+	monterRoles(api, s)
 	monterDump(api, s)
 	monterEnrolement(api, s)
 	monterPlateforme(api, s)
@@ -165,6 +167,8 @@ type Compte struct {
 	Username      string     `json:"username"`
 	FullName      string     `json:"fullName"`
 	Role          socle.Role `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	RoleID        string     `json:"roleId"`
+	RoleLibelle   string     `json:"roleLibelle"`
 	IsActive      bool       `json:"isActive"`
 	PhoneE164     *string    `json:"phoneE164"`
 	LastLoginAt   *time.Time `json:"lastLoginAt"`
@@ -182,7 +186,7 @@ type CompteOutput struct {
 func versCompte(r *db.UserDetailRow) Compte {
 	return Compte{
 		ID: r.ID, Email: r.Email, Username: r.Username, FullName: r.FullName,
-		Role: socle.Role(r.Role), IsActive: r.IsActive, PhoneE164: r.PhoneE164,
+		Role: socle.Role(r.Role), RoleID: r.RoleId, RoleLibelle: r.RoleLibelle, IsActive: r.IsActive, PhoneE164: r.PhoneE164,
 		LastLoginAt: r.LastLoginAt, CreatedAt: r.CreatedAt, ProspectCount: int(r.ProspectCount),
 		RepresentantCount: int(r.RepresentantCount),
 	}
@@ -275,6 +279,7 @@ type CreerCompteInput struct {
 		FullName string      `json:"fullName" minLength:"2" maxLength:"160"`
 		Password string      `json:"password" minLength:"1" maxLength:"1024"`
 		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}
 }
@@ -338,21 +343,24 @@ func (s *service) creerCompte(ctx context.Context, in *CreerCompteInput) (*Compt
 	if err != nil {
 		return nil, err
 	}
-	role := socle.Commercial
-	if in.Body.Role != nil {
-		role = *in.Body.Role
+	role, idDuRole, err := s.roleDeCreation(ctx, in.Body.RoleID, in.Body.Role)
+	if err != nil {
+		return nil, err
 	}
 
 	var cree Compte
 	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
+		if err := q.VerrouAdministrationDesRoles(ctx); err != nil {
+			return err
+		}
 		if err := q.InsertUser(ctx, db.InsertUserParams{
 			ID: id.String(), Email: email, Username: username, FullName: strings.TrimSpace(in.Body.FullName),
-			PasswordHash: condensat, Role: db.Role(role), PhoneE164: texteAdmin(phone),
+			PasswordHash: condensat, Role: db.Role(role), PhoneE164: texteAdmin(phone), RoleId: idDuRole,
 		}); err != nil {
 			return err
 		}
 		if err := database.Auditer(ctx, q, acteur.ID, "user.create", "user", id.String(), nil,
-			map[string]any{cleEmail: email, "username": username, cleRole: role}); err != nil {
+			traceRole(map[string]any{cleEmail: email, "username": username, cleRole: role}, role, idDuRole)); err != nil {
 			return err
 		}
 		var err error
@@ -372,6 +380,7 @@ type ModifierCompteInput struct {
 		Username *string     `json:"username,omitempty" minLength:"3" maxLength:"40" pattern:"^[a-zA-Z0-9._-]+$"`
 		FullName *string     `json:"fullName,omitempty" minLength:"2" maxLength:"160"`
 		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}
 }
@@ -379,6 +388,7 @@ type ModifierCompteInput struct {
 type changementCompte struct {
 	email, username, fullName *string
 	role                      *socle.Role
+	roleID                    *string
 	actif                     *bool
 	phone                     *string
 	phoneTouche               bool
@@ -387,7 +397,7 @@ type changementCompte struct {
 // Le verrou porte sur TOUTES les lignes ADMIN actives, pas seulement les
 // autres : deux rétrogradations croisées se liraient sinon l'une l'autre et
 // laisseraient la plateforme sans administrateur.
-func adminSurvit(ctx context.Context, q *db.Queries, existant db.UserRoleForUpdateRow, acteurID string, role *socle.Role, actif *bool) error {
+func adminSurvit(ctx context.Context, q *db.Queries, existant *db.UserRoleForUpdateRow, acteurID string, role *socle.Role, actif *bool) error {
 	perd := socle.Role(existant.Role) == socle.Admin && ((role != nil && *role != socle.Admin) || (actif != nil && !*actif))
 	if !perd {
 		return nil
@@ -425,7 +435,7 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 	if err := s.identifiantsLibres(ctx, identifiantChange(chg.email, existant.Email), identifiantChange(chg.username, existant.Username)); err != nil {
 		return Compte{}, err
 	}
-	roleChange := chg.role != nil && socle.Role(existant.Role) != *chg.role
+	roleChange := chg.roleID != nil && existant.RoleId != *chg.roleID
 	if err := s.quitterLesEquipes(ctx, roleChange, chg.role, chg.actif, id); err != nil {
 		return Compte{}, err
 	}
@@ -433,7 +443,7 @@ func (s *service) appliquerChangement(ctx context.Context, id string, chg change
 	var modifie Compte
 	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
 		var err error
-		modifie, err = ecrireChangement(ctx, q, id, chg, existant, acteurID)
+		modifie, err = ecrireChangement(ctx, q, id, chg, &existant, acteurID)
 		return err
 	})
 	if err != nil {
@@ -458,14 +468,20 @@ func (s *service) quitterLesEquipes(ctx context.Context, roleChange bool, role *
 	return campagnes.RetirerDesEquipes(ctx, s.Deps, id)
 }
 
-func ecrireChangement(ctx context.Context, q *db.Queries, id string, chg changementCompte, existant db.UserRoleForUpdateRow, acteurID string) (Compte, error) {
+func ecrireChangement(ctx context.Context, q *db.Queries, id string, chg changementCompte, existant *db.UserRoleForUpdateRow, acteurID string) (Compte, error) {
+	if err := q.VerrouAdministrationDesRoles(ctx); err != nil {
+		return Compte{}, err
+	}
 	if err := adminSurvit(ctx, q, existant, acteurID, chg.role, chg.actif); err != nil {
 		return Compte{}, err
 	}
 	if err := q.UpdateUser(ctx, db.UpdateUserParams{
 		ID: id, Email: chg.email, Username: chg.username, FullName: chg.fullName,
-		Role: (*db.Role)(chg.role), IsActive: chg.actif, PhoneTouched: chg.phoneTouche, Phone: chg.phone,
+		RoleID: chg.roleID, IsActive: chg.actif, PhoneTouched: chg.phoneTouche, Phone: chg.phone,
 	}); err != nil {
+		return Compte{}, err
+	}
+	if err := administrationDesRolesSurvit(ctx, q); err != nil {
 		return Compte{}, err
 	}
 	modifie, err := compteAdmin(ctx, q, id)
@@ -473,17 +489,24 @@ func ecrireChangement(ctx context.Context, q *db.Queries, id string, chg changem
 		return Compte{}, err
 	}
 	action := "user.update"
-	if chg.role != nil && socle.Role(existant.Role) != *chg.role {
+	if modifie.RoleID != existant.RoleId {
 		action = "user.role_change"
 	}
 	return modifie, database.Auditer(ctx, q, acteurID, action, "user", id,
-		map[string]any{cleRole: existant.Role, "isActive": existant.IsActive, cleEmail: existant.Email},
-		map[string]any{cleRole: modifie.Role, "isActive": modifie.IsActive, cleEmail: modifie.Email})
+		traceRole(map[string]any{cleRole: existant.Role, "isActive": existant.IsActive, cleEmail: existant.Email}, socle.Role(existant.Role), existant.RoleId),
+		traceRole(map[string]any{cleRole: modifie.Role, "isActive": modifie.IsActive, cleEmail: modifie.Email}, modifie.Role, modifie.RoleID))
 }
 
 func (s *service) modifierCompte(ctx context.Context, in *ModifierCompteInput) (*CompteOutput, error) {
 	acteur := socle.UtilisateurCourant(ctx)
-	chg := changementCompte{role: in.Body.Role, phoneTouche: in.Body.Phone != nil}
+	roleID, base, err := roleDuCompte(ctx, s.Q, in.Body.RoleID, in.Body.Role)
+	if err != nil {
+		return nil, err
+	}
+	if err := s.compteDansSesDroits(ctx, in.ID, roleID); err != nil {
+		return nil, err
+	}
+	chg := changementCompte{role: base, roleID: roleID, phoneTouche: in.Body.Phone != nil}
 	if in.Body.Email != nil {
 		email := strings.ToLower(strings.TrimSpace(*in.Body.Email))
 		chg.email = &email
@@ -520,6 +543,9 @@ func (s *service) activerCompte(ctx context.Context, in *ActiverCompteInput) (*C
 	acteur := socle.UtilisateurCourant(ctx)
 	if in.ID == acteur.ID && !in.Body.IsActive {
 		return nil, socle.Problem(http.StatusBadRequest, "CANNOT_DEACTIVATE_SELF", "Un administrateur ne peut pas désactiver son propre compte.")
+	}
+	if err := s.compteDansSesDroits(ctx, in.ID, nil); err != nil {
+		return nil, err
 	}
 	if !in.Body.IsActive {
 		if err := s.reprisePortefeuille(ctx, in.ID, in.Body.HandoverToID, acteur.ID); err != nil {
@@ -584,6 +610,9 @@ func (s *service) reinitialiserMotDePasse(ctx context.Context, in *MotDePasseCom
 	if err := s.bornesMotDePasse(in.Body.Password); err != nil {
 		return nil, err
 	}
+	if err := s.compteDansSesDroits(ctx, in.ID, nil); err != nil {
+		return nil, err
+	}
 	if _, err := s.Q.UserRoleForUpdate(ctx, in.ID); err != nil {
 		if errors.Is(err, pgx.ErrNoRows) {
 			return nil, socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Compte introuvable.")
@@ -619,7 +648,7 @@ func (s *service) supprimerCompte(ctx context.Context, in *SupprimerCompteInput)
 	if in.ID == acteur.ID {
 		return nil, socle.Problem(http.StatusBadRequest, "CANNOT_DELETE_SELF", "Un administrateur ne peut pas supprimer son propre compte.")
 	}
-	existant, err := s.Q.UserRoleForUpdate(ctx, in.ID)
+	existant, err := s.compteSupprimable(ctx, in.ID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Compte introuvable.")
 	}
@@ -634,10 +663,16 @@ func (s *service) supprimerCompte(ctx context.Context, in *SupprimerCompteInput)
 	}
 	inactif := false
 	err = s.txAdmin(ctx, func(_ pgx.Tx, q *db.Queries) error {
-		if err := adminSurvit(ctx, q, existant, acteur.ID, nil, &inactif); err != nil {
+		if err := q.VerrouAdministrationDesRoles(ctx); err != nil {
+			return err
+		}
+		if err := adminSurvit(ctx, q, &existant, acteur.ID, nil, &inactif); err != nil {
 			return err
 		}
 		if err := q.SoftDeleteUser(ctx, in.ID); err != nil {
+			return err
+		}
+		if err := administrationDesRolesSurvit(ctx, q); err != nil {
 			return err
 		}
 		return database.Auditer(ctx, q, acteur.ID, "user.delete", "user", in.ID,
@@ -1212,7 +1247,7 @@ func reponseDisposition(d Disposition, source string, updatedAt *time.Time) *Dis
 func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*DispositionOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	rendre := func(d Disposition, source string, updatedAt *time.Time) *DispositionOutput {
-		if u.Role != socle.Admin {
+		if !u.Peut(socle.PermissionEnrolementAdministrer) {
 			d = sansEnrolement(d)
 		}
 		return reponseDisposition(d, source, updatedAt)
@@ -1235,7 +1270,7 @@ func (s *service) lireDisposition(ctx context.Context, in *DispositionInput) (*D
 			return rendre(d, "defaut", &defaut.UpdatedAt), nil
 		}
 	}
-	montants := u.Role == socle.Admin || u.Role == socle.Direction
+	montants := u.Peut(socle.PermissionChiffresVoirMontants)
 	return rendre(dispositionUsine(in.Ecran, montants), "usine", nil), nil
 }
 

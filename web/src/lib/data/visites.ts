@@ -6,12 +6,12 @@ import { flattenPage } from '@/lib/api/query-params';
 import { readEnum, readIsoDate, readPositiveInt, readString } from '@/lib/search-params';
 import type { Paginated, SortDirection } from '@/lib/types';
 
-export type Visite = components['schemas']['VisiteDto'];
-export type VisiteRef = components['schemas']['VisiteReferentielRefDto'];
-export type VisiteReferentielItem = components['schemas']['VisiteReferentielDto'];
-export type VisiteReferentiels = components['schemas']['VisiteReferentielsBundleDto'];
-export type CreateVisiteInput = components['schemas']['CreateVisiteDto'];
-export type UpdateVisiteInput = components['schemas']['UpdateVisiteDto'];
+export type Visite = components['schemas']['Visite'];
+export type VisiteRef = components['schemas']['VisiteRef'];
+export type VisiteReferentielItem = components['schemas']['EntreeReferentielVisite'];
+export type VisiteReferentiels = components['schemas']['ReferentielsVisiteOutputBody'];
+export type CreateVisiteInput = components['schemas']['CreerVisiteInputBody'];
+export type UpdateVisiteInput = components['schemas']['CorrigerVisiteInputBody'];
 type VisitesQuery = NonNullable<operations['listVisites']['parameters']['query']>;
 
 export const VISITE_SORT_FIELDS = [
@@ -21,7 +21,7 @@ export const VISITE_SORT_FIELDS = [
   'direction',
   'destinataire',
   'objet',
-] as const satisfies readonly components['schemas']['VisiteSortField'][];
+] as const satisfies readonly Exclude<VisitesQuery['sortBy'], undefined>[];
 
 export type VisiteSortField = (typeof VISITE_SORT_FIELDS)[number];
 

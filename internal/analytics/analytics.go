@@ -47,22 +47,26 @@ var (
 )
 
 // Qui voit le travail de tous, `readsEveryone` de common/scope.ts.
-func litToutLeTravail(role socle.Role) bool {
-	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
+func litToutLeTravail(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
-// Même entrée de cache pour tous ceux qui voient tout ; un téléconseiller n'a
-// que la sienne.
+// Même entrée de cache pour tous ceux qui voient tout et partagent un rôle ;
+// un téléconseiller n'a que la sienne. Clé par rôle attribué, pas par rôle de
+// base : un rôle personnalisé n'a pas forcément les permissions de sa base.
 func porteeDeCache(ctx context.Context) string {
 	u := socle.UtilisateurCourant(ctx)
-	if litToutLeTravail(u.Role) {
-		return string(u.Role)
+	if !litToutLeTravail(&u) {
+		return u.ID
 	}
-	return u.ID
+	if u.RoleID != "" {
+		return u.RoleID
+	}
+	return string(u.Role)
 }
 
 func teleconseillerLisible(u *socle.Utilisateur, demande string) string {
-	if litToutLeTravail(u.Role) || demande == u.ID {
+	if litToutLeTravail(u) || demande == u.ID {
 		return demande
 	}
 	return "__aucun__"
@@ -113,7 +117,7 @@ type FiltreDesAnalyses struct {
 	CanalProvenanceID      string `query:"canalProvenanceId"`
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar"`
 	EnrollmentCapturedByID string `query:"enrollmentCapturedById"`
@@ -150,13 +154,13 @@ func borneDuJour(iso string, tz *time.Location, fin bool) (time.Time, bool) {
 
 func porteeDeLecture(u *socle.Utilisateur, f *FiltreDesAnalyses, p *parametresSQL) []string {
 	conditions := []string{}
-	if !litToutLeTravail(u.Role) {
+	if !litToutLeTravail(u) {
 		conditions = append(conditions, `p."createdById" = `+p.marque(u.ID))
 	}
 	if f.CommercialID != "" {
 		conditions = append(conditions, `p."createdById" = `+p.marque(teleconseillerLisible(u, f.CommercialID)))
 	}
-	if !f.IncludeDeleted || u.Role != socle.Admin {
+	if !f.IncludeDeleted || !u.Peut(socle.PermissionDonneesVoirSupprimees) {
 		conditions = append(conditions, `p."deletedAt" IS NULL`)
 	}
 	// Sans ce filtre un total « par département » dépasse le total global.
@@ -813,23 +817,23 @@ func (s *service) rendementParDepartement(ctx context.Context, f *FiltreDesAnaly
 	return &RendementOutput{Body: corps}, nil
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/analytics/funnel":                  socle.Parcours,
-	"GET /api/v1/analytics/delays":                  socle.Parcours,
-	"GET /api/v1/analytics/departement-yield":       socle.Parcours,
-	"GET /api/v1/analytics/by-enrollment-method":    socle.Parcours,
-	"GET /api/v1/analytics/by-banque":               socle.Parcours,
-	"GET /api/v1/analytics/by-departement":          socle.Parcours,
-	"GET /api/v1/analytics/by-syndicat":             socle.Parcours,
-	"GET /api/v1/supervision/representants":         socle.Encadrement,
-	"GET /api/v1/supervision/representants/qualite": socle.Encadrement,
-	"GET /api/v1/supervision/prospects/marketing":   socle.Encadrement,
-	"GET /api/v1/supervision/leads-importes":        socle.Encadrement,
-	"GET /api/v1/supervision/campagnes":             socle.Encadrement,
-	"GET /api/v1/supervision/activite":              socle.Encadrement,
-	"GET /api/v1/supervision/creneaux":              socle.Encadrement,
-	"PUT /api/v1/supervision/creneaux":              socle.Encadrement,
-	"GET /api/v1/supervision/objectifs":             socle.Encadrement,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/analytics/funnel":                  socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/delays":                  socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/departement-yield":       socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/by-enrollment-method":    socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/by-banque":               socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/by-departement":          socle.PermissionFichesTenir,
+	"GET /api/v1/analytics/by-syndicat":             socle.PermissionFichesTenir,
+	"GET /api/v1/supervision/representants":         socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/representants/qualite": socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/prospects/marketing":   socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/leads-importes":        socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/campagnes":             socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/activite":              socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/creneaux":              socle.PermissionAnalyticsSuperviser,
+	"PUT /api/v1/supervision/creneaux":              socle.PermissionAnalyticsSuperviser,
+	"GET /api/v1/supervision/objectifs":             socle.PermissionAnalyticsSuperviser,
 }
 
 func routeDeLecture[I, O any](api huma.API, id, chemin string, handler func(context.Context, *I) (*O, error)) {
