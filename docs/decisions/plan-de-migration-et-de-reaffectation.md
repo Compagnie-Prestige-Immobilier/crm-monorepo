@@ -4,7 +4,7 @@ Source : classeur « arbitrage-statuts-qualification-2026-09-16 » rempli par le
 équipes CPI, puis réponses écrites du 17 septembre 2026. Périmètre : statuts
 prospects. L'onglet Représentants est une liste de référence, rien n'y change.
 
-État : **règles arrêtées, trois points ouverts (section 8), rien n'est codé.**
+État : **règles arrêtées et confirmées (section 8), rien n'est codé.**
 
 ## 1. Vocabulaire
 
@@ -41,9 +41,11 @@ Deux exceptions :
 
 Droits :
 
-- le superviseur a la main pour déqualifier chaque fiche ;
-- le téléconseiller agit sur les fiches de son reste à appeler et de « Mes
-  contacts » (à confirmer, point 8.1).
+- superviseur, direction et admin peuvent déqualifier n'importe quelle fiche ;
+- le téléconseiller qualifie les fiches de son reste à appeler ;
+- le téléconseiller peut aussi requalifier une fiche de « Mes contacts », **même
+  fermée**, car il en a l'historique ;
+- hors de ces deux listes, le téléconseiller ne change pas le statut.
 
 ## 3. Effet de chaque statut à partir de maintenant
 
@@ -91,13 +93,14 @@ Changements par rapport au comportement actuel :
   partenariat ferment désormais la fiche ;
 - les rendez-vous ferment la fiche mais restent dans « Rappels promis ».
 
-## 4. Nouvelle rubrique « Intéressés, hésitants et rendez-vous à venir »
+## 4. Nouvelle rubrique « Intéressés, hésitants et rendez-vous »
 
 - Contenu : fiches fermées en Hésitant, en Intéressé (et ses sous-statuts) ou
   en Rendez-vous (et ses sous-statuts).
 - Ces fiches sont sorties de leurs campagnes mais gardent leur statut.
-- Accès : superviseurs et administrateurs. Direction et téléconseillers : à
-  confirmer (point 8.2).
+- Accès : superviseurs, direction et administrateurs uniquement. Les
+  téléconseillers ne la voient pas.
+- Un rendez-vous dont la date est passée **reste** dans la rubrique.
 
 ## 5. Reprise des anciens statuts (migration)
 
@@ -163,12 +166,11 @@ statut de la section 3.
 5. Tests : un test d'intégration Go par règle modifiée, cassé puis remis ; un
    parcours Playwright pour la rubrique.
 
-## 8. Points ouverts
+## 8. Réponses du 17 septembre 2026
 
-1. **Droits du téléconseiller** : il change le statut seulement si la fiche est
-   dans son reste à appeler ou dans « Mes contacts » ; une fois fermée, seul le
-   superviseur la déqualifie. Exact ?
-2. **Rubrique** : la direction la voit-elle ? Le téléconseiller voit-il ses
-   propres intéressés et rendez-vous ?
-3. **Rendez-vous passé** : la fiche reste-t-elle dans la rubrique, ou seuls les
-   rendez-vous à venir y figurent ?
+1. **Droits du téléconseiller** : il qualifie les fiches de son reste à appeler
+   et peut requalifier une fiche de « Mes contacts » même fermée, car il en a
+   l'historique. Superviseur, direction et admin déqualifient toute fiche.
+2. **Rubrique** : visible seulement par superviseurs, direction et
+   administrateurs.
+3. **Rendez-vous passé** : la fiche reste dans la rubrique.
