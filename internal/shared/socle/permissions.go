@@ -3,7 +3,10 @@ package socle
 import (
 	"context"
 	"cpi-go/db"
+	"errors"
 	"log/slog"
+	"slices"
+	"sync"
 	"sync/atomic"
 )
 
@@ -20,6 +23,7 @@ const (
 	domaineBanque     = "Banque & Finance"
 	domaineCampagnes  = "Campagnes"
 	domaineChiffres   = "Chiffres"
+	domaineComptes    = "Comptes"
 	domaineExports    = "Exports"
 	domaineFiches     = "Fiches"
 	domainePlateforme = "Plateforme"
@@ -31,7 +35,6 @@ const (
 	PermissionCampagnesSuperviser      Permission = "campagnes.superviser"
 	PermissionCampagnesAdministrer     Permission = "campagnes.administrer"
 	PermissionAnalyticsSuperviser      Permission = "analytics.superviser"
-	PermissionQualificationSuperviser  Permission = "qualification.superviser"
 	PermissionImportsAdministrer       Permission = "imports.administrer"
 	PermissionReferentielsSuperviser   Permission = "referentiels.superviser"
 	PermissionProspectsSuperviser      Permission = "prospects.superviser"
@@ -44,7 +47,6 @@ const (
 	PermissionComptesAdministrer       Permission = "comptes.administrer"
 	PermissionComptesLister            Permission = "comptes.lister"
 	PermissionRolesAdministrer         Permission = "roles.administrer"
-	PermissionReferentielsAdministrer  Permission = "referentiels.administrer"
 	PermissionExploitationAdministrer  Permission = "exploitation.administrer"
 	PermissionCourrielsAdministrer     Permission = "courriels.administrer"
 	PermissionEnrolementAdministrer    Permission = "enrolement.administrer"
@@ -72,54 +74,55 @@ const (
 	PermissionPlateformeSaisir            Permission = "plateforme.saisir"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
 	PermissionFichesIgnorerPropriete      Permission = "fiches.ignorer_propriete"
+	PermissionFichesModifierToutes        Permission = "fiches.modifier_toutes"
 	PermissionFichesForcerTransition      Permission = "fiches.forcer_transition"
 	PermissionFichesParametresReserves    Permission = "fiches.parametres_reserves"
 	PermissionDonneesVoirSupprimees       Permission = "donnees.voir_supprimees"
 	PermissionChiffresVoirMontants        Permission = "chiffres.voir_montants"
 	PermissionVisitesVoirArchivees        Permission = "visites.voir_archivees"
+	PermissionVisitesDetruire             Permission = "visites.detruire"
 	PermissionBanqueVoirTousPortefeuilles Permission = "banque.voir_tous_portefeuilles"
 	PermissionCampagnesAttributionsToutes Permission = "campagnes.attributions_toutes"
 	PermissionExportsVoirTout             Permission = "exports.voir_tout"
-	PermissionFichesModifierToutes        Permission = "fiches.modifier_toutes"
-	PermissionVisitesDetruire             Permission = "visites.detruire"
 )
 
 var Catalogue = map[Permission]definitionPermission{
 	PermissionPanneauAcceder:           {"Panneau", "Accéder au panneau", Tous},
 	PermissionFichesTenir:              {domaineFiches, "Lire et modifier les fiches de son portefeuille", Parcours},
 	PermissionCampagnesSuperviser:      {domaineCampagnes, "Superviser les campagnes", Encadrement},
-	PermissionCampagnesAdministrer:     {domaineCampagnes, "Administrer les campagnes", AdminSeul},
+	PermissionCampagnesAdministrer:     {domaineCampagnes, "Supprimer une campagne", AdminSeul},
 	PermissionAnalyticsSuperviser:      {domaineChiffres, "Consulter les tableaux de bord de supervision", Encadrement},
-	PermissionImportsAdministrer:       {"Imports", "Administrer les imports", AdminSeul},
+	PermissionImportsAdministrer:       {"Imports", "Importer des fichiers", AdminSeul},
 	PermissionReferentielsSuperviser:   {"Référentiels", "Modifier les référentiels métier", Encadrement},
-	PermissionProspectsSuperviser:      {domaineFiches, "Superviser les fiches", Encadrement},
+	PermissionProspectsSuperviser:      {domaineFiches, "Régler les segments et les paramètres CHUES", Encadrement},
 	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, CCP, Admin, Superviseur, Direction}},
 	PermissionProspectsFusionner:       {domaineFiches, "Fusionner des fiches", []Role{Commercial, ChargeClientele, Admin}},
 	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
-	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter toutes les fiches", []Role{Admin, Superviseur}},
+	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter vers un autre téléconseiller", []Role{Admin, Superviseur}},
 	PermissionProspectsRevoir:          {domaineFiches, "Revoir une demande", []Role{ChargeClientele, Superviseur, Admin}},
 	PermissionProspectsConvertir:       {domaineFiches, "Convertir les parcours grand public", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
-	PermissionComptesAdministrer:       {"Comptes", "Administrer les comptes", AdminSeul},
-	PermissionComptesLister:            {"Comptes", "Lister les comptes", Encadrement},
-	PermissionExploitationAdministrer:  {"Exploitation", "Administrer l'exploitation", AdminSeul},
-	PermissionCourrielsAdministrer:     {"Courriels", "Administrer les courriels", AdminSeul},
-	PermissionEnrolementAdministrer:    {"Enrôlement", "Administrer l'enrôlement", AdminSeul},
-	PermissionNotificationsAdministrer: {"Notifications", "Administrer les notifications", AdminSeul},
-	PermissionBanqueAdministrer:        {domaineBanque, "Administrer Banque & Finance", AdminSeul},
-	PermissionParametresAdministrer:    {"Paramètres", "Administrer les paramètres", AdminSeul},
-	PermissionBasesAdministrer:         {"Bases", "Administrer les bases", AdminSeul},
+	PermissionComptesAdministrer:       {domaineComptes, "Créer, modifier et désactiver les comptes", AdminSeul},
+	PermissionComptesLister:            {domaineComptes, "Lister les comptes", Encadrement},
+	PermissionRolesAdministrer:         {domaineComptes, "Créer les rôles et régler leurs permissions", AdminSeul},
+	PermissionExploitationAdministrer:  {"Exploitation", "Exploitation, journal et purge", AdminSeul},
+	PermissionCourrielsAdministrer:     {"Courriels", "Régler les courriels", AdminSeul},
+	PermissionEnrolementAdministrer:    {"Enrôlement", "Suivre et régler l'enrôlement", AdminSeul},
+	PermissionNotificationsAdministrer: {"Notifications", "Envoyer et régler les notifications", AdminSeul},
+	PermissionBanqueAdministrer:        {domaineBanque, "Régler les étapes et valider les dossiers", AdminSeul},
+	PermissionParametresAdministrer:    {"Paramètres", "Régler les objectifs et les tableaux de bord par défaut", AdminSeul},
+	PermissionBasesAdministrer:         {"Bases", "Créer et supprimer les bases de démonstration", AdminSeul},
 	PermissionPlateformeEquipe:         {domainePlateforme, "Voir l'équipe plateforme", []Role{Admin, Superviseur, Direction, CCP}},
 	PermissionBanqueDossiers:           {domaineBanque, "Traiter les dossiers Banque & Finance", Banque},
 	PermissionBanqueLire:               {domaineBanque, "Lire les dossiers Banque & Finance", BanqueLecture},
 	PermissionAccueilRegistre:          {domaineAccueil, "Tenir le registre des visites", Registre},
-	PermissionAccueilListes:            {domaineAccueil, "Administrer les listes de visites", []Role{Admin, Direction}},
+	PermissionAccueilListes:            {domaineAccueil, "Gérer les listes de visites et les imports", []Role{Admin, Direction}},
 	PermissionCampagnesGerer:           {domaineCampagnes, "Créer et modifier les campagnes", []Role{Admin, Superviseur}},
 	PermissionChiffresDisposer:         {domaineChiffres, "Disposer le tableau de bord", []Role{Admin, Direction, Superviseur, Accueil}},
 	PermissionExportsGlobaux:           {domaineExports, "Exporter les données d'encadrement", Encadrement},
 	PermissionExportsProspects:         {domaineExports, "Exporter les prospects", Parcours},
 	PermissionExportsBanque:            {domaineExports, "Exporter Banque & Finance", []Role{Admin, BanqueFinance, Superviseur}},
 	PermissionExportsModeles:           {domaineExports, "Télécharger les modèles d'import", AdminSeul},
-	PermissionFormulairesAdministrer:   {"Formulaires", "Administrer les formulaires publics", AdminSeul},
+	PermissionFormulairesAdministrer:   {"Formulaires", "Régler les champs de conversion", AdminSeul},
 	PermissionQualificationRappels:     {"Qualification", "Reporter ou annuler ses rappels", []Role{Admin, Commercial, ChargeClientele, CCP}},
 	PermissionVentesLire:               {"Ventes", "Lire les ventes", []Role{Admin, Direction}},
 
@@ -127,17 +130,17 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionPlateformeVoir:              {domainePlateforme, "Voir les fiches plateforme", Encadrement},
 	PermissionPlateformeSaisir:            {domainePlateforme, "Saisir les fiches plateforme", []Role{CCP}},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
-	PermissionFichesIgnorerPropriete:      {domaineFiches, "Ignorer la propriété d'une fiche", AdminSeul},
-	PermissionFichesForcerTransition:      {domaineFiches, "Forcer une transition de fiche", AdminSeul},
-	PermissionFichesParametresReserves:    {domaineFiches, "Modifier les paramètres réservés", AdminSeul},
+	PermissionFichesIgnorerPropriete:      {domaineFiches, "Agir sur les rappels et identifiants des autres", AdminSeul},
+	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
+	PermissionFichesForcerTransition:      {domaineFiches, "Forcer un changement de statut", AdminSeul},
+	PermissionFichesParametresReserves:    {domaineFiches, "Régler les liens, l'adresse et les destinataires CHUES", AdminSeul},
 	PermissionDonneesVoirSupprimees:       {"Données", "Voir les données supprimées", AdminSeul},
 	PermissionChiffresVoirMontants:        {domaineChiffres, "Voir les montants", []Role{Admin, Direction}},
 	PermissionVisitesVoirArchivees:        {domaineAccueil, "Voir les visites archivées", []Role{Direction}},
-	PermissionBanqueVoirTousPortefeuilles: {domaineBanque, "Voir tous les portefeuilles Banque & Finance", AdminSeul},
-	PermissionCampagnesAttributionsToutes: {domaineCampagnes, "Voir toutes les attributions", []Role{Admin, Superviseur, Direction, BanqueFinance, Accueil}},
-	PermissionExportsVoirTout:             {domaineExports, "Exporter tous les portefeuilles", Encadrement},
-	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
 	PermissionVisitesDetruire:             {domaineAccueil, "Détruire définitivement une visite archivée", []Role{Direction}},
+	PermissionBanqueVoirTousPortefeuilles: {domaineBanque, "Voir les demandes de tous les portefeuilles", AdminSeul},
+	PermissionCampagnesAttributionsToutes: {domaineCampagnes, "Voir toutes les attributions", []Role{Admin, Superviseur, Direction, BanqueFinance, Accueil}},
+	PermissionExportsVoirTout:             {domaineExports, "Exporter le portefeuille d'un autre", Encadrement},
 }
 
 var permissionsDePortee = map[Permission]bool{
@@ -146,6 +149,7 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionPlateformeSaisir:            true,
 	PermissionFichesVoirConverties:        true,
 	PermissionFichesIgnorerPropriete:      true,
+	PermissionFichesModifierToutes:        true,
 	PermissionFichesForcerTransition:      true,
 	PermissionFichesParametresReserves:    true,
 	PermissionDonneesVoirSupprimees:       true,
@@ -154,17 +158,53 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionBanqueVoirTousPortefeuilles: true,
 	PermissionCampagnesAttributionsToutes: true,
 	PermissionExportsVoirTout:             true,
-	PermissionFichesModifierToutes:        true,
 	PermissionProspectsReaffecterTout:     true,
 }
 
-var attributions atomic.Pointer[map[Role]map[Permission]bool]
+// Chaque base porte sa table `role_permissions` ; sa garde lit ses propres
+// attributions, rechargées d'un bloc après chaque écriture.
+type Attributions struct {
+	parRole atomic.Pointer[map[string]map[Permission]bool]
+	// Deux rechargements concurrents ne doivent pas ranger une lecture plus ancienne en dernier.
+	chargement sync.Mutex
+}
 
-func ChargerAttributions(_ context.Context, _ *db.Queries) error {
-	defauts := AttributionsParDefaut()
-	attributions.Store(&defauts)
+func (a *Attributions) Charger(ctx context.Context, q *db.Queries) error {
+	a.chargement.Lock()
+	defer a.chargement.Unlock()
+	lignes, err := q.ListRolePermissions(ctx)
+	if err != nil {
+		return err
+	}
+	if len(lignes) == 0 {
+		return errors.New("table roles vide : la migration 20260916190000_role_permissions n'est pas appliquée")
+	}
+	parRole := map[string]map[Permission]bool{}
+	for _, ligne := range lignes {
+		if parRole[ligne.RoleID] == nil {
+			parRole[ligne.RoleID] = map[Permission]bool{}
+		}
+		if ligne.Permission != nil && permissionConnue(Permission(*ligne.Permission)) {
+			parRole[ligne.RoleID][Permission(*ligne.Permission)] = true
+		}
+	}
+	a.parRole.Store(&parRole)
 	return nil
 }
+
+func (a *Attributions) PermissionsDuRole(roleID string) map[Permission]bool {
+	return a.duRole(roleID)
+}
+
+// Un rôle inconnu de la table n'a aucune permission : jamais celles de sa base.
+func (a *Attributions) duRole(roleID string) map[Permission]bool {
+	if permissions, ok := (*a.parRole.Load())[roleID]; ok {
+		return permissions
+	}
+	return map[Permission]bool{}
+}
+
+var attributionsParDefaut = sync.OnceValue(AttributionsParDefaut)
 
 func AttributionsParDefaut() map[Role]map[Permission]bool {
 	out := map[Role]map[Permission]bool{}
@@ -179,20 +219,32 @@ func AttributionsParDefaut() map[Role]map[Permission]bool {
 	return out
 }
 
+// Hors session (tâches planifiées, drapeaux), un utilisateur garde les
+// permissions par défaut de son rôle.
 func (u *Utilisateur) Peut(p Permission) bool {
 	if p == Publique {
 		return true
 	}
-	attribution := attributions.Load()
-	if attribution == nil {
-		defauts := AttributionsParDefaut()
-		if attributions.CompareAndSwap(nil, &defauts) {
-			attribution = &defauts
-		} else {
-			attribution = attributions.Load()
+	if u.permissions != nil {
+		return u.permissions[p]
+	}
+	return attributionsParDefaut()[u.Role][p]
+}
+
+func (u *Utilisateur) Permissions() []string {
+	permissions := make([]string, 0, len(Catalogue))
+	for p := range Catalogue {
+		if u.Peut(p) {
+			permissions = append(permissions, string(p))
 		}
 	}
-	return (*attribution)[u.Role][p]
+	slices.Sort(permissions)
+	return permissions
+}
+
+func PermissionConnue(p Permission) bool {
+	_, ok := Catalogue[p]
+	return ok
 }
 
 func RolesAutorises(p Permission) []Role {
@@ -203,9 +255,7 @@ func RolesAutorises(p Permission) []Role {
 	if !ok {
 		return nil
 	}
-	roles := make([]Role, len(definition.Defaut))
-	copy(roles, definition.Defaut)
-	return roles
+	return slices.Clone(definition.Defaut)
 }
 
 func permissionConnue(p Permission) bool {

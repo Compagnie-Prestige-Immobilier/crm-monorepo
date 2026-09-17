@@ -57,6 +57,7 @@ func gardesDomaines() []map[string]socle.Permission {
 		notifications.GardeCourriels,
 		imports.Garde,
 		admin.Garde,
+		admin.GardeRoles,
 		analytics.Garde,
 		prospects.Garde,
 		prospects.GardeFormulairePublic,

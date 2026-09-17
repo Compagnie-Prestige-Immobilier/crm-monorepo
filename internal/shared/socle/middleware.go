@@ -209,7 +209,7 @@ func origineAutorisee(r *http.Request, motif string) bool {
 // (`METHODE /chemin`) est la clé de `garde` ; le panneau statique n'en a pas.
 // Cookie SameSite=Lax + même origine exigée sur toute écriture : le cookie
 // `__Host-` seul laisse passer un sous-domaine voisin (OWASP CSRF).
-func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
+func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		_, motif := mux.Handler(r)
 		permission, gardee := Garde[motif]
@@ -228,7 +228,7 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries) http.Handler {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "UNAUTHENTICATED", "Connexion requise."))
 			return
 		}
-		u, err := utilisateurParSession(r.Context(), q, jeton)
+		u, err := utilisateurParSession(r.Context(), q, a, jeton)
 		if err != nil {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
 			return

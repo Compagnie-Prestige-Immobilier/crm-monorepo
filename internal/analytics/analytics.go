@@ -51,14 +51,18 @@ func litToutLeTravail(u *socle.Utilisateur) bool {
 	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
-// Même entrée de cache pour tous ceux qui voient tout ; un téléconseiller n'a
-// que la sienne.
+// Même entrée de cache pour tous ceux qui voient tout et partagent un rôle ;
+// un téléconseiller n'a que la sienne. Clé par rôle attribué, pas par rôle de
+// base : un rôle personnalisé n'a pas forcément les permissions de sa base.
 func porteeDeCache(ctx context.Context) string {
 	u := socle.UtilisateurCourant(ctx)
-	if litToutLeTravail(&u) {
-		return string(u.Role)
+	if !litToutLeTravail(&u) {
+		return u.ID
 	}
-	return u.ID
+	if u.RoleID != "" {
+		return u.RoleID
+	}
+	return string(u.Role)
 }
 
 func teleconseillerLisible(u *socle.Utilisateur, demande string) string {

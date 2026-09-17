@@ -292,7 +292,7 @@ func monterBaseDemo(ctx context.Context, principal *socle.Config, reg *registre,
 			return nil, nil, fmt.Errorf("semis de %s : %w", nom, err)
 		}
 	}
-	i, err := instancier(&cfg, pool, reg)
+	i, err := instancierBase(ctx, &cfg, pool, reg)
 	if err != nil {
 		pool.Close()
 		return nil, nil, err

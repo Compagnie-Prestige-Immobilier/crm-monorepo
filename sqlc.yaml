@@ -17,6 +17,8 @@ sql:
         emit_pointers_for_null_types: true
         # Une liste vide sort en `[]`, jamais en `null` : le panneau itère sans garde.
         emit_empty_slices: true
+        # Au singulier, la table `roles` engendrerait `Role`, déjà le nom de l'enum.
+        inflection_exclude_table_names: [roles]
         overrides:
           - db_type: pg_catalog.timestamp
             go_type: time.Time
