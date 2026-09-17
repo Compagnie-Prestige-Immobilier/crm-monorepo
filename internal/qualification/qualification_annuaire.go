@@ -25,7 +25,7 @@ type AnnuaireInput struct {
 type AnnuaireEntree struct {
 	ProspectID       string  `json:"prospectId"`
 	PhoneE164        string  `json:"phoneE164"`
-	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod *string `json:"enrollmentMethod"`
 	Rev              int32   `json:"rev"`
 	UpdatedAt        string  `json:"updatedAt"`

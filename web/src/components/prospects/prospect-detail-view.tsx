@@ -10,6 +10,7 @@ import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import {
   HistoireDeLaFiche,
@@ -30,7 +31,6 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   callOutcomeLabel,
   enrollmentMethodLabel,
-  PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   peutRevoirUneDemande,
@@ -111,7 +111,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         badges={
           <>
             <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
-            <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
+            <EtiquettesStatut prospect={prospect} />
             <RevueDemande prospect={prospect} user={user} />
           </>
         }

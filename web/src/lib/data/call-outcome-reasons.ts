@@ -16,6 +16,11 @@ export const CALL_OUTCOME_EFFECTS = [
   'CLOSE_REFUSED',
   'CLOSE_WRONG_NUMBER',
   'CLOSE_LOST',
+  'CLOSE_UNREACHABLE',
+  'CLOSE_INTERESTED',
+  'CLOSE_HESITANT',
+  'CLOSE_APPOINTMENT',
+  'CLOSE_REACHED',
   'KEEP_OPEN',
   'SCHEDULE_CALLBACK',
 ] as const satisfies readonly CallOutcomeEffect[];
@@ -24,7 +29,12 @@ export const CALL_OUTCOME_EFFECT_LABELS: Record<CallOutcomeEffect, string> = {
   CLOSE_METHOD: 'Clôt, méthode obtenue',
   CLOSE_REFUSED: 'Clôt, refus',
   CLOSE_WRONG_NUMBER: 'Clôt, faux numéro',
-  CLOSE_LOST: 'Clôt, fiche à supprimer',
+  CLOSE_LOST: 'Clôt, fiche perdue',
+  CLOSE_UNREACHABLE: 'Clôt, injoignable',
+  CLOSE_INTERESTED: 'Clôt, intéressé',
+  CLOSE_HESITANT: 'Clôt, hésitant',
+  CLOSE_APPOINTMENT: 'Clôt, rendez-vous daté',
+  CLOSE_REACHED: 'Clôt, joint sans suite',
   KEEP_OPEN: 'Laisse le prospect à rappeler',
   SCHEDULE_CALLBACK: 'Planifie un rappel daté',
 };
@@ -95,6 +105,11 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
   CLOSE_REFUSED: 'REFUSED',
   CLOSE_WRONG_NUMBER: 'WRONG_NUMBER',
   CLOSE_LOST: 'REFUSED',
+  CLOSE_UNREACHABLE: 'UNREACHABLE',
+  CLOSE_INTERESTED: 'OTHER',
+  CLOSE_HESITANT: 'OTHER',
+  CLOSE_APPOINTMENT: 'CALLBACK',
+  CLOSE_REACHED: 'OTHER',
   SCHEDULE_CALLBACK: 'CALLBACK',
   KEEP_OPEN: 'UNREACHABLE',
 };
@@ -102,6 +117,9 @@ export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
 /** KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien : joint, il vaut « Autre ». */
 export const issueDuMotif = (motif: Pick<MotifAppel, 'effect' | 'countsAsReached'>): CallOutcome =>
   motif.effect === 'KEEP_OPEN' && motif.countsAsReached ? 'OTHER' : EFFET_ISSUE[motif.effect];
+
+export const planifieUneDate = (effect: CallOutcomeEffect): boolean =>
+  effect === 'SCHEDULE_CALLBACK' || effect === 'CLOSE_APPOINTMENT';
 
 /** Le libellé du statut qui réclame un commentaire, nul quand aucun ne le réclame. */
 export const commentaireExigePar = (motif: MotifAppel | null): string | null =>

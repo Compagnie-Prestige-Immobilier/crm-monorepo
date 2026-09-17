@@ -4,7 +4,7 @@ Source : classeur « arbitrage-statuts-qualification-2026-09-16 » rempli par le
 équipes CPI, puis réponses écrites du 17 septembre 2026. Périmètre : statuts
 prospects. L'onglet Représentants est une liste de référence, rien n'y change.
 
-État : **règles arrêtées et confirmées (section 8), rien n'est codé.**
+État : **règles arrêtées et confirmées (section 8), codées le 17 septembre 2026 (section 7).**
 
 ## 1. Vocabulaire
 
@@ -151,20 +151,31 @@ Règles de reprise :
 À revoir avec ce plan : « À traiter » doit rouvrir une fiche fermée par un
 statut de la section 3.
 
-## 7. Plan technique (à chiffrer avant de coder)
+## 7. Mise en œuvre
 
-1. Référentiel : sur chaque statut, un réglage « ferme la fiche » et « va dans
-   la rubrique », modifiable dans l'écran « Statuts de qualification ». Pas de
-   code par statut.
-2. Consignation d'un appel : appliquer la section 3 (fermeture, sortie des
-   campagnes, rappel pour les rendez-vous, double étiquette Intéressé /
-   Méthode obtenue).
-3. Migration goose : renommer les appels selon la section 5, corriger la
-   famille de TRANSFERT_ENROLEMENT, renommer À supprimer, fermer les fiches
-   déjà qualifiées.
-4. Rubrique : un écran liste avec un seul endpoint.
-5. Tests : un test d'intégration Go par règle modifiée, cassé puis remis ; un
-   parcours Playwright pour la rubrique.
+- **Effet du statut.** Cinq effets s'ajoutent au référentiel des motifs, chacun
+  ferme la fiche sur un état : `CLOSE_UNREACHABLE` (Boîte vocale, NRP, Autre
+  injoignable), `CLOSE_INTERESTED` (Intéressé et ses sous-statuts),
+  `CLOSE_HESITANT`, `CLOSE_APPOINTMENT` (Rendez-vous et ses sous-statuts, date
+  obligatoire, le rappel reste dans « Rappels promis »), `CLOSE_REACHED`
+  (Demande d'information, Demande de partenariat). « À rappeler » garde
+  `SCHEDULE_CALLBACK` et laisse la fiche ouverte.
+- **État de la fiche (phase 2).** Les valeurs `UNREACHABLE`, `INTERESTED`,
+  `HESITANT`, `APPOINTMENT` et `REACHED` s'ajoutent à `PENDING`,
+  `METHOD_OBTAINED`, `REFUSED` et `WRONG_NUMBER`. Libellés, filtres et exports
+  les connaissent.
+- **Double étiquette.** La fiche et les listes affichent l'état, puis le statut
+  posé quand il diffère : « Méthode obtenue » et « Intéressé ».
+- **Reste à appeler.** Inchangé : une fiche appelée par le téléconseiller en
+  sort déjà. « Requalifier → À traiter » l'y remet (colonne
+  `remiseATraiterAt`).
+- **Mes contacts.** Le dernier à avoir appelé une fiche peut la requalifier,
+  même si une campagne l'a confiée à un collègue.
+- **Rubrique.** `/teleconseil/interesses` : la liste des prospects, avec trois
+  onglets Intéressés, Hésitants, Rendez-vous, réservée à l'encadrement.
+- **Migrations.** `20260917140000` (valeurs d'enum), `20260917140100` (effets,
+  libellé À supprimer, reprise des appels, fermeture des fiches déjà
+  qualifiées), `20260917140200` (remise à traiter).
 
 ## 8. Réponses du 17 septembre 2026
 

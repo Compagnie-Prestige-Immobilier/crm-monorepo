@@ -80,7 +80,8 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
+    OR (p."statut" <> 'PERDU'
+        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
@@ -102,6 +103,7 @@ WHERE p."deletedAt" IS NULL
                 AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
+            AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
       ))
     ))
@@ -210,7 +212,8 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
+    OR (p."statut" <> 'PERDU'
+        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
@@ -232,6 +235,7 @@ WHERE p."deletedAt" IS NULL
                 AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
+            AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
       ))
     ))
@@ -625,5 +629,6 @@ UPDATE "prospects" SET
   "statut" = @statut::"ProspectStatut",
   "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
   "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
 WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';

@@ -15,13 +15,15 @@ import (
 	"github.com/google/uuid"
 )
 
-// Routes ajoutées après le gel du 16 septembre : l'écran des rôles.
+// Routes ajoutées après le gel du 16 septembre : l'écran des rôles, puis la
+// requalification par l'encadrement.
 var routesDesRoles = map[string][]socle.Role{
-	"GET /api/v1/roles":                  {socle.Admin},
-	"POST /api/v1/roles":                 {socle.Admin},
-	"PATCH /api/v1/roles/{id}":           {socle.Admin},
-	"DELETE /api/v1/roles/{id}":          {socle.Admin},
-	"PUT /api/v1/roles/{id}/permissions": {socle.Admin},
+	"POST /api/v1/prospects/{id}/requalifier": {socle.Admin, socle.Superviseur, socle.Direction},
+	"GET /api/v1/roles":                       {socle.Admin},
+	"POST /api/v1/roles":                      {socle.Admin},
+	"PATCH /api/v1/roles/{id}":                {socle.Admin},
+	"DELETE /api/v1/roles/{id}":               {socle.Admin},
+	"PUT /api/v1/roles/{id}/permissions":      {socle.Admin},
 }
 
 func TestMatriceRolesInchangee(t *testing.T) {

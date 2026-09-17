@@ -28,7 +28,7 @@ type ExportProspectsInput struct {
 	CanalProvenanceId      string `query:"canalProvenanceId"`
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod"`
 	AppelePar              string `query:"appelePar"`
 	LastCallById           string `query:"lastCallById"`

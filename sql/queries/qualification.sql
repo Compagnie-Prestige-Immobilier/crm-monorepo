@@ -94,7 +94,8 @@ SELECT "id", "projet", "rev", "updatedAt", "lastCallAt", "incomeBandId",
        "phoneE164", "whatsappStatus", "whatsappE164"
 FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 
--- Un rappel promis se tient, même quand la campagne a rendu la fiche. Une fiche
+-- Un rappel promis se tient, même quand la campagne a rendu la fiche, et le
+-- dernier à avoir appelé requalifie depuis « Mes contacts ». Une fiche
 -- attribuée à un autre échappe à son créateur et à l'encadrement : deux
 -- personnes appelleraient la même.
 -- name: ProspectAttribue :one
@@ -110,7 +111,8 @@ SELECT EXISTS (
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
          OR EXISTS (SELECT 1 FROM "scheduled_callbacks" c
-                    WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')));
+                    WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')
+         OR p."lastCallById" = @agent));
 
 -- name: ProspectOuvrable :one
 SELECT EXISTS (
@@ -126,6 +128,7 @@ SELECT EXISTS (
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
          OR EXISTS (SELECT 1 FROM "scheduled_callbacks" c
                     WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')
+         OR p."lastCallById" = @agent
          OR (@converti_visible::bool AND p."statut" = 'CONVERTI')));
 
 -- name: OuvrirParcours :one

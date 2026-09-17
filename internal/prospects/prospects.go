@@ -201,7 +201,7 @@ type Prospect struct {
 	CanalProvenanceID        *string           `json:"canalProvenanceId"`
 	CanalProvenanceLabel     *string           `json:"canalProvenanceLabel"`
 	Segment                  *string           `json:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status             string            `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status             string            `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod         *string           `json:"enrollmentMethod"`
 	EnrollmentCapturedByID   *string           `json:"enrollmentCapturedById"`
 	EnrollmentCapturedByName *string           `json:"enrollmentCapturedByName"`
@@ -457,7 +457,7 @@ type ProspectListInput struct {
 	CanalProvenanceID      string `query:"canalProvenanceId" format:"uuid"`
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar" format:"uuid"`
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
