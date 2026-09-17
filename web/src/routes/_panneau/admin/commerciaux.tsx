@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { CommerciauxView } from '@/components/commerciaux/commerciaux-view';
+import { UtilisateursEtRoles } from '@/components/commerciaux/utilisateurs-et-roles';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardPermission } from '@/lib/guard';
 
@@ -27,5 +27,5 @@ function Loading() {
 function CommerciauxPage() {
   const { user } = Route.useRouteContext();
 
-  return <CommerciauxView currentUserId={user.id} />;
+  return <UtilisateursEtRoles user={user} />;
 }

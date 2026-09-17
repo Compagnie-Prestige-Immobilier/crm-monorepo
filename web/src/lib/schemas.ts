@@ -38,19 +38,7 @@ const userBaseSchema = z.object({
   username: usernameField,
   fullName: z.string().trim().min(1, 'Le nom complet est obligatoire.').max(160, 'Nom trop long.'),
   phone: z.string().trim().max(40, 'Numéro trop long.'),
-  role: z.enum(
-    [
-      'ADMIN',
-      'COMMERCIAL',
-      'BANQUE_FINANCE',
-      'SUPERVISEUR',
-      'DIRECTION',
-      'ACCUEIL',
-      'CHARGE_CLIENTELE',
-      'CCP',
-    ],
-    { message: 'Choisissez le rôle du compte.' },
-  ),
+  roleId: z.string().min(1, 'Choisissez le rôle du compte.'),
 });
 
 export function userFormSchema(mode: 'create' | 'edit') {

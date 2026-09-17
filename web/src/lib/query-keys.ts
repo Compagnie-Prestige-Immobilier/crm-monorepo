@@ -32,6 +32,7 @@ export const queryKeys = {
   representant: (id: string) => ['representants', 'detail', id] as const,
 
   commerciauxRoot: ['commerciaux'] as const,
+  roles: ['roles'] as const,
   commerciaux: (filters: UserFilters) => ['commerciaux', userFiltersQueryKey(filters)] as const,
 
   referentielsRoot: ['referentiels'] as const,
