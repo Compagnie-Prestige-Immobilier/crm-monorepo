@@ -1231,12 +1231,15 @@ func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 
 func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative) error {
 	quand := t.callbackAt
+	if quand == nil && !t.regle.accepteCallbackAt {
+		// L'appel a tenu la promesse sans en prendre une nouvelle : le rappel
+		// promis se clôt sur cette tentative au lieu de rester en retard.
+		// (La clôture de parcours, plus bas, referme ce qui s'y ajoute.)
+		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
+	}
 	if quand == nil {
 		// Sans date, un statut qui promet un rappel le rend dû tout de suite :
 		// autrement la fiche ne figurerait dans aucune file.
-		if !t.regle.accepteCallbackAt {
-			return nil
-		}
 		au := b.ClientCreatedAt.UTC()
 		quand = &au
 	}
