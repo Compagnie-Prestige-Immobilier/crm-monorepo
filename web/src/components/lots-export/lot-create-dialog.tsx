@@ -170,7 +170,7 @@ const choixInitial = (famille: Famille, projet: Projet | typeof TOUS): Choix => 
 });
 
 function nomDe(
-  lignes: readonly { id: string; name: string }[] | undefined,
+  lignes: readonly { id: string; name: string | null }[] | undefined,
   id: string,
 ): string | null {
   const ligne = (lignes ?? []).find((row) => row.id === id);
@@ -600,7 +600,7 @@ function ChampsRepresentants({
               describedBy={props['aria-describedby']}
               items={[
                 { value: TOUS, label: 'Tous les départements' },
-                ...departements.map((row) => ({ value: row.id, label: row.name })),
+                ...departements.map((row) => ({ value: row.id, label: row.name ?? '' })),
               ]}
               value={choix.departementId}
               placeholder="Département"
@@ -615,7 +615,7 @@ function ChampsRepresentants({
               describedBy={props['aria-describedby']}
               items={[
                 { value: TOUS, label: 'Toutes les IEF' },
-                ...iefsDuDepartement.map((row) => ({ value: row.id, label: row.name })),
+                ...iefsDuDepartement.map((row) => ({ value: row.id, label: row.name ?? '' })),
               ]}
               value={choix.iefId}
               placeholder="IEF"

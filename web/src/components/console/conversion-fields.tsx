@@ -159,15 +159,15 @@ export function ConversionFields({
 
   const banqueItems = (banques.data ?? []).map((banque) => ({
     value: banque.id,
-    label: withRetired(banque.shortName, banque.isActive),
+    label: withRetired(banque.shortName ?? '', banque.isActive ?? false),
   }));
   const syndicatItems = (syndicats.data ?? []).map((syndicat) => ({
     value: syndicat.id,
-    label: withRetired(syndicat.sigle, syndicat.isActive),
+    label: withRetired(syndicat.sigle ?? '', syndicat.isActive ?? false),
   }));
   const trancheItems = (tranches.data ?? []).map((tranche) => ({
     value: tranche.id,
-    label: withRetired(tranche.label, tranche.isActive),
+    label: withRetired(tranche.label ?? '', tranche.isActive ?? false),
   }));
 
   const noeuds: Readonly<Record<ChampReglable, ReactNode>> = {

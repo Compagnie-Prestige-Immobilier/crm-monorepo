@@ -126,13 +126,13 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 		p.Projet = &in.Projet
 	}
 	assigne := in.AssignedToID
-	if !qualificationVoitTout(u.Role) && u.Role != socle.CCP {
+	if !qualificationVoitTout(&u) && !u.Peut(socle.PermissionPlateformeSaisir) {
 		assigne = u.ID
 	}
 	if assigne != "" {
 		p.AssignedToID = &assigne
 	}
-	p.Plateforme = socle.PorteePlateforme(u.Role)
+	p.Plateforme = socle.PorteePlateforme(&u)
 	rows, err := s.Q.ListerRappels(ctx, p)
 	if err != nil {
 		return nil, err
@@ -175,7 +175,7 @@ func (s *service) qualificationReporterRappel(ctx context.Context, in *Qualifica
 	if err != nil {
 		return nil, err
 	}
-	if u.Role != socle.Admin && row.AssignedToId != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
 	}
 	maintenant := time.Now().UTC()
@@ -201,7 +201,7 @@ func (s *service) qualificationAnnulerRappel(ctx context.Context, in *Qualificat
 	if err != nil {
 		return nil, err
 	}
-	if u.Role != socle.Admin && row.AssignedToId != u.ID {
+	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
 	}
 	if row.Status == db.ScheduledCallbackStatusPENDING {
@@ -337,7 +337,7 @@ func (s *service) qualificationFicheOuvrable(ctx context.Context, u *socle.Utili
 		"Cette fiche n’existe pas, elle n’est pas dans vos campagnes, ou elle est attribuée à quelqu’un d’autre.")
 	if representantID != nil {
 		_, err := s.Q.RepresentantAQualifier(ctx, db.RepresentantAQualifierParams{
-			ID: *representantID, Tous: qualificationVoitTout(u.Role), Agent: u.ID,
+			ID: *representantID, Tous: qualificationVoitTout(u), Agent: u.ID,
 		})
 		if errors.Is(err, pgx.ErrNoRows) {
 			return introuvable
@@ -345,8 +345,8 @@ func (s *service) qualificationFicheOuvrable(ctx context.Context, u *socle.Utili
 		return err
 	}
 	ouvrable, err := s.Q.ProspectOuvrable(ctx, db.ProspectOuvrableParams{
-		ID: *prospectID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP, Agent: u.ID,
-		ConvertiVisible: u.Role == socle.ChargeClientele, Plateforme: qualificationTientLaPlateforme(u.Role),
+		ID: *prospectID, Tous: qualificationVoitTout(u) || u.Peut(socle.PermissionPlateformeSaisir), Agent: u.ID,
+		ConvertiVisible: u.Peut(socle.PermissionFichesVoirConverties), Plateforme: qualificationTientLaPlateforme(u),
 	})
 	if err != nil {
 		return err
@@ -498,7 +498,7 @@ func (s *service) qualificationComptage(ctx context.Context, in *QualificationCo
 	u := socle.UtilisateurCourant(ctx)
 	p := db.ComptageOuverturesParams{}
 	borne := in.OpenedByID
-	if !qualificationVoitTout(u.Role) {
+	if !qualificationVoitTout(&u) {
 		borne = u.ID
 	}
 	if borne != "" {
@@ -592,7 +592,7 @@ type QualificationSuggestionsOutput struct {
 func (s *service) qualificationListerSuggestions(ctx context.Context, in *QualificationSuggestionsInput) (*QualificationSuggestionsOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	p := db.ListerSuggestionsParams{
-		Tous: qualificationVoitTout(u.Role), Agent: u.ID, Lim: in.PageSize,
+		Tous: qualificationVoitTout(&u), Agent: u.ID, Lim: in.PageSize,
 		Decalage: (in.Page - 1) * in.PageSize,
 	}
 	if in.Status != "" {
@@ -634,7 +634,7 @@ type QualificationSuggestionOutput struct {
 func (s *service) qualificationBasculerSuggestion(ctx context.Context, in *QualificationSuggestionStatutInput) (*QualificationSuggestionOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	introuvable := socle.Problem(http.StatusNotFound, "SUGGESTION_NOT_FOUND", "Ce numéro suggéré est introuvable.")
-	tous := qualificationVoitTout(u.Role)
+	tous := qualificationVoitTout(&u)
 	courant, err := s.Q.SuggestionCourante(ctx, db.SuggestionCouranteParams{ID: in.ID, Tous: tous, Agent: u.ID})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, introuvable
@@ -643,7 +643,7 @@ func (s *service) qualificationBasculerSuggestion(ctx context.Context, in *Quali
 		return nil, err
 	}
 	depuis := string(courant)
-	if u.Role != socle.Admin && !qualificationTransitionLegale(qualificationTransitionsSuggestion, depuis, in.Body.Status) {
+	if !u.Peut(socle.PermissionFichesForcerTransition) && !qualificationTransitionLegale(qualificationTransitionsSuggestion, depuis, in.Body.Status) {
 		return nil, socle.Problem(http.StatusForbidden, "SUGGESTION_TRANSITION_REFUSED",
 			"Numéro suggéré : le passage de « "+depuis+" » à « "+in.Body.Status+" » n’est pas permis.")
 	}

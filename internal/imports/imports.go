@@ -49,16 +49,16 @@ var (
 	scientifiqueImport        = regexp.MustCompile(`^\d(?:\.\d+)?[eE]\+?\d+$`)
 )
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/imports":                         socle.AdminSeul,
-	"POST /api/v1/imports/representants":          socle.AdminSeul,
-	"POST /api/v1/imports/prospects":              socle.AdminSeul,
-	"POST /api/v1/imports/prospects-grand-public": socle.AdminSeul,
-	"POST /api/v1/imports/visites":                socle.AdminSeul,
-	"GET /api/v1/imports/{id}":                    socle.AdminSeul,
-	"POST /api/v1/imports/{id}/apply":             socle.AdminSeul,
-	"POST /api/v1/representants/import":           socle.AdminSeul,
-	cheminRattrapageFeuilles:                      socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/imports":                         socle.PermissionImportsAdministrer,
+	"POST /api/v1/imports/representants":          socle.PermissionImportsAdministrer,
+	"POST /api/v1/imports/prospects":              socle.PermissionImportsAdministrer,
+	"POST /api/v1/imports/prospects-grand-public": socle.PermissionImportsAdministrer,
+	"POST /api/v1/imports/visites":                socle.PermissionImportsAdministrer,
+	"GET /api/v1/imports/{id}":                    socle.PermissionImportsAdministrer,
+	"POST /api/v1/imports/{id}/apply":             socle.PermissionImportsAdministrer,
+	"POST /api/v1/representants/import":           socle.PermissionImportsAdministrer,
+	cheminRattrapageFeuilles:                      socle.PermissionImportsAdministrer,
 }
 
 type reglagesImport struct {

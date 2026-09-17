@@ -5,8 +5,8 @@ import { getApiClient } from '@/lib/api/browser';
 import { flattenPage } from '@/lib/api/query-params';
 import type { Paginated } from '@/lib/types';
 
-export type Suggestion = components['schemas']['SuggestionDto'];
-export type SuggestionStatus = components['schemas']['SuggestionStatus'];
+export type Suggestion = components['schemas']['QualificationSuggestionDTO'];
+export type SuggestionStatus = Suggestion['status'];
 
 export const SUGGESTION_STATUSES = ['A_APPELER', 'APPELE', 'ABANDONNE'] as const;
 

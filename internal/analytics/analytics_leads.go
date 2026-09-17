@@ -18,6 +18,7 @@ type ImportDeLeads struct {
 	Appeles    int       `json:"appeles"`
 	Joints     int       `json:"joints"`
 	Interesses int       `json:"interesses"`
+	Plateforme int       `json:"plateforme" doc:"Fiches de ce classeur passées plateforme : hors des autres colonnes."`
 }
 
 type LeadTresInteresse struct {
@@ -65,7 +66,7 @@ func (s *service) leadsImportes(ctx context.Context, _ *struct{}) (*LeadsImporte
 		corps.Imports = append(corps.Imports, ImportDeLeads{
 			ID: ligne.ID, Fichier: ligne.Fichier, ImporteLe: ligne.ImporteLe,
 			Importes: int(ligne.Importes), Appeles: int(ligne.Appeles),
-			Joints: int(ligne.Joints), Interesses: int(ligne.Interesses),
+			Joints: int(ligne.Joints), Interesses: int(ligne.Interesses), Plateforme: int(ligne.Plateforme),
 		})
 	}
 	for i := range fiches {

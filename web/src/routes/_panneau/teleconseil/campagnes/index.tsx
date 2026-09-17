@@ -2,10 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { LotsExportView } from '@/components/lots-export/lots-export-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/campagnes/')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('campagnes.superviser'),
   component: TeleconseilCampagnesPage,
   pendingComponent: Loading,
 });
@@ -29,8 +30,8 @@ function TeleconseilCampagnesPage() {
 
   return (
     <LotsExportView
-      canCreate={user.role === 'ADMIN' || user.role === 'SUPERVISEUR'}
-      canDelete={user.role === 'ADMIN'}
+      canCreate={peut(user, 'campagnes.gerer')}
+      canDelete={peut(user, 'campagnes.administrer')}
     />
   );
 }

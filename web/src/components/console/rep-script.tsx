@@ -792,8 +792,12 @@ function syndicatsDe(
   const syndicats = reference?.syndicats ?? [];
   return {
     options: syndicats
-      .filter((syndicat) => syndicat.isActive)
-      .map((syndicat) => ({ value: syndicat.id, label: syndicat.name, hint: syndicat.sigle })),
+      .filter((syndicat) => syndicat.isActive === true)
+      .map((syndicat) => ({
+        value: syndicat.id,
+        label: syndicat.name ?? '',
+        hint: syndicat.sigle ?? '',
+      })),
     name: syndicats.find((syndicat) => syndicat.id === syndicatId)?.name ?? '',
   };
 }

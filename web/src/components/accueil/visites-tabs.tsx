@@ -1,19 +1,26 @@
 'use client';
 
+import { useQuery } from '@tanstack/react-query';
 import { ChartNoAxesCombinedIcon, ListChecksIcon, ListIcon, UploadIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import type { Role } from '@/lib/types';
+import { meQueryOptions } from '@/api/auth';
+import { type Permission, peut } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-const TABS = [
-  { href: '/accueil', label: 'Liste', icon: ListIcon, roles: null },
+const TABS: readonly {
+  href: string;
+  label: string;
+  icon: typeof ListIcon;
+  permission: Permission | null;
+}[] = [
+  { href: '/accueil', label: 'Liste', icon: ListIcon, permission: null },
   {
     href: '/accueil/tableau-de-bord',
     label: 'Tableau de bord',
     icon: ChartNoAxesCombinedIcon,
-    roles: null,
+    permission: null,
   },
   {
     // Gestion des quatre listes qui alimentent la saisie : réservée à qui les
@@ -21,21 +28,20 @@ const TABS = [
     href: '/accueil/listes',
     label: 'Listes',
     icon: ListChecksIcon,
-    roles: ['ADMIN', 'DIRECTION'] as const,
+    permission: 'accueil.listes',
   },
   {
     href: '/accueil/import',
     label: 'Import',
     icon: UploadIcon,
-    roles: ['ADMIN', 'DIRECTION'] as const,
+    permission: 'accueil.listes',
   },
-] as const;
+];
 
-export function VisitesTabs({ role }: { role: Role }) {
+export function VisitesTabs() {
   const pathname = usePathname();
-  const tabs = TABS.filter(
-    (tab) => tab.roles === null || (tab.roles as readonly Role[]).includes(role),
-  );
+  const { data: user } = useQuery(meQueryOptions);
+  const tabs = TABS.filter((tab) => tab.permission === null || peut(user, tab.permission));
 
   return (
     <nav aria-label="Visites" className="print:hidden">

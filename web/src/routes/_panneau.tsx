@@ -36,14 +36,14 @@ function Panneau() {
   const { pathname } = useLocation();
 
   useEffect(() => {
-    document.title = `${navTitle(user.role, pathname)} · CPI GO`;
-  }, [user.role, pathname]);
+    document.title = `${navTitle(user, pathname)} · CPI GO`;
+  }, [user, pathname]);
 
   return (
     <CoqueShell>
       <LiveStream />
       <RappelPopUpIntrusif userId={user.id} />
-      <SidebarShell role={user.role} defaultCollapsed={sidebarRepliee()} />
+      <SidebarShell visiteur={user} defaultCollapsed={sidebarRepliee()} />
 
       <div className="flex min-w-0 flex-1 flex-col">
         <DemoBanner user={user} />

@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { ChampsConversionView } from '@/components/settings/champs-conversion-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/champs-conversion')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('formulaires.administrer'),
   component: ChampsConversionPage,
   pendingComponent: Loading,
 });

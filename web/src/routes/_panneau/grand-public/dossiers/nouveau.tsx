@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { BankAOuvrirSkeleton, BankAOuvrirView } from '@/components/bank/bank-a-ouvrir-view';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/dossiers/nouveau')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: NouveauDossierGrandPublicPage,
   pendingComponent: BankAOuvrirSkeleton,
 });

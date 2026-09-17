@@ -4,10 +4,10 @@ import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-vi
 import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { ActivityView } from '@/components/supervision/activity-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/supervision')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: SupervisionGrandPublicPage,
   pendingComponent: Loading,
 });

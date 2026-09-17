@@ -29,21 +29,21 @@ const (
 	qualificationFauxNumero  = "WRONG_NUMBER"
 )
 
-var Garde = map[string][]socle.Role{
-	"POST /api/v1/rep-campaigns/attempts":       socle.Parcours,
-	"POST /api/v1/phase2/call-attempts":         socle.Parcours,
-	"GET /api/v1/phase2/callbacks":              socle.Parcours,
-	"GET /api/v1/phase2/directory":              socle.Parcours,
-	"POST /api/v1/phase2/callbacks/{id}/cancel": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
-	"POST /api/v1/phase2/callbacks/{id}/snooze": {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP},
-	"POST /api/v1/ouvertures":                   socle.Parcours,
-	"GET /api/v1/ouvertures/courante":           socle.Parcours,
-	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.Parcours,
-	"GET /api/v1/ouvertures/comptage":           socle.Parcours,
-	"GET /api/v1/suggestions":                   socle.Parcours,
-	"PATCH /api/v1/suggestions/{id}":            socle.Parcours,
-	"POST /api/v1/sync/push":                    socle.Parcours,
-	"POST /api/v1/presence/beat":                socle.Tous,
+var Garde = map[string]socle.Permission{
+	"POST /api/v1/rep-campaigns/attempts":       socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/call-attempts":         socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/callbacks":              socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/directory":              socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/callbacks/{id}/cancel": socle.PermissionQualificationRappels,
+	"POST /api/v1/phase2/callbacks/{id}/snooze": socle.PermissionQualificationRappels,
+	"POST /api/v1/ouvertures":                   socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/courante":           socle.PermissionFichesTenir,
+	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/comptage":           socle.PermissionFichesTenir,
+	"GET /api/v1/suggestions":                   socle.PermissionFichesTenir,
+	"PATCH /api/v1/suggestions/{id}":            socle.PermissionFichesTenir,
+	"POST /api/v1/sync/push":                    socle.PermissionFichesTenir,
+	"POST /api/v1/presence/beat":                socle.PermissionPanneauAcceder,
 }
 
 func qualificationRoute(id, methode, chemin string) huma.Operation {
@@ -123,12 +123,14 @@ func qualificationInstant(t time.Time) *time.Time {
 	return &utc
 }
 
-func qualificationVoitTout(role socle.Role) bool {
-	return role == socle.Admin || role == socle.Superviseur || role == socle.Direction
+func qualificationVoitTout(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
 // Seul le CCP ouvre et consigne une fiche plateforme ; l'encadrement la lit.
-func qualificationTientLaPlateforme(role socle.Role) bool { return role == socle.CCP }
+func qualificationTientLaPlateforme(u *socle.Utilisateur) bool {
+	return u.Peut(socle.PermissionPlateformeSaisir)
+}
 
 var qualificationTransitionsRelation = map[string][]string{
 	"INCONNU":                {"CONTACTE", qualificationAmbassadeur, qualificationRefus},
@@ -433,7 +435,7 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 		return qualificationRepResultat("duplicate", b.ID), nil
 	}
 	rep, err := s.Q.RepresentantAQualifier(ctx, db.RepresentantAQualifierParams{
-		ID: b.RepresentantID, Tous: qualificationVoitTout(u.Role), Agent: u.ID,
+		ID: b.RepresentantID, Tous: qualificationVoitTout(&u), Agent: u.ID,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, s.qualificationRepAbsent(ctx, b.RepresentantID)
@@ -680,8 +682,27 @@ var qualificationReglesEffet = map[db.CallOutcomeEffect]qualificationRegleIssue{
 	db.CallOutcomeEffectCLOSEREFUSED:     {clot: true, phase2Status: qualificationRefusee},
 	db.CallOutcomeEffectCLOSEWRONGNUMBER: {clot: true, phase2Status: qualificationFauxNumero},
 	db.CallOutcomeEffectCLOSELOST:        {clot: true, phase2Status: qualificationRefusee},
+	db.CallOutcomeEffectCLOSEUNREACHABLE: {clot: true, phase2Status: string(db.Phase2StatusUNREACHABLE)},
+	db.CallOutcomeEffectCLOSEINTERESTED:  {clot: true, phase2Status: string(db.Phase2StatusINTERESTED)},
+	db.CallOutcomeEffectCLOSEHESITANT:    {clot: true, phase2Status: string(db.Phase2StatusHESITANT)},
+	db.CallOutcomeEffectCLOSEREACHED:     {clot: true, phase2Status: string(db.Phase2StatusREACHED)},
+	db.CallOutcomeEffectCLOSEAPPOINTMENT: {clot: true, phase2Status: string(db.Phase2StatusAPPOINTMENT), accepteCallbackAt: true},
 	db.CallOutcomeEffectKEEPOPEN:         {},
 	db.CallOutcomeEffectSCHEDULECALLBACK: {accepteCallbackAt: true},
+}
+
+// La famille de l'appel suit l'effet du motif ; KEEP_OPEN la tient de « compte comme joint ».
+var qualificationFamilles = map[db.CallOutcomeEffect]string{
+	db.CallOutcomeEffectCLOSEMETHOD:      exports.ExportCleMethodeObtenue,
+	db.CallOutcomeEffectCLOSEREFUSED:     qualificationRefusee,
+	db.CallOutcomeEffectCLOSELOST:        qualificationRefusee,
+	db.CallOutcomeEffectCLOSEWRONGNUMBER: qualificationFauxNumero,
+	db.CallOutcomeEffectSCHEDULECALLBACK: qualificationCallback,
+	db.CallOutcomeEffectCLOSEAPPOINTMENT: qualificationCallback,
+	db.CallOutcomeEffectCLOSEUNREACHABLE: string(db.CallOutcomeUNREACHABLE),
+	db.CallOutcomeEffectCLOSEINTERESTED:  string(db.CallOutcomeOTHER),
+	db.CallOutcomeEffectCLOSEHESITANT:    string(db.CallOutcomeOTHER),
+	db.CallOutcomeEffectCLOSEREACHED:     string(db.CallOutcomeOTHER),
 }
 
 type qualificationMotifIssue struct {
@@ -739,7 +760,7 @@ type QualificationCallAttemptInput struct{ Body QualificationCallAttemptBody }
 
 type QualificationProspectPhase2StateDTO struct {
 	ProspectID       string  `json:"prospectId" format:"uuid"`
-	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER"`
+	Phase2Status     string  `json:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod *string `json:"enrollmentMethod"`
 	Rev              int32   `json:"rev"`
 	UpdatedAt        string  `json:"updatedAt" format:"date-time"`
@@ -799,19 +820,11 @@ func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *Qualificati
 }
 
 func qualificationFamilleDuMotif(effet db.CallOutcomeEffect, joint bool) string {
-	switch effet {
-	case db.CallOutcomeEffectCLOSEMETHOD:
-		return exports.ExportCleMethodeObtenue
-	case db.CallOutcomeEffectCLOSEREFUSED, db.CallOutcomeEffectCLOSELOST:
-		return qualificationRefusee
-	case db.CallOutcomeEffectCLOSEWRONGNUMBER:
-		return qualificationFauxNumero
-	case db.CallOutcomeEffectSCHEDULECALLBACK:
-		return qualificationCallback
-	case db.CallOutcomeEffectKEEPOPEN:
-		if joint {
-			return string(db.CallOutcomeOTHER)
-		}
+	if famille, ok := qualificationFamilles[effet]; ok {
+		return famille
+	}
+	if effet == db.CallOutcomeEffectKEEPOPEN && joint {
+		return string(db.CallOutcomeOTHER)
 	}
 	return string(db.CallOutcomeUNREACHABLE)
 }
@@ -1000,8 +1013,8 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 // partout sauf sur une fiche attribuée à quelqu'un d'autre.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
-		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u.Role) || u.Role == socle.CCP,
-		Plateforme: qualificationTientLaPlateforme(u.Role),
+		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u) || u.Peut(socle.PermissionPlateformeSaisir),
+		Plateforme: qualificationTientLaPlateforme(u),
 	})
 	if err != nil {
 		return err
@@ -1218,12 +1231,15 @@ func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 
 func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative) error {
 	quand := t.callbackAt
+	if quand == nil && !t.regle.accepteCallbackAt {
+		// L'appel a tenu la promesse sans en prendre une nouvelle : le rappel
+		// promis se clôt sur cette tentative au lieu de rester en retard.
+		// (La clôture de parcours, plus bas, referme ce qui s'y ajoute.)
+		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
+	}
 	if quand == nil {
 		// Sans date, un statut qui promet un rappel le rend dû tout de suite :
 		// autrement la fiche ne figurerait dans aucune file.
-		if !t.regle.accepteCallbackAt {
-			return nil
-		}
 		au := b.ClientCreatedAt.UTC()
 		quand = &au
 	}
@@ -1264,7 +1280,7 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 	}); err != nil {
 		return "", vide, err
 	}
-	if err := q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID}); err != nil {
+	if err := qualificationCloreRappels(ctx, q, b, t); err != nil {
 		return "", vide, err
 	}
 	if t.motif.effet == db.CallOutcomeEffectCLOSELOST {
@@ -1281,4 +1297,12 @@ func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.
 		return "", vide, err
 	}
 	return tentativeAppliquee, qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
+}
+
+// Un rendez-vous ferme la fiche mais garde le rappel qu'il vient de poser.
+func qualificationCloreRappels(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody, t *qualificationTentative) error {
+	if t.regle.accepteCallbackAt {
+		return nil
+	}
+	return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
 }

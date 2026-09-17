@@ -15,6 +15,8 @@ type Deps struct {
 	Cfg      *Config
 	Live     *Live
 	Annuaire *Annuaire
+	// Nil sans base (drapeaux -roles, -openapi) : les permissions par défaut valent.
+	Attributions *Attributions
 	// Nom de tâche vers expression cron, rempli au démarrage par le
 	// planificateur : le retard d'un cron se juge sur la cadence déclarée.
 	Planifications map[string]string

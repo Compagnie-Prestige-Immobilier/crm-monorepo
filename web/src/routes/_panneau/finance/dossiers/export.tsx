@@ -4,10 +4,10 @@ import { BankCasesSkeleton } from '@/components/bank/bank-cases-view';
 import { BankExportView } from '@/components/bank/bank-export-view';
 import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/dossiers/export')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: ExportDossiersPage,
   pendingComponent: Loading,
 });

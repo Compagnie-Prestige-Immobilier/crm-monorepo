@@ -1077,7 +1077,7 @@ func banqueDemandeDTO(row *db.ClientRequestListRow) DemandeClientBanque {
 // Un agent bancaire ne voit que ses propres demandes : les autres révéleraient à
 // une banque les clients qu'une concurrente cherche à faire créer.
 func banquePortefeuilleDemandes(u *socle.Utilisateur) *string {
-	if u.Role == socle.Admin {
+	if u.Peut(socle.PermissionBanqueVoirTousPortefeuilles) {
 		return nil
 	}
 	return &u.ID
@@ -1398,30 +1398,30 @@ func (s *service) banqueRefuserDemande(ctx context.Context, in *RefusBanqueInput
 	return &DemandeBanqueOutput{Body: arbitree}, nil
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/bank-cases":                        socle.Banque,
-	"POST /api/v1/bank-cases":                       socle.Banque,
-	"GET /api/v1/bank-cases/a-ouvrir":               socle.Banque,
-	"GET /api/v1/bank-cases/analytics":              socle.BanqueLecture,
-	"GET /api/v1/bank-cases/prospect-search":        socle.Banque,
-	"GET /api/v1/bank-cases/rejection-reasons":      socle.BanqueLecture,
-	"GET /api/v1/bank-cases/{id}":                   socle.Banque,
-	"GET /api/v1/bank-inscriptions/{id}/pieces":     socle.Banque,
-	"GET /api/v1/bank-inscriptions/{id}/piece":      socle.Banque,
-	"GET /api/v1/bank-inscriptions/{id}/pieces.zip": socle.Banque,
-	"PATCH /api/v1/bank-cases/{id}":                 socle.Banque,
-	"POST /api/v1/bank-cases/{id}/transitions":      socle.Banque,
-	"POST /api/v1/bank-cases/{id}/corrections":      socle.AdminSeul,
-	"GET /api/v1/bank-case-stages":                  socle.BanqueLecture,
-	"POST /api/v1/bank-case-stages":                 socle.AdminSeul,
-	"POST /api/v1/bank-case-stages/reorder":         socle.AdminSeul,
-	"PATCH /api/v1/bank-case-stages/{id}":           socle.AdminSeul,
-	"POST /api/v1/bank-case-stages/{id}/active":     socle.AdminSeul,
-	"POST /api/v1/client-requests":                  socle.Banque,
-	"GET /api/v1/client-requests":                   socle.Banque,
-	"GET /api/v1/client-requests/{id}":              socle.Banque,
-	"POST /api/v1/client-requests/{id}/approve":     socle.AdminSeul,
-	"POST /api/v1/client-requests/{id}/reject":      socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/bank-cases":                        socle.PermissionBanqueDossiers,
+	"POST /api/v1/bank-cases":                       socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases/a-ouvrir":               socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases/analytics":              socle.PermissionBanqueLire,
+	"GET /api/v1/bank-cases/prospect-search":        socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-cases/rejection-reasons":      socle.PermissionBanqueLire,
+	"GET /api/v1/bank-cases/{id}":                   socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-inscriptions/{id}/pieces":     socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-inscriptions/{id}/piece":      socle.PermissionBanqueDossiers,
+	"GET /api/v1/bank-inscriptions/{id}/pieces.zip": socle.PermissionBanqueDossiers,
+	"PATCH /api/v1/bank-cases/{id}":                 socle.PermissionBanqueDossiers,
+	"POST /api/v1/bank-cases/{id}/transitions":      socle.PermissionBanqueDossiers,
+	"POST /api/v1/bank-cases/{id}/corrections":      socle.PermissionBanqueAdministrer,
+	"GET /api/v1/bank-case-stages":                  socle.PermissionBanqueLire,
+	"POST /api/v1/bank-case-stages":                 socle.PermissionBanqueAdministrer,
+	"POST /api/v1/bank-case-stages/reorder":         socle.PermissionBanqueAdministrer,
+	"PATCH /api/v1/bank-case-stages/{id}":           socle.PermissionBanqueAdministrer,
+	"POST /api/v1/bank-case-stages/{id}/active":     socle.PermissionBanqueAdministrer,
+	"POST /api/v1/client-requests":                  socle.PermissionBanqueDossiers,
+	"GET /api/v1/client-requests":                   socle.PermissionBanqueDossiers,
+	"GET /api/v1/client-requests/{id}":              socle.PermissionBanqueDossiers,
+	"POST /api/v1/client-requests/{id}/approve":     socle.PermissionBanqueAdministrer,
+	"POST /api/v1/client-requests/{id}/reject":      socle.PermissionBanqueAdministrer,
 }
 
 func Monter(api huma.API, d *socle.Deps) {

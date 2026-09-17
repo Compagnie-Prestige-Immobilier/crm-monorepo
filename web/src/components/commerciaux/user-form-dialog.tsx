@@ -1,14 +1,15 @@
 'use client';
 
 import { zodResolver } from '@hookform/resolvers/zod';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { LoaderIcon } from 'lucide-react';
-import { useEffect } from 'react';
-import { useForm } from 'react-hook-form';
+import { useEffect, useState } from 'react';
+import { useForm, type UseFormReturn } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
 import { Button } from '@/components/ui/button';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import {
   Dialog,
   DialogContent,
@@ -25,33 +26,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { fetchRoles, type RoleCompte } from '@/lib/data/roles';
 import { createUser, updateUser } from '@/lib/data/users';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { userFormSchema, type UserFormInput } from '@/lib/schemas';
-import {
-  ROLE_LABELS,
-  type CreateUserInput,
-  type Role,
-  type UpdateUserInput,
-  type UserRow,
-} from '@/lib/types';
-import { ROLES } from '@/lib/user-filters';
-
-function userFormDefaults(user: UserRow | undefined) {
-  return {
-    email: user?.email ?? '',
-    username: user?.username ?? '',
-    fullName: user?.fullName ?? '',
-    phone: user?.phoneE164 ?? '',
-    password: '',
-    ...(user ? { role: user.role } : {}),
-  };
-}
-
-function errorMessage(error?: { message?: string }): string | undefined {
-  return error?.message;
-}
+import { ROLE_LABELS, type Role, type UserRow } from '@/lib/types';
 
 const ROLE_HINTS: Record<Role, string> = {
   ADMIN: 'Accès complet, y compris les comptes et les référentiels.',
@@ -64,121 +44,126 @@ const ROLE_HINTS: Record<Role, string> = {
   CCP: 'Appelle toutes les fiches venues des plateformes d’enrôlement, jamais celles des campagnes.',
 };
 
+const TEXTES = {
+  creation: {
+    titre: 'Nouvel utilisateur',
+    description: 'Le rôle décide de ce que le compte pourra consulter.',
+    bouton: 'Créer le compte',
+    succes: (nom: string) => `Compte de ${nom} créé.`,
+    echec: 'Création impossible. Réessayez.',
+  },
+  edition: {
+    titre: 'Modifier le compte',
+    description: 'Le mot de passe n’est pas modifiable ici.',
+    bouton: 'Enregistrer',
+    succes: (nom: string) => `Compte de ${nom} mis à jour.`,
+    echec: 'Modification impossible. Réessayez.',
+  },
+};
+
+function aideDuRole(role: RoleCompte | undefined): string {
+  if (role === undefined) return 'Décide de ce que le compte pourra consulter.';
+  if (role.systeme) return ROLE_HINTS[role.roleDeBase];
+  return `Rôle de base : ${ROLE_LABELS[role.roleDeBase]}.`;
+}
+
+function valeursDuCompte(user: UserRow | undefined): UserFormInput {
+  if (user === undefined) {
+    return { email: '', username: '', fullName: '', phone: '', password: '', roleId: '' };
+  }
+  const { email, username, fullName, roleId } = user;
+  return { email, username, fullName, roleId, phone: user.phoneE164 ?? '', password: '' };
+}
+
+// La chaîne VIDE sur un PATCH efface le téléphone ; à la création, un vide s'omet.
+function enregistrerCompte(values: UserFormInput, user: UserRow | undefined): Promise<UserRow> {
+  const { email, username, fullName, roleId, phone, password } = values;
+  if (user !== undefined) return updateUser(user.id, { email, username, fullName, roleId, phone });
+  return createUser({
+    email,
+    username,
+    fullName,
+    roleId,
+    password,
+    ...(phone === '' ? {} : { phone }),
+  });
+}
+
 export function UserFormDialog({
   open,
   onOpenChange,
   user,
+  currentUserId,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   user?: UserRow | undefined;
+  currentUserId: string;
 }) {
-  const isEdit = user !== undefined;
+  const textes = user === undefined ? TEXTES.creation : TEXTES.edition;
   const queryClient = useQueryClient();
+  const [aConfirmer, setAConfirmer] = useState<UserFormInput | null>(null);
 
-  const form = useForm<UserFormInput>({
-    resolver: zodResolver(userFormSchema(isEdit ? 'edit' : 'create')),
-    defaultValues: {
-      email: '',
-      username: '',
-      fullName: '',
-      phone: '',
-      password: '',
-    },
+  const { register, handleSubmit, reset, setValue, watch, formState } = useForm<UserFormInput>({
+    resolver: zodResolver(userFormSchema(user === undefined ? 'create' : 'edit')),
+    defaultValues: valeursDuCompte(undefined),
   });
-
-  const { register, handleSubmit, reset, setValue, watch, formState } = form;
+  const erreurs = formState.errors;
 
   useEffect(() => {
-    if (!open) return;
-    reset(userFormDefaults(user));
+    if (open) reset(valeursDuCompte(user));
   }, [open, user, reset]);
 
   const mutation = useMutation({
-    mutationFn: async (values: UserFormInput) => {
-      const phone = values.phone;
-
-      if (isEdit) {
-        const patch: UpdateUserInput = {
-          email: values.email,
-          username: values.username,
-          fullName: values.fullName,
-          role: values.role,
-        };
-        // La chaine VIDE et non `undefined` : sur un PATCH, un champ absent veut
-        // dire « ne change rien », et le telephone ne s'effacerait jamais.
-        patch.phone = phone;
-        return updateUser(user.id, patch);
-      }
-
-      const body: CreateUserInput = {
-        email: values.email,
-        username: values.username,
-        fullName: values.fullName,
-        password: values.password,
-        role: values.role,
-      };
-      // A la creation, en revanche, un vide n'a rien a effacer : on l'omet.
-      if (phone !== '') body.phone = phone;
-      return createUser(body);
-    },
+    mutationFn: (values: UserFormInput) => enregistrerCompte(values, user),
     onSuccess: (saved) => {
       void queryClient.invalidateQueries({ queryKey: queryKeys.commerciauxRoot });
+      void queryClient.invalidateQueries({ queryKey: queryKeys.roles });
       void queryClient.invalidateQueries({ queryKey: queryKeys.reference });
-      toast.success(
-        isEdit ? `Compte de ${saved.fullName} mis à jour.` : `Compte de ${saved.fullName} créé.`,
-      );
+      toast.success(textes.succes(saved.fullName));
+      setAConfirmer(null);
       onOpenChange(false);
     },
     onError: (error) => {
-      toastApiError(
-        error,
-        isEdit ? 'Modification impossible. Réessayez.' : 'Création impossible. Réessayez.',
-      );
+      setAConfirmer(null);
+      toastApiError(error, textes.echec);
     },
   });
 
-  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-  const role = watch('role') as UserFormInput['role'] | undefined;
-
-  const roleItems = ROLES.map((value) => ({ value, label: ROLE_LABELS[value] }));
+  const soumettre = (values: UserFormInput): void => {
+    const sonPropreRole = user?.id === currentUserId && values.roleId !== user.roleId;
+    if (sonPropreRole) setAConfirmer(values);
+    else mutation.mutate(values);
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>{isEdit ? 'Modifier le compte' : 'Nouvel utilisateur'}</DialogTitle>
-          <DialogDescription>
-            {isEdit
-              ? 'Le mot de passe n’est pas modifiable ici.'
-              : 'Le rôle décide de ce que le compte pourra consulter.'}
-          </DialogDescription>
+          <DialogTitle>{textes.titre}</DialogTitle>
+          <DialogDescription>{textes.description}</DialogDescription>
         </DialogHeader>
 
         <form
           noValidate
           className="grid gap-4 sm:grid-cols-2"
           onSubmit={(event) => {
-            void handleSubmit((values) => {
-              mutation.mutate(values);
-            })(event);
+            void handleSubmit(soumettre)(event);
           }}
         >
-          <Field label="Nom complet" required error={errorMessage(formState.errors.fullName)}>
+          <Field label="Nom complet" required error={erreurs.fullName?.message}>
             {(props) => <Input {...props} autoComplete="name" {...register('fullName')} />}
           </Field>
-
-          <Field label="Adresse e-mail" required error={errorMessage(formState.errors.email)}>
+          <Field label="Adresse e-mail" required error={erreurs.email?.message}>
             {(props) => (
               <Input {...props} type="email" autoComplete="email" {...register('email')} />
             )}
           </Field>
-
           <Field
             label="Identifiant"
             required
             description="Utilisé pour la connexion, avec l’e-mail."
-            error={errorMessage(formState.errors.username)}
+            error={erreurs.username?.message}
           >
             {(props) => (
               <Input
@@ -189,73 +174,20 @@ export function UserFormDialog({
               />
             )}
           </Field>
-
-          <Field
-            label="Téléphone"
-            description="Format libre."
-            error={errorMessage(formState.errors.phone)}
-          >
+          <Field label="Téléphone" description="Format libre." error={erreurs.phone?.message}>
             {(props) => (
               <Input {...props} type="tel" placeholder="77 123 45 67" {...register('phone')} />
             )}
           </Field>
-
-          {/*
-            Sans ce champ, la création posait « COMMERCIAL » en dur : aucun
-            compte bancaire ne pouvait naître depuis le panel, alors que tout
-            l'espace « Dossiers » leur est destiné.
-          */}
-          <Field
-            label="Rôle"
-            required
-            description={
-              role === undefined ? 'Décide de ce que le compte pourra consulter.' : ROLE_HINTS[role]
-            }
-            error={errorMessage(formState.errors.role)}
-          >
-            {(props) => (
-              <Select
-                items={roleItems}
-                value={role ?? ''}
-                onValueChange={(value) => {
-                  if (value === null) return;
-                  setValue('role', value as UserFormInput['role'], {
-                    shouldDirty: true,
-                    shouldValidate: true,
-                  });
-                }}
-              >
-                <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
-                  <SelectValue placeholder="Choisir un rôle" />
-                </SelectTrigger>
-                <SelectContent>
-                  {roleItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            )}
-          </Field>
-
-          {isEdit ? null : (
-            <Field
-              label="Mot de passe"
-              required
-              description="12 caractères minimum."
-              error={errorMessage(formState.errors.password)}
-            >
-              {(props) => (
-                <Input
-                  {...props}
-                  type="password"
-                  autoComplete="new-password"
-                  {...register('password')}
-                />
-              )}
-            </Field>
-          )}
+          <ChampRole
+            // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
+            roleId={watch('roleId')}
+            erreur={erreurs.roleId?.message}
+            onChange={(roleId) => {
+              setValue('roleId', roleId, { shouldDirty: true, shouldValidate: true });
+            }}
+          />
+          {user === undefined ? <ChampMotDePasse form={{ register, formState }} /> : null}
 
           <DialogFooter className="sm:col-span-2">
             <Button
@@ -271,11 +203,95 @@ export function UserFormDialog({
               {mutation.isPending ? (
                 <LoaderIcon className="size-4 animate-spin" aria-hidden="true" />
               ) : null}
-              {isEdit ? 'Enregistrer' : 'Créer le compte'}
+              {textes.bouton}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <ConfirmDialog
+        open={aConfirmer !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setAConfirmer(null);
+        }}
+        title="Changer votre propre rôle ?"
+        description="Vos accès changent dès la prochaine action."
+        confirmLabel="Changer mon rôle"
+        confirmVariant="default"
+        pending={mutation.isPending}
+        onConfirm={() => {
+          if (aConfirmer !== null) mutation.mutate(aConfirmer);
+        }}
+      />
     </Dialog>
+  );
+}
+
+function ChampMotDePasse({
+  form,
+}: {
+  form: Pick<UseFormReturn<UserFormInput>, 'register' | 'formState'>;
+}) {
+  return (
+    <Field
+      label="Mot de passe"
+      required
+      description="12 caractères minimum."
+      error={form.formState.errors.password?.message}
+    >
+      {(props) => (
+        <Input
+          {...props}
+          type="password"
+          autoComplete="new-password"
+          {...form.register('password')}
+        />
+      )}
+    </Field>
+  );
+}
+
+/** Rôles système d'abord, puis personnalisés : l'ordre que renvoie le serveur. */
+function ChampRole({
+  roleId,
+  erreur,
+  onChange,
+}: {
+  roleId: string;
+  erreur: string | undefined;
+  onChange: (roleId: string) => void;
+}) {
+  const { data } = useQuery({ queryKey: queryKeys.roles, queryFn: () => fetchRoles() });
+  const roles = data?.roles ?? [];
+  const items = roles.map((role) => ({ value: role.id, label: role.libelle }));
+
+  return (
+    <Field
+      label="Rôle"
+      required
+      description={aideDuRole(roles.find((role) => role.id === roleId))}
+      error={erreur}
+    >
+      {(props) => (
+        <Select
+          items={items}
+          value={roleId}
+          onValueChange={(value) => {
+            if (value !== null) onChange(value);
+          }}
+        >
+          <SelectTrigger id={props.id} aria-describedby={props['aria-describedby']}>
+            <SelectValue placeholder="Choisir un rôle" />
+          </SelectTrigger>
+          <SelectContent>
+            {items.map((item) => (
+              <SelectItem key={item.value} value={item.value}>
+                {item.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
+    </Field>
   );
 }

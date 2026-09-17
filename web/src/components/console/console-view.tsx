@@ -72,9 +72,9 @@ import { dakarLocalToIso, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
+  callOutcomeLabel,
   type ProspectRow,
   type ProspectStatut,
   type Role,
@@ -133,34 +133,34 @@ const NON_JOINT = { countsAsReached: false } as const;
 const AVEC_DATE = { requiresCallback: true } as const;
 
 export const MOTIFS_SYSTEME: readonly MotifAppel[] = [
-  motifDeRepli('MESSAGERIE', 'Boîte vocale', 'KEEP_OPEN', NON_JOINT),
-  motifDeRepli('PAS_DE_REPONSE', 'NRP', 'KEEP_OPEN', NON_JOINT),
+  motifDeRepli('MESSAGERIE', 'Boîte vocale', 'CLOSE_UNREACHABLE', NON_JOINT),
+  motifDeRepli('PAS_DE_REPONSE', 'NRP', 'CLOSE_UNREACHABLE', NON_JOINT),
   motifDeRepli('WRONG_NUMBER', 'Faux numéro', 'CLOSE_WRONG_NUMBER', NON_JOINT),
-  motifDeRepli('AUTRE_NON_JOINT', 'Autre injoignable', 'KEEP_OPEN', NON_JOINT),
-  motifDeRepli('INTERESSE', 'Intéressé', 'KEEP_OPEN'),
-  motifDeRepli('TERRAIN', 'Terrain', 'KEEP_OPEN', { parentId: 'INTERESSE' }),
-  motifDeRepli('VILLA', 'Villa', 'KEEP_OPEN', { parentId: 'INTERESSE' }),
-  motifDeRepli('CONSTRUCTION', 'Construction', 'KEEP_OPEN', { parentId: 'INTERESSE' }),
-  motifDeRepli('FORMALITES_DOMANIALES', 'Formalités domaniales', 'KEEP_OPEN', {
+  motifDeRepli('AUTRE_NON_JOINT', 'Autre injoignable', 'CLOSE_UNREACHABLE', NON_JOINT),
+  motifDeRepli('INTERESSE', 'Intéressé', 'CLOSE_INTERESTED'),
+  motifDeRepli('TERRAIN', 'Terrain', 'CLOSE_INTERESTED', { parentId: 'INTERESSE' }),
+  motifDeRepli('VILLA', 'Villa', 'CLOSE_INTERESTED', { parentId: 'INTERESSE' }),
+  motifDeRepli('CONSTRUCTION', 'Construction', 'CLOSE_INTERESTED', { parentId: 'INTERESSE' }),
+  motifDeRepli('FORMALITES_DOMANIALES', 'Formalités domaniales', 'CLOSE_INTERESTED', {
     parentId: 'INTERESSE',
   }),
   motifDeRepli('PAS_INTERESSE', 'Pas intéressé', 'CLOSE_REFUSED'),
-  motifDeRepli('HESITANT', 'Hésitant', 'KEEP_OPEN'),
+  motifDeRepli('HESITANT', 'Hésitant', 'CLOSE_HESITANT'),
   motifDeRepli('CALLBACK', 'À rappeler', 'SCHEDULE_CALLBACK', AVEC_DATE),
-  motifDeRepli('DEMANDE_INFORMATION', 'Demande d’information', 'KEEP_OPEN'),
-  motifDeRepli('PARTENARIAT', 'Demande de partenariat', 'KEEP_OPEN'),
-  motifDeRepli('A_SUPPRIMER', 'À supprimer', 'CLOSE_LOST'),
-  motifDeRepli('RENDEZ_VOUS', 'Rendez-vous', 'SCHEDULE_CALLBACK', AVEC_DATE),
-  motifDeRepli('RV_CPI', 'RV CPI', 'SCHEDULE_CALLBACK', { ...AVEC_DATE, parentId: 'RENDEZ_VOUS' }),
-  motifDeRepli('RV_SITE', 'RV site', 'SCHEDULE_CALLBACK', {
+  motifDeRepli('DEMANDE_INFORMATION', 'Demande d’information', 'CLOSE_REACHED'),
+  motifDeRepli('PARTENARIAT', 'Demande de partenariat', 'CLOSE_REACHED'),
+  motifDeRepli('A_SUPPRIMER', 'À supprimer · Farceur / Non sérieux', 'CLOSE_LOST'),
+  motifDeRepli('RENDEZ_VOUS', 'Rendez-vous', 'CLOSE_APPOINTMENT', AVEC_DATE),
+  motifDeRepli('RV_CPI', 'RV CPI', 'CLOSE_APPOINTMENT', { ...AVEC_DATE, parentId: 'RENDEZ_VOUS' }),
+  motifDeRepli('RV_SITE', 'RV site', 'CLOSE_APPOINTMENT', {
     ...AVEC_DATE,
     parentId: 'RENDEZ_VOUS',
   }),
-  motifDeRepli('RV_EXTERNE', 'RV externe', 'SCHEDULE_CALLBACK', {
+  motifDeRepli('RV_EXTERNE', 'RV externe', 'CLOSE_APPOINTMENT', {
     ...AVEC_DATE,
     parentId: 'RENDEZ_VOUS',
   }),
-  motifDeRepli('RDV_TELEPHONIQUE', 'RV téléphonique', 'SCHEDULE_CALLBACK', {
+  motifDeRepli('RDV_TELEPHONIQUE', 'RV téléphonique', 'CLOSE_APPOINTMENT', {
     ...AVEC_DATE,
     parentId: 'RENDEZ_VOUS',
   }),
@@ -803,7 +803,7 @@ function StatutAnnuaire({ row }: { row: ProspectRow }) {
   if (row.lastAttemptAt === null)
     return <span className="text-[0.8125rem] text-muted-foreground">Non qualifié</span>;
   const label =
-    row.lastReasonLabel ?? (row.lastOutcome ? CALL_OUTCOME_LABELS[row.lastOutcome] : 'Qualifié');
+    row.lastReasonLabel ?? (row.lastOutcome ? callOutcomeLabel(row.lastOutcome) : 'Qualifié');
   const variant = variantDuCode(
     row.phase2Status === 'METHOD_OBTAINED' ? row.phase2Status : row.lastOutcome,
   );
@@ -938,8 +938,7 @@ function rattachements(prospect: ProspectRow, projet: Projet): string {
 function resumeDernierAppel(prospect: ProspectRow): string {
   const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
   if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
-  const issue =
-    prospect.lastOutcome === null ? '' : ` · ${CALL_OUTCOME_LABELS[prospect.lastOutcome]}`;
+  const issue = prospect.lastOutcome === null ? '' : ` · ${callOutcomeLabel(prospect.lastOutcome)}`;
   return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
 }
 
@@ -976,8 +975,7 @@ function statutsDuGroupe(catalogue: readonly MotifAppel[], groupe: Groupe | null
 function aideDe(item: MotifAppel, catalogue: readonly MotifAppel[]): string | undefined {
   if (sousMotifsDe(catalogue, item.id).length > 0) return 'Puis une précision';
   if (item.requiresCallback) return 'Puis la date et l’heure';
-  if (item.effect === 'CLOSE_REFUSED' || item.effect === 'CLOSE_LOST') return 'Ferme la fiche';
-  if (item.effect === 'CLOSE_WRONG_NUMBER') return 'Ferme la fiche';
+  if (item.effect.startsWith('CLOSE_')) return 'Ferme la fiche';
   return undefined;
 }
 

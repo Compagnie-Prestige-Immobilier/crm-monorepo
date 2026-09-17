@@ -48,28 +48,28 @@ const (
 	champCommentaire  = "commentaire"
 )
 
-var listesVisiteEcriture = []socle.Role{socle.Admin, socle.Direction}
+var listesVisiteEcriture = socle.PermissionAccueilListes
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/visites/referentiels":                     socle.Tous,
-	"GET /api/v1/visites/referentiels/{kind}":              socle.Tous,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/visites/referentiels":                     socle.PermissionPanneauAcceder,
+	"GET /api/v1/visites/referentiels/{kind}":              socle.PermissionPanneauAcceder,
 	"GET /api/v1/visites/referentiels/usage":               listesVisiteEcriture,
 	"POST /api/v1/visites/referentiels/{kind}":             listesVisiteEcriture,
 	"PATCH /api/v1/visites/referentiels/{kind}/{id}":       listesVisiteEcriture,
 	"POST /api/v1/visites/referentiels/{kind}/{id}/active": listesVisiteEcriture,
 	"POST /api/v1/visites/referentiels/{kind}/reorder":     listesVisiteEcriture,
-	"GET /api/v1/visites/statistiques":                     socle.Registre,
-	"GET /api/v1/visites":                                  socle.Registre,
-	"POST /api/v1/visites":                                 socle.Registre,
-	"GET /api/v1/visites/{id}":                             socle.Registre,
-	"PATCH /api/v1/visites/{id}":                           socle.Registre,
-	"DELETE /api/v1/visites/{id}":                          socle.Registre,
-	"DELETE /api/v1/visites/{id}/definitif":                {socle.Direction},
-	"POST /api/v1/visites/import":                          {socle.Admin, socle.Direction},
-	"GET /api/v1/visites/import/{id}":                      {socle.Admin, socle.Direction},
-	"GET /api/v1/visites/import/{id}/revue":                {socle.Admin, socle.Direction},
-	"PATCH /api/v1/visites/import/{id}/revue":              {socle.Admin, socle.Direction},
-	"POST /api/v1/visites/import/{id}/apply":               {socle.Admin, socle.Direction},
+	"GET /api/v1/visites/statistiques":                     socle.PermissionAccueilRegistre,
+	"GET /api/v1/visites":                                  socle.PermissionAccueilRegistre,
+	"POST /api/v1/visites":                                 socle.PermissionAccueilRegistre,
+	"GET /api/v1/visites/{id}":                             socle.PermissionAccueilRegistre,
+	"PATCH /api/v1/visites/{id}":                           socle.PermissionAccueilRegistre,
+	"DELETE /api/v1/visites/{id}":                          socle.PermissionAccueilRegistre,
+	"DELETE /api/v1/visites/{id}/definitif":                socle.PermissionVisitesDetruire,
+	"POST /api/v1/visites/import":                          socle.PermissionAccueilListes,
+	"GET /api/v1/visites/import/{id}":                      socle.PermissionAccueilListes,
+	"GET /api/v1/visites/import/{id}/revue":                socle.PermissionAccueilListes,
+	"PATCH /api/v1/visites/import/{id}/revue":              socle.PermissionAccueilListes,
+	"POST /api/v1/visites/import/{id}/apply":               socle.PermissionAccueilListes,
 }
 
 func Monter(api huma.API, d *socle.Deps) {
@@ -273,7 +273,8 @@ func (f *FiltresVisites) where() (clause string, args []any) {
 func (s *service) listerVisites(ctx context.Context, in *FiltresVisites) (*ListeVisitesOutput, error) {
 	// L'accueil ne voit pas les archives : lui rendre ce qu'il vient de retirer
 	// annulerait le geste à ses yeux.
-	if in.Archivees && socle.UtilisateurCourant(ctx).Role != socle.Direction {
+	u := socle.UtilisateurCourant(ctx)
+	if in.Archivees && !u.Peut(socle.PermissionVisitesVoirArchivees) {
 		return nil, socle.Problem(http.StatusForbidden, "FORBIDDEN",
 			"Seule la direction consulte les visites archivées.")
 	}

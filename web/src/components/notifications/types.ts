@@ -1,19 +1,21 @@
 import type { components } from '@crm/api-client';
 
+import type { Role } from '@/lib/types';
+
 type Schemas = components['schemas'];
 
-export type Role = Schemas['Role'];
-export type NotificationCategory = Schemas['NotificationCategory'];
-export type NotificationAudience = Schemas['NotificationAudience'];
-export type NotificationStatus = Schemas['NotificationStatus'];
-export type NotificationDeliveryStatus = Schemas['NotificationDeliveryStatus'];
+export type { Role };
+export type NotificationRow = Schemas['Notification'];
+export type NotificationCategory = NotificationRow['category'];
+export type NotificationAudience = NotificationRow['audience'];
+export type NotificationStatus = NotificationRow['status'];
+export type NotificationDeliveryStatus = Schemas['NotificationDestinataire']['status'];
 
-export type NotificationRow = Schemas['NotificationDto'];
-export type NotificationList = Schemas['NotificationListDto'];
-export type NotificationDetail = Schemas['NotificationDetailDto'];
-export type AudiencePreview = Schemas['AudiencePreviewDto'];
+export type NotificationList = Schemas['ListerNotificationsOutputBody'];
+export type NotificationDetail = Schemas['DetailNotificationOutputBody'];
+export type AudiencePreview = Schemas['NotificationApercuOutputBody'];
 
-export type CreateNotificationInput = Schemas['CreateNotificationDto'];
+export type CreateNotificationInput = Schemas['CreationNotification'];
 
 /**
  * `CAMPAGNE` n'est plus proposé nulle part : plus rien n'en produit depuis le

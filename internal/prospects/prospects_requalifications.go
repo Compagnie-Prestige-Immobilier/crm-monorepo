@@ -66,4 +66,5 @@ func prospectMonterRequalifications(api huma.API, s *service) {
 		OperationID: "listProspectRequalifications", Method: http.MethodGet,
 		Path: "/api/v1/prospects/{id}/requalifications",
 	}, s.prospectRequalifications)
+	prospectMonterRequalifier(api, s)
 }

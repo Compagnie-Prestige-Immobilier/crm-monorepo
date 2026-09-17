@@ -11,6 +11,7 @@ import {
 import Link from 'next/link';
 import { useState } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { ClientRequestReviewDialogs } from '@/components/client-requests/client-request-review-dialogs';
 import { useClientRequestFilters } from '@/components/client-requests/use-client-request-filters';
 import { EmptyState } from '@/components/empty-state';
@@ -35,7 +36,7 @@ import {
 import { fetchReferenceData } from '@/lib/data/reference';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import type { BadgeVariant, Role } from '@/lib/types';
+import { type BadgeVariant, peut } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const STATUS_VARIANT: Record<ClientRequestStatus, BadgeVariant> = {
@@ -59,8 +60,9 @@ function videDescription(activeFilterCount: number, canReview: boolean): string 
   return 'Depuis « À ouvrir (plateforme) », si le client est absent de la base, demandez sa création.';
 }
 
-export function ClientRequestsView({ role }: { role: Role }) {
-  const canReview = role === 'ADMIN';
+export function ClientRequestsView() {
+  const { data: user } = useQuery(meQueryOptions);
+  const canReview = peut(user, 'banque.administrer');
   const { filters, setFilters, resetFilters } = useClientRequestFilters();
   const [reviewing, setReviewing] = useState<{
     request: ClientRequest;
@@ -126,8 +128,8 @@ export function ClientRequestsView({ role }: { role: Role }) {
                 value={filters.banqueId}
                 options={(reference?.banques ?? []).map((banque) => ({
                   value: banque.id,
-                  label: banque.name,
-                  hint: banque.shortName,
+                  label: banque.name ?? '',
+                  hint: banque.shortName ?? undefined,
                 }))}
                 onChange={(value) => {
                   setFilters({ banqueId: value });

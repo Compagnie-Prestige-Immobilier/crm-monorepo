@@ -24,6 +24,7 @@ import {
   commentaireExigePar,
   fetchMotifsAppel,
   issueDuMotif,
+  planifieUneDate,
   type MotifAppel,
 } from '@/lib/data/call-outcome-reasons';
 import { useChampsConversion } from '@/lib/data/champs-conversion';
@@ -342,7 +343,7 @@ export function NouveauProspect({
 
   function poser(choisi: MotifAppel): void {
     setMotif(choisi);
-    if (choisi.effect === 'SCHEDULE_CALLBACK') ouvrirEcheance();
+    if (planifieUneDate(choisi.effect)) ouvrirEcheance();
     else setSlots(null);
   }
 

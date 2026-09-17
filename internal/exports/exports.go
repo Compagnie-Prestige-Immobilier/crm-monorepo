@@ -114,15 +114,15 @@ const (
 	exportExempleTelephone        = "77 123 45 67"
 )
 
-var Garde = map[string][]socle.Role{
-	"GET /api/v1/export/global.xlsx":                        socle.Encadrement,
-	"GET /api/v1/export/prospects.xlsx":                     {socle.Admin, socle.Commercial, socle.ChargeClientele, socle.CCP, socle.Superviseur, socle.Direction},
-	"GET /api/v1/export/representants.xlsx":                 socle.Parcours,
-	"GET /api/v1/export/visites.xlsx":                       socle.Registre,
-	"GET /api/v1/export/bank-cases.xlsx":                    {socle.Admin, socle.BanqueFinance, socle.Superviseur},
-	"GET /api/v1/export/prospects-modele.xlsx":              socle.AdminSeul,
-	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.AdminSeul,
-	"GET /api/v1/export/representants-modele.xlsx":          socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"GET /api/v1/export/global.xlsx":                        socle.PermissionExportsGlobaux,
+	"GET /api/v1/export/prospects.xlsx":                     socle.PermissionExportsProspects,
+	"GET /api/v1/export/representants.xlsx":                 socle.PermissionFichesTenir,
+	"GET /api/v1/export/visites.xlsx":                       socle.PermissionAccueilRegistre,
+	"GET /api/v1/export/bank-cases.xlsx":                    socle.PermissionExportsBanque,
+	"GET /api/v1/export/prospects-modele.xlsx":              socle.PermissionExportsModeles,
+	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.PermissionExportsModeles,
+	"GET /api/v1/export/representants-modele.xlsx":          socle.PermissionExportsModeles,
 }
 
 // LibellePaiement nomme un mode de paiement, ici comme dans les classeurs.
@@ -148,7 +148,7 @@ var (
 	exportLibellesType              = map[string]string{"FONCTIONNAIRE": exportLibelleFonctionnaire, "SECTEUR_PRIVE": "Secteur privé", "INFORMEL": "Informel", "DIASPORA": "Diaspora"}
 	exportLibellesContrat           = map[string]string{string(db.TypeContratCDI): exportLibelleCdi, string(db.TypeContratCDD): exportLibelleCdd, string(db.TypeContratAUTRE): ExportLibelleAutre}
 	exportLibellesEpargne           = map[string]string{"TONTINE": exportLibelleTontine, "MOBILE_MONEY": ExportLibelleMobileMoney, "BANQUE": exportEnteteBanque, ExportCleAucun: exportLibelleAucun}
-	exportLibellesPhase2            = map[string]string{exportCleEnAttente: "En attente", ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero}
+	exportLibellesPhase2            = map[string]string{exportCleEnAttente: "En attente", ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, "UNREACHABLE": ExportLibelleInjoignable, "INTERESTED": "Intéressé", "HESITANT": "Hésitant", "APPOINTMENT": "Rendez-vous", "REACHED": "Joint, sans suite"}
 	ExportLibellesMethode           = map[string]string{string(db.EnrollmentMethodAPPOINTMENT): exportLibelleRendezVous, string(db.EnrollmentMethodPHYSICAL): exportLibelleRendezVous, string(db.EnrollmentMethodRDVCPI): exportLibelleRendezVous, string(db.EnrollmentMethodPLATFORM): exportLibellePlateforme, string(db.EnrollmentMethodPLATEFORMEENLIGNE): exportLibellePlateforme, string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING): exportLibelleMail, string(db.EnrollmentMethodMAIL): exportLibelleMail, string(db.EnrollmentMethodWHATSAPP): ExportEnteteWhatsapp}
 	exportLibellesIssue             = map[string]string{ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, string(db.CallOutcomeUNREACHABLE): ExportLibelleInjoignable, string(db.CallOutcomeCALLBACK): ExportLibelleARappeler, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, string(db.CallOutcomeOTHER): ExportLibelleAutre}
 	exportLibellesSegment           = map[string]string{exportCleBdd1: "BDD1 : CHUES / CBAO", exportCleBdd2: "BDD2 : CHUES / autre banque", exportCleBdd3: "BDD3 : autre syndicat / CBAO", exportCleBdd4: "BDD4 : autre syndicat / autre banque"}
@@ -160,7 +160,7 @@ var (
 	exportLibellesTypeBien          = map[string]string{string(db.TypeBienTERRAIN): "Terrain", string(db.TypeBienVILLA): "Villa"}
 	exportLibellesConsentement      = map[string]string{exportCleNonDemande: ExportLibelleNonDemande, "INTERESSE": "Intéressé", "REFUSE": exportLibelleRefuse}
 	exportLibellesSuggestion        = map[string]string{string(db.SuggestionStatusAAPPELER): "À appeler", string(db.SuggestionStatusAPPELE): "Appelé", string(db.SuggestionStatusABANDONNE): "Abandonné"}
-	exportOrdrePhase2               = []string{exportCleEnAttente, ExportCleMethodeObtenue, ExportCleRefus, ExportCleMauvaisNumero}
+	exportOrdrePhase2               = []string{exportCleEnAttente, "INTERESTED", "HESITANT", "APPOINTMENT", ExportCleMethodeObtenue, "REACHED", ExportCleRefus, "UNREACHABLE", ExportCleMauvaisNumero}
 	ExportOrdreMethodes             = []string{string(db.EnrollmentMethodAPPOINTMENT), string(db.EnrollmentMethodPLATFORM), string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), string(db.EnrollmentMethodWHATSAPP)}
 	exportSegments                  = []string{exportCleBdd1, exportCleBdd2, exportCleBdd3, exportCleBdd4}
 )
@@ -409,13 +409,13 @@ type ExportRepresentantsInput struct {
 
 func exportConditionsRepresentants(u *socle.Utilisateur, in *ExportRepresentantsInput) (*exportPredicat, error) {
 	p := &exportPredicat{clauses: []string{`r."deletedAt" IS NULL`}}
-	if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction {
+	if !u.Peut(socle.PermissionPortefeuilleVoirTout) {
 		p.clauses = append(p.clauses, `(r."createdById" = `+p.valeur(u.ID)+
 			` OR EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."representantId" = r."id" AND li."assigneeId" = `+p.valeur(u.ID)+"))")
 	}
 	if in.CommercialId != "" {
 		cible := in.CommercialId
-		if u.Role != socle.Admin && u.Role != socle.Superviseur && u.Role != socle.Direction && cible != u.ID {
+		if !u.Peut(socle.PermissionExportsVoirTout) && cible != u.ID {
 			cible = cleAucunAuteur
 		}
 		p.ajouter(`r."createdById"`, "=", cible)

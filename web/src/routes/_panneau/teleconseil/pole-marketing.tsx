@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { PoleMarketingView } from '@/components/pilotage/pole-marketing-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/pole-marketing')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: PoleMarketingPage,
   pendingComponent: Loading,
 });

@@ -1,4 +1,4 @@
-import type { ApiClient, components } from '@crm/api-client';
+import type { ApiClient, components, operations } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 import { z } from 'zod';
 
@@ -20,6 +20,7 @@ import type {
   Projet,
   ProspectRow,
   ProspectType,
+  RepCallOutcome,
 } from '@/lib/types';
 
 export const callbackKeys = {
@@ -29,14 +30,11 @@ export const callbackKeys = {
   teleconseillers: ['callbacks', 'teleconseillers'] as const,
 };
 
-export type Callback = components['schemas']['CallbackDto'] & {
-  prospectName: string;
-  projet: Projet;
-  /** Le statut qui a promis le rappel, « RV téléphonique » par exemple. */
-  reasonLabel: string | null;
-};
-/** « all » : toute la file promise, sans borne de date ; le contrat v1 figé s'arrête à la semaine. */
-export type CallbackScope = components['schemas']['CallbackScope'] | 'all';
+export type Callback = components['schemas']['QualificationRappelDTO'];
+export type CallbackScope = Exclude<
+  NonNullable<operations['listScheduledCallbacks']['parameters']['query']>['scope'],
+  undefined
+>;
 
 export interface CallbackList {
   readonly items: Callback[];
@@ -64,13 +62,13 @@ export async function fetchCallbacks(
     await client.GET('/api/v1/phase2/callbacks', {
       params: {
         query: {
-          scope: scope as components['schemas']['CallbackScope'],
+          scope,
           ...(assignedToId === null ? {} : { assignedToId }),
           ...(projet ? { projet } : {}),
         },
       },
     }),
-  ) as unknown as CallbackList;
+  );
   return { items: sortCallbacks(list.items), serverTime: list.serverTime, total: list.total };
 }
 
@@ -80,7 +78,7 @@ export async function cancelCallback(
 ): Promise<Callback> {
   return unwrap(
     await client.POST('/api/v1/phase2/callbacks/{id}/cancel', { params: { path: { id } } }),
-  ) as unknown as Callback;
+  );
 }
 
 export async function snoozeCallback(id: string): Promise<Callback> {
@@ -738,8 +736,8 @@ export function uuidV7(now: number = Date.now(), random: () => number = Math.ran
   return `${timestamp.slice(0, 8)}-${timestamp.slice(8, 12)}-7${hex(12)}-${variant}${hex(12)}-${hex(48)}`;
 }
 
-type SyncPushBody = components['schemas']['SyncPushDto'];
-type SyncEntityData = components['schemas']['SyncEntityDataDto'];
+type SyncPushBody = components['schemas']['SyncPushInputBody'];
+type SyncEntityData = Partial<components['schemas']['QualificationCallAttemptBody']>;
 
 function identiteData(draft: ConversionDraft): SyncEntityData {
   const nom = draft.nom.trim();
@@ -892,10 +890,7 @@ export async function pushCallAttempt(
   client: ApiClient = getApiClient(),
 ): Promise<void> {
   const response = unwrap(
-    await client.POST('/api/v1/sync/push', {
-      params: { header: { 'Idempotency-Key': input.batchId } },
-      body: buildAttemptBatch(input),
-    }),
+    await client.POST('/api/v1/sync/push', { body: buildAttemptBatch(input) }),
   );
 
   const result = response.results[0];
@@ -922,11 +917,9 @@ export function repRelationSettled(representant: ScriptedRepresentant): boolean 
   return REP_RELATION_RANK[representant.relationStatus] === 2;
 }
 
-type RepCallOutcome = components['schemas']['RepCallOutcome'];
+type RepAttemptBody = components['schemas']['QualificationRepAttemptBody'];
 
-type RepAttemptBody = components['schemas']['CreateRepCallAttemptDto'];
-
-export type RepCallAttemptResult = components['schemas']['RepCallAttemptResultDto'];
+export type RepCallAttemptResult = components['schemas']['QualificationRepAttemptOutputBody'];
 
 /**
  * Une réponse, et une seule. Chaque champ voyage seul pour qu'un appel coupé

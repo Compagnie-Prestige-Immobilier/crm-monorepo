@@ -47,19 +47,25 @@ const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
   departementId: (filters, reference) => {
     if (filters.departementId === null) return null;
     const item = reference?.departements.find((d) => d.id === filters.departementId);
-    return item === undefined ? UNKNOWN_VALUE : withRetired(item.name, item.isActive);
+    return item === undefined
+      ? UNKNOWN_VALUE
+      : withRetired(item.name ?? '', item.isActive ?? false);
   },
 
   banqueId: (filters, reference) => {
     if (filters.banqueId === null) return null;
     const item = reference?.banques.find((b) => b.id === filters.banqueId);
-    return item === undefined ? UNKNOWN_VALUE : withRetired(item.shortName, item.isActive);
+    return item === undefined
+      ? UNKNOWN_VALUE
+      : withRetired(item.shortName ?? '', item.isActive ?? false);
   },
 
   syndicatId: (filters, reference) => {
     if (filters.syndicatId === null) return null;
     const item = reference?.syndicats.find((s) => s.id === filters.syndicatId);
-    return item === undefined ? UNKNOWN_VALUE : withRetired(item.sigle, item.isActive);
+    return item === undefined
+      ? UNKNOWN_VALUE
+      : withRetired(item.sigle ?? '', item.isActive ?? false);
   },
 
   statut: (filters) => (filters.statut === null ? null : PROSPECT_STATUT_LABELS[filters.statut]),

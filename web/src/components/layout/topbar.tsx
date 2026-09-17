@@ -15,13 +15,13 @@ import { UserMenu } from '@/components/layout/user-menu';
 import { NotificationBell } from '@/components/notifications/notification-bell';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet';
-import type { SessionUser } from '@/lib/types';
+import { peut, type SessionUser } from '@/lib/types';
 
 export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  const title = navTitle(user.role, pathname);
+  const title = navTitle(user, pathname);
 
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
@@ -44,7 +44,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         >
           <SheetTitle className="sr-only">Navigation principale</SheetTitle>
           <SidebarNav
-            role={user.role}
+            visiteur={user}
             onNavigate={() => {
               setOpen(false);
             }}
@@ -64,7 +64,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
           « Tous les espaces » reste joignable par le pied de la navigation
           mobile (`sidebar-nav.tsx`), et l'export global attend l'écran
           suivant. */}
-      {['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role) ? (
+      {peut(user, 'exports.globaux') ? (
         <div className="hidden md:block">
           <GlobalExportButton />
         </div>

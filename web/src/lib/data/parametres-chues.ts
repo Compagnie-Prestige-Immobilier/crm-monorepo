@@ -4,9 +4,9 @@ import { unwrap } from '@crm/api-client/query';
 import { getApiClient } from '@/lib/api/browser';
 
 type Schemas = components['schemas'];
-export type ParametresChues = Schemas['ParametresChuesDto'];
-export type UpdateParametresChues = Schemas['UpdateParametresChuesDto'];
-export type ParametreChangement = Schemas['ParametreChangementDto'];
+export type ParametresChues = Schemas['ProspectParametresChues'];
+export type UpdateParametresChues = Schemas['ProspectMajParametresInputBody'];
+export type ParametreChangement = Schemas['ProspectParametreChangement'];
 
 export async function fetchParametresChues(
   client: ApiClient = getApiClient(),

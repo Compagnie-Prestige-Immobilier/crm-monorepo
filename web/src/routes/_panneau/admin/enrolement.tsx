@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { EnrolementView } from '@/components/enrolement/enrolement-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/enrolement')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('enrolement.administrer'),
   component: EnrolementPage,
   pendingComponent: Loading,
 });

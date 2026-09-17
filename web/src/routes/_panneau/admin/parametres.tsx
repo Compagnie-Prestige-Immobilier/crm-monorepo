@@ -3,10 +3,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { DatabaseDumpSection } from '@/components/settings/database-dump-section';
 import { PurgeCard } from '@/components/settings/purge-card';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/parametres')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('parametres.administrer'),
   component: ParametresPage,
   pendingComponent: Loading,
 });

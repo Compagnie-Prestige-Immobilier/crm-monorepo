@@ -2,6 +2,7 @@ import {
   ActivityIcon,
   ArchiveIcon,
   BellIcon,
+  HeartHandshakeIcon,
   ClipboardListIcon,
   ClockIcon,
   ContactRoundIcon,
@@ -31,7 +32,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
-import type { Role } from '@/lib/types';
+import { type Permission, peut, type Role, type SessionUser } from '@/lib/types';
 
 /** Écran de choix, seul atterrissage après connexion. */
 export const HUB_PATH = '/espaces';
@@ -66,13 +67,24 @@ export const inboxPathFor = (role: Role): string =>
 
 export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
 
+/**
+ * La permission que garde la route ; une liste de rôles là où aucune
+ * permission n'a exactement le même ensemble, et le rôle de base décide.
+ */
+type Acces = Permission | readonly Role[];
+
+export type Visiteur = Pick<SessionUser, 'role' | 'permissions'>;
+
+const ouvert = (visiteur: Visiteur, acces: Acces): boolean =>
+  typeof acces === 'string' ? peut(visiteur, acces) : acces.includes(visiteur.role);
+
 export interface CoqueEntry {
   id: Coque;
   label: string;
   /** Racine de la coque ; toute route en dessous en porte la palette. */
   path: string;
   description: string;
-  roles: readonly Role[];
+  acces: Acces;
 }
 
 /**
@@ -84,35 +96,35 @@ export const COQUES: readonly CoqueEntry[] = [
     label: 'Accueil',
     path: '/accueil',
     description: 'Registre des visites du comptoir',
-    roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
+    acces: 'accueil.registre',
   },
   {
     id: 'teleconseil',
     label: 'Téléconseil',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
-    roles: ['ADMIN', 'DIRECTION', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'CCP'],
+    acces: 'fiches.tenir',
   },
   {
     id: 'finance',
     label: 'Banque & Finance',
     path: '/finance',
     description: 'Dossiers bancaires et demandes de création de client',
-    roles: ['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION'],
+    acces: 'banque.lire',
   },
   {
     id: 'ventes',
     label: 'Ventes',
     path: '/ventes',
     description: 'Tableau des ventes, échéances et encaissements par site',
-    roles: ['ADMIN', 'DIRECTION'],
+    acces: 'ventes.lire',
   },
   {
     id: 'admin',
     label: 'Admin',
     path: '/admin',
     description: 'Comptes, listes de référence, imports et paramètres',
-    roles: ['ADMIN'],
+    acces: ['ADMIN'],
   },
 ];
 
@@ -121,8 +133,7 @@ export interface NavItem {
   label: string;
   icon: LucideIcon;
   description: string;
-  /** Rôles auxquels l'entrée est présentée. */
-  roles: readonly Role[];
+  acces: Acces;
   /**
    * Rangée sous « Plus », repliée. L'écran sert quelques fois par semaine ; le
    * laisser en pleine barre allonge la liste que l'œil doit trier chaque matin
@@ -180,7 +191,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Registre des visites',
         icon: ClipboardListIcon,
         description: 'Visites du jour et saisie',
-        roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
+        acces: 'accueil.registre',
       },
       // Les trois écrans qui suivent sont les ONGLETS du registre
       // (`visites-tabs.tsx`, monté par `accueil/layout.tsx`) : les répéter dans
@@ -190,7 +201,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Affluence et motifs de visite',
-        roles: ['ADMIN', 'DIRECTION', 'ACCUEIL'],
+        acces: 'accueil.registre',
         hidden: true,
       },
       {
@@ -200,7 +211,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Listes',
         icon: ListIcon,
         description: 'Entreprises, directions, destinataires, objets',
-        roles: ['ADMIN', 'DIRECTION'],
+        acces: 'accueil.listes',
         hidden: true,
       },
       {
@@ -210,7 +221,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Import du registre',
         icon: UploadIcon,
         description: 'Export, correction et réimport en masse',
-        roles: ['ADMIN', 'DIRECTION'],
+        acces: 'accueil.listes',
         hidden: true,
       },
       {
@@ -220,7 +231,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Visites archivées',
         icon: ArchiveIcon,
         description: 'Retirées du registre, à détruire après trente jours',
-        roles: ['DIRECTION'],
+        acces: 'visites.voir_archivees',
         secondary: true,
       },
     ],
@@ -234,28 +245,28 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Appels, adhésions et encaissements',
-        roles: ENCADREMENT,
+        acces: 'analytics.superviser',
       },
       {
         href: '/teleconseil/leads-importes',
         label: 'Leads importés',
         icon: UploadIcon,
         description: 'Fiches très intéressées et qualité des classeurs',
-        roles: ENCADREMENT,
+        acces: 'analytics.superviser',
       },
       {
         href: '/teleconseil',
         label: 'Mon travail',
         icon: HouseIcon,
         description: 'Les trois étapes, dans l’ordre',
-        roles: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
+        acces: ['COMMERCIAL', 'CHARGE_CLIENTELE'],
       },
       {
         href: '/teleconseil',
         label: 'Les trois étapes',
         icon: HouseIcon,
         description: 'Qualifier, ajouter, convertir',
-        roles: ENCADREMENT,
+        acces: ENCADREMENT,
         hidden: true,
       },
       {
@@ -263,42 +274,42 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Fiche représentant',
         icon: PhoneCallIcon,
         description: 'Première étape',
-        roles: TERRAIN,
+        acces: TERRAIN,
       },
       {
         href: '/teleconseil/console',
         label: 'Fiche prospect',
         icon: HeadsetIcon,
         description: 'Dernière étape',
-        roles: ['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE'],
+        acces: 'prospects.convertir',
       },
       {
         href: '/teleconseil/plateforme-apercu',
         label: 'Aperçu plateforme',
         icon: LayoutDashboardIcon,
         description: 'Volume des inscriptions et appels à faire',
-        roles: [...ENCADREMENT, 'CCP'],
+        acces: 'plateforme.equipe',
       },
       {
         href: '/teleconseil/plateforme',
         label: 'Mon travail',
         icon: HeadsetIcon,
         description: 'Les inscrits des plateformes d’enrôlement',
-        roles: ['CCP'],
+        acces: 'plateforme.saisir',
       },
       {
         href: '/teleconseil/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
         description: 'Ce qu’on a promis de rappeler',
-        roles: [...TERRAIN, 'CCP'],
+        acces: 'fiches.tenir',
       },
       {
         href: '/teleconseil/supervision',
         label: 'Tableau de bord',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
-        roles: ENCADREMENT,
+        acces: 'analytics.superviser',
         hidden: true,
         onglet: '/teleconseil/tableau-de-bord',
       },
@@ -307,7 +318,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées',
-        roles: TERRAIN,
+        acces: TERRAIN,
         secondary: true,
       },
       {
@@ -315,14 +326,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Mes contacts',
         icon: ContactRoundIcon,
         description: 'Les personnes que j’ai appelées sur la plateforme',
-        roles: ['CCP'],
+        acces: ['CCP'],
       },
       {
         href: '/teleconseil/suggestions',
         label: 'Contacts recommandés',
         icon: PhoneForwardedIcon,
         description: 'Numéros donnés par les représentants',
-        roles: TERRAIN,
+        acces: TERRAIN,
         secondary: true,
       },
       {
@@ -330,7 +341,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Représentants',
         icon: UsersRoundIcon,
         description: 'Les enseignants déjà appelés',
-        roles: TERRAIN,
+        acces: TERRAIN,
         secondary: true,
       },
       {
@@ -340,22 +351,29 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Les fiches déjà notées',
         // Le téléconseiller et le chargé de clientèle appellent depuis leur
         // console : cette liste suit le travail des autres.
-        roles: ENCADREMENT,
+        acces: 'prospects.superviser',
         secondary: true,
+      },
+      {
+        href: '/teleconseil/interesses',
+        label: 'Intéressés, hésitants et RDV',
+        icon: HeartHandshakeIcon,
+        description: 'Fiches fermées à suivre',
+        acces: 'prospects.superviser',
       },
       {
         href: '/teleconseil/campagnes',
         label: 'Campagnes d’appels',
         icon: MegaphoneIcon,
         description: 'Fiches exportées et distribution',
-        roles: ENCADREMENT,
+        acces: 'campagnes.superviser',
       },
       {
         href: '/teleconseil/pole-deploiement',
         label: 'Pôle déploiement',
         icon: UsersRoundIcon,
         description: 'Qualité de la base représentants et rendement départemental',
-        roles: ENCADREMENT,
+        acces: 'analytics.superviser',
         hidden: true,
         onglet: '/teleconseil/tableau-de-bord',
       },
@@ -364,7 +382,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Pôle marketing',
         icon: ActivityIcon,
         description: 'Qualité des prospects amenés et conversion par canal',
-        roles: ENCADREMENT,
+        acces: 'analytics.superviser',
         hidden: true,
         onglet: '/teleconseil/tableau-de-bord',
       },
@@ -373,7 +391,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Paramètres',
         icon: SlidersHorizontalIcon,
         description: 'Réglages CHUES et Grand Public',
-        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+        acces: 'prospects.superviser',
         secondary: true,
       },
       {
@@ -381,7 +399,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Importer des représentants',
         icon: UploadIcon,
         description: 'Classeur de représentants',
-        roles: ['ADMIN'],
+        acces: 'imports.administrer',
         hidden: true,
       },
     ],
@@ -395,35 +413,35 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Vue d’ensemble',
         icon: LayoutDashboardIcon,
         description: 'Encaissements, rejets et délais',
-        roles: ['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION'],
+        acces: 'banque.lire',
       },
       {
         href: '/finance/dossiers',
         label: 'Dossiers bancaires',
         icon: FolderOpenIcon,
         description: 'Dossiers déposés en banque',
-        roles: ['ADMIN', 'BANQUE_FINANCE'],
+        acces: 'banque.dossiers',
       },
       {
         href: '/finance/dossiers/nouveau',
         label: 'À ouvrir (plateforme)',
         icon: PlusCircleIcon,
         description: 'Ouverture de dossier',
-        roles: ['ADMIN', 'BANQUE_FINANCE'],
+        acces: 'banque.dossiers',
       },
       {
         href: '/finance/demandes-clients',
         label: 'Demandes de création de client',
         icon: UserPlusIcon,
         description: 'Créations de client demandées',
-        roles: ['ADMIN', 'BANQUE_FINANCE'],
+        acces: 'banque.dossiers',
       },
       {
         href: '/finance/dossiers/export',
         label: 'Exporter les dossiers',
         icon: FileSpreadsheetIcon,
         description: 'Classeur Dossiers · Historique · Synthèse',
-        roles: ['ADMIN', 'BANQUE_FINANCE'],
+        acces: 'banque.dossiers',
         secondary: true,
       },
       {
@@ -431,7 +449,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Étapes des dossiers',
         icon: ListOrderedIcon,
         description: 'Flux de traitement',
-        roles: ['ADMIN'],
+        acces: 'banque.administrer',
         secondary: true,
       },
     ],
@@ -445,7 +463,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau des ventes',
         icon: FileSpreadsheetIcon,
         description: 'Ventes, échéances et sites',
-        roles: ['ADMIN', 'DIRECTION'],
+        acces: 'ventes.lire',
       },
     ],
   },
@@ -458,21 +476,21 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
         description: 'Vue d’ensemble globale : enrôlement, CCP, déploiement et marketing',
-        roles: ['ADMIN'],
+        acces: 'parametres.administrer',
       },
       {
         href: '/admin/enrolement',
         label: 'Plateformes d’enrôlement',
         icon: PlugZapIcon,
         description: 'Inscriptions CHUES et Grand Public',
-        roles: ['ADMIN'],
+        acces: 'enrolement.administrer',
       },
       {
         href: '/admin/commerciaux',
-        label: 'Utilisateurs',
+        label: 'Utilisateurs et rôles',
         icon: UsersIcon,
         description: 'Comptes, rôles et accès',
-        roles: ['ADMIN'],
+        acces: 'comptes.administrer',
       },
     ],
   },
@@ -485,21 +503,21 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Listes de référence',
         icon: LibraryIcon,
         description: 'Départements, banques, syndicats',
-        roles: ['ADMIN', 'SUPERVISEUR', 'DIRECTION'],
+        acces: 'referentiels.superviser',
       },
       {
         href: '/admin/imports',
         label: 'Importer un fichier Excel',
         icon: UploadIcon,
         description: 'Dépôt de classeurs et suivi des travaux',
-        roles: ['ADMIN'],
+        acces: 'imports.administrer',
       },
       {
         href: '/admin/champs-conversion',
         label: 'Champs de la conversion',
         icon: ListChecksIcon,
         description: 'Ordre, visibilité et champs ajoutés',
-        roles: ['ADMIN'],
+        acces: 'formulaires.administrer',
         secondary: true,
       },
     ],
@@ -513,14 +531,14 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Envoyer une notification',
         icon: BellIcon,
         description: 'Annonces et rappels envoyés',
-        roles: ['ADMIN'],
+        acces: 'notifications.administrer',
       },
       {
         href: '/admin/courriels',
         label: 'Courriels',
         icon: MailIcon,
         description: 'Destinataires et textes des envois automatiques',
-        roles: ['ADMIN'],
+        acces: 'courriels.administrer',
       },
     ],
   },
@@ -533,21 +551,21 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Journal des actions',
         icon: ScrollTextIcon,
         description: 'Qui a fait quoi : campagnes, comptes, enrôlement, base',
-        roles: ['ADMIN'],
+        acces: 'exploitation.administrer',
       },
       {
         href: '/admin/parametres',
         label: 'Paramètres',
         icon: SettingsIcon,
         description: 'Démonstration et suppression',
-        roles: ['ADMIN'],
+        acces: 'parametres.administrer',
       },
       {
         href: '/admin/exploitation',
         label: 'Exploitation',
         icon: ActivityIcon,
         description: 'Trafic, erreurs, tâches planifiées et courriels',
-        roles: ['ADMIN'],
+        acces: 'exploitation.administrer',
         secondary: true,
       },
       {
@@ -555,7 +573,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Bases de démonstration',
         icon: DatabaseIcon,
         description: 'Copies d’exemple pour former, sans toucher aux données réelles',
-        roles: ['ADMIN'],
+        acces: 'bases.administrer',
         secondary: true,
       },
     ],
@@ -590,36 +608,36 @@ export function coqueOf(pathname: string): Coque | null {
  * d'accueil voit ainsi que CHUES existe sans pouvoir l'ouvrir, plutôt que de
  * découvrir six mois plus tard qu'on lui parlait d'un écran invisible.
  */
-export function coquesForRole(role: Role): { entry: CoqueEntry; allowed: boolean }[] {
-  return COQUES.map((entry) => ({ entry, allowed: entry.roles.includes(role) }));
+export function coquesForRole(visiteur: Visiteur): { entry: CoqueEntry; allowed: boolean }[] {
+  return COQUES.map((entry) => ({ entry, allowed: ouvert(visiteur, entry.acces) }));
 }
 
 /** Tout ce que ce rôle peut ouvrir dans cette coque, entrées hors barre comprises. */
-function everyItem(role: Role, coque: Coque): NavItem[] {
+function everyItem(visiteur: Visiteur, coque: Coque): NavItem[] {
   return SECTIONS.filter((section) => section.coque === coque).flatMap((section) =>
-    section.items.filter((item) => item.roles.includes(role)),
+    section.items.filter((item) => ouvert(visiteur, item.acces)),
   );
 }
 
 /** Sections de cette coque visibles par ce rôle. Une section vide disparaît. */
-export function navSections(role: Role, coque: Coque): NavSection[] {
+export function navSections(visiteur: Visiteur, coque: Coque): NavSection[] {
   return SECTIONS.filter((section) => section.coque === coque)
     .map((section) => ({
       coque: section.coque,
       title: section.title,
-      items: section.items.filter((item) => item.roles.includes(role) && item.hidden !== true),
+      items: section.items.filter((item) => ouvert(visiteur, item.acces) && item.hidden !== true),
     }))
     .filter((section) => section.items.length > 0);
 }
 
 /** À plat, pour les recherches par chemin. */
-function navItems(role: Role, coque: Coque): NavItem[] {
-  return navSections(role, coque).flatMap((section) => section.items);
+function navItems(visiteur: Visiteur, coque: Coque): NavItem[] {
+  return navSections(visiteur, coque).flatMap((section) => section.items);
 }
 
 /** Premier écran d'une coque pour ce rôle : le premier de la barre, replis exclus. */
-export function coqueHomePath(role: Role, coque: Coque): string {
-  const first = navItems(role, coque).find((item) => item.secondary !== true);
+export function coqueHomePath(visiteur: Visiteur, coque: Coque): string {
+  const first = navItems(visiteur, coque).find((item) => item.secondary !== true);
   return first?.href ?? HUB_PATH;
 }
 
@@ -661,9 +679,9 @@ export function homePathForRole(role: Role): string {
  * `/chues/dossiers/abc-123` doit bien afficher « Dossiers bancaires ». Trier
  * par longueur décroissante règle les deux cas d'un coup.
  */
-export function navTitle(role: Role, pathname: string): string {
+export function navTitle(visiteur: Visiteur, pathname: string): string {
   if (pathname === INBOX_PATH) return 'Notifications';
-  return matchNavItem(role, pathname)?.label ?? 'CPI GO';
+  return matchNavItem(visiteur, pathname)?.label ?? 'CPI GO';
 }
 
 /**
@@ -671,22 +689,22 @@ export function navTitle(role: Role, pathname: string): string {
  * ouverte au rôle. Sans elle, la boîte de réception n'offrirait aucun chemin
  * de retour.
  */
-export function fallbackCoque(role: Role): Coque | null {
-  return COQUES.find((entry) => entry.roles.includes(role))?.id ?? null;
+export function fallbackCoque(visiteur: Visiteur): Coque | null {
+  return COQUES.find((entry) => ouvert(visiteur, entry.acces))?.id ?? null;
 }
 
 /** L'entrée est-elle celle de la page courante ? Même règle que `navTitle`. */
-export function isNavItemActive(role: Role, pathname: string, item: NavItem): boolean {
-  const courant = matchNavItem(role, pathname);
+export function isNavItemActive(visiteur: Visiteur, pathname: string, item: NavItem): boolean {
+  const courant = matchNavItem(visiteur, pathname);
   return (courant?.onglet ?? courant?.href) === item.href;
 }
 
-function matchNavItem(role: Role, pathname: string): NavItem | undefined {
+function matchNavItem(visiteur: Visiteur, pathname: string): NavItem | undefined {
   const coque = coqueOf(pathname);
   if (coque === null) return undefined;
   // Sur la liste COMPLÈTE : un écran hors barre garde son titre et sa
   // surbrillance, c'est tout ce que `hidden` lui retire.
-  return everyItem(role, coque)
+  return everyItem(visiteur, coque)
     .sort((a, b) => b.href.length - a.href.length)
     .find((item) => pathname === item.href || pathname.startsWith(`${item.href}/`));
 }

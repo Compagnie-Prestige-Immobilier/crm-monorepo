@@ -34,12 +34,14 @@ allowBuilds:
   '@parcel/watcher': true
   '@scarf/scarf': false
   esbuild: true
+  lefthook: false
   unrs-resolver: true
 
 catalog:
   '@types/node': '26.1.1'
   'eslint-plugin-sonarjs': '4.2.0'
   'knip': '6.32.2'
+  'lefthook': '2.1.14'
   'oxlint': '1.80.0'
   'oxlint-tsgolint': '7.0.2001'
   'prettier': '3.9.5'

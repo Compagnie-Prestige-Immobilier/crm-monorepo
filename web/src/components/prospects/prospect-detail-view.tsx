@@ -5,10 +5,13 @@ import { ExternalLinkIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
+import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
+import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import {
   HistoireDeLaFiche,
   NO_VALUE,
@@ -26,18 +29,18 @@ import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/for
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  CALL_OUTCOME_LABELS,
-  ENROLLMENT_METHOD_LABELS,
-  PHASE2_STATUS_LABELS,
+  callOutcomeLabel,
+  enrollmentMethodLabel,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   peutRevoirUneDemande,
   peutTenirUneFiche,
   type ProspectRow,
   type Role,
+  type SessionUser,
 } from '@/lib/types';
 
-function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
+export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
   const dernierPar = prospect.lastCallByName === null ? '' : ` · ${prospect.lastCallByName}`;
   return [
     {
@@ -46,7 +49,7 @@ function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
       precision:
         prospect.lastCallOutcome === null
           ? 'Jamais appelé'
-          : `Dernier : ${prospect.lastReasonLabel ?? CALL_OUTCOME_LABELS[prospect.lastCallOutcome]}`,
+          : `Dernier : ${prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastCallOutcome)}`,
     },
     {
       label: 'Dernier appel',
@@ -64,6 +67,7 @@ function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
 
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
 export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
+  const { data: user } = useQuery(meQueryOptions);
   const fiche = useQuery({
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
@@ -107,13 +111,13 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         badges={
           <>
             <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
-            <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
-            <RevueDemande prospect={prospect} role={role} />
+            <EtiquettesStatut prospect={prospect} />
+            <RevueDemande prospect={prospect} user={user} />
           </>
         }
         actions={
           <>
-            {peutTenirUneFiche(role) ? (
+            {peutTenirUneFiche(user) ? (
               <Link
                 href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
                 className={buttonVariants({ variant: 'default' })}
@@ -123,6 +127,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
               </Link>
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
+            <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
           </>
         }
         chiffres={chiffresDe(prospect)}
@@ -171,7 +176,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
             <Champ label="Méthode d’enrôlement">
               {prospect.enrollmentMethod === null
                 ? NO_VALUE
-                : ENROLLMENT_METHOD_LABELS[prospect.enrollmentMethod]}
+                : enrollmentMethodLabel(prospect.enrollmentMethod)}
             </Champ>
           </dl>
         </section>
@@ -227,7 +232,13 @@ function ChampsAjoutes({ prospect }: { prospect: ProspectRow }) {
 }
 
 /** La revue du closing : rien tant que la demande n'est pas convertie. */
-function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+function RevueDemande({
+  prospect,
+  user,
+}: {
+  prospect: ProspectRow;
+  user: SessionUser | null | undefined;
+}) {
   const queryClient = useQueryClient();
   const revue = useMutation({
     mutationFn: () => marquerProspectRevue(prospect.id),
@@ -254,7 +265,7 @@ function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role })
   return (
     <>
       <Badge variant="warning">Demande non revue</Badge>
-      {peutRevoirUneDemande(role) ? (
+      {peutRevoirUneDemande(user) ? (
         <Button
           size="sm"
           disabled={revue.isPending}

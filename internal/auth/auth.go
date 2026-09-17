@@ -87,9 +87,10 @@ var demoProfiles = map[string]struct {
 // avant d'arriver ici. `workspace` nomme la base qui sert cette session.
 type CompteConnecte struct {
 	socle.Utilisateur
-	IsActive    bool    `json:"isActive"`
-	Workspace   string  `json:"workspace"`
-	LastLoginAt *string `json:"lastLoginAt"`
+	Permissions []string `json:"permissions"`
+	IsActive    bool     `json:"isActive"`
+	Workspace   string   `json:"workspace"`
+	LastLoginAt *string  `json:"lastLoginAt"`
 }
 
 type SessionOutput struct {
@@ -174,14 +175,24 @@ func (s *service) ouvrirSession(ctx context.Context, userAgent string, u *db.Use
 		return nil, err
 	}
 	out := &SessionOutput{SetCookie: cookieSession(ctx, jeton, int(s.Cfg.SessionTTL.Seconds()))}
-	out.Body.User = s.compte(&socle.Utilisateur{ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role), PhoneE164: u.PhoneE164})
+	connecte := socle.Utilisateur{
+		ID: u.ID, Email: u.Email, Username: u.Username, FullName: u.FullName, Role: socle.Role(u.Role),
+		PhoneE164: u.PhoneE164, RoleID: u.RoleId, RoleLibelle: u.RoleLibelle,
+	}
+	if err := s.Attributions.Attribuer(ctx, s.Q, &connecte); err != nil {
+		return nil, err
+	}
+	if !connecte.Peut(socle.PermissionPanneauAcceder) {
+		return nil, socle.Problem(http.StatusForbidden, "PANNEAU_INTERDIT", "Votre rôle ne donne pas accès au panneau. Contactez un administrateur.")
+	}
+	out.Body.User = s.compte(&connecte)
 	return out, nil
 }
 
 func stringPtr(value string) *string { return &value }
 
 func (s *service) compte(u *socle.Utilisateur) CompteConnecte {
-	return CompteConnecte{Utilisateur: *u, IsActive: true, Workspace: s.Cfg.Base}
+	return CompteConnecte{Utilisateur: *u, Permissions: u.Permissions(), IsActive: true, Workspace: s.Cfg.Base}
 }
 
 type MeOutput struct{ Body CompteConnecte }
@@ -295,14 +306,14 @@ func (s *service) changerMotDePasse(ctx context.Context, in *PasswordInput) (*st
 	})
 }
 
-var Garde = map[string][]socle.Role{
-	"GET /health/ready":            {socle.Public},
-	"GET /health/live":             {socle.Public},
-	"POST /api/v1/auth/login":      {socle.Public},
-	"POST /api/v1/auth/demo-login": {socle.Public},
-	"GET /api/v1/auth/bases":       {socle.Public},
-	"POST /api/v1/auth/logout":     socle.Tous,
-	"GET /api/v1/auth/me":          socle.Tous,
-	"POST /api/v1/auth/password":   socle.Tous,
-	"PUT /api/v1/auth/me/password": socle.Tous,
+var Garde = map[string]socle.Permission{
+	"GET /health/ready":            socle.Publique,
+	"GET /health/live":             socle.Publique,
+	"POST /api/v1/auth/login":      socle.Publique,
+	"POST /api/v1/auth/demo-login": socle.Publique,
+	"GET /api/v1/auth/bases":       socle.Publique,
+	"POST /api/v1/auth/logout":     socle.PermissionPanneauAcceder,
+	"GET /api/v1/auth/me":          socle.PermissionPanneauAcceder,
+	"POST /api/v1/auth/password":   socle.PermissionPanneauAcceder,
+	"PUT /api/v1/auth/me/password": socle.PermissionPanneauAcceder,
 }

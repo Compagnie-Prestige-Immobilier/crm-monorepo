@@ -10,6 +10,7 @@ import {
 import Link from 'next/link';
 import { useRef, useState } from 'react';
 
+import { meQueryOptions } from '@/api/auth';
 import { BarreEdition } from '@/components/accueil/tableau-de-bord/barre-edition';
 import { WidgetGrid } from '@/components/accueil/tableau-de-bord/grille';
 import { marqueRecommandee } from '@/components/accueil/tableau-de-bord/recommandation';
@@ -80,7 +81,7 @@ import type { BlocTableauDeBord, ClasseurTableauDeBord } from '@/lib/tableau-de-
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 import { avecTransition } from '@/lib/transition-de-vue';
-import type { Role } from '@/lib/types';
+import { peut } from '@/lib/types';
 
 /** Une requête par jeu, et seulement pour les jeux qu'une carte posée réclame. */
 const CHARGEURS: Record<Jeu, (perimetre: PerimetreChiffres) => Promise<unknown>> = {
@@ -357,14 +358,16 @@ function SelecteurCampagne({
   );
 }
 
-export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Role }) {
+export function ChiffresView({ ecran }: { ecran: DashboardEcran }) {
   const { filters, setFilters } = useUrlFilters(chiffresFiltersAdapter);
   const live = useLive();
   const queryClient = useQueryClient();
+  const { data: user } = useQuery(meQueryOptions);
 
   const projet: Projet | null = filters.projet;
-  const voitLesMontants = role === 'ADMIN' || role === 'DIRECTION';
-  const catalogue = catalogueDe({ chues: true, voitLesMontants, role, projet });
+  const voitLesMontants = peut(user, 'chiffres.voir_montants');
+  const voitLEnrolement = peut(user, 'enrolement.administrer');
+  const catalogue = catalogueDe({ chues: true, voitLesMontants, voitLEnrolement, projet });
 
   const plage = plageDeFiltres(filters);
   const perimetre: PerimetreChiffres = {
@@ -510,7 +513,7 @@ export function ChiffresView({ ecran, role }: { ecran: DashboardEcran; role: Rol
         resetPending={resetMutation.isPending}
         dirty={dirty}
         savePending={saveMutation.isPending}
-        role={role}
+        isAdmin={peut(user, 'parametres.administrer')}
         onEnter={enterEdition}
         onSave={handleSave}
         onCancel={cancelEdition}
@@ -618,7 +621,7 @@ function ChiffresToolbar({
   resetPending,
   dirty,
   savePending,
-  role,
+  isAdmin,
   onEnter,
   onSave,
   onCancel,
@@ -643,7 +646,7 @@ function ChiffresToolbar({
   resetPending: boolean;
   dirty: boolean;
   savePending: boolean;
-  role: Role;
+  isAdmin: boolean;
   onEnter: () => void;
   onSave: () => void;
   onCancel: () => void;
@@ -733,7 +736,7 @@ function ChiffresToolbar({
           editing={editing}
           dirty={dirty}
           pending={savePending}
-          isAdmin={role === 'ADMIN'}
+          isAdmin={isAdmin}
           entryLabel="Composer l’écran"
           onEnter={onEnter}
           onSave={onSave}

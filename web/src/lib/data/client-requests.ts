@@ -6,16 +6,16 @@ import type { ClientRequestFilters } from '@/lib/client-request-filters';
 
 type Schemas = components['schemas'];
 
-export type ClientRequest = Schemas['ClientRequestDto'];
-export type ClientRequestList = Schemas['ClientRequestListDto'];
-export type CreateClientRequestInput = Schemas['CreateClientRequestDto'];
-export type ApproveClientRequestInput = Schemas['ApproveClientRequestDto'];
+export type ClientRequest = Schemas['DemandeClientBanque'];
+export type ClientRequestList = Schemas['ListeDemandesBanqueOutputBody'];
+export type CreateClientRequestInput = Schemas['CreationDemandeBanqueInputBody'];
+export type ApproveClientRequestInput = Schemas['ApprobationBanqueInputBody'];
 
 export async function fetchClientRequests(
   filters: ClientRequestFilters,
   client: ApiClient = getApiClient(),
 ): Promise<ClientRequestList> {
-  const query: NonNullable<operations['listClientRequests']['parameters']['query']> = {
+  const query: NonNullable<operations['get-api-v1-client-requests']['parameters']['query']> = {
     page: filters.page,
     pageSize: filters.pageSize,
   };

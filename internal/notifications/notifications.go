@@ -165,20 +165,20 @@ func Monter(api huma.API, d *socle.Deps) {
 	s.monterCourriels(api)
 }
 
-var Garde = map[string][]socle.Role{
-	"POST /api/v1/notifications":                      socle.AdminSeul,
-	"GET /api/v1/notifications":                       socle.AdminSeul,
-	"GET /api/v1/notifications/mine":                  socle.Tous,
-	"GET /api/v1/notifications/audience-preview":      socle.AdminSeul,
-	"GET /api/v1/notifications/{id}":                  socle.AdminSeul,
-	"POST /api/v1/notifications/{id}/cancel":          socle.AdminSeul,
-	"POST /api/v1/notifications/{id}/read":            socle.Tous,
-	"GET /api/v1/notification-templates":              socle.AdminSeul,
-	"POST /api/v1/notification-templates":             socle.AdminSeul,
-	"GET /api/v1/notification-templates/{id}":         socle.AdminSeul,
-	"PATCH /api/v1/notification-templates/{id}":       socle.AdminSeul,
-	"POST /api/v1/notification-templates/{id}/active": socle.AdminSeul,
-	"POST /api/v1/notification-templates/{id}/render": socle.AdminSeul,
+var Garde = map[string]socle.Permission{
+	"POST /api/v1/notifications":                      socle.PermissionNotificationsAdministrer,
+	"GET /api/v1/notifications":                       socle.PermissionNotificationsAdministrer,
+	"GET /api/v1/notifications/mine":                  socle.PermissionPanneauAcceder,
+	"GET /api/v1/notifications/audience-preview":      socle.PermissionNotificationsAdministrer,
+	"GET /api/v1/notifications/{id}":                  socle.PermissionNotificationsAdministrer,
+	"POST /api/v1/notifications/{id}/cancel":          socle.PermissionNotificationsAdministrer,
+	"POST /api/v1/notifications/{id}/read":            socle.PermissionPanneauAcceder,
+	"GET /api/v1/notification-templates":              socle.PermissionNotificationsAdministrer,
+	"POST /api/v1/notification-templates":             socle.PermissionNotificationsAdministrer,
+	"GET /api/v1/notification-templates/{id}":         socle.PermissionNotificationsAdministrer,
+	"PATCH /api/v1/notification-templates/{id}":       socle.PermissionNotificationsAdministrer,
+	"POST /api/v1/notification-templates/{id}/active": socle.PermissionNotificationsAdministrer,
+	"POST /api/v1/notification-templates/{id}/render": socle.PermissionNotificationsAdministrer,
 }
 
 // L'heure des rappels vient de l'environnement : elle ne peut pas s'écrire

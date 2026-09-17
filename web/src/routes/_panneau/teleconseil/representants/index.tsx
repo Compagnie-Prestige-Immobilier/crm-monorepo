@@ -3,7 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { RepresentantsView } from '@/components/representants/representants-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
-import { canExportRepresentants, readsOnly } from '@/lib/types';
+import { canExportRepresentants, peut, readsOnly } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/representants/')({
   beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
@@ -30,7 +30,7 @@ function TeleconseilRepresentantsPage() {
 
   return (
     <RepresentantsView
-      canAdminister={user.role === 'ADMIN'}
+      canAdminister={peut(user, 'imports.administrer')}
       readOnly={readsOnly(user.role)}
       canExport={canExportRepresentants(user.role)}
       campaignScoped={user.role === 'COMMERCIAL'}

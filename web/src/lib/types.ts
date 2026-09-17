@@ -1,26 +1,28 @@
-import type { components } from '@crm/api-client';
+import type { components, operations } from '@crm/api-client';
 
 type Schemas = components['schemas'];
 
-export type Role = Schemas['Role'];
-export type ProspectStatut = Schemas['ProspectStatut'];
-export type ProspectType = Schemas['ProspectType'];
-export type TypeBien = Schemas['TypeBien'];
-export type PaymentMode = Schemas['PaymentMode'];
+export type Role = Schemas['CompteConnecte']['role'];
+export type ProspectStatut = Schemas['Prospect']['statut'];
+export type ProspectType = NonNullable<Schemas['Prospect']['type']>;
+export type TypeBien = NonNullable<Schemas['Prospect']['typeBien']>;
+export type PaymentMode = NonNullable<Schemas['Prospect']['paymentMode']>;
 
-export type Region = Schemas['RegionDto'];
-export type Departement = Schemas['DepartementDto'];
-export type Ief = Schemas['IefDto'];
-export type Banque = Schemas['BanqueDto'];
-export type Syndicat = Schemas['SyndicatDto'];
-export type Profession = Schemas['ProfessionDto'];
-export type IncomeBand = Schemas['IncomeBandDto'];
-export type Offer = Schemas['OfferDto'];
-export type Employeur = Schemas['EmployeurDto'];
-export type EmployeurType = Schemas['EmployeurType'];
-export type Pays = Schemas['PaysDto'];
-export type TypeContrat = Schemas['TypeContrat'];
-export type ModeEpargne = Schemas['ModeEpargne'];
+/** Un même item générique porte tous les référentiels côté Go (`ReferentielsItem`). */
+type ReferentielItem = Schemas['ReferentielsItem'];
+export type Region = ReferentielItem;
+export type Departement = ReferentielItem;
+export type Ief = ReferentielItem;
+export type Banque = ReferentielItem;
+export type Syndicat = ReferentielItem;
+export type Profession = ReferentielItem;
+export type IncomeBand = ReferentielItem;
+export type Offer = ReferentielItem;
+export type Employeur = ReferentielItem;
+export type EmployeurType = Exclude<Schemas['ReferentielsEntree']['type'], undefined>;
+export type Pays = ReferentielItem;
+export type TypeContrat = NonNullable<Schemas['Prospect']['typeContrat']>;
+export type ModeEpargne = NonNullable<Schemas['Prospect']['modeEpargne']>;
 
 export const EMPLOYEUR_TYPE_LABELS: Record<EmployeurType, string> = {
   MINISTERE: 'Ministère',
@@ -60,15 +62,15 @@ export const TYPE_BIEN_LABELS: Record<TypeBien, string> = {
   VILLA: 'Villa',
 };
 
-export type SessionUser = Schemas['AuthUserDto'];
-export type UserRow = Schemas['UserDto'];
+export type SessionUser = Schemas['CompteConnecte'];
+export type UserRow = Schemas['Compte'];
 export type RepresentantRow = Schemas['RepresentantDto'];
-export type ProspectRow = Schemas['ProspectDto'];
+export type ProspectRow = Schemas['Prospect'];
 
-export type CreateUserInput = Schemas['CreateUserDto'];
-export type UpdateUserInput = Schemas['UpdateUserDto'];
-export type UpdateProspectInput = Schemas['UpdateProspectDto'];
-export type UpdateRepresentantInput = Schemas['UpdateRepresentantDto'];
+export type CreateUserInput = Schemas['CreerCompteInputBody'];
+export type UpdateUserInput = Schemas['ModifierCompteInputBody'];
+export type UpdateProspectInput = Schemas['ProspectBody'];
+export type UpdateRepresentantInput = Schemas['RepresentantUpdateInputBody'];
 
 /** Borne du serveur (`attempt-rules.ts`) : la conversion et le formulaire public la partagent. */
 export const DUREE_ETABLISSEMENT_MAX_MOIS = 600;
@@ -87,7 +89,7 @@ export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
   PERDU: 'Perdu',
 };
 
-export type Projet = Schemas['Projet'];
+export type Projet = Schemas['Prospect']['projet'];
 
 /**
  * Le statut du PARCOURS demandé, et non celui du point d'entrée.
@@ -102,6 +104,70 @@ export function statutForProjet(prospect: ProspectRow, projet: Projet | null): P
   if (projet === null) return prospect.statut;
   return prospect.journeys.find((journey) => journey.projet === projet)?.statut ?? prospect.statut;
 }
+
+/** Catalogue fermé, tenu égal à `internal/shared/socle/permissions.go` par un test d'intégration. */
+export const PERMISSIONS = [
+  'accueil.listes',
+  'accueil.registre',
+  'analytics.superviser',
+  'banque.administrer',
+  'banque.dossiers',
+  'banque.lire',
+  'banque.voir_tous_portefeuilles',
+  'bases.administrer',
+  'campagnes.administrer',
+  'campagnes.attributions_toutes',
+  'campagnes.gerer',
+  'campagnes.superviser',
+  'chiffres.disposer',
+  'chiffres.voir_montants',
+  'comptes.administrer',
+  'comptes.lister',
+  'courriels.administrer',
+  'donnees.voir_supprimees',
+  'enrolement.administrer',
+  'exploitation.administrer',
+  'exports.banque',
+  'exports.globaux',
+  'exports.modeles',
+  'exports.prospects',
+  'exports.voir_tout',
+  'fiches.forcer_transition',
+  'fiches.ignorer_propriete',
+  'fiches.modifier_toutes',
+  'fiches.parametres_reserves',
+  'fiches.tenir',
+  'fiches.voir_converties',
+  'formulaires.administrer',
+  'imports.administrer',
+  'notifications.administrer',
+  'panneau.acceder',
+  'parametres.administrer',
+  'plateforme.equipe',
+  'plateforme.saisir',
+  'plateforme.voir',
+  'portefeuille.voir_tout',
+  'prospects.convertir',
+  'prospects.fusionner',
+  'prospects.lire',
+  'prospects.reaffecter',
+  'prospects.reaffecter_tout',
+  'prospects.revoir',
+  'prospects.superviser',
+  'qualification.rappels',
+  'referentiels.superviser',
+  'roles.administrer',
+  'ventes.lire',
+  'visites.detruire',
+  'visites.voir_archivees',
+] as const;
+
+export type Permission = (typeof PERMISSIONS)[number];
+
+export const peut = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+  permission: Permission,
+): boolean => user?.permissions.includes(permission) ?? false;
 
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
@@ -136,13 +202,9 @@ export const canExportProspects = (role: Role | undefined): boolean =>
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
  * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
  */
-export const peutTenirUneFiche = (role: Role | undefined): boolean =>
-  role === 'ADMIN' ||
-  role === 'COMMERCIAL' ||
-  role === 'CHARGE_CLIENTELE' ||
-  role === 'CCP' ||
-  role === 'SUPERVISEUR' ||
-  role === 'DIRECTION';
+export const peutTenirUneFiche = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+): boolean => peut(user, 'fiches.tenir');
 
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>
@@ -153,8 +215,9 @@ export const canExportRepresentants = (role: Role | undefined): boolean =>
   role === 'DIRECTION';
 
 /** Qui marque une demande convertie « revue ». Miroir de `POST /prospects/{id}/revue`. */
-export const peutRevoirUneDemande = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'CHARGE_CLIENTELE' || role === 'SUPERVISEUR';
+export const peutRevoirUneDemande = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+): boolean => peut(user, 'prospects.revoir');
 
 export const RETIRED_SUFFIX = '(retiré)';
 
@@ -166,6 +229,8 @@ export interface Paginated<T> {
   pageCount: number;
 }
 
+type ListeProspectsQuery = NonNullable<operations['listProspects']['parameters']['query']>;
+
 export const PROSPECT_SORT_FIELDS = [
   'clientCreatedAt',
   'createdAt',
@@ -174,14 +239,14 @@ export const PROSPECT_SORT_FIELDS = [
   'statut',
   'lastCallAt',
   'plateformeDepuis',
-] as const satisfies readonly Schemas['ProspectSortField'][];
+] as const satisfies readonly ListeProspectsQuery['sortBy'][];
 
 export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];
 
-export type SortDirection = Schemas['SortOrder'];
+export type SortDirection = Exclude<ListeProspectsQuery['sortOrder'], undefined>;
 
 export interface ProspectFilters {
-  projet: Schemas['Projet'] | null;
+  projet: Projet | null;
   search: string;
   commercialId: string | null;
   representantId: string | null;
@@ -203,10 +268,10 @@ export interface ProspectFilters {
   sortDir: SortDirection;
 }
 
-export type BddSegment = Schemas['BddSegment'];
-export type Phase2Status = Schemas['Phase2Status'];
-export type EnrollmentMethod = Schemas['EnrollmentMethod'];
-export type CallOutcome = Schemas['CallOutcome'];
+export type BddSegment = NonNullable<Schemas['Prospect']['segment']>;
+export type Phase2Status = Schemas['Prospect']['phase2Status'];
+export type EnrollmentMethod = Exclude<ListeProspectsQuery['enrollmentMethod'], undefined>;
+export type CallOutcome = Schemas['QualificationCallAttemptBody']['outcome'];
 export const BDD_SEGMENTS = [
   'BDD1',
   'BDD2',
@@ -224,14 +289,24 @@ export const SEGMENT_LABELS: Record<BddSegment, string> = {
 export const PHASE2_STATUSES = [
   'PENDING',
   'METHOD_OBTAINED',
+  'INTERESTED',
+  'HESITANT',
+  'APPOINTMENT',
+  'REACHED',
   'REFUSED',
+  'UNREACHABLE',
   'WRONG_NUMBER',
 ] as const satisfies readonly Phase2Status[];
 
 export const PHASE2_STATUS_LABELS: Record<Phase2Status, string> = {
   PENDING: 'En attente',
   METHOD_OBTAINED: 'Méthode obtenue',
+  INTERESTED: 'Intéressé',
+  HESITANT: 'Hésitant',
+  APPOINTMENT: 'Rendez-vous',
+  REACHED: 'Joint, sans suite',
   REFUSED: 'Refus',
+  UNREACHABLE: 'Injoignable',
   WRONG_NUMBER: 'Faux numéro',
 };
 
@@ -280,7 +355,21 @@ export const CALL_OUTCOME_VARIANTS: Record<CallOutcome, BadgeVariant> = {
   OTHER: 'outline',
 };
 
-export type RepCallOutcome = Schemas['RepCallOutcome'];
+/**
+ * `Prospect.enrollmentMethod` et `.lastOutcome` voyagent en `string` côté Go,
+ * pas en énum : une tentative plus ancienne qu'un retrait de méthode ou de
+ * motif garde une valeur que le catalogue actuel ignore.
+ */
+export const enrollmentMethodLabel = (method: string): string =>
+  ENROLLMENT_METHOD_LABELS[method as EnrollmentMethod] ?? method;
+
+export const callOutcomeLabel = (outcome: string): string =>
+  CALL_OUTCOME_LABELS[outcome as CallOutcome] ?? outcome;
+
+export const callOutcomeVariant = (outcome: string): BadgeVariant =>
+  CALL_OUTCOME_VARIANTS[outcome as CallOutcome] ?? 'outline';
+
+export type RepCallOutcome = Schemas['QualificationRepAttemptBody']['outcome'];
 
 export const REP_CALL_OUTCOME_LABELS: Record<RepCallOutcome, string> = {
   REACHED: 'Joint',
@@ -313,7 +402,7 @@ type FilterListCoverage = {
     (typeof ENROLLMENT_METHODS)[number]
   >;
   PROSPECT_SORT_FIELDS: MissingFrom<
-    Schemas['ProspectSortField'],
+    Exclude<ListeProspectsQuery['sortBy'], undefined>,
     (typeof PROSPECT_SORT_FIELDS)[number]
   >;
   BANK_CASE_SORT_FIELDS: MissingFrom<BankCaseSortField, (typeof BANK_CASE_SORT_FIELDS)[number]>;
@@ -321,20 +410,22 @@ type FilterListCoverage = {
 
 void ({} as FilterListCoverage satisfies Record<keyof FilterListCoverage, never>);
 
-export type BankStageType = Schemas['BankStageType'];
-export type BankCaseStage = Schemas['BankCaseStageDto'];
-export type BankRejectionReason = Schemas['BankRejectionReasonDto'];
-export type BankCase = Schemas['BankCaseDto'];
-export type BankCaseTransition = Schemas['BankCaseTransitionDto'];
-export type BankCaseDetail = Schemas['BankCaseDetailDto'];
-export type BankCaseAnalytics = Schemas['BankCaseAnalyticsDto'];
-export type BankProspectSearchItem = Schemas['ProspectSearchItemDto'];
-export type CreateBankCaseInput = Schemas['CreateBankCaseDto'];
+type ListeDossiersQuery = NonNullable<operations['get-api-v1-bank-cases']['parameters']['query']>;
+
+export type BankStageType = Schemas['EtapeBanque']['type'];
+export type BankCaseStage = Schemas['EtapeBanque'];
+export type BankRejectionReason = Schemas['MotifBanque'];
+export type BankCase = Schemas['DossierBanque'];
+export type BankCaseTransition = Schemas['TransitionBanque'];
+export type BankCaseDetail = Schemas['DetailDossierOutputBody'];
+export type BankCaseAnalytics = Schemas['IndicateursBanqueOutputBody'];
+export type BankProspectSearchItem = Schemas['ProspectBanque'];
+export type CreateBankCaseInput = Schemas['CreationDossierInputBody'];
 export type InscriptionAOuvrir = Schemas['InscriptionAOuvrir'];
 export type PilotageBanque = Schemas['PilotageBanque'];
 export type Courriel = Schemas['CourrielDTO'];
 export type ReglagesCourriels = Schemas['ReglagesCourriels'];
-export type BankCaseSortField = Schemas['BankCaseSortField'];
+export type BankCaseSortField = Exclude<ListeDossiersQuery['sortBy'], undefined>;
 
 export const BANK_CASE_SORT_FIELDS = [
   'createdAt',
@@ -372,7 +463,22 @@ export const BANK_STAGE_TYPE_LABELS: Record<BankStageType, string> = {
   REJECTED: 'Rejeté',
 };
 
-export type DemoStatus = Schemas['DemoWorkspaceStatusDto'];
+/**
+ * Relevé du journal d'appels du téléphone. Absent du contrat Go : venait de
+ * l'application mobile, abandonnée le 8 septembre 2026 ; `fetchProspectDeviceCalls`
+ * et `fetchRepresentantDeviceCalls` rendent toujours une liste vide.
+ */
+export interface DeviceCallDetection {
+  id: string;
+  performedById: string;
+  performedByName: string;
+  deviceCallType:
+    'sortant' | 'entrant' | 'manque' | 'rejete' | 'bloque' | 'messagerie' | 'externe' | 'inconnu';
+  deviceCallDurationSeconds: number;
+  deviceCallAt: string;
+  detectedAt: string;
+  attemptId: string | null;
+}
 
 export interface NamedCount {
   id: string;

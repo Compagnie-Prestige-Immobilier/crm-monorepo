@@ -4,11 +4,11 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { EtapeSkeleton } from '@/components/chues/etapes';
 import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import { readString } from '@/lib/search-params';
 
 export const Route = createFileRoute('/_panneau/teleconseil/prospects/nouveau')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('prospects.superviser'),
   component: NouveauProspectPage,
   pendingComponent: Loading,
 });

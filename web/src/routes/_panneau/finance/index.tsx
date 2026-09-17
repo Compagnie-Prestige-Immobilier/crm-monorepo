@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { BankDashboardSkeleton, BankDashboardView } from '@/components/bank/bank-dashboard-view';
 import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('banque.lire'),
   component: BanqueDashboardPage,
   pendingComponent: Loading,
 });

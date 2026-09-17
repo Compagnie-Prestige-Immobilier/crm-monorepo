@@ -33,7 +33,7 @@ function Loading() {
 /** La page `(hub)/espaces` de la v1. */
 function EspacesPage() {
   const { user } = Route.useRouteContext();
-  const tuiles = coquesForRole(user.role);
+  const tuiles = coquesForRole(user);
   const requestedReturn = useSearchParams().get('retour');
   // `//evil.com` commence par « / » et est pourtant une URL absolue : le même
   // motif qu'à la connexion refuse la double barre et l'antislash.
@@ -86,7 +86,7 @@ function EspacesPage() {
           return (
             <li key={entry.id} className="h-full">
               <Link
-                href={coqueHomePath(user.role, entry.id)}
+                href={coqueHomePath(user, entry.id)}
                 style={{ animationDelay: `${String(index * 40)}ms` }}
                 className="animate-rise relative flex h-full min-h-[14rem] flex-col gap-3 overflow-hidden rounded-lg border border-border bg-card p-6 shadow-elev-sm transition-shadow duration-(--dur-2) ease-(--ease-out-cpi) hover:shadow-elev-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >

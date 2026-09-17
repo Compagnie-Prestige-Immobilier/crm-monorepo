@@ -80,7 +80,8 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
+    OR (p."statut" <> 'PERDU'
+        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
@@ -102,6 +103,7 @@ WHERE p."deletedAt" IS NULL
                 AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
+            AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
       ))
     ))
@@ -113,7 +115,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status")
+  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -210,7 +216,8 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
-    OR (p."statut" <> 'PERDU' AND p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' AND (
+    OR (p."statut" <> 'PERDU'
+        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
       (sqlc.narg('scope_plateforme')::boolean IS TRUE
         AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
       OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
@@ -232,6 +239,7 @@ WHERE p."deletedAt" IS NULL
                 AND rr."toAssigneeId" = rli."assigneeId" AND rli."position" = ANY (rr."positions")
               WHERE rli."prospectId" = p."id" AND rli."assigneeId" = sqlc.arg('scope_user_id')::text
             ), '-infinity'::timestamp)
+            AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
       ))
     ))
@@ -243,7 +251,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status")
+  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -610,3 +622,21 @@ LEFT JOIN "users" u ON u."id" = a."userId"
 WHERE a."entity" = 'prospect' AND a."entityId" = $1 AND a."action" = 'prospect.requalification'
 ORDER BY a."at" DESC, a."id" DESC
 LIMIT 50;
+
+-- name: RequalifierJourney :execrows
+UPDATE "prospect_journeys" SET
+  "statut" = @statut::"ProspectStatut",
+  "consent" = CASE WHEN @statut = 'NOUVEAU' THEN 'NON_DEMANDE' ELSE "consent" END,
+  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
+WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';
+
+-- name: RequalifierProspect :exec
+UPDATE "prospects" SET
+  "statut" = @statut::"ProspectStatut",
+  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
+  "rev" = "rev" + 1, "updatedAt" = now()
+WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';

@@ -4,10 +4,10 @@ import { BankCaseDetailView } from '@/components/bank/bank-case-detail-view';
 import { BankCasesSkeleton } from '@/components/bank/bank-cases-view';
 import { BankFiltersBarSkeleton } from '@/components/bank/bank-filters-bar';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/dossiers/$id')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: DossierPage,
   pendingComponent: Loading,
 });
@@ -26,8 +26,7 @@ function Loading() {
 }
 
 function DossierPage() {
-  const { user } = Route.useRouteContext();
   const { id } = Route.useParams();
 
-  return <BankCaseDetailView caseId={id} role={user.role} />;
+  return <BankCaseDetailView caseId={id} />;
 }

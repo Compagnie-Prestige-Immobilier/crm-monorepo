@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { CourrielsReglages } from '@/components/settings/courriels-reglages';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/courriels')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('courriels.administrer'),
   component: CourrielsPage,
   pendingComponent: Loading,
 });
