@@ -623,6 +623,7 @@ const (
 	codeDateCorrigeeImport   = "PROSPECT_GP_IMPORT_DATE_CORRIGEE"
 	codeCanalAVerifierImport = "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER"
 	codeSansIdentiteImport   = "PROSPECT_GP_IMPORT_LIGNE_SANS_IDENTITE"
+	codeSansTelephoneImport  = "PROSPECT_GP_IMPORT_LIGNE_SANS_TELEPHONE"
 	codeDejaEnBaseImport     = "PROSPECT_GP_IMPORT_DEJA_EN_BASE"
 	codePerdueImport         = "PROSPECT_GP_IMPORT_PERDUE_A_L_ECRITURE"
 	codeRemplaceeImport      = "PROSPECT_GP_IMPORT_LIGNE_REMPLACEE"
@@ -1155,7 +1156,11 @@ func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
 			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansIdentiteImport,
 				"Ni nom ni téléphone : rien à rattacher, la ligne est ignorée."))
 			continue
-		case ligne.telephone != nil && deja[telephoneConnuImport(ligne.telephone)].id != "":
+		case ligne.telephone == nil:
+			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansTelephoneImport,
+				"Sans téléphone, personne ne peut appeler cette fiche : la ligne est ignorée."))
+			continue
+		case deja[telephoneConnuImport(ligne.telephone)].id != "":
 			tri.connues = append(tri.connues, ligne)
 		default:
 			if refus := doublonEmailGrandPublicImport(&ligne, etat, dejaEmail); refus != nil {

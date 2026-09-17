@@ -893,9 +893,9 @@ func projetsDesParcoursTest(b *banc, prospectID string) []string {
 	return parcours
 }
 
-// Le relevé horaire relit le même classeur. Une ligne sans téléphone ne se
-// reconnaît qu'à son adresse : sans cela, chaque passage recrée la personne.
-func TestImportLeadsSansTelephoneNeSeRecreePasAChaquePassage(t *testing.T) {
+// Une ligne de lead sans téléphone n'écrit aucune fiche : personne ne pourrait
+// l'appeler, et le relevé horaire la recréait à chaque passage. Le rapport la dit.
+func TestImportLeadsIgnoreEtSignaleUneLigneSansTelephone(t *testing.T) {
 	b := nouveauBanc(t, "ADMIN")
 	connecte(b)
 	b.canalSiteWeb()
@@ -914,24 +914,12 @@ func TestImportLeadsSansTelephoneNeSeRecreePasAChaquePassage(t *testing.T) {
 		{"14/09/2026", "Serigne Mbaye Dramé", courriel, "Payé", "", canalMetaChuesTest, ""},
 	}}})
 
-	b.releverLeadsTest(classeur, nomClasseur)
-	if n := importCompterParCourriel(b, courriel); n != 1 {
-		t.Fatalf("le premier relevé écrit la fiche sans téléphone : %d fiche(s)", n)
+	travail := b.releverLeadsTest(classeur, nomClasseur)
+	if n := importCompterParCourriel(b, courriel); n != 0 {
+		t.Fatalf("une ligne sans téléphone n'écrit rien : %d fiche(s)", n)
 	}
-	b.importRelever(classeur, nomClasseur)
-	if n := importCompterParCourriel(b, courriel); n != 1 {
-		t.Fatalf("le second passage a recréé la fiche : %d fiches", n)
-	}
-}
-
-// Le relevé s'arrête sur une empreinte inchangée : la remettre à zéro rejoue le
-// même classeur, comme le cron sur un classeur modifié entre deux passages.
-func (b *banc) importRelever(classeur []byte, nomClasseur string) {
-	b.t.Helper()
-	if _, err := b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'imports.leadsEmpreinte'`); err != nil {
-		b.t.Fatal(err)
-	}
-	b.releverLeadsTest(classeur, nomClasseur)
+	b.attendRapportTest(travail, "total=1 created=0 updated=0 skipped=1 errors=0 warnings=1",
+		map[string]float64{"PROSPECT_GP_IMPORT_LIGNE_SANS_TELEPHONE": 1})
 }
 
 func importCompterParCourriel(b *banc, courriel string) int {
