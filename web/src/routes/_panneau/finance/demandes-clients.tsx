@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { ClientRequestsView } from '@/components/client-requests/client-requests-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/finance/demandes-clients')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: DemandesClientsPage,
   pendingComponent: Loading,
 });
@@ -24,7 +24,5 @@ function Loading() {
 }
 
 function DemandesClientsPage() {
-  const { user } = Route.useRouteContext();
-
-  return <ClientRequestsView role={user.role} />;
+  return <ClientRequestsView />;
 }

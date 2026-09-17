@@ -4,10 +4,9 @@ import { PanelLeftCloseIcon, PanelLeftOpenIcon } from 'lucide-react';
 import { usePathname } from 'next/navigation';
 import { useCallback, useState } from 'react';
 
-import { coqueOf } from '@/components/layout/nav-items';
+import { coqueOf, type Visiteur } from '@/components/layout/nav-items';
 import { SIDEBAR_COOKIE, SIDEBAR_COOKIE_MAX_AGE } from '@/components/layout/sidebar-cookie';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
-import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function persist(collapsed: boolean): void {
@@ -17,10 +16,10 @@ function persist(collapsed: boolean): void {
 }
 
 export function SidebarShell({
-  role,
+  visiteur,
   defaultCollapsed,
 }: {
-  role: Role;
+  visiteur: Visiteur;
   defaultCollapsed: boolean;
 }) {
   const pathname = usePathname();
@@ -40,7 +39,7 @@ export function SidebarShell({
   return (
     <aside className={cn('hidden shrink-0 transition-[width] duration-200 md:block', width)}>
       <div className={cn('fixed inset-y-0 left-0 transition-[width] duration-200', width)}>
-        <SidebarNav role={role} collapsed={collapsed} navId="navigation-laterale" />
+        <SidebarNav visiteur={visiteur} collapsed={collapsed} navId="navigation-laterale" />
 
         {/*
           Le bouton est posé SUR le bord droit de la barre, à cheval sur la

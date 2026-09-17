@@ -5,6 +5,7 @@ import { ExternalLinkIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
@@ -35,6 +36,7 @@ import {
   peutTenirUneFiche,
   type ProspectRow,
   type Role,
+  type SessionUser,
 } from '@/lib/types';
 
 function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
@@ -64,6 +66,7 @@ function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
 
 /** La fiche CHUES telle que les téléconseillers l'ont remplie, et tout ce qui lui est arrivé depuis. */
 export function ProspectDetailView({ prospectId, role }: { prospectId: string; role: Role }) {
+  const { data: user } = useQuery(meQueryOptions);
   const fiche = useQuery({
     queryKey: queryKeys.prospect(prospectId),
     queryFn: () => fetchProspect(prospectId),
@@ -108,12 +111,12 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
           <>
             <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
             <Badge variant="secondary">{PHASE2_STATUS_LABELS[prospect.phase2Status]}</Badge>
-            <RevueDemande prospect={prospect} role={role} />
+            <RevueDemande prospect={prospect} user={user} />
           </>
         }
         actions={
           <>
-            {peutTenirUneFiche(role) ? (
+            {peutTenirUneFiche(user) ? (
               <Link
                 href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
                 className={buttonVariants({ variant: 'default' })}
@@ -227,7 +230,13 @@ function ChampsAjoutes({ prospect }: { prospect: ProspectRow }) {
 }
 
 /** La revue du closing : rien tant que la demande n'est pas convertie. */
-function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role }) {
+function RevueDemande({
+  prospect,
+  user,
+}: {
+  prospect: ProspectRow;
+  user: SessionUser | null | undefined;
+}) {
   const queryClient = useQueryClient();
   const revue = useMutation({
     mutationFn: () => marquerProspectRevue(prospect.id),
@@ -254,7 +263,7 @@ function RevueDemande({ prospect, role }: { prospect: ProspectRow; role: Role })
   return (
     <>
       <Badge variant="warning">Demande non revue</Badge>
-      {peutRevoirUneDemande(role) ? (
+      {peutRevoirUneDemande(user) ? (
         <Button
           size="sm"
           disabled={revue.isPending}

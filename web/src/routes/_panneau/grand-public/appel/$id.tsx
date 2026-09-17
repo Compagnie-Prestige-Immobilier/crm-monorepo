@@ -6,13 +6,13 @@ import { AppelProspect } from '@/components/grand-public/appel-prospect';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Skeleton } from '@/components/ui/skeleton';
 import { fetchProspect } from '@/lib/data/prospects';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 import type { ProspectRow } from '@/lib/types';
 
 type Chargement = { statut: 'ok'; prospect: ProspectRow } | { statut: 'panne'; error: unknown };
 
 export const Route = createFileRoute('/_panneau/grand-public/appel/$id')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'COMMERCIAL', 'CHARGE_CLIENTELE']),
+  beforeLoad: guardPermission('prospects.convertir'),
   loader: async ({ params }): Promise<Chargement> => {
     try {
       return { statut: 'ok', prospect: await fetchProspect(params.id) };

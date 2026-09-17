@@ -77,6 +77,30 @@ func TestCatalogueSansPermissionMorte(t *testing.T) {
 	}
 }
 
+// Le panneau tape ses permissions sur une liste recopiée : elle ne doit ni manquer ni inventer.
+func TestPermissionsDuPanneauEgalesAuCatalogue(t *testing.T) {
+	source, err := os.ReadFile("../../web/src/lib/types.ts")
+	if err != nil {
+		t.Fatal(err)
+	}
+	bloc := strings.SplitN(strings.SplitN(string(source), "export const PERMISSIONS = [", 2)[1], "] as const", 2)[0]
+	panneau := []string{}
+	for _, ligne := range strings.Split(bloc, "\n") {
+		if p := strings.Trim(strings.TrimSpace(ligne), "',"); p != "" {
+			panneau = append(panneau, p)
+		}
+	}
+	catalogue := make([]string, 0, len(socle.Catalogue))
+	for p := range socle.Catalogue {
+		catalogue = append(catalogue, string(p))
+	}
+	slices.Sort(catalogue)
+	slices.Sort(panneau)
+	if !slices.Equal(panneau, catalogue) {
+		t.Fatalf("panneau %v\ncatalogue %v", panneau, catalogue)
+	}
+}
+
 func permissionsEnBase(b *banc, roleID string) []string {
 	b.t.Helper()
 	rows, err := b.pool.Query(b.ctx, `SELECT "permission" FROM "role_permissions" WHERE "roleId" = $1 ORDER BY "permission"`, roleID)

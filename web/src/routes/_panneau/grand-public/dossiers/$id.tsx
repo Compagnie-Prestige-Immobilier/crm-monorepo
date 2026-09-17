@@ -3,10 +3,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { BankCaseDetailView } from '@/components/bank/bank-case-detail-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/dossiers/$id')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: DossierGrandPublicPage,
   pendingComponent: Loading,
 });
@@ -26,8 +26,7 @@ function Loading() {
 
 /** La page `(panel)/grand-public/dossiers/[id]` de la v1. */
 function DossierGrandPublicPage() {
-  const { user } = Route.useRouteContext();
   const { id } = Route.useParams();
 
-  return <BankCaseDetailView caseId={id} role={user.role} projet="GRAND_PUBLIC" />;
+  return <BankCaseDetailView caseId={id} projet="GRAND_PUBLIC" />;
 }

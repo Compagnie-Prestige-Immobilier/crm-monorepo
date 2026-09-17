@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { RepresentantsImportView } from '@/components/representants/representants-import-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/representants/import')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('imports.administrer'),
   component: TeleconseilRepresentantsImportPage,
   pendingComponent: Loading,
 });

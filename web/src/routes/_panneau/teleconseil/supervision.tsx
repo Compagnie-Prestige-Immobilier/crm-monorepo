@@ -5,10 +5,10 @@ import { SupervisionTabs } from '@/components/supervision/supervision-tabs';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
 import { SupervisionSkeleton } from '@/components/supervision/supervision-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/supervision')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: TeleconseilSupervisionPage,
   pendingComponent: Loading,
 });

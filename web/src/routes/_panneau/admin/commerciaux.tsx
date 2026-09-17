@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { CommerciauxView } from '@/components/commerciaux/commerciaux-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/admin/commerciaux')({
-  beforeLoad: guardRoles(['ADMIN']),
+  beforeLoad: guardPermission('comptes.administrer'),
   component: CommerciauxPage,
   pendingComponent: Loading,
 });

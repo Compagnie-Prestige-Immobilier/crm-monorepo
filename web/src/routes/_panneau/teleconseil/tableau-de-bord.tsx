@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { ChiffresView } from '@/components/chiffres/vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/teleconseil/tableau-de-bord')({
-  beforeLoad: guardRoles(['ADMIN', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('analytics.superviser'),
   component: TeleconseilTableauDeBordPage,
   pendingComponent: Loading,
 });
@@ -25,7 +25,5 @@ function Loading() {
 
 /** La page `/teleconseil/tableau-de-bord` unifiée. */
 function TeleconseilTableauDeBordPage() {
-  const { user } = Route.useRouteContext();
-
-  return <ChiffresView ecran="chues" role={user.role} />;
+  return <ChiffresView ecran="chues" />;
 }

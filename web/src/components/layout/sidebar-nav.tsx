@@ -14,9 +14,9 @@ import {
   isNavItemActive,
   navSections,
   type NavItem,
+  type Visiteur,
 } from '@/components/layout/nav-items';
 import { SIDEBAR_COOKIE_MAX_AGE, SIDEBAR_MORE_COOKIE } from '@/components/layout/sidebar-cookie';
-import type { Role } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function readMoreOpen(): boolean {
@@ -34,26 +34,28 @@ function persistMoreOpen(open: boolean): void {
 }
 
 export function SidebarNav({
-  role,
+  visiteur,
   onNavigate = () => undefined,
   collapsed = false,
   navId,
 }: {
-  role: Role;
+  visiteur: Visiteur;
   onNavigate?: (() => void) | undefined;
   collapsed?: boolean | undefined;
   navId?: string | undefined;
 }) {
   const pathname = usePathname();
-  const coque = coqueOf(pathname) ?? fallbackCoque(role);
-  const sections = coque === null ? [] : navSections(role, coque);
+  const coque = coqueOf(pathname) ?? fallbackCoque(visiteur);
+  const sections = coque === null ? [] : navSections(visiteur, coque);
   const coqueLabel = COQUES.find((entry) => entry.id === coque)?.label ?? 'CPI GO';
   const hubHref = `${HUB_PATH}?retour=${encodeURIComponent(pathname)}`;
 
   // Un écran replié ne peut pas être l'écran courant SANS que son repli
   // s'ouvre : la surbrillance serait invisible.
   const repliActif = sections.some((section) =>
-    section.items.some((item) => item.secondary === true && isNavItemActive(role, pathname, item)),
+    section.items.some(
+      (item) => item.secondary === true && isNavItemActive(visiteur, pathname, item),
+    ),
   );
 
   // Fermé au premier rendu, serveur comme client : la préférence est relue
@@ -137,7 +139,7 @@ export function SidebarNav({
                   <NavLink
                     key={item.href}
                     item={item}
-                    role={role}
+                    visiteur={visiteur}
                     pathname={pathname}
                     collapsed={collapsed}
                     onNavigate={onNavigate}
@@ -147,7 +149,7 @@ export function SidebarNav({
 
               <Replis
                 items={replies}
-                role={role}
+                visiteur={visiteur}
                 pathname={pathname}
                 collapsed={collapsed}
                 open={moreOpen}
@@ -211,7 +213,7 @@ function SidebarFooterLink({
 /** Le bloc « Plus » : ce qui sert quelques fois par semaine, sous un seul clic. */
 function Replis({
   items,
-  role,
+  visiteur,
   pathname,
   collapsed,
   open,
@@ -219,7 +221,7 @@ function Replis({
   onNavigate,
 }: {
   items: readonly NavItem[];
-  role: Role;
+  visiteur: Visiteur;
   pathname: string;
   collapsed: boolean;
   open: boolean;
@@ -234,7 +236,7 @@ function Replis({
         <NavLink
           key={item.href}
           item={item}
-          role={role}
+          visiteur={visiteur}
           pathname={pathname}
           collapsed={collapsed}
           onNavigate={onNavigate}
@@ -279,18 +281,18 @@ function Replis({
 
 function NavLink({
   item,
-  role,
+  visiteur,
   pathname,
   collapsed,
   onNavigate,
 }: {
   item: NavItem;
-  role: Role;
+  visiteur: Visiteur;
   pathname: string;
   collapsed: boolean;
   onNavigate: () => void;
 }) {
-  const isActive = isNavItemActive(role, pathname, item);
+  const isActive = isNavItemActive(visiteur, pathname, item);
   const Icon = item.icon;
 
   return (

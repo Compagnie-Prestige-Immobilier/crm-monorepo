@@ -11,6 +11,7 @@ import {
 import { useId, useState } from 'react';
 import { toast } from 'sonner';
 
+import { meQueryOptions } from '@/api/auth';
 import { BankCourriels } from '@/components/bank/bank-courriels';
 import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { StageBadge } from '@/components/bank/stage-badge';
@@ -51,13 +52,13 @@ import { formatDateTime, formatPhone } from '@/lib/format';
 import { formatXof, parseMoneyInput } from '@/lib/money';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import type {
-  BankCase,
-  BankCaseStage,
-  BankCaseTransition,
-  BankRejectionReason,
-  Projet,
-  Role,
+import {
+  type BankCase,
+  type BankCaseStage,
+  type BankCaseTransition,
+  type BankRejectionReason,
+  peut,
+  type Projet,
 } from '@/lib/types';
 
 const OTHER_REASON_CODE = 'AUTRE';
@@ -162,7 +163,6 @@ function BankCaseActions({
   action,
   rejectedStage,
   enTraitement,
-  role,
   onAdvance,
   onReject,
 }: {
@@ -170,10 +170,11 @@ function BankCaseActions({
   action: ReturnType<typeof primaryAction>;
   rejectedStage: BankCaseStage | undefined;
   enTraitement: boolean;
-  role: Role;
   onAdvance: () => void;
   onReject: () => void;
 }) {
+  const { data: user } = useQuery(meQueryOptions);
+
   if (!canAct) {
     return (
       <p
@@ -181,7 +182,7 @@ function BankCaseActions({
         className="flex items-start gap-2 rounded-md bg-muted px-3 py-2.5 text-[0.8125rem] text-muted-foreground"
       >
         <ShieldAlertIcon className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
-        {role === 'ADMIN'
+        {peut(user, 'banque.administrer')
           ? 'Étape terminale. Correction possible par un administrateur, avec justification.'
           : 'Étape terminale. Dossier verrouillé.'}
       </p>
@@ -219,7 +220,6 @@ function BankCaseSummaryCard({
   canAct,
   action,
   rejectedStage,
-  role,
   onAdvance,
   onReject,
 }: {
@@ -227,7 +227,6 @@ function BankCaseSummaryCard({
   canAct: boolean;
   action: ReturnType<typeof primaryAction>;
   rejectedStage: BankCaseStage | undefined;
-  role: Role;
   onAdvance: () => void;
   onReject: () => void;
 }) {
@@ -268,7 +267,6 @@ function BankCaseSummaryCard({
           action={action}
           rejectedStage={rejectedStage}
           enTraitement={!bankCase.currentStage.isInitial}
-          role={role}
           onAdvance={onAdvance}
           onReject={onReject}
         />
@@ -279,11 +277,9 @@ function BankCaseSummaryCard({
 
 export function BankCaseDetailView({
   caseId,
-  role,
   projet,
 }: {
   caseId: string;
-  role: Role;
   projet?: Projet | null | undefined;
 }) {
   const queryClient = useQueryClient();
@@ -355,7 +351,6 @@ export function BankCaseDetailView({
         canAct={canAct}
         action={action}
         rejectedStage={rejectedStage}
-        role={role}
         onAdvance={() => {
           setAdvancing(true);
         }}

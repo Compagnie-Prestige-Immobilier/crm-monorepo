@@ -2,17 +2,11 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { MesContactsView } from '@/components/contacts/mes-contacts-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/teleconseil/mes-contacts')({
-  beforeLoad: guardRoles([
-    'ADMIN',
-    'SUPERVISEUR',
-    'DIRECTION',
-    'COMMERCIAL',
-    'CHARGE_CLIENTELE',
-    'CCP',
-  ]),
+  beforeLoad: guardPermission('prospects.lire'),
   component: MesContactsPage,
   pendingComponent: Loading,
 });
@@ -28,10 +22,5 @@ function Loading() {
 
 function MesContactsPage() {
   const { user } = Route.useRouteContext();
-  return (
-    <MesContactsView
-      userId={user.id}
-      canFilter={user.role === 'ADMIN' || user.role === 'SUPERVISEUR' || user.role === 'DIRECTION'}
-    />
-  );
+  return <MesContactsView userId={user.id} canFilter={peut(user, 'comptes.lister')} />;
 }

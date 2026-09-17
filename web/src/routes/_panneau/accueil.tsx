@@ -1,20 +1,18 @@
 import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 import { VisitesTabs } from '@/components/accueil/visites-tabs';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil')({
-  beforeLoad: guardRoles(['ADMIN', 'DIRECTION', 'ACCUEIL']),
+  beforeLoad: guardPermission('accueil.registre'),
   component: AccueilLayout,
 });
 
 /** Le layout `(panel)/accueil` de la v1. */
 function AccueilLayout() {
-  const { user } = Route.useRouteContext();
-
   return (
     <div className="mx-auto flex w-full max-w-[1600px] flex-col gap-6">
-      <VisitesTabs role={user.role} />
+      <VisitesTabs />
       <Outlet />
     </div>
   );

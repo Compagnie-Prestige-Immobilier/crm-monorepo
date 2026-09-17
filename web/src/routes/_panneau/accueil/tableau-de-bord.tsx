@@ -2,10 +2,10 @@ import { createFileRoute } from '@tanstack/react-router';
 
 import { DashboardVisitesView } from '@/components/accueil/tableau-de-bord/vue';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/accueil/tableau-de-bord')({
-  beforeLoad: guardRoles(['ADMIN', 'DIRECTION', 'ACCUEIL']),
+  beforeLoad: guardPermission('accueil.registre'),
   component: TableauDeBordVisitesPage,
   pendingComponent: Loading,
 });

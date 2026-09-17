@@ -3,10 +3,10 @@ import { createFileRoute } from '@tanstack/react-router';
 import { BankExportView } from '@/components/bank/bank-export-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/dossiers/export')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE', 'SUPERVISEUR']),
+  beforeLoad: guardPermission('exports.banque'),
   component: ExportDossiersGrandPublicPage,
   pendingComponent: Loading,
 });

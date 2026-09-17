@@ -3,11 +3,12 @@ import { createFileRoute, redirect } from '@tanstack/react-router';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { LotExportDetailView } from '@/components/lots-export/lot-export-detail-view';
 import { Skeleton } from '@/components/ui/skeleton';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/campagnes/$id')({
   // La v1 renvoyait un rôle refusé vers l'accueil du projet, sans écran de refus.
   beforeLoad: ({ context }) => {
-    if (!['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(context.user.role)) {
+    if (!peut(context.user, 'campagnes.superviser')) {
       throw redirect({ href: '/chues' });
     }
   },
@@ -33,10 +34,5 @@ function LotExportDetailPage() {
   const { user } = Route.useRouteContext();
   const { id } = Route.useParams();
 
-  return (
-    <LotExportDetailView
-      id={id}
-      peutRegler={user.role === 'ADMIN' || user.role === 'SUPERVISEUR'}
-    />
-  );
+  return <LotExportDetailView id={id} peutRegler={peut(user, 'campagnes.gerer')} />;
 }

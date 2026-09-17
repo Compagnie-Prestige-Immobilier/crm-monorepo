@@ -103,6 +103,70 @@ export function statutForProjet(prospect: ProspectRow, projet: Projet | null): P
   return prospect.journeys.find((journey) => journey.projet === projet)?.statut ?? prospect.statut;
 }
 
+/** Catalogue fermé, tenu égal à `internal/shared/socle/permissions.go` par un test d'intégration. */
+export const PERMISSIONS = [
+  'accueil.listes',
+  'accueil.registre',
+  'analytics.superviser',
+  'banque.administrer',
+  'banque.dossiers',
+  'banque.lire',
+  'banque.voir_tous_portefeuilles',
+  'bases.administrer',
+  'campagnes.administrer',
+  'campagnes.attributions_toutes',
+  'campagnes.gerer',
+  'campagnes.superviser',
+  'chiffres.disposer',
+  'chiffres.voir_montants',
+  'comptes.administrer',
+  'comptes.lister',
+  'courriels.administrer',
+  'donnees.voir_supprimees',
+  'enrolement.administrer',
+  'exploitation.administrer',
+  'exports.banque',
+  'exports.globaux',
+  'exports.modeles',
+  'exports.prospects',
+  'exports.voir_tout',
+  'fiches.forcer_transition',
+  'fiches.ignorer_propriete',
+  'fiches.modifier_toutes',
+  'fiches.parametres_reserves',
+  'fiches.tenir',
+  'fiches.voir_converties',
+  'formulaires.administrer',
+  'imports.administrer',
+  'notifications.administrer',
+  'panneau.acceder',
+  'parametres.administrer',
+  'plateforme.equipe',
+  'plateforme.saisir',
+  'plateforme.voir',
+  'portefeuille.voir_tout',
+  'prospects.convertir',
+  'prospects.fusionner',
+  'prospects.lire',
+  'prospects.reaffecter',
+  'prospects.reaffecter_tout',
+  'prospects.revoir',
+  'prospects.superviser',
+  'qualification.rappels',
+  'referentiels.superviser',
+  'roles.administrer',
+  'ventes.lire',
+  'visites.detruire',
+  'visites.voir_archivees',
+] as const;
+
+export type Permission = (typeof PERMISSIONS)[number];
+
+export const peut = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+  permission: Permission,
+): boolean => user?.permissions.includes(permission) ?? false;
+
 export const ROLE_LABELS: Record<Role, string> = {
   ADMIN: 'Administrateur',
   COMMERCIAL: 'Téléconseiller',
@@ -136,13 +200,9 @@ export const canExportProspects = (role: Role | undefined): boolean =>
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
  * fiche, donc les seuls à qui la barre supérieure a une ouverture à demander.
  */
-export const peutTenirUneFiche = (role: Role | undefined): boolean =>
-  role === 'ADMIN' ||
-  role === 'COMMERCIAL' ||
-  role === 'CHARGE_CLIENTELE' ||
-  role === 'CCP' ||
-  role === 'SUPERVISEUR' ||
-  role === 'DIRECTION';
+export const peutTenirUneFiche = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+): boolean => peut(user, 'fiches.tenir');
 
 /** Miroir de `@Roles` sur `GET /export/representants.xlsx`. */
 export const canExportRepresentants = (role: Role | undefined): boolean =>
@@ -153,8 +213,9 @@ export const canExportRepresentants = (role: Role | undefined): boolean =>
   role === 'DIRECTION';
 
 /** Qui marque une demande convertie « revue ». Miroir de `POST /prospects/{id}/revue`. */
-export const peutRevoirUneDemande = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'CHARGE_CLIENTELE' || role === 'SUPERVISEUR';
+export const peutRevoirUneDemande = (
+  user: Pick<SessionUser, 'permissions'> | null | undefined,
+): boolean => peut(user, 'prospects.revoir');
 
 export const RETIRED_SUFFIX = '(retiré)';
 

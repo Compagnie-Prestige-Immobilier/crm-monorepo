@@ -24,7 +24,7 @@ import type {
 import type { ComptageOuvertures } from '@/lib/data/ouvertures';
 import { formatDecimal, formatNumber, formatShortDate } from '@/lib/format';
 import { formatXof } from '@/lib/money';
-import type { Projet, Role } from '@/lib/types';
+import type { Projet } from '@/lib/types';
 
 type ChiffreSource = components['schemas']['DashboardSource'];
 
@@ -949,13 +949,13 @@ const SOURCES_ENROLEMENT: readonly string[] = [
 export function catalogueDe(input: {
   chues: boolean;
   voitLesMontants: boolean;
-  role: Role;
+  voitLEnrolement: boolean;
   projet: Projet | null;
 }): Record<string, SourceChiffre> {
   const entrees = Object.entries(SOURCES_CHIFFRES).filter(([cle]) => {
     if (!input.chues && SOURCES_CHUES_SEULEMENT.includes(cle)) return false;
     if (!input.voitLesMontants && SOURCES_MONTANTS.includes(cle)) return false;
-    if (input.role !== 'ADMIN' && SOURCES_ENROLEMENT.includes(cle)) return false;
+    if (!input.voitLEnrolement && SOURCES_ENROLEMENT.includes(cle)) return false;
     if (input.projet === null && SOURCES_ENROLEMENT.includes(cle)) return false;
     return true;
   });

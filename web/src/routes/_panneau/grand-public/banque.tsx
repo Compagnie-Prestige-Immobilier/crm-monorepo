@@ -4,10 +4,11 @@ import { BankDashboardView } from '@/components/bank/bank-dashboard-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { Skeleton } from '@/components/ui/skeleton';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/banque')({
-  beforeLoad: guardRoles(['ADMIN', 'BANQUE_FINANCE']),
+  beforeLoad: guardPermission('banque.dossiers'),
   component: BanqueGrandPublicPage,
   pendingComponent: Loading,
 });
@@ -29,7 +30,7 @@ function Loading() {
 function BanqueGrandPublicPage() {
   const { user } = Route.useRouteContext();
 
-  if (user.role !== 'ADMIN') return <BankDashboardView projet="GRAND_PUBLIC" />;
+  if (!peut(user, 'banque.administrer')) return <BankDashboardView projet="GRAND_PUBLIC" />;
 
   return (
     <div className="flex flex-col gap-6">

@@ -4,6 +4,7 @@ import { ConsoleView } from '@/components/console/console-view';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/console')({
   beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
@@ -27,7 +28,7 @@ function Loading() {
 /** La page `(panel)/grand-public/console` de la v1. */
 function GrandPublicConsolePage() {
   const { user } = Route.useRouteContext();
-  const canCreateProspect = ['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(user.role);
+  const canCreateProspect = peut(user, 'prospects.superviser');
 
   return (
     <ConsoleView

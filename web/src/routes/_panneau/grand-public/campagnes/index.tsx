@@ -4,11 +4,12 @@ import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-vi
 import { LotsExportView } from '@/components/lots-export/lots-export-view';
 import { OngletsPilotage } from '@/components/pilotage/onglets';
 import { Skeleton } from '@/components/ui/skeleton';
+import { peut } from '@/lib/types';
 
 export const Route = createFileRoute('/_panneau/grand-public/campagnes/')({
   // La v1 renvoyait un rôle refusé vers l'accueil du projet, sans écran de refus.
   beforeLoad: ({ context }) => {
-    if (!['ADMIN', 'SUPERVISEUR', 'DIRECTION'].includes(context.user.role)) {
+    if (!peut(context.user, 'campagnes.superviser')) {
       throw redirect({ href: '/grand-public' });
     }
   },
@@ -37,8 +38,8 @@ function LotsExportGrandPublicPage() {
     <div className="flex flex-col gap-6">
       <OngletsPilotage coque="grand-public" role={user.role} />
       <LotsExportView
-        canCreate={user.role === 'ADMIN' || user.role === 'SUPERVISEUR'}
-        canDelete={user.role === 'ADMIN'}
+        canCreate={peut(user, 'campagnes.gerer')}
+        canDelete={peut(user, 'campagnes.administrer')}
         projet="GRAND_PUBLIC"
       />
     </div>
