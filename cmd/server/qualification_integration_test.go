@@ -937,3 +937,33 @@ func TestQualificationLeDernierAppelantRequalifieSaFiche(t *testing.T) {
 	statut, body = qualificationEnvoi(tiers, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, nil))
 	tiers.attend(statut, http.StatusForbidden, "un tiers ne requalifie pas", body)
 }
+
+// Un intéressé qui donne sa méthode passe en méthode obtenue et reste dans
+// l'onglet Intéressés ; un hésitant qui la donne n'y entre pas.
+func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	interesse, hesitant := qualificationProspect(b), qualificationProspect(b)
+	revenu := uuid.NewString()
+	qualificationExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
+	adhesion := map[string]any{"outcome": "OTHER", "method": "WHATSAPP", "incomeBandId": revenu, "dureeEtablissementMois": 12}
+	appels := []map[string]any{
+		qualificationCorpsTentative(interesse, maps.Clone(adhesion)),
+		qualificationCorpsTentative(hesitant, maps.Clone(adhesion)),
+	}
+	appels[0]["reasonCode"], appels[1]["reasonCode"] = "VILLA", "HESITANT"
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" IN ($1, $2)`, interesse, hesitant)
+	})
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "income_bands" WHERE "id" = $1`, revenu) })
+	for _, appel := range appels {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+		b.attend(statut, http.StatusOK, "méthode obtenue", body)
+	}
+	if lu := qualificationStatutPhase2(b, interesse); lu != "METHOD_OBTAINED" {
+		t.Fatalf("la méthode l'emporte sur l'état : %s", lu)
+	}
+	_, ids := qualificationTotalProspects(b, "&phase2Status=INTERESTED")
+	if !slices.Contains(ids, interesse) || slices.Contains(ids, hesitant) {
+		t.Fatalf("onglet Intéressés : %v", ids)
+	}
+}

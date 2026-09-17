@@ -115,7 +115,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status")
+  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -247,7 +251,11 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status")
+  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)

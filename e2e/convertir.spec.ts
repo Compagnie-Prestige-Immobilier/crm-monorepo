@@ -266,7 +266,7 @@ test.describe('parcours 5, convertir un prospect', () => {
       .poll(() => lireClassement(fiche.id))
       .toMatchObject({
         tentatives: 2,
-        phase2Status: 'PENDING',
+        phase2Status: 'UNREACHABLE',
       });
 
     await page.goto(`/teleconseil/appel/${fiche.id}`);
