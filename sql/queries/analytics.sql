@@ -36,7 +36,8 @@ SELECT COUNT(*)::int AS convertis,
 FROM "prospects" p
 WHERE (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet')::"Projet")
   AND p."deletedAt" IS NULL
-  AND p."phase2Status" = 'METHOD_OBTAINED';
+  -- L'enrôlement compte dès qu'une méthode est acquise, quel que soit le dernier statut posé.
+  AND p."enrollmentMethod" IS NOT NULL;
 
 -- name: LotStatsRepresentants :one
 SELECT COUNT(*)::int AS calls, COUNT(DISTINCT a."representantId")::int AS fiches
@@ -98,8 +99,11 @@ RETURNING "updatedAt";
 SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE r."lastCallAt" IS NOT NULL)::int AS eprouves,
+  -- Les appels d'avant le referentiel n'ont pas pose de statut : l'issue de
+  -- l'appel dit alors si la personne a repondu, sinon le taux sous-compte.
   COUNT(*) FILTER (
-    WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+    WHERE CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+               ELSE r."lastCallOutcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END
   )::int AS joints,
   COUNT(*) FILTER (WHERE apport.prospects > 0)::int AS productifs,
   COALESCE(SUM(apport.prospects), 0)::int AS prospects_apportes
@@ -130,7 +134,8 @@ SELECT
   d."name" AS label,
   COUNT(r."id")::int AS fiches,
   COUNT(r."id") FILTER (
-    WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+    WHERE CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
+               ELSE r."lastCallOutcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END
   )::int AS joints,
   COALESCE(SUM(apport.prospects), 0)::int AS prospects
 FROM "departements" d

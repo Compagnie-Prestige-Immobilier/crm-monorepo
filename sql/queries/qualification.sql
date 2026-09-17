@@ -202,11 +202,14 @@ UPDATE "prospects" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOU
 -- name: MarquerParcoursContacte :exec
 UPDATE "prospect_journeys" SET "statut" = 'CONTACTE' WHERE "id" = $1 AND "statut" = 'NOUVEAU';
 
+-- L'enrôlement est un fait acquis : la fiche prend le statut du dernier appel,
+-- mais seule une nouvelle méthode remplace celle déjà obtenue.
 -- name: CloreParcours :exec
 UPDATE "prospect_journeys" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
-  "enrollmentMethod" = CAST(sqlc.narg('method') AS text)::"EnrollmentMethod",
-  "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by
+  "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
+  "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
+  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById")
 WHERE "id" = @id;
 
 -- name: MarquerProspectPerdu :execrows
@@ -215,8 +218,9 @@ UPDATE "prospects" SET "statut" = 'PERDU' WHERE "id" = @id AND "statut" <> 'PERD
 -- name: CloreProspectParTentative :exec
 UPDATE "prospects" SET
   "phase2Status" = CAST(@phase2_status AS text)::"Phase2Status",
-  "enrollmentMethod" = CAST(sqlc.narg('method') AS text)::"EnrollmentMethod",
-  "enrollmentCapturedAt" = @at, "enrollmentCapturedById" = @by, "rev" = "rev" + 1
+  "enrollmentMethod" = COALESCE(CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", "enrollmentMethod"),
+  "enrollmentCapturedAt" = COALESCE(@at, "enrollmentCapturedAt"),
+  "enrollmentCapturedById" = COALESCE(@by, "enrollmentCapturedById"), "rev" = "rev" + 1
 WHERE "id" = @id;
 
 -- name: ListerRappels :many
