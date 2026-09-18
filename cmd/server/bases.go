@@ -30,9 +30,10 @@ const (
 var nomBaseValide = regexp.MustCompile(`^[a-z][a-z0-9-]{2,20}$`)
 
 var GardeBases = map[string]socle.Permission{
-	"GET " + cheminBases:               socle.PermissionBasesAdministrer,
-	"POST " + cheminBases:              socle.PermissionBasesAdministrer,
-	"DELETE " + cheminBases + "/{nom}": socle.PermissionBasesAdministrer,
+	"GET " + cheminBases:                        socle.PermissionBasesAdministrer,
+	"POST " + cheminBases:                       socle.PermissionBasesAdministrer,
+	"DELETE " + cheminBases + "/{nom}":          socle.PermissionBasesAdministrer,
+	"POST " + cheminBases + "/{nom}/rafraichir": socle.PermissionBasesAdministrer,
 }
 
 type BaseDemoDto struct {
@@ -142,27 +143,34 @@ func (s *serviceBases) creer(ctx context.Context, in *BaseCreerInput) (*BasesOut
 	return s.lister(ctx, nil)
 }
 
+// Nom de base à part : administrer une autre base que la principale reste
+// interdit à trois endroits (supprimer, rafraîchir, et demain un quatrième),
+// donc factorisé ici plutôt que triplé.
+func (s *serviceBases) baseSQLPour(ctx context.Context, nom string) (string, error) {
+	if nom == socle.BasePublique {
+		return "", socle.Problem(http.StatusForbidden, "BASE_PRINCIPALE",
+			"La base principale ne se gère pas comme une base de démonstration.")
+	}
+	lignes, err := s.Q.BasesDemonstration(ctx)
+	if err != nil {
+		return "", err
+	}
+	for i := range lignes {
+		if lignes[i].Nom == nom {
+			return lignes[i].BaseSql, nil
+		}
+	}
+	return "", socle.Problem(http.StatusNotFound, "BASE_INTROUVABLE", "Cette base n'existe pas.")
+}
+
 func (s *serviceBases) supprimer(ctx context.Context, in *BaseSupprimerInput) (*BasesOutput, error) {
 	if err := s.exigerBasePrincipale(); err != nil {
 		return nil, err
 	}
 	nom := strings.ToLower(strings.TrimSpace(in.Nom))
-	if nom == socle.BasePublique {
-		return nil, socle.Problem(http.StatusForbidden, "BASE_PRINCIPALE",
-			"La base principale ne se supprime pas.")
-	}
-	lignes, err := s.Q.BasesDemonstration(ctx)
+	baseSQL, err := s.baseSQLPour(ctx, nom)
 	if err != nil {
 		return nil, err
-	}
-	baseSQL := ""
-	for i := range lignes {
-		if lignes[i].Nom == nom {
-			baseSQL = lignes[i].BaseSql
-		}
-	}
-	if baseSQL == "" {
-		return nil, socle.Problem(http.StatusNotFound, "BASE_INTROUVABLE", "Cette base n'existe pas.")
 	}
 	// La ligne part EN DERNIER. Effacée d'abord, une destruction qui échoue
 	// laisserait sur le disque une base que plus rien ne référence, invisible
@@ -181,6 +189,41 @@ func (s *serviceBases) supprimer(ctx context.Context, in *BaseSupprimerInput) (*
 		return nil, err
 	}
 	slog.Info("base de démonstration supprimée", "nom", nom, "baseSql", baseSQL,
+		"userId", socle.UtilisateurCourant(ctx).ID)
+	return s.lister(ctx, nil)
+}
+
+// Le schéma suit les migrations à chaque redémarrage, mais le semis, lui, ne
+// rejoue jamais sur une base déjà montée (`monterBaseDemo`) : sans ce point
+// d'entrée, rattraper une base créée avant une fonctionnalité récente voulait
+// dire la supprimer puis la recréer à la main depuis le panneau.
+func (s *serviceBases) rafraichir(ctx context.Context, in *BaseSupprimerInput) (*BasesOutput, error) {
+	if err := s.exigerBasePrincipale(); err != nil {
+		return nil, err
+	}
+	nom := strings.ToLower(strings.TrimSpace(in.Nom))
+	baseSQL, err := s.baseSQLPour(ctx, nom)
+	if err != nil {
+		return nil, err
+	}
+	if pool := s.reg.demonter(nom); pool != nil {
+		pool.Close()
+	}
+	travail, arreter := context.WithTimeout(context.WithoutCancel(ctx), delaiCreationDemo)
+	defer arreter()
+	if err := detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
+		return nil, socle.Problem(http.StatusServiceUnavailable, "RAFRAICHISSEMENT_IMPOSSIBLE",
+			"La base n'a pas pu être réinitialisée. Réessayez.")
+	}
+	if err := creerBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
+		return nil, err
+	}
+	pool, i, err := monterBaseDemo(travail, s.Cfg, s.reg, baseSQL, nom, true)
+	if err != nil {
+		return nil, err
+	}
+	s.reg.monter(nom, i, pool)
+	slog.Info("base de démonstration rafraîchie", "nom", nom, "baseSql", baseSQL,
 		"userId", socle.UtilisateurCourant(ctx).ID)
 	return s.lister(ctx, nil)
 }
@@ -331,4 +374,7 @@ func monterBases(api huma.API, d *socle.Deps, reg *registre) {
 	huma.Register(api, huma.Operation{
 		OperationID: "supprimerBaseDemo", Method: http.MethodDelete, Path: cheminBases + "/{nom}",
 	}, s.supprimer)
+	huma.Register(api, huma.Operation{
+		OperationID: "rafraichirBaseDemo", Method: http.MethodPost, Path: cheminBases + "/{nom}/rafraichir",
+	}, s.rafraichir)
 }
