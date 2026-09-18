@@ -14,7 +14,7 @@ export function GlobalExportButton() {
   async function download(): Promise<void> {
     setPending(true);
     try {
-      const response = await fetch('/api/export/global', { cache: 'no-store' });
+      const response = await fetch('/api/v1/export/global.xlsx', { cache: 'no-store' });
       if (!response.ok) {
         const error: unknown = await response.json().catch(() => null);
         throw new Error(apiErrorMessage(error, 'L’export a échoué. Réessayez.'));
