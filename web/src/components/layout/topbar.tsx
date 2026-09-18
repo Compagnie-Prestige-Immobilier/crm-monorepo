@@ -7,7 +7,6 @@ import { useState } from 'react';
 
 import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
 import { coqueOf, hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
-import { RechercheGlobale } from '@/components/layout/recherche-globale';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { SignalerProbleme } from '@/components/layout/signaler-probleme';
 import { GlobalExportButton } from '@/components/exports/global-export-button';
@@ -81,8 +80,6 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
       >
         {title}
       </h1>
-
-      <RechercheGlobale role={user.role} />
 
       <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
 

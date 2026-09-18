@@ -90,6 +90,7 @@ export async function avecBase(
 }
 
 export async function creerComptes(): Promise<void> {
+  await supprimerComptes({ garderLesActuels: true });
   await avecBase(async (client) => {
     for (const compte of TOUS_LES_COMPTES) {
       await client.query(
@@ -107,13 +108,23 @@ export async function creerComptes(): Promise<void> {
   });
 }
 
-export async function supprimerComptes(): Promise<void> {
+/**
+ * Supprimer un fichier de parcours réduit le nombre de jeux : les comptes des
+ * index désormais hors liste survivaient à toutes les suites suivantes et
+ * saturaient les sélecteurs d'équipe, bornés à cinquante comptes. La purge
+ * vise donc le préfixe `e2e-`, pas la seule liste du moment.
+ */
+export async function supprimerComptes({ garderLesActuels = false } = {}): Promise<void> {
   const identifiants = TOUS_LES_COMPTES.map((compte) => compte.id);
   await avecBase(async (client) => {
     await client.query('BEGIN');
     try {
       await client.query('CREATE TEMP TABLE e2e_users (id text PRIMARY KEY) ON COMMIT DROP');
-      await client.query('INSERT INTO e2e_users (id) SELECT unnest($1::text[])', [identifiants]);
+      await client.query(
+        `INSERT INTO e2e_users (id)
+         SELECT id FROM users WHERE id LIKE 'e2e-%' AND ($2 = false OR NOT (id = ANY($1::text[])))`,
+        [identifiants, garderLesActuels],
+      );
       await client.query(`
         DO $cleanup$
         DECLARE
