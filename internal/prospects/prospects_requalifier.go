@@ -35,8 +35,8 @@ func (s *service) prospectRequalifier(ctx context.Context, in *ProspectRequalifi
 	if err != nil {
 		return nil, socle.Problem(http.StatusNotFound, "PROSPECT_PARCOURS_ABSENT", "Cette fiche n’a pas de parcours sur ce projet.")
 	}
-	if avant.Statut == db.ProspectStatutCONVERTI {
-		return nil, socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI", "Une fiche convertie ne se requalifie pas.")
+	if avant.Statut == db.ProspectStatutCONVERTI || avant.Statut == db.ProspectStatutVENDU {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI", "Une fiche convertie ou vendue ne se requalifie pas.")
 	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
 		if _, err := q.RequalifierJourney(ctx, db.RequalifierJourneyParams{Statut: db.ProspectStatut(in.Body.Statut), ProspectID: in.ID, Projet: projet}); err != nil {

@@ -170,7 +170,7 @@ SELECT
   COUNT(*) FILTER (
     WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
   )::int AS joints,
-  COUNT(*) FILTER (WHERE p."statut" = 'CONVERTI')::int AS convertis
+  COUNT(*) FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL;
 
@@ -183,7 +183,7 @@ SELECT
   COUNT(p."id") FILTER (
     WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
   )::int AS joints,
-  COUNT(p."id") FILTER (WHERE p."statut" = 'CONVERTI')::int AS convertis
+  COUNT(p."id") FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "canaux_provenance" c
 JOIN "prospects" p ON p."canalProvenanceId" = c."id" AND p."deletedAt" IS NULL
 GROUP BY c."id", c."code", c."label", c."position"
