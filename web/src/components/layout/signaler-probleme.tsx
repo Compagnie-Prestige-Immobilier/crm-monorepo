@@ -58,7 +58,7 @@ async function envoyerTicket(champs: Record<string, string>, images: Image[]) {
   for (const image of images) form.append('images', image.fichier);
   return unwrap(
     await getApiClient().POST('/api/v1/support/tickets', {
-      body: { description: '', contexte: '', images: [], urgence: 3, categorie: 0 },
+      body: { description: '', contexte: '', images: [], urgence: 3, categorie: 1 },
       bodySerializer: () => form,
     }),
   );
@@ -66,11 +66,7 @@ async function envoyerTicket(champs: Record<string, string>, images: Image[]) {
 
 async function lireCategories(): Promise<Choix[]> {
   const categories = unwrap(await getApiClient().GET('/api/v1/support/categories'));
-  if (categories.length === 0) return [];
-  return [
-    { value: '0', label: 'Sans catégorie' },
-    ...categories.map((c) => ({ value: String(c.id), label: c.nom })),
-  ];
+  return categories.map((c) => ({ value: String(c.id), label: c.nom }));
 }
 
 function Choisir({
@@ -85,9 +81,13 @@ function Choisir({
   changer: (valeur: string) => void;
 }) {
   return (
-    <Select items={choix} value={valeur} onValueChange={(v) => changer(v ?? valeur)}>
+    <Select
+      items={choix}
+      value={valeur === '' ? null : valeur}
+      onValueChange={(v) => changer(v ?? valeur)}
+    >
       <SelectTrigger aria-label={libelle}>
-        <SelectValue />
+        <SelectValue placeholder={libelle} />
       </SelectTrigger>
       <SelectContent>
         {choix.map((c) => (
@@ -118,8 +118,8 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   const [ouvert, setOuvert] = useState(false);
   const [images, setImages] = useState<Image[]>([]);
   const [description, setDescription] = useState('');
-  const [urgence, setUrgence] = useState('3');
-  const [categorie, setCategorie] = useState('0');
+  const [urgence, setUrgence] = useState('');
+  const [categorie, setCategorie] = useState('');
   const categories = useQuery({
     queryKey: ['support', 'categories'],
     queryFn: lireCategories,
@@ -149,13 +149,15 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     if (!envoi.isSuccess) return;
     setDescription('');
     setImages([]);
-    setCategorie('0');
+    setCategorie('');
+    setUrgence('');
     envoi.reset();
   };
 
   const lienPlateforme = plateforme ? <LienPlateforme /> : null;
   const listeCategories = categories.data ?? [];
-  const envoyable = description.trim().length >= 3 && !envoi.isPending;
+  const envoyable =
+    description.trim().length >= 3 && urgence !== '' && categorie !== '' && !envoi.isPending;
   const envoyer = () => {
     if (envoyable) envoi.mutate();
   };
@@ -217,15 +219,18 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
               />
               <div className="grid grid-cols-2 gap-2">
                 <Choisir libelle="Urgence" choix={URGENCES} valeur={urgence} changer={setUrgence} />
-                {listeCategories.length === 0 ? null : (
-                  <Choisir
-                    libelle="Catégorie"
-                    choix={listeCategories}
-                    valeur={categorie}
-                    changer={setCategorie}
-                  />
-                )}
+                <Choisir
+                  libelle="Catégorie"
+                  choix={listeCategories}
+                  valeur={categorie}
+                  changer={setCategorie}
+                />
               </div>
+              {categories.isSuccess && listeCategories.length === 0 ? (
+                <p role="alert" className="text-[0.8125rem] text-destructive">
+                  Les catégories GLPI sont illisibles. Prévenez l'administrateur.
+                </p>
+              ) : null}
               <PiecesJointes
                 images={images}
                 ajouter={ajouter}

@@ -26,7 +26,6 @@ var Garde = map[string]socle.Permission{
 const (
 	ticketIncident = 1
 	comptePilotage = "pilotage"
-	urgenceMoyenne = 3
 )
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
@@ -59,8 +58,8 @@ type TicketInput struct {
 		Description string          `form:"description" required:"true" minLength:"3" maxLength:"5000"`
 		Contexte    string          `form:"contexte" required:"false" maxLength:"5000"`
 		Images      []huma.FormFile `form:"images" required:"false" contentType:"image/png,image/jpeg,image/webp,image/gif"`
-		Urgence     int             `form:"urgence" required:"false" enum:"2,3,4"`
-		Categorie   int             `form:"categorie" required:"false" minimum:"0"`
+		Urgence     int             `form:"urgence" required:"true" enum:"2,3,4"`
+		Categorie   int             `form:"categorie" required:"true" minimum:"1"`
 	}]
 }
 
@@ -117,9 +116,6 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 	if len(form.Images) > imagesMax {
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_TROP_D_IMAGES", fmt.Sprintf("%d images au plus par ticket.", imagesMax))
 	}
-	if form.Urgence == 0 {
-		form.Urgence = urgenceMoyenne
-	}
 	u := socle.UtilisateurCourant(ctx)
 	contenu := paragraphe(form.Description) +
 		paragraphe(fmt.Sprintf("Signalé par %s (%s, %s)", u.FullName, u.RoleLibelle, u.Email)) +
@@ -144,7 +140,7 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 			Content   string `json:"content"`
 			Type      int    `json:"type"`
 			Urgence   int    `json:"urgency"`
-			Categorie int    `json:"itilcategories_id,omitempty"`
+			Categorie int    `json:"itilcategories_id"`
 			Demandeur int    `json:"_users_id_requester"`
 		} `json:"input"`
 	}
