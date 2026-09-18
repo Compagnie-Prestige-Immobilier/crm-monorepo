@@ -3,13 +3,14 @@
 import { unwrap } from '@crm/api-client/query';
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { CheckCircle2Icon, ExternalLinkIcon, LifeBuoyIcon, Loader2Icon } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 
 import {
   IMAGES_MAX,
   imagesDepuis,
   PiecesJointes,
   type Image,
+  type PiecesJointesHandle,
 } from '@/components/layout/pieces-jointes';
 import { Button, buttonVariants } from '@/components/ui/button';
 import {
@@ -100,6 +101,33 @@ function Choisir({
   );
 }
 
+// Le panneau reste ouvert et non modal : la page derrière répond aux clics et
+// au survol, pour que le signalant montre l'écran fautif sans perdre son message.
+function useSurvolDeLaPage(actif: boolean) {
+  useEffect(() => {
+    if (!actif) return;
+    let survole: Element | null = null;
+    const marquer = (event: MouseEvent) => {
+      const cible = event.target;
+      if (!(cible instanceof Element) || cible.closest('[data-slot="sheet-content"]')) return;
+      survole?.classList.remove('cpi-survol-signale');
+      survole = cible;
+      cible.classList.add('cpi-survol-signale');
+    };
+    const oublier = () => {
+      survole?.classList.remove('cpi-survol-signale');
+      survole = null;
+    };
+    document.addEventListener('mouseover', marquer);
+    document.addEventListener('mouseleave', oublier);
+    return () => {
+      document.removeEventListener('mouseover', marquer);
+      document.removeEventListener('mouseleave', oublier);
+      oublier();
+    };
+  }, [actif]);
+}
+
 function LienPlateforme() {
   return (
     <a
@@ -120,6 +148,19 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   const [description, setDescription] = useState('');
   const [urgence, setUrgence] = useState('');
   const [categorie, setCategorie] = useState('');
+  const pieces = useRef<PiecesJointesHandle>(null);
+  useSurvolDeLaPage(ouvert);
+  useEffect(() => {
+    if (!ouvert) return;
+    const surCapture = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        void pieces.current?.capturer();
+      }
+    };
+    window.addEventListener('keydown', surCapture);
+    return () => window.removeEventListener('keydown', surCapture);
+  }, [ouvert]);
   const categories = useQuery({
     queryKey: ['support', 'categories'],
     queryFn: lireCategories,
@@ -173,8 +214,8 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
       >
         <LifeBuoyIcon className="size-5" aria-hidden="true" />
       </Button>
-      <Sheet open={ouvert} onOpenChange={fermer}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+      <Sheet open={ouvert} onOpenChange={fermer} modal={false} disablePointerDismissal>
+        <SheetContent side="right" voile={false} className="w-full sm:max-w-md pointer-events-auto">
           {envoi.isSuccess ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
               <CheckCircle2Icon className="size-12 text-success" aria-hidden="true" />

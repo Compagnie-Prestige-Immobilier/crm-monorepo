@@ -19,19 +19,29 @@ function SheetTrigger(props: SheetTriggerProps) {
 type SheetContentProps = Omit<SheetPrimitive.Popup.Props, 'className'> & {
   className?: string | undefined;
   side?: 'top' | 'right' | 'bottom' | 'left' | undefined;
+  /** false : pas de voile ni de blocage de clics, pour un panneau non modal posé sur la page active. */
+  voile?: boolean;
 };
 
-function SheetContent({ className, children, side = 'right', ...props }: SheetContentProps) {
+function SheetContent({
+  className,
+  children,
+  side = 'right',
+  voile = true,
+  ...props
+}: SheetContentProps) {
   return (
     <SheetPrimitive.Portal>
-      <SheetPrimitive.Backdrop
-        data-slot="sheet-overlay"
-        className={cn(
-          'fixed inset-0 z-50 bg-scrim',
-          'data-open:animate-in data-open:fade-in-0',
-          'data-closed:animate-out data-closed:fade-out-0',
-        )}
-      />
+      {voile ? (
+        <SheetPrimitive.Backdrop
+          data-slot="sheet-overlay"
+          className={cn(
+            'fixed inset-0 z-50 bg-scrim',
+            'data-open:animate-in data-open:fade-in-0',
+            'data-closed:animate-out data-closed:fade-out-0',
+          )}
+        />
+      ) : null}
       <SheetPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
