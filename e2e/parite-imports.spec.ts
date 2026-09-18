@@ -187,8 +187,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
       await console.goto('/teleconseil/console');
       await console.getByLabel('Quel prospect avez-vous appelé ?').fill(NOM);
     };
+    // Deux fiches Grand Public portent ce nom : viser celle de Fatou.
+    const fiche = console.getByRole('button', { name: new RegExp(`${NOM} Fatou`, 'u') });
     await chercher();
-    await expect(console.getByRole('button', { name: new RegExp(NOM, 'u') })).toBeVisible();
+    await expect(fiche).toBeVisible();
 
     await page.getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(page.getByText(/En pause depuis le/u)).toBeVisible();
@@ -200,7 +202,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await page.getByRole('button', { name: 'Reprendre' }).click();
     await expect(page.getByRole('button', { name: 'Mettre en pause' })).toBeVisible();
     await chercher();
-    await expect(console.getByRole('button', { name: new RegExp(NOM, 'u') })).toBeVisible();
+    await expect(fiche).toBeVisible();
     await contexte.close();
   });
 });

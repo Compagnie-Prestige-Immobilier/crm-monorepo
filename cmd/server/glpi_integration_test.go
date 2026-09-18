@@ -62,7 +62,7 @@ func TestGlpiOuvreLaPlateformeAvecLaSessionDuPanneau(t *testing.T) {
 	}
 
 	statut, body = b.jetonGlpi(code, "mauvais")
-	b.attend(statut, http.StatusUnauthorized, "secret faux", body)
+	b.attend(statut, http.StatusBadRequest, "secret faux", body)
 	statut, body = b.jetonGlpi(code, "secret-essai")
 	b.attend(statut, http.StatusOK, "échange du code", body)
 	acces := texteDe(body["access_token"])

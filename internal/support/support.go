@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"mime/multipart"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -18,8 +19,14 @@ import (
 )
 
 var Garde = map[string]socle.Permission{
-	"POST /api/v1/support/tickets": socle.PermissionSupportSignaler,
+	"POST /api/v1/support/tickets":   socle.PermissionSupportSignaler,
+	"GET /api/v1/support/categories": socle.PermissionSupportSignaler,
 }
+
+const (
+	ticketIncident = 1
+	comptePilotage = "pilotage"
+)
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
 
@@ -38,8 +45,12 @@ func Monter(api huma.API, _ *socle.Deps) {
 	huma.Register(api, huma.Operation{
 		OperationID: "creerTicketSupport", Method: http.MethodPost, Path: "/api/v1/support/tickets",
 		MaxBodyBytes: 40 << 20,
-		Summary:      "Ouvre un ticket GLPI au nom du compte de pilotage, avec la page et ses images.",
+		Summary:      "Ouvre un ticket GLPI au nom du signalant, avec la page et ses images.",
 	}, g.creer)
+	huma.Register(api, huma.Operation{
+		OperationID: "categoriesSupport", Method: http.MethodGet, Path: "/api/v1/support/categories",
+		Summary: "Les catégories GLPI proposées au demandeur.",
+	}, g.categories)
 }
 
 type TicketInput struct {
@@ -47,7 +58,48 @@ type TicketInput struct {
 		Description string          `form:"description" required:"true" minLength:"3" maxLength:"5000"`
 		Contexte    string          `form:"contexte" maxLength:"5000"`
 		Images      []huma.FormFile `form:"images" contentType:"image/png,image/jpeg,image/webp,image/gif"`
+		Urgence     int             `form:"urgence" enum:"2,3,4" default:"3"`
+		Categorie   int             `form:"categorie" minimum:"0"`
 	}]
+}
+
+type CategorieDTO struct {
+	ID  int    `json:"id"`
+	Nom string `json:"nom"`
+}
+
+type CategoriesOutput struct {
+	Body []CategorieDTO
+}
+
+// Une catégorie illisible (droit manquant côté GLPI) masque le choix au lieu de bloquer le ticket.
+func (g glpi) categories(ctx context.Context, _ *struct{}) (*CategoriesOutput, error) {
+	out := &CategoriesOutput{Body: []CategorieDTO{}}
+	if g.url == "" {
+		return out, nil
+	}
+	session, err := g.ouvrirSession(ctx)
+	if err != nil {
+		slog.Warn("catégories GLPI illisibles", "err", err)
+		return out, nil
+	}
+	defer g.fermerSession(ctx, session)
+	var lues []struct {
+		ID       int    `json:"id"`
+		Nom      string `json:"completename"`
+		Visible  int    `json:"is_helpdeskvisible"`
+		Incident int    `json:"is_incident"`
+	}
+	if err := g.appeler(ctx, session, http.MethodGet, "/ITILCategory?range=0-500", "", nil, &lues); err != nil {
+		slog.Warn("catégories GLPI illisibles", "err", err)
+		return out, nil
+	}
+	for _, c := range lues {
+		if c.Visible == 1 && c.Incident == 1 {
+			out.Body = append(out.Body, CategorieDTO{ID: c.ID, Nom: c.Nom})
+		}
+	}
+	return out, nil
 }
 
 type TicketOutput struct {
@@ -75,16 +127,25 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 	}
 	defer g.fermerSession(ctx, session)
 
+	demandeur, err := g.demandeur(ctx, session, u.Username, u.Role)
+	if err != nil {
+		return nil, glpiInjoignable(err)
+	}
 	var ticket struct {
 		ID int `json:"id"`
 	}
 	var nouveau struct {
 		Input struct {
-			Name    string `json:"name"`
-			Content string `json:"content"`
+			Name      string `json:"name"`
+			Content   string `json:"content"`
+			Type      int    `json:"type"`
+			Urgence   int    `json:"urgency"`
+			Categorie int    `json:"itilcategories_id,omitempty"`
+			Demandeur int    `json:"_users_id_requester"`
 		} `json:"input"`
 	}
-	nouveau.Input.Name, nouveau.Input.Content = titre(form.Description), contenu
+	nouveau.Input.Name, nouveau.Input.Content, nouveau.Input.Type = titre(form.Description), contenu, ticketIncident
+	nouveau.Input.Urgence, nouveau.Input.Categorie, nouveau.Input.Demandeur = form.Urgence, form.Categorie, demandeur
 	corps, err := json.Marshal(nouveau)
 	if err != nil {
 		return nil, err
@@ -100,6 +161,39 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 	out := &TicketOutput{}
 	out.Body.Numero = ticket.ID
 	return out, nil
+}
+
+// Un administrateur signale au nom du pilotage ; les autres sous leur compte GLPI, créé à leur
+// première ouverture de GLPI depuis le panneau, et au nom du pilotage d'ici là.
+func (g glpi) demandeur(ctx context.Context, session, login string, role socle.Role) (int, error) {
+	if role != socle.Admin {
+		id, err := g.idCompte(ctx, session, login)
+		if err != nil || id != 0 {
+			return id, err
+		}
+	}
+	id, err := g.idCompte(ctx, session, comptePilotage)
+	if err == nil && id == 0 {
+		err = fmt.Errorf("compte GLPI %q introuvable", comptePilotage)
+	}
+	return id, err
+}
+
+func (g glpi) idCompte(ctx context.Context, session, login string) (int, error) {
+	var comptes []struct {
+		ID  int    `json:"id"`
+		Nom string `json:"name"`
+	}
+	chemin := "/User?" + url.Values{"searchText[name]": {"^" + login + "$"}, "range": {"0-5"}}.Encode()
+	if err := g.appeler(ctx, session, http.MethodGet, chemin, "", nil, &comptes); err != nil {
+		return 0, err
+	}
+	for _, c := range comptes {
+		if strings.EqualFold(c.Nom, login) {
+			return c.ID, nil
+		}
+	}
+	return 0, nil
 }
 
 func (g glpi) joindreImage(ctx context.Context, session string, ticketID, rang int, image huma.FormFile) error {

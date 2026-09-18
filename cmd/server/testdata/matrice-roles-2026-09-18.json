@@ -382,6 +382,7 @@
     "DIRECTION",
     "SUPERVISEUR"
   ],
+  "GET /api/v1/support/categories": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/users": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/users/{id}": ["ADMIN"],
   "GET /api/v1/ventes": ["ADMIN", "DIRECTION"],

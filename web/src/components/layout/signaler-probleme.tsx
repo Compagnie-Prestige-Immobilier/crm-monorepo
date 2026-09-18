@@ -82,10 +82,15 @@ function contexteDePage(ecran: string): string {
   ].join('\n');
 }
 
-async function envoyerTicket(description: string, contexte: string, images: Image[]) {
+const URGENCES = [
+  { value: '2', label: 'Basse' },
+  { value: '3', label: 'Moyenne' },
+  { value: '4', label: 'Haute' },
+];
+
+async function envoyerTicket(champs: Record<string, string>, images: Image[]) {
   const form = new FormData();
-  form.append('description', description);
-  form.append('contexte', contexte);
+  for (const [nom, valeur] of Object.entries(champs)) form.append(nom, valeur);
   for (const image of images) form.append('images', image.fichier);
   return unwrap(
     await getApiClient().POST('/api/v1/support/tickets', {
@@ -94,6 +99,8 @@ async function envoyerTicket(description: string, contexte: string, images: Imag
     }),
   );
 }
+
+const lireCategories = async () => unwrap(await getApiClient().GET('/api/v1/support/categories'));
 
 function LienPlateforme() {
   return (
@@ -114,9 +121,21 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   const [images, setImages] = useState<Image[]>([]);
   const [capture, setCapture] = useState(false);
   const [description, setDescription] = useState('');
+  const [urgence, setUrgence] = useState('3');
+  const [categorie, setCategorie] = useState('0');
+  const categories = useQuery({
+    queryKey: ['support', 'categories'],
+    queryFn: lireCategories,
+    enabled: ouvert,
+    staleTime: Infinity,
+  });
 
   const envoi = useMutation({
-    mutationFn: () => envoyerTicket(description.trim(), contexteDePage(ecran), images),
+    mutationFn: () =>
+      envoyerTicket(
+        { description: description.trim(), contexte: contexteDePage(ecran), urgence, categorie },
+        images,
+      ),
     onError: (error) => {
       toastApiError(error, "Le ticket n'est pas parti. Réessayez.");
     },
@@ -155,9 +174,15 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     if (!envoi.isSuccess) return;
     setDescription('');
     setImages([]);
+    setCategorie('0');
     envoi.reset();
   };
 
+  const listeCategories = [
+    { value: '0', label: 'Sans catégorie' },
+    ...(categories.data ?? []).map((c) => ({ value: String(c.id), label: c.nom })),
+  ];
+  if (listeCategories.length === 1) listeCategories.pop();
   const lienPlateforme = plateforme ? <LienPlateforme /> : null;
   const complet = images.length >= IMAGES_MAX;
   const envoyable = description.trim().length >= 3 && !envoi.isPending;
@@ -221,6 +246,42 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
                   if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) envoyer();
                 }}
               />
+              <div className="grid grid-cols-2 gap-2">
+                <Select
+                  items={URGENCES}
+                  value={urgence}
+                  onValueChange={(v) => setUrgence(v ?? '3')}
+                >
+                  <SelectTrigger aria-label="Urgence">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {URGENCES.map((u) => (
+                      <SelectItem key={u.value} value={u.value}>
+                        Urgence {u.label.toLowerCase()}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {listeCategories.length === 0 ? null : (
+                  <Select
+                    items={listeCategories}
+                    value={categorie}
+                    onValueChange={(v) => setCategorie(v ?? '0')}
+                  >
+                    <SelectTrigger aria-label="Catégorie">
+                      <SelectValue placeholder="Catégorie" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {listeCategories.map((c) => (
+                        <SelectItem key={c.value} value={c.value}>
+                          {c.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+              </div>
               <div className="flex flex-wrap gap-2">
                 {captureDisponible() ? (
                   <Button

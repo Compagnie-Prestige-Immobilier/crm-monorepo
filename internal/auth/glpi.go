@@ -131,7 +131,7 @@ func (f *fournisseurGlpi) jeton(_ context.Context, in *JetonGlpiInput) (*JetonGl
 	if err != nil || form.Get("grant_type") != "authorization_code" || f.secret == "" ||
 		form.Get("client_id") != f.clientID ||
 		subtle.ConstantTimeCompare([]byte(form.Get("client_secret")), []byte(f.secret)) != 1 {
-		return nil, socle.Problem(http.StatusUnauthorized, "invalid_client", "Client refusé.")
+		return nil, socle.Problem(http.StatusBadRequest, "invalid_client", "Client refusé.")
 	}
 	identite, ok := f.prendre(f.codes, form.Get("code"), true)
 	if !ok || identite.retour != form.Get("redirect_uri") {
@@ -148,7 +148,7 @@ func (f *fournisseurGlpi) jeton(_ context.Context, in *JetonGlpiInput) (*JetonGl
 func (f *fournisseurGlpi) profil(_ context.Context, in *ProfilGlpiInput) (*ProfilGlpiOutput, error) {
 	identite, ok := f.prendre(f.jetons, strings.TrimPrefix(in.Authorization, "Bearer "), false)
 	if !ok {
-		return nil, socle.Problem(http.StatusUnauthorized, "invalid_token", "Jeton expiré.")
+		return nil, socle.Problem(http.StatusForbidden, "invalid_token", "Jeton expiré.")
 	}
 	return &ProfilGlpiOutput{Body: identite.profil}, nil
 }
