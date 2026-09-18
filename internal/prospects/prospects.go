@@ -1323,7 +1323,7 @@ func (s *service) prospectRevue(ctx context.Context, in *ProspectIDInput) (*Pros
 	if err != nil {
 		return nil, err
 	}
-	if existant.Statut != db.ProspectStatutCONVERTI {
+	if existant.Statut != db.ProspectStatutCONVERTI && existant.Statut != db.ProspectStatutVENDU {
 		return nil, socle.Problem(http.StatusBadRequest, "PROSPECT_REVUE_REQUIRES_CONVERSION", "Seule une demande convertie se revoit.")
 	}
 	if err := s.Q.MarquerProspectRevue(ctx, db.MarquerProspectRevueParams{ID: in.ID, RevueById: &u.ID}); err != nil {

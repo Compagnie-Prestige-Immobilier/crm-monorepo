@@ -97,7 +97,7 @@ type ListerInscriptionsInput struct {
 	InclureDisparues string `query:"inclureDisparues" enum:"true,false"`
 	// Les étages de l'entonnoir : la plateforme ne les nomme pas, ils se
 	// déduisent de l'étape et des dates.
-	Avancement string `query:"avancement" enum:"ouvert,soumis,decide"`
+	Avancement string `query:"avancement" enum:"ouvert,soumis,decide,negatif"`
 }
 
 type ListerInscriptionsOutput struct {
@@ -546,7 +546,7 @@ func (s *service) executerTirage(ctx context.Context, projet string) (BilanTirag
 	retenues := depuisReprise(lignes, valeurs.RepriseDepuis)
 	bilan.Lus = len(retenues)
 
-	index, err := s.indexerProspects(ctx, projet, retenues)
+	index, err := s.indexerProspects(ctx, retenues)
 	if err != nil {
 		return bilan, err
 	}
@@ -684,11 +684,11 @@ func cles(lignes []inscriptionDistante) (telephones, emails []string) {
 	return slices.Compact(slices.Sorted(slices.Values(telephones))), slices.Compact(slices.Sorted(slices.Values(emails)))
 }
 
-func (s *service) indexerProspects(ctx context.Context, projet string, lignes []inscriptionDistante) (indexProspects, error) {
+func (s *service) indexerProspects(ctx context.Context, lignes []inscriptionDistante) (indexProspects, error) {
 	index := indexProspects{parTelephone: map[string][]candidatProspect{}, parEmail: map[string][]candidatProspect{}}
 	telephones, emails := cles(lignes)
 	if len(telephones) > 0 {
-		rows, err := s.Q.CandidatsParTelephone(ctx, db.CandidatsParTelephoneParams{Projet: db.Projet(projet), Telephones: telephones})
+		rows, err := s.Q.CandidatsParTelephone(ctx, telephones)
 		if err != nil {
 			return index, err
 		}
@@ -700,7 +700,7 @@ func (s *service) indexerProspects(ctx context.Context, projet string, lignes []
 	if len(emails) > 0 {
 		// `prospects` n'a pas d'e-mail fiable : la conversion l'écrit sur la
 		// tentative d'appel.
-		rows, err := s.Q.CandidatsParEmail(ctx, db.CandidatsParEmailParams{Projet: db.Projet(projet), Emails: emails})
+		rows, err := s.Q.CandidatsParEmail(ctx, emails)
 		if err != nil {
 			return index, err
 		}
