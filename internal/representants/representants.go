@@ -243,6 +243,7 @@ type RepresentantListInput struct {
 	HasWhatsapp           string   `query:"hasWhatsapp" enum:"true,false"`
 	Suivi                 string   `query:"suivi" enum:"A_RAPPELER,INJOIGNABLE"`
 	LastCallByID          string   `query:"lastCallById" maxLength:"64"`
+	AppelePar             string   `query:"appelePar" maxLength:"64"`
 	RelationStatus        []string `query:"relationStatus" enum:"INCONNU,CONTACTE,AMBASSADEUR,REFUS"`
 	MesFiches             bool     `query:"mesFiches"`
 	SortBy                string   `query:"sortBy" enum:"clientCreatedAt,createdAt,fullName,prospects,lastCallAt,nextCallbackAt,priorite"`
@@ -391,6 +392,7 @@ func representantFiltres(u *socle.Utilisateur, in *RepresentantListInput) (db.Li
 		IefID:                 representantNarg(in.IefID),
 		StatutQualificationID: representantNarg(in.StatutQualificationID),
 		LastCallByID:          representantNarg(in.LastCallByID),
+		AppelePar:             representantNarg(in.AppelePar),
 		RelationStatus:        in.RelationStatus,
 		WhatsappStatuses:      representantWhatsappFiltre(in.WhatsappStatus, representantBooleen(in.HasWhatsapp)),
 		DateFrom:              debut,
@@ -413,7 +415,7 @@ func representantCompteFiltres(p *db.ListRepresentantsParams) db.CountRepresenta
 	return db.CountRepresentantsParams{
 		ReadsEveryone: p.ReadsEveryone, OwnerID: p.OwnerID,
 		CommercialID: p.CommercialID, DepartementID: p.DepartementID, IefID: p.IefID,
-		StatutQualificationID: p.StatutQualificationID, LastCallByID: p.LastCallByID,
+		StatutQualificationID: p.StatutQualificationID, LastCallByID: p.LastCallByID, AppelePar: p.AppelePar,
 		RelationStatus: p.RelationStatus, WhatsappStatuses: p.WhatsappStatuses,
 		DateFrom: p.DateFrom, DateTo: p.DateTo, Suivi: p.Suivi, HasProspects: p.HasProspects,
 		Search: p.Search, SearchDigits: p.SearchDigits,

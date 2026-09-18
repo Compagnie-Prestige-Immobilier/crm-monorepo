@@ -36,6 +36,13 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('ief_id')::text IS NULL OR r."iefId" = sqlc.narg('ief_id')::text)
   AND (sqlc.narg('statut_qualification_id')::text IS NULL OR r."statutQualificationId" = sqlc.narg('statut_qualification_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR r."lastCallById" = sqlc.narg('last_call_by_id')::text)
+  AND (
+    sqlc.narg('appele_par')::text IS NULL
+    OR EXISTS (
+      SELECT 1 FROM "rep_call_attempts" ap
+      WHERE ap."representantId" = r."id" AND ap."performedById" = sqlc.narg('appele_par')::text
+    )
+  )
   AND (sqlc.narg('relation_status')::text[] IS NULL OR r."relationStatus"::text = ANY(sqlc.narg('relation_status')::text[]))
   AND (sqlc.narg('whatsapp_statuses')::text[] IS NULL OR r."whatsappStatus"::text = ANY(sqlc.narg('whatsapp_statuses')::text[]))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR r."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)
@@ -103,6 +110,13 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('ief_id')::text IS NULL OR r."iefId" = sqlc.narg('ief_id')::text)
   AND (sqlc.narg('statut_qualification_id')::text IS NULL OR r."statutQualificationId" = sqlc.narg('statut_qualification_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR r."lastCallById" = sqlc.narg('last_call_by_id')::text)
+  AND (
+    sqlc.narg('appele_par')::text IS NULL
+    OR EXISTS (
+      SELECT 1 FROM "rep_call_attempts" ap
+      WHERE ap."representantId" = r."id" AND ap."performedById" = sqlc.narg('appele_par')::text
+    )
+  )
   AND (sqlc.narg('relation_status')::text[] IS NULL OR r."relationStatus"::text = ANY(sqlc.narg('relation_status')::text[]))
   AND (sqlc.narg('whatsapp_statuses')::text[] IS NULL OR r."whatsappStatus"::text = ANY(sqlc.narg('whatsapp_statuses')::text[]))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR r."clientCreatedAt" >= sqlc.narg('date_from')::timestamp)

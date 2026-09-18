@@ -135,7 +135,7 @@ export async function fetchProspectsAQualifier(
 
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchProspectsAppeles(
-  lastCallById: string,
+  appelePar: string,
   projet: Projet | null | undefined,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
@@ -143,7 +143,7 @@ export async function fetchProspectsAppeles(
     await client.GET('/api/v1/prospects', {
       params: {
         query: {
-          lastCallById,
+          appelePar,
           ...(projet === null || projet === undefined ? {} : { projet }),
           sortBy: 'lastCallAt',
           sortOrder: 'desc',
