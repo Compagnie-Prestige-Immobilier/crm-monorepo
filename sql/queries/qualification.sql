@@ -127,7 +127,7 @@ SELECT EXISTS (
          OR EXISTS (SELECT 1 FROM "scheduled_callbacks" c
                     WHERE c."prospectId" = p."id" AND c."assignedToId" = @agent AND c."status" = 'PENDING')
          OR p."lastCallById" = @agent
-         OR (@converti_visible::bool AND p."statut" = 'CONVERTI')));
+         OR (@converti_visible::bool AND p."statut" IN ('CONVERTI', 'VENDU'))));
 
 -- name: OuvrirParcours :one
 INSERT INTO "prospect_journeys" ("id", "prospectId", "projet")
@@ -433,7 +433,7 @@ WHERE p."deletedAt" IS NULL
           WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
             AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
         ))
-    OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
+    OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
