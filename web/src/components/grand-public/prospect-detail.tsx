@@ -65,6 +65,7 @@ const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 
   NOUVEAU: 'secondary',
   CONTACTE: 'info',
   CONVERTI: 'success',
+  VENDU: 'success',
   PERDU: 'destructive',
 };
 

@@ -187,7 +187,39 @@ func prospectLibelleMontant(montant *int32) string {
 // Avancement d'un parcours : la fusion garde toujours le plus avancé des deux.
 var prospectRangStatut = map[db.ProspectStatut]int{
 	db.ProspectStatutNOUVEAU: 0, db.ProspectStatutPERDU: 1,
-	db.ProspectStatutCONTACTE: 2, db.ProspectStatutCONVERTI: 3,
+	db.ProspectStatutCONTACTE: 2, db.ProspectStatutCONVERTI: 3, db.ProspectStatutVENDU: 4,
+}
+
+type ProspectVendreInput struct {
+	ID string `path:"id" format:"uuid"`
+}
+
+// Seule une fiche convertie devient vendue ; le dépôt du classeur fait le même geste.
+func (s *service) prospectVendre(ctx context.Context, in *ProspectVendreInput) (*ProspectOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	if _, err := s.prospectModifiable(ctx, &u, in.ID); err != nil {
+		return nil, err
+	}
+	if err := s.prospectTx(ctx, func(q *db.Queries) error {
+		lignes, err := q.MarquerProspectVendu(ctx, in.ID)
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			return socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_NOT_CONVERTI",
+				"Seule une fiche convertie peut être marquée vendue.")
+		}
+		return database.Auditer(ctx, q, u.ID, "prospect.vendre", prospectEntite, in.ID,
+			map[string]any{prospectChampStatut: string(db.ProspectStatutCONVERTI)},
+			map[string]any{prospectChampStatut: string(db.ProspectStatutVENDU)})
+	}); err != nil {
+		return nil, err
+	}
+	item, err := s.prospectLire(ctx, &u, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	return &ProspectOutput{Body: *item}, nil
 }
 
 // TOUT ce qui pend à la source suit : un parcours resté sur une fiche supprimée
@@ -943,6 +975,7 @@ func (s *service) prospectJournal(ctx context.Context, in *ProspectJournalInput)
 func prospectMonterConversion(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{OperationID: "updateGrandPublicConsent", Method: http.MethodPatch, Path: "/api/v1/prospects/{id}/parcours/grand-public/consentement"}, s.prospectConsentement)
 	huma.Register(api, huma.Operation{OperationID: "confirmGrandPublicConversion", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/parcours/grand-public/conversion"}, s.prospectConvertir)
+	huma.Register(api, huma.Operation{OperationID: "vendreProspect", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/vendre"}, s.prospectVendre)
 	huma.Register(api, huma.Operation{OperationID: "getChampsConversion", Method: http.MethodGet, Path: "/api/v1/champs-conversion/{projet}"}, s.prospectLireChamps)
 	huma.Register(api, huma.Operation{OperationID: "updateChampsConversion", Method: http.MethodPut, Path: "/api/v1/champs-conversion/{projet}"}, s.prospectMajChamps)
 	huma.Register(api, huma.Operation{OperationID: "getParametresChues", Method: http.MethodGet, Path: "/api/v1/parametres-chues"}, s.prospectParametres)

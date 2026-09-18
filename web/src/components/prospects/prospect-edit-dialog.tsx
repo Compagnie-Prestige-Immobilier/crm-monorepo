@@ -35,8 +35,8 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { prospectSchema, type ProspectFormInput } from '@/lib/schemas';
 import {
-  PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  PROSPECT_STATUTS_MODIFIABLES,
   SEGMENT_LABELS,
   type BddSegment,
   type ProspectRow,
@@ -125,16 +125,19 @@ function reasonValidationError(segmentChanged: boolean, reason: string): string 
   return 'Expliquez la bascule : elle est enregistrée et rendue à la direction.';
 }
 
+// Vendue, une fiche ne redevient jamais convertie ici : le champ ne se
+// soumet pas, même si le formulaire porte une valeur de repli pour l'afficher.
 function identityPatch(
   values: ProspectFormInput,
   prospect: ProspectRow,
 ): UpdateProspectInput | null {
+  const statutModifiable = prospect.statut !== 'VENDU';
   const changed =
     values.nom !== prospect.nom ||
     values.prenom !== prospect.prenom ||
     values.phone !== prospect.phoneE164 ||
     !memeChoix(values.representantId, prospect.representantId) ||
-    values.statut !== prospect.statut;
+    (statutModifiable && values.statut !== prospect.statut);
   if (!changed) return null;
   // L'API attend un UUID ou rien : une fiche sans représentant ne doit pas envoyer "".
   return {
@@ -142,7 +145,7 @@ function identityPatch(
     prenom: values.prenom,
     phone: values.phone,
     ...(values.representantId === '' ? {} : { representantId: values.representantId }),
-    statut: values.statut,
+    ...(statutModifiable ? { statut: values.statut } : {}),
   };
 }
 
@@ -268,7 +271,8 @@ export function ProspectEditDialog({
       banqueId: prospect.banqueId ?? '',
       syndicatId: prospect.syndicatId ?? '',
       representantId: prospect.representantId ?? '',
-      statut: prospect.statut,
+      // Vendue, la fiche n'a plus de choix éditable : le dernier statut modifiable l'affiche.
+      statut: prospect.statut === 'VENDU' ? 'CONVERTI' : prospect.statut,
     });
   }, [prospect, reset]);
 
@@ -356,11 +360,17 @@ export function ProspectEditDialog({
             {(props) => <Input {...props} type="tel" {...register('phone')} />}
           </Field>
 
-          <Field label="Statut" required error={formState.errors.statut?.message}>
+          <Field
+            label="Statut"
+            required
+            description={prospect?.statut === 'VENDU' ? 'Vendue, la fiche ne se requalifie plus.' : undefined}
+            error={formState.errors.statut?.message}
+          >
             {(props) => (
               <Select
                 items={PROSPECT_STATUT_LABELS}
                 value={statut}
+                disabled={prospect?.statut === 'VENDU'}
                 onValueChange={(value) => {
                   applyIfSelected(value, (statutValue) => {
                     setValue('statut', statutValue, { shouldDirty: true });
@@ -371,7 +381,7 @@ export function ProspectEditDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PROSPECT_STATUTS.map((value) => (
+                  {PROSPECT_STATUTS_MODIFIABLES.map((value) => (
                     <SelectItem key={value} value={value}>
                       {PROSPECT_STATUT_LABELS[value]}
                     </SelectItem>

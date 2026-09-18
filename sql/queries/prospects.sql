@@ -361,6 +361,18 @@ UPDATE "prospects" SET "revueAt" = now(), "revueById" = $2 WHERE "id" = $1 AND "
 -- name: MarquerProspectConverti :exec
 UPDATE "prospects" SET "statut" = 'CONVERTI', "rev" = "rev" + 1 WHERE "id" = $1;
 
+-- Le `WHERE statut = 'CONVERTI'` protège la transition : un double dépôt du
+-- classeur ou un double clic ne fait rien la seconde fois.
+-- name: MarquerProspectVendu :execrows
+UPDATE "prospects" SET "statut" = 'VENDU', "rev" = "rev" + 1
+WHERE "id" = $1 AND "statut" = 'CONVERTI' AND "deletedAt" IS NULL;
+
+-- name: ProspectsVivantsParTelephones :many
+SELECT p."id", p."phoneE164", p."statut", u."fullName" AS "teleconseiller"
+FROM "prospects" p
+LEFT JOIN "users" u ON u."id" = p."lastCallById"
+WHERE p."phoneE164" = ANY(sqlc.arg('telephones')::text[]) AND p."deletedAt" IS NULL;
+
 -- name: JourneysDesProspects :many
 SELECT "id", "prospectId", "projet", "statut", "consent", "consentAt", "convertedAt"
 FROM "prospect_journeys"
@@ -622,7 +634,7 @@ UPDATE "prospect_journeys" SET
   "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
   "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
   "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
-WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';
+WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
 -- name: RequalifierProspect :exec
 UPDATE "prospects" SET
@@ -631,4 +643,4 @@ UPDATE "prospects" SET
   "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
-WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" <> 'CONVERTI';
+WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');

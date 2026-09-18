@@ -79,6 +79,19 @@ export const PROSPECT_STATUTS = [
   'NOUVEAU',
   'CONTACTE',
   'CONVERTI',
+  'VENDU',
+  'PERDU',
+] as const satisfies readonly ProspectStatut[];
+
+/**
+ * Ce que la fiche accepte en écriture directe (création, édition). `VENDU` ne
+ * s'atteint que par l'action dédiée « Marquer vendu » : le serveur le refuse
+ * ailleurs, ce sous-ensemble évite d'offrir un choix qu'il rejette.
+ */
+export const PROSPECT_STATUTS_MODIFIABLES = [
+  'NOUVEAU',
+  'CONTACTE',
+  'CONVERTI',
   'PERDU',
 ] as const satisfies readonly ProspectStatut[];
 
@@ -86,6 +99,7 @@ export const PROSPECT_STATUT_LABELS: Record<ProspectStatut, string> = {
   NOUVEAU: 'Nouveau',
   CONTACTE: 'Contacté',
   CONVERTI: 'Converti',
+  VENDU: 'Vendu',
   PERDU: 'Perdu',
 };
 

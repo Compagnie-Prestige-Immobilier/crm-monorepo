@@ -10,7 +10,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatFcfa, totalVerse, type Vente } from '@/lib/data/ventes';
+import { formatFcfa, totalVerse, type Vente, type VenteParTeleconseiller } from '@/lib/data/ventes';
 import { formatDate } from '@/lib/format';
 
 const MONTANT = 'text-right tabular-nums whitespace-nowrap';
@@ -22,6 +22,7 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
         <TableRow>
           <TableHead>Souscription</TableHead>
           <TableHead>Client</TableHead>
+          <TableHead>Téléconseiller</TableHead>
           <TableHead>Site</TableHead>
           <TableHead>Canal</TableHead>
           <TableHead>Lots</TableHead>
@@ -42,6 +43,7 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
                 {vente.telephone}
               </span>
             </TableCell>
+            <TableCell>{vente.teleconseiller ?? '–'}</TableCell>
             <TableCell>{vente.site}</TableCell>
             <TableCell>{vente.canal}</TableCell>
             <TableCell>
@@ -50,6 +52,33 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
             <TableCell className={MONTANT}>{formatFcfa(vente.prixTotal)}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.acompte)}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.partCpi)}</TableCell>
+          </TableRow>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+export function TableParTeleconseiller({
+  lignes,
+}: {
+  lignes: readonly VenteParTeleconseiller[];
+}) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Téléconseiller</TableHead>
+          <TableHead className="text-right">Ventes</TableHead>
+          <TableHead className="text-right">Chiffre d’affaires</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {lignes.map((ligne) => (
+          <TableRow key={ligne.nom}>
+            <TableCell className="font-[600]">{ligne.nom}</TableCell>
+            <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
+            <TableCell className={MONTANT}>{formatFcfa(ligne.prixTotal)}</TableCell>
           </TableRow>
         ))}
       </TableBody>

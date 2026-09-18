@@ -26,7 +26,7 @@ type ExportProspectsInput struct {
 	Projet                 string `query:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Type                   string `query:"type" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	CanalProvenanceId      string `query:"canalProvenanceId"`
-	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
+	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod"`
@@ -736,17 +736,18 @@ func (s *service) exportVueDEnsemble(ctx context.Context, p *exportPredicat, in 
   COUNT(*) FILTER (WHERE ` + statut + ` = 'NOUVEAU')::int,
   COUNT(*) FILTER (WHERE ` + statut + ` = 'CONTACTE')::int,
   COUNT(*) FILTER (WHERE ` + statut + ` = 'CONVERTI')::int,
+  COUNT(*) FILTER (WHERE ` + statut + ` = 'VENDU')::int,
   COUNT(*) FILTER (WHERE ` + statut + ` = 'PERDU')::int,
   COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '7 days')::int,
   COUNT(*) FILTER (WHERE p."clientCreatedAt" >= now() - interval '30 days')::int` +
 		exportJointuresProspects + ` LEFT JOIN "users" u ON u."id" = p."createdById" WHERE ` + p.where()
-	var v [8]int
-	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7]); err != nil {
+	var v [9]int
+	if err := s.Pool.QueryRow(ctx, requete, args...).Scan(&v[0], &v[1], &v[2], &v[3], &v[4], &v[5], &v[6], &v[7], &v[8]); err != nil {
 		return nil, err
 	}
 	libelles := []string{
 		"Commerciaux actifs", "Départements couverts", "Nouveaux", "Contactés",
-		"Convertis", "Perdus", "Saisis sur 7 jours", "Saisis sur 30 jours",
+		"Convertis", "Vendus", "Perdus", "Saisis sur 7 jours", "Saisis sur 30 jours",
 	}
 	lignes := make([]exportLigneSynthese, 0, len(libelles))
 	for i, libelle := range libelles {
