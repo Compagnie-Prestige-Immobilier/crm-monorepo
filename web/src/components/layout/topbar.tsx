@@ -110,7 +110,9 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
           ouvrir : `INBOX_ROLES`. La montrer plus largement menait « Tout voir »
           droit sur un refus de permission. */}
       {peut(user, 'support.signaler') ? (
-        <SignalerProbleme ecran={title} plateforme={peut(user, 'support.plateforme')} />
+        <div className="hidden md:block">
+          <SignalerProbleme ecran={title} plateforme={peut(user, 'support.plateforme')} />
+        </div>
       ) : null}
       {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
       <ThemeToggle />
