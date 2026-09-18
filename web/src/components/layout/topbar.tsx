@@ -37,7 +37,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
       {accueil ? (
         <Link
           href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
-          className="flex items-center gap-2"
+          className="hidden items-center gap-2 md:flex"
         >
           <img src="/brand/cpi-header.webp" alt="CPI" className="h-10 w-auto" />
           <span className="cpi-go-mark" aria-label="GO">
