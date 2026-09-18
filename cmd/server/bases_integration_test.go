@@ -52,6 +52,49 @@ func TestBaseDemonstrationCreeeServieEtSupprimee(t *testing.T) {
 	}
 }
 
+// Rafraîchir doit remettre la base à l'état d'une base neuve : le semis
+// revient, et ce qu'on avait tapé dedans depuis sa création disparaît.
+func TestBaseDemonstrationRafraichieRepartDuSemis(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	nom := "essai-refresh"
+	baseSQL := prefixeBaseSQL + "essai_refresh"
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = $1`, nom)
+		_ = detruireBaseSQL(b.ctx, b.dsn, baseSQL)
+	})
+
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/admin/bases", map[string]any{"nom": nom}, nil)
+	b.attend(statut, http.StatusCreated, "création de la base", body)
+
+	url, err := urlPourBase(b.dsn, baseSQL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	conn, err := pgx.Connect(b.ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conn.Exec(b.ctx,
+		`INSERT INTO "banques" ("id", "name", "shortName") VALUES ('essai-refresh-banque', 'Trace à effacer', 'TAE')`,
+	); err != nil {
+		_ = conn.Close(b.ctx)
+		t.Fatal(err)
+	}
+	_ = conn.Close(b.ctx)
+
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/admin/bases/"+nom+"/rafraichir", nil, nil)
+	b.attend(statut, http.StatusOK, "rafraîchissement de la base", body)
+
+	if n := compterDansBase(t, b, baseSQL,
+		`SELECT COUNT(*) FROM "banques" WHERE "id" = 'essai-refresh-banque'`); n != 0 {
+		t.Fatal("la trace laissée avant le rafraîchissement doit avoir disparu")
+	}
+	if n := compterDansBase(t, b, baseSQL, `SELECT COUNT(*) FROM "representants"`); n == 0 {
+		t.Fatal("une base rafraîchie doit reporter son jeu d'essai")
+	}
+}
+
 // Créer une base monte une instance, donc reconstruisait la carte GLOBALE des
 // gardes que la garde d'accès lit à chaque requête. Sous trafic, cela plantait
 // le processus sur « concurrent map read and map write ». À lancer avec -race.

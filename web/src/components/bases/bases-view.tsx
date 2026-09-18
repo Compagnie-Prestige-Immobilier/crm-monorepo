@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { DatabaseIcon, Trash2Icon } from 'lucide-react';
+import { DatabaseIcon, RefreshCwIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -11,16 +11,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
-import { basesDemoQuery, creerBaseDemo, supprimerBaseDemo } from '@/lib/data/bases';
+import {
+  basesDemoQuery,
+  creerBaseDemo,
+  rafraichirBaseDemo,
+  supprimerBaseDemo,
+} from '@/lib/data/bases';
 import { formatDateTime } from '@/lib/format';
 
 export function BasesView() {
   const client = useQueryClient();
   const [nom, setNom] = useState('');
-  const [aConfirmer, setAConfirmer] = useState<string | null>(null);
+  const [aSupprimer, setASupprimer] = useState<string | null>(null);
+  const [aRafraichir, setARafraichir] = useState<string | null>(null);
   const bases = useQuery(basesDemoQuery());
 
-  const rafraichir = (): void => {
+  const invalider = (): void => {
     void client.invalidateQueries({ queryKey: basesDemoQuery().queryKey });
   };
 
@@ -28,7 +34,7 @@ export function BasesView() {
     mutationFn: creerBaseDemo,
     onSuccess: () => {
       setNom('');
-      rafraichir();
+      invalider();
       toast.success('Base créée. Elle apparaît dans le sélecteur de la page de connexion.');
     },
     onError: (erreur: Error) => {
@@ -39,9 +45,21 @@ export function BasesView() {
   const suppression = useMutation({
     mutationFn: supprimerBaseDemo,
     onSuccess: () => {
-      setAConfirmer(null);
-      rafraichir();
+      setASupprimer(null);
+      invalider();
       toast.success('Base supprimée.');
+    },
+    onError: (erreur: Error) => {
+      toast.error(erreur.message);
+    },
+  });
+
+  const rafraichissement = useMutation({
+    mutationFn: rafraichirBaseDemo,
+    onSuccess: () => {
+      setARafraichir(null);
+      invalider();
+      toast.success('Base réinitialisée avec le schéma et les données d’exemple actuels.');
     },
     onError: (erreur: Error) => {
       toast.error(erreur.message);
@@ -124,18 +142,32 @@ export function BasesView() {
                       {base.createdByName === '' ? '' : ` par ${base.createdByName}`}
                     </p>
                   </div>
-                  <Button
-                    type="button"
-                    variant="destructive"
-                    size="sm"
-                    disabled={suppression.isPending}
-                    onClick={() => {
-                      setAConfirmer(base.nom);
-                    }}
-                  >
-                    <Trash2Icon className="size-4" aria-hidden="true" />
-                    Supprimer
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={rafraichissement.isPending}
+                      onClick={() => {
+                        setARafraichir(base.nom);
+                      }}
+                    >
+                      <RefreshCwIcon className="size-4" aria-hidden="true" />
+                      Rafraîchir
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="destructive"
+                      size="sm"
+                      disabled={suppression.isPending}
+                      onClick={() => {
+                        setASupprimer(base.nom);
+                      }}
+                    >
+                      <Trash2Icon className="size-4" aria-hidden="true" />
+                      Supprimer
+                    </Button>
+                  </div>
                 </li>
               ))}
             </ul>
@@ -144,16 +176,30 @@ export function BasesView() {
       </Card>
 
       <ConfirmDialog
-        open={aConfirmer !== null}
+        open={aSupprimer !== null}
         onOpenChange={(ouvert) => {
-          if (!ouvert) setAConfirmer(null);
+          if (!ouvert) setASupprimer(null);
         }}
-        title={`Supprimer la base « ${aConfirmer ?? ''} » ?`}
+        title={`Supprimer la base « ${aSupprimer ?? ''} » ?`}
         description="La base et tout ce qu’elle contient sont détruits sur le serveur. C’est immédiat et sans retour possible."
         confirmLabel="Supprimer définitivement"
         pending={suppression.isPending}
         onConfirm={() => {
-          if (aConfirmer !== null) suppression.mutate(aConfirmer);
+          if (aSupprimer !== null) suppression.mutate(aSupprimer);
+        }}
+      />
+
+      <ConfirmDialog
+        open={aRafraichir !== null}
+        onOpenChange={(ouvert) => {
+          if (!ouvert) setARafraichir(null);
+        }}
+        title={`Rafraîchir la base « ${aRafraichir ?? ''} » ?`}
+        description="Son contenu repart du schéma et des données d’exemple actuels : ce qui a été saisi dedans depuis sa création est perdu."
+        confirmLabel="Rafraîchir"
+        pending={rafraichissement.isPending}
+        onConfirm={() => {
+          if (aRafraichir !== null) rafraichissement.mutate(aRafraichir);
         }}
       />
     </div>
