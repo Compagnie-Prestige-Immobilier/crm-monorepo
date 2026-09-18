@@ -105,6 +105,11 @@ function isSegmentChanged(
   return segmentBascule(prospect, banqueId, syndicatId);
 }
 
+// Vendue, une fiche affiche le dernier statut modifiable ; le champ ne se soumet pas.
+function statutAffiche(statut: ProspectRow['statut']): ProspectFormInput['statut'] {
+  return statut === 'VENDU' ? 'CONVERTI' : statut;
+}
+
 function savedByLabel(prospect: ProspectRow | null): string {
   if (prospect === null) return '–';
   return prospect.ownedByCommercialName;
@@ -237,6 +242,7 @@ export function ProspectEditDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const vendue = prospect?.statut === 'VENDU';
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -271,8 +277,7 @@ export function ProspectEditDialog({
       banqueId: prospect.banqueId ?? '',
       syndicatId: prospect.syndicatId ?? '',
       representantId: prospect.representantId ?? '',
-      // Vendue, la fiche n'a plus de choix éditable : le dernier statut modifiable l'affiche.
-      statut: prospect.statut === 'VENDU' ? 'CONVERTI' : prospect.statut,
+      statut: statutAffiche(prospect.statut),
     });
   }, [prospect, reset]);
 
@@ -363,16 +368,14 @@ export function ProspectEditDialog({
           <Field
             label="Statut"
             required
-            description={
-              prospect?.statut === 'VENDU' ? 'Vendue, la fiche ne se requalifie plus.' : undefined
-            }
+            description={vendue ? 'Vendue, la fiche ne se requalifie plus.' : undefined}
             error={formState.errors.statut?.message}
           >
             {(props) => (
               <Select
                 items={PROSPECT_STATUT_LABELS}
                 value={statut}
-                disabled={prospect?.statut === 'VENDU'}
+                disabled={vendue}
                 onValueChange={(value) => {
                   applyIfSelected(value, (statutValue) => {
                     setValue('statut', statutValue, { shouldDirty: true });
