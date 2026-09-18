@@ -110,6 +110,14 @@ function statutAffiche(statut: ProspectRow['statut']): ProspectFormInput['statut
   return statut === 'VENDU' ? 'CONVERTI' : statut;
 }
 
+function estVendue(prospect: ProspectRow | null): boolean {
+  return prospect?.statut === 'VENDU';
+}
+
+function descriptionStatut(vendue: boolean): string | undefined {
+  return vendue ? 'Vendue, la fiche ne se requalifie plus.' : undefined;
+}
+
 function savedByLabel(prospect: ProspectRow | null): string {
   if (prospect === null) return '–';
   return prospect.ownedByCommercialName;
@@ -242,7 +250,7 @@ export function ProspectEditDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
-  const vendue = prospect?.statut === 'VENDU';
+  const vendue = estVendue(prospect);
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -368,7 +376,7 @@ export function ProspectEditDialog({
           <Field
             label="Statut"
             required
-            description={vendue ? 'Vendue, la fiche ne se requalifie plus.' : undefined}
+            description={descriptionStatut(vendue)}
             error={formState.errors.statut?.message}
           >
             {(props) => (
