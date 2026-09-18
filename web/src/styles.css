@@ -718,11 +718,11 @@ html.dark:has([data-coque='chues']) {
     background: #2b0207;
   }
 
-  .cpi-navbar button {
+  .cpi-navbar button:not(.cpi-export) {
     color: #fff;
   }
 
-  .panel-topbar button {
+  .panel-topbar button:not(.cpi-export) {
     color: var(--foreground) !important;
   }
 
