@@ -72,16 +72,14 @@ type CategoriesOutput struct {
 	Body []CategorieDTO
 }
 
-// Une catégorie illisible (droit manquant côté GLPI) masque le choix au lieu de bloquer le ticket.
 func (g glpi) categories(ctx context.Context, _ *struct{}) (*CategoriesOutput, error) {
 	out := &CategoriesOutput{Body: []CategorieDTO{}}
-	if g.url == "" {
-		return out, nil
+	if !g.configure() {
+		return nil, nonConfigure()
 	}
 	session, err := g.ouvrirSession(ctx)
 	if err != nil {
-		slog.Warn("catégories GLPI illisibles", "err", err)
-		return out, nil
+		return nil, glpiInjoignable(err)
 	}
 	defer g.fermerSession(ctx, session)
 	var lues []struct {
@@ -91,8 +89,7 @@ func (g glpi) categories(ctx context.Context, _ *struct{}) (*CategoriesOutput, e
 		Incident int    `json:"is_incident"`
 	}
 	if err := g.appeler(ctx, session, http.MethodGet, "/ITILCategory?range=0-500", "", nil, &lues); err != nil {
-		slog.Warn("catégories GLPI illisibles", "err", err)
-		return out, nil
+		return nil, glpiInjoignable(err)
 	}
 	for _, c := range lues {
 		if c.Visible == 1 && c.Incident == 1 {
@@ -109,8 +106,8 @@ type TicketOutput struct {
 }
 
 func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error) {
-	if g.url == "" || g.appToken == "" || g.userToken == "" {
-		return nil, socle.Problem(http.StatusServiceUnavailable, "SUPPORT_NON_CONFIGURE", "Le support n'est pas encore relié à GLPI. Prévenez l'administrateur.")
+	if !g.configure() {
+		return nil, nonConfigure()
 	}
 	form := in.RawBody.Data()
 	if len(form.Images) > imagesMax {
@@ -283,8 +280,16 @@ func (g glpi) envoyer(req *http.Request, cible any) error {
 	return json.Unmarshal(lu, cible)
 }
 
+func (g glpi) configure() bool {
+	return g.url != "" && g.appToken != "" && g.userToken != ""
+}
+
+func nonConfigure() error {
+	return socle.Problem(http.StatusServiceUnavailable, "SUPPORT_NON_CONFIGURE", "Le support n'est pas encore relié à GLPI. Prévenez l'administrateur.")
+}
+
 func glpiInjoignable(err error) error {
-	slog.Error("ticket GLPI non créé", "err", err)
+	slog.Error("appel GLPI en échec", "err", err)
 	return socle.Problem(http.StatusBadGateway, "SUPPORT_GLPI_INJOIGNABLE", "GLPI ne répond pas. Réessayez dans un instant.")
 }
 
