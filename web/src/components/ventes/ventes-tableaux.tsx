@@ -59,11 +59,7 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
   );
 }
 
-export function TableParTeleconseiller({
-  lignes,
-}: {
-  lignes: readonly VenteParTeleconseiller[];
-}) {
+export function TableParTeleconseiller({ lignes }: { lignes: readonly VenteParTeleconseiller[] }) {
   return (
     <Table>
       <TableHeader>
