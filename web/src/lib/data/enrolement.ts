@@ -32,6 +32,7 @@ export interface FiltresInscriptions {
   dateFrom?: string | undefined;
   dateTo?: string | undefined;
   rapproche?: boolean | undefined;
+  negatif?: boolean | undefined;
   inclureDisparues?: boolean | undefined;
   avancement?: Avancement | undefined;
 }

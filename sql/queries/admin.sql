@@ -139,6 +139,9 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet"
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))
+  AND (sqlc.narg('negatif')::boolean IS NULL
+       OR (sqlc.narg('negatif')::boolean AND i."motifNegatif" IS NOT NULL)
+       OR (NOT sqlc.narg('negatif')::boolean AND i."motifNegatif" IS NULL))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR i."inscriteLe" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR i."inscriteLe" <= sqlc.narg('date_to')::timestamp)
   AND (sqlc.narg('search')::text IS NULL
@@ -150,7 +153,7 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet"
 -- name: ListInscriptions :many
 SELECT i."id", i."projet", i."identifiantDistant", i."nom", i."prenom", i."phoneE164",
        i."email", i."statutDistant", i."etapeDistante", i."inscriteLe", i."soumiseLe",
-       i."decideeLe", i."disparueLe", i."prospectId", i."dernierTirageAt"
+       i."decideeLe", i."disparueLe", i."prospectId", i."dernierTirageAt", i."motifNegatif"
 FROM "inscriptions_plateforme" i
 WHERE i."projet" = sqlc.arg('projet')::"Projet"
   AND (sqlc.arg('inclure_disparues')::boolean OR i."disparueLe" IS NULL)
@@ -164,6 +167,9 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet"
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))
+  AND (sqlc.narg('negatif')::boolean IS NULL
+       OR (sqlc.narg('negatif')::boolean AND i."motifNegatif" IS NOT NULL)
+       OR (NOT sqlc.narg('negatif')::boolean AND i."motifNegatif" IS NULL))
   AND (sqlc.narg('date_from')::timestamp IS NULL OR i."inscriteLe" >= sqlc.narg('date_from')::timestamp)
   AND (sqlc.narg('date_to')::timestamp IS NULL OR i."inscriteLe" <= sqlc.narg('date_to')::timestamp)
   AND (sqlc.narg('search')::text IS NULL
@@ -177,7 +183,8 @@ LIMIT sqlc.arg('page_size')::int OFFSET sqlc.arg('page_offset')::int;
 -- name: GetInscription :one
 SELECT i."id", i."projet", i."identifiantDistant", i."nom", i."prenom", i."phoneE164",
        i."email", i."statutDistant", i."etapeDistante", i."inscriteLe", i."soumiseLe",
-       i."decideeLe", i."disparueLe", i."prospectId", i."dernierTirageAt", i."chargeUtile"
+       i."decideeLe", i."disparueLe", i."prospectId", i."dernierTirageAt", i."chargeUtile",
+       i."motifNegatif"
 FROM "inscriptions_plateforme" i
 WHERE i."id" = $1 AND i."projet" = $2;
 
@@ -185,15 +192,16 @@ WHERE i."id" = $1 AND i."projet" = $2;
 INSERT INTO "inscriptions_plateforme" (
   "id", "projet", "identifiantDistant", "nom", "prenom", "phoneE164", "email",
   "statutDistant", "etapeDistante", "inscriteLe", "soumiseLe", "decideeLe",
-  "disparueLe", "prospectId", "chargeUtile", "dernierTirageAt", "updatedAt")
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL, $13, $14, $15, now())
+  "disparueLe", "prospectId", "chargeUtile", "dernierTirageAt", "updatedAt", "motifNegatif")
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NULL, $13, $14, $15, now(), $16)
 ON CONFLICT ("projet", "identifiantDistant") DO UPDATE SET
   "nom" = EXCLUDED."nom", "prenom" = EXCLUDED."prenom", "phoneE164" = EXCLUDED."phoneE164",
   "email" = EXCLUDED."email", "statutDistant" = EXCLUDED."statutDistant",
   "etapeDistante" = EXCLUDED."etapeDistante", "inscriteLe" = EXCLUDED."inscriteLe",
   "soumiseLe" = EXCLUDED."soumiseLe", "decideeLe" = EXCLUDED."decideeLe",
   "disparueLe" = NULL, "prospectId" = EXCLUDED."prospectId",
-  "chargeUtile" = EXCLUDED."chargeUtile", "dernierTirageAt" = EXCLUDED."dernierTirageAt";
+  "chargeUtile" = EXCLUDED."chargeUtile", "dernierTirageAt" = EXCLUDED."dernierTirageAt",
+  "motifNegatif" = EXCLUDED."motifNegatif";
 
 -- name: IdentifiantsConnus :many
 SELECT "identifiantDistant" FROM "inscriptions_plateforme" WHERE "projet" = $1;
