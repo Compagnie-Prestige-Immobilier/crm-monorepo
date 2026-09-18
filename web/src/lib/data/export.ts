@@ -3,6 +3,12 @@ import { serializeGrandPublicFilters, type GrandPublicFilters } from '@/lib/data
 import { serializeProspectFilters } from '@/lib/filters';
 import type { ProspectFilters } from '@/lib/types';
 
+// Les routes du serveur Go, versionnees et nommees par leur extension. Les
+// chemins `/api/export/*` etaient ceux du relais Next de la v1 : le binaire
+// repond « Route inconnue. » a tout `/api/` qu'il ne sert pas.
+const CHEMIN_PROSPECTS = '/api/v1/export/prospects.xlsx';
+const CHEMIN_DOSSIERS = '/api/v1/export/bank-cases.xlsx';
+
 export type ProspectExportMode = 'filtered' | 'consolidated';
 
 export function buildExportUrl(
@@ -20,8 +26,13 @@ export function buildExportUrl(
     params.set('mode', 'consolidated');
   }
 
+  // L'ecran ecrit « oui » et « non » dans son URL ; la route d'export attend le
+  // booleen que porte le contrat.
+  const revue = params.get('revue');
+  if (revue !== null) params.set('revue', String(revue === 'oui'));
+
   const query = params.toString();
-  return query === '' ? '/api/export/prospects' : `/api/export/prospects?${query}`;
+  return query === '' ? CHEMIN_PROSPECTS : `${CHEMIN_PROSPECTS}?${query}`;
 }
 
 export function exportFileName(now = new Date(), mode: ProspectExportMode = 'filtered'): string {
@@ -46,7 +57,7 @@ export function buildGrandPublicExportUrl(filters: GrandPublicFilters, viewerId:
   params.delete('origine');
   if (filters.origine === 'MOI') params.set('commercialId', viewerId);
   params.set('projet', 'GRAND_PUBLIC');
-  return `/api/export/prospects?${params.toString()}`;
+  return `${CHEMIN_PROSPECTS}?${params.toString()}`;
 }
 
 export function grandPublicExportFileName(now = new Date()): string {
@@ -63,7 +74,7 @@ export function buildBankExportUrl(filters: BankCaseFilters): string {
   // d'export, elle, n'a que ce paramètre pour savoir de quelle coque elle vient.
   if (filters.projet !== null) params.set('projet', filters.projet);
   const query = params.toString();
-  return query === '' ? '/api/export/bank-cases' : `/api/export/bank-cases?${query}`;
+  return query === '' ? CHEMIN_DOSSIERS : `${CHEMIN_DOSSIERS}?${query}`;
 }
 
 export function bankExportFileName(now = new Date()): string {
