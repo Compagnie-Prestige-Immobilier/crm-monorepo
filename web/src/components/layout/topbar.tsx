@@ -24,7 +24,16 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
   const title = navTitle(user, pathname);
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center gap-2 border-b border-border bg-background/90 px-4 backdrop-blur-sm">
+    <header className="cpi-navbar sticky top-0 z-30 flex h-20 shrink-0 items-center gap-3 border-b border-white/15 px-4 text-primary-foreground md:px-6">
+      <Link
+        href={`${HUB_PATH}?retour=${encodeURIComponent(pathname)}`}
+        className="flex items-center gap-2"
+      >
+        <img src="/brand/cpi-header.webp" alt="CPI" className="h-10 w-auto" />
+        <span className="cpi-go-mark" aria-label="GO">
+          GO
+        </span>
+      </Link>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger
           render={
@@ -52,7 +61,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         </SheetContent>
       </Sheet>
 
-      <h1 className="min-w-0 flex-1 truncate font-display text-[1.25rem] font-[700] tracking-[-0.02em]">
+      <h1 className="min-w-0 flex-1 truncate font-display text-[1.25rem] font-[700] tracking-[-0.02em] text-white">
         {title}
       </h1>
 
