@@ -144,7 +144,7 @@ func Monter(api huma.API, d *socle.Deps) {
 
 var (
 	exportLibellesProjet            = map[string]string{exportCleChues: exportCleChues, exportCleGrandPublic: "Grand Public"}
-	exportLibellesStatut            = map[string]string{string(db.ProspectStatutNOUVEAU): "Nouveau", string(db.ProspectStatutCONTACTE): exportLibelleContacte, string(db.ProspectStatutCONVERTI): "Converti", string(db.ProspectStatutPERDU): "Perdu"}
+	exportLibellesStatut            = map[string]string{string(db.ProspectStatutNOUVEAU): "Nouveau", string(db.ProspectStatutCONTACTE): exportLibelleContacte, string(db.ProspectStatutCONVERTI): "Converti", string(db.ProspectStatutPERDU): "Perdu", string(db.ProspectStatutVENDU): "Vendu"}
 	exportLibellesType              = map[string]string{"FONCTIONNAIRE": exportLibelleFonctionnaire, "SECTEUR_PRIVE": "Secteur privé", "INFORMEL": "Informel", "DIASPORA": "Diaspora"}
 	exportLibellesContrat           = map[string]string{string(db.TypeContratCDI): exportLibelleCdi, string(db.TypeContratCDD): exportLibelleCdd, string(db.TypeContratAUTRE): ExportLibelleAutre}
 	exportLibellesEpargne           = map[string]string{"TONTINE": exportLibelleTontine, "MOBILE_MONEY": ExportLibelleMobileMoney, "BANQUE": exportEnteteBanque, ExportCleAucun: exportLibelleAucun}

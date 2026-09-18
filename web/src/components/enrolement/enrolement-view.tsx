@@ -78,6 +78,7 @@ const RAPPROCHES = 'rapproches';
 const SANS_PROSPECT = 'sans-prospect';
 const PRESENTES = 'presentes';
 const AVEC_DISPARUES = 'avec-disparues';
+const NEGATIFS = 'negatifs';
 
 const libelle = (valeur: (typeof ONGLETS)[number]): string =>
   valeur === SYNTHESE ? 'Synthèse' : LIBELLE_ONGLET[valeur];
@@ -605,6 +606,25 @@ function FiltresBarre({
       </div>
 
       <div className="flex flex-col gap-1.5">
+        <Label htmlFor="negatif-enrolement">Motif</Label>
+        <Select
+          value={filtres.negatif === true ? NEGATIFS : TOUS}
+          onValueChange={(valeur) => {
+            if (valeur === null) return;
+            poser({ negatif: valeur === NEGATIFS ? true : undefined });
+          }}
+        >
+          <SelectTrigger id="negatif-enrolement" size="sm" className="w-52">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value={TOUS}>Toutes</SelectItem>
+            <SelectItem value={NEGATIFS}>Négatives seulement</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
         <Label htmlFor="presence-enrolement">Sur la plateforme</Label>
         <Select
           value={filtres.inclureDisparues === true ? AVEC_DISPARUES : PRESENTES}
@@ -671,6 +691,7 @@ interface EtatInscriptions {
           inscriteLe: string | null;
           disparueLe: string | null;
           prospectId: string | null;
+          motifNegatif: string | null;
         }[];
         meta: { total: number; page: number; pageCount: number };
       }
@@ -745,6 +766,7 @@ function TableauInscriptions({
             <TableHead>Nom</TableHead>
             <TableHead>Contact</TableHead>
             <TableHead>Statut</TableHead>
+            <TableHead>Motif</TableHead>
             <TableHead>Étape</TableHead>
             <TableHead>Inscription</TableHead>
             <TableHead>
@@ -781,6 +803,13 @@ function TableauInscriptions({
                   <span className="ml-2 text-[0.75rem] text-muted-foreground">
                     retirée de la plateforme le {formatDate(ligne.disparueLe)}
                   </span>
+                )}
+              </TableCell>
+              <TableCell>
+                {ligne.motifNegatif === null ? (
+                  '—'
+                ) : (
+                  <Badge variant="destructive">{ligne.motifNegatif}</Badge>
                 )}
               </TableCell>
               <TableCell className="tabular-nums">{ligne.etapeDistante ?? '—'}</TableCell>

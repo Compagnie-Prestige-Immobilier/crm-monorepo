@@ -244,6 +244,14 @@ export async function marquerProspectRevue(
   return unwrap(await client.POST('/api/v1/prospects/{id}/revue', { params: { path: { id } } }));
 }
 
+/** Le closing confirme la vente : la fiche convertie devient vendue. */
+export async function marquerProspectVendu(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(await client.POST('/api/v1/prospects/{id}/vendre', { params: { path: { id } } }));
+}
+
 export async function deleteProspect(
   id: string,
   client: ApiClient = getApiClient(),

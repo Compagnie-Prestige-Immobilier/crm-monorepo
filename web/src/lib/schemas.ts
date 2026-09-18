@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { PROSPECT_TYPES } from '@/lib/data/grand-public';
 import { WHATSAPP_STATUSES } from '@/lib/data/representants';
-import { DUREE_ETABLISSEMENT_MAX_MOIS, PAYMENT_MODES, PROSPECT_STATUTS } from '@/lib/types';
+import {
+  DUREE_ETABLISSEMENT_MAX_MOIS,
+  PAYMENT_MODES,
+  PROSPECT_STATUTS_MODIFIABLES,
+} from '@/lib/types';
 
 export const loginSchema = z.object({
   identifier: z
@@ -126,7 +130,7 @@ export const prospectSchema = z.object({
   banqueId: z.string().trim(),
   syndicatId: z.string().trim(),
   representantId: z.string().trim(),
-  statut: z.enum(PROSPECT_STATUTS),
+  statut: z.enum(PROSPECT_STATUTS_MODIFIABLES),
 });
 export type ProspectFormInput = z.infer<typeof prospectSchema>;
 

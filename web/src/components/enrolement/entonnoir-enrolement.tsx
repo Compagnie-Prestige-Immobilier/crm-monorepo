@@ -51,6 +51,12 @@ const ETAGES: readonly Etage[] = [
     aide: 'Une décision est datée sur la plateforme.',
     filtre: 'decide',
   },
+  {
+    cle: 'negatifs',
+    label: 'Négatifs',
+    aide: 'Un refus, une pièce à remplacer ou un dossier incomplet : ce qui n’avance plus sans intervention.',
+    filtre: undefined,
+  },
 ];
 
 /**

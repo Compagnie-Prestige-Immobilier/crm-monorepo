@@ -55,6 +55,7 @@ function Normalise({
       </Case>
       <Case cle="Courriel">{texte(detail.email)}</Case>
       <Case cle="Statut">{libelles.get(detail.statutDistant) ?? detail.statutDistant}</Case>
+      <Case cle="Motif négatif">{texte(detail.motifNegatif)}</Case>
       <Case cle="Étape">{detail.etapeDistante ?? ABSENT}</Case>
       <Case cle="Inscription">{texte(detail.inscriteLe, formatDateTime)}</Case>
       <Case cle="Dossier soumis">{texte(detail.soumiseLe, formatDateTime)}</Case>

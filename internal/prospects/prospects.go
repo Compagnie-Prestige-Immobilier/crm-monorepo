@@ -159,7 +159,7 @@ type Prospect struct {
 	Prenom                   string            `json:"prenom"`
 	PhoneE164                *string           `json:"phoneE164"`
 	Rev                      int32             `json:"rev"`
-	Statut                   string            `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
+	Statut                   string            `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Projet                   string            `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	BanqueID                 *string           `json:"banqueId"`
 	BanqueName               *string           `json:"banqueName"`
@@ -448,7 +448,7 @@ type ProspectListInput struct {
 	Projet                 string `query:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Type                   string `query:"type" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
 	CanalProvenanceID      string `query:"canalProvenanceId" format:"uuid"`
-	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
+	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
@@ -1106,6 +1106,7 @@ var prospectTransitions = map[db.ProspectStatut][]db.ProspectStatut{
 	db.ProspectStatutCONTACTE: {db.ProspectStatutCONVERTI, db.ProspectStatutPERDU},
 	db.ProspectStatutPERDU:    {db.ProspectStatutCONTACTE},
 	db.ProspectStatutCONVERTI: {},
+	db.ProspectStatutVENDU:    {},
 }
 
 // `CONVERTI` porte une conversion signée et datée : on n'y entre que par la
@@ -1459,6 +1460,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects/{id}/journal":                              prospectLecture,
 	"PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": socle.PermissionProspectsConvertir,
 	"POST /api/v1/prospects/{id}/parcours/grand-public/conversion":    socle.PermissionProspectsConvertir,
+	"POST /api/v1/prospects/{id}/vendre":                              socle.PermissionProspectsConvertir,
 	"GET /api/v1/champs-conversion/{projet}":                          socle.PermissionPanneauAcceder,
 	"PUT /api/v1/champs-conversion/{projet}":                          socle.PermissionFormulairesAdministrer,
 	"GET /api/v1/parametres-chues":                                    socle.PermissionFichesTenir,

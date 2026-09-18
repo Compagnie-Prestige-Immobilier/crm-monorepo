@@ -674,6 +674,66 @@ func adminReglagesEcrits(b *banc) {
 	}
 }
 
+func adminPlateformeChuesAdhesionRejetee(demandeID string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/clients":
+			_, _ = w.Write([]byte(`{"clients":[],"meta":{"lastPage":1}}`))
+		case "/chues/adhesions":
+			_, _ = w.Write([]byte(`{"requests":[{"id":"` + demandeID + `","email":"rejetee@example.sn",` +
+				`"firstName":"Awa","lastName":"Diop","phone":"+221771234567","status":"rejected",` +
+				`"callStatus":"unreachable","createdAt":1757000000000,"decidedAt":1757100000000}],"meta":{"lastPage":1}}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+func TestAdminTirageEnrolementChuesDemandeRejeteeSansCompteEstNegative(t *testing.T) {
+	b := adminConnecte(t)
+	demandeID := uuid.NewString()
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
+	})
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+
+	plateforme := adminPlateformeChuesAdhesionRejetee(demandeID)
+	t.Cleanup(plateforme.Close)
+	t.Setenv("PLATEFORME_CHUES_URL", plateforme.URL)
+	t.Setenv("PLATEFORME_CHUES_TOKEN", "jeton-machine")
+
+	statut, body := adminAppel(b, http.MethodPost, "/api/v1/enrolement/CHUES/tirage", nil)
+	b.attend(statut, http.StatusCreated, "tirage CHUES", body)
+	if body["erreur"] != nil {
+		t.Fatalf("tirage en erreur : %v", body["erreur"])
+	}
+	if nombreDe(body["crees"]) != 1 {
+		t.Fatalf("compteurs du tirage : %v", body)
+	}
+
+	var motif *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "motifNegatif" FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES' AND "identifiantDistant" = $1`,
+		"adhesion-"+demandeID).Scan(&motif); err != nil {
+		t.Fatal(err)
+	}
+	if motif == nil || *motif != "Refus des deux" {
+		t.Fatalf("motif négatif : %v", motif)
+	}
+
+	statut, negatifs := adminAppel(b, http.MethodGet, "/api/v1/enrolement/CHUES/inscriptions?negatif=true", nil)
+	b.attend(statut, http.StatusOK, "liste des inscriptions négatives", negatifs)
+	items, _ := negatifs["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("%d inscriptions négatives : %v", len(items), negatifs)
+	}
+	if premiere, _ := items[0].(map[string]any); premiere["motifNegatif"] != "Refus des deux" {
+		t.Fatalf("motif dans la liste : %v", items[0])
+	}
+}
+
 func TestAdminSupervisionLitLaPresenceBattue(t *testing.T) {
 	b := adminConnecte(t)
 	teleID, teleEmail := adminCompte(b, "COMMERCIAL")
