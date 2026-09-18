@@ -30,8 +30,19 @@ var lecteurs = socle.PermissionVentesLire
 
 var Garde = map[string]socle.Permission{
 	"GET /api/v1/ventes":                  lecteurs,
+	"POST /api/v1/ventes":                 lecteurs,
+	"PATCH /api/v1/ventes/{id}":           lecteurs,
+	"DELETE /api/v1/ventes/{id}":          lecteurs,
+	"POST /api/v1/ventes/{id}/restaurer":  lecteurs,
 	"POST /api/v1/ventes/classeur":        lecteurs,
 	"GET /api/v1/ventes/classeur/fichier": lecteurs,
+	"GET /api/v1/ventes/configuration":    lecteurs,
+	"POST /api/v1/ventes/sites":            lecteurs,
+	"PATCH /api/v1/ventes/sites/{id}":     lecteurs,
+	"POST /api/v1/ventes/sites/{id}/active": lecteurs,
+	"POST /api/v1/ventes/canaux":           lecteurs,
+	"PATCH /api/v1/ventes/canaux/{id}":    lecteurs,
+	"POST /api/v1/ventes/canaux/{id}/active": lecteurs,
 }
 
 const codeIllisible = "VENTES_CLASSEUR_ILLISIBLE"
@@ -40,8 +51,24 @@ func Monter(api huma.API, d *socle.Deps) {
 	s := &service{d}
 	huma.Register(api, huma.Operation{
 		OperationID: "listVentes", Method: http.MethodGet, Path: "/api/v1/ventes",
-		Summary: "Les ventes et leurs versements, lus dans le dernier classeur déposé.",
+		Summary: "Les ventes actives et leurs versements.",
 	}, s.lister)
+	huma.Register(api, huma.Operation{
+		OperationID: "createVente", Method: http.MethodPost, Path: "/api/v1/ventes",
+		DefaultStatus: http.StatusCreated, Summary: "Enregistre une vente saisie dans le panneau.",
+	}, s.creer)
+	huma.Register(api, huma.Operation{
+		OperationID: "updateVente", Method: http.MethodPatch, Path: "/api/v1/ventes/{id}",
+		Summary: "Corrige une vente et ses versements.",
+	}, s.corriger)
+	huma.Register(api, huma.Operation{
+		OperationID: "archiveVente", Method: http.MethodDelete, Path: "/api/v1/ventes/{id}",
+		Summary: "Archive une vente sans supprimer son historique.",
+	}, s.archiver)
+	huma.Register(api, huma.Operation{
+		OperationID: "restoreVente", Method: http.MethodPost, Path: "/api/v1/ventes/{id}/restaurer",
+		Summary: "Restaure une vente archivée.",
+	}, s.restaurer)
 	huma.Register(api, huma.Operation{
 		OperationID: "deposerClasseurVentes", Method: http.MethodPost, Path: "/api/v1/ventes/classeur",
 		MaxBodyBytes: 20 << 20,
@@ -51,6 +78,11 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "telechargerClasseurVentes", Method: http.MethodGet, Path: "/api/v1/ventes/classeur/fichier",
 		Summary: "Le classeur déposé, tel quel.",
 	}, s.telecharger)
+	huma.Register(api, huma.Operation{
+		OperationID: "listVentesConfiguration", Method: http.MethodGet, Path: "/api/v1/ventes/configuration",
+		Summary: "Les sites et canaux proposés à la saisie.",
+	}, s.configuration)
+	monterConfiguration(api, s)
 }
 
 type VersementDTO struct {
@@ -59,6 +91,8 @@ type VersementDTO struct {
 }
 
 type VenteDTO struct {
+	ID               int64          `json:"id"`
+	Origine          string         `json:"origine"`
 	Numero           int32          `json:"numero"`
 	Canal            string         `json:"canal"`
 	DateSouscription *string        `json:"dateSouscription"`
@@ -123,14 +157,17 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 	out.Body.ParTeleconseiller = []VenteParTeleconseillerDTO{}
 	classeur, err := s.Q.ClasseurVentes(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return out, nil
+		classeur = db.ClasseurVentesRow{}
+		err = nil
 	}
 	if err != nil {
 		return nil, err
 	}
-	out.Body.Classeur = &ClasseurDTO{
-		NomFichier: classeur.NomFichier, Depuis: jourOuNul(classeur.Depuis),
-		ImporteLe: classeur.ImporteLe.UTC().Format(time.RFC3339), ImportePar: classeur.ImportePar,
+	if classeur.ID != "" {
+		out.Body.Classeur = &ClasseurDTO{
+			NomFichier: classeur.NomFichier, Depuis: jourOuNul(classeur.Depuis),
+			ImporteLe: classeur.ImporteLe.UTC().Format(time.RFC3339), ImportePar: classeur.ImportePar,
+		}
 	}
 	ventes, err := s.Q.ListerVentes(ctx)
 	if err != nil {
@@ -253,7 +290,7 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 		versements = []VersementDTO{}
 	}
 	return VenteDTO{
-		Numero: v.Numero, Canal: v.Canal, DateSouscription: jourOuNul(v.DateSouscription), Client: v.Client,
+		ID: v.ID, Origine: v.Origine, Numero: v.Numero, Canal: v.Canal, DateSouscription: jourOuNul(v.DateSouscription), Client: v.Client,
 		Telephone: v.Telephone, Site: v.Site, NombreLots: v.NombreLots, NumerosLots: v.NumerosLots,
 		Superficie: v.Superficie, PrixUnitaire: v.PrixUnitaire, PrixTotal: v.PrixTotal, Acompte: v.Acompte,
 		Reliquat: v.Reliquat, PartProprietaire: v.PartProprietaire, PartApporteur: v.PartApporteur,
@@ -286,6 +323,9 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 	u := socle.UtilisateurCourant(ctx)
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if err := q.SupprimerVentesImportees(ctx); err != nil {
+			return err
+		}
 		if err := q.SupprimerClasseursVentes(ctx); err != nil {
 			return err
 		}
@@ -325,7 +365,8 @@ func telephonesDesVentesLues(lues []venteLue, region string) []string {
 func insererVentes(ctx context.Context, q *db.Queries, classeurID string, lues []venteLue) error {
 	for i := range lues {
 		v := &lues[i]
-		v.ligne.ClasseurId = classeurID
+		v.ligne.ClasseurId = &classeurID
+		v.ligne.Origine = "IMPORT"
 		venteID, err := q.InsererVente(ctx, v.ligne)
 		if err != nil {
 			return err
