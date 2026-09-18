@@ -455,6 +455,7 @@
   "PATCH /api/v1/visites/referentiels/{kind}/{id}": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/admin/bases": ["ADMIN"],
+  "POST /api/v1/admin/bases/{nom}/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/database-dump": ["ADMIN"],
   "POST /api/v1/admin/purge": ["ADMIN"],
   "POST /api/v1/auth/demo-login": ["PUBLIC"],
