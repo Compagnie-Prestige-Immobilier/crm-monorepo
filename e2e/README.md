@@ -3,17 +3,17 @@
 Prerequis : `cpi_v2_dev` avec le schema v1 (`make db`) et le binaire a jour
 (`make build` : le panneau est embarque, un changement produit ne se voit
 qu'apres reconstruction). `global-setup` cree un jeu de sept comptes
-`e2e.<role>.<index>@cpi.sn` par travailleur Playwright (un index par coeur,
+`e2e.<role>.<index>@cpi.sn` par travailleur Playwright (quatre par défaut,
 le prefixe `fixture.` appartient au seed) et ecrit `.roles.json` depuis
 `./cpi-go -roles` ; `auth.setup.ts` ouvre leurs sessions par l'API ;
 `global-teardown` les supprime. `compteDe('ROLE')` rend le compte du
 travailleur courant (`TEST_PARALLEL_INDEX`) : deux fichiers qui tournent en
 meme temps ne partagent ni fiche ouverte, ni rappels, ni disposition.
 
-Commande : `make e2e` depuis la racine, ou `pnpm test` ici : un travailleur
-par coeur (`workers: '100%'`), la suite entiere tient en trois minutes. Sur un
-poste a huit coeurs, `--workers=29` ne va pas plus vite et fait tomber des
-delais : les navigateurs se disputent la machine. Le harnais lance
+Commande : `make e2e` depuis la racine, ou `pnpm test` ici : quatre workers par
+défaut, la suite entiere tient en trois minutes. Une valeur différente se
+passe avec `E2E_WORKERS`; trop de workers font tomber les délais car les
+navigateurs se disputent la machine. Le harnais lance
 `../cpi-go` sur le port de `E2E_URL` (4000 par defaut) contre `DATABASE_URL`
 avec `API_TRUST_PROXY_HEADERS=true`, ce qui donne a chaque parcours son
 propre budget de connexions via `X-Forwarded-For` (limiteur 10/min par

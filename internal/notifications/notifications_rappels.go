@@ -56,7 +56,6 @@ func (s *service) rappelsQuotidiens(ctx context.Context) error {
 		s.rappelerAppelsAPasserNotification(ctx, maintenant),
 		s.rappelerDossiersBanqueNotification(ctx, maintenant, "NOTIFICATIONS_BANK_PENDING", 5, notificationCleDossiersEnAttente),
 		s.rappelerDossiersBanqueNotification(ctx, maintenant, "NOTIFICATIONS_BANK_STALE", 10, notificationCleDossiersSansMouvement),
-		s.rappelerFichesPlateformeNotification(ctx, maintenant),
 	)
 }
 

@@ -127,11 +127,6 @@ func qualificationVoitTout(u *socle.Utilisateur) bool {
 	return u.Peut(socle.PermissionPortefeuilleVoirTout)
 }
 
-// Seul le CCP ouvre et consigne une fiche plateforme ; l'encadrement la lit.
-func qualificationTientLaPlateforme(u *socle.Utilisateur) bool {
-	return u.Peut(socle.PermissionPlateformeSaisir)
-}
-
 var qualificationTransitionsRelation = map[string][]string{
 	"INCONNU":                {"CONTACTE", qualificationAmbassadeur, qualificationRefus},
 	"CONTACTE":               {qualificationAmbassadeur, qualificationRefus},
@@ -1013,8 +1008,7 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 // partout sauf sur une fiche attribuée à quelqu'un d'autre.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
-		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u) || u.Peut(socle.PermissionPlateformeSaisir),
-		Plateforme: qualificationTientLaPlateforme(u),
+		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u),
 	})
 	if err != nil {
 		return err

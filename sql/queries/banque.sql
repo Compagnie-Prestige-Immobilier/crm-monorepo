@@ -223,7 +223,7 @@ SELECT c."id", c."reference", c."customerName", c."customerPhoneE164", c."amount
 FROM "bank_cases" c
 INNER JOIN "banques" b ON b."id" = c."processingBankId"
 INNER JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
-INNER JOIN "prospects" p ON p."id" = c."prospectId"
+LEFT JOIN "prospects" p ON p."id" = c."prospectId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 LEFT JOIN "bank_rejection_reasons" r ON r."id" = c."rejectionReasonId"
 WHERE c."id" = $1;

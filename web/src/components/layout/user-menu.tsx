@@ -81,7 +81,7 @@ export function UserMenu({ user, demoEnabled }: { user: SessionUser; demoEnabled
         render={
           <Button
             variant="ghost"
-            className="h-11 gap-2 px-2"
+            className="h-12 gap-2 px-2 text-[1rem] text-white hover:bg-white/15 hover:text-white"
             aria-label={`Compte de ${user.fullName}`}
           />
         }

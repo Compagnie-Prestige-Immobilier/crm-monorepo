@@ -35,7 +35,7 @@ const jointuresDossier = depuisDossier + `
 	INNER JOIN "banques" b ON b."id" = c."processingBankId"
 	INNER JOIN "users" cu ON cu."id" = c."createdById"
 	LEFT JOIN "users" uu ON uu."id" = c."updatedById"
-	INNER JOIN "prospects" p ON p."id" = c."prospectId"
+	LEFT JOIN "prospects" p ON p."id" = c."prospectId"
 	LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")`
 
 func lireDossier(rows pgx.Rows, ref *referentielBanque) (DossierBanque, error) {

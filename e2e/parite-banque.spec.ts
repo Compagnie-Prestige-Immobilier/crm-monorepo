@@ -157,16 +157,17 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
     await expect(page.getByRole('button', { name: 'Rejeter le dossier' })).toHaveCount(0);
   });
 
-  test('une inscription déjà ouverte disparaît, une sans prospect reste fermée', async ({
+  test('une inscription déjà ouverte disparaît, une sans fiche s’ouvre quand même', async ({
     page,
   }) => {
     await page.goto('/finance/dossiers/nouveau');
     await expect(page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` })).toHaveCount(
       0,
     );
+    // Les plateformes suivent seules leurs inscrits : le dossier prend l'identité
+    // de l'inscription, sans fiche au CRM.
     const orpheline = page.getByRole('listitem').filter({ hasText: `Coumba ${NOM_CLIENT}` });
-    await expect(orpheline.getByText('Prospect inconnu')).toBeVisible();
-    await expect(orpheline.getByRole('button', { name: 'Ouvrir le dossier' })).toBeDisabled();
+    await expect(orpheline.getByRole('button', { name: 'Ouvrir le dossier' })).toBeEnabled();
     expect(
       await compter(`SELECT count(*) AS n FROM bank_cases WHERE "inscriptionId" = $1`, [
         inscriptionAwa,

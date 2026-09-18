@@ -45,7 +45,7 @@ func monterRoles(api huma.API, s *service) {
 type RoleDTO struct {
 	ID            string     `json:"id"`
 	Libelle       string     `json:"libelle"`
-	RoleDeBase    socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	RoleDeBase    socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	Systeme       bool       `json:"systeme"`
 	Comptes       int        `json:"comptes"`
 	ComptesActifs int        `json:"comptesActifs"`
@@ -191,7 +191,7 @@ func (s *service) ecrireRoles(ctx context.Context, geste func(*db.Queries) error
 type CreerRoleInput struct {
 	Body struct {
 		Libelle     string     `json:"libelle" minLength:"2" maxLength:"60"`
-		RoleDeBase  socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		RoleDeBase  socle.Role `json:"roleDeBase" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 		Permissions *[]string  `json:"permissions,omitempty"`
 	}
 }
@@ -238,7 +238,7 @@ type ModifierRoleInput struct {
 	ID   string `path:"id"`
 	Body struct {
 		Libelle    *string     `json:"libelle,omitempty" minLength:"2" maxLength:"60"`
-		RoleDeBase *socle.Role `json:"roleDeBase,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		RoleDeBase *socle.Role `json:"roleDeBase,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	}
 }
 

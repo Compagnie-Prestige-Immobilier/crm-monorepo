@@ -5,29 +5,28 @@
   "DELETE /api/v1/lots-export/{id}": ["ADMIN"],
   "DELETE /api/v1/prospects/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "DELETE /api/v1/representants/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "DELETE /api/v1/representants/{id}/comments/{commentId}": ["ADMIN"],
+  "DELETE /api/v1/roles/{id}": ["ADMIN"],
   "DELETE /api/v1/tableaux-de-bord/{ecran}/disposition": [
+    "ACCUEIL",
     "ADMIN",
     "DIRECTION",
-    "SUPERVISEUR",
-    "ACCUEIL"
+    "SUPERVISEUR"
   ],
   "DELETE /api/v1/users/{id}": ["ADMIN"],
-  "DELETE /api/v1/visites/{id}": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "DELETE /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "DELETE /api/v1/visites/{id}/definitif": ["DIRECTION"],
   "GET /api/v1/admin/bases": ["ADMIN"],
   "GET /api/v1/admin/database-dump": ["ADMIN"],
@@ -36,109 +35,99 @@
   "GET /api/v1/admin/exploitation/routes": ["ADMIN"],
   "GET /api/v1/admin/journal": ["ADMIN"],
   "GET /api/v1/admin/purge": ["ADMIN"],
-  "GET /api/v1/admin/supervision": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/admin/supervision": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/analytics/by-banque": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/by-departement": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/by-enrollment-method": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/by-syndicat": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/delays": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/departement-yield": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/analytics/funnel": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/auth/bases": ["PUBLIC"],
   "GET /api/v1/auth/me": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/bank-case-stages": ["ADMIN", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/bank-case-stages": ["ADMIN", "BANQUE_FINANCE", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/bank-cases": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/bank-cases/a-ouvrir": ["ADMIN", "BANQUE_FINANCE"],
-  "GET /api/v1/bank-cases/analytics": ["ADMIN", "BANQUE_FINANCE", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/bank-cases/analytics": ["ADMIN", "BANQUE_FINANCE", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/bank-cases/prospect-search": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/bank-cases/rejection-reasons": [
     "ADMIN",
     "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/bank-cases/{id}": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/bank-inscriptions/{id}/piece": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/bank-inscriptions/{id}/pieces": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/bank-inscriptions/{id}/pieces.zip": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/call-outcome-reasons": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/call-outcome-reasons/administration": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/call-outcome-reasons/administration": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/champs-conversion/{projet}": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/client-requests": ["ADMIN", "BANQUE_FINANCE"],
   "GET /api/v1/client-requests/{id}": ["ADMIN", "BANQUE_FINANCE"],
@@ -150,379 +139,339 @@
   "GET /api/v1/enrolement/{projet}/inscriptions/{id}": ["ADMIN"],
   "GET /api/v1/enrolement/{projet}/reglages": ["ADMIN"],
   "GET /api/v1/export/bank-cases.xlsx": ["ADMIN", "BANQUE_FINANCE", "SUPERVISEUR"],
-  "GET /api/v1/export/global.xlsx": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/export/global.xlsx": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/export/prospects-grand-public-modele.xlsx": ["ADMIN"],
   "GET /api/v1/export/prospects-modele.xlsx": ["ADMIN"],
   "GET /api/v1/export/prospects.xlsx": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/export/representants-modele.xlsx": ["ADMIN"],
   "GET /api/v1/export/representants.xlsx": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/export/visites.xlsx": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "GET /api/v1/export/visites.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/formulaire-public/formulaire": ["PUBLIC"],
   "GET /api/v1/formulaire-public/mon-lien": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/imports": ["ADMIN"],
   "GET /api/v1/imports/{id}": ["ADMIN"],
   "GET /api/v1/live": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/lots-export": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/lots-export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/lots-export/imports": ["ADMIN", "SUPERVISEUR"],
   "GET /api/v1/lots-export/mes-attributions": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/lots-export/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/lots-export/{id}/export.xlsx": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/lots-export/{id}/fiches": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/lots-export/{id}/fiches-recues.pdf": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/lots-export/{id}/programme.pdf": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/lots-export/{id}/programmes.zip": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/lots-export/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/lots-export/{id}/export.xlsx": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/lots-export/{id}/fiches": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/lots-export/{id}/fiches-recues.pdf": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/lots-export/{id}/programme.pdf": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/lots-export/{id}/programmes.zip": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/notification-templates": ["ADMIN"],
   "GET /api/v1/notification-templates/{id}": ["ADMIN"],
   "GET /api/v1/notifications": ["ADMIN"],
   "GET /api/v1/notifications/audience-preview": ["ADMIN"],
   "GET /api/v1/notifications/mine": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/notifications/{id}": ["ADMIN"],
   "GET /api/v1/ouvertures/comptage": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/ouvertures/courante": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/parametres-chues": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/parametres-chues/journal": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/parametres-chues/journal": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/phase2/callbacks": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/phase2/directory": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "GET /api/v1/plateforme/equipe": ["ADMIN", "SUPERVISEUR", "DIRECTION", "CCP"],
-  "GET /api/v1/prospects": [
     "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
-    "ADMIN",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
+  "GET /api/v1/prospects": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/prospects/{id}": [
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
     "ADMIN",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/prospects/{id}/call-attempts": [
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
     "ADMIN",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/prospects/{id}/journal": [
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
     "ADMIN",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/prospects/{id}/requalifications": [
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
     "ADMIN",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/prospects/{id}/segment-history": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/referentiels": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/referentiels/{kind}": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/lookup": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/{id}/call-attempts": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/{id}/comments": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/{id}/fiche-history": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/representants/{id}/relation-history": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "GET /api/v1/statuts-qualification": [
-    "ADMIN",
     "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
     "DIRECTION",
-    "ACCUEIL",
-    "CHARGE_CLIENTELE",
-    "CCP"
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/statuts-qualification/administration": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/roles": ["ADMIN"],
+  "GET /api/v1/statuts-qualification": [
+    "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/statuts-qualification/administration": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/suggestions": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/supervision/activite": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/campagnes": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/creneaux": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/leads-importes": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/objectifs": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/prospects/marketing": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/representants": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "GET /api/v1/supervision/representants/qualite": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/supervision/activite": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/campagnes": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/creneaux": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/leads-importes": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/objectifs": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/prospects/marketing": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/representants": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/supervision/representants/qualite": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/tableaux-de-bord/{ecran}/disposition": [
+    "ACCUEIL",
     "ADMIN",
     "DIRECTION",
-    "SUPERVISEUR",
-    "ACCUEIL"
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/users": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "GET /api/v1/users": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/users/{id}": ["ADMIN"],
   "GET /api/v1/ventes": ["ADMIN", "DIRECTION"],
   "GET /api/v1/ventes/classeur/fichier": ["ADMIN", "DIRECTION"],
-  "GET /api/v1/visites": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "GET /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /api/v1/visites/import/{id}": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/referentiels": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "GET /api/v1/visites/referentiels/usage": ["ADMIN", "DIRECTION"],
   "GET /api/v1/visites/referentiels/{kind}": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "GET /api/v1/visites/statistiques": ["ADMIN", "DIRECTION", "ACCUEIL"],
-  "GET /api/v1/visites/{id}": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "GET /api/v1/visites/statistiques": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "GET /health/live": ["PUBLIC"],
   "GET /health/ready": ["PUBLIC"],
   "PATCH /api/v1/bank-case-stages/{id}": ["ADMIN"],
   "PATCH /api/v1/bank-cases/{id}": ["ADMIN", "BANQUE_FINANCE"],
-  "PATCH /api/v1/call-outcome-reasons/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "PATCH /api/v1/call-outcome-reasons/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PATCH /api/v1/lots-export/{id}": ["ADMIN", "SUPERVISEUR"],
   "PATCH /api/v1/notification-templates/{id}": ["ADMIN"],
-  "PATCH /api/v1/parametres-chues": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "PATCH /api/v1/parametres-chues": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PATCH /api/v1/prospects/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": [
     "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "ADMIN",
+    "DIRECTION",
     "SUPERVISEUR"
   ],
-  "PATCH /api/v1/prospects/{id}/segment": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "PATCH /api/v1/referentiels/{kind}/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "PATCH /api/v1/prospects/{id}/parcours/grand-public/consentement": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "SUPERVISEUR"
+  ],
+  "PATCH /api/v1/prospects/{id}/segment": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PATCH /api/v1/referentiels/{kind}/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PATCH /api/v1/representants/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "PATCH /api/v1/statuts-qualification/{id}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "PATCH /api/v1/roles/{id}": ["ADMIN"],
+  "PATCH /api/v1/statuts-qualification/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PATCH /api/v1/suggestions/{id}": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "PATCH /api/v1/users/{id}": ["ADMIN"],
   "PATCH /api/v1/visites/import/{id}/revue": ["ADMIN", "DIRECTION"],
   "PATCH /api/v1/visites/referentiels/{kind}/{id}": ["ADMIN", "DIRECTION"],
-  "PATCH /api/v1/visites/{id}": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/admin/bases": ["ADMIN"],
   "POST /api/v1/admin/database-dump": ["ADMIN"],
   "POST /api/v1/admin/purge": ["ADMIN"],
   "POST /api/v1/auth/demo-login": ["PUBLIC"],
   "POST /api/v1/auth/login": ["PUBLIC"],
   "POST /api/v1/auth/logout": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/auth/password": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/bank-case-stages": ["ADMIN"],
   "POST /api/v1/bank-case-stages/reorder": ["ADMIN"],
@@ -530,22 +479,21 @@
   "POST /api/v1/bank-cases": ["ADMIN", "BANQUE_FINANCE"],
   "POST /api/v1/bank-cases/{id}/corrections": ["ADMIN"],
   "POST /api/v1/bank-cases/{id}/transitions": ["ADMIN", "BANQUE_FINANCE"],
-  "POST /api/v1/call-outcome-reasons": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "POST /api/v1/call-outcome-reasons/{id}/active": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "POST /api/v1/call-outcome-reasons": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/call-outcome-reasons/{id}/active": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/client-requests": ["ADMIN", "BANQUE_FINANCE"],
   "POST /api/v1/client-requests/{id}/approve": ["ADMIN"],
   "POST /api/v1/client-requests/{id}/reject": ["ADMIN"],
   "POST /api/v1/courriels/{id}/renvoyer": ["ADMIN", "BANQUE_FINANCE"],
   "POST /api/v1/enrolement/{projet}/tirage": ["ADMIN"],
   "POST /api/v1/formulaire-public/mon-lien/rotation": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/formulaire-public/{jeton}": ["PUBLIC"],
   "POST /api/v1/imports/prospects": ["ADMIN"],
@@ -565,99 +513,80 @@
   "POST /api/v1/notifications": ["ADMIN"],
   "POST /api/v1/notifications/{id}/cancel": ["ADMIN"],
   "POST /api/v1/notifications/{id}/read": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/ouvertures": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/phase2/call-attempts": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "POST /api/v1/phase2/callbacks/{id}/cancel": ["ADMIN", "COMMERCIAL", "CHARGE_CLIENTELE", "CCP"],
-  "POST /api/v1/phase2/callbacks/{id}/snooze": ["ADMIN", "COMMERCIAL", "CHARGE_CLIENTELE", "CCP"],
-  "POST /api/v1/presence/beat": [
-    "ADMIN",
     "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
     "DIRECTION",
-    "ACCUEIL",
-    "CHARGE_CLIENTELE",
-    "CCP"
-  ],
-  "POST /api/v1/prospects": [
-    "ADMIN",
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "POST /api/v1/prospects/merge": ["COMMERCIAL", "CHARGE_CLIENTELE", "ADMIN"],
-  "POST /api/v1/prospects/reassign": ["COMMERCIAL", "CHARGE_CLIENTELE", "ADMIN", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/parcours/grand-public/conversion": [
-    "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "ADMIN",
     "SUPERVISEUR"
   ],
-  "POST /api/v1/prospects/{id}/revue": ["CHARGE_CLIENTELE", "SUPERVISEUR", "ADMIN"],
-  "POST /api/v1/referentiels/{kind}": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "POST /api/v1/phase2/callbacks/{id}/cancel": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
+  "POST /api/v1/phase2/callbacks/{id}/snooze": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
+  "POST /api/v1/presence/beat": [
+    "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "POST /api/v1/prospects": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/merge": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL"],
+  "POST /api/v1/prospects/reassign": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/parcours/grand-public/conversion": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "SUPERVISEUR"
+  ],
+  "POST /api/v1/prospects/{id}/requalifier": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
+  "POST /api/v1/referentiels/{kind}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/rep-campaigns/attempts": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/representants": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "POST /api/v1/representants/import": ["ADMIN"],
   "POST /api/v1/representants/{id}/comments": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
-  ],
-  "POST /api/v1/statuts-qualification": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "POST /api/v1/statuts-qualification/{id}/active": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
-  "POST /api/v1/sync/push": [
-    "ADMIN",
     "COMMERCIAL",
-    "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
+  "POST /api/v1/roles": ["ADMIN"],
+  "POST /api/v1/statuts-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/statuts-qualification/{id}/active": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/sync/push": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/users": ["ADMIN"],
   "POST /api/v1/ventes/classeur": ["ADMIN", "DIRECTION"],
-  "POST /api/v1/visites": ["ADMIN", "DIRECTION", "ACCUEIL"],
+  "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/visites/import": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites/import/{id}/apply": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites/referentiels/{kind}": ["ADMIN", "DIRECTION"],
@@ -666,33 +595,31 @@
   "POST /api/v1/webhooks/brevo": ["PUBLIC"],
   "POST /api/v1/webhooks/enrolement/{projet}": ["PUBLIC"],
   "PUT /api/v1/auth/me/password": [
-    "ADMIN",
-    "COMMERCIAL",
-    "BANQUE_FINANCE",
-    "SUPERVISEUR",
-    "DIRECTION",
     "ACCUEIL",
+    "ADMIN",
+    "BANQUE_FINANCE",
     "CHARGE_CLIENTELE",
-    "CCP"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
   "PUT /api/v1/champs-conversion/{projet}": ["ADMIN"],
   "PUT /api/v1/courriels/reglages": ["ADMIN"],
   "PUT /api/v1/enrolement/{projet}/reglages": ["ADMIN"],
   "PUT /api/v1/ouvertures/{id}/brouillon": [
     "ADMIN",
-    "COMMERCIAL",
     "CHARGE_CLIENTELE",
-    "CCP",
-    "SUPERVISEUR",
-    "DIRECTION"
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
   ],
-  "PUT /api/v1/plateforme/objectif": ["ADMIN"],
-  "PUT /api/v1/supervision/creneaux": ["ADMIN", "SUPERVISEUR", "DIRECTION"],
+  "PUT /api/v1/roles/{id}/permissions": ["ADMIN"],
+  "PUT /api/v1/supervision/creneaux": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition": [
+    "ACCUEIL",
     "ADMIN",
     "DIRECTION",
-    "SUPERVISEUR",
-    "ACCUEIL"
+    "SUPERVISEUR"
   ],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": ["ADMIN"],
   "PUT /api/v1/users/{id}/active": ["ADMIN"],
