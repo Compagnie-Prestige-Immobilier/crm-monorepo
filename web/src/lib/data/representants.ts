@@ -177,11 +177,11 @@ export async function fetchRepresentantsAQualifier(
 
 /** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchRepresentantsAppeles(
-  lastCallById: string,
+  appelePar: string,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<RepresentantRow>> {
   const query: RepresentantQuery = {
-    lastCallById,
+    appelePar,
     sortBy: 'lastCallAt',
     sortOrder: 'desc',
     page: 1,

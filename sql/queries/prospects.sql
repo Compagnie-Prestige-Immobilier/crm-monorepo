@@ -64,6 +64,11 @@ WHERE p."deletedAt" IS NULL
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
+    -- Une fiche appelée reste visible après la pause ou le retrait du lot.
+    OR EXISTS (
+      SELECT 1 FROM "call_attempts" sa
+      WHERE sa."prospectId" = p."id" AND sa."performedById" = sqlc.arg('scope_user_id')::text
+    )
   )
   AND (
     NOT sqlc.arg('attribue')::boolean
@@ -191,6 +196,11 @@ WHERE p."deletedAt" IS NULL
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
+    )
+    -- Une fiche appelée reste visible après la pause ou le retrait du lot.
+    OR EXISTS (
+      SELECT 1 FROM "call_attempts" sa
+      WHERE sa."prospectId" = p."id" AND sa."performedById" = sqlc.arg('scope_user_id')::text
     )
   )
   AND (
