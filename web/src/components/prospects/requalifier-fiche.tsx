@@ -28,11 +28,12 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { peut, type Projet, type ProspectRow, type ProspectStatut } from '@/lib/types';
 
-type StatutRequalifiable = 'NOUVEAU' | 'CONTACTE' | 'PERDU';
+type StatutRequalifiable = 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
 
 const CHOIX: readonly { value: StatutRequalifiable; label: string }[] = [
   { value: 'NOUVEAU', label: 'À traiter (remise à zéro)' },
   { value: 'CONTACTE', label: 'Contacté' },
+  { value: 'CONVERTI', label: 'Converti' },
   { value: 'PERDU', label: 'Perdu' },
 ];
 

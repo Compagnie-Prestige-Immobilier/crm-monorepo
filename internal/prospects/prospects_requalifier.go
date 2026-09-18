@@ -20,7 +20,7 @@ type ProspectRequalifierInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
 		Projet string `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-		Statut string `json:"statut" enum:"NOUVEAU,CONTACTE,PERDU"`
+		Statut string `json:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU"`
 	}
 }
 
