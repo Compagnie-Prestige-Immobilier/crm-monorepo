@@ -35,8 +35,8 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { prospectSchema, type ProspectFormInput } from '@/lib/schemas';
 import {
-  PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  PROSPECT_STATUTS_MODIFIABLES,
   SEGMENT_LABELS,
   type BddSegment,
   type ProspectRow,
@@ -105,6 +105,19 @@ function isSegmentChanged(
   return segmentBascule(prospect, banqueId, syndicatId);
 }
 
+// Vendue, une fiche affiche le dernier statut modifiable ; le champ ne se soumet pas.
+function statutAffiche(statut: ProspectRow['statut']): ProspectFormInput['statut'] {
+  return statut === 'VENDU' ? 'CONVERTI' : statut;
+}
+
+function estVendue(prospect: ProspectRow | null): boolean {
+  return prospect?.statut === 'VENDU';
+}
+
+function descriptionStatut(vendue: boolean): string | undefined {
+  return vendue ? 'Vendue, la fiche ne se requalifie plus.' : undefined;
+}
+
 function savedByLabel(prospect: ProspectRow | null): string {
   if (prospect === null) return '–';
   return prospect.ownedByCommercialName;
@@ -125,16 +138,19 @@ function reasonValidationError(segmentChanged: boolean, reason: string): string 
   return 'Expliquez la bascule : elle est enregistrée et rendue à la direction.';
 }
 
+// Vendue, une fiche ne redevient jamais convertie ici : le champ ne se
+// soumet pas, même si le formulaire porte une valeur de repli pour l'afficher.
 function identityPatch(
   values: ProspectFormInput,
   prospect: ProspectRow,
 ): UpdateProspectInput | null {
+  const statutModifiable = prospect.statut !== 'VENDU';
   const changed =
     values.nom !== prospect.nom ||
     values.prenom !== prospect.prenom ||
     values.phone !== prospect.phoneE164 ||
     !memeChoix(values.representantId, prospect.representantId) ||
-    values.statut !== prospect.statut;
+    (statutModifiable && values.statut !== prospect.statut);
   if (!changed) return null;
   // L'API attend un UUID ou rien : une fiche sans représentant ne doit pas envoyer "".
   return {
@@ -142,7 +158,7 @@ function identityPatch(
     prenom: values.prenom,
     phone: values.phone,
     ...(values.representantId === '' ? {} : { representantId: values.representantId }),
-    statut: values.statut,
+    ...(statutModifiable ? { statut: values.statut } : {}),
   };
 }
 
@@ -234,6 +250,7 @@ export function ProspectEditDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const queryClient = useQueryClient();
+  const vendue = estVendue(prospect);
 
   const { data: reference } = useQuery({
     queryKey: queryKeys.reference,
@@ -268,7 +285,7 @@ export function ProspectEditDialog({
       banqueId: prospect.banqueId ?? '',
       syndicatId: prospect.syndicatId ?? '',
       representantId: prospect.representantId ?? '',
-      statut: prospect.statut,
+      statut: statutAffiche(prospect.statut),
     });
   }, [prospect, reset]);
 
@@ -356,11 +373,17 @@ export function ProspectEditDialog({
             {(props) => <Input {...props} type="tel" {...register('phone')} />}
           </Field>
 
-          <Field label="Statut" required error={formState.errors.statut?.message}>
+          <Field
+            label="Statut"
+            required
+            description={descriptionStatut(vendue)}
+            error={formState.errors.statut?.message}
+          >
             {(props) => (
               <Select
                 items={PROSPECT_STATUT_LABELS}
                 value={statut}
+                disabled={vendue}
                 onValueChange={(value) => {
                   applyIfSelected(value, (statutValue) => {
                     setValue('statut', statutValue, { shouldDirty: true });
@@ -371,7 +394,7 @@ export function ProspectEditDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {PROSPECT_STATUTS.map((value) => (
+                  {PROSPECT_STATUTS_MODIFIABLES.map((value) => (
                     <SelectItem key={value} value={value}>
                       {PROSPECT_STATUT_LABELS[value]}
                     </SelectItem>

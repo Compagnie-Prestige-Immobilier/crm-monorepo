@@ -5,9 +5,11 @@ import { getApiClient } from '@/lib/api/browser';
 
 export type Vente = components['schemas']['VenteDTO'];
 export type ClasseurVentes = components['schemas']['ClasseurDTO'];
+export type VenteParTeleconseiller = components['schemas']['VenteParTeleconseillerDTO'];
 export interface VentesData {
   classeur: ClasseurVentes | null;
   ventes: Vente[];
+  parTeleconseiller: VenteParTeleconseiller[];
 }
 
 export const CLASSEUR_VENTES_URL = '/api/v1/ventes/classeur/fichier';

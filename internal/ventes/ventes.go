@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"errors"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"math"
 	"net/http"
 	"net/url"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -74,6 +76,16 @@ type VenteDTO struct {
 	PartApporteur    int64          `json:"partApporteur"`
 	PartCpi          int64          `json:"partCpi"`
 	Versements       []VersementDTO `json:"versements"`
+	ProspectID       *string        `json:"prospectId"`
+	Teleconseiller   *string        `json:"teleconseiller"`
+}
+
+// Le classement par téléconseiller jusqu'à qui a amené le client : seules les
+// ventes rattachées à une fiche comptent, les autres n'ont pas d'auteur à créditer.
+type VenteParTeleconseillerDTO struct {
+	Nom       string `json:"nom"`
+	Ventes    int32  `json:"ventes"`
+	PrixTotal int64  `json:"prixTotal"`
 }
 
 type ClasseurDTO struct {
@@ -85,8 +97,9 @@ type ClasseurDTO struct {
 
 type VentesOutput struct {
 	Body struct {
-		Classeur *ClasseurDTO `json:"classeur"`
-		Ventes   []VenteDTO   `json:"ventes"`
+		Classeur          *ClasseurDTO                `json:"classeur"`
+		Ventes            []VenteDTO                  `json:"ventes"`
+		ParTeleconseiller []VenteParTeleconseillerDTO `json:"parTeleconseiller"`
 	}
 }
 
@@ -107,6 +120,7 @@ type FichierOutput struct {
 func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error) {
 	out := &VentesOutput{}
 	out.Body.Ventes = []VenteDTO{}
+	out.Body.ParTeleconseiller = []VenteParTeleconseillerDTO{}
 	classeur, err := s.Q.ClasseurVentes(ctx)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return out, nil
@@ -130,10 +144,108 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 	for _, v := range versements {
 		parVente[v.VenteId] = append(parVente[v.VenteId], VersementDTO{Date: jour(v.Date), Montant: v.Montant})
 	}
-	for i := range ventes {
-		out.Body.Ventes = append(out.Body.Ventes, venteDTO(&ventes[i], parVente[ventes[i].ID]))
+	telephones, parLigne := telephonesNormalises(ventes, s.Cfg.PhoneRegion)
+	prospects, err := s.prospectsParTelephones(ctx, telephones)
+	if err != nil {
+		return nil, err
 	}
+	for i := range ventes {
+		dto := venteDTO(&ventes[i], parVente[ventes[i].ID])
+		if p, ok := prospects[parLigne[i]]; parLigne[i] != "" && ok {
+			dto.ProspectID, dto.Teleconseiller = &p.ID, p.Teleconseiller
+		}
+		out.Body.Ventes = append(out.Body.Ventes, dto)
+	}
+	out.Body.ParTeleconseiller = agregerParTeleconseiller(out.Body.Ventes)
 	return out, nil
+}
+
+// Le téléphone est la seule clé commune au classeur et aux fiches : une
+// vente sans correspondance reste affichée, simplement sans lien ni auteur.
+func telephonesNormalises(ventes []db.Vente, region string) (telephones, parLigne []string) {
+	uniques := map[string]bool{}
+	parLigne = make([]string, len(ventes))
+	for i := range ventes {
+		e164, err := database.NormaliserTelephone(ventes[i].Telephone, region)
+		if err != nil {
+			continue
+		}
+		parLigne[i] = e164
+		uniques[e164] = true
+	}
+	telephones = make([]string, 0, len(uniques))
+	for e164 := range uniques {
+		telephones = append(telephones, e164)
+	}
+	return telephones, parLigne
+}
+
+func (s *service) prospectsParTelephones(ctx context.Context, telephones []string) (map[string]db.ProspectsVivantsParTelephonesRow, error) {
+	parTelephone := map[string]db.ProspectsVivantsParTelephonesRow{}
+	if len(telephones) == 0 {
+		return parTelephone, nil
+	}
+	lignes, err := s.Q.ProspectsVivantsParTelephones(ctx, telephones)
+	if err != nil {
+		return nil, err
+	}
+	for _, l := range lignes {
+		if l.PhoneE164 != nil {
+			parTelephone[*l.PhoneE164] = l
+		}
+	}
+	return parTelephone, nil
+}
+
+func agregerParTeleconseiller(ventes []VenteDTO) []VenteParTeleconseillerDTO {
+	parNom := map[string]*VenteParTeleconseillerDTO{}
+	for i := range ventes {
+		v := &ventes[i]
+		if v.Teleconseiller == nil {
+			continue
+		}
+		ligne, existe := parNom[*v.Teleconseiller]
+		if !existe {
+			ligne = &VenteParTeleconseillerDTO{Nom: *v.Teleconseiller}
+			parNom[*v.Teleconseiller] = ligne
+		}
+		ligne.Ventes++
+		ligne.PrixTotal += v.PrixTotal
+	}
+	lignes := make([]VenteParTeleconseillerDTO, 0, len(parNom))
+	for _, ligne := range parNom {
+		lignes = append(lignes, *ligne)
+	}
+	sort.Slice(lignes, func(i, j int) bool { return lignes[i].PrixTotal > lignes[j].PrixTotal })
+	return lignes
+}
+
+func marquerProspectsVendus(ctx context.Context, q *db.Queries, userID string, telephones []string) error {
+	if len(telephones) == 0 {
+		return nil
+	}
+	prospects, err := q.ProspectsVivantsParTelephones(ctx, telephones)
+	if err != nil {
+		return err
+	}
+	for _, p := range prospects {
+		if p.Statut != db.ProspectStatutCONVERTI {
+			continue
+		}
+		lignes, err := q.MarquerProspectVendu(ctx, p.ID)
+		if err != nil {
+			return err
+		}
+		if lignes == 0 {
+			continue
+		}
+		if err := database.Auditer(ctx, q, userID, "prospect.vendre", "prospect", p.ID,
+			map[string]any{"statut": string(db.ProspectStatutCONVERTI)},
+			map[string]any{"statut": string(db.ProspectStatutVENDU)}); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
@@ -171,6 +283,7 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 	if err != nil {
 		return nil, err
 	}
+	u := socle.UtilisateurCourant(ctx)
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
 		if err := q.SupprimerClasseursVentes(ctx); err != nil {
@@ -178,16 +291,35 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 		}
 		if err := q.InsererClasseurVentes(ctx, db.InsererClasseurVentesParams{
 			ID: id.String(), NomFichier: nom, Contenu: contenu, Depuis: depuis,
-			ImporteParId: socle.UtilisateurCourant(ctx).ID,
+			ImporteParId: u.ID,
 		}); err != nil {
 			return err
 		}
-		return insererVentes(ctx, q, id.String(), lues)
+		if err := insererVentes(ctx, q, id.String(), lues); err != nil {
+			return err
+		}
+		return marquerProspectsVendus(ctx, q, u.ID, telephonesDesVentesLues(lues, s.Cfg.PhoneRegion))
 	})
 	if err != nil {
 		return nil, err
 	}
 	return s.lister(ctx, nil)
+}
+
+func telephonesDesVentesLues(lues []venteLue, region string) []string {
+	uniques := map[string]bool{}
+	for i := range lues {
+		e164, err := database.NormaliserTelephone(lues[i].ligne.Telephone, region)
+		if err != nil || uniques[e164] {
+			continue
+		}
+		uniques[e164] = true
+	}
+	telephones := make([]string, 0, len(uniques))
+	for e164 := range uniques {
+		telephones = append(telephones, e164)
+	}
+	return telephones
 }
 
 func insererVentes(ctx context.Context, q *db.Queries, classeurID string, lues []venteLue) error {

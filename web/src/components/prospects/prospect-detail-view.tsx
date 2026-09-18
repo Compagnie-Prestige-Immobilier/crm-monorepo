@@ -24,13 +24,14 @@ import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useChampsConversion } from '@/lib/data/champs-conversion';
-import { fetchProspect, marquerProspectRevue } from '@/lib/data/prospects';
+import { fetchProspect, marquerProspectRevue, marquerProspectVendu } from '@/lib/data/prospects';
 import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   callOutcomeLabel,
   enrollmentMethodLabel,
+  peut,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
   peutRevoirUneDemande,
@@ -128,6 +129,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
             <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
+            <MarquerVendu prospect={prospect} user={user} />
           </>
         }
         chiffres={chiffresDe(prospect)}
@@ -277,5 +279,40 @@ function RevueDemande({
         </Button>
       ) : null}
     </>
+  );
+}
+
+/** La confirmation de la vente : rien tant que la demande n'est pas convertie. */
+function MarquerVendu({
+  prospect,
+  user,
+}: {
+  prospect: ProspectRow;
+  user: SessionUser | null | undefined;
+}) {
+  const queryClient = useQueryClient();
+  const vente = useMutation({
+    mutationFn: () => marquerProspectVendu(prospect.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+      toast.success('Fiche marquée vendue.');
+    },
+    onError: (error) => {
+      toastApiError(error, 'La fiche n’a pas pu être marquée vendue.');
+    },
+  });
+
+  if (prospect.statut !== 'CONVERTI' || !peut(user, 'prospects.convertir')) return null;
+
+  return (
+    <Button
+      variant="outline"
+      disabled={vente.isPending}
+      onClick={() => {
+        vente.mutate();
+      }}
+    >
+      Marquer vendu
+    </Button>
   );
 }

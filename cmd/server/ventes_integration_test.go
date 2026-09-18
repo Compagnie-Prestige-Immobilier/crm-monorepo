@@ -66,6 +66,70 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	superviseur.attend(statut, http.StatusForbidden, "lecture par un superviseur", reponse)
 }
 
+func TestProspectVenteFermeLeParcoursEtRapprocheLeClasseur(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	direction := nouveauBanc(t, "DIRECTION")
+	connecte(direction)
+	nettoyerProspects(b, b.userID)
+
+	id := creerProspect(b, "Diouf", numeroSenegalais(22))["id"].(string)
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "prospects" SET "statut" = 'CONVERTI' WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/prospects/"+id+"/vendre", nil, nil)
+	b.attend(statut, http.StatusOK, "vente d'une fiche convertie", body)
+	if body["statut"] != "VENDU" {
+		t.Fatalf("statut après vente : %v", body["statut"])
+	}
+	statut, journal := appelJSON(b, http.MethodGet, "/api/v1/prospects/"+id+"/journal", nil, nil)
+	b.attend(statut, http.StatusOK, "journal de la fiche", journal)
+	items, _ := journal["items"].([]any)
+	trouve := false
+	for _, it := range items {
+		entree, _ := it.(map[string]any)
+		if entree["action"] == "prospect.vendre" {
+			trouve = true
+		}
+	}
+	if !trouve {
+		t.Fatalf("le journal doit garder l'action prospect.vendre : %v", items)
+	}
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/prospects/"+id+"/vendre", nil, nil)
+	b.attend(statut, http.StatusUnprocessableEntity, "revente d'une fiche déjà vendue", body)
+
+	autreID := creerProspect(b, "Sarr", "77 000 00 02")["id"].(string)
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "prospects" SET "statut" = 'CONVERTI', "lastCallById" = $2 WHERE "id" = $1`, autreID, b.userID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { direction.exec(`DELETE FROM "ventes_classeurs"`) })
+	statut, reponse := direction.deposerClasseur("/api/v1/ventes/classeur", "ventes.xlsx", classeurVentesTest(t))
+	direction.attend(statut, http.StatusOK, "dépôt du classeur", reponse)
+
+	var apres string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "statut" FROM "prospects" WHERE "id" = $1`, autreID).Scan(&apres); err != nil {
+		t.Fatal(err)
+	}
+	if apres != "VENDU" {
+		t.Fatalf("la fiche dont le téléphone correspond doit passer vendue : %s", apres)
+	}
+
+	statut, ventes := direction.appel(http.MethodGet, "/api/v1/ventes", nil, false)
+	direction.attend(statut, http.StatusOK, "lecture des ventes", ventes)
+	items2, _ := ventes["ventes"].([]any)
+	var teleconseiller any
+	for _, it := range items2 {
+		vente, _ := it.(map[string]any)
+		if vente["client"] == "AWA SARR" {
+			teleconseiller = vente["teleconseiller"]
+		}
+	}
+	if teleconseiller != "Test Intégration" {
+		t.Fatalf("le téléconseiller doit apparaître sur la vente rapprochée : %v", teleconseiller)
+	}
+}
+
 func classeurVentesTest(t *testing.T) []byte {
 	t.Helper()
 	f := excelize.NewFile()

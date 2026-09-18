@@ -21,7 +21,12 @@ import {
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DepotClasseur } from '@/components/ventes/depot-classeur';
-import { SyntheseSites, TableEcheances, TableVentes } from '@/components/ventes/ventes-tableaux';
+import {
+  SyntheseSites,
+  TableEcheances,
+  TableParTeleconseiller,
+  TableVentes,
+} from '@/components/ventes/ventes-tableaux';
 import {
   CLASSEUR_VENTES_URL,
   fetchVentes,
@@ -123,7 +128,7 @@ export function VentesView() {
   if (query.isError)
     return <QueryErrorState error={query.error} onRetry={() => void query.refetch()} />;
 
-  const { classeur, ventes } = query.data;
+  const { classeur, ventes, parTeleconseiller } = query.data;
   if (classeur === null) {
     return (
       <EmptyState
@@ -218,6 +223,7 @@ export function VentesView() {
           <TabsTrigger value="ventes">Ventes</TabsTrigger>
           <TabsTrigger value="echeances">Échéances</TabsTrigger>
           <TabsTrigger value="sites">Sites</TabsTrigger>
+          <TabsTrigger value="teleconseillers">Téléconseillers</TabsTrigger>
         </TabsList>
         <TabsContent value="ventes">
           <TableVentes ventes={visibles} />
@@ -227,6 +233,9 @@ export function VentesView() {
         </TabsContent>
         <TabsContent value="sites">
           <SyntheseSites ventes={visibles} />
+        </TabsContent>
+        <TabsContent value="teleconseillers">
+          <TableParTeleconseiller lignes={parTeleconseiller} />
         </TabsContent>
       </Tabs>
     </div>
