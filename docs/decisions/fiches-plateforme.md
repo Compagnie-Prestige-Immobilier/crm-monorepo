@@ -1,11 +1,51 @@
-# Fiches venues des plateformes
+# Les inscrits des plateformes ne sont plus des fiches du CRM
 
-Une fiche prospect devient « plateforme » par deux portes. Le relevé : une inscription relevée sur monespace.cpi-chues.com ou monespace.cpi.sn lui est rapprochée, par téléphone puis par e-mail, et `prospects."plateformeDepuis"` prend la date de l'inscription. Le classeur des leads : la colonne « Canal » cite l'une des deux plateformes, et la fiche prend la date de la ligne (`import-leads.md`). La marque ne se retire jamais, même si l'inscription disparaît ensuite du relevé. Une inscription sans fiche au numéro crée sa fiche, origine `PLATEFORME`, portée par le premier administrateur actif.
+Décision du propriétaire, 18 septembre 2026. Le traitement et la répartition des
+inscrits de monespace.cpi-chues.com et monespace.cpi.sn se font sur ces
+plateformes. Le CRM n'en tient plus de fiche, ne les attribue à personne et n'a
+plus de rôle pour les appeler.
 
-Chaude ou froide : la liste des CCP porte une étoile « Inscription confirmée » quand une inscription non disparue est rapprochée de la fiche ; sinon elle dit « A commencé sur le site », la personne a laissé ses coordonnées sans finir. Les deux vont au CCP, la plus récente d'abord, l'étoile ne change pas l'ordre. La colonne « Réponse du prospect » du classeur se lit sur la fiche et dans la console comme « Note du classeur ».
+## Ce qui a disparu
 
-Ces fiches appartiennent aux chargés de clientèle plateforme, rôle `CCP`. Ils voient toutes les fiches plateforme, les plus récentes d'abord, sans partage entre eux. Un téléconseiller ou un chargé de clientèle ne les voit nulle part : ni dans sa console, ni dans la liste des fiches, ni dans ses rappels, ni dans son export. Depuis le 16 septembre 2026, l'encadrement, administrateur, superviseur et direction, suit le travail des CCP sans y toucher : il lit ces fiches dans la liste des prospects, leur détail et leur historique d'appels, leurs rappels dans « Rappels promis » avec un filtre par CCP, leurs exports, la page « Aperçu plateforme », et chaque CCP compte dans le volet Activité du tableau de bord comme un téléconseiller. Il ne les trouve pas dans l'annuaire d'appel, ne les ouvre pas et n'y consigne rien : deux bornes servies par le serveur, l'une pour lire, l'autre pour saisir, cette dernière réservée au CCP. La page « Mon travail » n'existe que pour les CCP. L'aperçu plateforme porte un tableau par CCP, appels et fiches jointes du jour, appels depuis lundi, rappels promis, dernier appel, à l'heure de Dakar, et l'administrateur y règle un objectif d'appels par CCP et par jour, zéro pour aucun ; chaque CCP y lit sa propre ligne.
+Le rôle `CCP`, « chargé de clientèle plateforme », et les trois permissions
+`plateforme.voir`, `plateforme.saisir` et `plateforme.equipe`. Les écrans
+« Mon travail » et « Aperçu plateforme », l'objectif d'appels par jour, le
+tableau de suivi par CCP. La notification matinale des fiches arrivées et
+l'alerte de renfort au-delà d'un seuil, avec son réglage. La colonne
+`prospects."plateformeDepuis"` et tout ce qui la lisait : bornes de lecture et
+de saisie, filtre `plateforme` de la liste des prospects, tri par date
+d'inscription, colonne « Inscrit le » et étoile d'inscription de la console,
+clause d'export, colonne « Passées plateforme » du rapport des leads importés.
 
-Aucune campagne d'appels prospects ne tire une fiche plateforme, chaude ou froide, et les chiffres des imports ne la comptent pas. Une fiche qui devient plateforme alors qu'une campagne la tient en sort à l'instant : sa ligne quitte la campagne, qui se recompte seule, et le journal des actions garde le retrait avec la position et l'attribution ; l'historique des appels reste sur la fiche. Une fiche dont le classeur change le projet en sort de la même façon (`lot_export.hors_projet`), et une campagne ne tire que les fiches du projet qu'elles portent aujourd'hui, un ancien parcours dans l'autre projet ne compte pas. Les lignes déjà retirées au 16 septembre 2026 sont sorties par les migrations `20260916001000_fiches_retirees_hors_campagne.sql` et `20260916050000_fiches_dun_autre_projet_hors_campagne.sql`. Les rappels promis suivent la fiche : sur une fiche devenue plateforme ils passent au CCP actif le moins chargé, avec une trace `rappel.reattribue`, et s'il n'y avait aucun CCP à ce moment, chaque tirage d'enrôlement rattrape ceux restés chez un autre rôle dès qu'un CCP existe ; sur une fiche hors projet ils restent au téléconseiller, qui garde le droit d'ouvrir la fiche tant que son rappel est en attente. L'historique des appels ne bouge jamais. Les fiches déjà plateforme au 15 septembre 2026 sont sorties des campagnes de la même manière par la migration `20260915160100_fiches_plateforme.sql`.
+Les 200 fiches portant la marque ont été supprimées définitivement, avec leurs
+appels, rappels promis et lignes de campagne (migration
+`20260917260200_fiches_plateforme_purgees.sql`). Le journal d'audit en garde
+l'identité, ligne `prospect.purge_plateforme`. Les comptes CCP sont désactivés
+et rattachés au rôle `CHARGE_CLIENTELE` ; la valeur `'CCP'` reste dans l'enum
+Postgres `"Role"`, orpheline, PostgreSQL ne sachant pas la retirer.
 
-Les deux CCP ne se verrouillent pas l'un l'autre, conformément à `fiche-lock.md`. La console leur montre « En cours · Prénom Nom » sur une fiche qu'un collègue a ouverte depuis moins de deux heures, et le rappelle avant d'ouvrir. Chaque matin, une notification leur donne le nombre de fiches arrivées la veille, dont celles inscrites sur la plateforme, et de fiches qui attendent un premier appel ; une ligne de classeur datée d'avant la veille ne compte pas parmi les nouvelles. Quand ce dernier nombre dépasse le seuil réglé par l'administrateur dans les réglages de l'enrôlement, la même notification part aux superviseurs et aux administrateurs : les CCP ont besoin de renfort.
+## Ce que le CRM fait encore
+
+Le relevé d'enrôlement lit les deux plateformes comme avant et dépose chaque
+inscription dans `inscriptions_plateforme`. Quand un numéro correspond à une
+fiche existante, il la rapproche : ce lien nomme le téléconseiller qui a suivi
+la personne sur l'écran des dossiers bancaires. Il ne crée plus de fiche et
+n'en marque aucune.
+
+Le classeur des leads du marketing laisse passer les lignes dont le Canal cite
+l'une des deux plateformes : elles ne sont ni créées ni mises à jour, et le
+rapport du travail les compte sous `PROSPECT_GP_IMPORT_LIGNE_PLATEFORME`. Ces
+personnes n'existent que sur la plateforme.
+
+Le suivi se lit dans « Plateformes d'enrôlement » (`/admin/enrolement`) :
+inscriptions relevées, étape, dates, filtre « rapproché », entonnoir, et les
+widgets `enrolement-par-jour` et `enrolement-par-etape` du tableau de bord.
+
+## Le dossier bancaire ne tient plus à une fiche
+
+Un dossier s'ouvrait seulement sur une inscription rapprochée à un prospect.
+Sans fiche, la chaîne Banque & Finance se serait arrêtée. `bank_cases."prospectId"`
+est désormais facultatif : le dossier porte le nom et le numéro lus sur
+l'inscription, et les écrans qui nommaient le téléconseiller suiveur le laissent
+vide. Même chose pour `client_creation_requests."createdProspectId"`, dont la
+contrainte « une demande approuvée a créé une fiche » est levée.

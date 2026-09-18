@@ -102,7 +102,6 @@ FROM "prospects" WHERE "id" = $1 AND "deletedAt" IS NULL;
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
-    AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
     AND ((@tous::bool OR p."createdById" = @agent)
          AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
                          WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
@@ -118,7 +117,6 @@ SELECT EXISTS (
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
-    AND @plateforme::bool = (p."plateformeDepuis" IS NOT NULL)
     AND ((@tous::bool OR p."createdById" = @agent)
          AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
                          WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
@@ -239,8 +237,6 @@ WHERE c."status" = 'PENDING'
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
        OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
-  AND (sqlc.narg('plateforme')::boolean IS NULL
-       OR sqlc.narg('plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL))
   AND (CAST(sqlc.narg('projet') AS text) IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id"
@@ -258,8 +254,6 @@ WHERE c."status" = 'PENDING'
        OR c."scheduledAt" <= sqlc.narg('avant')::timestamp)
   AND (CAST(sqlc.narg('assigned_to_id') AS text) IS NULL
        OR c."assignedToId" = CAST(sqlc.narg('assigned_to_id') AS text))
-  AND (sqlc.narg('plateforme')::boolean IS NULL
-       OR sqlc.narg('plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL))
   AND (CAST(sqlc.narg('projet') AS text) IS NULL
        OR EXISTS (SELECT 1 FROM "prospect_journeys" j
                   WHERE j."prospectId" = p."id"
@@ -445,10 +439,6 @@ WHERE p."deletedAt" IS NULL
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
       WHERE li."prospectId" = p."id" AND li."assigneeId" = sqlc.arg('scope_user_id')::text
     )
-  )
-  AND (
-    sqlc.narg('scope_plateforme')::boolean IS NULL
-    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
   )
   AND (
     sqlc.narg('depuis_at')::timestamp IS NULL

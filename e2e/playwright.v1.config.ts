@@ -5,7 +5,7 @@ const WEB_URL = process.env.E2E_WEB_URL ?? 'http://localhost:4000';
 
 export default defineConfig({
   testDir: './v1',
-  workers: Number(process.env.E2E_WORKERS ?? 1),
+  workers: Number(process.env.E2E_WORKERS ?? 4),
   fullyParallel: false,
   retries: 0,
   timeout: 60_000,

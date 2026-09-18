@@ -4,9 +4,8 @@ import { BASE_URL, DATABASE_URL, PORT } from './comptes';
 
 export default defineConfig({
   testDir: '.',
-  // Un travailleur par cœur, un fichier par travailleur : au-delà des cœurs,
-  // les navigateurs se disputent la machine et les délais tombent.
-  workers: '100%',
+  // Quatre workers équilibrent le débit et la mémoire sur le poste local.
+  workers: Number(process.env.E2E_WORKERS ?? 4),
   fullyParallel: false,
   retries: 0,
   timeout: 60_000,

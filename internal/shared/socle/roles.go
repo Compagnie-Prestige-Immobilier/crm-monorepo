@@ -19,15 +19,12 @@ const (
 	Direction       Role = "DIRECTION"
 	Accueil         Role = "ACCUEIL"
 	ChargeClientele Role = "CHARGE_CLIENTELE"
-	// Chargé de clientèle plateforme : appelle les fiches venues des plateformes
-	// d'enrôlement, et elles seules (docs/decisions/fiches-plateforme.md).
-	CCP    Role = "CCP"
-	Public Role = "PUBLIC"
+	Public          Role = "PUBLIC"
 )
 
 var (
-	Tous          = []Role{Admin, Commercial, BanqueFinance, Superviseur, Direction, Accueil, ChargeClientele, CCP}
-	Parcours      = []Role{Admin, Commercial, ChargeClientele, CCP, Superviseur, Direction}
+	Tous          = []Role{Admin, Commercial, BanqueFinance, Superviseur, Direction, Accueil, ChargeClientele}
+	Parcours      = []Role{Admin, Commercial, ChargeClientele, Superviseur, Direction}
 	Encadrement   = []Role{Admin, Superviseur, Direction}
 	Registre      = []Role{Admin, Direction, Accueil}
 	Banque        = []Role{Admin, BanqueFinance}
@@ -56,30 +53,6 @@ func FusionnerGardes(gardes ...map[string]Permission) {
 func cleGarde(method, path string) string {
 	return strings.ToUpper(method) + " " + path
 }
-
-// Lecture d'une fiche plateforme : nil, l'encadrement lit tout ; vrai, le CCP
-// ne voit que les fiches venues des plateformes ; faux, personne d'autre ne
-// les voit jamais. Lire n'est pas toucher : voir PorteeSaisiePlateforme.
-func PorteePlateforme(u *Utilisateur) *bool {
-	if u.Peut(PermissionPlateformeVoir) {
-		return nil
-	}
-	if u.Peut(PermissionPlateformeSaisir) {
-		return &vrai
-	}
-	return &faux
-}
-
-// Saisie sur une fiche plateforme, annuaire d'appel compris : seul le CCP.
-// L'encadrement suit le travail des CCP sans jamais composer leurs numéros.
-func PorteeSaisiePlateforme(u *Utilisateur) *bool {
-	if u.Peut(PermissionPlateformeSaisir) {
-		return &vrai
-	}
-	return &faux
-}
-
-var vrai, faux = true, false
 
 func VerifierGarde(api huma.API) error {
 	vues := map[string]bool{}

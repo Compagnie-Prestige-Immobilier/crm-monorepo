@@ -39,7 +39,7 @@ type Utilisateur struct {
 	Email     string  `json:"email"`
 	Username  string  `json:"username"`
 	FullName  string  `json:"fullName"`
-	Role      Role    `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	Role      Role    `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	PhoneE164 *string `json:"phoneE164"`
 	// Role reste le rôle de base, qui porte les données ; RoleID donne les permissions.
 	RoleID      string `json:"roleId"`
@@ -63,7 +63,7 @@ func Empreinte(jeton string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func utilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, jeton string) (Utilisateur, error) {
+func UtilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, jeton string) (Utilisateur, error) {
 	row, err := q.UserBySession(ctx, Empreinte(jeton))
 	if err != nil {
 		return Utilisateur{}, err

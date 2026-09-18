@@ -1,4 +1,5 @@
 import { createFileRoute, Outlet, redirect } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 import { meQueryOptions } from '@/api/auth';
 import { EcranErreurPleinePage } from '@/components/etats-router';
@@ -21,23 +22,30 @@ export const Route = createFileRoute('/_hub')({
 function Hub() {
   const { user } = Route.useRouteContext();
 
+  useEffect(() => {
+    document.title = 'Espaces · CPI GO';
+  }, []);
+
   return (
     <div className="flex min-h-dvh flex-col">
       <LiveStream />
       <DemoBanner user={user} />
-      <header className="flex h-16 shrink-0 items-center gap-2 border-b border-border px-4 md:px-6">
+      <header className="cpi-navbar flex h-20 shrink-0 items-center gap-3 px-4 text-primary-foreground md:px-6">
         <img
           src="/brand/cpi-header.webp"
-          alt="CPI GO"
+          alt="CPI"
           width={312}
           height={128}
-          className="h-8 w-auto"
+          className="h-10 w-auto"
         />
+        <span className="cpi-go-mark ml-2" aria-label="GO">
+          GO
+        </span>
         <div className="flex-1" />
         <ThemeToggle />
         <UserMenu user={user} demoEnabled={false} />
       </header>
-      <main id="contenu-principal" className="flex-1 px-4 py-8 md:px-6 md:py-12">
+      <main id="contenu-principal" className="cpi-logo-field flex-1 px-4 py-8 md:px-6 md:py-12">
         <Outlet />
       </main>
     </div>

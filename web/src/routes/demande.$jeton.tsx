@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
+import { useEffect } from 'react';
 
 import { FormulaireDemande } from '@/components/demande/formulaire-demande';
 import { getApiClient } from '@/lib/api/browser';
@@ -33,6 +34,10 @@ function Indisponible() {
 
 function DemandePubliquePage() {
   const { jeton } = Route.useParams();
+  useEffect(() => {
+    document.title = 'Demande de rappel · CPI GO';
+  }, []);
+
   const composition = useQuery({ queryKey: ['formulaire-public'], queryFn: lireComposition });
   const formulaire = composition.data ?? null;
   const cleSite = formulaire?.turnstileSiteKey ?? '';

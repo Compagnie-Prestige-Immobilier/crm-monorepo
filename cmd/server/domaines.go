@@ -16,6 +16,7 @@ import (
 	"cpi-go/internal/referentiels"
 	"cpi-go/internal/representants"
 	"cpi-go/internal/shared/socle"
+	"cpi-go/internal/support"
 	"cpi-go/internal/ventes"
 	"errors"
 
@@ -44,6 +45,7 @@ func monterDomaines(api huma.API, d *socle.Deps) error {
 	campagnes.Monter(api, d)
 	qualification.Monter(api, d)
 	ventes.Monter(api, d)
+	support.Monter(api, d)
 	return nil
 }
 
@@ -68,6 +70,7 @@ func gardesDomaines() []map[string]socle.Permission {
 		campagnes.Garde,
 		qualification.Garde,
 		ventes.Garde,
+		support.Garde,
 	}
 }
 

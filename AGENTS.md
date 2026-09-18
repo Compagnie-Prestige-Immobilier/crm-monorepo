@@ -72,6 +72,23 @@ Un test qui passe sur du code casse est PIRE que pas de test. Avant de garder
 un test d'integration ou e2e, le casser: modifier le code qu'il couvre,
 verifier qu'il rougit, remettre.
 
+**Ne lancer que les tests du perimetre touche.** La suite complete coute des
+minutes de machine et rend des echecs sans rapport avec le changement. Nommer
+les fichiers concernes:
+
+```
+rtk go test -tags=integration ./cmd/server -run 'TestBanque|TestImports'
+rtk pnpm --dir e2e test parite-banque.spec.ts rappels.spec.ts
+```
+
+La suite entiere se lance une seule fois, a la fin, quand le perimetre est
+vert. Ne pas la relancer apres chaque correction.
+
+**Ne pas changer le nombre de workers Playwright.** Le depot regle quatre
+workers dans `e2e/playwright.config.ts`; c'est la valeur mesuree sur ce poste.
+Une valeur plus haute ne va pas plus vite et fait tomber les delais. Un
+`E2E_WORKERS` different ne se pose que sur demande explicite du proprietaire.
+
 ## Commentaires
 
 Rares. Le code se lit d'abord.

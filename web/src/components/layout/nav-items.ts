@@ -100,7 +100,7 @@ export const COQUES: readonly CoqueEntry[] = [
   },
   {
     id: 'teleconseil',
-    label: 'Téléconseil',
+    label: 'Commercial',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
     acces: 'fiches.tenir',
@@ -284,20 +284,6 @@ const SECTIONS: readonly NavSection[] = [
         acces: 'prospects.convertir',
       },
       {
-        href: '/teleconseil/plateforme-apercu',
-        label: 'Aperçu plateforme',
-        icon: LayoutDashboardIcon,
-        description: 'Volume des inscriptions et appels à faire',
-        acces: 'plateforme.equipe',
-      },
-      {
-        href: '/teleconseil/plateforme',
-        label: 'Mon travail',
-        icon: HeadsetIcon,
-        description: 'Les inscrits des plateformes d’enrôlement',
-        acces: 'plateforme.saisir',
-      },
-      {
         href: '/teleconseil/rappels',
         label: 'Rappels promis',
         icon: ClockIcon,
@@ -320,13 +306,6 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Les personnes que j’ai appelées',
         acces: TERRAIN,
         secondary: true,
-      },
-      {
-        href: '/teleconseil/mes-contacts',
-        label: 'Mes contacts',
-        icon: ContactRoundIcon,
-        description: 'Les personnes que j’ai appelées sur la plateforme',
-        acces: ['CCP'],
       },
       {
         href: '/teleconseil/suggestions',
@@ -475,7 +454,7 @@ const SECTIONS: readonly NavSection[] = [
         href: '/admin/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
-        description: 'Vue d’ensemble globale : enrôlement, CCP, déploiement et marketing',
+        description: 'Vue d’ensemble globale : enrôlement, déploiement et marketing',
         acces: 'parametres.administrer',
       },
       {
@@ -657,8 +636,6 @@ export function homePathForRole(role: Role): string {
     case 'COMMERCIAL':
     case 'CHARGE_CLIENTELE':
       return '/teleconseil';
-    case 'CCP':
-      return '/teleconseil/plateforme-apercu';
     case 'DIRECTION':
       return '/teleconseil/leads-importes';
     case 'SUPERVISEUR':

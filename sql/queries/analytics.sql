@@ -217,15 +217,12 @@ SELECT
   j."id",
   j."fileName" AS fichier,
   j."createdAt" AS importe_le,
-  COUNT(p."id") FILTER (WHERE p."plateformeDepuis" IS NULL)::int AS importes,
-  COUNT(p."id") FILTER (WHERE p."plateformeDepuis" IS NULL AND p."lastCallAt" IS NOT NULL)::int AS appeles,
+  COUNT(p."id")::int AS importes,
+  COUNT(p."id") FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS appeles,
   COUNT(p."id") FILTER (
-    WHERE p."plateformeDepuis" IS NULL
-      AND p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
+    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
   )::int AS joints,
-  COUNT(p."id") FILTER (WHERE p."plateformeDepuis" IS NULL AND r."code" = ANY(@motifs::text[]))::int AS interesses,
-  -- Passées plateforme : suivies par les CCP, hors de ce tableau mais comptées pour qu'il boucle avec l'import.
-  COUNT(p."id") FILTER (WHERE p."plateformeDepuis" IS NOT NULL)::int AS plateforme
+  COUNT(p."id") FILTER (WHERE r."code" = ANY(@motifs::text[]))::int AS interesses
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 LEFT JOIN LATERAL (
@@ -243,7 +240,7 @@ ORDER BY j."createdAt" DESC;
 -- name: LeadsImportesInteressesTotal :one
 SELECT COUNT(*)::int
 FROM "prospects" p
-JOIN "import_jobs" j ON j."id" = p."importJobId" AND p."plateformeDepuis" IS NULL
+JOIN "import_jobs" j ON j."id" = p."importJobId"
 JOIN LATERAL (
   SELECT c."reasonId"
   FROM "call_attempts" c
@@ -268,7 +265,7 @@ SELECT
   r."label" AS motif,
   dernier."comment" AS commentaire
 FROM "prospects" p
-JOIN "import_jobs" j ON j."id" = p."importJobId" AND p."plateformeDepuis" IS NULL
+JOIN "import_jobs" j ON j."id" = p."importJobId"
 JOIN LATERAL (
   SELECT c."reasonId", c."createdAt", c."comment", c."performedById"
   FROM "call_attempts" c

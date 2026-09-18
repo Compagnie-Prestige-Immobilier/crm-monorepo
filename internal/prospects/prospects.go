@@ -218,8 +218,6 @@ type Prospect struct {
 	LastCallAt               *string           `json:"lastCallAt"`
 	LastCallByID             *string           `json:"lastCallById"`
 	LastCallByName           *string           `json:"lastCallByName"`
-	PlateformeDepuis         *string           `json:"plateformeDepuis" doc:"Inscription sur une plateforme d'enrôlement : la fiche revient aux chargés de clientèle plateforme."`
-	PlateformeInscrite       bool              `json:"plateformeInscrite" doc:"Une inscription présente sur la plateforme est rapprochée de la fiche. Sans elle, la fiche vient d'un classeur qui cite le site."`
 	RemarqueImport           *string           `json:"remarqueImport" doc:"Réponse du prospect notée dans le classeur importé."`
 	EnCoursPar               *string           `json:"enCoursPar" doc:"Un collègue a la fiche ouverte depuis moins de deux heures."`
 	RepresentantAppeleAt     *string           `json:"representantAppeleAt" doc:"Le numéro est aussi celui d'un représentant déjà appelé : date de ce dernier appel."`
@@ -318,7 +316,6 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
 		LastCallOutcome: prospectEnum(p.LastCallOutcome), LastCallAt: prospectISOPtr(p.LastCallAt),
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
-		PlateformeDepuis: prospectISOPtr(p.PlateformeDepuis), PlateformeInscrite: l.PlateformeInscrite,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
@@ -338,21 +335,18 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 }
 
 type prospectPortee struct {
-	tout       bool
-	converti   bool
-	plateforme *bool
-	userID     string
+	tout     bool
+	converti bool
+	userID   string
 }
 
 // Le chargé de clientèle voit TOUTE demande convertie : c'est lui qui la relit
-// avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait. Le
-// CCP voit tout, mais la borne plateforme ne lui laisse que ses fiches.
+// avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait.
 func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 	return prospectPortee{
-		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout) || u.Peut(socle.PermissionPlateformeSaisir),
-		converti:   u.Peut(socle.PermissionFichesVoirConverties),
-		plateforme: socle.PorteePlateforme(u),
-		userID:     u.ID,
+		tout:     u.Peut(socle.PermissionPortefeuilleVoirTout),
+		converti: u.Peut(socle.PermissionFichesVoirConverties),
+		userID:   u.ID,
 	}
 }
 
@@ -412,8 +406,7 @@ func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id str
 	p := prospectPorteeDe(u)
 	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
 		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
-		ScopePlateforme: p.plateforme,
-		SortBy:          prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
+		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
 	})
 	if err != nil {
 		return nil, err
@@ -469,8 +462,7 @@ type ProspectListInput struct {
 	MesFiches              bool   `query:"mesFiches"`
 	Attribue               bool   `query:"attribue"`
 	ResteAAppeler          bool   `query:"resteAAppeler"`
-	Plateforme             bool   `query:"plateforme" doc:"true : seulement les fiches venues des plateformes. Sans effet sur un rôle qui ne les lit pas."`
-	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt,plateformeDepuis"`
+	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
 	Page                   int32  `query:"page" minimum:"1" default:"1"`
 	PageSize               int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
@@ -536,17 +528,12 @@ func prospectRechercheTelephone(recherche, region string) *string {
 func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (db.ListProspectsParams, error) {
 	p := prospectPorteeDe(u)
 	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
-	// compose que les numéros qui lui reviennent. Les fiches plateforme
-	// reviennent toutes aux CCP, sans partage.
-	if in.MesFiches && !u.Peut(socle.PermissionPlateformeSaisir) {
+	// compose que les numéros qui lui reviennent.
+	if in.MesFiches {
 		p.tout, p.converti = false, false
 	}
-	if in.Plateforme && p.plateforme == nil {
-		plateforme := true
-		p.plateforme = &plateforme
-	}
 	arg := db.ListProspectsParams{
-		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopePlateforme: p.plateforme,
+		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
@@ -590,7 +577,7 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
 		Search: arg.Search, PhoneSearch: arg.PhoneSearch, Attribue: arg.Attribue,
-		ResteAAppeler: arg.ResteAAppeler, ScopePlateforme: arg.ScopePlateforme,
+		ResteAAppeler: arg.ResteAAppeler,
 	}
 }
 

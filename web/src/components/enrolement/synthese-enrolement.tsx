@@ -10,7 +10,6 @@ import {
 import { DelaisEnrolement } from '@/components/enrolement/delais-enrolement';
 import { CourbeEnrolement, EntonnoirCarte } from '@/components/enrolement/entonnoir-enrolement';
 import { InfoPopover } from '@/components/stats/stat-info';
-import { PlateformeOverview } from '@/components/console/plateforme-overview';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
@@ -195,8 +194,6 @@ export function SyntheseEnrolement() {
 
   return (
     <div className="flex flex-col gap-6 pt-2">
-      <PlateformeOverview encadrement={true} regleObjectif={true} />
-
       <CourbeEnrolement
         titre="Inscriptions par jour"
         series={PROJETS.map((entree, index) => ({
