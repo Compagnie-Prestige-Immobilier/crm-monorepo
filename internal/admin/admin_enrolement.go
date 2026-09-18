@@ -299,21 +299,17 @@ type reglagesEnrolement struct {
 	RepriseDepuis    *string      `json:"repriseDepuis"`
 	StatutsComplets  []string     `json:"statutsComplets"`
 	DernierTirage    *BilanTirage `json:"dernierTirage"`
-	// Fiches plateforme sans premier appel au-delà desquelles l'encadrement est
-	// prévenu que les CCP ont besoin de renfort. Zéro : jamais.
-	SeuilAttentePlateforme int `json:"seuilAttentePlateforme"`
 }
 
 type ReglagesOutput struct {
 	Body struct {
-		Projet                 string       `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
-		FrequenceMinutes       int          `json:"frequenceMinutes"`
-		RepriseDepuis          *string      `json:"repriseDepuis"`
-		StatutsComplets        []string     `json:"statutsComplets"`
-		SeuilAttentePlateforme int          `json:"seuilAttentePlateforme"`
-		Configuree             bool         `json:"configuree"`
-		DernierTirage          *BilanTirage `json:"dernierTirage"`
-		UpdatedAt              *time.Time   `json:"updatedAt"`
+		Projet           string       `json:"projet" enum:"CHUES,GRAND_PUBLIC"`
+		FrequenceMinutes int          `json:"frequenceMinutes"`
+		RepriseDepuis    *string      `json:"repriseDepuis"`
+		StatutsComplets  []string     `json:"statutsComplets"`
+		Configuree       bool         `json:"configuree"`
+		DernierTirage    *BilanTirage `json:"dernierTirage"`
+		UpdatedAt        *time.Time   `json:"updatedAt"`
 	}
 }
 
@@ -331,7 +327,6 @@ func reglagesStockes(valeur string) reglagesEnrolement {
 		valeurs.FrequenceMinutes = stockees.FrequenceMinutes
 	}
 	valeurs.RepriseDepuis, valeurs.DernierTirage = stockees.RepriseDepuis, stockees.DernierTirage
-	valeurs.SeuilAttentePlateforme = max(0, stockees.SeuilAttentePlateforme)
 	if stockees.StatutsComplets != nil {
 		valeurs.StatutsComplets = stockees.StatutsComplets
 	}
@@ -366,7 +361,6 @@ func (s *service) reponseReglagesEnrolement(ctx context.Context, projet string) 
 	out.Body.FrequenceMinutes = valeurs.FrequenceMinutes
 	out.Body.RepriseDepuis = valeurs.RepriseDepuis
 	out.Body.StatutsComplets = valeurs.StatutsComplets
-	out.Body.SeuilAttentePlateforme = valeurs.SeuilAttentePlateforme
 	out.Body.Configuree = base != "" && jeton != ""
 	out.Body.DernierTirage = valeurs.DernierTirage
 	out.Body.UpdatedAt = quand
@@ -380,10 +374,9 @@ func (s *service) lireReglagesEnrolement(ctx context.Context, in *ProjetEnroleme
 type EcrireReglagesInput struct {
 	Projet string `path:"projet" enum:"CHUES,GRAND_PUBLIC"`
 	Body   struct {
-		FrequenceMinutes       *int      `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
-		RepriseDepuis          *string   `json:"repriseDepuis,omitempty" maxLength:"40"`
-		StatutsComplets        *[]string `json:"statutsComplets,omitempty" maxItems:"20"`
-		SeuilAttentePlateforme *int      `json:"seuilAttentePlateforme,omitempty" minimum:"0" maximum:"100000"`
+		FrequenceMinutes *int      `json:"frequenceMinutes,omitempty" minimum:"5" maximum:"1440"`
+		RepriseDepuis    *string   `json:"repriseDepuis,omitempty" maxLength:"40"`
+		StatutsComplets  *[]string `json:"statutsComplets,omitempty" maxItems:"20"`
 	}
 }
 
@@ -409,7 +402,7 @@ func repriseNormalisee(valeur, courant *string) *string {
 func reglagesJournal(r *reglagesEnrolement) map[string]any {
 	return map[string]any{
 		"frequenceMinutes": r.FrequenceMinutes, "repriseDepuis": r.RepriseDepuis,
-		"statutsComplets": r.StatutsComplets, "seuilAttentePlateforme": r.SeuilAttentePlateforme,
+		"statutsComplets": r.StatutsComplets,
 	}
 }
 
@@ -422,9 +415,6 @@ func (s *service) ecrireReglagesEnrolement(ctx context.Context, in *EcrireReglag
 	avant := valeurs
 	if in.Body.FrequenceMinutes != nil {
 		valeurs.FrequenceMinutes = *in.Body.FrequenceMinutes
-	}
-	if in.Body.SeuilAttentePlateforme != nil {
-		valeurs.SeuilAttentePlateforme = *in.Body.SeuilAttentePlateforme
 	}
 	valeurs.RepriseDepuis = repriseNormalisee(in.Body.RepriseDepuis, valeurs.RepriseDepuis)
 	if in.Body.StatutsComplets != nil {
@@ -527,9 +517,6 @@ func (s *service) tirer(ctx context.Context, projet string) BilanTirage {
 	} else if _, err := banque.SignalerDossiersComplets(ctx, s.Deps, projet); err != nil {
 		slog.Error("tirage d’enrôlement : dossiers complets non signalés", "projet", projet, "err", err)
 	}
-	if err := s.remettreRappelsPlateformeAuxCCP(ctx); err != nil {
-		slog.Error("tirage d’enrôlement : rappels plateforme non remis aux CCP", "projet", projet, "err", err)
-	}
 	valeurs, _, lecture := s.reglagesTirage(ctx, projet)
 	if lecture == nil {
 		valeurs.DernierTirage = &bilan
@@ -570,7 +557,15 @@ func (s *service) executerTirage(ctx context.Context, projet string) (BilanTirag
 	for i := range retenues {
 		ligne := &retenues[i]
 		candidat := index.choisir(ligne.PhoneE164, ligne.Email)
-		if err := s.tirerLigne(ctx, projet, base, ligne, candidat, connus, tirageAt, &bilan); err != nil {
+		if candidat != nil {
+			bilan.Rapproches++
+		}
+		if slices.Contains(connus, ligne.IdentifiantDistant) {
+			bilan.MisAJour++
+		} else {
+			bilan.Crees++
+		}
+		if err := s.deposerInscription(ctx, projet, ligne, candidat, tirageAt); err != nil {
 			return bilan, err
 		}
 		vus = append(vus, ligne.IdentifiantDistant)

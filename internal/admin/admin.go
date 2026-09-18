@@ -77,8 +77,6 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
 	"PUT /api/v1/enrolement/{projet}/reglages":                    socle.PermissionEnrolementAdministrer,
 	"POST /api/v1/enrolement/{projet}/tirage":                     socle.PermissionEnrolementAdministrer,
-	"GET /api/v1/plateforme/equipe":                               socle.PermissionPlateformeEquipe,
-	"PUT /api/v1/plateforme/objectif":                             socle.PermissionParametresAdministrer,
 	"POST /api/v1/webhooks/enrolement/{projet}":                   socle.Publique,
 	"GET /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
 	"PUT /api/v1/tableaux-de-bord/{ecran}/disposition":            rolesChiffres,
@@ -108,7 +106,6 @@ func Monter(api huma.API, d *socle.Deps) {
 	monterRoles(api, s)
 	monterDump(api, s)
 	monterEnrolement(api, s)
-	monterPlateforme(api, s)
 	monterExploitation(api, s)
 }
 
@@ -166,7 +163,7 @@ type Compte struct {
 	Email         string     `json:"email"`
 	Username      string     `json:"username"`
 	FullName      string     `json:"fullName"`
-	Role          socle.Role `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	Role          socle.Role `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	RoleID        string     `json:"roleId"`
 	RoleLibelle   string     `json:"roleLibelle"`
 	IsActive      bool       `json:"isActive"`
@@ -205,7 +202,7 @@ func compteAdmin(ctx context.Context, q *db.Queries, id string) (Compte, error) 
 
 type ListerComptesInput struct {
 	Search   string `query:"search" maxLength:"120"`
-	Role     string `query:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	Role     string `query:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	IsActive string `query:"isActive" enum:"true,false"`
 	Page     int32  `query:"page" minimum:"1" default:"1"`
 	PageSize int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
@@ -278,7 +275,7 @@ type CreerCompteInput struct {
 		Username string      `json:"username" minLength:"3" maxLength:"40" pattern:"^[a-zA-Z0-9._-]+$"`
 		FullName string      `json:"fullName" minLength:"2" maxLength:"160"`
 		Password string      `json:"password" minLength:"1" maxLength:"1024"`
-		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}
@@ -379,7 +376,7 @@ type ModifierCompteInput struct {
 		Email    *string     `json:"email,omitempty" format:"email" maxLength:"254"`
 		Username *string     `json:"username,omitempty" minLength:"3" maxLength:"40" pattern:"^[a-zA-Z0-9._-]+$"`
 		FullName *string     `json:"fullName,omitempty" minLength:"2" maxLength:"160"`
-		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+		Role     *socle.Role `json:"role,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 		RoleID   *string     `json:"roleId,omitempty" maxLength:"64"`
 		Phone    *string     `json:"phone,omitempty" maxLength:"40"`
 	}

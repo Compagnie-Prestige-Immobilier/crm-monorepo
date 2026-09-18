@@ -100,10 +100,6 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 	} else if !errors.Is(err, pgx.ErrNoRows) {
 		return insc, err
 	}
-	if insc.ProspectId == nil {
-		return insc, socle.Problem(http.StatusUnprocessableEntity, "BANK_CASE_INSCRIPTION_SANS_PROSPECT",
-			"Aucun prospect du CRM ne correspond à cette inscription (téléphone ou courriel). Rapprochez-la avant d’ouvrir le dossier.")
-	}
 	statuts, err := socle.StatutsDossierComplet(ctx, s.Q, string(insc.Projet))
 	if err != nil {
 		return insc, err
@@ -115,16 +111,26 @@ func (s *service) inscriptionOuvrable(ctx context.Context, id string) (db.BankIn
 	return insc, nil
 }
 
+// Sans fiche rapprochée, le dossier porte l'identité de l'inscription : les
+// plateformes suivent seules leurs inscrits, le CRM n'a plus de fiche à opposer.
+func (s *service) prospectDuDossier(ctx context.Context, insc *db.BankInscriptionPourDossierRow) (db.BankCaseProspectRow, error) {
+	if insc.ProspectId == nil {
+		return db.BankCaseProspectRow{Nom: insc.Nom, Prenom: insc.Prenom, PhoneE164: insc.PhoneE164}, nil
+	}
+	prospect, err := s.Q.BankCaseProspect(ctx, *insc.ProspectId)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return prospect, socle.Problem(http.StatusNotFound, "BANK_CASE_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
+	}
+	return prospect, err
+}
+
 func (s *service) creerDossier(ctx context.Context, in *CreationDossierInput) (*DossierOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	insc, err := s.inscriptionOuvrable(ctx, in.Body.InscriptionID)
 	if err != nil {
 		return nil, err
 	}
-	prospect, err := s.Q.BankCaseProspect(ctx, *insc.ProspectId)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "BANK_CASE_PROSPECT_NOT_FOUND", "Prospect introuvable ou supprimé.")
-	}
+	prospect, err := s.prospectDuDossier(ctx, &insc)
 	if err != nil {
 		return nil, err
 	}

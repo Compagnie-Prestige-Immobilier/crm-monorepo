@@ -28,9 +28,8 @@ const (
 )
 
 // Qui passe des appels et apparaît donc dans l'équipe. L'encadrement décroche
-// aussi, les CCP appellent les inscrits des plateformes ; l'ADMIN est un compte
-// d'administration, pas de plateau.
-const rolesDuPlateau = `u."role" IN ('COMMERCIAL'::"Role", 'SUPERVISEUR'::"Role", 'DIRECTION'::"Role", 'CCP'::"Role") AND u."deletedAt" IS NULL`
+// aussi ; l'ADMIN est un compte d'administration, pas de plateau.
+const rolesDuPlateau = `u."role" IN ('COMMERCIAL'::"Role", 'SUPERVISEUR'::"Role", 'DIRECTION'::"Role") AND u."deletedAt" IS NULL`
 
 // Issues d'appel prospect qui ne comptent pas comme un contact. Un faux numéro
 // n'en est plus : la fiche est traitée.

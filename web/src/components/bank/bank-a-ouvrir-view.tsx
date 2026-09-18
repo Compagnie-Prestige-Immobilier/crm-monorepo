@@ -232,9 +232,7 @@ function CarteInscription({
                   : formatPhone(inscription.phoneE164)}
               </p>
             </div>
-            <Badge variant={sansProspect ? 'warning' : 'success'}>
-              {sansProspect ? 'Prospect inconnu' : 'Validé'}
-            </Badge>
+            <Badge variant="success">Validé</Badge>
           </div>
           <dl className="grid grid-cols-2 gap-2 text-[0.8125rem]">
             <div>
@@ -260,12 +258,12 @@ function CarteInscription({
           </dl>
           {sansProspect ? (
             <p className="text-[0.8125rem] text-muted-foreground">
-              Aucun prospect du CRM ne porte ce téléphone ou ce courriel. Créez ou corrigez le
-              prospect, le prochain tirage le rapprochera.
+              Aucune fiche du CRM ne porte ce téléphone : le dossier prendra le nom et le numéro de
+              l’inscription, et ne nommera aucun téléconseiller.
             </p>
           ) : null}
           <div className="mt-auto flex flex-wrap gap-2">
-            <Button type="button" disabled={sansProspect || pending} onClick={onOuvrir}>
+            <Button type="button" disabled={pending} onClick={onOuvrir}>
               <FolderPlusIcon aria-hidden="true" />
               Ouvrir le dossier
             </Button>

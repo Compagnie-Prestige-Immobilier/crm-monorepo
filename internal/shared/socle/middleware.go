@@ -228,7 +228,7 @@ func GarderAcces(mux *http.ServeMux, q *db.Queries, a *Attributions) http.Handle
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "UNAUTHENTICATED", "Connexion requise."))
 			return
 		}
-		u, err := utilisateurParSession(r.Context(), q, a, jeton)
+		u, err := UtilisateurParSession(r.Context(), q, a, jeton)
 		if err != nil {
 			EcrireProblem(w, r, Problem(http.StatusUnauthorized, "SESSION_EXPIRED", "Session expirée. Reconnectez-vous."))
 			return

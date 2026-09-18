@@ -91,7 +91,7 @@ type DossierBanque struct {
 	ID                 string       `json:"id"`
 	Reference          string       `json:"reference"`
 	ReferenceKey       string       `json:"referenceKey"`
-	ProspectID         string       `json:"prospectId"`
+	ProspectID         *string      `json:"prospectId" doc:"Vide : l'inscription n'a pas de fiche au CRM, le dossier porte son identité seule."`
 	CustomerName       string       `json:"customerName"`
 	CustomerPhoneE164  string       `json:"customerPhoneE164"`
 	ProcessingBankID   string       `json:"processingBankId"`
@@ -414,14 +414,19 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 	}
 	if prospect.PhoneE164 == nil {
 		return "", socle.Problem(http.StatusUnprocessableEntity, "BANK_CASE_PHONE_REQUIRED",
-			"Ce prospect n’a pas de numéro : la banque ne pourrait pas le joindre. Renseignez son téléphone.")
+			"Aucun numéro de téléphone : la banque ne pourrait pas joindre cette personne.")
+	}
+	// Vide : l'inscription n'a pas de fiche au CRM, le dossier porte son identité seule.
+	var prospectID *string
+	if prospect.ID != "" {
+		prospectID = &prospect.ID
 	}
 	nom := banqueEspaces.ReplaceAllString(strings.TrimSpace(prospect.Prenom+" "+prospect.Nom), " ")
 	instant := time.Now()
 	err = s.transactionBanque(ctx, func(q *db.Queries) error {
 		if err := q.BankCaseInsert(ctx, db.BankCaseInsertParams{
 			ID: id.String(), Reference: banqueReferenceAffichee(reference), ReferenceKey: banqueReferenceCle(reference),
-			ProspectId: prospect.ID, CustomerName: nom, CustomerPhoneE164: *prospect.PhoneE164,
+			ProspectId: prospectID, CustomerName: nom, CustomerPhoneE164: *prospect.PhoneE164,
 			ProcessingBankId: banqueID, CurrentStageId: initiale, CreatedById: agentID, InscriptionId: inscriptionID,
 		}); err != nil {
 			return err
@@ -436,7 +441,7 @@ func (s *service) ecrireDossier(ctx context.Context, agentID, banqueID, initiale
 		}
 		return database.Auditer(ctx, q, agentID, "bank_case.create", "bank_case", id.String(), nil,
 			map[string]any{
-				banqueCleReference: banqueReferenceAffichee(reference), "prospectId": prospect.ID,
+				banqueCleReference: banqueReferenceAffichee(reference), "prospectId": prospectID,
 				banqueCleBanque: banqueID, "inscriptionId": inscriptionID,
 			})
 	})

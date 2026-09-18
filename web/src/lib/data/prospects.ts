@@ -76,7 +76,6 @@ function buildAQualifierQuery(
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
     resteAAppeler?: boolean | undefined;
-    plateforme?: boolean | undefined;
     tous?: boolean | undefined;
     page: number;
     representantId?: string | null;
@@ -89,14 +88,12 @@ function buildAQualifierQuery(
     dateTo?: string | null;
   },
   origine: OrigineFiche,
-  plateforme: boolean,
 ): ProspectQuery {
   const base: ProspectQuery = {
     mesFiches: criteres.tous !== true,
-    plateforme,
     search: criteres.search,
-    sortBy: plateforme ? 'plateformeDepuis' : 'nom',
-    sortOrder: plateforme ? 'desc' : 'asc',
+    sortBy: 'nom',
+    sortOrder: 'asc',
     page: criteres.page,
     pageSize: A_QUALIFIER_PAGE_SIZE,
   };
@@ -116,8 +113,6 @@ export async function fetchProspectsAQualifier(
     origine?: OrigineFiche | undefined;
     viewerId?: string | undefined;
     resteAAppeler?: boolean | undefined;
-    /** Les fiches plateforme seulement, dans l'ordre d'arrivée, la plus récente d'abord. */
-    plateforme?: boolean | undefined;
     /** L'encadrement regarde le travail de tous, il ne compose aucun numéro. */
     tous?: boolean | undefined;
     /** La page demandée : la liste entière se parcourt, vingt fiches à la fois. */
@@ -134,8 +129,7 @@ export async function fetchProspectsAQualifier(
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const origine = criteres.origine ?? 'TOUS';
-  const plateforme = criteres.plateforme === true;
-  const query = buildAQualifierQuery(criteres, origine, plateforme);
+  const query = buildAQualifierQuery(criteres, origine);
   return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
 }
 

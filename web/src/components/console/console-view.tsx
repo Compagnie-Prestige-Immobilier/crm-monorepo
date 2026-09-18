@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { CopyIcon, StarIcon } from 'lucide-react';
+import { CopyIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useCallback, useRef, useState, type ReactNode } from 'react';
@@ -191,7 +191,6 @@ export function ConsoleView({
   role,
   origineFiltrable = false,
   canCreateProspect = false,
-  plateforme = false,
 }: {
   projet?: Projet | null;
   /** Le lecteur : « Ajoutés par moi » se borne à ses saisies. */
@@ -201,8 +200,6 @@ export function ConsoleView({
   /** Seul celui à qui une campagne confie des fiches a deux provenances à départager. */
   origineFiltrable?: boolean | undefined;
   canCreateProspect?: boolean | undefined;
-  /** Les fiches venues des plateformes, partagées entre les CCP, la plus récente d'abord. */
-  plateforme?: boolean | undefined;
 }) {
   const queryClient = useQueryClient();
   const searchParams = useSearchParams();
@@ -248,7 +245,6 @@ export function ConsoleView({
     origine,
     viewerId,
     seulementARappeler: resteAAppeler,
-    plateforme,
     page,
     enabled: pasDeFicheOuverte(consultee, aConfirmer),
     representantId: consoleFilters.values.representantId,
@@ -320,7 +316,6 @@ export function ConsoleView({
         cherche={cherche}
         search={search}
         projet={projet}
-        plateforme={plateforme}
         origine={origineAffichee(origineFiltrable, origine)}
         resteAAppeler={resteAAppeler}
         total={totalAffiche(annuaire.data)}
@@ -390,7 +385,6 @@ export function ConsoleView({
         onPage={setPage}
         canCreateProspect={canCreateProspect}
         seulementARappeler={resteAAppeler}
-        plateforme={plateforme}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -455,7 +449,6 @@ function useAnnuaireAQualifier(criteres: {
   origine: OrigineFiche;
   viewerId: string | undefined;
   seulementARappeler: boolean;
-  plateforme: boolean;
   page: number;
   enabled: boolean;
   representantId?: string | null | undefined;
@@ -467,8 +460,7 @@ function useAnnuaireAQualifier(criteres: {
   dateFrom?: string | null | undefined;
   dateTo?: string | null | undefined;
 }) {
-  const { projet, cherche, origine, viewerId, seulementARappeler, plateforme, page, ...filters } =
-    criteres;
+  const { projet, cherche, origine, viewerId, seulementARappeler, page, ...filters } = criteres;
   return useQuery({
     queryKey: [
       ...queryKeys.prospectsRoot,
@@ -477,7 +469,6 @@ function useAnnuaireAQualifier(criteres: {
       cherche,
       origine,
       seulementARappeler,
-      plateforme,
       page,
       filters.representantId,
       filters.departementId,
@@ -495,7 +486,6 @@ function useAnnuaireAQualifier(criteres: {
         origine,
         viewerId,
         resteAAppeler: seulementARappeler,
-        plateforme,
         page,
         representantId: filters.representantId ?? null,
         departementId: filters.departementId ?? null,
@@ -508,8 +498,6 @@ function useAnnuaireAQualifier(criteres: {
       }),
     enabled: criteres.enabled,
     placeholderData: (previous) => previous,
-    // Deux CCP sur le même lot : « en cours par » doit se voir sans recharger.
-    refetchInterval: plateforme ? 30_000 : false,
   });
 }
 
@@ -695,7 +683,6 @@ function ListeAnnuaire({
   onPage,
   canCreateProspect,
   seulementARappeler,
-  plateforme,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
@@ -704,7 +691,6 @@ function ListeAnnuaire({
   onPage: (page: number) => void;
   canCreateProspect: boolean;
   seulementARappeler: boolean;
-  plateforme: boolean;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -742,7 +728,6 @@ function ListeAnnuaire({
             <TableHead>Nom et prénom</TableHead>
             <TableHead>Projet</TableHead>
             <TableHead>Numéro</TableHead>
-            {plateforme ? <TableHead>Inscrit le</TableHead> : null}
             <TableHead>Statut / Qualification</TableHead>
             <TableHead>Dernier appel</TableHead>
           </TableRow>
@@ -771,11 +756,6 @@ function ListeAnnuaire({
                 <TableCell className="whitespace-nowrap font-mono text-[0.875rem]">
                   {formatPhone(row.phoneE164)}
                 </TableCell>
-                {plateforme ? (
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    <CelluleInscritLe row={row} />
-                  </TableCell>
-                ) : null}
                 <TableCell>
                   <StatutAnnuaire row={row} />
                 </TableCell>
@@ -830,32 +810,9 @@ function StatutAnnuaire({ row }: { row: ProspectRow }) {
   );
 }
 
-/** L'étoile : une inscription vivante sur la plateforme, pas seulement un classeur qui cite le site. */
-function CelluleInscritLe({ row }: { row: ProspectRow }) {
-  if (row.plateformeDepuis == null) return null;
-  return (
-    <span className="flex flex-col gap-0.5">
-      <span>{formatDateTime(row.plateformeDepuis)}</span>
-      {row.plateformeInscrite === true ? null : (
-        <span className="text-[0.75rem]">A commencé sur le site</span>
-      )}
-    </span>
-  );
-}
-
 function NomProspect({ row }: { row: ProspectRow }) {
   return (
     <>
-      {row.plateformeInscrite === true ? (
-        <span
-          role="img"
-          aria-label="Inscription confirmée sur la plateforme"
-          title="Inscription confirmée sur la plateforme"
-          className="inline-flex shrink-0"
-        >
-          <StarIcon aria-hidden="true" className="size-4 fill-current text-warning" />
-        </span>
-      ) : null}
       <span className="truncate">
         {row.nom} {row.prenom}
       </span>

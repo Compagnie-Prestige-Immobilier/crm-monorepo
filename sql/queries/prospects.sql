@@ -24,8 +24,6 @@ SELECT
      AND o."openedById" <> sqlc.arg('scope_user_id')::text
      AND o."openedAt" > (now() AT TIME ZONE 'UTC') - interval '2 hours'
    ORDER BY o."openedAt" DESC LIMIT 1), '')::text AS en_cours_par,
-  (EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
-   WHERE ip."prospectId" = p."id" AND ip."disparueLe" IS NULL))::boolean AS plateforme_inscrite,
   ra."lastCallAt" AS representant_appele_at,
   ru."fullName" AS representant_appele_par
 FROM "prospects" p
@@ -68,10 +66,6 @@ WHERE p."deletedAt" IS NULL
     )
   )
   AND (
-    sqlc.narg('scope_plateforme')::boolean IS NULL
-    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
-  )
-  AND (
     NOT sqlc.arg('attribue')::boolean
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" la
@@ -82,9 +76,6 @@ WHERE p."deletedAt" IS NULL
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
         AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
-      (sqlc.narg('scope_plateforme')::boolean IS TRUE
-        AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
-      OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
         NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
@@ -105,7 +96,6 @@ WHERE p."deletedAt" IS NULL
             ), '-infinity'::timestamp)
             AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
-      ))
     ))
   )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)
@@ -174,10 +164,10 @@ ORDER BY
     WHEN 'nom' THEN p."nom" WHEN 'prenom' THEN p."prenom" WHEN 'statut' THEN p."statut"::text END END DESC,
   CASE WHEN sqlc.arg('sort_order')::text = 'asc' THEN CASE sqlc.arg('sort_by')::text
     WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt"
-    WHEN 'plateformeDepuis' THEN p."plateformeDepuis" ELSE p."clientCreatedAt" END END ASC,
+    ELSE p."clientCreatedAt" END END ASC,
   CASE WHEN sqlc.arg('sort_order')::text = 'desc' THEN CASE sqlc.arg('sort_by')::text
     WHEN 'createdAt' THEN p."createdAt" WHEN 'lastCallAt' THEN p."lastCallAt"
-    WHEN 'plateformeDepuis' THEN p."plateformeDepuis" ELSE p."clientCreatedAt" END END DESC,
+    ELSE p."clientCreatedAt" END END DESC,
   p."id" DESC
 LIMIT sqlc.arg('taille')::int OFFSET sqlc.arg('saut')::int;
 
@@ -204,10 +194,6 @@ WHERE p."deletedAt" IS NULL
     )
   )
   AND (
-    sqlc.narg('scope_plateforme')::boolean IS NULL
-    OR sqlc.narg('scope_plateforme')::boolean = (p."plateformeDepuis" IS NOT NULL)
-  )
-  AND (
     NOT sqlc.arg('attribue')::boolean
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" la
@@ -218,9 +204,6 @@ WHERE p."deletedAt" IS NULL
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
         AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
-      (sqlc.narg('scope_plateforme')::boolean IS TRUE
-        AND (p."lastCallAt" IS NULL OR p."lastCallAt" < p."plateformeDepuis"))
-      OR (sqlc.narg('scope_plateforme')::boolean IS NOT TRUE AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
         NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
@@ -241,7 +224,6 @@ WHERE p."deletedAt" IS NULL
             ), '-infinity'::timestamp)
             AND ra."createdAt" >= COALESCE(p."remiseATraiterAt", '-infinity'::timestamp)
         )
-      ))
     ))
   )
   AND (sqlc.narg('commercial_id')::text IS NULL OR p."createdById" = sqlc.narg('commercial_id')::text)

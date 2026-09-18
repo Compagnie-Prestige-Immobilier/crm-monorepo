@@ -973,7 +973,7 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 func TestRappelConsommeParTentativeSansNouvelleEcheance(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
-	plateformeRappelPromis(b, prospect, b.userID)
+	rappelPromis(b, prospect, b.userID)
 	corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "reasonCode": "TERRAIN"})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
@@ -1022,4 +1022,26 @@ func TestQualificationMethodeAcquiseSurvitAuStatutSuivant(t *testing.T) {
 	if lu := qualificationCompte(b, `SELECT count(*)::int FROM "prospect_journeys" WHERE "prospectId" = $1 AND "enrollmentMethod" = 'WHATSAPP'`, fiche); lu != 1 {
 		t.Fatalf("le parcours garde la méthode : %d", lu)
 	}
+}
+
+func ouvertureFiche(prospectID string) map[string]any {
+	return map[string]any{
+		"id": uuid.Must(uuid.NewV7()).String(), "prospectId": prospectID,
+		"openedAt": time.Now().UTC().Format(time.RFC3339Nano),
+	}
+}
+
+// Un rappel promis par le téléconseiller, encore à venir.
+func rappelPromis(b *banc, prospectID, teleconseillerID string) {
+	b.t.Helper()
+	tentative, rappel := uuid.NewString(), uuid.NewString()
+	adminExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt")
+		VALUES ($1,$2,$3,'CALLBACK',now())`, tentative, prospectID, teleconseillerID)
+	adminExec(b, `INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","sourceAttemptId","updatedAt")
+		VALUES ($1,$2,$3,now() + interval '1 day',$4,now())`, rappel, prospectID, teleconseillerID, tentative)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, rappel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "id" = $1`, rappel)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, tentative)
+	})
 }

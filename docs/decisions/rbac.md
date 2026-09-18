@@ -3,6 +3,13 @@
 Révisé le 16 septembre 2026 sur deux décisions du propriétaire : les rôles
 personnalisés sont retenus (D1), l'onglet « Utilisateurs » est réécrit (phase 5).
 
+Le 18 septembre 2026, le rôle `CCP` et les permissions `plateforme.voir`,
+`plateforme.saisir` et `plateforme.equipe` ont quitté l'application : le suivi
+des inscrits se fait sur les plateformes (`fiches-plateforme.md`). Le gel de la
+matrice est repris à `cmd/server/testdata/matrice-roles-2026-09-18.json`, 225
+routes. Ce qui suit décrit la construction du RBAC et garde le vocabulaire de
+l'époque : les mentions de `CCP` y sont historiques.
+
 Plan d'exécution, écrit le 16 septembre 2026 après cinq audits en lecture seule
 (points de décision Go, panneau web, base, preuves, conception). Il s'adresse
 à un agent qui exécute une phase à la fois, sans contexte préalable. Chaque
@@ -290,7 +297,7 @@ rtk make test                       # intégration Go contre Postgres
 rtk pnpm typecheck
 rtk pnpm plafonds
 rtk pnpm complexite:go              # aucune nouvelle fonction au-dessus de 15
-rtk pnpm --dir e2e test -- --workers=29   # binaire reconstruit avant (make e2e le fait)
+rtk pnpm --dir e2e test   # quatre workers par défaut, binaire reconstruit avant
 ```
 
 Puis, sans exception, l'étape « casser » propre à la phase, avec le test

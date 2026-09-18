@@ -529,12 +529,17 @@ func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
 	if body["code"] != "BANK_CASE_INSCRIPTION_ALREADY_OPEN" {
 		t.Fatalf("code : %v", body["code"])
 	}
+	// Les plateformes suivent seules leurs inscrits : le dossier s'ouvre sur
+	// l'identité de l'inscription, sans fiche au CRM, la banque étant choisie.
 	sansProspect := s.inscription(nil)
-	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases", map[string]any{"inscriptionId": sansProspect})
-	s.attend(statut, http.StatusUnprocessableEntity, "inscription sans prospect", body)
-	if body["code"] != "BANK_CASE_INSCRIPTION_SANS_PROSPECT" {
-		t.Fatalf("code : %v", body["code"])
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases",
+		map[string]any{"inscriptionId": sansProspect, "processingBankId": s.banqueID})
+	s.attend(statut, http.StatusCreated, "dossier ouvert sans fiche au CRM", body)
+	if body["prospectId"] != nil {
+		t.Fatalf("le dossier ne s’accroche à aucune fiche : %v", body)
 	}
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/"+texteDe(body["id"]), nil)
+	s.attend(statut, http.StatusOK, "relecture du dossier sans fiche", body)
 	statut, body = banqueJSON(s.banc, http.MethodPatch, "/api/v1/bank-cases/"+id,
 		map[string]any{"expectedRev": 1, "reference": "DOS-SAISIE"})
 	s.attend(statut, http.StatusUnprocessableEntity, "la référence ne se saisit plus", body)

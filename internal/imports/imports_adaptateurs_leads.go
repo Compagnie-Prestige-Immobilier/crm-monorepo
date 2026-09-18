@@ -26,9 +26,7 @@ func provenanceEtDateGrandPublicImport(ligne *ligneGrandPublicImport, cellules m
 	if correction != nil {
 		ligne.avertissements = append(ligne.avertissements, *correction)
 	}
-	if plateformeGrandPublicImport(canal) {
-		ligne.plateformeDepuis = &ligne.creeLe
-	}
+	ligne.plateforme = plateformeGrandPublicImport(canal)
 }
 
 // Le canal nomme le réseau, la règle nomme la campagne : elle seule sait à quel

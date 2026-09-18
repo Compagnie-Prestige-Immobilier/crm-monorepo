@@ -23,7 +23,7 @@ let dossier = '';
 let classeur = '';
 let lotId: string | null = null;
 let canalSiteWebPose: string | null = null;
-const telephones = [numero(), numero(), numero()];
+const telephones = [numero(), numero(), numero(), numero()];
 
 interface FicheLue {
   projet: string;
@@ -47,7 +47,7 @@ async function classeurDeCampagne(chemin: string): Promise<void> {
     `Fatou ${NOM}`,
     `fatou.${cle}@example.sn`,
     telephones[0],
-    SITE_GRAND_PUBLIC,
+    'Site web',
   ]);
   feuille.addRow([
     '10/09/2026',
@@ -62,6 +62,14 @@ async function classeurDeCampagne(chemin: string): Promise<void> {
     `awa.${cle}@example.sn`,
     telephones[2],
     'Campagne jamais vue',
+  ]);
+  // Inscrite sur une plateforme : elle n'existe que là-bas, sa ligne ne fait pas de fiche.
+  feuille.addRow([
+    '10/09/2026',
+    `Coumba ${NOM}`,
+    `coumba.${cle}@example.sn`,
+    telephones[3],
+    SITE_GRAND_PUBLIC,
   ]);
   await classeurExcel.xlsx.writeFile(chemin);
 }
@@ -179,8 +187,10 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
       await console.goto('/teleconseil/console');
       await console.getByLabel('Quel prospect avez-vous appelé ?').fill(NOM);
     };
+    // Deux fiches Grand Public portent ce nom : viser celle de Fatou.
+    const fiche = console.getByRole('button', { name: new RegExp(`${NOM} Fatou`, 'u') });
     await chercher();
-    await expect(console.getByRole('button', { name: new RegExp(NOM, 'u') })).toBeVisible();
+    await expect(fiche).toBeVisible();
 
     await page.getByRole('button', { name: 'Mettre en pause' }).click();
     await expect(page.getByText(/En pause depuis le/u)).toBeVisible();
@@ -192,7 +202,7 @@ test.describe('parité imports, un export de campagne entre tel quel', () => {
     await page.getByRole('button', { name: 'Reprendre' }).click();
     await expect(page.getByRole('button', { name: 'Mettre en pause' })).toBeVisible();
     await chercher();
-    await expect(console.getByRole('button', { name: new RegExp(NOM, 'u') })).toBeVisible();
+    await expect(fiche).toBeVisible();
     await contexte.close();
   });
 });

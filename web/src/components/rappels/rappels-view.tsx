@@ -354,14 +354,8 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
   const teleconseillers = useQuery({
     queryKey: callbackKeys.teleconseillers,
-    queryFn: async () => {
-      const pages = await Promise.all(
-        (['COMMERCIAL', 'CCP'] as const).map((role) =>
-          fetchUsers({ ...EMPTY_USER_FILTERS, role, isActive: true, pageSize: 200 }),
-        ),
-      );
-      return { items: pages.flatMap((page) => page.items) };
-    },
+    queryFn: () =>
+      fetchUsers({ ...EMPTY_USER_FILTERS, role: 'COMMERCIAL', isActive: true, pageSize: 200 }),
     enabled: canFilter,
     staleTime: 300_000,
   });

@@ -39,8 +39,6 @@ const (
 	notificationCleDossiersEnAttente     = "bank-cases-pending"
 	notificationCleDossiersSansMouvement = "bank-cases-stale"
 	notificationCleCompteRendu           = "daily-report"
-	notificationCleFichesPlateforme      = "platform-fiches"
-	notificationCleAttentePlateforme     = "platform-backlog"
 )
 
 var (
@@ -88,7 +86,7 @@ type Notification struct {
 type NotificationDestinataire struct {
 	UserID   string     `json:"userId"`
 	FullName string     `json:"fullName"`
-	Role     string     `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	Role     string     `json:"role" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	Status   string     `json:"status" enum:"PENDING,SENT,DELIVERED,FAILED,READ"`
 	Error    *string    `json:"error"`
 	SentAt   *time.Time `json:"sentAt"`
@@ -125,7 +123,7 @@ type CreationNotification struct {
 	Category        string     `json:"category,omitempty" enum:"ANNONCE,RAPPEL,CAMPAGNE,DOSSIER,SYSTEME"`
 	Route           string     `json:"route,omitempty" maxLength:"300" pattern:"^/[A-Za-z0-9\\-._~/%?&=+:@!$'(),;\\[\\]*]*$"`
 	Audience        string     `json:"audience" enum:"ALL,ROLE,DEPARTEMENT,USERS"`
-	AudienceRole    string     `json:"audienceRole,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	AudienceRole    string     `json:"audienceRole,omitempty" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	AudienceUserIDs []string   `json:"audienceUserIds,omitempty" maxItems:"1000"`
 	ScheduledFor    *time.Time `json:"scheduledFor,omitempty"`
 	TemplateID      string     `json:"templateId,omitempty" format:"uuid"`
@@ -810,7 +808,7 @@ func (s *service) marquerNotificationLue(ctx context.Context, in *NotificationID
 
 type NotificationApercuInput struct {
 	Audience        string `query:"audience" required:"true" enum:"ALL,ROLE,DEPARTEMENT,USERS"`
-	AudienceRole    string `query:"audienceRole" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE,CCP"`
+	AudienceRole    string `query:"audienceRole" enum:"ADMIN,COMMERCIAL,BANQUE_FINANCE,SUPERVISEUR,DIRECTION,ACCUEIL,CHARGE_CLIENTELE"`
 	AudienceUserIDs string `query:"audienceUserIds" maxLength:"40000"`
 }
 

@@ -11,7 +11,7 @@ import { PoleMarketingView } from '@/components/pilotage/pole-marketing-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const VOLETS = [
-  { id: 'enrolement', label: 'Enrôlement & CCP', icon: PlugZapIcon },
+  { id: 'enrolement', label: 'Enrôlement', icon: PlugZapIcon },
   { id: 'teleconseil', label: 'Activité téléconseil', icon: PhoneCallIcon },
   { id: 'deploiement', label: 'Pôle déploiement', icon: UsersRoundIcon },
   { id: 'marketing', label: 'Pôle marketing', icon: ActivityIcon },
@@ -44,8 +44,8 @@ export function AdminTableauDeBordView() {
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">Tableau de bord admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Vue d’ensemble globale : enrôlement des plateformes, activité CCP et téléconseil, qualité
-          de la base et marketing.
+          Vue d’ensemble globale : enrôlement des plateformes, activité téléconseil, qualité de la
+          base et marketing.
         </p>
       </div>
 

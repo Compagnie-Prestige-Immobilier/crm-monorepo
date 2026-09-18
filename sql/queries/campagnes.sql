@@ -62,7 +62,7 @@ WITH fiches AS (
          p."projet" = 'GRAND_PUBLIC' AS gp,
          p."projet" = 'CHUES' AS chues
   FROM "import_jobs" j
-  JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL AND p."plateformeDepuis" IS NULL
+  JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL
 )
 SELECT MAX("jobId")::text AS "id",
        MAX("fileName")::text AS "fileName",
@@ -418,7 +418,6 @@ LIMIT sqlc.arg('places');
 SELECT COUNT(*)::int
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
-  AND p."plateformeDepuis" IS NULL
   AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))
@@ -448,7 +447,6 @@ WHERE p."deletedAt" IS NULL
 SELECT p."id"
 FROM "prospects" p
 WHERE p."deletedAt" IS NULL
-  AND p."plateformeDepuis" IS NULL
   AND p."statut" <> 'PERDU'
   AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
   AND (sqlc.narg('type')::"ProspectType" IS NULL OR p."type" = sqlc.narg('type'))

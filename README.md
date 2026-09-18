@@ -37,7 +37,8 @@ pnpm verify:local   # format, lint, code mort, types, plafonds, golangci-lint
 pnpm complexite:go  # dix fonctions les plus complexes
 ```
 
-Les parcours Playwright se lancent avec `--workers=29` depuis `e2e/`.
+Les parcours Playwright utilisent quatre workers par défaut depuis `e2e/`.
+La valeur peut être ajustée ponctuellement avec `E2E_WORKERS`.
 
 ## Arborescence
 

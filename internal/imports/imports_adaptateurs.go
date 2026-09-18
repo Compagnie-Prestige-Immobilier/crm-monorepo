@@ -627,6 +627,7 @@ const (
 	codeDejaEnBaseImport     = "PROSPECT_GP_IMPORT_DEJA_EN_BASE"
 	codePerdueImport         = "PROSPECT_GP_IMPORT_PERDUE_A_L_ECRITURE"
 	codeRemplaceeImport      = "PROSPECT_GP_IMPORT_LIGNE_REMPLACEE"
+	codePlateformeImport     = "PROSPECT_GP_IMPORT_LIGNE_PLATEFORME"
 )
 
 // Les deux plateformes d'enrôlement, telles que cleImport les écrit
@@ -715,7 +716,9 @@ type ligneGrandPublicImport struct {
 	modeEpargne                                            *db.ModeEpargne
 	paysID, villeResidence, whatsapp, relaisNom, relaisTel *string
 	feuille, remarque                                      *string
-	plateformeDepuis                                       *time.Time
+	// Le Canal cite une plateforme d'enrôlement : la personne n'existe que
+	// là-bas, sa ligne se compte sans jamais entrer dans les fiches.
+	plateforme bool
 	// Ni nom ni téléphone : rien à rattacher, la ligne se signale sans s'écrire.
 	vide           bool
 	avertissements []erreurLigneImport
@@ -740,9 +743,8 @@ type etatGrandPublicImport struct {
 }
 
 type connuImport struct {
-	id         string
-	projet     db.Projet
-	plateforme bool
+	id     string
+	projet db.Projet
 }
 
 // `sure` : une règle ou un libellé exact a parlé ; sinon le canal est deviné et le projet reste à vérifier.
@@ -1160,6 +1162,10 @@ func trierGrandPublicImport(uniques []any, deja map[string]connuImport,
 			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(2), codeSansTelephoneImport,
 				"Sans téléphone, personne ne peut appeler cette fiche : la ligne est ignorée."))
 			continue
+		case ligne.plateforme:
+			tri.ignorer(refusImport(ligne.numero, enteteGrandPublicImport(8), codePlateformeImport,
+				"Inscrit sur une plateforme d’enrôlement : le suivi s’y fait, la ligne n’entre pas dans les fiches."))
+			continue
 		case deja[telephoneConnuImport(ligne.telephone)].id != "":
 			tri.connues = append(tri.connues, ligne)
 		default:
@@ -1211,7 +1217,7 @@ func dejaEnBaseGrandPublicImport(ctx context.Context, q *db.Queries, uniques []a
 			return nil, nil, err
 		}
 		for _, ligne := range connus {
-			telephones[telephoneConnuImport(ligne.PhoneE164)] = connuImport{id: ligne.ID, projet: ligne.Projet, plateforme: ligne.Plateforme}
+			telephones[telephoneConnuImport(ligne.PhoneE164)] = connuImport{id: ligne.ID, projet: ligne.Projet}
 		}
 	}
 	for _, lot := range lotsImport(clesEmail) {
@@ -1296,7 +1302,7 @@ func persisterGrandPublicImport(ctx context.Context, q *db.Queries, c contexteIm
 			WhatsappStatus: statut, WhatsappE164: numero, RelaisNom: ligne.relaisNom,
 			RelaisPhoneE164: ligne.relaisTel, CreatedByID: c.demandeur,
 			ClientCreatedAt: ligne.creeLe, ImportJobID: &c.jobID, ImportFeuille: ligne.feuille,
-			RemarqueImport: ligne.remarque, PlateformeDepuis: ligne.plateformeDepuis,
+			RemarqueImport: ligne.remarque,
 		})
 	}
 	if err := executerLotImport(q.InsertImportProspectGrandPublic(ctx, fiches).Exec); err != nil {
@@ -1357,7 +1363,7 @@ func mettreAJourGrandPublicImport(ctx context.Context, q *db.Queries, c contexte
 
 // Une fiche connue garde son projet : le classeur recodifie parfois le même
 // numéro d'un onglet à l'autre, et chaque relevé la sortait de sa campagne.
-// Canal, note du classeur et marque plateforme suivent la dernière ligne lue.
+// Canal et note du classeur suivent la dernière ligne lue.
 func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c contexteImport,
 	ligne *ligneGrandPublicImport, connue connuImport,
 ) (bool, error) {
@@ -1368,7 +1374,7 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 	}
 	rangs, err := q.ImportMettreAJourProspectGrandPublic(ctx, db.ImportMettreAJourProspectGrandPublicParams{
 		ID: connue.id, CanalProvenanceID: ligne.canalID, RemarqueImport: ligne.remarque,
-		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email, PlateformeDepuis: ligne.plateformeDepuis,
+		Nom: ligne.nom, Prenom: ligne.prenom, Email: ligne.email,
 	})
 	if err != nil || rangs == 0 {
 		return false, err
@@ -1376,12 +1382,9 @@ func mettreAJourFicheGrandPublicImport(ctx context.Context, q *db.Queries, c con
 	if err := database.Auditer(ctx, q, c.demandeur, "prospect.import", "prospect", connue.id, nil,
 		map[string]any{
 			"canalProvenanceId": ligne.canalID, "remarqueImport": ligne.remarque,
-			"plateformeDepuis": ligne.plateformeDepuis, "onglet": ligne.feuille,
+			"onglet": ligne.feuille,
 		}); err != nil {
 		return false, err
-	}
-	if ligne.plateformeDepuis != nil && !connue.plateforme {
-		return true, database.PasserAuxCCP(ctx, q, c.demandeur, connue.id)
 	}
 	return true, nil
 }

@@ -30,7 +30,14 @@ export function ThemeToggle() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger
-        render={<Button variant="ghost" size="icon" aria-label="Changer de thème" />}
+        render={
+          <Button
+            variant="ghost"
+            size="icon"
+            className="text-white hover:bg-white/15 hover:text-white"
+            aria-label="Changer de thème"
+          />
+        }
       >
         {mounted ? (
           <>

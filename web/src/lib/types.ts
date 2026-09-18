@@ -143,9 +143,6 @@ export const PERMISSIONS = [
   'notifications.administrer',
   'panneau.acceder',
   'parametres.administrer',
-  'plateforme.equipe',
-  'plateforme.saisir',
-  'plateforme.voir',
   'portefeuille.voir_tout',
   'prospects.convertir',
   'prospects.fusionner',
@@ -157,6 +154,8 @@ export const PERMISSIONS = [
   'qualification.rappels',
   'referentiels.superviser',
   'roles.administrer',
+  'support.plateforme',
+  'support.signaler',
   'ventes.lire',
   'visites.detruire',
   'visites.voir_archivees',
@@ -177,7 +176,6 @@ export const ROLE_LABELS: Record<Role, string> = {
   DIRECTION: 'Direction',
   ACCUEIL: 'Accueil',
   CHARGE_CLIENTELE: 'Chargé de clientèle',
-  CCP: 'Chargé de clientèle plateforme',
 };
 
 /**
@@ -192,11 +190,7 @@ export const readsOnly = (role: Role | undefined): boolean =>
  * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' ||
-  role === 'COMMERCIAL' ||
-  role === 'CHARGE_CLIENTELE' ||
-  role === 'CCP' ||
-  role === 'DIRECTION';
+  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
@@ -238,7 +232,6 @@ export const PROSPECT_SORT_FIELDS = [
   'prenom',
   'statut',
   'lastCallAt',
-  'plateformeDepuis',
 ] as const satisfies readonly ListeProspectsQuery['sortBy'][];
 
 export type ProspectSortField = (typeof PROSPECT_SORT_FIELDS)[number];

@@ -80,7 +80,6 @@ var demoProfiles = map[string]struct {
 	"DIRECTION":        {email: "fixture.direction@cpi.sn", role: db.RoleDIRECTION},
 	"ACCUEIL":          {email: "fixture.accueil@cpi.sn", role: db.RoleACCUEIL},
 	"CHARGE_CLIENTELE": {email: "fixture.clientele@cpi.sn", role: db.RoleCHARGECLIENTELE},
-	"CCP":              {email: "fixture.plateforme@cpi.sn", role: db.RoleCCP},
 }
 
 // Le compte est forcément actif : la session d'un compte désactivé est coupée
@@ -256,6 +255,7 @@ func Monter(api huma.API, d *socle.Deps) error {
 	huma.Register(api, huma.Operation{OperationID: "logout", Method: http.MethodPost, Path: "/api/v1/auth/logout", DefaultStatus: http.StatusNoContent}, s.logout)
 	huma.Register(api, huma.Operation{OperationID: "change-password", Method: http.MethodPost, Path: "/api/v1/auth/password", DefaultStatus: http.StatusNoContent}, s.changerMotDePasse)
 	huma.Register(api, huma.Operation{OperationID: "changeMyPassword", Method: http.MethodPut, Path: "/api/v1/auth/me/password"}, s.changerMotDePasseOk)
+	monterGlpi(api, d)
 	return nil
 }
 
@@ -316,4 +316,9 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/auth/me":          socle.PermissionPanneauAcceder,
 	"POST /api/v1/auth/password":   socle.PermissionPanneauAcceder,
 	"PUT /api/v1/auth/me/password": socle.PermissionPanneauAcceder,
+	// La garde répondrait en JSON : `autoriser` renvoie lui-même vers la connexion ou GLPI.
+	"GET /api/v1/auth/glpi/ouvrir":    socle.PermissionSupportPlateforme,
+	"GET /api/v1/auth/glpi/autoriser": socle.Publique,
+	"POST /api/v1/auth/glpi/jeton":    socle.Publique,
+	"GET /api/v1/auth/glpi/profil":    socle.Publique,
 }

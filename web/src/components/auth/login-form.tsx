@@ -42,7 +42,6 @@ const DEMO_ROLES = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
-  'CCP',
 ] as const satisfies readonly Role[];
 
 function baseCourante(): string {
@@ -217,6 +216,11 @@ export function LoginForm({ next }: { next?: string | null }) {
         meQueryOptions.queryKey,
         ((payload as { user?: unknown } | null)?.user ?? null) as SessionUser | null,
       );
+      // Une route du serveur (connexion à GLPI) ne se sert pas par le routeur du panneau.
+      if (next?.startsWith('/api/') === true) {
+        window.location.replace(next);
+        return;
+      }
       router.replace(next != null && next !== '' ? next : homePathForRole(roleOf(payload)));
     } catch {
       setServerError('Le serveur est injoignable. Vérifiez votre connexion.');

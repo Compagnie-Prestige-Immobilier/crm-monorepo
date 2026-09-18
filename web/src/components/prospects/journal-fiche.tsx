@@ -25,17 +25,11 @@ const ACTIONS: Record<string, { titre: string; categorie: 'fiche' | 'statut'; va
     'prospect.consentement': { titre: 'Consentement', categorie: 'statut' },
     'prospect.merge': { titre: 'Fusionnée', categorie: 'fiche' },
     'prospect.delete': { titre: 'Supprimée', categorie: 'fiche', variant: 'destructive' },
-    'lot_export.plateforme': {
-      titre: 'Retirée de la campagne : plateforme',
-      categorie: 'statut',
-      variant: 'warning',
-    },
     'lot_export.hors_projet': {
       titre: 'Retirée de la campagne : hors projet',
       categorie: 'statut',
       variant: 'warning',
     },
-    'rappel.reattribue': { titre: 'Rappel promis transféré à un CCP', categorie: 'statut' },
     'prospect.requalification': {
       titre: 'Fiche requalifiée',
       categorie: 'statut',

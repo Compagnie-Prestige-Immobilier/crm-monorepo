@@ -15,28 +15,16 @@ import (
 	"github.com/google/uuid"
 )
 
-// Routes ajoutées après le gel du 16 septembre : l'écran des rôles, puis la
-// requalification par l'encadrement.
-var routesDesRoles = map[string][]socle.Role{
-	"POST /api/v1/prospects/{id}/requalifier": {socle.Admin, socle.Superviseur, socle.Direction},
-	"GET /api/v1/roles":                       {socle.Admin},
-	"POST /api/v1/roles":                      {socle.Admin},
-	"PATCH /api/v1/roles/{id}":                {socle.Admin},
-	"DELETE /api/v1/roles/{id}":               {socle.Admin},
-	"PUT /api/v1/roles/{id}/permissions":      {socle.Admin},
-}
-
+// Gel repris le 18 septembre 2026 : le rôle CCP et les deux bornes plateforme
+// ont quitté l'application, le suivi des inscrits se fait sur les plateformes.
 func TestMatriceRolesInchangee(t *testing.T) {
 	var attendu map[string][]socle.Role
-	contenu, err := os.ReadFile("testdata/matrice-roles-2026-09-16.json")
+	contenu, err := os.ReadFile("testdata/matrice-roles-2026-09-18.json")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if err := json.Unmarshal(contenu, &attendu); err != nil {
 		t.Fatal(err)
-	}
-	for route, roles := range routesDesRoles {
-		attendu[route] = roles
 	}
 
 	cfg, err := socle.LireConfig()

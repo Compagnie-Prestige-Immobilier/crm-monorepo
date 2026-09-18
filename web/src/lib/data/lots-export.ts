@@ -249,7 +249,9 @@ export async function fetchTeleconseillers(
   const pages = await Promise.all(
     (['COMMERCIAL', 'SUPERVISEUR', 'DIRECTION'] as const).map((role) =>
       client.GET('/api/v1/users', {
-        params: { query: { role, isActive: 'true', pageSize: 50 } },
+        // Le maximum de l'API : au-dela d'une page, un teleconseiller actif
+        // disparaissait sans un mot du choix d'equipe de la campagne.
+        params: { query: { role, isActive: 'true', pageSize: 200 } },
       }),
     ),
   );

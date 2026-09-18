@@ -387,20 +387,6 @@ func TestSupervisionActiviteDeLaFenetre(t *testing.T) {
 	totaux = analyticsObjet(b, "totaux hors fenêtre", body["totals"])
 	analyticsEgal(b, "appels hors fenêtre", totaux["calls"], 0)
 	analyticsNul(b, "sans appel le taux est nul, jamais 0", totaux["reachRate"])
-
-	ccpID, _ := adminCompte(b, "CCP")
-	plateforme := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
-	analyticsExec(b, `UPDATE "prospects" SET "plateformeDepuis" = now() WHERE "id" = $1`, plateforme)
-	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt")
-		VALUES ($1,$2,$3,'OTHER'::"CallOutcome",$4::timestamp)`, uuid.NewString(), plateforme, ccpID, instantAnalytics)
-	analyticsViderCache()
-	parCCP := "?commercialId=" + ccpID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
-	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/activite"+parCCP, nil, false)
-	b.attend(statut, http.StatusOK, "activité d'un CCP", body)
-	totaux = analyticsObjet(b, "totaux du CCP", body["totals"])
-	analyticsEgal(b, "l'appel du CCP sur une fiche plateforme compte", totaux["calls"], 1)
-	ligne = analyticsObjet(b, "ligne du CCP", analyticsListe(b, "une ligne pour le CCP", body["items"], 1)[0])
-	analyticsTexte(b, "le CCP est de l'équipe", ligne["teleconseillerId"], ccpID)
 }
 
 func TestSupervisionCampagnesEtStock(t *testing.T) {
@@ -539,48 +525,6 @@ func TestSupervisionActiviteParCampagneRepresentants(t *testing.T) {
 	totaux := analyticsObjet(b, "totaux de la campagne", body["totals"])
 	analyticsEgal(b, "appels représentants de la campagne regardée", totaux["repCalls"], 1)
 	analyticsEgal(b, "fiches représentants de la campagne regardée", totaux["repFiches"], 1)
-}
-
-// Un classeur doit boucler avec son import : les fiches passées plateforme
-// sortent des colonnes d'appel mais restent comptées, et un classeur qui n'a
-// plus que des fiches plateforme reste listé.
-func TestLeadsImportesComptentLesFichesPasseesPlateforme(t *testing.T) {
-	b := analyticsConnexion(t, "DIRECTION")
-	importer := func(plateformes, visibles int) string {
-		id := uuid.Must(uuid.NewV7()).String()
-		analyticsExec(b, `INSERT INTO "import_jobs" ("id","kind","status","mode","requestedById","fileName","fileBytes","storagePath","expiresAt","updatedAt")
-			VALUES ($1,'PROSPECTS_GRAND_PUBLIC','succeeded','APPLY',$2,'Leads test.xlsx',1,'/tmp/x',now() + interval '1 day',now())`, id, b.userID)
-		for i := range plateformes + visibles {
-			depuis := any(nil)
-			if i < plateformes {
-				depuis = "2026-09-10 10:00:00"
-			}
-			analyticsExec(b, `INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","updatedAt","importJobId","plateformeDepuis")
-				VALUES ($1,'Lead','Test',$2,$3,now(),now(),$4,$5::timestamp)`, uuid.NewString(), telephoneAnalytics(), b.userID, id, depuis)
-		}
-		t.Cleanup(func() {
-			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "importJobId" = $1`, id)
-			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "import_jobs" WHERE "id" = $1`, id)
-		})
-		return id
-	}
-	mixte, plateformeSeule := importer(2, 3), importer(1, 0)
-	analyticsViderCache()
-
-	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/leads-importes", nil, false)
-	b.attend(statut, http.StatusOK, "leads importés", body)
-	lignes := map[string]map[string]any{}
-	imports, _ := body["imports"].([]any)
-	for _, brut := range imports {
-		ligne, _ := brut.(map[string]any)
-		lignes[texteDe(ligne["id"])] = ligne
-	}
-	analyticsEgal(b, "fiches visibles du classeur mixte", lignes[mixte]["importes"], 3)
-	analyticsEgal(b, "fiches plateforme du classeur mixte", lignes[mixte]["plateforme"], 2)
-	if lignes[plateformeSeule] == nil {
-		t.Fatal("un classeur dont toutes les fiches sont passées plateforme reste listé")
-	}
-	analyticsEgal(b, "fiches visibles du classeur plateforme", lignes[plateformeSeule]["importes"], 0)
 }
 
 // Les appels d'avant le référentiel du 7 septembre 2026 n'ont posé aucun
