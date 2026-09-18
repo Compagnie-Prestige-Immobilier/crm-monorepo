@@ -63,7 +63,7 @@ func Empreinte(jeton string) string {
 	return hex.EncodeToString(h[:])
 }
 
-func utilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, jeton string) (Utilisateur, error) {
+func UtilisateurParSession(ctx context.Context, q *db.Queries, a *Attributions, jeton string) (Utilisateur, error) {
 	row, err := q.UserBySession(ctx, Empreinte(jeton))
 	if err != nil {
 		return Utilisateur{}, err
