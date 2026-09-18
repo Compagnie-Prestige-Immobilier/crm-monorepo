@@ -706,10 +706,46 @@ html.dark:has([data-coque='chues']) {
 @layer utilities {
   .cpi-navbar {
     background: #4d000b;
+    border-bottom: 1px solid rgb(255 255 255 / 28%);
   }
 
   .dark .cpi-navbar {
     background: #2b0207;
+  }
+
+  .cpi-navbar button {
+    color: #fff;
+  }
+
+  .cpi-navbar a {
+    color: #fff;
+  }
+
+  .cpi-navbar [data-slot='select-trigger'] {
+    border-color: rgb(255 255 255 / 45%);
+    background: rgb(255 255 255 / 12%);
+    color: #fff;
+  }
+
+  .cpi-navbar .text-warning {
+    color: var(--accent-on-dark);
+  }
+
+  .cpi-navbar input {
+    border-color: rgb(255 255 255 / 42%);
+    background: rgb(255 255 255 / 10%);
+    color: #fff;
+  }
+
+  .cpi-navbar input::placeholder,
+  .cpi-navbar .text-muted-foreground {
+    color: rgb(255 255 255 / 76%);
+  }
+
+  .cpi-navbar button:focus-visible,
+  .cpi-navbar input:focus-visible,
+  .cpi-navbar a:focus-visible {
+    outline-color: var(--accent-on-dark);
   }
 
   .dark .cpi-space-icon {
