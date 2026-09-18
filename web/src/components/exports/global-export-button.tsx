@@ -44,6 +44,7 @@ export function GlobalExportButton() {
   return (
     <Button
       variant="outline"
+      className="cpi-export border-white/45 bg-white text-primary hover:bg-white/90 hover:text-primary"
       disabled={pending}
       aria-busy={pending}
       title="Export Excel global"

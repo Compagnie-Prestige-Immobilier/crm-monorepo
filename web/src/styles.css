@@ -717,6 +717,14 @@ html.dark:has([data-coque='chues']) {
     color: #fff;
   }
 
+  .panel-topbar button {
+    color: var(--foreground) !important;
+  }
+
+  .cpi-navbar .cpi-nav-action {
+    color: #fff;
+  }
+
   .cpi-navbar a {
     color: #fff;
   }
