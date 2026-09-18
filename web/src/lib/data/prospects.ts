@@ -395,7 +395,7 @@ export async function reassignProspects(
 
 export async function requalifierProspect(
   id: string,
-  body: { projet: 'CHUES' | 'GRAND_PUBLIC'; statut: 'NOUVEAU' | 'CONTACTE' | 'PERDU' },
+  body: { projet: 'CHUES' | 'GRAND_PUBLIC'; statut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU' },
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
   return unwrap(

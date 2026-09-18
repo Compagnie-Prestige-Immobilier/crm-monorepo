@@ -169,6 +169,24 @@ doit comprendre en une lecture, sans sauter entre les fichiers.
 - Prefixer les commandes par `rtk`, conformement a
   `/Users/cheikh/.codex/RTK.md`.
 
+## Sessions paralleles sur le meme checkout
+
+Plusieurs sessions (Claude, Codex) travaillent souvent en meme temps dans ce
+depot, sur la meme branche et le meme arbre de travail. Un fichier modifie
+qu'on n'a pas touche, un fichier non suivi qu'on n'a pas cree, une migration
+qu'on n'a pas ecrite : c'est le travail en cours d'une autre session.
+
+- Ne JAMAIS le combattre : pas de `git restore`, `git checkout`, `git stash`,
+  `git reset` ni reecriture d'historique sur ce qui n'est pas a soi. Ne pas
+  retirer ces fichiers d'un commit, ne pas les renommer, ne pas les corriger.
+- Essayer de comprendre ce que fait l'autre session (lire son diff, ses
+  migrations, ses tests) et travailler A COTE : autres fichiers, autres
+  numeros de migration, autres bases de test.
+- Si son travail bloque une verification (build, lint, hook de push), le dire
+  en une ligne au proprietaire et continuer sans le contourner ni l'ecraser.
+- `git add -A` embarque son travail : c'est accepte par le proprietaire. Ce
+  qui n'est pas accepte, c'est de le detruire.
+
 ## Agents specialises versionnes
 
 - Les agents du projet sont versionnes dans `.claude/agents/` pour Claude et
