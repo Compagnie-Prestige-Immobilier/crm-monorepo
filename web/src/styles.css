@@ -704,6 +704,11 @@ html.dark:has([data-coque='chues']) {
 }
 
 @layer utilities {
+  .cpi-survol-signale {
+    outline: 2px dashed var(--accent-border);
+    outline-offset: 2px;
+  }
+
   .cpi-navbar {
     background: #4d000b;
     border-bottom: 1px solid rgb(255 255 255 / 28%);

@@ -1,7 +1,7 @@
 'use client';
 
 import { ImagePlusIcon, ScreenShareIcon, XIcon } from 'lucide-react';
-import { useState } from 'react';
+import { forwardRef, useImperativeHandle, useState } from 'react';
 
 import { Button, buttonVariants } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -63,21 +63,24 @@ export const imagesDepuis = (fichiers: File[]): Promise<Image[]> =>
       })),
   );
 
-export function PiecesJointes({
-  images,
-  ajouter,
-  retirer,
-  masquerPanneau,
-}: {
-  images: Image[];
-  ajouter: (fichiers: File[]) => Promise<void>;
-  retirer: (id: string) => void;
-  masquerPanneau: (masque: boolean) => void;
-}) {
+export interface PiecesJointesHandle {
+  capturer: () => Promise<void>;
+}
+
+export const PiecesJointes = forwardRef<
+  PiecesJointesHandle,
+  {
+    images: Image[];
+    ajouter: (fichiers: File[]) => Promise<void>;
+    retirer: (id: string) => void;
+    masquerPanneau: (masque: boolean) => void;
+  }
+>(function PiecesJointes({ images, ajouter, retirer, masquerPanneau }, ref) {
   const [capture, setCapture] = useState(false);
   const complet = images.length >= IMAGES_MAX;
 
   const capturer = async () => {
+    if (complet || capture) return;
     setCapture(true);
     masquerPanneau(true);
     await attendre(250);
@@ -91,6 +94,8 @@ export function PiecesJointes({
       masquerPanneau(false);
     }
   };
+
+  useImperativeHandle(ref, () => ({ capturer }));
 
   return (
     <>
@@ -150,4 +155,4 @@ export function PiecesJointes({
       )}
     </>
   );
-}
+});
