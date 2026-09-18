@@ -98,7 +98,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
 	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter vers un autre téléconseiller", []Role{Admin, Superviseur}},
 	PermissionProspectsRevoir:          {domaineFiches, "Revoir une demande", []Role{ChargeClientele, Superviseur, Admin}},
-	PermissionProspectsConvertir:       {domaineFiches, "Convertir les parcours grand public", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
+	PermissionProspectsConvertir:       {domaineFiches, "Convertir les parcours grand public", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
 	PermissionComptesAdministrer:       {domaineComptes, "Créer, modifier et désactiver les comptes", AdminSeul},
 	PermissionComptesLister:            {domaineComptes, "Lister les comptes", Encadrement},
 	PermissionRolesAdministrer:         {domaineComptes, "Créer les rôles et régler leurs permissions", AdminSeul},

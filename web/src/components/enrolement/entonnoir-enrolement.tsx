@@ -55,7 +55,7 @@ const ETAGES: readonly Etage[] = [
     cle: 'negatifs',
     label: 'Négatifs',
     aide: 'Un refus, une pièce à remplacer ou un dossier incomplet : ce qui n’avance plus sans intervention.',
-    filtre: undefined,
+    filtre: 'negatif',
   },
 ];
 

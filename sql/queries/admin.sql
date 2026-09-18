@@ -135,7 +135,8 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet"
            AND (COALESCE(i."etapeDistante", 0) > 0
                 OR (i."etapeDistante" IS NULL AND i."statutDistant" NOT LIKE 'compte-%')))
        OR (sqlc.narg('avancement')::text = 'soumis' AND i."soumiseLe" IS NOT NULL)
-       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL))
+       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL)
+       OR (sqlc.narg('avancement')::text = 'negatif' AND i."motifNegatif" IS NOT NULL))
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))
@@ -163,7 +164,8 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet"
            AND (COALESCE(i."etapeDistante", 0) > 0
                 OR (i."etapeDistante" IS NULL AND i."statutDistant" NOT LIKE 'compte-%')))
        OR (sqlc.narg('avancement')::text = 'soumis' AND i."soumiseLe" IS NOT NULL)
-       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL))
+       OR (sqlc.narg('avancement')::text = 'decide' AND i."decideeLe" IS NOT NULL)
+       OR (sqlc.narg('avancement')::text = 'negatif' AND i."motifNegatif" IS NOT NULL))
   AND (sqlc.narg('rapproche')::boolean IS NULL
        OR (sqlc.narg('rapproche')::boolean AND i."prospectId" IS NOT NULL)
        OR (NOT sqlc.narg('rapproche')::boolean AND i."prospectId" IS NULL))
@@ -220,7 +222,7 @@ DELETE FROM "inscriptions_plateforme" WHERE "id" = $1 AND "projet" = $2;
 -- name: CandidatsParTelephone :many
 SELECT p."id", p."projet", p."phoneE164", p."whatsappE164", p."clientCreatedAt"
 FROM "prospects" p
-WHERE p."projet" = $1 AND p."deletedAt" IS NULL
+WHERE p."deletedAt" IS NULL
   AND (p."phoneE164" = ANY(sqlc.arg('telephones')::text[])
        OR p."whatsappE164" = ANY(sqlc.arg('telephones')::text[]));
 
@@ -229,5 +231,5 @@ SELECT DISTINCT p."id", p."projet", p."phoneE164", p."whatsappE164", p."clientCr
        LOWER(ca."email") AS email
 FROM "call_attempts" ca
 INNER JOIN "prospects" p ON p."id" = ca."prospectId"
-WHERE p."projet" = $1 AND p."deletedAt" IS NULL
+WHERE p."deletedAt" IS NULL
   AND ca."email" IS NOT NULL AND LOWER(ca."email") = ANY(sqlc.arg('emails')::text[]);

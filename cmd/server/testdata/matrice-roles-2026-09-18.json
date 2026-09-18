@@ -430,6 +430,7 @@
     "ADMIN",
     "CHARGE_CLIENTELE",
     "COMMERCIAL",
+    "DIRECTION",
     "SUPERVISEUR"
   ],
   "PATCH /api/v1/prospects/{id}/segment": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
@@ -559,11 +560,18 @@
     "ADMIN",
     "CHARGE_CLIENTELE",
     "COMMERCIAL",
+    "DIRECTION",
     "SUPERVISEUR"
   ],
   "POST /api/v1/prospects/{id}/requalifier": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/vendre": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/vendre": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "POST /api/v1/referentiels/{kind}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/rep-campaigns/attempts": [
     "ADMIN",
