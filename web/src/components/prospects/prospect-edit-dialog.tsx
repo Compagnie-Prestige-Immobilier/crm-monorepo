@@ -363,7 +363,9 @@ export function ProspectEditDialog({
           <Field
             label="Statut"
             required
-            description={prospect?.statut === 'VENDU' ? 'Vendue, la fiche ne se requalifie plus.' : undefined}
+            description={
+              prospect?.statut === 'VENDU' ? 'Vendue, la fiche ne se requalifie plus.' : undefined
+            }
             error={formState.errors.statut?.message}
           >
             {(props) => (
