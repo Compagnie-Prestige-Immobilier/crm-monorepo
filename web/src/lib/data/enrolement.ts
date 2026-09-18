@@ -22,7 +22,7 @@ export const projetDeLOnglet = (onglet: OngletEnrolement): Projet =>
   onglet === 'chues' ? 'CHUES' : 'GRAND_PUBLIC';
 
 /** Les étages de l'entonnoir, tels que l'API les accepte. */
-export type Avancement = 'ouvert' | 'soumis' | 'decide';
+export type Avancement = 'ouvert' | 'soumis' | 'decide' | 'negatif';
 
 export interface FiltresInscriptions {
   page?: number | undefined;

@@ -58,7 +58,7 @@ WHERE p."deletedAt" IS NULL
           WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
             AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
         ))
-    OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
+    OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -135,7 +135,7 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     sqlc.narg('revue')::boolean IS NULL
-    OR (p."statut" = 'CONVERTI' AND (p."revueAt" IS NOT NULL) = sqlc.narg('revue')::boolean)
+    OR (p."statut" IN ('CONVERTI', 'VENDU') AND (p."revueAt" IS NOT NULL) = sqlc.narg('revue')::boolean)
   )
   AND (
     sqlc.narg('segment')::text IS NULL
@@ -191,7 +191,7 @@ WHERE p."deletedAt" IS NULL
           WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
             AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
         ))
-    OR (sqlc.arg('scope_converti')::boolean AND p."statut" = 'CONVERTI')
+    OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -268,7 +268,7 @@ WHERE p."deletedAt" IS NULL
   )
   AND (
     sqlc.narg('revue')::boolean IS NULL
-    OR (p."statut" = 'CONVERTI' AND (p."revueAt" IS NOT NULL) = sqlc.narg('revue')::boolean)
+    OR (p."statut" IN ('CONVERTI', 'VENDU') AND (p."revueAt" IS NOT NULL) = sqlc.narg('revue')::boolean)
   )
   AND (
     sqlc.narg('segment')::text IS NULL
