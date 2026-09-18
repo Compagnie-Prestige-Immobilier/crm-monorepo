@@ -53,12 +53,7 @@ func exportBorneDeJournee(brut string, fin bool) (time.Time, error) {
 }
 
 func exportPorteeDeLecture(p *exportPredicat, u *socle.Utilisateur) {
-	if borne := socle.PorteePlateforme(u); borne != nil && *borne {
-		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NOT NULL`)
-	} else if borne != nil {
-		p.clauses = append(p.clauses, `p."plateformeDepuis" IS NULL`)
-	}
-	if u.Peut(socle.PermissionPortefeuilleVoirTout) || u.Peut(socle.PermissionPlateformeSaisir) {
+	if u.Peut(socle.PermissionPortefeuilleVoirTout) {
 		return
 	}
 	enMain := `(p."createdById" = ` + p.valeur(u.ID) +

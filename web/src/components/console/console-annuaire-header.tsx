@@ -24,7 +24,6 @@ type EnTeteAnnuaireProps = {
   cherche: string;
   search: string;
   projet: Projet | null;
-  plateforme: boolean;
   origine: OrigineFiche | null;
   resteAAppeler: boolean;
   total: number | null;
@@ -60,7 +59,6 @@ export function EnTeteAnnuaire({
   cherche,
   search,
   projet,
-  plateforme,
   origine,
   resteAAppeler,
   total,
@@ -91,9 +89,6 @@ export function EnTeteAnnuaire({
 }: EnTeteAnnuaireProps) {
   let texteAide: string;
   if (cherche !== '') texteAide = "Choisissez qui vous venez d'appeler.";
-  else if (plateforme)
-    texteAide =
-      "Les contacts transmis par les plateformes, y compris les parcours interrompus. Les plus récents d'abord.";
   else if (projet === null)
     texteAide = 'Vos fiches CHUES et Grand Public, y compris celles confiées par une campagne.';
   else if (projet === 'GRAND_PUBLIC')
@@ -216,7 +211,6 @@ function FiltresConsole({
   | 'cherche'
   | 'search'
   | 'projet'
-  | 'plateforme'
   | 'origine'
   | 'resteAAppeler'
   | 'total'

@@ -42,7 +42,6 @@ const DEMO_ROLES = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
-  'CCP',
 ] as const satisfies readonly Role[];
 
 function baseCourante(): string {

@@ -12,7 +12,7 @@ import (
 // Une ligne du journal de la fiche : qui, quand, quoi, avec l'avant et l'après.
 type ProspectJournalEntree struct {
 	ID     string         `json:"id"`
-	Action string         `json:"action" doc:"prospect.update, prospect.statut, prospect.import, prospect.date_corrigee, lot_export.plateforme, lot_export.hors_projet, rappel.reattribue…"`
+	Action string         `json:"action" doc:"prospect.update, prospect.statut, prospect.import, prospect.date_corrigee…"`
 	Entite string         `json:"entite"`
 	At     string         `json:"at" format:"date-time"`
 	Auteur string         `json:"auteur" doc:"« CPI GO » quand une migration ou une tâche a écrit seule."`

@@ -419,7 +419,7 @@ Chaque parcours touché se casse une fois avant d’être gardé.
 rtk make test              # intégration Go, gardes comprises
 rtk pnpm verify:local
 rtk pnpm complexite:go
-rtk make e2e               # Playwright, --workers=29
+rtk make e2e               # Playwright, quatre workers par défaut
 ```
 
 ## Définition de terminé

@@ -433,13 +433,13 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	}
 }
 
-// Deux membres passés CCP : le premier se retire même si le second siège encore,
-// seuls ceux restés téléconseillers reprennent ses fiches.
+// Deux membres passés chargés de clientèle : le premier se retire même si le
+// second siège encore, seuls ceux restés téléconseillers reprennent ses fiches.
 func TestCampagneRetraitDunMembreDontLeRoleAChange(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	agentC := b.agent("Agent Coumba Fall")
 	b.creer()
-	if _, err := b.pool.Exec(b.ctx, `UPDATE "users" SET "role" = 'CCP' WHERE "id" IN ($1, $2)`, b.agentA, agentC); err != nil {
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "users" SET "role" = 'CHARGE_CLIENTELE' WHERE "id" IN ($1, $2)`, b.agentA, agentC); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := b.pool.Exec(b.ctx,
@@ -450,7 +450,7 @@ func TestCampagneRetraitDunMembreDontLeRoleAChange(t *testing.T) {
 	}
 	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
 		map[string]any{"teleconseillerId": b.agentA})
-	b.attend(statut, http.StatusOK, "retrait d'un membre devenu CCP", body)
+	b.attend(statut, http.StatusOK, "retrait d'un membre devenu chargé de clientèle", body)
 	if len(b.positionsDe(b.agentA)) != 0 || len(b.positionsDe(b.agentB)) != 10 || len(b.positionsDe(agentC)) != 0 {
 		t.Fatalf("seul le téléconseiller restant reprend : A %v, B %v, C %v",
 			b.positionsDe(b.agentA), b.positionsDe(b.agentB), b.positionsDe(agentC))
@@ -464,10 +464,10 @@ func TestAdminChangementDeRoleRetireDesCampagnes(t *testing.T) {
 	b.creer()
 	admin := adminConnecte(t)
 
-	statut, body := adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentA, map[string]any{"role": "CCP"})
-	admin.attend(statut, http.StatusOK, "passage d'un membre de campagne en CCP", body)
+	statut, body := adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentA, map[string]any{"role": "CHARGE_CLIENTELE"})
+	admin.attend(statut, http.StatusOK, "passage d'un membre de campagne en chargé de clientèle", body)
 	if len(b.positionsDe(b.agentA)) != 0 || len(b.positionsDe(b.agentB)) != 10 {
-		t.Fatalf("les fiches du nouveau CCP reviennent à l'équipe : A %v, B %v", b.positionsDe(b.agentA), b.positionsDe(b.agentB))
+		t.Fatalf("les fiches du partant reviennent à l'équipe : A %v, B %v", b.positionsDe(b.agentA), b.positionsDe(b.agentB))
 	}
 	if n := b.compte(`SELECT count(*)::int FROM "audit_logs" WHERE "entity" = 'lot_export' AND "entityId" = $1 AND "action" = 'lot_export.retrait'`,
 		b.lotID); n != 1 {
@@ -475,10 +475,10 @@ func TestAdminChangementDeRoleRetireDesCampagnes(t *testing.T) {
 	}
 	_, detail := b.appelCampagne(http.MethodGet, "/api/v1/lots-export/"+b.lotID, nil)
 	if campagneListeMembre(detail["repartition"], b.agentA) {
-		t.Fatalf("le CCP siège encore dans la campagne : %v", detail["repartition"])
+		t.Fatalf("le partant siège encore dans la campagne : %v", detail["repartition"])
 	}
 
-	statut, body = adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentB, map[string]any{"role": "CCP"})
+	statut, body = adminAppel(admin, http.MethodPatch, "/api/v1/users/"+b.agentB, map[string]any{"role": "CHARGE_CLIENTELE"})
 	admin.attend(statut, http.StatusUnprocessableEntity, "le dernier téléconseiller d'une campagne", body)
 	if body["code"] != "LOT_EXPORT_EQUIPE_VIDE" || !strings.Contains(texteDe(body["message"]), "Campagne test") {
 		t.Fatalf("refus attendu avec le nom de la campagne : %v", body)

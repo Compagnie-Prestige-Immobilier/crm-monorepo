@@ -19,14 +19,13 @@ type definitionPermission struct {
 }
 
 const (
-	domaineAccueil    = "Accueil"
-	domaineBanque     = "Banque & Finance"
-	domaineCampagnes  = "Campagnes"
-	domaineChiffres   = "Chiffres"
-	domaineComptes    = "Comptes"
-	domaineExports    = "Exports"
-	domaineFiches     = "Fiches"
-	domainePlateforme = "Plateforme"
+	domaineAccueil   = "Accueil"
+	domaineBanque    = "Banque & Finance"
+	domaineCampagnes = "Campagnes"
+	domaineChiffres  = "Chiffres"
+	domaineComptes   = "Comptes"
+	domaineExports   = "Exports"
+	domaineFiches    = "Fiches"
 
 	Publique Permission = "publique"
 
@@ -54,7 +53,6 @@ const (
 	PermissionBanqueAdministrer        Permission = "banque.administrer"
 	PermissionParametresAdministrer    Permission = "parametres.administrer"
 	PermissionBasesAdministrer         Permission = "bases.administrer"
-	PermissionPlateformeEquipe         Permission = "plateforme.equipe"
 	PermissionBanqueDossiers           Permission = "banque.dossiers"
 	PermissionBanqueLire               Permission = "banque.lire"
 	PermissionAccueilRegistre          Permission = "accueil.registre"
@@ -70,8 +68,6 @@ const (
 	PermissionVentesLire               Permission = "ventes.lire"
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
-	PermissionPlateformeVoir              Permission = "plateforme.voir"
-	PermissionPlateformeSaisir            Permission = "plateforme.saisir"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
 	PermissionFichesIgnorerPropriete      Permission = "fiches.ignorer_propriete"
 	PermissionFichesModifierToutes        Permission = "fiches.modifier_toutes"
@@ -95,7 +91,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionImportsAdministrer:       {"Imports", "Importer des fichiers", AdminSeul},
 	PermissionReferentielsSuperviser:   {"Référentiels", "Modifier les référentiels métier", Encadrement},
 	PermissionProspectsSuperviser:      {domaineFiches, "Régler segments et paramètres CHUES, requalifier une fiche", Encadrement},
-	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, CCP, Admin, Superviseur, Direction}},
+	PermissionProspectsLire:            {domaineFiches, "Lire les prospects", []Role{Commercial, ChargeClientele, Admin, Superviseur, Direction}},
 	PermissionProspectsFusionner:       {domaineFiches, "Fusionner des fiches", []Role{Commercial, ChargeClientele, Admin}},
 	PermissionProspectsReaffecter:      {domaineFiches, "Réaffecter des fiches", []Role{Commercial, ChargeClientele, Admin, Superviseur}},
 	PermissionProspectsReaffecterTout:  {domaineFiches, "Réaffecter vers un autre téléconseiller", []Role{Admin, Superviseur}},
@@ -111,7 +107,6 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionBanqueAdministrer:        {domaineBanque, "Régler les étapes et valider les dossiers", AdminSeul},
 	PermissionParametresAdministrer:    {"Paramètres", "Régler les objectifs et les tableaux de bord par défaut", AdminSeul},
 	PermissionBasesAdministrer:         {"Bases", "Créer et supprimer les bases de démonstration", AdminSeul},
-	PermissionPlateformeEquipe:         {domainePlateforme, "Voir l'équipe plateforme", []Role{Admin, Superviseur, Direction, CCP}},
 	PermissionBanqueDossiers:           {domaineBanque, "Traiter les dossiers Banque & Finance", Banque},
 	PermissionBanqueLire:               {domaineBanque, "Lire les dossiers Banque & Finance", BanqueLecture},
 	PermissionAccueilRegistre:          {domaineAccueil, "Tenir le registre des visites", Registre},
@@ -123,12 +118,10 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionExportsBanque:            {domaineExports, "Exporter Banque & Finance", []Role{Admin, BanqueFinance, Superviseur}},
 	PermissionExportsModeles:           {domaineExports, "Télécharger les modèles d'import", AdminSeul},
 	PermissionFormulairesAdministrer:   {"Formulaires", "Régler les champs de conversion", AdminSeul},
-	PermissionQualificationRappels:     {"Qualification", "Reporter ou annuler ses rappels", []Role{Admin, Commercial, ChargeClientele, CCP}},
+	PermissionQualificationRappels:     {"Qualification", "Reporter ou annuler ses rappels", []Role{Admin, Commercial, ChargeClientele}},
 	PermissionVentesLire:               {"Ventes", "Lire les ventes", []Role{Admin, Direction}},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
-	PermissionPlateformeVoir:              {domainePlateforme, "Voir les fiches plateforme", Encadrement},
-	PermissionPlateformeSaisir:            {domainePlateforme, "Saisir les fiches plateforme", []Role{CCP}},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
 	PermissionFichesIgnorerPropriete:      {domaineFiches, "Agir sur les rappels et identifiants des autres", AdminSeul},
 	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
@@ -145,8 +138,6 @@ var Catalogue = map[Permission]definitionPermission{
 
 var permissionsDePortee = map[Permission]bool{
 	PermissionPortefeuilleVoirTout:        true,
-	PermissionPlateformeVoir:              true,
-	PermissionPlateformeSaisir:            true,
 	PermissionFichesVoirConverties:        true,
 	PermissionFichesIgnorerPropriete:      true,
 	PermissionFichesModifierToutes:        true,

@@ -148,7 +148,6 @@ WHERE "phoneE164" = ANY(@phones::text[]) AND "deletedAt" IS NULL;
 
 -- name: ImportProspectsConnus :many
 SELECT "id", "phoneE164", "representantId", "projet",
-       ("plateformeDepuis" IS NOT NULL)::boolean AS "plateforme",
        EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC') AS "parcoursGp",
        EXISTS (SELECT 1 FROM "prospect_journeys" j WHERE j."prospectId" = p."id" AND j."projet" = 'CHUES') AS "parcoursChues"
 FROM "prospects" p
@@ -183,17 +182,15 @@ UPDATE "prospects" SET
   "nom" = CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
   "prenom" = CASE WHEN "prenom" = '' THEN @prenom::text ELSE "prenom" END,
   "email" = COALESCE("email", sqlc.narg('email')),
-  "plateformeDepuis" = COALESCE("plateformeDepuis", sqlc.narg('plateforme_depuis')),
   "updatedAt" = now()
 WHERE "id" = @id AND "deletedAt" IS NULL
-  AND ("canalProvenanceId", "remarqueImport", "nom", "prenom", "email", "plateformeDepuis")
+  AND ("canalProvenanceId", "remarqueImport", "nom", "prenom", "email")
       IS DISTINCT FROM
       (COALESCE(sqlc.narg('canal_provenance_id'), "canalProvenanceId"),
        COALESCE(sqlc.narg('remarque_import'), "remarqueImport"),
        CASE WHEN "nom" = '' THEN @nom::text ELSE "nom" END,
        CASE WHEN "prenom" = '' THEN @prenom::text ELSE "prenom" END,
-       COALESCE("email", sqlc.narg('email')),
-       COALESCE("plateformeDepuis", sqlc.narg('plateforme_depuis')));
+       COALESCE("email", sqlc.narg('email')));
 
 -- name: ImportVisitesConnues :many
 SELECT "visitedAt", "timeKnown", "visitorName", "entrepriseId" FROM "visites"
@@ -232,7 +229,7 @@ INSERT INTO "prospects" (
   "type", "dureeSystemeMois", "canalProvenanceId", "employeurId", "employeur", "typeContrat",
   "ancienneteMois", "lieuActivite", "modeEpargne", "paysResidenceId", "villeResidence",
   "whatsappStatus", "whatsappE164", "relaisNom", "relaisPhoneE164",
-  "createdById", "clientCreatedAt", "importJobId", "importFeuille", "remarqueImport", "plateformeDepuis", "updatedAt"
+  "createdById", "clientCreatedAt", "importJobId", "importFeuille", "remarqueImport", "updatedAt"
 ) VALUES (@id, @projet, @nom, @prenom, sqlc.narg('phone_e164'), sqlc.narg('email'), @statut, sqlc.narg('profession'),
           sqlc.narg('syndicat_id'), sqlc.narg('banque_id'), sqlc.narg('type'),
           sqlc.narg('duree_systeme_mois'), sqlc.narg('canal_provenance_id'), sqlc.narg('employeur_id'),
@@ -241,7 +238,7 @@ INSERT INTO "prospects" (
           sqlc.narg('ville_residence'), @whatsapp_status, sqlc.narg('whatsapp_e164'),
           sqlc.narg('relais_nom'), sqlc.narg('relais_phone_e164'),
           @created_by_id, @client_created_at, @import_job_id, sqlc.narg('import_feuille'),
-          sqlc.narg('remarque_import'), sqlc.narg('plateforme_depuis'), now())
+          sqlc.narg('remarque_import'), now())
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspectJourney :batchexec

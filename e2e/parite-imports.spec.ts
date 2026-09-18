@@ -23,7 +23,7 @@ let dossier = '';
 let classeur = '';
 let lotId: string | null = null;
 let canalSiteWebPose: string | null = null;
-const telephones = [numero(), numero(), numero()];
+const telephones = [numero(), numero(), numero(), numero()];
 
 interface FicheLue {
   projet: string;
@@ -47,7 +47,7 @@ async function classeurDeCampagne(chemin: string): Promise<void> {
     `Fatou ${NOM}`,
     `fatou.${cle}@example.sn`,
     telephones[0],
-    SITE_GRAND_PUBLIC,
+    'Site web',
   ]);
   feuille.addRow([
     '10/09/2026',
@@ -62,6 +62,14 @@ async function classeurDeCampagne(chemin: string): Promise<void> {
     `awa.${cle}@example.sn`,
     telephones[2],
     'Campagne jamais vue',
+  ]);
+  // Inscrite sur une plateforme : elle n'existe que là-bas, sa ligne ne fait pas de fiche.
+  feuille.addRow([
+    '10/09/2026',
+    `Coumba ${NOM}`,
+    `coumba.${cle}@example.sn`,
+    telephones[3],
+    SITE_GRAND_PUBLIC,
   ]);
   await classeurExcel.xlsx.writeFile(chemin);
 }

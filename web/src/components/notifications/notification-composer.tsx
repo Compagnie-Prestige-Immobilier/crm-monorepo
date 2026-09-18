@@ -65,7 +65,6 @@ const ROLES: Role[] = [
   'DIRECTION',
   'ACCUEIL',
   'CHARGE_CLIENTELE',
-  'CCP',
 ];
 
 const CATEGORY_ITEMS = CATEGORIES.map((item) => ({ value: item, label: CATEGORY_LABELS[item] }));

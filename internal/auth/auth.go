@@ -80,7 +80,6 @@ var demoProfiles = map[string]struct {
 	"DIRECTION":        {email: "fixture.direction@cpi.sn", role: db.RoleDIRECTION},
 	"ACCUEIL":          {email: "fixture.accueil@cpi.sn", role: db.RoleACCUEIL},
 	"CHARGE_CLIENTELE": {email: "fixture.clientele@cpi.sn", role: db.RoleCHARGECLIENTELE},
-	"CCP":              {email: "fixture.plateforme@cpi.sn", role: db.RoleCCP},
 }
 
 // Le compte est forcément actif : la session d'un compte désactivé est coupée

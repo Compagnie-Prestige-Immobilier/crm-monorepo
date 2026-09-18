@@ -77,7 +77,7 @@ export function SidebarNav({
         <Link
           href={hubHref}
           onClick={onNavigate}
-          aria-label="Tous les espaces"
+          aria-label="CPI GO, tous les espaces"
           className="flex h-full items-center rounded-sm focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-sidebar-ring"
         >
           {(() => {
@@ -91,7 +91,7 @@ export function SidebarNav({
             return (
               <Image
                 src={collapsed ? '/brand/icon-512.webp' : '/brand/cpi-header.webp'}
-                alt="CPI GO"
+                alt="CPI"
                 width={collapsed ? 72 : 312}
                 height={collapsed ? 72 : 128}
                 priority
@@ -99,6 +99,11 @@ export function SidebarNav({
               />
             );
           })()}
+          {collapsed ? null : (
+            <span className="cpi-go-mark ml-3" aria-label="GO">
+              GO
+            </span>
+          )}
         </Link>
       </div>
 

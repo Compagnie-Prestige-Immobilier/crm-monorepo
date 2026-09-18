@@ -472,7 +472,7 @@ func classeurLeads(t *testing.T, telephone string) []byte {
 	feuille := fichier.GetSheetName(0)
 	lignes := [][]string{
 		{"Date", "Nom complet", "Email", "Téléphone", "Canal"},
-		{"10/09/2026", "Fatou Relevée", "fatou." + telephone[4:] + "@example.sn", telephone, "https://monespace.cpi.sn/"},
+		{"10/09/2026", "Fatou Relevée", "fatou." + telephone[4:] + "@example.sn", telephone, "Site web"},
 	}
 	for rang, ligne := range lignes {
 		for index, valeur := range ligne {
@@ -686,16 +686,15 @@ type ficheLeadTest struct {
 	id, projet, canal string
 	creeLe            time.Time
 	remarque          *string
-	plateforme        *time.Time
 }
 
 func (b *banc) ficheLeadTest(telephone string) ficheLeadTest {
 	b.t.Helper()
 	var f ficheLeadTest
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT p."id", p."projet"::text, COALESCE(c."label", ''), p."clientCreatedAt", p."remarqueImport", p."plateformeDepuis"
+		`SELECT p."id", p."projet"::text, COALESCE(c."label", ''), p."clientCreatedAt", p."remarqueImport"
 		   FROM "prospects" p LEFT JOIN "canaux_provenance" c ON c."id" = p."canalProvenanceId"
-		  WHERE p."phoneE164" = $1`, telephone).Scan(&f.id, &f.projet, &f.canal, &f.creeLe, &f.remarque, &f.plateforme); err != nil {
+		  WHERE p."phoneE164" = $1`, telephone).Scan(&f.id, &f.projet, &f.canal, &f.creeLe, &f.remarque); err != nil {
 		b.t.Fatalf("la fiche %s doit exister : %v", telephone, err)
 	}
 	return f
@@ -787,7 +786,7 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 
 	// Le téléconseiller de la campagne a promis un rappel : il le tient, fiche hors projet ou non.
 	commercialID, commercialEmail := adminCompte(b, "COMMERCIAL")
-	plateformeRappelPromis(b, a.id, commercialID)
+	rappelPromis(b, a.id, commercialID)
 
 	treize := ongletLeadsBrutTest{nom: "Leads 13 sept 2026", lignes: [][]any{
 		{"13/09/2026", "Aminata Diop", "", "Payé", tels[0], canalMetaGPTest, "oui"},
@@ -796,23 +795,20 @@ func TestImportLeadsCorrigeDatesEtCanaux(t *testing.T) {
 	verifierSecondReleveLeadsTest(b, travail, tels[0], lotID)
 
 	commercial := adminSession(b, commercialEmail)
-	statut, body := adminAppel(commercial, http.MethodPost, "/api/v1/ouvertures", plateformeOuverture(a.id))
+	statut, body := adminAppel(commercial, http.MethodPost, "/api/v1/ouvertures", ouvertureFiche(a.id))
 	if statut/100 != 2 {
 		t.Fatalf("le rappel promis doit rester ouvrable par le téléconseiller : %d %v", statut, body)
 	}
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ouvertures_fiche" WHERE "prospectId" = $1`, a.id) })
 }
 
-// « projet | canal | créée le | note | plateforme depuis », lisible d'un coup dans l'échec.
+// « projet | canal | créée le | note », lisible d'un coup dans l'échec.
 func (f *ficheLeadTest) resume() string {
-	remarque, plateforme := "", ""
+	remarque := ""
 	if f.remarque != nil {
 		remarque = *f.remarque
 	}
-	if f.plateforme != nil {
-		plateforme = f.plateforme.UTC().Format(time.RFC3339)
-	}
-	return strings.Join([]string{f.projet, f.canal, f.creeLe.UTC().Format(time.RFC3339), remarque, plateforme}, " | ")
+	return strings.Join([]string{f.projet, f.canal, f.creeLe.UTC().Format(time.RFC3339), remarque}, " | ")
 }
 
 func resumeRapportTest(rapport map[string]any) string {
@@ -836,18 +832,20 @@ func (b *banc) attendRapportTest(travail, attendu string, compteursAttendus map[
 
 func verifierPremierReleveLeadsTest(b *banc, travail string, tels []string) ficheLeadTest {
 	b.t.Helper()
-	a, bb, c := b.ficheLeadTest(tels[0]), b.ficheLeadTest(tels[1]), b.ficheLeadTest(tels[2])
-	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | à rappeler | " {
+	a, c := b.ficheLeadTest(tels[0]), b.ficheLeadTest(tels[2])
+	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | à rappeler" {
 		b.t.Fatalf("A : %s", a.resume())
 	}
-	if bb.resume() != "GRAND_PUBLIC | Site web | 2026-09-12T00:00:00Z |  | 2026-09-12T00:00:00Z" {
-		b.t.Fatalf("B : %s", bb.resume())
+	// B cite monespace.cpi.sn : la personne n'existe que sur la plateforme.
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = $1`, tels[1]); n != 0 {
+		b.t.Fatalf("la ligne plateforme ne doit créer aucune fiche : %d", n)
 	}
-	if c.resume() != "GRAND_PUBLIC | "+libelleMetaTest+" | 2026-09-12T00:00:00Z |  | " {
+	if c.resume() != "GRAND_PUBLIC | "+libelleMetaTest+" | 2026-09-12T00:00:00Z | " {
 		b.t.Fatalf("C : %s", c.resume())
 	}
-	b.attendRapportTest(travail, "total=4 created=3 updated=0 skipped=1 errors=0 warnings=3", map[string]float64{
-		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1, "PROSPECT_GP_IMPORT_LIGNE_SANS_IDENTITE": 1,
+	b.attendRapportTest(travail, "total=4 created=2 updated=0 skipped=2 errors=0 warnings=4", map[string]float64{
+		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1,
+		"PROSPECT_GP_IMPORT_LIGNE_SANS_IDENTITE": 1, "PROSPECT_GP_IMPORT_LIGNE_PLATEFORME": 1,
 	})
 	return a
 }
@@ -855,7 +853,7 @@ func verifierPremierReleveLeadsTest(b *banc, travail string, tels []string) fich
 func verifierSecondReleveLeadsTest(b *banc, travail, telephone, lotID string) {
 	b.t.Helper()
 	a := b.ficheLeadTest(telephone)
-	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | oui | " {
+	if a.resume() != "CHUES | "+libelleMetaTest+" | 2026-09-12T08:30:00Z | oui" {
 		b.t.Fatalf("A relue : %s", a.resume())
 	}
 	if parcours := projetsDesParcoursTest(b, a.id); strings.Join(parcours, ",") != "CHUES" {
@@ -871,7 +869,8 @@ func verifierSecondReleveLeadsTest(b *banc, travail, telephone, lotID string) {
 	}
 	// Quatre lignes ignorées, plus la date de A et le canal de C signalés une seconde fois.
 	b.attendRapportTest(travail, "total=5 created=0 updated=1 skipped=4 errors=0 warnings=6", map[string]float64{
-		"PROSPECT_GP_IMPORT_DEJA_EN_BASE": 3, "PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1,
+		"PROSPECT_GP_IMPORT_DEJA_EN_BASE": 2, "PROSPECT_GP_IMPORT_LIGNE_PLATEFORME": 1,
+		"PROSPECT_GP_IMPORT_DATE_CORRIGEE": 1, "PROSPECT_GP_IMPORT_CANAL_A_VERIFIER": 1,
 	})
 }
 

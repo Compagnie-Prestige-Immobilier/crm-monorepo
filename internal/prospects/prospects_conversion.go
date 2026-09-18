@@ -200,7 +200,7 @@ func prospectFusion(ctx context.Context, q *db.Queries, u *socle.Utilisateur, so
 	if err := prospectDeplacerParcours(ctx, q, sourceID, targetID); err != nil {
 		return err
 	}
-	if err := q.DeplacerDossiersBancaires(ctx, db.DeplacerDossiersBancairesParams{ProspectId: sourceID, ProspectId_2: targetID}); err != nil {
+	if err := q.DeplacerDossiersBancaires(ctx, db.DeplacerDossiersBancairesParams{ProspectId: &sourceID, ProspectId_2: &targetID}); err != nil {
 		return err
 	}
 	if err := q.DeplacerTentatives(ctx, db.DeplacerTentativesParams{ProspectId: sourceID, ProspectId_2: targetID}); err != nil {
