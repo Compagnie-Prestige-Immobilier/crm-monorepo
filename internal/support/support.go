@@ -26,6 +26,7 @@ var Garde = map[string]socle.Permission{
 const (
 	ticketIncident = 1
 	comptePilotage = "pilotage"
+	urgenceMoyenne = 3
 )
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
@@ -56,10 +57,10 @@ func Monter(api huma.API, _ *socle.Deps) {
 type TicketInput struct {
 	RawBody huma.MultipartFormFiles[struct {
 		Description string          `form:"description" required:"true" minLength:"3" maxLength:"5000"`
-		Contexte    string          `form:"contexte" maxLength:"5000"`
-		Images      []huma.FormFile `form:"images" contentType:"image/png,image/jpeg,image/webp,image/gif"`
-		Urgence     int             `form:"urgence" enum:"2,3,4" default:"3"`
-		Categorie   int             `form:"categorie" minimum:"0"`
+		Contexte    string          `form:"contexte" required:"false" maxLength:"5000"`
+		Images      []huma.FormFile `form:"images" required:"false" contentType:"image/png,image/jpeg,image/webp,image/gif"`
+		Urgence     int             `form:"urgence" required:"false" enum:"2,3,4"`
+		Categorie   int             `form:"categorie" required:"false" minimum:"0"`
 	}]
 }
 
@@ -115,6 +116,9 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 	form := in.RawBody.Data()
 	if len(form.Images) > imagesMax {
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_TROP_D_IMAGES", fmt.Sprintf("%d images au plus par ticket.", imagesMax))
+	}
+	if form.Urgence == 0 {
+		form.Urgence = urgenceMoyenne
 	}
 	u := socle.UtilisateurCourant(ctx)
 	contenu := paragraphe(form.Description) +
