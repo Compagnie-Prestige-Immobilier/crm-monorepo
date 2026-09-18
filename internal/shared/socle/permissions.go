@@ -66,6 +66,8 @@ const (
 	PermissionFormulairesAdministrer   Permission = "formulaires.administrer"
 	PermissionQualificationRappels     Permission = "qualification.rappels"
 	PermissionVentesLire               Permission = "ventes.lire"
+	PermissionSupportSignaler          Permission = "support.signaler"
+	PermissionSupportPlateforme        Permission = "support.plateforme"
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
@@ -120,6 +122,8 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionFormulairesAdministrer:   {"Formulaires", "Régler les champs de conversion", AdminSeul},
 	PermissionQualificationRappels:     {"Qualification", "Reporter ou annuler ses rappels", []Role{Admin, Commercial, ChargeClientele}},
 	PermissionVentesLire:               {"Ventes", "Lire les ventes", []Role{Admin, Direction}},
+	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
+	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},

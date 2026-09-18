@@ -86,6 +86,9 @@
     "SUPERVISEUR"
   ],
   "GET /api/v1/auth/bases": ["PUBLIC"],
+  "GET /api/v1/auth/glpi/autoriser": ["PUBLIC"],
+  "GET /api/v1/auth/glpi/ouvrir": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/auth/glpi/profil": ["PUBLIC"],
   "GET /api/v1/auth/me": [
     "ACCUEIL",
     "ADMIN",
@@ -454,6 +457,7 @@
   "POST /api/v1/admin/database-dump": ["ADMIN"],
   "POST /api/v1/admin/purge": ["ADMIN"],
   "POST /api/v1/auth/demo-login": ["PUBLIC"],
+  "POST /api/v1/auth/glpi/jeton": ["PUBLIC"],
   "POST /api/v1/auth/login": ["PUBLIC"],
   "POST /api/v1/auth/logout": [
     "ACCUEIL",
@@ -584,6 +588,7 @@
   "POST /api/v1/statuts-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/statuts-qualification/{id}/active": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/sync/push": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/users": ["ADMIN"],
   "POST /api/v1/ventes/classeur": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],

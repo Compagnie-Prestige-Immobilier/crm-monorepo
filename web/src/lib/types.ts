@@ -154,6 +154,8 @@ export const PERMISSIONS = [
   'qualification.rappels',
   'referentiels.superviser',
   'roles.administrer',
+  'support.plateforme',
+  'support.signaler',
   'ventes.lire',
   'visites.detruire',
   'visites.voir_archivees',
