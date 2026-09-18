@@ -29,7 +29,7 @@ import {
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
 import { getApiClient } from '@/lib/api/browser';
-import { toastApiError } from '@/lib/mutation-feedback';
+import { apiErrorText, toastApiError } from '@/lib/mutation-feedback';
 import { cn } from '@/lib/utils';
 
 interface Choix {
@@ -267,12 +267,13 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
                   changer={setCategorie}
                 />
               </div>
-              {categories.isSuccess && listeCategories.length === 0 ? (
+              {categories.isError ? (
                 <p role="alert" className="text-[0.8125rem] text-destructive">
-                  Les catégories GLPI sont illisibles. Prévenez l'administrateur.
+                  {apiErrorText(categories.error, 'Les catégories GLPI sont illisibles.')}
                 </p>
               ) : null}
               <PiecesJointes
+                ref={pieces}
                 images={images}
                 ajouter={ajouter}
                 retirer={(id) => setImages((actuelles) => actuelles.filter((i) => i.id !== id))}
