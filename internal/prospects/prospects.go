@@ -224,6 +224,9 @@ type Prospect struct {
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
+	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
+	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
+	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
 	ClientCreatedAt          string            `json:"clientCreatedAt"`
 	CreatedAt                string            `json:"createdAt"`
 	UpdatedAt                string            `json:"updatedAt"`
@@ -317,6 +320,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
+		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
 	}
@@ -1452,6 +1456,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects/pipeline":                                  prospectLecture,
 	"GET /api/v1/prospects/clients":                                   prospectLecture,
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
+	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
 	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,
@@ -1488,4 +1493,5 @@ func Monter(api huma.API, d *socle.Deps) {
 	prospectMonterSegment(api, s)
 	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)
+	prospectMonterRendezVous(api, s)
 }

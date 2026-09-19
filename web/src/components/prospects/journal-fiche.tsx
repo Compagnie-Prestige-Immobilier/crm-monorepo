@@ -42,6 +42,7 @@ const ACTIONS: Record<string, { titre: string; categorie: 'fiche' | 'statut'; va
     },
     'prospect.affectation': { titre: 'Suivi confié', categorie: 'fiche', variant: 'info' },
     'prospect.vendre': { titre: 'Vendue', categorie: 'statut', variant: 'success' },
+    'prospect.suivi_rendez_vous': { titre: 'Suivi du rendez-vous', categorie: 'statut' },
   };
 
 const LIBELLES: Record<string, string> = {
@@ -69,6 +70,9 @@ const LIBELLES: Record<string, string> = {
   syndicatId: 'Syndicat',
   representantId: 'Représentant',
   commercialId: 'Téléconseiller',
+  issue: 'Rendez-vous',
+  suiteRencontre: 'Suite après rencontre',
+  reporteAt: 'Reporté au',
 };
 
 const PROJETS: Record<string, string> = { CHUES: 'CHUES', GRAND_PUBLIC: 'Grand Public' };

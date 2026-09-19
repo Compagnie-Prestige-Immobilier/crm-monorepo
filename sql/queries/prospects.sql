@@ -697,3 +697,13 @@ UPDATE "prospects" SET
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
 WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
+
+-- name: SuivreRendezVous :one
+UPDATE "prospects" p SET
+  "rendezVousIssue" = sqlc.arg('issue')::text,
+  "rendezVousReporteAt" = sqlc.narg('reporte_at')::timestamp,
+  "suiteRencontre" = sqlc.narg('suite')::text,
+  "rev" = p."rev" + 1, "updatedAt" = now()
+FROM "prospects" avant
+WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant;
