@@ -23,7 +23,10 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/support/categories": socle.PermissionSupportSignaler,
 }
 
-const ticketIncident = 1
+const (
+	ticketIncident = 1
+	comptePilotage = "pilotage"
+)
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
 
@@ -186,8 +189,16 @@ func (g glpi) terminer(ctx context.Context, session string, ticketID int, images
 	}
 }
 
-// Le compte porte l'identifiant du panneau : la connexion unique à GLPI le retrouve ensuite.
+// Un administrateur signale au nom du pilotage ; les autres sous leur compte, créé au besoin avec
+// l'identifiant du panneau, que la connexion unique à GLPI retrouve ensuite.
 func (g glpi) demandeur(ctx context.Context, session string, u *socle.Utilisateur) (int, error) {
+	if u.Role == socle.Admin {
+		id, err := g.idCompte(ctx, session, comptePilotage)
+		if err == nil && id == 0 {
+			err = fmt.Errorf("compte GLPI %q introuvable", comptePilotage)
+		}
+		return id, err
+	}
 	id, err := g.idCompte(ctx, session, u.Username)
 	if err != nil || id != 0 {
 		return id, err
