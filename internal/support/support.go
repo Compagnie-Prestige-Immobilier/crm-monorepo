@@ -24,8 +24,9 @@ var Garde = map[string]socle.Permission{
 }
 
 const (
-	ticketIncident = 1
-	comptePilotage = "pilotage"
+	ticketIncident   = 1
+	comptePilotage   = "pilotage"
+	groupeCommercial = "Commerciaux"
 )
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
@@ -123,6 +124,10 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 		return nil, glpiInjoignable(err)
 	}
 	demandeur, err := g.demandeur(ctx, session, &u)
+	groupe := 0
+	if err == nil && commercial(u.Role) {
+		groupe, err = g.rattacherAuGroupe(ctx, session, demandeur)
+	}
 	if err != nil {
 		g.fermerSession(ctx, session)
 		return nil, glpiInjoignable(err)
@@ -138,10 +143,12 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 			Urgence   int    `json:"urgency"`
 			Categorie int    `json:"itilcategories_id"`
 			Demandeur int    `json:"_users_id_requester"`
+			Groupe    int    `json:"_groups_id_requester,omitempty"`
 		} `json:"input"`
 	}
 	nouveau.Input.Name, nouveau.Input.Content, nouveau.Input.Type = titre(form.Description), contenu, ticketIncident
 	nouveau.Input.Urgence, nouveau.Input.Categorie, nouveau.Input.Demandeur = form.Urgence, form.Categorie, demandeur
+	nouveau.Input.Groupe = groupe
 	corps, err := json.Marshal(nouveau)
 	if err != nil {
 		return nil, err
@@ -220,6 +227,35 @@ func (g glpi) demandeur(ctx context.Context, session string, u *socle.Utilisateu
 	}
 	err = g.appeler(ctx, session, http.MethodPost, "/User", "application/json", bytes.NewReader(corps), &cree)
 	return cree.ID, err
+}
+
+func commercial(role socle.Role) bool {
+	return role == socle.Superviseur || role == socle.Direction
+}
+
+// Le groupe est créé dans GLPI par l'administrateur ; son absence laisse partir le ticket sans groupe.
+func (g glpi) rattacherAuGroupe(ctx context.Context, session string, compte int) (int, error) {
+	var groupes []struct {
+		ID  int    `json:"id"`
+		Nom string `json:"name"`
+	}
+	chemin := "/Group?" + url.Values{"searchText[name]": {"^" + groupeCommercial + "$"}, "range": {"0-5"}}.Encode()
+	if err := g.appeler(ctx, session, http.MethodGet, chemin, "", nil, &groupes); err != nil || len(groupes) == 0 {
+		return 0, err
+	}
+	var membres []struct {
+		Groupe int `json:"groups_id"`
+	}
+	if err := g.appeler(ctx, session, http.MethodGet, fmt.Sprintf("/User/%d/Group_User", compte), "", nil, &membres); err != nil {
+		return 0, err
+	}
+	for _, m := range membres {
+		if m.Groupe == groupes[0].ID {
+			return m.Groupe, nil
+		}
+	}
+	corps := fmt.Sprintf(`{"input":{"users_id":%d,"groups_id":%d}}`, compte, groupes[0].ID)
+	return groupes[0].ID, g.appeler(ctx, session, http.MethodPost, "/Group_User", "application/json", strings.NewReader(corps), nil)
 }
 
 func (g glpi) idCompte(ctx context.Context, session, login string) (int, error) {
