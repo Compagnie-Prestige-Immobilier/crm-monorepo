@@ -6,6 +6,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState, type ReactNode } from 'react';
 
+import { MesClients } from '@/components/contacts/mes-clients';
+import { PipelineContactsBande } from '@/components/contacts/pipeline-contacts';
 import { EmptyState } from '@/components/empty-state';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
@@ -27,10 +29,6 @@ import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import {
   PHASE2_STATUSES,
   PHASE2_STATUS_LABELS,
-  REP_CALL_OUTCOME_LABELS,
-  REP_CALL_OUTCOME_VARIANTS,
-  callOutcomeLabel,
-  callOutcomeVariant,
   type Paginated,
   type Projet,
   type ProspectRow,
@@ -38,11 +36,12 @@ import {
 } from '@/lib/types';
 import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
 
-type Onglet = 'PROSPECTS' | 'REPRESENTANTS';
+type Onglet = 'PROSPECTS' | 'REPRESENTANTS' | 'CLIENTS';
 
 const ONGLETS: readonly { value: Onglet; label: string }[] = [
   { value: 'PROSPECTS', label: 'Prospects' },
   { value: 'REPRESENTANTS', label: 'Représentants' },
+  { value: 'CLIENTS', label: 'Clients' },
 ];
 
 const PROJET_OPTIONS = [
@@ -50,23 +49,9 @@ const PROJET_OPTIONS = [
   { value: 'GRAND_PUBLIC', label: 'Grand Public' },
 ];
 
-const PROSPECT_ISSUE_OPTIONS = [
-  { value: 'NRP', label: 'NRP' },
-  { value: 'A_RAPPELER', label: 'À rappeler' },
-  { value: 'TRANSFERT_ENROLEMENT', label: 'Transfert enrôlement' },
-  { value: 'REFUS', label: 'Refus' },
-  { value: 'FAUX_NUMERO', label: 'Faux numéro' },
-  { value: 'DECES', label: 'Décès' },
-  { value: 'AUTRE', label: 'Autre' },
-];
-
-const REP_ISSUE_OPTIONS = [
-  { value: 'NRP', label: 'NRP' },
-  { value: 'A_RAPPELER', label: 'À rappeler' },
-  { value: 'ACCORD', label: 'Accord' },
-  { value: 'REFUS', label: 'Refus' },
-  { value: 'FAUX_NUMERO', label: 'Faux numéro' },
-  { value: 'DECES', label: 'Décès' },
+const ISSUE_OPTIONS = [
+  { value: 'JOIGNABLE', label: 'Joignable' },
+  { value: 'INJOIGNABLE', label: 'Injoignable' },
 ];
 
 const PROSPECT_STATUT_OPTIONS = PHASE2_STATUSES.map((status) => ({
@@ -123,7 +108,8 @@ function filterProspectItem(
 ): boolean {
   if (!matchesSearch(`${item.prenom} ${item.nom}`, item.phoneE164 ?? '', search)) return false;
   if (targetProjet !== null && item.projet !== targetProjet) return false;
-  if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+  if (issueFiltre === 'JOIGNABLE' && item.lastJoignable !== true) return false;
+  if (issueFiltre === 'INJOIGNABLE' && item.lastJoignable !== false) return false;
   return statutFiltre === null || item.phase2Status === statutFiltre;
 }
 
@@ -134,7 +120,10 @@ function filterRepresentantItem(
   statutFiltre: string | null,
 ): boolean {
   if (!matchesSearch(item.fullName, item.phoneE164 ?? '', search)) return false;
-  if (issueFiltre !== null && item.lastCallOutcome !== issueFiltre) return false;
+  const joignable =
+    item.statutQualificationEffect !== null && item.statutQualificationEffect !== 'UNREACHABLE';
+  if (issueFiltre === 'JOIGNABLE' && !joignable) return false;
+  if (issueFiltre === 'INJOIGNABLE' && joignable) return false;
   if (statutFiltre === null) return true;
   return item.relationStatus === statutFiltre || item.statutQualificationLabel === statutFiltre;
 }
@@ -154,6 +143,8 @@ function checkActiveFilters(
 }
 
 function MesContactsListContent({
+  onglet,
+  appelePar,
   vueRepresentants,
   representants,
   filteredRepresentants,
@@ -163,6 +154,8 @@ function MesContactsListContent({
   resetFilters,
   proj,
 }: {
+  onglet: Onglet;
+  appelePar: string;
   vueRepresentants: boolean;
   representants: UseQueryResult<Paginated<RepresentantRow>>;
   filteredRepresentants: RepresentantRow[];
@@ -172,6 +165,9 @@ function MesContactsListContent({
   resetFilters: () => void;
   proj: Projet | null;
 }) {
+  if (onglet === 'CLIENTS') {
+    return <MesClients appelePar={appelePar} projet={proj} />;
+  }
   if (vueRepresentants) {
     return (
       <Liste
@@ -224,7 +220,7 @@ function MesContactsFilterBar({
   projetFiltre: string | null;
   setProjetFiltre: (val: string | null) => void;
   canFilter: boolean;
-  teleconseillers: { id: string; fullName: string }[];
+  teleconseillers: { id: string; fullName: string; isActive: boolean }[];
   filtreId: string | null;
   setFiltreId: (val: string | null) => void;
   vueRepresentants: boolean;
@@ -263,7 +259,7 @@ function MesContactsFilterBar({
             placeholder="Mes appels"
             options={teleconseillers.map((user) => ({
               value: user.id,
-              label: user.fullName,
+              label: user.isActive ? user.fullName : `${user.fullName} (compte fermé)`,
             }))}
             value={filtreId}
             onChange={setFiltreId}
@@ -275,7 +271,7 @@ function MesContactsFilterBar({
         <FilterCombobox
           label="Issue de l’appel"
           placeholder="Toutes les issues"
-          options={vueRepresentants ? REP_ISSUE_OPTIONS : PROSPECT_ISSUE_OPTIONS}
+          options={ISSUE_OPTIONS}
           value={issueFiltre}
           onChange={setIssueFiltre}
         />
@@ -315,10 +311,10 @@ function MesContactsTabsToggle({
   onglet: Onglet;
   setOnglet: (val: Onglet) => void;
 }) {
-  if (!avecRepresentants) return null;
+  const entrees = ONGLETS.filter((entree) => avecRepresentants || entree.value !== 'REPRESENTANTS');
   return (
     <div className="flex flex-wrap gap-2" role="group" aria-label="Type de contact">
-      {ONGLETS.map((entree) => (
+      {entrees.map((entree) => (
         <Button
           key={entree.value}
           type="button"
@@ -373,8 +369,8 @@ export function MesContactsView({
 
   const teleconseillers = useQuery({
     queryKey: callbackKeys.teleconseillers,
-    queryFn: () =>
-      fetchUsers({ ...EMPTY_USER_FILTERS, role: 'COMMERCIAL', isActive: true, pageSize: 200 }),
+    // Comptes fermés et rôles changés compris : leurs appels restent lisibles.
+    queryFn: () => fetchUsers({ ...EMPTY_USER_FILTERS, pageSize: 200 }),
     enabled: canFilter,
     staleTime: 300_000,
   });
@@ -436,7 +432,15 @@ export function MesContactsView({
         setOnglet={setOnglet}
       />
 
+      <PipelineContactsBande
+        appelePar={lastCallById}
+        projet={targetProjet}
+        masquee={onglet !== 'PROSPECTS'}
+      />
+
       <MesContactsListContent
+        onglet={onglet}
+        appelePar={lastCallById}
         vueRepresentants={vueRepresentants}
         representants={representants}
         filteredRepresentants={filteredRepresentants}
@@ -528,7 +532,7 @@ const COLONNES_REPRESENTANTS_CONTACTS = {
   nom: (representant: RepresentantRow) => representant.fullName,
   telephone: (representant: RepresentantRow) => representant.phoneE164,
   appel: (representant: RepresentantRow) => representant.lastCallAt,
-  issue: (representant: RepresentantRow) => representant.lastCallOutcome,
+  issue: (representant: RepresentantRow) => representant.statutQualificationLabel,
   statut: (representant: RepresentantRow) => representant.statutQualificationLabel,
 };
 
@@ -545,7 +549,7 @@ const COLONNES_PROSPECTS_CONTACTS = {
   nom: (prospect: ProspectRow) => `${prospect.prenom} ${prospect.nom}`,
   telephone: (prospect: ProspectRow) => prospect.phoneE164,
   appel: (prospect: ProspectRow) => prospect.lastCallAt,
-  issue: (prospect: ProspectRow) => prospect.lastCallOutcome,
+  issue: (prospect: ProspectRow) => prospect.lastReasonLabel,
   statut: (prospect: ProspectRow) => prospect.phase2Status,
 };
 
@@ -596,11 +600,15 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
               <Quand at={representant.lastCallAt} />
             </TableCell>
             <TableCell>
-              {representant.lastCallOutcome === null ? (
+              {representant.statutQualificationLabel === null ? (
                 SANS_VALEUR
               ) : (
-                <Badge variant={REP_CALL_OUTCOME_VARIANTS[representant.lastCallOutcome]}>
-                  {REP_CALL_OUTCOME_LABELS[representant.lastCallOutcome]}
+                <Badge
+                  variant={
+                    representant.statutQualificationEffect === 'UNREACHABLE' ? 'warning' : 'info'
+                  }
+                >
+                  {representant.statutQualificationLabel}
                 </Badge>
               )}
             </TableCell>
@@ -609,7 +617,6 @@ function TableRepresentants({ items }: { items: RepresentantRow[] }) {
                 status={representant.relationStatus}
                 label={representant.statutQualificationLabel}
                 effect={representant.statutQualificationEffect}
-                lastCallOutcome={representant.lastCallOutcome}
               />
             </TableCell>
           </LigneVersFiche>
@@ -655,11 +662,11 @@ function TableProspects({ items, projet }: { items: ProspectRow[]; projet: Proje
               <Quand at={prospect.lastCallAt} />
             </TableCell>
             <TableCell>
-              {prospect.lastCallOutcome === null ? (
+              {prospect.lastReasonLabel === null ? (
                 SANS_VALEUR
               ) : (
-                <Badge variant={callOutcomeVariant(prospect.lastCallOutcome)}>
-                  {prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastCallOutcome)}
+                <Badge variant={prospect.lastJoignable === false ? 'warning' : 'info'}>
+                  {prospect.lastReasonLabel}
                 </Badge>
               )}
             </TableCell>

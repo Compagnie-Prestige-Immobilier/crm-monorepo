@@ -201,16 +201,18 @@ func requeteCadenceDuJour(shifts []analytics.CreneauDeTravail) string {
 	trouMort := `EXTRACT(EPOCH FROM p.gap) > ` + strconv.Itoa(trouMortSecondes) + ` AND p."shift" = p."prevShift"`
 	return `
 WITH attempts AS (
-  SELECT "performedById" AS "userId", "clientCreatedAt", "createdAt",
-    'prospect' AS famille, "prospectId" AS cible,
-    ("outcome" NOT IN ` + analytics.IssuesNonJointes + `)::int AS joint,
-    ("outcome" = 'METHOD_OBTAINED')::int AS qualifie
-  FROM "call_attempts" WHERE "clientCreatedAt" >= $1 AND "clientCreatedAt" < $2
+  SELECT ca."performedById" AS "userId", ca."clientCreatedAt", ca."createdAt",
+    'prospect' AS famille, ca."prospectId" AS cible,
+    (` + analytics.ProspectJoint + `)::int AS joint,
+    (ca."method" IS NOT NULL)::int AS qualifie
+  FROM "call_attempts" ca ` + analytics.JointureMotifIssue + `
+  WHERE ca."clientCreatedAt" >= $1 AND ca."clientCreatedAt" < $2
   UNION ALL
-  SELECT "performedById", "clientCreatedAt", "createdAt",
-    'representant', "representantId",
-    ("outcome" IN ` + analytics.IssuesRepresentantJointes + `)::int, 0
-  FROM "rep_call_attempts" WHERE "clientCreatedAt" >= $1 AND "clientCreatedAt" < $2
+  SELECT rca."performedById", rca."clientCreatedAt", rca."createdAt",
+    'representant', rca."representantId",
+    (` + analytics.RepresentantJoint + `)::int, 0
+  FROM "rep_call_attempts" rca ` + analytics.JointureStatutQualification + `
+  WHERE rca."clientCreatedAt" >= $1 AND rca."clientCreatedAt" < $2
 ),
 situes AS (
   SELECT a.*, ` + creneauDe + ` AS "shift"

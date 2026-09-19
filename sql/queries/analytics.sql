@@ -99,12 +99,7 @@ RETURNING "updatedAt";
 SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE r."lastCallAt" IS NOT NULL)::int AS eprouves,
-  -- Les appels d'avant le referentiel n'ont pas pose de statut : l'issue de
-  -- l'appel dit alors si la personne a repondu, sinon le taux sous-compte.
-  COUNT(*) FILTER (
-    WHERE CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
-               ELSE r."lastCallOutcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END
-  )::int AS joints,
+  COUNT(*) FILTER (WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK'))::int AS joints,
   COUNT(*) FILTER (WHERE apport.prospects > 0)::int AS productifs,
   COALESCE(SUM(apport.prospects), 0)::int AS prospects_apportes
 FROM "representants" r
@@ -133,10 +128,7 @@ SELECT
   d."id",
   d."name" AS label,
   COUNT(r."id")::int AS fiches,
-  COUNT(r."id") FILTER (
-    WHERE CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK')
-               ELSE r."lastCallOutcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END
-  )::int AS joints,
+  COUNT(r."id") FILTER (WHERE sq."effect" IN ('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK'))::int AS joints,
   COALESCE(SUM(apport.prospects), 0)::int AS prospects
 FROM "departements" d
 JOIN "representants" r ON r."departementId" = d."id" AND r."deletedAt" IS NULL
@@ -167,11 +159,10 @@ SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE p."canalProvenanceId" IS NOT NULL)::int AS avec_canal,
   COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS eprouves,
-  COUNT(*) FILTER (
-    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
-  )::int AS joints,
+  COUNT(*) FILTER (WHERE lr."countsAsReached")::int AS joints,
   COUNT(*) FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "prospects" p
+LEFT JOIN "call_outcome_reasons" lr ON lr."id" = p."lastReasonId"
 WHERE p."deletedAt" IS NULL;
 
 -- name: MarketingParCanal :many
@@ -180,12 +171,11 @@ SELECT
   c."code",
   c."label",
   COUNT(p."id")::int AS prospects,
-  COUNT(p."id") FILTER (
-    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
-  )::int AS joints,
+  COUNT(p."id") FILTER (WHERE lr."countsAsReached")::int AS joints,
   COUNT(p."id") FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "canaux_provenance" c
 JOIN "prospects" p ON p."canalProvenanceId" = c."id" AND p."deletedAt" IS NULL
+LEFT JOIN "call_outcome_reasons" lr ON lr."id" = p."lastReasonId"
 GROUP BY c."id", c."code", c."label", c."position"
 ORDER BY prospects DESC, c."position";
 
@@ -219,9 +209,7 @@ SELECT
   j."createdAt" AS importe_le,
   COUNT(p."id")::int AS importes,
   COUNT(p."id") FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS appeles,
-  COUNT(p."id") FILTER (
-    WHERE p."lastCallOutcome" IN ('METHOD_OBTAINED', 'CALLBACK', 'REFUSED', 'OTHER')
-  )::int AS joints,
+  COUNT(p."id") FILTER (WHERE r."countsAsReached")::int AS joints,
   COUNT(p."id") FILTER (WHERE r."code" = ANY(@motifs::text[]))::int AS interesses
 FROM "import_jobs" j
 JOIN "prospects" p ON p."importJobId" = j."id" AND p."deletedAt" IS NULL

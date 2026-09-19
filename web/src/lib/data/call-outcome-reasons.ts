@@ -2,7 +2,6 @@ import type { ApiClient, components } from '@crm/api-client';
 import { unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
-import type { CallOutcome } from '@/lib/types';
 
 type Schemas = components['schemas'];
 
@@ -96,28 +95,6 @@ export const motifsRacine = (motifs: readonly MotifAppel[]): MotifAppel[] =>
 export const sousMotifsDe = (motifs: readonly MotifAppel[], parentId: string): MotifAppel[] =>
   motifs.filter((motif) => motif.parentId === parentId);
 
-/**
- * L'effet commande tout : le groupe où le motif s'affiche et l'issue envoyée.
- * Le serveur refuse une issue qui ne correspond pas à l'effet du motif.
- */
-export const EFFET_ISSUE: Readonly<Record<CallOutcomeEffect, CallOutcome>> = {
-  CLOSE_METHOD: 'METHOD_OBTAINED',
-  CLOSE_REFUSED: 'REFUSED',
-  CLOSE_WRONG_NUMBER: 'WRONG_NUMBER',
-  CLOSE_LOST: 'REFUSED',
-  CLOSE_UNREACHABLE: 'UNREACHABLE',
-  CLOSE_INTERESTED: 'OTHER',
-  CLOSE_HESITANT: 'OTHER',
-  CLOSE_APPOINTMENT: 'CALLBACK',
-  CLOSE_REACHED: 'OTHER',
-  SCHEDULE_CALLBACK: 'CALLBACK',
-  KEEP_OPEN: 'UNREACHABLE',
-};
-
-/** KEEP_OPEN couvre aussi l'appel abouti qui ne tranche rien : joint, il vaut « Autre ». */
-export const issueDuMotif = (motif: Pick<MotifAppel, 'effect' | 'countsAsReached'>): CallOutcome =>
-  motif.effect === 'KEEP_OPEN' && motif.countsAsReached ? 'OTHER' : EFFET_ISSUE[motif.effect];
-
 export const planifieUneDate = (effect: CallOutcomeEffect): boolean =>
   effect === 'SCHEDULE_CALLBACK' || effect === 'CLOSE_APPOINTMENT';
 
@@ -125,10 +102,7 @@ export const planifieUneDate = (effect: CallOutcomeEffect): boolean =>
 export const commentaireExigePar = (motif: MotifAppel | null): string | null =>
   motif?.requiresComment === true ? motif.label : null;
 
-/** Joignable : on a parlé à la personne, qu'elle adhère ou qu'elle refuse. */
-const EFFETS_JOIGNABLE: readonly CallOutcomeEffect[] = ['CLOSE_METHOD', 'CLOSE_REFUSED'];
-
-export const estJoignable = (motif: MotifAppel): boolean => EFFETS_JOIGNABLE.includes(motif.effect);
+export const estJoignable = (motif: MotifAppel): boolean => motif.countsAsReached;
 
 export async function createCallOutcomeReason(
   input: CreateCallOutcomeReasonInput,

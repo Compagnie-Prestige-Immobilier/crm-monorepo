@@ -30,7 +30,7 @@ interface RappelEnBase {
   status: string;
   scheduledAt: Date;
   assignedToId: string;
-  outcome: string;
+  effect: string;
   comment: string | null;
 }
 
@@ -39,9 +39,10 @@ async function lireRappel(prospectId: string): Promise<RappelEnBase> {
   await avecBase(async (client) => {
     const { rows } = await client.query<RappelEnBase>(
       `SELECT c.status::text AS status, c."scheduledAt", c."assignedToId", c.comment,
-              a.outcome::text AS outcome
+              r.effect::text AS effect
          FROM scheduled_callbacks c
          JOIN call_attempts a ON a.id = c."sourceAttemptId"
+         JOIN call_outcome_reasons r ON r.id = a."reasonId"
         WHERE c."prospectId" = $1`,
       [prospectId],
     );
@@ -123,7 +124,7 @@ test.describe('parcours 6, rappels promis', () => {
 
     const promis = await lireRappel(fiche.id);
     expect(promis.status).toBe('PENDING');
-    expect(promis.outcome).toBe('CALLBACK');
+    expect(promis.effect).toBe('SCHEDULE_CALLBACK');
     expect(promis.assignedToId).toBe(compte.id);
     expect(promis.comment).toBe(COMMENTAIRE);
     // « Dans 1 h » : le creneau clique est bien celui enregistre, une heure

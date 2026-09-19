@@ -14,11 +14,17 @@ import {
   type EvenementHistorique,
 } from '@/components/historique/historique';
 import { QueryErrorState } from '@/components/query-error-state';
-import { RELATION_VARIANTS, RelationBadge } from '@/components/representants/relation-badge';
+import {
+  RELATION_VARIANTS,
+  RelationBadge,
+  varianteDeLEffet,
+} from '@/components/representants/relation-badge';
 import {
   ComposeurFil,
   SupprimerCommentaireDialog,
 } from '@/components/representants/representant-comments';
+import { AffecterFiche } from '@/components/prospects/affecter-fiche';
+import { RequalifierRepresentant } from '@/components/representants/requalifier-representant';
 import { SupprimerRepresentant } from '@/components/representants/supprimer-representant';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -56,8 +62,6 @@ import { queryKeys } from '@/lib/query-keys';
 import { REPRESENTANT_RELATION_LABELS } from '@/lib/representant-filters';
 import {
   PROSPECT_STATUT_LABELS,
-  REP_CALL_OUTCOME_LABELS,
-  REP_CALL_OUTCOME_VARIANTS,
   type Paginated,
   type ProspectRow,
   type RepresentantRow,
@@ -74,10 +78,6 @@ function ouiNon(value: boolean | null): string {
 
 function ouVide(value: string | null, repli: string = NO_VALUE): string {
   return value === null || value === '' ? repli : value;
-}
-
-function pluriel(count: number): string {
-  return count === 1 ? '' : 's';
 }
 
 function evenementCreation(representant: RepresentantRow): EvenementHistorique {
@@ -101,9 +101,6 @@ function evenementCreation(representant: RepresentantRow): EvenementHistorique {
 
 function resumeAppel(appel: RepresentantCallAttempt): string {
   if (appel.comment !== null && appel.comment !== '') return appel.comment;
-  if (appel.promisedProspects !== null) {
-    return `${formatNumber(appel.promisedProspects)} prospect${pluriel(appel.promisedProspects)} promis`;
-  }
   if (appel.callbackAt !== null) return `Rappel le ${formatDateTime(appel.callbackAt)}`;
   return '';
 }
@@ -113,18 +110,15 @@ function evenementAppel(appel: RepresentantCallAttempt): EvenementHistorique {
     id: appel.id,
     categorie: 'appel',
     at: appel.clientCreatedAt,
-    titre: appel.statutQualificationLabel ?? REP_CALL_OUTCOME_LABELS[appel.outcome],
-    variant: REP_CALL_OUTCOME_VARIANTS[appel.outcome],
+    titre: appel.statutQualificationLabel,
+    variant: varianteDeLEffet(appel.statutQualificationEffect),
     resume: resumeAppel(appel),
     acteur: appel.performedByName,
     source: appel.deviceCallAt === null ? 'Non confirmé par le téléphone' : formatDeviceCall(appel),
     detail: (
       <>
         <dl className="grid gap-3 sm:grid-cols-2">
-          <Champ label="Issue">{REP_CALL_OUTCOME_LABELS[appel.outcome]}</Champ>
-          <Champ label="Statut de qualification">
-            {ouVide(appel.statutQualificationLabel, 'Aucun')}
-          </Champ>
+          <Champ label="Statut de qualification">{appel.statutQualificationLabel}</Champ>
           <Champ label="Téléphone">{formatDeviceCall(appel).replace('Téléphone : ', '')}</Champ>
           <Champ label="Temps de traitement">
             {appel.dureeTraitementSecondes === null
@@ -133,9 +127,6 @@ function evenementAppel(appel: RepresentantCallAttempt): EvenementHistorique {
           </Champ>
           <Champ label="Rappel promis">
             {appel.callbackAt === null ? 'Non' : formatDateTime(appel.callbackAt)}
-          </Champ>
-          <Champ label="Prospects promis">
-            {appel.promisedProspects === null ? NO_VALUE : formatNumber(appel.promisedProspects)}
           </Champ>
         </dl>
         <section className="flex flex-col gap-2">
@@ -501,10 +492,20 @@ export function RepresentantDetailView({
             status={representant.relationStatus}
             label={representant.statutQualificationLabel}
             effect={representant.statutQualificationEffect}
-            lastCallOutcome={representant.lastCallOutcome}
           />
         }
-        actions={<LienConsigner representantId={representant.id} readOnly={readOnly} />}
+        actions={
+          <>
+            <LienConsigner representantId={representant.id} readOnly={readOnly} />
+            <RequalifierRepresentant representantId={representant.id} nom={representant.fullName} />
+            <AffecterFiche
+              cible="representant"
+              id={representant.id}
+              nom={representant.fullName}
+              titulaireId={representant.createdById}
+            />
+          </>
+        }
         chiffres={chiffresDe(representant)}
       />
 

@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"slices"
+	"strconv"
 	"testing"
 	"time"
 
@@ -116,13 +117,22 @@ func qualificationCorpsTentative(prospectID string, extra map[string]any) map[st
 	corps := map[string]any{
 		"id":              uuid.Must(uuid.NewV7()).String(),
 		"prospectId":      prospectID,
-		"outcome":         "UNREACHABLE",
+		"reasonCode":      "PAS_DE_REPONSE",
 		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	for cle, valeur := range extra {
 		corps[cle] = valeur
 	}
 	return corps
+}
+
+func qualificationStatutID(b *banc, code string) string {
+	b.t.Helper()
+	var id string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "id" FROM "statuts_qualification" WHERE "code" = $1`, code).Scan(&id); err != nil {
+		b.t.Fatal(err)
+	}
+	return id
 }
 
 func TestQualificationProspectGrandPublicNonAttribueRefuse(t *testing.T) {
@@ -216,23 +226,23 @@ func TestQualificationTentativeProspectRejoueeNEcritQuUneLigne(t *testing.T) {
 	}
 }
 
-func TestQualificationIssueSansCommentaireRefusee(t *testing.T) {
+func TestQualificationMotifInconnuRefuse(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
 
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
-		qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER"}))
-	b.attend(statut, http.StatusBadRequest, "issue OTHER sans commentaire", body)
-	if body["code"] != "PHASE2_COMMENT_REQUIRED" {
+		qualificationCorpsTentative(prospect, map[string]any{"reasonCode": "MOTIF_INEXISTANT"}))
+	b.attend(statut, http.StatusBadRequest, "motif inconnu", body)
+	if body["code"] != "PHASE2_REASON_UNKNOWN" {
 		t.Fatalf("code : %v", body["code"])
 	}
 	if n := qualificationCompte(b, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1`, prospect); n != 0 {
 		t.Fatalf("une tentative refusée ne doit rien écrire : %d lignes", n)
 	}
-	corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "comment": "  injoignable au bureau "})
+	corps := qualificationCorpsTentative(prospect, map[string]any{"reasonCode": "DEMANDE_INFORMATION", "comment": "  rappelle au bureau "})
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"]) })
 	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
-	b.attend(statut, http.StatusOK, "issue OTHER commentée", body)
+	b.attend(statut, http.StatusOK, "motif du référentiel", body)
 }
 
 func TestQualificationRappelPlanifieEtListe(t *testing.T) {
@@ -242,7 +252,7 @@ func TestQualificationRappelPlanifieEtListe(t *testing.T) {
 	// dépend pas de l'heure à laquelle le test tourne.
 	quand := time.Now().UTC().Add(-time.Hour)
 	corps := qualificationCorpsTentative(prospect, map[string]any{
-		"outcome":         "CALLBACK",
+		"reasonCode":      "CALLBACK",
 		"clientCreatedAt": quand.Add(-time.Hour).Format(time.RFC3339Nano),
 		"callbackAt":      quand.Format(time.RFC3339Nano),
 	})
@@ -309,10 +319,10 @@ func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 	traitee, intacte, rappelee, injoignable := qualificationProspect(b), qualificationProspect(b), qualificationProspect(b), qualificationProspect(b)
 	appel := qualificationCorpsTentative(traitee, nil)
 	rappel := qualificationCorpsTentative(rappelee, map[string]any{
-		"outcome":    "CALLBACK",
+		"reasonCode": "CALLBACK",
 		"callbackAt": time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano),
 	})
-	nonJoint := qualificationCorpsTentative(injoignable, map[string]any{"outcome": "UNREACHABLE"})
+	nonJoint := qualificationCorpsTentative(injoignable, nil)
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, rappelee)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2, $3)`, appel["id"], rappel["id"], nonJoint["id"])
@@ -339,9 +349,13 @@ func TestQualificationResteAAppelerEcarteLesFichesTraitees(t *testing.T) {
 func TestQualificationRequalificationRouvreLeStatutEtLaisseUneTrace(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	fiche := qualificationProspect(b)
-	refus := qualificationCorpsTentative(fiche, map[string]any{"outcome": "REFUSED"})
-	reprise := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "comment": "Rappelle demain"})
+	refus := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "PAS_INTERESSE"})
+	reprise := qualificationCorpsTentative(fiche, map[string]any{
+		"reasonCode": "CALLBACK", "comment": "Rappelle demain",
+		"callbackAt": time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano),
+	})
 	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" IN ($1, $2)`, refus["id"], reprise["id"])
 	})
@@ -381,7 +395,7 @@ func TestQualificationReaffectationRemetLaFicheDansLaFile(t *testing.T) {
 	                      VALUES ($1,$2,1,$3,1)`, lot, fiche, b.userID)
 	// Pas d'injoignable ici : depuis le 16 septembre 2026 la file exclut toute
 	// fiche dont le dernier appel n'a pas abouti, ce que ce parcours ne teste pas.
-	appel := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "TERRAIN"})
+	appel := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "TERRAIN"})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_reaffectations" WHERE "lotId" = $1`, lot)
@@ -566,7 +580,7 @@ func TestSyncPushConsigneLaTentativeEtRendLesRefusDansLeCorps(t *testing.T) {
 	attemptID := uuid.Must(uuid.NewV7()).String()
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect) })
 	data := map[string]any{
-		"prospectId": prospect, "outcome": "UNREACHABLE",
+		"prospectId": prospect, "reasonCode": "PAS_DE_REPONSE",
 		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 
@@ -584,7 +598,7 @@ func TestSyncPushConsigneLaTentativeEtRendLesRefusDansLeCorps(t *testing.T) {
 	}
 
 	muet := map[string]any{
-		"prospectId": prospect, "outcome": "OTHER",
+		"prospectId": prospect, "reasonCode": "MOTIF_INEXISTANT",
 		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	resultats = qualificationResultatsSync(b, qualificationLotSync(
@@ -592,7 +606,7 @@ func TestSyncPushConsigneLaTentativeEtRendLesRefusDansLeCorps(t *testing.T) {
 		qualificationOperationSync("prospect", "update", uuid.Must(uuid.NewV7()).String(), nil),
 	), "lot refusé")
 	refus, _ := resultats[0].(map[string]any)
-	if refus["status"] != "rejected" || refus["errorCode"] != "PHASE2_COMMENT_REQUIRED" || refus["error"] == nil {
+	if refus["status"] != "rejected" || refus["errorCode"] != "PHASE2_REASON_UNKNOWN" || refus["error"] == nil {
 		t.Fatalf("refus métier : %v", refus)
 	}
 	inconnue, _ := resultats[1].(map[string]any)
@@ -617,7 +631,7 @@ func TestQualificationAppelRepresentantRendLaSuggestionRecueillie(t *testing.T) 
 	})
 
 	corps := map[string]any{
-		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "outcome": "REFUSED",
+		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "statutQualificationId": qualificationStatutID(b, "REFUSE"),
 		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 		"suggestedPhone":  numero, "suggestedName": "Fatou Sow", "suggestedNote": "une collègue",
 	}
@@ -637,7 +651,7 @@ func TestQualificationAppelRepresentantRendLaSuggestionRecueillie(t *testing.T) 
 	}
 
 	sans := map[string]any{
-		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "outcome": "UNREACHABLE",
+		"id": uuid.Must(uuid.NewV7()).String(), "representantId": rep, "statutQualificationId": qualificationStatutID(b, "PAS_DE_REPONSE"),
 		"clientCreatedAt": time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/rep-campaigns/attempts", sans)
@@ -733,24 +747,23 @@ func TestCodificationLeads(t *testing.T) {
 	cas := []struct {
 		motif    string
 		extra    map[string]any
-		issue    string
 		phase2   string
 		perdu    bool
 		rappels  int
 		prenom   string
 		aAppeler bool
 	}{
-		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, issue: "OTHER", phase2: "INTERESTED", prenom: "Aminata"},
-		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, issue: "CALLBACK", phase2: "APPOINTMENT", rappels: 1, prenom: "Awa"},
+		{motif: "TERRAIN", extra: map[string]any{"prenom": "Aminata"}, phase2: "INTERESTED", prenom: "Aminata"},
+		{motif: "RV_CPI", extra: map[string]any{"callbackAt": dansUneHeure}, phase2: "APPOINTMENT", rappels: 1, prenom: "Awa"},
 		{
 			motif: "HESITANT", extra: map[string]any{"method": "APPOINTMENT", "rendezVousAt": dansUneHeure, "incomeBandId": revenu, "dureeEtablissementMois": 12},
-			issue: "METHOD_OBTAINED", phase2: "METHOD_OBTAINED", prenom: "Awa",
+			phase2: "METHOD_OBTAINED", prenom: "Awa",
 		},
-		{motif: "A_SUPPRIMER", issue: "REFUSED", phase2: "REFUSED", perdu: true, prenom: "Awa"},
+		{motif: "A_SUPPRIMER", phase2: "REFUSED", perdu: true, prenom: "Awa"},
 	}
 	for _, c := range cas {
 		prospect := qualificationProspect(b)
-		corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "reasonCode": c.motif})
+		corps := qualificationCorpsTentative(prospect, map[string]any{"reasonCode": c.motif})
 		maps.Copy(corps, c.extra)
 		t.Cleanup(func() {
 			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospect)
@@ -759,15 +772,15 @@ func TestCodificationLeads(t *testing.T) {
 		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
 		b.attend(statut, http.StatusOK, "appel "+c.motif, body)
 
-		var issue, phase2, statutFiche, prenom string
+		var phase2, statutFiche, prenom string
 		if err := b.pool.QueryRow(b.ctx,
-			`SELECT a."outcome"::text, p."phase2Status"::text, p."statut"::text, p."prenom"
+			`SELECT p."phase2Status"::text, p."statut"::text, p."prenom"
 			   FROM "call_attempts" a JOIN "prospects" p ON p."id" = a."prospectId" WHERE a."id" = $1`,
-			corps["id"]).Scan(&issue, &phase2, &statutFiche, &prenom); err != nil {
+			corps["id"]).Scan(&phase2, &statutFiche, &prenom); err != nil {
 			t.Fatal(err)
 		}
-		if issue != c.issue || phase2 != c.phase2 || (statutFiche == "PERDU") != c.perdu || prenom != c.prenom {
-			t.Fatalf("%s : issue %s, phase 2 %s, statut %s, prénom %s ; attendu %+v", c.motif, issue, phase2, statutFiche, prenom, c)
+		if phase2 != c.phase2 || (statutFiche == "PERDU") != c.perdu || prenom != c.prenom {
+			t.Fatalf("%s : phase 2 %s, statut %s, prénom %s ; attendu %+v", c.motif, phase2, statutFiche, prenom, c)
 		}
 		rappels := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, prospect)
 		if rappels != c.rappels {
@@ -779,9 +792,7 @@ func TestCodificationLeads(t *testing.T) {
 		}
 	}
 
-	corps := qualificationCorpsTentative(qualificationProspect(b), map[string]any{
-		"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE", "method": "WHATSAPP",
-	})
+	corps := qualificationCorpsTentative(qualificationProspect(b), map[string]any{"method": "WHATSAPP"})
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
 	b.attend(statut, http.StatusBadRequest, "méthode sur un appel non joint", body)
 	if body["code"] != "PHASE2_METHOD_NOT_ALLOWED" {
@@ -813,7 +824,6 @@ func TestQualificationRappelLointainSeVoitDansTous(t *testing.T) {
 	prospect := qualificationProspect(b)
 	quand := time.Now().UTC().AddDate(0, 0, 30)
 	corps := qualificationCorpsTentative(prospect, map[string]any{
-		"outcome":    "CALLBACK",
 		"reasonCode": "RDV_TELEPHONIQUE",
 		"callbackAt": quand.Format(time.RFC3339Nano),
 	})
@@ -846,19 +856,19 @@ func TestQualificationUnStatutPoseFermeLaFiche(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	dans := time.Now().UTC().Add(24 * time.Hour).Format(time.RFC3339Nano)
 	cas := []struct {
-		motif, issue, phase2 string
-		rappel               bool
+		motif, phase2 string
+		rappel        bool
 	}{
-		{"PAS_DE_REPONSE", "UNREACHABLE", "UNREACHABLE", false},
-		{"HESITANT", "OTHER", "HESITANT", false},
-		{"VILLA", "OTHER", "INTERESTED", false},
-		{"DEMANDE_INFORMATION", "OTHER", "REACHED", false},
-		{"RV_CPI", "CALLBACK", "APPOINTMENT", true},
-		{"CALLBACK", "CALLBACK", "PENDING", true},
+		{"PAS_DE_REPONSE", "UNREACHABLE", false},
+		{"HESITANT", "HESITANT", false},
+		{"VILLA", "INTERESTED", false},
+		{"DEMANDE_INFORMATION", "REACHED", false},
+		{"RV_CPI", "APPOINTMENT", true},
+		{"CALLBACK", "PENDING", true},
 	}
 	for _, c := range cas {
 		fiche := qualificationProspect(b)
-		extra := map[string]any{"outcome": c.issue, "reasonCode": c.motif}
+		extra := map[string]any{"reasonCode": c.motif}
 		if c.rappel {
 			extra["callbackAt"] = dans
 		}
@@ -885,7 +895,7 @@ func TestQualificationRemiseATraiterRameneLaFicheDansLaFile(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	superviseur := qualificationConnecte(t, "SUPERVISEUR")
 	fiche := qualificationProspect(b)
-	appel := qualificationCorpsTentative(fiche, map[string]any{"outcome": "UNREACHABLE", "reasonCode": "PAS_DE_REPONSE"})
+	appel := qualificationCorpsTentative(fiche, nil)
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
@@ -919,8 +929,8 @@ func TestQualificationLeDernierAppelantRequalifieSaFiche(t *testing.T) {
 	                             VALUES ($1,'Campagne contacts','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, createur.userID)
 	qualificationExec(createur, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
 		lot, fiche, appelant.userID)
-	premier := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "HESITANT"})
-	reprise := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "INTERESSE"})
+	premier := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "HESITANT"})
+	reprise := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "INTERESSE"})
 	t.Cleanup(func() {
 		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
 		_, _ = createur.pool.Exec(createur.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
@@ -945,7 +955,7 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 	interesse, hesitant := qualificationProspect(b), qualificationProspect(b)
 	revenu := uuid.NewString()
 	qualificationExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
-	adhesion := map[string]any{"outcome": "OTHER", "method": "WHATSAPP", "incomeBandId": revenu, "dureeEtablissementMois": 12}
+	adhesion := map[string]any{"method": "WHATSAPP", "incomeBandId": revenu, "dureeEtablissementMois": 12}
 	appels := []map[string]any{
 		qualificationCorpsTentative(interesse, maps.Clone(adhesion)),
 		qualificationCorpsTentative(hesitant, maps.Clone(adhesion)),
@@ -974,7 +984,7 @@ func TestRappelConsommeParTentativeSansNouvelleEcheance(t *testing.T) {
 	b := qualificationConnecte(t, "COMMERCIAL")
 	prospect := qualificationProspect(b)
 	rappelPromis(b, prospect, b.userID)
-	corps := qualificationCorpsTentative(prospect, map[string]any{"outcome": "OTHER", "reasonCode": "TERRAIN"})
+	corps := qualificationCorpsTentative(prospect, map[string]any{"reasonCode": "TERRAIN"})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, corps["id"])
 	})
@@ -996,10 +1006,10 @@ func TestQualificationMethodeAcquiseSurvitAuStatutSuivant(t *testing.T) {
 	revenu := uuid.NewString()
 	qualificationExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
 	adhesion := qualificationCorpsTentative(fiche, map[string]any{
-		"outcome": "OTHER", "reasonCode": "INTERESSE", "method": "WHATSAPP",
+		"reasonCode": "INTERESSE", "method": "WHATSAPP",
 		"incomeBandId": revenu, "dureeEtablissementMois": 12,
 	})
-	suivant := qualificationCorpsTentative(fiche, map[string]any{"outcome": "OTHER", "reasonCode": "DEMANDE_INFORMATION"})
+	suivant := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "DEMANDE_INFORMATION"})
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "income_bands" WHERE "id" = $1`, revenu) })
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche) })
 	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", adhesion)
@@ -1035,8 +1045,8 @@ func ouvertureFiche(prospectID string) map[string]any {
 func rappelPromis(b *banc, prospectID, teleconseillerID string) {
 	b.t.Helper()
 	tentative, rappel := uuid.NewString(), uuid.NewString()
-	adminExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt")
-		VALUES ($1,$2,$3,'CALLBACK',now())`, tentative, prospectID, teleconseillerID)
+	adminExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",now() FROM "call_outcome_reasons" WHERE "code" = 'CALLBACK'`, tentative, prospectID, teleconseillerID)
 	adminExec(b, `INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","sourceAttemptId","updatedAt")
 		VALUES ($1,$2,$3,now() + interval '1 day',$4,now())`, rappel, prospectID, teleconseillerID, tentative)
 	b.t.Cleanup(func() {
@@ -1044,4 +1054,341 @@ func rappelPromis(b *banc, prospectID, teleconseillerID string) {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "id" = $1`, rappel)
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, tentative)
 	})
+}
+
+// L'encadrement pose le motif sans appel : la fiche suit l'effet du motif,
+// aucun appel n'est ajouté, et le rappel promis revient au dernier appelant.
+func TestRequalificationParMotifSansAppel(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	fiche := qualificationProspect(b)
+	appel := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "HESITANT"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+	b.attend(statut, http.StatusOK, "hésitant consigné", body)
+
+	chemin := "/api/v1/prospects/" + fiche + "/statut-qualification"
+	interesse := map[string]any{"reasonCode": "INTERESSE"}
+	statut, body = qualificationEnvoi(b, http.MethodPost, chemin, interesse)
+	b.attend(statut, http.StatusForbidden, "requalification hors encadrement", body)
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, interesse)
+	superviseur.attend(statut, http.StatusOK, "intéressé posé sans appel", body)
+	if lu := qualificationStatutPhase2(b, fiche); lu != "INTERESTED" {
+		t.Fatalf("la fiche suit le motif posé : %s", lu)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1`, fiche); n != 1 {
+		t.Fatalf("aucun appel ne s'ajoute : %d", n)
+	}
+	if _, ids := qualificationTotalProspects(b, "&phase2Status=INTERESTED"); !slices.Contains(ids, fiche) {
+		t.Fatalf("onglet Intéressés : %v", ids)
+	}
+
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"reasonCode": "CALLBACK"})
+	superviseur.attend(statut, http.StatusBadRequest, "un rappel exige sa date", body)
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"reasonCode": "CALLBACK", "callbackAt": quand})
+	superviseur.attend(statut, http.StatusOK, "rappel posé", body)
+	if lu := qualificationStatutPhase2(b, fiche); lu != "PENDING" {
+		t.Fatalf("à rappeler rouvre la fiche : %s", lu)
+	}
+	var assigne string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "assignedToId" FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`, fiche).Scan(&assigne); err != nil {
+		t.Fatal(err)
+	}
+	if assigne != b.userID {
+		t.Fatalf("le rappel revient au dernier appelant : %s", assigne)
+	}
+}
+
+func TestRequalificationRepresentantParStatut(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	rep := qualificationRepresentant(b)
+	chemin := "/api/v1/representants/" + rep + "/statut-qualification"
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, rep)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "representant_relation_changes" WHERE "representantId" = $1`, rep)
+	})
+	statut, body := qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"statutQualificationId": qualificationStatutID(b, "A_RAPPELER")})
+	superviseur.attend(statut, http.StatusBadRequest, "à rappeler sans date", body)
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"statutQualificationId": qualificationStatutID(b, "REFUSE")})
+	superviseur.attend(statut, http.StatusOK, "refusé posé sans appel", body)
+	var code string
+	if err := b.pool.QueryRow(b.ctx, `SELECT sq."code" FROM "representants" r JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId" WHERE r."id" = $1`, rep).Scan(&code); err != nil {
+		t.Fatal(err)
+	}
+	if code != "REFUSE" {
+		t.Fatalf("la fiche porte le statut posé : %s", code)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "rep_call_attempts" WHERE "representantId" = $1`, rep); n != 0 {
+		t.Fatalf("aucun appel ne s'ajoute : %d", n)
+	}
+}
+
+// Un rendez-vous téléphonique n'est pas un rendez-vous : l'onglet l'écarte.
+func TestRubriqueRendezVousEcarteLeTelephonique(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	physique, telephonique := qualificationProspect(b), qualificationProspect(b)
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	appels := []map[string]any{
+		qualificationCorpsTentative(physique, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}),
+		qualificationCorpsTentative(telephonique, map[string]any{"reasonCode": "RDV_TELEPHONIQUE", "callbackAt": quand}),
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" IN ($1, $2)`, physique, telephonique)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" IN ($1, $2)`, physique, telephonique)
+	})
+	for _, appel := range appels {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+		b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
+	}
+	_, ids := qualificationTotalProspects(b, "&phase2Status=APPOINTMENT&sansMotif=RDV_TELEPHONIQUE")
+	if !slices.Contains(ids, physique) || slices.Contains(ids, telephonique) {
+		t.Fatalf("onglet Rendez-vous : %v", ids)
+	}
+}
+
+// « Affecter à » change le titulaire ; la campagne en cours et le rappel promis
+// suivent, l'appel passé reste à son auteur.
+func TestAffectationDUneFicheSuitCampagneEtRappel(t *testing.T) {
+	avant := qualificationConnecte(t, "COMMERCIAL")
+	apres := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	fiche := qualificationProspect(avant)
+	lot := uuid.NewString()
+	qualificationExec(avant, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                          VALUES ($1,'Campagne affectation','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, superviseur.userID)
+	qualificationExec(avant, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, fiche, avant.userID)
+	rappelPromis(avant, fiche, avant.userID)
+	t.Cleanup(func() {
+		_, _ = avant.pool.Exec(avant.ctx, `DELETE FROM "audit_logs" WHERE "entityId" IN ($1, $2)`, fiche, lot)
+		_, _ = avant.pool.Exec(avant.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+
+	chemin := "/api/v1/prospects/" + fiche + "/affecter"
+	corps := map[string]any{"teleconseillerId": apres.userID}
+	statut, body := qualificationEnvoi(avant, http.MethodPost, chemin, corps)
+	avant.attend(statut, http.StatusForbidden, "affectation hors encadrement", body)
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, corps)
+	superviseur.attend(statut, http.StatusOK, "fiche affectée", body)
+	if n, _ := body["campagnes"].(float64); n != 1 {
+		t.Fatalf("la campagne en cours suit : %v", body["campagnes"])
+	}
+	var titulaire, attributaire, rappel string
+	if err := avant.pool.QueryRow(avant.ctx, `SELECT p."createdById", i."assigneeId", c."assignedToId"
+		FROM "prospects" p
+		JOIN "lot_export_items" i ON i."prospectId" = p."id" AND i."lotId" = $2
+		JOIN "scheduled_callbacks" c ON c."prospectId" = p."id" AND c."status" = 'PENDING'
+		WHERE p."id" = $1`, fiche, lot).Scan(&titulaire, &attributaire, &rappel); err != nil {
+		t.Fatal(err)
+	}
+	if titulaire != apres.userID || attributaire != apres.userID || rappel != apres.userID {
+		t.Fatalf("titulaire, campagne et rappel suivent : %s %s %s", titulaire, attributaire, rappel)
+	}
+	if n := qualificationCompte(avant, `SELECT count(*) FROM "lot_export_reaffectations" WHERE "lotId" = $1 AND "toAssigneeId" = $2`, lot, apres.userID); n != 1 {
+		t.Fatalf("la réaffectation de campagne est tracée : %d", n)
+	}
+	if n := qualificationCompte(avant, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1 AND "performedById" = $2`, fiche, avant.userID); n != 1 {
+		t.Fatalf("l'appel passé reste à son auteur : %d", n)
+	}
+}
+
+func TestAffectationDUnRepresentant(t *testing.T) {
+	avant := qualificationConnecte(t, "COMMERCIAL")
+	apres := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	rep := qualificationRepresentant(avant)
+	t.Cleanup(func() { _, _ = avant.pool.Exec(avant.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, rep) })
+	statut, body := qualificationEnvoi(superviseur, http.MethodPost, "/api/v1/representants/"+rep+"/affecter",
+		map[string]any{"teleconseillerId": apres.userID})
+	superviseur.attend(statut, http.StatusOK, "représentant affecté", body)
+	var titulaire string
+	if err := avant.pool.QueryRow(avant.ctx, `SELECT "createdById" FROM "representants" WHERE "id" = $1`, rep).Scan(&titulaire); err != nil {
+		t.Fatal(err)
+	}
+	if titulaire != apres.userID {
+		t.Fatalf("le titulaire change : %s", titulaire)
+	}
+}
+
+// Affecter à une campagne : la fiche y entre, va au membre le moins chargé et
+// passe en tête de son reste à appeler.
+func TestAffectationAUneCampagneVaAuMoinsCharge(t *testing.T) {
+	charge := qualificationConnecte(t, "COMMERCIAL")
+	libre := qualificationConnecte(t, "COMMERCIAL")
+	superviseur := qualificationConnecte(t, "SUPERVISEUR")
+	ancienne, nouvelle := qualificationProspect(charge), qualificationProspect(superviseur)
+	// Plus récente que la fiche affectée : sans priorité, elle passerait devant.
+	propre := qualificationProspect(libre)
+	lot := uuid.NewString()
+	filtres := `{"distribution":{"teleconseillerIds":["` + charge.userID + `","` + libre.userID + `"]}}`
+	qualificationExec(charge, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                           VALUES ($1,'Campagne équipe','PROSPECTS','CHUES',$2::jsonb,1,$3)`, lot, filtres, superviseur.userID)
+	qualificationExec(charge, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, ancienne, charge.userID)
+	t.Cleanup(func() {
+		_, _ = charge.pool.Exec(charge.ctx, `DELETE FROM "audit_logs" WHERE "entityId" IN ($1, $2)`, nouvelle, lot)
+		_, _ = charge.pool.Exec(charge.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+
+	chemin := "/api/v1/prospects/" + nouvelle + "/affecter"
+	statut, body := qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"teleconseillerId": libre.userID, "campagneId": lot})
+	superviseur.attend(statut, http.StatusBadRequest, "une seule destination", body)
+	statut, body = qualificationEnvoi(superviseur, http.MethodPost, chemin, map[string]any{"campagneId": lot})
+	superviseur.attend(statut, http.StatusOK, "affectée à la campagne", body)
+	if vers, _ := body["teleconseillerId"].(string); vers != libre.userID {
+		t.Fatalf("le membre le moins chargé reçoit la fiche : %s", vers)
+	}
+	var attributaire string
+	var position int
+	if err := charge.pool.QueryRow(charge.ctx, `SELECT "assigneeId", "position" FROM "lot_export_items" WHERE "lotId" = $1 AND "prospectId" = $2`,
+		lot, nouvelle).Scan(&attributaire, &position); err != nil {
+		t.Fatal(err)
+	}
+	if attributaire != libre.userID || position != 2 {
+		t.Fatalf("la fiche entre dans la campagne chez le moins chargé : %s %d", attributaire, position)
+	}
+	if n := qualificationCompte(charge, `SELECT "itemCount" FROM "lots_export" WHERE "id" = $1`, lot); n != 2 {
+		t.Fatalf("la campagne compte la fiche : %d", n)
+	}
+	_, ids := qualificationTotalProspects(libre, "&resteAAppeler=true")
+	if len(ids) < 2 || ids[0] != nouvelle || !slices.Contains(ids, propre) {
+		t.Fatalf("la fiche affectée passe en tête du reste à appeler : %v", ids)
+	}
+}
+
+// Celui qui joint le prospect le garde : un appel injoignable ne change rien,
+// le premier appel où la personne répond fait du collègue le titulaire.
+func TestCeluiQuiJointLeProspectLeGarde(t *testing.T) {
+	titulaire := qualificationConnecte(t, "COMMERCIAL")
+	collegue := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(titulaire)
+	lot := uuid.NewString()
+	qualificationExec(titulaire, `INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	                              VALUES ($1,'Relance injoignables','PROSPECTS','CHUES','{}'::jsonb,1,$2)`, lot, titulaire.userID)
+	qualificationExec(titulaire, `INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId","day") VALUES ($1,$2,1,$3,1)`,
+		lot, fiche, collegue.userID)
+	t.Cleanup(func() {
+		_, _ = titulaire.pool.Exec(titulaire.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = titulaire.pool.Exec(titulaire.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+		_, _ = titulaire.pool.Exec(titulaire.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+	proprietaire := func() string {
+		var id string
+		if err := titulaire.pool.QueryRow(titulaire.ctx, `SELECT "createdById" FROM "prospects" WHERE "id" = $1`, fiche).Scan(&id); err != nil {
+			t.Fatal(err)
+		}
+		return id
+	}
+	// Importée par l'admin, la fiche n'a pas encore de suivi : le premier appel la prend.
+	admin := qualificationConnecte(t, "ADMIN")
+	qualificationExec(admin, `UPDATE "prospects" SET "createdById" = $2 WHERE "id" = $1`, fiche, admin.userID)
+	statut, body := qualificationEnvoi(collegue, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, nil))
+	collegue.attend(statut, http.StatusOK, "premier appel, injoignable", body)
+	if proprietaire() != collegue.userID {
+		t.Fatal("une fiche importée va au premier qui l'appelle")
+	}
+	// La relance suivante confie la fiche à un autre.
+	qualificationExec(admin, `UPDATE "lot_export_items" SET "assigneeId" = $2 WHERE "lotId" = $1`, lot, titulaire.userID)
+	statut, body = qualificationEnvoi(titulaire, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, nil))
+	titulaire.attend(statut, http.StatusOK, "injoignable consigné", body)
+	if proprietaire() != collegue.userID {
+		t.Fatal("un appel injoignable ne change pas de titulaire")
+	}
+	statut, body = qualificationEnvoi(titulaire, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "HESITANT"}))
+	titulaire.attend(statut, http.StatusOK, "joint consigné", body)
+	if proprietaire() != titulaire.userID {
+		t.Fatal("celui qui joint le prospect le garde")
+	}
+}
+
+// « Mes contacts » montre le parcours du téléconseiller jusqu'à la vente, y
+// compris une vente posée depuis le classeur des ventes.
+func TestPipelineDesContactsJusquALaVente(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	autre := qualificationConnecte(t, "COMMERCIAL")
+	vendue, injoignable := qualificationProspect(b), qualificationProspect(b)
+	appels := []map[string]any{
+		qualificationCorpsTentative(vendue, map[string]any{"reasonCode": "INTERESSE"}),
+		qualificationCorpsTentative(injoignable, nil),
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" IN ($1, $2)`, vendue, injoignable)
+	})
+	for _, appel := range appels {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+		b.attend(statut, http.StatusOK, "appel consigné", body)
+	}
+	qualificationExec(b, `UPDATE "prospects" SET "statut" = 'VENDU' WHERE "id" = $1`, vendue)
+
+	statut, body := qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/pipeline?appelePar="+autre.userID, nil)
+	b.attend(statut, http.StatusOK, "pipeline", body)
+	if body["appelees"] != float64(2) || body["joignables"] != float64(1) || body["vendues"] != float64(1) {
+		t.Fatalf("le téléconseiller voit son propre parcours, quel que soit l'appelePar demandé : %v", body)
+	}
+	statut, body = qualificationEnvoi(autre, http.MethodGet, "/api/v1/prospects/pipeline", nil)
+	autre.attend(statut, http.StatusOK, "pipeline d'un autre", body)
+	if body["appelees"] != float64(0) {
+		t.Fatalf("les fiches d'un collègue ne comptent pas : %v", body)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/clients", nil)
+	b.attend(statut, http.StatusOK, "clients", body)
+	items, _ := body["items"].([]any)
+	if len(items) != 1 {
+		t.Fatalf("la fiche vendue est un client, sans vente rapprochée : %v", body)
+	}
+	client, _ := items[0].(map[string]any)
+	if rapprochee, _ := client["vente"].(bool); client["id"] != vendue || rapprochee {
+		t.Fatalf("client sans vente rapprochée : %v", items[0])
+	}
+}
+
+// Une vente saisie vaut conversion : la fiche jointe passe vendue sans passer
+// par la conversion, et la vente se lit dans les clients du téléconseiller.
+func TestVenteSaisieVendLaFicheJointe(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	direction := qualificationConnecte(t, "DIRECTION")
+	fiche := qualificationProspect(b)
+	// Un numéro mobile sénégalais valide : la saisie normalise le téléphone avant le rapprochement.
+	telephone := "+22177" + strconv.FormatInt(time.Now().UnixNano()%10_000_000+1_000_000, 10)[:7]
+	qualificationExec(b, `UPDATE "prospects" SET "phoneE164" = $2 WHERE "id" = $1`, fiche, telephone)
+	appel := qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "INTERESSE"})
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "telephone" = $1`, telephone)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "audit_logs" WHERE "entityId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, appel["id"])
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+	b.attend(statut, http.StatusOK, "intéressé consigné", body)
+
+	vente := map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-18", "client": "CLIENT " + fiche[:8],
+		"telephone": telephone, "site": "THIEO", "nombreLots": 1, "numerosLots": "2001",
+		"superficie": "225 m²", "prixUnitaire": 2800000, "acompte": 500000, "modePaiement": "COMPTANT",
+	}
+	statut, body = qualificationEnvoi(direction, http.MethodPost, "/api/v1/ventes", vente)
+	direction.attend(statut, http.StatusCreated, "vente saisie", body)
+
+	var statutFiche, parcours string
+	if err := b.pool.QueryRow(b.ctx, `SELECT p."statut"::text, j."statut"::text FROM "prospects" p
+		JOIN "prospect_journeys" j ON j."prospectId" = p."id" AND j."projet" = p."projet" WHERE p."id" = $1`, fiche).Scan(&statutFiche, &parcours); err != nil {
+		t.Fatal(err)
+	}
+	if statutFiche != "VENDU" || parcours != "VENDU" {
+		t.Fatalf("une vente vaut conversion : %s %s", statutFiche, parcours)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/clients", nil)
+	b.attend(statut, http.StatusOK, "clients", body)
+	items, _ := body["items"].([]any)
+	client, _ := items[0].(map[string]any)
+	rapprochee, _ := client["vente"].(bool)
+	if len(items) != 1 || !rapprochee || client["site"] != "THIEO" || client["prixTotal"] != float64(2800000) {
+		t.Fatalf("la vente se lit chez le téléconseiller : %v", items)
+	}
 }

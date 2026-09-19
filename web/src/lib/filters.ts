@@ -40,6 +40,7 @@ export const EMPTY_FILTERS: ProspectFilters = {
   enrollmentMethod: null,
   enrollmentCapturedById: null,
   revue: null,
+  sansMotif: null,
   dateFrom: null,
   dateTo: null,
   page: 1,
@@ -89,6 +90,7 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
     enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
     revue: readFrenchBoolean(params, 'revue'),
+    sansMotif: readString(params, 'sansMotif'),
     dateFrom: readIsoDate(params, 'dateFrom'),
     dateTo: readIsoDate(params, 'dateTo'),
     page: readPositiveInt(params, 'page', 1),
@@ -119,6 +121,7 @@ export function serializeProspectFilters(filters: ProspectFilters): URLSearchPar
   put('enrollmentMethod', filters.enrollmentMethod);
   put('enrollmentCapturedById', filters.enrollmentCapturedById);
   if (filters.revue !== null) put('revue', filters.revue ? 'oui' : 'non');
+  put('sansMotif', filters.sansMotif);
   put('dateFrom', filters.dateFrom);
   put('dateTo', filters.dateTo);
   if (filters.page !== 1) put('page', String(filters.page));

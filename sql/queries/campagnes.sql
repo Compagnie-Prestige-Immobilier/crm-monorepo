@@ -246,11 +246,12 @@ LEFT JOIN hors_attribution h ON h.id = m.id
 ORDER BY m.name ASC;
 
 -- name: LotAttemptsRepresentants :many
-SELECT a."id", r."phoneE164", a."outcome"::text AS outcome, a."comment",
+SELECT a."id", r."phoneE164", sq."label" AS "statutLabel", a."comment",
        u."fullName" AS "performedByName", a."createdAt"
 FROM "rep_call_attempts" a
 INNER JOIN "representants" r ON r."id" = a."representantId"
 INNER JOIN "users" u ON u."id" = a."performedById"
+INNER JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
 WHERE a."clientCreatedAt" >= $2
   AND EXISTS (
     SELECT 1 FROM "lot_export_items" i
@@ -260,14 +261,14 @@ ORDER BY a."clientCreatedAt" DESC, a."id" DESC
 LIMIT 50;
 
 -- name: LotAttemptsProspects :many
-SELECT a."id", p."phoneE164", a."outcome"::text AS outcome, cr."label" AS "reasonLabel",
+SELECT a."id", p."phoneE164", cr."label" AS "reasonLabel",
        COALESCE(a."method"::text, '')::text AS method,
        a."comment", u."fullName" AS "performedByName", a."createdAt", a."email",
        a."fonctionnaire", a."engagementEnCours", a."dureeEtablissementMois", a."rendezVousAt"
 FROM "call_attempts" a
 INNER JOIN "prospects" p ON p."id" = a."prospectId"
 INNER JOIN "users" u ON u."id" = a."performedById"
-LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
+INNER JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 WHERE a."clientCreatedAt" >= $2
   AND EXISTS (
     SELECT 1 FROM "lot_export_items" i
@@ -312,11 +313,7 @@ WHERE i."lotId" = $1
 -- name: LotFichesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName",
        p."id" AS "ficheId", p."nom", p."prenom", p."phoneE164",
-       COALESCE(p."lastCallOutcome"::text, '')::text AS "lastCallOutcome",
-       (SELECT cr."label" FROM "call_attempts" a
-        LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
-        WHERE a."prospectId" = p."id"
-        ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1) AS "lastReasonLabel"
+       COALESCE((SELECT cr."label" FROM "call_outcome_reasons" cr WHERE cr."id" = p."lastReasonId"), '')::text AS "lastReasonLabel"
 FROM "lot_export_items" i
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
@@ -397,7 +394,7 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('ief_id')::text IS NULL OR r."iefId" = sqlc.narg('ief_id'))
   AND (sqlc.narg('relation_status')::"RepresentantRelation" IS NULL OR r."relationStatus" = sqlc.narg('relation_status'))
   AND (NOT sqlc.arg('injoignables')::boolean
-       OR (r."lastCallOutcome" = 'UNREACHABLE' AND sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL));
+       OR (sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL));
 
 -- name: TirerRepresentantsCible :many
 SELECT r."id"
@@ -408,7 +405,7 @@ WHERE r."deletedAt" IS NULL
   AND (sqlc.narg('ief_id')::text IS NULL OR r."iefId" = sqlc.narg('ief_id'))
   AND (sqlc.narg('relation_status')::"RepresentantRelation" IS NULL OR r."relationStatus" = sqlc.narg('relation_status'))
   AND (NOT sqlc.arg('injoignables')::boolean
-       OR (r."lastCallOutcome" = 'UNREACHABLE' AND sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL))
+       OR (sq."effect" = 'UNREACHABLE' AND sq."retryAfterMinutes" IS NOT NULL))
 ORDER BY r."id" ASC
 LIMIT sqlc.arg('places');
 
@@ -431,7 +428,8 @@ WHERE p."deletedAt" IS NULL
            AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
-  AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
+  AND (NOT sqlc.arg('injoignables')::boolean
+       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"))
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
   -- ne se retire pas : deux attributaires appelleraient la même personne.
   AND (sqlc.arg('injoignables')::boolean
@@ -460,7 +458,8 @@ WHERE p."deletedAt" IS NULL
            AND EXISTS (SELECT 1 FROM "import_jobs" ja JOIN "import_jobs" jb ON jb."fileName" = ja."fileName"
                        WHERE ja."id" = sqlc.narg('import_job_id')::text AND jb."id" = p."importJobId")))
   AND (sqlc.narg('import_feuille')::text IS NULL OR p."importFeuille" = sqlc.narg('import_feuille'))
-  AND (NOT sqlc.arg('injoignables')::boolean OR p."lastCallOutcome" = 'UNREACHABLE')
+  AND (NOT sqlc.arg('injoignables')::boolean
+       OR EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached"))
   -- Hors relance des injoignables, une fiche déjà appelée ou déjà distribuée
   -- ne se retire pas : deux attributaires appelleraient la même personne.
   AND (sqlc.arg('injoignables')::boolean
@@ -503,3 +502,27 @@ VALUES ($1, $2, $3, $4, $5, $6, $7);
 
 -- name: ResoudreSuggestion :exec
 UPDATE "representant_suggestions" SET "resolvedRepresentantId" = $2 WHERE "id" = $1;
+
+-- name: LotsActifsDeLaFiche :many
+SELECT i."lotId", i."position"
+FROM "lot_export_items" i
+JOIN "lots_export" l ON l."id" = i."lotId" AND l."pausedAt" IS NULL
+WHERE (sqlc.narg('prospect_id')::text IS NOT NULL AND i."prospectId" = sqlc.narg('prospect_id')::text)
+   OR (sqlc.narg('representant_id')::text IS NOT NULL AND i."representantId" = sqlc.narg('representant_id')::text)
+ORDER BY l."createdAt" ASC, i."position" ASC;
+
+-- name: AjouterFicheAuLot :one
+INSERT INTO "lot_export_items" ("lotId", "representantId", "prospectId", "position", "assigneeId", "day")
+SELECT @lot_id, sqlc.narg('representant_id'), sqlc.narg('prospect_id'),
+       COALESCE(MAX(i."position"), 0) + 1, @assignee_id, 1
+FROM "lot_export_items" i WHERE i."lotId" = @lot_id
+RETURNING "position";
+
+-- name: IncrementerItemCount :exec
+UPDATE "lots_export" SET "itemCount" = "itemCount" + 1 WHERE "id" = $1;
+
+-- name: LotChargeParMembre :many
+SELECT i."assigneeId", COUNT(*)::int AS fiches
+FROM "lot_export_items" i
+WHERE i."lotId" = $1 AND i."assigneeId" IS NOT NULL
+GROUP BY i."assigneeId";

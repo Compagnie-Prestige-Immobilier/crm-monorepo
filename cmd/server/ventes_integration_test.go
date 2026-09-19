@@ -4,8 +4,10 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 	"time"
 
@@ -64,6 +66,119 @@ func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	connecte(superviseur)
 	statut, reponse = superviseur.appel(http.MethodGet, "/api/v1/ventes", nil, false)
 	superviseur.attend(statut, http.StatusForbidden, "lecture par un superviseur", reponse)
+}
+
+func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	client := "CLIENT SAISIE " + b.userID[:8]
+	var venteID int64
+	t.Cleanup(func() {
+		if venteID != 0 {
+			b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+		}
+	})
+
+	statut, configuration := appelJSON(b, http.MethodGet, "/api/v1/ventes/configuration", nil, nil)
+	b.attend(statut, http.StatusOK, "configuration des ventes", configuration)
+	if len(configuration["sites"].([]any)) == 0 || len(configuration["canaux"].([]any)) == 0 {
+		t.Fatalf("la configuration doit proposer des sites et des canaux : %v", configuration)
+	}
+	exigerCanauxVentes(t, configuration["canaux"].([]any))
+
+	corps := map[string]any{
+		"canal": "CPI", "dateSouscription": "2026-09-18", "client": client,
+		"telephone": "77 000 00 88", "site": "THIEO", "nombreLots": 2,
+		"numerosLots": "2001 - 2002", "superficie": "225 m²", "prixUnitaire": 2800000,
+		"acompte": 500000, "modePaiement": "CREDIT", "nombreMois": 12,
+	}
+	venteID = venteSaisieCalculee(t, b, corps)
+
+	statut, liste := appelJSON(b, http.MethodGet, "/api/v1/ventes", nil, nil)
+	b.attend(statut, http.StatusOK, "lecture de la vente saisie", liste)
+	if len(liste["ventes"].([]any)) == 0 {
+		t.Fatalf("la vente saisie doit apparaître dans la liste : %v", liste)
+	}
+
+	corps["client"] = client + " MODIFIE"
+	corps["acompte"] = 900000
+	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
+	b.attend(statut, http.StatusOK, "modification de la vente", vente)
+	if !strings.EqualFold(fmt.Sprint(vente["client"]), client+" MODIFIE") || vente["acompte"] != float64(900000) {
+		t.Fatalf("vente modifiée : %v", vente)
+	}
+
+	statut, vente = appelJSON(b, http.MethodPost, fmt.Sprintf("/api/v1/ventes/%d/versements", venteID), map[string]any{
+		"date": "2026-09-19", "montant": 4700000,
+	}, nil)
+	b.attend(statut, http.StatusCreated, "ajout du versement dans le détail", vente)
+	versements, _ := vente["versements"].([]any)
+	if soldee, _ := vente["soldee"].(bool); len(versements) != 1 || !soldee || vente["reliquat"] != float64(0) {
+		t.Fatalf("vente soldée après le versement : %v", vente)
+	}
+	venteArchiveePuisSoldee(t, b, venteID, corps)
+}
+
+func venteSaisieCalculee(t *testing.T, b *banc, corps map[string]any) int64 {
+	t.Helper()
+	statut, vente := appelJSON(b, http.MethodPost, "/api/v1/ventes", corps, nil)
+	b.attend(statut, http.StatusCreated, "création d’une vente", vente)
+	versements, _ := vente["versements"].([]any)
+	if vente["origine"] != "SAISIE" || vente["prixTotal"] != float64(5600000) || vente["reliquat"] != float64(5100000) || vente["modePaiement"] != "CREDIT" || vente["nombreMois"] != float64(12) || len(versements) != 0 {
+		t.Fatalf("calcul de la vente : %v", vente)
+	}
+	return int64(vente["id"].(float64))
+}
+
+func venteArchiveePuisSoldee(t *testing.T, b *banc, venteID int64, corps map[string]any) {
+	t.Helper()
+	statut, _ := appelJSON(b, http.MethodDelete, fmt.Sprintf("/api/v1/ventes/%d", venteID), nil, nil)
+	b.attend(statut, http.StatusNoContent, "archivage de la vente", nil)
+	statut, liste := appelJSON(b, http.MethodGet, "/api/v1/ventes", nil, nil)
+	b.attend(statut, http.StatusOK, "liste après archivage", liste)
+	if venteDansListe(liste["ventes"].([]any), venteID) {
+		t.Fatalf("la vente archivée ne doit plus être active : %v", liste)
+	}
+
+	statut, vente := appelJSON(b, http.MethodPost, fmt.Sprintf("/api/v1/ventes/%d/restaurer", venteID), nil, nil)
+	b.attend(statut, http.StatusOK, "restauration de la vente", vente)
+	if int64(vente["id"].(float64)) != venteID {
+		t.Fatalf("vente restaurée : %v", vente)
+	}
+	corps["modePaiement"] = "COMPTANT"
+	delete(corps, "nombreMois")
+	corps["acompte"] = 100000
+	corps["marquerSoldee"] = true
+	statut, vente = appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
+	b.attend(statut, http.StatusOK, "forçage explicite du statut soldée", vente)
+	soldee, _ := vente["soldee"].(bool)
+	manuellement, _ := vente["soldeeManuellement"].(bool)
+	if !soldee || !manuellement {
+		t.Fatalf("la vente doit être soldée après confirmation explicite : %v", vente)
+	}
+}
+
+func venteDansListe(elements []any, id int64) bool {
+	for _, element := range elements {
+		if element.(map[string]any)["id"] == float64(id) {
+			return true
+		}
+	}
+	return false
+}
+
+func exigerCanauxVentes(t *testing.T, elements []any) {
+	t.Helper()
+	canaux := map[string]bool{}
+	for _, element := range elements {
+		canal := element.(map[string]any)
+		canaux[canal["libelle"].(string)] = true
+	}
+	for _, libelle := range []string{"CPI", "DMN", "BDD CPI", "BDD PERSO.", "SPONTANNE", "MARKETING", "BDD DEPLOIEMENT"} {
+		if !canaux[libelle] {
+			t.Fatalf("canal manquant dans la configuration : %s (%v)", libelle, canaux)
+		}
+	}
 }
 
 func TestProspectVenteFermeLeParcoursEtRapprocheLeClasseur(t *testing.T) {

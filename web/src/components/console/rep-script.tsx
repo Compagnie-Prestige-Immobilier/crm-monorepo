@@ -57,7 +57,6 @@ import {
   statutsDeLaBranche,
   statutsRacine,
   type StatutQualification,
-  type StatutQualificationEffect,
 } from '@/lib/data/statuts-qualification';
 import { formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
@@ -69,18 +68,6 @@ import { cn } from '@/lib/utils';
 
 /** L'appel a abouti, ou non. Ce qu'il a donné se dit ensuite, au statut. */
 type Resultat = 'JOIGNABLE' | 'INJOIGNABLE';
-
-const OUTCOME_PAR_EFFET: Record<StatutQualificationEffect, RepAnswer['outcome']> = {
-  REACHED: 'REACHED',
-  REFUSED: 'REFUSED',
-  SCHEDULE_CALLBACK: 'CALLBACK',
-  UNREACHABLE: 'UNREACHABLE',
-  WRONG_NUMBER: 'WRONG_NUMBER',
-};
-
-/** Le serveur dérive la même issue et refuse celle qui le contredit. */
-const outcomeDuStatut = (effect: StatutQualificationEffect): RepAnswer['outcome'] =>
-  OUTCOME_PAR_EFFET[effect];
 
 const KEYBOARD_MAP: readonly (readonly [string, string])[] = [
   ['1 à 9', 'Répondre'],
@@ -729,7 +716,6 @@ function EnTeteRepresentant({ representant }: { representant: ScriptedRepresenta
           status={representant.relationStatus}
           label={representant.statutQualificationLabel}
           effect={representant.statutQualificationEffect}
-          lastCallOutcome={representant.lastCallOutcome}
         />
       </div>
 
@@ -886,7 +872,6 @@ function champsSuggestion(etat: EtatReponse): Partial<RepAnswer> {
 /** Chaque champ voyage seul : ce que la question n'a pas posé ne part pas. */
 function reponseDe(etat: EtatReponse): RepAnswer {
   return {
-    outcome: outcomeDuStatut(etat.statut.effect),
     statutQualificationId: etat.statut.id,
     ...champsRelation(etat),
     ...champsJoignable(etat),

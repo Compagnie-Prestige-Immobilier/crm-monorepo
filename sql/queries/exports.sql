@@ -38,7 +38,7 @@ SELECT
     WHEN 'AUTRE_NUMERO' THEN r."whatsappE164"
   END, '')::text AS whatsapp,
   r."profession", r."syndicat", r."connaitUES", r."contacte", r."notes",
-  COALESCE(r."lastCallOutcome"::text, '')::text AS derniere_issue, r."lastCallAt",
+  COALESCE(sq."label", '')::text AS derniere_issue, r."lastCallAt",
   lb."fullName" AS dernier_appel_par, r."lastCallById",
   r."nextCallbackAt", COALESCE(r."nextCallbackOrigine"::text, '')::text AS relance_origine,
   r."clientCreatedAt", r."createdAt", r."updatedAt",
@@ -107,14 +107,14 @@ LIMIT 1000;
 SELECT
   a."id", a."prospectId", p."prenom", p."nom", p."phoneE164",
   u."fullName" AS teleconseiller, a."performedById", a."clientCreatedAt",
-  a."outcome"::text AS issue, rs."label" AS motif, a."comment",
+  rs."label" AS motif, a."comment",
   COALESCE(a."method"::text, '')::text AS methode, a."rendezVousAt", a."email",
   a."fonctionnaire", a."engagementEnCours", a."dureeEtablissementMois",
   a."deviceCallType", a."deviceCallDurationSeconds", a."deviceCallAt", a."createdAt"
 FROM "call_attempts" a
 INNER JOIN "prospects" p ON p."id" = a."prospectId"
 INNER JOIN "users" u ON u."id" = a."performedById"
-LEFT JOIN "call_outcome_reasons" rs ON rs."id" = a."reasonId"
+INNER JOIN "call_outcome_reasons" rs ON rs."id" = a."reasonId"
 WHERE p."deletedAt" IS NULL AND (sqlc.narg('apres')::text IS NULL OR a."id" > sqlc.narg('apres')::text)
 ORDER BY a."id" ASC
 LIMIT 1000;
@@ -123,14 +123,14 @@ LIMIT 1000;
 SELECT
   a."id", a."representantId", r."fullName", r."phoneE164",
   u."fullName" AS teleconseiller, a."performedById", a."clientCreatedAt",
-  a."outcome"::text AS issue, a."comment", a."promisedProspects", a."callbackAt",
+  a."comment", a."callbackAt",
   a."etablissementConfirme", a."numeroConfirme", a."contacte", a."connaitUES",
   a."syndicat", sq."label" AS qualification,
   a."deviceCallType", a."deviceCallDurationSeconds", a."deviceCallAt", a."createdAt"
 FROM "rep_call_attempts" a
 INNER JOIN "representants" r ON r."id" = a."representantId"
 INNER JOIN "users" u ON u."id" = a."performedById"
-LEFT JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
+INNER JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
 WHERE r."deletedAt" IS NULL AND (sqlc.narg('apres')::text IS NULL OR a."id" > sqlc.narg('apres')::text)
 ORDER BY a."id" ASC
 LIMIT 1000;
@@ -149,13 +149,15 @@ LIMIT 1000;
 SELECT
   i."position", i."day", i."prospectId", i."representantId",
   p."prenom", p."nom", p."phoneE164" AS prospect_phone,
-  COALESCE(p."lastCallOutcome"::text, '')::text AS prospect_issue, p."lastCallAt" AS prospect_appel,
+  COALESCE(pr."label", '')::text AS prospect_issue, p."lastCallAt" AS prospect_appel,
   r."fullName", r."phoneE164" AS representant_phone,
-  COALESCE(r."lastCallOutcome"::text, '')::text AS representant_issue, r."lastCallAt" AS representant_appel,
+  COALESCE(sq."label", '')::text AS representant_issue, r."lastCallAt" AS representant_appel,
   u."fullName" AS assigne, i."assigneeId", COALESCE(u."role"::text, '')::text AS role
 FROM "lot_export_items" i
 LEFT JOIN "prospects" p ON p."id" = i."prospectId" AND p."deletedAt" IS NULL
+LEFT JOIN "call_outcome_reasons" pr ON pr."id" = p."lastReasonId"
 LEFT JOIN "representants" r ON r."id" = i."representantId" AND r."deletedAt" IS NULL
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 WHERE i."lotId" = $1 AND i."position" > $2 AND (p."id" IS NOT NULL OR r."id" IS NOT NULL)
 ORDER BY i."position" ASC

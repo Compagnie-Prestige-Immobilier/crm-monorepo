@@ -246,8 +246,8 @@ func TestCampagneStatsComptentUneTentativePosterieure(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := b.pool.Exec(b.ctx,
-		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
-		 VALUES ($1,$2,$3,'REACHED',now())`,
+		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt")
+		 SELECT $1,$2,$3,"id",now() FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT'`,
 		uuid.NewString(), fiche, b.agentA); err != nil {
 		t.Fatal(err)
 	}
@@ -313,8 +313,9 @@ func TestCampagneReaffectationConfieUneFicheTraitee(t *testing.T) {
 	appelee := b.positionsDe(b.agentA)[0]
 	tentative := uuid.NewString()
 	if _, err := b.pool.Exec(b.ctx,
-		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
-		 SELECT $1, "representantId", $2, 'REACHED', now() FROM "lot_export_items" WHERE "lotId" = $3 AND "position" = $4`,
+		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt")
+		 SELECT $1, "representantId", $2, (SELECT "id" FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT'), now()
+		   FROM "lot_export_items" WHERE "lotId" = $3 AND "position" = $4`,
 		tentative, b.agentA, b.lotID, appelee); err != nil {
 		t.Fatal(err)
 	}
@@ -401,8 +402,8 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 		t.Fatal(err)
 	}
 	if _, err := b.pool.Exec(b.ctx,
-		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
-		 VALUES ($1,$2,$3,'REACHED',now())`,
+		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt")
+		 SELECT $1,$2,$3,"id",now() FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT'`,
 		uuid.NewString(), fiche, b.agentA); err != nil {
 		t.Fatal(err)
 	}
@@ -608,9 +609,10 @@ func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut st
 	id := uuid.NewString()
 	if _, err := b.pool.Exec(b.ctx,
 		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","clientCreatedAt","projet","updatedAt",
-		                          "importFeuille","lastCallOutcome","lastCallAt","statut")
-		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,$6::"CallOutcome",
-		         CASE WHEN $6::"CallOutcome" IS NULL THEN NULL ELSE now() END,$7::"ProspectStatut")`,
+		                          "importFeuille","lastReasonId","lastCallAt","statut")
+		 VALUES ($1,'Sarr','Mame',$2,$3,now(),$4::"Projet",now(),$5,
+		         (SELECT "id" FROM "call_outcome_reasons" WHERE "code" = $6::text),
+		         CASE WHEN $6::text IS NULL THEN NULL ELSE now() END,$7::"ProspectStatut")`,
 		id, "+2217"+id[:8], b.userID, projet, feuille, issue, statut); err != nil {
 		b.t.Fatal(err)
 	}
@@ -633,7 +635,7 @@ func (b *bancCampagne) prospect(feuille, projet string, issue *string, statut st
 func TestCampagneProspectsTousProjetsEtInjoignables(t *testing.T) {
 	b := nouveauBancCampagne(t, 0)
 	feuille := "Feuille " + uuid.NewString()
-	injoignable := "UNREACHABLE"
+	injoignable := "PAS_DE_REPONSE"
 	jamaisAppelee := b.prospect(feuille, "CHUES", nil, "NOUVEAU")
 	aRelancer := b.prospect(feuille, "CHUES", &injoignable, "NOUVEAU")
 	b.prospect(feuille, "CHUES", &injoignable, "PERDU")

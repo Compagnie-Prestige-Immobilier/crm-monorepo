@@ -29,19 +29,20 @@ type service struct{ *socle.Deps }
 var lecteurs = socle.PermissionVentesLire
 
 var Garde = map[string]socle.Permission{
-	"GET /api/v1/ventes":                  lecteurs,
-	"POST /api/v1/ventes":                 lecteurs,
-	"PATCH /api/v1/ventes/{id}":           lecteurs,
-	"DELETE /api/v1/ventes/{id}":          lecteurs,
-	"POST /api/v1/ventes/{id}/restaurer":  lecteurs,
-	"POST /api/v1/ventes/classeur":        lecteurs,
-	"GET /api/v1/ventes/classeur/fichier": lecteurs,
-	"GET /api/v1/ventes/configuration":    lecteurs,
-	"POST /api/v1/ventes/sites":            lecteurs,
-	"PATCH /api/v1/ventes/sites/{id}":     lecteurs,
-	"POST /api/v1/ventes/sites/{id}/active": lecteurs,
-	"POST /api/v1/ventes/canaux":           lecteurs,
-	"PATCH /api/v1/ventes/canaux/{id}":    lecteurs,
+	"GET /api/v1/ventes":                     lecteurs,
+	"POST /api/v1/ventes":                    lecteurs,
+	"PATCH /api/v1/ventes/{id}":              lecteurs,
+	"POST /api/v1/ventes/{id}/versements":    lecteurs,
+	"DELETE /api/v1/ventes/{id}":             lecteurs,
+	"POST /api/v1/ventes/{id}/restaurer":     lecteurs,
+	"POST /api/v1/ventes/classeur":           lecteurs,
+	"GET /api/v1/ventes/classeur/fichier":    lecteurs,
+	"GET /api/v1/ventes/configuration":       lecteurs,
+	"POST /api/v1/ventes/sites":              lecteurs,
+	"PATCH /api/v1/ventes/sites/{id}":        lecteurs,
+	"POST /api/v1/ventes/sites/{id}/active":  lecteurs,
+	"POST /api/v1/ventes/canaux":             lecteurs,
+	"PATCH /api/v1/ventes/canaux/{id}":       lecteurs,
 	"POST /api/v1/ventes/canaux/{id}/active": lecteurs,
 }
 
@@ -59,11 +60,16 @@ func Monter(api huma.API, d *socle.Deps) {
 	}, s.creer)
 	huma.Register(api, huma.Operation{
 		OperationID: "updateVente", Method: http.MethodPatch, Path: "/api/v1/ventes/{id}",
-		Summary: "Corrige une vente et ses versements.",
+		Summary: "Corrige une vente.",
 	}, s.corriger)
 	huma.Register(api, huma.Operation{
+		OperationID: "addVenteVersement", Method: http.MethodPost, Path: "/api/v1/ventes/{id}/versements",
+		DefaultStatus: http.StatusCreated, Summary: "Ajoute un versement au détail d’une vente.",
+	}, s.ajouterVersement)
+	huma.Register(api, huma.Operation{
 		OperationID: "archiveVente", Method: http.MethodDelete, Path: "/api/v1/ventes/{id}",
-		Summary: "Archive une vente sans supprimer son historique.",
+		DefaultStatus: http.StatusNoContent,
+		Summary:       "Archive une vente sans supprimer son historique.",
 	}, s.archiver)
 	huma.Register(api, huma.Operation{
 		OperationID: "restoreVente", Method: http.MethodPost, Path: "/api/v1/ventes/{id}/restaurer",
@@ -91,27 +97,31 @@ type VersementDTO struct {
 }
 
 type VenteDTO struct {
-	ID               int64          `json:"id"`
-	Origine          string         `json:"origine"`
-	Numero           int32          `json:"numero"`
-	Canal            string         `json:"canal"`
-	DateSouscription *string        `json:"dateSouscription"`
-	Client           string         `json:"client"`
-	Telephone        string         `json:"telephone"`
-	Site             string         `json:"site"`
-	NombreLots       int32          `json:"nombreLots"`
-	NumerosLots      string         `json:"numerosLots"`
-	Superficie       string         `json:"superficie"`
-	PrixUnitaire     int64          `json:"prixUnitaire"`
-	PrixTotal        int64          `json:"prixTotal"`
-	Acompte          int64          `json:"acompte"`
-	Reliquat         int64          `json:"reliquat"`
-	PartProprietaire int64          `json:"partProprietaire"`
-	PartApporteur    int64          `json:"partApporteur"`
-	PartCpi          int64          `json:"partCpi"`
-	Versements       []VersementDTO `json:"versements"`
-	ProspectID       *string        `json:"prospectId"`
-	Teleconseiller   *string        `json:"teleconseiller"`
+	ID                 int64          `json:"id"`
+	Origine            string         `json:"origine"`
+	Numero             int32          `json:"numero"`
+	Canal              string         `json:"canal"`
+	DateSouscription   *string        `json:"dateSouscription"`
+	Client             string         `json:"client"`
+	Telephone          string         `json:"telephone"`
+	Site               string         `json:"site"`
+	NombreLots         int32          `json:"nombreLots"`
+	NumerosLots        string         `json:"numerosLots"`
+	Superficie         string         `json:"superficie"`
+	PrixUnitaire       int64          `json:"prixUnitaire"`
+	PrixTotal          int64          `json:"prixTotal"`
+	Acompte            int64          `json:"acompte"`
+	Reliquat           int64          `json:"reliquat"`
+	ModePaiement       string         `json:"modePaiement"`
+	NombreMois         *int32         `json:"nombreMois"`
+	SoldeeManuellement bool           `json:"soldeeManuellement"`
+	Soldee             bool           `json:"soldee"`
+	PartProprietaire   int64          `json:"partProprietaire"`
+	PartApporteur      int64          `json:"partApporteur"`
+	PartCpi            int64          `json:"partCpi"`
+	Versements         []VersementDTO `json:"versements"`
+	ProspectID         *string        `json:"prospectId"`
+	Teleconseiller     *string        `json:"teleconseiller"`
 }
 
 // Le classement par téléconseiller jusqu'à qui a amené le client : seules les
@@ -265,10 +275,8 @@ func marquerProspectsVendus(ctx context.Context, q *db.Queries, userID string, t
 	if err != nil {
 		return err
 	}
+	// Une vente validée vaut conversion : la fiche passe vendue quel que soit son statut.
 	for _, p := range prospects {
-		if p.Statut != db.ProspectStatutCONVERTI {
-			continue
-		}
 		lignes, err := q.MarquerProspectVendu(ctx, p.ID)
 		if err != nil {
 			return err
@@ -276,8 +284,11 @@ func marquerProspectsVendus(ctx context.Context, q *db.Queries, userID string, t
 		if lignes == 0 {
 			continue
 		}
+		if err := q.MarquerParcoursVendu(ctx, p.ID); err != nil {
+			return err
+		}
 		if err := database.Auditer(ctx, q, userID, "prospect.vendre", "prospect", p.ID,
-			map[string]any{"statut": string(db.ProspectStatutCONVERTI)},
+			map[string]any{"statut": string(p.Statut)},
 			map[string]any{"statut": string(db.ProspectStatutVENDU)}); err != nil {
 			return err
 		}
@@ -289,12 +300,18 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 	if versements == nil {
 		versements = []VersementDTO{}
 	}
+	encaisse := v.Acompte
+	for _, versement := range versements {
+		encaisse += versement.Montant
+	}
 	return VenteDTO{
 		ID: v.ID, Origine: v.Origine, Numero: v.Numero, Canal: v.Canal, DateSouscription: jourOuNul(v.DateSouscription), Client: v.Client,
 		Telephone: v.Telephone, Site: v.Site, NombreLots: v.NombreLots, NumerosLots: v.NumerosLots,
 		Superficie: v.Superficie, PrixUnitaire: v.PrixUnitaire, PrixTotal: v.PrixTotal, Acompte: v.Acompte,
-		Reliquat: v.Reliquat, PartProprietaire: v.PartProprietaire, PartApporteur: v.PartApporteur,
-		PartCpi: v.PartCpi, Versements: versements,
+		Reliquat: v.Reliquat, ModePaiement: v.ModePaiement, NombreMois: v.NombreMois,
+		SoldeeManuellement: v.SoldeeManuellement, Soldee: v.SoldeeManuellement || encaisse >= v.PrixTotal,
+		PartProprietaire: v.PartProprietaire,
+		PartApporteur:    v.PartApporteur, PartCpi: v.PartCpi, Versements: versements,
 	}
 }
 
