@@ -39,14 +39,15 @@ test.beforeAll(async () => {
       );
     }
     await client.query(
-      `INSERT INTO call_attempts (id, "prospectId", "performedById", outcome, comment,
+      `INSERT INTO call_attempts (id, "prospectId", "performedById", comment,
                                   "clientCreatedAt", "reasonId")
-       SELECT $1, $2, $3, 'OTHER', $4, now(), r.id
+       SELECT $1, $2, $3, $4, now(), r.id
          FROM call_outcome_reasons r WHERE r.code = 'DEMANDE_INFORMATION'`,
       [randomUUID(), interesse.id, teleconseiller.id, COMMENTAIRE],
     );
     await client.query(
-      `UPDATE prospects SET "lastCallAt" = now(), "lastCallOutcome" = 'OTHER', "lastCallById" = $2
+      `UPDATE prospects SET "lastCallAt" = now(), "lastCallById" = $2,
+              "lastReasonId" = (SELECT id FROM call_outcome_reasons WHERE code = 'DEMANDE_INFORMATION')
         WHERE id = $1`,
       [interesse.id, teleconseiller.id],
     );

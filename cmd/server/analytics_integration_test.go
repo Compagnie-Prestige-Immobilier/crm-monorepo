@@ -94,13 +94,16 @@ func analyticsProspect(b *banc, jeu *jeuAnalytics, proprietaire, quand string, m
 
 func analyticsAppel(b *banc, prospect, issue string) {
 	b.t.Helper()
-	methode := any(nil)
-	if issue == "METHOD_OBTAINED" {
-		methode = "WHATSAPP"
+	methode, motif := any(nil), "PAS_DE_REPONSE"
+	switch issue {
+	case "METHOD_OBTAINED":
+		methode, motif = "WHATSAPP", "INTERESSE"
+	case "REACHED":
+		motif = "DEMANDE_INFORMATION"
 	}
-	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","method","clientCreatedAt")
-		VALUES ($1,$2,$3,$4::"CallOutcome",$5::"EnrollmentMethod",$6::timestamp)`,
-		uuid.NewString(), prospect, b.userID, issue, methode, instantAnalytics)
+	analyticsExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","method","clientCreatedAt")
+		SELECT $1,$2,$3,"id",$5::"EnrollmentMethod",$6::timestamp FROM "call_outcome_reasons" WHERE "code" = $4`,
+		uuid.NewString(), prospect, b.userID, motif, methode, instantAnalytics)
 }
 
 func analyticsViderCache() {
@@ -358,20 +361,22 @@ func TestSupervisionActiviteDeLaFenetre(t *testing.T) {
 	jeu := analyticsSemer(b)
 	joint := analyticsProspect(b, &jeu, b.userID, instantAnalytics, true)
 	perdu := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
+	sansSuite := analyticsProspect(b, &jeu, b.userID, instantAnalytics, false)
 	analyticsAppel(b, joint, "METHOD_OBTAINED")
 	analyticsAppel(b, perdu, "UNREACHABLE")
+	analyticsAppel(b, sansSuite, "REACHED")
 
 	fenetre := "?commercialId=" + b.userID + "&actFrom=" + jourAnalytics + "&actTo=" + jourAnalytics
 	statut, body := b.appel(http.MethodGet, "/api/v1/supervision/activite"+fenetre, nil, false)
 	b.attend(statut, http.StatusOK, "activité", body)
 	totaux := analyticsObjet(b, "totaux", body["totals"])
-	analyticsEgal(b, "appels", totaux["calls"], 2)
+	analyticsEgal(b, "appels", totaux["calls"], 3)
 	analyticsEgal(b, "méthodes obtenues", totaux["methodObtained"], 1)
 	analyticsEgal(b, "injoignables", totaux["unreachable"], 1)
-	analyticsEgal(b, "seule l'issue UNREACHABLE sort du numérateur", totaux["reachRate"], 50)
-	analyticsEgal(b, "fiches de la fenêtre", totaux["fiches"], 2)
-	analyticsEgal(b, "fiches jointes", totaux["fichesJointes"], 1)
-	analyticsEgal(b, "fiches saisies", totaux["prospectsCreated"], 2)
+	analyticsEgal(b, "seul un motif qui ne compte pas comme joint sort du numérateur", totaux["reachRate"], 66.7)
+	analyticsEgal(b, "fiches de la fenêtre", totaux["fiches"], 3)
+	analyticsEgal(b, "fiches jointes", totaux["fichesJointes"], 2)
+	analyticsEgal(b, "fiches saisies", totaux["prospectsCreated"], 3)
 
 	ligne := analyticsObjet(b, "ligne", analyticsListe(b, "une ligne par agent et par jour", body["items"], 1)[0])
 	analyticsTexte(b, "téléconseiller de la ligne", ligne["teleconseillerId"], b.userID)
@@ -505,8 +510,8 @@ func TestSupervisionActiviteParCampagneRepresentants(t *testing.T) {
 	analyticsExec(b, `INSERT INTO "lot_export_items" ("lotId","representantId","position","assigneeId","day")
 		VALUES ($1,$2,1,$3,1)`, lot, jeu.representant, b.userID)
 	for _, representant := range []string{jeu.representant, horsCampagne} {
-		analyticsExec(b, `INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","clientCreatedAt")
-			VALUES ($1,$2,$3,'REACHED'::"RepCallOutcome",$4::timestamp)`,
+		analyticsExec(b, `INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt")
+			SELECT $1,$2,$3,"id",$4::timestamp FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT'`,
 			uuid.NewString(), representant, b.userID, instantAnalytics)
 	}
 	t.Cleanup(func() {
@@ -540,7 +545,8 @@ func TestQualiteBaseCompteUnAppelSansStatutPose(t *testing.T) {
 	b.attend(statut, http.StatusOK, "qualité de la base", body)
 	avant := analyticsNombre(b, body["joints"], "joints avant l'appel")
 
-	analyticsExec(b, `UPDATE "representants" SET "lastCallAt" = now(), "lastCallById" = $2, "lastCallOutcome" = 'REACHED'
+	analyticsExec(b, `UPDATE "representants" SET "lastCallAt" = now(), "lastCallById" = $2,
+	                  "statutQualificationId" = (SELECT "id" FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT')
 	                  WHERE "id" = $1`, jeu.representant, b.userID)
 	analytics.PerimerCache()
 	statut, body = b.appel(http.MethodGet, chemin, nil, false)

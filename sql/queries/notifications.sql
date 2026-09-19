@@ -288,13 +288,15 @@ SELECT
     WHERE ca."performedById" IN (SELECT "id" FROM agents)
       AND ca."clientCreatedAt" >= @debut AND ca."clientCreatedAt" <= @fin)::int AS appels,
   (SELECT count(*) FROM "call_attempts" ca
-    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND ca."outcome" = 'METHOD_OBTAINED'
+    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND ca."method" IS NOT NULL
       AND ca."clientCreatedAt" >= @debut AND ca."clientCreatedAt" <= @fin)::int AS methodes,
   (SELECT count(*) FROM "call_attempts" ca
-    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND ca."outcome" = 'UNREACHABLE'
+    JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
+    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND NOT cr."countsAsReached"
       AND ca."clientCreatedAt" >= @debut AND ca."clientCreatedAt" <= @fin)::int AS injoignables,
   (SELECT count(*) FROM "call_attempts" ca
-    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND ca."outcome" = 'WRONG_NUMBER'
+    JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
+    WHERE ca."performedById" IN (SELECT "id" FROM agents) AND cr."effect" = 'CLOSE_WRONG_NUMBER'
       AND ca."clientCreatedAt" >= @debut AND ca."clientCreatedAt" <= @fin)::int AS faux_numeros,
   (SELECT count(*) FROM "prospects" p
     WHERE p."createdById" IN (SELECT "id" FROM agents) AND p."deletedAt" IS NULL

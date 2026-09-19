@@ -111,7 +111,7 @@ func (s *service) lotLireFiches(ctx context.Context, row *db.LotParIdRow, traite
 			TeleconseillerID:   ligne.AssigneeId,
 			TeleconseillerName: lotSiVide(lotValeurTexte(ligne.AssigneeName), "Non attribuée"),
 			Etat:               lotEtatDe(traitees[ligne.Position], false),
-			StatutLabel:        lotStatutFiche(ligne.LastReasonLabel, ligne.LastCallOutcome),
+			StatutLabel:        lotPointeurTexte(ligne.LastReasonLabel),
 		})
 	}
 	return fiches, nil
@@ -137,12 +137,4 @@ func lotNomEtPrenom(nom, prenom *string) string {
 		}
 	}
 	return strings.Join(parties, " ")
-}
-
-// Le statut choisi par le téléconseiller, à défaut la famille de l'issue.
-func lotStatutFiche(libelleMotif *string, issue string) *string {
-	if libelleMotif != nil && *libelleMotif != "" {
-		return libelleMotif
-	}
-	return lotPointeurTexte(lotLibellesIssueAppel[issue])
 }

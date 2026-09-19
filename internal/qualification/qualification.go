@@ -24,26 +24,27 @@ const (
 	qualificationAmbassadeur = "AMBASSADEUR"
 	qualificationRefus       = "REFUS"
 	qualificationAutreNumero = "AUTRE_NUMERO"
-	qualificationCallback    = "CALLBACK"
 	qualificationRefusee     = "REFUSED"
 	qualificationFauxNumero  = "WRONG_NUMBER"
 )
 
 var Garde = map[string]socle.Permission{
-	"POST /api/v1/rep-campaigns/attempts":       socle.PermissionFichesTenir,
-	"POST /api/v1/phase2/call-attempts":         socle.PermissionFichesTenir,
-	"GET /api/v1/phase2/callbacks":              socle.PermissionFichesTenir,
-	"GET /api/v1/phase2/directory":              socle.PermissionFichesTenir,
-	"POST /api/v1/phase2/callbacks/{id}/cancel": socle.PermissionQualificationRappels,
-	"POST /api/v1/phase2/callbacks/{id}/snooze": socle.PermissionQualificationRappels,
-	"POST /api/v1/ouvertures":                   socle.PermissionFichesTenir,
-	"GET /api/v1/ouvertures/courante":           socle.PermissionFichesTenir,
-	"PUT /api/v1/ouvertures/{id}/brouillon":     socle.PermissionFichesTenir,
-	"GET /api/v1/ouvertures/comptage":           socle.PermissionFichesTenir,
-	"GET /api/v1/suggestions":                   socle.PermissionFichesTenir,
-	"PATCH /api/v1/suggestions/{id}":            socle.PermissionFichesTenir,
-	"POST /api/v1/sync/push":                    socle.PermissionFichesTenir,
-	"POST /api/v1/presence/beat":                socle.PermissionPanneauAcceder,
+	"POST /api/v1/rep-campaigns/attempts":                  socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/call-attempts":                    socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/callbacks":                         socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/directory":                         socle.PermissionFichesTenir,
+	"POST /api/v1/phase2/callbacks/{id}/cancel":            socle.PermissionQualificationRappels,
+	"POST /api/v1/phase2/callbacks/{id}/snooze":            socle.PermissionQualificationRappels,
+	"POST /api/v1/ouvertures":                              socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/courante":                      socle.PermissionFichesTenir,
+	"PUT /api/v1/ouvertures/{id}/brouillon":                socle.PermissionFichesTenir,
+	"GET /api/v1/ouvertures/comptage":                      socle.PermissionFichesTenir,
+	"GET /api/v1/suggestions":                              socle.PermissionFichesTenir,
+	"PATCH /api/v1/suggestions/{id}":                       socle.PermissionFichesTenir,
+	"POST /api/v1/sync/push":                               socle.PermissionFichesTenir,
+	"POST /api/v1/presence/beat":                           socle.PermissionPanneauAcceder,
+	"POST /api/v1/prospects/{id}/statut-qualification":     socle.PermissionProspectsSuperviser,
+	"POST /api/v1/representants/{id}/statut-qualification": socle.PermissionProspectsSuperviser,
 }
 
 func qualificationRoute(id, methode, chemin string) huma.Operation {
@@ -61,6 +62,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, qualificationRoute("ouvertureCourante", http.MethodGet, "/api/v1/ouvertures/courante"), s.qualificationOuvertureCourante)
 	huma.Register(api, qualificationRoute("enregistrerBrouillonOuverture", http.MethodPut, "/api/v1/ouvertures/{id}/brouillon"), s.qualificationEnregistrerBrouillon)
 	huma.Register(api, qualificationRoute("compterOuvertures", http.MethodGet, "/api/v1/ouvertures/comptage"), s.qualificationComptage)
+	qualificationMonterRequalification(api, s)
 	huma.Register(api, qualificationRoute("listSuggestions", http.MethodGet, "/api/v1/suggestions"), s.qualificationListerSuggestions)
 	huma.Register(api, qualificationRoute("updateSuggestionStatus", http.MethodPatch, "/api/v1/suggestions/{id}"), s.qualificationBasculerSuggestion)
 	presenceMonterRoutes(api, s)
@@ -101,13 +103,6 @@ func qualificationRogne(v *string) *string {
 	return &s
 }
 
-func qualificationTexte(p *string) string {
-	if p == nil {
-		return ""
-	}
-	return *p
-}
-
 func qualificationValeur[T any](p *T) any {
 	if p == nil {
 		return nil
@@ -141,11 +136,9 @@ func qualificationTransitionLegale(t map[string][]string, de, vers string) bool 
 type QualificationRepAttemptBody struct {
 	ID                    string     `json:"id" format:"uuid"`
 	RepresentantID        string     `json:"representantId" format:"uuid"`
-	Outcome               string     `json:"outcome" enum:"REACHED,PROSPECTS_PROMISED,UNREACHABLE,CALLBACK,REFUSED,WRONG_NUMBER,OTHER"`
 	ClientCreatedAt       time.Time  `json:"clientCreatedAt" format:"date-time"`
-	StatutQualificationID *string    `json:"statutQualificationId,omitempty" format:"uuid"`
+	StatutQualificationID string     `json:"statutQualificationId" format:"uuid"`
 	OuvertureID           *string    `json:"ouvertureId,omitempty" format:"uuid"`
-	PromisedProspects     *int32     `json:"promisedProspects,omitempty" minimum:"0" maximum:"10000"`
 	Comment               *string    `json:"comment,omitempty" maxLength:"2000"`
 	RelationStatus        *string    `json:"relationStatus,omitempty" enum:"INCONNU,CONTACTE,AMBASSADEUR,REFUS"`
 	SuggestedPhone        *string    `json:"suggestedPhone,omitempty" minLength:"6" maxLength:"40"`
@@ -180,22 +173,10 @@ func qualificationRepResultat(statut, id string) *QualificationRepAttemptOutput 
 	return out
 }
 
-var qualificationOutcomeParEffet = map[db.StatutQualificationEffect]string{
-	db.StatutQualificationEffectREACHED:          exports.IssueJointImport,
-	db.StatutQualificationEffectREFUSED:          qualificationRefusee,
-	db.StatutQualificationEffectSCHEDULECALLBACK: qualificationCallback,
-	db.StatutQualificationEffectUNREACHABLE:      string(db.CallOutcomeUNREACHABLE),
-	db.StatutQualificationEffectWRONGNUMBER:      qualificationFauxNumero,
-}
-
 var qualificationReponsesRattachement = []string{qualificationAmbassadeur, qualificationRefus}
 
-func qualificationReglesRepIssue(b *QualificationRepAttemptBody) error {
-	if b.PromisedProspects != nil && b.Outcome != "PROSPECTS_PROMISED" {
-		return socle.Problem(http.StatusBadRequest, "REP_CAMPAIGN_PROMISED_NOT_ALLOWED",
-			"Un nombre de fiches promises n’est admis que pour l’issue PROSPECTS_PROMISED.")
-	}
-	if b.Outcome == qualificationCallback && b.CallbackAt == nil {
+func qualificationReglesRepIssue(callbackAt *time.Time, statut *db.StatutQualificationParIdRow) error {
+	if statut.Effect == db.StatutQualificationEffectSCHEDULECALLBACK && callbackAt == nil {
 		return socle.Problem(http.StatusBadRequest, "REP_CAMPAIGN_CALLBACK_AT_REQUIRED",
 			"L’issue « À rappeler » exige une date de rappel.")
 	}
@@ -325,8 +306,8 @@ type qualificationAppelRep struct {
 	suggestion *qualificationSuggestionRecue
 }
 
-func (s *service) qualificationStatutCoherent(ctx context.Context, b *QualificationRepAttemptBody, comment *string) (db.StatutQualificationParIdRow, error) {
-	statut, err := s.Q.StatutQualificationParId(ctx, *b.StatutQualificationID)
+func (s *service) qualificationStatutActif(ctx context.Context, id string) (db.StatutQualificationParIdRow, error) {
+	statut, err := s.Q.StatutQualificationParId(ctx, id)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return statut, socle.Problem(http.StatusBadRequest, "REP_STATUT_QUALIFICATION_UNKNOWN",
 			"Ce statut de qualification n’existe pas.")
@@ -338,10 +319,16 @@ func (s *service) qualificationStatutCoherent(ctx context.Context, b *Qualificat
 		return statut, socle.Problem(http.StatusBadRequest, "REP_STATUT_QUALIFICATION_INACTIVE",
 			"Le statut « "+statut.Label+" » a été retiré : choisissez-en un autre.")
 	}
-	attendue := qualificationOutcomeParEffet[statut.Effect]
-	if b.Outcome != attendue {
-		return statut, socle.Problem(http.StatusBadRequest, "REP_OUTCOME_STATUT_MISMATCH",
-			"Le statut choisi impose l’issue « "+attendue+" », or « "+b.Outcome+" » a été envoyée.")
+	return statut, nil
+}
+
+func (s *service) qualificationStatutCoherent(ctx context.Context, b *QualificationRepAttemptBody, comment *string) (db.StatutQualificationParIdRow, error) {
+	statut, err := s.qualificationStatutActif(ctx, b.StatutQualificationID)
+	if err != nil {
+		return statut, err
+	}
+	if err := qualificationReglesRepIssue(b.CallbackAt, &statut); err != nil {
+		return statut, err
 	}
 	if qualificationContreditRattachement(b.RelationStatus, statut.RelationStatus) {
 		return statut, socle.Problem(http.StatusBadRequest, "REP_RELATION_STATUT_MISMATCH",
@@ -396,13 +383,11 @@ func (s *service) qualificationPreparerAppelRep(ctx context.Context, u *socle.Ut
 	if numero != "" {
 		appel.numero = &numero
 	}
-	if b.StatutQualificationID != nil {
-		statut, erreur := s.qualificationStatutCoherent(ctx, b, appel.comment)
-		if erreur != nil {
-			return erreur
-		}
-		appel.statut = &statut
+	statut, err := s.qualificationStatutCoherent(ctx, b, appel.comment)
+	if err != nil {
+		return err
 	}
+	appel.statut = &statut
 	if b.SuggestedPhone != nil {
 		recue, erreur := s.qualificationSuggestionDuRefus(ctx, *b.SuggestedPhone, s.Cfg.PhoneRegion)
 		if erreur != nil {
@@ -419,9 +404,6 @@ func (s *service) qualificationRepAppel(ctx context.Context, in *QualificationRe
 	u := socle.UtilisateurCourant(ctx)
 	b := &in.Body
 	comment := qualificationRogne(b.Comment)
-	if err := qualificationReglesRepIssue(b); err != nil {
-		return nil, err
-	}
 	deja, err := s.Q.RepAttemptExiste(ctx, b.ID)
 	if err != nil {
 		return nil, err
@@ -481,8 +463,7 @@ func (s *service) qualificationJoindreSuggestion(ctx context.Context, a *qualifi
 func (s *service) qualificationAppliquerRepAppel(ctx context.Context, q *db.Queries, a *qualificationAppelRep) (bool, error) {
 	n, err := q.InsererRepAttempt(ctx, db.InsererRepAttemptParams{
 		ID: a.b.ID, RepresentantID: a.b.RepresentantID, PerformedByID: a.u.ID,
-		Outcome: a.b.Outcome, PromisedProspects: a.b.PromisedProspects, Comment: a.comment,
-		CallbackAt: a.b.CallbackAt, EtablissementConfirme: a.b.EtablissementConfirme,
+		Comment: a.comment, CallbackAt: a.b.CallbackAt, EtablissementConfirme: a.b.EtablissementConfirme,
 		NumeroConfirme: a.b.NumeroConfirme, Contacte: a.b.Contacte, ConnaitUes: a.b.ConnaitUES,
 		Syndicat: qualificationRogne(a.b.Syndicat), StatutQualificationID: a.b.StatutQualificationID,
 		ClientCreatedAt: a.b.ClientCreatedAt.UTC(),
@@ -499,10 +480,13 @@ func (s *service) qualificationAppliquerRepAppel(ctx context.Context, q *db.Quer
 	if err := s.qualificationMajRepresentant(ctx, q, a); err != nil {
 		return false, err
 	}
+	if err := qualificationPrendreLeRepresentant(ctx, q, a); err != nil {
+		return false, err
+	}
 	if err := s.qualificationFermerOuverture(ctx, q, a); err != nil {
 		return false, err
 	}
-	return true, s.qualificationBasculerRelation(ctx, q, a)
+	return true, qualificationBasculerRelation(ctx, q, a.b.RepresentantID, string(a.rep.RelationStatus), a.relation, a.u.ID)
 }
 
 func (*service) qualificationEcrireSuggestion(ctx context.Context, q *db.Queries, a *qualificationAppelRep) error {
@@ -567,7 +551,7 @@ func qualificationPatchRepresentant(a *qualificationAppelRep) db.MajRepresentant
 		p.MajEtablissement, p.Etablissement = true, qualificationRogne(a.b.Etablissement)
 	}
 	p.ConnaitUes, p.Contacte = a.b.ConnaitUES, a.b.Contacte
-	p.StatutQualificationID = a.b.StatutQualificationID
+	p.StatutQualificationID = &a.b.StatutQualificationID
 	p.PhoneE164 = a.numero
 	// Une tentative plus ancienne que le dernier appel connu ne réécrit pas la fiche.
 	p.MajDernierAppel = a.rep.LastCallAt == nil || !a.b.ClientCreatedAt.Before(*a.rep.LastCallAt)
@@ -575,8 +559,7 @@ func qualificationPatchRepresentant(a *qualificationAppelRep) db.MajRepresentant
 		return p
 	}
 	at := a.b.ClientCreatedAt.UTC()
-	outcome := a.b.Outcome
-	p.LastCallOutcome, p.LastCallAt, p.LastCallByID = &outcome, &at, &a.u.ID
+	p.LastCallAt, p.LastCallByID = &at, &a.u.ID
 	p.NextCallbackAt, p.NextCallbackOrigine = qualificationProchainRappel(a.b.CallbackAt, at, a.statut)
 	return p
 }
@@ -638,16 +621,15 @@ func (*service) qualificationFermerOuverture(ctx context.Context, q *db.Queries,
 	})
 }
 
-func (*service) qualificationBasculerRelation(ctx context.Context, q *db.Queries, a *qualificationAppelRep) error {
-	depuis := string(a.rep.RelationStatus)
-	if a.relation == nil || *a.relation == depuis {
+func qualificationBasculerRelation(ctx context.Context, q *db.Queries, representantID, depuis string, vers *string, userID string) error {
+	if vers == nil || *vers == depuis {
 		return nil
 	}
-	if !qualificationTransitionLegale(qualificationTransitionsRelation, depuis, *a.relation) {
+	if !qualificationTransitionLegale(qualificationTransitionsRelation, depuis, *vers) {
 		return socle.Problem(http.StatusForbidden, "REPRESENTANT_RELATION_TRANSITION_REFUSED",
-			"Relation du représentant : le passage de « "+depuis+" » à « "+*a.relation+" » n’est pas permis.")
+			"Relation du représentant : le passage de « "+depuis+" » à « "+*vers+" » n’est pas permis.")
 	}
-	n, err := q.BasculerRelation(ctx, db.BasculerRelationParams{Vers: *a.relation, ID: a.b.RepresentantID, Depuis: depuis})
+	n, err := q.BasculerRelation(ctx, db.BasculerRelationParams{Vers: *vers, ID: representantID, Depuis: depuis})
 	if err != nil || n != 1 {
 		return err
 	}
@@ -656,8 +638,7 @@ func (*service) qualificationBasculerRelation(ctx context.Context, q *db.Queries
 		return err
 	}
 	return q.InsererRelationChange(ctx, db.InsererRelationChangeParams{
-		ID: id.String(), RepresentantID: a.b.RepresentantID, Depuis: depuis,
-		Vers: *a.relation, ChangedByID: a.u.ID,
+		ID: id.String(), RepresentantID: representantID, Depuis: depuis, Vers: *vers, ChangedByID: userID,
 	})
 }
 
@@ -686,37 +667,13 @@ var qualificationReglesEffet = map[db.CallOutcomeEffect]qualificationRegleIssue{
 	db.CallOutcomeEffectSCHEDULECALLBACK: {accepteCallbackAt: true},
 }
 
-// La famille de l'appel suit l'effet du motif ; KEEP_OPEN la tient de « compte comme joint ».
-var qualificationFamilles = map[db.CallOutcomeEffect]string{
-	db.CallOutcomeEffectCLOSEMETHOD:      exports.ExportCleMethodeObtenue,
-	db.CallOutcomeEffectCLOSEREFUSED:     qualificationRefusee,
-	db.CallOutcomeEffectCLOSELOST:        qualificationRefusee,
-	db.CallOutcomeEffectCLOSEWRONGNUMBER: qualificationFauxNumero,
-	db.CallOutcomeEffectSCHEDULECALLBACK: qualificationCallback,
-	db.CallOutcomeEffectCLOSEAPPOINTMENT: qualificationCallback,
-	db.CallOutcomeEffectCLOSEUNREACHABLE: string(db.CallOutcomeUNREACHABLE),
-	db.CallOutcomeEffectCLOSEINTERESTED:  string(db.CallOutcomeOTHER),
-	db.CallOutcomeEffectCLOSEHESITANT:    string(db.CallOutcomeOTHER),
-	db.CallOutcomeEffectCLOSEREACHED:     string(db.CallOutcomeOTHER),
-}
-
 type qualificationMotifIssue struct {
-	id               *string
+	id               string
 	label            string
 	effet            db.CallOutcomeEffect
+	joint            bool
 	exigeCommentaire bool
 	exigeRappel      bool
-}
-
-// Les six motifs compilés portent les codes de `CallOutcome` à l'identique.
-// CALLBACK n'exige pas de date : seul un motif du référentiel peut le durcir.
-var qualificationMotifsSysteme = map[string]qualificationMotifIssue{
-	exports.ExportCleMethodeObtenue:   {label: exports.ExportLibelleMethodeObtenue, effet: db.CallOutcomeEffectCLOSEMETHOD},
-	qualificationCallback:             {label: exports.ExportLibelleARappeler, effet: db.CallOutcomeEffectSCHEDULECALLBACK},
-	string(db.CallOutcomeUNREACHABLE): {label: exports.ExportLibelleInjoignable, effet: db.CallOutcomeEffectKEEPOPEN},
-	qualificationRefusee:              {label: exports.ExportLibelleRefus, effet: db.CallOutcomeEffectCLOSEREFUSED},
-	qualificationFauxNumero:           {label: exports.ExportLibelleFauxNumero, effet: db.CallOutcomeEffectCLOSEWRONGNUMBER},
-	string(db.CallOutcomeOTHER):       {label: exports.ExportLibelleAutre, effet: db.CallOutcomeEffectKEEPOPEN},
 }
 
 type QualificationCallAttemptBody struct {
@@ -724,9 +681,8 @@ type QualificationCallAttemptBody struct {
 	// /sync/push : il est donc contrôlé par la logique, pas par le schéma.
 	ID                     string            `json:"id,omitempty" format:"uuid"`
 	ProspectID             string            `json:"prospectId" format:"uuid"`
-	Outcome                string            `json:"outcome" enum:"METHOD_OBTAINED,UNREACHABLE,CALLBACK,REFUSED,WRONG_NUMBER,OTHER"`
 	ClientCreatedAt        time.Time         `json:"clientCreatedAt" format:"date-time"`
-	ReasonCode             *string           `json:"reasonCode,omitempty" maxLength:"40"`
+	ReasonCode             string            `json:"reasonCode" minLength:"1" maxLength:"40"`
 	Method                 *string           `json:"method,omitempty" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	Comment                *string           `json:"comment,omitempty" maxLength:"2000"`
 	CallbackAt             *time.Time        `json:"callbackAt,omitempty" format:"date-time"`
@@ -780,48 +736,23 @@ type qualificationTentative struct {
 	rendezVousAt *time.Time
 }
 
-func (s *service) qualificationMotifDeLIssue(ctx context.Context, b *QualificationCallAttemptBody) (qualificationMotifIssue, error) {
-	issueSansMotif := b.Outcome == string(db.CallOutcomeOTHER)
-	systeme := qualificationMotifsSysteme[b.Outcome]
-	code := strings.ToUpper(strings.TrimSpace(qualificationTexte(b.ReasonCode)))
-	demande := code != ""
-	if !demande {
-		code = b.Outcome
-	}
+func (s *service) qualificationMotifDeLIssue(ctx context.Context, reasonCode string) (qualificationMotifIssue, error) {
+	code := strings.ToUpper(strings.TrimSpace(reasonCode))
 	row, err := s.Q.MotifIssueParCode(ctx, code)
 	if errors.Is(err, pgx.ErrNoRows) {
-		if !demande {
-			systeme.exigeCommentaire = issueSansMotif
-			return systeme, nil
-		}
-		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_UNKNOWN", "Motif d’issue inconnu : "+code+".")
+		return qualificationMotifIssue{}, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_UNKNOWN", "Motif d’issue inconnu : "+code+".")
 	}
 	if err != nil {
-		return systeme, err
+		return qualificationMotifIssue{}, err
 	}
-	if demande && !row.IsActive {
-		return systeme, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_INACTIVE",
+	if !row.IsActive {
+		return qualificationMotifIssue{}, socle.Problem(http.StatusBadRequest, "PHASE2_REASON_INACTIVE",
 			"Le motif « "+row.Label+" » a été retiré du référentiel.")
 	}
-	// Le motif commande la famille, jamais le panneau : KEEP_OPEN vaut
-	// « Autre » quand le motif compte comme joint, « Injoignable » sinon.
-	b.Outcome = qualificationFamilleDuMotif(row.Effect, row.CountsAsReached)
-	// Sans motif nommé, « Autre » ne dit rien : le commentaire le remplace.
 	return qualificationMotifIssue{
-		id: &row.ID, label: row.Label, effet: row.Effect,
-		exigeCommentaire: row.RequiresComment || (!demande && issueSansMotif),
-		exigeRappel:      row.RequiresCallback,
+		id: row.ID, label: row.Label, effet: row.Effect, joint: row.CountsAsReached,
+		exigeCommentaire: row.RequiresComment, exigeRappel: row.RequiresCallback,
 	}, nil
-}
-
-func qualificationFamilleDuMotif(effet db.CallOutcomeEffect, joint bool) string {
-	if famille, ok := qualificationFamilles[effet]; ok {
-		return famille
-	}
-	if effet == db.CallOutcomeEffectKEEPOPEN && joint {
-		return string(db.CallOutcomeOTHER)
-	}
-	return string(db.CallOutcomeUNREACHABLE)
 }
 
 func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qualificationMotifIssue) (qualificationTentative, error) {
@@ -835,7 +766,7 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 		return t, socle.Problem(http.StatusBadRequest, "PHASE2_COMMENT_REQUIRED",
 			"L’issue « "+motif.label+" » exige un commentaire : sans lui, la case ne dit rien.")
 	}
-	rappel, err := qualificationRappelPromis(b, &t.motif, &t.regle)
+	rappel, err := qualificationRappelPromis(b.CallbackAt, b.ClientCreatedAt, &t.motif, &t.regle)
 	if err != nil {
 		return t, err
 	}
@@ -858,20 +789,19 @@ func qualificationAdhesionParFormulaire(b *QualificationCallAttemptBody, t *qual
 	if b.Method == nil || t.regle.exigeMethode {
 		return nil
 	}
-	if b.Outcome == string(db.CallOutcomeUNREACHABLE) || t.motif.effet == db.CallOutcomeEffectCLOSEWRONGNUMBER {
+	if !t.motif.joint {
 		return socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_NOT_ALLOWED",
 			"Une méthode d’enrôlement n’est admise que sur un appel où la personne a répondu.")
 	}
-	b.Outcome = exports.ExportCleMethodeObtenue
 	t.regle = qualificationReglesEffet[db.CallOutcomeEffectCLOSEMETHOD]
 	t.motif.exigeRappel = false
 	return nil
 }
 
 // Le futur se juge sur l'horodatage TERRAIN, jamais sur l'heure du serveur.
-func qualificationRappelPromis(b *QualificationCallAttemptBody, motif *qualificationMotifIssue, regle *qualificationRegleIssue) (time.Time, error) {
+func qualificationRappelPromis(callbackAt *time.Time, reference time.Time, motif *qualificationMotifIssue, regle *qualificationRegleIssue) (time.Time, error) {
 	var absent time.Time
-	if b.CallbackAt == nil {
+	if callbackAt == nil {
 		if motif.exigeRappel {
 			return absent, socle.Problem(http.StatusBadRequest, "PHASE2_CALLBACK_AT_REQUIRED",
 				"L’issue « "+motif.label+" » exige la date du rappel promis.")
@@ -882,8 +812,8 @@ func qualificationRappelPromis(b *QualificationCallAttemptBody, motif *qualifica
 		return absent, socle.Problem(http.StatusBadRequest, "PHASE2_CALLBACK_AT_NOT_ALLOWED",
 			"Une date de rappel n’est admise que pour une issue qui planifie un rappel.")
 	}
-	quand := b.CallbackAt.UTC()
-	if quand.Before(b.ClientCreatedAt.Add(-qualificationToleranceHorloge)) {
+	quand := callbackAt.UTC()
+	if quand.Before(reference.Add(-qualificationToleranceHorloge)) {
 		return absent, socle.Problem(http.StatusBadRequest, "PHASE2_CALLBACK_AT_PAST",
 			"La date de rappel précède l’appel qui l’a promise.")
 	}
@@ -977,7 +907,7 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 		return "", vide, socle.Problem(http.StatusUnprocessableEntity, "VALIDATION_FAILED",
 			"L’identifiant de la tentative est obligatoire.")
 	}
-	motif, err := s.qualificationMotifDeLIssue(ctx, b)
+	motif, err := s.qualificationMotifDeLIssue(ctx, b.ReasonCode)
 	if err != nil {
 		return "", vide, err
 	}
@@ -1062,24 +992,72 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 	if err := qualificationMarquerContacte(ctx, q, u, b.ProspectID, parcours.ID); err != nil {
 		return "", vide, err
 	}
-	corrige, err := s.qualificationCorrigerProspect(ctx, q, u, b, &prospect)
+	corrige, err := s.qualificationCorrigerProspect(ctx, q, u, b, &prospect, t.motif.id)
 	if err != nil {
 		return "", vide, err
 	}
-	if err := qualificationPlanifierRappel(ctx, q, u, b, t); err != nil {
+	issue := qualificationIssue{
+		prospectID: b.ProspectID, statut: corrige.Statut, attemptID: &b.ID, method: b.Method,
+		motif: t.motif, regle: t.regle, comment: t.comment, callbackAt: t.callbackAt,
+		reference: b.ClientCreatedAt.UTC(), assignedTo: u.ID,
+	}
+	if err := qualificationPrendreLaFiche(ctx, q, u, &issue); err != nil {
+		return "", vide, err
+	}
+	if err := qualificationPlanifierRappel(ctx, q, &issue); err != nil {
 		return "", vide, err
 	}
 	if err := qualificationFermerOuvertureProspect(ctx, q, u, b); err != nil {
 		return "", vide, err
 	}
-	if !t.regle.clot {
-		etat, err := qualificationRouvrirFiche(ctx, q, u, b, &corrige, &parcours)
-		if err != nil {
-			return "", vide, err
-		}
-		return tentativeAppliquee, etat, nil
+	etat, err := qualificationAppliquerIssue(ctx, q, u, &issue, &parcours)
+	if err != nil {
+		return "", vide, err
 	}
-	return qualificationCloturerParcours(ctx, q, u, b, t, &corrige, &parcours)
+	return tentativeAppliquee, etat, nil
+}
+
+// Ce qu'une issue fait à la fiche, qu'elle vienne d'un appel ou d'une
+// requalification par l'encadrement : même clôture, même rappel, même réouverture.
+type qualificationIssue struct {
+	prospectID string
+	statut     db.ProspectStatut
+	attemptID  *string
+	method     *string
+	motif      qualificationMotifIssue
+	regle      qualificationRegleIssue
+	comment    *string
+	callbackAt *time.Time
+	reference  time.Time
+	assignedTo string
+}
+
+// Une fiche importée que personne ne suit va au premier qui l'appelle ; entre
+// téléconseillers, celui qui joint la personne la garde.
+func qualificationPrendreLaFiche(ctx context.Context, q *db.Queries, u *socle.Utilisateur, i *qualificationIssue) error {
+	rangs, err := q.PrendreLaFiche(ctx, db.PrendreLaFicheParams{Agent: u.ID, ID: i.prospectID, Joint: i.motif.joint})
+	if err != nil || rangs == 0 {
+		return err
+	}
+	return database.Auditer(ctx, q, u.ID, "prospect.affectation", "prospect", i.prospectID,
+		nil, map[string]any{"teleconseillerId": u.ID, qualificationCleMotif: i.motif.label})
+}
+
+func qualificationPrendreLeRepresentant(ctx context.Context, q *db.Queries, a *qualificationAppelRep) error {
+	joint := a.statut.Effect != db.StatutQualificationEffectUNREACHABLE
+	rangs, err := q.PrendreLeRepresentant(ctx, db.PrendreLeRepresentantParams{Agent: a.u.ID, ID: a.b.RepresentantID, Joint: joint})
+	if err != nil || rangs == 0 {
+		return err
+	}
+	return database.Auditer(ctx, q, a.u.ID, "representant.affectation", "representant", a.b.RepresentantID,
+		nil, map[string]any{"teleconseillerId": a.u.ID, qualificationCleStatut: a.statut.Label})
+}
+
+func qualificationAppliquerIssue(ctx context.Context, q *db.Queries, u *socle.Utilisateur, i *qualificationIssue, parcours *db.ParcoursDuProspectRow) (QualificationProspectPhase2StateDTO, error) {
+	if !i.regle.clot {
+		return qualificationRouvrirFiche(ctx, q, u, i.prospectID, parcours)
+	}
+	return qualificationCloturerParcours(ctx, q, u, i, parcours)
 }
 
 // Le parcours est ouvert à la volée : une fiche importée sans parcours doit
@@ -1097,7 +1075,7 @@ func qualificationOuvrirParcours(ctx context.Context, q *db.Queries, prospectID 
 
 func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative) error {
 	n, err := q.InsererCallAttempt(ctx, db.InsererCallAttemptParams{
-		ID: b.ID, ProspectID: b.ProspectID, PerformedByID: u.ID, Outcome: b.Outcome,
+		ID: b.ID, ProspectID: b.ProspectID, PerformedByID: u.ID,
 		ReasonID: t.motif.id, Method: b.Method, Comment: t.comment, Email: t.email,
 		Fonctionnaire: b.Fonctionnaire, EngagementEnCours: b.EngagementEnCours,
 		DureeEtablissementMois: b.DureeEtablissementMois, RendezVousAt: t.rendezVousAt,
@@ -1126,17 +1104,17 @@ func qualificationMarquerContacte(ctx context.Context, q *db.Queries, u *socle.U
 }
 
 // « À supprimer » ferme la fiche au statut PERDU, sans la détruire ; le journal dit le motif.
-func qualificationMarquerPerdu(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospect *db.CorrigerProspectParTentativeRow, motif string) error {
-	rangs, err := q.MarquerProspectPerdu(ctx, prospect.ID)
+func qualificationMarquerPerdu(ctx context.Context, q *db.Queries, u *socle.Utilisateur, i *qualificationIssue) error {
+	rangs, err := q.MarquerProspectPerdu(ctx, i.prospectID)
 	if err != nil || rangs == 0 {
 		return err
 	}
-	return qualificationAuditerStatut(ctx, q, u, prospect.ID, prospect.Statut, db.ProspectStatutPERDU, motif)
+	return qualificationAuditerStatut(ctx, q, u, i.prospectID, i.statut, db.ProspectStatutPERDU, i.motif.label)
 }
 
 func qualificationAuditerStatut(ctx context.Context, q *db.Queries, u *socle.Utilisateur, prospectID string, avant, apres db.ProspectStatut, motif string) error {
 	return database.Auditer(ctx, q, u.ID, "prospect.statut", "prospect", prospectID,
-		map[string]any{"statut": avant}, map[string]any{"statut": apres, "motif": motif})
+		map[string]any{qualificationCleStatut: avant}, map[string]any{qualificationCleStatut: apres, qualificationCleMotif: motif})
 }
 
 func qualificationFicheModifiee(p *db.CorrigerProspectParTentativeParams) bool {
@@ -1152,7 +1130,7 @@ func qualificationFicheModifiee(p *db.CorrigerProspectParTentativeParams) bool {
 
 // Un champ absent laisse la valeur en place : le formulaire omet ce qu'il n'a
 // pas demandé, et lire ce silence comme un vidage effacerait des saisies.
-func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, courant *db.ProspectPourTentativeRow) (db.CorrigerProspectParTentativeRow, error) {
+func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, courant *db.ProspectPourTentativeRow, motifID string) (db.CorrigerProspectParTentativeRow, error) {
 	p := db.CorrigerProspectParTentativeParams{
 		ID: courant.ID, Nom: qualificationRogne(b.Nom), Prenom: qualificationRogne(b.Prenom),
 		Profession: qualificationRogne(b.Profession), BanqueID: b.BanqueID, SyndicatID: b.SyndicatID,
@@ -1175,8 +1153,7 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	p.MajDernierAppel = courant.LastCallAt == nil || !b.ClientCreatedAt.Before(*courant.LastCallAt)
 	if p.MajDernierAppel {
 		at := b.ClientCreatedAt.UTC()
-		outcome := b.Outcome
-		p.LastCallOutcome, p.LastCallAt, p.LastCallByID = &outcome, &at, &u.ID
+		p.LastReasonID, p.LastCallAt, p.LastCallByID = &motifID, &at, &u.ID
 	}
 	return q.CorrigerProspectParTentative(ctx, p)
 }
@@ -1223,21 +1200,21 @@ func qualificationDeduireWhatsapp(statut, numero, phoneE164 *string) string {
 	return qualificationAutreNumero
 }
 
-func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative) error {
-	quand := t.callbackAt
-	if quand == nil && !t.regle.accepteCallbackAt {
+func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, i *qualificationIssue) error {
+	quand := i.callbackAt
+	if quand == nil && !i.regle.accepteCallbackAt {
 		// L'appel a tenu la promesse sans en prendre une nouvelle : le rappel
 		// promis se clôt sur cette tentative au lieu de rester en retard.
 		// (La clôture de parcours, plus bas, referme ce qui s'y ajoute.)
-		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
+		return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: i.attemptID, ProspectID: i.prospectID})
 	}
 	if quand == nil {
 		// Sans date, un statut qui promet un rappel le rend dû tout de suite :
 		// autrement la fiche ne figurerait dans aucune file.
-		au := b.ClientCreatedAt.UTC()
+		au := i.reference
 		quand = &au
 	}
-	if err := q.SupplanterRappels(ctx, b.ProspectID); err != nil {
+	if err := q.SupplanterRappels(ctx, i.prospectID); err != nil {
 		return err
 	}
 	id, err := uuid.NewV7()
@@ -1245,8 +1222,8 @@ func qualificationPlanifierRappel(ctx context.Context, q *db.Queries, u *socle.U
 		return err
 	}
 	return q.InsererRappel(ctx, db.InsererRappelParams{
-		ID: id.String(), ProspectID: b.ProspectID, AssignedToID: u.ID,
-		ScheduledAt: *quand, Comment: t.comment, SourceAttemptID: b.ID,
+		ID: id.String(), ProspectID: i.prospectID, AssignedToID: i.assignedTo,
+		ScheduledAt: *quand, Comment: i.comment, SourceAttemptID: i.attemptID,
 	})
 }
 
@@ -1261,42 +1238,47 @@ func qualificationFermerOuvertureProspect(ctx context.Context, q *db.Queries, u 
 }
 
 // Une fiche déjà classée se reclasse : la dernière issue l'emporte.
-func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, t *qualificationTentative, prospect *db.CorrigerProspectParTentativeRow, parcours *db.ParcoursDuProspectRow) (string, QualificationProspectPhase2StateDTO, error) {
+func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.Utilisateur, i *qualificationIssue, parcours *db.ParcoursDuProspectRow) (QualificationProspectPhase2StateDTO, error) {
 	var vide QualificationProspectPhase2StateDTO
 	at := time.Now().UTC()
 	if err := q.CloreParcours(ctx, db.CloreParcoursParams{
-		Phase2Status: t.regle.phase2Status, Method: b.Method, At: &at, By: &u.ID, ID: parcours.ID,
+		Phase2Status: i.regle.phase2Status, Method: i.method, At: &at, By: &u.ID, ID: parcours.ID,
 	}); err != nil {
-		return "", vide, err
+		return vide, err
 	}
 	if err := q.CloreProspectParTentative(ctx, db.CloreProspectParTentativeParams{
-		Phase2Status: t.regle.phase2Status, Method: b.Method, At: &at, By: &u.ID, ID: prospect.ID,
+		Phase2Status: i.regle.phase2Status, Method: i.method, At: &at, By: &u.ID, ID: i.prospectID,
 	}); err != nil {
-		return "", vide, err
+		return vide, err
 	}
-	if err := qualificationCloreRappels(ctx, q, b, t); err != nil {
-		return "", vide, err
+	if err := qualificationCloreRappels(ctx, q, i); err != nil {
+		return vide, err
 	}
-	if t.motif.effet == db.CallOutcomeEffectCLOSELOST {
-		if err := qualificationMarquerPerdu(ctx, q, u, prospect, t.motif.label); err != nil {
-			return "", vide, err
+	if i.motif.effet == db.CallOutcomeEffectCLOSELOST {
+		if err := qualificationMarquerPerdu(ctx, q, u, i); err != nil {
+			return vide, err
 		}
 	}
-	final, err := q.ProspectPourTentative(ctx, b.ProspectID)
+	return qualificationEtatRelu(ctx, q, i.prospectID)
+}
+
+func qualificationEtatRelu(ctx context.Context, q *db.Queries, prospectID string) (QualificationProspectPhase2StateDTO, error) {
+	var vide QualificationProspectPhase2StateDTO
+	final, err := q.ProspectPourTentative(ctx, prospectID)
 	if err != nil {
-		return "", vide, err
+		return vide, err
 	}
-	relu, err := q.ParcoursDuProspect(ctx, db.ParcoursDuProspectParams{ProspectID: b.ProspectID, Projet: string(final.Projet)})
+	relu, err := q.ParcoursDuProspect(ctx, db.ParcoursDuProspectParams{ProspectID: prospectID, Projet: string(final.Projet)})
 	if err != nil {
-		return "", vide, err
+		return vide, err
 	}
-	return tentativeAppliquee, qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
+	return qualificationEtatPhase2(final.ID, final.Rev, final.UpdatedAt, &relu), nil
 }
 
 // Un rendez-vous ferme la fiche mais garde le rappel qu'il vient de poser.
-func qualificationCloreRappels(ctx context.Context, q *db.Queries, b *QualificationCallAttemptBody, t *qualificationTentative) error {
-	if t.regle.accepteCallbackAt {
+func qualificationCloreRappels(ctx context.Context, q *db.Queries, i *qualificationIssue) error {
+	if i.regle.accepteCallbackAt {
 		return nil
 	}
-	return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: &b.ID, ProspectID: b.ProspectID})
+	return q.CloreRappels(ctx, db.CloreRappelsParams{AttemptID: i.attemptID, ProspectID: i.prospectID})
 }

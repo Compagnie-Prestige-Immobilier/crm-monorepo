@@ -167,6 +167,7 @@ const (
 	libelleQualifieImport     = "Qualifié"
 	libelleAucunImport        = "Aucun"
 	libelleAutreImport        = "Autre"
+	statutImportJoint         = "AUTRE_JOINT"
 	libelleBanqueImport       = "Banque"
 	libelleCDDImport          = "CDD"
 	libelleCDIImport          = "CDI"
@@ -205,8 +206,8 @@ var (
 		exports.ExportLibelleAutreNumero: string(db.WhatsappStatusAUTRENUMERO), libelleAucunImport: string(db.WhatsappStatusAUCUN),
 	})
 	issuesImport = tableLibellesImport(map[string]string{
-		exports.ExportLibelleJoint: exports.IssueJointImport, exports.ExportLibelleInjoignable: string(db.CallOutcomeUNREACHABLE), exports.ExportLibelleRefus: exports.ExportCleRefus,
-		exports.ExportLibelleFauxNumero: exports.ExportCleMauvaisNumero, libelleAutreImport: string(db.CallOutcomeOTHER),
+		exports.ExportLibelleJoint: statutImportJoint, exports.ExportLibelleInjoignable: "AUTRE_NON_JOINT", exports.ExportLibelleRefus: "REFUSE",
+		exports.ExportLibelleFauxNumero: "FAUX_NUMERO", libelleAutreImport: statutImportJoint,
 	})
 	jourMoisAnImport = regexp.MustCompile(`^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$`)
 	anMoisJourImport = regexp.MustCompile(`^(\d{4})-(\d{2})-(\d{2})`)
@@ -225,7 +226,7 @@ func tableLibellesImport(entrees map[string]string) map[string]string {
 
 type appelImportRep struct {
 	date        time.Time
-	issue       db.RepCallOutcome
+	statutCode  string
 	commentaire *string
 }
 
@@ -409,20 +410,19 @@ func lireAppelImport(cellules map[string]string, notes string, numero int) (*app
 	if !lisible {
 		return nil, nil
 	}
-	issue := exports.IssueJointImport
+	statutCode := statutImportJoint
 	if strings.TrimSpace(brutIssue) != "" {
 		valeur, connu := issuesImport[cleImport(brutIssue)]
 		if !connu {
 			return nil, refusImport(numero, EnteteRepresentantImport(10), "CALL_OUTCOME_UNKNOWN", "Issue d’appel inconnue. Joint, Injoignable, Refus, Faux numéro ou Autre.")
 		}
-		issue = valeur
+		statutCode = valeur
 	}
 	commentaire := couperImport(strings.TrimSpace(notes), 2_000)
-	// Même règle qu'en base : `rep_call_attempts_other_requires_comment`.
-	if issue == "OTHER" && commentaire == nil {
+	if cleImport(brutIssue) == cleImport(libelleAutreImport) && commentaire == nil {
 		return nil, refusImport(numero, EnteteRepresentantImport(10), "CALL_COMMENT_REQUIRED", "L’issue « Autre » exige une note : sans elle, l’appel n’apprend rien.")
 	}
-	return &appelImportRep{date: date, issue: db.RepCallOutcome(issue), commentaire: commentaire}, nil
+	return &appelImportRep{date: date, statutCode: statutCode, commentaire: commentaire}, nil
 }
 
 // Un appel ne se consigne pas dans le futur.
@@ -582,6 +582,7 @@ func ecrireAppelsRepresentantsImport(ctx context.Context, q *db.Queries, c conte
 	retenues []ligneRepresentantImport, identifiants []string, presents map[string]bool,
 ) error {
 	var appels []db.InsertImportRepCallAttemptParams
+	statuts := map[string]string{}
 	for i := range retenues {
 		ligne := &retenues[i]
 		if ligne.appel == nil || !presents[identifiants[i]] {
@@ -591,9 +592,18 @@ func ecrireAppelsRepresentantsImport(ctx context.Context, q *db.Queries, c conte
 		if ligne.proprietaireID != nil {
 			auteur = *ligne.proprietaireID
 		}
+		statutID, connu := statuts[ligne.appel.statutCode]
+		if !connu {
+			statut, err := q.StatutQualificationParCode(ctx, ligne.appel.statutCode)
+			if err != nil {
+				return err
+			}
+			statutID = statut.ID
+			statuts[ligne.appel.statutCode] = statutID
+		}
 		appels = append(appels, db.InsertImportRepCallAttemptParams{
 			ID: identifiantImport(), RepresentantID: identifiants[i], PerformedByID: auteur,
-			Outcome: ligne.appel.issue, Comment: ligne.appel.commentaire, ClientCreatedAt: ligne.appel.date,
+			StatutQualificationID: statutID, Comment: ligne.appel.commentaire, ClientCreatedAt: ligne.appel.date,
 		})
 	}
 	if len(appels) == 0 {

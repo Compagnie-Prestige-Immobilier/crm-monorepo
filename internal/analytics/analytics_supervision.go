@@ -31,42 +31,32 @@ const (
 // aussi ; l'ADMIN est un compte d'administration, pas de plateau.
 const rolesDuPlateau = `u."role" IN ('COMMERCIAL'::"Role", 'SUPERVISEUR'::"Role", 'DIRECTION'::"Role") AND u."deletedAt" IS NULL`
 
-// Issues d'appel prospect qui ne comptent pas comme un contact. Un faux numéro
-// n'en est plus : la fiche est traitée.
-const IssuesNonJointes = `('UNREACHABLE')`
-
+// Deux familles, celles de la codification des leads : joignable ou non. Un
+// faux numéro compte comme joint côté représentants, la fiche est traitée.
 const (
-	issuesRepresentantSaisissables = `('REACHED', 'REFUSED', 'CALLBACK', 'UNREACHABLE', 'WRONG_NUMBER')`
-	IssuesRepresentantJointes      = `('REACHED', 'REFUSED', 'CALLBACK', 'WRONG_NUMBER')`
-	effetsRepresentantJoints       = `('REACHED', 'REFUSED', 'SCHEDULE_CALLBACK', 'WRONG_NUMBER')`
+	RepresentantJoint = `sq."effect" <> 'UNREACHABLE'`
+	ProspectJoint     = `cr."countsAsReached"`
 )
 
-const JointureStatutQualification = `LEFT JOIN "statuts_qualification" sq ON sq."id" = rca."statutQualificationId"`
+const (
+	JointureStatutQualification = `JOIN "statuts_qualification" sq ON sq."id" = rca."statutQualificationId"`
+	JointureMotifIssue          = `JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"`
+)
 
 // Ce que la tentative tranche de l'adhésion, ou NULL quand elle ne tranche rien.
-// Une tentative d'avant le référentiel ne porte aucun statut : son issue reste
-// le seul signal, sinon le taux changerait avec l'âge des données.
 const ArbitrageDeLAdhesion = `CASE
     WHEN sq."relationStatus" IN ('AMBASSADEUR', 'REFUS') THEN sq."relationStatus"::text
-    WHEN rca."statutQualificationId" IS NOT NULL THEN NULL
-    WHEN rca."outcome" = 'REACHED' THEN 'AMBASSADEUR'
-    WHEN rca."outcome" = 'REFUSED' THEN 'REFUS'
   END`
 
 // EB-33 : une tentative lue comme dernier statut de sa fiche. « Éligible » borne
 // le taux d'acceptation, hors faux numéro et hors fermeture sans arbitrage.
 const colonnesFicheRepresentant = `
-    (CASE WHEN sq."id" IS NOT NULL THEN sq."effect" IN ` + effetsRepresentantJoints + `
-          ELSE rca."outcome" IN ` + IssuesRepresentantJointes + ` END)::int AS joint,
+    (` + RepresentantJoint + `)::int                                        AS joint,
     (` + ArbitrageDeLAdhesion + ` = 'AMBASSADEUR')::int                     AS accepte,
     (` + ArbitrageDeLAdhesion + ` = 'REFUS')::int                           AS refuse,
-    (CASE WHEN sq."id" IS NOT NULL THEN sq."effect" = 'SCHEDULE_CALLBACK'
-          ELSE rca."outcome" = 'CALLBACK' END)::int                         AS rappel,
-    (CASE WHEN sq."id" IS NOT NULL
-          THEN sq."effect" IN ` + effetsRepresentantJoints + `
-               AND sq."effect" <> 'WRONG_NUMBER'
-               AND NOT (sq."effect" = 'REFUSED' AND sq."relationStatus" IS NULL)
-          ELSE rca."outcome" IN ('REACHED', 'REFUSED', 'CALLBACK') END)::int AS eligible`
+    (sq."effect" = 'SCHEDULE_CALLBACK')::int                                AS rappel,
+    (sq."effect" NOT IN ('UNREACHABLE', 'WRONG_NUMBER')
+     AND NOT (sq."effect" = 'REFUSED' AND sq."relationStatus" IS NULL))::int AS eligible`
 
 type FiltreDeSupervision struct {
 	ActFrom      string `query:"actFrom"`
@@ -459,8 +449,7 @@ func sqlRendementDesCampagnes(perimetre perimetreSupervision, p *parametresSQL) 
 	           ELSE t."prospectId" = i."prospectId" END`
 	return `
 	WITH tentatives AS (
-	  SELECT "representantId", NULL::text AS "prospectId", "clientCreatedAt",
-	         ("outcome" IN ` + issuesRepresentantSaisissables + ` OR "statutQualificationId" IS NOT NULL) AS traite
+	  SELECT "representantId", NULL::text AS "prospectId", "clientCreatedAt", TRUE AS traite
 	  FROM "rep_call_attempts"
 	  UNION ALL
 	  SELECT NULL::text, "prospectId", "clientCreatedAt", TRUE

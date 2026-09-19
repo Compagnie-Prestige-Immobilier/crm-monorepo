@@ -1,26 +1,24 @@
 'use client';
 
-import { useQuery } from '@tanstack/react-query';
-import { DownloadIcon, FileSpreadsheetIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from '@tanstack/react-router';
+import { DownloadIcon, FileSpreadsheetIcon, PlusIcon, SearchIcon } from 'lucide-react';
+import Link from 'next/link';
+import { memo, useCallback, useState, type ReactNode } from 'react';
+import { toast } from 'sonner';
 
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { DepotClasseur } from '@/components/ventes/depot-classeur';
+import { VenteDetailDialog } from '@/components/ventes/vente-detail-dialog';
+import { VenteParcours } from '@/components/ventes/vente-parcours';
+import { PageReglages } from '@/components/ventes/ventes-reglages';
 import {
   SyntheseSites,
   TableEcheances,
@@ -29,71 +27,30 @@ import {
 } from '@/components/ventes/ventes-tableaux';
 import {
   CLASSEUR_VENTES_URL,
+  archiveVente,
   fetchVentes,
+  fetchVentesConfiguration,
   formatFcfa,
   totalVerse,
+  type CanalVente,
+  type SiteVente,
   type Vente,
+  type VentesData,
 } from '@/lib/data/ventes';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 
-const TOUS = 'TOUS';
-
-interface Filtres {
-  recherche: string;
-  site: string;
-  canal: string;
-  du: string;
-  au: string;
-}
-
-const FILTRES_VIDES: Filtres = { recherche: '', site: TOUS, canal: TOUS, du: '', au: '' };
-
-function filtrer(ventes: readonly Vente[], f: Filtres): Vente[] {
-  const cherche = f.recherche.trim().toLowerCase();
-  const garde: ((vente: Vente) => boolean)[] = [];
-  if (cherche !== '')
-    garde.push((v) => `${v.client} ${v.telephone}`.toLowerCase().includes(cherche));
-  if (f.site !== TOUS) garde.push((v) => v.site === f.site);
-  if (f.canal !== TOUS) garde.push((v) => v.canal === f.canal);
-  if (f.du !== '') garde.push((v) => v.dateSouscription !== null && v.dateSouscription >= f.du);
-  if (f.au !== '') garde.push((v) => v.dateSouscription !== null && v.dateSouscription <= f.au);
-  return ventes.filter((vente) => garde.every((retenir) => retenir(vente)));
-}
-
-const valeursDe = (ventes: readonly Vente[], cle: 'site' | 'canal'): string[] =>
-  [...new Set(ventes.map((vente) => vente[cle]).filter((valeur) => valeur !== ''))].sort();
-
-function ChoixListe(props: {
-  id: string;
-  label: string;
-  tous: string;
-  valeurs: readonly string[];
-  value: string;
-  onChange: (valeur: string) => void;
-}) {
-  const items = [
-    { value: TOUS, label: props.tous },
-    ...props.valeurs.map((v) => ({ value: v, label: v })),
-  ];
-  return (
-    <div className="flex flex-col gap-1.5">
-      <Label htmlFor={props.id}>{props.label}</Label>
-      <Select items={items} value={props.value} onValueChange={(v) => props.onChange(v ?? TOUS)}>
-        <SelectTrigger id={props.id} className="min-w-44">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          {items.map((item) => (
-            <SelectItem key={item.value} value={item.value}>
-              {item.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
+/** Les adresses de la barre : une page chacune, ou une fenêtre ouverte d'emblée. */
+export const VUES_VENTES = [
+  'ventes',
+  'echeances',
+  'sites',
+  'teleconseillers',
+  'nouvelle',
+  'reglages',
+] as const;
+export type VueVentes = (typeof VUES_VENTES)[number];
 
 function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
   const chiffre = ventes.reduce((s, v) => s + v.prixTotal, 0);
@@ -102,7 +59,7 @@ function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
     { label: 'Ventes', valeur: String(ventes.length) },
     { label: 'Chiffre d’affaires', valeur: formatFcfa(chiffre) },
     { label: 'Encaissé', valeur: formatFcfa(verse) },
-    { label: 'À recouvrer', valeur: formatFcfa(Math.max(0, chiffre - verse)) },
+    { label: 'Reste à encaisser', valeur: formatFcfa(Math.max(0, chiffre - verse)) },
     { label: 'Part CPI', valeur: formatFcfa(ventes.reduce((s, v) => s + v.partCpi, 0)) },
   ];
   return (
@@ -119,125 +76,262 @@ function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
   );
 }
 
-export function VentesView() {
-  const [filtres, setFiltres] = useState<Filtres>(FILTRES_VIDES);
-  const telechargement = useFileDownload();
+function SansVente() {
+  return (
+    <EmptyState
+      icon={FileSpreadsheetIcon}
+      title="Aucune vente pour l'instant"
+      description="Cette page se remplit dès la première vente enregistrée."
+      action={
+        <Button size="lg" render={<Link href="/ventes/nouvelle" />}>
+          <PlusIcon aria-hidden="true" /> Nouvelle vente
+        </Button>
+      }
+    />
+  );
+}
+
+function venteAvecId(ventes: readonly Vente[], id: number | null): Vente | null {
+  if (id === null) return null;
+  return ventes.find((vente) => vente.id === id) ?? null;
+}
+
+export function VentesView({ vue = 'ventes' }: { vue?: VueVentes }) {
   const query = useQuery({ queryKey: queryKeys.ventes, queryFn: () => fetchVentes() });
+  const configuration = useQuery({
+    queryKey: queryKeys.ventesConfiguration,
+    queryFn: () => fetchVentesConfiguration(),
+  });
 
   if (query.isPending) return <Skeleton className="h-96 w-full rounded-lg" />;
   if (query.isError)
     return <QueryErrorState error={query.error} onRetry={() => void query.refetch()} />;
 
-  const { classeur, ventes, parTeleconseiller } = query.data;
-  if (classeur === null) {
-    return (
-      <EmptyState
-        icon={FileSpreadsheetIcon}
-        title="Aucun tableau des ventes"
-        description="Importez le classeur Excel des ventes pour suivre les encaissements par site et par client."
-        action={<DepotClasseur premier />}
+  return (
+    <VentesLoaded
+      key={vue}
+      vue={vue}
+      data={query.data}
+      sites={configuration.data?.sites ?? []}
+      canaux={configuration.data?.canaux ?? []}
+    />
+  );
+}
+
+function VentesLoaded({
+  vue,
+  data,
+  sites,
+  canaux,
+}: {
+  vue: VueVentes;
+  data: VentesData;
+  sites: readonly SiteVente[];
+  canaux: readonly CanalVente[];
+}) {
+  const navigate = useNavigate();
+  const [saisieOuverte, setSaisieOuverte] = useState(vue === 'nouvelle');
+  const [venteEditee, setVenteEditee] = useState<Vente | null>(null);
+  const [venteDetailId, setVenteDetailId] = useState<number | null>(null);
+  const [venteAArchiver, setVenteAArchiver] = useState<Vente | null>(null);
+  const queryClient = useQueryClient();
+  // Le parcours ouvert depuis la barre ramène sur le tableau en se fermant,
+  // sinon l'adresse et la surbrillance de la barre resteraient sur lui.
+  const fermerSaisie = useCallback(
+    (open: boolean) => {
+      setSaisieOuverte(open);
+      if (open) return;
+      setVenteEditee(null);
+      if (vue === 'nouvelle') void navigate({ to: '/ventes' });
+    },
+    [navigate, vue],
+  );
+  const archivage = useMutation({
+    mutationFn: (vente: Vente) => archiveVente(vente.id),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: queryKeys.ventes });
+      setVenteAArchiver(null);
+      toast.success('Vente archivée.');
+    },
+    onError: (error) => toastApiError(error, 'La vente n’a pas pu être archivée.'),
+  });
+
+  const { ventes, parTeleconseiller } = data;
+  const venteDetail = venteAvecId(ventes, venteDetailId);
+  const ajouter = useCallback(() => {
+    setVenteEditee(null);
+    setSaisieOuverte(true);
+  }, []);
+  const modifier = useCallback((vente: Vente) => {
+    setVenteEditee(vente);
+    setSaisieOuverte(true);
+  }, []);
+  const voirDetail = useCallback((vente: Vente) => setVenteDetailId(vente.id), []);
+  const archiver = useCallback((vente: Vente) => setVenteAArchiver(vente), []);
+  return (
+    <>
+      {vue === 'echeances' ? (
+        <PageSimple vide={ventes.length === 0}>
+          <TableEcheances ventes={ventes} />
+        </PageSimple>
+      ) : null}
+      {vue === 'teleconseillers' ? (
+        <PageSimple vide={parTeleconseiller.length === 0}>
+          <TableParTeleconseiller lignes={parTeleconseiller} />
+        </PageSimple>
+      ) : null}
+      {vue === 'sites' ? <PageSites ventes={ventes} sites={sites} /> : null}
+      {vue === 'reglages' ? <PageReglages sites={sites} canaux={canaux} /> : null}
+      {PAGES_TABLEAU.has(vue) ? (
+        <PageVentes
+          data={data}
+          onAjouter={ajouter}
+          onEdit={modifier}
+          onDetail={voirDetail}
+          onArchive={archiver}
+        />
+      ) : null}
+
+      <VenteParcours open={saisieOuverte} onOpenChange={fermerSaisie} vente={venteEditee} />
+      <VenteDetailDialog
+        vente={venteDetail}
+        open={venteDetail !== null}
+        onOpenChange={(open) => {
+          if (!open) setVenteDetailId(null);
+        }}
       />
-    );
-  }
+      <ConfirmDialog
+        open={venteAArchiver !== null}
+        onOpenChange={(open) => {
+          if (!open) setVenteAArchiver(null);
+        }}
+        title="Archiver cette vente ?"
+        description="Elle ne sera plus visible dans les ventes actives, mais pourra être restaurée."
+        confirmLabel="Archiver"
+        pending={archivage.isPending}
+        onConfirm={() => {
+          if (venteAArchiver !== null) archivage.mutate(venteAArchiver);
+        }}
+      >
+        {venteAArchiver === null ? null : (
+          <p className="rounded-md bg-muted p-3 text-sm">
+            {venteAArchiver.client} · {venteAArchiver.site} · {formatFcfa(venteAArchiver.prixTotal)}
+          </p>
+        )}
+      </ConfirmDialog>
+    </>
+  );
+}
 
-  const visibles = filtrer(ventes, filtres);
-  const changer = (patch: Partial<Filtres>) => setFiltres((f) => ({ ...f, ...patch }));
+/** Le tableau reste derrière le parcours ouvert depuis la barre. */
+const PAGES_TABLEAU: ReadonlySet<VueVentes> = new Set(['ventes', 'nouvelle']);
 
+function PageSites({ ventes, sites }: { ventes: readonly Vente[]; sites: readonly SiteVente[] }) {
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-[0.875rem] text-muted-foreground">
-          {classeur.nomFichier}, importé le {formatDateTime(classeur.importeLe)} par{' '}
-          {classeur.importePar}
-          {classeur.depuis === null ? '' : `, ventes depuis le ${formatDate(classeur.depuis)}`}
-        </p>
-        <div className="flex flex-wrap gap-2">
-          <Button
-            variant="outline"
-            disabled={telechargement.pending}
-            onClick={() =>
-              void telechargement.download({
-                url: CLASSEUR_VENTES_URL,
-                fileName: classeur.nomFichier,
-                failureMessage: 'Le classeur n’a pas pu être téléchargé.',
-              })
-            }
-          >
-            <DownloadIcon aria-hidden="true" />
-            Télécharger le classeur
-          </Button>
-          <DepotClasseur premier={false} />
-        </div>
-      </div>
-
-      <div className="flex flex-wrap items-end gap-3">
-        <div className="flex min-w-56 flex-1 flex-col gap-1.5">
-          <Label htmlFor="ventes-recherche">Client</Label>
-          <Input
-            id="ventes-recherche"
-            placeholder="Nom ou téléphone"
-            value={filtres.recherche}
-            onChange={(e) => changer({ recherche: e.target.value })}
-          />
-        </div>
-        <ChoixListe
-          id="ventes-site"
-          label="Site"
-          tous="Tous les sites"
-          valeurs={valeursDe(ventes, 'site')}
-          value={filtres.site}
-          onChange={(site) => changer({ site })}
-        />
-        <ChoixListe
-          id="ventes-canal"
-          label="Canal"
-          tous="Tous les canaux"
-          valeurs={valeursDe(ventes, 'canal')}
-          value={filtres.canal}
-          onChange={(canal) => changer({ canal })}
-        />
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="ventes-du">Du</Label>
-          <Input
-            id="ventes-du"
-            type="date"
-            value={filtres.du}
-            onChange={(e) => changer({ du: e.target.value })}
-          />
-        </div>
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="ventes-au">Au</Label>
-          <Input
-            id="ventes-au"
-            type="date"
-            value={filtres.au}
-            onChange={(e) => changer({ au: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <Chiffres ventes={visibles} />
-
-      <Tabs defaultValue="ventes">
-        <TabsList>
-          <TabsTrigger value="ventes">Ventes</TabsTrigger>
-          <TabsTrigger value="echeances">Échéances</TabsTrigger>
-          <TabsTrigger value="sites">Sites</TabsTrigger>
-          <TabsTrigger value="teleconseillers">Téléconseillers</TabsTrigger>
-        </TabsList>
-        <TabsContent value="ventes">
-          <TableVentes ventes={visibles} />
-        </TabsContent>
-        <TabsContent value="echeances">
-          <TableEcheances ventes={visibles} />
-        </TabsContent>
-        <TabsContent value="sites">
-          <SyntheseSites ventes={visibles} />
-        </TabsContent>
-        <TabsContent value="teleconseillers">
-          <TableParTeleconseiller lignes={parTeleconseiller} />
-        </TabsContent>
-      </Tabs>
+      {ventes.length > 0 ? <Chiffres ventes={ventes} /> : null}
+      <SyntheseSites ventes={ventes} configuration={sites} />
     </div>
   );
 }
+
+function PageSimple({ vide, children }: { vide: boolean; children: ReactNode }) {
+  return vide ? <SansVente /> : <>{children}</>;
+}
+
+const chercher = (ventes: readonly Vente[], texte: string): Vente[] => {
+  const cherche = texte.trim().toLowerCase();
+  if (cherche === '') return [...ventes];
+  return ventes.filter((v) => `${v.client} ${v.telephone}`.toLowerCase().includes(cherche));
+};
+
+const PageVentes = memo(function PageVentes({
+  data,
+  onAjouter,
+  onEdit,
+  onDetail,
+  onArchive,
+}: {
+  data: VentesData;
+  onAjouter: () => void;
+  onEdit: (vente: Vente) => void;
+  onDetail: (vente: Vente) => void;
+  onArchive: (vente: Vente) => void;
+}) {
+  const [recherche, setRecherche] = useState('');
+  const telechargement = useFileDownload();
+  const { classeur, ventes } = data;
+  if (ventes.length === 0) {
+    return (
+      <EmptyState
+        icon={FileSpreadsheetIcon}
+        title="Aucune vente enregistrée"
+        description="Enregistrez la première vente en quelques questions, ou importez le classeur Excel existant."
+        action={
+          <div className="flex flex-wrap justify-center gap-2">
+            <Button size="lg" onClick={onAjouter}>
+              <PlusIcon aria-hidden="true" /> Nouvelle vente
+            </Button>
+            <DepotClasseur premier={false} />
+          </div>
+        }
+      />
+    );
+  }
+  const visibles = chercher(ventes, recherche);
+  return (
+    <div className="flex flex-col gap-5">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative min-w-64 flex-1">
+          <SearchIcon
+            className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+            aria-hidden="true"
+          />
+          <Input
+            aria-label="Chercher un client"
+            className="pl-9"
+            placeholder="Chercher un client par nom ou téléphone"
+            value={recherche}
+            onChange={(e) => setRecherche(e.target.value)}
+          />
+        </div>
+        <Button size="lg" onClick={onAjouter}>
+          <PlusIcon aria-hidden="true" /> Nouvelle vente
+        </Button>
+      </div>
+      {visibles.length === 0 ? (
+        <p className="p-6 text-center text-muted-foreground">
+          Aucun client ne correspond à cette recherche.
+        </p>
+      ) : (
+        <TableVentes ventes={visibles} onDetail={onDetail} onEdit={onEdit} onArchive={onArchive} />
+      )}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-[0.875rem] text-muted-foreground">
+        <span>
+          {classeur === null
+            ? `${ventes.length} ventes saisies dans le panneau.`
+            : `Classeur ${classeur.nomFichier}, importé le ${formatDateTime(classeur.importeLe)} par ${classeur.importePar}${classeur.depuis === null ? '' : `, ventes depuis le ${formatDate(classeur.depuis)}`}.`}
+        </span>
+        <div className="flex flex-wrap gap-2">
+          {classeur === null ? null : (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={telechargement.pending}
+              onClick={() =>
+                void telechargement.download({
+                  url: CLASSEUR_VENTES_URL,
+                  fileName: classeur.nomFichier,
+                  failureMessage: 'Le classeur n’a pas pu être téléchargé.',
+                })
+              }
+            >
+              <DownloadIcon aria-hidden="true" /> Télécharger le classeur
+            </Button>
+          )}
+          <DepotClasseur premier={false} />
+        </div>
+      </div>
+    </div>
+  );
+});

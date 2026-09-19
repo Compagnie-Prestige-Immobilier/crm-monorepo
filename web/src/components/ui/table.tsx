@@ -2,9 +2,18 @@ import type * as React from 'react';
 
 import { cn } from '@/lib/utils';
 
-function Table({ className, ...props }: React.ComponentProps<'table'>) {
+function Table({
+  className,
+  containerClassName,
+  ...props
+}: React.ComponentProps<'table'> & {
+  containerClassName?: string | undefined;
+}) {
   return (
-    <div data-slot="table-container" className="relative w-full overflow-x-auto scrollbar-thin">
+    <div
+      data-slot="table-container"
+      className={cn('relative w-full overflow-x-auto scrollbar-thin', containerClassName)}
+    >
       {/* `figure` (tabular-nums) sur la TABLE entière, pas cellule par cellule.
           Un CRM aligne des montants, des compteurs et des dates : en chiffres
           proportionnels, une colonne se décale à chaque rafraîchissement et

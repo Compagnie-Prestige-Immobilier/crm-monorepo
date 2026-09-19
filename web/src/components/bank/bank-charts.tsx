@@ -5,7 +5,7 @@ import { BasicTooltip } from '@nivo/tooltip';
 
 import { useChartTheme } from '@/lib/chart-theme';
 import { formatNumber, formatShortDate } from '@/lib/format';
-import { formatXof, xofToChartNumber } from '@/lib/money';
+import { formatXof, formatXofAxisTick, xofToChartNumber } from '@/lib/money';
 import { usePrefersReducedMotion } from '@/lib/use-prefers-reduced-motion';
 
 export interface ClickableSlice {
@@ -38,12 +38,18 @@ function nivoTheme(theme: ReturnType<typeof useChartTheme>) {
 export function BankRankChart({
   items,
   label: _label,
+  valueFormat = 'count',
 }: {
   items: readonly ClickableSlice[];
   label: string;
+  valueFormat?: 'count' | 'fcfa';
 }) {
   const theme = useChartTheme();
   const reducedMotion = usePrefersReducedMotion();
+  const formatValue = (value: number) =>
+    valueFormat === 'fcfa'
+      ? formatXof(String(Math.round(value)), '0 FCFA')
+      : formatNumber(Math.round(value));
   return (
     <div className="h-full min-h-40">
       <ResponsiveBar
@@ -58,10 +64,23 @@ export function BankRankChart({
         enableLabel={false}
         enableGridX={true}
         enableGridY={false}
-        axisBottom={{ tickSize: 0, tickPadding: 8 }}
+        axisBottom={{
+          tickSize: 0,
+          tickPadding: 8,
+          format: (value) =>
+            valueFormat === 'fcfa' ? formatXofAxisTick(Number(value)) : formatNumber(Number(value)),
+        }}
         axisLeft={{ tickSize: 0, tickPadding: 8 }}
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
+        tooltip={({ indexValue, value, color }) => (
+          <BasicTooltip
+            id={String(indexValue)}
+            value={formatValue(Number(value))}
+            color={color}
+            enableChip
+          />
+        )}
         onClick={(datum) =>
           items.find((item) => item.label === String(datum.indexValue))?.onSelect?.()
         }
@@ -102,13 +121,13 @@ export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) 
         }
         enableArcLinkLabels={false}
         enableArcLabels={false}
-        margin={{ top: 10, right: 118, bottom: 10, left: 10 }}
+        margin={{ top: 10, right: 158, bottom: 10, left: 10 }}
         legends={[
           {
             anchor: 'right',
             direction: 'column',
-            translateX: 110,
-            itemWidth: 100,
+            translateX: 146,
+            itemWidth: 140,
             itemHeight: 20,
             itemsSpacing: 4,
             symbolSize: 9,
@@ -116,6 +135,14 @@ export function BankShareChart({ items }: { items: readonly ClickableSlice[] }) 
         ]}
         theme={nivoTheme(theme)}
         animate={!reducedMotion}
+        tooltip={({ datum }) => (
+          <BasicTooltip
+            id={String(datum.id)}
+            value={formatNumber(Number(datum.value))}
+            color={datum.color}
+            enableChip
+          />
+        )}
         onClick={(datum) => items.find((item) => item.label === String(datum.id))?.onSelect?.()}
       />
     </div>

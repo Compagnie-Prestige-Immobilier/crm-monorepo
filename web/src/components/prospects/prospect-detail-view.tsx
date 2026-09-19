@@ -11,6 +11,7 @@ import { FicheEnTete, type ChiffreDeFiche } from '@/components/fiche-en-tete';
 import { Champ } from '@/components/historique/historique';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
+import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import {
   HistoireDeLaFiche,
@@ -29,7 +30,6 @@ import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/for
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  callOutcomeLabel,
   enrollmentMethodLabel,
   peut,
   PROSPECT_STATUT_LABELS,
@@ -48,9 +48,9 @@ export function chiffresDe(prospect: ProspectRow): ChiffreDeFiche[] {
       label: 'Appels consignés',
       valeur: formatNumber(prospect.callAttemptCount),
       precision:
-        prospect.lastCallOutcome === null
+        prospect.lastReasonLabel === null
           ? 'Jamais appelé'
-          : `Dernier : ${prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastCallOutcome)}`,
+          : `Dernier : ${prospect.lastReasonLabel}`,
     },
     {
       label: 'Dernier appel',
@@ -129,6 +129,12 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             ) : null}
             <BoutonWhatsApp prospect={prospect} />
             <RequalifierFiche prospect={prospect} projet="CHUES" statut={prospect.statut} />
+            <AffecterFiche
+              cible="prospect"
+              id={prospect.id}
+              nom={`${prospect.prenom} ${prospect.nom}`}
+              titulaireId={prospect.ownedByCommercialId}
+            />
             <MarquerVendu prospect={prospect} user={user} />
           </>
         }

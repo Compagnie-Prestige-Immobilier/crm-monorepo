@@ -9,15 +9,26 @@ import { canExportProspects, peut, readsOnly, type Phase2Status } from '@/lib/ty
 const SUIVIS: readonly { value: Phase2Status; label: string }[] = [
   { value: 'INTERESTED', label: 'Intéressés' },
   { value: 'HESITANT', label: 'Hésitants' },
-  { value: 'APPOINTMENT', label: 'Rendez-vous' },
+  { value: 'APPOINTMENT', label: 'Rendez-vous (hors téléphonique)' },
 ];
+
+/** Un rendez-vous téléphonique n'est pas un rendez-vous : l'onglet l'écarte. */
+const RENDEZ_VOUS_TELEPHONIQUE = 'RDV_TELEPHONIQUE';
+
+const sansMotifDe = (statut: Phase2Status): string | null =>
+  statut === 'APPOINTMENT' ? RENDEZ_VOUS_TELEPHONIQUE : null;
 
 export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
   beforeLoad: (contexte: Contexte & { location: { searchStr: string } }) => {
     guardPermission('prospects.superviser')(contexte);
-    const statut = new URLSearchParams(contexte.location.searchStr).get('phase2Status');
+    const params = new URLSearchParams(contexte.location.searchStr);
+    const statut = params.get('phase2Status');
     if (!SUIVIS.some((suivi) => suivi.value === statut)) {
       throw redirect({ href: '/teleconseil/interesses?phase2Status=INTERESTED' });
+    }
+    if (statut === 'APPOINTMENT' && params.get('sansMotif') !== RENDEZ_VOUS_TELEPHONIQUE) {
+      params.set('sansMotif', RENDEZ_VOUS_TELEPHONIQUE);
+      throw redirect({ href: `/teleconseil/interesses?${params.toString()}` });
     }
   },
   component: TeleconseilInteressesPage,
@@ -33,7 +44,8 @@ function TeleconseilInteressesPage() {
       <Tabs
         value={filters.phase2Status}
         onValueChange={(value) => {
-          setFilters({ phase2Status: value as Phase2Status });
+          const statut = value as Phase2Status;
+          setFilters({ phase2Status: statut, sansMotif: sansMotifDe(statut) });
         }}
       >
         <TabsList>

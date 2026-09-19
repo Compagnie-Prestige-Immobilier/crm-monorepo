@@ -23,7 +23,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import {
-  callOutcomeLabel,
   enrollmentMethodLabel,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
@@ -134,17 +133,15 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       },
     },
     {
-      id: 'lastOutcome',
-      accessorKey: 'lastOutcome',
+      id: 'lastReasonLabel',
+      accessorKey: 'lastReasonLabel',
       header: 'Dernier appel',
       cell: ({ row }) => {
-        const { lastOutcome, lastReasonLabel, lastComment, lastAttemptAt } = row.original;
-        if (lastOutcome === null) return <Empty />;
+        const { lastReasonLabel, lastComment, lastAttemptAt } = row.original;
+        if (lastReasonLabel === null) return <Empty />;
         return (
           <div className="min-w-0 max-w-[16rem]">
-            <p className="truncate font-[600]">
-              {lastReasonLabel ?? callOutcomeLabel(lastOutcome)}
-            </p>
+            <p className="truncate font-[600]">{lastReasonLabel}</p>
             {lastComment !== null && lastComment !== '' ? (
               <p className="truncate text-[0.75rem] text-muted-foreground" title={lastComment}>
                 {lastComment}

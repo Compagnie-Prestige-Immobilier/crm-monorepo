@@ -24,8 +24,6 @@ type CompteursProspects struct {
 	Confirmes     int32
 	Injoignables  int32
 	Faux          int32
-	Refus         int32
-	Autres        int32
 	Methodes      int32
 	Rappels       int32
 	Joignables    int32
@@ -49,7 +47,6 @@ type CompteursRepresentants struct {
 	Joints          int32
 	Rappels         int32
 	Injoignables    int32
-	Autres          int32
 	Interroges      int32
 	Qualifies       int32
 	Fiches          int32
@@ -138,8 +135,6 @@ type CompteursDActivite struct {
 	AvgCallSeconds         *float64 `json:"avgCallSeconds"`
 	Unreachable            int      `json:"unreachable"`
 	WrongNumber            int      `json:"wrongNumber"`
-	Refused                int      `json:"refused"`
-	Other                  int      `json:"other"`
 	MethodObtained         int      `json:"methodObtained"`
 	Callback               int      `json:"callback"`
 	ReachRate              *float64 `json:"reachRate"`
@@ -157,7 +152,6 @@ type CompteursDActivite struct {
 	RepReached             int      `json:"repReached"`
 	RepCallback            int      `json:"repCallback"`
 	RepUnreachable         int      `json:"repUnreachable"`
-	RepOther               int      `json:"repOther"`
 	RepContactRate         *float64 `json:"repContactRate"`
 	RepCallbackRate        *float64 `json:"repCallbackRate"`
 	RepQuestioned          int      `json:"repQuestioned"`
@@ -319,33 +313,32 @@ func (perimetre perimetreSupervision) actes(p *parametresSQL) string {
 	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
 	  1                                                 AS appel,
 	  (ca."deviceCallAt" IS NOT NULL)::int              AS confirme,
-	  (ca."outcome" = 'UNREACHABLE')::int               AS injoignable,
-	  (ca."outcome" = 'WRONG_NUMBER')::int              AS faux,
-	  (ca."outcome" = 'REFUSED')::int                   AS refus,
-	  (ca."outcome" = 'OTHER')::int                     AS autre,
-	  (ca."outcome" = 'METHOD_OBTAINED')::int           AS methode,
-	  (ca."outcome" = 'CALLBACK')::int                  AS rappel,
-	  (ca."outcome" NOT IN ` + IssuesNonJointes + `)::int AS joignable,
+	  (NOT ` + ProspectJoint + `)::int                  AS injoignable,
+	  (cr."effect" = 'CLOSE_WRONG_NUMBER')::int         AS faux,
+	  (ca."method" IS NOT NULL)::int                    AS methode,
+	  (cr."effect" = 'SCHEDULE_CALLBACK')::int          AS rappel,
+	  (` + ProspectJoint + `)::int                      AS joignable,
 	  0                                                 AS prospect,
 	  NULL::text                                        AS representant
 	FROM "call_attempts" ca
+	` + JointureMotifIssue + `
 	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT p."createdById", ` + perimetre.tronque(`p."clientCreatedAt"`) + `,
-	  0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL::text
+	  0, 0, 0, 0, 0, 0, 0, 1, NULL::text
 	FROM "prospects" p
 	WHERE p."deletedAt" IS NULL AND ` + perimetre.ficheDuPerimetre(p, `p."id"`) + etSQL + perimetre.fenetre(p, `p."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT rca."performedById", ` + perimetre.tronque(`rca."clientCreatedAt"`) + `,
-	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
+	  0, 0, 0, 0, 0, 0, 0, 0, rca."representantId"
 	FROM "rep_call_attempts" rca
 	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT d."performedById", ` + perimetre.tronque(`d."deviceCallAt"`) + `,
-	  0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL::text
+	  0, 0, 0, 0, 0, 0, 0, 0, NULL::text
 	FROM "device_call_detections" d
 	WHERE ` + perimetre.fenetre(p, `d."deviceCallAt"`) + ` AND CASE
 	  WHEN d."representantId" IS NOT NULL THEN ` + perimetre.representantsVisibles(p, `d."representantId"`) + `
@@ -357,14 +350,14 @@ func (perimetre perimetreSupervision) tentativesRepresentants(p *parametresSQL) 
 	SELECT
 	  rca."performedById"                                AS "userId",
 	  ` + perimetre.tronque(`rca."clientCreatedAt"`) + ` AS bucket,
-	  (rca."outcome" IN ` + issuesRepresentantSaisissables + `)::int AS appel,
-	  (rca."outcome" IN ` + issuesRepresentantSaisissables + ` AND rca."deviceCallAt" IS NOT NULL)::int AS confirme,
-	  (rca."outcome" = 'WRONG_NUMBER')::int              AS faux,
-	  (rca."outcome" IN ` + IssuesRepresentantJointes + `)::int AS joint,
-	  (rca."outcome" = 'CALLBACK')::int                  AS rappel,
-	  (rca."outcome" = 'UNREACHABLE')::int               AS injoignable,
-	  (rca."outcome" NOT IN ` + issuesRepresentantSaisissables + `)::int AS autre
+	  1                                                  AS appel,
+	  (rca."deviceCallAt" IS NOT NULL)::int              AS confirme,
+	  (sq."effect" = 'WRONG_NUMBER')::int                AS faux,
+	  (` + RepresentantJoint + `)::int                   AS joint,
+	  (sq."effect" = 'SCHEDULE_CALLBACK')::int           AS rappel,
+	  (sq."effect" = 'UNREACHABLE')::int                 AS injoignable
 	FROM "rep_call_attempts" rca
+	` + JointureStatutQualification + `
 	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
 }
 
@@ -393,8 +386,7 @@ func (perimetre perimetreSupervision) fichesRepresentants(p *parametresSQL) stri
 	  ` + perimetre.tronque(`rca."clientCreatedAt"`) + ` AS bucket,` + colonnesFicheRepresentant + `
 	FROM "rep_call_attempts" rca
 	` + JointureStatutQualification + `
-	WHERE rca."outcome" IN ` + issuesRepresentantSaisissables + etSQL + perimetre.representantsVisibles(p, `rca."representantId"`) +
-		etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
+	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`) + `
 	ORDER BY rca."representantId", rca."clientCreatedAt" DESC, rca."id" DESC`
 }
 
@@ -403,8 +395,9 @@ func (perimetre perimetreSupervision) fichesProspects(p *parametresSQL) string {
 	SELECT DISTINCT ON (ca."prospectId")
 	  ca."performedById"                                AS "userId",
 	  ` + perimetre.tronque(`ca."clientCreatedAt"`) + ` AS bucket,
-	  (ca."outcome" NOT IN ` + IssuesNonJointes + `)::int AS joint
+	  (` + ProspectJoint + `)::int AS joint
 	FROM "call_attempts" ca
+	` + JointureMotifIssue + `
 	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 	ORDER BY ca."prospectId", ca."clientCreatedAt" DESC, ca."id" DESC`
 }
@@ -444,9 +437,9 @@ func (perimetre perimetreSupervision) journalEtRappels(p *parametresSQL) string 
 	UNION ALL
 	SELECT rca."performedById", ` + perimetre.tronque(`rca."clientCreatedAt"`) + `,
 	  0, 0, 0, 0, 0, 0,
-	  CASE WHEN rca."outcome" IN ` + issuesRepresentantSaisissables + ` AND rca."deviceCallAt" IS NOT NULL
+	  CASE WHEN rca."deviceCallAt" IS NOT NULL
 	    THEN COALESCE(rca."deviceCallDurationSeconds", 0) ELSE 0 END,
-	  (rca."outcome" IN ` + issuesRepresentantSaisissables + ` AND rca."deviceCallAt" IS NOT NULL)::int,
+	  (rca."deviceCallAt" IS NOT NULL)::int,
 	  (rca."deviceCallType" = 'entrant')::int,
 	  (rca."deviceCallType" = 'manque')::int,
 	  0, 0, 0, 0, 0, 0
@@ -499,8 +492,6 @@ func (s *service) lignesParTeleconseiller(ctx context.Context, perimetre perimet
 	  SUM(a.confirme)::int                AS confirmes,
 	  SUM(a.injoignable)::int             AS injoignables,
 	  SUM(a.faux)::int                    AS faux,
-	  SUM(a.refus)::int                   AS refus,
-	  SUM(a.autre)::int                   AS autres,
 	  SUM(a.methode)::int                 AS methodes,
 	  SUM(a.rappel)::int                  AS rappels,
 	  SUM(a.joignable)::int               AS joignables,
@@ -545,7 +536,6 @@ func (s *service) lignesRepresentantsParTeleconseiller(ctx context.Context, peri
 	  SUM(t.joint)::int                   AS joints,
 	  SUM(t.rappel)::int                  AS rappels,
 	  SUM(t.injoignable)::int             AS injoignables,
-	  SUM(t.autre)::int                   AS autres,
 	  COALESCE(MAX(i.interroges), 0)::int AS interroges,
 	  COALESCE(MAX(i.qualifies), 0)::int  AS qualifies,
 	  COALESCE(MAX(f.fiches), 0)::int            AS fiches,
@@ -605,8 +595,6 @@ func (s *service) totauxDesProspects(ctx context.Context, perimetre perimetreSup
 	  COALESCE(SUM(a.confirme), 0)::int    AS confirmes,
 	  COALESCE(SUM(a.injoignable), 0)::int AS injoignables,
 	  COALESCE(SUM(a.faux), 0)::int        AS faux,
-	  COALESCE(SUM(a.refus), 0)::int       AS refus,
-	  COALESCE(SUM(a.autre), 0)::int       AS autres,
 	  COALESCE(SUM(a.methode), 0)::int     AS methodes,
 	  COALESCE(SUM(a.rappel), 0)::int      AS rappels,
 	  COALESCE(SUM(a.joignable), 0)::int   AS joignables,
@@ -641,7 +629,6 @@ func (s *service) totauxDesRepresentants(ctx context.Context, perimetre perimetr
 	  COALESCE(SUM(t.joint), 0)::int       AS joints,
 	  COALESCE(SUM(t.rappel), 0)::int      AS rappels,
 	  COALESCE(SUM(t.injoignable), 0)::int AS injoignables,
-	  COALESCE(SUM(t.autre), 0)::int       AS autres,
 	  (SELECT COUNT(*)::int FROM reponses r WHERE ` + perimetre.membreDeLEquipe(p, `r."userId"`) + `) AS interroges,
 	  (SELECT COALESCE(SUM(r.qualifie), 0)::int FROM reponses r WHERE ` + perimetre.membreDeLEquipe(p, `r."userId"`) + `) AS qualifies,
 	  MAX(f.fiches)::int            AS fiches,
@@ -719,7 +706,7 @@ func (s *service) repartitionParStatut(ctx context.Context, perimetre perimetreS
 	)
 	SELECT
 	  sq.id, sq.code, sq.label, sq."isActive",
-	  (sq."effect" IN ` + effetsRepresentantJoints + `) AS joint,
+	  (` + RepresentantJoint + `) AS joint,
 	  COALESCE(c.count, 0)::int AS count
 	FROM "statuts_qualification" sq
 	LEFT JOIN comptes c ON c."statutId" = sq.id
@@ -763,16 +750,18 @@ func (perimetre perimetreSupervision) appelsSituesDansLeCreneau(p *parametresSQL
 	  ca."clientCreatedAt"                         AS quand,
 	  'prospect'                                   AS famille,
 	  ca."prospectId"::text                        AS cible,
-	  (ca."outcome" NOT IN ` + IssuesNonJointes + `)::int AS joint,
-	  (ca."outcome" = 'METHOD_OBTAINED')::int      AS qualifie
+	  (` + ProspectJoint + `)::int                 AS joint,
+	  (ca."method" IS NOT NULL)::int               AS qualifie
 	FROM "call_attempts" ca
+	` + JointureMotifIssue + `
 	WHERE ` + perimetre.ficheDuPerimetre(p, `ca."prospectId"`) + etSQL + perimetre.fenetre(p, `ca."clientCreatedAt"`) + `
 
 	UNION ALL
 	SELECT rca."performedById", rca."clientCreatedAt", 'representant',
 	  rca."representantId"::text,
-	  (rca."outcome" IN ` + IssuesRepresentantJointes + `)::int, 0
+	  (` + RepresentantJoint + `)::int, 0
 	FROM "rep_call_attempts" rca
+	` + JointureStatutQualification + `
 	WHERE ` + perimetre.representantsVisibles(p, `rca."representantId"`) + etSQL + perimetre.fenetre(p, `rca."clientCreatedAt"`)
 	return `
 	SELECT a.*, ` + creneauDe + ` AS creneau, date_trunc('day', a.quand) AS jour
@@ -980,8 +969,6 @@ func compteursDActivite(prospects CompteursProspects, representants CompteursRep
 		AvgCallSeconds:         moyenneEnSecondes(journal.Duree, journal.Durees),
 		Unreachable:            int(prospects.Injoignables),
 		WrongNumber:            int(prospects.Faux),
-		Refused:                int(prospects.Refus),
-		Other:                  int(prospects.Autres),
 		MethodObtained:         int(prospects.Methodes),
 		Callback:               int(prospects.Rappels),
 		ReachRate:              tauxOuNul(int(prospects.Joignables), int(prospects.Appels)),
@@ -999,7 +986,6 @@ func compteursDActivite(prospects CompteursProspects, representants CompteursRep
 		RepReached:             int(representants.Joints),
 		RepCallback:            int(representants.Rappels),
 		RepUnreachable:         int(representants.Injoignables),
-		RepOther:               int(representants.Autres),
 		RepContactRate:         tauxOuNul(int(representants.Joints), int(representants.Appels)),
 		RepCallbackRate:        tauxOuNul(int(representants.Rappels), int(representants.Appels)),
 		RepQuestioned:          int(representants.Interroges),

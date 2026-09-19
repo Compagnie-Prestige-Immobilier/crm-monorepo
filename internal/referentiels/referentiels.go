@@ -820,7 +820,7 @@ const (
 )
 
 var (
-	referentielsEffetsJoints = []string{exports.IssueJointImport, "REFUSED", "SCHEDULE_CALLBACK", "WRONG_NUMBER"}
+	referentielsEffetsJoints = []string{string(db.StatutQualificationEffectREACHED), "REFUSED", "SCHEDULE_CALLBACK", "WRONG_NUMBER"}
 	referentielsDiacritiques = strings.NewReplacer("à", "a", "â", "a", "ä", "a", "á", "a", "ã", "a", "å", "a", "ç", "c", "é", "e", "è", "e", "ê", "e", "ë", "e", "î", "i", "ï", "i", "í", "i", "ì", "i", "ô", "o", "ö", "o", "ó", "o", "ò", "o", "õ", "o", "ù", "u", "û", "u", "ü", "u", "ú", "u", "ÿ", "y", "ñ", "n", "œ", "oe", "æ", "ae")
 	referentielsEspaces      = regexp.MustCompile(`\s+`)
 	referentielsCodeValide   = regexp.MustCompile(`^[A-Z][A-Z0-9_]*$`)
@@ -834,7 +834,7 @@ func referentielsBranche(effet db.StatutQualificationEffect) []string {
 			return referentielsEffetsJoints
 		}
 	}
-	return []string{string(db.CallOutcomeUNREACHABLE)}
+	return []string{string(db.StatutQualificationEffectUNREACHABLE)}
 }
 
 func referentielsConvertir[S, D any](lignes []S, versDTO func(*S) D) []D {

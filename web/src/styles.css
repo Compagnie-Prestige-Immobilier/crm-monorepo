@@ -39,12 +39,11 @@
   --popover-foreground: #1c0810;
   --border: rgba(99, 2, 16, 0.12);
   --input: transparent;
-  --input-background: #f5ecee;
-  /* WCAG 1.4.11 : le CONTOUR d'un champ doit atteindre 3:1, car son
-     remplissage ne suffit pas à le délimiter : #F5ECEE sur #FAF7F7 ne fait que
-     1,09:1. L'ancienne bordure `--border` tombait à 1,27:1 : les champs
-     n'existaient visuellement pas. Ici 3,24:1 sur le fond, 3,45:1 sur `card`. */
-  --input-border: #af7d84;
+  /* Champ blanc, bordure grise neutre : le rose teintait chaque formulaire.
+     WCAG 1.4.11 : le CONTOUR doit atteindre 3:1 ; #86868B fait 3,3:1 sur le
+     fond et 3,5:1 sur `card`. Le bordeaux ne vient qu'au focus (`ring`). */
+  --input-background: #ffffff;
+  --input-border: #86868b;
   --switch-background: #c4a0aa;
   /* Voile des surfaces modales. Rôle absent de design.md ; ajouté ici plutôt
      qu'en dur dans dialog/sheet (§1.2). Il reste sombre en thème sombre : un

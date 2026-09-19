@@ -35,6 +35,13 @@ const ACTIONS: Record<string, { titre: string; categorie: 'fiche' | 'statut'; va
       categorie: 'statut',
       variant: 'info',
     },
+    'prospect.requalification_encadrement': {
+      titre: 'Requalifiée par l’encadrement',
+      categorie: 'statut',
+      variant: 'info',
+    },
+    'prospect.affectation': { titre: 'Suivi confié', categorie: 'fiche', variant: 'info' },
+    'prospect.vendre': { titre: 'Vendue', categorie: 'statut', variant: 'success' },
   };
 
 const LIBELLES: Record<string, string> = {

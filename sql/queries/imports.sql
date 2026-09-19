@@ -209,8 +209,8 @@ INSERT INTO "representants" (
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportRepCallAttempt :batchexec
-INSERT INTO "rep_call_attempts" ("id", "representantId", "performedById", "outcome", "comment", "clientCreatedAt")
-VALUES (@id, @representant_id, @performed_by_id, @outcome, sqlc.narg('comment'), @client_created_at)
+INSERT INTO "rep_call_attempts" ("id", "representantId", "performedById", "statutQualificationId", "comment", "clientCreatedAt")
+VALUES (@id, @representant_id, @performed_by_id, @statut_qualification_id, sqlc.narg('comment'), @client_created_at)
 ON CONFLICT DO NOTHING;
 
 -- name: InsertImportProspect :batchexec

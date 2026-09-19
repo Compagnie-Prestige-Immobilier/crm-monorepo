@@ -13,13 +13,12 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`DELETE FROM "lot_export_reaffectations" WHERE "lotId"='dev-lot-001'`,
 		`DELETE FROM "lot_export_items" WHERE "lotId"='dev-lot-001'`,
 		`DELETE FROM "lots_export" WHERE "id"='dev-lot-001'`,
-		`INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt","createdAt","updatedAt","relationStatus","prenom","etablissement","contacte","lastCallAt","lastCallById","lastCallOutcome","statutQualificationId")
+		`INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt","createdAt","updatedAt","relationStatus","prenom","etablissement","contacte","lastCallAt","lastCallById","statutQualificationId")
 		SELECT '0199f100-0000-7000-8000-'||lpad(g::text,12,'0'),
 		  prenoms.p||' '||(ARRAY['Diop','Fall','Ndiaye','Sow','Diallo','Sarr','Ba','Gueye','Faye','Thiam','Kane'])[1+(g-1)%11],
 		  '+2217'||(ARRAY['7','8','6','0'])[1+(g-1)%4]||((g*7919)%9000000+1000000)::text,d.id,u.id,jour+ecoule*.2,jour+ecoule*.2,now(),
 		  COALESCE(sq."relationStatus",'CONTACTE'),prenoms.p,
-		  'École de '||d.name,sq.effect <> 'UNREACHABLE',jour+ecoule*.3,u.id,
-		  (ARRAY['REACHED','REFUSED','CALLBACK','UNREACHABLE']::"RepCallOutcome"[])[1+(g-1)/60],sq.id
+		  'École de '||d.name,sq.effect <> 'UNREACHABLE',jour+ecoule*.3,u.id,sq.id
 		FROM generate_series(1,240) g
 		CROSS JOIN LATERAL (SELECT (ARRAY['Aminata','Moussa','Fatou','Ibrahima','Awa','Cheikh','Mariama','Ousmane','Khady','Abdou','Ndèye','Pape'])[1+(g-1)%12] AS p) prenoms
 		CROSS JOIN LATERAL (SELECT date_trunc('day',now())-make_interval(days=>(g-1)%60) AS jour,now()-date_trunc('day',now()) AS ecoule) dates
@@ -27,9 +26,9 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		JOIN (SELECT id,name,row_number() OVER (ORDER BY code) AS rang FROM "departements" WHERE code IN ('DK-DAK','TH-THI','SL-STL','TH-MBO')) d ON d.rang=1+(g-1)%4
 		JOIN "statuts_qualification" sq ON sq.code=(ARRAY['ACCEPTE','REFUSE','A_RAPPELER','PAS_DE_REPONSE'])[1+(g-1)/60]
 		ON CONFLICT (id) DO UPDATE SET "phoneE164"=EXCLUDED."phoneE164","fullName"=EXCLUDED."fullName","prenom"=EXCLUDED."prenom","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
-		  "lastCallAt"=EXCLUDED."lastCallAt","lastCallById"=EXCLUDED."lastCallById","lastCallOutcome"=EXCLUDED."lastCallOutcome",
+		  "lastCallAt"=EXCLUDED."lastCallAt","lastCallById"=EXCLUDED."lastCallById",
 		  "statutQualificationId"=EXCLUDED."statutQualificationId","relationStatus"=EXCLUDED."relationStatus","departementId"=EXCLUDED."departementId"`,
-		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","banqueId","syndicatId","representantId","createdById","clientCreatedAt","createdAt","updatedAt","projet","statut","type","professionId","incomeBandId","employeurId","canalProvenanceId","paysResidenceId","villeResidence","email","phase2Status","enrollmentMethod","enrollmentCapturedAt","enrollmentCapturedById","lastCallAt","lastCallById","lastCallOutcome")
+		`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","banqueId","syndicatId","representantId","createdById","clientCreatedAt","createdAt","updatedAt","projet","statut","type","professionId","incomeBandId","employeurId","canalProvenanceId","paysResidenceId","villeResidence","email","phase2Status","enrollmentMethod","enrollmentCapturedAt","enrollmentCapturedById","lastCallAt","lastCallById","lastReasonId")
 		SELECT '0199f100-0000-7001-8000-'||lpad(g::text,12,'0'),
 		  (ARRAY['Diop','Ndiaye','Fall','Sow','Diallo','Sarr','Ba','Gueye','Faye','Thiam','Kane','Mbaye','Cissé'])[1+(g-1)%13],
 		  (ARRAY['Aminata','Mamadou','Fatou','Ibrahima','Awa','Cheikh','Mariama','Ousmane','Khady','Abdou','Ndèye','Pape'])[1+(g-1)%12],
@@ -40,18 +39,18 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		  (SELECT id FROM "employeurs" ORDER BY code LIMIT 1),c.id,(SELECT id FROM "pays" WHERE code='SN'),'Dakar','dev'||g||'@example.test',
 		  CASE WHEN g<=240 THEN 'METHOD_OBTAINED'::"Phase2Status" ELSE 'PENDING'::"Phase2Status" END,
 		  CASE WHEN g<=240 THEN (ARRAY['PLATFORM','WHATSAPP','VOICE_OR_ELECTRONIC_MESSAGING']::"EnrollmentMethod"[])[1+((g-1)/60+(g-1)%60)%3] END,
-		  CASE WHEN g<=240 THEN jour+ecoule*.6 END,CASE WHEN g<=240 THEN u.id END,jour+ecoule*.6,u.id,
-		  CASE WHEN g<=240 THEN 'METHOD_OBTAINED'::"CallOutcome" WHEN g<=360 THEN 'CALLBACK'::"CallOutcome" ELSE 'UNREACHABLE'::"CallOutcome" END
+		  CASE WHEN g<=240 THEN jour+ecoule*.6 END,CASE WHEN g<=240 THEN u.id END,jour+ecoule*.6,u.id,cr.id
 		FROM generate_series(1,480) g
 		CROSS JOIN LATERAL (SELECT date_trunc('day',now())-make_interval(days=>(g-1)%60) AS jour,now()-date_trunc('day',now()) AS ecoule) dates
 		JOIN "users" u ON u.email=CASE WHEN ((g-1)/120+(g-1)%60)%2=0 THEN 'fixture.awa@cpi.sn' ELSE 'fixture.fatou@cpi.sn' END
+		JOIN "call_outcome_reasons" cr ON cr.code=CASE WHEN g<=240 THEN 'INTERESSE' WHEN g<=360 THEN 'CALLBACK' ELSE 'PAS_DE_REPONSE' END
 		JOIN (SELECT id,row_number() OVER (ORDER BY "shortName") AS rang FROM "banques" WHERE "isActive") b ON b.rang=1+((g-1)/60+(g-1)%60)%4
 		JOIN (SELECT id,row_number() OVER (ORDER BY sigle) AS rang FROM "syndicats" WHERE "isActive") sy ON sy.rang=1+(g-1)%3
 		JOIN (SELECT id,row_number() OVER (ORDER BY code) AS rang FROM "canaux_provenance" WHERE "isActive") c ON c.rang=1+((g-1)/60+(g-1)%60)%4
 		ON CONFLICT (id) DO UPDATE SET "phoneE164"=EXCLUDED."phoneE164",nom=EXCLUDED.nom,prenom=EXCLUDED.prenom,"createdById"=EXCLUDED."createdById","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
 		  "projet"=EXCLUDED."projet","statut"=EXCLUDED."statut","phase2Status"=EXCLUDED."phase2Status","enrollmentMethod"=EXCLUDED."enrollmentMethod",
 		  "enrollmentCapturedAt"=EXCLUDED."enrollmentCapturedAt","enrollmentCapturedById"=EXCLUDED."enrollmentCapturedById",
-		  "lastCallAt"=EXCLUDED."lastCallAt","lastCallById"=EXCLUDED."lastCallById","lastCallOutcome"=EXCLUDED."lastCallOutcome",
+		  "lastCallAt"=EXCLUDED."lastCallAt","lastCallById"=EXCLUDED."lastCallById","lastReasonId"=EXCLUDED."lastReasonId",
 		  "banqueId"=EXCLUDED."banqueId","syndicatId"=EXCLUDED."syndicatId","representantId"=EXCLUDED."representantId","canalProvenanceId"=EXCLUDED."canalProvenanceId"`,
 		`INSERT INTO "prospect_journeys" ("id","prospectId","projet","statut","createdAt","updatedAt","phase2Status","enrollmentMethod","enrollmentCapturedAt","enrollmentCapturedById","convertedAt","convertedById")
 		SELECT gen_random_uuid()::text,p.id,p.projet,p.statut,p."createdAt",now(),p."phase2Status",p."enrollmentMethod",p."enrollmentCapturedAt",p."enrollmentCapturedById",
@@ -59,18 +58,18 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		ON CONFLICT ("prospectId",projet) DO UPDATE SET statut=EXCLUDED.statut,"createdAt"=EXCLUDED."createdAt","phase2Status"=EXCLUDED."phase2Status",
 		  "enrollmentMethod"=EXCLUDED."enrollmentMethod","enrollmentCapturedAt"=EXCLUDED."enrollmentCapturedAt","enrollmentCapturedById"=EXCLUDED."enrollmentCapturedById",
 		  "convertedAt"=EXCLUDED."convertedAt","convertedById"=EXCLUDED."convertedById"`,
-		`INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","method","reasonId","clientCreatedAt","createdAt","fonctionnaire","engagementEnCours","deviceCallType","deviceCallDurationSeconds","deviceCallAt")
-		SELECT replace(p.id,'7001','7003'),p.id,p."lastCallById",p."lastCallOutcome",p."enrollmentMethod",r.id,p."lastCallAt",p."lastCallAt",true,true,
-		  'sortant',CASE WHEN p."lastCallOutcome"='UNREACHABLE' THEN 0 ELSE 120+(right(p.id,3)::int%5)*30 END,p."lastCallAt"
-		FROM "prospects" p JOIN "call_outcome_reasons" r ON r.code=CASE p."lastCallOutcome"::text WHEN 'METHOD_OBTAINED' THEN 'TRANSFERT_ENROLEMENT' WHEN 'UNREACHABLE' THEN 'PAS_DE_REPONSE' ELSE p."lastCallOutcome"::text END WHERE p.id LIKE '0199f100-0000-7001-8000-%'
-		ON CONFLICT (id) DO UPDATE SET "prospectId"=EXCLUDED."prospectId","performedById"=EXCLUDED."performedById",outcome=EXCLUDED.outcome,method=EXCLUDED.method,"reasonId"=EXCLUDED."reasonId",
+		`INSERT INTO "call_attempts" ("id","prospectId","performedById","method","reasonId","clientCreatedAt","createdAt","fonctionnaire","engagementEnCours","deviceCallType","deviceCallDurationSeconds","deviceCallAt")
+		SELECT replace(p.id,'7001','7003'),p.id,p."lastCallById",p."enrollmentMethod",r.id,p."lastCallAt",p."lastCallAt",true,true,
+		  'sortant',CASE WHEN NOT r."countsAsReached" THEN 0 ELSE 120+(right(p.id,3)::int%5)*30 END,p."lastCallAt"
+		FROM "prospects" p JOIN "call_outcome_reasons" r ON r.id=p."lastReasonId" WHERE p.id LIKE '0199f100-0000-7001-8000-%'
+		ON CONFLICT (id) DO UPDATE SET "prospectId"=EXCLUDED."prospectId","performedById"=EXCLUDED."performedById",method=EXCLUDED.method,"reasonId"=EXCLUDED."reasonId",
 		  "clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt","deviceCallType"=EXCLUDED."deviceCallType",
 		  "deviceCallDurationSeconds"=EXCLUDED."deviceCallDurationSeconds","deviceCallAt"=EXCLUDED."deviceCallAt"`,
-		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","outcome","promisedProspects","statutQualificationId","clientCreatedAt","createdAt","deviceCallType","deviceCallDurationSeconds","deviceCallAt")
-		SELECT replace(r.id,'7000','7004'),r.id,r."lastCallById",r."lastCallOutcome",CASE WHEN r."lastCallOutcome"='PROSPECTS_PROMISED' THEN 3 END,
-		  r."statutQualificationId",r."lastCallAt",r."lastCallAt",'sortant',CASE WHEN r."lastCallOutcome"='UNREACHABLE' THEN 0 ELSE 180 END,r."lastCallAt"
-		FROM "representants" r WHERE r.id LIKE '0199f100-0000-7000-8000-%'
-		ON CONFLICT (id) DO UPDATE SET "representantId"=EXCLUDED."representantId","performedById"=EXCLUDED."performedById",outcome=EXCLUDED.outcome,"promisedProspects"=EXCLUDED."promisedProspects",
+		`INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt","createdAt","deviceCallType","deviceCallDurationSeconds","deviceCallAt")
+		SELECT replace(r.id,'7000','7004'),r.id,r."lastCallById",
+		  r."statutQualificationId",r."lastCallAt",r."lastCallAt",'sortant',CASE WHEN sq.effect='UNREACHABLE' THEN 0 ELSE 180 END,r."lastCallAt"
+		FROM "representants" r JOIN "statuts_qualification" sq ON sq.id=r."statutQualificationId" WHERE r.id LIKE '0199f100-0000-7000-8000-%'
+		ON CONFLICT (id) DO UPDATE SET "representantId"=EXCLUDED."representantId","performedById"=EXCLUDED."performedById",
 		  "statutQualificationId"=EXCLUDED."statutQualificationId","clientCreatedAt"=EXCLUDED."clientCreatedAt","createdAt"=EXCLUDED."createdAt",
 		  "deviceCallType"=EXCLUDED."deviceCallType","deviceCallDurationSeconds"=EXCLUDED."deviceCallDurationSeconds","deviceCallAt"=EXCLUDED."deviceCallAt"`,
 		`INSERT INTO "bank_cases" ("id","reference","referenceKey","prospectId","customerName","customerPhoneE164","processingBankId","currentStageId","createdById","updatedAt") SELECT '0199f100-0000-7005-8000-000000000001','DEV-BANK-001','DEV-BANK-001',p."id",p."prenom"||' '||p."nom",p."phoneE164",(SELECT "id" FROM "banques" LIMIT 1),(SELECT "id" FROM "bank_case_stages" WHERE "code"='A_TRAITER' LIMIT 1),(SELECT "id" FROM "users" WHERE "email"='fixture.banque@cpi.sn'),now() FROM "prospects" p ORDER BY p."id" LIMIT 1 ON CONFLICT DO NOTHING`,
@@ -115,7 +114,7 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		ON CONFLICT (id) DO UPDATE SET "toStageId"=EXCLUDED."toStageId","amountXof"=EXCLUDED."amountXof","rejectionReasonId"=EXCLUDED."rejectionReasonId","createdAt"=EXCLUDED."createdAt"`,
 		`INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","comment","sourceAttemptId","updatedAt")
 		SELECT replace(p.id,'7001','7009'),p.id,p."lastCallById",p."lastCallAt"+interval '2 days','Rappeler',replace(p.id,'7001','7003'),now()
-		FROM "prospects" p WHERE p.id LIKE '0199f100-0000-7001-8000-%' AND p."lastCallOutcome"='CALLBACK'
+		FROM "prospects" p JOIN "call_outcome_reasons" cr ON cr.id=p."lastReasonId" AND cr.code='CALLBACK' WHERE p.id LIKE '0199f100-0000-7001-8000-%'
 		ON CONFLICT (id) DO UPDATE SET "assignedToId"=EXCLUDED."assignedToId","scheduledAt"=EXCLUDED."scheduledAt"`,
 		`INSERT INTO "agent_activity_slots" ("userId","slot","firstSeenAt","lastSeenAt","activeSeconds") SELECT "id",date_trunc('hour',now()),now()-interval '1 hour',now()-interval '50 minutes',600 FROM "users" WHERE "email"='fixture.awa@cpi.sn' ON CONFLICT DO NOTHING`,
 		`INSERT INTO "agent_heartbeats" ("userId","lastPullAt","lastPushAt","pendingOps","appVersion","updatedAt") SELECT "id",now(),now(),1,'dev-factory',now() FROM "users" WHERE "email"='fixture.awa@cpi.sn' ON CONFLICT DO NOTHING`,
