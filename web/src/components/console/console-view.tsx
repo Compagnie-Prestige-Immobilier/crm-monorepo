@@ -53,7 +53,6 @@ import { AUCUN_MOTIF, Palier, type Choix } from '@/components/console/console-pa
 import { EtapesProgression } from '@/components/grand-public/etapes';
 import {
   commentaireExigePar,
-  issueDuMotif,
   fetchMotifsAppel,
   motifsRacine,
   sousMotifsDe,
@@ -74,7 +73,6 @@ import { queryKeys } from '@/lib/query-keys';
 import {
   PHASE2_STATUS_LABELS,
   PROSPECT_STATUT_LABELS,
-  callOutcomeLabel,
   type ProspectRow,
   type ProspectStatut,
   type Role,
@@ -779,14 +777,16 @@ function variantDuCode(code: string | null): 'success' | 'destructive' | 'warnin
   return 'info';
 }
 
+function variantDuStatut(row: ProspectRow): 'success' | 'destructive' | 'warning' | 'info' {
+  if (row.phase2Status === 'METHOD_OBTAINED') return variantDuCode(row.phase2Status);
+  return row.lastJoignable === false ? 'warning' : 'info';
+}
+
 function StatutAnnuaire({ row }: { row: ProspectRow }) {
   if (row.lastAttemptAt === null)
     return <span className="text-[0.8125rem] text-muted-foreground">Non qualifié</span>;
-  const label =
-    row.lastReasonLabel ?? (row.lastOutcome ? callOutcomeLabel(row.lastOutcome) : 'Qualifié');
-  const variant = variantDuCode(
-    row.phase2Status === 'METHOD_OBTAINED' ? row.phase2Status : row.lastOutcome,
-  );
+  const label = row.lastReasonLabel ?? 'Qualifié';
+  const variant = variantDuStatut(row);
 
   return (
     <div className="flex flex-col gap-0.5">
@@ -895,7 +895,7 @@ function rattachements(prospect: ProspectRow, projet: Projet): string {
 function resumeDernierAppel(prospect: ProspectRow): string {
   const commentaire = prospect.lastComment === null ? '' : ` · « ${prospect.lastComment} »`;
   if (prospect.lastAttemptAt === null) return `Jamais appelée.${commentaire}`;
-  const issue = prospect.lastOutcome === null ? '' : ` · ${callOutcomeLabel(prospect.lastOutcome)}`;
+  const issue = prospect.lastReasonLabel === null ? '' : ` · ${prospect.lastReasonLabel}`;
   return `Dernier appel : ${formatDateTime(prospect.lastAttemptAt)}${issue}${commentaire}`;
 }
 
@@ -979,7 +979,7 @@ export function draftDe(
 ): AttemptDraft {
   const method = conversion?.method ?? null;
   return {
-    outcome: method === null ? issueDuMotif(choisi) : 'METHOD_OBTAINED',
+    effect: method === null ? choisi.effect : 'CLOSE_METHOD',
     reasonCode: choisi.code,
     method,
     comment,
@@ -1088,7 +1088,7 @@ export function Consignation({
       // ferait refuser toute écriture postérieure. Le dossier passe par lui et
       // non par la tentative : incomplet, le serveur la refuserait en 400.
       const garderBrouillon =
-        draft.outcome === 'CALLBACK' || (draft.method === null && conversion !== null);
+        draft.effect === 'SCHEDULE_CALLBACK' || (draft.method === null && conversion !== null);
       if (garderBrouillon && ouverture !== null) {
         // La borne vient d'ici et non de l'horloge du serveur : la base exige
         // qu'elle suive `openedAt`, qui est l'heure de ce navigateur.

@@ -263,6 +263,8 @@ export interface ProspectFilters {
   statut: ProspectStatut | null;
   segment: BddSegment | null;
   phase2Status: Phase2Status | null;
+  /** Code du motif dont le dernier appel écarte la fiche de la liste. */
+  sansMotif: string | null;
   enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
   /** Revue du closing : `false` isole les demandes converties qui restent à revoir. */
@@ -278,7 +280,6 @@ export interface ProspectFilters {
 export type BddSegment = NonNullable<Schemas['Prospect']['segment']>;
 export type Phase2Status = Schemas['Prospect']['phase2Status'];
 export type EnrollmentMethod = Exclude<ListeProspectsQuery['enrollmentMethod'], undefined>;
-export type CallOutcome = Schemas['QualificationCallAttemptBody']['outcome'];
 export const BDD_SEGMENTS = [
   'BDD1',
   'BDD2',
@@ -344,59 +345,13 @@ export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
   RDV_CPI: 'RDV en agence (Adhésion)',
 };
 
-export const CALL_OUTCOME_LABELS: Record<CallOutcome, string> = {
-  METHOD_OBTAINED: 'Méthode obtenue',
-  UNREACHABLE: 'Injoignable',
-  CALLBACK: 'À rappeler',
-  REFUSED: 'Refus',
-  WRONG_NUMBER: 'Faux numéro',
-  OTHER: 'Autre',
-};
-
-export const CALL_OUTCOME_VARIANTS: Record<CallOutcome, BadgeVariant> = {
-  METHOD_OBTAINED: 'success',
-  UNREACHABLE: 'secondary',
-  CALLBACK: 'info',
-  REFUSED: 'destructive',
-  WRONG_NUMBER: 'warning',
-  OTHER: 'outline',
-};
-
 /**
- * `Prospect.enrollmentMethod` et `.lastOutcome` voyagent en `string` côté Go,
- * pas en énum : une tentative plus ancienne qu'un retrait de méthode ou de
- * motif garde une valeur que le catalogue actuel ignore.
+ * `Prospect.enrollmentMethod` voyage en `string` côté Go, pas en énum : une
+ * tentative plus ancienne qu'un retrait de méthode garde une valeur que le
+ * catalogue actuel ignore.
  */
 export const enrollmentMethodLabel = (method: string): string =>
   ENROLLMENT_METHOD_LABELS[method as EnrollmentMethod] ?? method;
-
-export const callOutcomeLabel = (outcome: string): string =>
-  CALL_OUTCOME_LABELS[outcome as CallOutcome] ?? outcome;
-
-export const callOutcomeVariant = (outcome: string): BadgeVariant =>
-  CALL_OUTCOME_VARIANTS[outcome as CallOutcome] ?? 'outline';
-
-export type RepCallOutcome = Schemas['QualificationRepAttemptBody']['outcome'];
-
-export const REP_CALL_OUTCOME_LABELS: Record<RepCallOutcome, string> = {
-  REACHED: 'Joint',
-  PROSPECTS_PROMISED: 'Prospects promis',
-  UNREACHABLE: 'Injoignable',
-  CALLBACK: 'À rappeler',
-  REFUSED: 'Refus',
-  WRONG_NUMBER: 'Faux numéro',
-  OTHER: 'Autre',
-};
-
-export const REP_CALL_OUTCOME_VARIANTS: Record<RepCallOutcome, BadgeVariant> = {
-  REACHED: 'info',
-  PROSPECTS_PROMISED: 'success',
-  UNREACHABLE: 'secondary',
-  CALLBACK: 'info',
-  REFUSED: 'destructive',
-  WRONG_NUMBER: 'warning',
-  OTHER: 'outline',
-};
 
 type MissingFrom<Enum extends string, Listed extends string> = Exclude<Enum, Listed>;
 

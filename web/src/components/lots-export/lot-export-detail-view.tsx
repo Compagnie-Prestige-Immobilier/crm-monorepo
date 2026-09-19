@@ -55,17 +55,7 @@ import {
 import { apiErrorText } from '@/lib/mutation-feedback';
 import { formatDate, formatDateTime, formatNumber, formatPhone, formatRate } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
-import { CALL_OUTCOME_LABELS, enrollmentMethodLabel, REP_CALL_OUTCOME_LABELS } from '@/lib/types';
-
-/**
- * L'API rend l'issue brute d'un appel de prospect OU de représentant, dans un
- * même champ de texte : les deux tables de libellés se recouvrent sans se
- * contredire.
- */
-const ISSUE_LABELS: Record<string, string> = {
-  ...REP_CALL_OUTCOME_LABELS,
-  ...CALL_OUTCOME_LABELS,
-};
+import { enrollmentMethodLabel } from '@/lib/types';
 
 /**
  * `comment` et `rendezVousAt` sont déclarés sans type dans le DTO de l'API : le
@@ -421,9 +411,7 @@ function RecentAttemptsList({
       {recentAttempts.map((tentative) => (
         <li key={tentative.id} className="flex flex-col gap-1 py-3">
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">
-              {tentative.reasonLabel ?? ISSUE_LABELS[tentative.outcome] ?? tentative.outcome}
-            </Badge>
+            <Badge variant="secondary">{tentative.reasonLabel}</Badge>
             <span className="font-[600]">{tentative.shortCode}</span>
             <span className="text-[0.8125rem] text-muted-foreground tabular-nums">
               {formatPhone(tentative.phoneE164)}

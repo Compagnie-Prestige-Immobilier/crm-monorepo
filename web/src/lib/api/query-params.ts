@@ -54,6 +54,7 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
 export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   return {
     ...toFilterQuery(filters),
+    ...(filters.sansMotif === null ? {} : { sansMotif: filters.sansMotif }),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: filters.sortBy,

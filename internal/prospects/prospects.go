@@ -209,12 +209,11 @@ type Prospect struct {
 	RevueAt                  *string           `json:"revueAt"`
 	RevueByID                *string           `json:"revueById"`
 	RevueByName              *string           `json:"revueByName"`
-	LastOutcome              *string           `json:"lastOutcome"`
 	LastReasonLabel          *string           `json:"lastReasonLabel"`
+	LastJoignable            *bool             `json:"lastJoignable"`
 	LastComment              *string           `json:"lastComment"`
 	LastAttemptAt            *string           `json:"lastAttemptAt"`
 	CallAttemptCount         int32             `json:"callAttemptCount"`
-	LastCallOutcome          *string           `json:"lastCallOutcome"`
 	LastCallAt               *string           `json:"lastCallAt"`
 	LastCallByID             *string           `json:"lastCallById"`
 	LastCallByName           *string           `json:"lastCallByName"`
@@ -314,7 +313,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		EnrollmentCapturedByID: p.EnrollmentCapturedById, EnrollmentCapturedByName: l.EnrollmentCapturedByName,
 		EnrollmentCapturedAt: prospectISOPtr(p.EnrollmentCapturedAt),
 		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
-		LastCallOutcome: prospectEnum(p.LastCallOutcome), LastCallAt: prospectISOPtr(p.LastCallAt),
+		LastCallAt:   prospectISOPtr(p.LastCallAt),
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
@@ -325,8 +324,8 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		item.Journeys = []ProspectJourney{}
 	}
 	if derniere != nil {
-		item.LastOutcome = prospectPtr(string(derniere.Outcome))
-		item.LastReasonLabel = derniere.ReasonLabel
+		item.LastReasonLabel = &derniere.ReasonLabel
+		item.LastJoignable = &derniere.CountsAsReached
 		item.LastComment = derniere.Comment
 		item.LastAttemptAt = prospectPtr(prospectISO(derniere.At))
 		item.CallAttemptCount = derniere.Nombre
@@ -451,6 +450,7 @@ type ProspectListInput struct {
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
+	SansMotif              string `query:"sansMotif" maxLength:"40" doc:"Code du motif dont le dernier appel écarte la fiche."`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar" format:"uuid"`
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
@@ -539,6 +539,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
 		Origin:                 prospectVide(in.Origin),
 		Phase2Status:           prospectTypeEnum[db.Phase2Status](in.Phase2Status),
+		SansMotif:              prospectVide(in.SansMotif),
 		EnrollmentMethod:       prospectTypeEnum[db.EnrollmentMethod](in.EnrollmentMethod),
 		EnrollmentCapturedByID: prospectVide(in.EnrollmentCapturedByID),
 		LastCallByID:           prospectVide(in.LastCallByID),
@@ -572,7 +573,7 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti,
 		CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
 		RepresentantID: arg.RepresentantID, BanqueID: arg.BanqueID, SyndicatID: arg.SyndicatID,
-		Origin: arg.Origin, Phase2Status: arg.Phase2Status, EnrollmentMethod: arg.EnrollmentMethod,
+		Origin: arg.Origin, Phase2Status: arg.Phase2Status, SansMotif: arg.SansMotif, EnrollmentMethod: arg.EnrollmentMethod,
 		EnrollmentCapturedByID: arg.EnrollmentCapturedByID, LastCallByID: arg.LastCallByID,
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
@@ -626,8 +627,8 @@ func (s *service) prospectHandlerLire(ctx context.Context, in *ProspectIDInput) 
 
 type ProspectCallAttempt struct {
 	ID                        string  `json:"id"`
-	Outcome                   string  `json:"outcome"`
-	ReasonLabel               *string `json:"reasonLabel"`
+	ReasonLabel               string  `json:"reasonLabel"`
+	Joignable                 bool    `json:"joignable"`
 	Method                    *string `json:"method"`
 	Comment                   *string `json:"comment"`
 	Email                     *string `json:"email"`
@@ -672,7 +673,7 @@ func (s *service) prospectTentatives(ctx context.Context, in *ProspectIDInput) (
 	for i := range lignes {
 		l := &lignes[i]
 		out.Body.Items = append(out.Body.Items, ProspectCallAttempt{
-			ID: l.ID, Outcome: string(l.Outcome), ReasonLabel: l.ReasonLabel, Method: prospectEnum(l.Method),
+			ID: l.ID, ReasonLabel: l.ReasonLabel, Joignable: l.CountsAsReached, Method: prospectEnum(l.Method),
 			Comment: l.Comment, Email: l.Email, Fonctionnaire: l.Fonctionnaire,
 			EngagementEnCours: l.EngagementEnCours, DureeEtablissementMois: l.DureeEtablissementMois,
 			RendezVousAt: prospectISOPtr(l.RendezVousAt), DeviceCallType: l.DeviceCallType,
@@ -1448,6 +1449,8 @@ var Garde = map[string]socle.Permission{
 	"GET " + prospectCheminID:                                         prospectLecture,
 	"GET /api/v1/prospects/{id}/call-attempts":                        prospectLecture,
 	"GET /api/v1/prospects/{id}/requalifications":                     prospectLecture,
+	"GET /api/v1/prospects/pipeline":                                  prospectLecture,
+	"GET /api/v1/prospects/clients":                                   prospectLecture,
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
@@ -1480,6 +1483,8 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "reassignProspects", Method: http.MethodPost, Path: "/api/v1/prospects/reassign"}, s.prospectReaffecter)
 	huma.Register(api, huma.Operation{OperationID: "marquerProspectRevue", Method: http.MethodPost, Path: "/api/v1/prospects/{id}/revue"}, s.prospectRevue)
 	prospectMonterRequalifications(api, s)
+	prospectMonterPipeline(api, s)
+	prospectMonterClients(api, s)
 	prospectMonterSegment(api, s)
 	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)

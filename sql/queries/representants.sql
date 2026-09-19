@@ -50,7 +50,7 @@ WHERE r."deletedAt" IS NULL
   AND (
     sqlc.narg('suivi')::text IS NULL
     OR (sqlc.narg('suivi')::text = 'A_RAPPELER' AND r."nextCallbackAt" IS NOT NULL)
-    OR (sqlc.narg('suivi')::text = 'INJOIGNABLE' AND r."lastCallOutcome" = 'UNREACHABLE')
+    OR (sqlc.narg('suivi')::text = 'INJOIGNABLE' AND sq."effect" = 'UNREACHABLE')
   )
   AND (
     sqlc.narg('has_prospects')::boolean IS NULL
@@ -91,6 +91,7 @@ LIMIT sqlc.arg('lim')::int OFFSET sqlc.arg('off')::int;
 -- Mêmes prédicats que ListRepresentants : toute retouche ici se reporte là-bas.
 SELECT count(*)::int
 FROM "representants" r
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
 WHERE r."deletedAt" IS NULL
   AND (
     sqlc.arg('reads_everyone')::boolean
@@ -124,7 +125,7 @@ WHERE r."deletedAt" IS NULL
   AND (
     sqlc.narg('suivi')::text IS NULL
     OR (sqlc.narg('suivi')::text = 'A_RAPPELER' AND r."nextCallbackAt" IS NOT NULL)
-    OR (sqlc.narg('suivi')::text = 'INJOIGNABLE' AND r."lastCallOutcome" = 'UNREACHABLE')
+    OR (sqlc.narg('suivi')::text = 'INJOIGNABLE' AND sq."effect" = 'UNREACHABLE')
   )
   AND (
     sqlc.narg('has_prospects')::boolean IS NULL
@@ -200,13 +201,14 @@ SELECT
   a.*,
   u."fullName" AS performed_by_name,
   sq."label" AS statut_qualification_label,
-  COALESCE(sq."requiresComment", false) AS statut_qualification_requires_comment,
+  sq."effect" AS statut_qualification_effect,
+  sq."requiresComment" AS statut_qualification_requires_comment,
   s."suggestedName" AS suggested_name,
   s."suggestedPhoneE164" AS suggested_phone_e164,
   s."note" AS suggested_note
 FROM "rep_call_attempts" a
 JOIN "users" u ON u."id" = a."performedById"
-LEFT JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
+JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
 LEFT JOIN "representant_suggestions" s ON s."sourceAttemptId" = a."id"
 WHERE a."representantId" = $1
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC;
@@ -265,3 +267,8 @@ WHERE "representantId" = $1 AND "deletedAt" IS NULL;
 -- name: SoftDeleteRepresentant :execrows
 UPDATE "representants" SET "deletedAt" = now(), "rev" = "rev" + 1
 WHERE "id" = $1 AND "deletedAt" IS NULL;
+
+-- name: AffecterRepresentant :one
+UPDATE "representants" r SET "createdById" = @vers::text, "rev" = r."rev" + 1
+WHERE r."id" = @id::text AND r."deletedAt" IS NULL
+RETURNING (SELECT u."fullName" FROM "users" u WHERE u."id" = @vers::text)::text AS "versNom";

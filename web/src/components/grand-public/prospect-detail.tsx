@@ -12,6 +12,7 @@ import { DetailBackLink } from '@/components/detail-back-link';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { FicheEnTete } from '@/components/fiche-en-tete';
 import { chiffresDe } from '@/components/prospects/prospect-detail-view';
+import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import { ChampsAjoutes } from '@/components/prospects/champs-ajoutes';
 import { HistoireDeLaFiche } from '@/components/prospects/histoire-fiche';
@@ -25,6 +26,7 @@ import {
   formatDureeMois,
   updateGrandPublicConsent,
 } from '@/lib/data/grand-public';
+import { fetchProspect } from '@/lib/data/prospects';
 import {
   Dialog,
   DialogContent,
@@ -46,7 +48,6 @@ import { formatDate, formatDateTime, formatPhone } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  callOutcomeLabel,
   MODE_EPARGNE_LABELS,
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
@@ -279,13 +280,11 @@ function ActionsConsentement({
 }
 
 function DernierAppel({ prospect }: { prospect: ProspectRow }) {
-  if (prospect.lastOutcome === null) return <Absent>Jamais appelé</Absent>;
+  if (prospect.lastReasonLabel === null) return <Absent>Jamais appelé</Absent>;
 
   return (
     <span className="flex flex-col gap-0.5">
-      <span className="font-[600]">
-        {prospect.lastReasonLabel ?? callOutcomeLabel(prospect.lastOutcome)}
-      </span>
+      <span className="font-[600]">{prospect.lastReasonLabel}</span>
       {prospect.lastComment !== null && prospect.lastComment !== '' ? (
         <span className="text-[0.8125rem] text-muted-foreground">{prospect.lastComment}</span>
       ) : null}
@@ -423,6 +422,15 @@ export function GrandPublicProspectDetail({
               projet="GRAND_PUBLIC"
               statut={journey.statut}
               onRequalifiee={refresh}
+            />
+            <AffecterFiche
+              cible="prospect"
+              id={prospect.id}
+              nom={`${prospect.prenom} ${prospect.nom}`}
+              titulaireId={prospect.ownedByCommercialId}
+              onAffectee={() => {
+                void fetchProspect(prospect.id).then(refresh);
+              }}
             />
           </>
         }

@@ -34,11 +34,10 @@ SELECT EXISTS (SELECT 1 FROM "rep_call_attempts" WHERE "id" = $1);
 
 -- name: InsererRepAttempt :execrows
 INSERT INTO "rep_call_attempts" (
-  "id", "representantId", "performedById", "outcome", "promisedProspects", "comment",
+  "id", "representantId", "performedById", "comment",
   "callbackAt", "etablissementConfirme", "numeroConfirme", "contacte", "connaitUES",
   "syndicat", "statutQualificationId", "clientCreatedAt")
-VALUES (@id, @representant_id, @performed_by_id,
-        CAST(@outcome AS text)::"RepCallOutcome", @promised_prospects, @comment,
+VALUES (@id, @representant_id, @performed_by_id, @comment,
         @callback_at, @etablissement_confirme, @numero_confirme, @contacte, @connait_ues,
         @syndicat, @statut_qualification_id, @client_created_at)
 ON CONFLICT ("id") DO NOTHING;
@@ -61,8 +60,6 @@ UPDATE "representants" SET
   "contacte" = COALESCE(sqlc.narg('contacte'), "contacte"),
   "statutQualificationId" = COALESCE(sqlc.narg('statut_qualification_id'), "statutQualificationId"),
   "phoneE164" = COALESCE(sqlc.narg('phone_e164'), "phoneE164"),
-  "lastCallOutcome" = CASE WHEN @maj_dernier_appel::bool
-    THEN CAST(sqlc.narg('last_call_outcome') AS text)::"RepCallOutcome" ELSE "lastCallOutcome" END,
   "lastCallAt" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_at') ELSE "lastCallAt" END,
   "lastCallById" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_by_id') ELSE "lastCallById" END,
   "nextCallbackAt" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('next_callback_at') ELSE "nextCallbackAt" END,
@@ -146,11 +143,10 @@ FROM "call_outcome_reasons" WHERE "code" = $1;
 
 -- name: InsererCallAttempt :execrows
 INSERT INTO "call_attempts" (
-  "id", "prospectId", "performedById", "outcome", "reasonId", "method", "comment",
+  "id", "prospectId", "performedById", "reasonId", "method", "comment",
   "email", "fonctionnaire", "engagementEnCours", "dureeEtablissementMois",
   "rendezVousAt", "clientCreatedAt")
-VALUES (@id, @prospect_id, @performed_by_id, CAST(@outcome AS text)::"CallOutcome",
-        @reason_id, CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", @comment,
+VALUES (@id, @prospect_id, @performed_by_id, @reason_id, CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", @comment,
         @email, @fonctionnaire, @engagement_en_cours, @duree_etablissement_mois,
         @rendez_vous_at, @client_created_at)
 ON CONFLICT ("id") DO NOTHING;
@@ -171,14 +167,41 @@ UPDATE "prospects" SET
   "champsLibres" = CASE WHEN @maj_champs_libres::bool
     THEN COALESCE("champsLibres", '{}'::jsonb) || sqlc.narg('champs_libres')::jsonb
     ELSE "champsLibres" END,
-  "lastCallOutcome" = CASE WHEN @maj_dernier_appel::bool
-    THEN CAST(sqlc.narg('last_call_outcome') AS text)::"CallOutcome" ELSE "lastCallOutcome" END,
+  "lastReasonId" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_reason_id') ELSE "lastReasonId" END,
   "lastCallAt" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_at') ELSE "lastCallAt" END,
   "lastCallById" = CASE WHEN @maj_dernier_appel::bool THEN sqlc.narg('last_call_by_id') ELSE "lastCallById" END,
   "rev" = "rev" + CASE WHEN @maj_fiche::bool THEN 1 ELSE 0 END
 WHERE "id" = @id
 RETURNING "id", "projet", "statut", "rev", "updatedAt", "lastCallAt", "incomeBandId",
           "phoneE164", "whatsappStatus", "whatsappE164";
+
+-- name: ProspectPourRequalification :one
+SELECT p."id", p."projet", p."statut", p."lastCallById", p."createdById",
+       COALESCE(cr."label", '')::text AS "motifLabel",
+       COALESCE(t."fullName", '')::text AS "titulaireNom"
+FROM "prospects" p
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = p."lastReasonId"
+LEFT JOIN "users" t ON t."id" = p."createdById"
+WHERE p."id" = $1 AND p."deletedAt" IS NULL;
+
+-- name: RequalifierMotifProspect :exec
+UPDATE "prospects" SET "lastReasonId" = @reason_id::text, "rev" = "rev" + 1 WHERE "id" = @id;
+
+-- name: RepresentantPourRequalification :one
+SELECT r."relationStatus", r."createdById", COALESCE(sq."label", '')::text AS "statutLabel",
+       COALESCE(t."fullName", '')::text AS "titulaireNom"
+FROM "representants" r
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
+LEFT JOIN "users" t ON t."id" = r."createdById"
+WHERE r."id" = $1 AND r."deletedAt" IS NULL;
+
+-- name: RequalifierRepresentant :exec
+UPDATE "representants" SET
+  "statutQualificationId" = @statut_qualification_id,
+  "nextCallbackAt" = sqlc.narg('next_callback_at'),
+  "nextCallbackOrigine" = CAST(sqlc.narg('next_callback_origine') AS text)::"RappelOrigine",
+  "rev" = "rev" + 1
+WHERE "id" = @id;
 
 -- name: SupplanterRappels :exec
 UPDATE "scheduled_callbacks" SET "status" = 'SUPERSEDED'
@@ -459,3 +482,20 @@ FROM "prospects" p
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 WHERE p."id" = $1;
+
+-- Une fiche que personne ne suit encore (titulaire = compte d'import) va au
+-- premier qui l'appelle ; entre téléconseillers, elle change de main seulement
+-- quand le second joint la personne.
+-- name: PrendreLaFiche :execrows
+UPDATE "prospects" p SET "createdById" = @agent, "rev" = p."rev" + 1
+WHERE p."id" = @id AND p."createdById" <> @agent
+  AND (@joint::bool OR EXISTS (SELECT 1 FROM "users" u WHERE u."id" = p."createdById" AND u."role" = 'ADMIN'));
+
+-- name: PrendreLeRepresentant :execrows
+UPDATE "representants" r SET "createdById" = @agent, "rev" = r."rev" + 1
+WHERE r."id" = @id AND r."createdById" <> @agent
+  AND (@joint::bool OR EXISTS (SELECT 1 FROM "users" u WHERE u."id" = r."createdById" AND u."role" = 'ADMIN'));
+
+-- name: TransfererRappels :exec
+UPDATE "scheduled_callbacks" SET "assignedToId" = @vers
+WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';

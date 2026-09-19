@@ -20,14 +20,7 @@ import {
   type SegmentChangeRow,
 } from '@/lib/data/prospects';
 import { formatDateTime, formatDetectedCall, formatDeviceCall, formatNumber } from '@/lib/format';
-import {
-  SEGMENT_LABELS,
-  callOutcomeLabel,
-  callOutcomeVariant,
-  enrollmentMethodLabel,
-  type ProspectRow,
-  type Role,
-} from '@/lib/types';
+import { SEGMENT_LABELS, enrollmentMethodLabel, type ProspectRow, type Role } from '@/lib/types';
 
 export const NO_VALUE = '–';
 
@@ -88,15 +81,14 @@ function evenementAppel(appel: ProspectCallAttempt): EvenementHistorique {
     id: appel.id,
     categorie: 'appel',
     at: appel.clientCreatedAt,
-    titre: appel.reasonLabel ?? callOutcomeLabel(appel.outcome),
-    variant: callOutcomeVariant(appel.outcome),
+    titre: appel.reasonLabel,
+    variant: appel.joignable ? 'success' : 'warning',
     resume: resumeAppel(appel),
     acteur: appel.performedByName,
     source: appel.deviceCallAt === null ? 'Non confirmé par le téléphone' : formatDeviceCall(appel),
     detail: (
       <>
         <dl className="grid gap-3 sm:grid-cols-2">
-          <Champ label="Issue">{callOutcomeLabel(appel.outcome)}</Champ>
           <Champ label="Motif retenu">{ouVide(appel.reasonLabel, 'Aucun')}</Champ>
           <Champ label="Téléphone">{formatDeviceCall(appel).replace('Téléphone : ', '')}</Champ>
           <Champ label="Temps de traitement">
@@ -126,9 +118,7 @@ function evenementAppel(appel: ProspectCallAttempt): EvenementHistorique {
         </section>
         {appel.comment === null || appel.comment === '' ? null : (
           <section className="flex flex-col gap-1">
-            <p className="eyebrow text-muted-foreground">
-              {appel.outcome === 'OTHER' ? 'Motif' : 'Commentaire'}
-            </p>
+            <p className="eyebrow text-muted-foreground">Commentaire</p>
             <p className="whitespace-pre-wrap">{appel.comment}</p>
           </section>
         )}

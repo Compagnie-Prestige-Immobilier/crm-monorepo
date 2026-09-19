@@ -31,7 +31,6 @@ async function semer(role: string): Promise<FicheSemee> {
 
 interface ConversionEnBase {
   attemptId: string;
-  outcome: string;
   method: string | null;
   email: string | null;
   fonctionnaire: boolean | null;
@@ -51,7 +50,7 @@ async function lireConversion(prospectId: string): Promise<ConversionEnBase> {
   let lu: ConversionEnBase | null = null;
   await avecBase(async (client) => {
     const { rows } = await client.query<ConversionEnBase>(
-      `SELECT a.id AS "attemptId", a.outcome::text AS outcome, a.method::text AS method, a.email,
+      `SELECT a.id AS "attemptId", a.method::text AS method, a.email,
               a.fonctionnaire, a."engagementEnCours", a."dureeEtablissementMois", a."rendezVousAt",
               a.comment, p.profession, p."phase2Status"::text AS "phase2Status",
               p."enrollmentMethod"::text AS "enrollmentMethod", b.name AS "banqueName",
@@ -215,7 +214,6 @@ test.describe('parcours 5, convertir un prospect', () => {
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     const conversion = await lireConversion(fiche.id);
-    expect(conversion.outcome).toBe('METHOD_OBTAINED');
     expect(conversion.method).toBe('APPOINTMENT');
     expect(conversion.email).toBe(email);
     expect(conversion.fonctionnaire).toBe(true);

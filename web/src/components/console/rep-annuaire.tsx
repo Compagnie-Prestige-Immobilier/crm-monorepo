@@ -109,7 +109,6 @@ export function ResultatsAnnuaire({
               status={row.relationStatus}
               label={row.statutQualificationLabel}
               effect={row.statutQualificationEffect}
-              lastCallOutcome={row.lastCallOutcome}
             />
           </button>
         </li>

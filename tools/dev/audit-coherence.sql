@@ -5,11 +5,11 @@
 \timing off
 
 WITH dernier AS (
-  SELECT DISTINCT ON (a."prospectId") a."prospectId", a."outcome", a."method", r."effect"
+  SELECT DISTINCT ON (a."prospectId") a."prospectId", a."reasonId", a."method", r."effect"
   FROM call_attempts a JOIN call_outcome_reasons r ON r."id" = a."reasonId"
   ORDER BY a."prospectId", a."clientCreatedAt" DESC, a."id" DESC
 ), attendu AS (
-  SELECT d."prospectId", d."outcome", CASE
+  SELECT d."prospectId", d."reasonId", CASE
       WHEN d."effect"::text = 'CLOSE_UNREACHABLE' THEN 'UNREACHABLE'
       WHEN d."effect"::text = 'CLOSE_INTERESTED' THEN 'INTERESTED'
       WHEN d."effect"::text = 'CLOSE_HESITANT' THEN 'HESITANT'
@@ -22,27 +22,14 @@ WITH dernier AS (
   FROM dernier d
 )
 SELECT * FROM (
-  SELECT 'statuts : appel sans motif' AS controle,
-         count(*) FROM call_attempts WHERE "reasonId" IS NULL
-  UNION ALL SELECT 'statuts : appel sur un motif éteint',
+  SELECT 'statuts : appel sur un motif éteint' AS controle,
          count(*) FROM call_attempts a JOIN call_outcome_reasons r ON r."id" = a."reasonId" WHERE NOT r."isActive"
-  UNION ALL SELECT 'statuts : famille de l''appel hors effet du motif',
-         count(*) FROM call_attempts a JOIN call_outcome_reasons r ON r."id" = a."reasonId"
-         WHERE a."outcome"::text <> CASE
-           WHEN a."method" IS NOT NULL THEN 'METHOD_OBTAINED'
-           WHEN r."effect"::text = 'CLOSE_UNREACHABLE' THEN 'UNREACHABLE'
-           WHEN r."effect"::text = 'KEEP_OPEN' AND NOT r."countsAsReached" THEN 'UNREACHABLE'
-           WHEN r."effect"::text IN ('CLOSE_REFUSED', 'CLOSE_LOST') THEN 'REFUSED'
-           WHEN r."effect"::text = 'CLOSE_WRONG_NUMBER' THEN 'WRONG_NUMBER'
-           WHEN r."effect"::text IN ('SCHEDULE_CALLBACK', 'CLOSE_APPOINTMENT') THEN 'CALLBACK'
-           WHEN r."effect"::text = 'CLOSE_METHOD' THEN 'METHOD_OBTAINED'
-           ELSE 'OTHER' END
   UNION ALL SELECT 'fiches : état hors dernier statut posé',
          count(*) FROM prospects p JOIN attendu e ON e."prospectId" = p."id"
          WHERE p."phase2Status"::text <> e.phase2 AND p."enrollmentMethod" IS NULL
-  UNION ALL SELECT 'fiches : dernier appel désaccordé',
+  UNION ALL SELECT 'fiches : dernier motif désaccordé',
          count(*) FROM prospects p JOIN attendu e ON e."prospectId" = p."id"
-         WHERE p."lastCallOutcome" IS DISTINCT FROM e."outcome"
+         WHERE p."lastReasonId" IS DISTINCT FROM e."reasonId"
   UNION ALL SELECT 'fiches : classée sans aucun appel',
          count(*) FROM prospects p WHERE p."phase2Status" <> 'PENDING'
            AND NOT EXISTS (SELECT 1 FROM call_attempts a WHERE a."prospectId" = p."id")
@@ -84,17 +71,12 @@ SELECT * FROM (
   UNION ALL SELECT 'campagnes : réaffectation vers un compte hors équipe',
          count(*) FROM lot_export_reaffectations r
          WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u."id" = r."toAssigneeId")
-  -- Avant le referentiel du 7 septembre 2026, un appel de representant ne posait
-  -- pas de statut : seuls les appels d'apres comptent comme un manque.
-  UNION ALL SELECT 'représentants : appel sans statut posé depuis le référentiel',
-         count(*) FROM rep_call_attempts a WHERE a."statutQualificationId" IS NULL
-           AND a."clientCreatedAt" > (SELECT min("createdAt")::date + 1 FROM statuts_qualification)
   UNION ALL SELECT 'représentants : dernier appel désaccordé du statut posé',
          count(*) FROM representants r JOIN (
-           SELECT DISTINCT ON (a."representantId") a."representantId", a."outcome"
+           SELECT DISTINCT ON (a."representantId") a."representantId", a."statutQualificationId"
            FROM rep_call_attempts a ORDER BY a."representantId", a."clientCreatedAt" DESC, a."id" DESC) d
            ON d."representantId" = r."id"
-         WHERE r."lastCallOutcome" IS DISTINCT FROM d."outcome"
+         WHERE r."statutQualificationId" IS DISTINCT FROM d."statutQualificationId"
   UNION ALL SELECT 'représentants : ambassadeur sans appel ni statut posé',
          count(*) FROM representants r WHERE r."relationStatus" = 'AMBASSADEUR'
            AND r."statutQualificationId" IS NULL

@@ -12,6 +12,7 @@ import type { Projet, ProspectFilters } from '@/lib/types';
 export const queryKeys = {
   session: ['session'] as const,
   ventes: ['ventes'] as const,
+  ventesConfiguration: ['ventes', 'configuration'] as const,
   piecesDeposees: (inscriptionId: string) => ['pieces-deposees', inscriptionId] as const,
   reference: ['reference'] as const,
 

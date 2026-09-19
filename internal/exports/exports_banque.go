@@ -587,7 +587,7 @@ func (g *exportClasseurGlobal) ligneRepresentant(reps, rappels *exportFeuille, r
 		exportLibelle(exportLibellesWhatsapp, r.WhatsappStatut), r.Whatsapp,
 		exportCelluleTexte(r.Profession), exportCelluleTexte(r.Syndicat), exportCelluleOuiNon(r.ConnaitUES),
 		exportCelluleOuiNon(r.Contacte), exportCelluleTexte(r.Notes),
-		exportLibelle(exportLibellesIssueRepresentant, r.DerniereIssue), c.horodate(r.LastCallAt),
+		r.DerniereIssue, c.horodate(r.LastCallAt),
 		exportCelluleTexte(r.DernierAppelPar), c.horodate(r.NextCallbackAt), r.RelanceOrigine,
 		excelize.Cell{StyleID: c.date, Value: r.ClientCreatedAt},
 		excelize.Cell{StyleID: c.date, Value: r.CreatedAt},
@@ -764,9 +764,9 @@ func (g *exportClasseurGlobal) conversions(ctx context.Context) error {
 
 var exportEntetesAppels = []string{
 	exportEnteteIdentifiant, exportEnteteType, exportEnteteIdentifiantFiche, ExportEnteteNom, ExportEnteteTelephone, ExportEnteteTeleconseiller,
-	exportEnteteIdentifiantAgent, exportEnteteDate, "Résultat", "Motif", exportEnteteCommentaire, "Méthode",
+	exportEnteteIdentifiantAgent, exportEnteteDate, "Motif", exportEnteteCommentaire, "Méthode",
 	"Rendez-vous", "E-mail", exportLibelleFonctionnaire, "Engagement bancaire",
-	"Ancienneté établissement en mois", "Prospects promis", "Rappel promis",
+	"Ancienneté établissement en mois", "Rappel promis",
 	"Établissement confirmé", "Numéro confirmé", "Déjà contacté", "Connaît UES", ExportEnteteSyndicat,
 	"Qualification", "Type appel appareil", "Durée en secondes", "Date appel appareil", exportEnteteCreeLe,
 }
@@ -800,10 +800,10 @@ func (g *exportClasseurGlobal) appelsProspects(ctx context.Context, f *exportFeu
 			if err := f.ecrire(a.ID, "Prospect", a.ProspectId, strings.TrimSpace(a.Prenom+" "+a.Nom),
 				a.PhoneE164, a.Teleconseiller, a.PerformedById,
 				excelize.Cell{StyleID: c.date, Value: a.ClientCreatedAt},
-				exportLibelle(exportLibellesIssue, a.Issue), exportCelluleTexte(a.Motif), exportCelluleTexte(a.Comment),
+				a.Motif, exportCelluleTexte(a.Comment),
 				exportLibelle(ExportLibellesMethode, a.Methode), c.horodate(a.RendezVousAt),
 				exportCelluleTexte(a.Email), exportCelluleOuiNon(a.Fonctionnaire), exportCelluleOuiNon(a.EngagementEnCours),
-				exportCelluleNombre(a.DureeEtablissementMois), "", "", "", "", "", "", "", "",
+				exportCelluleNombre(a.DureeEtablissementMois), "", "", "", "", "", "", "",
 				exportCelluleTexte(a.DeviceCallType), exportCelluleNombre(a.DeviceCallDurationSeconds),
 				c.horodate(a.DeviceCallAt), excelize.Cell{StyleID: c.date, Value: a.CreatedAt}); err != nil {
 				return err
@@ -829,11 +829,11 @@ func (g *exportClasseurGlobal) appelsRepresentants(ctx context.Context, f *expor
 			g.compter("Appels par mois", a.ClientCreatedAt.Format("2006-01"))
 			if err := f.ecrire(a.ID, ExportEnteteRepresentant, a.RepresentantId, a.FullName, a.PhoneE164,
 				a.Teleconseiller, a.PerformedById, excelize.Cell{StyleID: c.date, Value: a.ClientCreatedAt},
-				exportLibelle(exportLibellesIssueRepresentant, a.Issue), "", exportCelluleTexte(a.Comment), "", "", "", "", "", "",
-				exportCelluleNombre(a.PromisedProspects), c.horodate(a.CallbackAt),
+				"", exportCelluleTexte(a.Comment), "", "", "", "", "", "",
+				c.horodate(a.CallbackAt),
 				exportCelluleOuiNon(a.EtablissementConfirme), exportCelluleOuiNon(a.NumeroConfirme),
 				exportCelluleOuiNon(a.Contacte), exportCelluleOuiNon(a.ConnaitUES), exportCelluleTexte(a.Syndicat),
-				exportCelluleTexte(a.Qualification), exportCelluleTexte(a.DeviceCallType),
+				a.Qualification, exportCelluleTexte(a.DeviceCallType),
 				exportCelluleNombre(a.DeviceCallDurationSeconds), c.horodate(a.DeviceCallAt),
 				excelize.Cell{StyleID: c.date, Value: a.CreatedAt}); err != nil {
 				return err
@@ -946,12 +946,12 @@ func (g *exportClasseurGlobal) affectations(ctx context.Context, f *exportFeuill
 func (g *exportClasseurGlobal) valeursAffectation(lot *db.ExportGlobalCampagnesRow, item *db.ExportGlobalAffectationsRow, repartition *exportRepartition) []any {
 	nature, fiche := ExportEnteteRepresentant, exportChaineOuVide(item.RepresentantId)
 	nom, phone := exportChaineOuVide(item.FullName), exportChaineOuVide(item.RepresentantPhone)
-	issue, appel := exportLibelle(exportLibellesIssueRepresentant, item.RepresentantIssue), item.RepresentantAppel
+	issue, appel := item.RepresentantIssue, item.RepresentantAppel
 	if item.ProspectId != nil {
 		nature, fiche = "Prospect", exportChaineOuVide(item.ProspectId)
 		nom = strings.TrimSpace(exportChaineOuVide(item.Prenom) + " " + exportChaineOuVide(item.Nom))
 		phone = exportChaineOuVide(item.ProspectPhone)
-		issue, appel = exportLibelle(exportLibellesIssue, item.ProspectIssue), item.ProspectAppel
+		issue, appel = item.ProspectIssue, item.ProspectAppel
 	}
 	objectif := any("")
 	if repartition != nil && item.AssigneeId != nil {

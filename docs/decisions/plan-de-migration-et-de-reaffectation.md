@@ -145,8 +145,42 @@ Règles de reprise :
 - Retirer un téléconseiller d'une campagne ne redistribue toujours que ses
   fiches non traitées.
 - Bouton « Requalifier » sur les fiches CHUES et Grand Public, réservé à
-  superviseur, direction et admin : À traiter (remise à zéro), Contacté, Perdu.
-  Une fiche convertie ne se requalifie pas. Le geste est audité.
+  superviseur, direction et admin : À traiter (remise à zéro), ou un motif du
+  référentiel, joignable ou injoignable, que la fiche suit comme après un appel
+  sans qu'aucun appel soit compté à personne ; le rappel promis revient au
+  dernier appelant. Même bouton sur la fiche représentant, avec un statut de
+  qualification (18 septembre 2026). Une fiche convertie ne se requalifie pas.
+  Le geste est audité.
+- Bouton « Affecter à » sur le détail d'une fiche prospect ou représentant,
+  réservé à superviseur et admin (18 septembre 2026) : vers un téléconseiller
+  nommé, ou vers une campagne en cours qui désigne son membre le moins chargé
+  et reçoit la fiche si elle ne l'a pas déjà. La fiche change de titulaire et
+  passe en tête de son reste à appeler ; ses campagnes en cours et son rappel
+  promis suivent, les appels passés restent à leurs auteurs. Une fiche
+  convertie ou vendue ne s'affecte plus. Le geste est audité sur la fiche et
+  sur chaque campagne touchée.
+- Une fiche suit UN téléconseiller (18 septembre 2026). Le compte qui importe
+  n'est jamais titulaire : une fiche importée va au premier qui l'appelle, et
+  la migration `20260918200000` reprend les fiches déjà appelées. Une campagne
+  ordinaire ne tire jamais une fiche déjà appelée ou déjà distribuée. Une
+  relance des injoignables peut la confier à un autre : celui qui joint la
+  personne en devient le titulaire, un appel injoignable ne change rien. Le
+  seul autre moyen de changer de main est « Affecter à ». Même règle pour les
+  représentants.
+- « Mes contacts » montre au téléconseiller son parcours, de l'appel à la
+  vente : appelées, joignables, intéressées, méthode obtenue, converties,
+  vendues. L'onglet Clients liste ses contacts vendus avec la vente
+  rapprochée par téléphone : site, souscription, lots, prix, reliquat.
+- Une vente validée vaut conversion : le classeur des ventes ou une vente
+  saisie passe la fiche rapprochée en VENDU quel que soit son statut, parcours
+  compris. Le journal de la fiche le dit.
+- Le parcours et les clients se lisent sur les appels passés, pas sur le
+  titulaire : un compte fermé ou passé à l'accueil garde son travail lisible
+  par l'encadrement, dans le filtre « Appelé par » de Mes contacts, même après
+  que ses fiches ont été confiées à un autre. « Affecter à » garde dans le
+  journal de la fiche qui la suivait avant.
+- Rubrique Intéressés, Hésitants, Rendez-vous : l'onglet Rendez-vous écarte le
+  RV téléphonique, qui n'est pas un rendez-vous ; l'export suit le même filtre.
 
 À revoir avec ce plan : « À traiter » doit rouvrir une fiche fermée par un
 statut de la section 3.

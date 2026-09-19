@@ -66,7 +66,6 @@ type RepresentantDto struct {
 	Syndicat                  *string `json:"syndicat"`
 	ConnaitUES                *bool   `json:"connaitUES"`
 	Contacte                  *bool   `json:"contacte"`
-	LastCallOutcome           *string `json:"lastCallOutcome" enum:"REACHED,PROSPECTS_PROMISED,UNREACHABLE,CALLBACK,REFUSED,WRONG_NUMBER,OTHER"`
 	LastCallAt                *string `json:"lastCallAt"`
 	CallAttemptCount          int32   `json:"callAttemptCount"`
 	LastCallByID              *string `json:"lastCallById"`
@@ -106,13 +105,12 @@ type RepresentantRelationChangeDto struct {
 
 type RepresentantCallAttemptDto struct {
 	ID                                 string  `json:"id"`
-	Outcome                            string  `json:"outcome" enum:"REACHED,PROSPECTS_PROMISED,UNREACHABLE,CALLBACK,REFUSED,WRONG_NUMBER,OTHER"`
-	StatutQualificationID              *string `json:"statutQualificationId"`
-	StatutQualificationLabel           *string `json:"statutQualificationLabel"`
+	StatutQualificationID              string  `json:"statutQualificationId"`
+	StatutQualificationLabel           string  `json:"statutQualificationLabel"`
+	StatutQualificationEffect          string  `json:"statutQualificationEffect" enum:"REACHED,REFUSED,SCHEDULE_CALLBACK,UNREACHABLE,WRONG_NUMBER"`
 	StatutQualificationRequiresComment bool    `json:"statutQualificationRequiresComment"`
 	Comment                            *string `json:"comment"`
 	CallbackAt                         *string `json:"callbackAt"`
-	PromisedProspects                  *int32  `json:"promisedProspects"`
 	EtablissementConfirme              *bool   `json:"etablissementConfirme"`
 	NumeroConfirme                     *bool   `json:"numeroConfirme"`
 	Contacte                           *bool   `json:"contacte"`
@@ -211,7 +209,7 @@ func representantDto(r *db.ListRepresentantsRow) RepresentantDto {
 		WhatsappNumber:            representantWhatsappNumber(r.WhatsappStatus, r.PhoneE164, r.WhatsappE164),
 		Profession:                r.Profession, Prenom: r.Prenom, Etablissement: r.Etablissement,
 		Syndicat: r.Syndicat, ConnaitUES: r.ConnaitUES, Contacte: r.Contacte,
-		LastCallOutcome: representantEnumPtr(r.LastCallOutcome), LastCallAt: representantISOPtr(r.LastCallAt),
+		LastCallAt:       representantISOPtr(r.LastCallAt),
 		CallAttemptCount: r.CallAttemptCount, LastCallByID: r.LastCallById, LastCallByName: r.LastCallByName,
 		NextCallbackAt: representantISOPtr(r.NextCallbackAt), NextCallbackOrigine: representantEnumPtr(r.NextCallbackOrigine),
 	}
@@ -1038,13 +1036,13 @@ func (s *service) historiqueAppelsRepresentant(ctx context.Context, in *Represen
 
 func representantCallAttemptDto(r *db.ListRepCallAttemptsRow) RepresentantCallAttemptDto {
 	return RepresentantCallAttemptDto{
-		ID: r.ID, Outcome: string(r.Outcome),
+		ID:                                 r.ID,
 		StatutQualificationID:              r.StatutQualificationId,
 		StatutQualificationLabel:           r.StatutQualificationLabel,
+		StatutQualificationEffect:          string(r.StatutQualificationEffect),
 		StatutQualificationRequiresComment: r.StatutQualificationRequiresComment,
 		Comment:                            r.Comment,
 		CallbackAt:                         representantISOPtr(r.CallbackAt),
-		PromisedProspects:                  r.PromisedProspects,
 		EtablissementConfirme:              r.EtablissementConfirme,
 		NumeroConfirme:                     r.NumeroConfirme,
 		Contacte:                           r.Contacte,
