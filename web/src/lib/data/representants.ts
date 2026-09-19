@@ -252,6 +252,34 @@ export async function lookupRepresentantByPhone(
   return unwrap(await client.GET('/api/v1/representants/lookup', { params: { query: { phone } } }));
 }
 
+/** L'encadrement confie la fiche à un téléconseiller ; les campagnes en cours suivent. */
+export async function affecterRepresentant(
+  id: string,
+  destination: { teleconseillerId: string } | { campagneId: string },
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.POST('/api/v1/representants/{id}/affecter', {
+      params: { path: { id } },
+      body: destination,
+    }),
+  );
+}
+
+/** L'encadrement pose le statut de qualification sans appel ; la relation suit. */
+export async function poserStatutRepresentant(
+  id: string,
+  body: { statutQualificationId: string; callbackAt?: string },
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.POST('/api/v1/representants/{id}/statut-qualification', {
+      params: { path: { id } },
+      body,
+    }),
+  );
+}
+
 export async function updateRepresentant(
   id: string,
   patch: UpdateRepresentantPatch,

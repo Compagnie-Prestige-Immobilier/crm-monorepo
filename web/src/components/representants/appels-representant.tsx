@@ -4,7 +4,6 @@ import { Badge } from '@/components/ui/badge';
 import { formatDuration } from '@/lib/data/admin';
 import { formatDateTime, formatDeviceCall, formatPhone } from '@/lib/format';
 import type { RepresentantCallAttempt } from '@/lib/data/representants';
-import { REP_CALL_OUTCOME_LABELS } from '@/lib/types';
 
 function ouiNon(value: boolean): string {
   return value ? 'Oui' : 'Non';
@@ -42,9 +41,7 @@ function AppelItem({ appel }: { appel: RepresentantCallAttempt }) {
   return (
     <li className="flex flex-col gap-1 py-3 first:pt-0 last:pb-0">
       <div className="flex flex-wrap items-center gap-2">
-        <Badge variant="outline">
-          {appel.statutQualificationLabel ?? REP_CALL_OUTCOME_LABELS[appel.outcome]}
-        </Badge>
+        <Badge variant="outline">{appel.statutQualificationLabel}</Badge>
         {appel.callbackAt === null ? null : (
           <span className="text-[0.8125rem]">Rappel le {formatDateTime(appel.callbackAt)}</span>
         )}

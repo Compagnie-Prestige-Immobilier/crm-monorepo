@@ -11,17 +11,10 @@ import type {
   ScriptedRepresentant,
   WhatsappStatus,
 } from '@/lib/data/representants';
+import type { CallOutcomeEffect } from '@/lib/data/call-outcome-reasons';
 import type { RepresentantRelation } from '@/lib/representant-filters';
 import { DUREE_ETABLISSEMENT_MAX_MOIS, ENROLLMENT_METHODS } from '@/lib/types';
-import type {
-  CallOutcome,
-  EnrollmentMethod,
-  PaymentMode,
-  Projet,
-  ProspectRow,
-  ProspectType,
-  RepCallOutcome,
-} from '@/lib/types';
+import type { EnrollmentMethod, PaymentMode, Projet, ProspectRow, ProspectType } from '@/lib/types';
 
 export const callbackKeys = {
   root: ['callbacks'] as const,
@@ -667,8 +660,8 @@ export function conversionErrorFor(
 }
 
 export interface AttemptDraft {
-  readonly outcome: CallOutcome;
-  /** Le motif choisi au référentiel. C'est lui qui commande `outcome`, jamais l'inverse. */
+  /** L'effet du motif choisi au référentiel : il commande le groupe et l'échéance. */
+  readonly effect: CallOutcomeEffect;
   readonly reasonCode: string;
   readonly method: EnrollmentMethod | null;
   readonly comment: string;
@@ -679,7 +672,7 @@ export interface AttemptDraft {
 }
 
 function methodeAttemptErreur(draft: AttemptDraft): string | null {
-  if (draft.outcome !== 'METHOD_OBTAINED' && draft.method !== null) {
+  if (draft.effect !== 'CLOSE_METHOD' && draft.method !== null) {
     return 'Une méthode ne s’enregistre que sur « Méthode obtenue ».';
   }
   return null;
@@ -688,7 +681,9 @@ function methodeAttemptErreur(draft: AttemptDraft): string | null {
 function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null {
   const callbackAt = draft.callbackAt ?? null;
   if (callbackAt === null) return null;
-  if (draft.outcome !== 'CALLBACK') return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  if (draft.effect !== 'SCHEDULE_CALLBACK') {
+    return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  }
   if (!(Date.parse(callbackAt) > now)) return 'Choisissez une échéance à venir.';
   return null;
 }
@@ -840,7 +835,6 @@ function buildAttemptBatch(input: AttemptInput): SyncPushBody {
         clientUpdatedAt: input.at,
         data: {
           prospectId: input.prospectId,
-          outcome: input.draft.outcome,
           reasonCode: input.draft.reasonCode,
           ...(input.draft.method === null ? {} : { method: input.draft.method }),
           ...(comment === '' ? {} : { comment }),
@@ -926,7 +920,6 @@ export type RepCallAttemptResult = components['schemas']['QualificationRepAttemp
  * après « non » laisse quand même le refus en base.
  */
 export interface RepAnswer {
-  readonly outcome: RepCallOutcome;
   readonly relationStatus?: RepresentantRelation;
   readonly whatsappStatus?: WhatsappStatus;
   readonly whatsappE164?: string;
@@ -935,7 +928,7 @@ export interface RepAnswer {
   readonly suggestedPhone?: string;
   readonly suggestedNote?: string;
   readonly comment?: string;
-  /** Exigée par le serveur pour l'issue CALLBACK, et par elle seule. */
+  /** Exigée par le serveur pour un statut qui planifie un rappel, et par lui seul. */
   readonly callbackAt?: string;
   readonly etablissementConfirme?: boolean;
   /** Nouvel établissement, quand `etablissementConfirme` vaut faux. */
@@ -943,8 +936,8 @@ export interface RepAnswer {
   readonly contacte?: boolean;
   readonly connaitUES?: boolean;
   readonly syndicat?: string;
-  /** Statut choisi au script. C'est lui qui commande `outcome`, jamais l'inverse. */
-  readonly statutQualificationId?: string;
+  /** Statut choisi au script. Le serveur en déduit tout le reste. */
+  readonly statutQualificationId: string;
   /** L'ouverture que cette tentative ferme : c'est elle qui arrête le chronomètre. */
   readonly ouvertureId?: string;
 }

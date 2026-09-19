@@ -219,6 +219,7 @@ export function GrandPublicProspectsView({
       statut: filters.statut,
       segment: null,
       phase2Status: null,
+      sansMotif: null,
       enrollmentMethod: null,
       enrollmentCapturedById: null,
       revue: null,

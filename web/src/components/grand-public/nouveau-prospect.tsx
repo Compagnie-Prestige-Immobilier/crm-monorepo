@@ -23,7 +23,6 @@ import { Button } from '@/components/ui/button';
 import {
   commentaireExigePar,
   fetchMotifsAppel,
-  issueDuMotif,
   planifieUneDate,
   type MotifAppel,
 } from '@/lib/data/call-outcome-reasons';
@@ -151,7 +150,7 @@ export async function consignerSur(
   brouillon: Record<string, unknown>,
 ): Promise<void> {
   const ouverture =
-    appel.outcome === 'CALLBACK'
+    appel.effect === 'SCHEDULE_CALLBACK'
       ? await ouvrirFiche({ prospectId, draft: brouillon }).catch(() => null)
       : null;
   const tentative = ouverture === null ? appel : { ...appel, ouvertureId: ouverture.id };
@@ -306,7 +305,7 @@ export function NouveauProspect({
     if (conversion.method === null) return;
     // L'adhésion se consigne par le formulaire : la méthode clôt, le statut reste le motif.
     verifierPuisEnvoyer(choisi, {
-      outcome: 'METHOD_OBTAINED',
+      effect: 'CLOSE_METHOD',
       reasonCode: choisi.code,
       method: conversion.method,
       comment,
@@ -318,7 +317,7 @@ export function NouveauProspect({
   function consigner(choisi: MotifAppel, callbackAt: string | null = null): void {
     if (identiteBloquee()) return;
     verifierPuisEnvoyer(choisi, {
-      outcome: issueDuMotif(choisi),
+      effect: choisi.effect,
       reasonCode: choisi.code,
       method: null,
       comment,

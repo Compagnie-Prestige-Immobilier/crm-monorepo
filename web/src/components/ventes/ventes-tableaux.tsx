@@ -1,7 +1,12 @@
 'use client';
 
-import { BankRankChart } from '@/components/bank/bank-charts';
+import { ArchiveIcon, EyeIcon, PencilIcon } from 'lucide-react';
+
+import { BankRankChart, BankShareChart } from '@/components/bank/bank-charts';
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { InfoPopover } from '@/components/ui/info-popover';
 import {
   Table,
   TableBody,
@@ -10,16 +15,96 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { formatFcfa, totalVerse, type Vente, type VenteParTeleconseiller } from '@/lib/data/ventes';
+import {
+  formatFcfa,
+  totalVerse,
+  type SiteVente,
+  type Vente,
+  type VenteParTeleconseiller,
+} from '@/lib/data/ventes';
 import { formatDate } from '@/lib/format';
 
-const MONTANT = 'text-right tabular-nums whitespace-nowrap';
+const TABLE_CONTAINER = 'rounded-lg border border-border bg-card shadow-elev-xs';
+const TABLE_HEADER = 'bg-secondary/70 hover:bg-secondary/70';
+const TABLE_ROW = 'odd:bg-secondary/20 hover:bg-primary/5';
+const MONTANT = 'text-right tabular-nums whitespace-nowrap font-[600]';
 
-export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
+function paiementLabel(vente: Vente): string {
+  return vente.soldee ? 'Soldée' : 'À solder';
+}
+
+function modeLabel(vente: Vente): string {
+  if (vente.modePaiement !== 'CREDIT') return 'Comptant';
+  return vente.nombreMois === null ? 'Crédit' : `Crédit ${vente.nombreMois} mois`;
+}
+
+function paiementVariant(vente: Vente): 'success' | 'warning' {
+  return vente.soldee ? 'success' : 'warning';
+}
+
+function ActionsVente({
+  vente,
+  onDetail,
+  onEdit,
+  onArchive,
+}: {
+  vente: Vente;
+  onDetail?: ((vente: Vente) => void) | undefined;
+  onEdit?: ((vente: Vente) => void) | undefined;
+  onArchive?: ((vente: Vente) => void) | undefined;
+}) {
+  if (onDetail === undefined && onEdit === undefined && onArchive === undefined) return null;
   return (
-    <Table>
+    <div className="flex justify-end gap-1">
+      {onDetail === undefined ? null : (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Voir le détail de ${vente.client}`}
+          onClick={() => onDetail(vente)}
+        >
+          <EyeIcon aria-hidden="true" />
+        </Button>
+      )}
+      {onEdit === undefined ? null : (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Modifier ${vente.client}`}
+          onClick={() => onEdit(vente)}
+        >
+          <PencilIcon aria-hidden="true" />
+        </Button>
+      )}
+      {onArchive === undefined ? null : (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={`Archiver ${vente.client}`}
+          onClick={() => onArchive(vente)}
+        >
+          <ArchiveIcon aria-hidden="true" />
+        </Button>
+      )}
+    </div>
+  );
+}
+
+export function TableVentes({
+  ventes,
+  onDetail,
+  onEdit,
+  onArchive,
+}: {
+  ventes: readonly Vente[];
+  onDetail?: (vente: Vente) => void;
+  onEdit?: (vente: Vente) => void;
+  onArchive?: (vente: Vente) => void;
+}) {
+  return (
+    <Table containerClassName={TABLE_CONTAINER}>
       <TableHeader>
-        <TableRow>
+        <TableRow className={TABLE_HEADER}>
           <TableHead>Souscription</TableHead>
           <TableHead>Client</TableHead>
           <TableHead>Téléconseiller</TableHead>
@@ -28,12 +113,14 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
           <TableHead>Lots</TableHead>
           <TableHead className="text-right">Prix total</TableHead>
           <TableHead className="text-right">Acompte</TableHead>
+          <TableHead>Paiement</TableHead>
           <TableHead className="text-right">Part CPI</TableHead>
+          <TableHead />
         </TableRow>
       </TableHeader>
       <TableBody>
         {ventes.map((vente) => (
-          <TableRow key={vente.numero}>
+          <TableRow key={vente.id} className={TABLE_ROW}>
             <TableCell className="whitespace-nowrap">
               {vente.dateSouscription === null ? 'Sans date' : formatDate(vente.dateSouscription)}
             </TableCell>
@@ -51,7 +138,23 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
             </TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.prixTotal)}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.acompte)}</TableCell>
+            <TableCell>
+              <span className="flex flex-wrap gap-1">
+                <Badge variant={vente.modePaiement === 'CREDIT' ? 'info' : 'outline'}>
+                  {modeLabel(vente)}
+                </Badge>
+                <Badge variant={paiementVariant(vente)}>{paiementLabel(vente)}</Badge>
+              </span>
+            </TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.partCpi)}</TableCell>
+            <TableCell className="text-right">
+              <ActionsVente
+                vente={vente}
+                onDetail={onDetail}
+                onEdit={onEdit}
+                onArchive={onArchive}
+              />
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
@@ -61,9 +164,9 @@ export function TableVentes({ ventes }: { ventes: readonly Vente[] }) {
 
 export function TableParTeleconseiller({ lignes }: { lignes: readonly VenteParTeleconseiller[] }) {
   return (
-    <Table>
+    <Table containerClassName={TABLE_CONTAINER}>
       <TableHeader>
-        <TableRow>
+        <TableRow className={TABLE_HEADER}>
           <TableHead>Téléconseiller</TableHead>
           <TableHead className="text-right">Ventes</TableHead>
           <TableHead className="text-right">Chiffre d’affaires</TableHead>
@@ -71,7 +174,7 @@ export function TableParTeleconseiller({ lignes }: { lignes: readonly VenteParTe
       </TableHeader>
       <TableBody>
         {lignes.map((ligne) => (
-          <TableRow key={ligne.nom}>
+          <TableRow key={ligne.nom} className={TABLE_ROW}>
             <TableCell className="font-[600]">{ligne.nom}</TableCell>
             <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(ligne.prixTotal)}</TableCell>
@@ -87,9 +190,9 @@ export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
     .map((vente) => ({ vente, verse: totalVerse(vente) }))
     .sort((a, b) => b.vente.prixTotal - b.verse - (a.vente.prixTotal - a.verse));
   return (
-    <Table>
+    <Table containerClassName={TABLE_CONTAINER}>
       <TableHeader>
-        <TableRow>
+        <TableRow className={TABLE_HEADER}>
           <TableHead>Client</TableHead>
           <TableHead>Site</TableHead>
           <TableHead>Dernier versement</TableHead>
@@ -103,7 +206,7 @@ export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
           const dernier = vente.versements.at(-1);
           const reste = vente.prixTotal - verse;
           return (
-            <TableRow key={vente.numero}>
+            <TableRow key={vente.numero} className={TABLE_ROW}>
               <TableCell>
                 <span className="font-[600]">{vente.client}</span>
                 <span className="block text-[0.8125rem] text-muted-foreground">
@@ -118,7 +221,7 @@ export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
               </TableCell>
               <TableCell className={MONTANT}>{formatFcfa(vente.prixTotal)}</TableCell>
               <TableCell className={MONTANT}>{formatFcfa(verse)}</TableCell>
-              <TableCell className={`${MONTANT} font-[600]`}>
+              <TableCell className={`${MONTANT} ${reste <= 0 ? 'text-success' : 'text-warning'}`}>
                 {reste <= 0 ? 'Soldé' : formatFcfa(reste)}
               </TableCell>
             </TableRow>
@@ -133,22 +236,40 @@ interface LigneSite {
   site: string;
   ventes: number;
   lots: number;
+  totalLots: number | null;
+  restants: number | null;
   chiffre: number;
   verse: number;
 }
 
-function parSite(ventes: readonly Vente[]): LigneSite[] {
+function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]): LigneSite[] {
   const sites = new Map<string, LigneSite>();
+  const parNom = new Map(configuration.map((site) => [site.nom, site]));
+  for (const config of configuration) {
+    sites.set(config.nom, {
+      site: config.nom,
+      ventes: 0,
+      lots: 0,
+      totalLots: config.totalLots,
+      restants: config.totalLots,
+      chiffre: 0,
+      verse: 0,
+    });
+  }
   for (const vente of ventes) {
+    const config = parNom.get(vente.site);
     const ligne = sites.get(vente.site) ?? {
       site: vente.site,
       ventes: 0,
       lots: 0,
+      totalLots: config?.totalLots ?? null,
+      restants: config?.totalLots ?? null,
       chiffre: 0,
       verse: 0,
     };
     ligne.ventes += 1;
     ligne.lots += vente.nombreLots;
+    if (ligne.restants !== null) ligne.restants -= vente.nombreLots;
     ligne.chiffre += vente.prixTotal;
     ligne.verse += totalVerse(vente);
     sites.set(vente.site, ligne);
@@ -156,45 +277,87 @@ function parSite(ventes: readonly Vente[]): LigneSite[] {
   return [...sites.values()].sort((a, b) => b.chiffre - a.chiffre);
 }
 
-export function SyntheseSites({ ventes }: { ventes: readonly Vente[] }) {
-  const sites = parSite(ventes);
+export function SyntheseSites({
+  ventes,
+  configuration = [],
+}: {
+  ventes: readonly Vente[];
+  configuration?: readonly SiteVente[];
+}) {
+  const sites = parSite(ventes, configuration);
+  const vendus = sites.filter((ligne) => ligne.ventes > 0);
   return (
     <div className="grid gap-4 lg:grid-cols-2">
-      <Card>
-        <CardHeader>
-          <CardTitle>Chiffre d’affaires par site</CardTitle>
-        </CardHeader>
-        <CardContent className="h-80">
-          <BankRankChart
-            label="Chiffre d’affaires par site"
-            items={sites.map((ligne) => ({ label: ligne.site, value: ligne.chiffre }))}
-          />
-        </CardContent>
-      </Card>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Site</TableHead>
-            <TableHead className="text-right">Ventes</TableHead>
-            <TableHead className="text-right">Lots</TableHead>
-            <TableHead className="text-right">Chiffre d’affaires</TableHead>
-            <TableHead className="text-right">Encaissé</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {sites.map((ligne) => (
-            <TableRow key={ligne.site}>
-              <TableCell className="font-[600]">{ligne.site}</TableCell>
-              <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
-              <TableCell className={MONTANT}>{ligne.lots}</TableCell>
-              <TableCell className={MONTANT}>{formatFcfa(ligne.chiffre)}</TableCell>
-              <TableCell className={MONTANT}>
-                {ligne.chiffre === 0 ? '–' : `${Math.round((ligne.verse / ligne.chiffre) * 100)} %`}
-              </TableCell>
+      {vendus.length > 0 ? (
+        <>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5">
+                Chiffre d’affaires par site
+                <InfoPopover
+                  label="Chiffre d’affaires par site"
+                  description="Montant total des ventes enregistrées, regroupé par site et trié du plus élevé au plus faible."
+                />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              <BankRankChart
+                label="Chiffre d’affaires par site"
+                valueFormat="fcfa"
+                items={vendus.map((ligne) => ({ label: ligne.site, value: ligne.chiffre }))}
+              />
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-1.5">
+                Répartition des ventes par site
+                <InfoPopover
+                  label="Répartition des ventes par site"
+                  description="Nombre de ventes enregistrées pour chaque site. La taille de chaque part suit ce nombre."
+                />
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="h-80">
+              <BankShareChart
+                items={vendus.map((ligne) => ({ label: ligne.site, value: ligne.ventes }))}
+              />
+            </CardContent>
+          </Card>
+        </>
+      ) : null}
+      <div className="lg:col-span-2">
+        <Table containerClassName={TABLE_CONTAINER}>
+          <TableHeader>
+            <TableRow className={TABLE_HEADER}>
+              <TableHead>Site</TableHead>
+              <TableHead className="text-right">Ventes</TableHead>
+              <TableHead className="text-right">Lots</TableHead>
+              <TableHead className="text-right">Restants</TableHead>
+              <TableHead className="text-right">Chiffre d’affaires</TableHead>
+              <TableHead className="text-right">Encaissé</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {sites.map((ligne) => (
+              <TableRow key={ligne.site} className={TABLE_ROW}>
+                <TableCell className="font-[600]">{ligne.site}</TableCell>
+                <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
+                <TableCell className={MONTANT}>{ligne.lots}</TableCell>
+                <TableCell className={MONTANT}>{ligne.restants ?? 'À configurer'}</TableCell>
+                <TableCell className={`${MONTANT} text-primary`}>
+                  {formatFcfa(ligne.chiffre)}
+                </TableCell>
+                <TableCell className={MONTANT}>
+                  {ligne.chiffre === 0
+                    ? '–'
+                    : `${Math.round((ligne.verse / ligne.chiffre) * 100)} %`}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }

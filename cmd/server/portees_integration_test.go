@@ -66,7 +66,7 @@ func TestPorteeRappelDUnCollegue(t *testing.T) {
 	superviseur := autreCompte(b, "SUPERVISEUR")
 	prospect := qualificationProspect(b)
 	corps := qualificationCorpsTentative(prospect, map[string]any{
-		"outcome": "CALLBACK", "callbackAt": time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano),
+		"reasonCode": "CALLBACK", "callbackAt": time.Now().UTC().Add(time.Hour).Format(time.RFC3339Nano),
 	})
 	t.Cleanup(func() {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, prospect)

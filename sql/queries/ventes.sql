@@ -21,8 +21,8 @@ SELECT COALESCE(MAX("numero"), 0)::integer + 1 AS "numero" FROM "ventes";
 -- name: InsererVenteSaisie :one
 INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone",
     "site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte",
-    "reliquat", "partProprietaire", "partApporteur", "partCpi")
-VALUES ('SAISIE', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+    "reliquat", "partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreMois", "soldeeManuellement")
+VALUES ('SAISIE', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 RETURNING "id";
 
 -- name: ModifierVente :exec
@@ -30,7 +30,8 @@ UPDATE "ventes"
 SET "canal" = $2, "dateSouscription" = $3, "client" = $4, "telephone" = $5, "site" = $6,
     "nombreLots" = $7, "numerosLots" = $8, "superficie" = $9, "prixUnitaire" = $10,
     "prixTotal" = $11, "acompte" = $12, "reliquat" = $13, "partProprietaire" = $14,
-    "partApporteur" = $15, "partCpi" = $16
+    "partApporteur" = $15, "partCpi" = $16, "modePaiement" = $17, "nombreMois" = $18,
+    "soldeeManuellement" = $19
 WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ArchiverVente :exec
@@ -47,6 +48,19 @@ DELETE FROM "ventes_versements" WHERE "venteId" = $1;
 -- name: InsererVersementVente :exec
 INSERT INTO "ventes_versements" ("venteId", "rang", "date", "montant")
 VALUES ($1, $2, $3, $4);
+
+-- name: ProchainRangVersement :one
+SELECT COALESCE(MAX("rang"), 0)::integer + 1 AS "rang"
+FROM "ventes_versements" WHERE "venteId" = $1;
+
+-- name: TotalVersementsVente :one
+SELECT COALESCE(SUM("montant"), 0)::bigint AS "total"
+FROM "ventes_versements" WHERE "venteId" = $1;
+
+-- name: ModifierReliquatVente :exec
+UPDATE "ventes"
+SET "reliquat" = $2
+WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ClasseurVentes :one
 SELECT c."id", c."nomFichier", c."depuis", c."importeLe", u."fullName" AS "importePar"

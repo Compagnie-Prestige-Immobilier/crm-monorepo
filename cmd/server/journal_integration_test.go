@@ -22,7 +22,7 @@ func TestJournalDeLaFicheDitQuiAChangeQuoi(t *testing.T) {
 		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_journeys" WHERE "prospectId" = $1`, prospectID)
 	})
 
-	corps := qualificationCorpsTentative(prospectID, map[string]any{"outcome": "OTHER", "reasonCode": "INTERESSE"})
+	corps := qualificationCorpsTentative(prospectID, map[string]any{"reasonCode": "INTERESSE"})
 	statut, body := adminAppel(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
 	b.attend(statut, http.StatusOK, "premier appel", body)
 	statut, body = adminAppel(b, http.MethodPatch, "/api/v1/prospects/"+prospectID, map[string]any{"statut": "CONVERTI"})

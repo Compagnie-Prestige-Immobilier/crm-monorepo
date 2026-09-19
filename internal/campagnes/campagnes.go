@@ -3,7 +3,6 @@ package campagnes
 import (
 	"context"
 	"cpi-go/db"
-	"cpi-go/internal/exports"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
@@ -38,13 +37,12 @@ const (
 	LotSegmentBDD2 = "BDD2"
 	LotSegmentBDD3 = "BDD3"
 
-	lotIssueCallback = "CALLBACK"
-	lotLibelleAutre  = "Autre"
-
 	lotCheminID = "/api/v1/lots-export/{id}"
 
-	lotDureeRepartition = 120 * time.Second
-	lotCleNom           = "name"
+	lotDureeRepartition    = 120 * time.Second
+	lotCleNom              = "name"
+	lotCleVers             = "vers"
+	lotCleTeleconseillerID = "teleconseillerId"
 )
 
 var campagnesEcriture = socle.PermissionCampagnesGerer
@@ -66,15 +64,8 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/lots-export/{id}/programme.pdf":     socle.PermissionCampagnesSuperviser,
 	"GET /api/v1/lots-export/{id}/fiches-recues.pdf": socle.PermissionCampagnesSuperviser,
 	"GET /api/v1/lots-export/{id}/programmes.zip":    socle.PermissionCampagnesSuperviser,
-}
-
-var lotLibellesIssueAppel = map[string]string{
-	exports.ExportCleMethodeObtenue:   exports.ExportLibelleMethodeObtenue,
-	string(db.CallOutcomeUNREACHABLE): exports.ExportLibelleInjoignable,
-	lotIssueCallback:                  exports.ExportLibelleARappeler,
-	exports.ExportCleRefus:            exports.ExportLibelleRefus,
-	exports.ExportCleMauvaisNumero:    exports.ExportLibelleFauxNumero,
-	string(db.CallOutcomeOTHER):       lotLibelleAutre,
+	"POST /api/v1/prospects/{id}/affecter":           socle.PermissionProspectsReaffecterTout,
+	"POST /api/v1/representants/{id}/affecter":       socle.PermissionProspectsReaffecterTout,
 }
 
 type CampagneCritereRepresentants struct {
@@ -132,8 +123,7 @@ type CampagneTentative struct {
 	ID                     string  `json:"id"`
 	PhoneE164              *string `json:"phoneE164"`
 	ShortCode              string  `json:"shortCode"`
-	Outcome                string  `json:"outcome"`
-	ReasonLabel            *string `json:"reasonLabel"`
+	ReasonLabel            string  `json:"reasonLabel"`
 	Method                 *string `json:"method"`
 	Comment                *string `json:"comment"`
 	PerformedByName        string  `json:"performedByName"`
@@ -1095,7 +1085,7 @@ func (s *service) lotTentativesRecentes(ctx context.Context, row *db.LotParIdRow
 		tentatives := make([]CampagneTentative, 0, len(lignes))
 		for _, ligne := range lignes {
 			tentatives = append(tentatives, CampagneTentative{
-				ID: ligne.ID, PhoneE164: &ligne.PhoneE164, Outcome: ligne.Outcome,
+				ID: ligne.ID, PhoneE164: &ligne.PhoneE164, ReasonLabel: ligne.StatutLabel,
 				Comment: ligne.Comment, PerformedByName: ligne.PerformedByName,
 				CreatedAt: lotISO(ligne.CreatedAt),
 			})
@@ -1112,7 +1102,7 @@ func (s *service) lotTentativesRecentes(ctx context.Context, row *db.LotParIdRow
 	for index := range lignes {
 		ligne := &lignes[index]
 		tentatives = append(tentatives, CampagneTentative{
-			ID: ligne.ID, PhoneE164: ligne.PhoneE164, Outcome: ligne.Outcome, ReasonLabel: ligne.ReasonLabel,
+			ID: ligne.ID, PhoneE164: ligne.PhoneE164, ReasonLabel: ligne.ReasonLabel,
 			Method: lotPointeurTexte(ligne.Method), Comment: ligne.Comment,
 			PerformedByName: ligne.PerformedByName, CreatedAt: lotISO(ligne.CreatedAt),
 			Email: ligne.Email, Fonctionnaire: ligne.Fonctionnaire,
@@ -1239,7 +1229,7 @@ func (s *service) campagneReaffecter(ctx context.Context, in *CampagneReaffecter
 		equipe = append(equipe, vers)
 	}
 	if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.reaffectation",
-		map[string]any{"vers": vers}); err != nil {
+		map[string]any{lotCleVers: vers}); err != nil {
 		return nil, err
 	}
 	return s.campagneDetail(ctx, &CampagneIDInput{ID: in.ID})
@@ -1429,6 +1419,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "reaffecterLotExport", Method: http.MethodPost,
 		Path: "/api/v1/lots-export/{id}/reaffectation",
 	}, s.campagneReaffecter)
+	campagneMonterAffectation(api, s)
 	huma.Register(api, huma.Operation{
 		OperationID: "retirerTeleconseillerLotExport", Method: http.MethodPost,
 		Path: "/api/v1/lots-export/{id}/retrait",

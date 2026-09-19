@@ -1,4 +1,16 @@
 {
+  "POST /api/v1/ventes": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/{id}/versements": ["ADMIN", "DIRECTION"],
+  "DELETE /api/v1/ventes/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/{id}/restaurer": ["ADMIN", "DIRECTION"],
+  "GET /api/v1/ventes/configuration": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/sites": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/sites/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/sites/{id}/active": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/canaux": ["ADMIN", "DIRECTION"],
+  "PATCH /api/v1/ventes/canaux/{id}": ["ADMIN", "DIRECTION"],
+  "POST /api/v1/ventes/canaux/{id}/active": ["ADMIN", "DIRECTION"],
   "DELETE /api/v1/admin/bases/{nom}": ["ADMIN"],
   "DELETE /api/v1/enrolement/{projet}/inscriptions": ["ADMIN"],
   "DELETE /api/v1/enrolement/{projet}/inscriptions/{id}": ["ADMIN"],
@@ -263,6 +275,20 @@
     "SUPERVISEUR"
   ],
   "GET /api/v1/prospects/{id}/journal": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/prospects/clients": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/prospects/pipeline": [
     "ADMIN",
     "CHARGE_CLIENTELE",
     "COMMERCIAL",
@@ -564,6 +590,10 @@
     "SUPERVISEUR"
   ],
   "POST /api/v1/prospects/{id}/requalifier": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
+  "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/vendre": [
     "ADMIN",

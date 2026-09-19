@@ -334,7 +334,8 @@ func TestProspectFusionDeplaceLesTentatives(t *testing.T) {
 
 	tentative := uuid.NewString()
 	if _, err := b.pool.Exec(b.ctx,
-		`INSERT INTO "call_attempts" ("id","prospectId","performedById","outcome","clientCreatedAt") VALUES ($1,$2,$3,'UNREACHABLE',now())`,
+		`INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		 SELECT $1,$2,$3,"id",now() FROM "call_outcome_reasons" WHERE "code" = 'PAS_DE_REPONSE'`,
 		tentative, source, b.userID); err != nil {
 		t.Fatal(err)
 	}

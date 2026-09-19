@@ -15,6 +15,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   Select,
@@ -23,19 +24,50 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { requalifierProspect } from '@/lib/data/prospects';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  fetchMotifsAppel,
+  planifieUneDate,
+  type MotifAppel,
+} from '@/lib/data/call-outcome-reasons';
+import { fetchProspect, poserMotifProspect, remettreProspectATraiter } from '@/lib/data/prospects';
+import { dakarLocalToIso } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { peut, type Projet, type ProspectRow, type ProspectStatut } from '@/lib/types';
 
-type StatutRequalifiable = 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU';
+type Famille = 'JOIGNABLE' | 'INJOIGNABLE';
 
-const CHOIX: readonly { value: StatutRequalifiable; label: string }[] = [
-  { value: 'NOUVEAU', label: 'À traiter (remise à zéro)' },
-  { value: 'CONTACTE', label: 'Contacté' },
-  { value: 'CONVERTI', label: 'Converti' },
-  { value: 'PERDU', label: 'Perdu' },
+const FAMILLES: readonly { value: Famille; label: string }[] = [
+  { value: 'JOIGNABLE', label: 'Joignable' },
+  { value: 'INJOIGNABLE', label: 'Injoignable' },
 ];
+
+const libelleMotif = (motif: MotifAppel, catalogue: readonly MotifAppel[]): string => {
+  const parent = catalogue.find((item) => item.id === motif.parentId);
+  return parent === undefined ? motif.label : `${parent.label} · ${motif.label}`;
+};
+
+interface Choix {
+  motif: MotifAppel | null;
+  echeance: string;
+}
+
+const exigeUneDate = (choix: Choix): boolean =>
+  choix.motif !== null && planifieUneDate(choix.motif.effect);
+
+const estPret = (choix: Choix): boolean =>
+  choix.motif !== null && (!exigeUneDate(choix) || dakarLocalToIso(choix.echeance) !== null);
+
+async function poserLeMotif(prospect: ProspectRow, choix: Choix): Promise<ProspectRow> {
+  if (choix.motif === null) return prospect;
+  const callbackAt = exigeUneDate(choix) ? dakarLocalToIso(choix.echeance) : null;
+  await poserMotifProspect(prospect.id, {
+    reasonCode: choix.motif.code,
+    ...(callbackAt === null ? {} : { callbackAt }),
+  });
+  return fetchProspect(prospect.id);
+}
 
 export function RequalifierFiche({
   prospect,
@@ -51,17 +83,41 @@ export function RequalifierFiche({
   const { data: user } = useQuery(meQueryOptions);
   const queryClient = useQueryClient();
   const [ouverte, setOuverte] = useState(false);
-  const [choix, setChoix] = useState<StatutRequalifiable>('NOUVEAU');
+  const [famille, setFamille] = useState<Famille>('JOIGNABLE');
+  const [code, setCode] = useState<string | null>(null);
+  const [echeance, setEcheance] = useState('');
+  const catalogue = useQuery({
+    queryKey: queryKeys.motifsAppel,
+    queryFn: () => fetchMotifsAppel(),
+    enabled: ouverte,
+  });
+  const liste = catalogue.data ?? [];
+  const motifs = liste.filter((motif) =>
+    famille === 'JOIGNABLE' ? motif.countsAsReached : !motif.countsAsReached,
+  );
+  const choix: Choix = { motif: motifs.find((item) => item.code === code) ?? null, echeance };
+
+  const terminer = (saved: ProspectRow, message: string) => {
+    onRequalifiee?.(saved);
+    void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
+    setOuverte(false);
+    toast.success(message);
+  };
   const requalification = useMutation({
-    mutationFn: () => requalifierProspect(prospect.id, { projet, statut: choix }),
+    mutationFn: () => poserLeMotif(prospect, choix),
     onSuccess: (saved) => {
-      onRequalifiee?.(saved);
-      void queryClient.invalidateQueries({ queryKey: queryKeys.prospectsRoot });
-      setOuverte(false);
-      toast.success('Fiche requalifiée.');
+      terminer(saved, 'Fiche requalifiée.');
     },
     onError: (error) => toastApiError(error, 'La fiche n’a pas pu être requalifiée.'),
   });
+  const remise = useMutation({
+    mutationFn: () => remettreProspectATraiter(prospect.id, projet),
+    onSuccess: (saved) => {
+      terminer(saved, 'Fiche remise à traiter.');
+    },
+    onError: (error) => toastApiError(error, 'La fiche n’a pas pu être remise à traiter.'),
+  });
+  const enCours = requalification.isPending || remise.isPending;
 
   if (!peut(user, 'prospects.superviser') || statut === 'CONVERTI') return null;
 
@@ -82,30 +138,69 @@ export function RequalifierFiche({
             <DialogTitle>
               Requalifier {prospect.prenom} {prospect.nom}
             </DialogTitle>
-            <DialogDescription>
-              Les appels déjà passés restent dans l’historique de leur téléconseiller.
-            </DialogDescription>
+            <DialogDescription>Nouveau motif, sans appel.</DialogDescription>
           </DialogHeader>
-          <div className="grid gap-2">
-            <Label htmlFor="requalifier-statut">Nouveau statut</Label>
-            <Select
-              items={CHOIX}
-              value={choix}
+          <div className="grid gap-4">
+            <Tabs
+              value={famille}
               onValueChange={(value) => {
-                if (value !== null) setChoix(value);
+                setFamille(value as Famille);
+                setCode(null);
               }}
             >
-              <SelectTrigger id="requalifier-statut">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {CHOIX.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
+              <TabsList className="w-full">
+                {FAMILLES.map((item) => (
+                  <TabsTrigger key={item.value} value={item.value} className="flex-1">
                     {item.label}
-                  </SelectItem>
+                  </TabsTrigger>
                 ))}
-              </SelectContent>
-            </Select>
+              </TabsList>
+            </Tabs>
+            <div className="grid gap-2">
+              <Label htmlFor="requalifier-motif">Motif</Label>
+              <Select
+                items={motifs.map((item) => ({
+                  value: item.code,
+                  label: libelleMotif(item, liste),
+                }))}
+                value={code}
+                onValueChange={setCode}
+              >
+                <SelectTrigger id="requalifier-motif">
+                  <SelectValue placeholder="Choisir un motif" />
+                </SelectTrigger>
+                <SelectContent>
+                  {motifs.map((item) => (
+                    <SelectItem key={item.code} value={item.code}>
+                      {libelleMotif(item, liste)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {exigeUneDate(choix) ? (
+              <div className="grid gap-2">
+                <Label htmlFor="requalifier-echeance">Date du rappel (heure de Dakar)</Label>
+                <Input
+                  id="requalifier-echeance"
+                  type="datetime-local"
+                  value={echeance}
+                  onChange={(event) => {
+                    setEcheance(event.target.value);
+                  }}
+                />
+              </div>
+            ) : null}
+            <Button
+              variant="link"
+              className="justify-start px-0"
+              disabled={enCours}
+              onClick={() => {
+                remise.mutate();
+              }}
+            >
+              Remettre à traiter (remise à zéro)
+            </Button>
           </div>
           <DialogFooter>
             <Button
@@ -117,7 +212,7 @@ export function RequalifierFiche({
               Annuler
             </Button>
             <Button
-              disabled={requalification.isPending}
+              disabled={!estPret(choix) || enCours}
               onClick={() => {
                 requalification.mutate();
               }}

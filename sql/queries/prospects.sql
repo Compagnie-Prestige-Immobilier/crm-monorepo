@@ -80,7 +80,8 @@ WHERE p."deletedAt" IS NULL
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
-        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
+        AND (NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached")
+             OR p."remiseATraiterAt" > p."lastCallAt") AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
         NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
@@ -115,6 +116,8 @@ WHERE p."deletedAt" IS NULL
        OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
            AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
                 WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
+  AND (sqlc.narg('sans_motif')::text IS NULL
+       OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -163,6 +166,7 @@ WHERE p."deletedAt" IS NULL
     OR (sqlc.narg('phone_search')::text IS NOT NULL AND p."phoneE164" LIKE '%' || sqlc.narg('phone_search')::text || '%')
   )
 ORDER BY
+  CASE WHEN sqlc.arg('reste_a_appeler')::boolean THEN p."remiseATraiterAt" END DESC NULLS LAST,
   CASE WHEN sqlc.arg('sort_order')::text = 'asc' THEN CASE sqlc.arg('sort_by')::text
     WHEN 'nom' THEN p."nom" WHEN 'prenom' THEN p."prenom" WHEN 'statut' THEN p."statut"::text END END ASC,
   CASE WHEN sqlc.arg('sort_order')::text = 'desc' THEN CASE sqlc.arg('sort_by')::text
@@ -213,7 +217,8 @@ WHERE p."deletedAt" IS NULL
   AND (
     NOT sqlc.arg('reste_a_appeler')::boolean
     OR (p."statut" <> 'PERDU'
-        AND (p."lastCallOutcome" IS DISTINCT FROM 'UNREACHABLE' OR p."remiseATraiterAt" > p."lastCallAt") AND (
+        AND (NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" lr WHERE lr."id" = p."lastReasonId" AND NOT lr."countsAsReached")
+             OR p."remiseATraiterAt" > p."lastCallAt") AND (
         -- Un rappel promis quitte cette file : il se tient depuis « Rappels ».
         NOT EXISTS (
           SELECT 1 FROM "scheduled_callbacks" sc
@@ -248,6 +253,8 @@ WHERE p."deletedAt" IS NULL
        OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
            AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
                 WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
+  AND (sqlc.narg('sans_motif')::text IS NULL
+       OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -361,11 +368,37 @@ UPDATE "prospects" SET "revueAt" = now(), "revueById" = $2 WHERE "id" = $1 AND "
 -- name: MarquerProspectConverti :exec
 UPDATE "prospects" SET "statut" = 'CONVERTI', "rev" = "rev" + 1 WHERE "id" = $1;
 
--- Le `WHERE statut = 'CONVERTI'` protège la transition : un double dépôt du
--- classeur ou un double clic ne fait rien la seconde fois.
+-- Une vente validée vaut conversion : toute fiche vivante devient vendue. Le
+-- `statut <> 'VENDU'` protège la transition, un double dépôt ne fait rien.
 -- name: MarquerProspectVendu :execrows
 UPDATE "prospects" SET "statut" = 'VENDU', "rev" = "rev" + 1
-WHERE "id" = $1 AND "statut" = 'CONVERTI' AND "deletedAt" IS NULL;
+WHERE "id" = $1 AND "statut" <> 'VENDU' AND "deletedAt" IS NULL;
+
+-- name: MarquerParcoursVendu :exec
+UPDATE "prospect_journeys" j SET "statut" = 'VENDU', "convertedAt" = COALESCE(j."convertedAt", now())
+FROM "prospects" p
+WHERE j."prospectId" = p."id" AND p."id" = $1 AND j."projet" = p."projet";
+
+-- Les clients d'un téléconseiller : ses contacts vendus, avec la vente
+-- rapprochée par téléphone.
+-- name: ClientsDuTeleconseiller :many
+SELECT p."id", p."prenom", p."nom", p."phoneE164", p."projet", p."lastCallAt",
+       (v."id" IS NOT NULL)::bool AS "vente", COALESCE(v."site", '')::text AS "site", v."dateSouscription",
+       COALESCE(v."nombreLots", 0)::int AS "nombreLots", COALESCE(v."numerosLots", '')::text AS "numerosLots",
+       COALESCE(v."prixTotal", 0)::bigint AS "prixTotal", COALESCE(v."reliquat", 0)::bigint AS "reliquat",
+       COALESCE(v."canal", '')::text AS "canal"
+FROM "prospects" p
+LEFT JOIN LATERAL (
+  SELECT v.* FROM "ventes" v
+  WHERE v."archiveeLe" IS NULL AND regexp_replace(v."telephone", '\D', '', 'g') <> ''
+    AND p."phoneE164" LIKE '%' || regexp_replace(v."telephone", '\D', '', 'g')
+  ORDER BY v."dateSouscription" DESC NULLS LAST, v."id" DESC LIMIT 1
+) v ON true
+WHERE p."deletedAt" IS NULL AND p."statut" = 'VENDU'
+  AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = @appele_par::text)
+  AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'))
+ORDER BY v."dateSouscription" DESC NULLS LAST, p."lastCallAt" DESC
+LIMIT 200;
 
 -- name: ProspectsVivantsParTelephones :many
 SELECT p."id", p."phoneE164", p."statut", u."fullName" AS "teleconseiller"
@@ -466,6 +499,25 @@ SELECT "id" FROM "prospects"
 WHERE "id" = ANY(sqlc.arg('ids')::text[]) AND "deletedAt" IS NULL
   AND (sqlc.arg('scope_all')::boolean OR "createdById" = sqlc.arg('scope_user_id')::text);
 
+-- Le parcours de « Mes contacts » : tout ce que ce téléconseiller a appelé,
+-- de l'appel à la vente.
+-- name: PipelineDesContacts :one
+SELECT COUNT(*)::int AS appelees,
+       COUNT(*) FILTER (WHERE cr."countsAsReached")::int AS joignables,
+       COUNT(*) FILTER (WHERE p."phase2Status" IN ('INTERESTED', 'HESITANT', 'APPOINTMENT'))::int AS interessees,
+       COUNT(*) FILTER (WHERE p."phase2Status" = 'METHOD_OBTAINED')::int AS methodes,
+       COUNT(*) FILTER (WHERE p."statut" = 'CONVERTI')::int AS converties,
+       COUNT(*) FILTER (WHERE p."statut" = 'VENDU')::int AS vendues
+FROM "prospects" p
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = p."lastReasonId"
+WHERE p."deletedAt" IS NULL
+  AND EXISTS (SELECT 1 FROM "call_attempts" ca WHERE ca."prospectId" = p."id" AND ca."performedById" = @appele_par::text)
+  AND (sqlc.narg('projet')::"Projet" IS NULL OR p."projet" = sqlc.narg('projet'));
+
+-- Une fiche confiée par « Affecter à » passe en tête du reste à appeler.
+-- name: PrioriserProspect :exec
+UPDATE "prospects" SET "remiseATraiterAt" = now() WHERE "id" = $1;
+
 -- name: ReaffecterProspects :exec
 UPDATE "prospects" SET
   "representantId" = COALESCE(sqlc.narg('representant_id')::text, "representantId"),
@@ -476,16 +528,16 @@ WHERE "id" = ANY(sqlc.arg('ids')::text[]);
 -- name: DernieresTentatives :many
 SELECT
   p."id" AS prospect_id,
-  a."outcome",
   a."comment",
   a."createdAt" AS at,
   a."reason_label",
+  a."counts_as_reached",
   (SELECT count(*) FROM "call_attempts" n WHERE n."prospectId" = p."id")::int AS nombre
 FROM "prospects" p
 JOIN LATERAL (
-  SELECT ca."outcome", ca."comment", ca."createdAt", cr."label" AS reason_label
+  SELECT ca."comment", ca."createdAt", cr."label" AS reason_label, cr."countsAsReached" AS counts_as_reached
   FROM "call_attempts" ca
-  LEFT JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
+  JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
   WHERE ca."prospectId" = p."id"
   ORDER BY ca."createdAt" DESC, ca."id" DESC
   LIMIT 1
@@ -494,16 +546,17 @@ WHERE p."id" = ANY(sqlc.arg('ids')::text[]);
 
 -- name: TentativesDuProspect :many
 SELECT
-  a."id", a."outcome", a."method", a."comment", a."email", a."fonctionnaire",
+  a."id", a."method", a."comment", a."email", a."fonctionnaire",
   a."engagementEnCours", a."dureeEtablissementMois", a."rendezVousAt", a."deviceCallType",
   a."deviceCallDurationSeconds", a."deviceCallAt", a."performedById", a."clientCreatedAt",
   u."fullName" AS performed_by_name,
   cr."label" AS reason_label,
+  cr."countsAsReached" AS counts_as_reached,
   ou."firstInputAt" AS ouverture_first_input_at,
   ou."closedAt" AS ouverture_closed_at
 FROM "call_attempts" a
 JOIN "users" u ON u."id" = a."performedById"
-LEFT JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
+JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 LEFT JOIN "ouvertures_fiche" ou ON ou."closingAttemptId" = a."id" AND ou."firstInputAt" IS NOT NULL
 WHERE a."prospectId" = $1
 ORDER BY a."clientCreatedAt" DESC, a."id" DESC;

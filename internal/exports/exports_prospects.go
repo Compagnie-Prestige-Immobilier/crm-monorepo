@@ -29,6 +29,7 @@ type ExportProspectsInput struct {
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
+	SansMotif              string `query:"sansMotif" maxLength:"40"`
 	EnrollmentMethod       string `query:"enrollmentMethod"`
 	AppelePar              string `query:"appelePar"`
 	LastCallById           string `query:"lastCallById"`
@@ -91,6 +92,9 @@ func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {
 }
 
 func exportFiltresDerives(p *exportPredicat, in *ExportProspectsInput, segment string) error {
+	if in.SansMotif != "" {
+		p.clauses = append(p.clauses, `NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = `+p.valeur(in.SansMotif)+`)`)
+	}
 	if in.Projet != "" {
 		clause := `EXISTS (SELECT 1 FROM "prospect_journeys" pj WHERE pj."prospectId" = p."id" AND pj."projet" = ` + p.valeur(in.Projet) + `::"Projet"`
 		if in.Statut != "" {
@@ -199,8 +203,9 @@ LEFT JOIN "income_bands" ib ON ib."id" = p."incomeBandId"
 LEFT JOIN "users" ec ON ec."id" = p."enrollmentCapturedById"
 LEFT JOIN "users" rv ON rv."id" = p."revueById"
 LEFT JOIN LATERAL (
-  SELECT ca."outcome"::text AS outcome, ca."comment" AS commentaire, ca."createdAt" AS le
-  FROM "call_attempts" ca WHERE ca."prospectId" = p."id"
+  SELECT cr."label" AS motif, ca."comment" AS commentaire, ca."createdAt" AS le
+  FROM "call_attempts" ca JOIN "call_outcome_reasons" cr ON cr."id" = ca."reasonId"
+  WHERE ca."prospectId" = p."id"
   ORDER BY ca."createdAt" DESC, ca."id" DESC LIMIT 1
 ) la ON TRUE`
 
@@ -219,7 +224,7 @@ SELECT p."id", p."nom", p."prenom", COALESCE(p."phoneE164", '')::text,
     WHEN 'MEME_NUMERO' THEN p."phoneE164" WHEN 'AUTRE_NUMERO' THEN p."whatsappE164" END, '')::text,
   COALESCE(p."relaisNom", '')::text, COALESCE(p."relaisPhoneE164", '')::text,
   COALESCE(p."enrollmentMethod"::text, '')::text, p."phase2Status"::text,
-  COALESCE(la.outcome, '')::text, COALESCE(la.commentaire, '')::text, la.le,
+  COALESCE(la.motif, '')::text, COALESCE(la.commentaire, '')::text, la.le,
   COALESCE(ec."fullName", '')::text, p."enrollmentCapturedAt",
   COALESCE(p."champsLibres", '{}'::jsonb),
   ARRAY(SELECT j."projet"::text FROM "prospect_journeys" j WHERE j."prospectId" = p."id" ORDER BY j."createdAt" ASC),
@@ -365,7 +370,7 @@ func exportValeursProspect(c *exportClasseur, l *exportLigneProspect, libres []e
 		exportLibelle(exportLibellesContrat, l.TypeContrat), exportCelluleNombre(l.Anciennete), l.LieuActivite,
 		exportLibelle(exportLibellesEpargne, l.ModeEpargne), l.Pays, l.Ville, l.Whatsapp, l.RelaisNom, l.RelaisPhone,
 		exportSegmentDuProspect(l), exportLibelle(ExportLibellesMethode, l.Methode), exportLibelle(exportLibellesPhase2, l.Phase2),
-		exportLibelle(exportLibellesIssue, l.DerniereIssue), l.DernierCommentair, c.horodate(l.DernierAppel),
+		l.DerniereIssue, l.DernierCommentair, c.horodate(l.DernierAppel),
 		l.MethodePar, c.horodate(l.MethodeLe),
 	}
 	if len(libres) == 0 {

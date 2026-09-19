@@ -31,8 +31,10 @@ export function useFileDownload(): {
         const anchor = document.createElement('a');
         anchor.href = objectUrl;
         anchor.download = fileName;
+        document.body.append(anchor);
         anchor.click();
-        URL.revokeObjectURL(objectUrl);
+        anchor.remove();
+        window.setTimeout(() => URL.revokeObjectURL(objectUrl), 0);
         toast.success('Fichier généré.');
       } catch {
         toast.error('Le serveur est injoignable.');

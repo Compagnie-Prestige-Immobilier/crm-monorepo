@@ -133,6 +133,39 @@ export async function fetchProspectsAQualifier(
   return flattenPage(unwrap(await client.GET('/api/v1/prospects', { params: { query } })));
 }
 
+export type PipelineContacts = components['schemas']['ProspectPipelineOutputBody'];
+export type ClientContact = components['schemas']['ProspectClient'];
+
+/** Les clients d'un téléconseiller : ses contacts vendus, avec la vente rapprochée par téléphone. */
+export async function fetchClientsContacts(
+  appelePar: string,
+  projet: Projet | null | undefined,
+  client: ApiClient = getApiClient(),
+): Promise<ClientContact[]> {
+  return unwrap(
+    await client.GET('/api/v1/prospects/clients', {
+      params: {
+        query: { appelePar, ...(projet === null || projet === undefined ? {} : { projet }) },
+      },
+    }),
+  ).items;
+}
+
+/** Le parcours d'un téléconseiller sur ses contacts, de l'appel à la vente. */
+export async function fetchPipelineContacts(
+  appelePar: string,
+  projet: Projet | null | undefined,
+  client: ApiClient = getApiClient(),
+): Promise<PipelineContacts> {
+  return unwrap(
+    await client.GET('/api/v1/prospects/pipeline', {
+      params: {
+        query: { appelePar, ...(projet === null || projet === undefined ? {} : { projet }) },
+      },
+    }),
+  );
+}
+
 /** Les prospects dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchProspectsAppeles(
   appelePar: string,
@@ -393,12 +426,47 @@ export async function reassignProspects(
   return unwrap(await client.POST('/api/v1/prospects/reassign', { body }));
 }
 
-export async function requalifierProspect(
+/** Remise à traiter : la fiche revient dans le reste à appeler, les appels passés restent. */
+export async function remettreProspectATraiter(
   id: string,
-  body: { projet: 'CHUES' | 'GRAND_PUBLIC'; statut: 'NOUVEAU' | 'CONTACTE' | 'CONVERTI' | 'PERDU' },
+  projet: 'CHUES' | 'GRAND_PUBLIC',
   client: ApiClient = getApiClient(),
 ): Promise<ProspectRow> {
   return unwrap(
-    await client.POST('/api/v1/prospects/{id}/requalifier', { params: { path: { id } }, body }),
+    await client.POST('/api/v1/prospects/{id}/requalifier', {
+      params: { path: { id } },
+      body: { projet, statut: 'NOUVEAU' },
+    }),
+  );
+}
+
+/** Un téléconseiller nommé, ou une campagne en cours qui désigne son membre le moins chargé. */
+export type AffectationCible = { teleconseillerId: string } | { campagneId: string };
+
+/** L'encadrement confie la fiche ; campagnes en cours et rappel promis suivent. */
+export async function affecterProspect(
+  id: string,
+  destination: AffectationCible,
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.POST('/api/v1/prospects/{id}/affecter', {
+      params: { path: { id } },
+      body: destination,
+    }),
+  );
+}
+
+/** L'encadrement pose le motif sans appel ; la fiche suit son effet. */
+export async function poserMotifProspect(
+  id: string,
+  body: { reasonCode: string; callbackAt?: string },
+  client: ApiClient = getApiClient(),
+): Promise<void> {
+  unwrap(
+    await client.POST('/api/v1/prospects/{id}/statut-qualification', {
+      params: { path: { id } },
+      body,
+    }),
   );
 }

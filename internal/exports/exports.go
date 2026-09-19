@@ -143,26 +143,24 @@ func Monter(api huma.API, d *socle.Deps) {
 }
 
 var (
-	exportLibellesProjet            = map[string]string{exportCleChues: exportCleChues, exportCleGrandPublic: "Grand Public"}
-	exportLibellesStatut            = map[string]string{string(db.ProspectStatutNOUVEAU): "Nouveau", string(db.ProspectStatutCONTACTE): exportLibelleContacte, string(db.ProspectStatutCONVERTI): "Converti", string(db.ProspectStatutPERDU): "Perdu", string(db.ProspectStatutVENDU): "Vendu"}
-	exportLibellesType              = map[string]string{"FONCTIONNAIRE": exportLibelleFonctionnaire, "SECTEUR_PRIVE": "Secteur privé", "INFORMEL": "Informel", "DIASPORA": "Diaspora"}
-	exportLibellesContrat           = map[string]string{string(db.TypeContratCDI): exportLibelleCdi, string(db.TypeContratCDD): exportLibelleCdd, string(db.TypeContratAUTRE): ExportLibelleAutre}
-	exportLibellesEpargne           = map[string]string{"TONTINE": exportLibelleTontine, "MOBILE_MONEY": ExportLibelleMobileMoney, "BANQUE": exportEnteteBanque, ExportCleAucun: exportLibelleAucun}
-	exportLibellesPhase2            = map[string]string{exportCleEnAttente: "En attente", ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, "UNREACHABLE": ExportLibelleInjoignable, "INTERESTED": "Intéressé", "HESITANT": "Hésitant", "APPOINTMENT": "Rendez-vous", "REACHED": "Joint, sans suite"}
-	ExportLibellesMethode           = map[string]string{string(db.EnrollmentMethodAPPOINTMENT): exportLibelleRendezVous, string(db.EnrollmentMethodPHYSICAL): exportLibelleRendezVous, string(db.EnrollmentMethodRDVCPI): exportLibelleRendezVous, string(db.EnrollmentMethodPLATFORM): exportLibellePlateforme, string(db.EnrollmentMethodPLATEFORMEENLIGNE): exportLibellePlateforme, string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING): exportLibelleMail, string(db.EnrollmentMethodMAIL): exportLibelleMail, string(db.EnrollmentMethodWHATSAPP): ExportEnteteWhatsapp}
-	exportLibellesIssue             = map[string]string{ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, string(db.CallOutcomeUNREACHABLE): ExportLibelleInjoignable, string(db.CallOutcomeCALLBACK): ExportLibelleARappeler, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, string(db.CallOutcomeOTHER): ExportLibelleAutre}
-	exportLibellesSegment           = map[string]string{exportCleBdd1: "BDD1 : CHUES / CBAO", exportCleBdd2: "BDD2 : CHUES / autre banque", exportCleBdd3: "BDD3 : autre syndicat / CBAO", exportCleBdd4: "BDD4 : autre syndicat / autre banque"}
-	exportLibellesRelation          = map[string]string{string(db.RepresentantRelationINCONNU): ExportLibelleNonQualifie, string(db.RepresentantRelationCONTACTE): exportLibelleContacte, string(db.RepresentantRelationAMBASSADEUR): ExportLibelleAccepte, string(db.RepresentantRelationREFUS): exportLibelleRefuse}
-	exportLibellesWhatsapp          = map[string]string{exportCleNonDemande: ExportLibelleNonDemande, exportCleMemeNumero: ExportLibelleMemeNumero, exportCleAutreNumero: ExportLibelleAutreNumero, ExportCleAucun: exportLibelleAucun}
-	exportLibellesIssueRepresentant = map[string]string{IssueJointImport: ExportLibelleJoint, "PROSPECTS_PROMISED": "Prospects promis", string(db.CallOutcomeUNREACHABLE): ExportLibelleInjoignable, string(db.CallOutcomeCALLBACK): ExportLibelleARappeler, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, string(db.CallOutcomeOTHER): ExportLibelleAutre}
-	exportLibellesRappel            = map[string]string{exportCleEnAttente: "En attente", "DONE": "Effectué", "CANCELLED": "Annulé", "SUPERSEDED": "Remplacé"}
-	exportLibellesPaiement          = map[string]string{string(db.PaymentModeCOMPTANT): "Comptant", string(db.PaymentModeECHELONNE): "Échelonné", string(db.PaymentModeCREDITIMMOBILIER): "Crédit immobilier"}
-	exportLibellesTypeBien          = map[string]string{string(db.TypeBienTERRAIN): "Terrain", string(db.TypeBienVILLA): "Villa"}
-	exportLibellesConsentement      = map[string]string{exportCleNonDemande: ExportLibelleNonDemande, "INTERESSE": "Intéressé", "REFUSE": exportLibelleRefuse}
-	exportLibellesSuggestion        = map[string]string{string(db.SuggestionStatusAAPPELER): "À appeler", string(db.SuggestionStatusAPPELE): "Appelé", string(db.SuggestionStatusABANDONNE): "Abandonné"}
-	exportOrdrePhase2               = []string{exportCleEnAttente, "INTERESTED", "HESITANT", "APPOINTMENT", ExportCleMethodeObtenue, "REACHED", ExportCleRefus, "UNREACHABLE", ExportCleMauvaisNumero}
-	ExportOrdreMethodes             = []string{string(db.EnrollmentMethodAPPOINTMENT), string(db.EnrollmentMethodPLATFORM), string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), string(db.EnrollmentMethodWHATSAPP)}
-	exportSegments                  = []string{exportCleBdd1, exportCleBdd2, exportCleBdd3, exportCleBdd4}
+	exportLibellesProjet       = map[string]string{exportCleChues: exportCleChues, exportCleGrandPublic: "Grand Public"}
+	exportLibellesStatut       = map[string]string{string(db.ProspectStatutNOUVEAU): "Nouveau", string(db.ProspectStatutCONTACTE): exportLibelleContacte, string(db.ProspectStatutCONVERTI): "Converti", string(db.ProspectStatutPERDU): "Perdu", string(db.ProspectStatutVENDU): "Vendu"}
+	exportLibellesType         = map[string]string{"FONCTIONNAIRE": exportLibelleFonctionnaire, "SECTEUR_PRIVE": "Secteur privé", "INFORMEL": "Informel", "DIASPORA": "Diaspora"}
+	exportLibellesContrat      = map[string]string{string(db.TypeContratCDI): exportLibelleCdi, string(db.TypeContratCDD): exportLibelleCdd, string(db.TypeContratAUTRE): ExportLibelleAutre}
+	exportLibellesEpargne      = map[string]string{"TONTINE": exportLibelleTontine, "MOBILE_MONEY": ExportLibelleMobileMoney, "BANQUE": exportEnteteBanque, ExportCleAucun: exportLibelleAucun}
+	exportLibellesPhase2       = map[string]string{exportCleEnAttente: "En attente", ExportCleMethodeObtenue: ExportLibelleMethodeObtenue, ExportCleRefus: ExportLibelleRefus, ExportCleMauvaisNumero: ExportLibelleFauxNumero, "UNREACHABLE": ExportLibelleInjoignable, "INTERESTED": "Intéressé", "HESITANT": "Hésitant", "APPOINTMENT": "Rendez-vous", "REACHED": "Joint, sans suite"}
+	ExportLibellesMethode      = map[string]string{string(db.EnrollmentMethodAPPOINTMENT): exportLibelleRendezVous, string(db.EnrollmentMethodPHYSICAL): exportLibelleRendezVous, string(db.EnrollmentMethodRDVCPI): exportLibelleRendezVous, string(db.EnrollmentMethodPLATFORM): exportLibellePlateforme, string(db.EnrollmentMethodPLATEFORMEENLIGNE): exportLibellePlateforme, string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING): exportLibelleMail, string(db.EnrollmentMethodMAIL): exportLibelleMail, string(db.EnrollmentMethodWHATSAPP): ExportEnteteWhatsapp}
+	exportLibellesSegment      = map[string]string{exportCleBdd1: "BDD1 : CHUES / CBAO", exportCleBdd2: "BDD2 : CHUES / autre banque", exportCleBdd3: "BDD3 : autre syndicat / CBAO", exportCleBdd4: "BDD4 : autre syndicat / autre banque"}
+	exportLibellesRelation     = map[string]string{string(db.RepresentantRelationINCONNU): ExportLibelleNonQualifie, string(db.RepresentantRelationCONTACTE): exportLibelleContacte, string(db.RepresentantRelationAMBASSADEUR): ExportLibelleAccepte, string(db.RepresentantRelationREFUS): exportLibelleRefuse}
+	exportLibellesWhatsapp     = map[string]string{exportCleNonDemande: ExportLibelleNonDemande, exportCleMemeNumero: ExportLibelleMemeNumero, exportCleAutreNumero: ExportLibelleAutreNumero, ExportCleAucun: exportLibelleAucun}
+	exportLibellesRappel       = map[string]string{exportCleEnAttente: "En attente", "DONE": "Effectué", "CANCELLED": "Annulé", "SUPERSEDED": "Remplacé"}
+	exportLibellesPaiement     = map[string]string{string(db.PaymentModeCOMPTANT): "Comptant", string(db.PaymentModeECHELONNE): "Échelonné", string(db.PaymentModeCREDITIMMOBILIER): "Crédit immobilier"}
+	exportLibellesTypeBien     = map[string]string{string(db.TypeBienTERRAIN): "Terrain", string(db.TypeBienVILLA): "Villa"}
+	exportLibellesConsentement = map[string]string{exportCleNonDemande: ExportLibelleNonDemande, "INTERESSE": "Intéressé", "REFUSE": exportLibelleRefuse}
+	exportLibellesSuggestion   = map[string]string{string(db.SuggestionStatusAAPPELER): "À appeler", string(db.SuggestionStatusAPPELE): "Appelé", string(db.SuggestionStatusABANDONNE): "Abandonné"}
+	exportOrdrePhase2          = []string{exportCleEnAttente, "INTERESTED", "HESITANT", "APPOINTMENT", ExportCleMethodeObtenue, "REACHED", ExportCleRefus, "UNREACHABLE", ExportCleMauvaisNumero}
+	ExportOrdreMethodes        = []string{string(db.EnrollmentMethodAPPOINTMENT), string(db.EnrollmentMethodPLATFORM), string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), string(db.EnrollmentMethodWHATSAPP)}
+	exportSegments             = []string{exportCleBdd1, exportCleBdd2, exportCleBdd3, exportCleBdd4}
 )
 
 func exportLibelle(table map[string]string, cle string) string {
@@ -445,7 +443,7 @@ func exportFiltresSuivi(p *exportPredicat, in *ExportRepresentantsInput) {
 		p.clauses = append(p.clauses, `r."nextCallbackAt" IS NOT NULL`)
 	}
 	if in.Suivi == "INJOIGNABLE" {
-		p.clauses = append(p.clauses, `r."lastCallOutcome" = 'UNREACHABLE'`)
+		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "statuts_qualification" sq WHERE sq."id" = r."statutQualificationId" AND sq."effect" = 'UNREACHABLE')`)
 	}
 	if in.HasProspects == exportFiltreVrai {
 		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "prospects" p WHERE p."representantId" = r."id" AND p."deletedAt" IS NULL)`)
@@ -993,5 +991,4 @@ const (
 	BanqueColonneMontant       = `c."amountXof"`
 	LotEtatARappeler           = "A_RAPPELER"
 	FormulaireLibelleEmployeur = "Employeur"
-	IssueJointImport           = "REACHED"
 )
