@@ -167,6 +167,7 @@ export const PERMISSIONS = [
   'prospects.superviser',
   'qualification.rappels',
   'referentiels.superviser',
+  'rendez_vous.suivre',
   'roles.administrer',
   'support.plateforme',
   'support.signaler',

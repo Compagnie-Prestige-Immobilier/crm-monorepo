@@ -458,6 +458,19 @@ export async function affecterProspect(
 }
 
 /** L'encadrement pose le motif sans appel ; la fiche suit son effet. */
+export async function suivreRendezVous(
+  id: string,
+  body: components['schemas']['ProspectSuiviRendezVousInputBody'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.POST('/api/v1/prospects/{id}/suivi-rendez-vous', {
+      params: { path: { id } },
+      body,
+    }),
+  );
+}
+
 export async function poserMotifProspect(
   id: string,
   body: { reasonCode: string; callbackAt?: string },
