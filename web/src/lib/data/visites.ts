@@ -174,7 +174,7 @@ export function countActiveVisiteFilters(filters: VisiteFilters): number {
 }
 
 /** Sans date choisie ni registre entier demandé, le registre est celui du jour. */
-function visiteDateRange(
+export function visiteDateRange(
   filters: VisiteFilters,
   today: string,
 ): { dateFrom: string | null; dateTo: string | null } {

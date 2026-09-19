@@ -4,13 +4,7 @@ import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { ProspectsView } from '@/components/prospects/prospects-view';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefusPermission, type Contexte } from '@/lib/guard';
-import {
-  canExportProspects,
-  peut,
-  readsOnly,
-  type Phase2Status,
-  type SessionUser,
-} from '@/lib/types';
+import { peut, readsOnly, type Phase2Status, type SessionUser } from '@/lib/types';
 
 const SUIVIS: readonly { value: Phase2Status; label: string }[] = [
   { value: 'INTERESTED', label: 'Intéressés' },
@@ -76,7 +70,7 @@ function TeleconseilInteressesPage() {
       <ProspectsView
         canAdminister={peut(user, 'fiches.ignorer_propriete')}
         canReassign={peut(user, 'prospects.reaffecter_tout')}
-        canExport={canExportProspects(user.role)}
+        canExport={peut(user, 'exports.prospects')}
         readOnly={readsOnly(user.role)}
         viewerId={['ADMIN', 'DIRECTION'].includes(user.role) ? user.id : undefined}
       />
