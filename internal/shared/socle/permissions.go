@@ -222,13 +222,18 @@ func (u *Utilisateur) Peut(p Permission) bool {
 	if p == Publique {
 		return true
 	}
-	if p == PermissionRendezVousSuivre && Env("BETA_SUIVI_RENDEZ_VOUS", Faux) != Vrai {
+	if p == PermissionRendezVousSuivre && !betaSuiviRendezVous() {
 		return false
 	}
 	if u.permissions != nil {
 		return u.permissions[p]
 	}
 	return attributionsParDefaut()[u.Role][p]
+}
+
+// Ouverte en développement local ; la production (NODE_ENV=production) attend la variable.
+func betaSuiviRendezVous() bool {
+	return Env("BETA_SUIVI_RENDEZ_VOUS", Faux) == Vrai || Env("NODE_ENV", "") == "development"
 }
 
 func (u *Utilisateur) Permissions() []string {
