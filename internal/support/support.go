@@ -23,10 +23,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/support/categories": socle.PermissionSupportSignaler,
 }
 
-const (
-	ticketIncident = 1
-	comptePilotage = "pilotage"
-)
+const ticketIncident = 1
 
 var clientGlpi = &http.Client{Timeout: 60 * time.Second}
 
@@ -122,10 +119,9 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 	if err != nil {
 		return nil, glpiInjoignable(err)
 	}
-	defer g.fermerSession(ctx, session)
-
-	demandeur, err := g.demandeur(ctx, session, u.Username, u.Role)
+	demandeur, err := g.demandeur(ctx, session, &u)
 	if err != nil {
+		g.fermerSession(ctx, session)
 		return nil, glpiInjoignable(err)
 	}
 	var ticket struct {
@@ -148,32 +144,71 @@ func (g glpi) creer(ctx context.Context, in *TicketInput) (*TicketOutput, error)
 		return nil, err
 	}
 	if err := g.appeler(ctx, session, http.MethodPost, "/Ticket", "application/json", bytes.NewReader(corps), &ticket); err != nil {
+		g.fermerSession(ctx, session)
 		return nil, glpiInjoignable(err)
 	}
-	for i, image := range form.Images {
-		if err := g.joindreImage(ctx, session, ticket.ID, i, image); err != nil {
-			slog.Warn("image non jointe au ticket GLPI", "ticket", ticket.ID, "err", err)
-		}
+	images, err := lireImages(form.Images)
+	if err != nil {
+		slog.Warn("images illisibles pour le ticket GLPI", "ticket", ticket.ID, "err", err)
 	}
+	// Le signalant attend le numéro, pas les pièces jointes : elles partent après la réponse.
+	go g.terminer(context.WithoutCancel(ctx), session, ticket.ID, images)
 	out := &TicketOutput{}
 	out.Body.Numero = ticket.ID
 	return out, nil
 }
 
-// Un administrateur signale au nom du pilotage ; les autres sous leur compte GLPI, créé à leur
-// première ouverture de GLPI depuis le panneau, et au nom du pilotage d'ici là.
-func (g glpi) demandeur(ctx context.Context, session, login string, role socle.Role) (int, error) {
-	if role != socle.Admin {
-		id, err := g.idCompte(ctx, session, login)
-		if err != nil || id != 0 {
-			return id, err
+type image struct {
+	nom     string
+	contenu []byte
+}
+
+func lireImages(fichiers []huma.FormFile) ([]image, error) {
+	images := make([]image, 0, len(fichiers))
+	for i, f := range fichiers {
+		contenu, err := io.ReadAll(f)
+		if err != nil {
+			return images, err
+		}
+		images = append(images, image{fmt.Sprintf("image-%d%s", i+1, extensionsImages[f.ContentType]), contenu})
+	}
+	return images, nil
+}
+
+func (g glpi) terminer(ctx context.Context, session string, ticketID int, images []image) {
+	ctx, annuler := context.WithTimeout(ctx, 2*time.Minute)
+	defer annuler()
+	defer g.fermerSession(ctx, session)
+	for _, im := range images {
+		if err := g.joindreImage(ctx, session, ticketID, im); err != nil {
+			slog.Warn("image non jointe au ticket GLPI", "ticket", ticketID, "err", err)
 		}
 	}
-	id, err := g.idCompte(ctx, session, comptePilotage)
-	if err == nil && id == 0 {
-		err = fmt.Errorf("compte GLPI %q introuvable", comptePilotage)
+}
+
+// Le compte porte l'identifiant du panneau : la connexion unique à GLPI le retrouve ensuite.
+func (g glpi) demandeur(ctx context.Context, session string, u *socle.Utilisateur) (int, error) {
+	id, err := g.idCompte(ctx, session, u.Username)
+	if err != nil || id != 0 {
+		return id, err
 	}
-	return id, err
+	var compte struct {
+		Input struct {
+			Name     string   `json:"name"`
+			Realname string   `json:"realname"`
+			Emails   []string `json:"_useremails"`
+		} `json:"input"`
+	}
+	compte.Input.Name, compte.Input.Realname, compte.Input.Emails = u.Username, u.FullName, []string{u.Email}
+	corps, err := json.Marshal(compte)
+	if err != nil {
+		return 0, err
+	}
+	var cree struct {
+		ID int `json:"id"`
+	}
+	err = g.appeler(ctx, session, http.MethodPost, "/User", "application/json", bytes.NewReader(corps), &cree)
+	return cree.ID, err
 }
 
 func (g glpi) idCompte(ctx context.Context, session, login string) (int, error) {
@@ -193,8 +228,8 @@ func (g glpi) idCompte(ctx context.Context, session, login string) (int, error) 
 	return 0, nil
 }
 
-func (g glpi) joindreImage(ctx context.Context, session string, ticketID, rang int, image huma.FormFile) error {
-	nom := fmt.Sprintf("image-%d%s", rang+1, extensionsImages[image.ContentType])
+func (g glpi) joindreImage(ctx context.Context, session string, ticketID int, im image) error {
+	nom := im.nom
 	var corps bytes.Buffer
 	w := multipart.NewWriter(&corps)
 	var document struct {
@@ -218,7 +253,7 @@ func (g glpi) joindreImage(ctx context.Context, session string, ticketID, rang i
 	if err != nil {
 		return err
 	}
-	if _, err := io.Copy(partie, image); err != nil {
+	if _, err := partie.Write(im.contenu); err != nil {
 		return err
 	}
 	if err := w.Close(); err != nil {
