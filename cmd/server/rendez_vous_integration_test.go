@@ -4,6 +4,7 @@ package main
 
 import (
 	"net/http"
+	"slices"
 	"testing"
 	"time"
 )
@@ -43,4 +44,15 @@ func TestSuiviRendezVousBetaParLaDirection(t *testing.T) {
 	if body["rendezVousIssue"] != "HONORE" || body["suiteRencontre"] != "CHAUD" {
 		t.Fatalf("suivi relu : %v", body)
 	}
+
+	telephone, _ := body["phoneE164"].(string)
+	cc := qualificationConnecte(t, "CHARGE_CLIENTELE")
+	statut, body = qualificationEnvoi(cc, http.MethodGet, "/api/v1/prospects?phase2Status=APPOINTMENT&search="+telephone[1:], nil)
+	cc.attend(statut, http.StatusOK, "onglet Rendez-vous", body)
+	items, _ := body["items"].([]any)
+	if !slices.ContainsFunc(items, func(item any) bool { ligne, _ := item.(map[string]any); return ligne["id"] == fiche }) {
+		t.Fatalf("le CC voit l'onglet Rendez-vous : %d fiches", len(items))
+	}
+	statut, body = qualificationEnvoi(cc, http.MethodPost, chemin, map[string]any{"issue": "NON_HONORE"})
+	cc.attend(statut, http.StatusOK, "le CC note le suivi", body)
 }
