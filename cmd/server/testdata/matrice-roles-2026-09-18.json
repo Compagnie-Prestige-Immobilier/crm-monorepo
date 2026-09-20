@@ -593,6 +593,7 @@
   "POST /api/v1/prospects/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
+  "POST /api/v1/prospects/{id}/suivi-rendez-vous": ["ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/vendre": [
@@ -630,6 +631,10 @@
   "POST /api/v1/statuts-qualification/{id}/active": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/sync/push": ["ADMIN", "CHARGE_CLIENTELE", "COMMERCIAL", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/support/tickets": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "GET /api/v1/support/tickets/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets/{id}/reprendre": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/support/tickets/{id}/rattacher": ["ADMIN"],
   "POST /api/v1/users": ["ADMIN"],
   "POST /api/v1/ventes/classeur": ["ADMIN", "DIRECTION"],
   "POST /api/v1/visites": ["ACCUEIL", "ADMIN", "DIRECTION"],

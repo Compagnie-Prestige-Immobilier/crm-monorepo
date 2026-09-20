@@ -224,6 +224,9 @@ type Prospect struct {
 	Origin                   *string           `json:"origin"`
 	OriginLabel              *string           `json:"originLabel"`
 	ARevoirAt                *string           `json:"aRevoirAt"`
+	RendezVousIssue          *string           `json:"rendezVousIssue" enum:"HONORE,NON_HONORE,REPORTE"`
+	RendezVousReporteAt      *string           `json:"rendezVousReporteAt"`
+	SuiteRencontre           *string           `json:"suiteRencontre" enum:"TRES_CHAUD,CHAUD,A_SUIVRE"`
 	ClientCreatedAt          string            `json:"clientCreatedAt"`
 	CreatedAt                string            `json:"createdAt"`
 	UpdatedAt                string            `json:"updatedAt"`
@@ -317,6 +320,7 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
+		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,
 		ClientCreatedAt: prospectISO(p.ClientCreatedAt), CreatedAt: prospectISO(p.CreatedAt),
 		UpdatedAt: prospectISO(p.UpdatedAt), DeletedAt: prospectISOPtr(p.DeletedAt),
 	}
@@ -334,18 +338,20 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 }
 
 type prospectPortee struct {
-	tout     bool
-	converti bool
-	userID   string
+	tout       bool
+	converti   bool
+	rendezVous bool
+	userID     string
 }
 
 // Le chargé de clientèle voit TOUTE demande convertie : c'est lui qui la relit
 // avant l'enrôlement, et une portée bornée à ses fiches la lui cacherait.
 func prospectPorteeDe(u *socle.Utilisateur) prospectPortee {
 	return prospectPortee{
-		tout:     u.Peut(socle.PermissionPortefeuilleVoirTout),
-		converti: u.Peut(socle.PermissionFichesVoirConverties),
-		userID:   u.ID,
+		tout:       u.Peut(socle.PermissionPortefeuilleVoirTout),
+		converti:   u.Peut(socle.PermissionFichesVoirConverties),
+		rendezVous: u.Peut(socle.PermissionRendezVousSuivre),
+		userID:     u.ID,
 	}
 }
 
@@ -404,7 +410,7 @@ func (s *service) prospectCharger(ctx context.Context, arg *db.ListProspectsPara
 func (s *service) prospectLire(ctx context.Context, u *socle.Utilisateur, id string) (*Prospect, error) {
 	p := prospectPorteeDe(u)
 	items, err := s.prospectCharger(ctx, &db.ListProspectsParams{
-		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
+		ID: &id, ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
 		SortBy: prospectTriDefaut, SortOrder: prospectOrdreDefaut, Taille: 1,
 	})
 	if err != nil {
@@ -530,10 +536,10 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 	// `mesFiches` borne aussi l'encadrement : sur l'écran d'appel, chacun ne
 	// compose que les numéros qui lui reviennent.
 	if in.MesFiches {
-		p.tout, p.converti = false, false
+		p.tout, p.converti, p.rendezVous = false, false, false
 	}
 	arg := db.ListProspectsParams{
-		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti,
+		ScopeAll: p.tout, ScopeUserID: p.userID, ScopeConverti: p.converti, ScopeRendezVous: p.rendezVous,
 		CommercialID: prospectVide(in.CommercialID), Type: prospectTypeEnum[db.ProspectType](in.Type),
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
@@ -570,7 +576,7 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 // la pagination annoncerait des pages vides.
 func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 	return db.CountProspectsParams{
-		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti,
+		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti, ScopeRendezVous: arg.ScopeRendezVous,
 		CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
 		RepresentantID: arg.RepresentantID, BanqueID: arg.BanqueID, SyndicatID: arg.SyndicatID,
 		Origin: arg.Origin, Phase2Status: arg.Phase2Status, SansMotif: arg.SansMotif, EnrollmentMethod: arg.EnrollmentMethod,
@@ -1452,6 +1458,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects/pipeline":                                  prospectLecture,
 	"GET /api/v1/prospects/clients":                                   prospectLecture,
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
+	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,
 	"DELETE " + prospectCheminID:                                      socle.PermissionFichesTenir,
@@ -1488,4 +1495,5 @@ func Monter(api huma.API, d *socle.Deps) {
 	prospectMonterSegment(api, s)
 	prospectMonterJournal(api, s)
 	prospectMonterConversion(api, s)
+	prospectMonterRendezVous(api, s)
 }

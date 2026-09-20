@@ -71,12 +71,14 @@ export type Coque = 'accueil' | 'teleconseil' | 'finance' | 'ventes' | 'admin';
  * La permission que garde la route ; une liste de rôles là où aucune
  * permission n'a exactement le même ensemble, et le rôle de base décide.
  */
-type Acces = Permission | readonly Role[];
+type Acces = Permission | readonly Role[] | ((visiteur: Visiteur) => boolean);
 
 export type Visiteur = Pick<SessionUser, 'role' | 'permissions'>;
 
-const ouvert = (visiteur: Visiteur, acces: Acces): boolean =>
-  typeof acces === 'string' ? peut(visiteur, acces) : acces.includes(visiteur.role);
+const ouvert = (visiteur: Visiteur, acces: Acces): boolean => {
+  if (typeof acces === 'function') return acces(visiteur);
+  return typeof acces === 'string' ? peut(visiteur, acces) : acces.includes(visiteur.role);
+};
 
 export interface CoqueEntry {
   id: Coque;
@@ -339,6 +341,14 @@ const SECTIONS: readonly NavSection[] = [
         icon: HeartHandshakeIcon,
         description: 'Fiches fermées à suivre',
         acces: 'prospects.superviser',
+      },
+      {
+        href: '/teleconseil/interesses',
+        label: 'Rendez-vous',
+        icon: HeartHandshakeIcon,
+        description: 'Rendez-vous obtenus et leur suivi',
+        acces: (visiteur) =>
+          !peut(visiteur, 'prospects.superviser') && peut(visiteur, 'rendez_vous.suivre'),
       },
       {
         href: '/teleconseil/campagnes',

@@ -417,6 +417,20 @@ func TestSupervisionCampagnesEtStock(t *testing.T) {
 	analyticsEgal(b, "une fiche confiée non appelée fait un taux de 0", campagne["contactRate"], 0)
 	analyticsListe(b, "détail par téléconseiller", campagne["parTeleconseiller"], 1)
 
+	tentative := uuid.NewString()
+	analyticsExec(b, `INSERT INTO "rep_call_attempts" ("id","representantId","performedById","statutQualificationId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",$4::timestamp FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT'`,
+		tentative, jeu.representant, b.userID, instantAnalytics)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "rep_call_attempts" WHERE "id" = $1`, tentative)
+	})
+	analyticsViderCache()
+	statut, body = b.appel(http.MethodGet, "/api/v1/supervision/campagnes"+fenetre, nil, false)
+	b.attend(statut, http.StatusOK, "campagnes après l'appel", body)
+	campagne = analyticsObjet(b, "campagne", analyticsListe(b, "campagnes de la fenêtre", body["items"], 1)[0])
+	analyticsEgal(b, "la fiche appelée compte", campagne["appelees"], 1)
+	analyticsEgal(b, "la seule fiche confiée est appelée", campagne["contactRate"], 100)
+
 	// Le stock n'a pas de filtre : sa clé de cache ne porte que le rôle, et une
 	// entrée d'un autre test la servirait.
 	analyticsViderCache()

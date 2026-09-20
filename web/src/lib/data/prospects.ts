@@ -170,6 +170,7 @@ export async function fetchPipelineContacts(
 export async function fetchProspectsAppeles(
   appelePar: string,
   projet: Projet | null | undefined,
+  page = 1,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const payload = unwrap(
@@ -180,7 +181,7 @@ export async function fetchProspectsAppeles(
           ...(projet === null || projet === undefined ? {} : { projet }),
           sortBy: 'lastCallAt',
           sortOrder: 'desc',
-          page: 1,
+          page,
           pageSize: SUIVI_PAGE_SIZE,
         },
       },
@@ -458,6 +459,19 @@ export async function affecterProspect(
 }
 
 /** L'encadrement pose le motif sans appel ; la fiche suit son effet. */
+export async function suivreRendezVous(
+  id: string,
+  body: components['schemas']['ProspectSuiviRendezVousInputBody'],
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.POST('/api/v1/prospects/{id}/suivi-rendez-vous', {
+      params: { path: { id } },
+      body,
+    }),
+  );
+}
+
 export async function poserMotifProspect(
   id: string,
   body: { reasonCode: string; callbackAt?: string },

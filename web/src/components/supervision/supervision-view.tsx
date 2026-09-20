@@ -33,7 +33,7 @@ import {
   type SupervisedUser,
 } from '@/lib/data/admin';
 import { formatNumber } from '@/lib/format';
-import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { queryKeys } from '@/lib/query-keys';
 
 const PRESENCE_VARIANT: Record<PresenceState, 'success' | 'info' | 'secondary'> = {
@@ -55,7 +55,7 @@ function formatDeadTime(seconds: number, gaps: number): string {
 }
 
 export function SupervisionView() {
-  const live = useLive();
+  const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });
 
   const supervision = useQuery({
     queryKey: queryKeys.supervision,
