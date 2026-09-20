@@ -265,7 +265,8 @@ WHERE c."status" = 'PENDING'
                   WHERE j."prospectId" = p."id"
                     AND j."projet"::text = CAST(sqlc.narg('projet') AS text)))
 ORDER BY c."scheduledAt" ASC, c."id" ASC
-LIMIT 500;
+LIMIT sqlc.arg('page_size')
+OFFSET sqlc.arg('page_offset');
 
 -- La liste s'arrête à 500 rappels : le total dit ce qu'elle ne montre pas.
 -- name: CompterRappels :one

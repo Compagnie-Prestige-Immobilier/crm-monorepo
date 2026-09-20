@@ -153,6 +153,8 @@ function MesContactsListContent({
   hasActiveFilters,
   resetFilters,
   proj,
+  page,
+  onPage,
 }: {
   onglet: Onglet;
   appelePar: string;
@@ -164,6 +166,8 @@ function MesContactsListContent({
   hasActiveFilters: boolean;
   resetFilters: () => void;
   proj: Projet | null;
+  page: number;
+  onPage: (page: number) => void;
 }) {
   if (onglet === 'CLIENTS') {
     return <MesClients appelePar={appelePar} projet={proj} />;
@@ -177,6 +181,8 @@ function MesContactsListContent({
         onResetFilters={resetFilters}
         vide="Un représentant apparaît ici dès que vous consignez un appel sur sa fiche."
         echec="Les représentants appelés n’ont pas pu être lus."
+        page={page}
+        onPage={onPage}
       >
         {(items) => <TableRepresentants items={items} />}
       </Liste>
@@ -190,6 +196,8 @@ function MesContactsListContent({
       onResetFilters={resetFilters}
       vide="Un prospect apparaît ici dès que vous consignez un appel sur sa fiche."
       echec="Les prospects appelés n’ont pas pu être lus."
+      page={page}
+      onPage={onPage}
     >
       {(items) => <TableProspects items={items} projet={proj} />}
     </Liste>
@@ -346,6 +354,7 @@ export function MesContactsView({
   const [issueFiltre, setIssueFiltre] = useState<string | null>(null);
   const [statutFiltre, setStatutFiltre] = useState<string | null>(null);
   const [filtreId, setFiltreId] = useState<string | null>(null);
+  const [page, setPage] = useState(1);
 
   const proj = projet ?? null;
   const lastCallById = computeLastCallId(canFilter, filtreId, userId);
@@ -354,15 +363,15 @@ export function MesContactsView({
   const vueRepresentants = avecRepresentants && onglet === 'REPRESENTANTS';
 
   const prospects = useQuery({
-    queryKey: ['mes-contacts', 'prospects', proj, lastCallById],
-    queryFn: () => fetchProspectsAppeles(lastCallById, proj),
+    queryKey: ['mes-contacts', 'prospects', proj, lastCallById, page],
+    queryFn: () => fetchProspectsAppeles(lastCallById, proj, page),
     enabled: !vueRepresentants,
     placeholderData: (previous) => previous,
   });
 
   const representants = useQuery({
-    queryKey: ['mes-contacts', 'representants', lastCallById],
-    queryFn: () => fetchRepresentantsAppeles(lastCallById),
+    queryKey: ['mes-contacts', 'representants', lastCallById, page],
+    queryFn: () => fetchRepresentantsAppeles(lastCallById, page),
     enabled: vueRepresentants,
     placeholderData: (previous) => previous,
   });
@@ -402,11 +411,6 @@ export function MesContactsView({
 
   return (
     <section className="flex flex-col gap-4">
-      <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-        Mes contacts regroupe les personnes déjà appelées par vous. Le projet est affiché sur chaque
-        fiche.
-      </p>
-
       <MesContactsFilterBar
         search={search}
         setSearch={setSearch}
@@ -449,6 +453,8 @@ export function MesContactsView({
         hasActiveFilters={hasActiveFilters}
         resetFilters={resetFilters}
         proj={proj}
+        page={page}
+        onPage={setPage}
       />
     </section>
   );
@@ -472,6 +478,8 @@ function Liste<T>({
   vide,
   echec,
   children,
+  page,
+  onPage,
 }: {
   liste: UseQueryResult<Paginated<T>>;
   itemsFiltered: T[];
@@ -480,6 +488,8 @@ function Liste<T>({
   vide: string;
   echec: string;
   children: (items: T[]) => ReactNode;
+  page: number;
+  onPage: (page: number) => void;
 }) {
   const data = liste.data;
   const hasData = data !== undefined;
@@ -524,6 +534,17 @@ function Liste<T>({
         {suiviTextLabel(hasFilters, itemsFiltered, data)}
       </p>
       {children(itemsFiltered)}
+      {data.pageCount > 1 ? (
+        <div className="flex items-center justify-between text-sm">
+          <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
+            Précédente
+          </Button>
+          <span>Page {data.page} sur {data.pageCount}</span>
+          <Button variant="outline" size="sm" disabled={page >= data.pageCount} onClick={() => onPage(page + 1)}>
+            Suivante
+          </Button>
+        </div>
+      ) : null}
     </div>
   );
 }

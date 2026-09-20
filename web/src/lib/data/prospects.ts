@@ -170,6 +170,7 @@ export async function fetchPipelineContacts(
 export async function fetchProspectsAppeles(
   appelePar: string,
   projet: Projet | null | undefined,
+  page = 1,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<ProspectRow>> {
   const payload = unwrap(
@@ -180,7 +181,7 @@ export async function fetchProspectsAppeles(
           ...(projet === null || projet === undefined ? {} : { projet }),
           sortBy: 'lastCallAt',
           sortOrder: 'desc',
-          page: 1,
+          page,
           pageSize: SUIVI_PAGE_SIZE,
         },
       },

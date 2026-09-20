@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { SearchField } from '@/components/filters/search-field';
+import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -251,7 +252,7 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
   const queryKey = ['referentiels', kind] as const;
   const query = useQuery<Row[]>({
     queryKey,
-    queryFn: FETCHERS[kind],
+    queryFn: () => FETCHERS[kind](),
   });
 
   const save = useMutation({
@@ -266,6 +267,10 @@ export function OpenReferentialTab({ kind }: { kind: Kind }) {
       toastApiError(error, 'Enregistrement impossible.');
     },
   });
+
+  if (query.isError) {
+    return <QueryErrorState error={query.error} onRetry={() => void query.refetch()} />;
+  }
 
   const rows = (query.data ?? []).filter((row) =>
     `${row.code} ${row.label}`.toLocaleLowerCase('fr').includes(search.toLocaleLowerCase('fr')),

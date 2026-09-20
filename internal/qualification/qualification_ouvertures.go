@@ -87,14 +87,18 @@ type QualificationRappelsInput struct {
 	Projet       string `query:"projet" enum:",CHUES,GRAND_PUBLIC"`
 	Scope        string `query:"scope" enum:"today,overdue,week,all" default:"today"`
 	AssignedToID string `query:"assignedToId" maxLength:"64"`
+	Page         int    `query:"page" minimum:"1" default:"1"`
+	PageSize     int    `query:"pageSize" minimum:"1" maximum:"100" default:"50"`
 }
 
 type QualificationRappelsOutput struct {
 	Body struct {
-		Items      []QualificationRappelDTO `json:"items" doc:"Les 500 plus proches au plus."`
+		Items      []QualificationRappelDTO `json:"items"`
 		ServerTime string                   `json:"serverTime" format:"date-time"`
-		// La liste s'arrête à 500 rappels : ce nombre dit ce qu'elle ne montre pas.
 		Total int `json:"total"`
+		Page int `json:"page"`
+		PageSize int `json:"pageSize"`
+		PageCount int `json:"pageCount"`
 	}
 }
 
@@ -122,6 +126,12 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	maintenant := time.Now().UTC()
 	borne := qualificationBorneRappels(in.Scope, maintenant, s.Cfg.TimeZone)
 	p := db.ListerRappelsParams{Avant: &borne}
+	page := in.Page
+	if page < 1 { page = 1 }
+	pageSize := in.PageSize
+	if pageSize < 1 || pageSize > 100 { pageSize = 50 }
+	p.PageOffset = int32((page - 1) * pageSize)
+	p.PageSize = int32(pageSize)
 	if in.Projet != "" {
 		p.Projet = &in.Projet
 	}
@@ -136,7 +146,9 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	if err != nil {
 		return nil, err
 	}
-	total, err := s.Q.CompterRappels(ctx, db.CompterRappelsParams(p))
+	total, err := s.Q.CompterRappels(ctx, db.CompterRappelsParams{
+		Avant: p.Avant, AssignedToID: p.AssignedToID, Projet: p.Projet,
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -144,6 +156,9 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	out.Body.Items = make([]QualificationRappelDTO, 0, len(rows))
 	out.Body.ServerTime = qualificationISO(maintenant)
 	out.Body.Total = int(total)
+	out.Body.Page = page
+	out.Body.PageSize = pageSize
+	out.Body.PageCount = (int(total) + pageSize - 1) / pageSize
 	for i := range rows {
 		r := &rows[i]
 		out.Body.Items = append(out.Body.Items, qualificationRappelDTO(&qualificationRappelLigne{
