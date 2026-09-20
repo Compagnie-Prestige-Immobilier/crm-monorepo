@@ -87,7 +87,7 @@ type QualificationRappelsInput struct {
 	Projet       string `query:"projet" enum:",CHUES,GRAND_PUBLIC"`
 	Scope        string `query:"scope" enum:"today,overdue,week,all" default:"today"`
 	AssignedToID string `query:"assignedToId" maxLength:"64"`
-	Page         int    `query:"page" minimum:"1" default:"1"`
+	Page         int    `query:"page" minimum:"1" maximum:"100000" default:"1"`
 	PageSize     int    `query:"pageSize" minimum:"1" maximum:"100" default:"50"`
 }
 
@@ -95,10 +95,10 @@ type QualificationRappelsOutput struct {
 	Body struct {
 		Items      []QualificationRappelDTO `json:"items"`
 		ServerTime string                   `json:"serverTime" format:"date-time"`
-		Total int `json:"total"`
-		Page int `json:"page"`
-		PageSize int `json:"pageSize"`
-		PageCount int `json:"pageCount"`
+		Total      int                      `json:"total"`
+		Page       int                      `json:"page"`
+		PageSize   int                      `json:"pageSize"`
+		PageCount  int                      `json:"pageCount"`
 	}
 }
 
@@ -119,6 +119,12 @@ func qualificationBorneRappels(portee string, maintenant time.Time, zone *time.L
 		int(999*time.Millisecond), zone).UTC()
 }
 
+const (
+	rappelsPageMax        = 100000
+	rappelsPageSizeMax    = 100
+	rappelsPageSizeDefaut = 50
+)
+
 // Le RETARD n'est pas un statut : un rappel de la veille reste PENDING et
 // remonte dans la journée courante.
 func (s *service) qualificationListerRappels(ctx context.Context, in *QualificationRappelsInput) (*QualificationRappelsOutput, error) {
@@ -127,10 +133,14 @@ func (s *service) qualificationListerRappels(ctx context.Context, in *Qualificat
 	borne := qualificationBorneRappels(in.Scope, maintenant, s.Cfg.TimeZone)
 	p := db.ListerRappelsParams{Avant: &borne}
 	page := in.Page
-	if page < 1 { page = 1 }
+	if page < 1 || page > rappelsPageMax {
+		page = 1
+	}
 	pageSize := in.PageSize
-	if pageSize < 1 || pageSize > 100 { pageSize = 50 }
-	p.PageOffset = int32((page - 1) * pageSize)
+	if pageSize < 1 || pageSize > rappelsPageSizeMax {
+		pageSize = rappelsPageSizeDefaut
+	}
+	p.PageOffset = int32((page - 1) * pageSize) //nolint:gosec // page et pageSize sont bornés juste au-dessus
 	p.PageSize = int32(pageSize)
 	if in.Projet != "" {
 		p.Projet = &in.Projet

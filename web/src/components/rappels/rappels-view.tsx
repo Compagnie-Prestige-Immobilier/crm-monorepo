@@ -257,11 +257,23 @@ function RappelsTable({
       <NoteListeTronquee affichees={list.data.items.length} total={list.data.total} />
       {list.data.pageCount > 1 ? (
         <div className="flex items-center justify-between text-sm">
-          <Button variant="outline" size="sm" disabled={list.data.page <= 1} onClick={() => onPage(list.data.page - 1)}>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={list.data.page <= 1}
+            onClick={() => onPage(list.data.page - 1)}
+          >
             Précédente
           </Button>
-          <span>Page {list.data.page} sur {list.data.pageCount}</span>
-          <Button variant="outline" size="sm" disabled={list.data.page >= list.data.pageCount} onClick={() => onPage(list.data.page + 1)}>
+          <span>
+            Page {list.data.page} sur {list.data.pageCount}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={list.data.page >= list.data.pageCount}
+            onClick={() => onPage(list.data.page + 1)}
+          >
             Suivante
           </Button>
         </div>

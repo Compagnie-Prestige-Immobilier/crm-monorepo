@@ -69,7 +69,14 @@ export async function fetchCallbacks(
       },
     }),
   );
-  return { items: sortCallbacks(list.items), serverTime: list.serverTime, total: list.total, page: list.page, pageSize: list.pageSize, pageCount: list.pageCount };
+  return {
+    items: sortCallbacks(list.items),
+    serverTime: list.serverTime,
+    total: list.total,
+    page: list.page,
+    pageSize: list.pageSize,
+    pageCount: list.pageCount,
+  };
 }
 
 export async function cancelCallback(

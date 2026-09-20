@@ -539,8 +539,15 @@ function Liste<T>({
           <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
             Précédente
           </Button>
-          <span>Page {data.page} sur {data.pageCount}</span>
-          <Button variant="outline" size="sm" disabled={page >= data.pageCount} onClick={() => onPage(page + 1)}>
+          <span>
+            Page {data.page} sur {data.pageCount}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= data.pageCount}
+            onClick={() => onPage(page + 1)}
+          >
             Suivante
           </Button>
         </div>
