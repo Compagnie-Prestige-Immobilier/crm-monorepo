@@ -606,7 +606,7 @@ function FiltresBarre({
       </div>
 
       <div className="flex flex-col gap-1.5">
-        <Label htmlFor="negatif-enrolement">Motif</Label>
+        <Label htmlFor="negatif-enrolement">Issue signalée</Label>
         <Select
           value={filtres.negatif === true ? NEGATIFS : TOUS}
           onValueChange={(valeur) => {
@@ -619,7 +619,7 @@ function FiltresBarre({
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={TOUS}>Toutes</SelectItem>
-            <SelectItem value={NEGATIFS}>Négatives seulement</SelectItem>
+            <SelectItem value={NEGATIFS}>Issues signalées</SelectItem>
           </SelectContent>
         </Select>
       </div>
