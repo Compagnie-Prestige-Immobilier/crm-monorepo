@@ -109,6 +109,7 @@ function RappelsTable({
   scope,
   cancelPending,
   onCancel,
+  onPage,
 }: {
   list: UseQueryResult<CallbackList>;
   filteredItems: Callback[];
@@ -117,6 +118,7 @@ function RappelsTable({
   scope: CallbackScope;
   cancelPending: boolean;
   onCancel: (callback: Callback) => void;
+  onPage: (page: number) => void;
 }) {
   const tri = useTriLocal(filteredItems, COLONNES_RAPPELS);
   if (list.isPending) return <Skeleton className="h-64" />;
@@ -253,6 +255,29 @@ function RappelsTable({
         </TableBody>
       </Table>
       <NoteListeTronquee affichees={list.data.items.length} total={list.data.total} />
+      {list.data.pageCount > 1 ? (
+        <div className="flex items-center justify-between text-sm">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={list.data.page <= 1}
+            onClick={() => onPage(list.data.page - 1)}
+          >
+            Précédente
+          </Button>
+          <span>
+            Page {list.data.page} sur {list.data.pageCount}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={list.data.page >= list.data.pageCount}
+            onClick={() => onPage(list.data.page + 1)}
+          >
+            Suivante
+          </Button>
+        </div>
+      ) : null}
     </>
   );
 }
@@ -339,15 +364,16 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
   const [assignedToId, setAssignedToId] = useState<string | null>(null);
   const [projet, setProjet] = useState<Projet | null>(null);
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
 
   const overdue = useQuery({
-    queryKey: [...callbackKeys.list('overdue', assignedToId), projet],
-    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet ?? undefined),
+    queryKey: [...callbackKeys.list('overdue', assignedToId), projet, page],
+    queryFn: () => fetchCallbacks('overdue', assignedToId, undefined, projet ?? undefined, page),
   });
 
   const list = useQuery({
-    queryKey: [...callbackKeys.list(scope, assignedToId), projet],
-    queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined),
+    queryKey: [...callbackKeys.list(scope, assignedToId), projet, page],
+    queryFn: () => fetchCallbacks(scope, assignedToId, undefined, projet ?? undefined, page),
   });
 
   const filteredItems = (list.data?.items ?? []).filter((cb) => filterCallbackBySearch(cb, search));
@@ -375,11 +401,6 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
 
   return (
     <div className="flex flex-col gap-6">
-      <p className="rounded-lg border border-primary/20 bg-primary/5 px-4 py-3 text-sm text-muted-foreground">
-        {canFilter
-          ? 'Ces rappels sont ceux que les téléconseillers ont promis : chacun rappelle les siens, vous suivez les retards. Filtrez par téléconseiller ou par projet.'
-          : 'Tous vos rappels promis sont ici. Utilisez « Projet » pour distinguer CHUES et Grand Public.'}
-      </p>
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-[0.9375rem]" role="status">
           <OverdueStatusCount
@@ -428,6 +449,7 @@ export function RappelsView({ canFilter }: { canFilter: boolean }) {
                 canFilter={canFilter}
                 racine={racine}
                 scope={scope}
+                onPage={setPage}
                 cancelPending={cancel.isPending}
                 onCancel={(cb) => {
                   cancel.mutate(cb);

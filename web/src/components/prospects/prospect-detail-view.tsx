@@ -13,6 +13,7 @@ import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
+import { SuiviRendezVous, SuiviRendezVousBadges } from '@/components/prospects/suivi-rendez-vous';
 import {
   HistoireDeLaFiche,
   NO_VALUE,
@@ -114,6 +115,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
             <Badge variant="outline">{PROSPECT_STATUT_LABELS[prospect.statut]}</Badge>
             <EtiquettesStatut prospect={prospect} />
             <RevueDemande prospect={prospect} user={user} />
+            <SuiviRendezVousBadges prospect={prospect} />
           </>
         }
         actions={
@@ -135,6 +137,7 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
               nom={`${prospect.prenom} ${prospect.nom}`}
               titulaireId={prospect.ownedByCommercialId}
             />
+            <SuiviRendezVous prospect={prospect} />
             <MarquerVendu prospect={prospect} user={user} />
           </>
         }

@@ -27,7 +27,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { bankBasePath } from '@/lib/bank-filters';
 import { fetchBankAnalytics } from '@/lib/data/bank-cases';
 import { formatDecimal, formatNumber } from '@/lib/format';
-import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { LIVE_SLOW_INTERVAL_MS, shouldShowError, shouldShowSkeleton } from '@/lib/live';
 import { ExactAmountsToggle, MoneyText } from '@/components/money/exact-amounts';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
@@ -36,7 +36,7 @@ import type { FilterOption, Projet } from '@/lib/types';
 export function BankDashboardView({ projet }: { projet?: Projet | null | undefined } = {}) {
   const router = useRouter();
   const { filters, hrefWith } = useBankFilters(projet);
-  const live = useLive();
+  const live = useLive({ intervalMs: LIVE_SLOW_INTERVAL_MS });
 
   const { data, isPending, isError, error, refetch, dataUpdatedAt } = useQuery({
     queryKey: queryKeys.bankAnalytics(filters),

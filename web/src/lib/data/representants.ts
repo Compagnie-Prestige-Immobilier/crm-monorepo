@@ -178,13 +178,14 @@ export async function fetchRepresentantsAQualifier(
 /** Les représentants dont ce téléconseiller a passé le DERNIER appel, du plus récent au plus ancien. */
 export async function fetchRepresentantsAppeles(
   appelePar: string,
+  page = 1,
   client: ApiClient = getApiClient(),
 ): Promise<Paginated<RepresentantRow>> {
   const query: RepresentantQuery = {
     appelePar,
     sortBy: 'lastCallAt',
     sortOrder: 'desc',
-    page: 1,
+    page,
     pageSize: SUIVI_PAGE_SIZE,
   };
   return flattenPage(unwrap(await client.GET('/api/v1/representants', { params: { query } })));

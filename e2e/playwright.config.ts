@@ -51,6 +51,11 @@ export default defineConfig({
       PORT,
       LOG_FORMAT: 'text',
       API_TRUST_PROXY_HEADERS: 'true',
+      // GLPI configure mais injoignable : le support doit accepter et suivre
+      // les signalements sans lui.
+      GLPI_URL: 'http://127.0.0.1:1',
+      GLPI_APP_TOKEN: 'e2e',
+      GLPI_USER_TOKEN: 'e2e',
     },
   },
 });

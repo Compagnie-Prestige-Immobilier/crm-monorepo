@@ -29,38 +29,38 @@ interface Etage {
 const ETAGES: readonly Etage[] = [
   {
     cle: 'inscriptions',
-    label: 'Comptes créés',
-    aide: 'Une inscription lue sur la plateforme.',
+    label: 'Inscriptions lues',
+    aide: 'Une personne lue sur la plateforme d’enrôlement.',
     filtre: undefined,
   },
   {
     cle: 'dossiersOuverts',
-    label: 'Dossiers ouverts',
-    aide: 'La personne a dépassé la simple création de compte.',
+    label: 'Parcours commencé',
+    aide: 'La personne a dépassé la simple inscription et a commencé son parcours.',
     filtre: 'ouvert',
   },
   {
     cle: 'dossiersSoumis',
-    label: 'Dossiers soumis',
-    aide: 'Le dossier est parti vers l’instruction.',
+    label: 'Dossiers envoyés',
+    aide: 'Le dossier a été envoyé pour instruction.',
     filtre: 'soumis',
   },
   {
     cle: 'dossiersDecides',
-    label: 'Décidés',
-    aide: 'Une décision est datée sur la plateforme.',
+    label: 'Décisions enregistrées',
+    aide: 'Une date de décision est enregistrée sur la plateforme.',
     filtre: 'decide',
   },
   {
     cle: 'negatifs',
-    label: 'Négatifs',
-    aide: 'Un refus, une pièce à remplacer ou un dossier incomplet : ce qui n’avance plus sans intervention.',
+    label: 'Issues signalées',
+    aide: 'Refus, orientation, absence de suite, injoignabilité ou pièce à reprendre signalés par la plateforme.',
     filtre: 'negatif',
   },
 ];
 
 /**
- * Un entonnoir mesure une seule chose à quatre profondeurs : le bordeaux se
+ * Un entonnoir mesure une seule chose à cinq profondeurs : le bordeaux se
  * décline par luminosité, il ne change pas de teinte comme le ferait une
  * palette catégorielle.
  */
@@ -110,7 +110,8 @@ export function EntonnoirCarte({
             <InfoPopover label={titre ?? 'Avancement des dossiers'} description={AIDE_ENTONNOIR} />
           </p>
           <p className="text-[0.8125rem] text-muted-foreground">
-            Ce qui reste à chaque étage, de la création du compte à la décision.
+            Ce qui est arrivé à chaque étape de l’inscription, jusqu’à la décision ou à l’issue
+            signalée.
           </p>
         </div>
         {total === 0 ? (

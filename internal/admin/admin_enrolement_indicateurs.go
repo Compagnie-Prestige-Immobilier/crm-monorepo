@@ -181,7 +181,7 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 	if err != nil {
 		return nil, err
 	}
-	out.Body.TauxConversion = tauxEnrolement(int(conversion.Inscrits), int(conversion.Convertis))
+	out.Body.TauxConversion = tauxEnrolement(int(conversion.Convertis), int(conversion.Inscrits))
 
 	if out.Body.ParJour, err = s.serieJoursEnrolement(ctx, depuis, args); err != nil {
 		return nil, err
@@ -196,7 +196,7 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 		` FROM "inscriptions_plateforme" i`+
 		` INNER JOIN "prospects" p ON p."id" = i."prospectId"`+
 		` INNER JOIN "users" u ON u."id" = COALESCE(p."enrollmentCapturedById", p."createdById")`+
-		` WHERE i."projet" = $1::"Projet" AND `+filtres+` GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
+		` WHERE i."projet" = $1::"Projet" AND u."role" = 'COMMERCIAL'::"Role" AND `+filtres+` GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
 		return nil, err
 	}
 	if out.Body.ParCampagne, err = s.repartitionEnrolement(ctx, `SELECT l."id", l."name", COUNT(DISTINCT i."id")::int`+

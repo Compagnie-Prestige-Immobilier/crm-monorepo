@@ -80,9 +80,10 @@ func tachesDomaines(d *socle.Deps) []socle.Tache {
 		// une ligne par route, par heure et par classe : sans échéance, les deux
 		// tables d'exploitation finissent par peser plus que le métier.
 		return errors.Join(d.Q.PurgeExpiredSessions(ctx), d.Q.PurgeCronRuns(ctx),
-			d.Q.PurgeMetriquesHttp(ctx), d.Q.PurgeCourrielsPiecesJointes(ctx))
+			d.Q.PurgeMetriquesHttp(ctx), d.Q.PurgeCourrielsPiecesJointes(ctx),
+			d.Q.PurgeSupportSignalements(ctx))
 	}}}
-	for _, t := range [][]socle.Tache{notifications.Taches(d), imports.Taches(d), admin.Taches(d)} {
+	for _, t := range [][]socle.Tache{notifications.Taches(d), imports.Taches(d), admin.Taches(d), support.Taches(d)} {
 		taches = append(taches, t...)
 	}
 	return taches

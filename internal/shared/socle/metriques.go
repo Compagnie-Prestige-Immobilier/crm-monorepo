@@ -119,7 +119,6 @@ func viderMetriques(ctx context.Context, q *db.Queries) {
 		})
 		if err != nil {
 			slog.Warn("métriques HTTP non écrites", "route", cle.route, "err", err)
-			return
 		}
 	}
 }

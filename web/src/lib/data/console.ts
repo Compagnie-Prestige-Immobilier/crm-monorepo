@@ -34,6 +34,9 @@ export interface CallbackList {
   readonly serverTime: string;
   /** La liste s'arrête à 500 rappels : le total dit ce qu'elle ne montre pas. */
   readonly total?: number | undefined;
+  readonly page: number;
+  readonly pageSize: number;
+  readonly pageCount: number;
 }
 
 /** L'heure promise croissante : le retard étant une heure dépassée, il vient en tête. */
@@ -50,6 +53,8 @@ export async function fetchCallbacks(
   assignedToId: string | null = null,
   client: ApiClient = getApiClient(),
   projet?: 'CHUES' | 'GRAND_PUBLIC',
+  page = 1,
+  pageSize = 50,
 ): Promise<CallbackList> {
   const list = unwrap(
     await client.GET('/api/v1/phase2/callbacks', {
@@ -58,11 +63,20 @@ export async function fetchCallbacks(
           scope,
           ...(assignedToId === null ? {} : { assignedToId }),
           ...(projet ? { projet } : {}),
+          page,
+          pageSize,
         },
       },
     }),
   );
-  return { items: sortCallbacks(list.items), serverTime: list.serverTime, total: list.total };
+  return {
+    items: sortCallbacks(list.items),
+    serverTime: list.serverTime,
+    total: list.total,
+    page: list.page,
+    pageSize: list.pageSize,
+    pageCount: list.pageCount,
+  };
 }
 
 export async function cancelCallback(

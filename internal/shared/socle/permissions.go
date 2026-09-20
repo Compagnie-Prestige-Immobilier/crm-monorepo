@@ -68,6 +68,7 @@ const (
 	PermissionVentesLire               Permission = "ventes.lire"
 	PermissionSupportSignaler          Permission = "support.signaler"
 	PermissionSupportPlateforme        Permission = "support.plateforme"
+	PermissionRendezVousSuivre         Permission = "rendez_vous.suivre"
 
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
@@ -124,6 +125,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionVentesLire:               {"Ventes", "Lire les ventes", []Role{Admin, Direction}},
 	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
 	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
+	PermissionRendezVousSuivre:         {"Rendez-vous", "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele}},
 
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
@@ -220,10 +222,18 @@ func (u *Utilisateur) Peut(p Permission) bool {
 	if p == Publique {
 		return true
 	}
+	if p == PermissionRendezVousSuivre && !betaSuiviRendezVous() {
+		return false
+	}
 	if u.permissions != nil {
 		return u.permissions[p]
 	}
 	return attributionsParDefaut()[u.Role][p]
+}
+
+// Ouverte en développement local ; la production (NODE_ENV=production) attend la variable.
+func betaSuiviRendezVous() bool {
+	return Env("BETA_SUIVI_RENDEZ_VOUS", Faux) == Vrai || Env("NODE_ENV", "") == "development"
 }
 
 func (u *Utilisateur) Permissions() []string {

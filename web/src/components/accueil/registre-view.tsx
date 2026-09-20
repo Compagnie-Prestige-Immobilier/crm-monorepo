@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Building2Icon,
   CalendarCheck2Icon,
+  DownloadIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
   ClipboardListIcon,
@@ -21,6 +22,7 @@ import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
 import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
+import { useFileDownload } from '@/components/exports/download-button';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
@@ -56,6 +58,7 @@ import {
   orderVisites,
   parseVisiteFilters,
   serializeVisiteFilters,
+  visiteDateRange,
   visitesQueryKey,
   type ImpressionColonne,
   type Visite,
@@ -64,6 +67,7 @@ import {
   type VisiteReferentiels,
   type VisiteSortField,
 } from '@/lib/data/visites';
+import { buildVisitesExportUrl, visitesExportFileName } from '@/lib/data/visites-import';
 import { formatDate, formatNumber } from '@/lib/format';
 import type { FilterOption } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
@@ -394,6 +398,7 @@ export function RegistreView() {
   const duId = useId();
   const auId = useId();
   const [today] = useState(() => dakarNow().date);
+  const telechargement = useFileDownload();
   const [corrigeeId, setCorrigeeId] = useState<string | null>(null);
   const [ajoutOuvert, setAjoutOuvert] = useState(false);
 
@@ -423,6 +428,7 @@ export function RegistreView() {
   });
 
   const visites = visitesTriees(registre.data, filters.sortBy);
+  const periode = visiteDateRange(filters, today);
   const { total, page, pageCount, premiere, derniere } = pagination(
     registre.data,
     filters.pageSize,
@@ -513,6 +519,26 @@ export function RegistreView() {
                 Tout le registre
               </button>
             </fieldset>
+            <div className="flex items-end gap-2">
+              <DatePicker
+                id={duId}
+                label="Du"
+                value={filters.dateFrom}
+                max={filters.dateTo}
+                onChange={(value) => {
+                  setFilters({ dateFrom: value });
+                }}
+              />
+              <DatePicker
+                id={auId}
+                label="Au"
+                value={filters.dateTo}
+                min={filters.dateFrom}
+                onChange={(value) => {
+                  setFilters({ dateTo: value });
+                }}
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -533,6 +559,25 @@ export function RegistreView() {
               <PrinterIcon aria-hidden="true" />
               Imprimer
             </Button>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={visites.length === 0 || telechargement.pending}
+              onClick={() => {
+                void telechargement.download({
+                  url: buildVisitesExportUrl({
+                    ...filters,
+                    from: periode.dateFrom,
+                    to: periode.dateTo,
+                  }),
+                  fileName: visitesExportFileName(),
+                  failureMessage: 'Le registre n’a pas pu être exporté.',
+                });
+              }}
+            >
+              <DownloadIcon aria-hidden="true" />
+              Exporter
+            </Button>
           </div>
         </div>
 
@@ -552,24 +597,6 @@ export function RegistreView() {
           }
         >
           <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            <DatePicker
-              id={duId}
-              label="Du"
-              value={filters.dateFrom}
-              max={filters.dateTo}
-              onChange={(value) => {
-                setFilters({ dateFrom: value });
-              }}
-            />
-            <DatePicker
-              id={auId}
-              label="Au"
-              value={filters.dateTo}
-              min={filters.dateFrom}
-              onChange={(value) => {
-                setFilters({ dateTo: value });
-              }}
-            />
             <FilterCombobox
               label={VISITE_COLONNES.entreprise}
               placeholder="Toutes"

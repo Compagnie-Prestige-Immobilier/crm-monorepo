@@ -59,6 +59,7 @@ WHERE p."deletedAt" IS NULL
             AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
+    OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -196,6 +197,7 @@ WHERE p."deletedAt" IS NULL
             AND lc."assigneeId" <> sqlc.arg('scope_user_id')::text
         ))
     OR (sqlc.arg('scope_converti')::boolean AND p."statut" IN ('CONVERTI', 'VENDU'))
+    OR (sqlc.arg('scope_rendez_vous')::boolean AND p."phase2Status" = 'APPOINTMENT')
     OR EXISTS (
       SELECT 1 FROM "lot_export_items" li
       JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
@@ -697,3 +699,13 @@ UPDATE "prospects" SET
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
 WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
+
+-- name: SuivreRendezVous :one
+UPDATE "prospects" p SET
+  "rendezVousIssue" = sqlc.arg('issue')::text,
+  "rendezVousReporteAt" = sqlc.narg('reporte_at')::timestamp,
+  "suiteRencontre" = sqlc.narg('suite')::text,
+  "rev" = p."rev" + 1, "updatedAt" = now()
+FROM "prospects" avant
+WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
+RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant;
