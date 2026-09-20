@@ -1,7 +1,6 @@
 'use client';
 
-import { unwrap } from '@crm/api-client/query';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2Icon, ExternalLinkIcon, LifeBuoyIcon, Loader2Icon } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -28,7 +27,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Textarea } from '@/components/ui/textarea';
-import { getApiClient } from '@/lib/api/browser';
+import { rafraichirSignalements, SuiviSignalements } from '@/components/layout/suivi-signalements';
+import { envoyerSignalement, lireCategoriesSupport } from '@/lib/data/support';
 import { apiErrorText, toastApiError } from '@/lib/mutation-feedback';
 import { cn } from '@/lib/utils';
 
@@ -51,23 +51,6 @@ function contexteDePage(ecran: string): string {
     `Navigateur : ${navigator.userAgent}`,
     `Heure : ${new Date().toLocaleString('fr-FR')}`,
   ].join('\n');
-}
-
-async function envoyerTicket(champs: Record<string, string>, images: Image[]) {
-  const form = new FormData();
-  for (const [nom, valeur] of Object.entries(champs)) form.append(nom, valeur);
-  for (const image of images) form.append('images', image.fichier);
-  return unwrap(
-    await getApiClient().POST('/api/v1/support/tickets', {
-      body: { description: '', contexte: '', images: [], urgence: 3, categorie: 1 },
-      bodySerializer: () => form,
-    }),
-  );
-}
-
-async function lireCategories(): Promise<Choix[]> {
-  const categories = unwrap(await getApiClient().GET('/api/v1/support/categories'));
-  return categories.map((c) => ({ value: String(c.id), label: c.nom }));
 }
 
 function Choisir({
@@ -144,11 +127,15 @@ function LienPlateforme() {
 
 export function SignalerProbleme({ ecran, plateforme }: { ecran: string; plateforme: boolean }) {
   const [ouvert, setOuvert] = useState(false);
+  // La cle survit aux echecs reseau : le meme envoi retrouve son signalement
+  // plutot que d'en creer un second.
+  const [cle, setCle] = useState(() => crypto.randomUUID());
   const [images, setImages] = useState<Image[]>([]);
   const [description, setDescription] = useState('');
   const [urgence, setUrgence] = useState('');
   const [categorie, setCategorie] = useState('');
   const pieces = useRef<PiecesJointesHandle>(null);
+  const cache = useQueryClient();
   useSurvolDeLaPage(ouvert);
   useEffect(() => {
     if (!ouvert) return;
@@ -163,19 +150,21 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   }, [ouvert]);
   const categories = useQuery({
     queryKey: ['support', 'categories'],
-    queryFn: lireCategories,
+    queryFn: lireCategoriesSupport,
     enabled: ouvert,
     staleTime: Infinity,
   });
 
   const envoi = useMutation({
     mutationFn: () =>
-      envoyerTicket(
+      envoyerSignalement(
+        cle,
         { description: description.trim(), contexte: contexteDePage(ecran), urgence, categorie },
-        images,
+        images.map((image) => image.fichier),
       ),
+    onSuccess: () => rafraichirSignalements(cache),
     onError: (error) => {
-      toastApiError(error, "Le ticket n'est pas parti. Réessayez.");
+      toastApiError(error, "Le signalement n'est pas parti. Réessayez.");
     },
   });
 
@@ -184,6 +173,8 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     setImages((actuelles) => [...actuelles, ...nouvelles].slice(0, IMAGES_MAX));
   };
 
+  // Le message, les images et la cle ne sont jetes qu'apres une reception
+  // confirmee : un echec les garde pour la tentative suivante.
   const fermer = (suivant: boolean) => {
     if (suivant) return;
     setOuvert(false);
@@ -192,6 +183,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     setImages([]);
     setCategorie('');
     setUrgence('');
+    setCle(crypto.randomUUID());
     envoi.reset();
   };
 
@@ -217,14 +209,20 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
       <Sheet open={ouvert} onOpenChange={fermer} modal={false} disablePointerDismissal>
         <SheetContent side="right" voile={false} className="w-full sm:max-w-md pointer-events-auto">
           {envoi.isSuccess ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-              <CheckCircle2Icon className="size-12 text-success" aria-hidden="true" />
-              <SheetTitle>Ticket n° {envoi.data.numero} envoyé</SheetTitle>
-              <SheetDescription>Le support vous répondra dans GLPI.</SheetDescription>
-              <Button className="mt-2" onClick={() => fermer(false)}>
-                Fermer
-              </Button>
-              {lienPlateforme}
+            <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <CheckCircle2Icon className="size-12 text-success" aria-hidden="true" />
+                <SheetTitle>Signalement reçu.</SheetTitle>
+                <SheetDescription>
+                  La transmission au support se poursuit sans vous. Le numéro du ticket apparaît
+                  ci-dessous.
+                </SheetDescription>
+                <Button className="mt-2" onClick={() => fermer(false)}>
+                  Fermer
+                </Button>
+                {lienPlateforme}
+              </div>
+              <SuiviSignalements ouvert={ouvert} />
             </div>
           ) : (
             <form
@@ -279,6 +277,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
                 retirer={(id) => setImages((actuelles) => actuelles.filter((i) => i.id !== id))}
                 masquerPanneau={(masque) => setOuvert(!masque)}
               />
+              <SuiviSignalements ouvert={ouvert} />
               <Button type="submit" className="mt-auto h-12" disabled={!envoyable}>
                 {envoi.isPending ? (
                   <Loader2Icon className="size-4 animate-spin" aria-hidden="true" />
