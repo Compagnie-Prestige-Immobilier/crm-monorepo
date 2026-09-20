@@ -110,7 +110,8 @@ export function EntonnoirCarte({
             <InfoPopover label={titre ?? 'Avancement des dossiers'} description={AIDE_ENTONNOIR} />
           </p>
           <p className="text-[0.8125rem] text-muted-foreground">
-            Ce qui est arrivé à chaque étape de l’inscription, jusqu’à la décision ou à l’issue signalée.
+            Ce qui est arrivé à chaque étape de l’inscription, jusqu’à la décision ou à l’issue
+            signalée.
           </p>
         </div>
         {total === 0 ? (
