@@ -1,0 +1,18 @@
+FROM python:3.13-slim
+COPY --from=golang:1.26-bookworm /usr/local/go /usr/local/go
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
+ENV PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates nodejs npm && rm -rf /var/lib/apt/lists/* \
+    && npm install --global @anthropic-ai/claude-code @openai/codex \
+    && npm cache clean --force
+RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
+RUN mkdir -p /home/nobody /work/jobs && chown -R nobody:nogroup /home/nobody /work
+COPY requirements.txt /opt/ticket-solver/requirements.txt
+RUN pip install --no-cache-dir -r /opt/ticket-solver/requirements.txt
+COPY app /opt/ticket-solver/app
+USER nobody
+ENV HOME=/home/nobody
+WORKDIR /opt/ticket-solver
+ENV PYTHONUNBUFFERED=1 PORT=8080
+EXPOSE 8080
+CMD ["python", "-m", "app.main"]
