@@ -15,7 +15,7 @@ from pathlib import Path
 
 import httpx
 
-logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO"), format="%(asctime)s %(levelname)s %(message)s")
+logging.basicConfig(level=os.getenv("LOG_LEVEL", "INFO").upper(), format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("ticket-solver")
 ROOT = Path(os.getenv("WORK_ROOT", "/work/jobs"))
 DB = Path(os.getenv("STATE_DB", "/work/tickets.sqlite3"))
