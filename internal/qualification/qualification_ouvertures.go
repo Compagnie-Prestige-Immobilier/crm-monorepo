@@ -370,7 +370,8 @@ func (s *service) qualificationFicheOuvrable(ctx context.Context, u *socle.Utili
 	}
 	ouvrable, err := s.Q.ProspectOuvrable(ctx, db.ProspectOuvrableParams{
 		ID: *prospectID, Tous: qualificationVoitTout(u), Agent: u.ID,
-		ConvertiVisible: u.Peut(socle.PermissionFichesVoirConverties),
+		IgnorerAttribution: u.Peut(socle.PermissionFichesOuvrirAttribuees),
+		ConvertiVisible:    u.Peut(socle.PermissionFichesVoirConverties),
 	})
 	if err != nil {
 		return err

@@ -939,6 +939,7 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 func (s *service) qualificationProspectAttribue(ctx context.Context, u *socle.Utilisateur, prospectID string) error {
 	mien, err := s.Q.ProspectAttribue(ctx, db.ProspectAttribueParams{
 		ID: prospectID, Agent: u.ID, Tous: qualificationVoitTout(u),
+		IgnorerAttribution: u.Peut(socle.PermissionFichesConsignerAttribuees),
 	})
 	if err != nil {
 		return err
