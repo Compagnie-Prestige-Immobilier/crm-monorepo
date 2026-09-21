@@ -15,6 +15,13 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { fetchProspects } from '@/lib/data/prospects';
 import { fetchReferenceData } from '@/lib/data/reference';
 import {
@@ -28,6 +35,8 @@ import {
   updateVente,
 } from '@/lib/data/ventes';
 import { EMPTY_FILTERS } from '@/lib/filters';
+import { fetchTeleconseillers } from '@/lib/data/lots-export';
+import { formatDate } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
@@ -37,9 +46,50 @@ type Draft = VenteInput;
 type Patch = Partial<Draft>;
 type Fiche = { id: string; nom: string; prenom: string; phoneE164: string | null };
 
-const ECRANS = ['telephone', 'nom', 'site', 'canal', 'lots', 'paiement', 'recap'] as const;
+const ECRANS = [
+  'telephone',
+  'nom',
+  'identite',
+  'site',
+  'canal',
+  'suivi',
+  'lots',
+  'paiement',
+  'recap',
+] as const;
 type Ecran = (typeof ECRANS)[number];
 const RECAP = ECRANS.length - 1;
+const rang = (ecran: Ecran) => ECRANS.indexOf(ecran);
+
+type ChampTexte =
+  | 'email'
+  | 'numeroCni'
+  | 'dateDelivranceCni'
+  | 'autrePiece'
+  | 'demeurantA'
+  | 'profession'
+  | 'adresseProfessionnelle'
+  | 'representant'
+  | 'nomTeleconseiller'
+  | 'responsableClosing';
+type Champ = { cle: ChampTexte; label: string; type?: 'email' | 'date'; placeholder?: string };
+
+const CHAMPS_IDENTITE: readonly Champ[] = [
+  { cle: 'email', label: 'E-mail', type: 'email' },
+  { cle: 'numeroCni', label: 'Numéro CNI' },
+  { cle: 'dateDelivranceCni', label: 'Date de délivrance CNI', type: 'date' },
+  { cle: 'autrePiece', label: 'Autre pièce', placeholder: 'Ex. passeport n° A0123456' },
+  { cle: 'demeurantA', label: 'Demeurant à' },
+  { cle: 'profession', label: 'Profession' },
+  { cle: 'adresseProfessionnelle', label: 'Adresse professionnelle' },
+];
+
+const CHAMPS_SUIVI: readonly Champ[] = [
+  { cle: 'representant', label: 'Représentant' },
+  { cle: 'responsableClosing', label: 'Responsable closing' },
+];
+
+const EMAIL_VALIDE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
 const entier = (brut: string) => Number(brut.replace(/\D/g, '')) || 0;
@@ -56,6 +106,16 @@ const NOUVEAU: Draft = {
   acompte: 0,
   modePaiement: 'COMPTANT',
   marquerSoldee: false,
+  email: '',
+  numeroCni: '',
+  dateDelivranceCni: '',
+  autrePiece: '',
+  demeurantA: '',
+  profession: '',
+  adresseProfessionnelle: '',
+  representant: '',
+  nomTeleconseiller: '',
+  responsableClosing: '',
 };
 
 function brouillonDe(vente: Vente | null): Draft {
@@ -75,6 +135,16 @@ function brouillonDe(vente: Vente | null): Draft {
     modePaiement: vente.modePaiement === 'CREDIT' ? 'CREDIT' : 'COMPTANT',
     ...(vente.nombreMois === null ? {} : { nombreMois: vente.nombreMois }),
     marquerSoldee: vente.soldeeManuellement,
+    email: vente.email,
+    numeroCni: vente.numeroCni,
+    dateDelivranceCni: vente.dateDelivranceCni ?? '',
+    autrePiece: vente.autrePiece,
+    demeurantA: vente.demeurantA,
+    profession: vente.profession,
+    adresseProfessionnelle: vente.adresseProfessionnelle,
+    representant: vente.representant,
+    nomTeleconseiller: vente.nomTeleconseiller,
+    responsableClosing: vente.responsableClosing,
   };
 }
 
@@ -82,6 +152,10 @@ function brouillonDe(vente: Vente | null): Draft {
 const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
   telephone: (d) => (d.telephone.trim() === '' ? 'Tapez le téléphone du client.' : null),
   nom: (d) => (d.client.trim() === '' ? 'Tapez le nom du client.' : null),
+  identite: (d) => {
+    const email = d.email?.trim() ?? '';
+    return email === '' || EMAIL_VALIDE.test(email) ? null : 'Indiquez un e-mail valide.';
+  },
   site: (d) => (d.site === '' ? 'Choisissez un site.' : null),
   canal: (d) => (d.canal === '' ? 'Choisissez un canal.' : null),
   lots: (d) => ((d.prixUnitaire ?? 0) <= 0 ? 'Indiquez le prix d’un lot.' : null),
@@ -225,15 +299,15 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
             client: `${fiche.prenom} ${fiche.nom}`.trim(),
             telephone: telephone.phone,
           });
-          aller(2);
+          aller(rang('identite'));
         }}
         onSite={(nom) => {
           changer(avecSite(draft, sites, nom));
-          aller(3);
+          aller(rang('canal'));
         }}
         onCanal={(canal) => {
           changer({ canal });
-          aller(4);
+          aller(rang('suivi'));
         }}
       />
     </Cadre>
@@ -280,6 +354,19 @@ function EcranCourant({
       );
     case 'nom':
       return <EcranNom draft={draft} changer={changer} />;
+    case 'identite':
+      return (
+        <Question titre="Qui est le client ?">
+          <Champs champs={CHAMPS_IDENTITE} draft={draft} changer={changer} />
+        </Question>
+      );
+    case 'suivi':
+      return (
+        <Question titre="Qui a suivi la vente ?">
+          <ChoixTeleconseiller draft={draft} changer={changer} />
+          <Champs champs={CHAMPS_SUIVI} draft={draft} changer={changer} />
+        </Question>
+      );
     case 'site':
       return (
         <Question titre="Sur quel site ?">
@@ -312,7 +399,7 @@ function EcranCourant({
   }
 }
 
-/** La fenêtre a une hauteur fixe : chaque écran tient dedans, rien ne défile. */
+/** La fenêtre a une hauteur fixe : seul l'écran d'identité défile, sur téléphone. */
 function Cadre({
   titre,
   pas,
@@ -360,7 +447,7 @@ function Cadre({
           </div>
           <div
             ref={corps}
-            className="flex min-h-0 flex-col justify-center gap-5 overflow-hidden px-6 py-5"
+            className="flex min-h-0 flex-col justify-center gap-5 overflow-y-auto px-6 py-5"
           >
             <div key={ecran}>{children}</div>
             {erreur === null ? null : (
@@ -548,6 +635,68 @@ function EcranNom({ draft, changer }: EcranProps) {
   );
 }
 
+function Champs({ champs, draft, changer }: EcranProps & { champs: readonly Champ[] }) {
+  return (
+    <div className="grid gap-3 sm:grid-cols-2">
+      {champs.map((champ) => (
+        <label
+          key={champ.cle}
+          htmlFor={`parcours-${champ.cle}`}
+          className="flex flex-col gap-1 text-[0.875rem] font-[600]"
+        >
+          {champ.label}
+          <Input
+            id={`parcours-${champ.cle}`}
+            type={champ.type ?? 'text'}
+            placeholder={champ.placeholder}
+            value={draft[champ.cle] ?? ''}
+            onChange={(e) => changer({ [champ.cle]: e.target.value })}
+          />
+        </label>
+      ))}
+    </div>
+  );
+}
+
+const AUCUN = 'aucun';
+
+function ChoixTeleconseiller({ draft, changer }: EcranProps) {
+  const teleconseillers = useQuery({
+    queryKey: queryKeys.lotsExportTeleconseillers,
+    queryFn: () => fetchTeleconseillers(),
+    staleTime: 5 * 60_000,
+  });
+  const choisi = draft.nomTeleconseiller ?? '';
+  const noms = (teleconseillers.data ?? []).map((t) => t.fullName);
+  // Un compte désactivé depuis la vente garde son nom à l'écran de modification.
+  if (choisi !== '' && !noms.includes(choisi)) noms.unshift(choisi);
+  return (
+    <div className="flex flex-col gap-1 text-[0.875rem] font-[600]">
+      Nom du téléconseiller
+      <Select
+        value={choisi === '' ? AUCUN : choisi}
+        onValueChange={(valeur) => {
+          if (valeur !== null) changer({ nomTeleconseiller: valeur === AUCUN ? '' : valeur });
+        }}
+      >
+        <SelectTrigger aria-label="Nom du téléconseiller" className="w-full">
+          <SelectValue>
+            {(valeur: string) => (valeur === AUCUN ? 'Non renseigné' : valeur)}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value={AUCUN}>Non renseigné</SelectItem>
+          {noms.map((nom) => (
+            <SelectItem key={nom} value={nom}>
+              {nom}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+}
+
 function EcranLots({ draft, changer }: EcranProps) {
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
   return (
@@ -726,6 +875,19 @@ function ConfirmationSoldee({ visible, draft, changer }: EcranProps & { visible:
   );
 }
 
+const joindre = (valeurs: readonly (string | undefined)[]) =>
+  valeurs.filter((valeur) => (valeur ?? '').trim() !== '').join(' · ');
+
+function pieceDe(draft: Draft): string {
+  const cni = draft.numeroCni?.trim() ?? '';
+  const delivrance = draft.dateDelivranceCni ?? '';
+  return joindre([
+    cni === '' ? '' : `CNI ${cni}`,
+    delivrance === '' ? '' : `délivrée le ${formatDate(delivrance)}`,
+    draft.autrePiece,
+  ]);
+}
+
 function EcranRecap({ draft, changer }: EcranProps) {
   const [details, setDetails] = useState(false);
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
@@ -735,14 +897,16 @@ function EcranRecap({ draft, changer }: EcranProps) {
       : 'Au comptant';
   const soldee = draft.acompte >= prixTotal || draft.marquerSoldee === true;
   const lots = `${draft.nombreLots} lot${draft.nombreLots > 1 ? 's' : ''}`;
-  const lignes: [string, string][] = [
+  const lignes = [
     ['Client', `${draft.client} · ${draft.telephone}`],
     ['Site', `${draft.site} · ${lots} · ${draft.canal}`],
     ['Prix total', formatFcfa(prixTotal)],
     ['Acompte', `${formatFcfa(draft.acompte)} · ${paiement}`],
     ['Reste à payer', formatFcfa(prixTotal - draft.acompte)],
     ['Statut', soldee ? 'Soldée' : 'À solder'],
-  ];
+    ['Pièce', pieceDe(draft)],
+    ['Suivi', joindre([draft.representant, draft.nomTeleconseiller, draft.responsableClosing])],
+  ].filter((ligne): ligne is [string, string] => ligne[1] !== '');
   return (
     <Question titre="Tout est bon ?">
       <dl className="divide-y divide-border rounded-md border border-border">
