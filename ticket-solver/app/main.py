@@ -57,10 +57,15 @@ class State:
 
 class Glpi:
     def __init__(self):
-        self.base = required("GLPI_BASE_URL").rstrip("/")
-        self.client = httpx.Client(timeout=30, headers={"App-Token": required("GLPI_CLIENT_ID")})
-        credentials = base64.b64encode((required("GLPI_USERNAME") + ":" + required("GLPI_PASSWORD")).encode()).decode()
-        response = self.client.get(f"{self.base}/apirest.php/initSession", headers={"Authorization": "Basic " + credentials})
+        self.base = (os.getenv("GLPI_BASE_URL") or required("GLPI_URL")).rstrip("/")
+        app_token = os.getenv("GLPI_APP_TOKEN") or required("GLPI_CLIENT_ID")
+        self.client = httpx.Client(timeout=30, headers={"App-Token": app_token})
+        if os.getenv("GLPI_USER_TOKEN"):
+            auth = "user_token " + os.environ["GLPI_USER_TOKEN"]
+        else:
+            credentials = base64.b64encode((required("GLPI_USERNAME") + ":" + required("GLPI_PASSWORD")).encode()).decode()
+            auth = "Basic " + credentials
+        response = self.client.get(f"{self.base}/apirest.php/initSession", headers={"Authorization": auth})
         response.raise_for_status()
         self.session = response.json()["session_token"]
         self.headers = {"Session-Token": self.session}
