@@ -166,8 +166,8 @@ func TestQualificationProspectGrandPublicNonAttribueRefuse(t *testing.T) {
 	b.attend(statut, http.StatusOK, "prospect Grand Public attribué par une campagne", body)
 }
 
-// La fiche saisie par un téléconseiller puis distribuée à un autre échappe à
-// son créateur et à l'encadrement : deux personnes appelleraient la même.
+// La fiche distribuée à un autre échappe à son créateur ; l'encadrement l'ouvre
+// mais ne consigne pas dessus : deux personnes appelleraient la même.
 func TestQualificationFicheAttribueeAUnAutreEchappeAuCreateurEtALEncadrement(t *testing.T) {
 	createur := qualificationConnecte(t, "COMMERCIAL")
 	superviseur := qualificationConnecte(t, "SUPERVISEUR")
@@ -191,8 +191,12 @@ func TestQualificationFicheAttribueeAUnAutreEchappeAuCreateurEtALEncadrement(t *
 			"id": uuid.Must(uuid.NewV7()).String(), "prospectId": prospect,
 			"openedAt": time.Now().UTC().Format(time.RFC3339Nano),
 		}
+		attendu := http.StatusNotFound
+		if b == superviseur {
+			attendu = http.StatusOK
+		}
 		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/ouvertures", ouvrir)
-		b.attend(statut, http.StatusNotFound, nom+" n'ouvre pas une fiche attribuée à un autre", body)
+		b.attend(statut, attendu, nom+" ouvre une fiche attribuée à un autre : le créateur non, l'encadrement oui", body)
 		statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, nil))
 		b.attend(statut, http.StatusForbidden, nom+" ne consigne pas sur une fiche attribuée à un autre", body)
 		if body["code"] != "PHASE2_NOT_ASSIGNED" {
