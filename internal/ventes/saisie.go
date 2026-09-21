@@ -185,8 +185,8 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 		return nil, err
 	}
 	date, err := time.Parse(time.DateOnly, in.Body.Date)
-	if err != nil || in.Body.Montant <= 0 {
-		return nil, socle.Problem(http.StatusBadRequest, "VENTE_VERSEMENT_INVALIDE", "Le versement doit avoir une date valide et un montant positif.")
+	if err != nil || date.After(time.Now()) || in.Body.Montant <= 0 {
+		return nil, socle.Problem(http.StatusBadRequest, "VENTE_VERSEMENT_INVALIDE", "Le versement doit avoir une date passée ou du jour et un montant positif.")
 	}
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {

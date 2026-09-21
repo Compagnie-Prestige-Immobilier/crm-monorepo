@@ -104,6 +104,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
                 <Input
                   aria-label="Date du versement"
                   type="date"
+                  max={aujourdhui()}
                   className="h-12 w-44"
                   value={date}
                   onChange={(e) => setDate(e.target.value)}
