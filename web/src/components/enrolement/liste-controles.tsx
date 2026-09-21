@@ -22,7 +22,8 @@ const TOUS = 'tous';
  */
 export function tonStatut(statut: string): 'success' | 'info' | 'outline' | 'destructive' {
   if (statut === 'rejected') return 'destructive';
-  if (statut === 'approved' || statut === 'compte-valide' || statut === 'etape-5') return 'success';
+  if (statut === 'validated' || statut === 'compte-valide' || statut === 'etape-5')
+    return 'success';
   if (statut === 'compte-en-attente' || statut === 'etape-0') return 'outline';
   return 'info';
 }

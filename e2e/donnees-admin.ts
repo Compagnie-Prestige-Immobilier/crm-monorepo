@@ -305,7 +305,7 @@ export async function creerInscriptionValidee(entree: {
     `INSERT INTO inscriptions_plateforme
        (id, projet, "identifiantDistant", nom, prenom, "phoneE164", "statutDistant", "decideeLe",
         "prospectId", "chargeUtile", "dernierTirageAt", "updatedAt")
-     VALUES ($1, 'CHUES', $2, $3, $4, $5, 'valide', now(), $6, '{}', now(), now())`,
+     VALUES ($1, 'CHUES', $2, $3, $4, $5, 'validated', now(), $6, '{}', now(), now())`,
     [id, `e2e-${id}`, entree.nom, entree.prenom, entree.telephone, entree.prospectId],
   );
   return id;
