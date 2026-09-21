@@ -85,6 +85,10 @@ const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
   canal: (d) => (d.canal === '' ? 'Choisissez un canal.' : null),
   lots: (d) => ((d.prixUnitaire ?? 0) <= 0 ? 'Indiquez le prix d’un lot.' : null),
   paiement: (d) => {
+    const prixTotal = (d.prixUnitaire ?? 0) * d.nombreLots;
+    if (d.modePaiement === 'COMPTANT' && d.acompte !== prixTotal) {
+      return `Au comptant, le montant payé doit être de ${formatFcfa(prixTotal)}.`;
+    }
     const moisManquants = d.modePaiement === 'CREDIT' && (d.nombreMois ?? 0) < 1;
     return moisManquants ? 'Indiquez le nombre de mois.' : null;
   },
@@ -116,6 +120,13 @@ function avecSite(draft: Draft, sites: readonly SiteVente[], nom: string): Patch
     superficie: draft.superficie || choix?.superficieDefaut || '',
     prixUnitaire: prixDuSite > 0 ? prixDuSite : (draft.prixUnitaire ?? 0),
   };
+}
+
+function comptantSolde(draft: Draft, patch: Patch): Draft {
+  const suivant = { ...draft, ...patch };
+  const prixChange = 'prixUnitaire' in patch || 'nombreLots' in patch || 'modePaiement' in patch;
+  if (suivant.modePaiement !== 'COMPTANT' || 'acompte' in patch || !prixChange) return suivant;
+  return { ...suivant, acompte: (suivant.prixUnitaire ?? 0) * suivant.nombreLots };
 }
 
 export function VenteParcours({
@@ -175,7 +186,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
 
   const changer = (patch: Patch) => {
     setErreur(null);
-    setDraft((d) => ({ ...d, ...patch }));
+    setDraft((d) => comptantSolde(d, patch));
   };
   const aller = (cible: number) => {
     setErreur(null);
