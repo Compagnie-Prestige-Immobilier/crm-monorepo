@@ -1,9 +1,19 @@
 'use client';
 
-import { ImagePlusIcon, ScreenShareIcon, XIcon } from 'lucide-react';
-import { forwardRef, useImperativeHandle, useState } from 'react';
+import { CropIcon, ImagePlusIcon, ScreenShareIcon, XIcon } from 'lucide-react';
+import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
+import ReactCrop, { type PixelCrop } from 'react-image-crop';
+import 'react-image-crop/dist/ReactCrop.css';
 
 import { Button, buttonVariants } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 
 export const IMAGES_MAX = 5;
@@ -64,7 +74,92 @@ export const imagesDepuis = (fichiers: File[]): Promise<Image[]> =>
   );
 
 export interface PiecesJointesHandle {
-  capturer: () => Promise<void>;
+  capturer: (zone?: boolean) => Promise<void>;
+}
+
+async function recadrer(image: HTMLImageElement, zone: PixelCrop): Promise<File | null> {
+  const ratio = image.naturalWidth / image.width;
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(zone.width * ratio);
+  canvas.height = Math.round(zone.height * ratio);
+  canvas
+    .getContext('2d')
+    ?.drawImage(
+      image,
+      zone.x * ratio,
+      zone.y * ratio,
+      zone.width * ratio,
+      zone.height * ratio,
+      0,
+      0,
+      canvas.width,
+      canvas.height,
+    );
+  const blob = await new Promise<Blob | null>((resolve) => {
+    canvas.toBlob(resolve, 'image/png');
+  });
+  return blob === null ? null : new File([blob], 'capture.png', { type: 'image/png' });
+}
+
+function RecadrageDialog({
+  image,
+  ajouter,
+  fermer,
+}: {
+  image: Image | null;
+  ajouter: (fichiers: File[]) => Promise<void>;
+  fermer: () => void;
+}) {
+  const [zone, setZone] = useState<PixelCrop>();
+  const source = useRef<HTMLImageElement>(null);
+  const valide = zone !== undefined && zone.width > 4 && zone.height > 4;
+
+  const garder = async () => {
+    if (source.current === null || !valide) return;
+    const fichier = await recadrer(source.current, zone);
+    if (fichier !== null) await ajouter([fichier]);
+    fermer();
+  };
+
+  return (
+    <Dialog
+      open={image !== null}
+      onOpenChange={(ouvert) => {
+        if (!ouvert) fermer();
+      }}
+    >
+      <DialogContent className="sm:max-w-4xl">
+        <DialogHeader>
+          <DialogTitle>Choisir la zone</DialogTitle>
+          <DialogDescription>Tracez un rectangle autour de ce qui pose problème.</DialogDescription>
+        </DialogHeader>
+        {image === null ? null : (
+          <ReactCrop
+            {...(zone === undefined ? {} : { crop: zone })}
+            onChange={(pixels) => {
+              setZone(pixels);
+            }}
+            className="max-h-[60dvh] justify-self-center"
+          >
+            <img
+              ref={source}
+              src={image.apercu}
+              alt="Capture de l'écran"
+              className="max-h-[60dvh]"
+            />
+          </ReactCrop>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="ghost" onClick={fermer}>
+            Annuler
+          </Button>
+          <Button type="button" disabled={!valide} onClick={() => void garder()}>
+            Joindre la zone
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export const PiecesJointes = forwardRef<
@@ -77,16 +172,19 @@ export const PiecesJointes = forwardRef<
   }
 >(function PiecesJointes({ images, ajouter, retirer, masquerPanneau }, ref) {
   const [capture, setCapture] = useState(false);
+  const [aRecadrer, setARecadrer] = useState<Image | null>(null);
   const complet = images.length >= IMAGES_MAX;
 
-  const capturer = async () => {
+  const capturer = async (zone = false) => {
     if (complet || capture) return;
     setCapture(true);
     masquerPanneau(true);
     await attendre(250);
     try {
       const fichier = await capturerOnglet();
-      if (fichier !== null) await ajouter([fichier]);
+      if (fichier === null) return;
+      if (zone) setARecadrer((await imagesDepuis([fichier]))[0] ?? null);
+      else await ajouter([fichier]);
     } catch {
       // Refus ou annulation du partage : le panneau revient tel quel.
     } finally {
@@ -112,6 +210,18 @@ export const PiecesJointes = forwardRef<
             Capturer l'écran
           </Button>
         ) : null}
+        {captureDisponible() ? (
+          <Button
+            type="button"
+            variant="outline"
+            className="gap-1.5"
+            disabled={complet || capture}
+            onClick={() => void capturer(true)}
+          >
+            <CropIcon className="size-4" aria-hidden="true" />
+            Capturer une zone
+          </Button>
+        ) : null}
         <label
           className={cn(
             buttonVariants({ variant: 'outline' }),
@@ -134,6 +244,14 @@ export const PiecesJointes = forwardRef<
           />
         </label>
       </div>
+      <RecadrageDialog
+        key={aRecadrer?.id ?? 'aucune'}
+        image={aRecadrer}
+        ajouter={ajouter}
+        fermer={() => {
+          setARecadrer(null);
+        }}
+      />
       {images.length === 0 ? null : (
         <ul className="grid grid-cols-2 gap-2">
           {images.map((image) => (

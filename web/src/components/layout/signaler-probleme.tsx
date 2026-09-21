@@ -142,7 +142,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     const surCapture = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault();
-        void pieces.current?.capturer();
+        void pieces.current?.capturer(event.shiftKey);
       }
     };
     window.addEventListener('keydown', surCapture);
