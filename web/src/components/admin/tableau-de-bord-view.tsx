@@ -11,13 +11,17 @@ import { PoleMarketingView } from '@/components/pilotage/pole-marketing-view';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const VOLETS = [
-  { id: 'enrolement', label: 'Enrôlement', icon: PlugZapIcon },
   { id: 'teleconseil', label: 'Activité téléconseil', icon: PhoneCallIcon },
+  { id: 'enrolement', label: 'Enrôlement', icon: PlugZapIcon },
   { id: 'deploiement', label: 'Pôle déploiement', icon: UsersRoundIcon },
   { id: 'marketing', label: 'Pôle marketing', icon: ActivityIcon },
 ] as const;
 
 type VoletId = (typeof VOLETS)[number]['id'];
+
+// Le volet par défaut n'écrit rien dans l'URL : les filtres de l'écran de
+// supervision la réécrivent sans `volet`, et renverraient ailleurs.
+const VOLET_PAR_DEFAUT: VoletId = 'teleconseil';
 
 export function AdminTableauDeBordView() {
   const router = useRouter();
@@ -26,13 +30,12 @@ export function AdminTableauDeBordView() {
 
   const voletActif: VoletId = useMemo(() => {
     const volet = searchParams.get('volet');
-    if (volet === 'deploiement' || volet === 'marketing' || volet === 'teleconseil') return volet;
-    return 'enrolement';
+    return VOLETS.find((v) => v.id === volet)?.id ?? VOLET_PAR_DEFAUT;
   }, [searchParams]);
 
   const changerVolet = (suivant: string) => {
     const params = new URLSearchParams();
-    if (suivant !== 'enrolement') {
+    if (suivant !== VOLET_PAR_DEFAUT) {
       params.set('volet', suivant);
     }
     const requete = params.toString();
@@ -44,8 +47,8 @@ export function AdminTableauDeBordView() {
       <div>
         <h1 className="font-display text-3xl font-bold tracking-tight">Tableau de bord admin</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          Vue d’ensemble globale : enrôlement des plateformes, activité téléconseil, qualité de la
-          base et marketing.
+          Le tableau de bord de supervision, puis l’enrôlement des plateformes, la qualité de la
+          base et le marketing.
         </p>
       </div>
 

@@ -91,6 +91,9 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		"telephone": "77 000 00 88", "site": "THIEO", "nombreLots": 2,
 		"numerosLots": "2001 - 2002", "superficie": "225 m²", "prixUnitaire": 2800000,
 		"acompte": 500000, "modePaiement": "CREDIT", "nombreMois": 12,
+		"email": "Client.Saisie@Exemple.sn", "numeroCni": "1 234 1990 01234", "dateDelivranceCni": "2021-03-04",
+		"demeurantA": "Dakar, Sacré-Cœur", "profession": "Enseignant", "representant": "Awa Ndiaye",
+		"nomTeleconseiller": "Moussa Diop", "responsableClosing": "Fatou Sarr",
 	}
 	venteID = venteSaisieCalculee(t, b, corps)
 
@@ -102,11 +105,13 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 
 	corps["client"] = client + " MODIFIE"
 	corps["acompte"] = 900000
+	corps["autrePiece"] = "Passeport A0123456"
 	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
 	b.attend(statut, http.StatusOK, "modification de la vente", vente)
 	if !strings.EqualFold(fmt.Sprint(vente["client"]), client+" MODIFIE") || vente["acompte"] != float64(900000) {
 		t.Fatalf("vente modifiée : %v", vente)
 	}
+	exigerIdentiteClient(t, vente)
 
 	statut, vente = appelJSON(b, http.MethodPost, fmt.Sprintf("/api/v1/ventes/%d/versements", venteID), map[string]any{
 		"date": "2026-09-19", "montant": 4700000,
@@ -117,6 +122,14 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		t.Fatalf("vente soldée après le versement : %v", vente)
 	}
 	venteArchiveePuisSoldee(t, b, venteID, corps)
+}
+
+func exigerIdentiteClient(t *testing.T, vente map[string]any) {
+	t.Helper()
+	if vente["email"] != "client.saisie@exemple.sn" || vente["dateDelivranceCni"] != "2021-03-04" ||
+		vente["autrePiece"] != "Passeport A0123456" || vente["responsableClosing"] != "Fatou Sarr" {
+		t.Fatalf("identité du client et suivi de la vente : %v", vente)
+	}
 }
 
 func venteSaisieCalculee(t *testing.T, b *banc, corps map[string]any) int64 {
