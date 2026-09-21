@@ -117,10 +117,10 @@ function useRaccourcisDeCapture(actif: boolean, pieces: RefObject<PiecesJointesH
   useEffect(() => {
     if (!actif) return;
     const surCapture = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        void pieces.current?.capturer(event.shiftKey);
-      }
+      const touche = event.key.toLowerCase();
+      if (!(event.metaKey || event.ctrlKey) || (touche !== 'k' && touche !== 'e')) return;
+      event.preventDefault();
+      void pieces.current?.capturer(touche === 'e');
     };
     window.addEventListener('keydown', surCapture);
     return () => window.removeEventListener('keydown', surCapture);
