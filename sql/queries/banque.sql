@@ -206,8 +206,9 @@ LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
   AND ((cardinality(sqlc.arg('statuts')::text[]) = 0
-        AND (i."statutDistant" = 'approved'
+        AND (i."statutDistant" = 'validated'
              OR (i."projet" = 'GRAND_PUBLIC'
+                 AND i."chargeUtile" #>> '{demande,submitted}' = 'true'
                  AND jsonb_array_length(COALESCE(i."chargeUtile" -> 'requisDocs', '[]'::jsonb)) > 0
                  AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i."chargeUtile" -> 'requisDocs') d
                                  WHERE d ->> 'status' <> 'accepte'))))
