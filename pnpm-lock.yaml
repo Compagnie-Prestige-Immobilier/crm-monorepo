@@ -27,6 +27,9 @@ catalogs:
     '@hookform/resolvers':
       specifier: ^5.2.0
       version: 5.7.1
+    '@playwright/test':
+      specifier: 1.61.1
+      version: 1.61.1
     '@tailwindcss/vite':
       specifier: ^4.3.3
       version: 4.3.3
@@ -42,6 +45,9 @@ catalogs:
     '@types/node':
       specifier: 26.1.1
       version: 26.1.1
+    '@types/pg':
+      specifier: 8.20.0
+      version: 8.20.0
     '@types/react':
       specifier: ^19.2.0
       version: 19.2.18
@@ -63,9 +69,18 @@ catalogs:
     date-fns:
       specifier: ^4.4.0
       version: 4.4.0
+    eslint-plugin-sonarjs:
+      specifier: 4.2.0
+      version: 4.2.0
     exceljs:
       specifier: ^4.4.0
       version: 4.4.0
+    knip:
+      specifier: 6.32.2
+      version: 6.32.2
+    lefthook:
+      specifier: 2.1.14
+      version: 2.1.14
     lucide-react:
       specifier: ^0.550.0
       version: 0.550.0
@@ -75,6 +90,15 @@ catalogs:
     openapi-typescript:
       specifier: 7.13.0
       version: 7.13.0
+    oxlint:
+      specifier: 1.80.0
+      version: 1.80.0
+    oxlint-tsgolint:
+      specifier: 7.0.2001
+      version: 7.0.2001
+    pg:
+      specifier: 8.22.0
+      version: 8.22.0
     prettier:
       specifier: 3.9.5
       version: 3.9.5
@@ -316,6 +340,9 @@ importers:
       react-hook-form:
         specifier: 'catalog:'
         version: 7.85.0(react@19.2.7)
+      react-image-crop:
+        specifier: ^11.1.2
+        version: 11.1.2(react@19.2.7)
       sonner:
         specifier: 'catalog:'
         version: 2.0.8(@types/react@19.2.18)(react-dom@19.2.7(react@19.2.7))(react@19.2.7)
@@ -3207,6 +3234,11 @@ packages:
     engines: {node: '>=18.0.0'}
     peerDependencies:
       react: ^16.8.0 || ^17 || ^18 || ^19
+
+  react-image-crop@11.1.2:
+    resolution: {integrity: sha512-+0Pc2fxpwKL4u4oLmdKBw8XSwUceFbXbKEHvFOlsl/MGB1OVNic4uBlAPmEHGXYgoJIq+b63xHbc/aJMG0AVkA==}
+    peerDependencies:
+      react: '>=16.13.1'
 
   react-remove-scroll-bar@2.3.8:
     resolution: {integrity: sha512-9r+yi9+mgU33AKcj6IbT9oRCO78WriSj6t/cF8DWBZJ9aOGPOTEDvdUDz1FwKim7QXWwmHqtdHnRJfhAxEG46Q==}
@@ -6452,6 +6484,10 @@ snapshots:
       scheduler: 0.27.0
 
   react-hook-form@7.85.0(react@19.2.7):
+    dependencies:
+      react: 19.2.7
+
+  react-image-crop@11.1.2(react@19.2.7):
     dependencies:
       react: 19.2.7
 
