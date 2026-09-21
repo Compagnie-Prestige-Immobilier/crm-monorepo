@@ -87,9 +87,10 @@ func seedFactory(ctx context.Context, tx pgx.Tx) error {
 		`INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","prospectId","chargeUtile","dernierTirageAt","updatedAt") SELECT '0199f100-0000-7008-8000-000000000001','CHUES'::"Projet",'DEV-001','Diallo','Mariama','soumis',p."id",'{}'::jsonb,now(),now() FROM "prospects" p ORDER BY p."id" LIMIT 1 ON CONFLICT DO NOTHING`,
 		`INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","phoneE164","email","statutDistant","etapeDistante","inscriteLe","soumiseLe","decideeLe","prospectId","chargeUtile","premierTirageAt","dernierTirageAt","updatedAt")
 		SELECT replace(p.id,'7001','7020'),p.projet,'FACTORY-PLATEFORME-'||lpad(right(p.id,12)::int::text,3,'0'),p.nom,p.prenom,p."phoneE164",p.email,
-		  CASE WHEN right(p.id,12)::int%5=0 THEN 'soumis' ELSE 'approved' END,CASE WHEN right(p.id,12)::int%5=0 THEN 2 ELSE 4 END,
+		  CASE WHEN right(p.id,12)::int%5=0 THEN 'soumis' ELSE 'validated' END,CASE WHEN right(p.id,12)::int%5=0 THEN 2 ELSE 4 END,
 		  p."enrollmentCapturedAt",p."enrollmentCapturedAt",CASE WHEN right(p.id,12)::int%5<>0 THEN p."enrollmentCapturedAt" END,p.id,
 		  jsonb_build_object('source','factory','revenu','250000','ville','Dakar',
+		    'demande',jsonb_build_object('submitted',true),
 		    'requisDocs',jsonb_build_array(jsonb_build_object('status',CASE WHEN right(p.id,12)::int%5=0 THEN 'en-attente' ELSE 'accepte' END))),
 		  p."enrollmentCapturedAt",now(),now()
 		FROM "prospects" p WHERE p.id LIKE '0199f100-0000-7001-8000-%' AND p."phase2Status"='METHOD_OBTAINED'
