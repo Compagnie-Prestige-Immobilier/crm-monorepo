@@ -67,10 +67,11 @@ export function PoleMarketingView() {
       couleur: '#B05070',
     },
     {
-      label: 'Non appelées (Stock brut)',
-      value: Math.max(0, data.total - data.eprouves),
+      label: 'Non appelées (en campagne)',
+      value: Math.max(0, data.total - data.eprouves - data.nonDistribues),
       couleur: '#C8921A',
     },
+    { label: 'Pas encore distribuées', value: data.nonDistribues, couleur: '#8A8A8A' },
   ];
 
   const lignesCanaux: LigneCroisee[] = (data.parCanal ?? []).map((c) => ({
