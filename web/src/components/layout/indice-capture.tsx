@@ -1,14 +1,14 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { Crop } from 'react-image-crop';
 
 export const captureDisponible = (): boolean =>
   typeof navigator !== 'undefined' && navigator.mediaDevices?.getDisplayMedia !== undefined;
 
-const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
-export const RACCOURCI_ECRAN = mac ? '⌘K' : 'Ctrl+K';
-export const RACCOURCI_ZONE = mac ? '⌘E' : 'Ctrl+E';
+export const RACCOURCI_ECRAN = 'Ctrl+K';
+export const RACCOURCI_ZONE = 'Ctrl+E';
 
 // L'élément que le survol a surligné pendant que le panneau était ouvert : le point de départ de la zone.
 export function zoneSurlignee(): Crop | undefined {
@@ -39,9 +39,18 @@ export function Touche({ children }: { children: ReactNode }) {
 }
 
 // Au milieu de la page, hors du panneau : la souris reste sur l'élément à montrer, le clavier fait le reste.
-export function IndiceCapture({ ouvert, envoye }: { ouvert: boolean; envoye: boolean }) {
-  if (!ouvert || envoye || !captureDisponible()) return null;
-  return (
+// Dans le body : la barre du haut floute son fond, ce qui en fait le repère d'un `fixed` et le rognerait.
+export function IndiceCapture({
+  ouvert,
+  envoye,
+  masque,
+}: {
+  ouvert: boolean;
+  envoye: boolean;
+  masque: boolean;
+}) {
+  if (!ouvert || envoye || masque || !captureDisponible()) return null;
+  return createPortal(
     <p
       aria-hidden="true"
       className="pointer-events-none fixed bottom-8 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-lg border border-border bg-card/75 px-4 py-2.5 text-[0.8125rem] shadow-elev-lg backdrop-blur-sm sm:left-[calc((100%-28rem)/2)]"
@@ -50,6 +59,7 @@ export function IndiceCapture({ ouvert, envoye }: { ouvert: boolean; envoye: boo
       <span className="text-muted-foreground">
         ou <Touche>{RACCOURCI_ECRAN}</Touche> pour tout l'écran
       </span>
-    </p>
+    </p>,
+    document.body,
   );
 }
