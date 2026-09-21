@@ -149,6 +149,8 @@ export const PERMISSIONS = [
   'fiches.forcer_transition',
   'fiches.ignorer_propriete',
   'fiches.modifier_toutes',
+  'fiches.ouvrir_attribuees',
+  'fiches.consigner_attribuees',
   'fiches.parametres_reserves',
   'fiches.tenir',
   'fiches.voir_converties',
