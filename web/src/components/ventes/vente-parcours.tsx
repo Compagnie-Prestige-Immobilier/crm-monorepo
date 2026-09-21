@@ -84,10 +84,7 @@ const CHAMPS_IDENTITE: readonly Champ[] = [
   { cle: 'adresseProfessionnelle', label: 'Adresse professionnelle' },
 ];
 
-const CHAMPS_SUIVI: readonly Champ[] = [
-  { cle: 'representant', label: 'Représentant' },
-  { cle: 'responsableClosing', label: 'Responsable closing' },
-];
+const CHAMPS_SUIVI: readonly Champ[] = [{ cle: 'representant', label: 'Représentant' }];
 
 const EMAIL_VALIDE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 
@@ -369,7 +366,20 @@ function EcranCourant({
     case 'suivi':
       return (
         <Question titre="Qui a suivi la vente ?">
-          <ChoixTeleconseiller draft={draft} changer={changer} />
+          <div className="grid gap-3 sm:grid-cols-2">
+            <ChoixPersonne
+              cle="nomTeleconseiller"
+              label="Nom du téléconseiller"
+              draft={draft}
+              changer={changer}
+            />
+            <ChoixPersonne
+              cle="responsableClosing"
+              label="Responsable closing"
+              draft={draft}
+              changer={changer}
+            />
+          </div>
           <Champs champs={CHAMPS_SUIVI} draft={draft} changer={changer} />
         </Question>
       );
@@ -681,26 +691,31 @@ function Champs({ champs, draft, changer }: EcranProps & { champs: readonly Cham
 
 const AUCUN = 'aucun';
 
-function ChoixTeleconseiller({ draft, changer }: EcranProps) {
+function ChoixPersonne({
+  cle,
+  label,
+  draft,
+  changer,
+}: EcranProps & { cle: 'nomTeleconseiller' | 'responsableClosing'; label: string }) {
   const teleconseillers = useQuery({
     queryKey: queryKeys.lotsExportTeleconseillers,
     queryFn: () => fetchTeleconseillers(),
     staleTime: 5 * 60_000,
   });
-  const choisi = draft.nomTeleconseiller ?? '';
+  const choisi = draft[cle] ?? '';
   const noms = (teleconseillers.data ?? []).map((t) => t.fullName);
   // Un compte désactivé depuis la vente garde son nom à l'écran de modification.
   if (choisi !== '' && !noms.includes(choisi)) noms.unshift(choisi);
   return (
     <div className="flex flex-col gap-1 text-[0.875rem] font-[600]">
-      Nom du téléconseiller
+      {label}
       <Select
         value={choisi === '' ? AUCUN : choisi}
         onValueChange={(valeur) => {
-          if (valeur !== null) changer({ nomTeleconseiller: valeur === AUCUN ? '' : valeur });
+          if (valeur !== null) changer({ [cle]: valeur === AUCUN ? '' : valeur });
         }}
       >
-        <SelectTrigger aria-label="Nom du téléconseiller" className="w-full">
+        <SelectTrigger aria-label={label} className="w-full">
           <SelectValue>
             {(valeur: string) => (valeur === AUCUN ? 'Non renseigné' : valeur)}
           </SelectValue>
