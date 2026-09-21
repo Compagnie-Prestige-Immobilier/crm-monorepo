@@ -500,7 +500,7 @@ const SECTIONS: readonly NavSection[] = [
         href: '/admin/tableau-de-bord',
         label: 'Tableau de bord',
         icon: LayoutDashboardIcon,
-        description: 'Vue d’ensemble globale : enrôlement, déploiement et marketing',
+        description: 'Supervision, enrôlement, déploiement et marketing',
         acces: 'parametres.administrer',
       },
       {
