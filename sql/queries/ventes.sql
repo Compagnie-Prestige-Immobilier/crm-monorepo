@@ -21,8 +21,11 @@ SELECT COALESCE(MAX("numero"), 0)::integer + 1 AS "numero" FROM "ventes";
 -- name: InsererVenteSaisie :one
 INSERT INTO "ventes" ("origine", "numero", "canal", "dateSouscription", "client", "telephone",
     "site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte",
-    "reliquat", "partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreMois", "soldeeManuellement")
-VALUES ('SAISIE', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+    "reliquat", "partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreMois", "soldeeManuellement",
+    "email", "numeroCni", "dateDelivranceCni", "autrePiece", "demeurantA", "profession",
+    "adresseProfessionnelle", "representant", "nomTeleconseiller", "responsableClosing")
+VALUES ('SAISIE', $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19,
+    $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
 RETURNING "id";
 
 -- name: ModifierVente :exec
@@ -31,7 +34,9 @@ SET "canal" = $2, "dateSouscription" = $3, "client" = $4, "telephone" = $5, "sit
     "nombreLots" = $7, "numerosLots" = $8, "superficie" = $9, "prixUnitaire" = $10,
     "prixTotal" = $11, "acompte" = $12, "reliquat" = $13, "partProprietaire" = $14,
     "partApporteur" = $15, "partCpi" = $16, "modePaiement" = $17, "nombreMois" = $18,
-    "soldeeManuellement" = $19
+    "soldeeManuellement" = $19, "email" = $20, "numeroCni" = $21, "dateDelivranceCni" = $22,
+    "autrePiece" = $23, "demeurantA" = $24, "profession" = $25, "adresseProfessionnelle" = $26,
+    "representant" = $27, "nomTeleconseiller" = $28, "responsableClosing" = $29
 WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ArchiverVente :exec
