@@ -8,7 +8,7 @@ export const captureDisponible = (): boolean =>
 
 const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.userAgent);
 export const RACCOURCI_ECRAN = mac ? '⌘K' : 'Ctrl+K';
-export const RACCOURCI_ZONE = mac ? '⌘⇧K' : 'Ctrl+Maj+K';
+export const RACCOURCI_ZONE = mac ? '⌘E' : 'Ctrl+E';
 
 // L'élément que le survol a surligné pendant que le panneau était ouvert : le point de départ de la zone.
 export function zoneSurlignee(): Crop | undefined {
@@ -44,7 +44,7 @@ export function IndiceCapture({ ouvert, envoye }: { ouvert: boolean; envoye: boo
   return (
     <p
       aria-hidden="true"
-      className="pointer-events-none fixed bottom-8 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-lg border border-border bg-card px-4 py-2.5 text-[0.8125rem] shadow-elev-lg"
+      className="pointer-events-none fixed bottom-8 left-1/2 z-40 flex -translate-x-1/2 flex-wrap items-center justify-center gap-x-2 gap-y-1 rounded-lg border border-border bg-card/75 px-4 py-2.5 text-[0.8125rem] shadow-elev-lg backdrop-blur-sm sm:left-[calc((100%-28rem)/2)]"
     >
       Survolez ce qui pose problème, puis <Touche>{RACCOURCI_ZONE}</Touche> pour capturer cette zone
       <span className="text-muted-foreground">
