@@ -1,7 +1,8 @@
 FROM python:3.13-slim
 COPY --from=golang:1.26-bookworm /usr/local/go /usr/local/go
+COPY --from=node:22-bookworm-slim /usr/local/bin/node /usr/local/bin/node
 ENV PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
-RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates nodejs npm && rm -rf /var/lib/apt/lists/* \
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates nodejs npm passwd && rm -rf /var/lib/apt/lists/* \
     && npm install --global @anthropic-ai/claude-code @openai/codex \
     && npm cache clean --force
 RUN useradd --uid 10001 --create-home solver && mkdir -p /work/jobs && chown -R solver:solver /work
