@@ -143,6 +143,8 @@ function LienPlateforme() {
 
 export function SignalerProbleme({ ecran, plateforme }: { ecran: string; plateforme: boolean }) {
   const [ouvert, setOuvert] = useState(false);
+  // Masqué et non fermé : fermer démonte le panneau, avec la zone en cours de tracé.
+  const [masque, setMasque] = useState(false);
   // La cle survit aux echecs reseau : le meme envoi retrouve son signalement
   // plutot que d'en creer un second.
   const [cle, setCle] = useState(() => crypto.randomUUID());
@@ -212,9 +214,14 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
       >
         <LifeBuoyIcon className="size-5" aria-hidden="true" />
       </Button>
-      <IndiceCapture ouvert={ouvert} envoye={envoi.isSuccess} />
+      <IndiceCapture ouvert={ouvert} envoye={envoi.isSuccess} masque={masque} />
       <Sheet open={ouvert} onOpenChange={fermer} modal={false} disablePointerDismissal>
-        <SheetContent side="right" voile={false} className="w-full sm:max-w-md pointer-events-auto">
+        <SheetContent
+          side="right"
+          voile={false}
+          data-masque={masque}
+          className="w-full sm:max-w-md pointer-events-auto data-[masque=true]:invisible"
+        >
           {envoi.isSuccess ? (
             <div className="flex flex-1 flex-col gap-4 overflow-y-auto p-6">
               <div className="flex flex-col items-center gap-3 text-center">
@@ -282,7 +289,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
                 images={images}
                 ajouter={ajouter}
                 retirer={(id) => setImages((actuelles) => actuelles.filter((i) => i.id !== id))}
-                masquerPanneau={(masque) => setOuvert(!masque)}
+                masquerPanneau={setMasque}
               />
               <SuiviSignalements ouvert={ouvert} />
               <Button type="submit" className="mt-auto h-12" disabled={!envoyable}>
