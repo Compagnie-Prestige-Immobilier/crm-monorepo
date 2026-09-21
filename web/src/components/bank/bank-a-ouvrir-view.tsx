@@ -95,8 +95,8 @@ export function BankAOuvrirView({ projet }: { projet?: Projet | null | undefined
             Dossiers complets sur la plateforme
           </h1>
           <p className="text-[0.875rem] text-muted-foreground">
-            Un dossier bancaire s’ouvre uniquement depuis un dossier validé sur la plateforme. La
-            référence est générée à l’ouverture.
+            Un dossier bancaire s’ouvre uniquement depuis un dossier validé sur la plateforme, dont
+            toutes les pièces sont valides. La référence est générée à l’ouverture.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">

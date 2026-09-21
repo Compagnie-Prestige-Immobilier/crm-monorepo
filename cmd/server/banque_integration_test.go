@@ -169,8 +169,18 @@ func (s *socleBanque) inscription(prospectID *string) string {
 	id := uuid.NewString()
 	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
 		("id","projet","identifiantDistant","nom","prenom","phoneE164","statutDistant","decideeLe","prospectId","chargeUtile","dernierTirageAt","updatedAt")
-		VALUES ($1,'CHUES',$2,'Diétou','Amadou',$3,'valide',now(),$4,'{}',now(),now())`,
+		VALUES ($1,'CHUES',$2,'Diétou','Amadou',$3,'approved',now(),$4,'{}',now(),now())`,
 		id, "test-"+s.banqueID+"-"+id[:8], "+2217"+s.prospectID[:8], prospectID)
+	return id
+}
+
+func (s *socleBanque) inscriptionDistante(projet, statutDistant, charge string) string {
+	s.t.Helper()
+	id := uuid.NewString()
+	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
+		("id","projet","identifiantDistant","nom","prenom","statutDistant","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,$2::"Projet",$3,'Sy','Awa',$4,$5::jsonb,now(),now())`,
+		id, projet, "test-"+s.banqueID+"-"+id[:8], statutDistant, charge)
 	return id
 }
 
@@ -499,6 +509,30 @@ func banqueCompter(s *socleBanque, requete string, args ...any) int {
 	return n
 }
 
+func TestBanqueSeulUnDossierValideAuxPiecesValidesEstProposeALOuverture(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	incompletes := []string{
+		s.inscriptionDistante("CHUES", "compte-adhesion-released", `{}`),
+		s.inscriptionDistante("CHUES", "needs_correction", `{}`),
+		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"requisDocs":[{"status":"accepte"},{"status":"en-attente"}]}`),
+		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"requisDocs":[]}`),
+	}
+	complete := s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"requisDocs":[{"status":"accepte"},{"status":"accepte"}]}`)
+	for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
+		statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet="+projet, nil)
+		s.attend(statut, http.StatusOK, "inscriptions à ouvrir "+projet, body)
+		for _, id := range incompletes {
+			if banqueContientID(body["items"], id) {
+				t.Fatalf("%s : un dossier non validé ou aux pièces non toutes valides est proposé : %s", projet, id)
+			}
+		}
+		if projet == "GRAND_PUBLIC" && !banqueContientID(body["items"], complete) {
+			t.Fatal("un dossier Grand Public aux pièces toutes acceptées doit être proposé")
+		}
+	}
+}
+
 func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
 	s := nouveauBancBanque(t, "BANQUE_FINANCE")
 	s.connecte()
@@ -506,16 +540,6 @@ func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
 	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
 	if !banqueContientID(body["items"], s.inscriptionID) {
 		t.Fatalf("l'inscription validée doit être proposée à l'ouverture : %v", body["items"])
-	}
-
-	adhesion := uuid.NewString()
-	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
-		("id","projet","identifiantDistant","nom","prenom","statutDistant","decideeLe","chargeUtile","dernierTirageAt","updatedAt")
-		VALUES ($1,'CHUES',$2,'Sy','Awa','compte-adhesion-released',now(),'{}',now(),now())`, adhesion, "adhesion-"+adhesion)
-	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
-	s.attend(statut, http.StatusOK, "inscriptions à ouvrir avec une demande d'adhésion décidée", body)
-	if banqueContientID(body["items"], adhesion) {
-		t.Fatal("une demande d'adhésion n'est pas un dossier complet")
 	}
 
 	id, _ := s.ouvrirDossier()
