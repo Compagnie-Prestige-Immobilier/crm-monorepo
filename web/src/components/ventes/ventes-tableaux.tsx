@@ -1,6 +1,7 @@
 'use client';
 
 import { ArchiveIcon, EyeIcon, PencilIcon } from 'lucide-react';
+import type { ReactNode } from 'react';
 
 import { BankRankChart, BankShareChart } from '@/components/bank/bank-charts';
 import { Badge } from '@/components/ui/badge';
@@ -40,6 +41,67 @@ function modeLabel(vente: Vente): string {
 
 function paiementVariant(vente: Vente): 'success' | 'warning' {
   return vente.soldee ? 'success' : 'warning';
+}
+
+export function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
+  const chiffre = ventes.reduce((s, v) => s + v.prixTotal, 0);
+  const verse = ventes.reduce((s, v) => s + totalVerse(v), 0);
+  const tuiles = [
+    { label: 'Ventes', valeur: String(ventes.length) },
+    { label: 'Chiffre d’affaires', valeur: formatFcfa(chiffre) },
+    { label: 'Encaissé', valeur: formatFcfa(verse) },
+    { label: 'Reste à encaisser', valeur: formatFcfa(Math.max(0, chiffre - verse)) },
+    { label: 'Part CPI', valeur: formatFcfa(ventes.reduce((s, v) => s + v.partCpi, 0)) },
+  ];
+  return (
+    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+      {tuiles.map((tuile) => (
+        <Card key={tuile.label} className="gap-1 p-4">
+          <span className="text-[0.8125rem] text-muted-foreground">{tuile.label}</span>
+          <strong className="font-display text-[1.25rem] font-[700] tabular-nums">
+            {tuile.valeur}
+          </strong>
+        </Card>
+      ))}
+    </div>
+  );
+}
+
+function LigneOuvrante({ onOuvrir, children }: { onOuvrir: () => void; children: ReactNode }) {
+  return (
+    <TableRow
+      className={`${TABLE_ROW} cursor-pointer`}
+      onClick={(event) => {
+        if (event.target instanceof HTMLElement && event.target.closest('button') !== null) return;
+        if (window.getSelection()?.isCollapsed === false) return;
+        onOuvrir();
+      }}
+    >
+      {children}
+    </TableRow>
+  );
+}
+
+function BoutonOuvrir({ onOuvrir, children }: { onOuvrir: () => void; children: ReactNode }) {
+  return (
+    <button
+      type="button"
+      aria-haspopup="dialog"
+      onClick={onOuvrir}
+      className="cursor-pointer rounded-sm text-left font-[600] hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+    >
+      {children}
+    </button>
+  );
+}
+
+function CelluleReste({ vente }: { vente: Vente }) {
+  const reste = vente.prixTotal - totalVerse(vente);
+  return (
+    <TableCell className={`${MONTANT} ${reste <= 0 ? 'text-success' : 'text-warning'}`}>
+      {reste <= 0 ? 'Soldé' : formatFcfa(reste)}
+    </TableCell>
+  );
 }
 
 function ActionsVente({
@@ -113,6 +175,7 @@ export function TableVentes({
           <TableHead>Lots</TableHead>
           <TableHead className="text-right">Prix total</TableHead>
           <TableHead className="text-right">Acompte</TableHead>
+          <TableHead className="text-right text-foreground">Reste à payer</TableHead>
           <TableHead>Paiement</TableHead>
           <TableHead className="text-right">Part CPI</TableHead>
           <TableHead />
@@ -120,12 +183,16 @@ export function TableVentes({
       </TableHeader>
       <TableBody>
         {ventes.map((vente) => (
-          <TableRow key={vente.id} className={TABLE_ROW}>
+          <LigneVente key={vente.id} vente={vente} onDetail={onDetail}>
             <TableCell className="whitespace-nowrap">
               {vente.dateSouscription === null ? 'Sans date' : formatDate(vente.dateSouscription)}
             </TableCell>
             <TableCell>
-              <span className="font-[600]">{vente.client}</span>
+              {onDetail === undefined ? (
+                <span className="font-[600]">{vente.client}</span>
+              ) : (
+                <BoutonOuvrir onOuvrir={() => onDetail(vente)}>{vente.client}</BoutonOuvrir>
+              )}
               <span className="block text-[0.8125rem] text-muted-foreground">
                 {vente.telephone}
               </span>
@@ -138,6 +205,7 @@ export function TableVentes({
             </TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.prixTotal)}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.acompte)}</TableCell>
+            <CelluleReste vente={vente} />
             <TableCell>
               <span className="flex flex-wrap gap-1">
                 <Badge variant={vente.modePaiement === 'CREDIT' ? 'info' : 'outline'}>
@@ -155,14 +223,33 @@ export function TableVentes({
                 onArchive={onArchive}
               />
             </TableCell>
-          </TableRow>
+          </LigneVente>
         ))}
       </TableBody>
     </Table>
   );
 }
 
-export function TableParTeleconseiller({ lignes }: { lignes: readonly VenteParTeleconseiller[] }) {
+function LigneVente({
+  vente,
+  onDetail,
+  children,
+}: {
+  vente: Vente;
+  onDetail?: ((vente: Vente) => void) | undefined;
+  children: ReactNode;
+}) {
+  if (onDetail === undefined) return <TableRow className={TABLE_ROW}>{children}</TableRow>;
+  return <LigneOuvrante onOuvrir={() => onDetail(vente)}>{children}</LigneOuvrante>;
+}
+
+export function TableParTeleconseiller({
+  lignes,
+  onOuvrir,
+}: {
+  lignes: readonly VenteParTeleconseiller[];
+  onOuvrir: (nom: string) => void;
+}) {
   return (
     <Table containerClassName={TABLE_CONTAINER}>
       <TableHeader>
@@ -174,19 +261,28 @@ export function TableParTeleconseiller({ lignes }: { lignes: readonly VenteParTe
       </TableHeader>
       <TableBody>
         {lignes.map((ligne) => (
-          <TableRow key={ligne.nom} className={TABLE_ROW}>
-            <TableCell className="font-[600]">{ligne.nom}</TableCell>
+          <LigneOuvrante key={ligne.nom} onOuvrir={() => onOuvrir(ligne.nom)}>
+            <TableCell>
+              <BoutonOuvrir onOuvrir={() => onOuvrir(ligne.nom)}>{ligne.nom}</BoutonOuvrir>
+            </TableCell>
             <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(ligne.prixTotal)}</TableCell>
-          </TableRow>
+          </LigneOuvrante>
         ))}
       </TableBody>
     </Table>
   );
 }
 
-export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
+export function TableEcheances({
+  ventes,
+  onDetail,
+}: {
+  ventes: readonly Vente[];
+  onDetail: (vente: Vente) => void;
+}) {
   const lignes = ventes
+    .filter((vente) => vente.modePaiement === 'CREDIT')
     .map((vente) => ({ vente, verse: totalVerse(vente) }))
     .sort((a, b) => b.vente.prixTotal - b.verse - (a.vente.prixTotal - a.verse));
   return (
@@ -204,11 +300,10 @@ export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
       <TableBody>
         {lignes.map(({ vente, verse }) => {
           const dernier = vente.versements.at(-1);
-          const reste = vente.prixTotal - verse;
           return (
-            <TableRow key={vente.numero} className={TABLE_ROW}>
+            <LigneOuvrante key={vente.id} onOuvrir={() => onDetail(vente)}>
               <TableCell>
-                <span className="font-[600]">{vente.client}</span>
+                <BoutonOuvrir onOuvrir={() => onDetail(vente)}>{vente.client}</BoutonOuvrir>
                 <span className="block text-[0.8125rem] text-muted-foreground">
                   {vente.telephone}
                 </span>
@@ -221,10 +316,8 @@ export function TableEcheances({ ventes }: { ventes: readonly Vente[] }) {
               </TableCell>
               <TableCell className={MONTANT}>{formatFcfa(vente.prixTotal)}</TableCell>
               <TableCell className={MONTANT}>{formatFcfa(verse)}</TableCell>
-              <TableCell className={`${MONTANT} ${reste <= 0 ? 'text-success' : 'text-warning'}`}>
-                {reste <= 0 ? 'Soldé' : formatFcfa(reste)}
-              </TableCell>
-            </TableRow>
+              <CelluleReste vente={vente} />
+            </LigneOuvrante>
           );
         })}
       </TableBody>
