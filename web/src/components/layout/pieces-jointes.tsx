@@ -5,6 +5,7 @@ import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import ReactCrop, { convertToPixelCrop, type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
 
+import { ApercuImage } from '@/components/layout/apercu-image';
 import {
   captureDisponible,
   RACCOURCI_ECRAN,
@@ -265,7 +266,7 @@ export const PiecesJointes = forwardRef<
         <ul className="grid grid-cols-2 gap-2">
           {images.map((image) => (
             <li key={image.id} className="relative overflow-hidden rounded-md border border-border">
-              <img src={image.apercu} alt="" className="h-28 w-full object-cover object-top" />
+              <ApercuImage src={image.apercu} />
               <Button
                 type="button"
                 variant="secondary"
