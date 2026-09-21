@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, LoaderIcon, MinusIcon, PlusIcon, UserCheckIcon } from 'lucide-react';
+import { CheckIcon, LoaderIcon, MinusIcon, PlusIcon, UserCheckIcon, XIcon } from 'lucide-react';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -160,6 +160,10 @@ const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
   canal: (d) => (d.canal === '' ? 'Choisissez un canal.' : null),
   lots: (d) => ((d.prixUnitaire ?? 0) <= 0 ? 'Indiquez le prix d’un lot.' : null),
   paiement: (d) => {
+    const prixTotal = (d.prixUnitaire ?? 0) * d.nombreLots;
+    if (d.modePaiement === 'COMPTANT' && d.acompte !== prixTotal) {
+      return `Au comptant, le montant payé doit être de ${formatFcfa(prixTotal)}.`;
+    }
     const moisManquants = d.modePaiement === 'CREDIT' && (d.nombreMois ?? 0) < 1;
     return moisManquants ? 'Indiquez le nombre de mois.' : null;
   },
@@ -180,14 +184,6 @@ function manqueTelephone(draft: Draft, callingCode: string): string | null {
 
 function manqueParcours(ecran: Ecran, draft: Draft, callingCode: string): string | null {
   if (ecran === 'telephone') return manqueTelephone(draft, callingCode);
-  if (
-    ecran === 'paiement' &&
-    draft.modePaiement === 'COMPTANT' &&
-    draft.acompte < (draft.prixUnitaire ?? 0) * draft.nombreLots &&
-    draft.marquerSoldee !== true
-  ) {
-    return 'Cochez la confirmation si vous voulez marquer cette vente soldée malgré le montant saisi.';
-  }
   return MANQUE[ecran]?.(draft) ?? null;
 }
 
@@ -199,6 +195,13 @@ function avecSite(draft: Draft, sites: readonly SiteVente[], nom: string): Patch
     superficie: draft.superficie || choix?.superficieDefaut || '',
     prixUnitaire: prixDuSite > 0 ? prixDuSite : (draft.prixUnitaire ?? 0),
   };
+}
+
+function comptantSolde(draft: Draft, patch: Patch): Draft {
+  const suivant = { ...draft, ...patch };
+  const prixChange = 'prixUnitaire' in patch || 'nombreLots' in patch || 'modePaiement' in patch;
+  if (suivant.modePaiement !== 'COMPTANT' || 'acompte' in patch || !prixChange) return suivant;
+  return { ...suivant, acompte: (suivant.prixUnitaire ?? 0) * suivant.nombreLots };
 }
 
 export function VenteParcours({
@@ -258,7 +261,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
 
   const changer = (patch: Patch) => {
     setErreur(null);
-    setDraft((d) => ({ ...d, ...patch }));
+    setDraft((d) => comptantSolde(d, patch));
   };
   const aller = (cible: number) => {
     setErreur(null);
@@ -441,22 +444,37 @@ function Cadre({
         >
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <DialogTitle className="text-[1.125rem]">{titre}</DialogTitle>
-            <DialogDescription className="tabular-nums">
-              {pas + 1} sur {ECRANS.length}
-            </DialogDescription>
+            <div className="flex items-center gap-2">
+              <DialogDescription className="tabular-nums">
+                {pas + 1} sur {ECRANS.length}
+              </DialogDescription>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="-mr-2"
+                aria-label="Fermer"
+                onClick={onFermer}
+              >
+                <XIcon aria-hidden="true" />
+              </Button>
+            </div>
           </div>
           <div
             ref={corps}
             className="flex min-h-0 flex-col justify-center gap-5 overflow-y-auto px-6 py-5"
           >
             <div key={ecran}>{children}</div>
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {erreur === null ? null : (
-              <p role="alert" className="rounded-md bg-destructive/10 px-4 py-3 text-destructive">
+              <p
+                role="alert"
+                className="basis-full rounded-md bg-destructive/10 px-4 py-2 font-[600] text-destructive"
+              >
                 {erreur}
               </p>
             )}
-          </div>
-          <div className="flex items-center justify-between border-t border-border px-6 py-4">
             <Button
               type="button"
               variant="outline"
@@ -551,7 +569,7 @@ function Montant({
         <Input
           id={id}
           inputMode="numeric"
-          className="h-14 text-[1.375rem] tabular-nums"
+          className="h-14 text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
           placeholder="0"
           value={espaces(valeur)}
           onChange={(e) => onChange(Math.min(max, entier(e.target.value)))}
@@ -626,7 +644,7 @@ function EcranNom({ draft, changer }: EcranProps) {
     <Question titre="Comment s'appelle le client ?">
       <Input
         aria-label="Nom du client"
-        className="h-14 text-[1.375rem]"
+        className="h-14 text-[1.375rem] placeholder:text-muted-foreground/50"
         placeholder="Prénom et nom"
         value={draft.client}
         onChange={(e) => changer({ client: e.target.value })}
@@ -761,7 +779,7 @@ function Mensualites({ draft, reste, changer }: EcranProps & { reste: number }) 
       <Input
         id="parcours-mois"
         inputMode="numeric"
-        className="h-14 w-24 text-center text-[1.375rem] tabular-nums"
+        className="h-14 w-24 text-center text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
         placeholder="12"
         value={mois === 0 ? '' : mois}
         onChange={(e) => changer({ nombreMois: Math.min(120, entier(e.target.value)) })}
@@ -815,7 +833,6 @@ function EcranPaiement({ draft, changer }: EcranProps) {
       >
         <PartsAcompte visible={credit} prixTotal={prixTotal} draft={draft} changer={changer} />
       </Montant>
-      <ConfirmationSoldee visible={!credit && !soldee} draft={draft} changer={changer} />
       {credit ? <Mensualites draft={draft} reste={reste} changer={changer} /> : null}
       <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-secondary p-3">
         <span className="text-[0.9375rem]">Statut</span>

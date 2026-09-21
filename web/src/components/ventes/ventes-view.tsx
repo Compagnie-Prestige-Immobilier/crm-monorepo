@@ -12,14 +12,15 @@ import { EmptyState } from '@/components/empty-state';
 import { useFileDownload } from '@/components/exports/download-button';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { DepotClasseur } from '@/components/ventes/depot-classeur';
 import { VenteDetailDialog } from '@/components/ventes/vente-detail-dialog';
 import { VenteParcours } from '@/components/ventes/vente-parcours';
+import { TeleconseillerDetailDialog } from '@/components/ventes/teleconseiller-detail-dialog';
 import { PageReglages } from '@/components/ventes/ventes-reglages';
 import {
+  Chiffres,
   SyntheseSites,
   TableEcheances,
   TableParTeleconseiller,
@@ -31,7 +32,6 @@ import {
   fetchVentes,
   fetchVentesConfiguration,
   formatFcfa,
-  totalVerse,
   type CanalVente,
   type SiteVente,
   type Vente,
@@ -52,30 +52,6 @@ export const VUES_VENTES = [
 ] as const;
 export type VueVentes = (typeof VUES_VENTES)[number];
 
-function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
-  const chiffre = ventes.reduce((s, v) => s + v.prixTotal, 0);
-  const verse = ventes.reduce((s, v) => s + totalVerse(v), 0);
-  const tuiles = [
-    { label: 'Ventes', valeur: String(ventes.length) },
-    { label: 'Chiffre d’affaires', valeur: formatFcfa(chiffre) },
-    { label: 'Encaissé', valeur: formatFcfa(verse) },
-    { label: 'Reste à encaisser', valeur: formatFcfa(Math.max(0, chiffre - verse)) },
-    { label: 'Part CPI', valeur: formatFcfa(ventes.reduce((s, v) => s + v.partCpi, 0)) },
-  ];
-  return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-      {tuiles.map((tuile) => (
-        <Card key={tuile.label} className="gap-1 p-4">
-          <span className="text-[0.8125rem] text-muted-foreground">{tuile.label}</span>
-          <strong className="font-display text-[1.25rem] font-[700] tabular-nums">
-            {tuile.valeur}
-          </strong>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
 function SansVente() {
   return (
     <EmptyState
@@ -84,6 +60,21 @@ function SansVente() {
       description="Cette page se remplit dès la première vente enregistrée."
       action={
         <Button size="lg" render={<Link href="/ventes/nouvelle" />}>
+          <PlusIcon aria-hidden="true" /> Nouvelle vente
+        </Button>
+      }
+    />
+  );
+}
+
+function SansCredit({ onAjouter }: { onAjouter: () => void }) {
+  return (
+    <EmptyState
+      icon={FileSpreadsheetIcon}
+      title="Aucune vente à crédit"
+      description="Enregistrez une vente à crédit pour suivre ici ses versements et son reste à payer."
+      action={
+        <Button size="lg" onClick={onAjouter}>
           <PlusIcon aria-hidden="true" /> Nouvelle vente
         </Button>
       }
@@ -134,6 +125,7 @@ function VentesLoaded({
   const [venteEditee, setVenteEditee] = useState<Vente | null>(null);
   const [venteDetailId, setVenteDetailId] = useState<number | null>(null);
   const [venteAArchiver, setVenteAArchiver] = useState<Vente | null>(null);
+  const [teleconseillerOuvert, setTeleconseillerOuvert] = useState<string | null>(null);
   const queryClient = useQueryClient();
   // Le parcours ouvert depuis la barre ramène sur le tableau en se fermant,
   // sinon l'adresse et la surbrillance de la barre resteraient sur lui.
@@ -172,12 +164,16 @@ function VentesLoaded({
     <>
       {vue === 'echeances' ? (
         <PageSimple vide={ventes.length === 0}>
-          <TableEcheances ventes={ventes} />
+          {ventes.some((vente) => vente.modePaiement === 'CREDIT') ? (
+            <TableEcheances ventes={ventes} onDetail={voirDetail} />
+          ) : (
+            <SansCredit onAjouter={ajouter} />
+          )}
         </PageSimple>
       ) : null}
       {vue === 'teleconseillers' ? (
         <PageSimple vide={parTeleconseiller.length === 0}>
-          <TableParTeleconseiller lignes={parTeleconseiller} />
+          <TableParTeleconseiller lignes={parTeleconseiller} onOuvrir={setTeleconseillerOuvert} />
         </PageSimple>
       ) : null}
       {vue === 'sites' ? <PageSites ventes={ventes} sites={sites} /> : null}
@@ -192,6 +188,11 @@ function VentesLoaded({
         />
       ) : null}
 
+      <TeleconseillerDetailDialog
+        nom={teleconseillerOuvert}
+        ventes={ventes}
+        onFermer={() => setTeleconseillerOuvert(null)}
+      />
       <VenteParcours open={saisieOuverte} onOpenChange={fermerSaisie} vente={venteEditee} />
       <VenteDetailDialog
         vente={venteDetail}
