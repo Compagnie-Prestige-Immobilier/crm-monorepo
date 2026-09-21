@@ -5,6 +5,7 @@ ENV PATH=/usr/local/go/bin:/usr/local/bin:/usr/bin:/bin
 RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates nodejs npm && rm -rf /var/lib/apt/lists/* \
     && npm install --global @anthropic-ai/claude-code @openai/codex \
     && npm cache clean --force
+RUN ln -s /usr/local/go/bin/go /usr/local/bin/go
 RUN mkdir -p /home/nobody /work/jobs && chown -R nobody:nogroup /home/nobody /work
 COPY requirements.txt /opt/ticket-solver/requirements.txt
 RUN pip install --no-cache-dir -r /opt/ticket-solver/requirements.txt
