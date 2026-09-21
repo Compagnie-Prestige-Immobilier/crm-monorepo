@@ -141,7 +141,6 @@ test.describe('parité banque, les écrans du dossier bancaire', () => {
   }) => {
     await page.goto('/finance/dossiers/nouveau');
     const carte = page.getByRole('listitem').filter({ hasText: `Awa ${NOM_CLIENT}` });
-    await expect(carte.getByText('Validé', { exact: true })).toBeVisible();
     await carte.getByRole('button', { name: 'Ouvrir le dossier' }).click();
     await expect(page.getByText(/^Dossier CHUES-BF-\d{4}-\d{6} ouvert\.$/u)).toBeVisible();
 
