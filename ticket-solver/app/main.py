@@ -210,7 +210,8 @@ def process(ticket_id, state, glpi):
                 previous, failure = summary, result.stdout[-12000:]
             except (subprocess.TimeoutExpired, FileNotFoundError, RuntimeError) as exc:
                 previous, failure = previous, str(exc)[-12000:]
-                log.warning("%s failed for ticket %s", agent, ticket_id)
+                detail = str(exc).replace(os.getenv("CLAUDE_CODE_OAUTH_TOKEN_0", ""), "[secret]").replace(os.getenv("CLAUDE_CODE_OAUTH_TOKEN_1", ""), "[secret]").replace(os.getenv("CODEX_ACCESS_TOKEN", ""), "[secret]")
+                log.warning("%s failed for ticket %s: %s", agent, ticket_id, detail[-1000:])
         glpi.followup(ticket_id, f"Automated correction could not safely complete this ticket.\n\nAttempted: Claude Primary, Claude Fallback, Codex Fallback\nFinal verification: FAILED\n\nNo change was merged or deployed. Human intervention is required.")
         state.finish(ticket_id, "needs_human")
     except Exception:
