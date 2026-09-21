@@ -205,7 +205,8 @@ LEFT JOIN "prospects" p ON p."id" = i."prospectId" AND p."deletedAt" IS NULL
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")
 WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
-  AND ((cardinality(sqlc.arg('statuts')::text[]) = 0 AND i."decideeLe" IS NOT NULL)
+  AND ((cardinality(sqlc.arg('statuts')::text[]) = 0 AND i."decideeLe" IS NOT NULL
+        AND i."statutDistant" NOT LIKE 'compte-adhesion-%')
        OR i."statutDistant" = ANY(sqlc.arg('statuts')::text[]))
   AND (NOT sqlc.arg('a_signaler')::boolean OR i."completeSignaleeLe" IS NULL)
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id" AND c."deletedAt" IS NULL)
