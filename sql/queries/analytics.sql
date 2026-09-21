@@ -159,6 +159,8 @@ SELECT
   COUNT(*)::int AS total,
   COUNT(*) FILTER (WHERE p."canalProvenanceId" IS NOT NULL)::int AS avec_canal,
   COUNT(*) FILTER (WHERE p."lastCallAt" IS NOT NULL)::int AS eprouves,
+  COUNT(*) FILTER (WHERE p."lastCallAt" IS NULL
+    AND NOT EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id"))::int AS non_distribues,
   COUNT(*) FILTER (WHERE lr."countsAsReached")::int AS joints,
   COUNT(*) FILTER (WHERE p."statut" IN ('CONVERTI', 'VENDU'))::int AS convertis
 FROM "prospects" p
@@ -184,7 +186,8 @@ ORDER BY prospects DESC, c."position";
 -- defini dans les listes de reference. Une fiche jamais appelee n'a pas de
 -- motif : elle n'a pas encore ete eprouvee.
 SELECT
-  COALESCE(r."label", 'Jamais appelé')::text AS label,
+  COALESCE(r."label", CASE WHEN EXISTS (SELECT 1 FROM "lot_export_items" li WHERE li."prospectId" = p."id")
+    THEN 'Jamais appelé' ELSE 'Pas encore distribué' END)::text AS label,
   COALESCE(r."effect"::text, '')::text AS effect,
   COUNT(*)::int AS count
 FROM "prospects" p

@@ -23,14 +23,15 @@ type MotifDAppel struct {
 }
 
 type QualiteDuMarketing struct {
-	Total     int                 `json:"total"`
-	AvecCanal int                 `json:"avecCanal"`
-	Eprouves  int                 `json:"eprouves"`
-	Joints    int                 `json:"joints"`
-	Convertis int                 `json:"convertis"`
-	Score     *int                `json:"score"`
-	ParCanal  []CanalDeProvenance `json:"parCanal"`
-	ParMotif  []MotifDAppel       `json:"parMotif"`
+	Total         int                 `json:"total"`
+	AvecCanal     int                 `json:"avecCanal"`
+	Eprouves      int                 `json:"eprouves"`
+	NonDistribues int                 `json:"nonDistribues"`
+	Joints        int                 `json:"joints"`
+	Convertis     int                 `json:"convertis"`
+	Score         *int                `json:"score"`
+	ParCanal      []CanalDeProvenance `json:"parCanal"`
+	ParMotif      []MotifDAppel       `json:"parMotif"`
 }
 
 type MarketingOutput struct{ Body QualiteDuMarketing }
@@ -73,14 +74,15 @@ func (s *service) lireMarketing(ctx context.Context) (QualiteDuMarketing, error)
 		return vide, err
 	}
 	marketing := QualiteDuMarketing{
-		Total:     int(compte.Total),
-		AvecCanal: int(compte.AvecCanal),
-		Eprouves:  int(compte.Eprouves),
-		Joints:    int(compte.Joints),
-		Convertis: int(compte.Convertis),
-		Score:     scoreMarketing(compte),
-		ParCanal:  make([]CanalDeProvenance, 0, len(canaux)),
-		ParMotif:  make([]MotifDAppel, 0, len(motifs)),
+		Total:         int(compte.Total),
+		AvecCanal:     int(compte.AvecCanal),
+		Eprouves:      int(compte.Eprouves),
+		NonDistribues: int(compte.NonDistribues),
+		Joints:        int(compte.Joints),
+		Convertis:     int(compte.Convertis),
+		Score:         scoreMarketing(compte),
+		ParCanal:      make([]CanalDeProvenance, 0, len(canaux)),
+		ParMotif:      make([]MotifDAppel, 0, len(motifs)),
 	}
 	for _, ligne := range canaux {
 		marketing.ParCanal = append(marketing.ParCanal, CanalDeProvenance{
