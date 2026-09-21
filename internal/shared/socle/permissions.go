@@ -133,7 +133,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
 	PermissionFichesIgnorerPropriete:      {domaineFiches, "Agir sur les rappels et identifiants des autres", AdminSeul},
 	PermissionFichesOuvrirAttribuees:      {domaineFiches, "Ouvrir une fiche attribuée à un autre téléconseiller", Encadrement},
-	PermissionFichesConsignerAttribuees:   {domaineFiches, "Consigner un appel sur une fiche attribuée à un autre téléconseiller", nil},
+	PermissionFichesConsignerAttribuees:   {domaineFiches, "Consigner un appel sur une fiche attribuée à un autre téléconseiller", []Role{}},
 	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
 	PermissionFichesForcerTransition:      {domaineFiches, "Forcer un changement de statut", AdminSeul},
 	PermissionFichesParametresReserves:    {domaineFiches, "Régler les liens, l'adresse et les destinataires CHUES", AdminSeul},
