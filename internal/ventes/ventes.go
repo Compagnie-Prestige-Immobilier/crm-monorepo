@@ -120,12 +120,26 @@ type VenteDTO struct {
 	PartApporteur      int64          `json:"partApporteur"`
 	PartCpi            int64          `json:"partCpi"`
 	Versements         []VersementDTO `json:"versements"`
-	ProspectID         *string        `json:"prospectId"`
-	Teleconseiller     *string        `json:"teleconseiller"`
+	IdentiteClientDTO
+	ProspectID     *string `json:"prospectId"`
+	Teleconseiller *string `json:"teleconseiller"`
 }
 
 // Le classement par téléconseiller jusqu'à qui a amené le client : seules les
 // ventes rattachées à une fiche comptent, les autres n'ont pas d'auteur à créditer.
+type IdentiteClientDTO struct {
+	Email                  string  `json:"email"`
+	NumeroCni              string  `json:"numeroCni"`
+	DateDelivranceCni      *string `json:"dateDelivranceCni"`
+	AutrePiece             string  `json:"autrePiece"`
+	DemeurantA             string  `json:"demeurantA"`
+	Profession             string  `json:"profession"`
+	AdresseProfessionnelle string  `json:"adresseProfessionnelle"`
+	Representant           string  `json:"representant"`
+	NomTeleconseiller      string  `json:"nomTeleconseiller"`
+	ResponsableClosing     string  `json:"responsableClosing"`
+}
+
 type VenteParTeleconseillerDTO struct {
 	Nom       string `json:"nom"`
 	Ventes    int32  `json:"ventes"`
@@ -312,6 +326,12 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 		SoldeeManuellement: v.SoldeeManuellement, Soldee: v.SoldeeManuellement || encaisse >= v.PrixTotal,
 		PartProprietaire: v.PartProprietaire,
 		PartApporteur:    v.PartApporteur, PartCpi: v.PartCpi, Versements: versements,
+		IdentiteClientDTO: IdentiteClientDTO{
+			Email: v.Email, NumeroCni: v.NumeroCni, DateDelivranceCni: jourOuNul(v.DateDelivranceCni),
+			AutrePiece: v.AutrePiece, DemeurantA: v.DemeurantA, Profession: v.Profession,
+			AdresseProfessionnelle: v.AdresseProfessionnelle, Representant: v.Representant,
+			NomTeleconseiller: v.NomTeleconseiller, ResponsableClosing: v.ResponsableClosing,
+		},
 	}
 }
 

@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type versementInput struct {
@@ -42,6 +43,20 @@ type venteInput struct {
 	PartProprietaire *int64 `json:"partProprietaire,omitempty" minimum:"0"`
 	PartApporteur    *int64 `json:"partApporteur,omitempty" minimum:"0"`
 	PartCpi          *int64 `json:"partCpi,omitempty"`
+	IdentiteClient
+}
+
+type IdentiteClient struct {
+	Email                  string `json:"email,omitempty" maxLength:"200" pattern:"^([^@\\s]+@[^@\\s]+\\.[^@\\s]+)?$"`
+	NumeroCni              string `json:"numeroCni,omitempty" maxLength:"60"`
+	DateDelivranceCni      string `json:"dateDelivranceCni,omitempty" pattern:"^(\\d{4}-\\d{2}-\\d{2})?$"`
+	AutrePiece             string `json:"autrePiece,omitempty" maxLength:"200"`
+	DemeurantA             string `json:"demeurantA,omitempty" maxLength:"200"`
+	Profession             string `json:"profession,omitempty" maxLength:"120"`
+	AdresseProfessionnelle string `json:"adresseProfessionnelle,omitempty" maxLength:"200"`
+	Representant           string `json:"representant,omitempty" maxLength:"200"`
+	NomTeleconseiller      string `json:"nomTeleconseiller,omitempty" maxLength:"200"`
+	ResponsableClosing     string `json:"responsableClosing,omitempty" maxLength:"200"`
 }
 
 type creerVenteInput struct {
@@ -138,6 +153,12 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 			PartApporteur:    preparee.Vente.PartApporteur, PartCpi: preparee.Vente.PartCpi,
 			ModePaiement: preparee.Vente.ModePaiement, NombreMois: preparee.Vente.NombreMois,
 			SoldeeManuellement: preparee.Vente.SoldeeManuellement,
+			Email:              preparee.Vente.Email, NumeroCni: preparee.Vente.NumeroCni,
+			DateDelivranceCni: preparee.Vente.DateDelivranceCni, AutrePiece: preparee.Vente.AutrePiece,
+			DemeurantA: preparee.Vente.DemeurantA, Profession: preparee.Vente.Profession,
+			AdresseProfessionnelle: preparee.Vente.AdresseProfessionnelle,
+			Representant:           preparee.Vente.Representant, NomTeleconseiller: preparee.Vente.NomTeleconseiller,
+			ResponsableClosing: preparee.Vente.ResponsableClosing,
 		}); err != nil {
 			return err
 		}
@@ -277,6 +298,10 @@ func (s *service) preparer(ctx context.Context, in *venteInput) (ventePreparee, 
 	if mode == modeComptant {
 		nombreMois = nil
 	}
+	delivrance, err := dateFacultative(in.DateDelivranceCni)
+	if err != nil {
+		return ventePreparee{}, err
+	}
 	sortie := ventePreparee{
 		Vente: db.InsererVenteSaisieParams{
 			Canal: contexte.canal, DateSouscription: dateSQL(contexte.date), Client: contexte.client,
@@ -286,6 +311,16 @@ func (s *service) preparer(ctx context.Context, in *venteInput) (ventePreparee, 
 			Reliquat: prix*int64(in.NombreLots) - in.Acompte, PartProprietaire: proprietaire,
 			PartApporteur: apporteur, PartCpi: cpi,
 			ModePaiement: mode, NombreMois: nombreMois, SoldeeManuellement: in.MarquerSoldee,
+			Email:                  strings.ToLower(strings.TrimSpace(in.Email)),
+			NumeroCni:              strings.TrimSpace(in.NumeroCni),
+			DateDelivranceCni:      delivrance,
+			AutrePiece:             strings.TrimSpace(in.AutrePiece),
+			DemeurantA:             strings.TrimSpace(in.DemeurantA),
+			Profession:             strings.TrimSpace(in.Profession),
+			AdresseProfessionnelle: strings.TrimSpace(in.AdresseProfessionnelle),
+			Representant:           strings.TrimSpace(in.Representant),
+			NomTeleconseiller:      strings.TrimSpace(in.NomTeleconseiller),
+			ResponsableClosing:     strings.TrimSpace(in.ResponsableClosing),
 		},
 	}
 	sortie.TelephoneE164, _ = database.NormaliserTelephone(contexte.telephone, s.Cfg.PhoneRegion)
@@ -399,6 +434,17 @@ func partApporteur(site *db.VentesSite, partProprietaire int64, lots int32) int6
 	default:
 		return 0
 	}
+}
+
+func dateFacultative(texte string) (pgtype.Date, error) {
+	if strings.TrimSpace(texte) == "" {
+		return pgtype.Date{}, nil
+	}
+	date, err := time.Parse(time.DateOnly, strings.TrimSpace(texte))
+	if err != nil {
+		return pgtype.Date{}, socle.Problem(http.StatusBadRequest, "VENTE_DATE_CNI_INVALIDE", "La date de délivrance de la CNI est invalide.")
+	}
+	return dateSQL(date), nil
 }
 
 func parseVenteID(value string) (int64, error) {
