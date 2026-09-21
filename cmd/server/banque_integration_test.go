@@ -508,6 +508,16 @@ func TestBanqueOuvertureDepuisInscriptionGenereLaReference(t *testing.T) {
 		t.Fatalf("l'inscription validée doit être proposée à l'ouverture : %v", body["items"])
 	}
 
+	adhesion := uuid.NewString()
+	banqueExec(s.banc, `INSERT INTO "inscriptions_plateforme"
+		("id","projet","identifiantDistant","nom","prenom","statutDistant","decideeLe","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$2,'Sy','Awa','compte-adhesion-released',now(),'{}',now(),now())`, adhesion, "adhesion-"+adhesion)
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=CHUES", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir avec une demande d'adhésion décidée", body)
+	if banqueContientID(body["items"], adhesion) {
+		t.Fatal("une demande d'adhésion n'est pas un dossier complet")
+	}
+
 	id, _ := s.ouvrirDossier()
 	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/"+id, nil)
 	s.attend(statut, http.StatusOK, "lecture du dossier", body)

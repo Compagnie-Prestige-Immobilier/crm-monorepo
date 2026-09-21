@@ -11,7 +11,6 @@ import { PiecesDeposees } from '@/components/bank/bank-pieces';
 import { ClientRequestDialog } from '@/components/bank/client-request-dialog';
 import { EmptyState } from '@/components/empty-state';
 import { QueryErrorState } from '@/components/query-error-state';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -232,7 +231,6 @@ function CarteInscription({
                   : formatPhone(inscription.phoneE164)}
               </p>
             </div>
-            <Badge variant="success">Validé</Badge>
           </div>
           <dl className="grid grid-cols-2 gap-2 text-[0.8125rem]">
             <div>
