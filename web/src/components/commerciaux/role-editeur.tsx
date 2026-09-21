@@ -6,10 +6,12 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { meQueryOptions } from '@/api/auth';
+import { AIDE_PERMISSIONS } from '@/components/commerciaux/permissions-aide';
 import { RoleDialog } from '@/components/commerciaux/role-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { InfoPopover } from '@/components/ui/info-popover';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -24,7 +26,7 @@ import {
 } from '@/lib/data/roles';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
-import { ROLE_LABELS } from '@/lib/types';
+import { type Permission, ROLE_LABELS } from '@/lib/types';
 
 /** ADMIN garde toujours de quoi réparer : le serveur refuse de les lui retirer. */
 const VERROUILLEES_ADMIN = ['comptes.administrer', 'roles.administrer'];
@@ -182,7 +184,13 @@ function LignePermission({
           onChange(permission.permission, event.target.checked);
         }}
       />
-      <span className="flex-1 text-[0.875rem]">{permission.libelle}</span>
+      <span className="flex flex-1 items-center gap-1.5 text-[0.875rem]">
+        {permission.libelle}
+        <InfoPopover
+          label={permission.libelle}
+          description={AIDE_PERMISSIONS[permission.permission as Permission]}
+        />
+      </span>
       {ecart ? <Badge variant="outline">modifié</Badge> : null}
     </li>
   );
