@@ -2,8 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2Icon, ExternalLinkIcon, LifeBuoyIcon, Loader2Icon } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useRef, useState } from 'react';
 
+import { IndiceCapture } from '@/components/layout/indice-capture';
 import {
   IMAGES_MAX,
   imagesDepuis,
@@ -111,6 +112,21 @@ function useSurvolDeLaPage(actif: boolean) {
   }, [actif]);
 }
 
+// Le clavier ne bouge pas la souris : l'élément surligné reste celui à montrer.
+function useRaccourcisDeCapture(actif: boolean, pieces: RefObject<PiecesJointesHandle | null>) {
+  useEffect(() => {
+    if (!actif) return;
+    const surCapture = (event: KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        void pieces.current?.capturer(event.shiftKey);
+      }
+    };
+    window.addEventListener('keydown', surCapture);
+    return () => window.removeEventListener('keydown', surCapture);
+  }, [actif, pieces]);
+}
+
 function LienPlateforme() {
   return (
     <a
@@ -137,17 +153,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   const pieces = useRef<PiecesJointesHandle>(null);
   const cache = useQueryClient();
   useSurvolDeLaPage(ouvert);
-  useEffect(() => {
-    if (!ouvert) return;
-    const surCapture = (event: KeyboardEvent) => {
-      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
-        event.preventDefault();
-        void pieces.current?.capturer(event.shiftKey);
-      }
-    };
-    window.addEventListener('keydown', surCapture);
-    return () => window.removeEventListener('keydown', surCapture);
-  }, [ouvert]);
+  useRaccourcisDeCapture(ouvert, pieces);
   const categories = useQuery({
     queryKey: ['support', 'categories'],
     queryFn: lireCategoriesSupport,
@@ -206,6 +212,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
       >
         <LifeBuoyIcon className="size-5" aria-hidden="true" />
       </Button>
+      <IndiceCapture ouvert={ouvert} envoye={envoi.isSuccess} />
       <Sheet open={ouvert} onOpenChange={fermer} modal={false} disablePointerDismissal>
         <SheetContent side="right" voile={false} className="w-full sm:max-w-md pointer-events-auto">
           {envoi.isSuccess ? (
