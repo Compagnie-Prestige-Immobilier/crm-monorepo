@@ -73,6 +73,8 @@ const (
 	PermissionPortefeuilleVoirTout        Permission = "portefeuille.voir_tout"
 	PermissionFichesVoirConverties        Permission = "fiches.voir_converties"
 	PermissionFichesIgnorerPropriete      Permission = "fiches.ignorer_propriete"
+	PermissionFichesOuvrirAttribuees      Permission = "fiches.ouvrir_attribuees"
+	PermissionFichesConsignerAttribuees   Permission = "fiches.consigner_attribuees"
 	PermissionFichesModifierToutes        Permission = "fiches.modifier_toutes"
 	PermissionFichesForcerTransition      Permission = "fiches.forcer_transition"
 	PermissionFichesParametresReserves    Permission = "fiches.parametres_reserves"
@@ -130,6 +132,8 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionPortefeuilleVoirTout:        {"Portefeuille", "Voir tous les portefeuilles", Encadrement},
 	PermissionFichesVoirConverties:        {domaineFiches, "Voir les fiches converties", []Role{ChargeClientele}},
 	PermissionFichesIgnorerPropriete:      {domaineFiches, "Agir sur les rappels et identifiants des autres", AdminSeul},
+	PermissionFichesOuvrirAttribuees:      {domaineFiches, "Ouvrir une fiche attribuée à un autre téléconseiller", Encadrement},
+	PermissionFichesConsignerAttribuees:   {domaineFiches, "Consigner un appel sur une fiche attribuée à un autre téléconseiller", nil},
 	PermissionFichesModifierToutes:        {domaineFiches, "Modifier et supprimer les fiches des autres", Encadrement},
 	PermissionFichesForcerTransition:      {domaineFiches, "Forcer un changement de statut", AdminSeul},
 	PermissionFichesParametresReserves:    {domaineFiches, "Régler les liens, l'adresse et les destinataires CHUES", AdminSeul},
@@ -146,6 +150,8 @@ var permissionsDePortee = map[Permission]bool{
 	PermissionPortefeuilleVoirTout:        true,
 	PermissionFichesVoirConverties:        true,
 	PermissionFichesIgnorerPropriete:      true,
+	PermissionFichesOuvrirAttribuees:      true,
+	PermissionFichesConsignerAttribuees:   true,
 	PermissionFichesModifierToutes:        true,
 	PermissionFichesForcerTransition:      true,
 	PermissionFichesParametresReserves:    true,

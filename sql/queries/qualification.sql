@@ -100,9 +100,10 @@ SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
     AND ((@tous::bool OR p."createdById" = @agent)
-         AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
-                         WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
-                           AND lc."assigneeId" <> @agent)
+         AND (@ignorer_attribution::bool
+              OR NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
+                             WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
+                               AND lc."assigneeId" <> @agent))
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
                     JOIN "lots_export" l ON l."id" = li."lotId" AND l."pausedAt" IS NULL
                     WHERE li."prospectId" = p."id" AND li."assigneeId" = @agent)
@@ -114,9 +115,9 @@ SELECT EXISTS (
 SELECT EXISTS (
   SELECT 1 FROM "prospects" p
   WHERE p."id" = @id AND p."deletedAt" IS NULL
-    AND (@tous::bool
-         OR (p."createdById" = @agent
-             AND NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
+    AND ((@tous::bool OR p."createdById" = @agent)
+         AND (@ignorer_attribution::bool
+              OR NOT EXISTS (SELECT 1 FROM "lot_export_items" lc
                              WHERE lc."prospectId" = p."id" AND lc."assigneeId" IS NOT NULL
                                AND lc."assigneeId" <> @agent))
          OR EXISTS (SELECT 1 FROM "lot_export_items" li
