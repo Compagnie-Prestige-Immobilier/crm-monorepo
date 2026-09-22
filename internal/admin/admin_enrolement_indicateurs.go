@@ -212,23 +212,27 @@ func (s *service) lireIndicateurs(ctx context.Context, in *IndicateursInput) (*I
 		return nil, err
 	}
 	if out.Body.ParPiece, err = s.repartitionEnrolement(ctx, requetePieces+filtres+
-		` AND jsonb_typeof(i."chargeUtile"->'requisDocs') = 'array' GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
+		` AND jsonb_typeof(i."chargeUtile"->'pieces') = 'array' GROUP BY 1, 2 ORDER BY 3 DESC, 2 ASC`, args); err != nil {
 		return nil, err
 	}
 	out.Body.ParMethode, err = s.parMethodeEnrolement(ctx, filtres, args)
 	return out, err
 }
 
-// L'agent qui a saisi l'inscription n'a pas de colonne : les deux plateformes
-// le rendent, sous deux noms, et le tirage garde leur reponse telle quelle.
-const agentPlateforme = `COALESCE(i."chargeUtile"->'agent'->>'name', i."chargeUtile"->>'conseiller')`
+// Le conseiller n'a pas de colonne : le flux le rend dans la fiche, que le
+// tirage garde telle quelle.
+const agentPlateforme = `(i."chargeUtile"->'conseiller'->>'nom')`
 
 // Une piece par ligne, avec son etat : c'est ce qui dit sur quoi un dossier bloque.
-const requetePieces = `SELECT (piece->>'docId') || ':' || (piece->>'status'),` +
-	` COALESCE(piece->>'label', piece->>'docId') || ' · ' ||` +
-	` CASE piece->>'status' WHEN 'accepte' THEN 'acceptée' WHEN 'en-attente' THEN 'en attente'` +
-	` WHEN 'refuse' THEN 'refusée' ELSE piece->>'status' END, COUNT(*)::int` +
-	` FROM "inscriptions_plateforme" i, jsonb_array_elements(i."chargeUtile"->'requisDocs') AS piece` +
+// Les deux plateformes nomment leurs états dans leur langue : CHUES en anglais, Grand Public en français.
+const requetePieces = `SELECT (piece->>'code') || ':' || (piece->>'statut'),` +
+	` COALESCE(piece->>'libelle', piece->>'code') || ' · ' ||` +
+	` CASE piece->>'statut' WHEN 'accepte' THEN 'acceptée' WHEN 'validated' THEN 'acceptée'` +
+	` WHEN 'en-attente' THEN 'en attente' WHEN 'missing' THEN 'en attente' WHEN 'draft' THEN 'en attente'` +
+	` WHEN 'depose' THEN 'déposée' WHEN 'submitted' THEN 'déposée' WHEN 'in_review' THEN 'en vérification'` +
+	` WHEN 'a-remplacer' THEN 'à remplacer' WHEN 'needs_correction' THEN 'à remplacer'` +
+	` WHEN 'refuse' THEN 'refusée' WHEN 'rejected' THEN 'refusée' ELSE piece->>'statut' END, COUNT(*)::int` +
+	` FROM "inscriptions_plateforme" i, jsonb_array_elements(i."chargeUtile"->'pieces') AS piece` +
 	` WHERE i."projet" = $1::"Projet" AND `
 
 func (s *service) serieJoursEnrolement(ctx context.Context, depuis string, args []any) ([]SerieJour, error) {

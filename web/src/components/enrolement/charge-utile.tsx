@@ -1,13 +1,22 @@
 'use client';
 
 import { Badge } from '@/components/ui/badge';
-import { formatNumber } from '@/lib/format';
+import { formatDate, formatDateTime, formatNumber } from '@/lib/format';
 
 export const ABSENT = 'Non renseigné';
 
+const JOUR = /^\d{4}-\d{2}-\d{2}$/;
+const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
+
+function texteScalaire(valeur: string): string {
+  if (valeur === '') return ABSENT;
+  if (JOUR.test(valeur)) return formatDate(valeur);
+  return INSTANT.test(valeur) ? formatDateTime(valeur) : valeur;
+}
+
 export function scalaire(valeur: unknown): string | null {
   if (valeur === null) return ABSENT;
-  if (typeof valeur === 'string') return valeur === '' ? ABSENT : valeur;
+  if (typeof valeur === 'string') return texteScalaire(valeur);
   if (typeof valeur === 'number') return String(valeur);
   if (typeof valeur === 'boolean') return valeur ? 'Oui' : 'Non';
   return null;
@@ -56,7 +65,7 @@ export function Champs({ valeur }: { valeur: unknown }) {
   return (
     <Grille>
       {Object.entries(valeur as Record<string, unknown>).map(([cle, sous]) => (
-        <Case key={cle} cle={cle}>
+        <Case key={cle} cle={libelleCle(cle)}>
           {scalaire(sous) === null ? <ImbriquE valeur={sous} /> : <Valeur valeur={sous} />}
         </Case>
       ))}
@@ -78,20 +87,22 @@ function ImbriquE({ valeur }: { valeur: unknown }) {
   );
 }
 
+/** Le premier des champs nommés qui porte un texte : les anciennes fiches disent `label`, le flux `libelle`. */
+function texteDe(element: unknown, cles: readonly string[]): string | null {
+  if (typeof element !== 'object' || element === null) return null;
+  for (const cle of cles) {
+    const valeur = (element as Record<string, unknown>)[cle];
+    if (typeof valeur === 'string' && valeur !== '') return valeur;
+  }
+  return null;
+}
+
 function titreElement(element: unknown, rang: number): string {
-  const libelle =
-    typeof element === 'object' && element !== null
-      ? (element as Record<string, unknown>)['label']
-      : null;
-  return typeof libelle === 'string' && libelle !== '' ? libelle : `Élément ${String(rang + 1)}`;
+  return texteDe(element, ['libelle', 'label']) ?? `Élément ${String(rang + 1)}`;
 }
 
 function etatElement(element: unknown): string | null {
-  const etat =
-    typeof element === 'object' && element !== null
-      ? (element as Record<string, unknown>)['status']
-      : null;
-  return typeof etat === 'string' && etat !== '' ? etat : null;
+  return texteDe(element, ['statut', 'status']);
 }
 
 /**
@@ -136,6 +147,24 @@ export function champsPlats(charge: unknown): Record<string, unknown> {
   );
 }
 
+const LIBELLES: Record<string, string> = {
+  decaissement: 'Financement',
+  pieces: 'Pièces',
+  prise_de_contact: 'Prise de contact',
+  documents_cpi: 'Documents CPI',
+  cgu: 'CGU',
+  ref: 'Référence',
+};
+
+/** Le flux nomme ses champs en `snake_case` : « inscrit_le » se lit « Inscrit le ». */
+function libelleCle(cle: string): string {
+  const connu = LIBELLES[cle];
+  if (connu !== undefined) return connu;
+  const mots = cle.replace(/_/g, ' ');
+  return mots.charAt(0).toUpperCase() + mots.slice(1);
+}
+
 export function libelleOnglet(cle: string, compte: number | null): string {
-  return compte === null ? cle : `${cle} (${formatNumber(compte)})`;
+  const libelle = libelleCle(cle);
+  return compte === null ? libelle : `${libelle} (${formatNumber(compte)})`;
 }
