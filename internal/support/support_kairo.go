@@ -24,15 +24,20 @@ const (
 var clientKairo = &http.Client{Timeout: 5 * time.Second}
 
 type TicketKairo struct {
-	ID     int    `json:"id"`
-	Projet string `json:"projet"`
-	Statut string `json:"statut"`
-	Essais int    `json:"essais"`
-	MajLe  string `json:"majLe"`
-	Lien   string `json:"lien"`
-	Resume string `json:"resume,omitempty"`
-	Cause  string `json:"cause,omitempty"`
-	Notes  string `json:"notes,omitempty"`
+	ID            int     `json:"id"`
+	Projet        string  `json:"projet"`
+	Statut        string  `json:"statut"`
+	Essais        int     `json:"essais"`
+	MajLe         string  `json:"majLe"`
+	Lien          string  `json:"lien"`
+	Resume        string  `json:"resume,omitempty"`
+	Cause         string  `json:"cause,omitempty"`
+	Notes         string  `json:"notes,omitempty"`
+	PRURL         string  `json:"prUrl,omitempty"`
+	Fichiers      string  `json:"fichiers,omitempty"`
+	DureeSecondes int     `json:"dureeSecondes,omitempty"`
+	JevCategorie  string  `json:"jevCategorie,omitempty"`
+	JevConfiance  float64 `json:"jevConfiance,omitempty"`
 }
 
 type EtatKairo struct {
@@ -42,6 +47,8 @@ type EtatKairo struct {
 	IntervalleSecondes      int           `json:"intervalleSecondes"`
 	Agents                  []string      `json:"agents"`
 	Tickets                 []TicketKairo `json:"tickets"`
+	MTTRSecondes            int           `json:"mttrSecondes,omitempty"`
+	JevActif                bool          `json:"jevActif,omitempty"`
 }
 
 type UsageModele struct {

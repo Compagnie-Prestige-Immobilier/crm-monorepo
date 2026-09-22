@@ -1,4 +1,4 @@
-import { CopyIcon, ExternalLinkIcon, RotateCcwIcon } from 'lucide-react';
+import { CopyIcon, ExternalLinkIcon, GitPullRequestIcon, RotateCcwIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -11,117 +11,192 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { ilYA, isoKairo, type TicketKairo } from '@/lib/data/kairo';
+import { formatDuree, ilYA, isoKairo, STATUTS_KAIRO, type TicketKairo } from '@/lib/data/kairo';
+
+function SectionTexte(props: { titre: string; contenu?: string | undefined }) {
+  if (!props.contenu) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        {props.titre}
+      </p>
+      <p className="mt-1 rounded-md bg-secondary/60 p-2.5 whitespace-pre-wrap">{props.contenu}</p>
+    </div>
+  );
+}
+
+function ListeFichiers(props: { fichiers?: string | undefined }) {
+  if (!props.fichiers) return null;
+  const list = props.fichiers.split(',').filter(Boolean);
+  if (list.length === 0) return null;
+  return (
+    <div>
+      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+        Fichiers modifiés ({list.length})
+      </p>
+      <div className="mt-1 flex flex-wrap gap-1.5">
+        {list.map((f) => (
+          <span
+            key={f}
+            className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-foreground/90"
+          >
+            {f}
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function peutRelancer(statut: string): boolean {
+  return statut === 'echec' || statut === 'escalade' || statut === 'arrete';
+}
+
+function texteACopier(ticket: TicketKairo, libelleStatut: string): string {
+  const lignes: string[] = [`Ticket n° ${String(ticket.id)} (${libelleStatut}) · ${ticket.projet}`];
+  if (ticket.jevConfiance && ticket.jevConfiance > 0) {
+    lignes.push(
+      `Classification JEV : ${ticket.jevCategorie || 'CODE_DEFECT'} (${String(Math.round(ticket.jevConfiance * 100))}%)`,
+    );
+  }
+  if (ticket.prUrl) lignes.push(`PR : ${ticket.prUrl}`);
+  if (ticket.resume) lignes.push(`Résumé : ${ticket.resume}`);
+  if (ticket.cause) lignes.push(`Origine : ${ticket.cause}`);
+  if (ticket.notes) lignes.push(`Points d’attention : ${ticket.notes}`);
+  if (ticket.fichiers) lignes.push(`Fichiers : ${ticket.fichiers}`);
+  return lignes.join('\n\n');
+}
+
+function BadgeJEV(props: { categorie?: string | undefined; confiance?: number | undefined }) {
+  if (!props.confiance || props.confiance <= 0) return null;
+  const pct = Math.round(props.confiance * 100);
+  const lib = props.categorie ? `· ${props.categorie}` : '';
+  return (
+    <Badge variant="outline" className="font-mono text-xs">
+      JEV {lib} ({String(pct)}%)
+    </Badge>
+  );
+}
+
+function EnteteTicket(props: {
+  ticket: TicketKairo;
+  statut: {
+    libelle: string;
+    variante: 'info' | 'success' | 'warning' | 'destructive' | 'secondary';
+  };
+}) {
+  const { ticket, statut } = props;
+  const dureeTxt =
+    ticket.dureeSecondes && ticket.dureeSecondes > 0
+      ? ` · Traité en ${formatDuree(ticket.dureeSecondes)}`
+      : '';
+  const essaisTxt = ticket.essais > 1 ? `${String(ticket.essais)} essais · ` : '';
+
+  return (
+    <DialogHeader>
+      <div className="flex flex-wrap items-center gap-2">
+        <DialogTitle>Ticket n° {ticket.id}</DialogTitle>
+        <Badge variant={statut.variante}>{statut.libelle}</Badge>
+        <BadgeJEV categorie={ticket.jevCategorie} confiance={ticket.jevConfiance} />
+        <span className="text-sm text-muted-foreground">{ticket.projet}</span>
+      </div>
+      <DialogDescription>
+        {essaisTxt}Mis à jour {ilYA(isoKairo(ticket.majLe))}
+        {dureeTxt}.
+      </DialogDescription>
+    </DialogHeader>
+  );
+}
+
+function PiedTicket(props: {
+  ticket: TicketKairo;
+  desactive?: boolean | undefined;
+  onCopier: () => void;
+  onRelancer: (t: TicketKairo) => void;
+  onClose: () => void;
+}) {
+  const { ticket, desactive, onCopier, onRelancer, onClose } = props;
+  return (
+    <DialogFooter className="mt-2 flex-wrap gap-2">
+      <Button variant="outline" size="sm" onClick={onCopier}>
+        <CopyIcon className="size-3.5" />
+        Copier
+      </Button>
+      <a
+        href={ticket.lien}
+        target="_blank"
+        rel="noreferrer"
+        className={buttonVariants({ variant: 'outline', size: 'sm' })}
+      >
+        <ExternalLinkIcon className="size-3.5" />
+        Ouvrir GLPI
+      </a>
+      {ticket.prUrl ? (
+        <a
+          href={ticket.prUrl}
+          target="_blank"
+          rel="noreferrer"
+          className={buttonVariants({ variant: 'default', size: 'sm' })}
+        >
+          <GitPullRequestIcon className="size-3.5" />
+          Ouvrir la PR
+        </a>
+      ) : null}
+      {peutRelancer(ticket.statut) ? (
+        <Button
+          size="sm"
+          disabled={desactive}
+          title={desactive ? 'Kairo est hors de portée' : undefined}
+          onClick={() => {
+            onRelancer(ticket);
+            onClose();
+          }}
+        >
+          <RotateCcwIcon className="size-3.5" />
+          Relancer
+        </Button>
+      ) : null}
+    </DialogFooter>
+  );
+}
 
 export function DialogDetailTicket(props: {
   ticket: TicketKairo | null;
   desactive?: boolean | undefined;
-  statuts: Record<
-    string,
-    { libelle: string; variante: 'info' | 'success' | 'warning' | 'destructive' | 'secondary' }
-  >;
   onClose: () => void;
   onRelancer: (t: TicketKairo) => void;
 }) {
-  const { ticket, desactive, statuts, onClose, onRelancer } = props;
+  const { ticket, desactive, onClose, onRelancer } = props;
   if (ticket === null) return null;
 
-  const statut = statuts[ticket.statut] ?? {
+  const statut = STATUTS_KAIRO[ticket.statut] ?? {
     libelle: ticket.statut,
     variante: 'secondary' as const,
   };
 
   async function copierMotif() {
     if (!ticket) return;
-    const lignes = [
-      `Ticket n° ${String(ticket.id)} (${statut.libelle}) · ${ticket.projet}`,
-      ticket.resume ? `Résumé : ${ticket.resume}` : '',
-      ticket.cause ? `Origine : ${ticket.cause}` : '',
-      ticket.notes ? `Points d’attention : ${ticket.notes}` : '',
-    ].filter(Boolean);
-    await navigator.clipboard.writeText(lignes.join('\n\n'));
+    await navigator.clipboard.writeText(texteACopier(ticket, statut.libelle));
     toast.success('Détails copiés dans le presse-papier.');
   }
 
   return (
     <Dialog open={ticket !== null} onOpenChange={(ouvert) => !ouvert && onClose()}>
       <DialogContent className="max-w-xl">
-        <DialogHeader>
-          <div className="flex flex-wrap items-center gap-2">
-            <DialogTitle>Ticket n° {ticket.id}</DialogTitle>
-            <Badge variant={statut.variante}>{statut.libelle}</Badge>
-            <span className="text-sm text-muted-foreground">{ticket.projet}</span>
-          </div>
-          <DialogDescription>
-            {ticket.essais > 1 ? `${String(ticket.essais)} essais. ` : ''}Dernière mise à jour{' '}
-            {ilYA(isoKairo(ticket.majLe))}.
-          </DialogDescription>
-        </DialogHeader>
-
+        <EnteteTicket ticket={ticket} statut={statut} />
         <div className="flex flex-col gap-4 text-sm">
-          {ticket.resume ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Résumé
-              </p>
-              <p className="mt-1 rounded-md bg-secondary/60 p-2.5 whitespace-pre-wrap">
-                {ticket.resume}
-              </p>
-            </div>
-          ) : null}
-
-          {ticket.cause ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Origine / Cause
-              </p>
-              <p className="mt-1 rounded-md bg-secondary/60 p-2.5 whitespace-pre-wrap">
-                {ticket.cause}
-              </p>
-            </div>
-          ) : null}
-
-          {ticket.notes ? (
-            <div>
-              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                Points d’attention
-              </p>
-              <p className="mt-1 rounded-md bg-secondary/60 p-2.5 whitespace-pre-wrap">
-                {ticket.notes}
-              </p>
-            </div>
-          ) : null}
+          <SectionTexte titre="Résumé" contenu={ticket.resume} />
+          <SectionTexte titre="Origine / Cause" contenu={ticket.cause} />
+          <SectionTexte titre="Points d’attention" contenu={ticket.notes} />
+          <ListeFichiers fichiers={ticket.fichiers} />
         </div>
-
-        <DialogFooter className="mt-2 flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={() => void copierMotif()}>
-            <CopyIcon className="size-3.5" />
-            Copier
-          </Button>
-          <a
-            href={ticket.lien}
-            target="_blank"
-            rel="noreferrer"
-            className={buttonVariants({ variant: 'outline', size: 'sm' })}
-          >
-            <ExternalLinkIcon className="size-3.5" />
-            Ouvrir GLPI
-          </a>
-          {ticket.statut === 'echec' || ticket.statut === 'escalade' ? (
-            <Button
-              size="sm"
-              disabled={desactive}
-              title={desactive ? 'Kairo est hors de portée' : undefined}
-              onClick={() => {
-                onRelancer(ticket);
-                onClose();
-              }}
-            >
-              <RotateCcwIcon className="size-3.5" />
-              Relancer
-            </Button>
-          ) : null}
-        </DialogFooter>
+        <PiedTicket
+          ticket={ticket}
+          desactive={desactive}
+          onCopier={() => void copierMotif()}
+          onRelancer={onRelancer}
+          onClose={onClose}
+        />
       </DialogContent>
     </Dialog>
   );

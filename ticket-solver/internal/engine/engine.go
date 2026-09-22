@@ -96,10 +96,13 @@ func (e *Engine) processNewTicket(ctx context.Context, project *config.Project, 
 	name, _ := ticketData["name"].(string)
 	content, _ := ticketData["content"].(string)
 	if !config.HasMarker(name, content, project.Markers) {
-		e.mu.Lock()
-		e.ignored[t.ID] = t.DateMod
-		e.mu.Unlock()
-		return
+		if !e.solver.ClassifyProject(ctx, name, content, project.Name) {
+			e.mu.Lock()
+			e.ignored[t.ID] = t.DateMod
+			e.mu.Unlock()
+			return
+		}
+		slog.Info("ticket sans marqueur qualifié par JEV", "ticket", t.ID, "projet", project.Name)
 	}
 
 	claimed, err := e.state.Claim(ctx, t.ID, project.Name)

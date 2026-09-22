@@ -153,6 +153,7 @@ func (s *Server) handleEtat(w http.ResponseWriter, r *http.Request) {
 		"agents":                  activeAgents,
 		"tickets":                 tickets,
 		"mttrSecondes":            mttrSec,
+		"jevActif":                strings.TrimSpace(s.cfg.JevAPIKey) != "",
 	})
 }
 

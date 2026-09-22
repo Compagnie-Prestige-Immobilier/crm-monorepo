@@ -116,6 +116,7 @@ var SecretNames = []string{
 	"CODEX_ACCESS_TOKEN",
 	"KAIRO_ADMIN_TOKEN",
 	"GITHUB_APP_PRIVATE_KEY",
+	"JEV_API_KEY",
 }
 
 type Project struct {
@@ -161,6 +162,8 @@ type Config struct {
 	StateDB             string
 	LogLevel            string
 	AdminToken          string
+	JevURL              string
+	JevAPIKey           string
 }
 
 var (
@@ -320,6 +323,8 @@ func Load() (*Config, error) {
 		StateDB:             EnvOrDefault("STATE_DB", "/work/tickets.sqlite3"),
 		LogLevel:            EnvOrDefault("LOG_LEVEL", "INFO"),
 		AdminToken:          strings.TrimSpace(os.Getenv("KAIRO_ADMIN_TOKEN")),
+		JevURL:              EnvOrDefault("JEV_URL", "https://api.jev.ai/v1/classify"),
+		JevAPIKey:           strings.TrimSpace(os.Getenv("JEV_API_KEY")),
 	}, nil
 }
 
