@@ -11,13 +11,41 @@ export type TicketKairo = components['schemas']['TicketKairo'];
 
 export const CLE_KAIRO = ['admin', 'kairo'] as const;
 
+export const STATUTS_KAIRO: Record<
+  string,
+  { libelle: string; variante: 'info' | 'success' | 'warning' | 'destructive' | 'secondary' }
+> = {
+  running: { libelle: 'En cours', variante: 'info' },
+  'running:analyse': { libelle: 'Analyse en cours', variante: 'info' },
+  'running:test': { libelle: 'Validation tests', variante: 'info' },
+  'running:publication': { libelle: 'Création PR', variante: 'info' },
+  retry: { libelle: 'Nouvel essai prévu', variante: 'warning' },
+  pr: { libelle: 'PR proposée', variante: 'success' },
+  escalade: { libelle: 'Escaladé', variante: 'warning' },
+  echec: { libelle: 'Échec', variante: 'destructive' },
+  abandon: { libelle: 'Clos avant traitement', variante: 'secondary' },
+  arrete: { libelle: 'Arrêté', variante: 'secondary' },
+  triage: { libelle: 'Triage (hors code)', variante: 'secondary' },
+  doublon: { libelle: 'Doublon (PR liée)', variante: 'secondary' },
+};
+
 export const FILTRES_TICKETS = {
   tous: { libelle: 'Tous', statuts: null },
-  aReprendre: { libelle: 'Bloqués', statuts: ['echec', 'escalade'] },
-  enCours: { libelle: 'En cours', statuts: ['running', 'retry'] },
+  aReprendre: { libelle: 'Bloqués', statuts: ['echec', 'escalade', 'arrete', 'triage'] },
+  enCours: {
+    libelle: 'En cours',
+    statuts: ['running', 'running:analyse', 'running:test', 'running:publication', 'retry'],
+  },
   pr: { libelle: 'PR proposées', statuts: ['pr'] },
 } as const;
 export type FiltreTickets = keyof typeof FILTRES_TICKETS;
+
+export function formatDuree(secondes: number): string {
+  if (secondes < 60) return `${String(secondes)} s`;
+  const min = Math.floor(secondes / 60);
+  const sec = secondes % 60;
+  return sec > 0 ? `${String(min)} min ${String(sec)} s` : `${String(min)} min`;
+}
 
 export function ticketsFiltres(tickets: TicketKairo[], filtre: FiltreTickets): TicketKairo[] {
   const statuts: readonly string[] | null = FILTRES_TICKETS[filtre].statuts;

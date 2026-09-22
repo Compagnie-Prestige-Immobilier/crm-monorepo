@@ -12,6 +12,7 @@ import (
 	"strings"
 	"sync"
 	"ticket-solver/internal/agent"
+	"ticket-solver/internal/classifier"
 	"ticket-solver/internal/config"
 	"ticket-solver/internal/git"
 	"ticket-solver/internal/github"
@@ -46,6 +47,7 @@ type Solver struct {
 	glpiClient *glpi.Client
 	ghClient   *github.Client
 	notif      *notify.Client
+	jev        *classifier.Client
 
 	mu         sync.Mutex
 	greenBases map[string]struct{}
@@ -58,6 +60,7 @@ func New(cfg *config.Config, s *state.Store, g *glpi.Client, gh *github.Client, 
 		glpiClient: g,
 		ghClient:   gh,
 		notif:      n,
+		jev:        classifier.New(cfg.JevURL, cfg.JevAPIKey),
 		greenBases: make(map[string]struct{}),
 	}
 }
@@ -123,7 +126,7 @@ func retryAgentVerification(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, vOut string,
+	jobDir, repoDir, vOut, modele string,
 	deadline time.Time,
 ) (*config.Answer, string, error) {
 	currentOut := vOut
@@ -136,9 +139,10 @@ func retryAgentVerification(
 			failureSnippet = failureSnippet[len(failureSnippet)-6000:]
 		}
 
-		motif := fmt.Sprintf("La vérification (%s) échoue après tes changements (essai de correction %d/%d) :\n%s", project.VerificationCommand, essai, maxEssais, failureSnippet)
+		nature, conseil := classifier.DiagnostiquerEchec(currentOut)
+		motif := fmt.Sprintf("La vérification (%s) échoue après tes changements (essai %d/%d) [%s: %s] :\n%s", project.VerificationCommand, essai, maxEssais, nature, conseil, failureSnippet)
 		retryPrompt := TicketPrompt(ticketID, ticket, project, motif)
-		ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, retryPrompt, deadline)
+		ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, retryPrompt, modele, deadline)
 		if askErr != nil {
 			return nil, "", askErr
 		}
@@ -172,7 +176,7 @@ func tryAgent(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, baseSHA, previous string,
+	jobDir, repoDir, baseSHA, previous, modele string,
 	deadline time.Time,
 ) (*config.Answer, string, error) {
 	gitEnv, err := git.GitEnv(jobDir, "")
@@ -184,7 +188,7 @@ func tryAgent(
 	_, _ = git.ExecGit(ctx, repoDir, gitEnv, 600*time.Second, "clean", "-fdq")
 
 	prompt := TicketPrompt(ticketID, ticket, project, previous)
-	ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, prompt, deadline)
+	ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, prompt, modele, deadline)
 	if askErr != nil {
 		return nil, "", askErr
 	}
@@ -200,7 +204,7 @@ func tryAgent(
 		return nil, "", vErr
 	}
 
-	return retryAgentVerification(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, vOut, deadline)
+	return retryAgentVerification(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, vOut, modele, deadline)
 }
 
 func isStopSignal(err error) bool {
@@ -216,12 +220,9 @@ func handleAgentError(err error, spec config.AgentSpec, ticketID int, deadline t
 		slog.Warn("agent indisponible", "ticket", ticketID, "err", unavailErr.Message)
 		return "", unavailErr.Message, nil
 	}
-	if time.Until(deadline) < 60*time.Second {
-		return "", "", git.ErrDeadline
-	}
 	prevErr := config.Redact(err.Error())
-	if len(prevErr) > 2000 {
-		prevErr = prevErr[len(prevErr)-2000:]
+	if len(prevErr) > 500 {
+		prevErr = prevErr[:500]
 	}
 	slog.Warn("échec agent", "ticket", ticketID, "agent", spec.Name, "err", prevErr)
 	return fmt.Sprintf("%s n'a pas abouti : %s", spec.Name, prevErr), "", nil
@@ -232,7 +233,7 @@ func (s *Solver) Solve(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, baseSHA string,
+	jobDir, repoDir, baseSHA, modele string,
 	deadline time.Time,
 ) (*config.Answer, error) {
 	if err := s.checkBaseline(ctx, repoDir, project, jobDir, baseSHA, deadline); err != nil {
@@ -250,7 +251,7 @@ func (s *Solver) Solve(
 		}
 		tried++
 
-		ans, failNote, err := tryAgent(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, baseSHA, previous, deadline)
+		ans, failNote, err := tryAgent(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, baseSHA, previous, modele, deadline)
 		if ans != nil {
 			return ans, nil
 		}
@@ -487,6 +488,10 @@ type DecisionTriage struct {
 	EstVague     bool
 	Raison       string
 	Reponse      string
+	Complexite   string
+	Categorie    string
+	Confiance    float64
+	Modele       string
 }
 
 func estDemandeAcces(plain string) bool {
@@ -555,10 +560,88 @@ func (s *Solver) verifierDoublon(ctx context.Context, ticketID int, projectName,
 	return true
 }
 
-func (s *Solver) verifierTriage(ctx context.Context, ticketID int, ticket map[string]any, dureeSec int) bool {
-	triage := evaluerTriage(ticket)
+func (s *Solver) triageJEV(ctx context.Context, ticket map[string]any, projectName string) (DecisionTriage, bool) {
+	if !s.jev.Configured() {
+		return DecisionTriage{}, false
+	}
+	name, _ := ticket["name"].(string)
+	content, _ := ticket["content"].(string)
+	res, err := s.jev.Classify(ctx, name, config.PlainText(content), projectName)
+	if err != nil || res == nil || res.Confidence < 0.70 {
+		if err != nil && !errors.Is(err, classifier.ErrNotConfigured) {
+			slog.Warn("JEV indisponible, recours aux règles", "err", err)
+		}
+		return DecisionTriage{}, false
+	}
+
+	comp := string(res.Complexity)
+	cat := string(res.Category)
+	modele := classifier.ChoisirModele(res)
+
+	switch res.Category {
+	case classifier.CategoryInsufficientInfo:
+		return DecisionTriage{
+			NonTechnique: true,
+			EstVague:     true,
+			Raison:       "Signalement imprécis (JEV: " + res.Reason + ")",
+			Reponse:      "Bonjour. Pour nous permettre d'analyser et de corriger cette anomalie sur le CRM, pourriez-vous préciser le contexte exact, les étapes pas à pas pour reproduire le comportement, ainsi que le message d'erreur ou une capture d'écran ? Le ticket est placé en attente de votre retour.",
+			Complexite:   comp,
+			Categorie:    cat,
+			Confiance:    res.Confidence,
+			Modele:       modele,
+		}, true
+	case classifier.CategoryAccessCreds:
+		return DecisionTriage{
+			NonTechnique: true,
+			Raison:       "Demande d'accès ou mot de passe (JEV: " + res.Reason + ")",
+			Reponse:      "Bonjour. Ce ticket concerne une demande d'accès ou de mot de passe. Kairo intervient exclusivement sur le code applicatif. Votre demande est transmise à l'équipe support.",
+			Complexite:   comp,
+			Categorie:    cat,
+			Confiance:    res.Confidence,
+			Modele:       modele,
+		}, true
+	case classifier.CategoryFunctionalHowto:
+		return DecisionTriage{
+			NonTechnique: true,
+			Raison:       "Question d'usage ou accompagnement (JEV: " + res.Reason + ")",
+			Reponse:      "Bonjour. Ce ticket concerne une question d'usage ou d'accompagnement fonctionnel. Kairo traite les anomalies et évolutions de code. L'équipe support prend le relais pour vous répondre.",
+			Complexite:   comp,
+			Categorie:    cat,
+			Confiance:    res.Confidence,
+			Modele:       modele,
+		}, true
+	case classifier.CategoryFeatureRequest:
+		return DecisionTriage{
+			NonTechnique: true,
+			Raison:       "Demande d'évolution fonctionnelle (JEV: " + res.Reason + ")",
+			Reponse:      "Bonjour. Ce ticket constitue une demande d'évolution fonctionnelle plutôt qu'une anomalie de code. Kairo transmet la demande au responsable de produit.",
+			Complexite:   comp,
+			Categorie:    cat,
+			Confiance:    res.Confidence,
+			Modele:       modele,
+		}, true
+	case classifier.CategoryCodeDefect:
+		return DecisionTriage{
+			NonTechnique: false,
+			Complexite:   comp,
+			Categorie:    cat,
+			Confiance:    res.Confidence,
+			Modele:       modele,
+		}, true
+	}
+	return DecisionTriage{}, false
+}
+
+func (s *Solver) verifierTriage(ctx context.Context, ticketID int, ticket map[string]any, projectName string, dureeSec int) (stop bool, complexite, modele string) {
+	triage, ok := s.triageJEV(ctx, ticket, projectName)
+	if !ok {
+		triage = evaluerTriage(ticket)
+		triage.Modele = classifier.ChoisirModele(nil)
+	} else if triage.Categorie != "" {
+		_ = s.state.SetJEV(ctx, ticketID, triage.Categorie, triage.Confiance)
+	}
 	if !triage.NonTechnique {
-		return false
+		return false, triage.Complexite, triage.Modele
 	}
 	slog.Info("ticket pré-qualifié en triage hors-code", "ticket", ticketID, "raison", triage.Raison, "vague", triage.EstVague)
 	_ = s.glpiClient.Followup(ctx, ticketID, triage.Reponse)
@@ -568,7 +651,11 @@ func (s *Solver) verifierTriage(ctx context.Context, ticketID int, ticket map[st
 		}
 	}
 	_ = s.state.Finish(ctx, ticketID, "triage", triage.Reponse, triage.Raison, "", "", "", dureeSec)
-	return true
+	return true, triage.Complexite, triage.Modele
+}
+
+func (s *Solver) ClassifyProject(ctx context.Context, title, content, targetProject string) bool {
+	return s.jev.ClassifyProject(ctx, title, content, targetProject)
 }
 
 func ticketEstClos(ticket map[string]any) bool {
@@ -616,6 +703,28 @@ func (s *Solver) prepareTicketWorkspace(ctx context.Context, project *config.Pro
 	return strings.TrimSpace(sha), nil
 }
 
+func (s *Solver) findProject(name string) *config.Project {
+	for i := range s.cfg.Projects {
+		if s.cfg.Projects[i].Name == name {
+			return &s.cfg.Projects[i]
+		}
+	}
+	return nil
+}
+
+func (s *Solver) handleSolveError(ctx context.Context, ticketID int, ticket map[string]any, err error, comp string, dureeSec int) {
+	if errors.Is(err, git.ErrCancelled) {
+		s.handleCancellation(ticketID)
+		return
+	}
+	var escaladeErr *EscaladeError
+	if errors.As(err, &escaladeErr) || errors.Is(err, git.ErrDeadline) {
+		s.handleEscalation(ctx, ticketID, ticket, err, comp, dureeSec)
+		return
+	}
+	s.handleTechnicalFailure(ctx, ticketID, err, dureeSec)
+}
+
 func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 	debut := time.Now()
 	duree := func() int { return int(time.Since(debut).Seconds()) }
@@ -626,13 +735,7 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 		_ = os.RemoveAll(jobDir)
 	}()
 
-	var project *config.Project
-	for i := range s.cfg.Projects {
-		if s.cfg.Projects[i].Name == projectName {
-			project = &s.cfg.Projects[i]
-			break
-		}
-	}
+	project := s.findProject(projectName)
 	if project == nil {
 		slog.Error("projet introuvable", "nom", projectName)
 		_ = s.state.Finish(ctx, ticketID, "echec", "Projet introuvable : "+projectName, "", "", "", "", duree())
@@ -656,7 +759,8 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 	if s.verifierDoublon(ctx, ticketID, projectName, ticketName, duree()) {
 		return
 	}
-	if s.verifierTriage(ctx, ticketID, ticket, duree()) {
+	stopTriage, complexiteJEV, modeleJEV := s.verifierTriage(ctx, ticketID, ticket, projectName, duree())
+	if stopTriage {
 		return
 	}
 
@@ -672,18 +776,9 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 
 	deadline := time.Now().Add(s.cfg.JobTimeout)
 	repoDir := filepath.Join(jobDir, "repo")
-	ans, err := s.Solve(ctx, ticketID, ticket, project, jobDir, repoDir, baseSHA, deadline)
+	ans, err := s.Solve(ctx, ticketID, ticket, project, jobDir, repoDir, baseSHA, modeleJEV, deadline)
 	if err != nil {
-		if errors.Is(err, git.ErrCancelled) {
-			s.handleCancellation(ticketID)
-			return
-		}
-		var escaladeErr *EscaladeError
-		if errors.As(err, &escaladeErr) || errors.Is(err, git.ErrDeadline) {
-			s.handleEscalation(ctx, ticketID, ticket, err, duree())
-			return
-		}
-		s.handleTechnicalFailure(ctx, ticketID, err, duree())
+		s.handleSolveError(ctx, ticketID, ticket, err, complexiteJEV, duree())
 		return
 	}
 
@@ -731,14 +826,17 @@ func (s *Solver) handleResolution(
 	s.ReportSuccess(ctx, ticketID, ticket, ans, prURL)
 }
 
-func (s *Solver) handleEscalation(ctx context.Context, ticketID int, ticket map[string]any, err error, dureeSec int) {
+func (s *Solver) handleEscalation(ctx context.Context, ticketID int, ticket map[string]any, err error, complexite string, dureeSec int) {
 	reason := err.Error()
 	if errors.Is(err, git.ErrDeadline) {
 		reason = fmt.Sprintf("Je n'ai pas terminé dans le délai de %d minutes.", int(s.cfg.JobTimeout.Minutes()))
 	}
+	if complexite == "" {
+		complexite = "complexe"
+	}
 	ans := &config.Answer{
 		Status:         config.StatusEscalade,
-		Complexity:     "complexe",
+		Complexity:     complexite,
 		Summary:        reason,
 		RootCause:      reason,
 		ImportantNotes: "",

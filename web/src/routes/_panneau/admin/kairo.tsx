@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { formatDistanceStrict } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { PauseIcon, PlayIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
+import { CrownIcon, PauseIcon, PlayIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -52,8 +52,8 @@ function Chargement() {
   return (
     <div className="flex flex-col gap-6" role="status" aria-label="Chargement de Kairo">
       <Skeleton className="h-28 w-full rounded-lg" />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {[0, 1, 2, 3].map((i) => (
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        {[0, 1, 2, 3, 4].map((i) => (
           <Skeleton key={i} className="h-24 rounded-lg" />
         ))}
       </div>
@@ -94,7 +94,7 @@ function KairoView() {
       {etatAffiche !== null ? (
         <>
           <BandeauEtat etat={etatAffiche} desactive={injoignable} />
-          <IndicateursKairo tickets={etatAffiche.tickets} />
+          <IndicateursKairo tickets={etatAffiche.tickets} mttrSecondes={etatAffiche.mttrSecondes} />
           <CarteTickets tickets={etatAffiche.tickets} desactive={injoignable} />
         </>
       ) : null}
@@ -140,6 +140,21 @@ function KairoInjoignable(props: {
   );
 }
 
+function BadgesAgents({ agents }: { agents: string[] }) {
+  if (agents.length === 0) {
+    return <Badge variant="destructive">Aucun agent configuré</Badge>;
+  }
+  return (
+    <>
+      {agents.map((agent) => (
+        <Badge key={agent} variant="outline">
+          {agent}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
 function BandeauEtat({ etat, desactive }: { etat: EtatKairo; desactive?: boolean }) {
   const client = useQueryClient();
   const enPause = etat.pauseDepuis !== null;
@@ -161,16 +176,30 @@ function BandeauEtat({ etat, desactive }: { etat: EtatKairo; desactive?: boolean
   return (
     <Card className={cn('border-l-4', bordure)}>
       <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
+        <img
+          src="/brand/kairo.png"
+          alt="Avatar Kairo"
+          className="size-14 shrink-0 rounded-full border border-border object-cover shadow-sm"
+        />
         <div className="min-w-0 flex-1" aria-live="polite">
-          <p className="flex items-center gap-3 font-display text-xl font-[800] tracking-[-0.01em]">
-            <span className="relative flex size-3 shrink-0" aria-hidden="true">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <p className="flex items-center gap-1.5 font-display text-xl font-[800] tracking-[-0.01em]">
+              <CrownIcon className="size-5 text-amber-500" aria-hidden="true" />
+              <span>Kairo</span>
+            </p>
+            <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
               {ton === 'actif' ? (
                 <span className="absolute inline-flex size-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
               ) : null}
-              <span className={cn('relative inline-flex size-3 rounded-full', point)} />
+              <span className={cn('relative inline-flex size-2.5 rounded-full', point)} />
             </span>
-            {titre}
-          </p>
+            <span className="text-sm font-medium text-muted-foreground">{titre}</span>
+            {etat.jevActif ? (
+              <Badge className="border-blue-500/30 bg-blue-500/15 text-blue-600 dark:text-blue-400">
+                JEV
+              </Badge>
+            ) : null}
+          </div>
           <p className="text-sm text-muted-foreground">
             {enPause ? (
               <>
@@ -185,15 +214,7 @@ function BandeauEtat({ etat, desactive }: { etat: EtatKairo; desactive?: boolean
             )}
           </p>
           <div className="mt-2 flex flex-wrap gap-1.5">
-            {etat.agents.length === 0 ? (
-              <Badge variant="destructive">Aucun agent configuré</Badge>
-            ) : (
-              etat.agents.map((agent) => (
-                <Badge key={agent} variant="outline">
-                  {agent}
-                </Badge>
-              ))
-            )}
+            <BadgesAgents agents={etat.agents} />
           </div>
         </div>
         <Button

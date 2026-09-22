@@ -20,7 +20,7 @@ func (e *UnavailableError) Error() string {
 	return e.Message
 }
 
-func Ask(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir, prompt string, deadline time.Time) (*config.Answer, error) {
+func Ask(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir, prompt, model string, deadline time.Time) (*config.Answer, error) {
 	timeout, err := git.Remaining(deadline, config.AgentTimeout)
 	if err != nil {
 		return nil, err
@@ -30,12 +30,12 @@ func Ask(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir, pro
 	env := git.SandboxEnv(jobDir, cacheDir)
 
 	if strings.HasPrefix(spec.Name, "claude") {
-		return runClaude(ctx, spec, token, repoDir, prompt, env, timeout)
+		return runClaude(ctx, spec, token, repoDir, prompt, model, env, timeout)
 	}
 	return runCodex(ctx, spec, token, jobDir, repoDir, prompt, env, timeout, cacheDir)
 }
 
-func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, prompt string, env []string, timeout time.Duration) (*config.Answer, error) {
+func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, prompt, model string, env []string, timeout time.Duration) (*config.Answer, error) {
 	env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+token)
 
 	args := []string{
@@ -46,6 +46,9 @@ func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, promp
 		"--permission-mode", "acceptEdits",
 		"--allowedTools", config.ClaudeTools,
 		"--no-session-persistence",
+	}
+	if model != "" {
+		args = append(args, "--model", model)
 	}
 
 	stdout, stderr, code, err := git.Run(ctx, git.ProgramClaude, args, repoDir, env, "", false, timeout)
@@ -90,7 +93,7 @@ func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, promp
 		return nil, fmt.Errorf("%s : réponse sans output structuré", spec.Name)
 	}
 
-	return validateAnswer(envelope.StructuredOutput, spec.Name)
+	return validateAnswer(envelope.StructuredOutput, spec.Name, model)
 }
 
 func runCodex(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir, prompt string, env []string, timeout time.Duration, cacheDir string) (*config.Answer, error) {
@@ -154,16 +157,20 @@ func runCodex(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir
 		return nil, fmt.Errorf("décodage réponse codex : %w", err)
 	}
 
-	return validateAnswer(&answer, spec.Name)
+	return validateAnswer(&answer, spec.Name, "")
 }
 
-func validateAnswer(ans *config.Answer, agentName string) (*config.Answer, error) {
+func validateAnswer(ans *config.Answer, agentName, model string) (*config.Answer, error) {
 	if ans.Status != "resolu" && ans.Status != "escalade" {
 		return nil, fmt.Errorf("%s : statut hors schéma (%s)", agentName, ans.Status)
 	}
 	if _, ok := config.Routes[ans.Complexity]; !ok {
 		return nil, fmt.Errorf("%s : complexité hors schéma (%s)", agentName, ans.Complexity)
 	}
-	ans.Agent = agentName
+	if model != "" {
+		ans.Agent = fmt.Sprintf("%s [%s]", agentName, model)
+	} else {
+		ans.Agent = agentName
+	}
 	return ans, nil
 }

@@ -18,19 +18,21 @@ type JobRetry struct {
 }
 
 type JobRecord struct {
-	TicketID      int    `json:"id"`
-	Project       string `json:"projet"`
-	Status        string `json:"statut"`
-	Attempts      int    `json:"essais"`
-	UpdatedAt     string `json:"majLe"`
-	Link          string `json:"lien"`
-	Titre         string `json:"titre,omitempty"`
-	Resume        string `json:"resume,omitempty"`
-	Cause         string `json:"cause,omitempty"`
-	Notes         string `json:"notes,omitempty"`
-	PRURL         string `json:"prUrl,omitempty"`
-	Fichiers      string `json:"fichiers,omitempty"`
-	DureeSecondes int    `json:"dureeSecondes,omitempty"`
+	TicketID      int     `json:"id"`
+	Project       string  `json:"projet"`
+	Status        string  `json:"statut"`
+	Attempts      int     `json:"essais"`
+	UpdatedAt     string  `json:"majLe"`
+	Link          string  `json:"lien"`
+	Titre         string  `json:"titre,omitempty"`
+	Resume        string  `json:"resume,omitempty"`
+	Cause         string  `json:"cause,omitempty"`
+	Notes         string  `json:"notes,omitempty"`
+	PRURL         string  `json:"prUrl,omitempty"`
+	Fichiers      string  `json:"fichiers,omitempty"`
+	DureeSecondes int     `json:"dureeSecondes,omitempty"`
+	JevCategorie  string  `json:"jevCategorie,omitempty"`
+	JevConfiance  float64 `json:"jevConfiance,omitempty"`
 }
 
 type Store struct {
@@ -104,6 +106,8 @@ func (s *Store) init(ctx context.Context) error {
 		"ALTER TABLE kairo_jobs ADD COLUMN pr_url TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE kairo_jobs ADD COLUMN fichiers TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE kairo_jobs ADD COLUMN duree_secondes INTEGER NOT NULL DEFAULT 0",
+		"ALTER TABLE kairo_jobs ADD COLUMN jev_categorie TEXT NOT NULL DEFAULT ''",
+		"ALTER TABLE kairo_jobs ADD COLUMN jev_confiance REAL NOT NULL DEFAULT 0.0",
 	}
 	for _, q := range migrations {
 		_, _ = s.db.ExecContext(ctx, q)
@@ -265,11 +269,19 @@ func (s *Store) Relaunch(ctx context.Context, ticketID int) (bool, error) {
 	return rows == 1, nil
 }
 
+func (s *Store) SetJEV(ctx context.Context, ticketID int, cat string, conf float64) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.ExecContext(ctx, "UPDATE kairo_jobs SET jev_categorie=?, jev_confiance=? WHERE ticket_id=?", cat, conf, ticketID)
+	return err
+}
+
 func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes, pr_url, fichiers, duree_secondes, titre FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
+	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes, pr_url, fichiers, duree_secondes, titre, jev_categorie, jev_confiance FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
@@ -278,7 +290,7 @@ func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	var list []JobRecord
 	for rows.Next() {
 		var r JobRecord
-		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes, &r.PRURL, &r.Fichiers, &r.DureeSecondes, &r.Titre); err != nil {
+		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes, &r.PRURL, &r.Fichiers, &r.DureeSecondes, &r.Titre, &r.JevCategorie, &r.JevConfiance); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
