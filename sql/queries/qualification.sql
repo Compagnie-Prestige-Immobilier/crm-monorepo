@@ -368,9 +368,21 @@ SELECT o."openedById", u."fullName" AS "openedByName",
        COUNT(*) FILTER (
          WHERE o."closedAt" IS NOT NULL AND o."firstInputAt" IS NOT NULL
        )::int AS mesurees,
-       COALESCE(AVG(EXTRACT(EPOCH FROM (o."closedAt" - o."firstInputAt")))::int, 0)::int AS "dureeMoyenneSecondes"
+       COALESCE(AVG(EXTRACT(EPOCH FROM (o."closedAt" - o."firstInputAt")))::int, 0)::int AS "dureeMoyenneSecondes",
+       COUNT(*) FILTER (WHERE deja."qualifiee")::int AS "ouverturesDejaQualifiees",
+       COUNT(*) FILTER (WHERE deja."qualifiee" AND o."closingAttemptId" IS NOT NULL)::int AS requalifiees
 FROM "ouvertures_fiche" o
 JOIN "users" u ON u."id" = o."openedById"
+CROSS JOIN LATERAL (
+  SELECT EXISTS (
+           SELECT 1 FROM "ouvertures_fiche" p
+           WHERE p."prospectId" = o."prospectId" AND p."openedAt" < o."openedAt"
+             AND p."closingAttemptId" IS NOT NULL)
+         OR EXISTS (
+           SELECT 1 FROM "ouvertures_fiche" p
+           WHERE p."representantId" = o."representantId" AND p."openedAt" < o."openedAt"
+             AND p."closingAttemptId" IS NOT NULL) AS "qualifiee"
+) deja
 WHERE (CAST(sqlc.narg('opened_by_id') AS text) IS NULL
        OR o."openedById" = CAST(sqlc.narg('opened_by_id') AS text))
   AND (CAST(sqlc.narg('depuis') AS timestamp) IS NULL

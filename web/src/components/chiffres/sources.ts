@@ -243,7 +243,7 @@ function matriceCreneaux(creneaux: ChiffresCreneaux): DonneesSource {
 
 const sommeOuvertures = (
   lignes: readonly ComptageOuvertures[],
-  cle: 'ouvertures' | 'qualifiees' | 'liberees',
+  cle: 'ouvertures' | 'qualifiees' | 'liberees' | 'ouverturesDejaQualifiees' | 'requalifiees',
 ): number => lignes.reduce((total, ligne) => total + ligne[cle], 0);
 
 /** DMT d'équipe pondérée par les fiches qualifiées de chaque ligne, jamais une moyenne de moyennes. */
@@ -521,16 +521,36 @@ const SOURCES_CHIFFRES = {
     forme: 'scalaire',
     jeu: 'ouvertures',
     description:
-      'Ouvertures closes par un appel consigné ÷ ouvertures. Une fiche rouverte compte à chaque ouverture ; l’écart avec 100 % : les sorties forcées.',
+      'Fiches qualifiées pour la première fois ÷ ouvertures de fiches jamais qualifiées. Une requalification compte dans le taux de réitération.',
     groupe: 'Fiches',
     extraire: ({ ouvertures }) => {
       if (ouvertures === undefined) return null;
-      const ouvertes = sommeOuvertures(ouvertures, 'ouvertures');
-      const qualifiees = sommeOuvertures(ouvertures, 'qualifiees');
+      const ouvertes =
+        sommeOuvertures(ouvertures, 'ouvertures') -
+        sommeOuvertures(ouvertures, 'ouverturesDejaQualifiees');
+      const qualifiees =
+        sommeOuvertures(ouvertures, 'qualifiees') - sommeOuvertures(ouvertures, 'requalifiees');
       return scalaireTaux(
         part(qualifiees, ouvertes),
         `${formatNumber(qualifiees)} qualifiées sur ${formatNumber(ouvertes)} ouvertures`,
         'Aucune ouverture sur la période',
+      );
+    },
+  },
+  'taux-de-reiteration': {
+    label: 'Taux de réitération',
+    forme: 'scalaire',
+    jeu: 'ouvertures',
+    description: 'Requalifications d’une fiche déjà qualifiée ÷ qualifications de la période.',
+    groupe: 'Fiches',
+    extraire: ({ ouvertures }) => {
+      if (ouvertures === undefined) return null;
+      const qualifiees = sommeOuvertures(ouvertures, 'qualifiees');
+      const requalifiees = sommeOuvertures(ouvertures, 'requalifiees');
+      return scalaireTaux(
+        part(requalifiees, qualifiees),
+        `${formatNumber(requalifiees)} requalifiées sur ${formatNumber(qualifiees)} qualifications`,
+        'Aucune qualification sur la période',
       );
     },
   },
