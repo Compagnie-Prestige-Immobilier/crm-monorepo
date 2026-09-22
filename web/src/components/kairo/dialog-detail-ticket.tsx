@@ -23,9 +23,7 @@ function SectionTexte(props: { titre: string; contenu?: string | undefined }) {
   if (!props.contenu) return null;
   return (
     <div>
-      <p className="text-xs font-semibold text-foreground">
-        {props.titre}
-      </p>
+      <p className="text-xs font-semibold text-foreground">{props.titre}</p>
       <p className="mt-1 rounded-xl border border-border/70 bg-secondary/35 p-3 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
         {props.contenu}
       </p>
@@ -39,9 +37,7 @@ function ListeFichiers(props: { fichiers?: string | undefined }) {
   if (list.length === 0) return null;
   return (
     <div>
-      <p className="text-xs font-semibold text-foreground">
-        Fichiers modifiés ({list.length})
-      </p>
+      <p className="text-xs font-semibold text-foreground">Fichiers modifiés ({list.length})</p>
       <div className="mt-1.5 flex flex-wrap gap-1.5">
         {list.map((f) => (
           <span
@@ -186,7 +182,11 @@ function PiedTicket(props: {
             onRelancer(ticket);
             onClose();
           }}
-          className={ticket.statut === 'escalade' ? 'bg-primary text-primary-foreground hover:bg-primary-hover' : undefined}
+          className={
+            ticket.statut === 'escalade'
+              ? 'bg-primary text-primary-foreground hover:bg-primary-hover'
+              : undefined
+          }
         >
           <RotateCcwIcon className="size-3.5" />
           {ticket.statut === 'escalade' ? 'Arbitrer' : 'Relancer'}
