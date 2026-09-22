@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { BandeauEtat } from '@/components/kairo/bandeau-etat';
 import { CarteReformulation } from '@/components/kairo/carte-reformulation';
 import { CarteTickets, IndicateursKairo } from '@/components/kairo/carte-tickets';
+import { ReglagesKairo } from '@/components/kairo/reglages-kairo';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -68,6 +69,7 @@ function ContenuKairo({
   return (
     <>
       <BandeauEtat etat={etat} desactive={desactive} simulation={simulation} />
+      <ReglagesKairo etat={etat} desactive={desactive} />
       <IndicateursKairo tickets={etat.tickets} mttrSecondes={etat.mttrSecondes} />
       <CarteTickets tickets={etat.tickets} desactive={desactive} />
     </>
