@@ -11,10 +11,12 @@ import (
 	"io"
 	"mime/multipart"
 	"net/http"
+	"net/http/httptest"
 	"net/textproto"
 	"slices"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -315,5 +317,95 @@ func TestSupportRepriseReconciliationEtCloisonnementDesAuteurs(t *testing.T) {
 	}
 	if numero == nil || *numero != 4242 {
 		t.Fatalf("le numéro déjà obtenu doit survivre aux reprises : %v", numero)
+	}
+}
+
+func fournisseurIAFactice(t *testing.T, enPanne *atomic.Bool, appels *atomic.Int32) {
+	t.Helper()
+	ia := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		appels.Add(1)
+		var requete struct {
+			Model string `json:"model"`
+		}
+		_ = json.NewDecoder(r.Body).Decode(&requete)
+		if enPanne.Load() || requete.Model == "modele-en-panne" || r.Header.Get("Authorization") != "Bearer cle-essai" {
+			w.WriteHeader(http.StatusServiceUnavailable)
+			return
+		}
+		contenu := `{"description": "Le bouton Enregistrer reste sans effet.", "contexte": ""}`
+		_ = json.NewEncoder(w).Encode(map[string]any{"choices": []any{map[string]any{"message": map[string]string{"role": "assistant", "content": contenu}}}})
+	}))
+	t.Cleanup(ia.Close)
+	t.Setenv("SUPPORT_AI_ENABLED", "true")
+	t.Setenv("SUPPORT_AI_PROVIDERS", "openrouter")
+	t.Setenv("OPENROUTER_API_KEY", "cle-essai")
+	t.Setenv("OPENROUTER_URL", ia.URL)
+	t.Setenv("OPENROUTER_MODELS", "modele-en-panne,modele-disponible")
+}
+
+func (b *banc) textesSignalement(id string) (description, contexte string, transmise, contexteTransmis *string) {
+	b.t.Helper()
+	if err := b.pool.QueryRow(b.ctx, `SELECT "description", "contexte", "descriptionTransmise", "contexteTransmis"
+		FROM "support_signalements" WHERE "id" = $1`, id).Scan(&description, &contexte, &transmise, &contexteTransmis); err != nil {
+		b.t.Fatal(err)
+	}
+	return description, contexte, transmise, contexteTransmis
+}
+
+// L'IA travaille après l'accusé de réception : le texte du signalant reste
+// intact, le texte transmis est fixé une fois, et une panne laisse partir l'original.
+func TestSupportReformuleApresReceptionSansToucherAuTexteDuSignalant(t *testing.T) {
+	var enPanne atomic.Bool
+	var appels atomic.Int32
+	fournisseurIAFactice(t, &enPanne, &appels)
+	b := bancSupport(t, "SUPERVISEUR")
+	cle, saisie := uuid.NewString(), "bouton enregistrer marche pas"
+
+	statut, body := b.signaler(cle, saisie, 0)
+	b.attend(statut, http.StatusAccepted, "signalement reçu", body)
+	id, _ := body["id"].(string)
+	if body["description"] != saisie {
+		t.Fatalf("le signalant doit relire son propre texte : %v", body["description"])
+	}
+	b.attendEtat(id, "reessai_planifie")
+	description, contexte, transmise, contexteTransmis := b.textesSignalement(id)
+	if description != saisie || contexte != "Écran : essai" {
+		t.Fatalf("texte d'origine modifié : %q / %q", description, contexte)
+	}
+	if transmise == nil || *transmise != "Le bouton Enregistrer reste sans effet." || contexteTransmis == nil || *contexteTransmis != contexte {
+		t.Fatalf("texte transmis : %v / %v", transmise, contexteTransmis)
+	}
+
+	statut, body = b.signaler(cle, saisie, 0)
+	b.attend(statut, http.StatusAccepted, "renvoi après coupure réseau", body)
+	if body["id"] != id {
+		t.Fatalf("le renvoi doit retrouver le même signalement : %v", body)
+	}
+
+	avant := appels.Load()
+	if _, err := b.pool.Exec(b.ctx, `UPDATE "support_signalements" SET "prochaineTentative" = now() WHERE "id" = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	if err := supportBalayer(b); err != nil {
+		t.Fatal(err)
+	}
+	if appels.Load() != avant {
+		t.Fatalf("une reprise ne doit pas rappeler l'IA : %d appels de plus", appels.Load()-avant)
+	}
+}
+
+func TestSupportTransmetLeTexteDOrigineQuandLIAEstEnPanne(t *testing.T) {
+	var enPanne atomic.Bool
+	var appels atomic.Int32
+	enPanne.Store(true)
+	fournisseurIAFactice(t, &enPanne, &appels)
+	b := bancSupport(t, "SUPERVISEUR")
+
+	statut, body := b.signaler(uuid.NewString(), "export vide depuis ce matin", 0)
+	b.attend(statut, http.StatusAccepted, "signalement reçu pendant une panne IA", body)
+	autre, _ := body["id"].(string)
+	b.attendEtat(autre, "reessai_planifie")
+	if _, _, transmise, _ := b.textesSignalement(autre); transmise == nil || *transmise != "export vide depuis ce matin" {
+		t.Fatalf("une panne IA doit transmettre le texte d'origine : %v", transmise)
 	}
 }

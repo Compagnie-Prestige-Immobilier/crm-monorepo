@@ -55,6 +55,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: true,
     proxy: {
       // `Host` reste celui du navigateur : l'API compare `Origin` à `Host` sur chaque écriture.
       '/api': {

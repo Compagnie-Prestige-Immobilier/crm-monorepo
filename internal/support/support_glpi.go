@@ -63,7 +63,7 @@ func (e *appelGlpiError) definitif() bool {
 type demande struct {
 	login, nom, email, roleLibelle string
 	pilotage, groupe               bool
-	description, contexte          string
+	description, contexte, origine string
 	urgence, categorie             int32
 	reference                      string
 }
@@ -113,6 +113,7 @@ func contenuTicket(d *demande) string {
 	return paragraphe(d.description) +
 		paragraphe(fmt.Sprintf("Signalé par %s (%s, %s)", d.nom, d.roleLibelle, d.email)) +
 		paragraphe(d.contexte) +
+		paragraphe("Texte d'origine :\n"+d.origine) +
 		paragraphe("Référence CRM : "+d.reference)
 }
 
