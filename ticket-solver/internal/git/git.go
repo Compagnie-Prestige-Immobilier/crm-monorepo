@@ -64,7 +64,6 @@ func GitEnv(jobDir, token string) ([]string, error) {
 	if token != "" {
 		askpass := filepath.Join(jobDir, "askpass.sh")
 		script := "#!/bin/sh\ncase \"$1\" in Username*) echo x-access-token ;; *) printf \"%s\\n\" \"$GIT_TOKEN\" ;; esac\n"
-		//nolint:gosec // askpass.sh doit être exécutable par git
 		if err := os.WriteFile(askpass, []byte(script), 0o700); err != nil {
 			return nil, fmt.Errorf("écriture askpass.sh : %w", err)
 		}
@@ -74,9 +73,22 @@ func GitEnv(jobDir, token string) ([]string, error) {
 	return env, nil
 }
 
+// Program énumère les seuls binaires que ce paquet peut lancer. Le nom réel passé à
+// exec.CommandContext vient toujours d'un des cas littéraux ci-dessous, jamais d'une
+// valeur externe : un appelant ne peut pas faire exécuter un programme arbitraire.
+type Program string
+
+const (
+	ProgramGit    Program = "git"
+	ProgramSh     Program = "sh"
+	ProgramClaude Program = "claude"
+	ProgramCodex  Program = "codex"
+)
+
 func Run(
 	ctx context.Context,
-	command []string,
+	program Program,
+	args []string,
 	cwd string,
 	env []string,
 	stdin string,
@@ -89,8 +101,24 @@ func Run(
 		defer cancel()
 	}
 
-	//nolint:gosec // exécution de commandes externes dans le bac à sable
-	cmd := exec.CommandContext(ctx, command[0], command[1:]...)
+	// Le switch doit rester ici, dans la même fonction que exec.CommandContext : c'est ce
+	// qui garantit, de façon vérifiable statiquement, qu'aucune valeur externe ne peut
+	// jamais devenir le nom du programme lancé.
+	var binary string
+	switch program {
+	case ProgramGit:
+		binary = "git"
+	case ProgramSh:
+		binary = "sh"
+	case ProgramClaude:
+		binary = "claude"
+	case ProgramCodex:
+		binary = "codex"
+	default:
+		return "", "", -1, fmt.Errorf("programme non autorisé : %s", string(program))
+	}
+
+	cmd := exec.CommandContext(ctx, binary, args...)
 	cmd.Dir = cwd
 	cmd.Env = env
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
@@ -124,7 +152,7 @@ func Run(
 			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
 		<-done
-		return stdoutBuf.String(), stderrBuf.String(), -1, fmt.Errorf("%s dépasse %d s", command[0], int(timeout.Seconds()))
+		return stdoutBuf.String(), stderrBuf.String(), -1, fmt.Errorf("%s dépasse %d s", binary, int(timeout.Seconds()))
 	case waitErr := <-done:
 		code := 0
 		if waitErr != nil {
@@ -140,14 +168,13 @@ func Run(
 }
 
 func ExecGit(ctx context.Context, repo string, env []string, timeout time.Duration, args ...string) (string, error) {
-	cmdArgs := append([]string{
-		"git",
+	gitArgs := append([]string{
 		"-c", "core.hooksPath=/dev/null",
 		"-c", "user.name=" + config.GitName,
 		"-c", "user.email=" + config.GitEmail,
 	}, args...)
 
-	stdout, stderr, code, err := Run(ctx, cmdArgs, repo, env, "", false, timeout)
+	stdout, stderr, code, err := Run(ctx, ProgramGit, gitArgs, repo, env, "", false, timeout)
 	if err != nil {
 		return "", err
 	}
@@ -190,7 +217,7 @@ func Verify(ctx context.Context, repo string, project *config.Project, jobDir st
 		return "", -1, err
 	}
 
-	cmd := []string{"sh", "-c", project.VerificationCommand}
-	out, _, code, runErr := Run(ctx, cmd, repo, SandboxEnv(jobDir, config.EnvOrDefault("CACHE_ROOT", "/work/cache")), "", true, timeout)
+	args := []string{"-c", project.VerificationCommand}
+	out, _, code, runErr := Run(ctx, ProgramSh, args, repo, SandboxEnv(jobDir, config.EnvOrDefault("CACHE_ROOT", "/work/cache")), "", true, timeout)
 	return out, code, runErr
 }

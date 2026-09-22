@@ -38,8 +38,7 @@ func Ask(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir, pro
 func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, prompt string, env []string, timeout time.Duration) (*config.Answer, error) {
 	env = append(env, "CLAUDE_CODE_OAUTH_TOKEN="+token)
 
-	command := []string{
-		"claude",
+	args := []string{
 		"-p", prompt,
 		"--append-system-prompt", config.Policy,
 		"--output-format", "json",
@@ -49,7 +48,7 @@ func runClaude(ctx context.Context, spec config.AgentSpec, token, repoDir, promp
 		"--no-session-persistence",
 	}
 
-	stdout, stderr, code, err := git.Run(ctx, command, repoDir, env, "", false, timeout)
+	stdout, stderr, code, err := git.Run(ctx, git.ProgramClaude, args, repoDir, env, "", false, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -102,8 +101,8 @@ func runCodex(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir
 
 	env = append(env, "CODEX_HOME="+codexHome)
 
-	loginCmd := []string{"codex", "login", "--with-access-token"}
-	loginOut, loginErr, loginCode, err := git.Run(ctx, loginCmd, "", env, token, false, 120*time.Second)
+	loginArgs := []string{"login", "--with-access-token"}
+	loginOut, loginErr, loginCode, err := git.Run(ctx, git.ProgramCodex, loginArgs, "", env, token, false, 120*time.Second)
 	if err != nil {
 		return nil, err
 	}
@@ -124,8 +123,8 @@ func runCodex(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir
 	tmpDir := filepath.Join(jobDir, "tmp")
 	promptWithPolicy := config.Policy + "\n\n" + prompt
 
-	execCmd := []string{
-		"codex", "exec",
+	execArgs := []string{
+		"exec",
 		"--sandbox", "workspace-write",
 		"-c", "sandbox_workspace_write.network_access=true",
 		"--ephemeral",
@@ -136,7 +135,7 @@ func runCodex(ctx context.Context, spec config.AgentSpec, token, jobDir, repoDir
 		promptWithPolicy,
 	}
 
-	stdout, stderr, code, err := git.Run(ctx, execCmd, repoDir, env, "", false, timeout)
+	stdout, stderr, code, err := git.Run(ctx, git.ProgramCodex, execArgs, repoDir, env, "", false, timeout)
 	if err != nil {
 		return nil, err
 	}

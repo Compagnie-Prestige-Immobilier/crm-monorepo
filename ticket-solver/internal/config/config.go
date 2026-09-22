@@ -99,7 +99,6 @@ type AgentSpec struct {
 	EnvToken string
 }
 
-//nolint:gosec // noms de variables d'environnement, pas de jetons en dur
 var Agents = []AgentSpec{
 	{Name: "claude-primary", EnvToken: "CLAUDE_CODE_OAUTH_TOKEN_0"},
 	{Name: "claude-fallback", EnvToken: "CLAUDE_CODE_OAUTH_TOKEN_1"},
