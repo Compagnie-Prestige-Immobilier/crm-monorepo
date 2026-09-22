@@ -1,4 +1,10 @@
-import { CopyIcon, ExternalLinkIcon, GitPullRequestIcon, RotateCcwIcon } from 'lucide-react';
+import {
+  CopyIcon,
+  ExternalLinkIcon,
+  GitPullRequestIcon,
+  RotateCcwIcon,
+  TerminalIcon,
+} from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -50,6 +56,15 @@ function ListeFichiers(props: { fichiers?: string | undefined }) {
 
 function peutRelancer(statut: string): boolean {
   return statut === 'echec' || statut === 'escalade' || statut === 'arrete';
+}
+
+function brancheKairo(ticketId: number): string {
+  return `kairo/glpi-${String(ticketId)}`;
+}
+
+function commandeRecuperation(ticketId: number): string {
+  const branche = brancheKairo(ticketId);
+  return `git fetch origin ${branche} && git checkout ${branche}`;
 }
 
 function texteACopier(ticket: TicketKairo, libelleStatut: string): string {
@@ -116,6 +131,12 @@ function PiedTicket(props: {
   onClose: () => void;
 }) {
   const { ticket, desactive, onCopier, onRelancer, onClose } = props;
+
+  async function copierCommande() {
+    await navigator.clipboard.writeText(commandeRecuperation(ticket.id));
+    toast.success('Commande de récupération locale copiée.');
+  }
+
   return (
     <DialogFooter className="mt-2 flex-wrap gap-2">
       <Button variant="outline" size="sm" onClick={onCopier}>
@@ -132,15 +153,26 @@ function PiedTicket(props: {
         Ouvrir GLPI
       </a>
       {ticket.prUrl ? (
-        <a
-          href={ticket.prUrl}
-          target="_blank"
-          rel="noreferrer"
-          className={buttonVariants({ variant: 'default', size: 'sm' })}
-        >
-          <GitPullRequestIcon className="size-3.5" />
-          Ouvrir la PR
-        </a>
+        <>
+          <a
+            href={ticket.prUrl}
+            target="_blank"
+            rel="noreferrer"
+            className={buttonVariants({ variant: 'default', size: 'sm' })}
+          >
+            <GitPullRequestIcon className="size-3.5" />
+            Ouvrir la PR
+          </a>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void copierCommande()}
+            title={commandeRecuperation(ticket.id)}
+          >
+            <TerminalIcon className="size-3.5" />
+            Copier la commande git
+          </Button>
+        </>
       ) : null}
       {peutRelancer(ticket.statut) ? (
         <Button
