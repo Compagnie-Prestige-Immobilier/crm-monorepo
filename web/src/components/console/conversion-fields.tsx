@@ -423,6 +423,15 @@ export function ConversionFields({
     method: (
       <>
         <GroupeEnLigne label="Méthode d’enrôlement" error={errors.method}>
+          <Pastille
+            type="radio"
+            name="console-method"
+            checked={draft.method === null}
+            label="Aucun"
+            onChange={() => {
+              onChange({ method: null, rendezVousAt: '' });
+            }}
+          />
           {ENROLLMENT_METHOD_ORDER.map((method) => (
             <MethodChoice
               key={method}
