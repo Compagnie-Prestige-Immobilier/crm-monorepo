@@ -91,6 +91,19 @@ const EMAIL_VALIDE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
 const aujourdhui = () => new Date().toISOString().slice(0, 10);
 const entier = (brut: string) => Number(brut.replace(/\D/g, '')) || 0;
 
+type Rythme = NonNullable<Draft['periodiciteMois']>;
+type JourVersement = NonNullable<Draft['jourVersement']>;
+const RYTHMES: readonly [Rythme, string][] = [
+  [1, 'Par mois'],
+  [2, 'Par 2 mois'],
+  [3, 'Par 3 mois'],
+];
+const JOURS_VERSEMENT: readonly [JourVersement, string][] = [
+  [5, 'Le 5'],
+  [10, 'Le 10'],
+  [15, 'Le 15'],
+];
+
 const NOUVEAU: Draft = {
   canal: '',
   dateSouscription: '',
@@ -102,6 +115,8 @@ const NOUVEAU: Draft = {
   superficie: '',
   acompte: 0,
   modePaiement: 'COMPTANT',
+  periodiciteMois: 1,
+  premierVersement: '',
   email: '',
   numeroCni: '',
   dateDelivranceCni: '',
@@ -113,6 +128,11 @@ const NOUVEAU: Draft = {
   nomTeleconseiller: '',
   responsableClosing: '',
 };
+
+function jourVersementDe(jour: number | null): Patch {
+  const connu = JOURS_VERSEMENT.find(([option]) => option === jour)?.[0];
+  return connu === undefined ? {} : { jourVersement: connu };
+}
 
 function brouillonDe(vente: Vente | null): Draft {
   if (vente === null) return { ...NOUVEAU, dateSouscription: aujourdhui() };
@@ -129,7 +149,10 @@ function brouillonDe(vente: Vente | null): Draft {
     prixUnitaire: vente.prixUnitaire,
     acompte: vente.acompte,
     modePaiement: vente.modePaiement === 'CREDIT' ? 'CREDIT' : 'COMPTANT',
-    ...(vente.nombreMois === null ? {} : { nombreMois: vente.nombreMois }),
+    ...(vente.nombreEcheances === null ? {} : { nombreEcheances: vente.nombreEcheances }),
+    periodiciteMois: RYTHMES.find(([mois]) => mois === vente.periodiciteMois)?.[0] ?? 1,
+    ...jourVersementDe(vente.jourVersement),
+    premierVersement: vente.premierVersement ?? '',
     marquerSoldee: vente.soldeeManuellement,
     email: vente.email,
     numeroCni: vente.numeroCni,
@@ -160,8 +183,10 @@ const MANQUE: Partial<Record<Ecran, (d: Draft) => string | null>> = {
     if (d.modePaiement === 'COMPTANT' && d.acompte !== prixTotal) {
       return `Au comptant, le montant payé doit être de ${formatFcfa(prixTotal)}.`;
     }
-    const moisManquants = d.modePaiement === 'CREDIT' && (d.nombreMois ?? 0) < 1;
-    return moisManquants ? 'Indiquez le nombre de mois.' : null;
+    if (d.modePaiement !== 'CREDIT') return null;
+    if ((d.nombreEcheances ?? 0) < 1) return 'Indiquez le nombre d’échéances.';
+    if (d.jourVersement === undefined) return 'Choisissez le jour de versement.';
+    return d.premierVersement ? null : 'Indiquez la date du premier versement.';
   },
 };
 
@@ -178,13 +203,36 @@ function manqueTelephone(draft: Draft, callingCode: string): string | null {
     : null;
 }
 
-function manqueParcours(ecran: Ecran, draft: Draft, callingCode: string): string | null {
+function superficieAChoisir(draft: Draft, site: SiteVente | undefined): boolean {
+  const aChoisir = (site?.superficies.length ?? 0) > 0;
+  return aChoisir && draft.superficie === '' && (draft.prixUnitaire ?? 0) <= 0;
+}
+
+function manqueParcours(
+  ecran: Ecran,
+  draft: Draft,
+  callingCode: string,
+  site: SiteVente | undefined,
+): string | null {
   if (ecran === 'telephone') return manqueTelephone(draft, callingCode);
+  if (ecran === 'lots' && superficieAChoisir(draft, site)) return 'Choisissez la superficie.';
   return MANQUE[ecran]?.(draft) ?? null;
+}
+
+function avecSuperficie(draft: Draft, site: SiteVente): Patch {
+  // Une vente déjà saisie sur ce site garde sa superficie et son prix d'alors.
+  if (draft.site === site.nom) return { site: site.nom };
+  const retenue = site.superficies.find((s) => s.superficie === draft.superficie);
+  return {
+    site: site.nom,
+    superficie: retenue?.superficie ?? '',
+    prixUnitaire: retenue?.prix ?? 0,
+  };
 }
 
 function avecSite(draft: Draft, sites: readonly SiteVente[], nom: string): Patch {
   const choix = sites.find((s) => s.nom === nom);
+  if (choix !== undefined && choix.superficies.length > 0) return avecSuperficie(draft, choix);
   const prixDuSite = choix?.prixUnitaireDefaut ?? 0;
   return {
     site: nom,
@@ -244,6 +292,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
     enabled: ecran === 'telephone' && recherche.trim().length >= 4,
   });
   const { sites, canaux } = actifs(configuration.data);
+  const siteChoisi = sites.find((s) => s.nom === draft.site);
   const enregistrer = useMutation({
     mutationFn: () => {
       const telephone = toInternationalE164(draft.telephone, callingCode);
@@ -268,7 +317,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
     setPas(Math.max(0, Math.min(RECAP, cible)));
   };
   const continuer = () => {
-    const bloquant = manqueParcours(ecran, draft, callingCode);
+    const bloquant = manqueParcours(ecran, draft, callingCode, siteChoisi);
     if (bloquant === null) aller(pas + 1);
     else setErreur(bloquant);
   };
@@ -290,6 +339,7 @@ function Parcours({ onFermer, vente }: { onFermer: () => void; vente: Vente | nu
         draft={draft}
         changer={changer}
         sites={sites}
+        site={siteChoisi}
         canaux={canaux}
         fiches={fiches.data?.items ?? []}
         countries={callingCountriesFrom(reference.data?.pays ?? [])}
@@ -322,6 +372,7 @@ function EcranCourant({
   draft,
   changer,
   sites,
+  site,
   canaux,
   fiches,
   countries,
@@ -333,6 +384,7 @@ function EcranCourant({
 }: EcranProps & {
   ecran: Ecran;
   sites: readonly SiteVente[];
+  site: SiteVente | undefined;
   canaux: readonly string[];
   fiches: readonly Fiche[];
   countries: readonly { code: string; label: string }[];
@@ -387,10 +439,7 @@ function EcranCourant({
       return (
         <Question titre="Sur quel site ?">
           <Grille
-            options={sites.map((s) => ({
-              valeur: s.nom,
-              detail: formatFcfa(s.prixUnitaireDefaut),
-            }))}
+            options={sites.map((s) => ({ valeur: s.nom, detail: prixAffiche(s) }))}
             valeur={draft.site}
             onChoisir={onSite}
           />
@@ -407,7 +456,7 @@ function EcranCourant({
         </Question>
       );
     case 'lots':
-      return <EcranLots draft={draft} changer={changer} />;
+      return <EcranLots draft={draft} changer={changer} site={site} />;
     case 'paiement':
       return <EcranPaiement draft={draft} changer={changer} />;
     default:
@@ -473,11 +522,11 @@ function Cadre({
               </Button>
             </div>
           </div>
-          <div
-            ref={corps}
-            className="flex min-h-0 flex-col justify-center gap-5 overflow-y-auto px-6 py-5"
-          >
-            <div key={ecran}>{children}</div>
+          <div ref={corps} className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 py-5">
+            {/* `my-auto` centre sans couper le haut quand l'écran défile, là où `justify-center` le rend inaccessible. */}
+            <div key={ecran} className="my-auto">
+              {children}
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {erreur === null ? null : (
@@ -563,11 +612,13 @@ function Montant({
   label,
   valeur,
   max = PLAFOND_MONTANT,
+  placeholder = '0',
   onChange,
   children,
 }: {
   id: string;
   label: string;
+  placeholder?: string;
   valeur: number;
   max?: number;
   onChange: (montant: number) => void;
@@ -582,8 +633,8 @@ function Montant({
         <Input
           id={id}
           inputMode="numeric"
-          className="h-14 text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
-          placeholder="0"
+          className="h-14 text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/40"
+          placeholder={placeholder}
           value={espaces(valeur)}
           onChange={(e) => onChange(Math.min(max, entier(e.target.value)))}
         />
@@ -733,10 +784,26 @@ function ChoixPersonne({
   );
 }
 
-function EcranLots({ draft, changer }: EcranProps) {
+function prixAffiche(site: SiteVente): string {
+  if (site.superficies.length === 0) return formatFcfa(site.prixUnitaireDefaut);
+  return formatFcfa(Math.min(...site.superficies.map((s) => s.prix)));
+}
+
+function EcranLots({ draft, changer, site }: EcranProps & { site: SiteVente | undefined }) {
+  const superficies = site?.superficies ?? [];
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
+  const parSuperficie = new Map(superficies.map((s) => [s.superficie, s.prix]));
   return (
     <Question titre={`Combien de lots à ${draft.site} ?`}>
+      {superficies.length === 0 ? null : (
+        <Grille
+          options={superficies.map((s) => ({ valeur: s.superficie, detail: formatFcfa(s.prix) }))}
+          valeur={draft.superficie}
+          onChoisir={(superficie) =>
+            changer({ superficie, prixUnitaire: parSuperficie.get(superficie) ?? 0 })
+          }
+        />
+      )}
       <div className="flex items-center gap-3">
         <Button
           type="button"
@@ -787,30 +854,99 @@ const PARTS_ACOMPTE: [string, number][] = [
   ['Tout', 1],
 ];
 
-function Mensualites({ draft, reste, changer }: EcranProps & { reste: number }) {
-  const mois = draft.nombreMois ?? 0;
+/** Prochaine date, après aujourd'hui, qui tombe ce jour du mois. */
+function prochaineDate(jour: number): string {
+  const maintenant = new Date();
+  const mois = maintenant.getMonth() + (maintenant.getDate() < jour ? 0 : 1);
+  const date = new Date(maintenant.getFullYear(), mois, jour);
+  const deux = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${deux(date.getMonth() + 1)}-${deux(date.getDate())}`;
+}
+
+function Choix<T extends number>({
+  label,
+  options,
+  valeur,
+  onChoisir,
+}: {
+  label: string;
+  options: readonly [T, string][];
+  valeur: T | undefined;
+  onChoisir: (valeur: T) => void;
+}) {
   return (
-    <div className="flex flex-wrap items-center gap-3">
-      <label htmlFor="parcours-mois" className="text-[1rem] font-[600]">
-        Sur combien de mois ?
-      </label>
-      <Input
-        id="parcours-mois"
-        inputMode="numeric"
-        className="h-14 w-24 text-center text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
-        placeholder="12"
-        value={mois === 0 ? '' : mois}
-        onChange={(e) => changer({ nombreMois: Math.min(120, entier(e.target.value)) })}
+    <div className="flex flex-col gap-1.5">
+      <span className="text-[1rem] font-[600]">{label}</span>
+      <div className="flex flex-wrap gap-2">
+        {options.map(([option, libelle]) => (
+          <Button
+            key={option}
+            type="button"
+            variant={option === valeur ? 'default' : 'outline'}
+            aria-pressed={option === valeur}
+            onClick={() => onChoisir(option)}
+          >
+            {libelle}
+          </Button>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Echeancier({ draft, reste, changer }: EcranProps & { reste: number }) {
+  const nombre = draft.nombreEcheances ?? 0;
+  return (
+    <div className="flex flex-col gap-4">
+      <Choix
+        label="Fréquence de paiement"
+        options={RYTHMES}
+        valeur={draft.periodiciteMois}
+        onChoisir={(periodiciteMois) => changer({ periodiciteMois })}
       />
-      {mois > 0 ? (
-        <span className="text-muted-foreground">
-          soit{' '}
-          <strong className="text-foreground tabular-nums">
-            {formatFcfa(Math.ceil(reste / mois))}
-          </strong>{' '}
-          par mois
-        </span>
-      ) : null}
+      <div className="flex flex-wrap items-center gap-3">
+        <label htmlFor="parcours-echeances" className="text-[1rem] font-[600]">
+          Nombre d’échéances
+        </label>
+        <Input
+          id="parcours-echeances"
+          inputMode="numeric"
+          className="h-14 w-24 text-center text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
+          placeholder="12"
+          value={nombre === 0 ? '' : nombre}
+          onChange={(e) => changer({ nombreEcheances: Math.min(120, entier(e.target.value)) })}
+        />
+        {nombre > 0 ? (
+          <span className="text-muted-foreground">
+            soit{' '}
+            <strong className="text-foreground tabular-nums">
+              {formatFcfa(Math.ceil(reste / nombre))}
+            </strong>{' '}
+            par échéance
+          </span>
+        ) : null}
+      </div>
+      <Choix
+        label="Date de versement"
+        options={JOURS_VERSEMENT}
+        valeur={draft.jourVersement}
+        onChoisir={(jourVersement) =>
+          changer({
+            jourVersement,
+            premierVersement: draft.premierVersement || prochaineDate(jourVersement),
+          })
+        }
+      />
+      <label htmlFor="parcours-premier" className="flex flex-col gap-1.5 text-[1rem] font-[600]">
+        Date du premier versement
+        <Input
+          id="parcours-premier"
+          type="date"
+          className="w-48"
+          value={draft.premierVersement ?? ''}
+          onChange={(e) => changer({ premierVersement: e.target.value })}
+        />
+      </label>
     </div>
   );
 }
@@ -840,18 +976,15 @@ function EcranPaiement({ draft, changer }: EcranProps) {
       />
       <Montant
         id="parcours-acompte"
-        label={
-          credit
-            ? `Acompte reçu aujourd'hui, sur ${formatFcfa(prixTotal)}`
-            : `Montant payé, sur ${formatFcfa(prixTotal)}`
-        }
+        label={credit ? 'Acompte' : `Montant payé, sur ${formatFcfa(prixTotal)}`}
         valeur={draft.acompte}
         max={prixTotal}
+        placeholder="Ex. 1 000 000"
         onChange={changerMontant}
       >
         <PartsAcompte visible={credit} prixTotal={prixTotal} draft={draft} changer={changer} />
       </Montant>
-      {credit ? <Mensualites draft={draft} reste={reste} changer={changer} /> : null}
+      {credit ? <Echeancier draft={draft} reste={reste} changer={changer} /> : null}
       <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-secondary p-3">
         <span className="text-[0.9375rem]">Statut</span>
         <Badge variant={etat.variant}>{etat.libelle}</Badge>
@@ -908,13 +1041,16 @@ function pieceDe(draft: Draft): string {
   ]);
 }
 
+function resumeCredit(draft: Draft): string {
+  const rythme = RYTHMES.find(([mois]) => mois === draft.periodiciteMois)?.[1] ?? 'Par mois';
+  const premier = draft.premierVersement ? `, dès le ${formatDate(draft.premierVersement)}` : '';
+  return `${draft.nombreEcheances ?? '?'} échéances ${rythme.toLowerCase()}${premier}`;
+}
+
 function EcranRecap({ draft, changer }: EcranProps) {
   const [details, setDetails] = useState(false);
   const prixTotal = (draft.prixUnitaire ?? 0) * draft.nombreLots;
-  const paiement =
-    draft.modePaiement === 'CREDIT'
-      ? `À crédit sur ${draft.nombreMois ?? '?'} mois`
-      : 'Au comptant';
+  const paiement = draft.modePaiement === 'CREDIT' ? resumeCredit(draft) : 'Au comptant';
   const soldee = draft.acompte >= prixTotal || draft.marquerSoldee === true;
   const lots = `${draft.nombreLots} lot${draft.nombreLots > 1 ? 's' : ''}`;
   const lignes = [

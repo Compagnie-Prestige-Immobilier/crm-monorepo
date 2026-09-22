@@ -37,7 +37,10 @@ type venteInput struct {
 	Superficie       string `json:"superficie" maxLength:"80"`
 	PrixUnitaire     *int64 `json:"prixUnitaire,omitempty" minimum:"0"`
 	ModePaiement     string `json:"modePaiement" enum:"COMPTANT,CREDIT"`
-	NombreMois       *int32 `json:"nombreMois,omitempty" minimum:"1"`
+	NombreEcheances  *int32 `json:"nombreEcheances,omitempty" minimum:"1"`
+	PeriodiciteMois  int32  `json:"periodiciteMois,omitempty" enum:"1,2,3"`
+	JourVersement    *int32 `json:"jourVersement,omitempty" enum:"5,10,15"`
+	PremierVersement string `json:"premierVersement,omitempty" pattern:"^(\\d{4}-\\d{2}-\\d{2})?$"`
 	MarquerSoldee    bool   `json:"marquerSoldee,omitempty"`
 	Acompte          int64  `json:"acompte" minimum:"0"`
 	PartProprietaire *int64 `json:"partProprietaire,omitempty" minimum:"0"`
@@ -87,7 +90,7 @@ type ventePreparee struct {
 }
 
 func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput, error) {
-	preparee, err := s.preparer(ctx, &in.Body)
+	preparee, err := s.preparer(ctx, &in.Body, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +133,7 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 	if err != nil {
 		return nil, err
 	}
-	preparee, err := s.preparer(ctx, &in.Body)
+	preparee, err := s.preparer(ctx, &in.Body, &avant)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +154,9 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 			Reliquat:         preparee.Vente.PrixTotal - preparee.Vente.Acompte - versements,
 			PartProprietaire: preparee.Vente.PartProprietaire,
 			PartApporteur:    preparee.Vente.PartApporteur, PartCpi: preparee.Vente.PartCpi,
-			ModePaiement: preparee.Vente.ModePaiement, NombreMois: preparee.Vente.NombreMois,
+			ModePaiement: preparee.Vente.ModePaiement, NombreEcheances: preparee.Vente.NombreEcheances,
+			PeriodiciteMois: preparee.Vente.PeriodiciteMois, JourVersement: preparee.Vente.JourVersement,
+			PremierVersement:   preparee.Vente.PremierVersement,
 			SoldeeManuellement: preparee.Vente.SoldeeManuellement,
 			Email:              preparee.Vente.Email, NumeroCni: preparee.Vente.NumeroCni,
 			DateDelivranceCni: preparee.Vente.DateDelivranceCni, AutrePiece: preparee.Vente.AutrePiece,
@@ -277,8 +282,10 @@ func (s *service) sortie(ctx context.Context, id int64) (*VenteOutput, error) {
 	return &VenteOutput{Body: venteDTO(&vente, parVente[id])}, nil
 }
 
-func (s *service) preparer(ctx context.Context, in *venteInput) (ventePreparee, error) {
-	contexte, err := s.contexte(ctx, in)
+// `avant` est la vente corrigée, nil à la création : une correction garde le
+// site, le canal et l'échéancier qu'elle avait, même retirés ou incomplets depuis.
+func (s *service) preparer(ctx context.Context, in *venteInput, avant *db.Vente) (ventePreparee, error) {
+	contexte, err := s.contexte(ctx, in, avant)
 	if err != nil {
 		return ventePreparee{}, err
 	}
@@ -290,13 +297,9 @@ func (s *service) preparer(ctx context.Context, in *venteInput) (ventePreparee, 
 	if in.Acompte < 0 {
 		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_ACOMPTE_INVALIDE", "L’acompte ne peut pas être négatif.")
 	}
-	mode, err := verifierModePaiement(in)
+	echeancier, err := verifierModePaiement(in, avant)
 	if err != nil {
 		return ventePreparee{}, err
-	}
-	nombreMois := in.NombreMois
-	if mode == modeComptant {
-		nombreMois = nil
 	}
 	delivrance, err := dateFacultative(in.DateDelivranceCni)
 	if err != nil {
@@ -310,7 +313,9 @@ func (s *service) preparer(ctx context.Context, in *venteInput) (ventePreparee, 
 			PrixUnitaire: prix, PrixTotal: prix * int64(in.NombreLots), Acompte: in.Acompte,
 			Reliquat: prix*int64(in.NombreLots) - in.Acompte, PartProprietaire: proprietaire,
 			PartApporteur: apporteur, PartCpi: cpi,
-			ModePaiement: mode, NombreMois: nombreMois, SoldeeManuellement: in.MarquerSoldee,
+			ModePaiement: echeancier.mode, NombreEcheances: echeancier.nombre,
+			PeriodiciteMois: echeancier.periodicite, JourVersement: echeancier.jour,
+			PremierVersement: echeancier.premier, SoldeeManuellement: in.MarquerSoldee,
 			Email:                  strings.ToLower(strings.TrimSpace(in.Email)),
 			NumeroCni:              strings.TrimSpace(in.NumeroCni),
 			DateDelivranceCni:      delivrance,
@@ -332,21 +337,52 @@ const (
 	modeCredit   = "CREDIT"
 )
 
-func verifierModePaiement(in *venteInput) (string, error) {
+type echeancier struct {
+	mode        string
+	nombre      *int32
+	periodicite int32
+	jour        *int32
+	premier     pgtype.Date
+}
+
+func verifierModePaiement(in *venteInput, avant *db.Vente) (echeancier, error) {
 	mode := strings.ToUpper(strings.TrimSpace(in.ModePaiement))
 	if mode == "" {
 		mode = modeComptant
 	}
 	if mode != modeComptant && mode != modeCredit {
-		return "", socle.Problem(http.StatusBadRequest, "VENTE_MODE_PAIEMENT_INVALIDE", "Choisissez comptant ou crédit.")
+		return echeancier{}, socle.Problem(http.StatusBadRequest, "VENTE_MODE_PAIEMENT_INVALIDE", "Choisissez comptant ou crédit.")
 	}
-	if mode == modeCredit && (in.NombreMois == nil || *in.NombreMois < 1) {
-		return "", socle.Problem(http.StatusBadRequest, "VENTE_DUREE_CREDIT_INVALIDE", "Indiquez le nombre de mois du crédit.")
+	if mode == modeComptant {
+		return echeancier{mode: mode, periodicite: 1}, nil
 	}
-	if mode == modeCredit && in.MarquerSoldee {
-		return "", socle.Problem(http.StatusBadRequest, "VENTE_SOLDEE_INVALIDE", "Une vente à crédit ne peut être soldée manuellement à cette étape.")
+	if in.MarquerSoldee {
+		return echeancier{}, socle.Problem(http.StatusBadRequest, "VENTE_SOLDEE_INVALIDE", "Une vente à crédit ne peut être soldée manuellement à cette étape.")
 	}
-	return mode, nil
+	return echeancierCredit(in, avant)
+}
+
+func echeancierCredit(in *venteInput, avant *db.Vente) (echeancier, error) {
+	if in.NombreEcheances == nil || *in.NombreEcheances < 1 {
+		return echeancier{}, socle.Problem(http.StatusBadRequest, "VENTE_ECHEANCIER_INVALIDE", "Indiquez le nombre d’échéances.")
+	}
+	periodicite := max(in.PeriodiciteMois, 1)
+	sortie := echeancier{mode: modeCredit, nombre: in.NombreEcheances, periodicite: periodicite}
+	if in.JourVersement == nil && in.PremierVersement == "" && echeancierAnterieur(avant) {
+		return sortie, nil
+	}
+	premier, err := time.Parse(time.DateOnly, in.PremierVersement)
+	if in.JourVersement == nil || err != nil {
+		return echeancier{}, socle.Problem(http.StatusBadRequest, "VENTE_ECHEANCIER_INVALIDE",
+			"Indiquez le jour de versement et la date du premier versement.")
+	}
+	sortie.jour, sortie.premier = in.JourVersement, dateSQL(premier)
+	return sortie, nil
+}
+
+// Un crédit saisi avant l'échéancier n'a ni jour ni premier versement.
+func echeancierAnterieur(avant *db.Vente) bool {
+	return avant != nil && avant.ModePaiement == modeCredit && avant.JourVersement == nil
 }
 
 type venteContexte struct {
@@ -355,7 +391,7 @@ type venteContexte struct {
 	site                              db.VentesSite
 }
 
-func (s *service) contexte(ctx context.Context, in *venteInput) (venteContexte, error) {
+func (s *service) contexte(ctx context.Context, in *venteInput, avant *db.Vente) (venteContexte, error) {
 	client := strings.Join(strings.Fields(strings.ToUpper(strings.TrimSpace(in.Client))), " ")
 	telephone := strings.TrimSpace(in.Telephone)
 	siteNom := strings.ToUpper(strings.TrimSpace(in.Site))
@@ -367,21 +403,30 @@ func (s *service) contexte(ctx context.Context, in *venteInput) (venteContexte, 
 	if err != nil {
 		return venteContexte{}, socle.Problem(http.StatusBadRequest, "VENTE_DATE_INVALIDE", "La date de souscription est invalide.")
 	}
-	site, err := s.Q.SiteVenteParNom(ctx, siteNom)
-	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !site.Actif) {
-		return venteContexte{}, socle.Problem(http.StatusBadRequest, "VENTE_SITE_INDISPONIBLE", "Ce site n’est plus proposé à la saisie.")
-	}
+	site, err := s.siteEtCanalProposes(ctx, siteNom, canal, avant)
 	if err != nil {
 		return venteContexte{}, err
+	}
+	return venteContexte{client: client, telephone: telephone, siteNom: siteNom, canal: canal, date: date, site: site}, nil
+}
+
+func (s *service) siteEtCanalProposes(ctx context.Context, siteNom, canal string, avant *db.Vente) (db.VentesSite, error) {
+	site, err := s.Q.SiteVenteParNom(ctx, siteNom)
+	siteConserve := avant != nil && avant.Site == siteNom
+	if errors.Is(err, pgx.ErrNoRows) || (err == nil && !site.Actif && !siteConserve) {
+		return db.VentesSite{}, socle.Problem(http.StatusBadRequest, "VENTE_SITE_INDISPONIBLE", "Ce site n’est plus proposé à la saisie.")
+	}
+	if err != nil {
+		return db.VentesSite{}, err
 	}
 	canaux, err := s.Q.ListerCanauxVentes(ctx)
 	if err != nil {
-		return venteContexte{}, err
+		return db.VentesSite{}, err
 	}
-	if !canalActif(canaux, canal) {
-		return venteContexte{}, socle.Problem(http.StatusBadRequest, "VENTE_CANAL_INDISPONIBLE", "Ce canal n’est plus proposé à la saisie.")
+	if !canalActif(canaux, canal) && (avant == nil || avant.Canal != canal) {
+		return db.VentesSite{}, socle.Problem(http.StatusBadRequest, "VENTE_CANAL_INDISPONIBLE", "Ce canal n’est plus proposé à la saisie.")
 	}
-	return venteContexte{client: client, telephone: telephone, siteNom: siteNom, canal: canal, date: date, site: site}, nil
+	return site, nil
 }
 
 func canalActif(canaux []db.VentesCanaux, libelle string) bool {

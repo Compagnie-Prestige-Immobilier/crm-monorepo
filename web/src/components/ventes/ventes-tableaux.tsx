@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/table';
 import {
   formatFcfa,
+  libelleCredit,
   totalVerse,
   type SiteVente,
   type Vente,
@@ -35,8 +36,7 @@ function paiementLabel(vente: Vente): string {
 }
 
 function modeLabel(vente: Vente): string {
-  if (vente.modePaiement !== 'CREDIT') return 'Comptant';
-  return vente.nombreMois === null ? 'Crédit' : `Crédit ${vente.nombreMois} mois`;
+  return vente.modePaiement === 'CREDIT' ? libelleCredit(vente) : 'Comptant';
 }
 
 function paiementVariant(vente: Vente): 'success' | 'warning' {
@@ -329,40 +329,31 @@ interface LigneSite {
   site: string;
   ventes: number;
   lots: number;
-  totalLots: number | null;
-  restants: number | null;
   chiffre: number;
   verse: number;
 }
 
 function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]): LigneSite[] {
   const sites = new Map<string, LigneSite>();
-  const parNom = new Map(configuration.map((site) => [site.nom, site]));
   for (const config of configuration) {
     sites.set(config.nom, {
       site: config.nom,
       ventes: 0,
       lots: 0,
-      totalLots: config.totalLots,
-      restants: config.totalLots,
       chiffre: 0,
       verse: 0,
     });
   }
   for (const vente of ventes) {
-    const config = parNom.get(vente.site);
     const ligne = sites.get(vente.site) ?? {
       site: vente.site,
       ventes: 0,
       lots: 0,
-      totalLots: config?.totalLots ?? null,
-      restants: config?.totalLots ?? null,
       chiffre: 0,
       verse: 0,
     };
     ligne.ventes += 1;
     ligne.lots += vente.nombreLots;
-    if (ligne.restants !== null) ligne.restants -= vente.nombreLots;
     ligne.chiffre += vente.prixTotal;
     ligne.verse += totalVerse(vente);
     sites.set(vente.site, ligne);
@@ -426,7 +417,6 @@ export function SyntheseSites({
               <TableHead>Site</TableHead>
               <TableHead className="text-right">Ventes</TableHead>
               <TableHead className="text-right">Lots</TableHead>
-              <TableHead className="text-right">Restants</TableHead>
               <TableHead className="text-right">Chiffre d’affaires</TableHead>
               <TableHead className="text-right">Encaissé</TableHead>
             </TableRow>
@@ -437,7 +427,6 @@ export function SyntheseSites({
                 <TableCell className="font-[600]">{ligne.site}</TableCell>
                 <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
                 <TableCell className={MONTANT}>{ligne.lots}</TableCell>
-                <TableCell className={MONTANT}>{ligne.restants ?? 'À configurer'}</TableCell>
                 <TableCell className={`${MONTANT} text-primary`}>
                   {formatFcfa(ligne.chiffre)}
                 </TableCell>
