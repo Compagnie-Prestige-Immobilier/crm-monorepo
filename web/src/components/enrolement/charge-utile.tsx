@@ -8,10 +8,54 @@ export const ABSENT = 'Non renseigné';
 const JOUR = /^\d{4}-\d{2}-\d{2}$/;
 const INSTANT = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/;
 
+/** Les codes d'état des deux plateformes : CHUES les écrit en anglais, Grand Public en français. */
+const ETATS: Record<string, string> = {
+  pending: 'En attente',
+  approved: 'Approuvé',
+  draft: 'Brouillon',
+  submitted: 'Déposé',
+  in_review: 'En vérification',
+  needs_correction: 'À corriger',
+  dfc_review: 'Revue DFC',
+  validated: 'Validé',
+  missing: 'Manquant',
+  rejected: 'Refusé',
+  transmitted: 'Transmis',
+  under_review: 'En examen',
+  accepted: 'Accepté',
+  refused: 'Refusé',
+  completed: 'Terminé',
+  resolved: 'Traitée',
+  to_public: 'Orientée Grand Public',
+  released: 'Inscription ouverte',
+  not_called: 'Pas encore appelé',
+  reached: 'Joint',
+  to_call_back: 'À rappeler',
+  unreachable: 'Injoignable',
+  declined: 'Ne donne pas suite',
+  no_answer_1: 'Sans réponse (1)',
+  no_answer_2: 'Sans réponse (2)',
+  disponible: 'Disponible',
+  reserve: 'Réservé',
+  vendu: 'Vendu',
+  valide: 'Validé',
+  rejete: 'Rejeté',
+  accepte: 'Acceptée',
+  'en-attente': 'En attente',
+  depose: 'Déposée',
+  verification: 'En vérification',
+  'a-remplacer': 'À remplacer',
+  refuse: 'Refusée',
+  in_person: 'En personne',
+  whatsapp: 'WhatsApp',
+  other: 'Autre',
+};
+
 function texteScalaire(valeur: string): string {
   if (valeur === '') return ABSENT;
   if (JOUR.test(valeur)) return formatDate(valeur);
-  return INSTANT.test(valeur) ? formatDateTime(valeur) : valeur;
+  if (INSTANT.test(valeur)) return formatDateTime(valeur);
+  return ETATS[valeur] ?? valeur;
 }
 
 export function scalaire(valeur: unknown): string | null {
@@ -73,16 +117,33 @@ export function Champs({ valeur }: { valeur: unknown }) {
   );
 }
 
-/** Un objet à l'intérieur d'un objet reste rare : il se lit à plat plutôt qu'en cascade. */
+/** Une personne (`{id, nom}`) se lit par son nom ; un autre objet par ses champs renseignés. */
+function resume(valeur: unknown): string {
+  const direct = scalaire(valeur);
+  if (direct !== null) return direct;
+  if (Array.isArray(valeur)) return valeur.map(resume).join(' ; ') || ABSENT;
+  const champs = valeur as Record<string, unknown>;
+  if (typeof champs['nom'] === 'string') return champs['nom'];
+  const renseignes = Object.entries(champs)
+    .filter(([, sous]) => sous !== null && sous !== '')
+    .map(([cle, sous]) => `${libelleCle(cle)} : ${resume(sous)}`);
+  return renseignes.length === 0 ? ABSENT : renseignes.join(' · ');
+}
+
+/** Un objet dans un objet se lit en lignes « Libellé : valeur », jamais en JSON. */
 function ImbriquE({ valeur }: { valeur: unknown }) {
   const elements = Array.isArray(valeur) ? valeur : [valeur];
+  if (elements.length === 0) return <span className="text-muted-foreground">{ABSENT}</span>;
   return (
     <ul className="flex flex-col gap-1">
-      {elements.map((element, rang) => (
-        <li key={rang} className="text-[0.8125rem] text-muted-foreground">
-          {JSON.stringify(element)}
-        </li>
-      ))}
+      {elements.map((element, rang) => {
+        const texte = resume(element);
+        return (
+          <li key={rang} className={texte === ABSENT ? 'text-muted-foreground' : ''}>
+            {texte}
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -102,7 +163,8 @@ function titreElement(element: unknown, rang: number): string {
 }
 
 function etatElement(element: unknown): string | null {
-  return texteDe(element, ['statut', 'status']);
+  const etat = texteDe(element, ['statut', 'status']);
+  return etat === null ? null : texteScalaire(etat);
 }
 
 /**
