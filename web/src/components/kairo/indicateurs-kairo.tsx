@@ -78,12 +78,7 @@ function genererStats(tickets: TicketKairo[], mttrSecondes?: number): StatKairo[
 function CelluleStat(props: { item: StatKairo; large: boolean }) {
   const { item, large } = props;
   return (
-    <div
-      className={cn(
-        'flex flex-col gap-1 p-4 sm:p-5',
-        large ? 'col-span-2 sm:col-span-1' : '',
-      )}
-    >
+    <div className={cn('flex flex-col gap-1 p-4 sm:p-5', large ? 'col-span-2 sm:col-span-1' : '')}>
       <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
         {item.titre}
       </span>
