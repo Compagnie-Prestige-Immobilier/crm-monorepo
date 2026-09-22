@@ -612,11 +612,13 @@ function Montant({
   label,
   valeur,
   max = PLAFOND_MONTANT,
+  placeholder = '0',
   onChange,
   children,
 }: {
   id: string;
   label: string;
+  placeholder?: string;
   valeur: number;
   max?: number;
   onChange: (montant: number) => void;
@@ -631,8 +633,8 @@ function Montant({
         <Input
           id={id}
           inputMode="numeric"
-          className="h-14 text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/15"
-          placeholder="0"
+          className="h-14 text-[1.375rem] tabular-nums placeholder:text-[1rem] placeholder:text-muted-foreground/40"
+          placeholder={placeholder}
           value={espaces(valeur)}
           onChange={(e) => onChange(Math.min(max, entier(e.target.value)))}
         />
@@ -981,6 +983,7 @@ function EcranPaiement({ draft, changer }: EcranProps) {
         }
         valeur={draft.acompte}
         max={prixTotal}
+        placeholder={credit ? 'Montant de l’acompte' : 'Montant payé'}
         onChange={changerMontant}
       >
         <PartsAcompte visible={credit} prixTotal={prixTotal} draft={draft} changer={changer} />
