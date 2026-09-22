@@ -20,7 +20,7 @@ func kairoFactice(t *testing.T, recues *[]string) {
 		*recues = append(*recues, r.Method+" "+r.URL.Path)
 		switch r.URL.Path {
 		case "/etat":
-			_, _ = w.Write([]byte(`{"sain":true,"pauseDepuis":null,"derniereLectureSecondes":3,"intervalleSecondes":30,"agents":["claude-primary"],"tickets":[]}`))
+			_, _ = w.Write([]byte(`{"sain":true,"pauseDepuis":null,"derniereLectureSecondes":3,"intervalleSecondes":30,"agents":["claude-primary"],"tickets":[{"id":7,"projet":"crm","statut":"escalade","essais":3,"majLe":"2026-09-22 01:00:00","lien":"https://glpi/7","resume":"Besoin d'arbitrage","cause":"Complexité haute","notes":"Vérifier la facture"}]}`))
 		case "/tickets/7/relance":
 			w.WriteHeader(http.StatusConflict)
 		default:
@@ -58,6 +58,7 @@ func TestKairoRelaieLesCommandesEtTraceLeModeleDeReformulation(t *testing.T) {
 	if sain, _ := etat["sain"].(bool); !sain {
 		t.Fatalf("état de Kairo : %v", body)
 	}
+	verifierDetailTicket(t, etat)
 	statut, body = b.appelSupport(http.MethodPost, "/api/v1/admin/kairo/pause", nil)
 	b.attend(statut, http.StatusNoContent, "pause", body)
 	statut, body = b.appelSupport(http.MethodPost, "/api/v1/admin/kairo/tickets/7/relance", nil)
@@ -71,5 +72,17 @@ func TestKairoRelaieLesCommandesEtTraceLeModeleDeReformulation(t *testing.T) {
 	b.attend(statut, http.StatusOK, "tableau sans Kairo", body)
 	if body["kairo"] != nil || body["kairoErreur"] == "" {
 		t.Fatalf("Kairo non relié : %v", body)
+	}
+}
+
+func verifierDetailTicket(t *testing.T, etat map[string]any) {
+	t.Helper()
+	tickets, _ := etat["tickets"].([]any)
+	if len(tickets) != 1 {
+		t.Fatalf("tickets attendus : %v", tickets)
+	}
+	t0, _ := tickets[0].(map[string]any)
+	if t0["resume"] != "Besoin d'arbitrage" || t0["cause"] != "Complexité haute" || t0["notes"] != "Vérifier la facture" {
+		t.Fatalf("champs de détail ticket : %v", t0)
 	}
 }

@@ -3,6 +3,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { formatDistanceStrict } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import { PauseIcon, PlayIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { CarteReformulation } from '@/components/kairo/carte-reformulation';
@@ -67,32 +68,47 @@ function KairoView() {
     queryFn: lireTableauKairo,
     refetchInterval: 15_000,
   });
+  const [dernierKairo, setDernierKairo] = useState<EtatKairo | null>(null);
+  if (tableau.data?.kairo && tableau.data.kairo !== dernierKairo) {
+    setDernierKairo(tableau.data.kairo);
+  }
+
   if (tableau.isPending) return <Chargement />;
   if (tableau.isError) {
     return <QueryErrorState error={tableau.error} onRetry={() => void tableau.refetch()} />;
   }
   const { kairo, kairoErreur, reformulation } = tableau.data;
+  const etatAffiche = kairo ?? dernierKairo;
+  const injoignable = kairo === null;
+
   return (
     <div className="flex flex-col gap-6">
-      {kairo === null ? (
+      {injoignable ? (
         <KairoInjoignable
           message={kairoErreur ?? ''}
           pending={tableau.isFetching}
           onRetry={() => void tableau.refetch()}
+          dernierEtatConserve={etatAffiche !== null}
         />
-      ) : (
+      ) : null}
+      {etatAffiche !== null ? (
         <>
-          <BandeauEtat etat={kairo} />
-          <IndicateursKairo tickets={kairo.tickets} />
-          <CarteTickets tickets={kairo.tickets} />
+          <BandeauEtat etat={etatAffiche} desactive={injoignable} />
+          <IndicateursKairo tickets={etatAffiche.tickets} />
+          <CarteTickets tickets={etatAffiche.tickets} desactive={injoignable} />
         </>
-      )}
+      ) : null}
       <CarteReformulation reformulation={reformulation} />
     </div>
   );
 }
 
-function KairoInjoignable(props: { message: string; pending: boolean; onRetry: () => void }) {
+function KairoInjoignable(props: {
+  message: string;
+  pending: boolean;
+  onRetry: () => void;
+  dernierEtatConserve?: boolean;
+}) {
   return (
     <Card role="alert" className="border-l-4 border-l-destructive">
       <CardContent className="flex flex-col items-start gap-4 sm:flex-row sm:items-center">
@@ -103,7 +119,12 @@ function KairoInjoignable(props: { message: string; pending: boolean; onRetry: (
           <p className="font-display text-xl font-[800] tracking-[-0.01em]">
             Kairo est hors de portée
           </p>
-          <p className="text-sm text-muted-foreground">{props.message}</p>
+          <p className="text-sm text-muted-foreground">
+            {props.message}
+            {props.dernierEtatConserve
+              ? ' Les tickets et métriques relevés lors de la dernière communication restent affichés ci-dessous en lecture seule.'
+              : null}
+          </p>
         </div>
         <Button
           variant="outline"
@@ -119,7 +140,7 @@ function KairoInjoignable(props: { message: string; pending: boolean; onRetry: (
   );
 }
 
-function BandeauEtat({ etat }: { etat: EtatKairo }) {
+function BandeauEtat({ etat, desactive }: { etat: EtatKairo; desactive?: boolean }) {
   const client = useQueryClient();
   const enPause = etat.pauseDepuis !== null;
   const bascule = useMutation({
@@ -178,7 +199,8 @@ function BandeauEtat({ etat }: { etat: EtatKairo }) {
         <Button
           size="lg"
           variant={enPause ? 'default' : 'outline'}
-          disabled={bascule.isPending}
+          disabled={desactive || bascule.isPending}
+          title={desactive ? 'Kairo est hors de portée' : undefined}
           onClick={() => bascule.mutate(!enPause)}
           className="w-full sm:w-auto"
         >

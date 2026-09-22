@@ -23,6 +23,9 @@ type JobRecord struct {
 	Attempts  int    `json:"essais"`
 	UpdatedAt string `json:"majLe"`
 	Link      string `json:"lien"`
+	Resume    string `json:"resume,omitempty"`
+	Cause     string `json:"cause,omitempty"`
+	Notes     string `json:"notes,omitempty"`
 }
 
 type Store struct {
@@ -67,7 +70,10 @@ func (s *Store) init(ctx context.Context) error {
 			project TEXT NOT NULL,
 			status TEXT NOT NULL,
 			attempts INTEGER NOT NULL DEFAULT 1,
-			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+			updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			resume TEXT NOT NULL DEFAULT '',
+			cause TEXT NOT NULL DEFAULT '',
+			notes TEXT NOT NULL DEFAULT ''
 		)`,
 		`UPDATE kairo_jobs SET status='retry', updated_at=datetime('now', '-1 day') WHERE status='running'`,
 		`CREATE TABLE IF NOT EXISTS kairo_pause (
@@ -80,6 +86,9 @@ func (s *Store) init(ctx context.Context) error {
 		if _, err := s.db.ExecContext(ctx, q); err != nil {
 			return fmt.Errorf("init db (%s) : %w", q, err)
 		}
+	}
+	for _, col := range []string{"resume", "cause", "notes"} {
+		_, _ = s.db.ExecContext(ctx, fmt.Sprintf("ALTER TABLE kairo_jobs ADD COLUMN %s TEXT NOT NULL DEFAULT ''", col))
 	}
 	return nil
 }
@@ -157,11 +166,15 @@ func (s *Store) DueRetries(ctx context.Context, retryDelayModifier string) ([]Jo
 	return list, rows.Err()
 }
 
-func (s *Store) Finish(ctx context.Context, ticketID int, status string) error {
+func (s *Store) Finish(ctx context.Context, ticketID int, status string, resume, cause, notes string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.ExecContext(ctx, "UPDATE kairo_jobs SET status=?, updated_at=CURRENT_TIMESTAMP WHERE ticket_id=?", status, ticketID)
+	_, err := s.db.ExecContext(
+		ctx,
+		"UPDATE kairo_jobs SET status=?, resume=?, cause=?, notes=?, updated_at=CURRENT_TIMESTAMP WHERE ticket_id=?",
+		status, resume, cause, notes, ticketID,
+	)
 	return err
 }
 
@@ -197,7 +210,7 @@ func (s *Store) Relaunch(ctx context.Context, ticketID int) (bool, error) {
 
 	res, err := s.db.ExecContext(
 		ctx,
-		`UPDATE kairo_jobs SET status='retry', attempts=0, updated_at=datetime('now', '-1 day')
+		`UPDATE kairo_jobs SET status='retry', attempts=0, resume='', cause='', notes='', updated_at=datetime('now', '-1 day')
 		WHERE ticket_id=? AND status IN ('echec', 'escalade')`,
 		ticketID,
 	)
@@ -215,7 +228,7 @@ func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
+	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
@@ -224,7 +237,7 @@ func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	var list []JobRecord
 	for rows.Next() {
 		var r JobRecord
-		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt); err != nil {
+		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
