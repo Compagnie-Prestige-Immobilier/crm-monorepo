@@ -784,7 +784,7 @@ function ChoixPersonne({
 
 function prixAffiche(site: SiteVente): string {
   if (site.superficies.length === 0) return formatFcfa(site.prixUnitaireDefaut);
-  return `Dès ${formatFcfa(Math.min(...site.superficies.map((s) => s.prix)))}`;
+  return formatFcfa(Math.min(...site.superficies.map((s) => s.prix)));
 }
 
 function EcranLots({ draft, changer, site }: EcranProps & { site: SiteVente | undefined }) {
