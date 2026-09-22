@@ -402,7 +402,60 @@ export function ConversionFields({
           )}
         </Field>
       ) : null,
+<<<<<<< HEAD
+    method: (
+      <>
+        <GroupeEnLigne label="Méthode d’enrôlement" error={errors.method}>
+          <Pastille
+            type="radio"
+            name="console-method"
+            checked={draft.method === null}
+            label="Aucun"
+            onChange={() => {
+              onChange({ method: null, rendezVousAt: '' });
+            }}
+          />
+          {ENROLLMENT_METHOD_ORDER.map((method) => (
+            <MethodChoice
+              key={method}
+              method={method}
+              checked={draft.method === method}
+              onSelect={() => {
+                // Changer de méthode efface la date : le serveur refuse un
+                // rendez-vous sur toute autre méthode que la prise de rendez-vous.
+                onChange({
+                  method,
+                  ...(method === 'APPOINTMENT' ? {} : { rendezVousAt: '' }),
+                });
+              }}
+            />
+          ))}
+        </GroupeEnLigne>
+        {draft.method === 'APPOINTMENT' ? (
+          <Field
+            label="Date et heure du rendez-vous en agence"
+            required
+            error={errors.rendezVousAt}
+            description="Heure de Dakar (UTC+0), quel que soit le fuseau de ce poste."
+          >
+            {(props) => (
+              <Input
+                {...props}
+                type="datetime-local"
+                value={draft.rendezVousAt}
+                onChange={(event) => {
+                  onChange({ rendezVousAt: event.target.value });
+                }}
+              />
+            )}
+          </Field>
+        ) : null}
+        <CoordonneeChues method={draft.method} />
+      </>
+    ),
+=======
     method: null,
+>>>>>>> 6fe6c7b3a993a49558bcff4112f1d1d535efd63d
     rendezVousAt: null,
   };
 

@@ -8,6 +8,7 @@ import { SUIVI_PAGE_SIZE } from '@/lib/data/representants';
 import type {
   BddSegment,
   DeviceCallDetection,
+  ENROLLMENT_METHOD_ORDER,
   Paginated,
   Projet,
   ProspectFilters,
@@ -437,6 +438,21 @@ export async function remettreProspectATraiter(
     await client.POST('/api/v1/prospects/{id}/requalifier', {
       params: { path: { id } },
       body: { projet, statut: 'NOUVEAU' },
+    }),
+  );
+}
+
+export type MethodeEncadrement = 'AUCUNE' | (typeof ENROLLMENT_METHOD_ORDER)[number];
+
+export async function modifierMethodeProspect(
+  id: string,
+  methode: MethodeEncadrement,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectRow> {
+  return unwrap(
+    await client.PUT('/api/v1/prospects/{id}/methode', {
+      params: { path: { id } },
+      body: { methode },
     }),
   );
 }
