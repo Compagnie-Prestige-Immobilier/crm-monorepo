@@ -59,7 +59,26 @@ func (e *Engine) Poll(ctx context.Context) {
 	}
 
 	e.pollRetries(ctx)
+	e.pollClosedBlocked(ctx)
 	_ = e.state.CheckpointWAL(ctx)
+}
+
+func (e *Engine) pollClosedBlocked(ctx context.Context) {
+	blockedIDs, err := e.state.BlockedTickets(ctx)
+	if err != nil || len(blockedIDs) == 0 {
+		return
+	}
+
+	for _, id := range blockedIDs {
+		ticketData, err := e.glpiClient.Ticket(ctx, id)
+		if err != nil {
+			continue
+		}
+		if solver.TicketEstClos(ticketData) {
+			slog.Info("ticket bloqué détecté comme clos dans GLPI", "ticket", id)
+			_ = e.state.Finish(ctx, id, "abandon", "Ticket clos ou résolu dans GLPI (escalade traitée).", "", "", "", "", 0)
+		}
+	}
 }
 
 func (e *Engine) pollProject(ctx context.Context, project *config.Project) {

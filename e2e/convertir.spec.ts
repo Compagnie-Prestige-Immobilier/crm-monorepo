@@ -157,7 +157,7 @@ const groupe = (page: Page, legende: string) => page.getByRole('group', { name: 
 
 async function remplirDossier(
   page: Page,
-  dossier: { profession: string; email: string; methode: string },
+  dossier: { profession: string; email: string },
 ): Promise<void> {
   await page.getByRole('textbox', { name: /^Profession/u }).fill(dossier.profession);
   await page.getByRole('spinbutton', { name: /^Durée dans la fonction/u }).fill('84');
@@ -176,13 +176,6 @@ async function remplirDossier(
     page.getByRole('combobox', { name: /^Revenu mensuel/u }),
     'Moins de 50 000 F CFA',
   );
-  await groupe(page, 'Méthode d’enrôlement').getByRole('radio', { name: dossier.methode }).check();
-}
-
-/** Deux jours plus tard a 10 h de Dakar, que le serveur lit en UTC. */
-function rendezVousProchain(): string {
-  const jour = new Date(Date.now() + 2 * 86_400_000);
-  return `${jour.toISOString().slice(0, 10)}T10:00`;
 }
 
 // Un micro feint pour tout le fichier : `launchOptions` ne se change pas par
@@ -194,18 +187,16 @@ test.afterAll(async () => {
 });
 
 test.describe('parcours 5, convertir un prospect', () => {
-  test('le dossier et le rendez-vous survivent a l’enregistrement', async ({ page }) => {
+  test('le dossier survit a l’enregistrement', async ({ page }) => {
     const fiche = await semer('Conversion');
     const suffixe = marque();
     const profession = `Instituteur ${suffixe}`;
     const email = `awa.${suffixe}@ecole.sn`;
     const commentaire = `Rendez-vous pris au bureau ${suffixe}`;
-    const rendezVous = rendezVousProchain();
 
     await ouvrirFiche(page, fiche);
     await issue(page, 'Joignable');
-    await remplirDossier(page, { profession, email, methode: 'RDV en agence (Adhésion)' });
-    await page.getByLabel(/^Date et heure du rendez-vous/u).fill(rendezVous);
+    await remplirDossier(page, { profession, email });
     await page.getByRole('button', { name: 'Continuer' }).click();
     await qualifier(page, /Intéressé/u, /Terrain/u);
     await page.getByLabel(/^Commentaire/u).fill(commentaire);
@@ -214,22 +205,18 @@ test.describe('parcours 5, convertir un prospect', () => {
     await expect(consigne(page, fiche.nom)).toBeVisible();
 
     const conversion = await lireConversion(fiche.id);
-    expect(conversion.method).toBe('APPOINTMENT');
+    expect(conversion.method).toBeNull();
     expect(conversion.email).toBe(email);
     expect(conversion.fonctionnaire).toBe(true);
     expect(conversion.engagementEnCours).toBe(false);
     expect(conversion.dureeEtablissementMois).toBe(84);
     expect(conversion.comment).toBe(commentaire);
-    expect(conversion.rendezVousAt?.toISOString()).toBe(`${rendezVous}:00.000Z`);
     expect(conversion.profession).toBe(profession);
-    expect(conversion.phase2Status).toBe('METHOD_OBTAINED');
-    expect(conversion.parcoursStatut).toBe('METHOD_OBTAINED');
-    expect(conversion.enrollmentMethod).toBe('APPOINTMENT');
+    expect(conversion.enrollmentMethod).toBeNull();
     expect(conversion.banqueName).toContain('CBAO');
     expect(conversion.incomeBandLabel).toBe('Moins de 50 000 F CFA');
 
     await page.goto(`/teleconseil/prospects/${fiche.id}`);
-    await expect(page.getByText('Méthode obtenue').first()).toBeVisible();
     await page.getByRole('list', { name: 'Histoire' }).getByText(commentaire).click();
     await expect(page.getByText(email)).toBeVisible();
     await expect(page.getByText(profession)).toBeVisible();
@@ -246,7 +233,6 @@ test.describe('parcours 5, convertir un prospect', () => {
     await remplirDossier(page, {
       profession: `Greffier ${suffixe}`,
       email: `omar.${suffixe}@ecole.sn`,
-      methode: 'Par e-mail',
     });
     await page.getByRole('button', { name: 'Continuer' }).click();
     await qualifier(page, /Hésitant/u);
@@ -255,7 +241,7 @@ test.describe('parcours 5, convertir un prospect', () => {
 
     await page.goto(`/teleconseil/appel/${fiche.id}`);
     await expect(
-      page.getByRole('status').filter({ hasText: 'Déjà classée : méthode obtenue.' }),
+      page.getByRole('status').filter({ hasText: 'Déjà classée : hésitant.' }),
     ).toBeVisible();
     await revenirAuxIssues(page);
     await issue(page, 'Injoignable', /NRP/u);
@@ -276,8 +262,7 @@ test.describe('parcours 5, convertir un prospect', () => {
       .toMatchObject({
         tentatives: 3,
         phase2Status: 'WRONG_NUMBER',
-        // L'enrolement obtenu plus tot reste acquis : seul un appel avec methode le remplace.
-        enrollmentMethod: 'VOICE_OR_ELECTRONIC_MESSAGING',
+        enrollmentMethod: null,
         parcoursStatut: 'WRONG_NUMBER',
       });
   });
@@ -363,7 +348,6 @@ test.describe('parcours 5 en 390 px', () => {
     await remplirDossier(page, {
       profession: `Professeur ${suffixe}`,
       email: `pape.${suffixe}@ecole.sn`,
-      methode: 'Par e-mail',
     });
     await page.getByRole('button', { name: 'Continuer' }).click();
     await qualifier(page, /Intéressé/u);
@@ -373,7 +357,7 @@ test.describe('parcours 5 en 390 px', () => {
     await sansDebordementHorizontal(page);
 
     const conversion = await lireConversion(fiche.id);
-    expect(conversion.method).toBe('VOICE_OR_ELECTRONIC_MESSAGING');
-    expect(conversion.phase2Status).toBe('METHOD_OBTAINED');
+    expect(conversion.method).toBeNull();
+    expect(conversion.phase2Status).toBe('INTERESTED');
   });
 });

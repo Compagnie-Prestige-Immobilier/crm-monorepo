@@ -1,11 +1,13 @@
 package support
 
 import (
+	"bytes"
 	"context"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -38,6 +40,7 @@ type TicketKairo struct {
 	DureeSecondes int     `json:"dureeSecondes,omitempty"`
 	JevCategorie  string  `json:"jevCategorie,omitempty"`
 	JevConfiance  float64 `json:"jevConfiance,omitempty"`
+	Consigne      string  `json:"consigne,omitempty"`
 }
 
 type EtatKairo struct {
@@ -80,8 +83,12 @@ type TableauKairoOutput struct {
 	}
 }
 
-type TicketKairoInput struct {
-	ID int `path:"id" minimum:"1"`
+type RelanceTicketKairoInput struct {
+	ID   int `path:"id" minimum:"1"`
+	Body *struct {
+		Consigne string `json:"consigne,omitempty"`
+		Action   string `json:"action,omitempty"`
+	}
 }
 
 func monterKairo(api huma.API, s *service) {
@@ -91,15 +98,23 @@ func monterKairo(api huma.API, s *service) {
 	}, s.tableauKairo)
 	huma.Register(api, huma.Operation{
 		OperationID: "pauseKairo", Method: http.MethodPost, Path: cheminKairoPause, DefaultStatus: http.StatusNoContent,
-	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) { return nil, commanderKairo(ctx, "/pause") })
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/pause", nil)
+	})
 	huma.Register(api, huma.Operation{
 		OperationID: "repriseKairo", Method: http.MethodPost, Path: cheminKairoReprise, DefaultStatus: http.StatusNoContent,
-	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) { return nil, commanderKairo(ctx, "/reprise") })
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/reprise", nil)
+	})
 	huma.Register(api, huma.Operation{
 		OperationID: "relanceTicketKairo", Method: http.MethodPost, Path: cheminKairoRelance, DefaultStatus: http.StatusNoContent,
 		Summary: "Remet à Kairo un ticket en échec ou escaladé.",
-	}, func(ctx context.Context, in *TicketKairoInput) (*struct{}, error) {
-		return nil, commanderKairo(ctx, fmt.Sprintf("/tickets/%d/relance", in.ID))
+	}, func(ctx context.Context, in *RelanceTicketKairoInput) (*struct{}, error) {
+		var corps any
+		if in.Body != nil {
+			corps = in.Body
+		}
+		return nil, commanderKairo(ctx, fmt.Sprintf("/tickets/%d/relance", in.ID), corps)
 	})
 }
 
@@ -141,21 +156,32 @@ func (s *service) tableauKairo(ctx context.Context, _ *struct{}) (*TableauKairoO
 	return out, nil
 }
 
-func appelKairo(ctx context.Context, methode, chemin string) (*http.Response, error) {
+func appelKairo(ctx context.Context, methode, chemin string, corps any) (*http.Response, error) {
 	base, jeton := socle.Env("KAIRO_URL", ""), socle.Env("KAIRO_ADMIN_TOKEN", "")
 	if base == "" || jeton == "" {
 		return nil, socle.Problem(http.StatusServiceUnavailable, "KAIRO_NON_CONFIGURE", "Kairo n'est pas relié à ce serveur. Renseignez KAIRO_URL et KAIRO_ADMIN_TOKEN sur Dokploy.")
 	}
-	req, err := http.NewRequestWithContext(ctx, methode, strings.TrimRight(base, "/")+chemin, http.NoBody)
+	var reader io.Reader = http.NoBody
+	if corps != nil {
+		b, err := json.Marshal(corps)
+		if err != nil {
+			return nil, err
+		}
+		reader = bytes.NewReader(b)
+	}
+	req, err := http.NewRequestWithContext(ctx, methode, strings.TrimRight(base, "/")+chemin, reader)
 	if err != nil {
 		return nil, err
 	}
 	req.Header.Set("Authorization", "Bearer "+jeton)
+	if corps != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	return clientKairo.Do(req)
 }
 
 func lireKairo(ctx context.Context) (*EtatKairo, error) {
-	resp, err := appelKairo(ctx, http.MethodGet, "/etat")
+	resp, err := appelKairo(ctx, http.MethodGet, "/etat", nil)
 	if err != nil {
 		return nil, err
 	}
@@ -167,8 +193,8 @@ func lireKairo(ctx context.Context) (*EtatKairo, error) {
 	return &etat, json.NewDecoder(resp.Body).Decode(&etat)
 }
 
-func commanderKairo(ctx context.Context, chemin string) error {
-	resp, err := appelKairo(ctx, http.MethodPost, chemin)
+func commanderKairo(ctx context.Context, chemin string, corps any) error {
+	resp, err := appelKairo(ctx, http.MethodPost, chemin, corps)
 	if err != nil {
 		var probleme huma.StatusError
 		if errors.As(err, &probleme) {
