@@ -516,11 +516,11 @@ func TestBanqueSeulUnDossierValideAuxPiecesValidesEstProposeALOuverture(t *testi
 		s.inscriptionDistante("CHUES", "compte-adhesion-released", `{}`),
 		s.inscriptionDistante("CHUES", "needs_correction", `{}`),
 		s.inscriptionDistante("CHUES", "dfc_review", `{}`),
-		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"demande":{"submitted":true},"requisDocs":[{"status":"accepte"},{"status":"en-attente"}]}`),
-		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"demande":{"submitted":true},"requisDocs":[]}`),
-		s.inscriptionDistante("GRAND_PUBLIC", "etape-0", `{"demande":{"submitted":false},"requisDocs":[{"status":"accepte"}]}`),
+		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"demande":{"soumise":true},"pieces":[{"statut":"accepte"},{"statut":"en-attente"}]}`),
+		s.inscriptionDistante("GRAND_PUBLIC", "etape-1", `{"demande":{"soumise":true},"pieces":[]}`),
+		s.inscriptionDistante("GRAND_PUBLIC", "etape-0", `{"demande":{"soumise":false},"pieces":[{"statut":"accepte"}]}`),
 	}
-	complete := s.inscriptionDistante("GRAND_PUBLIC", "etape-2", `{"demande":{"submitted":true},"requisDocs":[{"status":"accepte"},{"status":"accepte"}]}`)
+	complete := s.inscriptionDistante("GRAND_PUBLIC", "etape-2", `{"demande":{"soumise":true},"pieces":[{"statut":"accepte"},{"statut":"accepte"}]}`)
 	for _, projet := range []string{"CHUES", "GRAND_PUBLIC"} {
 		statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet="+projet, nil)
 		s.attend(statut, http.StatusOK, "inscriptions à ouvrir "+projet, body)
