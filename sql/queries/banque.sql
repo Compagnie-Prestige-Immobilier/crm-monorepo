@@ -208,10 +208,10 @@ WHERE i."projet" = sqlc.arg('projet')::"Projet" AND i."disparueLe" IS NULL
   AND ((cardinality(sqlc.arg('statuts')::text[]) = 0
         AND (i."statutDistant" = 'validated'
              OR (i."projet" = 'GRAND_PUBLIC'
-                 AND i."chargeUtile" #>> '{demande,submitted}' = 'true'
-                 AND jsonb_array_length(COALESCE(i."chargeUtile" -> 'requisDocs', '[]'::jsonb)) > 0
-                 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i."chargeUtile" -> 'requisDocs') d
-                                 WHERE d ->> 'status' <> 'accepte'))))
+                 AND i."chargeUtile" #>> '{demande,soumise}' = 'true'
+                 AND jsonb_array_length(COALESCE(i."chargeUtile" -> 'pieces', '[]'::jsonb)) > 0
+                 AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(i."chargeUtile" -> 'pieces') d
+                                 WHERE d ->> 'statut' <> 'accepte'))))
        OR i."statutDistant" = ANY(sqlc.arg('statuts')::text[]))
   AND (NOT sqlc.arg('a_signaler')::boolean OR i."completeSignaleeLe" IS NULL)
   AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id" AND c."deletedAt" IS NULL)

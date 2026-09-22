@@ -81,13 +81,15 @@ func pieceDuGrandPublic(ctx context.Context, source *sourceDesPieces, code strin
 func archiveChues(ctx context.Context, base, jeton string, charge []byte) ([]byte, error) {
 	var distant struct {
 		Dossier *struct {
-			ID json.Number `json:"id"`
+			ID json.RawMessage `json:"id"`
 		} `json:"dossier"`
 	}
 	if json.Unmarshal(charge, &distant) != nil || distant.Dossier == nil {
 		return nil, errors.New("aucun dossier ouvert sur la plateforme CHUES")
 	}
-	corps, _, err := lirePlateformeBrut(ctx, base+"/dossiers/"+distant.Dossier.ID.String()+"/archive", jeton)
+	// Le flux d'intégration rend l'identifiant en chaîne, l'ancienne route en nombre.
+	dossier := strings.Trim(string(distant.Dossier.ID), `"`)
+	corps, _, err := lirePlateformeBrut(ctx, base+"/dossiers/"+dossier+"/archive", jeton)
 	return corps, err
 }
 
