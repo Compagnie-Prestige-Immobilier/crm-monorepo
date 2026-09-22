@@ -1,0 +1,141 @@
+package engine
+
+import (
+	"context"
+	"log/slog"
+	"sync"
+	"sync/atomic"
+	"ticket-solver/internal/config"
+	"ticket-solver/internal/glpi"
+	"ticket-solver/internal/solver"
+	"ticket-solver/internal/state"
+)
+
+type Engine struct {
+	cfg        *config.Config
+	state      *state.Store
+	glpiClient *glpi.Client
+	solver     *solver.Solver
+	lastPoll   *atomic.Int64
+
+	sem     chan struct{}
+	wg      sync.WaitGroup
+	ignored map[int]string
+	mu      sync.Mutex
+}
+
+func New(
+	cfg *config.Config,
+	s *state.Store,
+	g *glpi.Client,
+	solv *solver.Solver,
+	lastPoll *atomic.Int64,
+) *Engine {
+	return &Engine{
+		cfg:        cfg,
+		state:      s,
+		glpiClient: g,
+		solver:     solv,
+		lastPoll:   lastPoll,
+		sem:        make(chan struct{}, cfg.MaxConcurrentJobs),
+		ignored:    make(map[int]string),
+	}
+}
+
+func (e *Engine) Poll(ctx context.Context) {
+	_, paused, err := e.state.PausedSince(ctx)
+	if err != nil {
+		slog.Error("erreur vérification pause", "err", err)
+		return
+	}
+	if paused {
+		return
+	}
+
+	for i := range e.cfg.Projects {
+		e.pollProject(ctx, &e.cfg.Projects[i])
+	}
+
+	e.pollRetries(ctx)
+}
+
+func (e *Engine) pollProject(ctx context.Context, project *config.Project) {
+	tickets, err := e.glpiClient.NewTickets(ctx, project.CategoryID)
+	if err != nil {
+		slog.Error("lecture GLPI impossible pour catégorie", "cat", project.CategoryID, "err", err)
+		return
+	}
+
+	for _, t := range tickets {
+		e.processNewTicket(ctx, project, t)
+	}
+}
+
+func (e *Engine) processNewTicket(ctx context.Context, project *config.Project, t glpi.TicketSummary) {
+	e.mu.Lock()
+	prevMod, wasIgnored := e.ignored[t.ID]
+	e.mu.Unlock()
+
+	if wasIgnored && prevMod == t.DateMod {
+		return
+	}
+
+	known, err := e.state.Known(ctx, t.ID)
+	if err != nil || known {
+		return
+	}
+
+	ticketData, err := e.glpiClient.Ticket(ctx, t.ID)
+	if err != nil {
+		return
+	}
+
+	name, _ := ticketData["name"].(string)
+	content, _ := ticketData["content"].(string)
+	if !config.HasMarker(name, content, project.Markers) {
+		e.mu.Lock()
+		e.ignored[t.ID] = t.DateMod
+		e.mu.Unlock()
+		return
+	}
+
+	claimed, err := e.state.Claim(ctx, t.ID, project.Name)
+	if err != nil || !claimed {
+		return
+	}
+
+	slog.Info("ticket pris en charge", "ticket", t.ID, "projet", project.Name)
+	e.launch(ctx, t.ID, project.Name)
+}
+
+func (e *Engine) pollRetries(ctx context.Context) {
+	retries, err := e.state.DueRetries(ctx, "-15 minutes")
+	if err != nil {
+		return
+	}
+
+	for _, r := range retries {
+		claimed, err := e.state.Claim(ctx, r.TicketID, r.Project)
+		if err != nil || !claimed {
+			continue
+		}
+		slog.Info("ticket nouvel essai", "ticket", r.TicketID, "projet", r.Project)
+		e.launch(ctx, r.TicketID, r.Project)
+	}
+}
+
+func (e *Engine) launch(ctx context.Context, ticketID int, projectName string) {
+	e.wg.Add(1)
+	jobCtx := context.WithoutCancel(ctx)
+	go func() {
+		defer e.wg.Done()
+		e.sem <- struct{}{}
+		defer func() { <-e.sem }()
+
+		e.solver.RunJob(jobCtx, ticketID, projectName)
+	}()
+}
+
+func (e *Engine) Wait() {
+	e.wg.Wait()
+}
