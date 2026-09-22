@@ -34,6 +34,7 @@ var GardeBases = map[string]socle.Permission{
 	"POST " + cheminBases:                       socle.PermissionBasesAdministrer,
 	"DELETE " + cheminBases + "/{nom}":          socle.PermissionBasesAdministrer,
 	"POST " + cheminBases + "/{nom}/rafraichir": socle.PermissionBasesAdministrer,
+	"POST " + cheminBases + "/rafraichir":       socle.PermissionBasesAdministrer,
 }
 
 type BaseDemoDto struct {
@@ -206,26 +207,52 @@ func (s *serviceBases) rafraichir(ctx context.Context, in *BaseSupprimerInput) (
 	if err != nil {
 		return nil, err
 	}
+	if err := s.rafraichirUne(ctx, nom, baseSQL); err != nil {
+		return nil, err
+	}
+	return s.lister(ctx, nil)
+}
+
+// Sans ce point d'entrée, rattraper une dérive de schéma entre plusieurs
+// bases de démonstration voulait dire les rafraîchir une à une depuis le
+// panneau, ce qui en oublie forcément une entre deux migrations.
+func (s *serviceBases) rafraichirTout(ctx context.Context, _ *struct{}) (*BasesOutput, error) {
+	if err := s.exigerBasePrincipale(); err != nil {
+		return nil, err
+	}
+	lignes, err := s.Q.BasesDemonstration(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range lignes {
+		if err := s.rafraichirUne(ctx, lignes[i].Nom, lignes[i].BaseSql); err != nil {
+			return nil, err
+		}
+	}
+	return s.lister(ctx, nil)
+}
+
+func (s *serviceBases) rafraichirUne(ctx context.Context, nom, baseSQL string) error {
 	if pool := s.reg.demonter(nom); pool != nil {
 		pool.Close()
 	}
 	travail, arreter := context.WithTimeout(context.WithoutCancel(ctx), delaiCreationDemo)
 	defer arreter()
 	if err := detruireBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
-		return nil, socle.Problem(http.StatusServiceUnavailable, "RAFRAICHISSEMENT_IMPOSSIBLE",
+		return socle.Problem(http.StatusServiceUnavailable, "RAFRAICHISSEMENT_IMPOSSIBLE",
 			"La base n'a pas pu être réinitialisée. Réessayez.")
 	}
 	if err := creerBaseSQL(travail, s.Cfg.DatabaseURL, baseSQL); err != nil {
-		return nil, err
+		return err
 	}
 	pool, i, err := monterBaseDemo(travail, s.Cfg, s.reg, baseSQL, nom, true)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	s.reg.monter(nom, i, pool)
 	slog.Info("base de démonstration rafraîchie", "nom", nom, "baseSql", baseSQL,
 		"userId", socle.UtilisateurCourant(ctx).ID)
-	return s.lister(ctx, nil)
+	return nil
 }
 
 // `CREATE DATABASE` refuse toute transaction et n'accepte pas d'identifiant lié :
@@ -377,4 +404,7 @@ func monterBases(api huma.API, d *socle.Deps, reg *registre) {
 	huma.Register(api, huma.Operation{
 		OperationID: "rafraichirBaseDemo", Method: http.MethodPost, Path: cheminBases + "/{nom}/rafraichir",
 	}, s.rafraichir)
+	huma.Register(api, huma.Operation{
+		OperationID: "rafraichirToutesBasesDemo", Method: http.MethodPost, Path: cheminBases + "/rafraichir",
+	}, s.rafraichirTout)
 }

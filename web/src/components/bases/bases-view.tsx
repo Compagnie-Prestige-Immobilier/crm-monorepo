@@ -15,6 +15,7 @@ import {
   basesDemoQuery,
   creerBaseDemo,
   rafraichirBaseDemo,
+  rafraichirToutesBasesDemo,
   supprimerBaseDemo,
 } from '@/lib/data/bases';
 import { formatDateTime } from '@/lib/format';
@@ -24,6 +25,7 @@ export function BasesView() {
   const [nom, setNom] = useState('');
   const [aSupprimer, setASupprimer] = useState<string | null>(null);
   const [aRafraichir, setARafraichir] = useState<string | null>(null);
+  const [toutARafraichir, setToutARafraichir] = useState(false);
   const bases = useQuery(basesDemoQuery());
 
   const invalider = (): void => {
@@ -60,6 +62,20 @@ export function BasesView() {
       setARafraichir(null);
       invalider();
       toast.success('Base réinitialisée avec le schéma et les données d’exemple actuels.');
+    },
+    onError: (erreur: Error) => {
+      toast.error(erreur.message);
+    },
+  });
+
+  const rafraichissementTout = useMutation({
+    mutationFn: rafraichirToutesBasesDemo,
+    onSuccess: () => {
+      setToutARafraichir(false);
+      invalider();
+      toast.success(
+        'Toutes les bases sont réinitialisées avec le schéma et les données d’exemple actuels.',
+      );
     },
     onError: (erreur: Error) => {
       toast.error(erreur.message);
@@ -119,8 +135,22 @@ export function BasesView() {
       </Card>
 
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle>Bases existantes</CardTitle>
+          {bases.data.items.length > 1 ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={rafraichissementTout.isPending}
+              onClick={() => {
+                setToutARafraichir(true);
+              }}
+            >
+              <RefreshCwIcon className="size-4" aria-hidden="true" />
+              Rafraîchir tout
+            </Button>
+          ) : null}
         </CardHeader>
         <CardContent>
           {bases.data.items.length === 0 ? (
@@ -200,6 +230,18 @@ export function BasesView() {
         pending={rafraichissement.isPending}
         onConfirm={() => {
           if (aRafraichir !== null) rafraichissement.mutate(aRafraichir);
+        }}
+      />
+
+      <ConfirmDialog
+        open={toutARafraichir}
+        onOpenChange={setToutARafraichir}
+        title="Rafraîchir toutes les bases ?"
+        description="Chacune repart du schéma et des données d’exemple actuels : ce qui a été saisi dedans depuis sa création est perdu."
+        confirmLabel="Rafraîchir tout"
+        pending={rafraichissementTout.isPending}
+        onConfirm={() => {
+          rafraichissementTout.mutate();
         }}
       />
     </div>
