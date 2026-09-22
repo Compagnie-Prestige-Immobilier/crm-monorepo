@@ -30,6 +30,9 @@ type TicketKairo struct {
 	Essais int    `json:"essais"`
 	MajLe  string `json:"majLe"`
 	Lien   string `json:"lien"`
+	Resume string `json:"resume,omitempty"`
+	Cause  string `json:"cause,omitempty"`
+	Notes  string `json:"notes,omitempty"`
 }
 
 type EtatKairo struct {

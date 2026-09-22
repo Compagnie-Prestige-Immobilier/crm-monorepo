@@ -2,6 +2,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CheckCheckIcon,
   ExternalLinkIcon,
+  FileTextIcon,
   GitPullRequestIcon,
   LoaderIcon,
   RotateCcwIcon,
@@ -11,6 +12,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { Kpi } from '@/components/bank/bank-kpi';
+import { DialogDetailTicket } from '@/components/kairo/dialog-detail-ticket';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -80,12 +82,20 @@ export function IndicateursKairo({ tickets }: { tickets: TicketKairo[] }) {
   );
 }
 
-export function CarteTickets({ tickets }: { tickets: TicketKairo[] }) {
+export function CarteTickets({
+  tickets,
+  desactive,
+}: {
+  tickets: TicketKairo[];
+  desactive?: boolean | undefined;
+}) {
   const client = useQueryClient();
   const [filtre, setFiltre] = useState<FiltreTickets>(() =>
     ticketsFiltres(tickets, 'aReprendre').length > 0 ? 'aReprendre' : 'tous',
   );
   const [aRelancer, setARelancer] = useState<TicketKairo | null>(null);
+  const [inspecte, setInspecte] = useState<TicketKairo | null>(null);
+
   const relance = useMutation({
     mutationFn: relancerTicketKairo,
     onSuccess: (_, id) => {
@@ -95,7 +105,9 @@ export function CarteTickets({ tickets }: { tickets: TicketKairo[] }) {
     onError: (error) => toastApiError(error, 'Kairo n’a pas pris la relance.'),
     onSettled: () => client.invalidateQueries({ queryKey: CLE_KAIRO }),
   });
+
   const visibles = ticketsFiltres(tickets, filtre);
+
   return (
     <Card>
       <CardHeader className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
@@ -127,11 +139,18 @@ export function CarteTickets({ tickets }: { tickets: TicketKairo[] }) {
         ) : (
           <ul className="divide-y" aria-label="Tickets traités par Kairo">
             {visibles.map((ticket) => (
-              <LigneTicket key={ticket.id} ticket={ticket} onRelancer={setARelancer} />
+              <LigneTicket
+                key={ticket.id}
+                ticket={ticket}
+                desactive={desactive}
+                onRelancer={setARelancer}
+                onInspecter={setInspecte}
+              />
             ))}
           </ul>
         )}
       </CardContent>
+
       <ConfirmDialog
         open={aRelancer !== null}
         onOpenChange={(ouvert) => !ouvert && setARelancer(null)}
@@ -142,41 +161,128 @@ export function CarteTickets({ tickets }: { tickets: TicketKairo[] }) {
         pending={relance.isPending}
         onConfirm={() => aRelancer !== null && relance.mutate(aRelancer.id)}
       />
+
+      <DialogDetailTicket
+        ticket={inspecte}
+        desactive={desactive}
+        statuts={STATUTS}
+        onClose={() => setInspecte(null)}
+        onRelancer={(t) => setARelancer(t)}
+      />
     </Card>
   );
 }
 
-function LigneTicket(props: { ticket: TicketKairo; onRelancer: (t: TicketKairo) => void }) {
-  const { ticket } = props;
-  const statut = STATUTS[ticket.statut] ?? { libelle: ticket.statut, variante: 'secondary' };
+function prefixeMotif(statut: string): string {
+  if (statut === 'escalade') return 'Escalade : ';
+  if (statut === 'echec') return 'Échec : ';
+  return 'Résumé : ';
+}
+
+function LigneMotif(props: { ticket: TicketKairo; onInspecter: () => void }) {
+  const motif = props.ticket.resume || props.ticket.cause;
+  if (!motif) return null;
+  return (
+    <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+      <p className="min-w-0 truncate">
+        <span className="font-semibold text-foreground/80">
+          {prefixeMotif(props.ticket.statut)}
+        </span>
+        {motif}
+      </p>
+      <button
+        type="button"
+        onClick={props.onInspecter}
+        className="shrink-0 text-primary hover:underline"
+      >
+        Lire plus
+      </button>
+    </div>
+  );
+}
+
+function ActionsTicket(props: {
+  ticket: TicketKairo;
+  desactive?: boolean | undefined;
+  aDetails: boolean;
+  onRelancer: (t: TicketKairo) => void;
+  onInspecter: (t: TicketKairo) => void;
+}) {
+  const { ticket, desactive, aDetails, onRelancer, onInspecter } = props;
+  const peutRelancer = ticket.statut === 'echec' || ticket.statut === 'escalade';
   const majLe = isoKairo(ticket.majLe);
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2">
-      <a
-        href={ticket.lien}
-        target="_blank"
-        rel="noreferrer"
-        className="inline-flex min-h-11 items-center gap-1.5 font-[600] tabular-nums hover:underline"
-      >
-        Ticket n° {ticket.id}
-        <ExternalLinkIcon className="size-3.5 text-muted-foreground" aria-label="(nouvel onglet)" />
-      </a>
-      <Badge variant={statut.variante}>{statut.libelle}</Badge>
-      <span className="text-sm text-muted-foreground">{ticket.projet}</span>
-      <span className="ml-auto flex items-center gap-4 text-sm text-muted-foreground tabular-nums">
-        <span>
-          {ticket.essais > 1 ? `${String(ticket.essais)} essais · ` : null}
-          <time dateTime={majLe} title={formatDateTime(majLe)}>
-            {ilYA(majLe)}
-          </time>
-        </span>
-        {ticket.statut === 'echec' || ticket.statut === 'escalade' ? (
-          <Button size="sm" variant="outline" onClick={() => props.onRelancer(ticket)}>
-            <RotateCcwIcon />
-            Relancer
-          </Button>
-        ) : null}
+    <span className="ml-auto flex items-center gap-2 sm:gap-3 text-sm text-muted-foreground tabular-nums">
+      <span>
+        {ticket.essais > 1 ? `${String(ticket.essais)} essais · ` : null}
+        <time dateTime={majLe} title={formatDateTime(majLe)}>
+          {ilYA(majLe)}
+        </time>
       </span>
+      {aDetails ? (
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => onInspecter(ticket)}
+          className="h-8 px-2"
+          title="Afficher les détails"
+        >
+          <FileTextIcon className="size-3.5" />
+          <span className="hidden sm:inline">Détails</span>
+        </Button>
+      ) : null}
+      {peutRelancer ? (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={desactive}
+          title={desactive ? 'Kairo est hors de portée' : undefined}
+          onClick={() => onRelancer(ticket)}
+        >
+          <RotateCcwIcon className="size-3.5" />
+          Relancer
+        </Button>
+      ) : null}
+    </span>
+  );
+}
+
+function LigneTicket(props: {
+  ticket: TicketKairo;
+  desactive?: boolean | undefined;
+  onRelancer: (t: TicketKairo) => void;
+  onInspecter: (t: TicketKairo) => void;
+}) {
+  const { ticket, desactive, onRelancer, onInspecter } = props;
+  const statut = STATUTS[ticket.statut] ?? { libelle: ticket.statut, variante: 'secondary' };
+  const aDetails = Boolean(ticket.resume || ticket.cause || ticket.notes);
+
+  return (
+    <li className="flex flex-col gap-1.5 py-2.5">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+        <a
+          href={ticket.lien}
+          target="_blank"
+          rel="noreferrer"
+          className="inline-flex min-h-11 items-center gap-1.5 font-[600] tabular-nums hover:underline"
+        >
+          Ticket n° {ticket.id}
+          <ExternalLinkIcon
+            className="size-3.5 text-muted-foreground"
+            aria-label="(nouvel onglet)"
+          />
+        </a>
+        <Badge variant={statut.variante}>{statut.libelle}</Badge>
+        <span className="text-sm text-muted-foreground">{ticket.projet}</span>
+        <ActionsTicket
+          ticket={ticket}
+          desactive={desactive}
+          aDetails={aDetails}
+          onRelancer={onRelancer}
+          onInspecter={onInspecter}
+        />
+      </div>
+      <LigneMotif ticket={ticket} onInspecter={() => onInspecter(ticket)} />
     </li>
   );
 }

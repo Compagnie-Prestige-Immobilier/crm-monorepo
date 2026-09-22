@@ -525,7 +525,7 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 	}
 	if project == nil {
 		slog.Error("projet introuvable", "nom", projectName)
-		_ = s.state.Finish(ctx, ticketID, "echec")
+		_ = s.state.Finish(ctx, ticketID, "echec", "Projet introuvable : "+projectName, "", "")
 		return
 	}
 
@@ -535,7 +535,7 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 		return
 	}
 	if abandon {
-		_ = s.state.Finish(ctx, ticketID, "abandon")
+		_ = s.state.Finish(ctx, ticketID, "abandon", "Ticket clos ou résolu dans GLPI avant traitement.", "", "")
 		return
 	}
 
@@ -557,7 +557,7 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 		return
 	}
 
-	_ = s.state.Finish(ctx, ticketID, config.StatusEscalade)
+	_ = s.state.Finish(ctx, ticketID, config.StatusEscalade, ans.Summary, ans.RootCause, ans.ImportantNotes)
 	s.ReportEscalation(ctx, ticketID, ticket, ans)
 }
 
@@ -576,7 +576,7 @@ func (s *Solver) handleResolution(
 			ans.Status = config.StatusEscalade
 			ans.Summary = esc.Message
 			ans.RootCause = esc.Message
-			_ = s.state.Finish(ctx, ticketID, config.StatusEscalade)
+			_ = s.state.Finish(ctx, ticketID, config.StatusEscalade, ans.Summary, ans.RootCause, ans.ImportantNotes)
 			s.ReportEscalation(ctx, ticketID, ticket, ans)
 			return
 		}
@@ -584,7 +584,7 @@ func (s *Solver) handleResolution(
 		return
 	}
 
-	_ = s.state.Finish(ctx, ticketID, "pr")
+	_ = s.state.Finish(ctx, ticketID, "pr", ans.Summary, ans.RootCause, ans.ImportantNotes)
 	slog.Info("PR créée", "ticket", ticketID, "url", prURL, "agent", ans.Agent, "complexité", ans.Complexity)
 	s.ReportSuccess(ctx, ticketID, ticket, ans, prURL)
 }
@@ -601,7 +601,7 @@ func (s *Solver) handleEscalation(ctx context.Context, ticketID int, ticket map[
 		RootCause:      reason,
 		ImportantNotes: "",
 	}
-	_ = s.state.Finish(ctx, ticketID, config.StatusEscalade)
+	_ = s.state.Finish(ctx, ticketID, config.StatusEscalade, ans.Summary, ans.RootCause, ans.ImportantNotes)
 	s.ReportEscalation(ctx, ticketID, ticket, ans)
 }
 
@@ -609,9 +609,9 @@ func (s *Solver) handleTechnicalFailure(ctx context.Context, ticketID int, err e
 	slog.Error("échec technique ticket", "ticket", ticketID, "err", err)
 	attempts, _ := s.state.Attempts(ctx, ticketID)
 	if attempts < config.MaxAttempts {
-		_ = s.state.Finish(ctx, ticketID, "retry")
+		_ = s.state.Finish(ctx, ticketID, "retry", err.Error(), "", "")
 		return
 	}
-	_ = s.state.Finish(ctx, ticketID, "echec")
+	_ = s.state.Finish(ctx, ticketID, "echec", err.Error(), "", "")
 	s.ReportFailure(ctx, ticketID, attempts, err.Error())
 }

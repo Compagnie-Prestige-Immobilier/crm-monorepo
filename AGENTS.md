@@ -140,6 +140,12 @@ doit comprendre en une lecture, sans sauter entre les fichiers.
 - Respecter les linteurs et le formatage du depot. Ne pas desactiver une regle,
   ajouter une suppression ou affaiblir la configuration pour faire passer un
   changement.
+- Les suppressions de lint ou d'analyse de securite sont interdites, y compris
+  `//nolint`, `# noqa`, `eslint-disable`, `nosemgrep` et leurs variantes. Un
+  commentaire justifiant l'exception ne rend jamais le code acceptable. Toute
+  occurrence ajoutee ou rencontree dans le flux modifie doit etre retiree et la
+  cause corrigee dans le code; ne jamais la conserver ni en ajouter une pour
+  faire passer un controle, meme accompagnee d'une justification.
 - Executer le lint et le controle de types du perimetre touche avant de
   terminer. Corriger les erreurs introduites; signaler distinctement celles
   qui existaient deja.
