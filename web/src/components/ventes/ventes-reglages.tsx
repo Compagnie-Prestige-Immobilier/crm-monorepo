@@ -99,17 +99,15 @@ export function PageReglages({
       >
         {sites.map((site) => (
           <li key={site.id} className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <span className="min-w-40 flex-1">
-              <strong className={site.actif ? '' : 'text-muted-foreground line-through'}>
-                {site.nom}
-              </strong>
-              <span className="block text-[0.875rem] text-muted-foreground">
-                {site.totalLots === null ? 'Lots à renseigner' : `${site.totalLots} lots`}
-                {site.prixUnitaireDefaut > 0
-                  ? ` · ${formatFcfa(site.prixUnitaireDefaut)} le lot`
-                  : ''}
-              </span>
-            </span>
+            <strong
+              className={
+                site.actif
+                  ? 'min-w-40 flex-1'
+                  : 'min-w-40 flex-1 text-muted-foreground line-through'
+              }
+            >
+              {site.nom}
+            </strong>
             <Button variant="outline" size="sm" onClick={() => setEdition(site)}>
               <PencilIcon aria-hidden="true" /> Modifier
             </Button>
