@@ -29,6 +29,11 @@ export async function rafraichirBaseDemo(nom: string): Promise<void> {
   if (error !== undefined) throw new Error(messageErreur(error));
 }
 
+export async function rafraichirToutesBasesDemo(): Promise<void> {
+  const { error } = await getServeurClient().POST(`${CHEMIN}/rafraichir`, {});
+  if (error !== undefined) throw new Error(messageErreur(error));
+}
+
 /** Le serveur dit pourquoi il refuse ; le rejeter sans son message obligerait à deviner. */
 function messageErreur(erreur: unknown): string {
   if (typeof erreur === 'object' && erreur !== null && 'message' in erreur) {
