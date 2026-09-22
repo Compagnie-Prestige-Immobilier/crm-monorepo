@@ -77,6 +77,18 @@ export async function basculerPauseKairo(pause: boolean): Promise<void> {
   }
 }
 
+export async function basculerReparationBaseKairo(active: boolean): Promise<void> {
+  const chemin = active
+    ? '/api/v1/admin/kairo/reglages/reparation-base/activer'
+    : '/api/v1/admin/kairo/reglages/reparation-base/desactiver';
+  try {
+    unwrap(await getApiClient().POST(chemin));
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
+}
+
 export async function relancerTicketKairo(
   options:
     | number
