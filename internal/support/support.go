@@ -32,16 +32,18 @@ const (
 )
 
 var Garde = map[string]socle.Permission{
-	"POST " + cheminTickets:          socle.PermissionSupportSignaler,
-	"GET " + cheminTickets:           socle.PermissionSupportSignaler,
-	"GET " + cheminTicket:            socle.PermissionSupportSignaler,
-	"POST " + cheminReprendre:        socle.PermissionSupportSignaler,
-	"POST " + cheminRattacher:        socle.PermissionExploitationAdministrer,
-	"GET /api/v1/support/categories": socle.PermissionSupportSignaler,
-	"GET " + cheminKairo:             socle.PermissionExploitationAdministrer,
-	"POST " + cheminKairoPause:       socle.PermissionExploitationAdministrer,
-	"POST " + cheminKairoReprise:     socle.PermissionExploitationAdministrer,
-	"POST " + cheminKairoRelance:     socle.PermissionExploitationAdministrer,
+	"POST " + cheminTickets:                       socle.PermissionSupportSignaler,
+	"GET " + cheminTickets:                        socle.PermissionSupportSignaler,
+	"GET " + cheminTicket:                         socle.PermissionSupportSignaler,
+	"POST " + cheminReprendre:                     socle.PermissionSupportSignaler,
+	"POST " + cheminRattacher:                     socle.PermissionExploitationAdministrer,
+	"GET /api/v1/support/categories":              socle.PermissionSupportSignaler,
+	"GET " + cheminKairo:                          socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoPause:                    socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoReprise:                  socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoRelance:                  socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoReparationBaseActiver:    socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoReparationBaseDesactiver: socle.PermissionExploitationAdministrer,
 }
 
 type service struct {

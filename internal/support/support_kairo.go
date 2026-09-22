@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	cheminKairo        = "/api/v1/admin/kairo"
-	cheminKairoPause   = cheminKairo + "/pause"
-	cheminKairoReprise = cheminKairo + "/reprise"
-	cheminKairoRelance = cheminKairo + "/tickets/{id}/relance"
+	cheminKairo                         = "/api/v1/admin/kairo"
+	cheminKairoPause                    = cheminKairo + "/pause"
+	cheminKairoReprise                  = cheminKairo + "/reprise"
+	cheminKairoRelance                  = cheminKairo + "/tickets/{id}/relance"
+	cheminKairoReparationBaseActiver    = cheminKairo + "/reglages/reparation-base/activer"
+	cheminKairoReparationBaseDesactiver = cheminKairo + "/reglages/reparation-base/desactiver"
 )
 
 var clientKairo = &http.Client{Timeout: 5 * time.Second}
@@ -52,6 +54,7 @@ type EtatKairo struct {
 	Tickets                 []TicketKairo `json:"tickets"`
 	MTTRSecondes            int           `json:"mttrSecondes,omitempty"`
 	JevActif                bool          `json:"jevActif,omitempty"`
+	ReparationBaseActive    bool          `json:"reparationBaseActive"`
 }
 
 type UsageModele struct {
@@ -105,6 +108,18 @@ func monterKairo(api huma.API, s *service) {
 		OperationID: "repriseKairo", Method: http.MethodPost, Path: cheminKairoReprise, DefaultStatus: http.StatusNoContent,
 	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
 		return nil, commanderKairo(ctx, "/reprise", nil)
+	})
+	huma.Register(api, huma.Operation{
+		OperationID: "activerReparationBaseKairo", Method: http.MethodPost, Path: cheminKairoReparationBaseActiver, DefaultStatus: http.StatusNoContent,
+		Summary: "Active la réparation automatique de la branche de base par Kairo.",
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/reglages/reparation-base/activer", nil)
+	})
+	huma.Register(api, huma.Operation{
+		OperationID: "desactiverReparationBaseKairo", Method: http.MethodPost, Path: cheminKairoReparationBaseDesactiver, DefaultStatus: http.StatusNoContent,
+		Summary: "Désactive la réparation automatique de la branche de base par Kairo.",
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/reglages/reparation-base/desactiver", nil)
 	})
 	huma.Register(api, huma.Operation{
 		OperationID: "relanceTicketKairo", Method: http.MethodPost, Path: cheminKairoRelance, DefaultStatus: http.StatusNoContent,

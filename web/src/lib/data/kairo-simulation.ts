@@ -13,6 +13,7 @@ export const ETAT_KAIRO_SIMULE: EtatKairo = {
   agents: ['cpi-expert', 'glpi-watcher', 'git-operator', 'pr-reviewer'],
   mttrSecondes: 275,
   jevActif: true,
+  reparationBaseActive: true,
   tickets: [
     {
       id: 274,
