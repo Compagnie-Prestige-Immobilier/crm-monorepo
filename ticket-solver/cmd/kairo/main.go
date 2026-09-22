@@ -162,17 +162,17 @@ func main() {
 	var lastPoll atomic.Int64
 	lastPoll.Store(time.Now().UnixNano())
 
-	httpSrv := server.New(cfg, store, &lastPoll)
+	glpiClient := glpi.NewClient(cfg)
+	notifClient := notify.NewClient(cfg)
+	solverInst := solver.New(cfg, store, glpiClient, ghClient, notifClient)
+	engineInst := engine.New(cfg, store, glpiClient, solverInst, &lastPoll)
+
+	httpSrv := server.New(cfg, store, engineInst, &lastPoll)
 	go func() {
 		if err := httpSrv.Start(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			slog.Error("erreur serveur HTTP", "err", err)
 		}
 	}()
-
-	glpiClient := glpi.NewClient(cfg)
-	notifClient := notify.NewClient(cfg)
-	solverInst := solver.New(cfg, store, glpiClient, ghClient, notifClient)
-	engineInst := engine.New(cfg, store, glpiClient, solverInst, &lastPoll)
 
 	slog.Info("Kairo démarre", "ticketsParalleles", cfg.MaxConcurrentJobs, "agents", strings.Join(activeAgents, ", "))
 

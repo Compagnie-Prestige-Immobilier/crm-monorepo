@@ -21,6 +21,7 @@ type Engine struct {
 	sem     chan struct{}
 	wg      sync.WaitGroup
 	ignored map[int]string
+	active  map[int]context.CancelFunc
 	mu      sync.Mutex
 }
 
@@ -39,6 +40,7 @@ func New(
 		lastPoll:   lastPoll,
 		sem:        make(chan struct{}, cfg.MaxConcurrentJobs),
 		ignored:    make(map[int]string),
+		active:     make(map[int]context.CancelFunc),
 	}
 }
 
@@ -57,6 +59,7 @@ func (e *Engine) Poll(ctx context.Context) {
 	}
 
 	e.pollRetries(ctx)
+	_ = e.state.CheckpointWAL(ctx)
 }
 
 func (e *Engine) pollProject(ctx context.Context, project *config.Project) {
@@ -126,14 +129,36 @@ func (e *Engine) pollRetries(ctx context.Context) {
 
 func (e *Engine) launch(ctx context.Context, ticketID int, projectName string) {
 	e.wg.Add(1)
-	jobCtx := context.WithoutCancel(ctx)
+	jobCtx, cancel := context.WithCancel(context.WithoutCancel(ctx))
+	e.mu.Lock()
+	e.active[ticketID] = cancel
+	e.mu.Unlock()
+
 	go func() {
 		defer e.wg.Done()
+		defer func() {
+			e.mu.Lock()
+			delete(e.active, ticketID)
+			e.mu.Unlock()
+			cancel()
+		}()
 		e.sem <- struct{}{}
 		defer func() { <-e.sem }()
 
 		e.solver.RunJob(jobCtx, ticketID, projectName)
 	}()
+}
+
+// Stop annule le job en cours pour ce ticket, s'il y en a un. Renvoie false si
+// aucun job n'est actif pour ce ticket (déjà terminé, ou jamais démarré).
+func (e *Engine) Stop(ticketID int) bool {
+	e.mu.Lock()
+	cancel, ok := e.active[ticketID]
+	e.mu.Unlock()
+	if ok {
+		cancel()
+	}
+	return ok
 }
 
 func (e *Engine) Wait() {
