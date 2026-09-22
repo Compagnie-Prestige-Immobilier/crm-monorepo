@@ -38,6 +38,10 @@ var Garde = map[string]socle.Permission{
 	"POST " + cheminReprendre:        socle.PermissionSupportSignaler,
 	"POST " + cheminRattacher:        socle.PermissionExploitationAdministrer,
 	"GET /api/v1/support/categories": socle.PermissionSupportSignaler,
+	"GET " + cheminKairo:             socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoPause:       socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoReprise:     socle.PermissionExploitationAdministrer,
+	"POST " + cheminKairoRelance:     socle.PermissionExploitationAdministrer,
 }
 
 type service struct {
@@ -73,6 +77,7 @@ func Monter(api huma.API, d *socle.Deps) {
 		OperationID: "categoriesSupport", Method: http.MethodGet, Path: "/api/v1/support/categories",
 		Summary: "Les catégories GLPI proposées au demandeur.",
 	}, s.categories)
+	monterKairo(api, s)
 }
 
 func Taches(d *socle.Deps) []socle.Tache {
@@ -153,11 +158,6 @@ func (s *service) recevoir(ctx context.Context, in *TicketInput) (*SignalementOu
 		return nil, err
 	}
 	u := socle.UtilisateurCourant(ctx)
-	reformule, errIA := reformulerTicket(ctx, form.Description, form.Contexte)
-	if errIA != nil {
-		slog.Warn("ticket envoyé sans reformulation IA", "erreur", erreurCourte(errIA))
-	}
-	form.Description, form.Contexte = reformule.Description, reformule.Contexte
 	empreinte := empreinteSoumission(form.Description, form.Contexte, form.Urgence, form.Categorie, images)
 	if deja, err := s.Q.SupportSignalementParCle(ctx, db.SupportSignalementParCleParams{AuteurId: u.ID, Cle: form.Cle}); err == nil {
 		return s.reponseExistante(ctx, &deja, empreinte)

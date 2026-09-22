@@ -5,6 +5,7 @@ import (
 	"cpi-go/db"
 	"errors"
 	"log/slog"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -85,6 +86,9 @@ func (s *service) poursuivre(ctx context.Context, sig *db.SupportSignalement, je
 	if !s.g.configure() {
 		return errNonRelie
 	}
+	if err := s.fixerTexteTransmis(ctx, sig, jeton); err != nil {
+		return err
+	}
 	session, err := s.g.ouvrirSession(ctx)
 	if err != nil {
 		return err
@@ -99,6 +103,35 @@ func (s *service) poursuivre(ctx context.Context, sig *db.SupportSignalement, je
 		numero = &obtenu
 	}
 	return s.joindreLesImages(ctx, session, sig, jeton, int(*numero))
+}
+
+// La reformulation n'a lieu qu'une fois, hors de la requête du signalant : une
+// reprise renvoie à GLPI le texte déjà fixé, sans nouvel appel IA.
+func (s *service) fixerTexteTransmis(ctx context.Context, sig *db.SupportSignalement, jeton string) error {
+	if sig.DescriptionTransmise != nil || sig.CreationEngagee || sig.NumeroGlpi != nil {
+		return nil
+	}
+	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte})
+	lignes, err := s.Q.SupportTexteTransmisFixe(ctx, db.SupportTexteTransmisFixeParams{
+		ID: sig.ID, Jeton: jeton, Description: texte.Description, Contexte: texte.Contexte, ReformulePar: auteur,
+	})
+	if err != nil {
+		return err
+	}
+	if lignes == 0 {
+		return errBailPerdu
+	}
+	sig.DescriptionTransmise, sig.ContexteTransmis = &texte.Description, &texte.Contexte
+	return nil
+}
+
+// Le texte saisi part toujours en référence, reformulé ou non : c'est lui qui fait foi.
+func texteAEnvoyer(sig *db.SupportSignalement) (description, contexte, origine string) {
+	origine = strings.TrimSpace(sig.Description + "\n\n" + sig.Contexte)
+	if sig.DescriptionTransmise == nil || sig.ContexteTransmis == nil {
+		return sig.Description, sig.Contexte, origine
+	}
+	return *sig.DescriptionTransmise, *sig.ContexteTransmis, origine
 }
 
 // Un numéro connu est enregistré AVANT de poursuivre : une interruption après
@@ -142,10 +175,11 @@ func (s *service) creerOuRetrouver(ctx context.Context, session string, sig *db.
 	} else if lignes == 0 {
 		return 0, errBailPerdu
 	}
+	description, contexte, origine := texteAEnvoyer(sig)
 	numero, err := s.g.creerTicket(ctx, session, &demande{
 		login: sig.AuteurLogin, nom: sig.AuteurNom, email: sig.AuteurEmail,
 		roleLibelle: sig.AuteurRoleLibelle, pilotage: sig.AuteurPilotage, groupe: sig.AuteurGroupe,
-		description: sig.Description, contexte: sig.Contexte,
+		description: description, contexte: contexte, origine: origine,
 		urgence: sig.Urgence, categorie: sig.Categorie, reference: reference,
 	})
 	return entier32(numero), err

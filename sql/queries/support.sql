@@ -49,6 +49,26 @@ WHERE "id" = @id
     OR ("etat" = 'en_cours' AND "prisAt" < @bail_expire::timestamp))
 RETURNING *;
 
+-- name: SupportTexteTransmisFixe :execrows
+UPDATE "support_signalements"
+SET "descriptionTransmise" = @description::text, "contexteTransmis" = @contexte::text,
+    "reformulePar" = sqlc.narg(reformule_par)::text, "updatedAt" = now()
+WHERE "id" = @id AND "jeton" = @jeton::text AND "descriptionTransmise" IS NULL;
+
+-- name: SupportReformulationsParModele :many
+SELECT coalesce("reformulePar", '')::text AS modele, count(*)::int AS nombre
+FROM "support_signalements"
+WHERE "descriptionTransmise" IS NOT NULL AND "createdAt" >= now() - interval '30 days'
+GROUP BY 1
+ORDER BY 2 DESC;
+
+-- name: SupportDernieresReformulations :many
+SELECT "id", "createdAt", "reformulePar", "description", "contexte", "descriptionTransmise"::text AS description_transmise
+FROM "support_signalements"
+WHERE "descriptionTransmise" IS NOT NULL
+ORDER BY "createdAt" DESC
+LIMIT 10;
+
 -- name: SupportCreationEngagee :execrows
 UPDATE "support_signalements"
 SET "creationEngagee" = true, "updatedAt" = now()
