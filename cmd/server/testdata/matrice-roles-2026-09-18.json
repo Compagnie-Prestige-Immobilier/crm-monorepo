@@ -46,6 +46,7 @@
   "GET /api/v1/admin/exploitation": ["ADMIN"],
   "GET /api/v1/admin/exploitation/routes": ["ADMIN"],
   "GET /api/v1/admin/journal": ["ADMIN"],
+  "GET /api/v1/admin/kairo": ["ADMIN"],
   "GET /api/v1/admin/purge": ["ADMIN"],
   "GET /api/v1/admin/supervision": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/analytics/by-banque": [
@@ -484,6 +485,9 @@
   "POST /api/v1/admin/bases": ["ADMIN"],
   "POST /api/v1/admin/bases/{nom}/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/database-dump": ["ADMIN"],
+  "POST /api/v1/admin/kairo/pause": ["ADMIN"],
+  "POST /api/v1/admin/kairo/reprise": ["ADMIN"],
+  "POST /api/v1/admin/kairo/tickets/{id}/relance": ["ADMIN"],
   "POST /api/v1/admin/purge": ["ADMIN"],
   "POST /api/v1/auth/demo-login": ["PUBLIC"],
   "POST /api/v1/auth/glpi/jeton": ["PUBLIC"],
