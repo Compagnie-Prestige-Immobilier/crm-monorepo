@@ -233,3 +233,14 @@ FROM "call_attempts" ca
 INNER JOIN "prospects" p ON p."id" = ca."prospectId"
 WHERE p."deletedAt" IS NULL
   AND ca."email" IS NOT NULL AND LOWER(ca."email") = ANY(sqlc.arg('emails')::text[]);
+
+-- name: EffacerInscriptionsPurgees :exec
+DELETE FROM "inscriptions_plateforme" i
+WHERE i."projet" = @projet::"Projet" AND i."identifiantDistant" = ANY(@identifiants::text[])
+  AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id");
+
+-- Un dossier bancaire garde sa ligne, qui porte son lien : seule la copie de la plateforme s'efface.
+-- name: ViderInscriptionsPurgees :exec
+UPDATE "inscriptions_plateforme"
+SET "chargeUtile" = '{}'::jsonb, "email" = NULL, "updatedAt" = now()
+WHERE "projet" = @projet::"Projet" AND "identifiantDistant" = ANY(@identifiants::text[]);
