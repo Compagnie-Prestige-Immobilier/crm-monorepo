@@ -976,11 +976,7 @@ function EcranPaiement({ draft, changer }: EcranProps) {
       />
       <Montant
         id="parcours-acompte"
-        label={
-          credit
-            ? `Acompte reçu aujourd'hui, sur ${formatFcfa(prixTotal)}`
-            : `Montant payé, sur ${formatFcfa(prixTotal)}`
-        }
+        label={credit ? 'Acompte' : `Montant payé, sur ${formatFcfa(prixTotal)}`}
         valeur={draft.acompte}
         max={prixTotal}
         placeholder="Ex. 1 000 000"
