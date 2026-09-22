@@ -153,7 +153,7 @@ function PiedTicket(props: {
           }}
         >
           <RotateCcwIcon className="size-3.5" />
-          Relancer
+          {ticket.statut === 'escalade' ? 'Arbitrer' : 'Relancer'}
         </Button>
       ) : null}
     </DialogFooter>
@@ -188,6 +188,7 @@ export function DialogDetailTicket(props: {
           <SectionTexte titre="Résumé" contenu={ticket.resume} />
           <SectionTexte titre="Origine / Cause" contenu={ticket.cause} />
           <SectionTexte titre="Points d’attention" contenu={ticket.notes} />
+          <SectionTexte titre="Consigne d’arbitrage appliquée" contenu={ticket.consigne} />
           <ListeFichiers fichiers={ticket.fichiers} />
         </div>
         <PiedTicket
