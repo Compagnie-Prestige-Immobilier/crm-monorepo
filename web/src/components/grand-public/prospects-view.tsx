@@ -403,7 +403,7 @@ function FiltresAvances({
   reference: ReferenceData | undefined;
 }) {
   return (
-    <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+    <>
       <ChoiceRow<ProspectType>
         legend="Situation"
         options={TYPE_OPTIONS}
@@ -488,7 +488,7 @@ function FiltresAvances({
           setFilters({ dateTo: value });
         }}
       />
-    </div>
+    </>
   );
 }
 

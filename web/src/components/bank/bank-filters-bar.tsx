@@ -278,7 +278,7 @@ export function BankFiltersBar({
           ) : null
         }
       >
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+        <>
           <FilterCombobox
             label="Banque de traitement"
             placeholder="Toutes les banques"
@@ -337,7 +337,7 @@ export function BankFiltersBar({
               }}
             />
           </div>
-        </div>
+        </>
       </AdvancedPanel>
     </section>
   );

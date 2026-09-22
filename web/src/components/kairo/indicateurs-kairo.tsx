@@ -25,7 +25,7 @@ function libelleEnCours(n: number): string {
 }
 
 function libelleBlocages(n: number): string {
-  if (n === 0) return 'Aucun blocage';
+  if (n === 0) return 'Aucun arbitrage';
   return `${String(n)} escalade${n > 1 ? 's' : ''}`;
 }
 
@@ -58,7 +58,7 @@ function genererStats(tickets: TicketKairo[], mttrSecondes?: number): StatKairo[
       titre: 'À arbitrer',
       valeur: String(aReprendre),
       detail: libelleBlocages(aReprendre),
-      accent: aReprendre > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground',
+      accent: aReprendre > 0 ? 'text-accent-text' : 'text-foreground',
     },
     {
       titre: 'Taux de succès',
@@ -78,13 +78,13 @@ function genererStats(tickets: TicketKairo[], mttrSecondes?: number): StatKairo[
 function CelluleStat(props: { item: StatKairo; large: boolean }) {
   const { item, large } = props;
   return (
-    <div className={cn('flex flex-col gap-1 p-4 sm:p-5', large ? 'col-span-2 sm:col-span-1' : '')}>
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+    <div className={cn('flex flex-col gap-1.5 p-5 sm:p-6', large ? 'col-span-2 sm:col-span-1' : '')}>
+      <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
         {item.titre}
       </span>
       <span
         className={cn(
-          'font-display text-2xl font-bold tracking-tight tabular-nums sm:text-3xl',
+          'font-display text-3xl font-bold tracking-tight tabular-nums sm:text-4xl',
           item.accent,
         )}
       >
@@ -103,7 +103,7 @@ export function IndicateursKairo(props: {
   const stats = genererStats(tickets, mttrSecondes);
 
   return (
-    <Card className="overflow-hidden border border-border/80 bg-card/60 p-0 shadow-xs backdrop-blur-xs">
+    <Card className="overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-xs">
       <div className="grid grid-cols-2 divide-y divide-border/60 sm:grid-cols-3 sm:divide-y-0 sm:divide-x xl:grid-cols-5">
         {stats.map((item, idx) => (
           <CelluleStat key={item.titre} item={item} large={idx === 4} />
