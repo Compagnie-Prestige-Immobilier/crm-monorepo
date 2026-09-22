@@ -510,6 +510,9 @@ type QualificationComptageJourDTO struct {
 	Qualifiees           int32  `json:"qualifiees"`
 	Liberees             int32  `json:"liberees"`
 	DureeMoyenneSecondes *int32 `json:"dureeMoyenneSecondes"`
+	// Une fiche déjà qualifiée qu'on qualifie de nouveau : comptée ici, pas dans le taux de qualification.
+	OuverturesDejaQualifiees int32 `json:"ouverturesDejaQualifiees"`
+	Requalifiees             int32 `json:"requalifiees"`
 }
 
 type QualificationComptageOutput struct {
@@ -556,6 +559,7 @@ func qualificationComptageDTO(r *db.ComptageOuverturesRow) QualificationComptage
 	item := QualificationComptageJourDTO{
 		OpenedByID: r.OpenedById, OpenedByName: r.OpenedByName, Jour: r.Jour,
 		Ouvertures: r.Ouvertures, Qualifiees: r.Qualifiees, Liberees: r.Liberees,
+		OuverturesDejaQualifiees: r.OuverturesDejaQualifiees, Requalifiees: r.Requalifiees,
 	}
 	// Une ouverture fermée sans aucune saisie sort du dénominateur au lieu d'y
 	// entrer avec une durée de zéro.

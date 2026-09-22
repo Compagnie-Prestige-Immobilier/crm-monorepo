@@ -34,6 +34,8 @@ export interface ComptageOuvertures {
   qualifiees: number;
   liberees: number;
   dureeMoyenneSecondes: number | null;
+  ouverturesDejaQualifiees: number;
+  requalifiees: number;
 }
 
 export interface OuvrirFicheInput {
