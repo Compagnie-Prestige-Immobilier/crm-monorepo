@@ -186,7 +186,7 @@ export function RepresentantsFiltersBar() {
           ) : null
         }
       >
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+        <>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={statutId}>Statut de qualification</Label>
             <Select
@@ -366,7 +366,7 @@ export function RepresentantsFiltersBar() {
               </SelectContent>
             </Select>
           </div>
-        </div>
+        </>
       </AdvancedPanel>
     </section>
   );

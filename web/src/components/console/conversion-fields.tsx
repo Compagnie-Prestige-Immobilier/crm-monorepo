@@ -20,18 +20,36 @@ import {
   PROSPECT_TYPE_LABELS,
   PROSPECT_TYPES,
 } from '@/lib/data/grand-public';
+import { fetchParametresChues } from '@/lib/data/parametres-chues';
 import { fetchBanques, fetchIncomeBands, fetchSyndicats } from '@/lib/data/reference';
 import { formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
+  ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
   PAYMENT_MODE_LABELS,
   PAYMENT_MODES,
+  type EnrollmentMethod,
   type PaymentMode,
   type ProspectType,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REFERENCE_STALE_TIME = 300_000;
+
+const COORDONNEES: Partial<
+  Record<
+    EnrollmentMethod,
+    {
+      readonly libelle: string;
+      readonly cle: 'plateformeChuesUrl' | 'emailChues' | 'whatsappChuesE164';
+    }
+  >
+> = {
+  PLATFORM: { libelle: 'Lien de la plateforme CPI CHUES', cle: 'plateformeChuesUrl' },
+  VOICE_OR_ELECTRONIC_MESSAGING: { libelle: 'Adresse e-mail CHUES', cle: 'emailChues' },
+  WHATSAPP: { libelle: 'Numéro WhatsApp CHUES', cle: 'whatsappChuesE164' },
+};
 
 const PAIEMENTS: readonly { value: PaymentMode; label: string }[] = PAYMENT_MODES.map((mode) => ({
   value: mode,
@@ -402,7 +420,6 @@ export function ConversionFields({
           )}
         </Field>
       ) : null,
-<<<<<<< HEAD
     method: (
       <>
         <GroupeEnLigne label="Méthode d’enrôlement" error={errors.method}>
@@ -453,9 +470,6 @@ export function ConversionFields({
         <CoordonneeChues method={draft.method} />
       </>
     ),
-=======
-    method: null,
->>>>>>> 6fe6c7b3a993a49558bcff4112f1d1d535efd63d
     rendezVousAt: null,
   };
 
@@ -518,12 +532,17 @@ export function ConversionFields({
   );
 }
 
-type SectionCle = 'identite' | 'situation';
+type SectionCle = 'identite' | 'situation' | 'enrolement';
 
-/** Le formulaire se lit en deux blocs, dans l'ordre où la conversation les amène. */
+/** Le formulaire se lit en trois blocs, dans l'ordre où la conversation les amène. */
 const SECTIONS: readonly { cle: SectionCle; titre: string; aide?: string }[] = [
   { cle: 'identite', titre: 'Qui est-ce ?' },
   { cle: 'situation', titre: 'Sa situation' },
+  {
+    cle: 'enrolement',
+    titre: 'Accepte-t-elle de s’enrôler ?',
+    aide: 'Choisir une méthode enregistre l’adhésion et ferme la fiche.',
+  },
 ];
 
 const CHAMPS_IDENTITE: ReadonlySet<string> = new Set([
@@ -535,8 +554,11 @@ const CHAMPS_IDENTITE: ReadonlySet<string> = new Set([
   'whatsappE164',
 ]);
 
+const CHAMPS_ENROLEMENT: ReadonlySet<string> = new Set(['method', 'rendezVousAt']);
+
 function sectionDe(champ: string): SectionCle {
   if (CHAMPS_IDENTITE.has(champ)) return 'identite';
+  if (CHAMPS_ENROLEMENT.has(champ)) return 'enrolement';
   return 'situation';
 }
 
@@ -553,12 +575,56 @@ function restreindreEtapes(
   };
 }
 
+/** EB-24 : ce que le téléconseiller dicte au prospect, selon la méthode choisie. */
+function CoordonneeChues({ method }: { method: EnrollmentMethod | null }) {
+  const parametres = useQuery({
+    queryKey: queryKeys.parametresChues,
+    queryFn: () => fetchParametresChues(),
+    staleTime: REFERENCE_STALE_TIME,
+  });
+
+  const attendue = method === null ? undefined : COORDONNEES[method];
+  if (attendue === undefined || parametres.data === undefined) return null;
+
+  const valeur = parametres.data[attendue.cle];
+  return (
+    <p className="rounded-md border border-border px-3 py-2 text-[0.875rem] sm:col-span-2">
+      <span className="text-muted-foreground">{attendue.libelle} : </span>
+      {valeur === '' ? (
+        'à renseigner dans les paramètres CHUES.'
+      ) : (
+        <span className="select-all font-[600]">{valeur}</span>
+      )}
+    </p>
+  );
+}
+
 /** Situation et mode de paiement n'existent pas sur CHUES : le prospect y est enseignant. */
 function visibleParDefaut(champ: string, complet: boolean): boolean {
   if (champ === 'type' || champ === 'paymentMode' || champ === 'dureeSystemeMois') {
     return !complet;
   }
   return true;
+}
+
+function MethodChoice({
+  method,
+  checked,
+  onSelect,
+}: {
+  method: EnrollmentMethod;
+  checked: boolean;
+  onSelect: () => void;
+}) {
+  return (
+    <Pastille
+      type="radio"
+      name="console-method"
+      checked={checked}
+      label={ENROLLMENT_METHOD_LABELS[method]}
+      onChange={onSelect}
+    />
+  );
 }
 
 function ChoixSituation({

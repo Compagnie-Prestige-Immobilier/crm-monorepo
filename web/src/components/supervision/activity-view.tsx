@@ -41,6 +41,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Skeleton } from '@/components/ui/skeleton';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
+import { TablePaginationLocale, usePaginationLocale } from '@/components/ui/table-pagination';
 import {
   Table,
   TableBody,
@@ -402,6 +403,8 @@ function ActivityDataTable({
   sortDir: SortDirection;
   onToggleSort: (key: ActivitySortKey) => void;
 }) {
+  const pagination = usePaginationLocale(lines);
+
   return (
     <Card>
       <CardContent className="p-0">
@@ -437,7 +440,7 @@ function ActivityDataTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {lines.map((line) => (
+            {pagination.pageLignes.map((line) => (
               <ActivityRow key={line.id} line={line} colonnes={colonnes} />
             ))}
             {lines.length === 0 ? (
@@ -460,6 +463,13 @@ function ActivityDataTable({
             </TableFooter>
           ) : null}
         </Table>
+        <TablePaginationLocale
+          page={pagination.page}
+          pageCount={pagination.pageCount}
+          pageSize={pagination.pageSize}
+          setPage={pagination.setPage}
+          setPageSize={pagination.setPageSize}
+        />
       </CardContent>
     </Card>
   );

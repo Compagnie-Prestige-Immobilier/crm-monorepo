@@ -23,10 +23,12 @@ function SectionTexte(props: { titre: string; contenu?: string | undefined }) {
   if (!props.contenu) return null;
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs font-semibold text-foreground">
         {props.titre}
       </p>
-      <p className="mt-1 rounded-md bg-secondary/60 p-2.5 whitespace-pre-wrap">{props.contenu}</p>
+      <p className="mt-1 rounded-xl border border-border/70 bg-secondary/35 p-3 text-xs leading-relaxed text-muted-foreground whitespace-pre-wrap">
+        {props.contenu}
+      </p>
     </div>
   );
 }
@@ -37,14 +39,14 @@ function ListeFichiers(props: { fichiers?: string | undefined }) {
   if (list.length === 0) return null;
   return (
     <div>
-      <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <p className="text-xs font-semibold text-foreground">
         Fichiers modifiés ({list.length})
       </p>
-      <div className="mt-1 flex flex-wrap gap-1.5">
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
         {list.map((f) => (
           <span
             key={f}
-            className="rounded bg-muted px-2 py-0.5 font-mono text-xs text-foreground/90"
+            className="rounded-md border border-border/70 bg-secondary/50 px-2 py-0.5 font-mono text-[11px] text-foreground"
           >
             {f}
           </span>
@@ -177,12 +179,14 @@ function PiedTicket(props: {
       {peutRelancer(ticket.statut) ? (
         <Button
           size="sm"
+          variant={ticket.statut === 'escalade' ? 'default' : 'outline'}
           disabled={desactive}
           title={desactive ? 'Kairo est hors de portée' : undefined}
           onClick={() => {
             onRelancer(ticket);
             onClose();
           }}
+          className={ticket.statut === 'escalade' ? 'bg-primary text-primary-foreground hover:bg-primary-hover' : undefined}
         >
           <RotateCcwIcon className="size-3.5" />
           {ticket.statut === 'escalade' ? 'Arbitrer' : 'Relancer'}

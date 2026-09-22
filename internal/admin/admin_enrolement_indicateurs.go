@@ -310,8 +310,8 @@ func (s *service) delaisEnrolement(ctx context.Context, depuis string, args []an
 	return delais, nil
 }
 
-const methodesEnrolement = "APPOINTMENT:RDV CPI,PHYSICAL:RDV CPI,PLATFORM:Plateforme en ligne,PLATEFORME_EN_LIGNE:Plateforme en ligne," +
-	"VOICE_OR_ELECTRONIC_MESSAGING:Mail,MAIL:Mail,WHATSAPP:WhatsApp,RDV_CPI:RDV CPI"
+const methodesEnrolement = "APPOINTMENT:Enrôlement sur place,PHYSICAL:Enrôlement sur place,PLATFORM:Plateforme en ligne,PLATEFORME_EN_LIGNE:Plateforme en ligne," +
+	"VOICE_OR_ELECTRONIC_MESSAGING:Mail,MAIL:Mail,WHATSAPP:WhatsApp,RDV_CPI:Enrôlement sur place"
 
 func libelleMethodeEnrolement(methode string) string {
 	for _, paire := range strings.Split(methodesEnrolement, ",") {

@@ -205,7 +205,7 @@ export function FiltersBar({
           ) : null
         }
       >
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+        <>
           <DatePicker
             id="prospects-date-from"
             label="Saisi à partir du"
@@ -352,7 +352,7 @@ export function FiltersBar({
               setFilters({ revue: value === null ? null : value === 'oui' });
             }}
           />
-        </div>
+        </>
       </AdvancedPanel>
     </section>
   );
