@@ -89,3 +89,5 @@ Les migrations goose s'appliquent au démarrage. Avant chaque `git push`,
 `lefthook` exécute `pnpm verify:local` (installé par `pnpm install`). En production les logs sont en JSON
 (`LOG_FORMAT=json`), chaque ligne porte `requestId`, `pattern`, `status` et
 `ms`. Le reste des commandes est dans `infra/dokploy/README.md`.
+
+Test Kairo, PR fermée aussitôt.
