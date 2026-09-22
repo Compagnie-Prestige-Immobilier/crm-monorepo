@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"strings"
@@ -13,16 +14,22 @@ import (
 )
 
 type SiteVenteDTO struct {
-	ID                     string `json:"id"`
-	Nom                    string `json:"nom"`
-	Actif                  bool   `json:"actif"`
-	Ordre                  int32  `json:"ordre"`
-	TotalLots              *int32 `json:"totalLots"`
-	SuperficieDefaut       string `json:"superficieDefaut"`
-	PrixUnitaireDefaut     int64  `json:"prixUnitaireDefaut"`
-	PartProprietaireParLot int64  `json:"partProprietaireParLot"`
-	PartApporteurMode      string `json:"partApporteurMode"`
-	PartApporteurValeur    int64  `json:"partApporteurValeur"`
+	ID                     string           `json:"id"`
+	Nom                    string           `json:"nom"`
+	Actif                  bool             `json:"actif"`
+	Ordre                  int32            `json:"ordre"`
+	TotalLots              *int32           `json:"totalLots"`
+	SuperficieDefaut       string           `json:"superficieDefaut"`
+	PrixUnitaireDefaut     int64            `json:"prixUnitaireDefaut"`
+	PartProprietaireParLot int64            `json:"partProprietaireParLot"`
+	PartApporteurMode      string           `json:"partApporteurMode"`
+	PartApporteurValeur    int64            `json:"partApporteurValeur"`
+	Superficies            []SuperficieSite `json:"superficies"`
+}
+
+type SuperficieSite struct {
+	Superficie string `json:"superficie" minLength:"1" maxLength:"80"`
+	Prix       int64  `json:"prix" minimum:"1"`
 }
 
 type CanalVenteDTO struct {
@@ -41,14 +48,15 @@ type VentesConfigurationOutput struct {
 
 type siteVenteInput struct {
 	Body struct {
-		Nom                    string `json:"nom" minLength:"1" maxLength:"120"`
-		Ordre                  int32  `json:"ordre" minimum:"0"`
-		TotalLots              *int32 `json:"totalLots,omitempty" minimum:"0"`
-		SuperficieDefaut       string `json:"superficieDefaut" maxLength:"80"`
-		PrixUnitaireDefaut     int64  `json:"prixUnitaireDefaut" minimum:"0"`
-		PartProprietaireParLot int64  `json:"partProprietaireParLot" minimum:"0"`
-		PartApporteurMode      string `json:"partApporteurMode"`
-		PartApporteurValeur    int64  `json:"partApporteurValeur" minimum:"0"`
+		Nom                    string           `json:"nom" minLength:"1" maxLength:"120"`
+		Ordre                  int32            `json:"ordre" minimum:"0"`
+		TotalLots              *int32           `json:"totalLots,omitempty" minimum:"0"`
+		SuperficieDefaut       string           `json:"superficieDefaut" maxLength:"80"`
+		PrixUnitaireDefaut     int64            `json:"prixUnitaireDefaut" minimum:"0"`
+		PartProprietaireParLot int64            `json:"partProprietaireParLot" minimum:"0"`
+		PartApporteurMode      string           `json:"partApporteurMode"`
+		PartApporteurValeur    int64            `json:"partApporteurValeur" minimum:"0"`
+		Superficies            []SuperficieSite `json:"superficies,omitempty" maxItems:"20"`
 	}
 }
 
@@ -93,7 +101,11 @@ func (s *service) configuration(ctx context.Context, _ *struct{}) (*VentesConfig
 	}
 	out := &VentesConfigurationOutput{}
 	for i := range sites {
-		out.Body.Sites = append(out.Body.Sites, siteDTO(&sites[i]))
+		dto, err := siteDTO(&sites[i])
+		if err != nil {
+			return nil, err
+		}
+		out.Body.Sites = append(out.Body.Sites, dto)
 	}
 	for i := range canaux {
 		out.Body.Canaux = append(out.Body.Canaux, canalDTO(&canaux[i]))
@@ -106,17 +118,21 @@ func (s *service) creerSite(ctx context.Context, in *siteVenteInput) (*SiteVente
 	if err := verifierModePartage(corps.PartApporteurMode, corps.PartApporteurValeur); err != nil {
 		return nil, err
 	}
+	superficies, err := superficiesJSON(corps.Superficies)
+	if err != nil {
+		return nil, err
+	}
 	row, err := s.Q.InsererSiteVente(ctx, db.InsererSiteVenteParams{
 		Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre, TotalLots: corps.TotalLots,
 		SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut), PrixUnitaireDefaut: corps.PrixUnitaireDefaut,
 		PartProprietaireParLot: corps.PartProprietaireParLot, PartApporteurMode: corps.PartApporteurMode,
-		PartApporteurValeur: corps.PartApporteurValeur,
+		PartApporteurValeur: corps.PartApporteurValeur, Superficies: superficies,
 	})
 	if err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
-	return &SiteVenteOutput{Body: siteDTO(&row)}, nil
+	return sortieSite(&row)
 }
 
 func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*SiteVenteOutput, error) {
@@ -124,11 +140,16 @@ func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*
 	if err := verifierModePartage(corps.PartApporteurMode, corps.PartApporteurValeur); err != nil {
 		return nil, err
 	}
+	superficies, err := superficiesJSON(corps.Superficies)
+	if err != nil {
+		return nil, err
+	}
 	row, err := s.Q.ModifierSiteVente(ctx, db.ModifierSiteVenteParams{
 		ID: in.ID, Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre,
 		TotalLots: corps.TotalLots, SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut),
 		PrixUnitaireDefaut: corps.PrixUnitaireDefaut, PartProprietaireParLot: corps.PartProprietaireParLot,
 		PartApporteurMode: corps.PartApporteurMode, PartApporteurValeur: corps.PartApporteurValeur,
+		Superficies: superficies,
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "VENTE_SITE_NOT_FOUND", "Site introuvable.")
@@ -137,20 +158,21 @@ func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
-	return &SiteVenteOutput{Body: siteDTO(&row)}, nil
+	return sortieSite(&row)
 }
 
 type siteVenteModifyInput struct {
 	ID   string `path:"id" format:"uuid"`
 	Body struct {
-		Nom                    string `json:"nom" minLength:"1" maxLength:"120"`
-		Ordre                  int32  `json:"ordre" minimum:"0"`
-		TotalLots              *int32 `json:"totalLots,omitempty" minimum:"0"`
-		SuperficieDefaut       string `json:"superficieDefaut" maxLength:"80"`
-		PrixUnitaireDefaut     int64  `json:"prixUnitaireDefaut" minimum:"0"`
-		PartProprietaireParLot int64  `json:"partProprietaireParLot" minimum:"0"`
-		PartApporteurMode      string `json:"partApporteurMode"`
-		PartApporteurValeur    int64  `json:"partApporteurValeur" minimum:"0"`
+		Nom                    string           `json:"nom" minLength:"1" maxLength:"120"`
+		Ordre                  int32            `json:"ordre" minimum:"0"`
+		TotalLots              *int32           `json:"totalLots,omitempty" minimum:"0"`
+		SuperficieDefaut       string           `json:"superficieDefaut" maxLength:"80"`
+		PrixUnitaireDefaut     int64            `json:"prixUnitaireDefaut" minimum:"0"`
+		PartProprietaireParLot int64            `json:"partProprietaireParLot" minimum:"0"`
+		PartApporteurMode      string           `json:"partApporteurMode"`
+		PartApporteurValeur    int64            `json:"partApporteurValeur" minimum:"0"`
+		Superficies            []SuperficieSite `json:"superficies,omitempty" maxItems:"20"`
 	}
 }
 
@@ -158,7 +180,14 @@ type SiteVenteOutput struct{ Body SiteVenteDTO }
 
 func (s *service) activerSite(ctx context.Context, in *siteVenteIDInput) (*SiteVenteOutput, error) {
 	row, err := s.Q.ActiverSiteVente(ctx, db.ActiverSiteVenteParams{ID: in.ID, Actif: in.Body.Actif})
-	return reponseActivation(err, "VENTE_SITE_NOT_FOUND", "Site introuvable.", SiteVenteOutput{Body: siteDTO(&row)}, s.Live.Emettre)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, socle.Problem(http.StatusNotFound, "VENTE_SITE_NOT_FOUND", "Site introuvable.")
+	}
+	if err != nil {
+		return nil, err
+	}
+	s.Live.Emettre("ventes")
+	return sortieSite(&row)
 }
 
 type CanalVenteOutput struct{ Body CanalVenteDTO }
@@ -208,13 +237,33 @@ func reponseActivation[T any](err error, code, message string, sortie T, emettre
 	return &sortie, nil
 }
 
-func siteDTO(site *db.VentesSite) SiteVenteDTO {
+func siteDTO(site *db.VentesSite) (SiteVenteDTO, error) {
+	superficies := []SuperficieSite{}
+	if err := json.Unmarshal(site.Superficies, &superficies); err != nil {
+		return SiteVenteDTO{}, err
+	}
 	return SiteVenteDTO{
 		ID: site.ID, Nom: site.Nom, Actif: site.Actif, Ordre: site.Ordre, TotalLots: site.TotalLots,
 		SuperficieDefaut: site.SuperficieDefaut, PrixUnitaireDefaut: site.PrixUnitaireDefaut,
 		PartProprietaireParLot: site.PartProprietaireParLot, PartApporteurMode: site.PartApporteurMode,
-		PartApporteurValeur: site.PartApporteurValeur,
+		PartApporteurValeur: site.PartApporteurValeur, Superficies: superficies,
+	}, nil
+}
+
+func sortieSite(site *db.VentesSite) (*SiteVenteOutput, error) {
+	dto, err := siteDTO(site)
+	if err != nil {
+		return nil, err
 	}
+	return &SiteVenteOutput{Body: dto}, nil
+}
+
+func superficiesJSON(superficies []SuperficieSite) ([]byte, error) {
+	propres := make([]SuperficieSite, 0, len(superficies))
+	for _, s := range superficies {
+		propres = append(propres, SuperficieSite{Superficie: strings.TrimSpace(s.Superficie), Prix: s.Prix})
+	}
+	return json.Marshal(propres)
 }
 
 func canalDTO(canal *db.VentesCanaux) CanalVenteDTO {
