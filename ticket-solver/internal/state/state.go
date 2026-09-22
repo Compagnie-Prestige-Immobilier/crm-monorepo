@@ -33,6 +33,7 @@ type JobRecord struct {
 	DureeSecondes int     `json:"dureeSecondes,omitempty"`
 	JevCategorie  string  `json:"jevCategorie,omitempty"`
 	JevConfiance  float64 `json:"jevConfiance,omitempty"`
+	Consigne      string  `json:"consigne,omitempty"`
 }
 
 type Store struct {
@@ -108,6 +109,7 @@ func (s *Store) init(ctx context.Context) error {
 		"ALTER TABLE kairo_jobs ADD COLUMN duree_secondes INTEGER NOT NULL DEFAULT 0",
 		"ALTER TABLE kairo_jobs ADD COLUMN jev_categorie TEXT NOT NULL DEFAULT ''",
 		"ALTER TABLE kairo_jobs ADD COLUMN jev_confiance REAL NOT NULL DEFAULT 0.0",
+		"ALTER TABLE kairo_jobs ADD COLUMN consigne TEXT NOT NULL DEFAULT ''",
 	}
 	for _, q := range migrations {
 		_, _ = s.db.ExecContext(ctx, q)
@@ -248,16 +250,77 @@ func (s *Store) Pause(ctx context.Context, active bool) error {
 	return err
 }
 
+func (s *Store) BlockedTickets(ctx context.Context) ([]int, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id FROM kairo_jobs WHERE status IN ('escalade', 'echec', 'triage', 'arrete')")
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var ids []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
+func (s *Store) Consigne(ctx context.Context, ticketID int) (string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	var c string
+	err := s.db.QueryRowContext(ctx, "SELECT consigne FROM kairo_jobs WHERE ticket_id=?", ticketID).Scan(&c)
+	if err == sql.ErrNoRows {
+		return "", nil
+	}
+	if err != nil {
+		return "", err
+	}
+	return c, nil
+}
+
 func (s *Store) Relaunch(ctx context.Context, ticketID int) (bool, error) {
+	return s.RelaunchWithDirective(ctx, ticketID, "")
+}
+
+func (s *Store) RelaunchWithDirective(ctx context.Context, ticketID int, consigne string) (bool, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	res, err := s.db.ExecContext(
 		ctx,
 		`UPDATE kairo_jobs
-		SET status='retry', attempts=0, resume='', cause='', notes='', pr_url='', fichiers='', duree_secondes=0, updated_at=datetime('now', '-1 day')
+		SET status='retry', attempts=0, resume='', cause='', notes='', pr_url='', fichiers='', duree_secondes=0, consigne=?, updated_at=datetime('now', '-1 day')
 		WHERE ticket_id=? AND status IN ('echec', 'escalade', 'arrete', 'triage')`,
-		ticketID,
+		consigne, ticketID,
+	)
+	if err != nil {
+		return false, err
+	}
+	rows, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return rows == 1, nil
+}
+
+func (s *Store) MarkHandled(ctx context.Context, ticketID int, raison string) (bool, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	res, err := s.db.ExecContext(
+		ctx,
+		`UPDATE kairo_jobs
+		SET status='abandon', resume=?, updated_at=CURRENT_TIMESTAMP
+		WHERE ticket_id=? AND status IN ('echec', 'escalade', 'arrete', 'triage')`,
+		raison, ticketID,
 	)
 	if err != nil {
 		return false, err
@@ -281,7 +344,7 @@ func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes, pr_url, fichiers, duree_secondes, titre, jev_categorie, jev_confiance FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
+	rows, err := s.db.QueryContext(ctx, "SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes, pr_url, fichiers, duree_secondes, titre, jev_categorie, jev_confiance, consigne FROM kairo_jobs ORDER BY updated_at DESC LIMIT 50")
 	if err != nil {
 		return nil, err
 	}
@@ -290,7 +353,7 @@ func (s *Store) Recent(ctx context.Context) ([]JobRecord, error) {
 	var list []JobRecord
 	for rows.Next() {
 		var r JobRecord
-		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes, &r.PRURL, &r.Fichiers, &r.DureeSecondes, &r.Titre, &r.JevCategorie, &r.JevConfiance); err != nil {
+		if err := rows.Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes, &r.PRURL, &r.Fichiers, &r.DureeSecondes, &r.Titre, &r.JevCategorie, &r.JevConfiance, &r.Consigne); err != nil {
 			return nil, err
 		}
 		list = append(list, r)
@@ -310,7 +373,7 @@ func (s *Store) MTTR(ctx context.Context) (int, error) {
 	return int(mttr.Float64), nil
 }
 
-func normaliserTitre(t string) string {
+func NormaliserTitre(t string) string {
 	t = strings.ToLower(strings.TrimSpace(t))
 	var sb strings.Builder
 	for _, r := range t {
@@ -321,24 +384,44 @@ func normaliserTitre(t string) string {
 	return strings.Join(strings.Fields(sb.String()), " ")
 }
 
-func (s *Store) FindDuplicatePR(ctx context.Context, project string, rawTitle string) (int, string, error) {
+func (s *Store) GetPreviousJob(ctx context.Context, ticketID int) (*JobRecord, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	normTarget := normaliserTitre(rawTitle)
+	var r JobRecord
+	err := s.db.QueryRowContext(
+		ctx,
+		`SELECT ticket_id, project, status, attempts, updated_at, resume, cause, notes, pr_url, fichiers, duree_secondes, titre, jev_categorie, jev_confiance
+		FROM kairo_jobs WHERE ticket_id=?`,
+		ticketID,
+	).Scan(&r.TicketID, &r.Project, &r.Status, &r.Attempts, &r.UpdatedAt, &r.Resume, &r.Cause, &r.Notes, &r.PRURL, &r.Fichiers, &r.DureeSecondes, &r.Titre, &r.JevCategorie, &r.JevConfiance)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &r, nil
+}
+
+func (s *Store) FindDuplicateResolution(ctx context.Context, project string, rawTitle string) (int, string, string, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	normTarget := NormaliserTitre(rawTitle)
 	if normTarget == "" || len(normTarget) < 5 {
-		return 0, "", nil
+		return 0, "", "", nil
 	}
 
 	rows, err := s.db.QueryContext(
 		ctx,
-		`SELECT ticket_id, titre, pr_url FROM kairo_jobs
-		WHERE project=? AND status='pr' AND pr_url != '' AND updated_at >= datetime('now', '-7 days')
-		ORDER BY updated_at DESC LIMIT 50`,
+		`SELECT ticket_id, titre, pr_url, status FROM kairo_jobs
+		WHERE project=? AND status IN ('pr', 'clos', 'resolu') AND updated_at >= datetime('now', '-60 days')
+		ORDER BY updated_at DESC LIMIT 100`,
 		project,
 	)
 	if err != nil {
-		return 0, "", err
+		return 0, "", "", err
 	}
 	defer func() { _ = rows.Close() }()
 
@@ -347,15 +430,21 @@ func (s *Store) FindDuplicatePR(ctx context.Context, project string, rawTitle st
 			tID       int
 			candTitre string
 			prURL     string
+			statut    string
 		)
-		if err := rows.Scan(&tID, &candTitre, &prURL); err != nil {
-			return 0, "", err
+		if err := rows.Scan(&tID, &candTitre, &prURL, &statut); err != nil {
+			return 0, "", "", err
 		}
-		if normaliserTitre(candTitre) == normTarget {
-			return tID, prURL, nil
+		if NormaliserTitre(candTitre) == normTarget {
+			return tID, prURL, statut, nil
 		}
 	}
-	return 0, "", rows.Err()
+	return 0, "", "", rows.Err()
+}
+
+func (s *Store) FindDuplicatePR(ctx context.Context, project string, rawTitle string) (int, string, error) {
+	tID, prURL, _, err := s.FindDuplicateResolution(ctx, project, rawTitle)
+	return tID, prURL, err
 }
 
 func (s *Store) CheckpointWAL(ctx context.Context) error {
