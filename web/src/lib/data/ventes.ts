@@ -9,6 +9,7 @@ export type VenteParTeleconseiller = components['schemas']['VenteParTeleconseill
 export type VenteInput = components['schemas']['VenteInput'];
 export type VersementInput = components['schemas']['VersementInput'];
 export type SiteVente = components['schemas']['SiteVenteDTO'];
+export type SuperficieSite = components['schemas']['SuperficieSite'];
 export type CanalVente = components['schemas']['CanalVenteDTO'];
 export type SiteVenteInput = components['schemas']['SiteVenteModifyInputBody'];
 export type SiteVenteCreationInput = components['schemas']['SiteVenteInputBody'];
@@ -156,3 +157,10 @@ export const totalVerse = (vente: Vente): number =>
 const FCFA = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
 
 export const formatFcfa = (montant: number): string => `${FCFA.format(montant)} FCFA`;
+
+export function libelleCredit(vente: Vente): string {
+  const nombre = vente.nombreEcheances;
+  if (nombre === null) return 'Crédit';
+  const rythme = vente.periodiciteMois > 1 ? `tous les ${vente.periodiciteMois} mois` : 'par mois';
+  return `Crédit, ${nombre} échéance${nombre > 1 ? 's' : ''} ${rythme}`;
+}
