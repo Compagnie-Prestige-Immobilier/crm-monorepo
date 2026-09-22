@@ -695,8 +695,8 @@ function methodeAttemptErreur(draft: AttemptDraft): string | null {
 function callbackAttemptErreur(draft: AttemptDraft, now: number): string | null {
   const callbackAt = draft.callbackAt ?? null;
   if (callbackAt === null) return null;
-  if (draft.effect !== 'SCHEDULE_CALLBACK') {
-    return 'Une échéance ne s’enregistre que sur « À rappeler ».';
+  if (draft.effect !== 'SCHEDULE_CALLBACK' && draft.effect !== 'CLOSE_APPOINTMENT') {
+    return 'Une échéance ne s’enregistre que sur « À rappeler » ou « Rendez-vous ».';
   }
   if (!(Date.parse(callbackAt) > now)) return 'Choisissez une échéance à venir.';
   return null;
