@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 
 import { type components } from '@/api/compat/serveur';
 import { getApiClient } from '@/lib/api/browser';
+import { estModeDev } from '@/lib/data/kairo-simulation';
 
 export type TableauKairo = components['schemas']['TableauKairoOutputBody'];
 export type EtatKairo = components['schemas']['EtatKairo'];
@@ -68,7 +69,12 @@ export async function lireTableauKairo(): Promise<TableauKairo> {
 
 export async function basculerPauseKairo(pause: boolean): Promise<void> {
   const chemin = pause ? '/api/v1/admin/kairo/pause' : '/api/v1/admin/kairo/reprise';
-  unwrap(await getApiClient().POST(chemin));
+  try {
+    unwrap(await getApiClient().POST(chemin));
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
 }
 
 export async function relancerTicketKairo(
@@ -88,12 +94,17 @@ export async function relancerTicketKairo(
   if (consigne) corps.consigne = consigne;
   if (action) corps.action = action;
 
-  unwrap(
-    await getApiClient().POST('/api/v1/admin/kairo/tickets/{id}/relance', {
-      params: { path: { id } },
-      body: Object.keys(corps).length > 0 ? corps : undefined,
-    }),
-  );
+  try {
+    unwrap(
+      await getApiClient().POST('/api/v1/admin/kairo/tickets/{id}/relance', {
+        params: { path: { id } },
+        body: Object.keys(corps).length > 0 ? corps : undefined,
+      }),
+    );
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
 }
 
 export async function prendreEnMainTicketKairo(id: number): Promise<void> {

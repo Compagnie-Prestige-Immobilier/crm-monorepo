@@ -14,6 +14,9 @@ export interface AdvancedChipItem<K extends string> {
   value: string;
 }
 
+const PASTILLE =
+  'inline-flex h-8 max-w-full items-center gap-1.5 rounded-full border border-border pr-1.5 pl-2.5 text-[0.75rem] transition-colors duration-(--dur-1) ease-(--ease-out-cpi) focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
+
 function storageKey(module: string): string {
   return `cpi.filtres-avances.${module}`;
 }
@@ -76,12 +79,15 @@ export function AdvancedPanel<K extends string>({
     });
   }, [module]);
 
+  const rappel = !open && count > 0;
+  const pluriel = count > 1 ? 's' : '';
+
   return (
-    <>
-      {/* ─── Commandes ──────────────────────────────────────────────────── */}
+    <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-2">
         <Button
           type="button"
+          size="sm"
           variant="outline"
           onClick={toggle}
           aria-expanded={open}
@@ -93,11 +99,11 @@ export function AdvancedPanel<K extends string>({
               sont les seuls qu'on ne voit pas. Compter aussi la recherche et la
               période mettrait un « 5 » sur un bouton qui n'en cache que trois. */}
           {count > 0 ? (
-            <Badge variant="default" className="ml-1 tabular-nums">
+            <Badge variant="default" className="tabular-nums">
               {count}
               <span className="sr-only">
                 {' '}
-                critère{count > 1 ? 's' : ''} replié{count > 1 ? 's' : ''}
+                critère{pluriel} replié{pluriel}
               </span>
             </Badge>
           ) : null}
@@ -110,45 +116,56 @@ export function AdvancedPanel<K extends string>({
           />
         </Button>
 
-        {actions}
+        {/* Rappel affiché UNIQUEMENT panneau fermé : ouvert, chaque champ porte
+            déjà sa valeur. */}
+        {rappel
+          ? chips.map((chip) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={() => {
+                  onRemove(chip.key);
+                }}
+                aria-label={`Retirer le filtre ${chip.field} : ${chip.value}`}
+                className={cn(PASTILLE, 'bg-secondary text-secondary-foreground hover:bg-muted')}
+              >
+                <span className="truncate">
+                  <span className="text-muted-foreground">{chip.field} : </span>
+                  <span className="font-[600]">{chip.value}</span>
+                </span>
+                <XIcon className="size-3.5 shrink-0" aria-hidden="true" />
+              </button>
+            ))
+          : null}
+        {/* Même forme que les pastilles : l'action porte sur elles, pas sur la
+            recherche ni la période, que « Tout effacer » emporte, lui. */}
+        {rappel ? (
+          <button
+            type="button"
+            onClick={onClearAll}
+            className={cn(
+              PASTILLE,
+              'border-dashed text-muted-foreground hover:bg-secondary hover:text-foreground',
+            )}
+          >
+            Tout retirer
+            <XIcon className="size-3.5 shrink-0" aria-hidden="true" />
+          </button>
+        ) : null}
+
+        {actions ? <div className="ml-auto flex items-center gap-2">{actions}</div> : null}
       </div>
 
-      {/* ─── Rappel des critères repliés ────────────────────────────────────
-          Affiché UNIQUEMENT panneau fermé : ouvert, chaque champ porte déjà sa
-          valeur, et doubler l'information ferait relire deux fois la même
-          chose. */}
-      {!open && count > 0 ? (
-        <div className="flex flex-wrap items-center gap-2 border-t border-border pt-3">
-          <span className="text-[0.75rem] text-muted-foreground">Filtres avancés actifs</span>
-          {chips.map((chip) => (
-            <button
-              key={chip.key}
-              type="button"
-              onClick={() => {
-                onRemove(chip.key);
-              }}
-              aria-label={`Retirer le filtre ${chip.field} : ${chip.value}`}
-              className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-secondary py-1 pr-1.5 pl-2.5 text-[0.75rem] text-secondary-foreground transition-colors duration-(--dur-1) ease-(--ease-out-cpi) hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-            >
-              <span className="truncate">
-                <span className="text-muted-foreground">{chip.field} : </span>
-                <span className="font-[600]">{chip.value}</span>
-              </span>
-              <XIcon className="size-3.5 shrink-0" aria-hidden="true" />
-            </button>
-          ))}
-          <Button variant="ghost" size="sm" onClick={onClearAll}>
-            Tout retirer
-          </Button>
-        </div>
-      ) : null}
-
-      {/* ─── Champs repliés ─────────────────────────────────────────────────
-          Retirés du DOM quand le panneau est fermé plutôt que masqués en CSS :
-          voir la garantie 2 du bloc d'en-tête. */}
-      <div id={panelId} hidden={!open}>
+      {/* Champs repliés retirés du DOM plutôt que masqués en CSS. La hauteur est
+          bornée : douze listes dépliées poussaient le tableau hors de l'écran,
+          sur téléphone comme sur poste. */}
+      <div
+        id={panelId}
+        hidden={!open}
+        className="grid max-h-[min(24rem,45svh)] gap-x-4 gap-y-3 overflow-y-auto rounded-md border border-border bg-secondary p-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 [&_[data-slot=label]]:text-[0.8125rem] [&_[data-slot=label]]:text-muted-foreground"
+      >
         {open ? children : null}
       </div>
-    </>
+    </div>
   );
 }

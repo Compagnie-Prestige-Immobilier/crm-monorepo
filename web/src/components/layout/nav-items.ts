@@ -295,12 +295,10 @@ const SECTIONS: readonly NavSection[] = [
       },
       {
         href: '/teleconseil/supervision',
-        label: 'Tableau de bord',
+        label: 'Superviser l’équipe',
         icon: ActivityIcon,
         description: 'Activité et présence des téléconseillers',
         acces: 'analytics.superviser',
-        hidden: true,
-        onglet: '/teleconseil/tableau-de-bord',
       },
       {
         href: '/teleconseil/mes-contacts',

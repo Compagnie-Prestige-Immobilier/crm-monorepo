@@ -596,7 +596,7 @@ export function RegistreView() {
             ) : null
           }
         >
-          <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <>
             <FilterCombobox
               label={VISITE_COLONNES.entreprise}
               placeholder="Toutes"
@@ -633,7 +633,7 @@ export function RegistreView() {
                 setFilters({ objetId: value });
               }}
             />
-          </div>
+          </>
         </AdvancedPanel>
       </section>
 

@@ -338,14 +338,14 @@ export const ENROLLMENT_METHOD_ORDER = [
 ] as const satisfies readonly EnrollmentMethod[];
 
 export const ENROLLMENT_METHOD_LABELS: Record<EnrollmentMethod, string> = {
-  APPOINTMENT: 'RDV en agence (Adhésion)',
-  PHYSICAL: 'RDV en agence (Adhésion)',
+  APPOINTMENT: 'Enrôlement sur place',
+  PHYSICAL: 'Enrôlement sur place',
   PLATFORM: 'Plateforme en ligne',
   PLATEFORME_EN_LIGNE: 'Plateforme en ligne',
   VOICE_OR_ELECTRONIC_MESSAGING: 'Par e-mail',
   MAIL: 'Par e-mail',
   WHATSAPP: 'Par WhatsApp',
-  RDV_CPI: 'RDV en agence (Adhésion)',
+  RDV_CPI: 'Enrôlement sur place',
 };
 
 /**

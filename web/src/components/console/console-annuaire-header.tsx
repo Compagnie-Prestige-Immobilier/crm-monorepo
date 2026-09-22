@@ -222,7 +222,7 @@ function FiltresConsole({
   | 'onClearFilters'
 >) {
   return (
-    <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+    <>
       {reference && reference.representants.length > 0 ? (
         <FilterCombobox
           label="Représentant"
@@ -293,7 +293,7 @@ function FiltresConsole({
         min={dateFrom}
         onChange={onDateToChange}
       />
-    </div>
+    </>
   );
 }
 
