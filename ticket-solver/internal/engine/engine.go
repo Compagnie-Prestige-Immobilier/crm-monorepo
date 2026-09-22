@@ -148,6 +148,7 @@ func (e *Engine) launch(ctx context.Context, ticketID int, projectName string) {
 		e.sem <- struct{}{}
 		defer func() { <-e.sem }()
 
+		slog.Info("ticket en traitement", "ticket", ticketID, "projet", projectName)
 		e.solver.RunJob(jobCtx, ticketID, projectName)
 	}()
 }
