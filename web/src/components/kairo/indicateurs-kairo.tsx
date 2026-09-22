@@ -1,13 +1,6 @@
-import {
-  CheckCheckIcon,
-  GitPullRequestIcon,
-  LoaderIcon,
-  TimerIcon,
-  TriangleAlertIcon,
-} from 'lucide-react';
-
-import { Kpi } from '@/components/bank/bank-kpi';
+import { Card } from '@/components/ui/card';
 import { formatDuree, ticketsFiltres, type TicketKairo } from '@/lib/data/kairo';
+import { cn } from '@/lib/utils';
 
 function calculerMTTR(tickets: TicketKairo[], mttrSecondes?: number): number {
   if (mttrSecondes && mttrSecondes > 0) return mttrSecondes;
@@ -19,50 +12,108 @@ function calculerMTTR(tickets: TicketKairo[], mttrSecondes?: number): number {
   return Math.round(somme / avecDuree.length);
 }
 
+interface StatKairo {
+  titre: string;
+  valeur: string;
+  detail: string;
+  accent: string;
+}
+
+function libelleEnCours(n: number): string {
+  if (n === 0) return 'Aucun traitement';
+  return `${String(n)} actif${n > 1 ? 's' : ''}`;
+}
+
+function libelleBlocages(n: number): string {
+  if (n === 0) return 'Aucun blocage';
+  return `${String(n)} escalade${n > 1 ? 's' : ''}`;
+}
+
+function libelleTaux(pr: number, termines: number): string {
+  if (termines === 0) return '–';
+  return `${String(Math.round((pr / termines) * 100))} %`;
+}
+
+function genererStats(tickets: TicketKairo[], mttrSecondes?: number): StatKairo[] {
+  const enCours = ticketsFiltres(tickets, 'enCours').length;
+  const pr = ticketsFiltres(tickets, 'pr').length;
+  const aReprendre = ticketsFiltres(tickets, 'aReprendre').length;
+  const termines = pr + aReprendre;
+  const mttr = calculerMTTR(tickets, mttrSecondes);
+
+  return [
+    {
+      titre: 'En cours',
+      valeur: String(enCours),
+      detail: libelleEnCours(enCours),
+      accent: enCours > 0 ? 'text-primary' : 'text-foreground',
+    },
+    {
+      titre: 'PR proposées',
+      valeur: String(pr),
+      detail: `${String(pr)} à relire`,
+      accent: pr > 0 ? 'text-success' : 'text-foreground',
+    },
+    {
+      titre: 'À arbitrer',
+      valeur: String(aReprendre),
+      detail: libelleBlocages(aReprendre),
+      accent: aReprendre > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-foreground',
+    },
+    {
+      titre: 'Taux de succès',
+      valeur: libelleTaux(pr, termines),
+      detail: `${String(pr)} PR sur ${String(termines)} terminé${termines > 1 ? 's' : ''}`,
+      accent: 'text-foreground',
+    },
+    {
+      titre: 'Délai moyen (MTTR)',
+      valeur: mttr > 0 ? formatDuree(mttr) : '–',
+      detail: 'Temps moyen avant PR',
+      accent: 'text-foreground',
+    },
+  ];
+}
+
+function CelluleStat(props: { item: StatKairo; large: boolean }) {
+  const { item, large } = props;
+  return (
+    <div
+      className={cn(
+        'flex flex-col gap-1 p-4 sm:p-5',
+        large ? 'col-span-2 sm:col-span-1' : '',
+      )}
+    >
+      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+        {item.titre}
+      </span>
+      <span
+        className={cn(
+          'font-display text-2xl font-bold tracking-tight tabular-nums sm:text-3xl',
+          item.accent,
+        )}
+      >
+        {item.valeur}
+      </span>
+      <span className="text-xs text-muted-foreground">{item.detail}</span>
+    </div>
+  );
+}
+
 export function IndicateursKairo(props: {
   tickets: TicketKairo[];
   mttrSecondes?: number | undefined;
 }) {
   const { tickets, mttrSecondes } = props;
-  const pr = ticketsFiltres(tickets, 'pr').length;
-  const aReprendre = ticketsFiltres(tickets, 'aReprendre').length;
-  const termines = pr + aReprendre;
-  const reussite = termines === 0 ? '–' : `${String(Math.round((pr / termines) * 100))} %`;
-
-  const mttr = calculerMTTR(tickets, mttrSecondes);
-  const mttrTxt = mttr > 0 ? formatDuree(mttr) : '–';
+  const stats = genererStats(tickets, mttrSecondes);
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-5">
-      <Kpi
-        index={0}
-        label="En cours"
-        value={String(ticketsFiltres(tickets, 'enCours').length)}
-        hint={`sur les ${String(tickets.length)} derniers tickets`}
-        icon={LoaderIcon}
-      />
-      <Kpi
-        index={1}
-        label="PR"
-        value={String(pr)}
-        hint="à relire par l’équipe"
-        icon={GitPullRequestIcon}
-      />
-      <Kpi
-        index={2}
-        label="Bloqués"
-        value={String(aReprendre)}
-        hint="échecs et escalades"
-        icon={TriangleAlertIcon}
-      />
-      <Kpi
-        index={3}
-        label="Réussite"
-        value={reussite}
-        hint={`${String(pr)} PR sur ${String(termines)} tickets terminés`}
-        icon={CheckCheckIcon}
-      />
-      <Kpi index={4} label="MTTR" value={mttrTxt} hint="délai moyen avant PR" icon={TimerIcon} />
-    </div>
+    <Card className="overflow-hidden border border-border/80 bg-card/60 p-0 shadow-xs backdrop-blur-xs">
+      <div className="grid grid-cols-2 divide-y divide-border/60 sm:grid-cols-3 sm:divide-y-0 sm:divide-x xl:grid-cols-5">
+        {stats.map((item, idx) => (
+          <CelluleStat key={item.titre} item={item} large={idx === 4} />
+        ))}
+      </div>
+    </Card>
   );
 }

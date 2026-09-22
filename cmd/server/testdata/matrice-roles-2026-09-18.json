@@ -484,6 +484,7 @@
   "PATCH /api/v1/visites/{id}": ["ACCUEIL", "ADMIN", "DIRECTION"],
   "POST /api/v1/admin/bases": ["ADMIN"],
   "POST /api/v1/admin/bases/{nom}/rafraichir": ["ADMIN"],
+  "POST /api/v1/admin/bases/rafraichir": ["ADMIN"],
   "POST /api/v1/admin/database-dump": ["ADMIN"],
   "POST /api/v1/admin/kairo/pause": ["ADMIN"],
   "POST /api/v1/admin/kairo/reprise": ["ADMIN"],
