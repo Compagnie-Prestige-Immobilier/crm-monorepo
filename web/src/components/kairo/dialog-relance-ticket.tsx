@@ -69,14 +69,13 @@ function PiedRelance(props: {
   );
 }
 
-export function DialogRelanceTicket(props: {
-  ticket: TicketKairo | null;
-  desactive?: boolean | undefined;
-  onClose: () => void;
-}) {
+// Clé sur ticket.id par le parent : remonte à chaque changement de ticket,
+// ce qui initialise consigne directement depuis ticket.consigne sans effet
+// de synchronisation, et la réinitialise proprement à l'ouverture suivante.
+function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose: () => void }) {
   const { ticket, desactive, onClose } = props;
   const client = useQueryClient();
-  const [consigne, setConsigne] = useState('');
+  const [consigne, setConsigne] = useState(ticket.consigne ?? '');
 
   const relance = useMutation({
     mutationFn: relancerTicketKairo,
@@ -84,7 +83,6 @@ export function DialogRelanceTicket(props: {
       const id = typeof variables === 'number' ? variables : variables.id;
       toast.success(`Ticket n° ${String(id)} remis à Kairo.`);
       onClose();
-      setConsigne('');
     },
     onError: (error) => toastApiError(error, 'Kairo n’a pas pris la relance.'),
     onSettled: () => client.invalidateQueries({ queryKey: CLE_KAIRO }),
@@ -95,13 +93,10 @@ export function DialogRelanceTicket(props: {
     onSuccess: (_, id) => {
       toast.success(`Ticket n° ${String(id)} pris en main par l'équipe.`);
       onClose();
-      setConsigne('');
     },
     onError: (error) => toastApiError(error, 'Impossible de prendre en main le ticket.'),
     onSettled: () => client.invalidateQueries({ queryKey: CLE_KAIRO }),
   });
-
-  if (ticket === null) return null;
 
   const estEscalade = ticket.statut === 'escalade';
   const motif = ticket.resume || ticket.cause;
@@ -114,12 +109,6 @@ export function DialogRelanceTicket(props: {
     : 'Kairo reprend le ticket depuis le début, avec trois tentatives.';
   const texteBouton = consigne.trim() !== '' ? 'Relancer avec consigne' : 'Relancer tel quel';
 
-  const gererFermeture = (ouvert: boolean) => {
-    if (!ouvert && !occupe) {
-      onClose();
-    }
-  };
-
   const gererRelance = () => {
     const texte = consigne.trim();
     relance.mutate({
@@ -130,40 +119,66 @@ export function DialogRelanceTicket(props: {
   };
 
   return (
+    <>
+      <DialogHeader>
+        <DialogTitle className="font-display text-lg font-bold">{titre}</DialogTitle>
+        <DialogDescription className="text-xs">{description}</DialogDescription>
+      </DialogHeader>
+
+      {motif ? (
+        <MotifArbitrage motif={motif} notes={ticket.notes} estEscalade={estEscalade} />
+      ) : null}
+
+      <div className="flex flex-col gap-1.5">
+        <label
+          htmlFor="consigne-kairo"
+          className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
+        >
+          Consigne ou directive pour Kairo (optionnel)
+          {ticket.consigne ? ' — reprise de la dernière relance, modifiable' : ''}
+        </label>
+        <textarea
+          id="consigne-kairo"
+          value={consigne}
+          disabled={occupe}
+          onChange={(e) => setConsigne(e.target.value)}
+          placeholder="Ex. Ne corriger que le composant d'interface sans toucher au modèle Go..."
+          className="h-20 w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+        />
+      </div>
+
+      <PiedRelance
+        desactive={occupe}
+        texteRelance={texteBouton}
+        onPriseEnMain={() => priseEnMain.mutate(ticket.id)}
+        onRelance={gererRelance}
+      />
+    </>
+  );
+}
+
+export function DialogRelanceTicket(props: {
+  ticket: TicketKairo | null;
+  desactive?: boolean | undefined;
+  onClose: () => void;
+}) {
+  const { ticket, desactive, onClose } = props;
+
+  const gererFermeture = (ouvert: boolean) => {
+    if (!ouvert) onClose();
+  };
+
+  return (
     <Dialog open={ticket !== null} onOpenChange={gererFermeture}>
       <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle className="font-display text-lg font-bold">{titre}</DialogTitle>
-          <DialogDescription className="text-xs">{description}</DialogDescription>
-        </DialogHeader>
-
-        {motif ? (
-          <MotifArbitrage motif={motif} notes={ticket.notes} estEscalade={estEscalade} />
-        ) : null}
-
-        <div className="flex flex-col gap-1.5">
-          <label
-            htmlFor="consigne-kairo"
-            className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-          >
-            Consigne ou directive pour Kairo (optionnel)
-          </label>
-          <textarea
-            id="consigne-kairo"
-            value={consigne}
-            disabled={occupe}
-            onChange={(e) => setConsigne(e.target.value)}
-            placeholder="Ex. Ne corriger que le composant d'interface sans toucher au modèle Go..."
-            className="h-20 w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+        {ticket ? (
+          <CorpsRelance
+            key={ticket.id}
+            ticket={ticket}
+            desactive={Boolean(desactive)}
+            onClose={onClose}
           />
-        </div>
-
-        <PiedRelance
-          desactive={occupe}
-          texteRelance={texteBouton}
-          onPriseEnMain={() => priseEnMain.mutate(ticket.id)}
-          onRelance={gererRelance}
-        />
+        ) : null}
       </DialogContent>
     </Dialog>
   );

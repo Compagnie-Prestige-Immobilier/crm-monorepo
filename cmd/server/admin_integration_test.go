@@ -528,21 +528,26 @@ func adminArchiveTelechargee(b *banc) {
 }
 
 type appelPlateformeRecu struct {
-	jeton string
-	page  string
+	jeton  string
+	limite string
 }
 
 func adminPlateformeGrandPublic(telephone string, recu *appelPlateformeRecu) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		recu.jeton = r.Header.Get("Authorization")
-		recu.page = r.URL.Query().Get("page")
-		if r.URL.Path != "/staff/clients" {
-			w.WriteHeader(http.StatusNotFound)
-			return
-		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"data":[{"id":4242,"name":"Awa Diop","email":"awa@example.sn","phone":"` +
-			telephone + `","dossierEtape":2,"dateInscription":"2026-09-03 13:43:05","demande":{"submittedAt":"2026-09-04 09:00:00"}}],"meta":{"last_page":1}}`))
+		switch r.URL.Path {
+		case "/integration/v1/clients":
+			recu.jeton = r.Header.Get("Authorization")
+			recu.limite = r.URL.Query().Get("limite")
+			_, _ = w.Write([]byte(`{"data":[{"id":"4242","ref":"CPI-2026-00001","nom":"Awa Diop","email":"awa@example.sn",` +
+				`"telephone":"` + telephone + `","etape_dossier":{"numero":2,"libelle":"Dépôt en banque"},` +
+				`"inscrit_le":"2026-09-03T13:43:05+00:00","compte":{"statut":"valide"},` +
+				`"demande":{"soumise":true,"soumise_le":"2026-09-04T09:00:00+00:00"},"pieces":[]}],"curseur_suivant":null}`))
+		case "/integration/v1/suppressions":
+			_, _ = w.Write([]byte(`{"data":[],"apres_suivant":null}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
 	}))
 }
 
@@ -589,8 +594,8 @@ func TestAdminTirageEnrolementRapprocheParTelephone(t *testing.T) {
 
 	adminReglagesLus(b)
 	adminTirage(b, 1, 0)
-	if recu.jeton != "Bearer jeton-machine" || recu.page != "1" {
-		t.Fatalf("appel plateforme : jeton %q, page %q", recu.jeton, recu.page)
+	if recu.jeton != "Bearer jeton-machine" || recu.limite != "500" {
+		t.Fatalf("appel plateforme : jeton %q, limite %q", recu.jeton, recu.limite)
 	}
 	adminInscriptionEcrite(b, prospectID)
 	// Rejeu : la même inscription est mise à jour, jamais redéposée.
@@ -678,12 +683,15 @@ func adminPlateformeChuesAdhesionRejetee(demandeID string) *httptest.Server {
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch r.URL.Path {
-		case "/clients":
-			_, _ = w.Write([]byte(`{"clients":[],"meta":{"lastPage":1}}`))
-		case "/chues/adhesions":
-			_, _ = w.Write([]byte(`{"requests":[{"id":"` + demandeID + `","email":"rejetee@example.sn",` +
-				`"firstName":"Awa","lastName":"Diop","phone":"+221771234567","status":"rejected",` +
-				`"callStatus":"unreachable","createdAt":1757000000000,"decidedAt":1757100000000}],"meta":{"lastPage":1}}`))
+		case "/integration/v1/clients":
+			_, _ = w.Write([]byte(`{"data":[],"curseur_suivant":null}`))
+		case "/integration/v1/prises-de-contact":
+			_, _ = w.Write([]byte(`{"data":[{"id":"` + demandeID + `","email":"rejetee@example.sn",` +
+				`"prenom":"Awa","nom_famille":"Diop","nom":"Awa Diop","telephone":"+221771234567","statut":"rejected",` +
+				`"statut_appel":"unreachable","cree_le":"2026-09-04T15:33:20+00:00","decidee_le":"2026-09-05T19:20:00+00:00",` +
+				`"client_ref":null}],"curseur_suivant":null}`))
+		case "/integration/v1/suppressions":
+			_, _ = w.Write([]byte(`{"data":[],"apres_suivant":null}`))
 		default:
 			w.WriteHeader(http.StatusNotFound)
 		}
@@ -731,6 +739,72 @@ func TestAdminTirageEnrolementChuesDemandeRejeteeSansCompteEstNegative(t *testin
 	}
 	if premiere, _ := items[0].(map[string]any); premiere["motifNegatif"] != "Refus des deux" {
 		t.Fatalf("motif dans la liste : %v", items[0])
+	}
+}
+
+func adminPlateformeChuesFlux(compteID, purgeID string) *httptest.Server {
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch r.URL.Path {
+		case "/integration/v1/clients":
+			_, _ = w.Write([]byte(`{"data":[{"id":"` + compteID + `","ref":"CHUES-2026-00001","plateforme":"cpi-chues",` +
+				`"nom":"Moussa Ndiaye","prenom":"Moussa","nom_famille":"Ndiaye","email":"moussa@example.sn",` +
+				`"telephone":"+221770000123","inscrit_le":"2026-09-02T10:00:00+00:00",` +
+				`"conseiller":{"id":"c1","nom":"Fatou Sarr","email":"fatou@example.sn"},` +
+				`"compte":{"statut":"approved"},"dossier":{"id":"d1","statut":"submitted","soumis_le":"2026-09-06T08:00:00+00:00","decide_le":null},` +
+				`"pieces":[{"code":"cni","libelle":"CNI","statut":"validated"}],"prise_de_contact":null}],"curseur_suivant":null}`))
+		case "/integration/v1/prises-de-contact":
+			_, _ = w.Write([]byte(`{"data":[{"id":"pdc-1","email":"MOUSSA@example.sn","prenom":"Moussa","nom_famille":"Ndiaye",` +
+				`"statut":"released","statut_appel":"reached","cree_le":"2026-09-01T09:00:00+00:00","client_ref":"CHUES-2026-00001"}],"curseur_suivant":null}`))
+		case "/integration/v1/suppressions":
+			_, _ = w.Write([]byte(`{"data":[{"id":7,"client_id":"` + purgeID + `","ref":"CHUES-2026-00002","type":"purge","survenu_le":"2026-09-10T00:00:00+00:00"}],"apres_suivant":null}`))
+		default:
+			w.WriteHeader(http.StatusNotFound)
+		}
+	}))
+}
+
+// Le flux d'intégration : la fiche porte son dossier, la prise de contact déjà
+// devenue compte n'est pas redéposée, et une purge efface la copie du CRM.
+func TestAdminTirageEnrolementChuesFluxEtPurge(t *testing.T) {
+	b := adminConnecte(t)
+	compteID, purgeID := uuid.NewString(), uuid.NewString()
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'enrolement.CHUES'`)
+	})
+	adminExec(b, `DELETE FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES'`)
+	adminExec(b, `INSERT INTO "inscriptions_plateforme" ("id","projet","identifiantDistant","nom","prenom","statutDistant","chargeUtile","dernierTirageAt","updatedAt")
+		VALUES ($1,'CHUES',$2,'Purgé','Client','submitted','{"email":"purge@example.sn"}'::jsonb,now(),now())`, uuid.NewString(), purgeID)
+
+	plateforme := adminPlateformeChuesFlux(compteID, purgeID)
+	t.Cleanup(plateforme.Close)
+	t.Setenv("PLATEFORME_CHUES_URL", plateforme.URL)
+	t.Setenv("PLATEFORME_CHUES_TOKEN", "jeton-machine")
+
+	statut, body := adminAppel(b, http.MethodPost, "/api/v1/enrolement/CHUES/tirage", nil)
+	b.attend(statut, http.StatusCreated, "tirage CHUES", body)
+	if body["erreur"] != nil || nombreDe(body["lus"]) != 1 {
+		t.Fatalf("tirage CHUES : %v", body)
+	}
+	var statutDistant, nom string
+	var soumise *time.Time
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "statutDistant", "nom", "soumiseLe" FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES' AND "identifiantDistant" = $1`,
+		compteID).Scan(&statutDistant, &nom, &soumise); err != nil {
+		t.Fatal(err)
+	}
+	if statutDistant != "submitted" || nom != "Ndiaye" || soumise == nil {
+		t.Fatalf("fiche CHUES écrite : %s %s %v", statutDistant, nom, soumise)
+	}
+	var restantes int
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT count(*) FROM "inscriptions_plateforme" WHERE "projet" = 'CHUES' AND "identifiantDistant" = ANY($1)`,
+		[]string{purgeID, "adhesion-pdc-1"}).Scan(&restantes); err != nil {
+		t.Fatal(err)
+	}
+	if restantes != 0 {
+		t.Fatalf("la purge et la prise de contact rattachée ne doivent laisser aucune ligne : %d", restantes)
 	}
 }
 
