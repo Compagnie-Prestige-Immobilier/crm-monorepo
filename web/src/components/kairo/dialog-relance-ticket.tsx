@@ -138,10 +138,7 @@ function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose:
       ) : null}
 
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="consigne-kairo"
-          className="text-xs font-semibold text-foreground"
-        >
+        <label htmlFor="consigne-kairo" className="text-xs font-semibold text-foreground">
           Consigne pour Kairo (optionnel)
         </label>
         <textarea

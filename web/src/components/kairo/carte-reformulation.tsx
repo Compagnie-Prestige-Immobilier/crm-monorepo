@@ -155,10 +155,7 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
                       {formatNumber(ligne.nombre)} · {pourcent(ligne.nombre, total)} %
                     </span>
                   </div>
-                  <div
-                    className="h-2 overflow-hidden rounded-full bg-secondary"
-                    aria-hidden="true"
-                  >
+                  <div className="h-2 overflow-hidden rounded-full bg-secondary" aria-hidden="true">
                     <div
                       className={cn(
                         'h-full rounded-full',
@@ -175,7 +172,10 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
 
         {recentes.length > 0 ? (
           <section className="flex flex-col gap-2.5" aria-labelledby="reformulations-recentes">
-            <h2 id="reformulations-recentes" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+            <h2
+              id="reformulations-recentes"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Derniers signalements
             </h2>
             <ul className="divide-y divide-border/60 rounded-xl border border-border/80 bg-card overflow-hidden">
