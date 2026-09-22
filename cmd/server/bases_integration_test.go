@@ -95,6 +95,57 @@ func TestBaseDemonstrationRafraichieRepartDuSemis(t *testing.T) {
 	}
 }
 
+// Rafraîchir tout doit rejouer le rafraîchissement sur chaque base en une
+// requête : c'est ce qui évite d'en oublier une entre deux migrations quand
+// on les rafraîchirait une à une depuis le panneau.
+func TestBasesDemonstrationRafraichiesToutesEnsemble(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	noms := []string{"essai-tout-a", "essai-tout-b"}
+	basesSQL := []string{prefixeBaseSQL + "essai_tout_a", prefixeBaseSQL + "essai_tout_b"}
+	t.Cleanup(func() {
+		for i := range noms {
+			_, _ = b.pool.Exec(b.ctx, `DELETE FROM "bases_demonstration" WHERE "nom" = $1`, noms[i])
+			_ = detruireBaseSQL(b.ctx, b.dsn, basesSQL[i])
+		}
+	})
+
+	for i := range noms {
+		statut, body := appelJSON(b, http.MethodPost, "/api/v1/admin/bases",
+			map[string]any{"nom": noms[i]}, nil)
+		b.attend(statut, http.StatusCreated, "création de la base", body)
+
+		url, err := urlPourBase(b.dsn, basesSQL[i])
+		if err != nil {
+			t.Fatal(err)
+		}
+		conn, err := pgx.Connect(b.ctx, url)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = conn.Exec(b.ctx,
+			`INSERT INTO "banques" ("id", "name", "shortName") VALUES ($1, 'Trace à effacer', 'TAE')`,
+			"essai-tout-banque-"+noms[i])
+		_ = conn.Close(b.ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/admin/bases/rafraichir", nil, nil)
+	b.attend(statut, http.StatusOK, "rafraîchissement de toutes les bases", body)
+
+	for i := range noms {
+		if n := compterDansBase(t, b, basesSQL[i],
+			`SELECT COUNT(*) FROM "banques" WHERE "id" = 'essai-tout-banque-`+noms[i]+`'`); n != 0 {
+			t.Fatalf("la trace laissée dans %s avant le rafraîchissement doit avoir disparu", noms[i])
+		}
+		if n := compterDansBase(t, b, basesSQL[i], `SELECT COUNT(*) FROM "representants"`); n == 0 {
+			t.Fatalf("%s rafraîchie doit reporter son jeu d'essai", noms[i])
+		}
+	}
+}
+
 // Créer une base monte une instance, donc reconstruisait la carte GLOBALE des
 // gardes que la garde d'accès lit à chaque requête. Sous trafic, cela plantait
 // le processus sur « concurrent map read and map write ». À lancer avec -race.
