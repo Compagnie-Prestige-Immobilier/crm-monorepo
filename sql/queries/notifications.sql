@@ -326,3 +326,9 @@ WHERE "status" = 'DONE' AND "updatedAt" >= @debut AND "updatedAt" <= @fin;
 SELECT count(*)::int AS total
 FROM "scheduled_callbacks"
 WHERE "status" = 'PENDING' AND "scheduledAt" <= @now;
+
+-- name: ActiveUsersByPermission :many
+SELECT u."id", u."fullName"
+FROM "users" u
+JOIN "role_permissions" rp ON rp."roleId" = u."roleId" AND rp."permission" = @permission
+WHERE u."isActive" AND u."deletedAt" IS NULL;

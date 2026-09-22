@@ -35,6 +35,10 @@ func CompteRenduQuotidien(ctx context.Context, d *socle.Deps) error {
 	return (&service{d}).compteRenduQuotidien(ctx)
 }
 
+func RappelerEcheancesVentes(ctx context.Context, d *socle.Deps) error {
+	return (&service{d}).rappelerEcheancesVentesNotification(ctx, time.Now())
+}
+
 func JourNotification(d *socle.Deps, instant time.Time) string {
 	return (&service{d}).jourNotification(instant)
 }

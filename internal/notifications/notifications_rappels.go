@@ -56,7 +56,62 @@ func (s *service) rappelsQuotidiens(ctx context.Context) error {
 		s.rappelerAppelsAPasserNotification(ctx, maintenant),
 		s.rappelerDossiersBanqueNotification(ctx, maintenant, "NOTIFICATIONS_BANK_PENDING", 5, notificationCleDossiersEnAttente),
 		s.rappelerDossiersBanqueNotification(ctx, maintenant, "NOTIFICATIONS_BANK_STALE", 10, notificationCleDossiersSansMouvement),
+		s.rappelerEcheancesVentesNotification(ctx, maintenant),
 	)
+}
+
+func (s *service) rappelerEcheancesVentesNotification(ctx context.Context, maintenant time.Time) error {
+	aujourdhui := maintenant.In(s.Cfg.TimeZone)
+	demain := time.Date(aujourdhui.Year(), aujourdhui.Month(), aujourdhui.Day()+1, 0, 0, 0, 0, time.UTC)
+	ventes, err := s.Q.EcheancesVentesACredit(ctx)
+	if err != nil {
+		return err
+	}
+	var clients []string
+	for i := range ventes {
+		if echeanceLe(&ventes[i], demain) {
+			clients = append(clients, ventes[i].Client)
+		}
+	}
+	if len(clients) == 0 {
+		return nil
+	}
+	lecteurs, err := s.Q.ActiveUsersByPermission(ctx, string(socle.PermissionVentesLire))
+	if err != nil {
+		return err
+	}
+	candidats := make([]notificationCandidatRappel, 0, len(lecteurs))
+	for _, lecteur := range lecteurs {
+		candidats = append(candidats, notificationCandidatRappel{userID: lecteur.ID, variables: map[string]string{
+			notificationVariableNom: lecteur.FullName, notificationVariableNombre: strconv.Itoa(len(clients)), "clients": strings.Join(clients, ", "),
+		}})
+	}
+	return s.emettreRappelNotification(ctx, notificationCleEcheancesVentes, maintenant, candidats, "Échéances de demain",
+		"{{nombre}} client(s) doivent verser demain : {{clients}}.", "/ventes", "RAPPEL")
+}
+
+// La première échéance tombe à la date choisie, les suivantes au jour de
+// versement, tous les `periodiciteMois` mois.
+func echeanceLe(vente *db.EcheancesVentesACreditRow, jour time.Time) bool {
+	premier := vente.PremierVersement.Time
+	nombre := int32(1)
+	if vente.NombreEcheances != nil {
+		nombre = *vente.NombreEcheances
+	}
+	for rang := range nombre {
+		echeance := premier
+		if rang > 0 {
+			mois := int(premier.Month()) + int(rang)*int(vente.PeriodiciteMois)
+			echeance = time.Date(premier.Year(), time.Month(mois), int(*vente.JourVersement), 0, 0, 0, 0, time.UTC)
+		}
+		if echeance.Equal(jour) {
+			return true
+		}
+		if echeance.After(jour) {
+			return false
+		}
+	}
+	return false
 }
 
 // Rappels promis et encore dus d'ici la fin de la journée, RETARDS COMPRIS :
@@ -70,7 +125,7 @@ func (s *service) rappelerAppelsAPasserNotification(ctx context.Context, mainten
 	candidats := make([]notificationCandidatRappel, 0, len(groupes))
 	for _, groupe := range groupes {
 		candidats = append(candidats, notificationCandidatRappel{userID: groupe.UserId, variables: map[string]string{
-			"nom": groupe.FullName, "nombre": strconv.Itoa(int(groupe.Total)),
+			notificationVariableNom: groupe.FullName, notificationVariableNombre: strconv.Itoa(int(groupe.Total)),
 		}})
 	}
 	return s.emettreRappelNotification(ctx, notificationCleRappelsAPasser, maintenant, candidats, "Rappels à passer",
@@ -98,7 +153,7 @@ func (s *service) rappelerDossiersBanqueNotification(ctx context.Context, mainte
 		return err
 	}
 	candidats, err := s.candidatsParRolesNotification(ctx, []string{string(socle.BanqueFinance)}, map[string]string{
-		"nombre": strconv.Itoa(int(total)), "jours": strconv.Itoa(jours),
+		notificationVariableNombre: strconv.Itoa(int(total)), "jours": strconv.Itoa(jours),
 	})
 	if err != nil {
 		return err
@@ -113,7 +168,7 @@ func (s *service) candidatsParRolesNotification(ctx context.Context, roles []str
 	}
 	candidats := make([]notificationCandidatRappel, 0, len(rows))
 	for _, row := range rows {
-		propres := map[string]string{"nom": row.FullName}
+		propres := map[string]string{notificationVariableNom: row.FullName}
 		for nom, valeur := range variables {
 			propres[nom] = valeur
 		}
