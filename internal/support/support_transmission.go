@@ -111,7 +111,15 @@ func (s *service) fixerTexteTransmis(ctx context.Context, sig *db.SupportSignale
 	if sig.DescriptionTransmise != nil || sig.CreationEngagee || sig.NumeroGlpi != nil {
 		return nil
 	}
-	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte})
+	rangees, err := s.Q.SupportImagesAEnvoyer(ctx, sig.ID)
+	if err != nil {
+		return err
+	}
+	images := make([]imagePiece, len(rangees))
+	for i, r := range rangees {
+		images[i] = imagePiece{TypeMime: r.TypeMime, Contenu: r.Contenu}
+	}
+	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte}, sig.AuteurRoleLibelle, images)
 	lignes, err := s.Q.SupportTexteTransmisFixe(ctx, db.SupportTexteTransmisFixeParams{
 		ID: sig.ID, Jeton: jeton, Description: texte.Description, Contexte: texte.Contexte, ReformulePar: auteur,
 	})
