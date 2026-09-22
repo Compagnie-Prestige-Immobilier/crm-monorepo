@@ -158,7 +158,12 @@ const STYLE_TON = {
   bloque: { point: 'bg-destructive', libelle: 'Non joignable' },
 } as const;
 
-function DescriptionCadence(props: { enPause: boolean; intervalle: number; derniereSec: number; pauseDepuis: string }) {
+function DescriptionCadence(props: {
+  enPause: boolean;
+  intervalle: number;
+  derniereSec: number;
+  pauseDepuis: string;
+}) {
   if (props.enPause) {
     return (
       <p className="text-xs text-muted-foreground">
