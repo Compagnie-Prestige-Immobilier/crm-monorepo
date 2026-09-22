@@ -61,13 +61,7 @@ function PiedRelance(props: {
         Prendre en main
       </Button>
 
-      <Button
-        type="button"
-        size="sm"
-        disabled={desactive}
-        onClick={onRelance}
-        className="text-xs"
-      >
+      <Button type="button" size="sm" disabled={desactive} onClick={onRelance} className="text-xs">
         <RotateCcwIcon className="size-3.5" />
         {texteRelance}
       </Button>
