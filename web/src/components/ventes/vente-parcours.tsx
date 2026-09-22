@@ -522,11 +522,11 @@ function Cadre({
               </Button>
             </div>
           </div>
-          <div
-            ref={corps}
-            className="flex min-h-0 flex-col justify-center gap-5 overflow-y-auto px-6 py-5"
-          >
-            <div key={ecran}>{children}</div>
+          <div ref={corps} className="flex min-h-0 flex-col gap-5 overflow-y-auto px-6 py-5">
+            {/* `my-auto` centre sans couper le haut quand l'écran défile, là où `justify-center` le rend inaccessible. */}
+            <div key={ecran} className="my-auto">
+              {children}
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-6 py-4">
             {erreur === null ? null : (
@@ -983,7 +983,7 @@ function EcranPaiement({ draft, changer }: EcranProps) {
         }
         valeur={draft.acompte}
         max={prixTotal}
-        placeholder={credit ? 'Montant de l’acompte' : 'Montant payé'}
+        placeholder="Ex. 1 000 000"
         onChange={changerMontant}
       >
         <PartsAcompte visible={credit} prixTotal={prixTotal} draft={draft} changer={changer} />
