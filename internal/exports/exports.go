@@ -503,16 +503,18 @@ func exportBornes(p *exportPredicat, colonne, du, au string) error {
 }
 
 type exportLigneRepresentant struct {
-	ID          string
-	Nom         string
-	Phone       string
-	Departement string
-	Ief         string
-	Commercial  string
-	Prospects   int32
-	Notes       string
-	Saisi       time.Time
-	Cree        time.Time
+	ID            string
+	Nom           string
+	Phone         string
+	Etablissement string
+	Departement   string
+	Ief           string
+	Qualification string
+	Commercial    string
+	Prospects     int32
+	Notes         string
+	Saisi         time.Time
+	Cree          time.Time
 }
 
 func (s *service) exportRepresentants(ctx context.Context, in *ExportRepresentantsInput) (*huma.StreamResponse, error) {
@@ -526,8 +528,8 @@ func (s *service) exportRepresentants(ctx context.Context, in *ExportRepresentan
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille(exportNomFeuilleRepresentants,
-		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteDepartement, ExportEnteteIef, exportEnteteCommercial, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
-		[]float64{30, 20, 24, 26, 26, 12, 40, 20, 20}, nil)
+		[]string{ExportEnteteNomComplet, ExportEnteteTelephone, ExportEnteteEtablissement, ExportEnteteDepartement, ExportEnteteIef, ExportEnteteQualification, exportEnteteCommercial, exportEnteteProspects, ExportEnteteNotes, ExportEnteteSaisiLe, "Créé en base le"},
+		[]float64{30, 20, 26, 24, 26, 20, 26, 12, 40, 20, 20}, nil)
 	if err != nil {
 		_ = c.f.Close()
 		return nil, err
@@ -539,12 +541,13 @@ func (s *service) exportRepresentants(ctx context.Context, in *ExportRepresentan
 	return exportReponseClasseur(c, "representants-cpi-"+s.exportDateDuJour()+".xlsx"), nil
 }
 
-const exportSelectRepresentants = `SELECT r."id", r."fullName", r."phoneE164", d."name", COALESCE(i."name", '')::text,
-  u."fullName", (SELECT COUNT(*) FROM "prospects" p WHERE p."representantId" = r."id" AND p."deletedAt" IS NULL)::int,
+const exportSelectRepresentants = `SELECT r."id", r."fullName", r."phoneE164", COALESCE(r."etablissement", '')::text, d."name", COALESCE(i."name", '')::text,
+  COALESCE(sq."label", '')::text, u."fullName", (SELECT COUNT(*) FROM "prospects" p WHERE p."representantId" = r."id" AND p."deletedAt" IS NULL)::int,
   COALESCE(r."notes", '')::text, r."clientCreatedAt", r."createdAt"
 FROM "representants" r
 INNER JOIN "departements" d ON d."id" = r."departementId"
 LEFT JOIN "iefs" i ON i."id" = r."iefId"
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
 INNER JOIN "users" u ON u."id" = r."createdById"
 WHERE `
 
@@ -569,7 +572,7 @@ func (s *service) exportEcrireRepresentants(ctx context.Context, c *exportClasse
 		}
 		for i := range page {
 			l := &page[i]
-			if err := f.ecrire(l.Nom, l.Phone, l.Departement, l.Ief, l.Commercial, l.Prospects, l.Notes,
+			if err := f.ecrire(l.Nom, l.Phone, l.Etablissement, l.Departement, l.Ief, l.Qualification, l.Commercial, l.Prospects, l.Notes,
 				excelize.Cell{StyleID: c.date, Value: l.Saisi}, excelize.Cell{StyleID: c.date, Value: l.Cree}); err != nil {
 				return err
 			}
