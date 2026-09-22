@@ -9,7 +9,13 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { addVenteVersement, formatFcfa, totalVerse, type Vente } from '@/lib/data/ventes';
+import {
+  addVenteVersement,
+  formatFcfa,
+  libelleCredit,
+  totalVerse,
+  type Vente,
+} from '@/lib/data/ventes';
 import { formatDate } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
@@ -31,11 +37,11 @@ export function VenteDetailDialog({
   return <Detail key={vente.id} vente={vente} onFermer={() => onOpenChange(false)} />;
 }
 
-/** Ce qu'un client verse d'habitude : le reste divisé par les mois qu'il reste. */
-function mensualite(vente: Vente, reste: number): number {
-  if (vente.modePaiement !== 'CREDIT' || vente.nombreMois === null) return 0;
-  const moisRestants = Math.max(1, vente.nombreMois - vente.versements.length);
-  return Math.ceil(reste / moisRestants);
+/** Ce qu'un client verse d'habitude : le reste divisé par les échéances qu'il reste. */
+function montantEcheance(vente: Vente, reste: number): number {
+  if (vente.modePaiement !== 'CREDIT' || vente.nombreEcheances === null) return 0;
+  const echeancesRestantes = Math.max(1, vente.nombreEcheances - vente.versements.length);
+  return Math.ceil(reste / echeancesRestantes);
 }
 
 function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
@@ -44,7 +50,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
   const [montant, setMontant] = useState(0);
   const verse = totalVerse(vente);
   const reste = Math.max(0, vente.prixTotal - verse);
-  const parMois = mensualite(vente, reste);
+  const parEcheance = montantEcheance(vente, reste);
   const ajout = useMutation({
     mutationFn: () => addVenteVersement(vente.id, { date, montant }),
     onSuccess: () => {
@@ -120,14 +126,14 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
                 </Button>
               </div>
               <div className="flex flex-wrap gap-2">
-                {parMois > 0 ? (
+                {parEcheance > 0 ? (
                   <Button
                     type="button"
                     variant="outline"
                     size="sm"
-                    onClick={() => setMontant(parMois)}
+                    onClick={() => setMontant(parEcheance)}
                   >
-                    Une mensualité · {formatFcfa(parMois)}
+                    Une échéance · {formatFcfa(parEcheance)}
                   </Button>
                 ) : null}
                 <Button type="button" variant="outline" size="sm" onClick={() => setMontant(reste)}>
@@ -154,7 +160,7 @@ function Etiquettes({ vente }: { vente: Vente }) {
   return (
     <span className="flex gap-1">
       <Badge variant={credit ? 'info' : 'secondary'}>
-        {credit ? `Crédit ${vente.nombreMois ?? '?'} mois` : 'Comptant'}
+        {credit ? libelleCredit(vente) : 'Comptant'}
       </Badge>
       <Badge variant={vente.soldee ? 'success' : 'warning'}>
         {vente.soldee ? 'Soldée' : 'À solder'}

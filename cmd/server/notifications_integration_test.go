@@ -470,6 +470,35 @@ func TestNotificationRappelQuotidienIdempotentSurLaPeriode(t *testing.T) {
 	}
 }
 
+func TestNotificationEcheanceVenteLaVeille(t *testing.T) {
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationPurge()
+	s := b.notificationService()
+	client := "CLIENT ECHEANCE " + uuid.NewString()[:8]
+	demain := notifications.JourNotification(s, time.Now().Add(24*time.Hour))
+	var venteID int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances", "jourVersement", "premierVersement")
+		VALUES ('SAISIE', 0, 'CPI', $1, '770000000', 'THIEO', 1, '', '', 4000000, 4000000, 0, 4000000,
+		0, 0, 4000000, 'CREDIT', 4, 5, $2::date) RETURNING "id"`, client, demain).Scan(&venteID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "ventes" WHERE "id" = $1`, venteID) })
+
+	if err := notifications.RappelerEcheancesVentes(b.ctx, s); err != nil {
+		t.Fatal(err)
+	}
+	var corps string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "body" FROM "notifications" WHERE "reminderKey" = $1 AND "period" = $2`,
+		"sales-due-tomorrow:"+b.userID, notifications.JourNotification(s, time.Now())).Scan(&corps); err != nil {
+		t.Fatalf("rappel d’échéance absent : %v", err)
+	}
+	if !strings.Contains(corps, client) {
+		t.Fatalf("le rappel doit nommer le client dont l’échéance tombe demain : %q", corps)
+	}
+}
+
 // Une session de plus sur le même serveur : `notificationCompte` pose un
 // condensat argon2 utilisable, le compte peut donc se connecter.
 func (b *banc) notificationSession(userID, email string) *banc {

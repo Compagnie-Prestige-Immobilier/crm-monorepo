@@ -90,7 +90,8 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		"canal": "CPI", "dateSouscription": "2026-09-18", "client": client,
 		"telephone": "77 000 00 88", "site": "THIEO", "nombreLots": 2,
 		"numerosLots": "2001 - 2002", "superficie": "225 m²", "prixUnitaire": 2800000,
-		"acompte": 500000, "modePaiement": "CREDIT", "nombreMois": 12,
+		"acompte": 500000, "modePaiement": "CREDIT", "nombreEcheances": 12,
+		"periodiciteMois": 2, "jourVersement": 10, "premierVersement": "2026-10-10",
 		"email": "Client.Saisie@Exemple.sn", "numeroCni": "1 234 1990 01234", "dateDelivranceCni": "2021-03-04",
 		"demeurantA": "Dakar, Sacré-Cœur", "profession": "Enseignant", "representant": "Awa Ndiaye",
 		"nomTeleconseiller": "Moussa Diop", "responsableClosing": "Fatou Sarr",
@@ -124,6 +125,32 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 	venteArchiveePuisSoldee(t, b, venteID, corps)
 }
 
+// Une vente saisie avant l'échéancier, sur un site et un canal retirés depuis,
+// reste corrigeable sans changer de site ni inventer de date.
+func TestVenteAncienneCorrigeableSurSiteEtCanalRetires(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	var venteID int64
+	if err := b.pool.QueryRow(b.ctx, `INSERT INTO "ventes" ("origine", "numero", "canal", "client", "telephone",
+		"site", "nombreLots", "numerosLots", "superficie", "prixUnitaire", "prixTotal", "acompte", "reliquat",
+		"partProprietaire", "partApporteur", "partCpi", "modePaiement", "nombreEcheances")
+		VALUES ('SAISIE', 0, 'DMN', 'CLIENT ANCIEN', '770000001', 'NOFLAYE', 1, '', '', 5000000, 5000000, 0, 5000000,
+		0, 0, 5000000, 'CREDIT', 10) RETURNING "id"`).Scan(&venteID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID) })
+
+	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), map[string]any{
+		"canal": "DMN", "dateSouscription": "2026-09-01", "client": "CLIENT ANCIEN", "telephone": "77 000 00 02",
+		"site": "NOFLAYE", "nombreLots": 1, "numerosLots": "", "superficie": "", "prixUnitaire": 5000000,
+		"acompte": 0, "modePaiement": "CREDIT", "nombreEcheances": 10,
+	}, nil)
+	b.attend(statut, http.StatusOK, "correction d’une ancienne vente", vente)
+	if vente["telephone"] == "770000001" || vente["jourVersement"] != nil {
+		t.Fatalf("vente ancienne corrigée : %v", vente)
+	}
+}
+
 func exigerIdentiteClient(t *testing.T, vente map[string]any) {
 	t.Helper()
 	if vente["email"] != "client.saisie@exemple.sn" || vente["dateDelivranceCni"] != "2021-03-04" ||
@@ -137,7 +164,8 @@ func venteSaisieCalculee(t *testing.T, b *banc, corps map[string]any) int64 {
 	statut, vente := appelJSON(b, http.MethodPost, "/api/v1/ventes", corps, nil)
 	b.attend(statut, http.StatusCreated, "création d’une vente", vente)
 	versements, _ := vente["versements"].([]any)
-	if vente["origine"] != "SAISIE" || vente["prixTotal"] != float64(5600000) || vente["reliquat"] != float64(5100000) || vente["modePaiement"] != "CREDIT" || vente["nombreMois"] != float64(12) || len(versements) != 0 {
+	if vente["origine"] != "SAISIE" || vente["prixTotal"] != float64(5600000) || vente["reliquat"] != float64(5100000) || vente["modePaiement"] != "CREDIT" || vente["nombreEcheances"] != float64(12) || vente["periodiciteMois"] != float64(2) ||
+		vente["jourVersement"] != float64(10) || vente["premierVersement"] != "2026-10-10" || len(versements) != 0 {
 		t.Fatalf("calcul de la vente : %v", vente)
 	}
 	return int64(vente["id"].(float64))
@@ -159,7 +187,7 @@ func venteArchiveePuisSoldee(t *testing.T, b *banc, venteID int64, corps map[str
 		t.Fatalf("vente restaurée : %v", vente)
 	}
 	corps["modePaiement"] = "COMPTANT"
-	delete(corps, "nombreMois")
+	delete(corps, "nombreEcheances")
 	corps["acompte"] = 100000
 	corps["marquerSoldee"] = true
 	statut, vente = appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), corps, nil)
@@ -185,9 +213,12 @@ func exigerCanauxVentes(t *testing.T, elements []any) {
 	canaux := map[string]bool{}
 	for _, element := range elements {
 		canal := element.(map[string]any)
-		canaux[canal["libelle"].(string)] = true
+		canaux[canal["libelle"].(string)] = canal["actif"].(bool)
 	}
-	for _, libelle := range []string{"CPI", "DMN", "BDD CPI", "BDD PERSO.", "SPONTANNE", "MARKETING", "BDD DEPLOIEMENT"} {
+	if canaux["DMN"] {
+		t.Fatalf("le canal DMN ne doit plus être proposé : %v", canaux)
+	}
+	for _, libelle := range []string{"CPI", "BDD CPI", "BDD PERSO.", "SPONTANNE", "MARKETING", "BDD DEPLOIEMENT"} {
 		if !canaux[libelle] {
 			t.Fatalf("canal manquant dans la configuration : %s (%v)", libelle, canaux)
 		}

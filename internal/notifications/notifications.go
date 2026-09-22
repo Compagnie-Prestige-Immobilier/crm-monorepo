@@ -25,6 +25,8 @@ const (
 	notificationTailleVague    = brevoDestinatairesParAppel * brevoAppelsSimultanes
 
 	notificationCleNom            = "name"
+	notificationVariableNom       = "nom"
+	notificationVariableNombre    = "nombre"
 	notificationErreurAReessayer  = "EMAIL_RETRY"
 	notificationErreurBoiteSeule  = "INBOX_ONLY"
 	notificationVerdictRemis      = "sent"
@@ -39,6 +41,7 @@ const (
 	notificationCleDossiersEnAttente     = "bank-cases-pending"
 	notificationCleDossiersSansMouvement = "bank-cases-stale"
 	notificationCleCompteRendu           = "daily-report"
+	notificationCleEcheancesVentes       = "sales-due-tomorrow"
 )
 
 var (
