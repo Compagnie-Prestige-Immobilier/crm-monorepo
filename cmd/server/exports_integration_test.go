@@ -268,11 +268,11 @@ func TestExportRepresentantsColonnes(t *testing.T) {
 	b.attend(statut, http.StatusOK, "export représentants", nil)
 	exportAttendFeuilles(t, f, "Représentants")
 	entetes := exportEntetes(t, f, "Représentants")
-	if len(entetes) != 9 || entetes[0] != "Nom complet" || entetes[8] != "Créé en base le" {
+	if len(entetes) != 11 || entetes[0] != "Nom complet" || entetes[10] != "Créé en base le" {
 		t.Fatalf("en-têtes : %v", entetes)
 	}
 	ligne := exportChercherLigne(t, f, "Représentants", j.nomRep)
-	if ligne[2] != j.nomDep || ligne[5] != "1" {
+	if ligne[3] != j.nomDep || ligne[7] != "1" {
 		t.Fatalf("ligne : %v", ligne)
 	}
 }
