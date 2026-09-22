@@ -43,10 +43,12 @@ signalé à Cheikh et Beni.
 
 ```
 docker build -t kairo ticket-solver
-docker run --env-file ticket-solver/.env -v kairo-work:/work kairo python -m app.main doctor
+docker run --env-file ticket-solver/.env -v kairo-work:/work kairo doctor
 ```
 
 Monter un volume sur `/work` (état SQLite, caches Go et pnpm). `GET /healthz`
 répond 503 si GLPI n'a pas été lu depuis cinq minutes. Les variables sont
 décrites dans `.env.example` ; les secrets viennent de Dokploy, jamais de
-l'image.
+l'image. `PROJECTS_JSON` et `GITHUB_APP_PRIVATE_KEY` ne prennent pas de
+guillemets englobants : Docker et Dokploy lisent la valeur telle quelle, sans
+retirer de quotes de shell.
