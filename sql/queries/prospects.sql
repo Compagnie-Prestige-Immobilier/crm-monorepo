@@ -700,6 +700,31 @@ UPDATE "prospects" SET
   "rev" = "rev" + 1, "updatedAt" = now()
 WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
+-- Sans méthode, une fiche ne peut plus rester « méthode obtenue » : elle redevient jointe.
+-- name: ModifierMethodeJourney :exec
+UPDATE "prospect_journeys" SET
+  "enrollmentMethod" = CAST(sqlc.narg('methode') AS text)::"EnrollmentMethod",
+  "phase2Status" = CASE
+    WHEN sqlc.narg('methode')::text IS NOT NULL THEN 'METHOD_OBTAINED'
+    WHEN "phase2Status" = 'METHOD_OBTAINED' THEN 'REACHED'
+    ELSE "phase2Status" END,
+  "enrollmentCapturedAt" = CASE WHEN sqlc.narg('methode')::text IS NULL THEN NULL ELSE now() END,
+  "enrollmentCapturedById" = CASE WHEN sqlc.narg('methode')::text IS NULL THEN NULL ELSE @par::text END,
+  "updatedAt" = now()
+WHERE "prospectId" = @prospect_id AND "projet" = @projet;
+
+-- name: ModifierMethodeProspect :exec
+UPDATE "prospects" SET
+  "enrollmentMethod" = CAST(sqlc.narg('methode') AS text)::"EnrollmentMethod",
+  "phase2Status" = CASE
+    WHEN sqlc.narg('methode')::text IS NOT NULL THEN 'METHOD_OBTAINED'
+    WHEN "phase2Status" = 'METHOD_OBTAINED' THEN 'REACHED'
+    ELSE "phase2Status" END,
+  "enrollmentCapturedAt" = CASE WHEN sqlc.narg('methode')::text IS NULL THEN NULL ELSE now() END,
+  "enrollmentCapturedById" = CASE WHEN sqlc.narg('methode')::text IS NULL THEN NULL ELSE @par::text END,
+  "rev" = "rev" + 1, "updatedAt" = now()
+WHERE "id" = @prospect_id;
+
 -- name: SuivreRendezVous :one
 UPDATE "prospects" p SET
   "rendezVousIssue" = sqlc.arg('issue')::text,
