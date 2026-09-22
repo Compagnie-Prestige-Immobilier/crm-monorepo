@@ -311,6 +311,16 @@ func (c *Client) Take(ctx context.Context, ticket map[string]any, categoryID str
 	return err
 }
 
+func (c *Client) SetStatus(ctx context.Context, ticketID, status int) error {
+	_, err := c.Call(ctx, http.MethodPut, fmt.Sprintf("Ticket/%d", ticketID), nil, map[string]any{
+		fieldInput: map[string]any{
+			"id":     ticketID,
+			"status": status,
+		},
+	})
+	return err
+}
+
 func (c *Client) Followup(ctx context.Context, ticketID int, text string) error {
 	content := html.EscapeString(config.Redact(text))
 	content = strings.ReplaceAll(content, "\n", "<br>")

@@ -16,6 +16,7 @@ import (
 )
 
 var ErrDeadline = errors.New("délai global dépassé")
+var ErrCancelled = errors.New("arrêté à la demande de l'équipe")
 
 func Remaining(deadline time.Time, capDuration time.Duration) (time.Duration, error) {
 	left := time.Until(deadline)
@@ -152,6 +153,9 @@ func Run(
 			_ = syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}
 		<-done
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return stdoutBuf.String(), stderrBuf.String(), -1, ErrCancelled
+		}
 		return stdoutBuf.String(), stderrBuf.String(), -1, fmt.Errorf("%s dépasse %d s", binary, int(timeout.Seconds()))
 	case waitErr := <-done:
 		code := 0

@@ -19,6 +19,7 @@ const (
 	GitEmail      = "kairo@cpi.sn"
 	GLPIClosed    = 5
 	GLPIAssigned  = 2
+	GLPIWaiting   = 4
 	MaxAttempts   = 3
 	RetryDelay    = -15 * time.Minute
 	AgentTimeout  = 2400 * time.Second

@@ -17,19 +17,26 @@ import (
 	"time"
 )
 
+type stopper interface {
+	Stop(ticketID int) bool
+}
+
 type Server struct {
 	cfg        *config.Config
 	state      *state.Store
+	engine     stopper
 	httpServer *http.Server
 	lastPoll   *atomic.Int64
 }
 
 var relanceRegex = regexp.MustCompile(`^/tickets/(\d+)/relance$`)
+var arreterRegex = regexp.MustCompile(`^/tickets/(\d+)/arreter$`)
 
-func New(cfg *config.Config, s *state.Store, lastPoll *atomic.Int64) *Server {
+func New(cfg *config.Config, s *state.Store, eng stopper, lastPoll *atomic.Int64) *Server {
 	srv := &Server{
 		cfg:      cfg,
 		state:    s,
+		engine:   eng,
 		lastPoll: lastPoll,
 	}
 
@@ -136,6 +143,8 @@ func (s *Server) handleEtat(w http.ResponseWriter, r *http.Request) {
 		tickets = append(tickets, rec)
 	}
 
+	mttrSec, _ := s.state.MTTR(r.Context())
+
 	writeJSON(w, http.StatusOK, map[string]any{
 		"sain":                    healthy,
 		"pauseDepuis":             pauseDepuis,
@@ -143,6 +152,7 @@ func (s *Server) handleEtat(w http.ResponseWriter, r *http.Request) {
 		"intervalleSecondes":      int(s.cfg.PollInterval.Seconds()),
 		"agents":                  activeAgents,
 		"tickets":                 tickets,
+		"mttrSecondes":            mttrSec,
 	})
 }
 
@@ -177,18 +187,24 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	matches := relanceRegex.FindStringSubmatch(r.URL.Path)
-	if len(matches) != 2 {
-		w.WriteHeader(http.StatusNotFound)
+	if matches := relanceRegex.FindStringSubmatch(r.URL.Path); len(matches) == 2 {
+		s.handleRelance(w, r, matches[1])
 		return
 	}
+	if matches := arreterRegex.FindStringSubmatch(r.URL.Path); len(matches) == 2 {
+		s.handleArreter(w, r, matches[1])
+		return
+	}
+	w.WriteHeader(http.StatusNotFound)
+}
 
+func (s *Server) handleRelance(w http.ResponseWriter, r *http.Request, rawID string) {
 	if !s.checkAdmin(r) {
 		w.WriteHeader(http.StatusUnauthorized)
 		return
 	}
 
-	id, err := strconv.Atoi(matches[1])
+	id, err := strconv.Atoi(rawID)
 	if err != nil {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -201,10 +217,31 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !ok {
-		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket en échec ou escaladé se relance"})
+		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket en échec, escaladé ou arrêté se relance"})
 		return
 	}
 
 	slog.Info("relance demandée depuis le CRM", "ticket", id)
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handleArreter(w http.ResponseWriter, r *http.Request, rawID string) {
+	if !s.checkAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	id, err := strconv.Atoi(rawID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if !s.engine.Stop(id) {
+		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "aucun traitement en cours pour ce ticket"})
+		return
+	}
+
+	slog.Info("arrêt demandé depuis le CRM", "ticket", id)
 	w.WriteHeader(http.StatusNoContent)
 }
