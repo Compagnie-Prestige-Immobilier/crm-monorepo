@@ -27,16 +27,17 @@ export const STATUTS_KAIRO: Record<
   arrete: { libelle: 'Arrêté', variante: 'secondary' },
   triage: { libelle: 'Triage (hors code)', variante: 'secondary' },
   doublon: { libelle: 'Doublon (PR liée)', variante: 'secondary' },
+  clos: { libelle: 'Déjà résolu (fermé)', variante: 'success' },
 };
 
 export const FILTRES_TICKETS = {
   tous: { libelle: 'Tous', statuts: null },
-  aReprendre: { libelle: 'Bloqués', statuts: ['echec', 'escalade', 'arrete', 'triage'] },
+  aReprendre: { libelle: 'À arbitrer', statuts: ['echec', 'escalade', 'arrete', 'triage'] },
   enCours: {
     libelle: 'En cours',
     statuts: ['running', 'running:analyse', 'running:test', 'running:publication', 'retry'],
   },
-  pr: { libelle: 'PR proposées', statuts: ['pr'] },
+  pr: { libelle: 'PR proposées', statuts: ['pr', 'clos'] },
 } as const;
 export type FiltreTickets = keyof typeof FILTRES_TICKETS;
 
@@ -70,10 +71,31 @@ export async function basculerPauseKairo(pause: boolean): Promise<void> {
   unwrap(await getApiClient().POST(chemin));
 }
 
-export async function relancerTicketKairo(id: number): Promise<void> {
+export async function relancerTicketKairo(
+  options:
+    | number
+    | {
+        id: number;
+        consigne?: string | undefined;
+        action?: 'relancer' | 'prendre_en_main' | undefined;
+      },
+): Promise<void> {
+  const id = typeof options === 'number' ? options : options.id;
+  const consigne = typeof options === 'object' ? options.consigne : undefined;
+  const action = typeof options === 'object' ? options.action : undefined;
+
+  const corps: { consigne?: string; action?: string } = {};
+  if (consigne) corps.consigne = consigne;
+  if (action) corps.action = action;
+
   unwrap(
     await getApiClient().POST('/api/v1/admin/kairo/tickets/{id}/relance', {
       params: { path: { id } },
+      body: Object.keys(corps).length > 0 ? corps : undefined,
     }),
   );
+}
+
+export async function prendreEnMainTicketKairo(id: number): Promise<void> {
+  return relancerTicketKairo({ id, action: 'prendre_en_main' });
 }

@@ -359,3 +359,50 @@ func (c *Client) createPullRequest(ctx context.Context, apiURL, baseBranch, bran
 
 	return createdPR.HTMLURL, nil
 }
+
+// FindMergedPR recherche si une pull request liée à ce ticket a déjà été fusionnée sur la branche cible.
+func (c *Client) FindMergedPR(ctx context.Context, project *config.Project, ticketID int) (string, error) {
+	token, err := c.GetToken(ctx, project)
+	if err != nil {
+		return "", err
+	}
+	owner, repoName, err := config.GitHubRepository(project.Repository)
+	if err != nil {
+		return "", err
+	}
+
+	branch := fmt.Sprintf("kairo/ticket-%d", ticketID)
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/pulls", owner, repoName)
+	reqURL := fmt.Sprintf("%s?head=%s:%s&state=closed", apiURL, owner, branch)
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, http.NoBody)
+	if err != nil {
+		return "", err
+	}
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Authorization", "Bearer "+token)
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("recherche PR fermée : %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	if resp.StatusCode == http.StatusOK {
+		var pulls []struct {
+			Number   int     `json:"number"`
+			HTMLURL  string  `json:"html_url"`
+			MergedAt *string `json:"merged_at"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&pulls); err == nil {
+			for _, pr := range pulls {
+				if pr.MergedAt != nil && *pr.MergedAt != "" {
+					return pr.HTMLURL, nil
+				}
+			}
+		}
+	}
+
+	return "", nil
+}
