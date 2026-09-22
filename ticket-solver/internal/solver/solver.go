@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"sync"
 	"ticket-solver/internal/agent"
@@ -24,7 +25,10 @@ import (
 	"github.com/google/uuid"
 )
 
-var reSecret = regexp.MustCompile(`(?i)(ghp_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|Bearer\s+[a-zA-Z0-9._-]{20,})`)
+var (
+	reSecret    = regexp.MustCompile(`(?i)(ghp_[a-zA-Z0-9]{20,}|sk-[a-zA-Z0-9]{20,}|Bearer\s+[a-zA-Z0-9._-]{20,})`)
+	reTicketRef = regexp.MustCompile(`(?i)(?:ticket|glpi|issue|fix|fixes|resolves?|closes?)\s*(?:n°|#|-)?\s*(\d+)|(?:^|[\s(])#(\d+)`)
+)
 
 func sanitiser(s string) string {
 	if s == "" {
@@ -65,7 +69,7 @@ func New(cfg *config.Config, s *state.Store, g *glpi.Client, gh *github.Client, 
 	}
 }
 
-func TicketPrompt(ticketID int, ticket map[string]any, project *config.Project, previous string) string {
+func TicketPrompt(ticketID int, ticket map[string]any, project *config.Project, previous, consigne string) string {
 	name, _ := ticket["name"].(string)
 	content, _ := ticket["content"].(string)
 	plainContent := config.PlainText(content)
@@ -83,6 +87,10 @@ func TicketPrompt(ticketID int, ticket map[string]any, project *config.Project, 
 
 	if strings.TrimSpace(previous) != "" {
 		parts = append(parts, "Tentative précédente, à ne pas répéter :\n"+previous)
+	}
+
+	if strings.TrimSpace(consigne) != "" {
+		parts = append(parts, "Consigne de l'équipe pour orienter la correction :\n"+strings.TrimSpace(consigne))
 	}
 
 	return strings.Join(parts, "\n\n")
@@ -126,7 +134,7 @@ func retryAgentVerification(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, vOut, modele string,
+	jobDir, repoDir, vOut, modele, consigne string,
 	deadline time.Time,
 ) (*config.Answer, string, error) {
 	currentOut := vOut
@@ -141,7 +149,7 @@ func retryAgentVerification(
 
 		nature, conseil := classifier.DiagnostiquerEchec(currentOut)
 		motif := fmt.Sprintf("La vérification (%s) échoue après tes changements (essai %d/%d) [%s: %s] :\n%s", project.VerificationCommand, essai, maxEssais, nature, conseil, failureSnippet)
-		retryPrompt := TicketPrompt(ticketID, ticket, project, motif)
+		retryPrompt := TicketPrompt(ticketID, ticket, project, motif, consigne)
 		ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, retryPrompt, modele, deadline)
 		if askErr != nil {
 			return nil, "", askErr
@@ -176,7 +184,7 @@ func tryAgent(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, baseSHA, previous, modele string,
+	jobDir, repoDir, baseSHA, previous, modele, consigne string,
 	deadline time.Time,
 ) (*config.Answer, string, error) {
 	gitEnv, err := git.GitEnv(jobDir, "")
@@ -187,7 +195,7 @@ func tryAgent(
 	_, _ = git.ExecGit(ctx, repoDir, gitEnv, 600*time.Second, "reset", "--quiet", "--hard", baseSHA)
 	_, _ = git.ExecGit(ctx, repoDir, gitEnv, 600*time.Second, "clean", "-fdq")
 
-	prompt := TicketPrompt(ticketID, ticket, project, previous)
+	prompt := TicketPrompt(ticketID, ticket, project, previous, consigne)
 	ans, askErr := agent.Ask(ctx, spec, token, jobDir, repoDir, prompt, modele, deadline)
 	if askErr != nil {
 		return nil, "", askErr
@@ -204,7 +212,7 @@ func tryAgent(
 		return nil, "", vErr
 	}
 
-	return retryAgentVerification(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, vOut, modele, deadline)
+	return retryAgentVerification(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, vOut, modele, consigne, deadline)
 }
 
 func isStopSignal(err error) bool {
@@ -233,7 +241,7 @@ func (s *Solver) Solve(
 	ticketID int,
 	ticket map[string]any,
 	project *config.Project,
-	jobDir, repoDir, baseSHA, modele string,
+	jobDir, repoDir, baseSHA, modele, consigne string,
 	deadline time.Time,
 ) (*config.Answer, error) {
 	if err := s.checkBaseline(ctx, repoDir, project, jobDir, baseSHA, deadline); err != nil {
@@ -251,7 +259,7 @@ func (s *Solver) Solve(
 		}
 		tried++
 
-		ans, failNote, err := tryAgent(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, baseSHA, previous, modele, deadline)
+		ans, failNote, err := tryAgent(ctx, spec, token, ticketID, ticket, project, jobDir, repoDir, baseSHA, previous, modele, consigne, deadline)
 		if ans != nil {
 			return ans, nil
 		}
@@ -435,8 +443,8 @@ func (s *Solver) ReportSuccess(ctx context.Context, ticketID int, ticket map[str
 
 	subject := fmt.Sprintf("Ticket #%d : correction prête pour relecture", ticketID)
 	body := fmt.Sprintf(
-		"J'ai préparé une correction pour le ticket #%d « %s ».\n\n%s%s\n\nPR : %s\nTicket : %s\nNiveau : %s\n\nRien n'est fusionné ni déployé.",
-		ticketID, config.PlainText(ticketName), ans.Summary, notes, prURL, s.glpiClient.Link(ticketID), ans.Complexity,
+		"J'ai préparé une correction pour le ticket #%d « %s ».\n\n%s\n\nCause : %s%s\n\nPR : %s\nTicket : %s\nNiveau : %s\n\nRien n'est fusionné ni déployé.",
+		ticketID, config.PlainText(ticketName), ans.Summary, ans.RootCause, notes, prURL, s.glpiClient.Link(ticketID), ans.Complexity,
 	)
 	s.notif.Send(ctx, keys, subject, body)
 }
@@ -548,16 +556,125 @@ func evaluerTriage(ticket map[string]any) DecisionTriage {
 	return DecisionTriage{NonTechnique: false}
 }
 
-func (s *Solver) verifierDoublon(ctx context.Context, ticketID int, projectName, title string, dureeSec int) bool {
-	dupID, dupPR, err := s.state.FindDuplicatePR(ctx, projectName, title)
-	if err != nil || dupPR == "" || dupID <= 0 {
+func ticketMentionne(texte string, ticketID int) bool {
+	matches := reTicketRef.FindAllStringSubmatch(texte, -1)
+	for _, m := range matches {
+		for i := 1; i < len(m); i++ {
+			if m[i] == "" {
+				continue
+			}
+			if id, err := strconv.Atoi(m[i]); err == nil && id == ticketID {
+				return true
+			}
+		}
+	}
+	return false
+}
+
+func titreCorrespond(commitSujet, ticketTitre string) bool {
+	normTitre := state.NormaliserTitre(ticketTitre)
+	normSujet := state.NormaliserTitre(commitSujet)
+	if len(normTitre) < 15 || len(normSujet) < 15 {
 		return false
 	}
-	slog.Info("ticket doublon détecté", "ticket", ticketID, "doublonDe", dupID, "pr", dupPR)
-	msg := fmt.Sprintf("Ce ticket semble identique au ticket #%d déjà traité. La pull request existante a été associée : %s", dupID, dupPR)
-	_ = s.glpiClient.Followup(ctx, ticketID, msg)
-	_ = s.state.Finish(ctx, ticketID, "pr", fmt.Sprintf("Doublon du ticket #%d (PR existante réutilisée).", dupID), fmt.Sprintf("Ticket identique au #%d.", dupID), "", dupPR, "", dureeSec)
-	return true
+	if normTitre == normSujet {
+		return true
+	}
+	return strings.Contains(normSujet, normTitre)
+}
+
+func (s *Solver) verifierMemoirePrecedente(ctx context.Context, ticketID int, projectName, title string, dureeSec int) bool {
+	prev, err := s.state.GetPreviousJob(ctx, ticketID)
+	if err == nil && prev != nil && (prev.Status == "pr" || prev.Status == "clos" || prev.Status == "resolu") {
+		slog.Info("ticket déjà traité et résolu dans la mémoire Kairo", "ticket", ticketID, "statut", prev.Status, "pr", prev.PRURL)
+		msg := "Ce ticket a déjà été résolu précédemment"
+		if prev.PRURL != "" {
+			msg += fmt.Sprintf(" (PR : %s)", prev.PRURL)
+		}
+		msg += ". Le ticket était resté ouvert dans GLPI ; il est maintenant clôturé automatiquement."
+		_ = s.glpiClient.Followup(ctx, ticketID, msg)
+		if err := s.glpiClient.SetStatus(ctx, ticketID, config.GLPIClosed); err != nil {
+			slog.Warn("impossible de clore le ticket dans GLPI", "ticket", ticketID, "err", err)
+		}
+		_ = s.state.Finish(ctx, ticketID, "clos", "Déjà résolu précédemment (fermé dans GLPI).", prev.Cause, prev.Notes, prev.PRURL, prev.Fichiers, dureeSec)
+		return true
+	}
+
+	dupID, dupPR, _, err := s.state.FindDuplicateResolution(ctx, projectName, title)
+	if err == nil && dupID > 0 && dupID != ticketID {
+		slog.Info("doublon résolu détecté dans la mémoire Kairo", "ticket", ticketID, "doublonDe", dupID, "pr", dupPR)
+		msg := fmt.Sprintf("Ce ticket est identique au ticket #%d déjà résolu", dupID)
+		if dupPR != "" {
+			msg += fmt.Sprintf(" (PR : %s)", dupPR)
+		}
+		msg += ". Clôture automatique du ticket."
+		_ = s.glpiClient.Followup(ctx, ticketID, msg)
+		if err := s.glpiClient.SetStatus(ctx, ticketID, config.GLPIClosed); err != nil {
+			slog.Warn("impossible de clore le doublon dans GLPI", "ticket", ticketID, "err", err)
+		}
+		_ = s.state.Finish(ctx, ticketID, "clos", fmt.Sprintf("Doublon du ticket #%d déjà résolu.", dupID), fmt.Sprintf("Ticket identique au #%d.", dupID), "", dupPR, "", dureeSec)
+		return true
+	}
+	return false
+}
+
+func (s *Solver) verifierPRExistante(ctx context.Context, project *config.Project, ticketID int, dureeSec int) bool {
+	mergedPR, err := s.ghClient.FindMergedPR(ctx, project, ticketID)
+	if err == nil && mergedPR != "" {
+		slog.Info("pull request déjà fusionnée trouvée pour ce ticket", "ticket", ticketID, "pr", mergedPR)
+		msg := fmt.Sprintf("Une pull request pour ce ticket a déjà été fusionnée sur la branche principale (%s), mais le ticket GLPI était resté ouvert. Le ticket est maintenant résolu et clôturé.", mergedPR)
+		_ = s.glpiClient.Followup(ctx, ticketID, msg)
+		if err := s.glpiClient.SetStatus(ctx, ticketID, config.GLPIClosed); err != nil {
+			slog.Warn("impossible de clore le ticket dans GLPI", "ticket", ticketID, "err", err)
+		}
+		_ = s.state.Finish(ctx, ticketID, "clos", "Pull request déjà fusionnée.", fmt.Sprintf("PR fusionnée : %s", mergedPR), "", mergedPR, "", dureeSec)
+		return true
+	}
+	return false
+}
+
+func (s *Solver) verifierCommitExistant(ctx context.Context, ticketID int, ticketTitle, repoDir, jobDir string, dureeSec int) bool {
+	gitEnv, err := git.GitEnv(jobDir, "")
+	if err != nil {
+		return false
+	}
+
+	out, err := git.ExecGit(ctx, repoDir, gitEnv, 30*time.Second, "log", "-n", "50", "--pretty=format:%h%x1f%s%x1f%b%x1e")
+	if err != nil || out == "" {
+		return false
+	}
+
+	for _, rec := range strings.Split(out, "\x1e") {
+		rec = strings.TrimSpace(rec)
+		if rec == "" {
+			continue
+		}
+		champs := strings.Split(rec, "\x1f")
+		hash := champs[0]
+		subject := ""
+		if len(champs) > 1 {
+			subject = champs[1]
+		}
+		body := ""
+		if len(champs) > 2 {
+			body = champs[2]
+		}
+
+		if ticketMentionne(subject+" "+body, ticketID) || titreCorrespond(subject, ticketTitle) {
+			slog.Info("ticket déjà résolu par un commit dans le code", "ticket", ticketID, "commit", hash, "sujet", subject)
+			msg := fmt.Sprintf("Une correction pour ce ticket est déjà présente dans le code (commit %s : « %s »), mais le ticket GLPI était resté ouvert. Le ticket est maintenant marqué comme résolu.", hash, subject)
+			_ = s.glpiClient.Followup(ctx, ticketID, msg)
+			if err := s.glpiClient.SetStatus(ctx, ticketID, config.GLPIClosed); err != nil {
+				slog.Warn("impossible de clore le ticket dans GLPI", "ticket", ticketID, "err", err)
+			}
+			resume := fmt.Sprintf("Déjà résolu dans le code (commit %s : %s).", hash, subject)
+			cause := fmt.Sprintf("Commit %s présent sur la branche principale.", hash)
+			_ = s.state.Finish(ctx, ticketID, "clos", resume, cause, "", "", "", dureeSec)
+			return true
+		}
+	}
+
+	return false
 }
 
 func (s *Solver) triageJEV(ctx context.Context, ticket map[string]any, projectName string) (DecisionTriage, bool) {
@@ -658,7 +775,7 @@ func (s *Solver) ClassifyProject(ctx context.Context, title, content, targetProj
 	return s.jev.ClassifyProject(ctx, title, content, targetProject)
 }
 
-func ticketEstClos(ticket map[string]any) bool {
+func TicketEstClos(ticket map[string]any) bool {
 	statusVal := 0
 	switch v := ticket["status"].(type) {
 	case float64:
@@ -748,7 +865,7 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 		s.handleTechnicalFailure(ctx, ticketID, err, duree())
 		return
 	}
-	if ticketEstClos(ticket) {
+	if TicketEstClos(ticket) {
 		_ = s.state.Finish(ctx, ticketID, "abandon", "Ticket clos ou résolu dans GLPI avant traitement.", "", "", "", "", duree())
 		return
 	}
@@ -756,7 +873,10 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 	ticketName, _ := ticket["name"].(string)
 	_ = s.state.SetTitle(ctx, ticketID, ticketName)
 
-	if s.verifierDoublon(ctx, ticketID, projectName, ticketName, duree()) {
+	if s.verifierMemoirePrecedente(ctx, ticketID, projectName, ticketName, duree()) {
+		return
+	}
+	if s.verifierPRExistante(ctx, project, ticketID, duree()) {
 		return
 	}
 	stopTriage, complexiteJEV, modeleJEV := s.verifierTriage(ctx, ticketID, ticket, projectName, duree())
@@ -774,9 +894,14 @@ func (s *Solver) RunJob(ctx context.Context, ticketID int, projectName string) {
 		return
 	}
 
-	deadline := time.Now().Add(s.cfg.JobTimeout)
 	repoDir := filepath.Join(jobDir, "repo")
-	ans, err := s.Solve(ctx, ticketID, ticket, project, jobDir, repoDir, baseSHA, modeleJEV, deadline)
+	if s.verifierCommitExistant(ctx, ticketID, ticketName, repoDir, jobDir, duree()) {
+		return
+	}
+
+	consigne, _ := s.state.Consigne(ctx, ticketID)
+	deadline := time.Now().Add(s.cfg.JobTimeout)
+	ans, err := s.Solve(ctx, ticketID, ticket, project, jobDir, repoDir, baseSHA, modeleJEV, consigne, deadline)
 	if err != nil {
 		s.handleSolveError(ctx, ticketID, ticket, err, complexiteJEV, duree())
 		return

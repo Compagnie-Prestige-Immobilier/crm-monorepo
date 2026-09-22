@@ -31,6 +31,7 @@ type Server struct {
 
 var relanceRegex = regexp.MustCompile(`^/tickets/(\d+)/relance$`)
 var arreterRegex = regexp.MustCompile(`^/tickets/(\d+)/arreter$`)
+var prendreEnMainRegex = regexp.MustCompile(`^/tickets/(\d+)/prendre-en-main$`)
 
 func New(cfg *config.Config, s *state.Store, eng stopper, lastPoll *atomic.Int64) *Server {
 	srv := &Server{
@@ -196,6 +197,10 @@ func (s *Server) handleRoot(w http.ResponseWriter, r *http.Request) {
 		s.handleArreter(w, r, matches[1])
 		return
 	}
+	if matches := prendreEnMainRegex.FindStringSubmatch(r.URL.Path); len(matches) == 2 {
+		s.handlePrendreEnMain(w, r, matches[1])
+		return
+	}
 	w.WriteHeader(http.StatusNotFound)
 }
 
@@ -211,18 +216,71 @@ func (s *Server) handleRelance(w http.ResponseWriter, r *http.Request, rawID str
 		return
 	}
 
-	ok, err := s.state.Relaunch(r.Context(), id)
+	var payload struct {
+		Consigne string `json:"consigne"`
+		Action   string `json:"action"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&payload)
+
+	if payload.Action == "prendre_en_main" || payload.Action == "abandonner" {
+		ok, err := s.state.MarkHandled(r.Context(), id, "Pris en main manuellement par l'équipe.")
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		if !ok {
+			writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket bloqué peut être pris en main"})
+			return
+		}
+		slog.Info("ticket pris en main depuis le CRM", "ticket", id)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	consigne := strings.TrimSpace(payload.Consigne)
+	var ok bool
+	if consigne != "" {
+		ok, err = s.state.RelaunchWithDirective(r.Context(), id, consigne)
+	} else {
+		ok, err = s.state.Relaunch(r.Context(), id)
+	}
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	if !ok {
-		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket en échec, escaladé ou arrêté se relance"})
+		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket en échec, escaladé, arrêté ou en triage se relance"})
 		return
 	}
 
-	slog.Info("relance demandée depuis le CRM", "ticket", id)
+	slog.Info("relance demandée depuis le CRM", "ticket", id, "avecConsigne", consigne != "")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+func (s *Server) handlePrendreEnMain(w http.ResponseWriter, r *http.Request, rawID string) {
+	if !s.checkAdmin(r) {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	id, err := strconv.Atoi(rawID)
+	if err != nil {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	ok, err := s.state.MarkHandled(r.Context(), id, "Pris en main manuellement par l'équipe.")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+	if !ok {
+		writeJSON(w, http.StatusConflict, map[string]string{"erreur": "seul un ticket bloqué peut être pris en main"})
+		return
+	}
+
+	slog.Info("ticket pris en main depuis le CRM", "ticket", id)
 	w.WriteHeader(http.StatusNoContent)
 }
 

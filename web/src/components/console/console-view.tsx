@@ -984,9 +984,7 @@ export function draftDe(
     method,
     comment,
     callbackAt,
-    // EB-10 : sans méthode d'enrôlement le dossier reste un brouillon. Joint à
-    // la tentative, incomplet, il la ferait refuser et emporterait l'appel.
-    ...(method === null || conversion === null ? {} : { conversion }),
+    ...(conversion === null ? {} : { conversion }),
     ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
   };
 }

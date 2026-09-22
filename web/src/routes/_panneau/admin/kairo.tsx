@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createFileRoute } from '@tanstack/react-router';
 import { formatDistanceStrict } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import { CrownIcon, PauseIcon, PlayIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
+import { PauseIcon, PlayIcon, RefreshCwIcon, UnplugIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
@@ -27,23 +27,13 @@ import { guardPermission } from '@/lib/guard';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { cn } from '@/lib/utils';
 
-const TONS = {
-  actif: { titre: 'Kairo veille sur GLPI', bordure: 'border-l-success', point: 'bg-success' },
-  pause: { titre: 'Kairo est en pause', bordure: 'border-l-warning', point: 'bg-warning' },
-  bloque: {
-    titre: 'Kairo ne lit plus GLPI',
-    bordure: 'border-l-destructive',
-    point: 'bg-destructive',
-  },
-};
-
 export const Route = createFileRoute('/_panneau/admin/kairo')({
   beforeLoad: guardPermission('exploitation.administrer'),
   component: KairoView,
   pendingComponent: Chargement,
 });
 
-function tonDe(etat: EtatKairo): keyof typeof TONS {
+function tonDe(etat: EtatKairo): 'pause' | 'actif' | 'bloque' {
   if (etat.pauseDepuis !== null) return 'pause';
   return etat.sain ? 'actif' : 'bloque';
 }
@@ -142,16 +132,49 @@ function KairoInjoignable(props: {
 
 function BadgesAgents({ agents }: { agents: string[] }) {
   if (agents.length === 0) {
-    return <Badge variant="destructive">Aucun agent configuré</Badge>;
+    return (
+      <Badge variant="destructive" className="font-mono text-[10px]">
+        Aucun agent configuré
+      </Badge>
+    );
   }
   return (
     <>
       {agents.map((agent) => (
-        <Badge key={agent} variant="outline">
+        <span
+          key={agent}
+          className="rounded border border-border/80 bg-muted/60 px-1.5 py-0.5 font-mono text-[11px] text-foreground/90"
+        >
           {agent}
-        </Badge>
+        </span>
       ))}
     </>
+  );
+}
+
+const STYLE_TON = {
+  actif: { point: 'bg-emerald-500', libelle: 'Veille active' },
+  pause: { point: 'bg-amber-500', libelle: 'En pause' },
+  bloque: { point: 'bg-destructive', libelle: 'Non joignable' },
+} as const;
+
+function DescriptionCadence(props: { enPause: boolean; intervalle: number; derniereSec: number; pauseDepuis: string }) {
+  if (props.enPause) {
+    return (
+      <p className="text-xs text-muted-foreground">
+        Suspendu depuis le{' '}
+        <time dateTime={props.pauseDepuis} title={ilYA(props.pauseDepuis)}>
+          {formatDateTime(props.pauseDepuis)}
+        </time>
+        . Traitements engagés poursuivis sans nouveau ticket.
+      </p>
+    );
+  }
+  return (
+    <p className="text-xs text-muted-foreground">
+      Cycle : toutes les {String(props.intervalle)} s · Dernière lecture il y a{' '}
+      {formatDistanceStrict(0, props.derniereSec * 1000, { locale: fr })}.
+    </p>
   );
 }
 
@@ -170,64 +193,55 @@ function BandeauEtat({ etat, desactive }: { etat: EtatKairo; desactive?: boolean
     onError: (error) => toastApiError(error, 'Kairo n’a pas pris la commande.'),
     onSettled: () => client.invalidateQueries({ queryKey: CLE_KAIRO }),
   });
-  const ton = tonDe(etat);
-  const { titre, bordure, point } = TONS[ton];
+  const ton = STYLE_TON[tonDe(etat)];
   const pauseDepuis = isoKairo(etat.pauseDepuis ?? '');
+
   return (
-    <Card className={cn('border-l-4', bordure)}>
-      <CardContent className="flex flex-col gap-4 sm:flex-row sm:items-center">
-        <img
-          src="/brand/kairo.png"
-          alt="Avatar Kairo"
-          className="size-14 shrink-0 rounded-full border border-border object-cover shadow-sm"
-        />
-        <div className="min-w-0 flex-1" aria-live="polite">
+    <Card className="border border-border/80 bg-card/60 shadow-xs backdrop-blur-xs">
+      <CardContent className="flex flex-col gap-5 p-5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-2" aria-live="polite">
           <div className="flex flex-wrap items-center gap-2.5">
-            <p className="flex items-center gap-1.5 font-display text-xl font-[800] tracking-[-0.01em]">
-              <CrownIcon className="size-5 text-amber-500" aria-hidden="true" />
-              <span>Kairo</span>
-            </p>
-            <span className="relative flex size-2.5 shrink-0" aria-hidden="true">
-              {ton === 'actif' ? (
-                <span className="absolute inline-flex size-full rounded-full bg-success opacity-60 motion-safe:animate-ping" />
-              ) : null}
-              <span className={cn('relative inline-flex size-2.5 rounded-full', point)} />
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+              Assistant DSI
             </span>
-            <span className="text-sm font-medium text-muted-foreground">{titre}</span>
+            <span className="text-muted-foreground/40">/</span>
+            <h1 className="font-display text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              Kairo
+            </h1>
+            <div className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-border/60 bg-secondary/50 px-2.5 py-0.5 text-xs text-foreground">
+              <span className={cn('size-2 rounded-full', ton.point)} aria-hidden="true" />
+              <span className="font-medium">{ton.libelle}</span>
+            </div>
             {etat.jevActif ? (
-              <Badge className="border-blue-500/30 bg-blue-500/15 text-blue-600 dark:text-blue-400">
-                JEV
+              <Badge variant="outline" className="font-mono text-[10px] text-muted-foreground">
+                JEV actif
               </Badge>
             ) : null}
           </div>
-          <p className="text-sm text-muted-foreground">
-            {enPause ? (
-              <>
-                Depuis le{' '}
-                <time dateTime={pauseDepuis} title={ilYA(pauseDepuis)}>
-                  {formatDateTime(pauseDepuis)}
-                </time>
-                . Les tickets en cours se terminent, aucun nouveau n’est pris.
-              </>
-            ) : (
-              `Lecture toutes les ${String(etat.intervalleSecondes)} s, la dernière il y a ${formatDistanceStrict(0, etat.derniereLectureSecondes * 1000, { locale: fr })}.`
-            )}
-          </p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
+          <DescriptionCadence
+            enPause={enPause}
+            intervalle={etat.intervalleSecondes}
+            derniereSec={etat.derniereLectureSecondes}
+            pauseDepuis={pauseDepuis}
+          />
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="text-[11px] text-muted-foreground">Agents :</span>
             <BadgesAgents agents={etat.agents} />
           </div>
         </div>
-        <Button
-          size="lg"
-          variant={enPause ? 'default' : 'outline'}
-          disabled={desactive || bascule.isPending}
-          title={desactive ? 'Kairo est hors de portée' : undefined}
-          onClick={() => bascule.mutate(!enPause)}
-          className="w-full sm:w-auto"
-        >
-          {enPause ? <PlayIcon /> : <PauseIcon />}
-          {enPause ? 'Reprendre' : 'Mettre en pause'}
-        </Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            size="sm"
+            variant={enPause ? 'default' : 'outline'}
+            disabled={desactive || bascule.isPending}
+            title={desactive ? 'Kairo est hors de portée' : undefined}
+            onClick={() => bascule.mutate(!enPause)}
+            className="h-9 gap-2 px-3 text-xs"
+          >
+            {enPause ? <PlayIcon className="size-3.5" /> : <PauseIcon className="size-3.5" />}
+            {enPause ? 'Reprendre la veille' : 'Mettre en pause'}
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
