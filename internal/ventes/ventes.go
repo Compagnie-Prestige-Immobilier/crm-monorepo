@@ -113,7 +113,10 @@ type VenteDTO struct {
 	Acompte            int64          `json:"acompte"`
 	Reliquat           int64          `json:"reliquat"`
 	ModePaiement       string         `json:"modePaiement"`
-	NombreMois         *int32         `json:"nombreMois"`
+	NombreEcheances    *int32         `json:"nombreEcheances"`
+	PeriodiciteMois    int32          `json:"periodiciteMois"`
+	JourVersement      *int32         `json:"jourVersement"`
+	PremierVersement   *string        `json:"premierVersement"`
 	SoldeeManuellement bool           `json:"soldeeManuellement"`
 	Soldee             bool           `json:"soldee"`
 	PartProprietaire   int64          `json:"partProprietaire"`
@@ -322,7 +325,8 @@ func venteDTO(v *db.Vente, versements []VersementDTO) VenteDTO {
 		ID: v.ID, Origine: v.Origine, Numero: v.Numero, Canal: v.Canal, DateSouscription: jourOuNul(v.DateSouscription), Client: v.Client,
 		Telephone: v.Telephone, Site: v.Site, NombreLots: v.NombreLots, NumerosLots: v.NumerosLots,
 		Superficie: v.Superficie, PrixUnitaire: v.PrixUnitaire, PrixTotal: v.PrixTotal, Acompte: v.Acompte,
-		Reliquat: v.Reliquat, ModePaiement: v.ModePaiement, NombreMois: v.NombreMois,
+		Reliquat: v.Reliquat, ModePaiement: v.ModePaiement, NombreEcheances: v.NombreEcheances,
+		PeriodiciteMois: v.PeriodiciteMois, JourVersement: v.JourVersement, PremierVersement: jourOuNul(v.PremierVersement),
 		SoldeeManuellement: v.SoldeeManuellement, Soldee: v.SoldeeManuellement || encaisse >= v.PrixTotal,
 		PartProprietaire: v.PartProprietaire,
 		PartApporteur:    v.PartApporteur, PartCpi: v.PartCpi, Versements: versements,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { LoaderIcon, PencilIcon, PlusIcon } from 'lucide-react';
+import { LoaderIcon, PencilIcon, PlusIcon, XIcon } from 'lucide-react';
 import { useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
@@ -32,6 +32,7 @@ import {
   type CanalVente,
   type SiteVente,
   type SiteVenteInput,
+  type SuperficieSite,
 } from '@/lib/data/ventes';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
@@ -55,6 +56,7 @@ const siteInput = (site: SiteVente | null, ordre: number): SiteVenteInput =>
         partProprietaireParLot: 0,
         partApporteurMode: 'AUCUNE',
         partApporteurValeur: 0,
+        superficies: [],
       }
     : {
         nom: site.nom,
@@ -65,6 +67,7 @@ const siteInput = (site: SiteVente | null, ordre: number): SiteVenteInput =>
         partProprietaireParLot: site.partProprietaireParLot,
         partApporteurMode: site.partApporteurMode,
         partApporteurValeur: site.partApporteurValeur,
+        superficies: site.superficies,
       };
 
 export function PageReglages({
@@ -241,7 +244,15 @@ function SiteDialog({
   const [draft, setDraft] = useState<SiteVenteInput>(() => siteInput(site, ordre));
   const changer = (patch: Partial<SiteVenteInput>) => setDraft((d) => ({ ...d, ...patch }));
   const enregistrer = useMutation({
-    mutationFn: () => (site === null ? createSiteVente(draft) : updateSiteVente(site.id, draft)),
+    mutationFn: () => {
+      const input = {
+        ...draft,
+        superficies: (draft.superficies ?? []).filter(
+          (s) => s.superficie.trim() !== '' && s.prix > 0,
+        ),
+      };
+      return site === null ? createSiteVente(input) : updateSiteVente(site.id, input);
+    },
     onSuccess: (enregistre) => {
       toast.success(`Site ${enregistre.nom} enregistré.`);
       onEnregistre();
@@ -333,6 +344,10 @@ function SiteDialog({
               />
             </Champ>
           </div>
+          <SuperficiesAuChoix
+            superficies={draft.superficies ?? []}
+            onChange={(superficies) => changer({ superficies })}
+          />
           <DialogFooter>
             <Button type="button" variant="outline" onClick={onFermer}>
               Annuler
@@ -347,6 +362,60 @@ function SiteDialog({
         </form>
       </DialogContent>
     </Dialog>
+  );
+}
+
+function SuperficiesAuChoix({
+  superficies,
+  onChange,
+}: {
+  superficies: readonly SuperficieSite[];
+  onChange: (superficies: SuperficieSite[]) => void;
+}) {
+  const remplacer = (rang: number, patch: Partial<SuperficieSite>) =>
+    onChange(superficies.map((s, i) => (i === rang ? { ...s, ...patch } : s)));
+  return (
+    <fieldset className="flex flex-col gap-2">
+      <legend className="text-[0.9375rem] font-[600]">Superficies au choix</legend>
+      <p className="text-[0.8125rem] text-muted-foreground">
+        Chacune avec son prix. La vente demande alors la superficie.
+      </p>
+      {superficies.map((s, rang) => (
+        <div key={rang} className="flex items-center gap-2">
+          <Input
+            aria-label="Superficie"
+            placeholder="Ex. 200 m²"
+            value={s.superficie}
+            onChange={(e) => remplacer(rang, { superficie: e.target.value })}
+          />
+          <Input
+            aria-label={`Prix d'un lot de ${s.superficie || 'cette superficie'}`}
+            inputMode="numeric"
+            placeholder="Prix d'un lot"
+            value={s.prix ? s.prix.toLocaleString('fr-FR') : ''}
+            onChange={(e) => remplacer(rang, { prix: entier(e.target.value) })}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            aria-label="Retirer cette superficie"
+            onClick={() => onChange(superficies.filter((_, i) => i !== rang))}
+          >
+            <XIcon aria-hidden="true" />
+          </Button>
+        </div>
+      ))}
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        className="self-start"
+        onClick={() => onChange([...superficies, { superficie: '', prix: 0 }])}
+      >
+        <PlusIcon aria-hidden="true" /> Ajouter une superficie
+      </Button>
+    </fieldset>
   );
 }
 
