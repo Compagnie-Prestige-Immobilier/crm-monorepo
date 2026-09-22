@@ -22,8 +22,10 @@ export const ETAT_KAIRO_SIMULE: EtatKairo = {
       majLe: '2026-09-22 13:29:47',
       lien: 'https://glpi.cpi.sn/front/ticket.form.php?id=274',
       resume: 'Rafraîchissement global des bases de démonstration',
-      cause: 'Demande d’évolution : besoin d’un bouton global pour rafraîchir toutes les bases d’un clic.',
-      notes: 'Bouton ajouté dans la vue admin/bases, point d’entrée Go POST /bases/rafraichir câblé.',
+      cause:
+        'Demande d’évolution : besoin d’un bouton global pour rafraîchir toutes les bases d’un clic.',
+      notes:
+        'Bouton ajouté dans la vue admin/bases, point d’entrée Go POST /bases/rafraichir câblé.',
       prUrl: 'https://github.com/Compagnie-Prestige-Immobilier/crm-monorepo/pull/116',
       dureeSecondes: 240,
       jevCategorie: 'Évolution',
@@ -38,8 +40,10 @@ export const ETAT_KAIRO_SIMULE: EtatKairo = {
       lien: 'https://glpi.cpi.sn/front/ticket.form.php?id=272',
       resume:
         'Dilemme métier : deux règles contradictoires sur le statut d’attribution lors de la conversion de prospect.',
-      cause: 'Faut-il écraser le téléconseiller initial ou conserver l’historique dans la fiche vente ?',
-      consigne: 'Conserver l’historique du téléconseiller d’origine et journaliser la nouvelle attribution.',
+      cause:
+        'Faut-il écraser le téléconseiller initial ou conserver l’historique dans la fiche vente ?',
+      consigne:
+        'Conserver l’historique du téléconseiller d’origine et journaliser la nouvelle attribution.',
       notes: 'Attention à la contrainte de clé étrangère sur la table prospects.',
       dureeSecondes: 180,
       jevCategorie: 'Anomalie métier',

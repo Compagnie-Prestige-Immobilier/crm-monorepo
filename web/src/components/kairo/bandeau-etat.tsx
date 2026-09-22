@@ -64,13 +64,7 @@ function PastilleStatut(props: { enPause: boolean; sain: boolean }) {
   );
 }
 
-function StatutVeille({
-  etat,
-  simulation,
-}: {
-  etat: EtatKairo;
-  simulation?: boolean | undefined;
-}) {
+function StatutVeille({ etat, simulation }: { etat: EtatKairo; simulation?: boolean | undefined }) {
   const enPause = etat.pauseDepuis !== null;
   const sain = etat.sain;
 
@@ -97,7 +91,11 @@ function DescriptionCadence(props: {
     return (
       <p className="text-xs leading-relaxed text-muted-foreground">
         Suspendu depuis le{' '}
-        <time dateTime={pauseDepuis} title={ilYA(pauseDepuis)} className="font-medium text-foreground">
+        <time
+          dateTime={pauseDepuis}
+          title={ilYA(pauseDepuis)}
+          className="font-medium text-foreground"
+        >
           {formatDateTime(pauseDepuis)}
         </time>
         . Les traitements engagés continuent sans prise en charge de nouveau ticket.
@@ -127,7 +125,9 @@ export function BandeauEtat(props: {
     onSuccess: (_, pause) => {
       const nouveauPause = pause ? new Date().toISOString().slice(0, 19).replace('T', ' ') : null;
       client.setQueryData<TableauKairo>(CLE_KAIRO, (avant) =>
-        avant?.kairo == null ? avant : { ...avant, kairo: { ...avant.kairo, pauseDepuis: nouveauPause } },
+        avant?.kairo == null
+          ? avant
+          : { ...avant, kairo: { ...avant.kairo, pauseDepuis: nouveauPause } },
       );
       toast.success(pause ? 'Kairo est en pause.' : 'Veille Kairo réactivée.');
     },
