@@ -325,6 +325,39 @@ func TestProspectRequalificationParLEncadrement(t *testing.T) {
 	}
 }
 
+func TestProspectMethodeModifieeParLEncadrement(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	superviseur := autreCompte(b, "SUPERVISEUR")
+	nettoyerProspects(b, b.userID, superviseur.userID)
+	id := creerProspect(b, "Ba", numeroSenegalais(22))["id"].(string)
+	chemin := "/api/v1/prospects/" + id + "/methode"
+
+	statut, body := appelJSON(b, http.MethodPut, chemin, map[string]any{"methode": "PLATFORM"}, nil)
+	b.attend(statut, http.StatusForbidden, "méthode hors encadrement", body)
+
+	statut, body = appelJSON(superviseur, http.MethodPut, chemin, map[string]any{"methode": "PLATFORM"}, nil)
+	superviseur.attend(statut, http.StatusOK, "méthode posée par le superviseur", body)
+	if body["enrollmentMethod"] != "PLATFORM" || body["phase2Status"] != "METHOD_OBTAINED" {
+		t.Fatalf("méthode posée : %v, %v", body["enrollmentMethod"], body["phase2Status"])
+	}
+
+	statut, body = appelJSON(superviseur, http.MethodPut, chemin, map[string]any{"methode": "AUCUNE"}, nil)
+	superviseur.attend(statut, http.StatusOK, "méthode retirée par le superviseur", body)
+	if body["enrollmentMethod"] != nil || body["phase2Status"] != "REACHED" {
+		t.Fatalf("sans méthode la fiche redevient jointe : %v, %v", body["enrollmentMethod"], body["phase2Status"])
+	}
+	var parcours *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT p."enrollmentMethod"::text FROM "prospect_journeys" p JOIN "prospects" f ON f."id" = p."prospectId" AND f."projet" = p."projet" WHERE f."id" = $1`,
+		id).Scan(&parcours); err != nil {
+		t.Fatal(err)
+	}
+	if parcours != nil {
+		t.Fatalf("le parcours du projet garde la méthode %s", *parcours)
+	}
+}
+
 func TestProspectFusionDeplaceLesTentatives(t *testing.T) {
 	b := nouveauBanc(t, "COMMERCIAL")
 	connecte(b)

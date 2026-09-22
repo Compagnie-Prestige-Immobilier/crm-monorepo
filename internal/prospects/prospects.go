@@ -1458,6 +1458,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/prospects/pipeline":                                  prospectLecture,
 	"GET /api/v1/prospects/clients":                                   prospectLecture,
 	"POST /api/v1/prospects/{id}/requalifier":                         socle.PermissionProspectsSuperviser,
+	"PUT /api/v1/prospects/{id}/methode":                              socle.PermissionProspectsSuperviser,
 	"POST /api/v1/prospects/{id}/suivi-rendez-vous":                   socle.PermissionRendezVousSuivre,
 	"POST /api/v1/prospects":                                          socle.PermissionFichesTenir,
 	"PATCH " + prospectCheminID:                                       socle.PermissionFichesTenir,

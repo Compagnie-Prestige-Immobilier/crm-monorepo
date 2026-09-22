@@ -12,6 +12,7 @@ import { Champ } from '@/components/historique/historique';
 import { BoutonWhatsApp } from '@/components/prospects/bouton-whatsapp';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
+import { MethodeFiche } from '@/components/prospects/methode-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
 import { SuiviRendezVous, SuiviRendezVousBadges } from '@/components/prospects/suivi-rendez-vous';
 import {
@@ -31,7 +32,6 @@ import { formatDate, formatDateTime, formatNumber, formatPhone } from '@/lib/for
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
-  enrollmentMethodLabel,
   peut,
   PROSPECT_STATUT_LABELS,
   SEGMENT_LABELS,
@@ -185,9 +185,7 @@ function FicheProspect({ prospect, role }: { prospect: ProspectRow; role: Role }
               </Champ>
             ) : null}
             <Champ label="Méthode d’enrôlement">
-              {prospect.enrollmentMethod === null
-                ? NO_VALUE
-                : enrollmentMethodLabel(prospect.enrollmentMethod)}
+              <MethodeFiche prospect={prospect} vide={NO_VALUE} />
             </Champ>
           </dl>
         </section>
