@@ -1,0 +1,59 @@
+@import 'tailwindcss';
+@import '@fontsource-variable/plus-jakarta-sans';
+@import '@fontsource-variable/bricolage-grotesque';
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans Variable', system-ui, sans-serif;
+  --font-display: 'Bricolage Grotesque Variable', system-ui, sans-serif;
+
+  --color-brand: #630210;
+  --color-brand-hover: #7e0417;
+  --color-brand-soft: #f6e9eb;
+  --color-gold: #c8921a;
+  --color-gold-text: #856011;
+  --color-gold-soft: #fbf3e2;
+  --color-ink: #1c0810;
+  --color-muted: #6b4a52;
+  --color-canvas: #f6f5f3;
+  --color-paper: #ffffff;
+  --color-line: rgb(99 2 16 / 0.12);
+  --color-line-strong: #86868b;
+
+  --color-ok: #166534;
+  --color-ok-soft: #e7f4ec;
+  --color-warn: #8a5a00;
+  --color-warn-soft: #fdf3dc;
+  --color-ko: #9f1c1c;
+  --color-ko-soft: #fbeaea;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+  body {
+    @apply bg-canvas text-ink font-sans antialiased;
+    font-feature-settings: 'ss01';
+  }
+  ::selection {
+    @apply bg-gold/30;
+  }
+}
+
+@utility focus-ring {
+  @apply outline-none data-[focus-visible]:ring-2 data-[focus-visible]:ring-brand data-[focus-visible]:ring-offset-2 data-[focus-visible]:ring-offset-canvas;
+}
+
+@utility field-box {
+  @apply w-full min-h-11 rounded-lg border border-line-strong/50 bg-paper px-3 text-[15px] transition-colors outline-none;
+  @apply hover:border-line-strong data-[focused]:border-brand data-[focused]:ring-2 data-[focused]:ring-brand/15;
+  @apply data-[focus-visible]:border-brand data-[focus-visible]:ring-2 data-[focus-visible]:ring-brand/15;
+  @apply data-[invalid]:border-ko data-[invalid]:bg-ko-soft/40 group-data-[invalid]:border-ko group-data-[invalid]:bg-ko-soft/40;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
