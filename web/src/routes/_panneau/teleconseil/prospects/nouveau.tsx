@@ -2,8 +2,7 @@ import { createFileRoute } from '@tanstack/react-router';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import { EtapeSkeleton } from '@/components/chues/etapes';
-import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
-import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
+import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { guardPermission } from '@/lib/guard';
 import { readString } from '@/lib/search-params';
 
@@ -21,17 +20,11 @@ function NouveauProspectPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const representantId = readString(searchParams, 'rep');
-  const rawProjet = readString(searchParams, 'projet');
-
-  if (rawProjet !== null && rawProjet.toLowerCase().includes('grand')) {
-    return (
-      <NouveauProspect
-        canalProvenanceId={null}
-        onSaved={() => router.push('/teleconseil/prospects?projet=GRAND_PUBLIC')}
-        onAnnuler={() => router.push('/teleconseil/prospects?projet=GRAND_PUBLIC')}
-      />
-    );
-  }
-
-  return <ProspectCreateForm representantId={representantId} />;
+  return (
+    <NouveauProspectConsole
+      representantId={representantId}
+      onSaved={() => router.push('/teleconseil/prospects')}
+      onAnnuler={() => router.push('/teleconseil/prospects')}
+    />
+  );
 }
