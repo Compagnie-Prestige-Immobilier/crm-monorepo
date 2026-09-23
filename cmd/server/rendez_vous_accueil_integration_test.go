@@ -22,13 +22,15 @@ func contientFiche(body map[string]any, fiche string) bool {
 func TestRendezVousFiltresParType(t *testing.T) {
 	t.Setenv("BETA_SUIVI_RENDEZ_VOUS", "true")
 	teleconseiller := qualificationConnecte(t, "COMMERCIAL")
-	accueil := qualificationConnecte(t, "ACCUEIL")
-	accueil.exec(`INSERT INTO "role_permissions" ("roleId", "permission")
-	              VALUES ('ACCUEIL', 'rendez_vous.suivre'), ('ACCUEIL', 'prospects.lire')
+	// Les permissions rendues par une connexion à part : la fermeture ne doit
+	// pas dépendre d'un banc réouvert plus bas, dont le pool serait déjà clos.
+	ouvreur := qualificationConnecte(t, "ADMIN")
+	ouvreur.exec(`INSERT INTO "role_permissions" ("roleId", "permission")
+	              VALUES ('ACCUEIL', 'rendez_vous.voir'), ('ACCUEIL', 'rendez_vous.suivre')
 	              ON CONFLICT DO NOTHING`)
 	t.Cleanup(func() {
-		_, _ = accueil.pool.Exec(accueil.ctx,
-			`DELETE FROM "role_permissions" WHERE "roleId" = 'ACCUEIL' AND "permission" IN ('rendez_vous.suivre', 'prospects.lire')`)
+		ouvreur.exec(`DELETE FROM "role_permissions"
+		              WHERE "roleId" = 'ACCUEIL' AND "permission" IN ('rendez_vous.voir', 'rendez_vous.suivre')`)
 	})
 
 	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
@@ -46,17 +48,22 @@ func TestRendezVousFiltresParType(t *testing.T) {
 		teleconseiller.attend(statut, http.StatusOK, motif+" consigné", body)
 	}
 
-	// La session porte les permissions lues à la connexion : elle est reprise
-	// après l'écriture en base, sinon l'accueil reste sur ses quatre permissions.
-	accueil = qualificationConnecte(t, "ACCUEIL")
-	const liste = "/api/v1/prospects?phase2Status=APPOINTMENT&pageSize=200"
-	statut, body := qualificationEnvoi(accueil, http.MethodGet, liste+"&motif=RV_CPI", nil)
+	// Sans la permission, le comptoir ne lit rien : le téléconseiller la teste
+	// pour tout le monde, lui qui vit pourtant dans les fiches.
+	statut, body := qualificationEnvoi(teleconseiller, http.MethodGet, "/api/v1/rendez-vous", nil)
+	teleconseiller.attend(statut, http.StatusForbidden, "lecture sans la permission", body)
+
+	// La session porte les permissions lues à la connexion : l'accueil se
+	// connecte après l'écriture, sinon il reste sur ses quatre permissions.
+	accueil := qualificationConnecte(t, "ACCUEIL")
+	const liste = "/api/v1/rendez-vous?pageSize=200"
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, liste+"&type=RV_CPI", nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous filtrés sur RV CPI", body)
 	if !contientFiche(body, fiches["RV_CPI"]) || contientFiche(body, fiches["RV_SITE"]) {
 		t.Fatalf("le filtre RV CPI ne garde pas la bonne fiche : %v", body["meta"])
 	}
 
-	statut, body = qualificationEnvoi(accueil, http.MethodGet, liste+"&motif=RV_SITE", nil)
+	statut, body = qualificationEnvoi(accueil, http.MethodGet, liste+"&type=RV_SITE", nil)
 	accueil.attend(statut, http.StatusOK, "rendez-vous filtrés sur RV site", body)
 	if !contientFiche(body, fiches["RV_SITE"]) || contientFiche(body, fiches["RV_CPI"]) {
 		t.Fatalf("le filtre RV site ne garde pas la bonne fiche : %v", body["meta"])

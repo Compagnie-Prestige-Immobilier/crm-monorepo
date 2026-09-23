@@ -202,7 +202,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Rendez-vous',
         icon: HeartHandshakeIcon,
         description: 'Rendez-vous obtenus au téléphone, à confirmer au comptoir',
-        acces: 'rendez_vous.suivre',
+        acces: 'rendez_vous.voir',
         hidden: true,
       },
       // Les trois écrans qui suivent sont les ONGLETS du registre

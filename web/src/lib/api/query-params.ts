@@ -55,7 +55,6 @@ export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   return {
     ...toFilterQuery(filters),
     ...(filters.sansMotif === null ? {} : { sansMotif: filters.sansMotif }),
-    ...(filters.motif === null ? {} : { motif: filters.motif }),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: filters.sortBy,

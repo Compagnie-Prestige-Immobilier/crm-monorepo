@@ -61,6 +61,8 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'referentiels.superviser': 'Modifier les listes de référence : motifs, statuts, départements.',
   'rendez_vous.suivre':
     'Noter l’issue d’un rendez-vous et la suite donnée après la rencontre (bêta).',
+  'rendez_vous.voir':
+    'Voir la liste des rendez-vous obtenus au téléphone, sans ouvrir les fiches prospect.',
   'roles.administrer': 'Créer des rôles et régler leurs permissions, dont celle-ci.',
   'support.plateforme': 'Ouvrir la plateforme de support GLPI.',
   'support.signaler': 'Signaler un problème au support depuis un écran.',

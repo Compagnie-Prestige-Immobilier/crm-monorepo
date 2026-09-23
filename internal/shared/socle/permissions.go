@@ -69,6 +69,7 @@ const (
 	PermissionSupportSignaler          Permission = "support.signaler"
 	PermissionSupportPlateforme        Permission = "support.plateforme"
 	PermissionRendezVousSuivre         Permission = "rendez_vous.suivre"
+	PermissionRendezVousVoir           Permission = "rendez_vous.voir"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
 
@@ -130,6 +131,7 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
 	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
 	PermissionRendezVousSuivre:         {"Rendez-vous", "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele}},
+	PermissionRendezVousVoir:           {"Rendez-vous", "Voir les rendez-vous obtenus au téléphone", AdminSeul},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", AdminSeul},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
 

@@ -33,7 +33,7 @@ const TABS: readonly {
     href: '/accueil/rendez-vous',
     label: 'Rendez-vous',
     icon: HeartHandshakeIcon,
-    permission: 'rendez_vous.suivre',
+    permission: 'rendez_vous.voir',
   },
   {
     // Gestion des quatre listes qui alimentent la saisie : réservée à qui les
