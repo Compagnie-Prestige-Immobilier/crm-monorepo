@@ -26,6 +26,7 @@ import {
   ScrollTextIcon,
   SettingsIcon,
   SlidersHorizontalIcon,
+  SparklesIcon,
   UploadIcon,
   UserPlusIcon,
   UsersIcon,
@@ -501,6 +502,13 @@ const SECTIONS: readonly NavSection[] = [
         icon: LayoutDashboardIcon,
         description: 'Supervision, enrôlement, déploiement et marketing',
         acces: 'parametres.administrer',
+      },
+      {
+        href: '/admin/assistant',
+        label: 'Assistant',
+        icon: SparklesIcon,
+        description: 'Questions sur les appels, les conversions et les prévisions',
+        acces: 'assistant.utiliser',
       },
       {
         href: '/admin/enrolement',
