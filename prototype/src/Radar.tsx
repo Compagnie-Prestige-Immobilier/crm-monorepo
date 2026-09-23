@@ -12,32 +12,29 @@ import {
 } from 'react-aria-components';
 
 import {
+  type Classe,
   computeScore,
   exportCsv,
   type Fiche,
-  fcfa,
   frDate,
   SECTOR_LABELS,
   today,
-  budgetConseille,
-  type Classe,
 } from './bant';
-import { optionLabel, selText } from './fields';
+import { selText } from './fields';
+import { Pilotage } from './Pilotage';
 import { fiches } from './store';
-import { Button, buttonClass, Card, ClassStamp } from './ui';
+import { Button, buttonClass, ClassStamp } from './ui';
 
 const LIMITE_LISTE = 100;
-const ETAPES_ORDRE = [
-  'nouveau',
-  'contacte',
-  'rdv',
-  'visite',
-  'proposition',
-  'negociation',
-  'reservation',
-  'perdu',
-];
 type Filtre = 'tous' | Classe | 'retard';
+const FILTRE_LABELS: Record<Filtre, string> = {
+  tous: 'Toutes',
+  A: 'Classe A',
+  B: 'Classe B',
+  C: 'Classe C',
+  D: 'Classe D',
+  retard: 'Relances en retard',
+};
 
 const actif = (f: Fiche) => !['perdu', 'reservation'].includes(f.values.etape ?? '');
 const enRetard = (f: Fiche) => actif(f) && (f.values['date-relance'] ?? '9999') < today();
@@ -115,7 +112,7 @@ export function Radar() {
               className={`focus-ring flex min-h-10 shrink-0 cursor-pointer items-center gap-2 rounded-full border px-3.5 text-sm font-semibold transition data-[selected]:border-ink data-[selected]:bg-ink data-[selected]:text-white ${k === 'retard' && counts.retard ? 'border-ko/30 text-ko' : 'border-line text-muted'}`}
             >
               {k === 'retard' && <AlarmClock size={15} />}
-              {k === 'tous' ? 'Toutes' : k === 'retard' ? 'Relances en retard' : `Classe ${k}`}
+              {FILTRE_LABELS[k]}
               <span className="tabular-nums opacity-70">{counts[k]}</span>
             </ToggleButton>
           ))}
@@ -169,14 +166,13 @@ export function Radar() {
 
 function Row({ f, classe, total }: { f: Fiche; classe: Classe; total: number }) {
   const name = f.values['prospect-name'] || f.values.company || 'Sans nom';
-  const relance = f.values['date-relance'];
   const late = enRetard(f);
   return (
     <GridListItem
       id={f.id}
       href={`/fiche/${f.id}`}
       textValue={name}
-      className={`focus-ring grid cursor-pointer grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 px-4 py-3.5 outline-none transition data-[hovered]:bg-brand-soft/40 md:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.4fr)_8rem] ${late ? 'bg-ko-soft/40' : ''}`}
+      className={`focus-ring grid cursor-pointer grid-cols-[auto_1fr] items-center gap-x-4 gap-y-1 px-4 py-3.5 outline-none transition data-[hovered]:bg-brand-soft/40 md:grid-cols-[auto_minmax(0,2fr)_minmax(0,1.2fr)_minmax(0,1.4fr)_11rem] ${late ? 'bg-ko-soft/40' : ''}`}
     >
       <ClassStamp classe={classe} size="sm" />
       <div className="min-w-0">
@@ -192,13 +188,7 @@ function Row({ f, classe, total }: { f: Fiche; classe: Classe; total: number }) 
         {SECTOR_LABELS[f.sector]}
         {f.residence === 'diaspora' && <Plane size={14} aria-label="Diaspora" />}
       </p>
-      <p
-        className={`col-start-2 flex items-center gap-1.5 text-sm md:col-start-auto ${late ? 'font-semibold text-ko' : ''}`}
-      >
-        {late && <AlarmClock size={14} aria-label="En retard" />}
-        {selText(f, 'prochaine-action') || 'Pas d’action prévue'}
-        {relance && <span className={late ? '' : 'text-muted'}>· {frDate(relance)}</span>}
-      </p>
+      <Relance f={f} late={late} />
       <p className="col-start-2 text-sm text-muted md:col-start-auto md:text-right">
         <span className="font-display font-bold text-ink tabular-nums">{total}</span>/100 ·{' '}
         {f.values.commercial || 'Non attribuée'}
@@ -207,139 +197,15 @@ function Row({ f, classe, total }: { f: Fiche; classe: Classe; total: number }) 
   );
 }
 
-function group(list: Fiche[], key: (f: Fiche) => string) {
-  const out = new Map<string, Fiche[]>();
-  for (const f of list) {
-    const k = key(f);
-    if (k) out.set(k, [...(out.get(k) ?? []), f]);
-  }
-  return [...out].sort((a, b) => b[1].length - a[1].length);
-}
-
-function Pilotage({ list }: { list: Fiche[] }) {
-  if (!list.length) return null;
-  const vivants = list.filter((f) => f.values.etape !== 'perdu');
-  const parLocalite = group(vivants, (f) => f.values['localite-souhaitee'] ?? '').map(
-    ([loc, fs]) => {
-      const budgets = fs
-        .map((f) => budgetConseille(f)?.max || Number(f.values['prix-lot'] ?? 0))
-        .filter((x) => x > 0);
-      return [
-        loc,
-        fs.length,
-        fs.filter((f) => ['A', 'B'].includes(computeScore(f).classe)).length,
-        budgets.length ? fcfa(budgets.reduce((a, b) => a + b, 0) / budgets.length) : '-',
-        group(fs, (f) => f.values.superficie ?? '')[0]?.[0] ?? '-',
-      ];
-    },
-  );
-  const parEtape = new Map(group(list, (f) => f.values.etape ?? ''));
-  const etapes = ETAPES_ORDRE.filter((e) => parEtape.has(e)).map((e) => [
-    optionLabel('etape', e),
-    parEtape.get(e)?.length ?? 0,
-  ]);
-  const canaux = group(list, (f) => selText(f, 'canal')).map(([c, fs]) => {
-    const res = fs.filter((f) => f.values.etape === 'reservation').length;
-    return [c, fs.length, res, `${Math.round((res / fs.length) * 100)} %`];
-  });
-  const pertes = group(
-    list.filter((f) => f.values.etape === 'perdu'),
-    (f) => selText(f, 'motif-perte') || 'Non renseigné',
-  ).map(([m, fs]) => [m, fs.length]);
+function Relance({ f, late }: { f: Fiche; late: boolean }) {
+  const relance = f.values['date-relance'];
   return (
-    <section aria-labelledby="pilotage" className="space-y-3 pt-4">
-      <h2 id="pilotage" className="font-display text-2xl font-bold">
-        Pilotage
-      </h2>
-      <div className="grid gap-4 md:grid-cols-2">
-        <MiniTable
-          title="Demande par localité"
-          head={['Localité', 'Prospects', 'dont A/B', 'Budget moyen', 'Superficie']}
-          rows={parLocalite}
-          empty="Renseigner la localité souhaitée."
-          className="md:col-span-2"
-        />
-        <MiniTable
-          title="Pipeline par étape"
-          head={['Étape', 'Fiches']}
-          rows={etapes}
-          empty="Aucune étape renseignée."
-          bar
-        />
-        <MiniTable
-          title="Conversion par canal"
-          head={['Canal', 'Fiches', 'Réservations', 'Taux']}
-          rows={canaux}
-          empty="Renseigner le canal."
-        />
-        <MiniTable
-          title="Motifs de perte"
-          head={['Motif', 'Fiches']}
-          rows={pertes}
-          empty="Aucun prospect perdu."
-          bar
-        />
-      </div>
-    </section>
-  );
-}
-
-function MiniTable({
-  title,
-  head,
-  rows,
-  empty,
-  bar,
-  className = '',
-}: {
-  title: string;
-  head: string[];
-  rows: (string | number)[][];
-  empty: string;
-  bar?: boolean;
-  className?: string;
-}) {
-  const max = Math.max(1, ...rows.map((r) => Number(r[1])));
-  return (
-    <Card title={title} className={className}>
-      {rows.length === 0 ? (
-        <p className="text-sm text-muted">{empty}</p>
-      ) : (
-        <div className="-mx-1 overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs text-muted">
-                {head.map((h) => (
-                  <th key={h} className="px-1 pb-2 font-semibold">
-                    {h}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-line">
-              {rows.map((r) => (
-                <tr key={String(r[0])}>
-                  {r.map((c, i) => (
-                    <td key={i} className={`px-1 py-2 ${i > 0 ? 'tabular-nums' : ''}`}>
-                      {bar && i === 1 ? (
-                        <span className="flex items-center gap-2">
-                          <span
-                            className="h-1.5 rounded-full bg-brand"
-                            style={{ width: `${(Number(c) / max) * 6}rem` }}
-                          />
-                          {c}
-                        </span>
-                      ) : (
-                        c
-                      )}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </Card>
+    <p
+      className={`col-start-2 flex items-center gap-1.5 text-sm md:col-start-auto ${late ? 'font-semibold text-ko' : ''}`}
+    >
+      {late && <AlarmClock size={14} aria-label="En retard" />}
+      {selText(f, 'prochaine-action') || 'Pas d’action prévue'}
+      {relance && <span className={late ? '' : 'text-muted'}>· {frDate(relance)}</span>}
+    </p>
   );
 }

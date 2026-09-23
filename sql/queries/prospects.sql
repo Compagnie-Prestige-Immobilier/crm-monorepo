@@ -12,6 +12,7 @@ SELECT
   ec."fullName" AS enrollment_captured_by_name,
   rv."fullName" AS revue_by_name,
   lc."fullName" AS last_call_by_name,
+  sq.label AS statut_qualification,
   cp.label AS canal_label,
   pf.label AS profession_label,
   pf."isTeaching" AS profession_is_teaching,
@@ -35,6 +36,7 @@ LEFT JOIN "departements" d ON d."id" = r."departementId"
 LEFT JOIN "users" ec ON ec."id" = p."enrollmentCapturedById"
 LEFT JOIN "users" rv ON rv."id" = p."revueById"
 LEFT JOIN "users" lc ON lc."id" = p."lastCallById"
+LEFT JOIN "call_outcome_reasons" sq ON sq."id" = p."lastReasonId"
 LEFT JOIN "canaux_provenance" cp ON cp."id" = p."canalProvenanceId"
 LEFT JOIN "professions" pf ON pf."id" = p."professionId"
 LEFT JOIN "income_bands" ib ON ib."id" = p."incomeBandId"
@@ -575,10 +577,17 @@ SELECT "key", "value" FROM "app_settings" WHERE "key" = ANY(sqlc.arg('keys')::te
 -- Tout ce que le journal sait d'une fiche : ses propres lignes, et celles des
 -- campagnes et rappels qui la nomment. « CPI GO » signe ce qu'une migration a fait.
 -- name: JournalDeLaFiche :many
-SELECT a."id", a."action", a."entity", a."before", a."after", a."at",
+-- Le journal nomme le téléconseiller au lieu de son identifiant.
+SELECT a."id", a."action", a."entity",
+       (a."before" - 'teleconseillerId')::jsonb AS "before",
+       CASE WHEN a."after" ? 'teleconseillerId'
+         THEN (a."after" - 'teleconseillerId') || jsonb_build_object('teleconseiller', COALESCE(t."fullName", 'inconnu'))
+         ELSE a."after" END::jsonb AS "after",
+       a."at",
        COALESCE(u."fullName", 'CPI GO')::text AS auteur
 FROM "audit_logs" a
 LEFT JOIN "users" u ON u."id" = a."userId"
+LEFT JOIN "users" t ON t."id" = a."after"->>'teleconseillerId'
 WHERE (a."entity" = 'prospect' AND a."entityId" = @prospect_id::text)
    OR (a."entity" IN ('lot_export', 'scheduled_callback') AND a."after"->>'prospectId' = @prospect_id::text)
 ORDER BY a."at" DESC, a."id" DESC

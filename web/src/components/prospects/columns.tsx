@@ -137,11 +137,15 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
       accessorKey: 'lastReasonLabel',
       header: 'Dernier appel',
       cell: ({ row }) => {
-        const { lastReasonLabel, lastComment, lastAttemptAt } = row.original;
+        const { lastReasonLabel, statutQualification, lastCallByName, lastComment, lastAttemptAt } =
+          row.original;
         if (lastReasonLabel === null) return <Empty />;
         return (
           <div className="min-w-0 max-w-[16rem]">
-            <p className="truncate font-[600]">{lastReasonLabel}</p>
+            {lastReasonLabel === statutQualification ? null : (
+              <p className="truncate font-[600]">{lastReasonLabel}</p>
+            )}
+            {lastCallByName !== null ? <p className="truncate">{lastCallByName}</p> : null}
             {lastComment !== null && lastComment !== '' ? (
               <p className="truncate text-[0.75rem] text-muted-foreground" title={lastComment}>
                 {lastComment}
@@ -162,7 +166,7 @@ export function prospectColumns(actions: ProspectRowActions): ColumnDef<Prospect
     {
       id: 'enrollmentCapturedBy',
       accessorKey: 'enrollmentCapturedByName',
-      header: 'Obtenu par',
+      header: 'Méthode obtenue par',
       cell: ({ row }) => {
         const { enrollmentCapturedByName, enrollmentCapturedAt } = row.original;
         if (enrollmentCapturedByName === null) return <Empty />;

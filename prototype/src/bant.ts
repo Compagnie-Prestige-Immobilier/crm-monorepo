@@ -84,8 +84,8 @@ export const VERDICT_LABELS: Record<Verdict, string> = {
   ko: 'Insuffisante',
 };
 
-type Grid = Record<Crit, string[]>;
-const GRIDS: Record<'common' | 'informal' | 'diaspora' | 'formal' | 'collective', Grid> = {
+type GridKey = 'common' | 'informal' | 'diaspora' | 'formal' | 'collective';
+const GRIDS: Record<GridKey, Record<Crit, string[]>> = {
   common: {
     budget: [
       "A l'acompte 50% + peut payer 24 mois",
@@ -237,6 +237,32 @@ const GRIDS: Record<'common' | 'informal' | 'diaspora' | 'formal' | 'collective'
     ],
   },
 };
+const CRIT_NAMES: Record<Crit, string> = {
+  budget: 'Budget',
+  authority: 'Autorité',
+  need: 'Besoin',
+  timeline: 'Calendrier',
+};
+const CRIT_DESC: Record<Crit, string> = {
+  budget: 'Capacité financière',
+  authority: 'Qui décide',
+  need: 'Urgence du besoin',
+  timeline: 'Quand décider',
+};
+const CRIT_DESC_BY_GRID: Record<GridKey, Partial<Record<Crit, string>>> = {
+  common: {},
+  informal: {},
+  diaspora: {
+    budget: "Capacité financière depuis l'étranger",
+    authority: 'Qui décide, qui agit sur place',
+    timeline: 'Lié à son prochain séjour',
+  },
+  formal: {
+    budget: 'Engagement financier de la structure',
+    authority: "Pouvoir de décision de l'interlocuteur",
+  },
+  collective: { authority: 'Consensus du groupe' },
+};
 
 export const MOTIVATIONS = [
   {
@@ -302,8 +328,10 @@ const n = (f: Fiche, id: string) => {
   const x = parseFloat(v(f, id));
   return Number.isNaN(x) ? 0 : x;
 };
-export const fcfa = (x: number) =>
-  `${Math.round(x).toLocaleString('fr-FR').replace(/ | /g, ' ')} FCFA`;
+const is = (f: Fiche, id: string, ...values: string[]) => values.includes(v(f, id));
+const isText = (x: unknown): x is string => typeof x === 'string' && x !== '';
+const grouped = (x: number) => Math.round(x).toLocaleString('fr-FR').replace(/ | /g, ' ');
+export const fcfa = (x: number) => `${grouped(x)} FCFA`;
 export const today = () => new Date().toISOString().slice(0, 10);
 export const frDate = (d: string) => (d ? d.slice(0, 10).split('-').reverse().join('/') : '');
 
@@ -322,61 +350,103 @@ export function blankFiche(): Fiche {
   };
 }
 
-function gridKey(f: Fiche): keyof typeof GRIDS {
+function gridKey(f: Fiche): GridKey {
   if (f.sector === 'collective' || f.sector === 'formal') return f.sector;
   if (f.residence === 'diaspora') return 'diaspora';
-  return f.sector === 'informal' ? 'informal' : 'common';
+  if (f.sector === 'informal') return 'informal';
+  return 'common';
 }
 
 export function criteria(f: Fiche) {
   const k = gridKey(f);
-  const desc: Record<Crit, string> = {
-    budget:
-      k === 'formal'
-        ? 'Engagement financier de la structure'
-        : k === 'diaspora'
-          ? "Capacité financière depuis l'étranger"
-          : 'Capacité financière',
-    authority:
-      k === 'collective'
-        ? 'Consensus du groupe'
-        : k === 'formal'
-          ? "Pouvoir de décision de l'interlocuteur"
-          : k === 'diaspora'
-            ? 'Qui décide, qui agit sur place'
-            : 'Qui décide',
-    need: 'Urgence du besoin',
-    timeline: k === 'diaspora' ? 'Lié à son prochain séjour' : 'Quand décider',
-  };
-  const names: Record<Crit, string> = {
-    budget: 'Budget',
-    authority: 'Autorité',
-    need: 'Besoin',
-    timeline: 'Calendrier',
-  };
   return (['budget', 'authority', 'need', 'timeline'] as const).map((key) => ({
     key,
-    name: names[key],
+    name: CRIT_NAMES[key],
     max: CONFIG.POIDS[key],
-    desc: desc[key],
+    desc: CRIT_DESC_BY_GRID[k][key] ?? CRIT_DESC[key],
     options: GRIDS[k][key].map((label, i) => ({ value: 5 - i, label })),
   }));
 }
 
-const tauxDevise = (f: Fiche) => {
-  const d = v(f, 'devise') || 'XOF';
-  if (d === 'XOF') return 1;
-  if (d === 'EUR') return CONFIG.EUR;
+function tauxDevise(f: Fiche) {
+  const devise = v(f, 'devise') || 'XOF';
+  if (devise === 'XOF') return 1;
+  if (devise === 'EUR') return CONFIG.EUR;
   return n(f, 'taux-change') || NaN;
-};
+}
 const personnesACharge = (f: Fiche) =>
   ({ '0': 0, '1-2': 2, '3-5': 4, '6+': 6 })[v(f, 'charges')] ?? 0;
 const resteMin = (f: Fiche) => CONFIG.RESTE_BASE + CONFIG.RESTE_PAR_PERSONNE * personnesACharge(f);
-const hasPret = (f: Fiche) => ['accord', 'en-cours', 'envisage'].includes(v(f, 'financement'));
+const hasPret = (f: Fiche) => is(f, 'financement', 'accord', 'en-cours', 'envisage');
+const RANK: Record<Verdict, number> = { ok: 0, limite: 1, ko: 2 };
+
+function palier(taux: number, ok: number, limite: number): Verdict {
+  if (taux <= ok) return 'ok';
+  return taux <= limite ? 'limite' : 'ko';
+}
+
+function palierReste(reste: number, min: number): Verdict {
+  if (reste >= min * 1.3) return 'ok';
+  return reste >= min ? 'limite' : 'ko';
+}
+
+function pretBancaire(f: Fiche) {
+  if (!hasPret(f) || n(f, 'pret-montant') <= 0 || n(f, 'pret-duree') <= 0)
+    return { pret: 0, mensuBanque: 0 };
+  const pret = n(f, 'pret-montant'),
+    months = n(f, 'pret-duree') * 12,
+    r = n(f, 'pret-taux') / 100 / 12;
+  return { pret, mensuBanque: r > 0 ? (pret * r) / (1 - Math.pow(1 + r, -months)) : pret / months };
+}
+
+function echeancier(f: Fiche, prix: number, apport: number, pret: number) {
+  if (!prix) return { acompte: 0, mensuCPI: 0, ecartApport: null as number | null };
+  const acompte = prix * CONFIG.ACOMPTE,
+    entree = apport + pret;
+  const ecartApport = v(f, 'apport') !== '' || pret ? entree - acompte : null;
+  return {
+    acompte,
+    ecartApport,
+    mensuCPI: Math.max(0, prix - Math.max(entree, acompte)) / CONFIG.DUREE_CPI_MOIS,
+  };
+}
+
+function endettement(credits: number, mensuTotal: number, revenu: number) {
+  const tauxAvant = credits / revenu;
+  if (mensuTotal > 0) {
+    const tauxApres = (credits + mensuTotal) / revenu;
+    const verdict = palier(tauxApres, CONFIG.ENDETTEMENT_OK, CONFIG.ENDETTEMENT_LIMITE);
+    return {
+      tauxAvant,
+      tauxApres,
+      verdict,
+      raison: verdict === 'ok' ? '' : `endettement de ${Math.round(tauxApres * 100)} %`,
+    };
+  }
+  const verdict = palier(tauxAvant, 0.2, CONFIG.ENDETTEMENT_OK);
+  return {
+    tauxAvant,
+    tauxApres: null,
+    verdict,
+    raison: verdict === 'ok' ? '' : `endettement actuel de ${Math.round(tauxAvant * 100)} %`,
+  };
+}
+
+function resteAVivre(f: Fiche, reste: number) {
+  if (f.residence === 'diaspora') return { resteMin: null, verdict: 'ok' as Verdict, raison: '' };
+  const min = resteMin(f);
+  const verdict = palierReste(reste, min);
+  return {
+    resteMin: min,
+    verdict,
+    raison:
+      verdict === 'ok' ? '' : `reste à vivre de ${fcfa(reste)} (minimum conseillé ${fcfa(min)})`,
+  };
+}
 
 export type Capacite = ReturnType<typeof capacite>;
 export function capacite(f: Fiche) {
-  const res = {
+  const empty = {
     applicable: f.sector !== 'formal',
     tauxManquant: false,
     revenu: 0,
@@ -398,59 +468,35 @@ export function capacite(f: Fiche) {
     raisons: [] as string[],
     ecartApport: null as number | null,
   };
-  if (!res.applicable) return res;
+  if (!empty.applicable) return empty;
   const rate = tauxDevise(f);
-  if (Number.isNaN(rate)) return { ...res, tauxManquant: true };
-  res.revenu = n(f, 'revenu') * rate;
-  res.credits = v(f, 'credit-en-cours') === 'oui' ? n(f, 'mensualites') * rate : 0;
-  res.loyer = v(f, 'logement') === 'locataire' ? n(f, 'loyer') * rate : 0;
-  res.transferts = n(f, 'transferts') * rate;
-  if (hasPret(f) && n(f, 'pret-montant') > 0 && n(f, 'pret-duree') > 0) {
-    res.pret = n(f, 'pret-montant');
-    const months = n(f, 'pret-duree') * 12,
-      r = n(f, 'pret-taux') / 100 / 12;
-    res.mensuBanque = r > 0 ? (res.pret * r) / (1 - Math.pow(1 + r, -months)) : res.pret / months;
-  }
-  if (res.prix) {
-    res.acompte = res.prix * CONFIG.ACOMPTE;
-    const entree = res.apport + res.pret;
-    if (v(f, 'apport') !== '' || res.pret) res.ecartApport = entree - res.acompte;
-    res.mensuCPI = Math.max(0, res.prix - Math.max(entree, res.acompte)) / CONFIG.DUREE_CPI_MOIS;
-  }
-  res.mensuTotal = res.mensuCPI + res.mensuBanque;
-  if (res.revenu > 0) {
-    const rank = { ok: 0, limite: 1, ko: 2 };
-    res.tauxAvant = res.credits / res.revenu;
-    let verdict: Verdict;
-    if (res.mensuTotal > 0) {
-      res.tauxApres = (res.credits + res.mensuTotal) / res.revenu;
-      verdict =
-        res.tauxApres <= CONFIG.ENDETTEMENT_OK
-          ? 'ok'
-          : res.tauxApres <= CONFIG.ENDETTEMENT_LIMITE
-            ? 'limite'
-            : 'ko';
-      if (verdict !== 'ok') res.raisons.push(`endettement de ${Math.round(res.tauxApres * 100)} %`);
-    } else {
-      verdict =
-        res.tauxAvant <= 0.2 ? 'ok' : res.tauxAvant <= CONFIG.ENDETTEMENT_OK ? 'limite' : 'ko';
-      if (verdict !== 'ok')
-        res.raisons.push(`endettement actuel de ${Math.round(res.tauxAvant * 100)} %`);
-    }
-    res.reste = res.revenu - res.credits - res.loyer - res.transferts - res.mensuTotal;
-    if (f.residence !== 'diaspora') {
-      res.resteMin = resteMin(f);
-      const rv: Verdict =
-        res.reste >= res.resteMin * 1.3 ? 'ok' : res.reste >= res.resteMin ? 'limite' : 'ko';
-      if (rv !== 'ok')
-        res.raisons.push(
-          `reste à vivre de ${fcfa(res.reste)} (minimum conseillé ${fcfa(res.resteMin)})`,
-        );
-      if (rank[rv] > rank[verdict]) verdict = rv;
-    }
-    res.verdict = verdict;
-  }
-  return res;
+  if (Number.isNaN(rate)) return { ...empty, tauxManquant: true };
+  const pret = pretBancaire(f);
+  const plan = echeancier(f, empty.prix, empty.apport, pret.pret);
+  const res = {
+    ...empty,
+    ...pret,
+    ...plan,
+    revenu: n(f, 'revenu') * rate,
+    credits: is(f, 'credit-en-cours', 'oui') ? n(f, 'mensualites') * rate : 0,
+    loyer: is(f, 'logement', 'locataire') ? n(f, 'loyer') * rate : 0,
+    transferts: n(f, 'transferts') * rate,
+    mensuTotal: plan.mensuCPI + pret.mensuBanque,
+  };
+  if (res.revenu <= 0) return res;
+  const dette = endettement(res.credits, res.mensuTotal, res.revenu);
+  const reste = res.revenu - res.credits - res.loyer - res.transferts - res.mensuTotal;
+  const vie = resteAVivre(f, reste);
+  const verdict = RANK[vie.verdict] > RANK[dette.verdict] ? vie.verdict : dette.verdict;
+  return {
+    ...res,
+    tauxAvant: dette.tauxAvant,
+    tauxApres: dette.tauxApres,
+    reste,
+    resteMin: vie.resteMin,
+    verdict,
+    raisons: [dette.raison, vie.raison].filter(isText),
+  };
 }
 
 export function budgetConseille(
@@ -477,28 +523,64 @@ export function budgetConseille(
   return { max: Math.floor(max / 250000) * 250000, limite: capRev <= capApp ? 'revenu' : 'apport' };
 }
 
+const ENGAGEMENT_ETAPE: Record<string, number> = {
+  contacte: 2,
+  rdv: 5,
+  visite: 8,
+  proposition: 10,
+  negociation: 13,
+  reservation: 15,
+};
+const ENGAGEMENT_SITE: Record<string, number> = { 'oui-plusieurs': 8, 'oui-un': 6 };
+const ENGAGEMENT_AGENCE: Record<string, number> = { 'oui-plusieurs': 5, 'oui-une-fois': 3 };
+const ENGAGEMENT_TERRAIN: Record<string, number> = { personne: 8, video: 6, proche: 3 };
+
 function engagementPts(f: Fiche) {
-  const etapes: Record<string, number> = {
-    contacte: 2,
-    rdv: 5,
-    visite: 8,
-    proposition: 10,
-    negociation: 13,
-    reservation: 15,
-  };
-  const site: Record<string, number> = { 'oui-plusieurs': 8, 'oui-un': 6 };
-  const agence: Record<string, number> = { 'oui-plusieurs': 5, 'oui-une-fois': 3 };
-  const terrain: Record<string, number> = { personne: 8, video: 6, proche: 3 };
-  return Math.min(
-    CONFIG.POIDS.engagement,
-    Math.max(
-      etapes[v(f, 'etape')] ?? 0,
-      site[v(f, 'visite-site')] ?? 0,
-      agence[v(f, 'visite-cpi')] ?? 0,
-      f.residence === 'diaspora' ? (terrain[v(f, 'vu-terrain')] ?? 0) : 0,
-      v(f, 'deja-client') === 'oui' ? 8 : 0,
-    ),
+  const terrain = f.residence === 'diaspora' ? (ENGAGEMENT_TERRAIN[v(f, 'vu-terrain')] ?? 0) : 0;
+  const client = is(f, 'deja-client', 'oui') ? 8 : 0;
+  const best = Math.max(
+    ENGAGEMENT_ETAPE[v(f, 'etape')] ?? 0,
+    ENGAGEMENT_SITE[v(f, 'visite-site')] ?? 0,
+    ENGAGEMENT_AGENCE[v(f, 'visite-cpi')] ?? 0,
+    terrain,
+    client,
   );
+  return Math.min(CONFIG.POIDS.engagement, best);
+}
+
+function capBudget(points: number, verdict: Verdict | null) {
+  if (verdict === 'ko' && points > 12)
+    return { points: 12, cap: 'Budget plafonné : capacité de paiement insuffisante' };
+  if (verdict === 'limite' && points > 24)
+    return { points: 24, cap: 'Budget plafonné : capacité de paiement limite' };
+  return { points, cap: '' };
+}
+
+function classeOf(total: number): Classe {
+  const S = CONFIG.SEUILS_CLASSES;
+  if (total >= S.A) return 'A';
+  if (total >= S.B) return 'B';
+  return total >= S.C ? 'C' : 'D';
+}
+
+function reglesEliminatoires(f: Fiche, verdict: Verdict | null) {
+  const caps: string[] = [];
+  let plafond: Classe = 'A';
+  if (f.scores.budget === 1 || verdict === 'ko') {
+    plafond = 'C';
+    caps.push(
+      `Règle éliminatoire : ${f.scores.budget === 1 ? 'budget noté 1' : 'capacité insuffisante'}, classe C au mieux`,
+    );
+  }
+  if (f.scores.authority === 1) {
+    plafond = 'C';
+    caps.push('Règle éliminatoire : autorité notée 1, classe C au mieux');
+  }
+  if (is(f, 'etape', 'perdu')) {
+    plafond = 'D';
+    caps.push(`Prospect perdu${v(f, 'motif-perte') ? ` : ${selText(f, 'motif-perte')}` : ''}`);
+  }
+  return { plafond, caps };
 }
 
 export type Score = ReturnType<typeof computeScore>;
@@ -506,41 +588,17 @@ export function computeScore(f: Fiche) {
   const P = CONFIG.POIDS,
     cap = capacite(f),
     s = f.scores;
+  const budget = capBudget((s.budget * P.budget) / 5, cap.verdict);
   const pts = {
-    budget: (s.budget * P.budget) / 5,
+    budget: budget.points,
     authority: (s.authority * P.authority) / 5,
     need: (s.need * P.need) / 5,
     timeline: (s.timeline * P.timeline) / 5,
     engagement: engagementPts(f),
   };
-  const caps: string[] = [];
-  if (cap.verdict === 'ko' && pts.budget > 12) {
-    pts.budget = 12;
-    caps.push('Budget plafonné : capacité de paiement insuffisante');
-  } else if (cap.verdict === 'limite' && pts.budget > 24) {
-    pts.budget = 24;
-    caps.push('Budget plafonné : capacité de paiement limite');
-  }
   const total = Math.round(Object.values(pts).reduce((a, b) => a + b, 0));
-  const S = CONFIG.SEUILS_CLASSES;
-  let classe: Classe = total >= S.A ? 'A' : total >= S.B ? 'B' : total >= S.C ? 'C' : 'D';
-  const atBest = (c: Classe) => {
-    if (classe < c) classe = c;
-  };
-  if (s.budget === 1 || cap.verdict === 'ko') {
-    atBest('C');
-    caps.push(
-      `Règle éliminatoire : ${s.budget === 1 ? 'budget noté 1' : 'capacité insuffisante'}, classe C au mieux`,
-    );
-  }
-  if (s.authority === 1) {
-    atBest('C');
-    caps.push('Règle éliminatoire : autorité notée 1, classe C au mieux');
-  }
-  if (v(f, 'etape') === 'perdu') {
-    classe = 'D';
-    caps.push(`Prospect perdu${v(f, 'motif-perte') ? ` : ${selText(f, 'motif-perte')}` : ''}`);
-  }
+  const regles = reglesEliminatoires(f, cap.verdict);
+  const classe = [classeOf(total), regles.plafond].toSorted().at(-1) as Classe;
   const manquants = (['budget', 'authority', 'need', 'timeline'] as const).filter(
     (k) => !s[k],
   ).length;
@@ -548,13 +606,19 @@ export function computeScore(f: Fiche) {
     pts,
     total,
     classe,
-    caps,
+    caps: [budget.cap, ...regles.caps].filter(isText),
     manquants,
     incoherent: cap.verdict === 'ko' && s.budget >= 4,
     cap,
   };
 }
 
+const BUDGET_CONSEIL: Record<Verdict, string> = { ok: '4 ou 5', limite: '3', ko: '1 ou 2' };
+const CAPACITE_TEXTE: Record<Verdict, string> = {
+  ok: 'capacité confirmée',
+  limite: 'capacité limite',
+  ko: 'capacité insuffisante',
+};
 export function budgetHint(f: Fiche, c: Capacite) {
   if (!c.verdict)
     return f.sector === 'formal'
@@ -563,68 +627,88 @@ export function budgetHint(f: Fiche, c: Capacite) {
           warn: false,
           text: 'Renseigner revenus et prix du lot (Découverte) pour guider la note.',
         };
-  const conseil = { ok: '4 ou 5', limite: '3', ko: '1 ou 2' }[c.verdict];
-  const txt = { ok: 'capacité confirmée', limite: 'capacité limite', ko: 'capacité insuffisante' }[
-    c.verdict
-  ];
   const warn =
     (c.verdict === 'ko' && f.scores.budget >= 3) ||
     (c.verdict === 'limite' && f.scores.budget >= 5);
   return {
     warn,
-    text: `Simulation : ${txt}, note conseillée ${conseil}${warn ? '. La note choisie est incohérente avec la simulation.' : ''}`,
+    text: `Simulation : ${CAPACITE_TEXTE[c.verdict]}, note conseillée ${BUDGET_CONSEIL[c.verdict]}${warn ? '. La note choisie est incohérente avec la simulation.' : ''}`,
   };
 }
 
 export type Niveau = 'forte' | 'moyenne' | 'faible' | 'na';
 export type Check = { state: 'ok' | 'partial' | 'ko' | 'info'; text: string };
+type Critere = { ok: boolean; partial: boolean; text: string } | null;
+
+function critereLocalite(f: Fiche): Critere {
+  const souhait = v(f, 'localite-souhaitee'),
+    lot = v(f, 'lot-localite');
+  if (!souhait || !lot) return null;
+  return {
+    ok: souhait === 'Indifférent' || souhait === lot,
+    partial: false,
+    text: `Localité : souhaitée ${souhait}, lot à ${lot}`,
+  };
+}
+function critereSuperficie(f: Fiche): Critere {
+  const souhait = v(f, 'superficie'),
+    lot = v(f, 'lot-superficie');
+  if (!souhait || !lot) return null;
+  const i = CONFIG.SUPERFICIES.indexOf(souhait as never),
+    j = CONFIG.SUPERFICIES.indexOf(lot as never);
+  return {
+    ok: i === j,
+    partial: Math.abs(i - j) === 1,
+    text: `Superficie : souhaitée ${souhait}, lot de ${lot}`,
+  };
+}
+function criterePapiers(f: Fiche): Critere {
+  const exigence = v(f, 'exigence-papiers'),
+    nature = v(f, 'nature-foncier');
+  if (!exigence || !nature) return null;
+  const ok =
+    exigence === 'indifferent' ||
+    (exigence === 'tf' && nature === 'titre-foncier') ||
+    (exigence === 'bail' && nature !== 'notification-bail');
+  return {
+    ok,
+    partial: exigence === 'bail' && nature === 'notification-bail',
+    text: `Papiers : ${selText(f, 'exigence-papiers').toLowerCase()}, lot en ${selText(f, 'nature-foncier').toLowerCase()}`,
+  };
+}
+function critereBudget(f: Fiche, c: Capacite): Critere {
+  const bud = budgetConseille(f, c),
+    prix = n(f, 'prix-lot');
+  if (!bud || !prix) return null;
+  return {
+    ok: prix <= bud.max,
+    partial: prix <= bud.max * 1.1,
+    text: `Budget : lot à ${fcfa(prix)}, budget conseillé ${fcfa(bud.max)}`,
+  };
+}
+const checkState = (x: NonNullable<Critere>): Check['state'] => {
+  if (x.ok) return 'ok';
+  return x.partial ? 'partial' : 'ko';
+};
+function niveauOf(ratio: number): Niveau {
+  if (ratio >= 0.8) return 'forte';
+  return ratio >= 0.5 ? 'moyenne' : 'faible';
+}
+
 export function adequation(
   f: Fiche,
   c = capacite(f),
 ): { niveau: Niveau; label: string; items: Check[] } {
-  const items: Check[] = [];
-  let score = 0,
-    count = 0;
-  const add = (ok: boolean, partial: boolean, text: string) => {
-    count++;
-    score += ok ? 1 : partial ? 0.5 : 0;
-    items.push({ state: ok ? 'ok' : partial ? 'partial' : 'ko', text });
-  };
-  const ls = v(f, 'localite-souhaitee'),
-    ll = v(f, 'lot-localite');
-  if (ls && ll)
-    add(ls === 'Indifférent' || ls === ll, false, `Localité : souhaitée ${ls}, lot à ${ll}`);
-  const ss = v(f, 'superficie'),
-    sl = v(f, 'lot-superficie');
-  if (ss && sl) {
-    const i = CONFIG.SUPERFICIES.indexOf(ss as never),
-      j = CONFIG.SUPERFICIES.indexOf(sl as never);
-    add(i === j, Math.abs(i - j) === 1, `Superficie : souhaitée ${ss}, lot de ${sl}`);
-  }
-  const ex = v(f, 'exigence-papiers'),
-    nat = v(f, 'nature-foncier');
-  if (ex && nat) {
-    const ok =
-      ex === 'indifferent' ||
-      (ex === 'tf' && nat === 'titre-foncier') ||
-      (ex === 'bail' && nat !== 'notification-bail');
-    add(
-      ok,
-      ex === 'bail' && nat === 'notification-bail',
-      `Papiers : ${selText(f, 'exigence-papiers').toLowerCase()}, lot en ${selText(f, 'nature-foncier').toLowerCase()}`,
-    );
-  }
-  const bud = budgetConseille(f, c),
-    prix = n(f, 'prix-lot');
-  if (bud && prix)
-    add(
-      prix <= bud.max,
-      prix <= bud.max * 1.1,
-      `Budget : lot à ${fcfa(prix)}, budget conseillé ${fcfa(bud.max)}`,
-    );
+  const criteres = [
+    critereLocalite(f),
+    critereSuperficie(f),
+    criterePapiers(f),
+    critereBudget(f, c),
+  ].filter((x) => x !== null);
+  const items: Check[] = criteres.map((x) => ({ state: checkState(x), text: x.text }));
   if (v(f, 'etat-site'))
     items.push({ state: 'info', text: `État du site : ${selText(f, 'etat-site')}` });
-  if (!count)
+  if (!criteres.length)
     return {
       niveau: 'na',
       label: 'À évaluer',
@@ -637,36 +721,36 @@ export function adequation(
             },
           ],
     };
-  const r = score / count;
-  const niveau = r >= 0.8 ? 'forte' : r >= 0.5 ? 'moyenne' : 'faible';
+  const score = criteres.reduce((sum, x) => sum + (x.ok ? 1 : Number(x.partial) / 2), 0);
+  const niveau = niveauOf(score / criteres.length);
   return { niveau, label: `Adéquation ${niveau}`, items };
 }
 
 export function simulationRows(f: Fiche, c: Capacite): [string, string][] {
-  const rows: [string, string][] = [];
-  if (c.revenu) rows.push(['Revenu mensuel', fcfa(c.revenu)]);
-  if (c.credits) rows.push(['Crédits en cours / mois', fcfa(c.credits)]);
-  if (c.loyer) rows.push(['Loyer / mois', fcfa(c.loyer)]);
-  if (c.transferts) rows.push(['Aide familiale / mois', fcfa(c.transferts)]);
-  if (c.prix)
-    rows.push(
-      [`Acompte ${CONFIG.ACOMPTE * 100} %`, fcfa(c.acompte)],
-      [`Mensualité CPI (${CONFIG.DUREE_CPI_MOIS} mois)`, fcfa(c.mensuCPI)],
-    );
-  if (c.mensuBanque) rows.push(['Mensualité banque', fcfa(c.mensuBanque)]);
-  if (c.ecartApport !== null)
-    rows.push([
-      c.ecartApport >= 0 ? 'Apport : excédent' : 'Apport : manque',
-      fcfa(Math.abs(c.ecartApport)),
-    ]);
-  if (c.tauxApres !== null)
-    rows.push(["Endettement avec l'achat", `${Math.round(c.tauxApres * 100)} %`]);
-  else if (c.tauxAvant !== null)
-    rows.push(['Endettement actuel', `${Math.round(c.tauxAvant * 100)} %`]);
-  if (c.reste !== null) rows.push(['Reste à vivre / mois', fcfa(c.reste)]);
   const bud = budgetConseille(f, c);
-  if (bud) rows.push(['Budget lot conseillé', fcfa(bud.max)]);
-  return rows;
+  const rows: [unknown, string, string][] = [
+    [c.revenu, 'Revenu mensuel', fcfa(c.revenu)],
+    [c.credits, 'Crédits en cours / mois', fcfa(c.credits)],
+    [c.loyer, 'Loyer / mois', fcfa(c.loyer)],
+    [c.transferts, 'Aide familiale / mois', fcfa(c.transferts)],
+    [c.prix, `Acompte ${CONFIG.ACOMPTE * 100} %`, fcfa(c.acompte)],
+    [c.prix, `Mensualité CPI (${CONFIG.DUREE_CPI_MOIS} mois)`, fcfa(c.mensuCPI)],
+    [c.mensuBanque, 'Mensualité banque', fcfa(c.mensuBanque)],
+    [
+      c.ecartApport !== null,
+      (c.ecartApport ?? 0) >= 0 ? 'Apport : excédent' : 'Apport : manque',
+      fcfa(Math.abs(c.ecartApport ?? 0)),
+    ],
+    [c.tauxApres !== null, "Endettement avec l'achat", `${Math.round((c.tauxApres ?? 0) * 100)} %`],
+    [
+      c.tauxApres === null && c.tauxAvant !== null,
+      'Endettement actuel',
+      `${Math.round((c.tauxAvant ?? 0) * 100)} %`,
+    ],
+    [c.reste !== null, 'Reste à vivre / mois', fcfa(c.reste ?? 0)],
+    [bud, 'Budget lot conseillé', fcfa(bud?.max ?? 0)],
+  ];
+  return rows.filter(([shown]) => shown).map(([, label, value]) => [label, value]);
 }
 
 export function verdictText(c: Capacite) {
@@ -689,7 +773,7 @@ export function calendarAlerts(f: Fiche): { type: 'warn' | 'good'; text: string 
       type: 'warn',
       text: `Calendrier des fêtes à mettre à jour (dates connues jusqu'au ${frDate(derniere)}).`,
     });
-  for (const p of CONFIG.PERIODES.filter((p) => d >= p.debut && d <= p.fin)) {
+  for (const p of CONFIG.PERIODES.filter((x) => d >= x.debut && d <= x.fin)) {
     if (p.type === 'warn')
       out.push({
         type: 'warn',
@@ -711,8 +795,8 @@ export function missingFields(f: Fiche) {
     ['etape', 'étape'],
   ];
   if (f.sector !== 'collective') req.push(['secteur-activite', 'secteur']);
-  if (v(f, 'etape') === 'perdu') req.push(['motif-perte', 'motif de perte']);
-  else if (v(f, 'etape') !== 'reservation')
+  if (is(f, 'etape', 'perdu')) req.push(['motif-perte', 'motif de perte']);
+  else if (!is(f, 'etape', 'reservation'))
     req.push(['prochaine-action', 'prochaine action'], ['date-relance', 'date de relance']);
   const out = req.filter(([id]) => !v(f, id)).map(([id, label]) => ({ id, label }));
   if (f.sector !== 'formal' && !f.motivations.length)
@@ -720,179 +804,267 @@ export function missingFields(f: Fiche) {
   return out;
 }
 
+type Rule<T> = readonly [when: (x: T) => boolean, text: string | ((x: T) => string)];
+const applyRules = <T>(rules: readonly Rule<T>[], x: T) =>
+  rules.filter(([when]) => when(x)).map(([, text]) => (typeof text === 'string' ? text : text(x)));
+
+type Ctx = {
+  f: Fiche;
+  s: Score;
+  a: ReturnType<typeof adequation>;
+  c: Capacite;
+  dias: boolean;
+  is: (id: string, ...values: string[]) => boolean;
+  low: (k: Crit) => boolean;
+};
+
+const BANT_RULES: Record<GridKey, readonly Rule<Ctx>[]> = {
+  collective: [
+    [(x) => x.low('budget'), 'Explorer tontine, cotisations exceptionnelles, subventions'],
+    [(x) => x.low('authority'), "Obtenir une présentation devant le bureau puis l'AG"],
+    [
+      (x) => x.low('need'),
+      "Montrer l'impact collectif (logement des membres, patrimoine du groupement)",
+    ],
+    [(x) => x.low('timeline'), 'Caler la proposition sur le cycle de cotisation'],
+  ],
+  formal: [
+    [
+      (x) => x.low('budget'),
+      'Proposer une formule sans coût pour la structure : convention + prélèvement sur salaire',
+    ],
+    [
+      (x) => x.low('authority') || x.is('fonction-interlocuteur', 'delegue', 'autre'),
+      "Obtenir un RDV avec le DG ou le DRH, avec l'appui de l'interlocuteur actuel",
+    ],
+    [
+      (x) => x.low('need'),
+      'Proposer un court sondage logement auprès des salariés pour mesurer la demande',
+    ],
+    [
+      (x) => x.low('timeline') || x.is('cycle', 'conseil'),
+      'Préparer le dossier pour le prochain comité ou le budget annuel',
+    ],
+    [
+      (x) => x.is('modalite', 'convention', 'prelevement'),
+      'Envoyer un projet de convention avec prix de groupe et modalités de prélèvement',
+    ],
+    [
+      (x) => n(x.f, 'salaries-concernes') >= 20 || x.is('effectif', '200-1000', 'plus-1000'),
+      'Organiser une présentation collective sur le lieu de travail',
+    ],
+  ],
+  diaspora: [
+    [(x) => x.low('budget'), 'Proposer un échéancier par virements mensuels sur 24 mois'],
+    [
+      (x) => x.low('authority'),
+      'Associer la famille au Sénégal : RDV agence avec le proche qui valide',
+    ],
+    [(x) => x.low('need'), 'Faire préciser le projet : retour, retraite, locatif ?'],
+    [(x) => x.low('timeline'), 'Fixer une échéance liée à son prochain séjour'],
+  ],
+  common: [],
+  informal: [],
+};
+BANT_RULES.common = [
+  [
+    (x) => x.low('budget'),
+    (x) =>
+      x.f.sector === 'informal'
+        ? "Caler l'acompte sur la tontine ou la bonne saison ; échéancier Wave/OM"
+        : 'Étudier un échéancier adapté (Wave/OM) ou un lot plus petit',
+  ],
+  [(x) => x.low('authority'), 'Inviter le conjoint ou la famille qui décide au prochain RDV'],
+  [(x) => x.low('need'), 'Faire émerger un bénéfice concret (loyer économisé, patrimoine)'],
+  [
+    (x) => x.low('timeline'),
+    'Trouver un événement déclencheur daté (fin de bail, tontine, rentrée)',
+  ],
+];
+BANT_RULES.informal = BANT_RULES.common;
+
+const stableJob = (x: Ctx) => x.is('statut-pro', 'fonctionnaire', 'cdi');
+const creditOui = (x: Ctx) => x.is('credit-en-cours', 'oui');
+const FINANCE_RULES: readonly Rule<Ctx>[] = [
+  [
+    (x) => x.is('banque', 'aucun', 'mobile'),
+    "Non bancarisé : échéancier Wave/OM avec reçu CPI, conseiller l'ouverture d'un compte",
+  ],
+  [
+    (x) => stableJob(x) && x.is('financement', 'envisage', ''),
+    'Salarié stable : proposer un montage de crédit immobilier avec sa banque',
+  ],
+  [
+    (x) => x.is('financement', 'en-cours', 'accord'),
+    'Préparer attestation de réservation / promesse de vente pour la banque',
+  ],
+  [
+    (x) => x.is('financement', 'refuse'),
+    'Crédit refusé : proposer paiement échelonné ou lot plus petit',
+  ],
+  [
+    (x) => hasPret(x.f) && !x.c.mensuBanque,
+    'Renseigner montant, durée et taux du prêt pour une simulation juste',
+  ],
+  [
+    (x) => creditOui(x) && x.is('fin-credit', 'moins-6', '6-12'),
+    'Crédit bientôt soldé : planifier la relance à cette date, sa capacité va se libérer',
+  ],
+  [
+    (x) => creditOui(x) && x.is('type-credit', 'immobilier'),
+    'Crédit immobilier en cours : vérifier si sa banque accepte un 2e crédit ou un rachat',
+  ],
+  [
+    (x) => creditOui(x) && !n(x.f, 'mensualites'),
+    'Demander le montant total des mensualités en cours',
+  ],
+  [
+    (x) => x.c.verdict === 'ko',
+    "Capacité insuffisante : proposer un lot plus petit, un apport plus fort, ou attendre la fin d'un crédit",
+  ],
+  [
+    (x) => x.c.verdict === 'limite',
+    'Capacité limite : vérifier le budget réel (dépenses familiales, cérémonies) avant de signer',
+  ],
+  [
+    (x) => x.is('regularite', 'variable'),
+    'Revenus variables : raisonner sur la moyenne de 6 mois et demander relevés bancaires ou Wave/OM',
+  ],
+  [
+    (x) => x.is('informel-credit', 'tontine'),
+    "Tontine : caler l'acompte sur la date où il « prend » la tontine",
+  ],
+  [
+    (x) => (x.c.ecartApport ?? 0) < 0,
+    (x) =>
+      `Il manque ${fcfa(-(x.c.ecartApport ?? 0))} pour l'acompte : échelonner l'acompte ou viser un lot moins cher`,
+  ],
+  [
+    (x) => !!x.c.loyer && !!x.c.mensuCPI,
+    (x) =>
+      `Loyer ${fcfa(x.c.loyer)} et mensualité CPI ${fcfa(x.c.mensuCPI)} se cumulent pendant ${CONFIG.DUREE_CPI_MOIS} mois : le vérifier avec lui`,
+  ],
+  [
+    (x) => x.is('age', 'plus-60') && x.is('financement', 'envisage', 'en-cours'),
+    "Plus de 60 ans : durée de crédit courte, privilégier l'apport ou l'échéancier CPI",
+  ],
+  [
+    (x) => x.is('age', '50-60') && stableJob(x),
+    "Proche de la retraite : utiliser sa capacité d'emprunt avant la fin d'activité",
+  ],
+  [
+    (x) => x.is('deja-proprio', 'bien'),
+    "Déjà propriétaire : positionner l'offre comme investissement (locatif, patrimoine)",
+  ],
+  [
+    (x) => x.is('matrimonial', 'marie') && x.f.scores.authority > 0 && x.f.scores.authority <= 3,
+    'Inviter le conjoint au prochain RDV ou à la visite',
+  ],
+  [(x) => x.is('credit-en-cours', ''), "Demander s'il a un crédit en cours"],
+  [(x) => x.is('banque', ''), 'Demander la banque du prospect'],
+];
+
+const FREINS: Record<string, string> = {
+  prix: 'Frein prix : comparer au m² avec la zone et rappeler ce qui est inclus (viabilisation, papiers)',
+  acompte: 'Frein acompte : étudier un acompte en 2 ou 3 versements',
+  confiance: 'Frein confiance : montrer un programme livré, les papiers et des témoignages clients',
+  zone: "Frein zone : présenter les projets d'accès et de services à venir, organiser la visite",
+  papiers:
+    'Frein papiers : expliquer TF / bail / notification et proposer la vérification par son notaire',
+  famille: 'Frein famille : organiser une visite de site en famille',
+};
+const closing = (x: Ctx) => x.is('etape', 'negociation', 'reservation');
+const client = (x: Ctx) => x.is('deja-client', 'oui');
+const GENERAL_RULES: readonly Rule<Ctx>[] = [
+  [
+    (x) => x.a.niveau === 'faible',
+    'Adéquation faible : proposer un autre lot du catalogue, plus proche de ses attentes',
+  ],
+  [
+    (x) =>
+      ['revenu', 'mensualites', 'apport', 'transferts'].some((id) => v(x.f, id) !== '') &&
+      x.is('consent-date', ''),
+    'Recueillir le consentement du prospect avant de conserver ses données financières',
+  ],
+  [
+    (x) => !x.is('acquereur', '', 'lui'),
+    "Bien au nom d'un tiers : pièces d'identité du titulaire et accord écrit de sa part",
+  ],
+  [
+    (x) => x.is('acquereur', 'famille'),
+    'Co-acquisition familiale : fixer par écrit, chez le notaire, la part de chacun',
+  ],
+  [
+    (x) => x.is('acquereur', 'proche') && x.dias,
+    "Diaspora, bien au nom d'un proche : risque de litige. Conseiller l'achat à son propre nom avec une procuration",
+  ],
+  [
+    (x) => x.is('acquereur', 'enfant'),
+    "Au nom d'enfants : si mineurs, vérifier avec le notaire (représentation légale)",
+  ],
+  [
+    (x) => closing(x) && x.is('piece', '', 'non'),
+    "Vérifier et copier la pièce d'identité avant tout encaissement",
+  ],
+  [
+    (x) => closing(x) && !x.is('origine-justifiee', 'oui'),
+    (x) =>
+      `Obtenir un justificatif de l'origine des fonds${x.dias ? " (bulletins de salaire, avis d'imposition)" : ''}`,
+  ],
+  [
+    (x) => x.is('mode-paiement', 'especes'),
+    "Paiement en espèces : l'orienter vers un versement bancaire sur le compte CPI ; sinon justificatif d'origine des fonds obligatoire",
+  ],
+  [
+    (x) => x.is('ppe', 'oui'),
+    'Personne politiquement exposée : vigilance renforcée, validation par la direction avant signature',
+  ],
+  [
+    (x) => x.is('ppe', 'verifier'),
+    'Vérifier si le prospect est une personne politiquement exposée',
+  ],
+  [
+    (x) => client(x) && x.is('satisfaction', 'insatisfait', 'mitige'),
+    'Client insatisfait : remonter à la direction et régler le problème avant toute nouvelle vente',
+  ],
+  [
+    (x) => client(x) && x.is('satisfaction', 'tres', 'satisfait') && !x.is('recommande', 'non'),
+    "Client satisfait : lui demander 2 ou 3 contacts et l'inscrire comme parrain",
+  ],
+  [
+    (x) => client(x) && x.is('satisfaction', ''),
+    "Demander au client s'il est satisfait de son premier achat",
+  ],
+  [(x) => v(x.f, 'frein') in FREINS, (x) => FREINS[v(x.f, 'frein')] ?? ''],
+  [
+    (x) => x.is('concurrence', 'plusieurs'),
+    'Il compare : fiche comparative CPI vs concurrents (papiers, viabilisation, délais) et relance rapide',
+  ],
+  [(x) => x.is('langue', ''), "Noter la langue dans laquelle il est le plus à l'aise"],
+];
+const INCOHERENCE: Rule<Ctx> = [
+  (x) => x.s.incoherent,
+  'Incohérence : budget noté 4 ou 5 alors que la simulation montre une capacité insuffisante. Revoir la note.',
+];
+
 export function recommendations(f: Fiche, s: Score, a: ReturnType<typeof adequation>) {
-  const r: string[] = [];
-  const c = s.cap,
-    dias = f.residence === 'diaspora',
-    k = gridKey(f);
-  const low = (key: Crit) => f.scores[key] > 0 && f.scores[key] <= 2;
-  if (s.incoherent)
-    r.push(
-      'Incohérence : budget noté 4 ou 5 alors que la simulation montre une capacité insuffisante. Revoir la note.',
-    );
-  if (k === 'collective') {
-    if (low('budget')) r.push('Explorer tontine, cotisations exceptionnelles, subventions');
-    if (low('authority')) r.push("Obtenir une présentation devant le bureau puis l'AG");
-    if (low('need'))
-      r.push("Montrer l'impact collectif (logement des membres, patrimoine du groupement)");
-    if (low('timeline')) r.push('Caler la proposition sur le cycle de cotisation');
-  } else if (k === 'formal') {
-    if (low('budget'))
-      r.push(
-        'Proposer une formule sans coût pour la structure : convention + prélèvement sur salaire',
-      );
-    if (low('authority') || ['delegue', 'autre'].includes(v(f, 'fonction-interlocuteur')))
-      r.push("Obtenir un RDV avec le DG ou le DRH, avec l'appui de l'interlocuteur actuel");
-    if (low('need'))
-      r.push('Proposer un court sondage logement auprès des salariés pour mesurer la demande');
-    if (low('timeline') || v(f, 'cycle') === 'conseil')
-      r.push('Préparer le dossier pour le prochain comité ou le budget annuel');
-    if (['convention', 'prelevement'].includes(v(f, 'modalite')))
-      r.push('Envoyer un projet de convention avec prix de groupe et modalités de prélèvement');
-    if (n(f, 'salaries-concernes') >= 20 || ['200-1000', 'plus-1000'].includes(v(f, 'effectif')))
-      r.push('Organiser une présentation collective sur le lieu de travail');
-  } else if (dias) {
-    if (low('budget')) r.push('Proposer un échéancier par virements mensuels sur 24 mois');
-    if (low('authority'))
-      r.push('Associer la famille au Sénégal : RDV agence avec le proche qui valide');
-    if (low('need')) r.push('Faire préciser le projet : retour, retraite, locatif ?');
-    if (low('timeline')) r.push('Fixer une échéance liée à son prochain séjour');
-  } else {
-    if (low('budget'))
-      r.push(
-        f.sector === 'informal'
-          ? "Caler l'acompte sur la tontine ou la bonne saison ; échéancier Wave/OM"
-          : 'Étudier un échéancier adapté (Wave/OM) ou un lot plus petit',
-      );
-    if (low('authority')) r.push('Inviter le conjoint ou la famille qui décide au prochain RDV');
-    if (low('need')) r.push('Faire émerger un bénéfice concret (loyer économisé, patrimoine)');
-    if (low('timeline'))
-      r.push('Trouver un événement déclencheur daté (fin de bail, tontine, rentrée)');
-  }
-  if (k !== 'formal') {
-    const b = v(f, 'banque'),
-      fin = v(f, 'financement'),
-      sp = v(f, 'statut-pro');
-    if (b === 'aucun' || b === 'mobile')
-      r.push(
-        "Non bancarisé : échéancier Wave/OM avec reçu CPI, conseiller l'ouverture d'un compte",
-      );
-    if ((sp === 'fonctionnaire' || sp === 'cdi') && (fin === 'envisage' || fin === ''))
-      r.push('Salarié stable : proposer un montage de crédit immobilier avec sa banque');
-    if (fin === 'en-cours' || fin === 'accord')
-      r.push('Préparer attestation de réservation / promesse de vente pour la banque');
-    if (fin === 'refuse') r.push('Crédit refusé : proposer paiement échelonné ou lot plus petit');
-    if (hasPret(f) && !c.mensuBanque)
-      r.push('Renseigner montant, durée et taux du prêt pour une simulation juste');
-    if (v(f, 'credit-en-cours') === 'oui') {
-      if (['moins-6', '6-12'].includes(v(f, 'fin-credit')))
-        r.push(
-          'Crédit bientôt soldé : planifier la relance à cette date, sa capacité va se libérer',
-        );
-      if (v(f, 'type-credit') === 'immobilier')
-        r.push(
-          'Crédit immobilier en cours : vérifier si sa banque accepte un 2e crédit ou un rachat',
-        );
-      if (!n(f, 'mensualites')) r.push('Demander le montant total des mensualités en cours');
-    }
-    if (c.verdict === 'ko')
-      r.push(
-        "Capacité insuffisante : proposer un lot plus petit, un apport plus fort, ou attendre la fin d'un crédit",
-      );
-    if (c.verdict === 'limite')
-      r.push(
-        'Capacité limite : vérifier le budget réel (dépenses familiales, cérémonies) avant de signer',
-      );
-    if (v(f, 'regularite') === 'variable')
-      r.push(
-        'Revenus variables : raisonner sur la moyenne de 6 mois et demander relevés bancaires ou Wave/OM',
-      );
-    if (v(f, 'informel-credit') === 'tontine')
-      r.push("Tontine : caler l'acompte sur la date où il « prend » la tontine");
-    if (c.ecartApport !== null && c.ecartApport < 0)
-      r.push(
-        `Il manque ${fcfa(-c.ecartApport)} pour l'acompte : échelonner l'acompte ou viser un lot moins cher`,
-      );
-    if (c.loyer && c.mensuCPI)
-      r.push(
-        `Loyer ${fcfa(c.loyer)} et mensualité CPI ${fcfa(c.mensuCPI)} se cumulent pendant ${CONFIG.DUREE_CPI_MOIS} mois : le vérifier avec lui`,
-      );
-    if (v(f, 'age') === 'plus-60' && ['envisage', 'en-cours'].includes(fin))
-      r.push("Plus de 60 ans : durée de crédit courte, privilégier l'apport ou l'échéancier CPI");
-    if (v(f, 'age') === '50-60' && (sp === 'fonctionnaire' || sp === 'cdi'))
-      r.push("Proche de la retraite : utiliser sa capacité d'emprunt avant la fin d'activité");
-    if (v(f, 'deja-proprio') === 'bien')
-      r.push("Déjà propriétaire : positionner l'offre comme investissement (locatif, patrimoine)");
-    if (v(f, 'matrimonial') === 'marie' && f.scores.authority && f.scores.authority <= 3)
-      r.push('Inviter le conjoint au prochain RDV ou à la visite');
-    if (!v(f, 'credit-en-cours')) r.push("Demander s'il a un crédit en cours");
-    if (!b) r.push('Demander la banque du prospect');
-  }
-  if (a.niveau === 'faible')
-    r.push('Adéquation faible : proposer un autre lot du catalogue, plus proche de ses attentes');
-  if (
-    ['revenu', 'mensualites', 'apport', 'transferts'].some((id) => v(f, id) !== '') &&
-    !v(f, 'consent-date')
-  )
-    r.push('Recueillir le consentement du prospect avant de conserver ses données financières');
-  const acq = v(f, 'acquereur');
-  if (acq && acq !== 'lui')
-    r.push("Bien au nom d'un tiers : pièces d'identité du titulaire et accord écrit de sa part");
-  if (acq === 'famille')
-    r.push('Co-acquisition familiale : fixer par écrit, chez le notaire, la part de chacun');
-  if (acq === 'proche' && dias)
-    r.push(
-      "Diaspora, bien au nom d'un proche : risque de litige. Conseiller l'achat à son propre nom avec une procuration",
-    );
-  if (acq === 'enfant')
-    r.push("Au nom d'enfants : si mineurs, vérifier avec le notaire (représentation légale)");
-  if (['negociation', 'reservation'].includes(v(f, 'etape'))) {
-    if (!v(f, 'piece') || v(f, 'piece') === 'non')
-      r.push("Vérifier et copier la pièce d'identité avant tout encaissement");
-    if (v(f, 'origine-justifiee') !== 'oui')
-      r.push(
-        `Obtenir un justificatif de l'origine des fonds${dias ? " (bulletins de salaire, avis d'imposition)" : ''}`,
-      );
-  }
-  if (v(f, 'mode-paiement') === 'especes')
-    r.push(
-      "Paiement en espèces : l'orienter vers un versement bancaire sur le compte CPI ; sinon justificatif d'origine des fonds obligatoire",
-    );
-  if (v(f, 'ppe') === 'oui')
-    r.push(
-      'Personne politiquement exposée : vigilance renforcée, validation par la direction avant signature',
-    );
-  if (v(f, 'ppe') === 'verifier')
-    r.push('Vérifier si le prospect est une personne politiquement exposée');
-  if (v(f, 'deja-client') === 'oui') {
-    const sat = v(f, 'satisfaction'),
-      rec = v(f, 'recommande');
-    if (sat === 'insatisfait' || sat === 'mitige')
-      r.push(
-        'Client insatisfait : remonter à la direction et régler le problème avant toute nouvelle vente',
-      );
-    if ((sat === 'tres' || sat === 'satisfait') && rec !== 'non')
-      r.push("Client satisfait : lui demander 2 ou 3 contacts et l'inscrire comme parrain");
-    if (!sat) r.push("Demander au client s'il est satisfait de son premier achat");
-  }
-  const freins: Record<string, string> = {
-    prix: 'Frein prix : comparer au m² avec la zone et rappeler ce qui est inclus (viabilisation, papiers)',
-    acompte: 'Frein acompte : étudier un acompte en 2 ou 3 versements',
-    confiance:
-      'Frein confiance : montrer un programme livré, les papiers et des témoignages clients',
-    zone: "Frein zone : présenter les projets d'accès et de services à venir, organiser la visite",
-    papiers:
-      'Frein papiers : expliquer TF / bail / notification et proposer la vérification par son notaire',
-    famille: 'Frein famille : organiser une visite de site en famille',
+  const k = gridKey(f);
+  const ctx: Ctx = {
+    f,
+    s,
+    a,
+    c: s.cap,
+    dias: f.residence === 'diaspora',
+    is: (id, ...values) => is(f, id, ...values),
+    low: (key) => f.scores[key] > 0 && f.scores[key] <= 2,
   };
-  const frein = freins[v(f, 'frein')];
-  if (frein) r.push(frein);
-  if (v(f, 'concurrence') === 'plusieurs')
-    r.push(
-      'Il compare : fiche comparative CPI vs concurrents (papiers, viabilisation, délais) et relance rapide',
-    );
-  if (!v(f, 'langue')) r.push("Noter la langue dans laquelle il est le plus à l'aise");
-  return r;
+  const rules = [
+    INCOHERENCE,
+    ...BANT_RULES[k],
+    ...(k === 'formal' ? [] : FINANCE_RULES),
+    ...GENERAL_RULES,
+  ];
+  return applyRules(rules, ctx);
 }
 
 export function argumentaire(f: Fiche) {
@@ -903,47 +1075,170 @@ export function argumentaire(f: Fiche) {
   }));
 }
 
-export function diasporaProtocol(f: Fiche) {
-  if (f.residence !== 'diaspora') return [];
-  const p = [
+const DIASPORA_RULES: readonly Rule<Fiche>[] = [
+  [
+    () => true,
     'Rappeler dès le 1er échange : tout paiement se fait uniquement sur le compte bancaire de CPI, jamais à un intermédiaire, avec un reçu à chaque versement.',
-  ];
-  p.push(
-    `Appeler aux heures qui l'arrangent${v(f, 'pays') ? ` (décalage horaire ${v(f, 'pays')})` : ''} ; messages vocaux WhatsApp en priorité.`,
-  );
-  const m = v(f, 'mandataire');
-  if (m === 'aucun' || m === '')
-    p.push(
-      'Proposer une procuration notariée (notaire ou consulat) pour signer et suivre le dossier en son absence.',
-    );
-  if (m === 'proche')
-    p.push("Le proche n'a pas de procuration : l'inviter à en établir une avant la signature.");
-  if (['non', 'proche', ''].includes(v(f, 'vu-terrain')))
-    p.push('Organiser une visite du site en vidéo WhatsApp en direct (bornes, voisinage, accès).');
-  const s = v(f, 'sejour');
-  if (s === 'sur-place' || s === 'moins-1-mois')
-    p.push(
-      'Il est (bientôt) au Sénégal : bloquer RDV agence + visite + signature pendant le séjour.',
-    );
-  else if (s === '1-3-mois' || s === '3-6-mois')
-    p.push('Préparer tout le dossier à distance pour signer lors de son prochain séjour.');
-  if (['transfert', 'famille'].includes(v(f, 'paiement-diaspora')))
-    p.push(
-      'Orienter vers un virement bancaire direct au compte CPI : traçable et sécurisant pour lui.',
-    );
-  const q = v(f, 'inquietude');
-  if (q === 'arnaque' || q === 'papiers')
-    p.push(
-      'Envoyer copie du titre / état des droits réels et proposer une vérification par son notaire.',
-    );
-  if (q === 'argent') p.push('Envoyer relevé des versements et reçus CPI à chaque paiement.');
-  if (q === 'chantier') p.push("S'engager sur un reporting photo/vidéo mensuel du chantier.");
-  if (q === 'prix') p.push('Donner une comparaison chiffrée avec les prix de la zone.');
-  p.push(
+  ],
+  [
+    () => true,
+    (f) =>
+      `Appeler aux heures qui l'arrangent${v(f, 'pays') ? ` (décalage horaire ${v(f, 'pays')})` : ''} ; messages vocaux WhatsApp en priorité.`,
+  ],
+  [
+    (f) => is(f, 'mandataire', 'aucun', ''),
+    'Proposer une procuration notariée (notaire ou consulat) pour signer et suivre le dossier en son absence.',
+  ],
+  [
+    (f) => is(f, 'mandataire', 'proche'),
+    "Le proche n'a pas de procuration : l'inviter à en établir une avant la signature.",
+  ],
+  [
+    (f) => is(f, 'vu-terrain', 'non', 'proche', ''),
+    'Organiser une visite du site en vidéo WhatsApp en direct (bornes, voisinage, accès).',
+  ],
+  [
+    (f) => is(f, 'sejour', 'sur-place', 'moins-1-mois'),
+    'Il est (bientôt) au Sénégal : bloquer RDV agence + visite + signature pendant le séjour.',
+  ],
+  [
+    (f) => is(f, 'sejour', '1-3-mois', '3-6-mois'),
+    'Préparer tout le dossier à distance pour signer lors de son prochain séjour.',
+  ],
+  [
+    (f) => is(f, 'paiement-diaspora', 'transfert', 'famille'),
+    'Orienter vers un virement bancaire direct au compte CPI : traçable et sécurisant pour lui.',
+  ],
+  [
+    (f) => is(f, 'inquietude', 'arnaque', 'papiers'),
+    'Envoyer copie du titre / état des droits réels et proposer une vérification par son notaire.',
+  ],
+  [
+    (f) => is(f, 'inquietude', 'argent'),
+    'Envoyer relevé des versements et reçus CPI à chaque paiement.',
+  ],
+  [
+    (f) => is(f, 'inquietude', 'chantier'),
+    "S'engager sur un reporting photo/vidéo mensuel du chantier.",
+  ],
+  [(f) => is(f, 'inquietude', 'prix'), 'Donner une comparaison chiffrée avec les prix de la zone.'],
+  [
+    () => true,
     "Préparer les justificatifs d'origine des fonds (bulletins de salaire, avis d'imposition) pour le closing.",
-  );
-  p.push('Proposer des références de clients diaspora déjà livrés.');
-  return p;
+  ],
+  [() => true, 'Proposer des références de clients diaspora déjà livrés.'],
+];
+export const diasporaProtocol = (f: Fiche) =>
+  f.residence === 'diaspora' ? applyRules(DIASPORA_RULES, f) : [];
+
+type LineCtx = { f: Fiche; s: Score; a: ReturnType<typeof adequation> };
+const sel = (id: string) => (x: LineCtx) => selText(x.f, id);
+const suffix = (x: LineCtx, id: string, format: (value: string) => string) =>
+  v(x.f, id) ? format(v(x.f, id)) : '';
+const onlyFor = (when: (f: Fiche) => boolean, id: string) => (x: LineCtx) =>
+  when(x.f) ? selText(x.f, id) : '';
+const formal = (f: Fiche) => f.sector === 'formal';
+const diaspora = (f: Fiche) => f.residence === 'diaspora';
+const COMPANY_TITLE: Partial<Record<Sector, string>> = {
+  formal: 'Structure',
+  collective: 'Groupement',
+};
+
+const FICHE_LINES: readonly [
+  label: string | ((x: LineCtx) => string),
+  value: (x: LineCtx) => string,
+][] = [
+  [
+    'Contact',
+    (x) => (v(x.f, 'prospect-name') || 'Non renseigné') + suffix(x, 'telephone', (t) => ` - ${t}`),
+  ],
+  [(x) => COMPANY_TITLE[x.f.sector] ?? 'Entreprise', (x) => v(x.f, 'company')],
+  [
+    'Type',
+    (x) =>
+      SECTOR_LABELS[x.f.sector] +
+      (diaspora(x.f) ? ` - Diaspora${suffix(x, 'pays', (p) => ` (${p})`)}` : ''),
+  ],
+  ['Classe', (x) => `${x.s.classe} - ${CLASSES[x.s.classe].label} (score ${x.s.total}/100)`],
+  ['Adéquation offre', (x) => x.a.label],
+  ['Rôle', sel('role-groupement')],
+  ['Secteur', sel('secteur-activite')],
+  ['Statut pro', sel('statut-pro')],
+  [
+    'Étape',
+    (x) =>
+      v(x.f, 'etape')
+        ? selText(x.f, 'etape') +
+          suffix(x, 'motif-perte', () => ` - ${selText(x.f, 'motif-perte')}`)
+        : '',
+  ],
+  ['Canal', sel('canal')],
+  [
+    'Langue',
+    (x) =>
+      v(x.f, 'langue')
+        ? v(x.f, 'langue') +
+          suffix(x, 'moment', () => `, joignable ${selText(x.f, 'moment').toLowerCase()}`)
+        : '',
+  ],
+  ['Type de structure', onlyFor(formal, 'type-structure')],
+  ['Effectif', onlyFor(formal, 'effectif')],
+  ['Salariés intéressés', onlyFor(formal, 'salaries-concernes')],
+  ['Interlocuteur', onlyFor(formal, 'fonction-interlocuteur')],
+  ['Modalité', onlyFor(formal, 'modalite')],
+  ['Validation', onlyFor(formal, 'cycle')],
+  ['Motivation', (x) => x.f.motivations.map(motivationLabel).join(' / ')],
+  ['Localité souhaitée', sel('localite-souhaitee')],
+  ['Superficie souhaitée', sel('superficie')],
+  ['Revenu', (x) => (x.s.cap.revenu ? fcfa(x.s.cap.revenu) : '')],
+  ['Crédit en cours', creditLine],
+  [
+    'Lot envisagé',
+    (x) => (x.s.cap.prix ? fcfa(x.s.cap.prix) + suffix(x, 'lot-localite', (l) => ` - ${l}`) : ''),
+  ],
+  [
+    'Apport',
+    (x) =>
+      v(x.f, 'apport')
+        ? fcfa(n(x.f, 'apport')) +
+          suffix(x, 'origine-apport', () => ` (${selText(x.f, 'origine-apport')})`)
+        : '',
+  ],
+  ['Capacité', (x) => (x.s.cap.verdict ? VERDICT_LABELS[x.s.cap.verdict] : '')],
+  ['Banque', sel('banque')],
+  ['Financement', sel('financement')],
+  ['Représentant', onlyFor(diaspora, 'mandataire')],
+  ['Prochain séjour', onlyFor(diaspora, 'sejour')],
+  ['Inquiétude', onlyFor(diaspora, 'inquietude')],
+  [
+    'Acquéreur au titre',
+    (x) =>
+      v(x.f, 'acquereur')
+        ? selText(x.f, 'acquereur') + suffix(x, 'titulaire', (t) => ` - ${t}`)
+        : '',
+  ],
+  ['Frein', sel('frein')],
+  ['Concurrence', sel('concurrence')],
+  ['Parrain', sel('parrain')],
+  ['Conseiller', sel('commercial')],
+  [
+    'Prochaine action',
+    (x) =>
+      v(x.f, 'prochaine-action')
+        ? selText(x.f, 'prochaine-action') + suffix(x, 'date-relance', (d) => ` le ${frDate(d)}`)
+        : '',
+  ],
+  [
+    'Consentement',
+    (x) => (v(x.f, 'consent-date') ? `Oui (${frDate(v(x.f, 'consent-date'))})` : 'Non'),
+  ],
+];
+
+function creditLine(x: LineCtx) {
+  if (!v(x.f, 'credit-en-cours')) return '';
+  if (!is(x.f, 'credit-en-cours', 'oui')) return 'Non';
+  const mensuel = x.s.cap.credits ? `, ${fcfa(x.s.cap.credits)}/mois` : '';
+  return `Oui${suffix(x, 'type-credit', () => ` - ${selText(x.f, 'type-credit')}`)}${mensuel}`;
 }
 
 export function ficheLines(
@@ -951,96 +1246,11 @@ export function ficheLines(
   s = computeScore(f),
   a = adequation(f, s.cap),
 ): [string, string][] {
-  const L: [string, string][] = [];
-  const add = (k: string, id: string) => {
-    if (v(f, id)) L.push([k, selText(f, id)]);
-  };
-  L.push([
-    'Contact',
-    (v(f, 'prospect-name') || 'Non renseigné') +
-      (v(f, 'telephone') ? ` - ${v(f, 'telephone')}` : ''),
-  ]);
-  if (v(f, 'company'))
-    L.push([
-      f.sector === 'formal' ? 'Structure' : f.sector === 'collective' ? 'Groupement' : 'Entreprise',
-      v(f, 'company'),
-    ]);
-  L.push([
-    'Type',
-    SECTOR_LABELS[f.sector] +
-      (f.residence === 'diaspora' ? ` - Diaspora${v(f, 'pays') ? ` (${v(f, 'pays')})` : ''}` : ''),
-  ]);
-  L.push(['Classe', `${s.classe} - ${CLASSES[s.classe].label} (score ${s.total}/100)`]);
-  L.push(['Adéquation offre', a.label]);
-  add('Rôle', 'role-groupement');
-  add('Secteur', 'secteur-activite');
-  add('Statut pro', 'statut-pro');
-  if (v(f, 'etape'))
-    L.push([
-      'Étape',
-      selText(f, 'etape') + (v(f, 'motif-perte') ? ` - ${selText(f, 'motif-perte')}` : ''),
-    ]);
-  add('Canal', 'canal');
-  if (v(f, 'langue'))
-    L.push([
-      'Langue',
-      v(f, 'langue') + (v(f, 'moment') ? `, joignable ${selText(f, 'moment').toLowerCase()}` : ''),
-    ]);
-  if (f.sector === 'formal') {
-    add('Type de structure', 'type-structure');
-    add('Effectif', 'effectif');
-    add('Salariés intéressés', 'salaries-concernes');
-    add('Interlocuteur', 'fonction-interlocuteur');
-    add('Modalité', 'modalite');
-    add('Validation', 'cycle');
-  }
-  if (f.motivations.length) L.push(['Motivation', f.motivations.map(motivationLabel).join(' / ')]);
-  add('Localité souhaitée', 'localite-souhaitee');
-  add('Superficie souhaitée', 'superficie');
-  const c = s.cap;
-  if (c.revenu) L.push(['Revenu', fcfa(c.revenu)]);
-  if (v(f, 'credit-en-cours'))
-    L.push([
-      'Crédit en cours',
-      v(f, 'credit-en-cours') === 'oui'
-        ? `Oui${v(f, 'type-credit') ? ` - ${selText(f, 'type-credit')}` : ''}${c.credits ? `, ${fcfa(c.credits)}/mois` : ''}`
-        : 'Non',
-    ]);
-  if (c.prix)
-    L.push([
-      'Lot envisagé',
-      fcfa(c.prix) + (v(f, 'lot-localite') ? ` - ${v(f, 'lot-localite')}` : ''),
-    ]);
-  if (v(f, 'apport') !== '')
-    L.push([
-      'Apport',
-      fcfa(n(f, 'apport')) + (v(f, 'origine-apport') ? ` (${selText(f, 'origine-apport')})` : ''),
-    ]);
-  if (c.verdict) L.push(['Capacité', VERDICT_LABELS[c.verdict]]);
-  add('Banque', 'banque');
-  add('Financement', 'financement');
-  if (f.residence === 'diaspora') {
-    add('Représentant', 'mandataire');
-    add('Prochain séjour', 'sejour');
-    add('Inquiétude', 'inquietude');
-  }
-  if (v(f, 'acquereur'))
-    L.push([
-      'Acquéreur au titre',
-      selText(f, 'acquereur') + (v(f, 'titulaire') ? ` - ${v(f, 'titulaire')}` : ''),
-    ]);
-  add('Frein', 'frein');
-  add('Concurrence', 'concurrence');
-  add('Parrain', 'parrain');
-  add('Conseiller', 'commercial');
-  if (v(f, 'prochaine-action'))
-    L.push([
-      'Prochaine action',
-      selText(f, 'prochaine-action') +
-        (v(f, 'date-relance') ? ` le ${frDate(v(f, 'date-relance'))}` : ''),
-    ]);
-  L.push(['Consentement', v(f, 'consent-date') ? `Oui (${frDate(v(f, 'consent-date'))})` : 'Non']);
-  return L;
+  const x = { f, s, a };
+  return FICHE_LINES.map(([label, value]): [string, string] => [
+    typeof label === 'string' ? label : label(x),
+    value(x),
+  ]).filter(([, value]) => value !== '');
 }
 
 export const ficheText = (f: Fiche) =>
@@ -1062,151 +1272,194 @@ const ACTIONS_BILAN: Record<string, string> = {
   banque: 'Point avec votre banque',
   signature: "Signature et versement de l'acompte",
 };
+const block = (title: string, lines: string[]) => (lines.length ? [title, ...lines, ''] : []);
+type Budget = ReturnType<typeof budgetConseille>;
+
+function bilanStructure(f: Fiche) {
+  const projet = [
+    v(f, 'company') && `• Structure : ${v(f, 'company')}`,
+    v(f, 'salaries-concernes') &&
+      `• Salariés potentiellement intéressés : ${v(f, 'salaries-concernes')}`,
+    v(f, 'modalite') && `• Formule envisagée : ${selText(f, 'modalite')}`,
+    v(f, 'localite-souhaitee') && `• Localité souhaitée : ${v(f, 'localite-souhaitee')}`,
+  ].filter(isText);
+  return [
+    ...block('*Le projet*', projet),
+    '*Ce que CPI propose*',
+    '• Un prix de groupe et des conditions de paiement adaptées aux salariés',
+    '• Une présentation sur site pour les salariés intéressés',
+    "• Un accompagnement de chaque acquéreur jusqu'à la remise des papiers",
+    '',
+  ];
+}
+
+function bilanProjet(f: Fiche) {
+  return [
+    f.motivations[0] && `• Objectif : ${motivationLabel(f.motivations[0])}`,
+    v(f, 'type-projet') && `• Formule : ${selText(f, 'type-projet')}`,
+    v(f, 'localite-souhaitee') && `• Localité souhaitée : ${v(f, 'localite-souhaitee')}`,
+    v(f, 'superficie') && `• Superficie : ${v(f, 'superficie')}`,
+  ].filter(isText);
+}
+
+function equivalent(f: Fiche) {
+  const devise = v(f, 'devise') || 'XOF',
+    rate = tauxDevise(f);
+  if (f.residence !== 'diaspora' || devise === 'XOF' || Number.isNaN(rate)) return () => '';
+  return (x: number) => ` (≈ ${grouped(x / rate)} ${devise === 'EUR' ? '€' : devise})`;
+}
+
+function bilanSimulation(f: Fiche, c: Capacite) {
+  if (!c.prix) return [];
+  const eqv = equivalent(f);
+  const lieu = [
+    v(f, 'lot-localite') && ` - ${v(f, 'lot-localite')}`,
+    v(f, 'nature-foncier') && `, ${selText(f, 'nature-foncier').toLowerCase()}`,
+  ].join('');
+  return block(
+    '*Votre simulation*',
+    [
+      `• Prix du lot : ${fcfa(c.prix)}${eqv(c.prix)}${lieu}`,
+      `• Acompte (${CONFIG.ACOMPTE * 100} %) : ${fcfa(c.acompte)}${eqv(c.acompte)}`,
+      c.mensuCPI
+        ? `• Puis ${CONFIG.DUREE_CPI_MOIS} mensualités de : ${fcfa(c.mensuCPI)}${eqv(c.mensuCPI)}`
+        : '',
+      c.mensuBanque ? `• Mensualité estimée de votre prêt bancaire : ${fcfa(c.mensuBanque)}` : '',
+      (c.ecartApport ?? 0) < 0
+        ? `• Complément à prévoir pour l'acompte : ${fcfa(-(c.ecartApport ?? 0))}. Nous pouvons étudier ensemble un étalement.`
+        : '',
+    ].filter(isText),
+  );
+}
+
+function conseilBudget(f: Fiche, c: Capacite, bud: Budget) {
+  if (!bud) return '';
+  if (bud.max >= CONFIG.PRIX_MIN)
+    return !c.prix || c.prix > bud.max
+      ? `Pour rester à l'aise, nous vous conseillons un lot jusqu'à ${fcfa(Math.min(bud.max, CONFIG.PRIX_MAX))}.`
+      : '';
+  if (bud.limite === 'apport')
+    return "Nous vous proposons de préparer ensemble votre acompte avant de vous engager, par exemple avec un plan d'épargne ou une tontine. Nous restons à vos côtés pour trouver le bon moment.";
+  if (c.credits > 0)
+    return `Vos engagements en cours limitent aujourd'hui la mensualité confortable. Nous vous proposons de refaire le point à la fin de votre crédit actuel${v(f, 'fin-credit') ? ` (${selText(f, 'fin-credit').toLowerCase()})` : ''}, ou d'étudier une formule avec un apport plus important.`;
+  return 'Nous pouvons étudier ensemble une formule avec un apport plus important pour alléger les mensualités.';
+}
+
+function conseil(f: Fiche, c: Capacite, bud: Budget) {
+  const principal =
+    c.prix && c.verdict === 'ok'
+      ? 'Ce projet est cohérent avec votre budget. Vous pouvez avancer sereinement.'
+      : '';
+  const limite =
+    c.prix && c.verdict === 'limite'
+      ? 'Ce projet est réalisable, mais demande un budget bien tenu. Nous pouvons aussi regarder un lot un peu plus petit pour plus de confort.'
+      : '';
+  const premier = principal || limite || conseilBudget(f, c, bud);
+  const prochain =
+    !c.revenu && !c.prix
+      ? 'Lors de notre prochain échange, nous préparerons ensemble une simulation adaptée à votre budget.'
+      : '';
+  return [premier, prochain].filter(isText);
+}
+
+function lotsSuggeres(f: Fiche, c: Capacite, bud: Budget, catalogue: Lot[]) {
+  const plafond = bud ? bud.max : c.prix || CONFIG.PRIX_MAX;
+  const souhait = v(f, 'localite-souhaitee');
+  const abordables = catalogue.filter((l) => l.prix <= plafond);
+  const proches = abordables.filter(
+    (l) => !souhait || souhait === 'Indifférent' || l.localite === souhait,
+  );
+  return (proches.length ? proches : abordables)
+    .toSorted((x, y) => y.prix - x.prix)
+    .slice(0, 3)
+    .map(
+      (l) =>
+        `• ${l.programme} - ${l.localite}, ${l.superficie} : ${fcfa(l.prix)} (${PAPIERS_BILAN[l.papiers] ?? l.papiers})`,
+    );
+}
+
+function bilanParticulier(f: Fiche, catalogue: Lot[]) {
+  const c = capacite(f),
+    bud = budgetConseille(f, c);
+  return [
+    ...block('*Votre projet*', bilanProjet(f)),
+    ...bilanSimulation(f, c),
+    ...block('*Notre conseil*', conseil(f, c, bud)),
+    ...block('*Des terrains qui correspondent à votre budget*', lotsSuggeres(f, c, bud, catalogue)),
+  ];
+}
+
+function bilanEtape(f: Fiche) {
+  const action = v(f, 'prochaine-action'),
+    date = v(f, 'date-relance');
+  if (!action && !date) return [];
+  const jour = date
+    ? ` le ${new Date(`${date}T12:00:00`).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}`
+    : '';
+  return ['*Prochaine étape*', `${ACTIONS_BILAN[action] ?? 'Prochain échange'}${jour}.`, ''];
+}
 
 export function buildBilan(f: Fiche, catalogue: Lot[]) {
-  const c = capacite(f);
   const nom = v(f, 'prospect-name') || v(f, 'company');
-  const d = v(f, 'devise') || 'XOF',
-    rate = tauxDevise(f);
-  const eqv = (x: number) =>
-    f.residence === 'diaspora' && d !== 'XOF' && !Number.isNaN(rate)
-      ? ` (≈ ${Math.round(x / rate)
-          .toLocaleString('fr-FR')
-          .replace(/ | /g, ' ')} ${d === 'EUR' ? '€' : d})`
-      : '';
-  const L = [
+  const securite =
+    diaspora(f) || is(f, 'etape', 'negociation', 'reservation')
+      ? [
+          'Pour votre sécurité, tous les paiements se font uniquement sur le compte bancaire de CPI, avec un reçu à chaque versement.',
+        ]
+      : [];
+  return [
     `Bonjour${nom ? ` ${nom}` : ''},`,
     '',
     'Merci pour notre échange. Comme promis, voici le récapitulatif de votre projet.',
     '',
-  ];
-  if (f.sector === 'formal') {
-    const p: string[] = [];
-    if (v(f, 'company')) p.push(`• Structure : ${v(f, 'company')}`);
-    if (v(f, 'salaries-concernes'))
-      p.push(`• Salariés potentiellement intéressés : ${v(f, 'salaries-concernes')}`);
-    if (v(f, 'modalite')) p.push(`• Formule envisagée : ${selText(f, 'modalite')}`);
-    if (v(f, 'localite-souhaitee')) p.push(`• Localité souhaitée : ${v(f, 'localite-souhaitee')}`);
-    if (p.length) L.push('*Le projet*', ...p, '');
-    L.push(
-      '*Ce que CPI propose*',
-      '• Un prix de groupe et des conditions de paiement adaptées aux salariés',
-      '• Une présentation sur site pour les salariés intéressés',
-      "• Un accompagnement de chaque acquéreur jusqu'à la remise des papiers",
-      '',
-    );
-  } else {
-    const projet: string[] = [];
-    if (f.motivations[0]) projet.push(`• Objectif : ${motivationLabel(f.motivations[0])}`);
-    if (v(f, 'type-projet')) projet.push(`• Formule : ${selText(f, 'type-projet')}`);
-    if (v(f, 'localite-souhaitee'))
-      projet.push(`• Localité souhaitée : ${v(f, 'localite-souhaitee')}`);
-    if (v(f, 'superficie')) projet.push(`• Superficie : ${v(f, 'superficie')}`);
-    if (projet.length) L.push('*Votre projet*', ...projet, '');
-    if (c.prix) {
-      L.push('*Votre simulation*');
-      L.push(
-        `• Prix du lot : ${fcfa(c.prix)}${eqv(c.prix)}${v(f, 'lot-localite') ? ` - ${v(f, 'lot-localite')}` : ''}${v(f, 'nature-foncier') ? `, ${selText(f, 'nature-foncier').toLowerCase()}` : ''}`,
-      );
-      L.push(`• Acompte (${CONFIG.ACOMPTE * 100} %) : ${fcfa(c.acompte)}${eqv(c.acompte)}`);
-      if (c.mensuCPI)
-        L.push(
-          `• Puis ${CONFIG.DUREE_CPI_MOIS} mensualités de : ${fcfa(c.mensuCPI)}${eqv(c.mensuCPI)}`,
-        );
-      if (c.mensuBanque)
-        L.push(`• Mensualité estimée de votre prêt bancaire : ${fcfa(c.mensuBanque)}`);
-      if (c.ecartApport !== null && c.ecartApport < 0)
-        L.push(
-          `• Complément à prévoir pour l'acompte : ${fcfa(-c.ecartApport)}. Nous pouvons étudier ensemble un étalement.`,
-        );
-      L.push('');
-    }
-    const bud = budgetConseille(f, c),
-      reco: string[] = [];
-    if (c.prix && c.verdict === 'ok')
-      reco.push('Ce projet est cohérent avec votre budget. Vous pouvez avancer sereinement.');
-    else if (c.prix && c.verdict === 'limite')
-      reco.push(
-        'Ce projet est réalisable, mais demande un budget bien tenu. Nous pouvons aussi regarder un lot un peu plus petit pour plus de confort.',
-      );
-    else if (bud && bud.max >= CONFIG.PRIX_MIN && (!c.prix || c.prix > bud.max))
-      reco.push(
-        `Pour rester à l'aise, nous vous conseillons un lot jusqu'à ${fcfa(Math.min(bud.max, CONFIG.PRIX_MAX))}.`,
-      );
-    else if (bud && bud.max < CONFIG.PRIX_MIN) {
-      if (bud.limite === 'apport')
-        reco.push(
-          "Nous vous proposons de préparer ensemble votre acompte avant de vous engager, par exemple avec un plan d'épargne ou une tontine. Nous restons à vos côtés pour trouver le bon moment.",
-        );
-      else if (c.credits > 0)
-        reco.push(
-          `Vos engagements en cours limitent aujourd'hui la mensualité confortable. Nous vous proposons de refaire le point à la fin de votre crédit actuel${v(f, 'fin-credit') ? ` (${selText(f, 'fin-credit').toLowerCase()})` : ''}, ou d'étudier une formule avec un apport plus important.`,
-        );
-      else
-        reco.push(
-          'Nous pouvons étudier ensemble une formule avec un apport plus important pour alléger les mensualités.',
-        );
-    }
-    if (!c.revenu && !c.prix)
-      reco.push(
-        'Lors de notre prochain échange, nous préparerons ensemble une simulation adaptée à votre budget.',
-      );
-    if (reco.length) L.push('*Notre conseil*', ...reco, '');
-    const plafond = bud ? bud.max : c.prix || CONFIG.PRIX_MAX;
-    const ls = v(f, 'localite-souhaitee');
-    let lots = catalogue.filter((l) => l.prix <= plafond);
-    const proches = lots.filter((l) => !ls || ls === 'Indifférent' || l.localite === ls);
-    if (proches.length) lots = proches;
-    lots = lots.sort((x, y) => y.prix - x.prix).slice(0, 3);
-    if (lots.length)
-      L.push(
-        '*Des terrains qui correspondent à votre budget*',
-        ...lots.map(
-          (l) =>
-            `• ${l.programme} - ${l.localite}, ${l.superficie} : ${fcfa(l.prix)} (${PAPIERS_BILAN[l.papiers] ?? l.papiers})`,
-        ),
-        '',
-      );
-  }
-  const pa = v(f, 'prochaine-action'),
-    dr = v(f, 'date-relance');
-  if (pa || dr) {
-    const jour = dr
-      ? new Date(`${dr}T12:00:00`).toLocaleDateString('fr-FR', {
-          weekday: 'long',
-          day: 'numeric',
-          month: 'long',
-        })
-      : '';
-    L.push(
-      '*Prochaine étape*',
-      `${pa ? ACTIONS_BILAN[pa] : 'Prochain échange'}${jour ? ` le ${jour}` : ''}.`,
-      '',
-    );
-  }
-  L.push('Ces informations restent strictement confidentielles entre vous et CPI.');
-  if (f.residence === 'diaspora' || ['negociation', 'reservation'].includes(v(f, 'etape')))
-    L.push(
-      'Pour votre sécurité, tous les paiements se font uniquement sur le compte bancaire de CPI, avec un reçu à chaque versement.',
-    );
-  L.push(
+    ...(formal(f) ? bilanStructure(f) : bilanParticulier(f, catalogue)),
+    ...bilanEtape(f),
+    'Ces informations restent strictement confidentielles entre vous et CPI.',
+    ...securite,
     '',
     'Je reste à votre disposition pour toute question.',
     '',
     v(f, 'commercial') || '[Votre nom]',
     'Conseiller, Groupe CPI (Compagnie Prestige Immobilier)',
-  );
-  return L.join('\n');
+  ].join('\n');
 }
 
 export function normTel(t: string) {
-  let x = t.replace(/[^\d+]/g, '');
-  if (x.startsWith('+')) x = x.slice(1);
-  else if (x.startsWith('00')) x = x.slice(2);
-  else if (/^[37]\d{8}$/.test(x)) x = `221${x}`;
-  return x;
+  const x = t.replace(/[^\d+]/g, '');
+  if (x.startsWith('+')) return x.slice(1);
+  if (x.startsWith('00')) return x.slice(2);
+  return /^[37]\d{8}$/.test(x) ? `221${x}` : x;
 }
 export const telKey = (t: string) => normTel(t).slice(-9);
+
+const csvCell = (x: string | number) => {
+  const s = String(x);
+  return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+};
+
+function csvRow(f: Fiche, ids: string[]): (string | number)[] {
+  const s = computeScore(f),
+    a = adequation(f, s.cap);
+  const notes = (['budget', 'authority', 'need', 'timeline'] as const).map(
+    (k) => f.scores[k] || '',
+  );
+  const capaciteLabel = s.cap.verdict ? VERDICT_LABELS[s.cap.verdict] : '';
+  return [
+    frDate(f.cree),
+    frDate(f.maj),
+    SECTOR_LABELS[f.sector],
+    diaspora(f) ? 'Diaspora' : 'Sénégal',
+    ...notes,
+    s.total,
+    s.classe,
+    a.label,
+    capaciteLabel,
+    f.motivations.map(motivationLabel).join(' / '),
+    f.history.length,
+    f.history.at(-1)?.note ?? '',
+    ...ids.map((id) => selText(f, id)),
+  ];
+}
 
 export function exportCsv(list: Fiche[]) {
   const ids = [...new Set(list.flatMap((f) => Object.keys(f.values)))];
@@ -1228,37 +1481,11 @@ export function exportCsv(list: Fiche[]) {
     'Dernier compte-rendu',
     ...ids.map(columnTitle),
   ];
-  const cell = (x: unknown) => {
-    const s = String(x ?? '');
-    return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
-  };
-  const rows = list.map((f) => {
-    const s = computeScore(f),
-      a = adequation(f, s.cap);
-    return [
-      frDate(f.cree),
-      frDate(f.maj),
-      SECTOR_LABELS[f.sector],
-      f.residence === 'diaspora' ? 'Diaspora' : 'Sénégal',
-      f.scores.budget || '',
-      f.scores.authority || '',
-      f.scores.need || '',
-      f.scores.timeline || '',
-      s.total,
-      s.classe,
-      a.label,
-      s.cap.verdict ? VERDICT_LABELS[s.cap.verdict] : '',
-      f.motivations.map(motivationLabel).join(' / '),
-      f.history.length,
-      f.history.at(-1)?.note ?? '',
-      ...ids.map((id) => selText(f, id)),
-    ];
-  });
-  const blob = new Blob([`﻿${[head, ...rows].map((r) => r.map(cell).join(';')).join('\r\n')}`], {
-    type: 'text/csv;charset=utf-8',
-  });
+  const csv = [head, ...list.map((f) => csvRow(f, ids))]
+    .map((r) => r.map(csvCell).join(';'))
+    .join('\r\n');
   const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
+  link.href = URL.createObjectURL(new Blob([`﻿${csv}`], { type: 'text/csv;charset=utf-8' }));
   link.download = `CPI_Radar_prospects_${today()}.csv`;
   link.click();
   URL.revokeObjectURL(link.href);

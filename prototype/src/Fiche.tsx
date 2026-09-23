@@ -1,14 +1,4 @@
-import {
-  ArrowLeft,
-  BookOpen,
-  Copy,
-  MessageCircle,
-  MoreHorizontal,
-  RefreshCw,
-  Save,
-  Send,
-  Trash2,
-} from 'lucide-react';
+import { ArrowLeft, BookOpen, Copy, MoreHorizontal, Save, Send, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import {
   Link,
@@ -20,8 +10,6 @@ import {
   TabList,
   TabPanel,
   Tabs,
-  TextArea,
-  TextField,
   ToggleButton,
   ToggleButtonGroup,
 } from 'react-aria-components';
@@ -30,28 +18,35 @@ import { useLocation } from 'wouter';
 
 import {
   blankFiche,
-  buildBilan,
   CLASSES,
   computeScore,
   type Fiche,
   ficheText,
   missingFields,
-  normTel,
   type Residence,
   type Sector,
   SECTOR_DESCRIPTIONS,
   SECTOR_LABELS,
-  telKey,
 } from './bant';
-import { phaseOf, PHASES, phaseProgress, selText, withoutHiddenValues } from './fields';
-import { Notation, PhaseForm, type Update } from './Form';
+import { Bilan, Guide } from './Dialogs';
+import { phaseOf, PHASES, phaseProgress, withoutHiddenValues } from './fields';
+import { PhaseForm, type Update } from './Form';
+import { Notation } from './Notation';
 import { ScorePanel } from './ScorePanel';
-import { fiches, lots, upsertFiche } from './store';
-import { Button, buttonClass, ClassStamp, Sheet } from './ui';
+import {
+  duplicateMessage,
+  fiches,
+  findDuplicate,
+  savedMessage,
+  upsertFiche,
+  withExchange,
+} from './store';
+import { Button, buttonClass, ClassStamp } from './ui';
 
 const SECTORS = Object.keys(SECTOR_LABELS) as Sector[];
+
 const segment =
-  'focus-ring min-h-11 flex-1 cursor-pointer rounded-lg px-3 text-sm font-semibold text-muted transition data-[hovered]:text-ink data-[selected]:bg-paper data-[selected]:text-brand data-[selected]:shadow-sm';
+  'focus-ring min-h-11 flex-1 cursor-pointer whitespace-nowrap rounded-lg px-3 text-sm font-semibold text-muted transition data-[hovered]:text-ink data-[selected]:bg-paper data-[selected]:text-brand data-[selected]:shadow-sm';
 
 export function FicheScreen({ id }: { id: string }) {
   const [, navigate] = useLocation();
@@ -89,48 +84,18 @@ export function FicheScreen({ id }: { id: string }) {
       toast.error(`Il manque : ${missing.map((m) => m.label).join(', ')}.`);
       return;
     }
-    const key = telKey(fiche.values.telephone ?? '');
-    const duplicate = fiches
-      .get()
-      .find((x) => x.id !== fiche.id && key && telKey(x.values.telephone ?? '') === key);
+    const duplicate = findDuplicate(fiche);
     if (duplicate) {
-      const owner = duplicate.values.commercial
-        ? `, suivie par ${duplicate.values.commercial}`
-        : '';
-      toast.warning(
-        `Ce numéro existe déjà : ${duplicate.values['prospect-name'] ?? duplicate.values.company}${owner}.`,
-        {
-          action: { label: 'Ouvrir', onClick: () => navigate(`/fiche/${duplicate.id}`) },
-        },
-      );
+      toast.warning(duplicateMessage(duplicate), {
+        action: { label: 'Ouvrir', onClick: () => navigate(`/fiche/${duplicate.id}`) },
+      });
       return;
     }
-    const now = new Date().toISOString();
-    const note = (fiche.values['compte-rendu'] ?? '').trim();
-    const values = { ...fiche.values };
-    delete values['compte-rendu'];
-    const entry = {
-      date: now,
-      etape: selText(fiche, 'etape'),
-      action: selText(fiche, 'prochaine-action'),
-      commercial: fiche.values.commercial ?? '',
-      note,
-    };
-    const next: Fiche = {
-      ...fiche,
-      id: fiche.id || `F${Date.now()}`,
-      maj: now,
-      values,
-      history: note ? [...fiche.history, entry] : fiche.history,
-    };
+    const next = withExchange(fiche);
     upsertFiche(next);
     setFiche(next);
     setShowErrors(false);
-    const noConsent =
-      ['revenu', 'mensualites', 'apport'].some((k) => values[k]) && !values['consent-date'];
-    toast.success(
-      `Fiche enregistrée${note ? ', compte-rendu ajouté' : ''}.${noConsent ? ' Consentement non recueilli.' : ''}`,
-    );
+    toast.success(savedMessage(fiche, next));
     if (!fiche.id) navigate(`/fiche/${next.id}`, { replace: true });
   }
 
@@ -163,7 +128,9 @@ export function FicheScreen({ id }: { id: string }) {
           <h1 className="truncate font-display text-2xl font-bold sm:text-3xl">{name}</h1>
           <p className="text-sm text-muted">{SECTOR_DESCRIPTIONS[fiche.sector]}</p>
         </div>
-        <ClassStamp classe={score.classe} />
+        <span className="lg:hidden">
+          <ClassStamp classe={score.classe} />
+        </span>
         <MenuTrigger>
           <Button variant="ghost" aria-label="Plus d'actions" className="size-11 !px-0">
             <MoreHorizontal size={20} />
@@ -301,9 +268,7 @@ export function FicheScreen({ id }: { id: string }) {
       </footer>
 
       {bilanOpen && <Bilan fiche={fiche} onClose={() => setBilanOpen(false)} copy={copy} />}
-      <Sheet isOpen={guideOpen} onOpenChange={setGuideOpen} title="Guide de qualification">
-        <Guide />
-      </Sheet>
+      <Guide isOpen={guideOpen} onOpenChange={setGuideOpen} />
     </div>
   );
 }
@@ -312,136 +277,3 @@ const menuItem =
   'flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-3 text-sm outline-none data-[focused]:bg-brand-soft';
 const tabClass =
   'focus-ring -mb-px flex min-h-14 shrink-0 cursor-pointer flex-col justify-center border-b-2 border-transparent px-3 text-left text-muted outline-none transition data-[hovered]:text-ink data-[selected]:border-brand data-[selected]:text-ink';
-
-function Bilan({
-  fiche,
-  onClose,
-  copy,
-}: {
-  fiche: Fiche;
-  onClose: () => void;
-  copy: (text: string, done: string) => void;
-}) {
-  const catalogue = lots.use();
-  const [text, setText] = useState(() => buildBilan(fiche, catalogue));
-  const tel = normTel(fiche.values.telephone ?? '');
-  const wrongCountry =
-    fiche.residence === 'diaspora' && tel.startsWith('221') && !!fiche.values.pays;
-  return (
-    <Sheet isOpen onOpenChange={(open) => !open && onClose()} title="Bilan pour le prospect">
-      <p className="mb-3 text-sm text-muted">
-        Ni score, ni freins, ni conformité. Relisez et modifiez avant l'envoi.
-      </p>
-      <TextField aria-label="Message au prospect" value={text} onChange={setText}>
-        <TextArea className="field-box min-h-80 py-3 leading-relaxed" />
-      </TextField>
-      {!fiche.values.commercial && (
-        <p className="mt-2 text-xs text-gold-text">
-          Renseignez « Conseiller en charge » (Closing) pour signer le message.
-        </p>
-      )}
-      {wrongCountry && (
-        <p className="mt-2 text-xs text-ko">
-          Vérifiez le numéro : pour la diaspora, saisir l'indicatif du pays.
-        </p>
-      )}
-      <div className="mt-4 flex flex-wrap gap-2">
-        <Link
-          href={`https://wa.me/${tel}?text=${encodeURIComponent(text)}`}
-          target="_blank"
-          rel="noreferrer"
-          className={buttonClass('whatsapp')}
-        >
-          <MessageCircle size={16} />
-          Ouvrir dans WhatsApp
-        </Link>
-        <Button onPress={() => copy(text, 'Bilan copié.')}>
-          <Copy size={16} />
-          Copier
-        </Button>
-        <Button variant="ghost" onPress={() => setText(buildBilan(fiche, catalogue))}>
-          <RefreshCw size={16} />
-          Régénérer
-        </Button>
-      </div>
-    </Sheet>
-  );
-}
-
-function Guide() {
-  return (
-    <div className="space-y-5 text-sm leading-relaxed">
-      <p>
-        La fiche est remplie par le conseiller, jamais par le prospect. Elle se complète au fil des
-        échanges. Chaque échange apporte quelque chose au prospect : plan, simulation, visite,
-        bilan.
-      </p>
-      <div>
-        <h3 className="mb-2 font-display text-base font-semibold">Deux indicateurs distincts</h3>
-        <p>
-          <b>Score prospect (sur 100)</b> : maturité du prospect, pour prioriser les relances.{' '}
-          <b>Adéquation de l'offre</b> : le lot proposé correspond-il à ce qu'il cherche ? Elle
-          n'entre pas dans le score.
-        </p>
-      </div>
-      <table className="w-full text-left">
-        <caption className="mb-2 text-left font-display text-base font-semibold">Barème</caption>
-        <tbody className="divide-y divide-line">
-          <tr>
-            <th className="py-2 pr-3">Budget</th>
-            <td className="pr-3 tabular-nums">30</td>
-            <td className="text-muted">
-              Note × 6, plafonnée à 24 si capacité limite, 12 si insuffisante
-            </td>
-          </tr>
-          <tr>
-            <th className="py-2 pr-3">Autorité</th>
-            <td className="tabular-nums">20</td>
-            <td className="text-muted">Note × 4</td>
-          </tr>
-          <tr>
-            <th className="py-2 pr-3">Besoin</th>
-            <td className="tabular-nums">20</td>
-            <td className="text-muted">Note × 4</td>
-          </tr>
-          <tr>
-            <th className="py-2 pr-3">Calendrier</th>
-            <td className="tabular-nums">15</td>
-            <td className="text-muted">Note × 3</td>
-          </tr>
-          <tr>
-            <th className="py-2 pr-3">Engagement</th>
-            <td className="tabular-nums">15</td>
-            <td className="text-muted">Automatique : étape, visites, client existant</td>
-          </tr>
-        </tbody>
-      </table>
-      <div>
-        <h3 className="mb-2 font-display text-base font-semibold">Classes</h3>
-        <p>
-          <b>A</b> À conclure (75+) · <b>B</b> À pousser (55 à 74) · <b>C</b> À faire mûrir (35 à
-          54) · <b>D</b> À éduquer (moins de 35).
-        </p>
-        <p className="mt-1 text-muted">
-          Budget noté 1, capacité insuffisante ou autorité notée 1 : classe C au mieux. Prospect
-          perdu : classe D.
-        </p>
-      </div>
-      <div>
-        <h3 className="mb-2 font-display text-base font-semibold">Questions sensibles</h3>
-        <ul className="list-disc space-y-1 pl-5 text-muted">
-          <li>Revenu : proposer une fourchette (« plutôt 300 000, 500 000, un million ? »).</li>
-          <li>
-            Crédits : « Vous avez déjà des prélèvements chaque mois ? Un prêt Tabaski, une avance,
-            une tontine ? »
-          </li>
-          <li>
-            Conformité : « La loi nous oblige à vérifier l'origine des fonds. C'est aussi ce qui
-            garantit que personne ne pourra contester votre terrain. »
-          </li>
-          <li>Toujours recueillir le consentement avant les questions d'argent.</li>
-        </ul>
-      </div>
-    </div>
-  );
-}
