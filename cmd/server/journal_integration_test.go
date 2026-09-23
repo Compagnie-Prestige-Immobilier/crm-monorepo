@@ -27,6 +27,9 @@ func TestJournalDeLaFicheDitQuiAChangeQuoi(t *testing.T) {
 	b.attend(statut, http.StatusOK, "premier appel", body)
 	statut, body = adminAppel(b, http.MethodPatch, "/api/v1/prospects/"+prospectID, map[string]any{"statut": "CONVERTI"})
 	b.attend(statut, http.StatusOK, "modification par le panneau", body)
+	adminExec(b, `INSERT INTO "audit_logs" ("id","userId","action","entity","entityId","after","at")
+		VALUES ($1,$2,'prospect.affectation','prospect',$3,jsonb_build_object('teleconseillerId',$2::text),now() - interval '1 hour')`,
+		uuid.NewString(), b.userID, prospectID)
 
 	statut, body = adminAppel(b, http.MethodGet, "/api/v1/prospects/"+prospectID+"/journal", nil)
 	b.attend(statut, http.StatusOK, "journal de la fiche", body)
@@ -45,6 +48,10 @@ func TestJournalDeLaFicheDitQuiAChangeQuoi(t *testing.T) {
 	modification, ok := parAction["prospect.update"]
 	if !ok || mapDe(modification["avant"])["statut"] != "CONTACTE" || mapDe(modification["apres"])["statut"] != "CONVERTI" {
 		t.Fatalf("la modification doit porter l’avant et l’après : %v", modification)
+	}
+	affectation := mapDe(parAction["prospect.affectation"]["apres"])
+	if affectation["teleconseiller"] != "Test Intégration" || affectation["teleconseillerId"] != nil {
+		t.Fatalf("le journal nomme le téléconseiller, pas son identifiant : %v", affectation)
 	}
 	if mapDe(items[0])["action"] != "prospect.update" {
 		t.Fatalf("le journal se lit du plus récent au plus ancien : %v", items)

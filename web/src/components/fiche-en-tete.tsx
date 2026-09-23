@@ -60,10 +60,12 @@ export function FicheEnTete({
           </div>
         </div>
         {actions === undefined ? null : (
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
+          <div className="grid w-full grid-flow-dense grid-cols-2 gap-2 *:w-full *:first:col-span-2 sm:flex sm:w-auto sm:flex-wrap sm:items-center sm:*:w-auto">
+            {actions}
+          </div>
         )}
       </div>
-      <dl className="grid gap-3 border-t border-border pt-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-3 border-t border-border pt-4 sm:grid-cols-3">
         {chiffres.map((chiffre) => (
           <div key={chiffre.label} className="min-w-0">
             <dt className="eyebrow text-muted-foreground">{chiffre.label}</dt>

@@ -308,7 +308,9 @@ function ActionsConsentement({
         Refusé
       </Button>
       {consentement === 'INTERESSE' ? (
-        <Button onClick={onConvertir}>Confirmer la conversion</Button>
+        <Button className="col-span-2" onClick={onConvertir}>
+          Confirmer la conversion
+        </Button>
       ) : null}
     </>
   );
