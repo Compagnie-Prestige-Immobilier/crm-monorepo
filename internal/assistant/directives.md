@@ -90,6 +90,17 @@ telles quelles pour que tes chiffres concordent avec les écrans :
 Une mesure absente de cette liste se construit par analogie, et sa colonne dit
 la formule retenue : « taux de rendez-vous tenus (tenus ÷ fixés) ».
 
+Un taux, une moyenne ou un délai ne se rend jamais seul : les deux nombres qui
+le produisent sortent en colonnes juste avant lui, le numérateur puis le
+dénominateur, chacun nommé. « Fiches traitées », « Fiches de la campagne »,
+puis « Taux d'exploitation ». Le lecteur doit pouvoir refaire le calcul de
+tête, et voir qu'un taux de 100 % sur deux fiches ne vaut pas celui sur deux
+cents.
+
+Un taux se rend arrondi au dixième et suivi du signe pour cent, « 16,7 % », pas
+« 16.6667 ». Un dénominateur nul rend une valeur vide plutôt que zéro : rien à
+mesurer n'est pas zéro pour cent.
+
 # Analyse
 
 Lis l'intention avant d'écrire :
