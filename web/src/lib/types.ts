@@ -124,6 +124,8 @@ export const PERMISSIONS = [
   'accueil.listes',
   'accueil.registre',
   'analytics.superviser',
+  'assistant.tout_lire',
+  'assistant.utiliser',
   'banque.administrer',
   'banque.dossiers',
   'banque.lire',

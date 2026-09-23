@@ -5,6 +5,10 @@ export const AIDE_PERMISSIONS: Record<Permission, string> = {
   'accueil.registre': 'Enregistrer les visites à l’accueil et les archiver.',
   'analytics.superviser':
     'Ouvrir les tableaux de bord de supervision : activité, entonnoir, pôle marketing.',
+  'assistant.tout_lire':
+    'Laisser l’assistant lire n’importe quelle donnée de la base pour répondre, sans se limiter aux chiffres prévus.',
+  'assistant.utiliser':
+    'Poser des questions sur les appels, les conversions et les conversions à venir.',
   'banque.administrer': 'Régler les étapes des dossiers Banque & Finance et valider les dossiers.',
   'banque.dossiers': 'Faire avancer les dossiers Banque & Finance de son portefeuille.',
   'banque.lire': 'Consulter les dossiers Banque & Finance, sans les modifier.',
