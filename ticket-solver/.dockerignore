@@ -1,8 +1,0 @@
-.git
-.env
-.env.*
-!.env.example
-bin/
-*.sqlite3
-*.sqlite3*
-*.patch
