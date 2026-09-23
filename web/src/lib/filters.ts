@@ -74,6 +74,13 @@ function readSortDir(params: RawSearchParams | URLSearchParams): SortDirection {
   return readString(params, 'sortDir') === 'asc' ? 'asc' : 'desc';
 }
 
+function readPhase2StatusFiltre(
+  params: RawSearchParams | URLSearchParams,
+): Phase2Status | 'TOUT' | null {
+  if (readString(params, 'phase2Status') === 'TOUT') return 'TOUT';
+  return readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES);
+}
+
 export function parseProspectFilters(params: RawSearchParams | URLSearchParams): ProspectFilters {
   const pageSize = readPositiveInt(params, 'pageSize', DEFAULT_PAGE_SIZE);
   return {
@@ -86,7 +93,7 @@ export function parseProspectFilters(params: RawSearchParams | URLSearchParams):
     syndicatId: readString(params, 'syndicatId'),
     statut: readStatut(params),
     segment: readEnum<BddSegment>(params, 'segment', BDD_SEGMENTS),
-    phase2Status: readEnum<Phase2Status>(params, 'phase2Status', PHASE2_STATUSES),
+    phase2Status: readPhase2StatusFiltre(params),
     enrollmentMethod: readEnum<EnrollmentMethod>(params, 'enrollmentMethod', ENROLLMENT_METHODS),
     enrollmentCapturedById: readString(params, 'enrollmentCapturedById'),
     revue: readFrenchBoolean(params, 'revue'),

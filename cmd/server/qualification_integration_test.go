@@ -982,6 +982,46 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 	}
 }
 
+// « Tout » régroupe les onglets Intéressés, Hésitants et Rendez-vous : un
+// injoignable n'y figure pas, et le rendez-vous téléphonique reste écarté
+// comme dans l'onglet Rendez-vous seul.
+func TestQualificationToutRegroupeIntereseHesitantEtRendezVous(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	interesse := qualificationProspect(b)
+	hesitant := qualificationProspect(b)
+	rdv := qualificationProspect(b)
+	telephonique := qualificationProspect(b)
+	injoignable := qualificationProspect(b)
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	appels := []map[string]any{
+		qualificationCorpsTentative(interesse, map[string]any{"reasonCode": "VILLA"}),
+		qualificationCorpsTentative(hesitant, map[string]any{"reasonCode": "HESITANT"}),
+		qualificationCorpsTentative(rdv, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}),
+		qualificationCorpsTentative(telephonique, map[string]any{"reasonCode": "RDV_TELEPHONIQUE", "callbackAt": quand}),
+		qualificationCorpsTentative(injoignable, nil),
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" IN ($1, $2, $3, $4, $5)`,
+			interesse, hesitant, rdv, telephonique, injoignable)
+	})
+	for _, appel := range appels {
+		statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", appel)
+		b.attend(statut, http.StatusOK, "appel consigné", body)
+	}
+
+	_, ids := qualificationTotalProspects(b, "&phase2Status=TOUT&sansMotif=RDV_TELEPHONIQUE")
+	for _, attendu := range []string{interesse, hesitant, rdv} {
+		if !slices.Contains(ids, attendu) {
+			t.Fatalf("« Tout » doit reprendre %s : %v", attendu, ids)
+		}
+	}
+	for _, exclu := range []string{telephonique, injoignable} {
+		if slices.Contains(ids, exclu) {
+			t.Fatalf("« Tout » ne doit pas reprendre %s : %v", exclu, ids)
+		}
+	}
+}
+
 // L'appel promis a eu lieu : sans nouvelle échéance, la fiche quitte
 // « Rappels promis » au lieu d'y rester jusqu'en retard.
 func TestRappelConsommeParTentativeSansNouvelleEcheance(t *testing.T) {

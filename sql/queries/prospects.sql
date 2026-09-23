@@ -112,11 +112,20 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
-       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
-       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
-           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
-                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
+  AND (
+    (NOT sqlc.arg('phase2_status_tout')::boolean
+     AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+          -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+          OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+              AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                   WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED')))
+    -- « Tout » régroupe les onglets Intéressés, Hésitants et Rendez-vous.
+    OR (sqlc.arg('phase2_status_tout')::boolean
+        AND (p."phase2Status" = ANY (ARRAY['INTERESTED', 'HESITANT', 'APPOINTMENT']::"Phase2Status"[])
+             OR (p."phase2Status" = 'METHOD_OBTAINED'
+                 AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                      WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED')))
+  )
   AND (sqlc.narg('sans_motif')::text IS NULL
        OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
@@ -250,11 +259,20 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('banque_id')::text IS NULL OR p."banqueId" = sqlc.narg('banque_id')::text)
   AND (sqlc.narg('syndicat_id')::text IS NULL OR p."syndicatId" = sqlc.narg('syndicat_id')::text)
   AND (sqlc.narg('origin')::text IS NULL OR p."origin" = sqlc.narg('origin')::text)
-  AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
-       -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
-       OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
-           AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
-                WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED'))
+  AND (
+    (NOT sqlc.arg('phase2_status_tout')::boolean
+     AND (sqlc.narg('phase2_status')::"Phase2Status" IS NULL OR p."phase2Status" = sqlc.narg('phase2_status')::"Phase2Status"
+          -- Un intéressé qui a donné sa méthode reste un intéressé, avec cette précision.
+          OR (sqlc.narg('phase2_status')::"Phase2Status" = 'INTERESTED' AND p."phase2Status" = 'METHOD_OBTAINED'
+              AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                   WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED')))
+    -- « Tout » régroupe les onglets Intéressés, Hésitants et Rendez-vous.
+    OR (sqlc.arg('phase2_status_tout')::boolean
+        AND (p."phase2Status" = ANY (ARRAY['INTERESTED', 'HESITANT', 'APPOINTMENT']::"Phase2Status"[])
+             OR (p."phase2Status" = 'METHOD_OBTAINED'
+                 AND (SELECT mr."effect" FROM "call_attempts" ma JOIN "call_outcome_reasons" mr ON mr."id" = ma."reasonId"
+                      WHERE ma."prospectId" = p."id" ORDER BY ma."clientCreatedAt" DESC, ma."id" DESC LIMIT 1) = 'CLOSE_INTERESTED')))
+  )
   AND (sqlc.narg('sans_motif')::text IS NULL
        OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
