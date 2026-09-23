@@ -77,7 +77,11 @@ function renseignes<T extends Record<string, unknown>>(valeurs: T): Renseignes<T
  * l'engagement bancaire et la méthode n'existent que sur une adhésion : ils
  * partent avec elle, comme depuis la page d'appel.
  */
-export function creationDepuis(dossier: ConversionDraft, phone: string): GrandPublicProspectInput {
+export function creationDepuis(
+  dossier: ConversionDraft,
+  phone: string,
+  canalProvenanceId: string | null = null,
+): GrandPublicProspectInput {
   const systeme = dossier.dureeSystemeMois.trim();
   return {
     nom: dossier.nom.trim(),
@@ -91,6 +95,7 @@ export function creationDepuis(dossier: ConversionDraft, phone: string): GrandPu
       incomeBandId: dossier.incomeBandId,
       paymentMode: dossier.paymentMode,
       dureeSystemeMois: systeme === '' ? null : Number(systeme),
+      canalProvenanceId,
     }),
     ...(Object.keys(dossier.champsLibres).length === 0
       ? {}
@@ -186,10 +191,12 @@ function useRaccourcisEcheance(
  */
 export function NouveauProspect({
   embedded = false,
+  canalProvenanceId,
   onSaved,
   onAnnuler,
 }: {
   embedded?: boolean;
+  canalProvenanceId: string | null;
   onSaved: (prospect: ProspectRow) => void;
   onAnnuler: () => void;
 }) {
@@ -264,7 +271,7 @@ export function NouveauProspect({
   function envoyer(appel: AttemptDraft | null): void {
     if (save.isPending || e164 === null) return;
     save.mutate({
-      input: creationDepuis(conversion, e164),
+      input: creationDepuis(conversion, e164, canalProvenanceId),
       appel,
       brouillon: brouillonDe(comment, conversion),
     });
