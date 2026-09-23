@@ -60,26 +60,49 @@ function ContenuKairo({
   etat,
   desactive,
   simulation,
+  page,
+  setPage,
+  pageSize,
+  setPageSize,
 }: {
   etat: EtatKairo | null;
   desactive: boolean;
   simulation?: boolean;
+  page: number;
+  setPage: (page: number) => void;
+  pageSize: number;
+  setPageSize: (pageSize: number) => void;
 }) {
   if (etat === null) return null;
   return (
     <>
       <BandeauEtat etat={etat} desactive={desactive} simulation={simulation} />
       <ReglagesKairo etat={etat} desactive={desactive} />
-      <IndicateursKairo tickets={etat.tickets} mttrSecondes={etat.mttrSecondes} />
-      <CarteTickets tickets={etat.tickets} desactive={desactive} />
+      <IndicateursKairo
+        tickets={etat.tickets}
+        comptesParStatut={etat.comptesParStatut}
+        mttrSecondes={etat.mttrSecondes}
+      />
+      <CarteTickets
+        tickets={etat.tickets}
+        desactive={desactive}
+        total={etat.ticketsTotal}
+        comptesParStatut={etat.comptesParStatut}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+      />
     </>
   );
 }
 
 function KairoView() {
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(25);
   const tableau = useQuery({
-    queryKey: CLE_KAIRO,
-    queryFn: lireTableauKairo,
+    queryKey: [...CLE_KAIRO, page, pageSize],
+    queryFn: () => lireTableauKairo(page, pageSize),
     refetchInterval: 15_000,
   });
   const [dernierKairo, setDernierKairo] = useState<EtatKairo | null>(null);
@@ -111,7 +134,15 @@ function KairoView() {
           dernierEtatConserve={etatAffiche !== null}
         />
       ) : null}
-      <ContenuKairo etat={etatAffiche} desactive={desactive} simulation={simulationActive} />
+      <ContenuKairo
+        etat={etatAffiche}
+        desactive={desactive}
+        simulation={simulationActive}
+        page={page}
+        setPage={setPage}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+      />
       <CarteReformulation reformulation={reformulationAffichee} />
     </div>
   );

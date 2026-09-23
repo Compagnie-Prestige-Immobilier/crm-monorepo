@@ -14,6 +14,10 @@ export const ETAT_KAIRO_SIMULE: EtatKairo = {
   mttrSecondes: 275,
   jevActif: true,
   reparationBaseActive: true,
+  ticketsTotal: 5,
+  ticketsPage: 1,
+  ticketsPageSize: 25,
+  comptesParStatut: { pr: 2, escalade: 1, running: 1, echec: 1 },
   tickets: [
     {
       id: 274,

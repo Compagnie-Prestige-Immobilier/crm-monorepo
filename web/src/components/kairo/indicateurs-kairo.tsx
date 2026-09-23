@@ -1,5 +1,8 @@
-import { Card } from '@/components/ui/card';
-import { formatDuree, ticketsFiltres, type TicketKairo } from '@/lib/data/kairo';
+import { BarresHorizontalesChart } from '@/components/dashboard/visites-charts';
+import { EmptyChart } from '@/components/dashboard/empty-chart';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { compteGroupe, formatDuree, STATUTS_KAIRO, type TicketKairo } from '@/lib/data/kairo';
+import type { NamedCount } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function calculerMTTR(tickets: TicketKairo[], mttrSecondes?: number): number {
@@ -34,10 +37,14 @@ function libelleTaux(pr: number, termines: number): string {
   return `${String(Math.round((pr / termines) * 100))} %`;
 }
 
-function genererStats(tickets: TicketKairo[], mttrSecondes?: number): StatKairo[] {
-  const enCours = ticketsFiltres(tickets, 'enCours').length;
-  const pr = ticketsFiltres(tickets, 'pr').length;
-  const aReprendre = ticketsFiltres(tickets, 'aReprendre').length;
+function genererStats(
+  tickets: TicketKairo[],
+  comptesParStatut: Record<string, number>,
+  mttrSecondes?: number,
+): StatKairo[] {
+  const enCours = compteGroupe(comptesParStatut, 'enCours');
+  const pr = compteGroupe(comptesParStatut, 'pr');
+  const aReprendre = compteGroupe(comptesParStatut, 'aReprendre');
   const termines = pr + aReprendre;
   const mttr = calculerMTTR(tickets, mttrSecondes);
 
@@ -97,20 +104,49 @@ function CelluleStat(props: { item: StatKairo; large: boolean }) {
   );
 }
 
+function repartitionParStatut(comptes: Record<string, number>): NamedCount[] {
+  return Object.entries(comptes)
+    .filter(([, n]) => n > 0)
+    .map(([statut, n]) => ({
+      id: statut,
+      label: STATUTS_KAIRO[statut]?.libelle ?? statut,
+      value: n,
+    }))
+    .sort((a, b) => b.value - a.value);
+}
+
 export function IndicateursKairo(props: {
   tickets: TicketKairo[];
+  comptesParStatut: Record<string, number>;
   mttrSecondes?: number | undefined;
 }) {
-  const { tickets, mttrSecondes } = props;
-  const stats = genererStats(tickets, mttrSecondes);
+  const { tickets, comptesParStatut, mttrSecondes } = props;
+  const stats = genererStats(tickets, comptesParStatut, mttrSecondes);
+  const repartition = repartitionParStatut(comptesParStatut);
 
   return (
-    <Card className="overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-xs">
-      <div className="grid grid-cols-2 divide-y divide-border/60 sm:grid-cols-3 sm:divide-y-0 sm:divide-x xl:grid-cols-5">
-        {stats.map((item, idx) => (
-          <CelluleStat key={item.titre} item={item} large={idx === 4} />
-        ))}
-      </div>
-    </Card>
+    <div className="flex flex-col gap-4">
+      <Card className="overflow-hidden rounded-2xl border border-border/80 bg-card p-0 shadow-xs">
+        <div className="grid grid-cols-2 divide-y divide-border/60 sm:grid-cols-3 sm:divide-y-0 sm:divide-x xl:grid-cols-5">
+          {stats.map((item, idx) => (
+            <CelluleStat key={item.titre} item={item} large={idx === 4} />
+          ))}
+        </div>
+      </Card>
+      <Card className="rounded-2xl border border-border/80 bg-card shadow-xs">
+        <CardHeader className="pb-2">
+          <CardTitle className="font-display text-base font-bold tracking-tight">
+            Répartition par statut
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="h-64">
+          {repartition.length === 0 ? (
+            <EmptyChart message="Aucun ticket traité pour le moment." />
+          ) : (
+            <BarresHorizontalesChart items={repartition} />
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
