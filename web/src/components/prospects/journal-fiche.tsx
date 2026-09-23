@@ -59,7 +59,7 @@ const LIBELLES: Record<string, string> = {
   regle: 'Règle appliquée',
   motif: 'Motif',
   assignedToId: 'Rappel porté par',
-  teleconseillerId: 'Téléconseiller',
+  teleconseiller: 'Téléconseiller',
   position: 'Position dans la campagne',
   nom: 'Nom',
   prenom: 'Prénom',
@@ -119,7 +119,7 @@ function changements(entree: ProspectJournalEntry): Changement[] {
 }
 
 const phrase = (c: Changement): string =>
-  c.cle in LIBELLES || c.avant !== undefined
+  c.avant !== undefined
     ? `${libelle(c.cle)} : ${lisible(c.cle, c.avant)} → ${lisible(c.cle, c.apres)}`
     : `${libelle(c.cle)} : ${lisible(c.cle, c.apres)}`;
 

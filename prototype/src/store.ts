@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from 'react';
 
-import { blankFiche, type Fiche, type Lot } from './bant';
+import { blankFiche, type Fiche, type Lot, telKey } from './bant';
+import { selText } from './fields';
 
 const FICHES_KEY = 'cpi_radar_proto_fiches';
 const LOTS_KEY = 'cpi_radar_proto_lots';
@@ -278,6 +279,45 @@ function createStore<T>(key: string, seedValue: T) {
 
 export const fiches = createStore(FICHES_KEY, SEED_FICHES);
 export const lots = createStore(LOTS_KEY, SEED_LOTS);
+
+export function findDuplicate(f: Fiche) {
+  const key = telKey(f.values.telephone ?? '');
+  if (!key) return undefined;
+  return fiches.get().find((x) => x.id !== f.id && telKey(x.values.telephone ?? '') === key);
+}
+
+export function duplicateMessage(d: Fiche) {
+  const owner = d.values.commercial ? `, suivie par ${d.values.commercial}` : '';
+  return `Ce numéro existe déjà : ${d.values['prospect-name'] ?? d.values.company}${owner}.`;
+}
+
+export function withExchange(f: Fiche): Fiche {
+  const now = new Date().toISOString();
+  const { 'compte-rendu': draft = '', ...values } = f.values;
+  const note = draft.trim();
+  const entry = {
+    date: now,
+    etape: selText(f, 'etape'),
+    action: selText(f, 'prochaine-action'),
+    commercial: f.values.commercial ?? '',
+    note,
+  };
+  return {
+    ...f,
+    id: f.id || `F${crypto.randomUUID().slice(0, 8)}`,
+    maj: now,
+    values,
+    history: note ? [...f.history, entry] : f.history,
+  };
+}
+
+export function savedMessage(before: Fiche, after: Fiche) {
+  const note = after.history.length > before.history.length ? ', compte-rendu ajouté' : '';
+  const noConsent =
+    ['revenu', 'mensualites', 'apport'].some((k) => after.values[k]) &&
+    !after.values['consent-date'];
+  return `Fiche enregistrée${note}.${noConsent ? ' Consentement non recueilli.' : ''}`;
+}
 
 export function upsertFiche(f: Fiche) {
   const list = fiches.get();

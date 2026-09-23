@@ -1288,14 +1288,19 @@ func qualificationFermerOuvertureProspect(ctx context.Context, q *db.Queries, u 
 // Une fiche déjà classée se reclasse : la dernière issue l'emporte.
 func qualificationCloturerParcours(ctx context.Context, q *db.Queries, u *socle.Utilisateur, i *qualificationIssue, parcours *db.ParcoursDuProspectRow) (QualificationProspectPhase2StateDTO, error) {
 	var vide QualificationProspectPhase2StateDTO
-	at := time.Now().UTC()
+	var at *time.Time
+	var par *string
+	if i.method != nil {
+		maintenant := time.Now().UTC()
+		at, par = &maintenant, &u.ID
+	}
 	if err := q.CloreParcours(ctx, db.CloreParcoursParams{
-		Phase2Status: i.regle.phase2Status, Method: i.method, At: &at, By: &u.ID, ID: parcours.ID,
+		Phase2Status: i.regle.phase2Status, Method: i.method, At: at, By: par, ID: parcours.ID,
 	}); err != nil {
 		return vide, err
 	}
 	if err := q.CloreProspectParTentative(ctx, db.CloreProspectParTentativeParams{
-		Phase2Status: i.regle.phase2Status, Method: i.method, At: &at, By: &u.ID, ID: i.prospectID,
+		Phase2Status: i.regle.phase2Status, Method: i.method, At: at, By: par, ID: i.prospectID,
 	}); err != nil {
 		return vide, err
 	}

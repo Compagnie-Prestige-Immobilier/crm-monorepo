@@ -79,6 +79,10 @@ export type Section = {
 const same = (...labels: string[]): Option[] => labels.map((l) => [l, l]);
 const v = (f: Fiche, id: string) => f.values[id] ?? '';
 const notFormal = (f: Fiche) => f.sector !== 'formal';
+const COMPANY_LABELS: Partial<Record<Fiche['sector'], string>> = {
+  formal: 'Nom de la structure',
+  collective: 'Nom du groupement',
+};
 const PAPIERS: Option[] = [
   ['titre-foncier', 'Titre foncier'],
   ['bail', 'Bail'],
@@ -171,12 +175,7 @@ export const FIELDS: Field[] = [
     id: 'company',
     section: 'info',
     kind: 'text',
-    label: (f) =>
-      f.sector === 'formal'
-        ? 'Nom de la structure'
-        : f.sector === 'collective'
-          ? 'Nom du groupement'
-          : 'Entreprise / employeur',
+    label: (f) => COMPANY_LABELS[f.sector] ?? 'Entreprise / employeur',
   },
   {
     id: 'telephone',
@@ -1067,26 +1066,17 @@ export function withoutHiddenValues(f: Fiche): Fiche {
 }
 
 const NOT_COUNTED = new Set(['devise', 'compte-rendu']);
+function sectionAnswers(f: Fiche, sectionId: string): boolean[] {
+  if (sectionId === 'motivations') return [f.motivations.length > 0];
+  if (sectionId === 'consent') return [!!v(f, 'consent-date')];
+  return FIELDS.filter(
+    (field) => field.section === sectionId && !NOT_COUNTED.has(field.id) && isVisible(f, field.id),
+  ).map((field) => !!v(f, field.id));
+}
+
 export function phaseProgress(f: Fiche, phase: 1 | 2 | 3) {
-  const sections = SECTIONS.filter((s) => s.phase === phase && (s.show?.(f) ?? true));
-  let total = 0,
-    done = 0;
-  for (const s of sections) {
-    if (s.id === 'motivations') {
-      total++;
-      if (f.motivations.length) done++;
-      continue;
-    }
-    if (s.id === 'consent') {
-      total++;
-      if (v(f, 'consent-date')) done++;
-      continue;
-    }
-    for (const field of FIELDS) {
-      if (field.section !== s.id || NOT_COUNTED.has(field.id) || !isVisible(f, field.id)) continue;
-      total++;
-      if (v(f, field.id)) done++;
-    }
-  }
-  return { total, done };
+  const answers = SECTIONS.filter((s) => s.phase === phase && (s.show?.(f) ?? true)).flatMap((s) =>
+    sectionAnswers(f, s.id),
+  );
+  return { total: answers.length, done: answers.filter(Boolean).length };
 }

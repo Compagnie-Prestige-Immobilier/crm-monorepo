@@ -976,6 +976,14 @@ func TestQualificationIntereseAvecMethodeResteIntereseDansLaRubrique(t *testing.
 	if lu := qualificationStatutPhase2(b, interesse); lu != "METHOD_OBTAINED" {
 		t.Fatalf("la méthode l'emporte sur l'état : %s", lu)
 	}
+	injoignable := qualificationProspect(b)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, injoignable) })
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(injoignable, nil))
+	b.attend(statut, http.StatusOK, "appel sans méthode", body)
+	obtenuPar := `SELECT count(*) FROM "prospects" WHERE "id" = $1 AND "enrollmentCapturedById" IS NOT NULL`
+	if qualificationCompte(b, obtenuPar, interesse) != 1 || qualificationCompte(b, obtenuPar, injoignable) != 0 {
+		t.Fatal("« Méthode obtenue par » ne doit nommer que l'agent qui a obtenu une méthode")
+	}
 	_, ids := qualificationTotalProspects(b, "&phase2Status=INTERESTED")
 	if !slices.Contains(ids, interesse) || slices.Contains(ids, hesitant) {
 		t.Fatalf("onglet Intéressés : %v", ids)

@@ -209,6 +209,7 @@ type Prospect struct {
 	RevueAt                  *string           `json:"revueAt"`
 	RevueByID                *string           `json:"revueById"`
 	RevueByName              *string           `json:"revueByName"`
+	StatutQualification      *string           `json:"statutQualification"`
 	LastReasonLabel          *string           `json:"lastReasonLabel"`
 	LastJoignable            *bool             `json:"lastJoignable"`
 	LastComment              *string           `json:"lastComment"`
@@ -314,10 +315,9 @@ func prospectDepuisLigne(l *db.ListProspectsRow, journeys []ProspectJourney, der
 		Segment:      prospectSegment(l.SyndicatSigle, l.BanqueShortName),
 		Phase2Status: string(p.Phase2Status), EnrollmentMethod: prospectEnum(p.EnrollmentMethod),
 		EnrollmentCapturedByID: p.EnrollmentCapturedById, EnrollmentCapturedByName: l.EnrollmentCapturedByName,
-		EnrollmentCapturedAt: prospectISOPtr(p.EnrollmentCapturedAt),
-		RevueAt:              prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName,
-		LastCallAt:   prospectISOPtr(p.LastCallAt),
-		LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName, RemarqueImport: p.RemarqueImport,
+		EnrollmentCapturedAt: prospectISOPtr(p.EnrollmentCapturedAt), StatutQualification: l.StatutQualification,
+		RevueAt: prospectISOPtr(p.RevueAt), RevueByID: p.RevueById, RevueByName: l.RevueByName, RemarqueImport: p.RemarqueImport,
+		LastCallAt: prospectISOPtr(p.LastCallAt), LastCallByID: p.LastCallById, LastCallByName: l.LastCallByName,
 		EnCoursPar: prospectVide(l.EnCoursPar), RepresentantAppelePar: l.RepresentantAppelePar, RepresentantAppeleAt: prospectISOPtr(l.RepresentantAppeleAt),
 		Origin: p.Origin, OriginLabel: p.OriginLabel, ARevoirAt: prospectISOPtr(p.ARevoirAt),
 		RendezVousIssue: p.RendezVousIssue, RendezVousReporteAt: prospectISOPtr(p.RendezVousReporteAt), SuiteRencontre: p.SuiteRencontre,

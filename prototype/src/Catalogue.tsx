@@ -39,7 +39,7 @@ export function Catalogue() {
       ...list,
       {
         ...draft,
-        id: `L${Date.now()}`,
+        id: `L${crypto.randomUUID().slice(0, 8)}`,
         programme: draft.programme.trim(),
         prix: Number(draft.prix),
       },

@@ -18,20 +18,18 @@ const PHASE2_VARIANT: Record<Phase2Status, BadgeVariant> = {
   WRONG_NUMBER: 'warning',
 };
 
-/** L'état de la fiche, le statut posé quand il en dit plus, et l'enrôlement acquis. */
+/** Le statut de qualification de la fiche, et l'enrôlement acquis. */
 export function EtiquettesStatut({
   prospect,
 }: {
-  prospect: Pick<ProspectRow, 'phase2Status' | 'lastReasonLabel' | 'enrollmentMethod'>;
+  prospect: Pick<ProspectRow, 'phase2Status' | 'statutQualification' | 'enrollmentMethod'>;
 }) {
-  const etat = PHASE2_STATUS_LABELS[prospect.phase2Status];
-  const pose = prospect.lastReasonLabel;
+  const statut = prospect.statutQualification ?? PHASE2_STATUS_LABELS[prospect.phase2Status];
   const methodeAcquise =
     prospect.enrollmentMethod !== null && prospect.phase2Status !== 'METHOD_OBTAINED';
   return (
     <span className="inline-flex flex-wrap items-center gap-1.5">
-      <Badge variant={PHASE2_VARIANT[prospect.phase2Status]}>{etat}</Badge>
-      {pose === null || pose === etat ? null : <Badge variant="outline">{pose}</Badge>}
+      <Badge variant={PHASE2_VARIANT[prospect.phase2Status]}>{statut}</Badge>
       {methodeAcquise ? (
         <Badge variant="success">{PHASE2_STATUS_LABELS.METHOD_OBTAINED}</Badge>
       ) : null}

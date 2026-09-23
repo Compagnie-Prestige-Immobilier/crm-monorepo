@@ -72,11 +72,11 @@ const STATUT_VARIANT: Record<ProspectStatut, 'secondary' | 'info' | 'success' | 
 
 function Ligne({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="flex flex-col gap-0.5 border-b border-border py-3 last:border-b-0 sm:flex-row sm:items-baseline sm:gap-4">
-      <dt className="text-[0.8125rem] font-[600] text-muted-foreground sm:w-56 sm:shrink-0">
+    <div className="flex flex-col gap-0.5 border-b border-border py-3 last:border-b-0 @md:flex-row @md:items-baseline @md:gap-4">
+      <dt className="text-[0.8125rem] font-[600] text-muted-foreground @md:w-48 @md:shrink-0">
         {label}
       </dt>
-      <dd className="min-w-0 text-[0.9375rem]">{children}</dd>
+      <dd className="min-w-0 text-[0.9375rem] [overflow-wrap:anywhere]">{children}</dd>
     </div>
   );
 }
@@ -475,7 +475,7 @@ export function GrandPublicProspectDetail({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <HistoireDeLaFiche prospect={prospect} role={role} />
 
-        <div className="flex min-w-0 flex-col gap-6">
+        <div className="@container flex min-w-0 flex-col gap-6">
           <Card>
             <CardHeader>
               <CardTitle>Le prospect</CardTitle>

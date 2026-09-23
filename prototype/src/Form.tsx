@@ -1,18 +1,15 @@
 import { AlertTriangle, CalendarCheck, Star } from 'lucide-react';
 import { useState } from 'react';
-import { Checkbox, Radio, RadioGroup, ToggleButton } from 'react-aria-components';
+import { Checkbox, ToggleButton } from 'react-aria-components';
 
 import {
   calendarAlerts,
-  criteria,
   fcfa,
   type Fiche,
   frDate,
   MOTIVATIONS,
   missingFields,
   today,
-  budgetHint,
-  type Capacite,
 } from './bant';
 import { type Field, FIELDS, fieldLabel, isVisible, SECTIONS, withoutHiddenValues } from './fields';
 import { lots } from './store';
@@ -61,31 +58,52 @@ export function PhaseForm({
           </h3>
           {s.hint && <p className="mt-1 max-w-prose text-sm text-muted">{s.hint}</p>}
           <div className="mt-4">
-            {s.id === 'motivations' ? (
-              <Motivations fiche={fiche} update={update} invalid={invalid.has('motivations')} />
-            ) : s.id === 'consent' ? (
-              <Consent fiche={fiche} update={update} />
-            ) : (
-              <div className="grid gap-4 sm:grid-cols-2">
-                {s.id === 'lot' && <LotPicker update={update} />}
-                {FIELDS.filter((field) => field.section === s.id && isVisible(fiche, field.id)).map(
-                  (field) => (
-                    <FieldControl
-                      key={field.id}
-                      fiche={fiche}
-                      field={field}
-                      update={update}
-                      isRequired={required.has(field.id)}
-                      isInvalid={invalid.has(field.id)}
-                    />
-                  ),
-                )}
-              </div>
-            )}
+            <SectionBody
+              sectionId={s.id}
+              fiche={fiche}
+              update={update}
+              invalid={invalid}
+              required={required}
+            />
           </div>
           {s.id === 'suivi' && <Suivi fiche={fiche} />}
         </section>
       ))}
+    </div>
+  );
+}
+
+function SectionBody({
+  sectionId,
+  fiche,
+  update,
+  invalid,
+  required,
+}: {
+  sectionId: string;
+  fiche: Fiche;
+  update: Update;
+  invalid: Set<string>;
+  required: Set<string>;
+}) {
+  if (sectionId === 'motivations')
+    return <Motivations fiche={fiche} update={update} invalid={invalid.has('motivations')} />;
+  if (sectionId === 'consent') return <Consent fiche={fiche} update={update} />;
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      {sectionId === 'lot' && <LotPicker update={update} />}
+      {FIELDS.filter((field) => field.section === sectionId && isVisible(fiche, field.id)).map(
+        (field) => (
+          <FieldControl
+            key={field.id}
+            fiche={fiche}
+            field={field}
+            update={update}
+            isRequired={required.has(field.id)}
+            isInvalid={invalid.has(field.id)}
+          />
+        ),
+      )}
     </div>
   );
 }
@@ -258,53 +276,5 @@ function Suivi({ fiche }: { fiche: Fiche }) {
         </ol>
       )}
     </>
-  );
-}
-
-export function Notation({ fiche, update, cap }: { fiche: Fiche; update: Update; cap: Capacite }) {
-  const hint = budgetHint(fiche, cap);
-  return (
-    <div className="space-y-4">
-      <p className="rounded-xl bg-gold-soft px-4 py-3 text-sm text-gold-text">
-        Noter sur des faits, pas sur ce que le prospect affirme. En cas de doute entre deux notes,
-        prendre la plus basse.
-      </p>
-      {criteria(fiche).map((c) => (
-        <section key={c.key} className="rounded-2xl border border-line bg-paper p-4 sm:p-6">
-          <RadioGroup
-            aria-label={c.name}
-            value={fiche.scores[c.key] ? String(fiche.scores[c.key]) : null}
-            onChange={(v) => update((f) => ({ ...f, scores: { ...f.scores, [c.key]: Number(v) } }))}
-            className="space-y-2"
-          >
-            <div className="mb-3 flex items-baseline justify-between gap-3">
-              <h3 className="font-display text-lg font-semibold">{c.name}</h3>
-              <span className="text-sm text-muted">
-                {c.max} pts · {c.desc}
-              </span>
-            </div>
-            {c.options.map((o) => (
-              <Radio
-                key={o.value}
-                value={String(o.value)}
-                className="focus-ring flex min-h-12 cursor-pointer items-center gap-3 rounded-xl border border-line px-3 py-2 text-sm transition data-[hovered]:border-brand/30 data-[selected]:border-brand data-[selected]:bg-brand-soft data-[selected]:font-medium"
-              >
-                <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-canvas font-display text-base font-bold text-muted in-data-[selected]:bg-brand in-data-[selected]:text-white">
-                  {o.value}
-                </span>
-                {o.label}
-              </Radio>
-            ))}
-          </RadioGroup>
-          {c.key === 'budget' && hint && (
-            <p
-              className={`mt-3 rounded-lg px-3 py-2 text-sm font-medium ${hint.warn ? 'bg-ko-soft text-ko' : 'bg-canvas text-muted'}`}
-            >
-              {hint.text}
-            </p>
-          )}
-        </section>
-      ))}
-    </div>
   );
 }
