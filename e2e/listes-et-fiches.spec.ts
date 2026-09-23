@@ -178,8 +178,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
 
     await page.goto('/teleconseil/prospects/nouveau?projet=GRAND_PUBLIC');
     await fermerRappelIntrusif(page);
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
-    await expect(page.locator('button').filter({ hasText: 'Situation' })).toBeDisabled();
+    // Premier pas du parcours unifié : le type de contact, pas encore le formulaire.
+    await expect(page.getByRole('button', { name: 'Appel entrant', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SMS / Whatsapp', exact: true })).toBeVisible();
 
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Recherche');
@@ -196,7 +197,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     // Pas à pas : la réponse, le formulaire, le statut, sa précision, la note.
     // Un Retour ne perd pas ce qui a été saisi dans le formulaire.
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
-    await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+    // « Aucun » coche par défaut la méthode d'enrôlement : c'est le seul radio actif ici.
+    await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+    await expect(page.getByRole('radio', { name: 'Aucun', checked: true })).toBeVisible();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: /^Retour/u }).click();
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();

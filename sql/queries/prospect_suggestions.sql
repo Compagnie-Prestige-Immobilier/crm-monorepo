@@ -1,0 +1,40 @@
+-- name: ProspectIdParTelephoneExact :one
+SELECT "id" FROM "prospects"
+WHERE "phoneE164" = $1 AND "deletedAt" IS NULL LIMIT 1;
+
+-- name: InsererSuggestionProspect :exec
+INSERT INTO "prospect_suggestions" (
+  "id", "sourceProspectId", "suggestedName", "suggestedPhoneE164", "note",
+  "suggestedById", "resolvedProspectId", "sourceAttemptId", "clientCreatedAt")
+VALUES (@id, @source_prospect_id, @suggested_name, @suggested_phone_e164, @note,
+        @suggested_by_id, @resolved_prospect_id, @source_attempt_id, @client_created_at);
+
+-- name: TirerSuggestionsProspect :many
+SELECT s."id", s."suggestedName", s."suggestedPhoneE164"
+FROM "prospect_suggestions" s
+INNER JOIN "prospects" src ON src."id" = s."sourceProspectId"
+WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedProspectId" IS NULL
+  AND src."deletedAt" IS NULL
+ORDER BY s."createdAt" ASC;
+
+-- name: TelephonesProspectsConnus :many
+SELECT "phoneE164" FROM "prospects"
+WHERE "phoneE164" = ANY($1::text[]) AND "deletedAt" IS NULL;
+
+-- name: ResoudreSuggestionProspect :exec
+UPDATE "prospect_suggestions" SET "resolvedProspectId" = $2 WHERE "id" = $1;
+
+-- name: ParrainDuProspect :one
+SELECT src."id", src."nom", src."prenom"
+FROM "prospect_suggestions" s
+JOIN "prospects" src ON src."id" = s."sourceProspectId"
+WHERE s."resolvedProspectId" = $1 AND s."deletedAt" IS NULL AND src."deletedAt" IS NULL
+LIMIT 1;
+
+-- name: ProspectsRecommandesPar :many
+SELECT filleul."id", filleul."nom", filleul."prenom", filleul."statut"
+FROM "prospect_suggestions" s
+JOIN "prospects" filleul ON filleul."id" = s."resolvedProspectId"
+WHERE s."sourceProspectId" = $1 AND s."deletedAt" IS NULL AND filleul."deletedAt" IS NULL
+ORDER BY s."createdAt" DESC
+LIMIT 20;

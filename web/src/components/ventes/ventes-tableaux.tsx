@@ -196,6 +196,11 @@ export function TableVentes({
               <span className="block text-[0.8125rem] text-muted-foreground">
                 {vente.telephone}
               </span>
+              {vente.parrain !== null && (
+                <span className="block text-[0.8125rem] text-muted-foreground">
+                  Parrainé par {vente.parrain}
+                </span>
+              )}
             </TableCell>
             <TableCell>{vente.teleconseiller ?? '–'}</TableCell>
             <TableCell>{vente.site}</TableCell>

@@ -210,6 +210,17 @@ export async function fetchProspectCallAttempts(
   return payload.items;
 }
 
+export type ProspectParrainage = components['schemas']['ProspectParrainageDTO'];
+
+export async function fetchProspectParrainage(
+  id: string,
+  client: ApiClient = getApiClient(),
+): Promise<ProspectParrainage> {
+  return unwrap(
+    await client.GET('/api/v1/prospects/{id}/parrainage', { params: { path: { id } } }),
+  );
+}
+
 export type ProspectRequalification = components['schemas']['ProspectRequalification'];
 
 export async function fetchProspectRequalifications(

@@ -1,4 +1,11 @@
 {
+  "GET /api/v1/prospects/{id}/parrainage": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "PUT /api/v1/prospects/{id}/methode": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/admin/kairo/reglages/reparation-base/activer": ["ADMIN"],
   "POST /api/v1/admin/kairo/reglages/reparation-base/desactiver": ["ADMIN"],

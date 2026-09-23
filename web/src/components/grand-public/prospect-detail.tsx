@@ -1,6 +1,6 @@
 'use client';
 
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PencilIcon, PhoneCallIcon } from 'lucide-react';
 import Link from 'next/link';
 import { useState, type ReactNode } from 'react';
@@ -26,7 +26,7 @@ import {
   formatDureeMois,
   updateGrandPublicConsent,
 } from '@/lib/data/grand-public';
-import { fetchProspect } from '@/lib/data/prospects';
+import { fetchProspect, fetchProspectParrainage } from '@/lib/data/prospects';
 import {
   Dialog,
   DialogContent,
@@ -96,6 +96,41 @@ function LigneSi({ label, value }: { label: string; value: string | null }) {
     <Ligne label={label}>
       <span>{value}</span>
     </Ligne>
+  );
+}
+
+/** Un parrainage Grand Public : jamais chargé avec la fiche, une route à part. */
+function SectionParrainage({ prospectId }: { prospectId: string }) {
+  const { data } = useQuery({
+    queryKey: ['prospects', 'parrainage', prospectId],
+    queryFn: () => fetchProspectParrainage(prospectId),
+  });
+  if (data === undefined) return null;
+  return (
+    <>
+      {data.recommandeParId !== null && (
+        <Ligne label="Recommandé par">
+          <Link href={`/teleconseil/prospects/${data.recommandeParId}`} className="underline">
+            {data.recommandeParNom}
+          </Link>
+        </Ligne>
+      )}
+      {data.aRecommande.length > 0 && (
+        <Ligne label="A recommandé">
+          <span className="flex flex-col gap-1">
+            {data.aRecommande.map((filleul) => (
+              <Link
+                key={filleul.id}
+                href={`/teleconseil/prospects/${filleul.id}`}
+                className="underline"
+              >
+                {filleul.nom}
+              </Link>
+            ))}
+          </span>
+        </Ligne>
+      )}
+    </>
   );
 }
 
@@ -464,6 +499,7 @@ export function GrandPublicProspectDetail({
                   )}
                 </Ligne>
                 <Ligne label="Durée du système">{dureeSystemeLigne(prospect)}</Ligne>
+                <SectionParrainage prospectId={prospect.id} />
               </dl>
             </CardContent>
           </Card>
