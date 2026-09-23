@@ -269,7 +269,8 @@ export interface ProspectFilters {
   syndicatId: string | null;
   statut: ProspectStatut | null;
   segment: BddSegment | null;
-  phase2Status: Phase2Status | null;
+  /** `TOUT` régroupe Intéressés, Hésitants et Rendez-vous : ce n'est pas un statut réel. */
+  phase2Status: Phase2Status | 'TOUT' | null;
   /** Code du motif dont le dernier appel écarte la fiche de la liste. */
   sansMotif: string | null;
   enrollmentMethod: EnrollmentMethod | null;

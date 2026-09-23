@@ -73,7 +73,9 @@ const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
   segment: (filters) => (filters.segment === null ? null : SEGMENT_LABELS[filters.segment]),
 
   phase2Status: (filters) =>
-    filters.phase2Status === null ? null : PHASE2_STATUS_LABELS[filters.phase2Status],
+    filters.phase2Status === null || filters.phase2Status === 'TOUT'
+      ? null
+      : PHASE2_STATUS_LABELS[filters.phase2Status],
 
   enrollmentMethod: (filters) =>
     filters.enrollmentMethod === null ? null : ENROLLMENT_METHOD_LABELS[filters.enrollmentMethod],
