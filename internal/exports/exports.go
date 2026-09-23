@@ -56,7 +56,7 @@ const (
 	exportLibelleAucun          = "Aucun"
 	exportLibelleTontine        = "Tontine"
 	exportLibellePlateforme     = "Plateforme en ligne"
-	exportLibelleRendezVous     = "RDV CPI"
+	exportLibelleRendezVous     = "Enrôlement sur place"
 	ExportCleRefus              = "REFUSED"
 	exportCleMemeNumero         = "MEME_NUMERO"
 	exportCleNonDemande         = "NON_DEMANDE"

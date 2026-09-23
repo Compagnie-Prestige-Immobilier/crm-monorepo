@@ -9,6 +9,11 @@ import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
+import {
+  contactsPourEnvoi,
+  ContactsRecommandes,
+  type ContactRecommandeLigne,
+} from '@/components/console/contacts-recommandes';
 import { HistoriqueFiche } from '@/components/console/historique-fiche';
 import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
@@ -72,6 +77,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   PHASE2_STATUS_LABELS,
+  PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   type ProspectRow,
   type ProspectStatut,
@@ -81,6 +87,10 @@ import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 import { EnTeteAnnuaire } from '@/components/console/console-annuaire-header';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 
 export type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
@@ -350,10 +360,6 @@ export function ConsoleView({
           consoleFilters.set.syndicatId(value);
           setPage(1);
         }}
-        onStatutChange={(value) => {
-          consoleFilters.set.statut(value);
-          setPage(1);
-        }}
         onCanalChange={(value) => {
           consoleFilters.set.canalProvenanceId(value);
           setPage(1);
@@ -370,7 +376,6 @@ export function ConsoleView({
         departementId={consoleFilters.values.departementId}
         banqueId={consoleFilters.values.banqueId}
         syndicatId={consoleFilters.values.syndicatId}
-        statut={consoleFilters.values.statut}
         canalProvenanceId={consoleFilters.values.canalProvenanceId}
         dateFrom={consoleFilters.values.dateFrom}
         dateTo={consoleFilters.values.dateTo}
@@ -383,6 +388,16 @@ export function ConsoleView({
         onPage={setPage}
         canCreateProspect={canCreateProspect}
         seulementARappeler={resteAAppeler}
+        filtreStatut={{
+          label: 'Statut',
+          placeholder: 'Tous les statuts',
+          options: PROSPECT_STATUTS.map((s) => ({ value: s, label: PROSPECT_STATUT_LABELS[s] })),
+          value: consoleFilters.values.statut,
+          onChange: (value) => {
+            consoleFilters.set.statut(value);
+            setPage(1);
+          },
+        }}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -681,6 +696,7 @@ function ListeAnnuaire({
   onPage,
   canCreateProspect,
   seulementARappeler,
+  filtreStatut,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
@@ -689,6 +705,7 @@ function ListeAnnuaire({
   onPage: (page: number) => void;
   canCreateProspect: boolean;
   seulementARappeler: boolean;
+  filtreStatut: FiltreColonne;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -726,7 +743,7 @@ function ListeAnnuaire({
             <TableHead>Nom et prénom</TableHead>
             <TableHead>Projet</TableHead>
             <TableHead>Numéro</TableHead>
-            <TableHead>Statut / Qualification</TableHead>
+            <FilterableTableHead label="Statut / Qualification" filtre={filtreStatut} />
             <TableHead>Dernier appel</TableHead>
           </TableRow>
         </TableHeader>
@@ -976,8 +993,10 @@ export function draftDe(
   conversion: ConversionDraft | null,
   comment: string,
   ouverture: OuvertureFiche | null,
+  contacts: readonly ContactRecommandeLigne[] = [],
 ): AttemptDraft {
   const method = conversion?.method ?? null;
+  const contactsRecommandes = contactsPourEnvoi(contacts);
   return {
     effect: method === null ? choisi.effect : 'CLOSE_METHOD',
     reasonCode: choisi.code,
@@ -986,6 +1005,7 @@ export function draftDe(
     callbackAt,
     ...(conversion === null ? {} : { conversion }),
     ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
+    ...(contactsRecommandes.length === 0 ? {} : { contactsRecommandes }),
   };
 }
 
@@ -1045,6 +1065,7 @@ export function Consignation({
 
   const [repris] = useState(() => lireBrouillon(ouverture?.draft));
   const [comment, setComment] = useState(repris.comment);
+  const [contacts, setContacts] = useState<ContactRecommandeLigne[]>([]);
   // Un brouillon repris vient d'un appel où la personne répondait : la question
   // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
   const [groupe, setGroupe] = useState<Groupe | null>(() =>
@@ -1150,7 +1171,7 @@ export function Consignation({
       toast.error('Ce créneau est passé, choisissez-en un autre.');
       return;
     }
-    const draft = draftDe(motif, callbackAt, conversion, comment, ouverture);
+    const draft = draftDe(motif, callbackAt, conversion, comment, ouverture, contacts);
     const problem = validateAttempt(draft, maintenant(), motif.requiresComment);
     if (problem !== null) {
       toast.error(problem);
@@ -1331,6 +1352,8 @@ export function Consignation({
           pas={pasCourant}
           groupe={groupe}
           prospect={prospect}
+          projet={projet}
+          contacts={contacts}
           conversion={conversion}
           conversionErrors={conversionErrors}
           formulaire={formulaire}
@@ -1357,6 +1380,7 @@ export function Consignation({
           onFreeCallback={setFreeCallback}
           onValidate={entree[pasCourant]}
           onComment={setComment}
+          onContacts={setContacts}
         />
 
         <PiedPas
@@ -1401,6 +1425,8 @@ function CorpsPas({
   pas,
   groupe,
   prospect,
+  projet,
+  contacts,
   conversion,
   conversionErrors,
   formulaire,
@@ -1423,10 +1449,13 @@ function CorpsPas({
   onFreeCallback,
   onValidate,
   onComment,
+  onContacts,
 }: {
   pas: Pas;
   groupe: Groupe | null;
   prospect: ProspectRow;
+  projet: Projet;
+  contacts: readonly ContactRecommandeLigne[];
   conversion: ConversionDraft | null;
   conversionErrors: ConversionErrors;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
@@ -1449,6 +1478,7 @@ function CorpsPas({
   onFreeCallback: (value: string) => void;
   onValidate: () => void;
   onComment: (value: string) => void;
+  onContacts: (value: ContactRecommandeLigne[]) => void;
 }) {
   switch (pas) {
     case 'reponse':
@@ -1513,14 +1543,19 @@ function CorpsPas({
       );
     case 'note':
       return (
-        <Commentaire
-          value={comment}
-          titre="Commentaire, facultatif"
-          obligatoirePour={commentaireObligatoirePour}
-          inputRef={commentRef}
-          onChange={onComment}
-          onValidate={onValidate}
-        />
+        <div className="flex flex-col gap-4">
+          <Commentaire
+            value={comment}
+            titre="Commentaire, facultatif"
+            obligatoirePour={commentaireObligatoirePour}
+            inputRef={commentRef}
+            onChange={onComment}
+            onValidate={onValidate}
+          />
+          {projet === 'GRAND_PUBLIC' && (
+            <ContactsRecommandes valeurs={contacts} onChange={onContacts} disabled={disabled} />
+          )}
+        </div>
       );
   }
 }

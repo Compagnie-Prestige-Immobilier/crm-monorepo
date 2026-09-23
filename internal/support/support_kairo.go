@@ -17,10 +17,12 @@ import (
 )
 
 const (
-	cheminKairo        = "/api/v1/admin/kairo"
-	cheminKairoPause   = cheminKairo + "/pause"
-	cheminKairoReprise = cheminKairo + "/reprise"
-	cheminKairoRelance = cheminKairo + "/tickets/{id}/relance"
+	cheminKairo                         = "/api/v1/admin/kairo"
+	cheminKairoPause                    = cheminKairo + "/pause"
+	cheminKairoReprise                  = cheminKairo + "/reprise"
+	cheminKairoRelance                  = cheminKairo + "/tickets/{id}/relance"
+	cheminKairoReparationBaseActiver    = cheminKairo + "/reglages/reparation-base/activer"
+	cheminKairoReparationBaseDesactiver = cheminKairo + "/reglages/reparation-base/desactiver"
 )
 
 var clientKairo = &http.Client{Timeout: 5 * time.Second}
@@ -44,14 +46,19 @@ type TicketKairo struct {
 }
 
 type EtatKairo struct {
-	Sain                    bool          `json:"sain"`
-	PauseDepuis             *string       `json:"pauseDepuis"`
-	DerniereLectureSecondes int           `json:"derniereLectureSecondes"`
-	IntervalleSecondes      int           `json:"intervalleSecondes"`
-	Agents                  []string      `json:"agents"`
-	Tickets                 []TicketKairo `json:"tickets"`
-	MTTRSecondes            int           `json:"mttrSecondes,omitempty"`
-	JevActif                bool          `json:"jevActif,omitempty"`
+	Sain                    bool           `json:"sain"`
+	PauseDepuis             *string        `json:"pauseDepuis"`
+	DerniereLectureSecondes int            `json:"derniereLectureSecondes"`
+	IntervalleSecondes      int            `json:"intervalleSecondes"`
+	Agents                  []string       `json:"agents"`
+	Tickets                 []TicketKairo  `json:"tickets"`
+	TicketsTotal            int            `json:"ticketsTotal"`
+	TicketsPage             int            `json:"ticketsPage"`
+	TicketsPageSize         int            `json:"ticketsPageSize"`
+	ComptesParStatut        map[string]int `json:"comptesParStatut"`
+	MTTRSecondes            int            `json:"mttrSecondes,omitempty"`
+	JevActif                bool           `json:"jevActif,omitempty"`
+	ReparationBaseActive    bool           `json:"reparationBaseActive"`
 }
 
 type UsageModele struct {
@@ -91,6 +98,11 @@ type RelanceTicketKairoInput struct {
 	}
 }
 
+type TableauKairoInput struct {
+	Page     int `query:"page" minimum:"1" default:"1"`
+	PageSize int `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
+}
+
 func monterKairo(api huma.API, s *service) {
 	huma.Register(api, huma.Operation{
 		OperationID: "tableauKairo", Method: http.MethodGet, Path: cheminKairo,
@@ -107,6 +119,18 @@ func monterKairo(api huma.API, s *service) {
 		return nil, commanderKairo(ctx, "/reprise", nil)
 	})
 	huma.Register(api, huma.Operation{
+		OperationID: "activerReparationBaseKairo", Method: http.MethodPost, Path: cheminKairoReparationBaseActiver, DefaultStatus: http.StatusNoContent,
+		Summary: "Active la réparation automatique de la branche de base par Kairo.",
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/reglages/reparation-base/activer", nil)
+	})
+	huma.Register(api, huma.Operation{
+		OperationID: "desactiverReparationBaseKairo", Method: http.MethodPost, Path: cheminKairoReparationBaseDesactiver, DefaultStatus: http.StatusNoContent,
+		Summary: "Désactive la réparation automatique de la branche de base par Kairo.",
+	}, func(ctx context.Context, _ *struct{}) (*struct{}, error) {
+		return nil, commanderKairo(ctx, "/reglages/reparation-base/desactiver", nil)
+	})
+	huma.Register(api, huma.Operation{
 		OperationID: "relanceTicketKairo", Method: http.MethodPost, Path: cheminKairoRelance, DefaultStatus: http.StatusNoContent,
 		Summary: "Remet à Kairo un ticket en échec ou escaladé.",
 	}, func(ctx context.Context, in *RelanceTicketKairoInput) (*struct{}, error) {
@@ -118,7 +142,7 @@ func monterKairo(api huma.API, s *service) {
 	})
 }
 
-func (s *service) tableauKairo(ctx context.Context, _ *struct{}) (*TableauKairoOutput, error) {
+func (s *service) tableauKairo(ctx context.Context, in *TableauKairoInput) (*TableauKairoOutput, error) {
 	out := &TableauKairoOutput{}
 	parModele, err := s.Q.SupportReformulationsParModele(ctx)
 	if err != nil {
@@ -143,7 +167,7 @@ func (s *service) tableauKairo(ctx context.Context, _ *struct{}) (*TableauKairoO
 			Description: ligne.Description, Contexte: ligne.Contexte, DescriptionTransmise: ligne.DescriptionTransmise,
 		})
 	}
-	out.Body.Kairo, err = lireKairo(ctx)
+	out.Body.Kairo, err = lireKairo(ctx, in.Page, in.PageSize)
 	var probleme huma.StatusError
 	switch {
 	case err == nil:
@@ -180,8 +204,9 @@ func appelKairo(ctx context.Context, methode, chemin string, corps any) (*http.R
 	return clientKairo.Do(req)
 }
 
-func lireKairo(ctx context.Context) (*EtatKairo, error) {
-	resp, err := appelKairo(ctx, http.MethodGet, "/etat", nil)
+func lireKairo(ctx context.Context, page, pageSize int) (*EtatKairo, error) {
+	chemin := fmt.Sprintf("/etat?page=%d&pageSize=%d", page, pageSize)
+	resp, err := appelKairo(ctx, http.MethodGet, chemin, nil)
 	if err != nil {
 		return nil, err
 	}

@@ -27,14 +27,10 @@ import {
   countActiveRepresentantFilters,
   REPRESENTANT_RELATION_CHOICES,
   REPRESENTANT_RELATION_LABELS,
-  REPRESENTANT_SORT_FIELDS,
-  REPRESENTANT_SORT_LABELS,
   type RepresentantRelation,
   type RepresentantAdvancedFilterKey,
   type RepresentantFilters,
-  type RepresentantSortField,
 } from '@/lib/representant-filters';
-import type { SortDirection } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
 
 const PRESENCE_ITEMS = [
@@ -49,15 +45,6 @@ const RELATION_ITEMS = [
     value: relation,
     label: REPRESENTANT_RELATION_LABELS[relation],
   })),
-];
-
-const SORT_ITEMS: { value: RepresentantSortField; label: string }[] = REPRESENTANT_SORT_FIELDS.map(
-  (field) => ({ value: field, label: REPRESENTANT_SORT_LABELS[field] }),
-);
-
-const DIRECTION_ITEMS: { value: SortDirection; label: string }[] = [
-  { value: 'desc', label: 'Décroissant' },
-  { value: 'asc', label: 'Croissant' },
 ];
 
 type Referentiels = Awaited<ReturnType<typeof fetchReferenceData>> | undefined;
@@ -80,8 +67,6 @@ function commerciauxDe(reference: Referentiels) {
 
 export function RepresentantsFiltersBar() {
   const { filters, setFilters, resetFilters } = useRepresentantFilters();
-  const sortId = useId();
-  const orderId = useId();
   const presenceId = useId();
   const relationId = useId();
   const statutId = useId();
@@ -136,38 +121,17 @@ export function RepresentantsFiltersBar() {
       aria-label="Filtres"
       className="flex flex-col gap-4 rounded-lg border border-border bg-card p-4 shadow-elev-sm"
     >
-      {/* ─── Filtrage simple ────────────────────────────────────────────── */}
+      {/* Qualification, département, IEF, « Saisi par » et « Prospects apportés »
+          se filtrent depuis l'en-tête de leur colonne, et le tri depuis le même
+          bouton. Sous 1024 px le tableau cède la place à des cartes : ces
+          critères restent alors dans le panneau. */}
       <div className="flex flex-wrap items-end gap-3">
         <SearchField
           value={searchDraft}
           onChange={setSearchDraft}
           placeholder="Nom ou téléphone…"
+          className="sm:max-w-md"
         />
-
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5 sm:max-w-xs">
-          <Label htmlFor={relationId}>Qualification</Label>
-          <Select
-            items={RELATION_ITEMS}
-            value={filters.relationStatus ?? 'tous'}
-            onValueChange={(value) => {
-              if (value === null) return;
-              setFilters({
-                relationStatus: value === 'tous' ? null : (value as RepresentantRelation),
-              });
-            }}
-          >
-            <SelectTrigger id={relationId} className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {RELATION_ITEMS.map((item) => (
-                <SelectItem key={item.value} value={item.value}>
-                  {item.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {/* ─── Filtrage avancé ────────────────────────────────────────────── */}
@@ -186,7 +150,7 @@ export function RepresentantsFiltersBar() {
           ) : null
         }
       >
-        <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
+        <>
           <div className="flex flex-col gap-1.5">
             <Label htmlFor={statutId}>Statut de qualification</Label>
             <Select
@@ -210,75 +174,6 @@ export function RepresentantsFiltersBar() {
             </Select>
           </div>
 
-          <div className="flex flex-col gap-1.5">
-            <FilterCombobox
-              label="Région"
-              placeholder="Toutes les régions"
-              value={regionId}
-              options={regionsDe(reference).map((region) => ({
-                value: region.id,
-                label: region.name ?? '',
-              }))}
-              onChange={(value) => {
-                setRegionDraft(value);
-                if (filters.departementId === null && filters.iefId === null) return;
-                setFilters({ departementId: null, iefId: null });
-              }}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <FilterCombobox
-              label="Département"
-              placeholder="Tous les départements"
-              value={filters.departementId}
-              options={departements
-                .filter((departement) => regionId === null || departement.regionId === regionId)
-                .map((departement) => ({
-                  value: departement.id,
-                  label: departement.name ?? '',
-                  hint: departement.regionName ?? undefined,
-                }))}
-              onChange={(value) => {
-                setFilters({ departementId: value, iefId: null });
-              }}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <FilterCombobox
-              label="IEF"
-              placeholder="Toutes les IEF"
-              value={filters.iefId}
-              options={iefsDe(reference)
-                .filter((ief) =>
-                  filters.departementId === null
-                    ? true
-                    : ief.departementId === filters.departementId,
-                )
-                .map((ief) => ({
-                  value: ief.id,
-                  label: ief.name ?? '',
-                  hint: ief.departementName ?? undefined,
-                }))}
-              onChange={(value) => {
-                setFilters({ iefId: value });
-              }}
-            />
-          </div>
-
-          <div className="flex flex-col gap-1.5">
-            <FilterCombobox
-              label="Téléconseiller"
-              placeholder="Tous les téléconseillers"
-              value={filters.commercialId}
-              options={commerciauxDe(reference)}
-              onChange={(value) => {
-                setFilters({ commercialId: value });
-              }}
-            />
-          </div>
-
           <DatePicker
             id="representants-date-from"
             label="Saisi à partir du"
@@ -298,75 +193,127 @@ export function RepresentantsFiltersBar() {
             }}
           />
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={presenceId}>Prospects apportés</Label>
-            <Select
-              items={PRESENCE_ITEMS}
-              value={presenceValue(filters.hasProspects)}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ hasProspects: presenceFromValue(value) });
-              }}
-            >
-              <SelectTrigger id={presenceId} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {PRESENCE_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {/* Sous 1024 px, des cartes remplacent le tableau : les critères que
+              portent les en-têtes n'ont plus où se poser, ils reviennent ici. */}
+          <div className="contents lg:hidden">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={relationId}>Qualification</Label>
+              <Select
+                items={RELATION_ITEMS}
+                value={filters.relationStatus ?? 'tous'}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setFilters({
+                    relationStatus: value === 'tous' ? null : (value as RepresentantRelation),
+                  });
+                }}
+              >
+                <SelectTrigger id={relationId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RELATION_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={sortId}>Trier par</Label>
-            <Select
-              items={SORT_ITEMS}
-              value={filters.sortBy}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ sortBy: value });
-              }}
-            >
-              <SelectTrigger id={sortId} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {SORT_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+            <div className="flex flex-col gap-1.5">
+              <FilterCombobox
+                label="Région"
+                placeholder="Toutes les régions"
+                value={regionId}
+                options={regionsDe(reference).map((region) => ({
+                  value: region.id,
+                  label: region.name ?? '',
+                }))}
+                onChange={(value) => {
+                  setRegionDraft(value);
+                  if (filters.departementId === null && filters.iefId === null) return;
+                  setFilters({ departementId: null, iefId: null });
+                }}
+              />
+            </div>
 
-          <div className="flex flex-col gap-1.5">
-            <Label htmlFor={orderId}>Sens</Label>
-            <Select
-              items={DIRECTION_ITEMS}
-              value={filters.sortDir}
-              onValueChange={(value) => {
-                if (value === null) return;
-                setFilters({ sortDir: value });
-              }}
-            >
-              <SelectTrigger id={orderId} className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {DIRECTION_ITEMS.map((item) => (
-                  <SelectItem key={item.value} value={item.value}>
-                    {item.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-1.5">
+              <FilterCombobox
+                label="Département"
+                placeholder="Tous les départements"
+                value={filters.departementId}
+                options={departements
+                  .filter((departement) => regionId === null || departement.regionId === regionId)
+                  .map((departement) => ({
+                    value: departement.id,
+                    label: departement.name ?? '',
+                    hint: departement.regionName ?? undefined,
+                  }))}
+                onChange={(value) => {
+                  setFilters({ departementId: value, iefId: null });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <FilterCombobox
+                label="IEF"
+                placeholder="Toutes les IEF"
+                value={filters.iefId}
+                options={iefsDe(reference)
+                  .filter((ief) =>
+                    filters.departementId === null
+                      ? true
+                      : ief.departementId === filters.departementId,
+                  )
+                  .map((ief) => ({
+                    value: ief.id,
+                    label: ief.name ?? '',
+                    hint: ief.departementName ?? undefined,
+                  }))}
+                onChange={(value) => {
+                  setFilters({ iefId: value });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <FilterCombobox
+                label="Saisi par"
+                placeholder="Tous les utilisateurs"
+                value={filters.commercialId}
+                options={commerciauxDe(reference)}
+                onChange={(value) => {
+                  setFilters({ commercialId: value });
+                }}
+              />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor={presenceId}>Prospects apportés</Label>
+              <Select
+                items={PRESENCE_ITEMS}
+                value={presenceValue(filters.hasProspects)}
+                onValueChange={(value) => {
+                  if (value === null) return;
+                  setFilters({ hasProspects: presenceFromValue(value) });
+                }}
+              >
+                <SelectTrigger id={presenceId} className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PRESENCE_ITEMS.map((item) => (
+                    <SelectItem key={item.value} value={item.value}>
+                      {item.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-        </div>
+        </>
       </AdvancedPanel>
     </section>
   );

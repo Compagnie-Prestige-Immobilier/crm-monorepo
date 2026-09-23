@@ -1,4 +1,4 @@
-import { ADVANCED_FILTER_KEYS, type AdvancedFilterKey } from '@/lib/filters';
+import type { AdvancedFilterKey } from '@/lib/filters';
 import { withRetired } from '@/lib/format';
 import {
   ENROLLMENT_METHOD_LABELS,
@@ -92,10 +92,11 @@ const CHIP_VALUES: Record<AdvancedFilterKey, ChipValue> = {
 export function buildAdvancedChips(
   filters: ProspectFilters,
   reference: ReferenceData | undefined,
+  keys: readonly AdvancedFilterKey[],
 ): AdvancedChip[] {
   const chips: AdvancedChip[] = [];
 
-  for (const key of ADVANCED_FILTER_KEYS) {
+  for (const key of keys) {
     const value = CHIP_VALUES[key](filters, reference);
     if (value === null) continue;
     chips.push({ key, field: ADVANCED_FILTER_LABELS[key], value });

@@ -9,6 +9,19 @@ graphique manque.
 Ce fichier s'adresse aux assistants qui ecrivent du code ici. Il complete
 `docs/QUALITY.md`, qui s'adresse aux humains.
 
+## Toute liste a une borne explicite
+
+Ne jamais justifier l'absence de pagination, de limite ou de plafond par une
+observation de la taille actuelle ("il n'y a que N teleconseillers", "cette
+table reste petite"). C'est une hypothese non ecrite qui casse des que la
+donnee grandit, et ce n'est jamais une explication acceptable a poser apres
+coup.
+
+Toute liste, tableau ou requete qui peut grandir recoit une limite explicite
+des sa premiere version : parametre de page cote API, `LIMIT` en SQL, plafond
+dur avec message si depasse. Ne pas attendre qu'elle devienne un probleme pour
+la borner.
+
 ## Commits
 
 **Aucune mention d'un assistant dans un commit.** Pas de `Co-Authored-By`

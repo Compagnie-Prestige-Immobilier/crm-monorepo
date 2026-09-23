@@ -10,6 +10,10 @@ import { BankFiltersBar } from '@/components/bank/bank-filters-bar';
 import { StageBadge } from '@/components/bank/stage-badge';
 import { useBankFilters } from '@/components/bank/use-bank-filters';
 import { EmptyState } from '@/components/empty-state';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Button, buttonVariants } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,8 +35,9 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { BANK_PAGE_SIZE_OPTIONS, bankBasePath, countActiveBankFilters } from '@/lib/bank-filters';
-import { fetchBankCases } from '@/lib/data/bank-cases';
-import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
+import { fetchBankCases, fetchBankStages } from '@/lib/data/bank-cases';
+import { fetchBanques } from '@/lib/data/reference';
+import { formatDateTime, formatNumber, formatPhone, withRetired } from '@/lib/format';
 import { formatXof } from '@/lib/money';
 import { queryKeys } from '@/lib/query-keys';
 import {
@@ -65,6 +70,45 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
     placeholderData: (previous) => previous,
   });
 
+  const stages = useQuery({
+    queryKey: queryKeys.bankStages(true),
+    queryFn: () => fetchBankStages(true),
+    staleTime: 5 * 60_000,
+  });
+  const banques = useQuery({
+    queryKey: queryKeys.banques,
+    queryFn: () => fetchBanques(),
+    staleTime: 5 * 60_000,
+  });
+
+  const filtreBanque: FiltreColonne = {
+    label: 'Banque',
+    placeholder: 'Toutes les banques',
+    options: (banques.data ?? []).map((banque) => ({
+      value: banque.id,
+      label: withRetired(banque.shortName ?? '', banque.isActive ?? false),
+      hint: banque.name ?? undefined,
+    })),
+    value: filters.banqueId,
+    onChange: (value) => {
+      setFilters({ banqueId: value });
+    },
+  };
+
+  const filtreEtape: FiltreColonne = {
+    label: 'Étape',
+    placeholder: 'Toutes les étapes',
+    options: (stages.data ?? []).map((stage) => ({
+      value: stage.id,
+      label: stage.label,
+      hint: stage.isActive ? undefined : 'désactivée',
+    })),
+    value: filters.stageId,
+    onChange: (value) => {
+      setFilters({ stageId: value, stageType: null });
+    },
+  };
+
   function toggleSort(columnId: string): void {
     if (!isSortField(columnId)) return;
     if (filters.sortBy === columnId) {
@@ -90,7 +134,7 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
         </div>
       </div>
 
-      <BankFiltersBar />
+      <BankFiltersBar colonnesFiltrables />
 
       {(() => {
         if (isPending) return <BankCasesSkeleton />;
@@ -159,8 +203,8 @@ export function BankCasesView({ projet }: { projet?: Projet | null | undefined }
                             onToggle={toggleSort}
                           />
                         ))}
-                        <TableHead>Banque</TableHead>
-                        <TableHead>Étape</TableHead>
+                        <FilterableTableHead label="Banque" filtre={filtreBanque} />
+                        <FilterableTableHead label="Étape" filtre={filtreEtape} />
                         <SortableTableHead
                           column={SORTABLE[2] ?? { id: 'amountXof', label: 'Montant' }}
                           sortBy={filters.sortBy}

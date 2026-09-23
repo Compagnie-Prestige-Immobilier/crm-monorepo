@@ -4,6 +4,7 @@ import { fr } from 'date-fns/locale';
 
 import { type components } from '@/api/compat/serveur';
 import { getApiClient } from '@/lib/api/browser';
+import { estModeDev } from '@/lib/data/kairo-simulation';
 
 export type TableauKairo = components['schemas']['TableauKairoOutputBody'];
 export type EtatKairo = components['schemas']['EtatKairo'];
@@ -53,6 +54,13 @@ export function ticketsFiltres(tickets: TicketKairo[], filtre: FiltreTickets): T
   return statuts === null ? tickets : tickets.filter((t) => statuts.includes(t.statut));
 }
 
+/** Somme sur TOUS les tickets connus, pas seulement la page affichée. */
+export function compteGroupe(comptes: Record<string, number>, filtre: FiltreTickets): number {
+  const statuts = FILTRES_TICKETS[filtre].statuts;
+  if (statuts === null) return Object.values(comptes).reduce((acc, n) => acc + n, 0);
+  return statuts.reduce((acc, statut) => acc + (comptes[statut] ?? 0), 0);
+}
+
 /** Kairo écrit ses dates en UTC, au format SQLite `AAAA-MM-JJ HH:MM:SS`. */
 export function isoKairo(sqlite: string): string {
   return `${sqlite.replace(' ', 'T')}Z`;
@@ -62,13 +70,32 @@ export function ilYA(iso: string): string {
   return formatDistanceToNowStrict(new Date(iso), { locale: fr, addSuffix: true });
 }
 
-export async function lireTableauKairo(): Promise<TableauKairo> {
-  return unwrap(await getApiClient().GET('/api/v1/admin/kairo'));
+export async function lireTableauKairo(page = 1, pageSize = 25): Promise<TableauKairo> {
+  return unwrap(
+    await getApiClient().GET('/api/v1/admin/kairo', { params: { query: { page, pageSize } } }),
+  );
 }
 
 export async function basculerPauseKairo(pause: boolean): Promise<void> {
   const chemin = pause ? '/api/v1/admin/kairo/pause' : '/api/v1/admin/kairo/reprise';
-  unwrap(await getApiClient().POST(chemin));
+  try {
+    unwrap(await getApiClient().POST(chemin));
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
+}
+
+export async function basculerReparationBaseKairo(active: boolean): Promise<void> {
+  const chemin = active
+    ? '/api/v1/admin/kairo/reglages/reparation-base/activer'
+    : '/api/v1/admin/kairo/reglages/reparation-base/desactiver';
+  try {
+    unwrap(await getApiClient().POST(chemin));
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
 }
 
 export async function relancerTicketKairo(
@@ -88,12 +115,17 @@ export async function relancerTicketKairo(
   if (consigne) corps.consigne = consigne;
   if (action) corps.action = action;
 
-  unwrap(
-    await getApiClient().POST('/api/v1/admin/kairo/tickets/{id}/relance', {
-      params: { path: { id } },
-      body: Object.keys(corps).length > 0 ? corps : undefined,
-    }),
-  );
+  try {
+    unwrap(
+      await getApiClient().POST('/api/v1/admin/kairo/tickets/{id}/relance', {
+        params: { path: { id } },
+        body: Object.keys(corps).length > 0 ? corps : undefined,
+      }),
+    );
+  } catch (err) {
+    if (estModeDev()) return;
+    throw err;
+  }
 }
 
 export async function prendreEnMainTicketKairo(id: number): Promise<void> {

@@ -17,6 +17,10 @@ import Link from 'next/link';
 import { useState } from 'react';
 
 import { useFileDownload } from '@/components/exports/download-button';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 import { QueryErrorState } from '@/components/query-error-state';
 import { RelationBadge } from '@/components/representants/relation-badge';
 import { RepresentantFormDialog } from '@/components/representants/representant-form-dialog';
@@ -32,6 +36,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Skeleton } from '@/components/ui/skeleton';
+import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import {
   Table,
   TableBody,
@@ -41,6 +46,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchRepresentants } from '@/lib/data/representants';
+import { fetchReferenceData } from '@/lib/data/reference';
 import {
   buildRepresentantsExportUrl,
   representantsExportFileName,
@@ -49,12 +55,120 @@ import { formatDate, formatNumber, formatPhone } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   countActiveRepresentantFilters,
+  REPRESENTANT_RELATION_CHOICES,
+  REPRESENTANT_RELATION_LABELS,
+  REPRESENTANT_SORT_FIELDS,
   type RepresentantFilters,
+  type RepresentantSortField,
 } from '@/lib/representant-filters';
-import type { RepresentantRow } from '@/lib/types';
+import type { FilterOption, ReferenceData, RepresentantRow } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const NO_VALUE = '–';
+
+const RELATION_OPTIONS: FilterOption[] = REPRESENTANT_RELATION_CHOICES.map((relation) => ({
+  value: relation,
+  label: REPRESENTANT_RELATION_LABELS[relation],
+}));
+
+const PRESENCE_OPTIONS: FilterOption[] = [
+  { value: 'oui', label: 'Au moins un' },
+  { value: 'non', label: 'Aucun' },
+];
+
+function isSortField(id: string): id is RepresentantSortField {
+  return (REPRESENTANT_SORT_FIELDS as readonly string[]).includes(id);
+}
+
+type CritereColonne = {
+  colonne: 'qualification' | 'departement' | 'ief' | 'saisiPar';
+  cle: 'relationStatus' | 'departementId' | 'iefId' | 'commercialId';
+  label: string;
+  placeholder: string;
+  options: (reference: ReferenceData | undefined) => readonly FilterOption[];
+};
+
+/** « Saisi par » porte `commercialId`, qui filtre bien l'auteur de la fiche. */
+const CRITERES_COLONNES: readonly CritereColonne[] = [
+  {
+    colonne: 'qualification',
+    cle: 'relationStatus',
+    label: 'Qualification',
+    placeholder: 'Toutes les qualifications',
+    options: () => RELATION_OPTIONS,
+  },
+  {
+    colonne: 'departement',
+    cle: 'departementId',
+    label: 'Département',
+    placeholder: 'Tous les départements',
+    options: (reference) =>
+      (reference?.departements ?? []).map((departement) => ({
+        value: departement.id,
+        label: departement.name ?? '',
+        hint: departement.regionName ?? undefined,
+      })),
+  },
+  {
+    colonne: 'ief',
+    cle: 'iefId',
+    label: 'IEF',
+    placeholder: 'Toutes les IEF',
+    options: (reference) =>
+      (reference?.iefs ?? []).map((ief) => ({
+        value: ief.id,
+        label: ief.name ?? '',
+        hint: ief.departementName ?? undefined,
+      })),
+  },
+  {
+    colonne: 'saisiPar',
+    cle: 'commercialId',
+    label: 'Saisi par',
+    placeholder: 'Tous les utilisateurs',
+    options: (reference) => reference?.commerciaux ?? [],
+  },
+];
+
+type FiltresColonnes = Record<CritereColonne['colonne'] | 'prospects', FiltreColonne>;
+
+function filtresDesColonnes(
+  filters: RepresentantFilters,
+  setFilters: (patch: Partial<RepresentantFilters>) => void,
+  reference: ReferenceData | undefined,
+): FiltresColonnes {
+  const listes = Object.fromEntries(
+    CRITERES_COLONNES.map((critere) => [
+      critere.colonne,
+      {
+        label: critere.label,
+        placeholder: critere.placeholder,
+        options: critere.options(reference),
+        value: filters[critere.cle],
+        onChange: (value: string | null) => {
+          setFilters({ [critere.cle]: value } as Partial<RepresentantFilters>);
+        },
+      },
+    ]),
+  ) as Record<CritereColonne['colonne'], FiltreColonne>;
+  return {
+    ...listes,
+    prospects: {
+      label: 'Prospects apportés',
+      placeholder: 'Tous les représentants',
+      options: PRESENCE_OPTIONS,
+      value: presenceValue(filters.hasProspects),
+      onChange: (value) => {
+        setFilters({ hasProspects: value === null ? null : value === 'oui' });
+      },
+    },
+  };
+}
+
+function presenceValue(hasProspects: boolean | null): string | null {
+  if (hasProspects === null) return null;
+  return hasProspects ? 'oui' : 'non';
+}
 
 function pagination(
   data: { total: number; page: number; pageCount: number } | undefined,
@@ -294,8 +408,24 @@ export function RepresentantsView({
   });
   const ambassadorCount = ambassadorCountDe(filters, ambassadors.data);
 
+  const { data: reference } = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
   const { total, page, pageCount, first, last } = pagination(data, filters.pageSize);
   const activeFilterCount = countActiveRepresentantFilters(filters);
+  const filtres = filtresDesColonnes(filters, setFilters, reference);
+
+  function toggleSort(columnId: string): void {
+    if (!isSortField(columnId)) return;
+    if (filters.sortBy === columnId) {
+      setFilters({ sortDir: filters.sortDir === 'asc' ? 'desc' : 'asc' });
+      return;
+    }
+    setFilters({ sortBy: columnId, sortDir: 'asc' });
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -394,14 +524,45 @@ export function RepresentantsView({
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
-                        <TableHead>Représentant</TableHead>
-                        <TableHead>Qualification</TableHead>
+                        <SortableTableHead
+                          column={{ id: 'fullName', label: 'Représentant' }}
+                          sortBy={filters.sortBy}
+                          sortDir={filters.sortDir}
+                          onToggle={toggleSort}
+                        />
+                        {/* Trier la qualification, c'est remonter les statuts
+                            prioritaires : c'est ce que « priorite » ordonne. */}
+                        <FilterableTableHead
+                          label="Qualification"
+                          filtre={filtres.qualification}
+                          tri={{
+                            column: { id: 'priorite', label: 'Qualification' },
+                            sortBy: filters.sortBy,
+                            sortDir: filters.sortDir,
+                            onToggle: toggleSort,
+                          }}
+                        />
                         <TableHead>Téléphone</TableHead>
-                        <TableHead>Département</TableHead>
-                        <TableHead>IEF</TableHead>
-                        <TableHead>Saisi par</TableHead>
-                        <TableHead className="text-right">Prospects</TableHead>
-                        <TableHead>Première saisie</TableHead>
+                        <FilterableTableHead label="Département" filtre={filtres.departement} />
+                        <FilterableTableHead label="IEF" filtre={filtres.ief} />
+                        <FilterableTableHead label="Saisi par" filtre={filtres.saisiPar} />
+                        <FilterableTableHead
+                          className="text-right"
+                          label="Prospects"
+                          filtre={filtres.prospects}
+                          tri={{
+                            column: { id: 'prospects', label: 'Prospects' },
+                            sortBy: filters.sortBy,
+                            sortDir: filters.sortDir,
+                            onToggle: toggleSort,
+                          }}
+                        />
+                        <SortableTableHead
+                          column={{ id: 'clientCreatedAt', label: 'Première saisie' }}
+                          sortBy={filters.sortBy}
+                          sortDir={filters.sortDir}
+                          onToggle={toggleSort}
+                        />
                         {readOnly ? null : (
                           <TableHead className="w-24">
                             <span className="sr-only">Actions</span>
