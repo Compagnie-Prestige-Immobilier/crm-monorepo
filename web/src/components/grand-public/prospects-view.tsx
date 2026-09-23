@@ -28,7 +28,7 @@ import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-u
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
-import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
+import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -357,9 +357,7 @@ export function GrandPublicProspectsView({
             <DialogTitle>Nouveau prospect Grand Public</DialogTitle>
             <DialogDescription>Le nom et le téléphone suffisent.</DialogDescription>
           </DialogHeader>
-          <NouveauProspect
-            embedded
-            canalProvenanceId={null}
+          <NouveauProspectConsole
             onSaved={() => {
               setCreateOpen(false);
             }}

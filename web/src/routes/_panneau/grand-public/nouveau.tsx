@@ -1,8 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { useRouter } from 'next/navigation';
 
-import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { GrandPublicTableSkeleton } from '@/components/grand-public/prospects-view';
+import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { Skeleton } from '@/components/ui/skeleton';
 import { guardRoles } from '@/lib/guard';
 
@@ -32,5 +32,5 @@ function NouveauGrandPublicPage() {
     router.push('/grand-public');
   };
 
-  return <NouveauProspect canalProvenanceId={null} onSaved={retour} onAnnuler={retour} />;
+  return <NouveauProspectConsole onSaved={retour} onAnnuler={retour} />;
 }
