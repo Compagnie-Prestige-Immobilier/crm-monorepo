@@ -123,6 +123,7 @@ var Garde = map[string]socle.Permission{
 	"GET /api/v1/export/prospects-modele.xlsx":              socle.PermissionExportsModeles,
 	"GET /api/v1/export/prospects-grand-public-modele.xlsx": socle.PermissionExportsModeles,
 	"GET /api/v1/export/representants-modele.xlsx":          socle.PermissionExportsModeles,
+	"GET " + cheminExportRendezVous:                         socle.PermissionRendezVousExporter,
 }
 
 // LibellePaiement nomme un mode de paiement, ici comme dans les classeurs.
@@ -140,6 +141,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	huma.Register(api, huma.Operation{OperationID: "modele-import-prospects", Method: http.MethodGet, Path: "/api/v1/export/prospects-modele.xlsx"}, s.exportModeleProspects)
 	huma.Register(api, huma.Operation{OperationID: "modele-import-prospects-grand-public", Method: http.MethodGet, Path: "/api/v1/export/prospects-grand-public-modele.xlsx"}, s.exportModeleGrandPublic)
 	huma.Register(api, huma.Operation{OperationID: "modele-import-representants", Method: http.MethodGet, Path: "/api/v1/export/representants-modele.xlsx"}, s.exportModeleRepresentants)
+	huma.Register(api, huma.Operation{OperationID: "export-rendez-vous", Method: http.MethodGet, Path: cheminExportRendezVous}, s.exportRendezVous)
 }
 
 var (

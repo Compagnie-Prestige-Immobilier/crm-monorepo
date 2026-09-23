@@ -1,14 +1,22 @@
 'use client';
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckIcon, XIcon } from 'lucide-react';
+import { CheckIcon, DownloadIcon, XIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Table,
@@ -20,7 +28,12 @@ import {
 } from '@/components/ui/table';
 import { TablePaginationLocale } from '@/components/ui/table-pagination';
 import { suivreRendezVous } from '@/lib/data/prospects';
-import { CLE_RENDEZ_VOUS, lireRendezVous, type RendezVousObtenu } from '@/lib/data/rendez-vous';
+import {
+  CLE_RENDEZ_VOUS,
+  lienExportRendezVous,
+  lireRendezVous,
+  type RendezVousObtenu,
+} from '@/lib/data/rendez-vous';
 import { formatDateTime } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 
@@ -84,17 +97,30 @@ function Suivi({ fiche, peutNoter }: { fiche: RendezVousObtenu; peutNoter: boole
  * Le comptoir confirme depuis la liste : ouvrir chaque fiche pour un seul clic
  * ferait perdre la file d'attente.
  */
+const VENUES: readonly { value: string; label: string }[] = [
+  { value: 'tous', label: 'Toutes les venues' },
+  { value: 'SANS', label: 'À confirmer' },
+  { value: 'HONORE', label: 'Venus' },
+  { value: 'NON_HONORE', label: 'Pas venus' },
+  { value: 'REPORTE', label: 'Reportés' },
+];
+
 export function RendezVousComptoir({
   type,
   peutNoter,
+  peutExporter,
 }: {
   type: string | null;
   peutNoter: boolean;
+  peutExporter: boolean;
 }) {
   const [search, setSearch] = useState('');
+  const [issue, setIssue] = useState('');
+  const [du, setDu] = useState('');
+  const [au, setAu] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const filtres = { type, search, page, pageSize };
+  const filtres = { type, search, issue, du, au, page, pageSize };
   const liste = useQuery({
     queryKey: [...CLE_RENDEZ_VOUS, filtres],
     queryFn: () => lireRendezVous(filtres),
@@ -106,21 +132,75 @@ export function RendezVousComptoir({
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border bg-card p-4">
         <Input
           type="search"
           value={search}
           placeholder="Nom ou numéro"
           aria-label="Rechercher un rendez-vous"
-          className="max-w-sm"
+          className="max-w-xs"
           onChange={(e) => {
             setSearch(e.target.value);
             setPage(1);
           }}
         />
-        {liste.data === undefined ? null : (
-          <p className="text-sm text-muted-foreground">{liste.data.total} rendez-vous</p>
-        )}
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rdv-du">Du</Label>
+          <Input
+            id="rdv-du"
+            type="date"
+            value={du}
+            onChange={(e) => {
+              setDu(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="rdv-au">Au</Label>
+          <Input
+            id="rdv-au"
+            type="date"
+            value={au}
+            onChange={(e) => {
+              setAu(e.target.value);
+              setPage(1);
+            }}
+          />
+        </div>
+        <Select
+          items={VENUES}
+          value={issue === '' ? 'tous' : issue}
+          onValueChange={(valeur) => {
+            setIssue(valeur === 'tous' || valeur === null ? '' : valeur);
+            setPage(1);
+          }}
+        >
+          <SelectTrigger aria-label="Venue" className="w-48">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {VENUES.map((venue) => (
+              <SelectItem key={venue.value} value={venue.value}>
+                {venue.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <div className="ml-auto flex items-center gap-3">
+          {liste.data === undefined ? null : (
+            <p className="text-sm text-muted-foreground">{liste.data.total} rendez-vous</p>
+          )}
+          {peutExporter ? (
+            <a
+              href={lienExportRendezVous(filtres)}
+              className={buttonVariants({ variant: 'outline', size: 'sm', className: 'gap-1.5' })}
+            >
+              <DownloadIcon className="size-3.5" aria-hidden="true" />
+              Exporter
+            </a>
+          ) : null}
+        </div>
       </div>
 
       {liste.isPending ? <Skeleton className="h-64 w-full rounded-lg" /> : null}
@@ -138,9 +218,10 @@ export function RendezVousComptoir({
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead>Rendez-vous le</TableHead>
                   <TableHead>Prospect</TableHead>
                   <TableHead>Type</TableHead>
-                  <TableHead>Rendez-vous pris le</TableHead>
+                  <TableHead>Pris le</TableHead>
                   <TableHead>Par</TableHead>
                   <TableHead>Venue</TableHead>
                 </TableRow>
@@ -148,6 +229,9 @@ export function RendezVousComptoir({
               <TableBody>
                 {liste.data.items.map((fiche) => (
                   <TableRow key={fiche.id}>
+                    <TableCell className="whitespace-nowrap">
+                      {fiche.quand === null ? '' : formatDateTime(fiche.quand)}
+                    </TableCell>
                     <TableCell>
                       <p className="font-medium">
                         {fiche.prenom} {fiche.nom}
