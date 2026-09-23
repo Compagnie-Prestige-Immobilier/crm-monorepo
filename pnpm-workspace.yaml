@@ -1,7 +1,6 @@
 packages:
   - web
   - e2e
-  - prototype
 
 # Correctifs transitifs maintenus en avance sur les outils qui les tirent.
 overrides:
