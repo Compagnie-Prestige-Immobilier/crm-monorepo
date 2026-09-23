@@ -222,11 +222,15 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     expect(appel).toEqual({ code: 'INTERESSE', nom: `Dossier ${cle}` });
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Recherche');
-    const ligneApresAppel = page.getByRole('row').filter({ hasText: `GP ${cle}` });
+    // Le nom saisi dans le formulaire corrige l'identité de la fiche
+    // (`CorrigerProspectParTentative`) : la liste rend le nouveau nom, pas l'ancien.
+    const ligneApresAppel = page.getByRole('row').filter({ hasText: `Dossier ${cle}` });
     await expect(ligneApresAppel).toContainText('Intéressé');
 
     await page.goto(`/teleconseil/prospects/${prospectGrandPublic}`);
-    await expect(page.getByRole('heading', { name: `Ousmane GP ${cle}`, level: 2 })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: `Ousmane Dossier ${cle}`, level: 2 }),
+    ).toBeVisible();
     await expect(page.getByRole('link', { name: /^\+221/ })).toBeVisible();
   });
 });
