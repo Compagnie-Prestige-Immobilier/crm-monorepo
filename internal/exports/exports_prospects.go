@@ -28,7 +28,7 @@ type ExportProspectsInput struct {
 	CanalProvenanceId      string `query:"canalProvenanceId"`
 	Statut                 string `query:"statut" enum:"NOUVEAU,CONTACTE,CONVERTI,PERDU,VENDU"`
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
-	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED"`
+	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED,TOUT"`
 	SansMotif              string `query:"sansMotif" maxLength:"40"`
 	EnrollmentMethod       string `query:"enrollmentMethod"`
 	AppelePar              string `query:"appelePar"`
@@ -80,7 +80,6 @@ func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {
 		{`p."lastCallById"`, in.LastCallById, ""},
 		{`p."origin"`, in.Origin, ""},
 		{`p."type"`, in.Type, `::"ProspectType"`},
-		{`p."phase2Status"`, in.Phase2Status, `::"Phase2Status"`},
 		{`p."enrollmentMethod"`, in.EnrollmentMethod, `::"EnrollmentMethod"`},
 	}
 	for _, d := range directs {
@@ -89,6 +88,20 @@ func exportFiltresDirects(p *exportPredicat, in *ExportProspectsInput) {
 		}
 		p.clauses = append(p.clauses, d.colonne+" = "+p.valeur(d.valeur)+d.cast)
 	}
+	exportFiltrePhase2Status(p, in)
+}
+
+// « TOUT » régroupe les onglets Intéressés, Hésitants et Rendez-vous : ce
+// n'est pas une valeur de l'énumération stockée, la clause la traite à part.
+func exportFiltrePhase2Status(p *exportPredicat, in *ExportProspectsInput) {
+	if in.Phase2Status == "" {
+		return
+	}
+	if in.Phase2Status != exportPhase2StatusTout {
+		p.clauses = append(p.clauses, `p."phase2Status" = `+p.valeur(in.Phase2Status)+`::"Phase2Status"`)
+		return
+	}
+	p.clauses = append(p.clauses, `p."phase2Status" = ANY (ARRAY['INTERESTED', 'HESITANT', 'APPOINTMENT']::"Phase2Status"[])`)
 }
 
 func exportFiltresDerives(p *exportPredicat, in *ExportProspectsInput, segment string) error {
