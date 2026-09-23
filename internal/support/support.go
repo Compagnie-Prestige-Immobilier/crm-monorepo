@@ -12,6 +12,8 @@ import (
 	"log/slog"
 	"math"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -27,6 +29,8 @@ const (
 	cheminRattacher  = cheminTicket + "/rattacher"
 	imagesMax        = 5
 	imageMaxOctets   = 8 << 20
+	fichiersMax      = 3
+	fichierMaxOctets = 200 << 10
 	signalementsVus  = 20
 	diagnosticMaxLen = 500
 )
@@ -102,6 +106,7 @@ type TicketInput struct {
 		Description string          `form:"description" required:"true" minLength:"3" maxLength:"5000"`
 		Contexte    string          `form:"contexte" required:"false" maxLength:"5000"`
 		Images      []huma.FormFile `form:"images" required:"false" contentType:"image/png,image/jpeg,image/webp,image/gif"`
+		Fichiers    []huma.FormFile `form:"fichiers" required:"false" contentType:"text/plain,application/json"`
 		Urgence     int32           `form:"urgence" required:"true" enum:"2,3,4"`
 		Categorie   int32           `form:"categorie" required:"true" minimum:"1"`
 	}]
@@ -155,10 +160,18 @@ func (s *service) recevoir(ctx context.Context, in *TicketInput) (*SignalementOu
 	if len(form.Images) > imagesMax {
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_TROP_D_IMAGES", fmt.Sprintf("%d images au plus par signalement.", imagesMax))
 	}
+	if len(form.Fichiers) > fichiersMax {
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_TROP_DE_FICHIERS", fmt.Sprintf("%d fichiers au plus par signalement.", fichiersMax))
+	}
 	images, err := lireImages(form.Images)
 	if err != nil {
 		return nil, err
 	}
+	fichiers, err := lireFichiersTexte(form.Fichiers)
+	if err != nil {
+		return nil, err
+	}
+	images = append(images, fichiers...)
 	u := socle.UtilisateurCourant(ctx)
 	empreinte := empreinteSoumission(form.Description, form.Contexte, form.Urgence, form.Categorie, images)
 	if deja, err := s.Q.SupportSignalementParCle(ctx, db.SupportSignalementParCleParams{AuteurId: u.ID, Cle: form.Cle}); err == nil {
@@ -401,6 +414,40 @@ func lireImages(fichiers []huma.FormFile) ([]image, error) {
 		})
 	}
 	return images, nil
+}
+
+// Les journaux et fichiers texte joints suivent le même chemin que les
+// images (stockage, transmission GLPI) : seule la validation d'entrée change.
+// Le contenu, jamais l'extension déclarée, décide s'il s'agit de texte.
+func lireFichiersTexte(fichiers []huma.FormFile) ([]image, error) {
+	textes := make([]image, 0, len(fichiers))
+	for i := range fichiers {
+		if fichiers[i].Size > fichierMaxOctets {
+			return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_FICHIER_TROP_LOURD",
+				fmt.Sprintf("Chaque fichier doit peser moins de %d Ko.", fichierMaxOctets>>10))
+		}
+		contenu, err := io.ReadAll(io.LimitReader(fichiers[i], fichierMaxOctets+1))
+		if err != nil {
+			return nil, socle.Problem(http.StatusBadRequest, "SUPPORT_FICHIER_ILLISIBLE", "Un fichier n'a pas pu être lu.")
+		}
+		typeMime := http.DetectContentType(contenu)
+		if !strings.HasPrefix(typeMime, "text/") {
+			return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_FICHIER_REFUSE",
+				"Seuls les fichiers texte (journal, .txt, .json...) sont acceptés.")
+		}
+		nom := filepath.Base(fichiers[i].Filename)
+		if nom == "" || nom == "." || nom == string(filepath.Separator) {
+			nom = fmt.Sprintf("fichier-%d.txt", i+1)
+		}
+		condensat := sha256.Sum256(contenu)
+		textes = append(textes, image{
+			nom:       nom,
+			typeMime:  "text/plain",
+			empreinte: hex.EncodeToString(condensat[:]),
+			contenu:   contenu,
+		})
+	}
+	return textes, nil
 }
 
 // L'empreinte porte sur les champs et les images, jamais sur l'encodage
