@@ -197,7 +197,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     // Pas à pas : la réponse, le formulaire, le statut, sa précision, la note.
     // Un Retour ne perd pas ce qui a été saisi dans le formulaire.
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
-    await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+    // « Aucun » coche par défaut la méthode d'enrôlement : c'est le seul radio actif ici.
+    await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+    await expect(page.getByRole('radio', { name: 'Aucun', checked: true })).toBeVisible();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: /^Retour/u }).click();
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
