@@ -72,6 +72,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
   PHASE2_STATUS_LABELS,
+  PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   type ProspectRow,
   type ProspectStatut,
@@ -81,6 +82,10 @@ import { useBrouillonAuto } from '@/lib/use-brouillon-auto';
 import { useDebouncedValue } from '@/lib/use-debounced-value';
 import { cn } from '@/lib/utils';
 import { EnTeteAnnuaire } from '@/components/console/console-annuaire-header';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 
 export type Projet = 'CHUES' | 'GRAND_PUBLIC';
 
@@ -350,10 +355,6 @@ export function ConsoleView({
           consoleFilters.set.syndicatId(value);
           setPage(1);
         }}
-        onStatutChange={(value) => {
-          consoleFilters.set.statut(value);
-          setPage(1);
-        }}
         onCanalChange={(value) => {
           consoleFilters.set.canalProvenanceId(value);
           setPage(1);
@@ -370,7 +371,6 @@ export function ConsoleView({
         departementId={consoleFilters.values.departementId}
         banqueId={consoleFilters.values.banqueId}
         syndicatId={consoleFilters.values.syndicatId}
-        statut={consoleFilters.values.statut}
         canalProvenanceId={consoleFilters.values.canalProvenanceId}
         dateFrom={consoleFilters.values.dateFrom}
         dateTo={consoleFilters.values.dateTo}
@@ -383,6 +383,16 @@ export function ConsoleView({
         onPage={setPage}
         canCreateProspect={canCreateProspect}
         seulementARappeler={resteAAppeler}
+        filtreStatut={{
+          label: 'Statut',
+          placeholder: 'Tous les statuts',
+          options: PROSPECT_STATUTS.map((s) => ({ value: s, label: PROSPECT_STATUT_LABELS[s] })),
+          value: consoleFilters.values.statut,
+          onChange: (value) => {
+            consoleFilters.set.statut(value);
+            setPage(1);
+          },
+        }}
         onChoisir={(row) => {
           setConfirme(null);
           setVise(row);
@@ -681,6 +691,7 @@ function ListeAnnuaire({
   onPage,
   canCreateProspect,
   seulementARappeler,
+  filtreStatut,
   onChoisir,
 }: {
   annuaire: UseQueryResult<Awaited<ReturnType<typeof fetchProspectsAQualifier>>>;
@@ -689,6 +700,7 @@ function ListeAnnuaire({
   onPage: (page: number) => void;
   canCreateProspect: boolean;
   seulementARappeler: boolean;
+  filtreStatut: FiltreColonne;
   onChoisir: (row: ProspectRow) => void;
 }) {
   if (annuaire.isError) {
@@ -726,7 +738,7 @@ function ListeAnnuaire({
             <TableHead>Nom et prénom</TableHead>
             <TableHead>Projet</TableHead>
             <TableHead>Numéro</TableHead>
-            <TableHead>Statut / Qualification</TableHead>
+            <FilterableTableHead label="Statut / Qualification" filtre={filtreStatut} />
             <TableHead>Dernier appel</TableHead>
           </TableRow>
         </TableHeader>
