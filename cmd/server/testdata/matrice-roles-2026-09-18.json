@@ -693,5 +693,6 @@
   "POST /api/v1/assistant/questions": ["ADMIN"],
   "GET /api/v1/assistant/questions-enregistrees": ["ADMIN"],
   "POST /api/v1/assistant/questions-enregistrees": ["ADMIN"],
-  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"]
+  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"],
+  "GET /api/v1/rendez-vous": ["ADMIN"]
 }

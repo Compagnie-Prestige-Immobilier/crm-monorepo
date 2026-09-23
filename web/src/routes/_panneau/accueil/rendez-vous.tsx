@@ -1,17 +1,14 @@
-import { createFileRoute, redirect } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
+import { useState } from 'react';
 
-import { useProspectFilters } from '@/components/filters/use-prospect-filters';
-import { ProspectsView } from '@/components/prospects/prospects-view';
+import { RendezVousComptoir } from '@/components/accueil/rendez-vous-comptoir';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefusPermission, type Contexte } from '@/lib/guard';
 import { peut } from '@/lib/types';
 
-/** Un rendez-vous téléphonique n'amène personne au comptoir : l'écran l'écarte. */
-const RENDEZ_VOUS_TELEPHONIQUE = 'RDV_TELEPHONIQUE';
-
 const TOUS = 'tous';
 
-/** Les sous-motifs du motif « Rendez-vous », tels que la console les propose. */
+/** Les sous-motifs du motif « Rendez-vous » qui amènent quelqu'un au comptoir. */
 const TYPES: readonly { value: string; label: string }[] = [
   { value: TOUS, label: 'Tous' },
   { value: 'RV_CPI', label: 'RV CPI' },
@@ -20,19 +17,9 @@ const TYPES: readonly { value: string; label: string }[] = [
 ];
 
 export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
-  beforeLoad: (contexte: Contexte & { location: { searchStr: string } }) => {
-    const { user } = contexte.context;
-    if (!peut(user, 'rendez_vous.suivre')) {
-      throw new RefusPermission(user.role);
-    }
-    const params = new URLSearchParams(contexte.location.searchStr);
-    if (
-      params.get('phase2Status') !== 'APPOINTMENT' ||
-      params.get('sansMotif') !== RENDEZ_VOUS_TELEPHONIQUE
-    ) {
-      params.set('phase2Status', 'APPOINTMENT');
-      params.set('sansMotif', RENDEZ_VOUS_TELEPHONIQUE);
-      throw redirect({ href: `/accueil/rendez-vous?${params.toString()}` });
+  beforeLoad: ({ context }: Contexte) => {
+    if (!peut(context.user, 'rendez_vous.voir')) {
+      throw new RefusPermission(context.user.role);
     }
   },
   component: RendezVousAccueilPage,
@@ -41,29 +28,25 @@ export const Route = createFileRoute('/_panneau/accueil/rendez-vous')({
 /** Les rendez-vous obtenus par les téléconseillers, à confirmer au comptoir. */
 function RendezVousAccueilPage() {
   const { user } = Route.useRouteContext();
-  const { filters, setFilters } = useProspectFilters();
+  const [type, setType] = useState<string | null>(null);
 
   return (
     <div className="flex flex-col gap-6">
       <Tabs
-        value={filters.motif ?? TOUS}
+        value={type ?? TOUS}
         onValueChange={(value) => {
-          setFilters({ motif: value === TOUS ? null : value });
+          setType(value === TOUS ? null : value);
         }}
       >
         <TabsList>
-          {TYPES.map((type) => (
-            <TabsTrigger key={type.value} value={type.value}>
-              {type.label}
+          {TYPES.map((choix) => (
+            <TabsTrigger key={choix.value} value={choix.value}>
+              {choix.label}
             </TabsTrigger>
           ))}
         </TabsList>
       </Tabs>
-      <ProspectsView
-        canAdminister={peut(user, 'fiches.ignorer_propriete')}
-        canExport={peut(user, 'exports.prospects')}
-        readOnly
-      />
+      <RendezVousComptoir type={type} peutNoter={peut(user, 'rendez_vous.suivre')} />
     </div>
   );
 }
