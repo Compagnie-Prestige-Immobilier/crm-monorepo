@@ -182,7 +182,8 @@ func (s *Store) DueRetries(ctx context.Context, _ string) ([]JobRetry, error) {
 		`SELECT ticket_id, project FROM kairo_jobs
 		WHERE status='retry'
 		  AND (
-		    (attempts <= 1 AND updated_at <= datetime('now', '-10 minutes'))
+		    attempts = 0
+		    OR (attempts = 1 AND updated_at <= datetime('now', '-10 minutes'))
 		    OR (attempts > 1 AND updated_at <= datetime('now', '-30 minutes'))
 		  )`,
 	)
@@ -214,12 +215,18 @@ func (s *Store) Finish(ctx context.Context, ticketID int, status string, resume,
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	// Une fois le ticket résolu ou fermé, la consigne de la dernière relance
+	// n'a plus d'objet : la garder préremplirait la prochaine relance, sur un
+	// problème sans rapport, avec des instructions périmées.
+	consigneEffacee := status == "pr" || status == "clos"
+
 	_, err := s.db.ExecContext(
 		ctx,
 		`UPDATE kairo_jobs
-		SET status=?, resume=?, cause=?, notes=?, pr_url=?, fichiers=?, duree_secondes=?, updated_at=CURRENT_TIMESTAMP
+		SET status=?, resume=?, cause=?, notes=?, pr_url=?, fichiers=?, duree_secondes=?, updated_at=CURRENT_TIMESTAMP,
+		    consigne=CASE WHEN ? THEN '' ELSE consigne END
 		WHERE ticket_id=?`,
-		status, resume, cause, notes, prURL, fichiers, dureeSec, ticketID,
+		status, resume, cause, notes, prURL, fichiers, dureeSec, consigneEffacee, ticketID,
 	)
 	return err
 }
@@ -297,7 +304,7 @@ func (s *Store) RelaunchWithDirective(ctx context.Context, ticketID int, consign
 	res, err := s.db.ExecContext(
 		ctx,
 		`UPDATE kairo_jobs
-		SET status='retry', attempts=0, resume='', cause='', notes='', pr_url='', fichiers='', duree_secondes=0, consigne=?, updated_at=datetime('now', '-1 day')
+		SET status='retry', attempts=0, resume='', cause='', notes='', pr_url='', fichiers='', duree_secondes=0, consigne=?, updated_at=CURRENT_TIMESTAMP
 		WHERE ticket_id=? AND status IN ('echec', 'escalade', 'arrete', 'triage')`,
 		consigne, ticketID,
 	)
