@@ -105,11 +105,8 @@ test.describe('parcours 7, les listes CHUES', () => {
     const affichage = page.getByRole('status').filter({ hasText: 'Représentants affichés' });
     await expect(affichage).toContainText(`1–25 sur ${String(REPRESENTANTS)}`);
 
-    await page.getByRole('button', { name: 'Filtres avancés' }).click();
-    await page.getByLabel('Trier par').click();
-    await page.getByRole('option', { name: 'Nom', exact: true }).click();
-    await page.getByLabel('Sens').click();
-    await page.getByRole('option', { name: 'Croissant', exact: true }).click();
+    // Le tri vit sur l'en-tête de colonne, plus dans les filtres avancés.
+    await page.getByRole('button', { name: 'Représentant', exact: true }).click();
     await expect(page).toHaveURL(/sortBy=fullName/);
     await expect(page).toHaveURL(/sortDir=asc/);
 

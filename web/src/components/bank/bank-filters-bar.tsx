@@ -107,8 +107,15 @@ function BankQuickViewButton({
 
 export function BankFiltersBar({
   agentOptions = [],
+  colonnesFiltrables = false,
 }: {
   agentOptions?: readonly FilterOption[] | undefined;
+  /**
+   * L'écran affiche le tableau des dossiers : banque et étape s'y filtrent
+   * depuis l'en-tête. Le tableau de bord et l'export n'ont pas de colonne où
+   * les poser, et les gardent ici.
+   */
+  colonnesFiltrables?: boolean | undefined;
 }) {
   const { filters, setFilters, resetFilters } = useBankFilters();
   const minId = useId();
@@ -224,9 +231,15 @@ export function BankFiltersBar({
           placeholder="Référence, nom du client, téléphone…"
         />
 
-        <div className="flex min-w-[13rem] flex-1 flex-col gap-1.5">
-          {/* Le seul critère de liste resté visible : l'étape est la question
-              posée à chaque session, celle que les vues rapides écrivent aussi. */}
+        {/* L'étape est la question posée à chaque session, celle que les vues
+            rapides écrivent aussi. Sous 1024 px des cartes remplacent le
+            tableau : elle revient alors même là où l'en-tête la porte. */}
+        <div
+          className={cn(
+            'flex min-w-[13rem] flex-1 flex-col gap-1.5',
+            colonnesFiltrables && 'lg:hidden',
+          )}
+        >
           <FilterCombobox
             label="Étape"
             placeholder="Toutes les étapes"
@@ -279,15 +292,17 @@ export function BankFiltersBar({
         }
       >
         <>
-          <FilterCombobox
-            label="Banque de traitement"
-            placeholder="Toutes les banques"
-            options={banqueOptions}
-            value={filters.banqueId}
-            onChange={(value) => {
-              setFilters({ banqueId: value });
-            }}
-          />
+          <div className={cn('contents', colonnesFiltrables && 'lg:hidden')}>
+            <FilterCombobox
+              label="Banque de traitement"
+              placeholder="Toutes les banques"
+              options={banqueOptions}
+              value={filters.banqueId}
+              onChange={(value) => {
+                setFilters({ banqueId: value });
+              }}
+            />
+          </div>
           <FilterCombobox
             label="Agent"
             placeholder="Tous les agents"
