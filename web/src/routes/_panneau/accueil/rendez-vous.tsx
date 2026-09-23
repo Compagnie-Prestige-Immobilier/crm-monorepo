@@ -46,7 +46,11 @@ function RendezVousAccueilPage() {
           ))}
         </TabsList>
       </Tabs>
-      <RendezVousComptoir type={type} peutNoter={peut(user, 'rendez_vous.suivre')} />
+      <RendezVousComptoir
+        type={type}
+        peutNoter={peut(user, 'rendez_vous.suivre')}
+        peutExporter={peut(user, 'rendez_vous.exporter')}
+      />
     </div>
   );
 }

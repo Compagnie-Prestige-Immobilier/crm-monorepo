@@ -19,13 +19,14 @@ type definitionPermission struct {
 }
 
 const (
-	domaineAccueil   = "Accueil"
-	domaineBanque    = "Banque & Finance"
-	domaineCampagnes = "Campagnes"
-	domaineChiffres  = "Chiffres"
-	domaineComptes   = "Comptes"
-	domaineExports   = "Exports"
-	domaineFiches    = "Fiches"
+	domaineAccueil    = "Accueil"
+	domaineBanque     = "Banque & Finance"
+	domaineCampagnes  = "Campagnes"
+	domaineChiffres   = "Chiffres"
+	domaineComptes    = "Comptes"
+	domaineExports    = "Exports"
+	domaineFiches     = "Fiches"
+	domaineRendezVous = "Rendez-vous"
 
 	Publique Permission = "publique"
 
@@ -70,6 +71,7 @@ const (
 	PermissionSupportPlateforme        Permission = "support.plateforme"
 	PermissionRendezVousSuivre         Permission = "rendez_vous.suivre"
 	PermissionRendezVousVoir           Permission = "rendez_vous.voir"
+	PermissionRendezVousExporter       Permission = "rendez_vous.exporter"
 	PermissionAssistantUtiliser        Permission = "assistant.utiliser"
 	PermissionAssistantToutLire        Permission = "assistant.tout_lire"
 
@@ -130,8 +132,9 @@ var Catalogue = map[Permission]definitionPermission{
 	PermissionVentesLire:               {"Ventes", "Lire les ventes", []Role{Admin, Direction}},
 	PermissionSupportSignaler:          {"Support", "Signaler un problème au support", Encadrement},
 	PermissionSupportPlateforme:        {"Support", "Ouvrir la plateforme de support GLPI", Encadrement},
-	PermissionRendezVousSuivre:         {"Rendez-vous", "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele}},
-	PermissionRendezVousVoir:           {"Rendez-vous", "Voir les rendez-vous obtenus au téléphone", AdminSeul},
+	PermissionRendezVousSuivre:         {domaineRendezVous, "Noter l'issue d'un rendez-vous et la suite après rencontre (bêta)", []Role{Admin, Direction, ChargeClientele, Accueil}},
+	PermissionRendezVousVoir:           {domaineRendezVous, "Voir les rendez-vous obtenus au téléphone", []Role{Admin, Direction, Accueil}},
+	PermissionRendezVousExporter:       {domaineRendezVous, "Exporter les rendez-vous en classeur", []Role{Admin, Direction, Accueil}},
 	PermissionAssistantUtiliser:        {"Assistant", "Interroger l'assistant sur les chiffres", AdminSeul},
 	PermissionAssistantToutLire:        {"Assistant", "Laisser l'assistant lire toute la base pour répondre", AdminSeul},
 

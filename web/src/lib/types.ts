@@ -172,6 +172,7 @@ export const PERMISSIONS = [
   'qualification.rappels',
   'referentiels.superviser',
   'rendez_vous.suivre',
+  'rendez_vous.exporter',
   'rendez_vous.voir',
   'roles.administrer',
   'support.plateforme',

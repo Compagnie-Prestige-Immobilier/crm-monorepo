@@ -6,7 +6,7 @@ import { compteDe } from './comptes';
 import { apiDe, creerProspect, purger, suffixe } from './donnees-listes';
 
 /** Ce qu'un ADMIN coche dans « Utilisateurs et rôles » pour ouvrir l'écran au comptoir. */
-const OUVERTURE = ['rendez_vous.voir', 'rendez_vous.suivre'];
+const OUVERTURE = ['rendez_vous.voir', 'rendez_vous.suivre', 'rendez_vous.exporter'];
 
 async function permissionsDuRoleAccueil(): Promise<string[]> {
   const api = await apiDe('ADMIN', '198.51.100.91');
@@ -34,7 +34,6 @@ test.describe('rendez-vous au comptoir', () => {
 
   test.beforeAll(async () => {
     permissionsAvant = await permissionsDuRoleAccueil();
-    await poserPermissions([...new Set([...permissionsAvant, ...OUVERTURE])]);
 
     // Un téléconseiller pose le rendez-vous, comme dans la console.
     const api = await apiDe('COMMERCIAL', '198.51.100.92');
@@ -83,6 +82,20 @@ test.describe('rendez-vous au comptoir', () => {
     // La venue se confirme depuis la liste : ouvrir chaque fiche ferait perdre la file.
     await ligne.getByRole('button', { name: /^Confirmer la venue/ }).click();
     await expect(ligne.getByText('Venu', { exact: true }).first()).toBeVisible();
+
+    // Le filtre des venues sépare ce qui est confirmé de ce qui attend.
+    await page.getByRole('combobox', { name: 'Venue' }).click();
+    await page.getByRole('option', { name: 'Pas venus', exact: true }).click();
+    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(0);
+    await page.getByRole('combobox', { name: 'Venue' }).click();
+    await page.getByRole('option', { name: 'Venus', exact: true }).click();
+    await expect(page.getByRole('row').filter({ hasText: nom })).toHaveCount(1);
+    await page.getByRole('combobox', { name: 'Venue' }).click();
+    await page.getByRole('option', { name: 'Toutes les venues', exact: true }).click();
+
+    // Le classeur emporte les filtres posés.
+    const lien = page.getByRole('link', { name: 'Exporter' });
+    await expect(lien).toHaveAttribute('href', /export\/rendez-vous\.xlsx/u);
 
     // La recherche porte sur le nom comme sur le numéro.
     const recherche = page.getByLabel('Rechercher un rendez-vous');

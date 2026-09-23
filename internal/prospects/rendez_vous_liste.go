@@ -17,7 +17,8 @@ const (
 	rendezVousPageMax = 200
 	// Au-delà, l'offset dépasse ce que la base contiendra jamais : la demande
 	// vient d'une URL bricolée, pas d'un clic.
-	rendezVousPagesMax = 10_000
+	rendezVousPagesMax   = 10_000
+	formatJourRendezVous = "2006-01-02"
 )
 
 // Le comptoir lit les rendez-vous sans lire les fiches : cette liste ne rend ni
@@ -29,6 +30,7 @@ type RendezVousObtenu struct {
 	PhoneE164 *string `json:"phoneE164"`
 	Type      string  `json:"type"`
 	TypeCode  string  `json:"typeCode"`
+	Quand     *string `json:"quand" doc:"Date du rendez-vous, telle que le rappel promis la porte."`
 	PrisLe    *string `json:"prisLe"`
 	PrisPar   string  `json:"prisPar"`
 	Issue     string  `json:"issue" enum:",HONORE,NON_HONORE,REPORTE"`
@@ -37,6 +39,9 @@ type RendezVousObtenu struct {
 type RendezVousListInput struct {
 	Type     string `query:"type" maxLength:"40" doc:"Code du type de rendez-vous : RV_CPI, RV_SITE, RV_EXTERNE."`
 	Search   string `query:"search" maxLength:"120" doc:"Nom, prénom ou numéro."`
+	Issue    string `query:"issue" enum:",HONORE,NON_HONORE,REPORTE,SANS" doc:"SANS pour les rendez-vous dont la venue n'est pas encore notée."`
+	Du       string `query:"du" doc:"Premier jour des rendez-vous, AAAA-MM-JJ."`
+	Au       string `query:"au" doc:"Dernier jour des rendez-vous, inclus, AAAA-MM-JJ."`
 	Page     int32  `query:"page" minimum:"1" maximum:"10000"`
 	PageSize int32  `query:"pageSize" minimum:"1" maximum:"200"`
 }
@@ -59,9 +64,16 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 	if taille < 1 || taille > rendezVousPageMax {
 		taille = rendezVousParPage
 	}
+	du, au, err := socle.BornesDuJour(in.Du, in.Au, s.Cfg.TimeZone)
+	if err != nil {
+		return nil, err
+	}
 	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{
 		TypeCode:  prospectVide(strings.TrimSpace(in.Type)),
 		Recherche: prospectVide(strings.TrimSpace(in.Search)),
+		Issue:     prospectVide(strings.TrimSpace(in.Issue)),
+		Du:        du,
+		Au:        au,
 		Prendre:   taille,
 		Sauter:    (page - 1) * taille,
 	})
@@ -77,7 +89,8 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 		}
 		out.Body.Items = append(out.Body.Items, RendezVousObtenu{
 			ID: ligne.ID, Prenom: ligne.Prenom, Nom: ligne.Nom, PhoneE164: ligne.PhoneE164,
-			Type: ligne.Type, TypeCode: ligne.TypeCode, PrisLe: rendezVousInstant(ligne.LastCallAt),
+			Type: ligne.Type, TypeCode: ligne.TypeCode,
+			Quand: prospectVide(ligne.Quand), PrisLe: rendezVousInstant(ligne.LastCallAt),
 			PrisPar: ligne.PrisPar, Issue: ligne.Issue,
 		})
 	}
