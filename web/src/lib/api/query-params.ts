@@ -30,7 +30,10 @@ function applyIdentityFilters(query: AnalyticsQuery, filters: ProspectFilters): 
 function applyStatusFilters(query: AnalyticsQuery, filters: ProspectFilters): void {
   if (filters.statut !== null) query.statut = filters.statut;
   if (filters.segment !== null) query.segment = filters.segment;
-  if (filters.phase2Status !== null) query.phase2Status = filters.phase2Status;
+  // `TOUT` n'existe que pour `/api/v1/prospects` : `toProspectQuery` le repose après coup.
+  if (filters.phase2Status !== null && filters.phase2Status !== 'TOUT') {
+    query.phase2Status = filters.phase2Status;
+  }
   if (filters.enrollmentMethod !== null) query.enrollmentMethod = filters.enrollmentMethod;
   if (filters.enrollmentCapturedById !== null) {
     query.enrollmentCapturedById = filters.enrollmentCapturedById;
@@ -54,6 +57,7 @@ export function toFilterQuery(filters: ProspectFilters): AnalyticsQuery {
 export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
   return {
     ...toFilterQuery(filters),
+    ...(filters.phase2Status === 'TOUT' ? { phase2Status: 'TOUT' as const } : {}),
     ...(filters.sansMotif === null ? {} : { sansMotif: filters.sansMotif }),
     page: filters.page,
     pageSize: filters.pageSize,
