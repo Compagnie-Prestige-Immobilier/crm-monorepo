@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input';
 import type { Projet } from '@/components/console/console-view';
 import type { OrigineFiche } from '@/lib/data/grand-public';
 import { withRetired } from '@/lib/format';
-import { PROSPECT_STATUTS, PROSPECT_STATUT_LABELS, type ReferenceData } from '@/lib/types';
+import type { ReferenceData } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 const REVELE = 'animate-in fade-in-0 slide-in-from-top-1 duration-200 motion-reduce:animate-none';
@@ -39,7 +39,6 @@ type EnTeteAnnuaireProps = {
   onDepartementChange: (value: string | null) => void;
   onBanqueChange: (value: string | null) => void;
   onSyndicatChange: (value: string | null) => void;
-  onStatutChange: (value: string | null) => void;
   onCanalChange: (value: string | null) => void;
   onDateFromChange: (value: string | null) => void;
   onDateToChange: (value: string | null) => void;
@@ -47,7 +46,6 @@ type EnTeteAnnuaireProps = {
   departementId: string | null;
   banqueId: string | null;
   syndicatId: string | null;
-  statut: string | null;
   canalProvenanceId: string | null;
   dateFrom: string | null;
   dateTo: string | null;
@@ -74,7 +72,6 @@ export function EnTeteAnnuaire({
   onDepartementChange,
   onBanqueChange,
   onSyndicatChange,
-  onStatutChange,
   onCanalChange,
   onDateFromChange,
   onDateToChange,
@@ -82,7 +79,6 @@ export function EnTeteAnnuaire({
   departementId,
   banqueId,
   syndicatId,
-  statut,
   canalProvenanceId,
   dateFrom,
   dateTo,
@@ -167,7 +163,6 @@ export function EnTeteAnnuaire({
           departementId={departementId}
           banqueId={banqueId}
           syndicatId={syndicatId}
-          statut={statut}
           canalProvenanceId={canalProvenanceId}
           dateFrom={dateFrom}
           dateTo={dateTo}
@@ -175,7 +170,6 @@ export function EnTeteAnnuaire({
           onDepartementChange={onDepartementChange}
           onBanqueChange={onBanqueChange}
           onSyndicatChange={onSyndicatChange}
-          onStatutChange={onStatutChange}
           onCanalChange={onCanalChange}
           onDateFromChange={onDateFromChange}
           onDateToChange={onDateToChange}
@@ -192,7 +186,6 @@ function FiltresConsole({
   departementId,
   banqueId,
   syndicatId,
-  statut,
   canalProvenanceId,
   dateFrom,
   dateTo,
@@ -200,7 +193,6 @@ function FiltresConsole({
   onDepartementChange,
   onBanqueChange,
   onSyndicatChange,
-  onStatutChange,
   onCanalChange,
   onDateFromChange,
   onDateToChange,
@@ -264,13 +256,6 @@ function FiltresConsole({
         }))}
         value={syndicatId}
         onChange={onSyndicatChange}
-      />
-      <FilterCombobox
-        label="Statut"
-        placeholder="Tous les statuts"
-        options={PROSPECT_STATUTS.map((s) => ({ value: s, label: PROSPECT_STATUT_LABELS[s] }))}
-        value={statut}
-        onChange={onStatutChange}
       />
       <FilterCombobox
         label="Canal de provenance"

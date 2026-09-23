@@ -151,19 +151,20 @@ export const ADVANCED_FILTER_KEYS = [
 
 export type AdvancedFilterKey = (typeof ADVANCED_FILTER_KEYS)[number];
 
-export function clearAdvancedFilters(): Partial<ProspectFilters> {
-  return {
-    representantId: null,
-    departementId: null,
-    banqueId: null,
-    syndicatId: null,
-    statut: null,
-    segment: null,
-    phase2Status: null,
-    enrollmentMethod: null,
-    enrollmentCapturedById: null,
-    revue: null,
-  } satisfies Record<AdvancedFilterKey, null>;
+/**
+ * Ce qui reste dans le panneau replié, une fois les critères portés par un
+ * en-tête de colonne retirés : eux se voient sur le tableau.
+ */
+export const PROSPECT_ADVANCED_KEYS: readonly AdvancedFilterKey[] = ['revue'];
+
+export const GRAND_PUBLIC_ADVANCED_KEYS: readonly AdvancedFilterKey[] = [
+  'representantId',
+  'departementId',
+  'syndicatId',
+];
+
+export function clearAdvancedFilters(keys: readonly AdvancedFilterKey[]): Partial<ProspectFilters> {
+  return Object.fromEntries(keys.map((key) => [key, null])) as Partial<ProspectFilters>;
 }
 
 export function advancedOpenFrom(hasAdvanced: boolean, stored: boolean | null): boolean {

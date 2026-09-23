@@ -20,14 +20,15 @@ import { ArchiverVisite } from '@/components/accueil/archiver-visite';
 import { ImpressionDialog } from '@/components/accueil/impression-dialog';
 import { VisiteForm } from '@/components/accueil/visite-form';
 import { EmptyState } from '@/components/empty-state';
-import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { DatePicker } from '@/components/filters/date-picker';
 import { useFileDownload } from '@/components/exports/download-button';
-import { FilterCombobox } from '@/components/filters/filter-combobox';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import {
-  VISITE_ADVANCED_FILTER_KEYS,
   buildVisiteAdvancedChips,
   type VisiteAdvancedFilterKey,
 } from '@/components/filters/visite-advanced-chips';
@@ -87,6 +88,65 @@ function isVisiteSortField(value: string): value is VisiteSortField {
   return (VISITE_SORT_FIELDS as readonly string[]).includes(value);
 }
 
+/** Les quatre référentiels du registre se filtrent depuis leur colonne. */
+const CRITERE_DE_COLONNE: {
+  colonne: string;
+  cle: VisiteAdvancedFilterKey;
+  liste: keyof VisiteReferentiels;
+  label: string;
+  placeholder: string;
+}[] = [
+  {
+    colonne: VISITE_COLONNES.entreprise,
+    cle: 'entrepriseId',
+    liste: 'entreprises',
+    label: 'Entreprise',
+    placeholder: 'Toutes',
+  },
+  {
+    colonne: VISITE_COLONNES.direction,
+    cle: 'directionId',
+    liste: 'directions',
+    label: 'Direction',
+    placeholder: 'Toutes',
+  },
+  {
+    colonne: VISITE_COLONNES.destinataire,
+    cle: 'destinataireId',
+    liste: 'destinataires',
+    label: 'Destinataire',
+    placeholder: 'Tous',
+  },
+  {
+    colonne: VISITE_COLONNES.objet,
+    cle: 'objetId',
+    liste: 'objets',
+    label: 'Objet de la visite',
+    placeholder: 'Tous',
+  },
+];
+
+function filtresDesColonnes(
+  filters: VisiteFilters,
+  setFilters: (patch: Partial<VisiteFilters>) => void,
+  referentiels: VisiteReferentiels | undefined,
+): Partial<Record<string, FiltreColonne>> {
+  return Object.fromEntries(
+    CRITERE_DE_COLONNE.map((critere) => [
+      critere.colonne,
+      {
+        label: critere.label,
+        placeholder: critere.placeholder,
+        options: options(referentiels?.[critere.liste]),
+        value: filters[critere.cle],
+        onChange: (value: string | null) => {
+          setFilters({ [critere.cle]: value });
+        },
+      },
+    ]),
+  );
+}
+
 const ADAPTER: UrlFilterAdapter<VisiteFilters> = {
   parse: parseVisiteFilters,
   serialize: serializeVisiteFilters,
@@ -107,13 +167,6 @@ const COLONNES = [
 
 function options(items: readonly VisiteReferentielItem[] | undefined): FilterOption[] {
   return (items ?? []).map((item) => ({ value: item.id, label: item.label }));
-}
-
-function optionsReferentiel<K extends keyof VisiteReferentiels>(
-  data: VisiteReferentiels | undefined,
-  key: K,
-): FilterOption[] {
-  return options(data?.[key]);
 }
 
 interface Pagination {
@@ -171,6 +224,35 @@ function contenuRegistreVide(jourSeul: boolean): { titre: string; description: s
   };
 }
 
+function EnTeteRegistre({
+  colonne,
+  filtre,
+  filters,
+  onToggle,
+  className,
+}: {
+  colonne: string;
+  filtre: FiltreColonne | undefined;
+  filters: VisiteFilters;
+  onToggle: (id: string) => void;
+  className: string | undefined;
+}) {
+  const sortField = SORT_FIELD_OF[colonne];
+  const tri =
+    sortField === undefined
+      ? undefined
+      : {
+          column: { id: sortField, label: colonne },
+          sortBy: filters.sortBy,
+          sortDir: filters.sortDir,
+          onToggle,
+        };
+  if (filtre !== undefined)
+    return <FilterableTableHead label={colonne} filtre={filtre} tri={tri} className={className} />;
+  if (tri !== undefined) return <SortableTableHead {...tri} className={className} />;
+  return <TableHead className={className}>{colonne}</TableHead>;
+}
+
 function RegistreCorps({
   isPending,
   isError,
@@ -183,6 +265,7 @@ function RegistreCorps({
   corrigeeId,
   referentielsData,
   filters,
+  filtres,
   toggleSort,
   onVoirToutLeRegistre,
   onCorriger,
@@ -200,6 +283,7 @@ function RegistreCorps({
   corrigeeId: string | null;
   referentielsData: VisiteReferentiels | undefined;
   filters: VisiteFilters;
+  filtres: Partial<Record<string, FiltreColonne>>;
   toggleSort: (columnId: string) => void;
   onVoirToutLeRegistre: () => void;
   onCorriger: (id: string) => void;
@@ -252,26 +336,18 @@ function RegistreCorps({
             >
               N° REGISTRE
             </TableHead>
-            {COLONNES.map((colonne) => {
-              const sortField = SORT_FIELD_OF[colonne];
-              const printClassName = impressionColonneVisible(colonne, colonnesImprimees)
-                ? undefined
-                : 'print:hidden';
-              return sortField === undefined ? (
-                <TableHead key={colonne} className={printClassName}>
-                  {colonne}
-                </TableHead>
-              ) : (
-                <SortableTableHead
-                  key={colonne}
-                  column={{ id: sortField, label: colonne }}
-                  sortBy={filters.sortBy}
-                  sortDir={filters.sortDir}
-                  onToggle={toggleSort}
-                  className={printClassName}
-                />
-              );
-            })}
+            {COLONNES.map((colonne) => (
+              <EnTeteRegistre
+                key={colonne}
+                colonne={colonne}
+                filtre={filtres[colonne]}
+                filters={filters}
+                onToggle={toggleSort}
+                className={
+                  impressionColonneVisible(colonne, colonnesImprimees) ? undefined : 'print:hidden'
+                }
+              />
+            ))}
             <TableHead className="print:hidden">CORRIGER</TableHead>
           </TableRow>
         </TableHeader>
@@ -441,14 +517,6 @@ export function RegistreView() {
     void queryClient.invalidateQueries({ queryKey: ['visites'] });
   }
 
-  function removeAdvanced(key: VisiteAdvancedFilterKey): void {
-    setFilters({ [key]: null });
-  }
-
-  function clearAdvanced(): void {
-    setFilters(Object.fromEntries(VISITE_ADVANCED_FILTER_KEYS.map((key) => [key, null])));
-  }
-
   function toggleSort(columnId: string): void {
     if (!isVisiteSortField(columnId)) return;
     if (filters.sortBy === columnId) {
@@ -581,60 +649,14 @@ export function RegistreView() {
           </div>
         </div>
 
-        <AdvancedPanel
-          module="registre"
-          startCollapsed={true}
-          chips={chips}
-          onRemove={removeAdvanced}
-          onClearAll={clearAdvanced}
-          actions={
-            countActiveVisiteFilters(filters) > 0 ? (
-              <Button type="button" variant="outline" onClick={resetFilters}>
-                <RotateCcwIcon aria-hidden="true" />
-                Retirer les filtres
-              </Button>
-            ) : null
-          }
-        >
-          <>
-            <FilterCombobox
-              label={VISITE_COLONNES.entreprise}
-              placeholder="Toutes"
-              options={optionsReferentiel(referentiels.data, 'entreprises')}
-              value={filters.entrepriseId}
-              onChange={(value) => {
-                setFilters({ entrepriseId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.direction}
-              placeholder="Toutes"
-              options={optionsReferentiel(referentiels.data, 'directions')}
-              value={filters.directionId}
-              onChange={(value) => {
-                setFilters({ directionId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.destinataire}
-              placeholder="Tous"
-              options={optionsReferentiel(referentiels.data, 'destinataires')}
-              value={filters.destinataireId}
-              onChange={(value) => {
-                setFilters({ destinataireId: value });
-              }}
-            />
-            <FilterCombobox
-              label={VISITE_COLONNES.objet}
-              placeholder="Tous"
-              options={optionsReferentiel(referentiels.data, 'objets')}
-              value={filters.objetId}
-              onChange={(value) => {
-                setFilters({ objetId: value });
-              }}
-            />
-          </>
-        </AdvancedPanel>
+        {/* Entreprise, direction, destinataire et objet se filtrent depuis
+            l'en-tête de leur colonne : il ne reste rien à replier ici. */}
+        {countActiveVisiteFilters(filters) > 0 ? (
+          <Button type="button" variant="outline" className="self-start" onClick={resetFilters}>
+            <RotateCcwIcon aria-hidden="true" />
+            Retirer les filtres
+          </Button>
+        ) : null}
       </section>
 
       <div className="flex items-center justify-between gap-3">
@@ -668,6 +690,7 @@ export function RegistreView() {
         corrigeeId={corrigeeId}
         referentielsData={referentiels.data}
         filters={filters}
+        filtres={filtresDesColonnes(filters, setFilters, referentiels.data)}
         toggleSort={toggleSort}
         onVoirToutLeRegistre={() => {
           setFilters({ toutePeriode: true, dateFrom: null, dateTo: null });
