@@ -383,7 +383,7 @@ func TestExportModeleProspectsListesDeroulantes(t *testing.T) {
 	if visible {
 		t.Fatal("la feuille Listes doit rester masquée")
 	}
-	if methode := exportCellule(t, f, "Listes", "C2"); methode != "RDV CPI" {
+	if methode := exportCellule(t, f, "Listes", "C2"); methode != "Enrôlement sur place" {
 		t.Fatalf("liste des méthodes : %q", methode)
 	}
 	if aide := exportCellule(t, f, "Instructions", "B2"); aide != "Oui" {
