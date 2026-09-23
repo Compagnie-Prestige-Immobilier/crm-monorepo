@@ -3,6 +3,9 @@ package socle
 import (
 	"context"
 	"cpi-go/db"
+	"net/http"
+	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -28,4 +31,38 @@ type Tache struct {
 	Nom  string
 	Cron string
 	Run  func(context.Context) error
+}
+
+// Un jour saisi par un écran vaut du premier instant local au premier instant
+// du lendemain : une borne posée à minuit perdrait la journée même.
+func BornesDuJour(du, au string, zone *time.Location) (debut, fin *time.Time, err error) {
+	premier, posePremier, err := borneDuJour(du, zone, 0)
+	if err != nil {
+		return nil, nil, err
+	}
+	dernier, poseDernier, err := borneDuJour(au, zone, 1)
+	if err != nil {
+		return nil, nil, err
+	}
+	if posePremier {
+		debut = &premier
+	}
+	if poseDernier {
+		fin = &dernier
+	}
+	return debut, fin, nil
+}
+
+// `pose` distingue la borne absente, qui ne filtre rien, de la borne fautive.
+func borneDuJour(jour string, zone *time.Location, joursEnPlus int) (borne time.Time, pose bool, err error) {
+	jour = strings.TrimSpace(jour)
+	if jour == "" {
+		return time.Time{}, false, nil
+	}
+	lu, err := time.ParseInLocation("2006-01-02", jour, zone)
+	if err != nil {
+		return time.Time{}, false, Problem(http.StatusBadRequest, "JOUR_INVALIDE",
+			"Les dates s'écrivent AAAA-MM-JJ.")
+	}
+	return lu.AddDate(0, 0, joursEnPlus).UTC(), true, nil
 }
