@@ -6,7 +6,8 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { RefusPermission, type Contexte } from '@/lib/guard';
 import { peut, readsOnly, type Phase2Status, type SessionUser } from '@/lib/types';
 
-const SUIVIS: readonly { value: Phase2Status; label: string }[] = [
+const SUIVIS: readonly { value: Phase2Status | 'TOUT'; label: string }[] = [
+  { value: 'TOUT', label: 'Tout' },
   { value: 'INTERESTED', label: 'Intéressés' },
   { value: 'HESITANT', label: 'Hésitants' },
   { value: 'APPOINTMENT', label: 'Rendez-vous (hors téléphonique)' },
@@ -21,8 +22,8 @@ const suivisDe = (user: SessionUser): typeof SUIVIS =>
     ? SUIVIS
     : SUIVIS.filter((suivi) => suivi.value === 'APPOINTMENT');
 
-const sansMotifDe = (statut: Phase2Status): string | null =>
-  statut === 'APPOINTMENT' ? RENDEZ_VOUS_TELEPHONIQUE : null;
+const sansMotifDe = (statut: Phase2Status | 'TOUT'): string | null =>
+  statut === 'APPOINTMENT' || statut === 'TOUT' ? RENDEZ_VOUS_TELEPHONIQUE : null;
 
 export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
   beforeLoad: (contexte: Contexte & { location: { searchStr: string } }) => {
@@ -37,7 +38,10 @@ export const Route = createFileRoute('/_panneau/teleconseil/interesses')({
         href: `/teleconseil/interesses?phase2Status=${suivisDe(user)[0]?.value ?? 'APPOINTMENT'}`,
       });
     }
-    if (statut === 'APPOINTMENT' && params.get('sansMotif') !== RENDEZ_VOUS_TELEPHONIQUE) {
+    if (
+      (statut === 'APPOINTMENT' || statut === 'TOUT') &&
+      params.get('sansMotif') !== RENDEZ_VOUS_TELEPHONIQUE
+    ) {
       params.set('sansMotif', RENDEZ_VOUS_TELEPHONIQUE);
       throw redirect({ href: `/teleconseil/interesses?${params.toString()}` });
     }
@@ -55,7 +59,7 @@ function TeleconseilInteressesPage() {
       <Tabs
         value={filters.phase2Status}
         onValueChange={(value) => {
-          const statut = value as Phase2Status;
+          const statut = value as Phase2Status | 'TOUT';
           setFilters({ phase2Status: statut, sansMotif: sansMotifDe(statut) });
         }}
       >
