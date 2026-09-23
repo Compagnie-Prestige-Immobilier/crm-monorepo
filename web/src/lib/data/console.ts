@@ -683,6 +683,8 @@ export interface AttemptDraft {
   readonly conversion?: ConversionDraft;
   /** L'ouverture que cette tentative referme, et dont elle arrête le chronomètre. */
   readonly ouvertureId?: string;
+  /** Grand Public seulement : les proches qu'un prospect recommande pendant l'appel. */
+  readonly contactsRecommandes?: { nom?: string; phone: string }[];
 }
 
 function methodeAttemptErreur(draft: AttemptDraft): string | null {
@@ -857,6 +859,9 @@ function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           ...(input.draft.ouvertureId === undefined
             ? {}
             : { ouvertureId: input.draft.ouvertureId }),
+          ...(input.draft.contactsRecommandes === undefined
+            ? {}
+            : { contactsRecommandes: input.draft.contactsRecommandes }),
           clientCreatedAt: input.at,
         },
       },
