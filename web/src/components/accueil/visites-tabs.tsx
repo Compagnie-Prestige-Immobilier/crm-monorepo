@@ -1,7 +1,13 @@
 'use client';
 
 import { useQuery } from '@tanstack/react-query';
-import { ChartNoAxesCombinedIcon, ListChecksIcon, ListIcon, UploadIcon } from 'lucide-react';
+import {
+  ChartNoAxesCombinedIcon,
+  HeartHandshakeIcon,
+  ListChecksIcon,
+  ListIcon,
+  UploadIcon,
+} from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
@@ -21,6 +27,13 @@ const TABS: readonly {
     label: 'Tableau de bord',
     icon: ChartNoAxesCombinedIcon,
     permission: null,
+  },
+  {
+    // Les rendez-vous obtenus au téléphone : le comptoir constate qui vient.
+    href: '/accueil/rendez-vous',
+    label: 'Rendez-vous',
+    icon: HeartHandshakeIcon,
+    permission: 'rendez_vous.voir',
   },
   {
     // Gestion des quatre listes qui alimentent la saisie : réservée à qui les

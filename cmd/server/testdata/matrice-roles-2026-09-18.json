@@ -608,7 +608,7 @@
   "POST /api/v1/prospects/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/suivi-rendez-vous": ["ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
+  "POST /api/v1/prospects/{id}/suivi-rendez-vous": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
   "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/vendre": [
@@ -693,5 +693,7 @@
   "POST /api/v1/assistant/questions": ["ADMIN"],
   "GET /api/v1/assistant/questions-enregistrees": ["ADMIN"],
   "POST /api/v1/assistant/questions-enregistrees": ["ADMIN"],
-  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"]
+  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"],
+  "GET /api/v1/rendez-vous": ["ACCUEIL", "ADMIN", "DIRECTION"],
+  "GET /api/v1/export/rendez-vous.xlsx": ["ACCUEIL", "ADMIN", "DIRECTION"]
 }
