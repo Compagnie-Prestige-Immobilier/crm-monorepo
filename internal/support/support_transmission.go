@@ -3,6 +3,7 @@ package support
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/socle"
 	"errors"
 	"log/slog"
 	"strings"
@@ -115,9 +116,9 @@ func (s *service) fixerTexteTransmis(ctx context.Context, sig *db.SupportSignale
 	if err != nil {
 		return err
 	}
-	images := make([]imagePiece, len(rangees))
+	images := make([]socle.ImageIA, len(rangees))
 	for i, r := range rangees {
-		images[i] = imagePiece{TypeMime: r.TypeMime, Contenu: r.Contenu}
+		images[i] = socle.ImageIA{TypeMime: r.TypeMime, Contenu: r.Contenu}
 	}
 	texte, auteur := reformuler(ctx, texteTicket{Description: sig.Description, Contexte: sig.Contexte}, sig.AuteurRoleLibelle, images)
 	lignes, err := s.Q.SupportTexteTransmisFixe(ctx, db.SupportTexteTransmisFixeParams{
