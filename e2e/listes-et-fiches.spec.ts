@@ -178,8 +178,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
 
     await page.goto('/teleconseil/prospects/nouveau?projet=GRAND_PUBLIC');
     await fermerRappelIntrusif(page);
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
-    await expect(page.locator('button').filter({ hasText: 'Situation' })).toBeDisabled();
+    // Premier pas du parcours unifié : le type de contact, pas encore le formulaire.
+    await expect(page.getByRole('button', { name: 'Appel entrant', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SMS / Whatsapp', exact: true })).toBeVisible();
 
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Recherche');
