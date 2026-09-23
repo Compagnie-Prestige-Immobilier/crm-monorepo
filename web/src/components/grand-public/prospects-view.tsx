@@ -19,12 +19,16 @@ import { AdvancedPanel } from '@/components/filters/advanced-panel';
 import { useFileDownload } from '@/components/exports/download-button';
 import { DatePicker } from '@/components/filters/date-picker';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 import { SearchField } from '@/components/filters/search-field';
 import { useUrlFilters, type UrlFilterAdapter } from '@/components/filters/use-url-filters';
 import { Absent } from '@/components/grand-public/absence';
 import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { FiltreOrigine } from '@/components/grand-public/filtre-origine';
-import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
+import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
 import { QueryErrorState } from '@/components/query-error-state';
 import { Badge } from '@/components/ui/badge';
 import { Button, buttonVariants } from '@/components/ui/button';
@@ -66,13 +70,19 @@ import {
   type ProspectType,
 } from '@/lib/data/grand-public';
 import { fetchReferenceData } from '@/lib/data/reference';
-import { clearAdvancedFilters, PAGE_SIZE_OPTIONS, type AdvancedFilterKey } from '@/lib/filters';
+import {
+  clearAdvancedFilters,
+  GRAND_PUBLIC_ADVANCED_KEYS,
+  PAGE_SIZE_OPTIONS,
+  type AdvancedFilterKey,
+} from '@/lib/filters';
 import { formatDate, formatDateTime, formatNumber, formatPhone, withRetired } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
 import {
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
   statutForProjet,
+  type FilterOption,
   type Paginated,
   type ProspectRow,
   type ProspectStatut,
@@ -95,43 +105,6 @@ const FILTERS_ADAPTER: UrlFilterAdapter<GrandPublicFilters> = {
   cleared: (current) => ({ ...EMPTY_GRAND_PUBLIC_FILTERS, pageSize: current.pageSize }),
 };
 
-/** Peu d'options, toutes visibles : on désigne au lieu d'ouvrir puis de chercher. */
-function ChoiceRow<T extends string>({
-  legend,
-  options,
-  value,
-  onChange,
-}: {
-  legend: string;
-  options: readonly { value: T; label: string }[];
-  value: T | null;
-  onChange: (value: T | null) => void;
-}) {
-  return (
-    <fieldset className="flex min-w-0 flex-col gap-1.5">
-      <legend className="mb-1.5 text-[0.8125rem] font-[600] text-foreground">{legend}</legend>
-      <div className="flex flex-wrap gap-2">
-        {options.map((option) => {
-          const active = value === option.value;
-          return (
-            <Button
-              key={option.value}
-              type="button"
-              variant={active ? 'default' : 'outline'}
-              aria-pressed={active}
-              onClick={() => {
-                onChange(active ? null : option.value);
-              }}
-            >
-              {option.label}
-            </Button>
-          );
-        })}
-      </div>
-    </fieldset>
-  );
-}
-
 const TYPE_OPTIONS = PROSPECT_TYPES.map((type) => ({
   value: type,
   label: PROSPECT_TYPE_LABELS[type],
@@ -141,6 +114,68 @@ const STATUT_OPTIONS = PROSPECT_STATUTS.map((statut) => ({
   value: statut,
   label: PROSPECT_STATUT_LABELS[statut],
 }));
+
+function banqueOptions(reference: ReferenceData | undefined) {
+  return (reference?.banques ?? []).map((banque) => ({
+    value: banque.id,
+    label: withRetired(banque.shortName ?? '', banque.isActive ?? false),
+    hint: banque.name ?? undefined,
+  }));
+}
+
+interface FiltresColonnes {
+  statut: FiltreColonne;
+  situation: FiltreColonne;
+  canal: FiltreColonne;
+  banque: FiltreColonne;
+}
+
+/** Colonne vers le critère qui la filtre déjà côté serveur. */
+function filtresDesColonnes(
+  filters: GrandPublicFilters,
+  setFilters: (patch: Partial<GrandPublicFilters>) => void,
+  reference: ReferenceData | undefined,
+  canaux: readonly FilterOption[],
+): FiltresColonnes {
+  return {
+    statut: {
+      label: 'Statut',
+      placeholder: 'Tous les statuts',
+      options: STATUT_OPTIONS,
+      value: filters.statut,
+      onChange: (value) => {
+        setFilters({ statut: value as ProspectStatut | null });
+      },
+    },
+    situation: {
+      label: 'Situation',
+      placeholder: 'Toutes les situations',
+      options: TYPE_OPTIONS,
+      value: filters.type,
+      onChange: (value) => {
+        setFilters({ type: value as ProspectType | null });
+      },
+    },
+    canal: {
+      label: 'Canal de provenance',
+      placeholder: 'Tous les canaux',
+      options: canaux,
+      value: filters.canalProvenanceId,
+      onChange: (value) => {
+        setFilters({ canalProvenanceId: value });
+      },
+    },
+    banque: {
+      label: 'Banque',
+      placeholder: 'Toutes les banques',
+      options: banqueOptions(reference),
+      value: filters.banqueId,
+      onChange: (value) => {
+        setFilters({ banqueId: value });
+      },
+    },
+  };
+}
 
 export function GrandPublicProspectsView({
   viewerId,
@@ -203,7 +238,7 @@ export function GrandPublicProspectsView({
   );
 
   const clearAdvanced = useCallback(() => {
-    setFilters(clearAdvancedFilters());
+    setFilters(clearAdvancedFilters(GRAND_PUBLIC_ADVANCED_KEYS));
   }, [setFilters]);
 
   const activeCount = countGrandPublicFilters(filters);
@@ -231,6 +266,7 @@ export function GrandPublicProspectsView({
       sortDir: 'desc',
     },
     reference.data,
+    GRAND_PUBLIC_ADVANCED_KEYS,
   );
   const [createOpen, setCreateOpen] = useState(false);
 
@@ -272,15 +308,6 @@ export function GrandPublicProspectsView({
               }}
             />
           ) : null}
-          <FilterCombobox
-            label="Canal de provenance"
-            placeholder="Tous les canaux"
-            value={filters.canalProvenanceId}
-            options={canalOptions}
-            onChange={(value) => {
-              setFilters({ canalProvenanceId: value });
-            }}
-          />
         </div>
 
         <AdvancedPanel
@@ -317,6 +344,7 @@ export function GrandPublicProspectsView({
         list={list}
         filters={filters}
         setFilters={setFilters}
+        filtresColonnes={filtresDesColonnes(filters, setFilters, reference.data, canalOptions)}
         hasFilters={activeCount > 0}
         canCreate={canCreate}
         campaignScoped={scopedParCampagnes}
@@ -329,8 +357,7 @@ export function GrandPublicProspectsView({
             <DialogTitle>Nouveau prospect Grand Public</DialogTitle>
             <DialogDescription>Le nom et le téléphone suffisent.</DialogDescription>
           </DialogHeader>
-          <NouveauProspect
-            embedded
+          <NouveauProspectConsole
             onSaved={() => {
               setCreateOpen(false);
             }}
@@ -403,23 +430,7 @@ function FiltresAvances({
   reference: ReferenceData | undefined;
 }) {
   return (
-    <div className="grid gap-3 border-t border-border pt-4 sm:grid-cols-2 xl:grid-cols-3">
-      <ChoiceRow<ProspectType>
-        legend="Situation"
-        options={TYPE_OPTIONS}
-        value={filters.type}
-        onChange={(value) => {
-          setFilters({ type: value });
-        }}
-      />
-      <ChoiceRow<ProspectStatut>
-        legend="Statut"
-        options={STATUT_OPTIONS}
-        value={filters.statut}
-        onChange={(value) => {
-          setFilters({ statut: value });
-        }}
-      />
+    <>
       {reference && reference.representants.length > 0 ? (
         <FilterCombobox
           label="Représentant"
@@ -442,19 +453,6 @@ function FiltresAvances({
         value={filters.departementId}
         onChange={(value) => {
           setFilters({ departementId: value });
-        }}
-      />
-      <FilterCombobox
-        label="Banque"
-        placeholder="Toutes les banques"
-        options={(reference?.banques ?? []).map((b) => ({
-          value: b.id,
-          label: withRetired(b.shortName ?? '', b.isActive ?? false),
-          hint: b.name ?? undefined,
-        }))}
-        value={filters.banqueId}
-        onChange={(value) => {
-          setFilters({ banqueId: value });
         }}
       />
       <FilterCombobox
@@ -488,7 +486,7 @@ function FiltresAvances({
           setFilters({ dateTo: value });
         }}
       />
-    </div>
+    </>
   );
 }
 
@@ -496,6 +494,7 @@ function ProspectsTable({
   list,
   filters,
   setFilters,
+  filtresColonnes,
   hasFilters,
   canCreate,
   campaignScoped,
@@ -504,6 +503,7 @@ function ProspectsTable({
   list: UseQueryResult<Paginated<ProspectRow>>;
   filters: GrandPublicFilters;
   setFilters: (patch: Partial<GrandPublicFilters>) => void;
+  filtresColonnes: FiltresColonnes;
   hasFilters: boolean;
   canCreate: boolean;
   campaignScoped: boolean;
@@ -539,11 +539,11 @@ function ProspectsTable({
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Nom</TableHead>
-              <TableHead>Statut</TableHead>
-              <TableHead>Situation</TableHead>
+              <FilterableTableHead label="Statut" filtre={filtresColonnes.statut} />
+              <FilterableTableHead label="Situation" filtre={filtresColonnes.situation} />
               <TableHead>Profession</TableHead>
-              <TableHead>Canal</TableHead>
-              <TableHead>Banque</TableHead>
+              <FilterableTableHead label="Canal" filtre={filtresColonnes.canal} />
+              <FilterableTableHead label="Banque" filtre={filtresColonnes.banque} />
               <TableHead>Segment</TableHead>
               <TableHead>Téléconseiller</TableHead>
               <TableHead>Saisi le</TableHead>

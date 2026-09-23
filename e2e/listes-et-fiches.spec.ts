@@ -105,11 +105,8 @@ test.describe('parcours 7, les listes CHUES', () => {
     const affichage = page.getByRole('status').filter({ hasText: 'Représentants affichés' });
     await expect(affichage).toContainText(`1–25 sur ${String(REPRESENTANTS)}`);
 
-    await page.getByRole('button', { name: 'Filtres avancés' }).click();
-    await page.getByLabel('Trier par').click();
-    await page.getByRole('option', { name: 'Nom', exact: true }).click();
-    await page.getByLabel('Sens').click();
-    await page.getByRole('option', { name: 'Croissant', exact: true }).click();
+    // Le tri vit sur l'en-tête de colonne, plus dans les filtres avancés.
+    await page.getByRole('button', { name: 'Représentant', exact: true }).click();
     await expect(page).toHaveURL(/sortBy=fullName/);
     await expect(page).toHaveURL(/sortDir=asc/);
 
@@ -181,8 +178,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
 
     await page.goto('/teleconseil/prospects/nouveau?projet=GRAND_PUBLIC');
     await fermerRappelIntrusif(page);
-    await expect(page.getByRole('button', { name: 'Continuer', exact: true })).toBeDisabled();
-    await expect(page.locator('button').filter({ hasText: 'Situation' })).toBeDisabled();
+    // Premier pas du parcours unifié : le type de contact, pas encore le formulaire.
+    await expect(page.getByRole('button', { name: 'Appel entrant', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'SMS / Whatsapp', exact: true })).toBeVisible();
 
     await page.goto('/teleconseil/prospects?projet=Grand+Public');
     await chercher(page, 'Recherche');
@@ -199,7 +197,9 @@ test.describe('parcours 7, la liste et la fiche Grand Public', () => {
     // Pas à pas : la réponse, le formulaire, le statut, sa précision, la note.
     // Un Retour ne perd pas ce qui a été saisi dans le formulaire.
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
-    await expect(page.getByRole('radio', { checked: true })).toHaveCount(0);
+    // « Aucun » coche par défaut la méthode d'enrôlement : c'est le seul radio actif ici.
+    await expect(page.getByRole('radio', { checked: true })).toHaveCount(1);
+    await expect(page.getByRole('radio', { name: 'Aucun', checked: true })).toBeVisible();
     await page.getByRole('textbox', { name: /^Nom/ }).fill(`Dossier ${cle}`);
     await page.getByRole('button', { name: /^Retour/u }).click();
     await page.getByRole('button', { name: /Oui, elle a répondu/u }).click();
@@ -290,6 +290,14 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
 
     const fenetre = page.getByRole('dialog');
     await expect(fenetre.getByRole('heading', { name: 'Nouveau prospect' })).toBeVisible();
+
+    // Le type de contact puis le canal de provenance precedent desormais la
+    // console : le canal se propose deja rempli par le choix precedent.
+    await fenetre.getByRole('button', { name: 'Appel entrant' }).click();
+    await expect(fenetre.getByRole('combobox', { name: 'Canal de provenance' })).toContainText(
+      'Appel entrant',
+    );
+    await fenetre.getByRole('button', { name: 'Continuer' }).click();
 
     // Le projet se choisit au dernier pas de la console : les etapes suivantes
     // restent fermees tant que la fiche n'est pas saisie.

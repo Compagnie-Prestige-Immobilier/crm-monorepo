@@ -49,20 +49,20 @@ Dans l'interface **Dokploy**, configurer les variables d'environnement suivantes
 
 ### A. Service Kairos (`ticket-solver`)
 
-| Variable                    | Description                                     | Valeur / Exemple                                                                                               |
-| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| `JEV_API_KEY`               | **Clé API du classificateur JEV (OBLIGATOIRE)** | `REDACTED` |
-| `JEV_URL`                   | Endpoint de l'API de classification JEV         | `https://api.jev.ai/v1/classify` (défaut)                                                                      |
-| `GLPI_URL`                  | URL de l'instance GLPI CPI                      | `https://support.cpi.sn`                                                                                       |
-| `GLPI_APP_TOKEN`            | Token d'application GLPI                        | _(Jeton GLPI de production)_                                                                                   |
-| `GLPI_USER_TOKEN`           | Token d'utilisateur GLPI                        | _(Jeton utilisateur Kairo)_                                                                                    |
-| `GIT_TOKEN`                 | Jeton GitHub pour Kairo (clone / PR)            | _(GitHub Personal Access Token)_                                                                               |
-| `KAIRO_ADMIN_TOKEN`         | Jeton secret pour l'API admin interne           | _(Généré aléatoirement, partagé avec le CRM)_                                                                  |
-| `KAIRO_PORT`                | Port d'écoute HTTP interne de Kairo             | `8090`                                                                                                         |
-| `CLAUDE_CODE_OAUTH_TOKEN_0` | Jeton Claude Code principal                     | _(Jeton OAuth Anthropic)_                                                                                      |
-| `CLAUDE_CODE_OAUTH_TOKEN_1` | Jeton Claude Code secours                       | _(Jeton OAuth Anthropic)_                                                                                      |
-| `CODEX_ACCESS_TOKEN`        | Jeton OpenAI Codex de secours                   | _(Optionnel)_                                                                                                  |
-| `BREVO_API_KEY`             | Clé API Brevo pour les notifications e-mail     | _(Clé API Brevo)_                                                                                              |
+| Variable                    | Description                                     | Valeur / Exemple                                                                 |
+| --------------------------- | ----------------------------------------------- | -------------------------------------------------------------------------------- |
+| `JEV_API_KEY`               | **Clé API du classificateur JEV (OBLIGATOIRE)** | _(clé fournie par JEV, à saisir uniquement dans Dokploy — jamais dans ce dépôt)_ |
+| `JEV_URL`                   | Endpoint de l'API de classification JEV         | `https://api.jev.ai/v1/classify` (défaut)                                        |
+| `GLPI_URL`                  | URL de l'instance GLPI CPI                      | `https://support.cpi.sn`                                                         |
+| `GLPI_APP_TOKEN`            | Token d'application GLPI                        | _(Jeton GLPI de production)_                                                     |
+| `GLPI_USER_TOKEN`           | Token d'utilisateur GLPI                        | _(Jeton utilisateur Kairo)_                                                      |
+| `GIT_TOKEN`                 | Jeton GitHub pour Kairo (clone / PR)            | _(GitHub Personal Access Token)_                                                 |
+| `KAIRO_ADMIN_TOKEN`         | Jeton secret pour l'API admin interne           | _(Généré aléatoirement, partagé avec le CRM)_                                    |
+| `KAIRO_PORT`                | Port d'écoute HTTP interne de Kairo             | `8090`                                                                           |
+| `CLAUDE_CODE_OAUTH_TOKEN_0` | Jeton Claude Code principal                     | _(Jeton OAuth Anthropic)_                                                        |
+| `CLAUDE_CODE_OAUTH_TOKEN_1` | Jeton Claude Code secours                       | _(Jeton OAuth Anthropic)_                                                        |
+| `CODEX_ACCESS_TOKEN`        | Jeton OpenAI Codex de secours                   | _(Optionnel)_                                                                    |
+| `BREVO_API_KEY`             | Clé API Brevo pour les notifications e-mail     | _(Clé API Brevo)_                                                                |
 
 ### B. Service CRM (`crm-monorepo`)
 
@@ -86,7 +86,7 @@ Pour déployer les deux applications sur l'infrastructure Dokploy :
 2. Aller dans les paramètres de l'application **Kairos** -> **Environment Variables**.
 3. Définir :
    ```env
-   JEV_API_KEY=REDACTED
+   JEV_API_KEY=<clé fournie par JEV>
    JEV_URL=https://api.jev.ai/v1/classify
    ```
 4. Sauvegarder les variables d'environnement.

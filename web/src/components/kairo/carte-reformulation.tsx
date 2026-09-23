@@ -14,51 +14,124 @@ function pourcent(part: number, total: number): number {
   return total === 0 ? 0 : Math.round((part / total) * 100);
 }
 
+function NomModele({ modele }: { modele: string }) {
+  const separateur = modele.indexOf('/');
+  if (separateur === -1) {
+    return <span className="font-medium text-foreground">{modele}</span>;
+  }
+  return (
+    <>
+      <span className="font-medium text-foreground">{modele.slice(separateur + 1)}</span>
+      <span className="ml-1.5 text-xs text-muted-foreground">({modele.slice(0, separateur)})</span>
+    </>
+  );
+}
+
+function Comparaison({ recente }: { recente: Recente }) {
+  const reecrit = recente.reformulePar !== null;
+  return (
+    <li className="border-b border-border/60 last:border-0">
+      <details className="group">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-2.5 transition-colors hover:bg-secondary/40 [&::-webkit-details-marker]:hidden">
+          <ChevronRightIcon
+            className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+          <span className="min-w-0 flex-1 truncate text-xs font-medium text-foreground">
+            {recente.description}
+          </span>
+          <Badge
+            variant={reecrit ? 'secondary' : 'outline'}
+            className="hidden sm:inline-flex font-mono text-[11px]"
+          >
+            {recente.reformulePar ?? 'Texte d’origine'}
+          </Badge>
+          <time
+            dateTime={recente.creeLe}
+            title={formatDateTime(recente.creeLe)}
+            className="shrink-0 text-xs text-muted-foreground tabular-nums"
+          >
+            {ilYA(recente.creeLe)}
+          </time>
+        </summary>
+        <div className="grid gap-3 bg-secondary/15 p-4 pt-1 sm:grid-cols-2">
+          <figure className="flex flex-col gap-1.5">
+            <figcaption className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Saisi par le demandeur
+            </figcaption>
+            <p className="whitespace-pre-wrap rounded-xl border border-border/70 bg-card p-3 text-xs leading-relaxed text-foreground shadow-2xs">
+              {recente.description}
+            </p>
+          </figure>
+          <figure className="flex flex-col gap-1.5">
+            <figcaption className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+              Envoyé à GLPI{reecrit ? ` · ${recente.reformulePar ?? ''}` : ''}
+            </figcaption>
+            <p className="whitespace-pre-wrap rounded-xl border border-border/70 bg-card p-3 text-xs leading-relaxed text-foreground shadow-2xs">
+              {recente.descriptionTransmise}
+            </p>
+          </figure>
+        </div>
+      </details>
+    </li>
+  );
+}
+
 export function CarteReformulation({ reformulation }: { reformulation: Reformulation }) {
   const { active, fournisseurs, parModele, recentes } = reformulation;
   const total = parModele.reduce((somme, ligne) => somme + ligne.nombre, 0);
   const origine = parModele.find((ligne) => ligne.modele === '')?.nombre ?? 0;
+
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex flex-wrap items-center gap-2">
-          <SparklesIcon className="size-5 text-primary" aria-hidden="true" />
-          Reformulation des signalements
-          <Badge variant={active ? 'success' : 'secondary'}>
-            {active ? 'Active' : 'Désactivée'}
-          </Badge>
-        </CardTitle>
-        {active ? (
-          <div className="flex flex-wrap gap-1.5 pt-1">
-            {fournisseurs.length === 0 ? (
-              <Badge variant="destructive">Aucune clé de fournisseur</Badge>
-            ) : (
-              fournisseurs.map((nom) => (
-                <Badge key={nom} variant="outline">
+    <Card className="rounded-2xl border border-border/80 bg-card shadow-xs">
+      <CardHeader className="pb-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <CardTitle className="flex items-center gap-2.5 font-display text-xl font-bold tracking-tight text-foreground">
+            <SparklesIcon className="size-4 text-primary" aria-hidden="true" />
+            Reformulation des signalements
+            <Badge
+              variant={active ? 'success' : 'secondary'}
+              className="rounded-md px-2 py-0.5 text-xs font-semibold"
+            >
+              {active ? 'Active' : 'Désactivée'}
+            </Badge>
+          </CardTitle>
+
+          {active && fournisseurs.length > 0 ? (
+            <div className="flex flex-wrap gap-1.5">
+              {fournisseurs.map((nom) => (
+                <Badge
+                  key={nom}
+                  variant="outline"
+                  className="font-mono text-[11px] text-muted-foreground"
+                >
                   {nom}
                 </Badge>
-              ))
-            )}
-          </div>
-        ) : (
-          <CardDescription>
+              ))}
+            </div>
+          ) : null}
+        </div>
+
+        {!active ? (
+          <CardDescription className="text-xs text-muted-foreground">
             Les signalements partent tels que saisis. Activez SUPPORT_AI_ENABLED sur Dokploy pour
             les réécrire.
           </CardDescription>
-        )}
+        ) : null}
       </CardHeader>
-      <CardContent className="flex flex-col gap-8">
+
+      <CardContent className="flex flex-col gap-6">
         {total === 0 ? (
-          <p className="rounded-md bg-secondary px-4 py-6 text-center text-sm text-muted-foreground">
+          <p className="rounded-xl border border-dashed border-border/70 bg-secondary/30 px-4 py-6 text-center text-xs text-muted-foreground">
             Aucun signalement transmis ces 30 derniers jours.
           </p>
         ) : (
           <div className="grid gap-6 md:grid-cols-[minmax(0,14rem)_1fr] md:items-center">
             <div>
-              <p className="font-display text-[2.5rem] font-[800] leading-none tracking-[-0.02em] tabular-nums">
+              <p className="font-display text-4xl font-bold tracking-tight text-foreground tabular-nums">
                 {pourcent(total - origine, total)} %
               </p>
-              <p className="mt-2 text-sm text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 réécrits par l’IA sur {formatNumber(total)} signalements en 30 jours
               </p>
             </div>
@@ -67,8 +140,8 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
               aria-label="Signalements par modèle, 30 derniers jours"
             >
               {parModele.map((ligne) => (
-                <li key={ligne.modele} className="flex flex-col gap-1">
-                  <div className="flex justify-between gap-4 text-sm">
+                <li key={ligne.modele} className="flex flex-col gap-1.5">
+                  <div className="flex justify-between gap-4 text-xs">
                     <span
                       className={cn('truncate', ligne.modele === '' && 'text-muted-foreground')}
                     >
@@ -86,7 +159,7 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
                     <div
                       className={cn(
                         'h-full rounded-full',
-                        ligne.modele === '' ? 'bg-muted-foreground/40' : 'bg-primary',
+                        ligne.modele === '' ? 'bg-muted-foreground/30' : 'bg-primary',
                       )}
                       style={{ width: `${String(Math.max(pourcent(ligne.nombre, total), 2))}%` }}
                     />
@@ -96,12 +169,16 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
             </ul>
           </div>
         )}
+
         {recentes.length > 0 ? (
-          <section className="flex flex-col gap-2" aria-labelledby="reformulations-recentes">
-            <h3 id="reformulations-recentes" className="text-sm font-[600]">
+          <section className="flex flex-col gap-2.5" aria-labelledby="reformulations-recentes">
+            <h2
+              id="reformulations-recentes"
+              className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
+            >
               Derniers signalements
-            </h3>
-            <ul className="divide-y rounded-md border">
+            </h2>
+            <ul className="divide-y divide-border/60 rounded-xl border border-border/80 bg-card overflow-hidden">
               {recentes.map((recente) => (
                 <Comparaison key={recente.id} recente={recente} />
               ))}
@@ -110,65 +187,5 @@ export function CarteReformulation({ reformulation }: { reformulation: Reformula
         ) : null}
       </CardContent>
     </Card>
-  );
-}
-
-function NomModele({ modele }: { modele: string }) {
-  const separateur = modele.indexOf('/');
-  return (
-    <>
-      {modele.slice(separateur + 1)}
-      <span className="ml-2 text-muted-foreground">{modele.slice(0, separateur)}</span>
-    </>
-  );
-}
-
-function Comparaison({ recente }: { recente: Recente }) {
-  const reecrit = recente.reformulePar !== null;
-  return (
-    <li>
-      <details className="group">
-        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-3 px-4 py-2 hover:bg-secondary/60 [&::-webkit-details-marker]:hidden">
-          <ChevronRightIcon
-            className="size-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90 motion-reduce:transition-none"
-            aria-hidden="true"
-          />
-          <span className="min-w-0 flex-1 truncate text-sm">{recente.description}</span>
-          <Badge variant={reecrit ? 'info' : 'secondary'} className="hidden sm:inline-flex">
-            {recente.reformulePar ?? 'Texte d’origine'}
-          </Badge>
-          <time
-            dateTime={recente.creeLe}
-            title={formatDateTime(recente.creeLe)}
-            className="shrink-0 text-xs text-muted-foreground tabular-nums"
-          >
-            {ilYA(recente.creeLe)}
-          </time>
-        </summary>
-        <div className="grid gap-4 px-4 pb-4 pt-1 md:grid-cols-2">
-          <figure className="flex flex-col gap-1.5">
-            <figcaption className="text-xs font-[600] uppercase tracking-wide text-muted-foreground">
-              Saisi par le demandeur
-            </figcaption>
-            <p className="whitespace-pre-wrap rounded-md bg-secondary p-3 text-sm">
-              {recente.description}
-            </p>
-          </figure>
-          <figure className="flex flex-col gap-1.5">
-            <figcaption className="text-xs font-[600] uppercase tracking-wide text-muted-foreground">
-              Envoyé à GLPI{reecrit ? ` · ${recente.reformulePar ?? ''}` : ''}
-            </figcaption>
-            <p
-              className={cn(
-                'whitespace-pre-wrap rounded-md p-3 text-sm',
-                reecrit ? 'border border-info/30 bg-info-surface' : 'bg-secondary',
-              )}
-            >
-              {recente.descriptionTransmise}
-            </p>
-          </figure>
-        </div>
-      </details>
-    </li>
   );
 }

@@ -163,7 +163,7 @@ export function FilterCombobox({
   );
 }
 
-function ComboboxList({
+export function ComboboxList({
   options,
   value,
   search,

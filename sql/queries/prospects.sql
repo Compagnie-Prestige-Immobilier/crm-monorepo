@@ -403,9 +403,12 @@ ORDER BY v."dateSouscription" DESC NULLS LAST, p."lastCallAt" DESC
 LIMIT 200;
 
 -- name: ProspectsVivantsParTelephones :many
-SELECT p."id", p."phoneE164", p."statut", u."fullName" AS "teleconseiller"
+SELECT p."id", p."phoneE164", p."statut", u."fullName" AS "teleconseiller",
+       parrain."nom" AS "parrainNom", parrain."prenom" AS "parrainPrenom"
 FROM "prospects" p
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
+LEFT JOIN "prospect_suggestions" ps ON ps."resolvedProspectId" = p."id" AND ps."deletedAt" IS NULL
+LEFT JOIN "prospects" parrain ON parrain."id" = ps."sourceProspectId" AND parrain."deletedAt" IS NULL
 WHERE p."phoneE164" = ANY(sqlc.arg('telephones')::text[]) AND p."deletedAt" IS NULL;
 
 -- name: JourneysDesProspects :many

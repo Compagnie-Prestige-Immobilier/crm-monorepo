@@ -26,14 +26,15 @@ function MotifArbitrage(props: {
   estEscalade: boolean;
 }) {
   const { motif, notes, estEscalade } = props;
-  const titre = estEscalade ? 'Dilemme soulevé par l’agent :' : 'Dernier motif relevé :';
+  const titre = estEscalade ? 'Dilemme soulevé par l’agent' : 'Dernier motif relevé';
   return (
-    <div className="rounded-md border border-amber-200/80 bg-amber-50/70 p-3 text-xs text-foreground dark:border-amber-900/50 dark:bg-amber-950/30">
-      <p className="font-semibold text-amber-900 dark:text-amber-200">{titre}</p>
-      <p className="mt-1 whitespace-pre-wrap text-muted-foreground">{motif}</p>
+    <div className="rounded-xl border border-border/80 bg-secondary/40 p-3.5 text-xs">
+      <p className="font-semibold text-foreground">{titre}</p>
+      <p className="mt-1 leading-relaxed text-muted-foreground">{motif}</p>
       {notes ? (
-        <p className="mt-2 text-muted-foreground/80">
-          <span className="font-medium text-foreground">Point d’attention :</span> {notes}
+        <p className="mt-2 text-muted-foreground">
+          <span className="font-semibold text-foreground">Point d’attention : </span>
+          {notes}
         </p>
       ) : null}
     </div>
@@ -55,13 +56,19 @@ function PiedRelance(props: {
         size="sm"
         disabled={desactive}
         onClick={onPriseEnMain}
-        className="text-xs"
+        className="rounded-lg px-4 text-xs font-semibold"
       >
         <UserCheckIcon className="size-3.5" />
         Prendre en main
       </Button>
 
-      <Button type="button" size="sm" disabled={desactive} onClick={onRelance} className="text-xs">
+      <Button
+        type="button"
+        size="sm"
+        disabled={desactive}
+        onClick={onRelance}
+        className="rounded-lg bg-primary px-4 text-xs font-semibold text-primary-foreground hover:bg-primary-hover shadow-xs"
+      >
         <RotateCcwIcon className="size-3.5" />
         {texteRelance}
       </Button>
@@ -69,9 +76,6 @@ function PiedRelance(props: {
   );
 }
 
-// Clé sur ticket.id par le parent : remonte à chaque changement de ticket,
-// ce qui initialise consigne directement depuis ticket.consigne sans effet
-// de synchronisation, et la réinitialise proprement à l'ouverture suivante.
 function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose: () => void }) {
   const { ticket, desactive, onClose } = props;
   const client = useQueryClient();
@@ -91,7 +95,7 @@ function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose:
   const priseEnMain = useMutation({
     mutationFn: prendreEnMainTicketKairo,
     onSuccess: (_, id) => {
-      toast.success(`Ticket n° ${String(id)} pris en main par l'équipe.`);
+      toast.success(`Ticket n° ${String(id)} pris en main par l’équipe.`);
       onClose();
     },
     onError: (error) => toastApiError(error, 'Impossible de prendre en main le ticket.'),
@@ -120,9 +124,13 @@ function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose:
 
   return (
     <>
-      <DialogHeader>
-        <DialogTitle className="font-display text-lg font-bold">{titre}</DialogTitle>
-        <DialogDescription className="text-xs">{description}</DialogDescription>
+      <DialogHeader className="gap-1">
+        <DialogTitle className="font-display text-xl font-bold tracking-tight text-foreground">
+          {titre}
+        </DialogTitle>
+        <DialogDescription className="text-xs leading-relaxed text-muted-foreground">
+          {description}
+        </DialogDescription>
       </DialogHeader>
 
       {motif ? (
@@ -130,20 +138,16 @@ function CorpsRelance(props: { ticket: TicketKairo; desactive: boolean; onClose:
       ) : null}
 
       <div className="flex flex-col gap-1.5">
-        <label
-          htmlFor="consigne-kairo"
-          className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground"
-        >
-          Consigne ou directive pour Kairo (optionnel)
-          {ticket.consigne ? ' — reprise de la dernière relance, modifiable' : ''}
+        <label htmlFor="consigne-kairo" className="text-xs font-semibold text-foreground">
+          Consigne pour Kairo (optionnel)
         </label>
         <textarea
           id="consigne-kairo"
           value={consigne}
           disabled={occupe}
           onChange={(e) => setConsigne(e.target.value)}
-          placeholder="Ex. Ne corriger que le composant d'interface sans toucher au modèle Go..."
-          className="h-20 w-full rounded-md border border-input bg-background p-2.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
+          placeholder="Ex. Ne corriger que le composant d’interface sans toucher au modèle Go..."
+          className="h-24 w-full rounded-xl border border-input-border bg-input-background p-3 text-xs leading-relaxed text-foreground placeholder:text-muted-foreground/60 focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:opacity-50"
         />
       </div>
 

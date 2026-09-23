@@ -20,6 +20,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { TablePaginationLocale, usePaginationLocale } from '@/components/ui/table-pagination';
 import {
   PRESENCE_LABELS,
   fetchSupervision,
@@ -184,6 +185,7 @@ function PresenceTable({
   empty: string;
 }) {
   const [openId, setOpenId] = useState<string | null>(null);
+  const pagination = usePaginationLocale(byScoreDesc(users));
 
   return (
     <Card className="animate-rise">
@@ -219,7 +221,7 @@ function PresenceTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
-            {byScoreDesc(users).map((user) => {
+            {pagination.pageLignes.map((user) => {
               const open = openId === user.id;
               return (
                 <PresenceRows
@@ -242,6 +244,13 @@ function PresenceTable({
             ) : null}
           </tbody>
         </table>
+        <TablePaginationLocale
+          page={pagination.page}
+          pageCount={pagination.pageCount}
+          pageSize={pagination.pageSize}
+          setPage={pagination.setPage}
+          setPageSize={pagination.setPageSize}
+        />
       </CardContent>
     </Card>
   );

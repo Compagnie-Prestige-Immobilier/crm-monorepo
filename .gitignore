@@ -34,3 +34,6 @@ trivy-report.json
 semgrep.sarif
 
 web/.tanstack/
+
+# Dépôt à part (github.com/traorecheikh/kairo), suivi par son propre .git.
+ticket-solver/

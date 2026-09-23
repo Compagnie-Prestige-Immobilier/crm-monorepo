@@ -3,9 +3,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { flexRender, getCoreRowModel, useReactTable, type Row } from '@tanstack/react-table';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, InboxIcon } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { toast } from 'sonner';
 
+import {
+  FilterableTableHead,
+  type FiltreColonne,
+} from '@/components/filters/filterable-table-head';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { QueryErrorState } from '@/components/query-error-state';
 import { prospectColumns } from '@/components/prospects/columns';
@@ -40,23 +44,181 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { deleteProspect, fetchProspects } from '@/lib/data/prospects';
+import { fetchReferenceData } from '@/lib/data/reference';
 import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
-import { formatNumber, formatPhone } from '@/lib/format';
+import { formatNumber, formatPhone, withRetired } from '@/lib/format';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import {
+  BDD_SEGMENTS,
+  ENROLLMENT_METHOD_LABELS,
+  ENROLLMENT_METHOD_ORDER,
+  PHASE2_STATUSES,
+  PHASE2_STATUS_LABELS,
   PROSPECT_SORT_FIELDS,
+  PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
+  SEGMENT_LABELS,
   statutForProjet,
+  type FilterOption,
   type Paginated,
   type ProspectFilters,
   type ProspectRow,
   type ProspectSortField,
+  type ReferenceData,
+  type SortDirection,
 } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
 function isSortField(id: string): id is ProspectSortField {
   return (PROSPECT_SORT_FIELDS as readonly string[]).includes(id);
+}
+
+const PROJET_OPTIONS: FilterOption[] = [
+  { value: 'CHUES', label: 'CHUES' },
+  { value: 'GRAND_PUBLIC', label: 'Grand Public' },
+];
+
+const STATUT_OPTIONS: FilterOption[] = PROSPECT_STATUTS.map((statut) => ({
+  value: statut,
+  label: PROSPECT_STATUT_LABELS[statut],
+}));
+
+const SEGMENT_OPTIONS: FilterOption[] = BDD_SEGMENTS.map((segment) => ({
+  value: segment,
+  label: SEGMENT_LABELS[segment],
+}));
+
+const PHASE2_STATUS_OPTIONS: FilterOption[] = PHASE2_STATUSES.map((status) => ({
+  value: status,
+  label: PHASE2_STATUS_LABELS[status],
+}));
+
+const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
+  value: method,
+  label: ENROLLMENT_METHOD_LABELS[method],
+}));
+
+/** Critères de liste portés par une colonne, dans l'ordre du tableau. */
+type CritereColonne = {
+  colonne: string;
+  cle: keyof ProspectFilters;
+  label: string;
+  placeholder: string;
+  options: (reference: ReferenceData | undefined) => readonly FilterOption[];
+};
+
+/**
+ * « Téléconseiller » n'y figure pas : la colonne montre le titulaire de la
+ * fiche, quand `commercialId` porte sur qui l'a saisie.
+ */
+const CRITERES_COLONNES: readonly CritereColonne[] = [
+  {
+    colonne: 'projet',
+    cle: 'projet',
+    label: 'Projet',
+    placeholder: 'Tous les projets',
+    options: () => PROJET_OPTIONS,
+  },
+  {
+    colonne: 'statut',
+    cle: 'statut',
+    label: 'Statut',
+    placeholder: 'Tous les statuts',
+    options: () => STATUT_OPTIONS,
+  },
+  {
+    colonne: 'segment',
+    cle: 'segment',
+    label: 'Segment',
+    placeholder: 'Tous les groupes',
+    options: () => SEGMENT_OPTIONS,
+  },
+  {
+    colonne: 'phase2Status',
+    cle: 'phase2Status',
+    label: 'Résultat de l’appel',
+    placeholder: 'Tous les résultats',
+    options: () => PHASE2_STATUS_OPTIONS,
+  },
+  {
+    colonne: 'enrollmentMethod',
+    cle: 'enrollmentMethod',
+    label: 'Méthode',
+    placeholder: 'Toutes les manières',
+    options: () => METHOD_OPTIONS,
+  },
+  {
+    colonne: 'enrollmentCapturedBy',
+    cle: 'enrollmentCapturedById',
+    label: 'Adhésion obtenue par',
+    placeholder: 'Tous les utilisateurs',
+    options: (reference) => reference?.utilisateurs ?? [],
+  },
+  {
+    colonne: 'representantName',
+    cle: 'representantId',
+    label: 'Représentant',
+    placeholder: 'Tous les représentants',
+    options: (reference) => reference?.representants ?? [],
+  },
+  {
+    colonne: 'departementName',
+    cle: 'departementId',
+    label: 'Département',
+    placeholder: 'Tous les départements',
+    options: (reference) =>
+      (reference?.departements ?? []).map((departement) => ({
+        value: departement.id,
+        label: withRetired(departement.name ?? '', departement.isActive ?? false),
+        hint: departement.regionName ?? undefined,
+      })),
+  },
+  {
+    colonne: 'banque',
+    cle: 'banqueId',
+    label: 'Banque',
+    placeholder: 'Toutes les banques',
+    options: (reference) =>
+      (reference?.banques ?? []).map((banque) => ({
+        value: banque.id,
+        label: withRetired(banque.shortName ?? '', banque.isActive ?? false),
+        hint: banque.name ?? undefined,
+      })),
+  },
+  {
+    colonne: 'syndicat',
+    cle: 'syndicatId',
+    label: 'Syndicat',
+    placeholder: 'Tous les syndicats',
+    options: (reference) =>
+      (reference?.syndicats ?? []).map((syndicat) => ({
+        value: syndicat.id,
+        label: withRetired(syndicat.sigle ?? '', syndicat.isActive ?? false),
+        hint: syndicat.secteur ?? undefined,
+      })),
+  },
+];
+
+function filtresDesColonnes(
+  filters: ProspectFilters,
+  setFilters: (patch: Partial<ProspectFilters>) => void,
+  reference: ReferenceData | undefined,
+): Partial<Record<string, FiltreColonne>> {
+  return Object.fromEntries(
+    CRITERES_COLONNES.map((critere) => [
+      critere.colonne,
+      {
+        label: critere.label,
+        placeholder: critere.placeholder,
+        options: critere.options(reference),
+        value: filters[critere.cle] as string | null,
+        onChange: (value: string | null) => {
+          setFilters({ [critere.cle]: value } as Partial<ProspectFilters>);
+        },
+      },
+    ]),
+  );
 }
 
 function tableSourceData(data: Paginated<ProspectRow> | undefined): {
@@ -150,6 +312,12 @@ export function ProspectsTable({
     placeholderData: (previous) => previous,
   });
 
+  const { data: reference } = useQuery({
+    queryKey: queryKeys.reference,
+    queryFn: () => fetchReferenceData(),
+    staleTime: 5 * 60_000,
+  });
+
   const remove = useMutation({
     mutationFn: (target: ProspectRow) => deleteProspect(target.id),
     onSuccess: (_result, target) => {
@@ -223,6 +391,7 @@ export function ProspectsTable({
   const last = Math.min(page * filters.pageSize, total);
   const lignes = table.getRowModel().rows;
   const groupes = regrouperProspects(lignes, regroupement, filters.projet);
+  const filtres = filtresDesColonnes(filters, setFilters, reference);
 
   const basculerGroupe = (cle: string): void => {
     setGroupesFermes((courants) => {
@@ -263,20 +432,17 @@ export function ProspectsTable({
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="hover:bg-transparent">
-                {headerGroup.headers.map((header) => {
-                  const label = flexRender(header.column.columnDef.header, header.getContext());
-                  return isSortField(header.column.id) ? (
-                    <SortableTableHead
-                      key={header.id}
-                      column={{ id: header.column.id, label }}
-                      sortBy={filters.sortBy}
-                      sortDir={filters.sortDir}
-                      onToggle={toggleSort}
-                    />
-                  ) : (
-                    <TableHead key={header.id}>{label}</TableHead>
-                  );
-                })}
+                {headerGroup.headers.map((header) => (
+                  <EnTeteProspects
+                    key={header.id}
+                    columnId={header.column.id}
+                    label={flexRender(header.column.columnDef.header, header.getContext())}
+                    filtre={filtres[header.column.id]}
+                    sortBy={filters.sortBy}
+                    sortDir={filters.sortDir}
+                    onToggle={toggleSort}
+                  />
+                ))}
               </TableRow>
             ))}
           </TableHeader>
@@ -340,6 +506,29 @@ export function ProspectsTable({
       />
     </div>
   );
+}
+
+function EnTeteProspects({
+  columnId,
+  label,
+  filtre,
+  sortBy,
+  sortDir,
+  onToggle,
+}: {
+  columnId: string;
+  label: ReactNode;
+  filtre: FiltreColonne | undefined;
+  sortBy: ProspectSortField;
+  sortDir: SortDirection;
+  onToggle: (id: string) => void;
+}) {
+  const tri = isSortField(columnId)
+    ? { column: { id: columnId, label }, sortBy, sortDir, onToggle }
+    : undefined;
+  if (filtre !== undefined) return <FilterableTableHead label={label} filtre={filtre} tri={tri} />;
+  if (tri !== undefined) return <SortableTableHead {...tri} />;
+  return <TableHead>{label}</TableHead>;
 }
 
 function CorpsProspects({

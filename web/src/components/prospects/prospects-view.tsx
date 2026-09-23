@@ -6,19 +6,11 @@ import { useState } from 'react';
 
 import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
-import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
 import { ProspectExportMenu } from '@/components/prospects/export-menu';
 import { NouveauProspectConsole } from '@/components/prospects/nouveau-prospect-console';
-import { ProspectCreateForm } from '@/components/prospects/prospect-create-form';
 import { ProspectsTable } from '@/components/prospects/prospects-table';
 import { Button } from '@/components/ui/button';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { fetchProspects } from '@/lib/data/prospects';
 import { formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
@@ -73,12 +65,7 @@ export function ProspectsView({
         campaignScoped={campaignScoped}
       />
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <CreationDialogContent
-          projet={filters.projet}
-          onClose={() => setCreateOpen(false)}
-          canCreate={canCreate}
-          canCreateGrandPublic={canCreateGrandPublic}
-        />
+        <CreationDialogContent onClose={() => setCreateOpen(false)} />
       </Dialog>
     </div>
   );
@@ -130,54 +117,13 @@ function peutCreerProjet(
   return projet === 'CHUES' ? canCreateChues : canCreateGrandPublic;
 }
 
-/** Un seul projet autorise : inutile de le demander. */
-function projetImpose(canCreateChues: boolean, canCreateGrandPublic: boolean): Projet | null {
-  if (canCreateChues && !canCreateGrandPublic) return 'CHUES';
-  if (!canCreateChues && canCreateGrandPublic) return 'GRAND_PUBLIC';
-  return null;
-}
-
-function CreationDialogContent({
-  projet,
-  onClose,
-  canCreate,
-  canCreateGrandPublic,
-}: {
-  projet: Projet | null;
-  onClose: () => void;
-  canCreate: boolean;
-  canCreateGrandPublic: boolean;
-}) {
-  const vise = projet ?? projetImpose(canCreate, canCreateGrandPublic);
-  if (vise === null) {
-    return (
-      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Nouveau prospect</DialogTitle>
-        </DialogHeader>
-        <NouveauProspectConsole onSaved={onClose} onAnnuler={onClose} />
-      </DialogContent>
-    );
-  }
-  const grandPublic = vise === 'GRAND_PUBLIC';
-
+function CreationDialogContent({ onClose }: { onClose: () => void }) {
   return (
     <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
       <DialogHeader>
-        <DialogTitle>
-          {grandPublic ? 'Nouveau prospect Grand Public' : 'Nouveau prospect'}
-        </DialogTitle>
-        {grandPublic ? null : (
-          <DialogDescription>
-            Recherchez le représentant par son nom ou son numéro.
-          </DialogDescription>
-        )}
+        <DialogTitle>Nouveau prospect</DialogTitle>
       </DialogHeader>
-      {grandPublic && canCreateGrandPublic ? (
-        <NouveauProspect embedded onSaved={onClose} onAnnuler={onClose} />
-      ) : (
-        <ProspectCreateForm representantId={null} onSaved={onClose} />
-      )}
+      <NouveauProspectConsole onSaved={onClose} onAnnuler={onClose} />
     </DialogContent>
   );
 }

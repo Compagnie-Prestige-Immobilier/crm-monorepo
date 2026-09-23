@@ -8,6 +8,7 @@ const (
 	CleIdentifiantExistant      = "existingId"
 	NomProspects                = "prospects"
 	ProjetGrandPublic           = "GRAND_PUBLIC"
+	ProspectOrigineParrainage   = "PARRAINAGE"
 	ProspectChampPrenom         = "prenom"
 	ProspectChampPhone          = "phoneE164"
 	ProspectChampProfession     = "profession"
