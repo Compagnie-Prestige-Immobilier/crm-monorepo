@@ -150,6 +150,7 @@ interface Choix {
   projet: Projet | typeof TOUS;
   type: ProspectType | typeof TOUS;
   injoignables: boolean;
+  contactsRecommandes: boolean;
   representants: CleRepresentants;
   departementId: string;
   iefId: string;
@@ -162,6 +163,7 @@ const choixInitial = (famille: Famille, projet: Projet | typeof TOUS): Choix => 
   projet,
   type: TOUS,
   injoignables: false,
+  contactsRecommandes: false,
   representants: 'representants',
   departementId: TOUS,
   iefId: TOUS,
@@ -260,6 +262,11 @@ function critereImport(choix: Choix): Critere {
   };
 }
 
+const CRITERE_CONTACTS_RECOMMANDES: Critere = {
+  corps: { cible: 'CONTACTS_RECOMMANDES', prospects: { projet: 'GRAND_PUBLIC' } },
+  etiquette: 'Contacts recommandés Grand Public (parrainage)',
+};
+
 function critereProspects(choix: Choix): Critere {
   const type = choix.projet === 'GRAND_PUBLIC' && choix.type !== TOUS ? choix.type : null;
   return {
@@ -289,6 +296,9 @@ function critereDuChoix(
 ): Critere {
   if (choix.famille === 'representants') return critereRepresentants(choix, nomDepartement, nomIef);
   if (choix.famille === 'import') return critereImport(choix);
+  if (choix.projet === 'GRAND_PUBLIC' && choix.contactsRecommandes) {
+    return CRITERE_CONTACTS_RECOMMANDES;
+  }
   return critereProspects(choix);
 }
 
@@ -535,6 +545,14 @@ function ChampsProspects({
         onChange={(projet) => onChange({ ...choix, projet, type: TOUS })}
       />
       {choix.projet === 'GRAND_PUBLIC' ? (
+        <Case
+          coche={choix.contactsRecommandes}
+          onChange={(contactsRecommandes) => onChange({ ...choix, contactsRecommandes })}
+        >
+          Contacts recommandés : les proches qu'un prospect a donnés au téléconseiller
+        </Case>
+      ) : null}
+      {choix.projet === 'GRAND_PUBLIC' && !choix.contactsRecommandes ? (
         <Field label="Type de prospect">
           {(props) => (
             <Liste
@@ -556,12 +574,14 @@ function ChampsProspects({
           )}
         </Field>
       ) : null}
-      <Case
-        coche={choix.injoignables}
-        onChange={(injoignables) => onChange({ ...choix, injoignables })}
-      >
-        Seulement les injoignables : dernier appel sans échange, hors injoignables définitifs
-      </Case>
+      {choix.contactsRecommandes ? null : (
+        <Case
+          coche={choix.injoignables}
+          onChange={(injoignables) => onChange({ ...choix, injoignables })}
+        >
+          Seulement les injoignables : dernier appel sans échange, hors injoignables définitifs
+        </Case>
+      )}
     </>
   );
 }

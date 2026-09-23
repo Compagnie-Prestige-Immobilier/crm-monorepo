@@ -359,6 +359,41 @@ func (s *service) qualificationSuggestionDuRefus(ctx context.Context, brut, regi
 	return recue, err
 }
 
+// Propre à Grand Public : CHUES recommande via le représentant qui décline un
+// appel (REFUS + un seul numéro), ce qui ne se mélange pas avec ce chemin-ci.
+func (s *service) qualificationEcrireContactsRecommandes(ctx context.Context, q *db.Queries, u *socle.Utilisateur, b *QualificationCallAttemptBody, projet db.Projet) error {
+	if projet != db.ProjetGRANDPUBLIC || len(b.ContactsRecommandes) == 0 {
+		return nil
+	}
+	for _, contact := range b.ContactsRecommandes {
+		e164, err := database.NormaliserTelephone(contact.Phone, s.Cfg.PhoneRegion)
+		if err != nil {
+			return err
+		}
+		var resolu *string
+		existantID, err := q.ProspectIdParTelephoneExact(ctx, &e164)
+		if err == nil {
+			resolu = &existantID
+		} else if !errors.Is(err, pgx.ErrNoRows) {
+			return err
+		}
+		id, err := uuid.NewV7()
+		if err != nil {
+			return err
+		}
+		if err := q.InsererSuggestionProspect(ctx, db.InsererSuggestionProspectParams{
+			ID: id.String(), SourceProspectID: b.ProspectID,
+			SuggestedName: qualificationRogne(contact.Nom), SuggestedPhoneE164: e164,
+			Note: qualificationRogne(contact.Note), SuggestedByID: u.ID,
+			ResolvedProspectID: resolu, SourceAttemptID: b.ID,
+			ClientCreatedAt: b.ClientCreatedAt.UTC(),
+		}); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 // « Pas à vous » ne se confond pas avec « n'existe pas ».
 func (s *service) qualificationRepAbsent(ctx context.Context, id string) error {
 	ailleurs, err := s.Q.RepresentantExisteAilleurs(ctx, id)
@@ -705,6 +740,15 @@ type QualificationCallAttemptBody struct {
 	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
 	DureeSystemeMois       *int32            `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300"`
 	ChampsLibres           map[string]string `json:"champsLibres,omitempty"`
+	// Un prospect Grand Public peut recommander plusieurs proches au même appel,
+	// contrairement au représentant qui n'en propose qu'un seul en cas de refus.
+	ContactsRecommandes []QualificationContactRecommande `json:"contactsRecommandes,omitempty" maxItems:"5"`
+}
+
+type QualificationContactRecommande struct {
+	Nom   *string `json:"nom,omitempty" maxLength:"120"`
+	Note  *string `json:"note,omitempty" maxLength:"500"`
+	Phone string  `json:"phone" minLength:"6" maxLength:"40"`
 }
 
 type QualificationCallAttemptInput struct{ Body QualificationCallAttemptBody }
@@ -988,6 +1032,9 @@ func (s *service) qualificationAppliquerTentative(ctx context.Context, q *db.Que
 		return "duplicate", qualificationEtatPhase2(prospect.ID, prospect.Rev, prospect.UpdatedAt, &parcours), nil
 	}
 	if err := qualificationInsererTentative(ctx, q, u, b, t); err != nil {
+		return "", vide, err
+	}
+	if err := s.qualificationEcrireContactsRecommandes(ctx, q, u, b, prospect.Projet); err != nil {
 		return "", vide, err
 	}
 	if err := qualificationMarquerContacte(ctx, q, u, b.ProspectID, parcours.ID); err != nil {

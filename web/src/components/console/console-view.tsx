@@ -9,6 +9,11 @@ import { toast } from 'sonner';
 
 import { BrouillonEnAttente } from '@/components/console/brouillon-en-attente';
 import { Chrono, copyPhone, Kbd } from '@/components/console/console-ui';
+import {
+  contactsPourEnvoi,
+  ContactsRecommandes,
+  type ContactRecommandeLigne,
+} from '@/components/console/contacts-recommandes';
 import { HistoriqueFiche } from '@/components/console/historique-fiche';
 import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
@@ -988,8 +993,10 @@ export function draftDe(
   conversion: ConversionDraft | null,
   comment: string,
   ouverture: OuvertureFiche | null,
+  contacts: readonly ContactRecommandeLigne[] = [],
 ): AttemptDraft {
   const method = conversion?.method ?? null;
+  const contactsRecommandes = contactsPourEnvoi(contacts);
   return {
     effect: method === null ? choisi.effect : 'CLOSE_METHOD',
     reasonCode: choisi.code,
@@ -998,6 +1005,7 @@ export function draftDe(
     callbackAt,
     ...(conversion === null ? {} : { conversion }),
     ...(ouverture === null ? {} : { ouvertureId: ouverture.id }),
+    ...(contactsRecommandes.length === 0 ? {} : { contactsRecommandes }),
   };
 }
 
@@ -1057,6 +1065,7 @@ export function Consignation({
 
   const [repris] = useState(() => lireBrouillon(ouverture?.draft));
   const [comment, setComment] = useState(repris.comment);
+  const [contacts, setContacts] = useState<ContactRecommandeLigne[]>([]);
   // Un brouillon repris vient d'un appel où la personne répondait : la question
   // « joignable ? » est déjà tranchée, la reposer effacerait ce qu'il porte.
   const [groupe, setGroupe] = useState<Groupe | null>(() =>
@@ -1162,7 +1171,7 @@ export function Consignation({
       toast.error('Ce créneau est passé, choisissez-en un autre.');
       return;
     }
-    const draft = draftDe(motif, callbackAt, conversion, comment, ouverture);
+    const draft = draftDe(motif, callbackAt, conversion, comment, ouverture, contacts);
     const problem = validateAttempt(draft, maintenant(), motif.requiresComment);
     if (problem !== null) {
       toast.error(problem);
@@ -1343,6 +1352,8 @@ export function Consignation({
           pas={pasCourant}
           groupe={groupe}
           prospect={prospect}
+          projet={projet}
+          contacts={contacts}
           conversion={conversion}
           conversionErrors={conversionErrors}
           formulaire={formulaire}
@@ -1369,6 +1380,7 @@ export function Consignation({
           onFreeCallback={setFreeCallback}
           onValidate={entree[pasCourant]}
           onComment={setComment}
+          onContacts={setContacts}
         />
 
         <PiedPas
@@ -1413,6 +1425,8 @@ function CorpsPas({
   pas,
   groupe,
   prospect,
+  projet,
+  contacts,
   conversion,
   conversionErrors,
   formulaire,
@@ -1435,10 +1449,13 @@ function CorpsPas({
   onFreeCallback,
   onValidate,
   onComment,
+  onContacts,
 }: {
   pas: Pas;
   groupe: Groupe | null;
   prospect: ProspectRow;
+  projet: Projet;
+  contacts: readonly ContactRecommandeLigne[];
   conversion: ConversionDraft | null;
   conversionErrors: ConversionErrors;
   formulaire: { champs: readonly ReglageChamp[]; libres: readonly ChampLibre[] };
@@ -1461,6 +1478,7 @@ function CorpsPas({
   onFreeCallback: (value: string) => void;
   onValidate: () => void;
   onComment: (value: string) => void;
+  onContacts: (value: ContactRecommandeLigne[]) => void;
 }) {
   switch (pas) {
     case 'reponse':
@@ -1525,14 +1543,19 @@ function CorpsPas({
       );
     case 'note':
       return (
-        <Commentaire
-          value={comment}
-          titre="Commentaire, facultatif"
-          obligatoirePour={commentaireObligatoirePour}
-          inputRef={commentRef}
-          onChange={onComment}
-          onValidate={onValidate}
-        />
+        <div className="flex flex-col gap-4">
+          <Commentaire
+            value={comment}
+            titre="Commentaire, facultatif"
+            obligatoirePour={commentaireObligatoirePour}
+            inputRef={commentRef}
+            onChange={onComment}
+            onValidate={onValidate}
+          />
+          {projet === 'GRAND_PUBLIC' && (
+            <ContactsRecommandes valeurs={contacts} onChange={onContacts} disabled={disabled} />
+          )}
+        </div>
       );
   }
 }
