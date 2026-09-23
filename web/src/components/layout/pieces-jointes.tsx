@@ -1,6 +1,6 @@
 'use client';
 
-import { CropIcon, ImagePlusIcon, ScreenShareIcon, XIcon } from 'lucide-react';
+import { CropIcon, FileTextIcon, ImagePlusIcon, ScreenShareIcon, XIcon } from 'lucide-react';
 import { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import ReactCrop, { convertToPixelCrop, type Crop, type PixelCrop } from 'react-image-crop';
 import 'react-image-crop/dist/ReactCrop.css';
@@ -25,11 +25,18 @@ import {
 import { cn } from '@/lib/utils';
 
 export const IMAGES_MAX = 5;
+export const DOCUMENTS_MAX = 3;
+const EXTENSIONS_DOCUMENTS = '.pdf,.doc,.docx,.xls,.xlsx';
 
 export interface Image {
   id: string;
   fichier: File;
   apercu: string;
+}
+
+export interface Document {
+  id: string;
+  fichier: File;
 }
 
 const attendre = (ms: number) =>
@@ -181,15 +188,22 @@ export const PiecesJointes = forwardRef<
   PiecesJointesHandle,
   {
     images: Image[];
+    documents: Document[];
     ajouter: (fichiers: File[]) => Promise<void>;
+    ajouterDocuments: (fichiers: File[]) => void;
     retirer: (id: string) => void;
+    retirerDocument: (id: string) => void;
     masquerPanneau: (masque: boolean) => void;
   }
->(function PiecesJointes({ images, ajouter, retirer, masquerPanneau }, ref) {
+>(function PiecesJointes(
+  { images, documents, ajouter, ajouterDocuments, retirer, retirerDocument, masquerPanneau },
+  ref,
+) {
   const [capture, setCapture] = useState(false);
   const [aRecadrer, setARecadrer] = useState<Image | null>(null);
   const [depart, setDepart] = useState<Crop>();
   const complet = images.length >= IMAGES_MAX;
+  const documentsComplet = documents.length >= DOCUMENTS_MAX;
 
   const capturer = async (zone = false) => {
     if (complet || capture) return;
@@ -252,6 +266,27 @@ export const PiecesJointes = forwardRef<
             }}
           />
         </label>
+        <label
+          className={cn(
+            buttonVariants({ variant: 'outline' }),
+            'cursor-pointer gap-1.5',
+            documentsComplet && 'pointer-events-none opacity-50',
+          )}
+        >
+          <FileTextIcon className="size-4" aria-hidden="true" />
+          Ajouter des fichiers
+          <input
+            type="file"
+            accept={EXTENSIONS_DOCUMENTS}
+            multiple
+            className="sr-only"
+            disabled={documentsComplet}
+            onChange={(event) => {
+              ajouterDocuments([...(event.target.files ?? [])]);
+              event.target.value = '';
+            }}
+          />
+        </label>
       </div>
       <RecadrageDialog
         key={aRecadrer?.id ?? 'aucune'}
@@ -274,6 +309,29 @@ export const PiecesJointes = forwardRef<
                 className="absolute top-1 right-1 size-8"
                 aria-label="Retirer l'image"
                 onClick={() => retirer(image.id)}
+              >
+                <XIcon className="size-4" aria-hidden="true" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+      {documents.length === 0 ? null : (
+        <ul className="flex flex-col gap-1.5">
+          {documents.map((document) => (
+            <li
+              key={document.id}
+              className="flex items-center gap-2 rounded-md border border-border px-2.5 py-1.5 text-[0.8125rem]"
+            >
+              <FileTextIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <span className="flex-1 truncate">{document.fichier.name}</span>
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon"
+                className="size-6"
+                aria-label="Retirer le fichier"
+                onClick={() => retirerDocument(document.id)}
               >
                 <XIcon className="size-4" aria-hidden="true" />
               </Button>

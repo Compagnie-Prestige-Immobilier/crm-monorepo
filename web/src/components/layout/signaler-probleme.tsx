@@ -6,9 +6,11 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 
 import { IndiceCapture } from '@/components/layout/indice-capture';
 import {
+  DOCUMENTS_MAX,
   IMAGES_MAX,
   imagesDepuis,
   PiecesJointes,
+  type Document,
   type Image,
   type PiecesJointesHandle,
 } from '@/components/layout/pieces-jointes';
@@ -149,6 +151,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
   // plutot que d'en creer un second.
   const [cle, setCle] = useState(() => crypto.randomUUID());
   const [images, setImages] = useState<Image[]>([]);
+  const [documents, setDocuments] = useState<Document[]>([]);
   const [description, setDescription] = useState('');
   const [urgence, setUrgence] = useState('');
   const [categorie, setCategorie] = useState('');
@@ -169,6 +172,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
         cle,
         { description: description.trim(), contexte: contexteDePage(ecran), urgence, categorie },
         images.map((image) => image.fichier),
+        documents.map((document) => document.fichier),
       ),
     onSuccess: () => rafraichirSignalements(cache),
     onError: (error) => {
@@ -181,6 +185,11 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     setImages((actuelles) => [...actuelles, ...nouvelles].slice(0, IMAGES_MAX));
   };
 
+  const ajouterDocuments = (fichiers: File[]) => {
+    const nouveaux = fichiers.map((fichier) => ({ id: crypto.randomUUID(), fichier }));
+    setDocuments((actuels) => [...actuels, ...nouveaux].slice(0, DOCUMENTS_MAX));
+  };
+
   // Le message, les images et la cle ne sont jetes qu'apres une reception
   // confirmee : un echec les garde pour la tentative suivante.
   const fermer = (suivant: boolean) => {
@@ -189,6 +198,7 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
     if (!envoi.isSuccess) return;
     setDescription('');
     setImages([]);
+    setDocuments([]);
     setCategorie('');
     setUrgence('');
     setCle(crypto.randomUUID());
@@ -287,8 +297,13 @@ export function SignalerProbleme({ ecran, plateforme }: { ecran: string; platefo
               <PiecesJointes
                 ref={pieces}
                 images={images}
+                documents={documents}
                 ajouter={ajouter}
+                ajouterDocuments={ajouterDocuments}
                 retirer={(id) => setImages((actuelles) => actuelles.filter((i) => i.id !== id))}
+                retirerDocument={(id) =>
+                  setDocuments((actuels) => actuels.filter((d) => d.id !== id))
+                }
                 masquerPanneau={setMasque}
               />
               <SuiviSignalements ouvert={ouvert} />

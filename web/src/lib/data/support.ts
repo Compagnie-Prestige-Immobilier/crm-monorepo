@@ -32,12 +32,14 @@ export function libelleEtat(s: Signalement): string {
 export async function envoyerSignalement(
   cle: string,
   champs: Record<string, string>,
-  fichiers: File[],
+  images: File[],
+  documents: File[],
 ): Promise<Signalement> {
   const form = new FormData();
   form.append('cle', cle);
   for (const [nom, valeur] of Object.entries(champs)) form.append(nom, valeur);
-  for (const fichier of fichiers) form.append('images', fichier);
+  for (const fichier of images) form.append('images', fichier);
+  for (const fichier of documents) form.append('fichiers', fichier);
   return unwrap(
     await getApiClient().POST(CHEMIN, {
       body: { cle: '', description: '', contexte: '', images: [], urgence: 3, categorie: 1 },
