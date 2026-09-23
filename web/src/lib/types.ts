@@ -270,6 +270,7 @@ export interface ProspectFilters {
   phase2Status: Phase2Status | null;
   /** Code du motif dont le dernier appel écarte la fiche de la liste. */
   sansMotif: string | null;
+  motif: string | null;
   enrollmentMethod: EnrollmentMethod | null;
   enrollmentCapturedById: string | null;
   /** Revue du closing : `false` isole les demandes converties qui restent à revoir. */

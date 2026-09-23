@@ -197,6 +197,14 @@ const SECTIONS: readonly NavSection[] = [
         description: 'Visites du jour et saisie',
         acces: 'accueil.registre',
       },
+      {
+        href: '/accueil/rendez-vous',
+        label: 'Rendez-vous',
+        icon: HeartHandshakeIcon,
+        description: 'Rendez-vous obtenus au téléphone, à confirmer au comptoir',
+        acces: 'rendez_vous.suivre',
+        hidden: true,
+      },
       // Les trois écrans qui suivent sont les ONGLETS du registre
       // (`visites-tabs.tsx`, monté par `accueil/layout.tsx`) : les répéter dans
       // la barre donnait deux chemins pour le même clic.
