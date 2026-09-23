@@ -46,15 +46,19 @@ type TicketKairo struct {
 }
 
 type EtatKairo struct {
-	Sain                    bool          `json:"sain"`
-	PauseDepuis             *string       `json:"pauseDepuis"`
-	DerniereLectureSecondes int           `json:"derniereLectureSecondes"`
-	IntervalleSecondes      int           `json:"intervalleSecondes"`
-	Agents                  []string      `json:"agents"`
-	Tickets                 []TicketKairo `json:"tickets"`
-	MTTRSecondes            int           `json:"mttrSecondes,omitempty"`
-	JevActif                bool          `json:"jevActif,omitempty"`
-	ReparationBaseActive    bool          `json:"reparationBaseActive"`
+	Sain                    bool           `json:"sain"`
+	PauseDepuis             *string        `json:"pauseDepuis"`
+	DerniereLectureSecondes int            `json:"derniereLectureSecondes"`
+	IntervalleSecondes      int            `json:"intervalleSecondes"`
+	Agents                  []string       `json:"agents"`
+	Tickets                 []TicketKairo  `json:"tickets"`
+	TicketsTotal            int            `json:"ticketsTotal"`
+	TicketsPage             int            `json:"ticketsPage"`
+	TicketsPageSize         int            `json:"ticketsPageSize"`
+	ComptesParStatut        map[string]int `json:"comptesParStatut"`
+	MTTRSecondes            int            `json:"mttrSecondes,omitempty"`
+	JevActif                bool           `json:"jevActif,omitempty"`
+	ReparationBaseActive    bool           `json:"reparationBaseActive"`
 }
 
 type UsageModele struct {
@@ -92,6 +96,11 @@ type RelanceTicketKairoInput struct {
 		Consigne string `json:"consigne,omitempty"`
 		Action   string `json:"action,omitempty"`
 	}
+}
+
+type TableauKairoInput struct {
+	Page     int `query:"page" minimum:"1" default:"1"`
+	PageSize int `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
 }
 
 func monterKairo(api huma.API, s *service) {
@@ -133,7 +142,7 @@ func monterKairo(api huma.API, s *service) {
 	})
 }
 
-func (s *service) tableauKairo(ctx context.Context, _ *struct{}) (*TableauKairoOutput, error) {
+func (s *service) tableauKairo(ctx context.Context, in *TableauKairoInput) (*TableauKairoOutput, error) {
 	out := &TableauKairoOutput{}
 	parModele, err := s.Q.SupportReformulationsParModele(ctx)
 	if err != nil {
@@ -158,7 +167,7 @@ func (s *service) tableauKairo(ctx context.Context, _ *struct{}) (*TableauKairoO
 			Description: ligne.Description, Contexte: ligne.Contexte, DescriptionTransmise: ligne.DescriptionTransmise,
 		})
 	}
-	out.Body.Kairo, err = lireKairo(ctx)
+	out.Body.Kairo, err = lireKairo(ctx, in.Page, in.PageSize)
 	var probleme huma.StatusError
 	switch {
 	case err == nil:
@@ -195,8 +204,9 @@ func appelKairo(ctx context.Context, methode, chemin string, corps any) (*http.R
 	return clientKairo.Do(req)
 }
 
-func lireKairo(ctx context.Context) (*EtatKairo, error) {
-	resp, err := appelKairo(ctx, http.MethodGet, "/etat", nil)
+func lireKairo(ctx context.Context, page, pageSize int) (*EtatKairo, error) {
+	chemin := fmt.Sprintf("/etat?page=%d&pageSize=%d", page, pageSize)
+	resp, err := appelKairo(ctx, http.MethodGet, chemin, nil)
 	if err != nil {
 		return nil, err
 	}
