@@ -7,7 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TablePaginationLocale } from '@/components/ui/table-pagination';
 import {
+  compteGroupe,
   FILTRES_TICKETS,
   ilYA,
   isoKairo,
@@ -24,9 +26,21 @@ export { IndicateursKairo } from '@/components/kairo/indicateurs-kairo';
 export function CarteTickets({
   tickets,
   desactive,
+  total,
+  comptesParStatut,
+  page,
+  setPage,
+  pageSize,
+  setPageSize,
 }: {
   tickets: TicketKairo[];
   desactive?: boolean | undefined;
+  total: number;
+  comptesParStatut: Record<string, number>;
+  page: number;
+  setPage: (page: number) => void;
+  pageSize: number;
+  setPageSize: (pageSize: number) => void;
 }) {
   const [filtre, setFiltre] = useState<FiltreTickets>(() =>
     ticketsFiltres(tickets, 'aReprendre').length > 0 ? 'aReprendre' : 'tous',
@@ -35,6 +49,7 @@ export function CarteTickets({
   const [inspecte, setInspecte] = useState<TicketKairo | null>(null);
 
   const visibles = ticketsFiltres(tickets, filtre);
+  const pageCount = Math.max(1, Math.ceil(total / pageSize));
 
   return (
     <Card className="rounded-2xl border border-border/80 bg-card shadow-xs">
@@ -44,7 +59,7 @@ export function CarteTickets({
             Tickets GLPI
           </CardTitle>
           <Badge variant="secondary" className="font-mono text-xs font-semibold">
-            {tickets.length} au total
+            {total} au total
           </Badge>
         </div>
         <Tabs
@@ -54,7 +69,7 @@ export function CarteTickets({
         >
           <TabsList className="h-9 w-full justify-start overflow-x-auto rounded-lg bg-secondary p-1 md:w-fit">
             {(Object.keys(FILTRES_TICKETS) as FiltreTickets[]).map((cle) => {
-              const compte = ticketsFiltres(tickets, cle).length;
+              const compte = compteGroupe(comptesParStatut, cle);
               return (
                 <TabsTrigger
                   key={cle}
@@ -81,7 +96,7 @@ export function CarteTickets({
       <CardContent>
         {visibles.length === 0 ? (
           <p className="rounded-xl border border-dashed border-border/70 bg-secondary/30 px-4 py-8 text-center text-xs text-muted-foreground">
-            {tickets.length === 0
+            {total === 0
               ? 'Aucun ticket traité pour le moment. Kairo surveille les nouveaux tickets GLPI.'
               : 'Aucun ticket dans cette catégorie.'}
           </p>
@@ -99,6 +114,13 @@ export function CarteTickets({
           </ul>
         )}
       </CardContent>
+      <TablePaginationLocale
+        page={page}
+        pageCount={pageCount}
+        pageSize={pageSize}
+        setPage={setPage}
+        setPageSize={setPageSize}
+      />
 
       <DialogRelanceTicket
         ticket={aRelancer}
