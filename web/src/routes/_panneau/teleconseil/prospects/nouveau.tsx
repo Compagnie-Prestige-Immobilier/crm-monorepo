@@ -26,6 +26,7 @@ function NouveauProspectPage() {
   if (rawProjet !== null && rawProjet.toLowerCase().includes('grand')) {
     return (
       <NouveauProspect
+        canalProvenanceId={null}
         onSaved={() => router.push('/teleconseil/prospects?projet=GRAND_PUBLIC')}
         onAnnuler={() => router.push('/teleconseil/prospects?projet=GRAND_PUBLIC')}
       />

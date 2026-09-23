@@ -288,6 +288,14 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
     const fenetre = page.getByRole('dialog');
     await expect(fenetre.getByRole('heading', { name: 'Nouveau prospect' })).toBeVisible();
 
+    // Le type de contact puis le canal de provenance precedent desormais la
+    // console : le canal se propose deja rempli par le choix precedent.
+    await fenetre.getByRole('button', { name: 'Appel entrant' }).click();
+    await expect(fenetre.getByRole('combobox', { name: 'Canal de provenance' })).toContainText(
+      'Appel entrant',
+    );
+    await fenetre.getByRole('button', { name: 'Continuer' }).click();
+
     // Le projet se choisit au dernier pas de la console : les etapes suivantes
     // restent fermees tant que la fiche n'est pas saisie.
     const etapes = fenetre.getByRole('navigation', { name: 'Progression du formulaire' });

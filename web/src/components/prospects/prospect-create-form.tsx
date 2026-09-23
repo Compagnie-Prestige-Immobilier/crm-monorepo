@@ -118,6 +118,7 @@ function buildCreateProspectInput(fields: {
   repId: string | null;
   banqueId: string | null;
   syndicatId: string | null;
+  canalProvenanceId: string | null;
 }): CreateProspectInput {
   return {
     prenom: fields.prenom.trim(),
@@ -127,6 +128,7 @@ function buildCreateProspectInput(fields: {
     ...(fields.repId === null ? {} : { representantId: fields.repId }),
     ...(fields.banqueId === null ? {} : { banqueId: fields.banqueId }),
     ...(fields.syndicatId === null ? {} : { syndicatId: fields.syndicatId }),
+    ...(fields.canalProvenanceId === null ? {} : { canalProvenanceId: fields.canalProvenanceId }),
   };
 }
 
@@ -268,9 +270,11 @@ function SavedStatusLine({
 
 export function ProspectCreateForm({
   representantId,
+  canalProvenanceId = null,
   onSaved,
 }: {
   representantId: string | null;
+  canalProvenanceId?: string | null;
   onSaved?: () => void;
 }) {
   const queryClient = useQueryClient();
@@ -362,6 +366,7 @@ export function ProspectCreateForm({
         repId,
         banqueId,
         syndicatId,
+        canalProvenanceId,
       }),
       andNext,
     });

@@ -32,5 +32,5 @@ function NouveauGrandPublicPage() {
     router.push('/grand-public');
   };
 
-  return <NouveauProspect onSaved={retour} onAnnuler={retour} />;
+  return <NouveauProspect canalProvenanceId={null} onSaved={retour} onAnnuler={retour} />;
 }

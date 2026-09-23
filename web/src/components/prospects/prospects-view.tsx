@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query';
 import { PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 
+import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { FiltersBar } from '@/components/filters/filters-bar';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { NouveauProspect } from '@/components/grand-public/nouveau-prospect';
@@ -19,6 +20,11 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  fetchCanauxProvenance,
+  grandPublicKeys,
+  type CanalProvenance,
+} from '@/lib/data/grand-public';
 import { fetchProspects } from '@/lib/data/prospects';
 import { formatNumber } from '@/lib/format';
 import { queryKeys } from '@/lib/query-keys';
@@ -137,16 +143,99 @@ function projetImpose(canCreateChues: boolean, canCreateGrandPublic: boolean): P
   return null;
 }
 
-function CreationDialogContent({
+type TypeContact = 'APPEL_ENTRANT' | 'WHATSAPP';
+
+const TYPES_CONTACT: readonly { code: TypeContact; label: string }[] = [
+  { code: 'APPEL_ENTRANT', label: 'Appel entrant' },
+  { code: 'WHATSAPP', label: 'SMS / Whatsapp' },
+];
+
+function ChoixTypeContact({
+  canaux,
+  onChoisi,
+  onAnnuler,
+}: {
+  canaux: readonly CanalProvenance[];
+  onChoisi: (canalProvenanceId: string | null) => void;
+  onAnnuler: () => void;
+}) {
+  return (
+    <div className="flex flex-col gap-4">
+      <p className="text-[0.9375rem] text-muted-foreground">
+        Comment ce prospect a-t-il pris contact ?
+      </p>
+      <div className="flex flex-wrap gap-3">
+        {TYPES_CONTACT.map((type) => (
+          <Button
+            key={type.code}
+            type="button"
+            variant="outline"
+            className="h-auto min-w-[220px] flex-1 py-4"
+            onClick={() => {
+              const canal = canaux.find((item) => item.code === type.code);
+              onChoisi(canal?.id ?? null);
+            }}
+          >
+            {type.label}
+          </Button>
+        ))}
+      </div>
+      <Button variant="ghost" className="self-start px-0" onClick={onAnnuler}>
+        Annuler
+      </Button>
+    </div>
+  );
+}
+
+function ChoixCanalProvenance({
+  canaux,
+  initialCanalId,
+  onValider,
+  onRetour,
+}: {
+  canaux: readonly CanalProvenance[];
+  initialCanalId: string | null;
+  onValider: (canalProvenanceId: string | null) => void;
+  onRetour: () => void;
+}) {
+  const [canalId, setCanalId] = useState(initialCanalId);
+  const options = canaux
+    .filter((canal) => canal.isActive === true)
+    .map((canal) => ({ value: canal.id, label: canal.label ?? '' }));
+
+  return (
+    <div className="flex flex-col gap-4">
+      <FilterCombobox
+        label="Canal de provenance"
+        placeholder="Choisir un canal"
+        value={canalId}
+        options={options}
+        onChange={setCanalId}
+      />
+      <div className="flex justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onRetour}>
+          Retour
+        </Button>
+        <Button type="button" onClick={() => onValider(canalId)}>
+          Continuer
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function EtapeFormulaire({
   projet,
-  onClose,
   canCreate,
   canCreateGrandPublic,
+  canalProvenanceId,
+  onClose,
 }: {
   projet: Projet | null;
-  onClose: () => void;
   canCreate: boolean;
   canCreateGrandPublic: boolean;
+  canalProvenanceId: string | null;
+  onClose: () => void;
 }) {
   const vise = projet ?? projetImpose(canCreate, canCreateGrandPublic);
   if (vise === null) {
@@ -155,7 +244,11 @@ function CreationDialogContent({
         <DialogHeader>
           <DialogTitle>Nouveau prospect</DialogTitle>
         </DialogHeader>
-        <NouveauProspectConsole onSaved={onClose} onAnnuler={onClose} />
+        <NouveauProspectConsole
+          canalProvenanceId={canalProvenanceId}
+          onSaved={onClose}
+          onAnnuler={onClose}
+        />
       </DialogContent>
     );
   }
@@ -174,11 +267,90 @@ function CreationDialogContent({
         )}
       </DialogHeader>
       {grandPublic && canCreateGrandPublic ? (
-        <NouveauProspect embedded onSaved={onClose} onAnnuler={onClose} />
+        <NouveauProspect
+          embedded
+          canalProvenanceId={canalProvenanceId}
+          onSaved={onClose}
+          onAnnuler={onClose}
+        />
       ) : (
-        <ProspectCreateForm representantId={null} onSaved={onClose} />
+        <ProspectCreateForm
+          representantId={null}
+          canalProvenanceId={canalProvenanceId}
+          onSaved={onClose}
+        />
       )}
     </DialogContent>
+  );
+}
+
+function CreationDialogContent({
+  projet,
+  onClose,
+  canCreate,
+  canCreateGrandPublic,
+}: {
+  projet: Projet | null;
+  onClose: () => void;
+  canCreate: boolean;
+  canCreateGrandPublic: boolean;
+}) {
+  const [etape, setEtape] = useState<'contact' | 'canal' | 'formulaire'>('contact');
+  const [canalProvenanceId, setCanalProvenanceId] = useState<string | null>(null);
+
+  const canaux = useQuery({
+    queryKey: grandPublicKeys.canaux,
+    queryFn: () => fetchCanauxProvenance(),
+    staleTime: 5 * 60_000,
+  });
+
+  if (etape === 'contact') {
+    return (
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Nouveau prospect</DialogTitle>
+        </DialogHeader>
+        <ChoixTypeContact
+          canaux={canaux.data ?? []}
+          onChoisi={(id) => {
+            setCanalProvenanceId(id);
+            setEtape('canal');
+          }}
+          onAnnuler={onClose}
+        />
+      </DialogContent>
+    );
+  }
+
+  if (etape === 'canal') {
+    return (
+      <DialogContent className="max-h-[90dvh] overflow-y-auto sm:max-w-3xl">
+        <DialogHeader>
+          <DialogTitle>Nouveau prospect</DialogTitle>
+        </DialogHeader>
+        <ChoixCanalProvenance
+          canaux={canaux.data ?? []}
+          initialCanalId={canalProvenanceId}
+          onValider={(id) => {
+            setCanalProvenanceId(id);
+            setEtape('formulaire');
+          }}
+          onRetour={() => {
+            setEtape('contact');
+          }}
+        />
+      </DialogContent>
+    );
+  }
+
+  return (
+    <EtapeFormulaire
+      projet={projet}
+      canCreate={canCreate}
+      canCreateGrandPublic={canCreateGrandPublic}
+      canalProvenanceId={canalProvenanceId}
+      onClose={onClose}
+    />
   );
 }
 
