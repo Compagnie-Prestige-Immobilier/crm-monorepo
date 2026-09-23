@@ -608,7 +608,12 @@
   "POST /api/v1/prospects/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/representants/{id}/statut-qualification": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
-  "POST /api/v1/prospects/{id}/suivi-rendez-vous": ["ACCUEIL", "ADMIN", "CHARGE_CLIENTELE", "DIRECTION"],
+  "POST /api/v1/prospects/{id}/suivi-rendez-vous": [
+    "ACCUEIL",
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "DIRECTION"
+  ],
   "POST /api/v1/representants/{id}/affecter": ["ADMIN", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/revue": ["ADMIN", "CHARGE_CLIENTELE", "SUPERVISEUR"],
   "POST /api/v1/prospects/{id}/vendre": [
