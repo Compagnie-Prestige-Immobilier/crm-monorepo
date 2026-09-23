@@ -688,6 +688,11 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 ) ([]string, error) {
 	f := lotFiltresDuCorps(body)
 	if body.Cible == lotCibleRecommandes {
+		// Le corps porte un filtre « prospects » : c'est un parrainage Grand
+		// Public, pas une recommandation de représentant.
+		if body.Prospects != nil {
+			return s.lotOuvrirContactsRecommandesProspects(ctx, q, createurID, places)
+		}
 		return s.lotOuvrirContactsRecommandes(ctx, q, createurID, f, places)
 	}
 	if lotSurRepresentants(body.Cible) {

@@ -126,6 +126,8 @@ type VenteDTO struct {
 	IdentiteClientDTO
 	ProspectID     *string `json:"prospectId"`
 	Teleconseiller *string `json:"teleconseiller"`
+	// Nul si le client n'a pas été amené par un parrainage Grand Public.
+	Parrain *string `json:"parrain"`
 }
 
 // Le classement par téléconseiller jusqu'à qui a amené le client : seules les
@@ -217,6 +219,7 @@ func (s *service) lister(ctx context.Context, _ *struct{}) (*VentesOutput, error
 		dto := venteDTO(&ventes[i], parVente[ventes[i].ID])
 		if p, ok := prospects[parLigne[i]]; parLigne[i] != "" && ok {
 			dto.ProspectID, dto.Teleconseiller = &p.ID, p.Teleconseiller
+			dto.Parrain = nomParrain(p.ParrainNom, p.ParrainPrenom)
 		}
 		out.Body.Ventes = append(out.Body.Ventes, dto)
 	}
@@ -259,6 +262,24 @@ func (s *service) prospectsParTelephones(ctx context.Context, telephones []strin
 		}
 	}
 	return parTelephone, nil
+}
+
+func nomParrain(nom, prenom *string) *string {
+	if nom == nil {
+		return nil
+	}
+	complet := strings.TrimSpace(strings.TrimSpace(deref(prenom)) + " " + *nom)
+	if complet == "" {
+		return nil
+	}
+	return &complet
+}
+
+func deref(v *string) string {
+	if v == nil {
+		return ""
+	}
+	return *v
 }
 
 func agregerParTeleconseiller(ventes []VenteDTO) []VenteParTeleconseillerDTO {
