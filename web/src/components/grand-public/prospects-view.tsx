@@ -359,6 +359,7 @@ export function GrandPublicProspectsView({
           </DialogHeader>
           <NouveauProspect
             embedded
+            canalProvenanceId={null}
             onSaved={() => {
               setCreateOpen(false);
             }}

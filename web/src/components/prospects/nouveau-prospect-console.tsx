@@ -91,9 +91,11 @@ interface Envoi {
 
 /** La console d'appel sans « Réponse » : la fiche se crée au choix du projet, puis l'appel s'y consigne. */
 export function NouveauProspectConsole({
+  canalProvenanceId = null,
   onSaved,
   onAnnuler,
 }: {
+  canalProvenanceId?: string | null;
   onSaved: () => void;
   onAnnuler: () => void;
 }) {
@@ -131,7 +133,10 @@ export function NouveauProspectConsole({
 
   const save = useMutation({
     mutationFn: async (envoi: Envoi): Promise<ProspectRow> => {
-      const input = { ...creationDepuis(envoi.dossier, envoi.phone), projet: envoi.projet };
+      const input = {
+        ...creationDepuis(envoi.dossier, envoi.phone, canalProvenanceId),
+        projet: envoi.projet,
+      };
       const prospect = cree.current ?? (await createProspect(input));
       cree.current = prospect;
       await consignerSur(prospect.id, envoi.appel, brouillonDe(envoi.comment, envoi.dossier));
