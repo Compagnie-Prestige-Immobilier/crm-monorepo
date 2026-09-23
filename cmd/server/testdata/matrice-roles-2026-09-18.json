@@ -682,5 +682,9 @@
   ],
   "PUT /api/v1/tableaux-de-bord/{ecran}/disposition/par-defaut": ["ADMIN"],
   "PUT /api/v1/users/{id}/active": ["ADMIN"],
-  "PUT /api/v1/users/{id}/password": ["ADMIN"]
+  "PUT /api/v1/users/{id}/password": ["ADMIN"],
+  "POST /api/v1/assistant/questions": ["ADMIN"],
+  "GET /api/v1/assistant/questions-enregistrees": ["ADMIN"],
+  "POST /api/v1/assistant/questions-enregistrees": ["ADMIN"],
+  "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN"]
 }
