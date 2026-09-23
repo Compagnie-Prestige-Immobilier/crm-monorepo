@@ -1,6 +1,7 @@
 package support
 
 import (
+	"bytes"
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
@@ -30,7 +31,7 @@ const (
 	imagesMax        = 5
 	imageMaxOctets   = 8 << 20
 	fichiersMax      = 3
-	fichierMaxOctets = 200 << 10
+	fichierMaxOctets = 10 << 20
 	signalementsVus  = 20
 	diagnosticMaxLen = 500
 )
@@ -106,7 +107,7 @@ type TicketInput struct {
 		Description string          `form:"description" required:"true" minLength:"3" maxLength:"5000"`
 		Contexte    string          `form:"contexte" required:"false" maxLength:"5000"`
 		Images      []huma.FormFile `form:"images" required:"false" contentType:"image/png,image/jpeg,image/webp,image/gif"`
-		Fichiers    []huma.FormFile `form:"fichiers" required:"false" contentType:"text/plain,application/json"`
+		Fichiers    []huma.FormFile `form:"fichiers" required:"false" contentType:"text/plain,application/json,application/pdf,application/msword,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"`
 		Urgence     int32           `form:"urgence" required:"true" enum:"2,3,4"`
 		Categorie   int32           `form:"categorie" required:"true" minimum:"1"`
 	}]
@@ -167,7 +168,7 @@ func (s *service) recevoir(ctx context.Context, in *TicketInput) (*SignalementOu
 	if err != nil {
 		return nil, err
 	}
-	fichiers, err := lireFichiersTexte(form.Fichiers)
+	fichiers, err := lireFichiersJoints(form.Fichiers)
 	if err != nil {
 		return nil, err
 	}
@@ -416,38 +417,78 @@ func lireImages(fichiers []huma.FormFile) ([]image, error) {
 	return images, nil
 }
 
-// Les journaux et fichiers texte joints suivent le même chemin que les
-// images (stockage, transmission GLPI) : seule la validation d'entrée change.
-// Le contenu, jamais l'extension déclarée, décide s'il s'agit de texte.
-func lireFichiersTexte(fichiers []huma.FormFile) ([]image, error) {
-	textes := make([]image, 0, len(fichiers))
+// Extension déclarée requise pour lever l'ambiguïté d'un conteneur générique
+// (ZIP pour le format Office moderne, OLE pour l'ancien) : la signature seule
+// ne distingue pas un .docx d'un .xlsx.
+var extensionsDocuments = map[string]string{
+	".pdf":  "application/pdf",
+	".doc":  "application/msword",
+	".xls":  "application/vnd.ms-excel",
+	".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+	".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+}
+
+var (
+	signaturePDF = []byte("%PDF-")
+	signatureZIP = []byte{'P', 'K', 0x03, 0x04}
+	signatureOLE = []byte{0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1}
+)
+
+func typeDocumentJoint(contenu []byte, nomDeclare string) (typeMime string, ok bool) {
+	extension := strings.ToLower(filepath.Ext(nomDeclare))
+	switch {
+	case bytes.HasPrefix(contenu, signaturePDF) && extension == ".pdf":
+		return extensionsDocuments[extension], true
+	case bytes.HasPrefix(contenu, signatureZIP) && (extension == ".docx" || extension == ".xlsx"):
+		return extensionsDocuments[extension], true
+	case bytes.HasPrefix(contenu, signatureOLE) && (extension == ".doc" || extension == ".xls"):
+		return extensionsDocuments[extension], true
+	default:
+		return "", false
+	}
+}
+
+// Les journaux, fichiers texte et documents (PDF, Word, Excel) joints suivent
+// le même chemin que les images (stockage, transmission GLPI) : seule la
+// validation d'entrée change. Le contenu, jamais le Content-Type déclaré,
+// décide du type ; l'extension ne sert qu'à lever l'ambiguïté d'un ZIP ou
+// d'un OLE générique entre Word et Excel.
+func lireFichiersJoints(fichiers []huma.FormFile) ([]image, error) {
+	joints := make([]image, 0, len(fichiers))
 	for i := range fichiers {
 		if fichiers[i].Size > fichierMaxOctets {
 			return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_FICHIER_TROP_LOURD",
-				fmt.Sprintf("Chaque fichier doit peser moins de %d Ko.", fichierMaxOctets>>10))
+				fmt.Sprintf("Chaque fichier doit peser moins de %d Mio.", fichierMaxOctets>>20))
 		}
 		contenu, err := io.ReadAll(io.LimitReader(fichiers[i], fichierMaxOctets+1))
 		if err != nil {
 			return nil, socle.Problem(http.StatusBadRequest, "SUPPORT_FICHIER_ILLISIBLE", "Un fichier n'a pas pu être lu.")
 		}
-		typeMime := http.DetectContentType(contenu)
-		if !strings.HasPrefix(typeMime, "text/") {
-			return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_FICHIER_REFUSE",
-				"Seuls les fichiers texte (journal, .txt, .json...) sont acceptés.")
-		}
 		nom := filepath.Base(fichiers[i].Filename)
-		if nom == "" || nom == "." || nom == string(filepath.Separator) {
-			nom = fmt.Sprintf("fichier-%d.txt", i+1)
+		typeMime := http.DetectContentType(contenu)
+		switch {
+		case strings.HasPrefix(typeMime, "text/"):
+			typeMime = "text/plain"
+			if nom == "" || nom == "." || nom == string(filepath.Separator) {
+				nom = fmt.Sprintf("fichier-%d.txt", i+1)
+			}
+		default:
+			detecte, connu := typeDocumentJoint(contenu, nom)
+			if !connu {
+				return nil, socle.Problem(http.StatusUnprocessableEntity, "SUPPORT_FICHIER_REFUSE",
+					"Seuls les fichiers texte (journal, .txt, .json...), PDF, Word (.doc/.docx) et Excel (.xls/.xlsx) sont acceptés.")
+			}
+			typeMime = detecte
 		}
 		condensat := sha256.Sum256(contenu)
-		textes = append(textes, image{
+		joints = append(joints, image{
 			nom:       nom,
-			typeMime:  "text/plain",
+			typeMime:  typeMime,
 			empreinte: hex.EncodeToString(condensat[:]),
 			contenu:   contenu,
 		})
 	}
-	return textes, nil
+	return joints, nil
 }
 
 // L'empreinte porte sur les champs et les images, jamais sur l'encodage
