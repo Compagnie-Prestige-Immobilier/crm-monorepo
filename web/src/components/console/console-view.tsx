@@ -19,6 +19,7 @@ import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { PanneauEcheance } from '@/components/console/panneau-echeance';
+import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
 import { useRvSite, type RvSiteConsole } from '@/components/console/rendez-vous-site';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
@@ -1738,7 +1739,8 @@ function EnTeteFiche({
         </div>
       )}
 
-      {prospect.phase2Status !== 'PENDING' ? (
+      <CarteRendezVous prospect={prospect} compacte />
+      {prospect.phase2Status !== 'PENDING' && prospect.phase2Status !== 'APPOINTMENT' ? (
         <div
           role="status"
           className="rounded-md border border-border bg-warning-surface px-3 py-2 text-[0.875rem] text-warning"

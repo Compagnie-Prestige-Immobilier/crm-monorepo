@@ -16,6 +16,7 @@ SELECT
   COALESCE(u."fullName", '') AS "prisPar",
   COALESCE(p."rendezVousIssue", '') AS "issue",
   COALESCE(vs."nom", '')::text AS "site",
+  COALESCE(vs."prixUnitaireDefaut", 0)::bigint AS "sitePrix",
   COALESCE(pr."label", '')::text AS "pointRencontre",
   COALESCE(dernier."pointRencontreCommentaire", '')::text AS "pointRencontreCommentaire",
   count(*) OVER () AS "total"
@@ -36,7 +37,9 @@ LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
 LEFT JOIN "points_rencontre" pr ON pr."id" = dernier."pointRencontreId"
 WHERE p."deletedAt" IS NULL
   AND p."phase2Status" = 'APPOINTMENT'
-  AND r."code" <> 'RDV_TELEPHONIQUE'
+  -- Le comptoir ne reçoit pas les rendez-vous téléphoniques ; la fiche, elle, les montre.
+  AND (r."code" <> 'RDV_TELEPHONIQUE' OR sqlc.narg('prospect_id')::text IS NOT NULL)
+  AND (sqlc.narg('prospect_id')::text IS NULL OR p."id" = sqlc.narg('prospect_id')::text)
   AND (sqlc.narg('type_code')::text IS NULL OR r."code" = sqlc.narg('type_code')::text)
   AND (sqlc.narg('issue')::text IS NULL
        OR (sqlc.narg('issue')::text = 'SANS' AND p."rendezVousIssue" IS NULL)

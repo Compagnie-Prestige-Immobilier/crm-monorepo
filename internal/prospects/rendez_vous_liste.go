@@ -35,6 +35,7 @@ type RendezVousObtenu struct {
 	PrisPar                   string  `json:"prisPar"`
 	Issue                     string  `json:"issue" enum:",HONORE,NON_HONORE,REPORTE"`
 	Site                      string  `json:"site"`
+	SitePrix                  int64   `json:"sitePrix"`
 	PointRencontre            string  `json:"pointRencontre"`
 	PointRencontreCommentaire string  `json:"pointRencontreCommentaire"`
 }
@@ -90,18 +91,21 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 		if i == 0 {
 			out.Body.Total = ligne.Total
 		}
-		out.Body.Items = append(out.Body.Items, RendezVousObtenu{
-			ID: ligne.ID, Prenom: ligne.Prenom, Nom: ligne.Nom, PhoneE164: ligne.PhoneE164,
-			Type: ligne.Type, TypeCode: ligne.TypeCode,
-			Quand: prospectVide(ligne.Quand), PrisLe: rendezVousInstant(ligne.LastCallAt),
-			PrisPar: ligne.PrisPar, Issue: ligne.Issue, Site: ligne.Site,
-			PointRencontre: ligne.PointRencontre, PointRencontreCommentaire: ligne.PointRencontreCommentaire,
-		})
+		out.Body.Items = append(out.Body.Items, rendezVousDe(ligne))
 	}
 	out.Body.Page, out.Body.PageSize = page, taille
 	parPage := int64(taille)
 	out.Body.PageCount = (out.Body.Total + parPage - 1) / parPage
 	return out, nil
+}
+
+func rendezVousDe(l *db.RendezVousObtenusRow) RendezVousObtenu {
+	return RendezVousObtenu{
+		ID: l.ID, Prenom: l.Prenom, Nom: l.Nom, PhoneE164: l.PhoneE164, Type: l.Type, TypeCode: l.TypeCode,
+		Quand: prospectVide(l.Quand), PrisLe: rendezVousInstant(l.LastCallAt), PrisPar: l.PrisPar,
+		Issue: l.Issue, Site: l.Site, SitePrix: l.SitePrix, PointRencontre: l.PointRencontre,
+		PointRencontreCommentaire: l.PointRencontreCommentaire,
+	}
 }
 
 func rendezVousInstant(quand *time.Time) *string {
@@ -113,7 +117,37 @@ func rendezVousInstant(quand *time.Time) *string {
 }
 
 var GardeRendezVous = map[string]socle.Permission{
-	"GET " + cheminRendezVous: socle.PermissionRendezVousVoir,
+	"GET " + cheminRendezVous:                socle.PermissionRendezVousVoir,
+	"GET /api/v1/prospects/{id}/rendez-vous": socle.PermissionProspectsLire,
+}
+
+type RendezVousFicheInput struct {
+	ID string `path:"id" format:"uuid"`
+}
+
+type RendezVousFicheOutput struct {
+	Body struct {
+		RendezVous *RendezVousObtenu `json:"rendezVous" doc:"Absent quand la fiche n'est pas en rendez-vous."`
+	}
+}
+
+// Le rendez-vous en cours d'une fiche, lu comme le comptoir le lit, pour qui
+// peut ouvrir la fiche.
+func (s *service) rendezVousDeLaFiche(ctx context.Context, in *RendezVousFicheInput) (*RendezVousFicheOutput, error) {
+	u := socle.UtilisateurCourant(ctx)
+	if _, err := s.prospectLire(ctx, &u, in.ID); err != nil {
+		return nil, err
+	}
+	lignes, err := s.Q.RendezVousObtenus(ctx, db.RendezVousObtenusParams{ProspectID: &in.ID, Prendre: 1})
+	if err != nil {
+		return nil, err
+	}
+	out := &RendezVousFicheOutput{}
+	if len(lignes) == 1 {
+		rdv := rendezVousDe(&lignes[0])
+		out.Body.RendezVous = &rdv
+	}
+	return out, nil
 }
 
 func MonterRendezVous(api huma.API, d *socle.Deps) {
@@ -122,4 +156,8 @@ func MonterRendezVous(api huma.API, d *socle.Deps) {
 		OperationID: "listRendezVous", Method: http.MethodGet, Path: cheminRendezVous,
 		Summary: "Les rendez-vous obtenus au téléphone, pour le comptoir.",
 	}, s.rendezVousLister)
+	huma.Register(api, huma.Operation{
+		OperationID: "rendezVousDeLaFiche", Method: http.MethodGet, Path: "/api/v1/prospects/{id}/rendez-vous",
+		Summary: "Le rendez-vous en cours d’une fiche.",
+	}, s.rendezVousDeLaFiche)
 }
