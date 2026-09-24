@@ -685,6 +685,9 @@ export interface AttemptDraft {
   readonly ouvertureId?: string;
   /** Grand Public seulement : les proches qu'un prospect recommande pendant l'appel. */
   readonly contactsRecommandes?: { nom?: string; phone: string }[];
+  /** RV site seulement : le site visité et le point de rencontre. */
+  readonly rvSite?:
+    { siteId?: string; pointRencontreId?: string; pointRencontreCommentaire?: string } | undefined;
 }
 
 function methodeAttemptErreur(draft: AttemptDraft): string | null {
@@ -862,6 +865,7 @@ function buildAttemptBatch(input: AttemptInput): SyncPushBody {
           ...(input.draft.contactsRecommandes === undefined
             ? {}
             : { contactsRecommandes: input.draft.contactsRecommandes }),
+          ...input.draft.rvSite,
           clientCreatedAt: input.at,
         },
       },

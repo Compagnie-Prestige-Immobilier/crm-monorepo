@@ -17,6 +17,7 @@ import {
   titreEcheance,
 } from '@/components/console/console-view';
 import { PanneauEcheance } from '@/components/console/panneau-echeance';
+import { useRvSite } from '@/components/console/rendez-vous-site';
 import { FilterCombobox } from '@/components/filters/filter-combobox';
 import { toInternationalE164 } from '@/components/forms/international-phone-field';
 import { EtapesProgression } from '@/components/grand-public/etapes';
@@ -33,10 +34,10 @@ import { ouvrirFiche } from '@/lib/data/ouvertures';
 import {
   AttemptRefused,
   callbackKeys,
-  callbackSlots,
   conversionErrorFor,
   dossierVide,
   newAttemptInput,
+  callbackSlots,
   pushCallAttempt,
   validateAttempt,
   validateConversion,
@@ -247,6 +248,7 @@ export function NouveauProspectConsole({
   const catalogue = motifs.data ?? MOTIFS_SYSTEME;
   const e164 = toInternationalE164(phone, INDICATIF);
   const { motif, adhesion, rappelDemande } = qualificationDe(statut, precision, conversion);
+  const rvSite = useRvSite(motif?.code);
   const precisions = statut === null ? [] : sousMotifsDe(catalogue, statut.id);
   const parcours = parcoursDe(precisions.length > 0, rappelDemande);
   const rang = Math.max(parcours.indexOf(pas), 0);
@@ -361,7 +363,13 @@ export function NouveauProspectConsole({
       return;
     }
     const appel = appelCree(sansAppel, motif, callbackAt, dossier, comment);
-    save.mutate({ projet, dossier, phone: e164, appel, comment });
+    save.mutate({
+      projet,
+      dossier,
+      phone: e164,
+      appel: appel && { ...appel, rvSite: rvSite.corps },
+      comment,
+    });
   };
 
   const choix = (
@@ -483,12 +491,13 @@ export function NouveauProspectConsole({
     ),
     echeance: () => (
       <PanneauEcheance
-        slots={slots}
+        slots={rvSite.filtrer(slots) ?? []}
         now={now}
         freeCallback={freeCallback}
         choisi={callbackAt}
         surDossier={adhesion}
         titre={titreEcheance(motif?.code)}
+        contenu={rvSite.calendrier(callbackAt, choisirEcheance)}
         disabled={pending}
         inputRef={callbackRef}
         onChoisir={choisirEcheance}
@@ -497,14 +506,17 @@ export function NouveauProspectConsole({
       />
     ),
     note: () => (
-      <Commentaire
-        value={comment}
-        titre="Commentaire, facultatif"
-        obligatoirePour={commentaireExigePar(motif)}
-        inputRef={commentRef}
-        onChange={setComment}
-        onValidate={quitterNote}
-      />
+      <div className="flex flex-col gap-4">
+        {rvSite.champs}
+        <Commentaire
+          value={comment}
+          titre="Commentaire, facultatif"
+          obligatoirePour={commentaireExigePar(motif)}
+          inputRef={commentRef}
+          onChange={setComment}
+          onValidate={quitterNote}
+        />
+      </div>
     ),
     projet: () => (
       <Palier
