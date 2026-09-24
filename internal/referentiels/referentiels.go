@@ -308,6 +308,13 @@ func referentielsConstruire() (map[string]*referentielsListe, []referentielsCham
 			},
 			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
 		},
+		"points-rencontre": {
+			champs: []referentielsChamp{
+				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 120, true),
+				cPosition, cIsActive, cUpdatedAt,
+			},
+			rang: referentielsTriPosition, lecture: socle.PermissionPanneauAcceder, ecriture: socle.PermissionReferentielsSuperviser,
+		},
 		NomProfessions: {
 			champs: []referentielsChamp{
 				referentielsRegle(cCode, 1, 40, true), referentielsRegle(cLabel, 2, 120, true),

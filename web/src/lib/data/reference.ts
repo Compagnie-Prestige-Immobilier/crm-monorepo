@@ -186,6 +186,17 @@ export async function fetchProfessions(client: ApiClient = getApiClient()): Prom
   );
 }
 
+export async function fetchReferentielComplet(
+  kind: 'points-rencontre',
+  client: ApiClient = getApiClient(),
+): Promise<Profession[]> {
+  return unwrap(
+    await client.GET('/api/v1/referentiels/{kind}', {
+      params: { path: { kind }, query: { activeOnly: false } },
+    }),
+  );
+}
+
 export async function fetchIncomeBands(client: ApiClient = getApiClient()): Promise<IncomeBand[]> {
   return unwrap(
     await client.GET('/api/v1/referentiels/{kind}', {
