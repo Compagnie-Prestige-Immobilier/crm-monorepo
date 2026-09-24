@@ -14,6 +14,7 @@ import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { MethodeFiche } from '@/components/prospects/methode-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
+import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
 import { SuiviRendezVous, SuiviRendezVousBadges } from '@/components/prospects/suivi-rendez-vous';
 import {
   HistoireDeLaFiche,
@@ -143,6 +144,8 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         }
         chiffres={chiffresDe(prospect)}
       />
+
+      <CarteRendezVous prospect={prospect} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <HistoireDeLaFiche prospect={prospect} role={role} />

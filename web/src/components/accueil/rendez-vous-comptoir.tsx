@@ -245,7 +245,17 @@ export function RendezVousComptoir({
                         </a>
                       )}
                     </TableCell>
-                    <TableCell>{fiche.type}</TableCell>
+                    <TableCell>
+                      {fiche.type}
+                      {fiche.site === '' ? null : (
+                        <p className="text-[0.8125rem] text-muted-foreground">
+                          {fiche.site} · {fiche.pointRencontre}
+                          {fiche.pointRencontreCommentaire === ''
+                            ? null
+                            : `, ${fiche.pointRencontreCommentaire}`}
+                        </p>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {fiche.prisLe === null ? '' : formatDateTime(fiche.prisLe)}
                     </TableCell>

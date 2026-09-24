@@ -17,6 +17,7 @@ const (
 
 var entetesRendezVous = []string{
 	"Rendez-vous le", "Prospect", "Téléphone", "Type", "Venue", "Pris le", "Pris par",
+	"Site", "Point de rencontre", "Précision du point",
 }
 
 // Le comptoir emporte ce qu'il voit : les mêmes lignes, les mêmes filtres.
@@ -57,7 +58,7 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 		return nil, err
 	}
 	f, err := c.nouvelleFeuille("Rendez-vous", entetesRendezVous,
-		[]float64{20, 30, 18, 16, 14, 20, 26}, map[int]int{3: c.texte})
+		[]float64{20, 30, 18, 16, 14, 20, 26, 20, 26, 30}, map[int]int{3: c.texte})
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +66,8 @@ func (s *service) exportRendezVous(ctx context.Context, in *ExportRendezVousInpu
 		ligne := &lignes[i]
 		if err := f.ecrire(quandLisible(ligne.Quand, s.Cfg.TimeZone), ligne.Prenom+" "+ligne.Nom,
 			exportCelluleTexte(ligne.PhoneE164), ligne.Type, venues[ligne.Issue],
-			c.horodate(ligne.LastCallAt), ligne.PrisPar); err != nil {
+			c.horodate(ligne.LastCallAt), ligne.PrisPar, ligne.Site, ligne.PointRencontre,
+			ligne.PointRencontreCommentaire); err != nil {
 			return nil, err
 		}
 	}

@@ -11,6 +11,7 @@ import { CanalProvenance } from '@/components/grand-public/canal-provenance';
 import { DetailBackLink } from '@/components/detail-back-link';
 import { EtiquettesStatut } from '@/components/prospects/etiquettes-statut';
 import { FicheEnTete } from '@/components/fiche-en-tete';
+import { CarteRendezVous } from '@/components/prospects/carte-rendez-vous';
 import { chiffresDe } from '@/components/prospects/prospect-detail-view';
 import { AffecterFiche } from '@/components/prospects/affecter-fiche';
 import { RequalifierFiche } from '@/components/prospects/requalifier-fiche';
@@ -473,6 +474,7 @@ export function GrandPublicProspectDetail({
         }
         chiffres={chiffresDe(prospect)}
       />
+      <CarteRendezVous prospect={prospect} />
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] xl:grid-cols-[minmax(0,1fr)_22rem]">
         <HistoireDeLaFiche prospect={prospect} role={role} />
