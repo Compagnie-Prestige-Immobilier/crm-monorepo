@@ -59,6 +59,7 @@ export function toProspectQuery(filters: ProspectFilters): ProspectQuery {
     ...toFilterQuery(filters),
     ...(filters.phase2Status === 'TOUT' ? { phase2Status: 'TOUT' as const } : {}),
     ...(filters.sansMotif === null ? {} : { sansMotif: filters.sansMotif }),
+    ...(filters.motif === null ? {} : { motif: filters.motif }),
     page: filters.page,
     pageSize: filters.pageSize,
     sortBy: filters.sortBy,

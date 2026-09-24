@@ -457,6 +457,7 @@ type ProspectListInput struct {
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED,TOUT" doc:"TOUT régroupe Intéressés, Hésitants et Rendez-vous."`
 	SansMotif              string `query:"sansMotif" maxLength:"40" doc:"Code du motif dont le dernier appel écarte la fiche."`
+	Motif                  string `query:"motif" maxLength:"40" doc:"Code du statut de qualification du dernier appel, ses précisions comprises."`
 	EnrollmentMethod       string `query:"enrollmentMethod" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
 	AppelePar              string `query:"appelePar" format:"uuid"`
 	LastCallByID           string `query:"lastCallById" format:"uuid"`
@@ -544,19 +545,18 @@ func (s *service) prospectFiltres(in *ProspectListInput, u *socle.Utilisateur) (
 		CanalProvenanceID: prospectVide(in.CanalProvenanceID), RepresentantID: prospectVide(in.RepresentantID),
 		BanqueID: prospectVide(in.BanqueID), SyndicatID: prospectVide(in.SyndicatID),
 		Origin: prospectVide(in.Origin), Phase2Status: prospectPhase2StatusFiltre(in.Phase2Status),
-		Phase2StatusTout:       in.Phase2Status == prospectPhase2StatusTout,
-		SansMotif:              prospectVide(in.SansMotif),
+		Phase2StatusTout: in.Phase2Status == prospectPhase2StatusTout,
+		SansMotif:        prospectVide(in.SansMotif), Motif: prospectVide(in.Motif),
 		EnrollmentMethod:       prospectTypeEnum[db.EnrollmentMethod](in.EnrollmentMethod),
-		EnrollmentCapturedByID: prospectVide(in.EnrollmentCapturedByID),
-		LastCallByID:           prospectVide(in.LastCallByID),
-		DepartementID:          prospectVide(in.DepartementID),
-		Projet:                 prospectTypeEnum[db.Projet](in.Projet),
-		Statut:                 prospectTypeEnum[db.ProspectStatut](in.Statut),
-		Segment:                prospectVide(in.Segment),
-		AppelePar:              prospectVide(in.AppelePar),
-		Search:                 prospectVide(strings.TrimSpace(in.Search)),
-		Attribue:               in.Attribue,
-		ResteAAppeler:          in.ResteAAppeler,
+		EnrollmentCapturedByID: prospectVide(in.EnrollmentCapturedByID), LastCallByID: prospectVide(in.LastCallByID),
+		DepartementID: prospectVide(in.DepartementID),
+		Projet:        prospectTypeEnum[db.Projet](in.Projet),
+		Statut:        prospectTypeEnum[db.ProspectStatut](in.Statut),
+		Segment:       prospectVide(in.Segment),
+		AppelePar:     prospectVide(in.AppelePar),
+		Search:        prospectVide(strings.TrimSpace(in.Search)),
+		Attribue:      in.Attribue,
+		ResteAAppeler: in.ResteAAppeler,
 	}
 	if in.Revue != "" {
 		arg.Revue = prospectPtr(in.Revue == prospectVrai)
@@ -579,7 +579,7 @@ func prospectComptage(arg *db.ListProspectsParams) db.CountProspectsParams {
 		ScopeAll: arg.ScopeAll, ScopeUserID: arg.ScopeUserID, ScopeConverti: arg.ScopeConverti, ScopeRendezVous: arg.ScopeRendezVous,
 		CommercialID: arg.CommercialID, Type: arg.Type, CanalProvenanceID: arg.CanalProvenanceID,
 		RepresentantID: arg.RepresentantID, BanqueID: arg.BanqueID, SyndicatID: arg.SyndicatID,
-		Origin: arg.Origin, Phase2Status: arg.Phase2Status, Phase2StatusTout: arg.Phase2StatusTout, SansMotif: arg.SansMotif, EnrollmentMethod: arg.EnrollmentMethod,
+		Origin: arg.Origin, Phase2Status: arg.Phase2Status, Phase2StatusTout: arg.Phase2StatusTout, SansMotif: arg.SansMotif, Motif: arg.Motif, EnrollmentMethod: arg.EnrollmentMethod,
 		EnrollmentCapturedByID: arg.EnrollmentCapturedByID, LastCallByID: arg.LastCallByID,
 		DepartementID: arg.DepartementID, Projet: arg.Projet, Statut: arg.Statut, Revue: arg.Revue,
 		Segment: arg.Segment, AppelePar: arg.AppelePar, DateFrom: arg.DateFrom, DateTo: arg.DateTo,
