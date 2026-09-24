@@ -56,3 +56,75 @@ func TestSuiviRendezVousBetaParLaDirection(t *testing.T) {
 	statut, body = qualificationEnvoi(cc, http.MethodPost, chemin, map[string]any{"issue": "NON_HONORE"})
 	cc.attend(statut, http.StatusOK, "le CC note le suivi", body)
 }
+
+func prochain(jour time.Weekday) string {
+	d := time.Now().UTC().AddDate(0, 0, 1)
+	for d.Weekday() != jour {
+		d = d.AddDate(0, 0, 1)
+	}
+	return time.Date(d.Year(), d.Month(), d.Day(), 7, 0, 0, 0, time.UTC).Format(time.RFC3339)
+}
+
+// Un RV site se prend à une heure ouverte par l'admin, vers un site et depuis un point de rencontre.
+func TestRendezVousSiteSurCreneauOuvert(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	fiche := qualificationProspect(b)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	var avant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'rv_site.reglages'`).Scan(&avant)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'rv_site.reglages'`)
+		if avant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key", "value", "updatedAt") VALUES ('rv_site.reglages', $1, now())`, *avant)
+		}
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPut, "/api/v1/rv-site/reglages", map[string]any{"jours": []int{7}})
+	b.attend(statut, http.StatusForbidden, "le téléconseiller ne règle pas", body)
+	admin := qualificationConnecte(t, "ADMIN")
+	reglages := map[string]any{"jours": []int{7, 7}, "heureDebut": 8, "heureFin": 7, "horizonJours": 60}
+	statut, body = qualificationEnvoi(admin, http.MethodPut, "/api/v1/rv-site/reglages", reglages)
+	admin.attend(statut, http.StatusBadRequest, "plage à l'envers", body)
+	reglages["heureDebut"], reglages["heureFin"], reglages["maxVisites"] = 7, 8, 1
+	statut, body = qualificationEnvoi(admin, http.MethodPut, "/api/v1/rv-site/reglages", reglages)
+	admin.attend(statut, http.StatusOK, "réglages enregistrés", body)
+	var site, point string
+	if err := b.pool.QueryRow(b.ctx, `SELECT (SELECT "id" FROM "ventes_sites" WHERE "actif" LIMIT 1),
+		(SELECT "id" FROM "points_rencontre" WHERE "isActive" LIMIT 1)`).Scan(&site, &point); err != nil {
+		t.Fatal(err)
+	}
+	rv := func(quand string, champs map[string]any) (int, map[string]any) {
+		champs["reasonCode"], champs["callbackAt"] = "RV_SITE", quand
+		return qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche, champs))
+	}
+	complet := func() map[string]any {
+		return map[string]any{"siteId": site, "pointRencontreId": point, "pointRencontreCommentaire": "devant la pharmacie"}
+	}
+	statut, body = rv(prochain(time.Wednesday), complet())
+	b.attend(statut, http.StatusBadRequest, "mercredi fermé", body)
+	statut, body = rv(prochain(time.Sunday), map[string]any{"siteId": site})
+	b.attend(statut, http.StatusBadRequest, "point de rencontre manquant", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(fiche,
+		map[string]any{"reasonCode": "RV_CPI", "callbackAt": prochain(time.Sunday), "siteId": site}))
+	b.attend(statut, http.StatusBadRequest, "site hors RV site", body)
+	statut, body = rv(prochain(time.Sunday), complet())
+	b.attend(statut, http.StatusOK, "RV site sur créneau ouvert", body)
+
+	autre := qualificationProspect(b)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, autre)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, autre)
+	})
+	corps := complet()
+	corps["reasonCode"], corps["callbackAt"] = "RV_SITE", prochain(time.Sunday)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(autre, corps))
+	b.attend(statut, http.StatusConflict, "créneau complet", body)
+
+	var siteLu, commentaire string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "siteId", "pointRencontreCommentaire" FROM "call_attempts" WHERE "prospectId" = $1`,
+		fiche).Scan(&siteLu, &commentaire); err != nil || siteLu != site || commentaire != "devant la pharmacie" {
+		t.Fatalf("appel relu : %s %q %v", siteLu, commentaire, err)
+	}
+}

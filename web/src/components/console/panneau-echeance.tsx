@@ -12,6 +12,7 @@ export function PanneauEcheance({
   choisi,
   surDossier,
   titre,
+  contenu = null,
   disabled,
   inputRef,
   onChoisir,
@@ -25,6 +26,8 @@ export function PanneauEcheance({
   choisi?: string | null;
   surDossier: boolean;
   titre?: string;
+  /** Remplace créneaux et saisie libre : le calendrier d'un RV site. */
+  contenu?: React.ReactNode;
   disabled: boolean;
   inputRef: React.RefObject<HTMLInputElement | null>;
   onChoisir: (at: string) => void;
@@ -41,7 +44,8 @@ export function PanneauEcheance({
           Vous retrouverez le dossier déjà rempli au prochain appel.
         </p>
       ) : null}
-      <div className="flex flex-wrap gap-2">
+      {contenu}
+      <div className={cn('flex flex-wrap gap-2', contenu !== null && 'hidden')}>
         {slots.map((slot) => (
           <Button
             key={slot.key}
@@ -68,7 +72,7 @@ export function PanneauEcheance({
         ))}
       </div>
 
-      <div className="flex flex-col gap-1.5">
+      <div className={cn('flex flex-col gap-1.5', contenu !== null && 'hidden')}>
         <label
           htmlFor="console-callback-at"
           className="flex items-center gap-2 text-[0.875rem] font-[600]"

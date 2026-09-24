@@ -15,6 +15,9 @@ SELECT
   p."lastCallAt",
   COALESCE(u."fullName", '') AS "prisPar",
   COALESCE(p."rendezVousIssue", '') AS "issue",
+  COALESCE(vs."nom", '')::text AS "site",
+  COALESCE(pr."label", '')::text AS "pointRencontre",
+  COALESCE(dernier."pointRencontreCommentaire", '')::text AS "pointRencontreCommentaire",
   count(*) OVER () AS "total"
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
@@ -25,6 +28,12 @@ LEFT JOIN (
   SELECT "prospectId", MAX("scheduledAt") AS "quand"
   FROM "scheduled_callbacks" GROUP BY "prospectId"
 ) rdv ON rdv."prospectId" = p."id"
+LEFT JOIN LATERAL (
+  SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
+  WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1
+) dernier ON true
+LEFT JOIN "ventes_sites" vs ON vs."id" = dernier."siteId"
+LEFT JOIN "points_rencontre" pr ON pr."id" = dernier."pointRencontreId"
 WHERE p."deletedAt" IS NULL
   AND p."phase2Status" = 'APPOINTMENT'
   AND r."code" <> 'RDV_TELEPHONIQUE'

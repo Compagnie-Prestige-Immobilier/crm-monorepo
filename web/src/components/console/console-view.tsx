@@ -19,6 +19,7 @@ import { Pages } from '@/components/console/rep-annuaire';
 import { ConversionFields, type SaisieTelephone } from '@/components/console/conversion-fields';
 import { EnvoiLienFormulaire } from '@/components/console/envoi-lien-formulaire';
 import { PanneauEcheance } from '@/components/console/panneau-echeance';
+import { useRvSite, type RvSiteConsole } from '@/components/console/rendez-vous-site';
 import { useShortcuts } from '@/components/console/use-shortcuts';
 import { BoutonWhatsApp, type FicheContactable } from '@/components/prospects/bouton-whatsapp';
 import { ProjetBadge } from '@/components/prospects/projet-badge';
@@ -1141,12 +1142,14 @@ export function Consignation({
   const parcours = parcoursDe(groupe, precisions.length > 0, rappelDemande);
   const pasCourant: Pas = parcours.includes(pas) ? pas : 'note';
   const rang = parcours.indexOf(pasCourant);
+  const rvSite = useRvSite(motif?.code);
 
   // L'échéance se propose à l'entrée du pas, à l'heure où on y arrive.
   const allerA = useCallback((cible: Pas): void => {
     if (cible === 'echeance') setSlots(callbackSlots(Date.now()));
     setPas(cible);
   }, []);
+  const slotsAffiches = rvSite.filtrer(slots);
 
   const maintenant = useCallback(() => Date.now(), []);
   const focaliserEcheance = useCallback(() => {
@@ -1183,7 +1186,7 @@ export function Consignation({
       setPas('formulaire');
       return;
     }
-    send.mutate(draft);
+    send.mutate({ ...draft, rvSite: rvSite.corps });
   };
 
   const precedent = (): void => {
@@ -1270,7 +1273,9 @@ export function Consignation({
   );
 
   const slotShortcuts: Record<string, () => void> = {
-    ...Object.fromEntries((slots ?? []).map((slot) => [slot.key, () => choisirEcheance(slot.at)])),
+    ...Object.fromEntries(
+      (slotsAffiches ?? []).map((slot) => [slot.key, () => choisirEcheance(slot.at)]),
+    ),
     '0': focaliserEcheance,
   };
 
@@ -1363,11 +1368,12 @@ export function Consignation({
           questionPrecision={
             statut === null ? 'Quelle précision ?' : `Précisez « ${statut.label} »`
           }
-          slots={slots}
+          slots={slotsAffiches}
           now={now}
           freeCallback={freeCallback}
           callbackAt={callbackAt}
           titreEcheance={titreEcheance(motif?.code)}
+          rvSite={rvSite}
           comment={comment}
           commentaireObligatoirePour={commentaireExigePar(motif)}
           disabled={send.isPending}
@@ -1439,6 +1445,7 @@ function CorpsPas({
   freeCallback,
   callbackAt,
   titreEcheance: titre,
+  rvSite,
   comment,
   commentaireObligatoirePour,
   disabled,
@@ -1468,6 +1475,7 @@ function CorpsPas({
   freeCallback: string;
   callbackAt: string | null;
   titreEcheance: string;
+  rvSite: RvSiteConsole;
   comment: string;
   commentaireObligatoirePour: string | null;
   disabled: boolean;
@@ -1534,6 +1542,7 @@ function CorpsPas({
           choisi={callbackAt}
           surDossier={conversion !== null}
           titre={titre}
+          contenu={rvSite.calendrier(callbackAt, onEcheance)}
           disabled={disabled}
           inputRef={callbackRef}
           onChoisir={onEcheance}
@@ -1544,6 +1553,7 @@ function CorpsPas({
     case 'note':
       return (
         <div className="flex flex-col gap-4">
+          {rvSite.champs}
           <Commentaire
             value={comment}
             titre="Commentaire, facultatif"
