@@ -255,6 +255,7 @@ export function GrandPublicProspectsView({
       segment: null,
       phase2Status: null,
       sansMotif: null,
+      motif: null,
       enrollmentMethod: null,
       enrollmentCapturedById: null,
       revue: null,

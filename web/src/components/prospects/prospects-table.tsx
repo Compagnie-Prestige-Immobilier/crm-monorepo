@@ -10,6 +10,7 @@ import {
   FilterableTableHead,
   type FiltreColonne,
 } from '@/components/filters/filterable-table-head';
+import { MOTIFS_SYSTEME, statutsJoignables } from '@/components/console/console-view';
 import { useProspectFilters } from '@/components/filters/use-prospect-filters';
 import { QueryErrorState } from '@/components/query-error-state';
 import { prospectColumns } from '@/components/prospects/columns';
@@ -43,6 +44,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { fetchMotifsAppel, motifsRacine, type MotifAppel } from '@/lib/data/call-outcome-reasons';
 import { deleteProspect, fetchProspects } from '@/lib/data/prospects';
 import { fetchReferenceData } from '@/lib/data/reference';
 import { PAGE_SIZE_OPTIONS } from '@/lib/filters';
@@ -53,8 +55,6 @@ import {
   BDD_SEGMENTS,
   ENROLLMENT_METHOD_LABELS,
   ENROLLMENT_METHOD_ORDER,
-  PHASE2_STATUSES,
-  PHASE2_STATUS_LABELS,
   PROSPECT_SORT_FIELDS,
   PROSPECT_STATUTS,
   PROSPECT_STATUT_LABELS,
@@ -89,11 +89,6 @@ const SEGMENT_OPTIONS: FilterOption[] = BDD_SEGMENTS.map((segment) => ({
   label: SEGMENT_LABELS[segment],
 }));
 
-const PHASE2_STATUS_OPTIONS: FilterOption[] = PHASE2_STATUSES.map((status) => ({
-  value: status,
-  label: PHASE2_STATUS_LABELS[status],
-}));
-
 const METHOD_OPTIONS: FilterOption[] = ENROLLMENT_METHOD_ORDER.map((method) => ({
   value: method,
   label: ENROLLMENT_METHOD_LABELS[method],
@@ -105,7 +100,10 @@ type CritereColonne = {
   cle: keyof ProspectFilters;
   label: string;
   placeholder: string;
-  options: (reference: ReferenceData | undefined) => readonly FilterOption[];
+  options: (
+    reference: ReferenceData | undefined,
+    motifs: readonly MotifAppel[],
+  ) => readonly FilterOption[];
 };
 
 /**
@@ -136,10 +134,14 @@ const CRITERES_COLONNES: readonly CritereColonne[] = [
   },
   {
     colonne: 'phase2Status',
-    cle: 'phase2Status',
+    cle: 'motif',
     label: 'Résultat de l’appel',
     placeholder: 'Tous les résultats',
-    options: () => PHASE2_STATUS_OPTIONS,
+    options: (_reference, motifs) =>
+      [
+        ...statutsJoignables(motifs),
+        ...motifsRacine(motifs).filter((motif) => !motif.countsAsReached),
+      ].map((motif) => ({ value: motif.code, label: motif.label })),
   },
   {
     colonne: 'enrollmentMethod',
@@ -204,6 +206,7 @@ function filtresDesColonnes(
   filters: ProspectFilters,
   setFilters: (patch: Partial<ProspectFilters>) => void,
   reference: ReferenceData | undefined,
+  motifs: readonly MotifAppel[],
 ): Partial<Record<string, FiltreColonne>> {
   return Object.fromEntries(
     CRITERES_COLONNES.map((critere) => [
@@ -211,7 +214,7 @@ function filtresDesColonnes(
       {
         label: critere.label,
         placeholder: critere.placeholder,
-        options: critere.options(reference),
+        options: critere.options(reference, motifs),
         value: filters[critere.cle] as string | null,
         onChange: (value: string | null) => {
           setFilters({ [critere.cle]: value } as Partial<ProspectFilters>);
@@ -318,6 +321,12 @@ export function ProspectsTable({
     staleTime: 5 * 60_000,
   });
 
+  const motifs = useQuery({
+    queryKey: queryKeys.motifsAppel,
+    queryFn: () => fetchMotifsAppel(),
+    staleTime: 300_000,
+  });
+
   const remove = useMutation({
     mutationFn: (target: ProspectRow) => deleteProspect(target.id),
     onSuccess: (_result, target) => {
@@ -391,7 +400,7 @@ export function ProspectsTable({
   const last = Math.min(page * filters.pageSize, total);
   const lignes = table.getRowModel().rows;
   const groupes = regrouperProspects(lignes, regroupement, filters.projet);
-  const filtres = filtresDesColonnes(filters, setFilters, reference);
+  const filtres = filtresDesColonnes(filters, setFilters, reference, motifs.data ?? MOTIFS_SYSTEME);
 
   const basculerGroupe = (cle: string): void => {
     setGroupesFermes((courants) => {
