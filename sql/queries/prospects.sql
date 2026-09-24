@@ -130,6 +130,10 @@ WHERE p."deletedAt" IS NULL
   )
   AND (sqlc.narg('sans_motif')::text IS NULL
        OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
+  AND (sqlc.narg('motif')::text IS NULL
+       OR p."lastReasonId" IN (SELECT m."id" FROM "call_outcome_reasons" m
+                               LEFT JOIN "call_outcome_reasons" mp ON mp."id" = m."parentId"
+                               WHERE sqlc.narg('motif')::text IN (m."code", mp."code")))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
@@ -277,6 +281,10 @@ WHERE p."deletedAt" IS NULL
   )
   AND (sqlc.narg('sans_motif')::text IS NULL
        OR NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = sqlc.narg('sans_motif')::text))
+  AND (sqlc.narg('motif')::text IS NULL
+       OR p."lastReasonId" IN (SELECT m."id" FROM "call_outcome_reasons" m
+                               LEFT JOIN "call_outcome_reasons" mp ON mp."id" = m."parentId"
+                               WHERE sqlc.narg('motif')::text IN (m."code", mp."code")))
   AND (sqlc.narg('enrollment_method')::"EnrollmentMethod" IS NULL OR p."enrollmentMethod" = sqlc.narg('enrollment_method')::"EnrollmentMethod")
   AND (sqlc.narg('enrollment_captured_by_id')::text IS NULL OR p."enrollmentCapturedById" = sqlc.narg('enrollment_captured_by_id')::text)
   AND (sqlc.narg('last_call_by_id')::text IS NULL OR p."lastCallById" = sqlc.narg('last_call_by_id')::text)
