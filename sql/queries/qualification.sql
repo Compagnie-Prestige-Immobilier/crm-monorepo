@@ -147,10 +147,11 @@ FROM "call_outcome_reasons" WHERE "code" = $1;
 INSERT INTO "call_attempts" (
   "id", "prospectId", "performedById", "reasonId", "method", "comment",
   "email", "fonctionnaire", "engagementEnCours", "dureeEtablissementMois",
-  "rendezVousAt", "clientCreatedAt")
+  "rendezVousAt", "clientCreatedAt", "siteId", "pointRencontreId", "pointRencontreCommentaire")
 VALUES (@id, @prospect_id, @performed_by_id, @reason_id, CAST(sqlc.narg('method') AS text)::"EnrollmentMethod", @comment,
         @email, @fonctionnaire, @engagement_en_cours, @duree_etablissement_mois,
-        @rendez_vous_at, @client_created_at)
+        @rendez_vous_at, @client_created_at, sqlc.narg('site_id'), sqlc.narg('point_rencontre_id'),
+        sqlc.narg('point_rencontre_commentaire'))
 ON CONFLICT ("id") DO NOTHING;
 
 -- name: CorrigerProspectParTentative :one
@@ -514,3 +515,30 @@ WHERE r."id" = @id AND r."createdById" <> @agent
 -- name: TransfererRappels :exec
 UPDATE "scheduled_callbacks" SET "assignedToId" = @vers
 WHERE "prospectId" = @prospect_id AND "status" = 'PENDING';
+
+-- name: RvSiteSites :many
+SELECT "id", "nom", "prixUnitaireDefaut" FROM "ventes_sites"
+WHERE "actif" ORDER BY "ordre", "nom" LIMIT 100;
+
+-- name: RvSitePoints :many
+SELECT "id", "label" FROM "points_rencontre"
+WHERE "isActive" ORDER BY "position", "label" LIMIT 100;
+
+-- name: RvSiteReservations :many
+-- La date d'un rendez-vous est celle du dernier rappel promis, comme à l'accueil.
+SELECT d."quand"::timestamp AS "quand", count(*)::int AS "nombre" FROM (
+  SELECT (SELECT max(sc."scheduledAt") FROM "scheduled_callbacks" sc WHERE sc."prospectId" = p."id") AS "quand"
+  FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+  WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
+) d
+WHERE d."quand" >= (now() AT TIME ZONE 'UTC')
+GROUP BY d."quand" ORDER BY d."quand" LIMIT 500;
+
+-- name: RvSiteChoixValide :one
+SELECT (SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+        WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
+          AND p."id" <> @prospect_id
+          AND (SELECT max(sc."scheduledAt") FROM "scheduled_callbacks" sc WHERE sc."prospectId" = p."id") = @quand::timestamp
+       )::int AS "reserves",
+       EXISTS (SELECT 1 FROM "ventes_sites" v WHERE v."actif" AND v."id" = @site_id) AS "site",
+       EXISTS (SELECT 1 FROM "points_rencontre" r WHERE r."isActive" AND r."id" = @point_rencontre_id) AS "point";

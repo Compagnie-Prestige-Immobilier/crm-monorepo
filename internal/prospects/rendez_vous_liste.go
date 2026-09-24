@@ -24,16 +24,19 @@ const (
 // Le comptoir lit les rendez-vous sans lire les fiches : cette liste ne rend ni
 // segment, ni banque, ni commentaire d'appel, seulement de quoi accueillir.
 type RendezVousObtenu struct {
-	ID        string  `json:"id"`
-	Prenom    string  `json:"prenom"`
-	Nom       string  `json:"nom"`
-	PhoneE164 *string `json:"phoneE164"`
-	Type      string  `json:"type"`
-	TypeCode  string  `json:"typeCode"`
-	Quand     *string `json:"quand" doc:"Date du rendez-vous, telle que le rappel promis la porte."`
-	PrisLe    *string `json:"prisLe"`
-	PrisPar   string  `json:"prisPar"`
-	Issue     string  `json:"issue" enum:",HONORE,NON_HONORE,REPORTE"`
+	ID                        string  `json:"id"`
+	Prenom                    string  `json:"prenom"`
+	Nom                       string  `json:"nom"`
+	PhoneE164                 *string `json:"phoneE164"`
+	Type                      string  `json:"type"`
+	TypeCode                  string  `json:"typeCode"`
+	Quand                     *string `json:"quand" doc:"Date du rendez-vous, telle que le rappel promis la porte."`
+	PrisLe                    *string `json:"prisLe"`
+	PrisPar                   string  `json:"prisPar"`
+	Issue                     string  `json:"issue" enum:",HONORE,NON_HONORE,REPORTE"`
+	Site                      string  `json:"site"`
+	PointRencontre            string  `json:"pointRencontre"`
+	PointRencontreCommentaire string  `json:"pointRencontreCommentaire"`
 }
 
 type RendezVousListInput struct {
@@ -91,7 +94,8 @@ func (s *service) rendezVousLister(ctx context.Context, in *RendezVousListInput)
 			ID: ligne.ID, Prenom: ligne.Prenom, Nom: ligne.Nom, PhoneE164: ligne.PhoneE164,
 			Type: ligne.Type, TypeCode: ligne.TypeCode,
 			Quand: prospectVide(ligne.Quand), PrisLe: rendezVousInstant(ligne.LastCallAt),
-			PrisPar: ligne.PrisPar, Issue: ligne.Issue,
+			PrisPar: ligne.PrisPar, Issue: ligne.Issue, Site: ligne.Site,
+			PointRencontre: ligne.PointRencontre, PointRencontreCommentaire: ligne.PointRencontreCommentaire,
 		})
 	}
 	out.Body.Page, out.Body.PageSize = page, taille
