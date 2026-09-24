@@ -375,6 +375,7 @@ var lotColonnesRepresentants = []struct {
 	{exports.ExportEnteteIef, 26},
 	{lotEnteteTeleconseiller, 26},
 	{exports.ExportEnteteNotes, 40},
+	{exports.ExportEnteteQualification, 26},
 	{exports.ExportEnteteSaisiLe, 20},
 }
 
@@ -392,6 +393,7 @@ var lotColonnesProspects = []struct {
 	{exports.ExportEnteteRepresentant, 26},
 	{exports.ExportEnteteDepartement, 24},
 	{lotEnteteTeleconseiller, 26},
+	{exports.ExportEnteteQualification, 26},
 	{exports.ExportEnteteDateSaisie, 20},
 }
 
@@ -482,6 +484,7 @@ func (s *service) lotFeuilleRepresentants(ctx context.Context, id string, rang [
 		cellules := []any{
 			lotValeurTexte(ligne.AssigneeName), int(ligne.Day), ligne.FullName, ligne.PhoneE164,
 			ligne.Departement, lotValeurTexte(ligne.Ief), ligne.Commercial, lotValeurTexte(ligne.Notes),
+			lotValeurTexte(ligne.Statut),
 			excelize.Cell{StyleID: styleDate, Value: lotHeureMuraleDakar(ligne.ClientCreatedAt, s.Cfg.TimeZone)},
 		}
 		if err := flux.SetRow("A"+strconv.Itoa(index+2), cellules); err != nil {
@@ -510,7 +513,7 @@ func (s *service) lotFeuilleProspects(ctx context.Context, id string, rang []str
 		cellules := []any{
 			lotValeurTexte(ligne.AssigneeName), int(ligne.Day), ligne.Nom, ligne.Prenom, ligne.PhoneE164,
 			lotValeurTexte(ligne.Banque), lotValeurTexte(ligne.Syndicat), lotValeurTexte(ligne.Representant),
-			lotValeurTexte(ligne.Departement), ligne.Commercial,
+			lotValeurTexte(ligne.Departement), ligne.Commercial, lotValeurTexte(ligne.Statut),
 			excelize.Cell{StyleID: styleDate, Value: lotHeureMuraleDakar(ligne.ClientCreatedAt, s.Cfg.TimeZone)},
 		}
 		if err := flux.SetRow("A"+strconv.Itoa(index+2), cellules); err != nil {

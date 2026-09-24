@@ -340,20 +340,21 @@ WHERE i."lotId" = $1
 -- name: LotLignesRepresentants :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", r."fullName", r."phoneE164",
        d."name" AS departement, ief."name" AS ief, c."fullName" AS commercial,
-       r."notes", r."clientCreatedAt"
+       r."notes", r."clientCreatedAt", sq."label" AS statut
 FROM "lot_export_items" i
 INNER JOIN "representants" r ON r."id" = i."representantId"
 INNER JOIN "departements" d ON d."id" = r."departementId"
 INNER JOIN "users" c ON c."id" = r."createdById"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "iefs" ief ON ief."id" = r."iefId"
+LEFT JOIN "statuts_qualification" sq ON sq."id" = r."statutQualificationId"
 WHERE i."lotId" = $1
 ORDER BY i."position";
 
 -- name: LotLignesProspects :many
 SELECT i."position", i."day", i."assigneeId", u."fullName" AS "assigneeName", p."nom", p."prenom", p."phoneE164",
        b."name" AS banque, s."sigle" AS syndicat, rep."fullName" AS representant,
-       d."name" AS departement, c."fullName" AS commercial, p."clientCreatedAt"
+       d."name" AS departement, c."fullName" AS commercial, p."clientCreatedAt", cr."label" AS statut
 FROM "lot_export_items" i
 INNER JOIN "prospects" p ON p."id" = i."prospectId"
 INNER JOIN "users" c ON c."id" = p."createdById"
@@ -362,6 +363,7 @@ LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "syndicats" s ON s."id" = p."syndicatId"
 LEFT JOIN "representants" rep ON rep."id" = p."representantId"
 LEFT JOIN "departements" d ON d."id" = rep."departementId"
+LEFT JOIN "call_outcome_reasons" cr ON cr."id" = p."lastReasonId"
 WHERE i."lotId" = $1
 ORDER BY i."position";
 

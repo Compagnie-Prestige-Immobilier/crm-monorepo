@@ -492,6 +492,11 @@ func TestAdminChangementDeRoleRetireDesCampagnes(t *testing.T) {
 func TestCampagneClasseurEtProgrammes(t *testing.T) {
 	b := nouveauBancCampagne(t, 10)
 	b.creer()
+	if _, err := b.pool.Exec(b.ctx,
+		`UPDATE "representants" SET "statutQualificationId" = (SELECT "id" FROM "statuts_qualification" WHERE "code" = 'AUTRE_JOINT')
+		  WHERE "id" IN (SELECT "representantId" FROM "lot_export_items" WHERE "lotId" = $1 AND "position" = 1)`, b.lotID); err != nil {
+		t.Fatal(err)
+	}
 
 	statut, entetes, corps := b.telechargerCampagne("/api/v1/lots-export/" + b.lotID + "/export.xlsx")
 	if statut != http.StatusOK || entetes.Get("Content-Type") != campagnes.LotMimeClasseur {
@@ -511,6 +516,18 @@ func TestCampagneClasseurEtProgrammes(t *testing.T) {
 	}
 	if lignes[1][0] != "Agent Aïda Ndoye" {
 		t.Fatalf("le classeur suit l'ordre du tourniquet : %v", lignes[1])
+	}
+	if !slices.Contains(lignes[0], "Qualification") {
+		t.Fatalf("le classeur porte la qualification : %v", lignes[0])
+	}
+	qualifiee := -1
+	for index, entete := range lignes[0] {
+		if entete == "Qualification" {
+			qualifiee = index
+		}
+	}
+	if lignes[1][qualifiee] != "Autre joint" {
+		t.Fatalf("la qualification posée sort dans le classeur : %v", lignes[1])
 	}
 }
 
