@@ -314,4 +314,12 @@ test.describe('parcours 7, creer un prospect depuis la liste', () => {
     await expect(dernier).toHaveAccessibleName(/Projet/u);
     await expect(dernier).toBeDisabled();
   });
+
+  // L'API autorise déjà `exports.prospects` pour ce rôle ; l'écran le lui
+  // refusait encore via une liste de rôles restée alignée sur l'ancienne
+  // garde v1.
+  test('le superviseur voit aussi le bouton d’export', async ({ page }) => {
+    await page.goto('/teleconseil/prospects');
+    await expect(page.getByRole('button', { name: 'Exporter' })).toBeVisible();
+  });
 });
