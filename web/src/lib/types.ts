@@ -207,11 +207,16 @@ export const readsOnly = (role: Role | undefined): boolean =>
   role === 'SUPERVISEUR' || role === 'DIRECTION';
 
 /**
- * L'export des prospects n'est pas un geste d'écriture : la DIRECTION y a droit
- * côté API (`@Roles(ADMIN, COMMERCIAL, DIRECTION)`), l'écran le lui laisse.
+ * L'export des prospects n'est pas un geste d'écriture : côté API la permission
+ * `exports.prospects` couvre le groupe Parcours (Admin, Commercial, Chargé de
+ * clientèle, Superviseur, Direction), l'écran le leur laisse.
  */
 export const canExportProspects = (role: Role | undefined): boolean =>
-  role === 'ADMIN' || role === 'COMMERCIAL' || role === 'CHARGE_CLIENTELE' || role === 'DIRECTION';
+  role === 'ADMIN' ||
+  role === 'COMMERCIAL' ||
+  role === 'CHARGE_CLIENTELE' ||
+  role === 'SUPERVISEUR' ||
+  role === 'DIRECTION';
 
 /**
  * Miroir de `PARCOURS_ROLES` côté API : les seuls rôles qui peuvent ouvrir une
