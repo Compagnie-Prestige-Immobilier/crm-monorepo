@@ -127,4 +127,15 @@ func TestRendezVousSiteSurCreneauOuvert(t *testing.T) {
 		fiche).Scan(&siteLu, &commentaire); err != nil || siteLu != site || commentaire != "devant la pharmacie" {
 		t.Fatalf("appel relu : %s %q %v", siteLu, commentaire, err)
 	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+fiche+"/rendez-vous", nil)
+	b.attend(statut, http.StatusOK, "rendez-vous de la fiche", body)
+	rdv, _ := body["rendezVous"].(map[string]any)
+	if rdv["typeCode"] != "RV_SITE" || rdv["site"] == "" || rdv["pointRencontre"] == "" || rdv["quand"] == nil {
+		t.Fatalf("rendez-vous de la fiche : %v", body)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/prospects/"+autre+"/rendez-vous", nil)
+	b.attend(statut, http.StatusOK, "fiche sans rendez-vous", body)
+	if body["rendezVous"] != nil {
+		t.Fatalf("aucun rendez-vous attendu : %v", body)
+	}
 }
