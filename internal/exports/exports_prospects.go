@@ -30,6 +30,7 @@ type ExportProspectsInput struct {
 	Segment                string `query:"segment" enum:"BDD1,BDD2,BDD3,BDD4"`
 	Phase2Status           string `query:"phase2Status" enum:"PENDING,METHOD_OBTAINED,REFUSED,WRONG_NUMBER,UNREACHABLE,INTERESTED,HESITANT,APPOINTMENT,REACHED,TOUT"`
 	SansMotif              string `query:"sansMotif" maxLength:"40"`
+	Motif                  string `query:"motif" maxLength:"40"`
 	EnrollmentMethod       string `query:"enrollmentMethod"`
 	AppelePar              string `query:"appelePar"`
 	LastCallById           string `query:"lastCallById"`
@@ -107,6 +108,9 @@ func exportFiltrePhase2Status(p *exportPredicat, in *ExportProspectsInput) {
 func exportFiltresDerives(p *exportPredicat, in *ExportProspectsInput, segment string) error {
 	if in.SansMotif != "" {
 		p.clauses = append(p.clauses, `NOT EXISTS (SELECT 1 FROM "call_outcome_reasons" sm WHERE sm."id" = p."lastReasonId" AND sm."code" = `+p.valeur(in.SansMotif)+`)`)
+	}
+	if in.Motif != "" {
+		p.clauses = append(p.clauses, `p."lastReasonId" IN (SELECT m."id" FROM "call_outcome_reasons" m LEFT JOIN "call_outcome_reasons" mp ON mp."id" = m."parentId" WHERE `+p.valeur(in.Motif)+` IN (m."code", mp."code"))`)
 	}
 	if in.Projet != "" {
 		clause := `EXISTS (SELECT 1 FROM "prospect_journeys" pj WHERE pj."prospectId" = p."id" AND pj."projet" = ` + p.valeur(in.Projet) + `::"Projet"`
