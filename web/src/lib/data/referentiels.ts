@@ -22,10 +22,10 @@ export type UpdateSyndicatInput = ReferentielEntree;
 export type CreateDepartementInput = ReferentielEntree;
 export type UpdateDepartementInput = ReferentielEntree;
 
-async function saveReferentiel(
+export async function saveReferentiel(
   kind: string,
   input: ReferentielEntree & { id?: string },
-  client: ApiClient,
+  client: ApiClient = getApiClient(),
 ): Promise<components['schemas']['ReferentielsItem']> {
   const { id, ...body } = input;
   if (id !== undefined) {

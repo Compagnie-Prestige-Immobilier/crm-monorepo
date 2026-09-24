@@ -33,6 +33,9 @@ var Garde = map[string]socle.Permission{
 	"POST /api/v1/phase2/call-attempts":                    socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/callbacks":                         socle.PermissionFichesTenir,
 	"GET /api/v1/phase2/directory":                         socle.PermissionFichesTenir,
+	"GET /api/v1/phase2/rv-site":                           socle.PermissionFichesTenir,
+	"GET /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
+	"PUT /api/v1/rv-site/reglages":                         socle.PermissionReferentielsSuperviser,
 	"POST /api/v1/phase2/callbacks/{id}/cancel":            socle.PermissionQualificationRappels,
 	"POST /api/v1/phase2/callbacks/{id}/snooze":            socle.PermissionQualificationRappels,
 	"POST /api/v1/ouvertures":                              socle.PermissionFichesTenir,
@@ -68,6 +71,7 @@ func Monter(api huma.API, d *socle.Deps) {
 	presenceMonterRoutes(api, s)
 	annuaireMonterRoutes(api, s)
 	syncMonterRoutes(api, s)
+	rvSiteMonterRoutes(api, s)
 }
 
 func qualificationTx(ctx context.Context, s *service, geste func(*db.Queries) error) error {
@@ -714,32 +718,35 @@ type qualificationMotifIssue struct {
 type QualificationCallAttemptBody struct {
 	// L'identifiant vient du corps sur la route directe, de `entityId` sur
 	// /sync/push : il est donc contrôlé par la logique, pas par le schéma.
-	ID                     string            `json:"id,omitempty" format:"uuid"`
-	ProspectID             string            `json:"prospectId" format:"uuid"`
-	ClientCreatedAt        time.Time         `json:"clientCreatedAt" format:"date-time"`
-	ReasonCode             string            `json:"reasonCode" minLength:"1" maxLength:"40"`
-	Method                 *string           `json:"method,omitempty" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
-	Comment                *string           `json:"comment,omitempty" maxLength:"2000"`
-	CallbackAt             *time.Time        `json:"callbackAt,omitempty" format:"date-time"`
-	ExpectedRev            *int32            `json:"expectedRev,omitempty" minimum:"1"`
-	OuvertureID            *string           `json:"ouvertureId,omitempty" format:"uuid"`
-	Email                  *string           `json:"email,omitempty" maxLength:"160"`
-	Fonctionnaire          *bool             `json:"fonctionnaire,omitempty"`
-	EngagementEnCours      *bool             `json:"engagementEnCours,omitempty"`
-	DureeEtablissementMois *int32            `json:"dureeEtablissementMois,omitempty" minimum:"0" maximum:"600"`
-	RendezVousAt           *time.Time        `json:"rendezVousAt,omitempty" format:"date-time"`
-	Nom                    *string           `json:"nom,omitempty" minLength:"1" maxLength:"120"`
-	Prenom                 *string           `json:"prenom,omitempty" maxLength:"120"`
-	Profession             *string           `json:"profession,omitempty" maxLength:"120"`
-	WhatsappStatus         *string           `json:"whatsappStatus,omitempty" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
-	WhatsappE164           *string           `json:"whatsappE164,omitempty" minLength:"6" maxLength:"40"`
-	BanqueID               *string           `json:"banqueId,omitempty" format:"uuid"`
-	SyndicatID             *string           `json:"syndicatId,omitempty" format:"uuid"`
-	Type                   *string           `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
-	IncomeBandID           *string           `json:"incomeBandId,omitempty" format:"uuid"`
-	PaymentMode            *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
-	DureeSystemeMois       *int32            `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300"`
-	ChampsLibres           map[string]string `json:"champsLibres,omitempty"`
+	ID                        string            `json:"id,omitempty" format:"uuid"`
+	ProspectID                string            `json:"prospectId" format:"uuid"`
+	ClientCreatedAt           time.Time         `json:"clientCreatedAt" format:"date-time"`
+	ReasonCode                string            `json:"reasonCode" minLength:"1" maxLength:"40"`
+	Method                    *string           `json:"method,omitempty" enum:"PLATFORM,PHYSICAL,VOICE_OR_ELECTRONIC_MESSAGING,APPOINTMENT,WHATSAPP,RDV_CPI,PLATEFORME_EN_LIGNE,MAIL"`
+	Comment                   *string           `json:"comment,omitempty" maxLength:"2000"`
+	CallbackAt                *time.Time        `json:"callbackAt,omitempty" format:"date-time"`
+	ExpectedRev               *int32            `json:"expectedRev,omitempty" minimum:"1"`
+	OuvertureID               *string           `json:"ouvertureId,omitempty" format:"uuid"`
+	Email                     *string           `json:"email,omitempty" maxLength:"160"`
+	Fonctionnaire             *bool             `json:"fonctionnaire,omitempty"`
+	EngagementEnCours         *bool             `json:"engagementEnCours,omitempty"`
+	DureeEtablissementMois    *int32            `json:"dureeEtablissementMois,omitempty" minimum:"0" maximum:"600"`
+	RendezVousAt              *time.Time        `json:"rendezVousAt,omitempty" format:"date-time"`
+	SiteID                    *string           `json:"siteId,omitempty" format:"uuid"`
+	PointRencontreID          *string           `json:"pointRencontreId,omitempty" format:"uuid"`
+	PointRencontreCommentaire *string           `json:"pointRencontreCommentaire,omitempty" maxLength:"500"`
+	Nom                       *string           `json:"nom,omitempty" minLength:"1" maxLength:"120"`
+	Prenom                    *string           `json:"prenom,omitempty" maxLength:"120"`
+	Profession                *string           `json:"profession,omitempty" maxLength:"120"`
+	WhatsappStatus            *string           `json:"whatsappStatus,omitempty" enum:"NON_DEMANDE,MEME_NUMERO,AUTRE_NUMERO,AUCUN"`
+	WhatsappE164              *string           `json:"whatsappE164,omitempty" minLength:"6" maxLength:"40"`
+	BanqueID                  *string           `json:"banqueId,omitempty" format:"uuid"`
+	SyndicatID                *string           `json:"syndicatId,omitempty" format:"uuid"`
+	Type                      *string           `json:"type,omitempty" enum:"FONCTIONNAIRE,SECTEUR_PRIVE,INFORMEL,DIASPORA"`
+	IncomeBandID              *string           `json:"incomeBandId,omitempty" format:"uuid"`
+	PaymentMode               *string           `json:"paymentMode,omitempty" enum:"COMPTANT,ECHELONNE,CREDIT_IMMOBILIER"`
+	DureeSystemeMois          *int32            `json:"dureeSystemeMois,omitempty" minimum:"1" maximum:"300"`
+	ChampsLibres              map[string]string `json:"champsLibres,omitempty"`
 	// Un prospect Grand Public peut recommander plusieurs proches au même appel,
 	// contrairement au représentant qui n'en propose qu'un seul en cas de refus.
 	ContactsRecommandes []QualificationContactRecommande `json:"contactsRecommandes,omitempty" maxItems:"5"`
@@ -959,6 +966,9 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	if err != nil {
 		return "", vide, err
 	}
+	if err := s.rvSiteVerifier(ctx, b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); err != nil {
+		return "", vide, err
+	}
 	if err := s.qualificationProspectAttribue(ctx, u, b.ProspectID); err != nil {
 		return "", vide, err
 	}
@@ -1127,7 +1137,8 @@ func qualificationInsererTentative(ctx context.Context, q *db.Queries, u *socle.
 		ReasonID: t.motif.id, Method: b.Method, Comment: t.comment, Email: t.email,
 		Fonctionnaire: b.Fonctionnaire, EngagementEnCours: b.EngagementEnCours,
 		DureeEtablissementMois: b.DureeEtablissementMois, RendezVousAt: t.rendezVousAt,
-		ClientCreatedAt: b.ClientCreatedAt.UTC(),
+		ClientCreatedAt: b.ClientCreatedAt.UTC(), SiteID: b.SiteID, PointRencontreID: b.PointRencontreID,
+		PointRencontreCommentaire: qualificationRogne(b.PointRencontreCommentaire),
 	})
 	if err == nil && n == 0 {
 		return socle.Problem(http.StatusConflict, "PHASE2_ATTEMPT_RACE", "Cette tentative vient d’être enregistrée. Réessayez.")

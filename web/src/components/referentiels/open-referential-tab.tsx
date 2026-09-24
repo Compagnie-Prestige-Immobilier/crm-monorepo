@@ -33,12 +33,19 @@ import {
   fetchIncomeBands,
   fetchOffers,
   fetchProfessions,
+  fetchReferentielComplet,
 } from '@/lib/data/reference';
-import { saveEmployeur, saveIncomeBand, saveOffer, saveProfession } from '@/lib/data/referentiels';
+import {
+  saveEmployeur,
+  saveIncomeBand,
+  saveOffer,
+  saveProfession,
+  saveReferentiel,
+} from '@/lib/data/referentiels';
 import { toastApiError } from '@/lib/mutation-feedback';
 import { EMPLOYEUR_TYPE_LABELS, type EmployeurType, type Profession } from '@/lib/types';
 
-type Kind = 'professions' | 'incomeBands' | 'offers' | 'employeurs';
+type Kind = 'professions' | 'incomeBands' | 'offers' | 'employeurs' | 'pointsRencontre';
 /** Profession, tranche de revenu, offre et employeur partagent le même `ReferentielsItem` côté Go. */
 type Row = Profession;
 
@@ -63,6 +70,11 @@ const CONFIG = {
     creer: 'Nouvel employeur',
     modifier: 'Modifier l’employeur',
     enregistre: 'Employeur enregistré.',
+  },
+  pointsRencontre: {
+    creer: 'Nouveau point de rencontre',
+    modifier: 'Modifier le point de rencontre',
+    enregistre: 'Point de rencontre enregistré.',
   },
 } as const;
 
@@ -206,6 +218,7 @@ const FETCHERS: Record<Kind, () => Promise<Row[]>> = {
   incomeBands: fetchIncomeBands,
   employeurs: fetchEmployeurs,
   offers: fetchOffers,
+  pointsRencontre: () => fetchReferentielComplet('points-rencontre'),
 };
 
 const SAVERS: Record<Kind, (value: Draft) => Promise<Row>> = {
@@ -232,6 +245,13 @@ const SAVERS: Record<Kind, (value: Draft) => Promise<Row>> = {
       code: value.code,
       label: value.label,
       type: value.type,
+      isActive: value.isActive,
+    }),
+  pointsRencontre: (value) =>
+    saveReferentiel('points-rencontre', {
+      ...(value.id ? { id: value.id } : {}),
+      code: value.code,
+      label: value.label,
       isActive: value.isActive,
     }),
   offers: (value) =>
