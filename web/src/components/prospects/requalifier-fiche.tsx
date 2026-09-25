@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -51,6 +52,7 @@ const libelleMotif = (motif: MotifAppel, catalogue: readonly MotifAppel[]): stri
 interface Choix {
   motif: MotifAppel | null;
   echeance: string;
+  commentaire: string;
 }
 
 const exigeUneDate = (choix: Choix): boolean =>
@@ -62,9 +64,11 @@ const estPret = (choix: Choix): boolean =>
 async function poserLeMotif(prospect: ProspectRow, choix: Choix): Promise<ProspectRow> {
   if (choix.motif === null) return prospect;
   const callbackAt = exigeUneDate(choix) ? dakarLocalToIso(choix.echeance) : null;
+  const commentaire = choix.commentaire.trim();
   await poserMotifProspect(prospect.id, {
     reasonCode: choix.motif.code,
     ...(callbackAt === null ? {} : { callbackAt }),
+    ...(commentaire === '' ? {} : { comment: commentaire }),
   });
   return fetchProspect(prospect.id);
 }
@@ -86,6 +90,7 @@ export function RequalifierFiche({
   const [famille, setFamille] = useState<Famille>('JOIGNABLE');
   const [code, setCode] = useState<string | null>(null);
   const [echeance, setEcheance] = useState('');
+  const [commentaire, setCommentaire] = useState('');
   const catalogue = useQuery({
     queryKey: queryKeys.motifsAppel,
     queryFn: () => fetchMotifsAppel(),
@@ -95,7 +100,11 @@ export function RequalifierFiche({
   const motifs = liste.filter((motif) =>
     famille === 'JOIGNABLE' ? motif.countsAsReached : !motif.countsAsReached,
   );
-  const choix: Choix = { motif: motifs.find((item) => item.code === code) ?? null, echeance };
+  const choix: Choix = {
+    motif: motifs.find((item) => item.code === code) ?? null,
+    echeance,
+    commentaire,
+  };
 
   const terminer = (saved: ProspectRow, message: string) => {
     onRequalifiee?.(saved);
@@ -191,6 +200,16 @@ export function RequalifierFiche({
                 />
               </div>
             ) : null}
+            <div className="grid gap-2">
+              <Label htmlFor="requalifier-commentaire">Commentaire, facultatif</Label>
+              <Textarea
+                id="requalifier-commentaire"
+                value={commentaire}
+                onChange={(event) => {
+                  setCommentaire(event.target.value);
+                }}
+              />
+            </div>
             <Button
               variant="link"
               className="justify-start px-0"

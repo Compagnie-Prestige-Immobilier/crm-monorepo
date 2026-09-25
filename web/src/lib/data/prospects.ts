@@ -501,7 +501,7 @@ export async function suivreRendezVous(
 
 export async function poserMotifProspect(
   id: string,
-  body: { reasonCode: string; callbackAt?: string },
+  body: { reasonCode: string; callbackAt?: string; comment?: string },
   client: ApiClient = getApiClient(),
 ): Promise<void> {
   unwrap(

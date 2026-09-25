@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -19,7 +20,10 @@ import (
 func TestVentesDepuisUneDateEtClasseurIntact(t *testing.T) {
 	b := nouveauBanc(t, "DIRECTION")
 	connecte(b)
-	t.Cleanup(func() { b.exec(`DELETE FROM "ventes_classeurs"`) })
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_classeurs"`)
+	})
 	contenu := classeurVentesTest(t)
 
 	statut, reponse := b.deposerClasseur("/api/v1/ventes/classeur?depuis=2026-09-10", "ventes.xlsx", contenu)
@@ -74,6 +78,7 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 	client := "CLIENT SAISIE " + b.userID[:8]
 	var venteID int64
 	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
 		if venteID != 0 {
 			b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
 		}
@@ -123,6 +128,56 @@ func TestVenteSaisieModificationEncaissementArchivageEtConfiguration(t *testing.
 		t.Fatalf("vente soldée après le versement : %v", vente)
 	}
 	venteArchiveePuisSoldee(t, b, venteID, corps)
+
+	// Des ventes saisies en production ont changé sans que personne ne sache qui
+	// avait touché quoi : chaque geste garde l'état avant et après.
+	exigerTrace(t, b, "vente", strconv.FormatInt(venteID, 10), "acompte", []string{
+		"vente.creer  500000", "vente.corriger 500000 900000", "vente.versement_ajouter  ",
+		"vente.archiver 900000 ", "vente.restaurer  900000", "vente.corriger 900000 100000",
+	})
+}
+
+// Changer la règle d'un site change les parts des ventes suivantes : l'ancienne valeur reste lisible.
+func TestReglageSiteVenteTrace(t *testing.T) {
+	b := nouveauBanc(t, "DIRECTION")
+	connecte(b)
+	corps := map[string]any{
+		"nom": "SITE TRACE " + b.userID[:8], "ordre": 99, "superficieDefaut": "", "prixUnitaireDefaut": 1000000,
+		"partProprietaireParLot": 500000, "partApporteurMode": "POURCENTAGE_PROPRIETAIRE", "partApporteurValeur": 10,
+	}
+	statut, site := appelJSON(b, http.MethodPost, "/api/v1/ventes/sites", corps, nil)
+	b.attend(statut, http.StatusOK, "ajout d’un site", site)
+	id := fmt.Sprint(site["id"])
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes_sites" WHERE "id" = $1`, id)
+	})
+	corps["partApporteurValeur"] = 5
+	statut, site = appelJSON(b, http.MethodPatch, "/api/v1/ventes/sites/"+id, corps, nil)
+	b.attend(statut, http.StatusOK, "modification de la règle apporteur", site)
+	exigerTrace(t, b, "vente_site", id, "partApporteurValeur", []string{
+		"vente_site.creer  10", "vente_site.modifier 10 5",
+	})
+}
+
+func exigerTrace(t *testing.T, b *banc, entite, id, champ string, attendu []string) {
+	t.Helper()
+	lignes, err := b.pool.Query(b.ctx, `SELECT "action" || ' ' || COALESCE("before"->>$3, '') || ' ' || COALESCE("after"->>$3, '')
+		FROM "audit_logs" WHERE "entity" = $1 AND "entityId" = $2 ORDER BY "at", "id"`, entite, id, champ)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var trace []string
+	for lignes.Next() {
+		var ligne string
+		if err := lignes.Scan(&ligne); err != nil {
+			t.Fatal(err)
+		}
+		trace = append(trace, ligne)
+	}
+	if strings.Join(trace, " | ") != strings.Join(attendu, " | ") {
+		t.Fatalf("trace de %s %s :\n reçue   %q\n attendue %q", entite, id, trace, attendu)
+	}
 }
 
 // Une vente saisie avant l'échéancier, sur un site et un canal retirés depuis,
@@ -138,7 +193,10 @@ func TestVenteAncienneCorrigeableSurSiteEtCanalRetires(t *testing.T) {
 		0, 0, 5000000, 'CREDIT', 10) RETURNING "id"`).Scan(&venteID); err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID) })
+	t.Cleanup(func() {
+		b.exec(`DELETE FROM "audit_logs" WHERE "userId" = $1`, b.userID)
+		b.exec(`DELETE FROM "ventes" WHERE "id" = $1`, venteID)
+	})
 
 	statut, vente := appelJSON(b, http.MethodPatch, fmt.Sprintf("/api/v1/ventes/%d", venteID), map[string]any{
 		"canal": "DMN", "dateSouscription": "2026-09-01", "client": "CLIENT ANCIEN", "telephone": "77 000 00 02",
