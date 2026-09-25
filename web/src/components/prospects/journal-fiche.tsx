@@ -58,6 +58,7 @@ const LIBELLES: Record<string, string> = {
   onglet: 'Onglet du classeur',
   regle: 'Règle appliquée',
   motif: 'Motif',
+  comment: 'Commentaire',
   assignedToId: 'Rappel porté par',
   teleconseiller: 'Téléconseiller',
   position: 'Position dans la campagne',
