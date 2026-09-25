@@ -12,6 +12,7 @@ import {
   Table,
   TableBody,
   TableCell,
+  TableFooter,
   TableHead,
   TableHeader,
   TableRow,
@@ -46,18 +47,43 @@ function paiementVariant(vente: Vente): 'success' | 'warning' {
 export function Chiffres({ ventes }: { ventes: readonly Vente[] }) {
   const chiffre = ventes.reduce((s, v) => s + v.prixTotal, 0);
   const verse = ventes.reduce((s, v) => s + totalVerse(v), 0);
+  const proprietaire = ventes.reduce((s, v) => s + v.partProprietaire, 0);
+  const apporteur = ventes.reduce((s, v) => s + v.partApporteur, 0);
   const tuiles = [
-    { label: 'Ventes', valeur: String(ventes.length) },
-    { label: 'Chiffre d’affaires', valeur: formatFcfa(chiffre) },
-    { label: 'Encaissé', valeur: formatFcfa(verse) },
-    { label: 'Reste à encaisser', valeur: formatFcfa(Math.max(0, chiffre - verse)) },
-    { label: 'Part CPI', valeur: formatFcfa(ventes.reduce((s, v) => s + v.partCpi, 0)) },
+    {
+      label: 'Ventes',
+      valeur: String(ventes.length),
+      aide: 'Le nombre de ventes enregistrées.',
+    },
+    {
+      label: 'Chiffre d’affaires',
+      valeur: formatFcfa(chiffre),
+      aide: 'La somme des prix totaux des ventes, payés ou non.',
+    },
+    {
+      label: 'Encaissé',
+      valeur: formatFcfa(verse),
+      aide: 'Ce que les clients ont déjà payé : acomptes et versements, toutes parts confondues.',
+    },
+    {
+      label: 'Reste à encaisser',
+      valeur: formatFcfa(Math.max(0, chiffre - verse)),
+      aide: 'Le chiffre d’affaires moins l’encaissé : ce que les clients doivent encore.',
+    },
+    {
+      label: 'Part CPI',
+      valeur: formatFcfa(ventes.reduce((s, v) => s + v.partCpi, 0)),
+      aide: `Ce qui revient à la CPI sur le chiffre d’affaires, une fois retirées la part propriétaire (${formatFcfa(proprietaire)}) et la part apporteur (${formatFcfa(apporteur)}). Ce n’est pas un montant encaissé.`,
+    },
   ];
   return (
     <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
       {tuiles.map((tuile) => (
         <Card key={tuile.label} className="gap-1 p-4">
-          <span className="text-[0.8125rem] text-muted-foreground">{tuile.label}</span>
+          <span className="flex items-center gap-1.5 text-[0.8125rem] text-muted-foreground">
+            {tuile.label}
+            <InfoPopover label={tuile.label} description={tuile.aide} />
+          </span>
           <strong className="font-display text-[1.25rem] font-[700] tabular-nums">
             {tuile.valeur}
           </strong>
@@ -177,6 +203,8 @@ export function TableVentes({
           <TableHead className="text-right">Acompte</TableHead>
           <TableHead className="text-right text-foreground">Reste à payer</TableHead>
           <TableHead>Paiement</TableHead>
+          <TableHead className="text-right">Part propriétaire</TableHead>
+          <TableHead className="text-right">Part apporteur</TableHead>
           <TableHead className="text-right">Part CPI</TableHead>
           <TableHead />
         </TableRow>
@@ -219,6 +247,8 @@ export function TableVentes({
                 <Badge variant={paiementVariant(vente)}>{paiementLabel(vente)}</Badge>
               </span>
             </TableCell>
+            <TableCell className={MONTANT}>{formatFcfa(vente.partProprietaire)}</TableCell>
+            <TableCell className={MONTANT}>{formatFcfa(vente.partApporteur)}</TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.partCpi)}</TableCell>
             <TableCell className="text-right">
               <ActionsVente
@@ -332,38 +362,98 @@ export function TableEcheances({
 
 interface LigneSite {
   site: string;
+  regle: string;
   ventes: number;
   lots: number;
   chiffre: number;
   verse: number;
+  proprietaire: number;
+  apporteur: number;
+  cpi: number;
 }
+
+/** La règle du fichier des ventes : part propriétaire par lot, puis celle de l'apporteur. */
+function regleSite(config: SiteVente | undefined): string {
+  if (config === undefined) return '';
+  const proprietaire =
+    config.partProprietaireParLot === 0
+      ? 'Sans part propriétaire'
+      : `Propriétaire ${formatFcfa(config.partProprietaireParLot)} par lot`;
+  const valeur = config.partApporteurValeur;
+  const apporteur = {
+    AUCUNE: 'sans apporteur',
+    POURCENTAGE_PROPRIETAIRE: `apporteur ${String(valeur)} % de la part propriétaire`,
+    MONTANT_PAR_LOT: `apporteur ${formatFcfa(valeur)} par lot`,
+    MONTANT_TOTAL: `apporteur ${formatFcfa(valeur)} par vente`,
+  }[config.partApporteurMode];
+  return `${proprietaire} · ${apporteur ?? 'sans apporteur'}`;
+}
+
+const ligneVide = (site: string, config?: SiteVente): LigneSite => ({
+  site,
+  regle: regleSite(config),
+  ventes: 0,
+  lots: 0,
+  chiffre: 0,
+  verse: 0,
+  proprietaire: 0,
+  apporteur: 0,
+  cpi: 0,
+});
 
 function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]): LigneSite[] {
   const sites = new Map<string, LigneSite>();
   for (const config of configuration) {
-    sites.set(config.nom, {
-      site: config.nom,
-      ventes: 0,
-      lots: 0,
-      chiffre: 0,
-      verse: 0,
-    });
+    sites.set(config.nom, ligneVide(config.nom, config));
   }
   for (const vente of ventes) {
-    const ligne = sites.get(vente.site) ?? {
-      site: vente.site,
-      ventes: 0,
-      lots: 0,
-      chiffre: 0,
-      verse: 0,
-    };
+    const ligne = sites.get(vente.site) ?? ligneVide(vente.site);
     ligne.ventes += 1;
     ligne.lots += vente.nombreLots;
     ligne.chiffre += vente.prixTotal;
     ligne.verse += totalVerse(vente);
+    ligne.proprietaire += vente.partProprietaire;
+    ligne.apporteur += vente.partApporteur;
+    ligne.cpi += vente.partCpi;
     sites.set(vente.site, ligne);
   }
   return [...sites.values()].sort((a, b) => b.chiffre - a.chiffre);
+}
+
+function total(sites: readonly LigneSite[]): LigneSite {
+  const somme = ligneVide('Total');
+  for (const ligne of sites) {
+    somme.ventes += ligne.ventes;
+    somme.lots += ligne.lots;
+    somme.chiffre += ligne.chiffre;
+    somme.verse += ligne.verse;
+    somme.proprietaire += ligne.proprietaire;
+    somme.apporteur += ligne.apporteur;
+    somme.cpi += ligne.cpi;
+  }
+  return somme;
+}
+
+function CellulesSite({ ligne }: { ligne: LigneSite }) {
+  return (
+    <>
+      <TableCell>
+        <span className="font-[600]">{ligne.site}</span>
+        {ligne.regle === '' ? null : (
+          <span className="block text-[0.8125rem] text-muted-foreground">{ligne.regle}</span>
+        )}
+      </TableCell>
+      <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
+      <TableCell className={MONTANT}>{ligne.lots}</TableCell>
+      <TableCell className={`${MONTANT} text-primary`}>{formatFcfa(ligne.chiffre)}</TableCell>
+      <TableCell className={MONTANT}>
+        {ligne.chiffre === 0 ? '–' : `${Math.round((ligne.verse / ligne.chiffre) * 100)} %`}
+      </TableCell>
+      <TableCell className={MONTANT}>{formatFcfa(ligne.proprietaire)}</TableCell>
+      <TableCell className={MONTANT}>{formatFcfa(ligne.apporteur)}</TableCell>
+      <TableCell className={`${MONTANT} text-primary`}>{formatFcfa(ligne.cpi)}</TableCell>
+    </>
+  );
 }
 
 export function SyntheseSites({
@@ -424,25 +514,23 @@ export function SyntheseSites({
               <TableHead className="text-right">Lots</TableHead>
               <TableHead className="text-right">Chiffre d’affaires</TableHead>
               <TableHead className="text-right">Encaissé</TableHead>
+              <TableHead className="text-right">Part propriétaire</TableHead>
+              <TableHead className="text-right">Part apporteur</TableHead>
+              <TableHead className="text-right">Part CPI</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {sites.map((ligne) => (
               <TableRow key={ligne.site} className={TABLE_ROW}>
-                <TableCell className="font-[600]">{ligne.site}</TableCell>
-                <TableCell className={MONTANT}>{ligne.ventes}</TableCell>
-                <TableCell className={MONTANT}>{ligne.lots}</TableCell>
-                <TableCell className={`${MONTANT} text-primary`}>
-                  {formatFcfa(ligne.chiffre)}
-                </TableCell>
-                <TableCell className={MONTANT}>
-                  {ligne.chiffre === 0
-                    ? '–'
-                    : `${Math.round((ligne.verse / ligne.chiffre) * 100)} %`}
-                </TableCell>
+                <CellulesSite ligne={ligne} />
               </TableRow>
             ))}
           </TableBody>
+          <TableFooter>
+            <TableRow>
+              <CellulesSite ligne={total(sites)} />
+            </TableRow>
+          </TableFooter>
         </Table>
       </div>
     </div>

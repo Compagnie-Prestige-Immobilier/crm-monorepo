@@ -3,19 +3,18 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangleIcon,
-  ArrowLeftIcon,
   CheckCircle2Icon,
   DownloadIcon,
   FileSpreadsheetIcon,
   LoaderIcon,
   UploadIcon,
 } from 'lucide-react';
-import Link from 'next/link';
 import { useId, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 import { useFileDownload } from '@/components/exports/download-button';
-import { Button, buttonVariants } from '@/components/ui/button';
+import { DetailBackLink } from '@/components/detail-back-link';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
@@ -92,13 +91,7 @@ export function RepresentantsImportView() {
     <div className="flex flex-col gap-6">
       {/* Un LIEN habillé en bouton : la primitive `Button` de Base UI poserait
           `role="button"` sur le `<a>` et lui retirerait sa sémantique de lien. */}
-      <Link
-        href="/teleconseil/representants"
-        className={cn(buttonVariants({ variant: 'ghost' }), 'w-fit -ml-2')}
-      >
-        <ArrowLeftIcon aria-hidden="true" />
-        Tous les représentants
-      </Link>
+      <DetailBackLink href="/teleconseil/representants">Tous les représentants</DetailBackLink>
 
       {/* ─── 1. Le modèle ───────────────────────────────────────────────── */}
       <Card>
