@@ -3,6 +3,7 @@ package ventes
 import (
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
@@ -122,11 +123,15 @@ func (s *service) creerSite(ctx context.Context, in *siteVenteInput) (*SiteVente
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.Q.InsererSiteVente(ctx, db.InsererSiteVenteParams{
-		Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre, TotalLots: corps.TotalLots,
-		SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut), PrixUnitaireDefaut: corps.PrixUnitaireDefaut,
-		PartProprietaireParLot: corps.PartProprietaireParLot, PartApporteurMode: corps.PartApporteurMode,
-		PartApporteurValeur: corps.PartApporteurValeur, Superficies: superficies,
+	var row db.VentesSite
+	err = s.tracer(ctx, "vente_site.creer", "vente_site", func(q *db.Queries) (string, any, any, error) {
+		row, err = q.InsererSiteVente(ctx, db.InsererSiteVenteParams{
+			Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre, TotalLots: corps.TotalLots,
+			SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut), PrixUnitaireDefaut: corps.PrixUnitaireDefaut,
+			PartProprietaireParLot: corps.PartProprietaireParLot, PartApporteurMode: corps.PartApporteurMode,
+			PartApporteurValeur: corps.PartApporteurValeur, Superficies: superficies,
+		})
+		return row.ID, nil, traceSite(&row), err
 	})
 	if err != nil {
 		return nil, err
@@ -144,12 +149,20 @@ func (s *service) modifierSite(ctx context.Context, in *siteVenteModifyInput) (*
 	if err != nil {
 		return nil, err
 	}
-	row, err := s.Q.ModifierSiteVente(ctx, db.ModifierSiteVenteParams{
-		ID: in.ID, Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre,
-		TotalLots: corps.TotalLots, SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut),
-		PrixUnitaireDefaut: corps.PrixUnitaireDefaut, PartProprietaireParLot: corps.PartProprietaireParLot,
-		PartApporteurMode: corps.PartApporteurMode, PartApporteurValeur: corps.PartApporteurValeur,
-		Superficies: superficies,
+	var row db.VentesSite
+	err = s.tracer(ctx, "vente_site.modifier", "vente_site", func(q *db.Queries) (string, any, any, error) {
+		avant, err := q.SiteVenteParID(ctx, in.ID)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		row, err = q.ModifierSiteVente(ctx, db.ModifierSiteVenteParams{
+			ID: in.ID, Nom: strings.ToUpper(strings.TrimSpace(corps.Nom)), Ordre: corps.Ordre,
+			TotalLots: corps.TotalLots, SuperficieDefaut: strings.TrimSpace(corps.SuperficieDefaut),
+			PrixUnitaireDefaut: corps.PrixUnitaireDefaut, PartProprietaireParLot: corps.PartProprietaireParLot,
+			PartApporteurMode: corps.PartApporteurMode, PartApporteurValeur: corps.PartApporteurValeur,
+			Superficies: superficies,
+		})
+		return in.ID, traceSite(&avant), traceSite(&row), err
 	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "VENTE_SITE_NOT_FOUND", "Site introuvable.")
@@ -179,7 +192,12 @@ type siteVenteModifyInput struct {
 type SiteVenteOutput struct{ Body SiteVenteDTO }
 
 func (s *service) activerSite(ctx context.Context, in *siteVenteIDInput) (*SiteVenteOutput, error) {
-	row, err := s.Q.ActiverSiteVente(ctx, db.ActiverSiteVenteParams{ID: in.ID, Actif: in.Body.Actif})
+	var row db.VentesSite
+	err := s.tracer(ctx, "vente_site.activer", "vente_site", func(q *db.Queries) (string, any, any, error) {
+		var err error
+		row, err = q.ActiverSiteVente(ctx, db.ActiverSiteVenteParams{ID: in.ID, Actif: in.Body.Actif})
+		return in.ID, nil, map[string]any{"actif": in.Body.Actif}, err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "VENTE_SITE_NOT_FOUND", "Site introuvable.")
 	}
@@ -193,7 +211,12 @@ func (s *service) activerSite(ctx context.Context, in *siteVenteIDInput) (*SiteV
 type CanalVenteOutput struct{ Body CanalVenteDTO }
 
 func (s *service) creerCanal(ctx context.Context, in *canalVenteInput) (*CanalVenteOutput, error) {
-	row, err := s.Q.InsererCanalVente(ctx, db.InsererCanalVenteParams{Libelle: strings.TrimSpace(in.Body.Libelle), Ordre: in.Body.Ordre})
+	var row db.VentesCanaux
+	err := s.tracer(ctx, "vente_canal.creer", "vente_canal", func(q *db.Queries) (string, any, any, error) {
+		var err error
+		row, err = q.InsererCanalVente(ctx, db.InsererCanalVenteParams{Libelle: strings.TrimSpace(in.Body.Libelle), Ordre: in.Body.Ordre})
+		return row.ID, nil, canalDTO(&row), err
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +225,15 @@ func (s *service) creerCanal(ctx context.Context, in *canalVenteInput) (*CanalVe
 }
 
 func (s *service) modifierCanal(ctx context.Context, in *canalVenteModifyInput) (*CanalVenteOutput, error) {
-	row, err := s.Q.ModifierCanalVente(ctx, db.ModifierCanalVenteParams{ID: in.ID, Libelle: strings.TrimSpace(in.Body.Libelle), Ordre: in.Body.Ordre})
+	var row db.VentesCanaux
+	err := s.tracer(ctx, "vente_canal.modifier", "vente_canal", func(q *db.Queries) (string, any, any, error) {
+		avant, err := q.CanalVenteParID(ctx, in.ID)
+		if err != nil {
+			return "", nil, nil, err
+		}
+		row, err = q.ModifierCanalVente(ctx, db.ModifierCanalVenteParams{ID: in.ID, Libelle: strings.TrimSpace(in.Body.Libelle), Ordre: in.Body.Ordre})
+		return in.ID, canalDTO(&avant), canalDTO(&row), err
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, socle.Problem(http.StatusNotFound, "VENTE_CANAL_NOT_FOUND", "Canal introuvable.")
 	}
@@ -222,8 +253,34 @@ type canalVenteModifyInput struct {
 }
 
 func (s *service) activerCanal(ctx context.Context, in *canalVenteIDInput) (*CanalVenteOutput, error) {
-	row, err := s.Q.ActiverCanalVente(ctx, db.ActiverCanalVenteParams{ID: in.ID, Actif: in.Body.Actif})
+	var row db.VentesCanaux
+	err := s.tracer(ctx, "vente_canal.activer", "vente_canal", func(q *db.Queries) (string, any, any, error) {
+		var err error
+		row, err = q.ActiverCanalVente(ctx, db.ActiverCanalVenteParams{ID: in.ID, Actif: in.Body.Actif})
+		return in.ID, nil, map[string]any{"actif": in.Body.Actif}, err
+	})
 	return reponseActivation(err, "VENTE_CANAL_NOT_FOUND", "Canal introuvable.", CanalVenteOutput{Body: canalDTO(&row)}, s.Live.Emettre)
+}
+
+// Un réglage de vente ne s'écrit pas sans sa trace : les parts de chaque vente en dépendent.
+func (s *service) tracer(ctx context.Context, action, entite string, ecrire func(q *db.Queries) (id string, avant, apres any, err error)) error {
+	acteur := socle.UtilisateurCourant(ctx).ID
+	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		id, avant, apres, err := ecrire(q)
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur, action, entite, id, avant, apres)
+	})
+}
+
+func traceSite(site *db.VentesSite) map[string]any {
+	return map[string]any{
+		"nom": site.Nom, "prixUnitaireDefaut": site.PrixUnitaireDefaut, "totalLots": site.TotalLots,
+		"partProprietaireParLot": site.PartProprietaireParLot, "partApporteurMode": site.PartApporteurMode,
+		"partApporteurValeur": site.PartApporteurValeur, "superficies": json.RawMessage(site.Superficies),
+	}
 }
 
 func reponseActivation[T any](err error, code, message string, sortie T, emettre func(string)) (*T, error) {

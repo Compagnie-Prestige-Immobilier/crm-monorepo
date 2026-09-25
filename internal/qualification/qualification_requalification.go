@@ -60,6 +60,7 @@ type QualificationRequalifierProspectInput struct {
 	Body struct {
 		ReasonCode string     `json:"reasonCode" minLength:"1" maxLength:"40"`
 		CallbackAt *time.Time `json:"callbackAt,omitempty" format:"date-time"`
+		Comment    *string    `json:"comment,omitempty" maxLength:"2000"`
 	}
 }
 
@@ -78,7 +79,7 @@ func (s *service) qualificationRequalifierProspect(ctx context.Context, in *Qual
 	}
 	issue := qualificationIssue{
 		prospectID: in.ID, motif: motif, regle: qualificationReglesEffet[motif.effet],
-		reference: time.Now().UTC(), assignedTo: u.ID,
+		reference: time.Now().UTC(), assignedTo: u.ID, comment: qualificationRogne(in.Body.Comment),
 	}
 	rappel, err := qualificationRappelPromis(in.Body.CallbackAt, issue.reference, &issue.motif, &issue.regle)
 	if err != nil {
@@ -127,9 +128,12 @@ func qualificationAppliquerRequalification(ctx context.Context, q *db.Queries, u
 	if err != nil {
 		return vide, err
 	}
+	apres := map[string]any{qualificationCleMotif: issue.motif.label, "phase2Status": etat.Phase2Status}
+	if issue.comment != nil {
+		apres["comment"] = *issue.comment
+	}
 	return etat, database.Auditer(ctx, q, u.ID, "prospect."+qualificationActionEncadrement, "prospect", issue.prospectID,
-		map[string]any{qualificationCleMotif: avant.MotifLabel},
-		map[string]any{qualificationCleMotif: issue.motif.label, "phase2Status": etat.Phase2Status})
+		map[string]any{qualificationCleMotif: avant.MotifLabel}, apres)
 }
 
 type QualificationRequalifierRepresentantInput struct {

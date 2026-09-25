@@ -92,6 +92,9 @@ SELECT * FROM "ventes_sites" ORDER BY "ordre", "nom";
 -- name: SiteVenteParNom :one
 SELECT * FROM "ventes_sites" WHERE "nom" = $1;
 
+-- name: SiteVenteParID :one
+SELECT * FROM "ventes_sites" WHERE "id" = $1;
+
 -- name: InsererSiteVente :one
 INSERT INTO "ventes_sites" ("nom", "ordre", "totalLots", "superficieDefaut", "prixUnitaireDefaut",
     "partProprietaireParLot", "partApporteurMode", "partApporteurValeur", "superficies")
@@ -114,6 +117,9 @@ RETURNING *;
 
 -- name: ListerCanauxVentes :many
 SELECT * FROM "ventes_canaux" ORDER BY "ordre", "libelle";
+
+-- name: CanalVenteParID :one
+SELECT * FROM "ventes_canaux" WHERE "id" = $1;
 
 -- name: InsererCanalVente :one
 INSERT INTO "ventes_canaux" ("libelle", "ordre") VALUES ($1, $2) RETURNING *;
