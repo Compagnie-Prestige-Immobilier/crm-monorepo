@@ -336,6 +336,7 @@ interface LigneSite {
   lots: number;
   chiffre: number;
   verse: number;
+  partCpi: number;
 }
 
 function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]): LigneSite[] {
@@ -347,6 +348,7 @@ function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]):
       lots: 0,
       chiffre: 0,
       verse: 0,
+      partCpi: 0,
     });
   }
   for (const vente of ventes) {
@@ -356,11 +358,13 @@ function parSite(ventes: readonly Vente[], configuration: readonly SiteVente[]):
       lots: 0,
       chiffre: 0,
       verse: 0,
+      partCpi: 0,
     };
     ligne.ventes += 1;
     ligne.lots += vente.nombreLots;
     ligne.chiffre += vente.prixTotal;
     ligne.verse += totalVerse(vente);
+    ligne.partCpi += vente.partCpi;
     sites.set(vente.site, ligne);
   }
   return [...sites.values()].sort((a, b) => b.chiffre - a.chiffre);
@@ -424,6 +428,15 @@ export function SyntheseSites({
               <TableHead className="text-right">Lots</TableHead>
               <TableHead className="text-right">Chiffre d’affaires</TableHead>
               <TableHead className="text-right">Encaissé</TableHead>
+              <TableHead className="text-right">
+                <span className="inline-flex items-center gap-1.5">
+                  Part CPI
+                  <InfoPopover
+                    label="Part CPI"
+                    description="Chiffre d’affaires du site une fois déduites la part de l’apporteur d’affaires et la part du propriétaire."
+                  />
+                </span>
+              </TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -440,6 +453,7 @@ export function SyntheseSites({
                     ? '–'
                     : `${Math.round((ligne.verse / ligne.chiffre) * 100)} %`}
                 </TableCell>
+                <TableCell className={MONTANT}>{formatFcfa(ligne.partCpi)}</TableCell>
               </TableRow>
             ))}
           </TableBody>
