@@ -382,30 +382,39 @@ func (s *service) deposer(ctx context.Context, in *DepotInput) (*VentesOutput, e
 	if err != nil {
 		return nil, err
 	}
-	u := socle.UtilisateurCourant(ctx)
+	classeur := db.InsererClasseurVentesParams{
+		ID: id.String(), NomFichier: nom, Contenu: contenu, Depuis: depuis,
+		ImporteParId: socle.UtilisateurCourant(ctx).ID,
+	}
+	telephones := telephonesDesVentesLues(lues, s.Cfg.PhoneRegion)
 	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
-		q := s.Q.WithTx(tx)
-		if err := q.SupprimerVentesImportees(ctx); err != nil {
-			return err
-		}
-		if err := q.SupprimerClasseursVentes(ctx); err != nil {
-			return err
-		}
-		if err := q.InsererClasseurVentes(ctx, db.InsererClasseurVentesParams{
-			ID: id.String(), NomFichier: nom, Contenu: contenu, Depuis: depuis,
-			ImporteParId: u.ID,
-		}); err != nil {
-			return err
-		}
-		if err := insererVentes(ctx, q, id.String(), lues); err != nil {
-			return err
-		}
-		return marquerProspectsVendus(ctx, q, u.ID, telephonesDesVentesLues(lues, s.Cfg.PhoneRegion))
+		return remplacerClasseur(ctx, s.Q.WithTx(tx), &classeur, lues, telephones)
 	})
 	if err != nil {
 		return nil, err
 	}
 	return s.lister(ctx, nil)
+}
+
+// Le dernier classeur déposé remplace les ventes importées avant lui.
+func remplacerClasseur(ctx context.Context, q *db.Queries, classeur *db.InsererClasseurVentesParams, lues []venteLue, telephones []string) error {
+	if err := q.SupprimerVentesImportees(ctx); err != nil {
+		return err
+	}
+	if err := q.SupprimerClasseursVentes(ctx); err != nil {
+		return err
+	}
+	if err := q.InsererClasseurVentes(ctx, *classeur); err != nil {
+		return err
+	}
+	if err := insererVentes(ctx, q, classeur.ID, lues); err != nil {
+		return err
+	}
+	if err := marquerProspectsVendus(ctx, q, classeur.ImporteParId, telephones); err != nil {
+		return err
+	}
+	return database.Auditer(ctx, q, classeur.ImporteParId, "vente.importer", "vente_classeur", classeur.ID, nil,
+		map[string]any{"fichier": classeur.NomFichier, "ventes": len(lues)})
 }
 
 func telephonesDesVentesLues(lues []venteLue, region string) []string {

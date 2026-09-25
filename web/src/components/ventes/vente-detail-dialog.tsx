@@ -63,7 +63,7 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
   });
   return (
     <Dialog open onOpenChange={(ouvert) => (ouvert ? null : onFermer())}>
-      <DialogContent className="grid h-[min(38rem,92dvh)] grid-rows-[auto_auto_1fr_auto] gap-0 p-0 sm:max-w-xl">
+      <DialogContent className="grid h-[min(44rem,92dvh)] grid-rows-[auto_auto_auto_1fr_auto] gap-0 p-0 sm:max-w-xl">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-6 py-4">
           <div>
             <DialogTitle className="text-[1.125rem]">{vente.client}</DialogTitle>
@@ -79,6 +79,15 @@ function Detail({ vente, onFermer }: { vente: Vente; onFermer: () => void }) {
           <Chiffre label="Prix total" valeur={formatFcfa(vente.prixTotal)} />
           <Chiffre label="Déjà payé" valeur={formatFcfa(verse)} />
           <Chiffre label="Reste à payer" valeur={formatFcfa(reste)} fort />
+        </dl>
+
+        <dl
+          aria-label="Répartition du prix"
+          className="grid grid-cols-3 gap-3 border-y border-border px-6 py-4"
+        >
+          <Chiffre label="Part propriétaire" valeur={formatFcfa(vente.partProprietaire)} />
+          <Chiffre label="Part apporteur" valeur={formatFcfa(vente.partApporteur)} />
+          <Chiffre label="Part CPI" valeur={formatFcfa(vente.partCpi)} fort />
         </dl>
 
         <div className="flex min-h-0 flex-col gap-4 px-6 py-4">
