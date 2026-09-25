@@ -21,11 +21,6 @@ type versementInput struct {
 	Montant int64  `json:"montant" minimum:"1"`
 }
 
-const (
-	champClient = "client"
-	champSite   = "site"
-)
-
 type venteInput struct {
 	Canal            string `json:"canal" minLength:"1" maxLength:"80"`
 	DateSouscription string `json:"dateSouscription" pattern:"^\\d{4}-\\d{2}-\\d{2}$"`
@@ -112,8 +107,11 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 				return err
 			}
 		}
-		return database.Auditer(ctx, q, acteur, "vente.creer", "vente", strconv.FormatInt(id, 10),
-			map[string]any{champClient: preparee.Vente.Client, champSite: preparee.Vente.Site}, nil)
+		apres, err := q.VenteParID(ctx, id)
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur, "vente.creer", "vente", strconv.FormatInt(id, 10), nil, venteDTO(&apres, nil))
 	}); err != nil {
 		return nil, err
 	}
@@ -167,9 +165,11 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 		}); err != nil {
 			return err
 		}
-		return database.Auditer(ctx, q, acteur, "vente.corriger", "vente", in.ID,
-			map[string]any{champClient: avant.Client, champSite: avant.Site},
-			map[string]any{champClient: preparee.Vente.Client, champSite: preparee.Vente.Site})
+		apres, err := q.VenteParID(ctx, id)
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur, "vente.corriger", "vente", in.ID, venteDTO(&avant, nil), venteDTO(&apres, nil))
 	}); err != nil {
 		return nil, err
 	}
@@ -243,8 +243,7 @@ func (s *service) archiver(ctx context.Context, in *venteIDInput) (*struct{}, er
 		if err := q.ArchiverVente(ctx, db.ArchiverVenteParams{ID: id, ArchiveeParId: &acteur}); err != nil {
 			return err
 		}
-		return database.Auditer(ctx, q, acteur, "vente.archiver", "vente", in.ID,
-			map[string]any{champClient: avant.Client, champSite: avant.Site}, nil)
+		return database.Auditer(ctx, q, acteur, "vente.archiver", "vente", in.ID, venteDTO(&avant, nil), nil)
 	}); err != nil {
 		return nil, err
 	}
@@ -257,7 +256,18 @@ func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput
 	if err != nil {
 		return nil, err
 	}
-	if err := s.Q.RestaurerVente(ctx, id); err != nil {
+	acteur := socle.UtilisateurCourant(ctx).ID
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		if err := q.RestaurerVente(ctx, id); err != nil {
+			return err
+		}
+		apres, err := q.VenteParID(ctx, id)
+		if err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, acteur, "vente.restaurer", "vente", in.ID, nil, venteDTO(&apres, nil))
+	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
