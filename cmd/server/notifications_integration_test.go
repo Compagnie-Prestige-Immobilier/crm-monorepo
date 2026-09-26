@@ -764,3 +764,34 @@ func TestCourrielOperationnelUnSeulToAvecCopie(t *testing.T) {
 		t.Fatalf("to %v, cc %v, %d version(s) : un `to` à deux adresses et aucune version attendus", appel.To, appel.Cc, len(appel.MessageVersions))
 	}
 }
+
+// Un « Renvoyer » pendant que le rejeu tient la ligne ne l'expédie pas une seconde fois.
+func TestCourrielRenvoiPendantLeRejeuNeDoublePas(t *testing.T) {
+	faux := brevoDeTest(t)
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationAdminConnecte()
+	sujet := "Refus de dossier " + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte","statut","updatedAt")
+		VALUES ($1,'DOSSIER_REJETE',$2,'{banque@test.cpi}','{}','inscription',$1,'<p>x</p>','x','ECHEC',now())`, courrielID, sujet)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	rejeu, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := rejeu.Exec(b.ctx, `SELECT 1 FROM "courriels" WHERE "id" = $1 FOR UPDATE`, courrielID); err != nil {
+		t.Fatal(err)
+	}
+	liberation := time.AfterFunc(2*time.Second, func() { _ = rejeu.Rollback(b.ctx) })
+	defer func() {
+		if liberation.Stop() {
+			_ = rejeu.Rollback(b.ctx)
+		}
+	}()
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
+	b.attend(statut, http.StatusConflict, "renvoi d'une ligne en cours d'envoi", body)
+	if n := len(faux.pour(sujet)); n != 0 {
+		t.Fatalf("aucun envoi tant que le rejeu tient la ligne, %d reçu(s)", n)
+	}
+}

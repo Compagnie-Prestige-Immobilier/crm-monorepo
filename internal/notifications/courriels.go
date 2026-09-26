@@ -429,26 +429,32 @@ type CourrielOutput struct {
 	Body CourrielDTO
 }
 
+// Même verrou que le rejeu : une ligne déjà en cours d'envoi n'est pas expédiée une seconde fois.
 func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*CourrielOutput, error) {
-	ligne, err := s.Q.CourrielByID(ctx, in.ID)
+	var ligne db.Courriel
+	err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
+		var err error
+		if ligne, err = q.CourrielReserverRenvoi(ctx, in.ID); err != nil {
+			return err
+		}
+		statut, erreur := CourrielEchec, courrielRetenu(s.Cfg.Base)
+		var messageID *string
+		var envoyeLe *time.Time
+		if erreur == nil {
+			statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
+				Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
+				Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
+			})
+		}
+		return q.CourrielRenvoye(ctx, db.CourrielRenvoyeParams{
+			ID: ligne.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
+		})
+	})
 	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+		return nil, s.courrielIntrouvableOuEnCours(ctx, in.ID)
 	}
 	if err != nil {
-		return nil, err
-	}
-	statut, erreur := CourrielEchec, courrielRetenu(s.Cfg.Base)
-	var messageID *string
-	var envoyeLe *time.Time
-	if erreur == nil {
-		statut, messageID, erreur, envoyeLe = expedierCourriel(ctx, &MessageBrevo{
-			Destinataires: courrielAdresses(ligne.Destinataires), Copies: courrielAdresses(ligne.Copies),
-			Sujet: ligne.Sujet, HTML: ligne.Html, Texte: ligne.Texte, PieceJointe: courrielPiece(ligne.NomPieceJointe, ligne.PieceJointe),
-		})
-	}
-	if err := s.Q.CourrielRenvoye(ctx, db.CourrielRenvoyeParams{
-		ID: ligne.ID, Statut: statut, MessageId: messageID, Erreur: erreur, EnvoyeLe: envoyeLe,
-	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre(sujetCourriels)
@@ -462,6 +468,17 @@ func (s *service) renvoyerCourriel(ctx context.Context, in *CourrielIDInput) (*C
 		}
 	}
 	return nil, socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+}
+
+func (s *service) courrielIntrouvableOuEnCours(ctx context.Context, id string) error {
+	_, err := s.Q.CourrielByID(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return socle.Problem(http.StatusNotFound, "COURRIEL_NOT_FOUND", "Courriel introuvable.")
+	}
+	if err != nil {
+		return err
+	}
+	return socle.Problem(http.StatusConflict, "COURRIEL_EN_COURS", "Ce courriel est déjà en cours d'envoi. Rechargez le journal dans un instant.")
 }
 
 type ReglagesCourrielsOutput struct {

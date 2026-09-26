@@ -40,6 +40,9 @@ SELECT "id" FROM "courriels"
 WHERE "id" = @id AND "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
 FOR UPDATE SKIP LOCKED;
 
+-- name: CourrielReserverRenvoi :one
+SELECT * FROM "courriels" WHERE "id" = @id FOR UPDATE SKIP LOCKED;
+
 -- name: CourrielRejeuEnregistre :exec
 UPDATE "courriels" SET "statut" = $2, "messageId" = $3, "erreur" = $4, "envoyeLe" = $5,
   "tentatives" = "tentatives" + 1
