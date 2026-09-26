@@ -122,10 +122,6 @@ export function ReponseCard({ reponse }: { reponse: ReponseAssistant }) {
             </Table>
           </div>
         )}
-
-        <p className="text-[11px] text-muted-foreground">
-          Chiffres lus dans la base. Lecture écrite par {reponse.reponduPar}.
-        </p>
       </CardContent>
     </Card>
   );

@@ -168,9 +168,9 @@ function EnteteTicket(props: { ticket: TicketKairo }) {
         <Badge
           variant="secondary"
           className="font-mono text-[10px] text-muted-foreground"
-          title={`Qualifié par JEV${infoJev}`}
+          title={`Tri automatique${infoJev}`}
         >
-          JEV · {Math.round((ticket.jevConfiance ?? 0) * 100)}%
+          Confiance {Math.round((ticket.jevConfiance ?? 0) * 100)} %
         </Badge>
       ) : null}
     </div>
@@ -206,7 +206,7 @@ function ActionsTicket(props: {
           className="inline-flex h-7 items-center gap-1 rounded-md border border-border bg-card px-2.5 text-xs font-medium text-foreground hover:bg-secondary"
         >
           <GitPullRequestIcon className="size-3 text-success" />
-          Voir la PR
+          Voir la correction
         </a>
       ) : null}
 

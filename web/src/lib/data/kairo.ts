@@ -18,16 +18,16 @@ export const STATUTS_KAIRO: Record<
 > = {
   running: { libelle: 'En cours', variante: 'info' },
   'running:analyse': { libelle: 'Analyse en cours', variante: 'info' },
-  'running:test': { libelle: 'Validation tests', variante: 'info' },
-  'running:publication': { libelle: 'Création PR', variante: 'info' },
+  'running:test': { libelle: 'Vérification', variante: 'info' },
+  'running:publication': { libelle: 'Correction en préparation', variante: 'info' },
   retry: { libelle: 'Nouvel essai prévu', variante: 'warning' },
-  pr: { libelle: 'PR proposée', variante: 'success' },
+  pr: { libelle: 'Correction proposée', variante: 'success' },
   escalade: { libelle: 'Escaladé', variante: 'warning' },
   echec: { libelle: 'Échec', variante: 'destructive' },
   abandon: { libelle: 'Clos avant traitement', variante: 'secondary' },
   arrete: { libelle: 'Arrêté', variante: 'secondary' },
-  triage: { libelle: 'Triage (hors code)', variante: 'secondary' },
-  doublon: { libelle: 'Doublon (PR liée)', variante: 'secondary' },
+  triage: { libelle: 'Hors code', variante: 'secondary' },
+  doublon: { libelle: 'Doublon', variante: 'secondary' },
   clos: { libelle: 'Déjà résolu (fermé)', variante: 'success' },
 };
 
@@ -38,7 +38,7 @@ export const FILTRES_TICKETS = {
     libelle: 'En cours',
     statuts: ['running', 'running:analyse', 'running:test', 'running:publication', 'retry'],
   },
-  pr: { libelle: 'PR proposées', statuts: ['pr', 'clos'] },
+  pr: { libelle: 'Corrections proposées', statuts: ['pr', 'clos'] },
 } as const;
 export type FiltreTickets = keyof typeof FILTRES_TICKETS;
 

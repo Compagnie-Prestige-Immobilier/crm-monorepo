@@ -39,9 +39,8 @@ export function ReglagesKairo(props: { etat: EtatKairo; desactive?: boolean | un
             Réparation automatique de la base
           </span>
           <p className="text-xs leading-relaxed text-muted-foreground">
-            Quand la branche de base ne passe plus sa propre vérification, Kairo propose une
-            correction dans une PR séparée, sans jamais bloquer le traitement des tickets en cours.
-            Il ne publie que s’il juge le correctif simple et sûr.
+            Quand le code de référence ne passe plus ses propres vérifications, Kairo propose une
+            correction à part, sans bloquer les tickets en cours.
           </p>
         </div>
         <Switch
