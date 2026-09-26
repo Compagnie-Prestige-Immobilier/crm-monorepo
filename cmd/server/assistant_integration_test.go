@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"cpi-go/db"
+	"cpi-go/internal/notifications"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -705,9 +706,72 @@ func TestAssistantResumeFicheAnonyme(t *testing.T) {
 	}
 }
 
+// Une campagne active dont aucune fiche n'a été appelée : le compte rendu doit la nommer.
+func (b *banc) semerCampagneARelancer() string {
+	b.t.Helper()
+	nettoyerProspects(b, b.userID)
+	lot, prospect := uuid.NewString(), uuid.NewString()
+	campagne := "Campagne assistant " + strings.ToUpper(uuid.NewString()[:6])
+	b.exec(`INSERT INTO "prospects" ("id","nom","prenom","phoneE164","createdById","projet","clientCreatedAt","updatedAt")
+	        VALUES ($1,'Relance','Campagne',$2,$3,'CHUES',now(),now())`, prospect, telephoneAssistant(), b.userID)
+	b.exec(`INSERT INTO "lots_export" ("id","name","cible","projet","filters","itemCount","createdById")
+	        VALUES ($1,$2,'PROSPECTS','CHUES','{}'::jsonb,1,$3)`, lot, campagne, b.userID)
+	b.exec(`INSERT INTO "lot_export_items" ("lotId","prospectId","position","assigneeId") VALUES ($1,$2,1,$3)`, lot, prospect, b.userID)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lot_export_items" WHERE "lotId" = $1`, lot)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lot)
+	})
+	return campagne
+}
+
+func (b *banc) compteRenduDuJour() string {
+	b.t.Helper()
+	b.notificationPurge()
+	s := b.notificationService()
+	if err := notifications.CompteRenduQuotidien(b.ctx, s); err != nil {
+		b.t.Fatal(err)
+	}
+	var corps string
+	if err := b.pool.QueryRow(b.ctx, `SELECT "body" FROM "notifications" WHERE "reminderKey" = $1 AND "period" = $2`,
+		"daily-report:"+b.userID, notifications.JourNotification(s, time.Now())).Scan(&corps); err != nil {
+		b.t.Fatal(err)
+	}
+	return corps
+}
+
 // Un numéro neuf à chaque appel : une fiche laissée par un autre test ne le porte pas.
 func telephoneAssistant() string {
 	return fmt.Sprintf("+22178%07d", time.Now().UnixNano()/1000%10_000_000)
+}
+
+// Le compte rendu de 17 h dit ce qui a changé à partir des chiffres, sans modèle.
+func TestAssistantCompteRenduCeQuiAChange(t *testing.T) {
+	t.Setenv("ASSISTANT_AI_PROVIDERS", "groq")
+	t.Setenv("GROQ_API_KEY", "")
+	b := nouveauBanc(t, "ADMIN")
+	campagne := b.semerCampagneARelancer()
+	corps := b.compteRenduDuJour()
+	if !strings.Contains(corps, "Ce qui a changé : ") || !strings.Contains(corps, "Campagnes à relancer : "+campagne) {
+		t.Fatalf("le compte rendu doit dire ce qui a changé et nommer la campagne à relancer : %s", corps)
+	}
+}
+
+// Le modèle ne reçoit que des agrégats : les noms de campagne restent au serveur.
+func TestAssistantCompteRenduRedigeSurAgregats(t *testing.T) {
+	faux := demarrerFauxFournisseur(t, func(map[string]any) string {
+		return `{"paragraphe":"Activité en recul, des rappels attendent."}`
+	})
+	b := nouveauBanc(t, "ADMIN")
+	campagne := b.semerCampagneARelancer()
+	corps := b.compteRenduDuJour()
+	if !strings.Contains(corps, "Ce qui a changé : Activité en recul, des rappels attendent. Campagnes à relancer : "+campagne) {
+		t.Fatalf("le paragraphe rédigé puis les campagnes à relancer : %s", corps)
+	}
+	for _, message := range faux.messages() {
+		if strings.Contains(message, campagne) {
+			t.Fatalf("un nom de campagne est parti chez le fournisseur : %s", message)
+		}
+	}
 }
 
 // Un lecteur limité à son portefeuille ne doit compter que ses fiches.
