@@ -5,6 +5,7 @@ package main
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/url"
 	"slices"
@@ -282,4 +283,32 @@ func TestRechercheNomPrenomDansLesDeuxOrdres(t *testing.T) {
 			}
 		}
 	}
+}
+
+// Le dimanche de 7 h à 8 h, une place par heure : 7 h prise, 8 h libre, rien les autres jours.
+func TestRendezVousSitePlacesRestantesParCreneau(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	b := qualificationConnecte(t, "COMMERCIAL")
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(rvSiteFiche(b), site, point, sept))
+	b.attend(statut, http.StatusOK, "RV site à 7 h", body)
+
+	chemin := "/api/v1/phase2/rv-site/creneaux?du=" + sept.AddDate(0, 0, -4).Format(time.DateOnly) + "&au=" + sept.Format(time.DateOnly)
+	statut, body = qualificationEnvoi(b, http.MethodGet, chemin, nil)
+	b.attend(statut, http.StatusOK, "créneaux de la semaine", body)
+	creneaux, _ := body["creneaux"].([]any)
+	attendus := []string{
+		sept.Format(time.RFC3339) + " 1 1 0",
+		sept.Add(time.Hour).Format(time.RFC3339) + " 1 0 1",
+	}
+	lus := make([]string, 0, len(creneaux))
+	for _, c := range creneaux {
+		creneau, _ := c.(map[string]any)
+		lus = append(lus, fmt.Sprintf("%v %v %v %v", creneau["quand"], creneau["capacite"], creneau["reserves"], creneau["restantes"]))
+	}
+	if !slices.Equal(lus, attendus) {
+		t.Fatalf("créneaux %v, attendu %v", lus, attendus)
+	}
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/rv-site/creneaux?du=2026-01-01&au=2026-02-02", nil)
+	b.attend(statut, http.StatusBadRequest, "plus de 31 jours", body)
 }

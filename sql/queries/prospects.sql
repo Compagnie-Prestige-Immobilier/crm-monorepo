@@ -791,3 +791,9 @@ UPDATE "prospects" p SET
 FROM "prospects" avant
 WHERE p."id" = @id AND avant."id" = p."id" AND p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT'
 RETURNING avant."rendezVousIssue" AS issue_avant, avant."suiteRencontre" AS suite_avant;
+
+-- name: TelephonesDesVentes :many
+SELECT DISTINCT "telephone" FROM "ventes"
+WHERE "archiveeLe" IS NULL AND "telephone" <> ''
+ORDER BY "telephone"
+LIMIT @limite::bigint;

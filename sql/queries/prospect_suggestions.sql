@@ -54,3 +54,33 @@ JOIN "prospects" filleul ON filleul."id" = s."resolvedProspectId"
 WHERE s."sourceProspectId" = $1 AND s."deletedAt" IS NULL AND filleul."deletedAt" IS NULL
 ORDER BY s."createdAt" DESC
 LIMIT 20;
+
+-- Un filleul vendu compte aussi converti : l'entonnoir ne remonte jamais.
+-- name: SuiviParrainage :one
+SELECT count(DISTINCT s."suggestedPhoneE164")::int AS "recommandes",
+       count(DISTINCT f."id")::int AS "fiches",
+       count(DISTINCT f."id") FILTER (WHERE f."statut" IN ('CONVERTI', 'VENDU')
+           OR f."phoneE164" = ANY(@telephones_vendus::text[]))::int AS "convertis",
+       count(DISTINCT f."id") FILTER (WHERE f."statut" = 'VENDU'
+           OR f."phoneE164" = ANY(@telephones_vendus::text[]))::int AS "vendus"
+FROM "prospect_suggestions" s
+LEFT JOIN "prospects" f ON f."id" = s."resolvedProspectId" AND f."deletedAt" IS NULL
+WHERE s."sourceProspectId" = @parrain AND s."deletedAt" IS NULL;
+
+-- name: ClassementParrains :many
+SELECT p."id", p."nom", p."prenom",
+       count(DISTINCT s."suggestedPhoneE164")::int AS "recommandes",
+       count(DISTINCT f."id")::int AS "fiches",
+       count(DISTINCT f."id") FILTER (WHERE f."statut" IN ('CONVERTI', 'VENDU')
+           OR f."phoneE164" = ANY(@telephones_vendus::text[]))::int AS "convertis",
+       count(DISTINCT f."id") FILTER (WHERE f."statut" = 'VENDU'
+           OR f."phoneE164" = ANY(@telephones_vendus::text[]))::int AS "vendus"
+FROM "prospect_suggestions" s
+JOIN "prospects" p ON p."id" = s."sourceProspectId" AND p."deletedAt" IS NULL
+LEFT JOIN "prospects" f ON f."id" = s."resolvedProspectId" AND f."deletedAt" IS NULL
+WHERE s."deletedAt" IS NULL
+  AND (sqlc.narg('du')::timestamp IS NULL OR s."createdAt" >= sqlc.narg('du')::timestamp)
+  AND (sqlc.narg('au')::timestamp IS NULL OR s."createdAt" < sqlc.narg('au')::timestamp)
+GROUP BY p."id", p."nom", p."prenom"
+ORDER BY "vendus" DESC, "convertis" DESC, "fiches" DESC, "recommandes" DESC, p."id"
+LIMIT 20;
