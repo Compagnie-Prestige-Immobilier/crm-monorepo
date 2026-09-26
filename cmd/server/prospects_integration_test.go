@@ -439,13 +439,14 @@ func TestProspectReaffectationEstAuditee(t *testing.T) {
 	if proprietaire != destinataire.userID {
 		t.Fatalf("le propriétaire doit avoir changé : %s", proprietaire)
 	}
-	var traces int
+	var traces, sansListe int
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT count(DISTINCT "entityId") FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces); err != nil {
+		`SELECT count(DISTINCT "entityId"), count(*) FILTER (WHERE NOT "after" ? 'prospectIds' AND "after"->>'nombre' = '2')
+		 FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces, &sansListe); err != nil {
 		t.Fatal(err)
 	}
-	if traces != 2 {
-		t.Fatalf("chaque fiche réaffectée doit laisser sa trace : %d", traces)
+	if traces != 2 || sansListe != 2 {
+		t.Fatalf("chaque fiche réaffectée laisse une trace sans la liste du lot : %d traces, %d sans liste", traces, sansListe)
 	}
 }
 
