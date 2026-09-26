@@ -1,11 +1,15 @@
 package assistant
 
 import (
+	"cmp"
 	"context"
 	"cpi-go/db"
+	"cpi-go/internal/analytics"
 	"cpi-go/internal/shared/socle"
+	ventesACredit "cpi-go/internal/ventes"
 	"fmt"
 	"math"
+	"slices"
 	"strconv"
 	"time"
 )
@@ -18,18 +22,22 @@ const (
 	colonneJoints     = "Joints"
 	libelleCanal      = "Canal"
 	axeJour           = "jour"
+	axeSite           = "site"
+	axeCanal          = "canal"
 	axeTeleconseiller = "teleconseiller"
 	libelleTotal      = "Total"
 	periodeParDefaut  = "30_derniers_jours"
 	periodeTrimestre  = "90_derniers_jours"
 	filtresChiffres   = "chiffres"
 	filtresBanque     = "banque"
+	joursAvantBlocage = 7
 )
 
 type parametres struct {
 	du, au         time.Time
 	maintenant     time.Time
 	jour           time.Time
+	zone           *time.Location
 	projet         *string
 	teleconseiller *string
 	axe            string
@@ -42,13 +50,17 @@ type ecranOutil struct {
 }
 
 // `projet` et `portefeuille` disent si le filtre de projet et la portée du rôle
-// s'appliquent : ils suivent l'écran qui montre les mêmes chiffres.
+// s'appliquent : ils suivent l'écran qui montre les mêmes chiffres. `groupe`
+// nomme les lignes d'un outil sans axe au choix.
 type outil struct {
 	libelle      string
 	description  string
 	permission   socle.Permission
 	source       string
 	axes         []string
+	groupe       string
+	mesures      []string
+	sansPeriode  bool
 	periode      string
 	futur        bool
 	projet       bool
@@ -56,6 +68,22 @@ type outil struct {
 	ecran        ecranOutil
 	executer     func(context.Context, *db.Queries, *parametres) (Resultat, error)
 }
+
+var (
+	mesuresAppels              = []string{colonneAppels, colonneJoints, "Taux joints", "Fiches appelées"}
+	mesuresConversions         = []string{"Prospects", colonneJoints, "Convertis", "Perdus", "Taux de conversion"}
+	mesuresPrevision           = []string{"Fiches ouvertes", "Tranchées sur 6 mois", "Taux historique", "Conversions attendues"}
+	mesuresVentes              = []string{"Ventes", "Lots", "Montant", "Encaissé", "Reliquat"}
+	mesuresDossiers            = []string{"Dossiers", "Encaissés", "Rejetés", "Montant encaissé", "Bloqués plus de 7 jours"}
+	mesuresVisites             = []string{"Visites"}
+	mesuresRendezVous          = []string{"Obtenus", "Honorés", "Non honorés", "Reportés", "Taux honorés"}
+	mesuresAppelsRepresentants = []string{colonneAppels, colonneJoints, "Représentants appelés", "Taux joints"}
+	mesuresRappels             = []string{"Promis", "Honorés", "En retard", "À venir", "Annulés"}
+	mesuresCampagnes           = []string{"Fiches confiées", "Fiches traitées", "Appelées aujourd'hui", "Taux d'exploitation"}
+	mesuresObjectifs           = []string{"Cible", "Réalisé", "Avancement", "Cadence requise", "Cadence réelle"}
+	mesuresEcheances           = []string{"Ventes en retard", "Montant dû"}
+	mesuresRisques             = []string{"Nombre"}
+)
 
 var (
 	ecranChiffres            = ecranOutil{"/teleconseil/tableau-de-bord", socle.PermissionAnalyticsSuperviser, filtresChiffres}
@@ -66,65 +94,89 @@ var outils = map[string]*outil{
 	outilAppels: {
 		libelle: colonneAppels, description: "Appels passés aux prospects, appels joints et fiches appelées, jour par jour, sur une période.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les appels consignés aux prospects, datés du jour de l'appel",
+		groupe: axeJour, mesures: mesuresAppels,
 		periode: periodeParDefaut, projet: true, portefeuille: true, ecran: ecranChiffres, executer: appels,
 	},
 	"conversions_par_canal": {
 		libelle: "Conversions par canal", description: "Prospects créés sur une période par canal de provenance : joints, convertis, perdus, taux de conversion.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les fiches créées sur la période, par canal de provenance",
+		groupe: axeCanal, mesures: mesuresConversions,
 		periode: periodeParDefaut, projet: true, portefeuille: true, ecran: ecranChiffres, executer: conversionsParCanal,
 	},
 	"prevision_conversions": {
 		libelle: "Prévision des conversions", description: "Prévision des conversions à venir parmi les fiches ouvertes, par canal et projet, d'après le taux des six derniers mois.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les fiches ouvertes et le taux de conversion des six mois qui précèdent la fin de période",
+		groupe: axeCanal, mesures: mesuresPrevision,
 		periode: periodeParDefaut, projet: true, portefeuille: true, ecran: ecranChiffres, executer: prevision,
 	},
 	outilVentes: {
-		libelle: "Ventes", description: "Ventes saisies sur une période : nombre, lots, montant total et montant encaissé, par site, par téléconseiller, par canal ou par jour.",
+		libelle: "Ventes", description: "Ventes saisies sur une période : nombre, lots, montant total, montant encaissé et reliquat, par site, par téléconseiller, par canal ou par jour.",
 		permission: socle.PermissionVentesLire, source: "les ventes saisies et non archivées, datées du jour de souscription",
-		axes: []string{"site", axeTeleconseiller, "canal", axeJour}, periode: periodeParDefaut,
+		axes: []string{axeSite, axeTeleconseiller, axeCanal, axeJour}, mesures: mesuresVentes, periode: periodeParDefaut,
 		ecran: ecranOutil{"/ventes", socle.PermissionVentesLire, ""}, executer: ventes,
 	},
 	outilDossiers: {
-		libelle: "Dossiers Banque & Finance", description: "Dossiers de financement créés sur une période : nombre, encaissés, rejetés et montant encaissé, par étape ou par banque.",
+		libelle: "Dossiers Banque & Finance", description: "Dossiers de financement créés sur une période : nombre, encaissés, rejetés, montant encaissé et dossiers bloqués plus de 7 jours dans leur étape, par étape ou par banque.",
 		permission: socle.PermissionBanqueLire, source: "les dossiers Banque & Finance créés sur la période, classés par leur étape actuelle",
-		axes: []string{"etape", "banque"}, periode: periodeParDefaut, projet: true,
+		axes: []string{"etape", "banque"}, mesures: mesuresDossiers, periode: periodeParDefaut, projet: true,
 		ecran: ecranOutil{"/finance", socle.PermissionBanqueLire, filtresBanque}, executer: dossiersBancaires,
 	},
 	"visites": {
 		libelle: "Visites de l'accueil", description: "Visites enregistrées à l'accueil sur une période, par jour ou par objet de la visite.",
 		permission: socle.PermissionAccueilRegistre, source: "le registre des visites, hors visites archivées",
-		axes: []string{axeJour, "objet"}, periode: periodeParDefaut,
+		axes: []string{axeJour, "objet"}, mesures: mesuresVisites, periode: periodeParDefaut,
 		ecran: ecranOutil{"/accueil/tableau-de-bord", socle.PermissionAccueilRegistre, filtresChiffres}, executer: visites,
 	},
 	"rendez_vous": {
 		libelle: "Rendez-vous", description: "Rendez-vous obtenus au téléphone dont la date tombe dans la période : obtenus, honorés, non honorés, reportés, par type ou par jour.",
 		permission: socle.PermissionRendezVousVoir, source: "les fiches en rendez-vous, datées par leur rappel",
-		axes: []string{"type", axeJour}, periode: periodeParDefaut, futur: true, projet: true,
+		axes: []string{"type", axeJour}, mesures: mesuresRendezVous, periode: periodeParDefaut, futur: true, projet: true,
 		ecran: ecranOutil{"/accueil/rendez-vous", socle.PermissionRendezVousVoir, ""}, executer: rendezVous,
 	},
 	"appels_representants": {
 		libelle: "Appels aux représentants", description: "Appels passés aux représentants syndicaux (CHUES) sur une période : appels, joints, représentants appelés, par jour ou par téléconseiller.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les appels consignés aux représentants, datés du jour de l'appel",
-		axes: []string{axeJour, axeTeleconseiller}, periode: periodeParDefaut, portefeuille: true,
+		axes: []string{axeJour, axeTeleconseiller}, mesures: mesuresAppelsRepresentants, periode: periodeParDefaut, portefeuille: true,
 		ecran: ecranAppelsRepresentants, executer: appelsRepresentants,
 	},
 	"rappels": {
 		libelle: "Rappels", description: "Rappels promis aux prospects dont l'échéance tombe dans la période, par téléconseiller : promis, honorés, en retard, à venir, annulés.",
 		permission: socle.PermissionAnalyticsSuperviser, source: "les rappels promis, datés par leur échéance",
+		groupe: axeTeleconseiller, mesures: mesuresRappels,
 		periode: periodeTrimestre, futur: true, projet: true, portefeuille: true,
 		ecran: ecranOutil{"/teleconseil/rappels", socle.PermissionFichesTenir, ""}, executer: rappels,
 	},
 	"campagnes": {
 		libelle: "Avancement des campagnes", description: "Avancement des campagnes d'appels créées sur la période : fiches confiées, fiches traitées, taux d'exploitation, appelées aujourd'hui, dernier appel.",
 		permission: socle.PermissionCampagnesSuperviser, source: "les campagnes créées sur la période, une fiche étant traitée dès son premier appel",
+		groupe: "campagne", mesures: mesuresCampagnes,
 		periode: periodeTrimestre, projet: true, portefeuille: true,
 		ecran: ecranOutil{"/teleconseil/campagnes", socle.PermissionCampagnesSuperviser, ""}, executer: campagnes,
+	},
+	"objectifs": {
+		libelle: "Objectifs de la campagne 2026", description: "Objectifs de la campagne 2026 contre le réalisé : CHUES, Grand Public et leads marketing, avec l'avancement et les cadences quotidiennes requise et réelle. Sans période : la campagne court du 10/09 au 23/12/2026.",
+		permission: socle.PermissionAnalyticsSuperviser, source: "les objectifs de la supervision, réalisé compté depuis le début de la campagne",
+		groupe: "objectif", mesures: mesuresObjectifs, periode: periodeParDefaut, sansPeriode: true,
+		ecran: ecranOutil{"/teleconseil/supervision", socle.PermissionAnalyticsSuperviser, ""}, executer: objectifs,
+	},
+	"echeances_en_retard": {
+		libelle: "Échéances en retard", description: "Ventes à crédit dont une échéance passée n'est pas couverte, et montant dû, par site, au jour d'aujourd'hui. Sans période.",
+		permission: socle.PermissionVentesLire, source: "les ventes à crédit et leurs versements, au jour d'aujourd'hui",
+		groupe: axeSite, mesures: mesuresEcheances, periode: periodeParDefaut, sansPeriode: true,
+		ecran: ecranOutil{"/ventes", socle.PermissionVentesLire, ""}, executer: echeancesEnRetard,
+	},
+	"risques": {
+		libelle: "Risques d'exploitation", description: "Courriels en échec et tâches planifiées en échec sur la période, imports en échec à ce jour.",
+		permission: socle.PermissionExploitationAdministrer, source: "le journal des courriels, des tâches planifiées et des imports",
+		groupe: "risque", mesures: mesuresRisques, periode: periodeParDefaut,
+		ecran: ecranOutil{"/admin/exploitation", socle.PermissionExploitationAdministrer, ""}, executer: risques,
 	},
 }
 
 var libellesAxes = map[string]string{
-	axeJour: "Jour", "site": "Site", axeTeleconseiller: "Téléconseiller", "canal": libelleCanal,
+	axeJour: "Jour", axeSite: "Site", axeTeleconseiller: "Téléconseiller", axeCanal: libelleCanal,
 	"etape": "Étape", "banque": "Banque", "objet": "Objet", "type": "Type",
+	"campagne": "Campagne", "objectif": "Objectif", "risque": "Risque",
 }
 
 type outilDecrit struct {
@@ -224,7 +276,7 @@ func appels(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error)
 		return Resultat{}, err
 	}
 	r := Resultat{
-		Tableau: Tableau{Colonnes: []string{"Jour", colonneAppels, colonneJoints, "Taux joints", "Fiches appelées"}, Lignes: [][]string{}},
+		Tableau: Tableau{Colonnes: slices.Concat([]string{"Jour"}, mesuresAppels), Lignes: [][]string{}},
 		Serie:   []Point{}, Mesure: colonneAppels,
 	}
 	var total, joints int32
@@ -243,8 +295,8 @@ func conversionsParCanal(ctx context.Context, q *db.Queries, p *parametres) (Res
 		return Resultat{}, err
 	}
 	r := Resultat{
-		Tableau: Tableau{Colonnes: []string{libelleCanal, "Prospects", colonneJoints, "Convertis", "Perdus", "Taux de conversion"}, Lignes: [][]string{}},
-		Serie:   []Point{}, Mesure: "Taux de conversion",
+		Tableau: Tableau{Colonnes: slices.Concat([]string{libelleCanal}, mesuresConversions), Lignes: [][]string{}},
+		Serie:   []Point{}, Mesure: mesuresConversions[4],
 	}
 	for _, l := range lignes {
 		t := taux(int64(l.Convertis), int64(l.Prospects))
@@ -263,8 +315,8 @@ func prevision(ctx context.Context, q *db.Queries, p *parametres) (Resultat, err
 		return Resultat{}, err
 	}
 	r := Resultat{
-		Tableau: Tableau{Colonnes: []string{libelleCanal, "Projet", "Fiches ouvertes", "Tranchées sur 6 mois", "Taux historique", "Conversions attendues"}, Lignes: [][]string{}},
-		Serie:   []Point{}, Mesure: "Conversions attendues",
+		Tableau: Tableau{Colonnes: slices.Concat([]string{libelleCanal, "Projet"}, mesuresPrevision), Lignes: [][]string{}},
+		Serie:   []Point{}, Mesure: mesuresPrevision[3],
 	}
 	attenduesTotal := 0.0
 	for _, l := range lignes {
@@ -290,22 +342,24 @@ func ventes(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error)
 	}
 	comptes := make([]compte, 0, len(lignes))
 	for _, l := range lignes {
-		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Ventes), int64(l.Lots), l.Montant, l.Encaisse}})
+		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Ventes), int64(l.Lots), l.Montant, l.Encaisse, l.Reliquat}})
 	}
-	g := grille{entete: enteteAxe(p.axe), noms: []string{"Ventes", "Lots", "Montant", "Encaissé"}, montants: map[int]bool{2: true, 3: true}, trace: 2}
+	g := grille{entete: enteteAxe(p.axe), noms: mesuresVentes, montants: map[int]bool{2: true, 3: true, 4: true}, trace: 2}
 	return g.resultat(comptes), nil
 }
 
 func dossiersBancaires(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error) {
-	lignes, err := q.AssistantDossiersBancaires(ctx, db.AssistantDossiersBancairesParams{Axe: p.axe, Du: p.du, Au: p.au, Projet: p.projet})
+	lignes, err := q.AssistantDossiersBancaires(ctx, db.AssistantDossiersBancairesParams{
+		Axe: p.axe, Du: p.du, Au: p.au, Projet: p.projet, BloqueAvant: p.maintenant.AddDate(0, 0, -joursAvantBlocage),
+	})
 	if err != nil {
 		return Resultat{}, err
 	}
 	comptes := make([]compte, 0, len(lignes))
 	for _, l := range lignes {
-		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Dossiers), int64(l.Encaisses), int64(l.Rejetes), l.MontantEncaisse}})
+		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Dossiers), int64(l.Encaisses), int64(l.Rejetes), l.MontantEncaisse, int64(l.Bloques)}})
 	}
-	g := grille{entete: enteteAxe(p.axe), noms: []string{"Dossiers", "Encaissés", "Rejetés", "Montant encaissé"}, montants: map[int]bool{3: true}}
+	g := grille{entete: enteteAxe(p.axe), noms: mesuresDossiers, montants: map[int]bool{3: true}}
 	return g.resultat(comptes), nil
 }
 
@@ -318,7 +372,7 @@ func visites(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error
 	for _, l := range lignes {
 		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Visites)}})
 	}
-	g := grille{entete: enteteAxe(p.axe), noms: []string{"Visites"}}
+	g := grille{entete: enteteAxe(p.axe), noms: mesuresVisites}
 	return g.resultat(comptes), nil
 }
 
@@ -331,7 +385,7 @@ func rendezVous(ctx context.Context, q *db.Queries, p *parametres) (Resultat, er
 	for _, l := range lignes {
 		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Obtenus), int64(l.Honores), int64(l.NonHonores), int64(l.Reportes)}})
 	}
-	g := grille{entete: enteteAxe(p.axe), noms: []string{"Obtenus", "Honorés", "Non honorés", "Reportés"}, taux: "Taux honorés", num: 1}
+	g := grille{entete: enteteAxe(p.axe), noms: mesuresRendezVous[:4], taux: mesuresRendezVous[4], num: 1}
 	return g.resultat(comptes), nil
 }
 
@@ -344,7 +398,7 @@ func appelsRepresentants(ctx context.Context, q *db.Queries, p *parametres) (Res
 	for _, l := range lignes {
 		comptes = append(comptes, compte{groupe: l.Groupe, valeurs: []int64{int64(l.Appels), int64(l.Joints), int64(l.Representants)}})
 	}
-	g := grille{entete: enteteAxe(p.axe), noms: []string{colonneAppels, colonneJoints, "Représentants appelés"}, taux: "Taux joints", num: 1}
+	g := grille{entete: enteteAxe(p.axe), noms: mesuresAppelsRepresentants[:3], taux: mesuresAppelsRepresentants[3], num: 1}
 	return g.resultat(comptes), nil
 }
 
@@ -359,7 +413,7 @@ func rappels(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error
 	for _, l := range lignes {
 		comptes = append(comptes, compte{groupe: l.Teleconseiller, valeurs: []int64{int64(l.Promis), int64(l.Honores), int64(l.EnRetard), int64(l.AVenir), int64(l.Annules)}})
 	}
-	g := grille{entete: "Téléconseiller", noms: []string{"Promis", "Honorés", "En retard", "À venir", "Annulés"}, trace: 2}
+	g := grille{entete: libellesAxes[axeTeleconseiller], noms: mesuresRappels, trace: 2}
 	return g.resultat(comptes), nil
 }
 
@@ -383,7 +437,78 @@ func campagnes(ctx context.Context, q *db.Queries, p *parametres) (Resultat, err
 	}
 	g := grille{
 		entete: "Campagne", details: []string{"Projet", "État", "Dernier appel"},
-		noms: []string{"Fiches confiées", "Fiches traitées", "Appelées aujourd'hui"}, taux: "Taux d'exploitation", num: 1, trace: 1,
+		noms: mesuresCampagnes[:3], taux: mesuresCampagnes[3], num: 1, trace: 1,
 	}
 	return g.resultat(comptes), nil
+}
+
+func objectifs(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error) {
+	o, err := analytics.Objectifs2026(ctx, q, p.zone)
+	if err != nil {
+		return Resultat{}, err
+	}
+	r := Resultat{
+		Tableau: Tableau{Colonnes: slices.Concat([]string{libellesAxes["objectif"]}, mesuresObjectifs), Lignes: [][]string{}},
+		Serie:   []Point{}, Mesure: mesuresObjectifs[2],
+	}
+	for _, suivi := range []struct {
+		nom string
+		o   analytics.ObjectifSuivi
+	}{{projetChues, o.Chues}, {"Grand Public", o.GrandPublic}, {"Leads marketing", o.LeadsMarketing}} {
+		r.Tableau.Lignes = append(r.Tableau.Lignes, []string{
+			suivi.nom, strconv.Itoa(suivi.o.Cible), strconv.Itoa(suivi.o.Realisations), pourcent(suivi.o.TauxAvancement),
+			strconv.FormatFloat(suivi.o.CadenceQuotidienneRequise, 'f', 1, 64), strconv.FormatFloat(suivi.o.CadenceQuotidienneReelle, 'f', 1, 64),
+		})
+		r.Serie = append(r.Serie, Point{Libelle: suivi.nom, Valeur: suivi.o.TauxAvancement})
+	}
+	return r, nil
+}
+
+func echeancesEnRetard(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error) {
+	lignes, _, err := ventesACredit.EcheancesEnRetard(ctx, q, p.maintenant, p.zone)
+	if err != nil {
+		return Resultat{}, err
+	}
+	rang := map[string]int{}
+	comptes := []compte{}
+	for j := range lignes {
+		site := lignes[j].Site
+		i, vu := rang[site]
+		if !vu {
+			i = len(comptes)
+			rang[site] = i
+			comptes = append(comptes, compte{groupe: site, valeurs: make([]int64, 2)})
+		}
+		comptes[i].valeurs[0]++
+		comptes[i].valeurs[1] += lignes[j].MontantDu
+	}
+	slices.SortFunc(comptes, func(a, b compte) int { return cmp.Compare(b.valeurs[1], a.valeurs[1]) })
+	g := grille{entete: libellesAxes[axeSite], noms: mesuresEcheances, montants: map[int]bool{1: true}, trace: 1}
+	return g.resultat(comptes), nil
+}
+
+func risques(ctx context.Context, q *db.Queries, p *parametres) (Resultat, error) {
+	courriels, err := q.CourrielsSurPlage(ctx, db.CourrielsSurPlageParams{Debut: p.du, Fin: p.au})
+	if err != nil {
+		return Resultat{}, err
+	}
+	echoue := db.ImportStatusFailed
+	imports, err := q.CountImportJobs(ctx, db.CountImportJobsParams{Status: &echoue})
+	if err != nil {
+		return Resultat{}, err
+	}
+	taches, err := q.CronRunsParNom(ctx, db.CronRunsParNomParams{Debut: p.du, Fin: p.au})
+	if err != nil {
+		return Resultat{}, err
+	}
+	var tachesEnEchec int64
+	for _, t := range taches {
+		tachesEnEchec += int64(t.Echecs)
+	}
+	g := grille{entete: libellesAxes["risque"], noms: mesuresRisques}
+	return g.resultat([]compte{
+		{groupe: "Courriels en échec", valeurs: []int64{int64(courriels.Echecs)}},
+		{groupe: "Imports en échec", valeurs: []int64{imports}},
+		{groupe: "Tâches planifiées en échec", valeurs: []int64{tachesEnEchec}},
+	}), nil
 }

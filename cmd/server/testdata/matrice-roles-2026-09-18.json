@@ -729,6 +729,13 @@
   "PATCH /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "DELETE /api/v1/assistant/questions-enregistrees/{id}": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/assistant/questions-enregistrees/{id}/export": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/tableaux-de-bord/calculs": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "POST /api/v1/tableaux-de-bord/{ecran}/construire": [
+    "ACCUEIL",
+    "ADMIN",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
   "POST /api/v1/prospects/{id}/resume": [
     "ADMIN",
     "CHARGE_CLIENTELE",

@@ -91,14 +91,15 @@ WITH lues AS (
       WHEN 'jour' THEN to_char(v."dateSouscription", 'YYYY-MM-DD')
       ELSE 'Total'
     END AS groupe,
-    v."nombreLots", v."prixTotal",
+    v."nombreLots", v."prixTotal", v."reliquat",
     v."acompte" + COALESCE((SELECT sum(vv."montant") FROM "ventes_versements" vv WHERE vv."venteId" = v."id"), 0) AS encaisse
   FROM "ventes" v
   WHERE v."archiveeLe" IS NULL
     AND v."dateSouscription" >= @du::timestamp AND v."dateSouscription" < @au::timestamp
 )
 SELECT groupe::text AS groupe, COUNT(*)::int AS ventes, COALESCE(SUM("nombreLots"), 0)::int AS lots,
-       COALESCE(SUM("prixTotal"), 0)::bigint AS montant, COALESCE(SUM(encaisse), 0)::bigint AS encaisse
+       COALESCE(SUM("prixTotal"), 0)::bigint AS montant, COALESCE(SUM(encaisse), 0)::bigint AS encaisse,
+       COALESCE(SUM("reliquat"), 0)::bigint AS reliquat
 FROM lues
 GROUP BY groupe
 ORDER BY CASE WHEN @axe::text = 'jour' THEN groupe END, montant DESC, groupe
@@ -106,12 +107,17 @@ LIMIT 200;
 
 -- name: AssistantDossiersBancaires :many
 -- Même périmètre que le tableau de bord Banque & Finance : dossiers créés sur la période.
+-- Un dossier ouvert est bloqué quand il est entré dans son étape avant `bloque_avant`.
 SELECT
   CASE WHEN @axe::text = 'banque' THEN COALESCE(b."shortName", 'Sans banque') ELSE s."label" END::text AS groupe,
   COUNT(*)::int AS dossiers,
   COUNT(*) FILTER (WHERE s."type" = 'CASHED')::int AS encaisses,
   COUNT(*) FILTER (WHERE s."type" = 'REJECTED')::int AS rejetes,
-  COALESCE(SUM(c."amountXof") FILTER (WHERE s."type" = 'CASHED'), 0)::bigint AS montant_encaisse
+  COALESCE(SUM(c."amountXof") FILTER (WHERE s."type" = 'CASHED'), 0)::bigint AS montant_encaisse,
+  COUNT(*) FILTER (WHERE s."type" = 'OPEN' AND COALESCE(
+    (SELECT MAX(t."createdAt") FROM "bank_case_transitions" t
+     WHERE t."caseId" = c."id" AND t."toStageId" = c."currentStageId"),
+    c."createdAt") < @bloque_avant::timestamp)::int AS bloques
 FROM "bank_cases" c
 JOIN "bank_case_stages" s ON s."id" = c."currentStageId"
 LEFT JOIN "banques" b ON b."id" = c."processingBankId"

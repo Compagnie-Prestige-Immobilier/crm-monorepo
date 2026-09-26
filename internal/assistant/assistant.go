@@ -69,6 +69,8 @@ var Garde = map[string]socle.Permission{
 	"DELETE " + cheminEnregistre:          permission,
 	"GET " + cheminEnregistre + "/export": permission,
 	"POST " + cheminResume:                socle.PermissionProspectsLire,
+	"POST " + cheminCalculs:               permission,
+	"POST " + cheminConstruire:            socle.PermissionChiffresDisposer,
 }
 
 type memoire[V any] struct {
@@ -266,7 +268,7 @@ func (s *service) parametresDe(u *socle.Utilisateur, o *outil, demande *Parametr
 	local := maintenant.In(s.Cfg.TimeZone)
 	jour := time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, s.Cfg.TimeZone)
 	du, au := resoudrePeriode(demande, o, jour)
-	p := parametres{du: du.UTC(), au: au.UTC(), maintenant: maintenant.UTC(), jour: jour.UTC(), axe: axeRetenu(o, demande.Axe)}
+	p := parametres{du: du.UTC(), au: au.UTC(), maintenant: maintenant.UTC(), jour: jour.UTC(), zone: s.Cfg.TimeZone, axe: axeRetenu(o, demande.Axe)}
 	lus := Parametres{
 		Outil: demande.Outil, Axe: p.axe,
 		Du: du.Format(formatJour), Au: au.AddDate(0, 0, -1).Format(formatJour),
@@ -450,9 +452,9 @@ func jourLu(jour string) string {
 }
 
 func explication(u *socle.Utilisateur, o *outil, lus *Parametres) string {
-	parties := []string{
-		"Outil « " + o.libelle + " »", o.source,
-		"du " + jourLu(lus.Du) + " au " + jourLu(lus.Au),
+	parties := []string{"Outil « " + o.libelle + " »", o.source}
+	if !o.sansPeriode {
+		parties = append(parties, "du "+jourLu(lus.Du)+" au "+jourLu(lus.Au))
 	}
 	if lus.Axe != "" {
 		parties = append(parties, "par "+strings.ToLower(libellesAxes[lus.Axe]))
@@ -763,4 +765,5 @@ func Monter(api huma.API, d *socle.Deps) {
 		Summary: "Repose une question enregistrée et rend son tableau en classeur.",
 	}, s.exporterEnregistree)
 	monterResume(api, s)
+	s.monterTableaux(api)
 }
