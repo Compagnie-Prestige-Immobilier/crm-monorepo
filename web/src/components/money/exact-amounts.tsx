@@ -97,7 +97,7 @@ export function ExactAmountsToggle({ className }: { className?: string | undefin
           )}
         />
       </span>
-      Chiffres exacts
+      Montants exacts
     </button>
   );
 }
