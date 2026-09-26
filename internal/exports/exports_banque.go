@@ -7,6 +7,7 @@ import (
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"net/http"
 	"sort"
 	"strconv"
@@ -61,8 +62,8 @@ func exportConditionsDossiers(in *ExportDossiersInput) (*exportPredicat, error) 
 		p.clauses = append(p.clauses, d.colonne+" "+d.operateur+" "+p.valeur(d.valeur)+d.cast)
 	}
 	if in.Projet != "" {
-		p.clauses = append(p.clauses, `EXISTS (SELECT 1 FROM "prospect_journeys" pj WHERE pj."prospectId" = c."prospectId" AND pj."projet" = `+
-			p.valeur(in.Projet)+`::"Projet")`)
+		p.args = append(p.args, in.Projet)
+		p.clauses = append(p.clauses, fmt.Sprintf(FiltreProjetDossier, len(p.args)))
 	}
 	// Créateur ou dernier intervenant : reprendre le dossier d'un collègue compte.
 	if in.AgentId != "" {

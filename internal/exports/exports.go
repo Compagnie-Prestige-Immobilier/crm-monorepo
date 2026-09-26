@@ -1004,3 +1004,10 @@ const (
 	LotEtatARappeler           = "A_RAPPELER"
 	FormulaireLibelleEmployeur = "Employeur"
 )
+
+// Le PARCOURS, pas le projet d'entrée : un même numéro suit les deux. Sans
+// fiche au CRM, il n'y a pas de parcours et l'inscription donne le projet.
+const FiltreProjetDossier = `(EXISTS (SELECT 1 FROM "prospect_journeys" pj
+		WHERE pj."prospectId" = c."prospectId" AND pj."projet" = $%[1]d::"Projet")
+	OR EXISTS (SELECT 1 FROM "inscriptions_plateforme" ip
+		WHERE ip."id" = c."inscriptionId" AND ip."projet" = $%[1]d::"Projet"))`
