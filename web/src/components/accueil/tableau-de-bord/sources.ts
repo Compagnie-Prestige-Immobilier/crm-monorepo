@@ -115,6 +115,11 @@ function labelMap(items: { id: string; label: string }[]): Map<string, string> {
   return new Map(items.map((item) => [item.id, item.label]));
 }
 
+function jourLabel(jour: string): string {
+  const [annee, mois, date] = jour.split('-');
+  return `${date ?? ''}/${mois ?? ''}/${annee ?? ''}`;
+}
+
 function moisLabel(month: string): string {
   const [annee, mois] = month.split('-');
   const index = Number(mois) - 1;
@@ -183,7 +188,7 @@ export const SOURCES = {
       return {
         forme: 'scalaire',
         donnee: {
-          libelle: plusCharge === null ? 'Aucune visite' : plusCharge.date,
+          libelle: plusCharge === null ? 'Aucune visite' : jourLabel(plusCharge.date),
           valeur: plusCharge?.count ?? 0,
         },
       };
@@ -247,7 +252,7 @@ export const SOURCES = {
       forme: 'serie-temporelle',
       donnee: [...stats.parJour]
         .sort((a, b) => a.date.localeCompare(b.date))
-        .map((point) => ({ id: point.date, label: point.date, value: point.count })),
+        .map((point) => ({ id: point.date, label: jourLabel(point.date), value: point.count })),
     }),
   },
   'par-mois': {
