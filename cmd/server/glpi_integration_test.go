@@ -87,3 +87,26 @@ func TestGlpiOuvreLaPlateformeAvecLaSessionDuPanneau(t *testing.T) {
 		t.Fatalf("rôle sans la permission : refus attendu, %s reçu", refus)
 	}
 }
+
+func TestGlpiRefuseLeCookieClairEnTLS(t *testing.T) {
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	t.Setenv("GLPI_URL", "https://glpi.essai")
+	t.Setenv("GLPI_SSO_CLIENT_ID", "crm")
+	t.Setenv("GLPI_SSO_SECRET", "secret-essai")
+	b := nouveauBanc(t, "SUPERVISEUR")
+	clair := b.cookieDeConnexion("")
+
+	requete := url.Values{"client_id": {"crm"}, "redirect_uri": {retourGlpiEssai}, "state": {"etat"}}
+	req, _ := http.NewRequestWithContext(b.ctx, http.MethodGet, b.ts.URL+"/api/v1/auth/glpi/autoriser?"+requete.Encode(), http.NoBody)
+	req.Header.Set("X-Forwarded-Proto", "https")
+	req.AddCookie(clair)
+	sansSuivre := http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
+	resp, err := sansSuivre.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_ = resp.Body.Close()
+	if vers := mustURL(t, resp.Header.Get("Location")); vers.Path != "/connexion" || vers.Query().Get("code") != "" {
+		t.Fatalf("en TLS, le cookie clair ne doit pas ouvrir GLPI : %d %s", resp.StatusCode, vers)
+	}
+}

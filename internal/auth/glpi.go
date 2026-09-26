@@ -106,7 +106,7 @@ func (f *fournisseurGlpi) autoriser(ctx context.Context, in *AutoriserGlpiInput)
 	if f.Cfg.Base != socle.BasePublique {
 		return nil, socle.Problem(http.StatusForbidden, "SUPPORT_BASE_DEMO", "La plateforme de support s'ouvre depuis la base principale.")
 	}
-	u, connecte := f.utilisateur(ctx, in.jeton())
+	u, connecte := f.utilisateur(ctx, in.jeton(ctx))
 	if !connecte {
 		suite := "/api/v1/auth/glpi/autoriser?" + url.Values{"client_id": {in.ClientID}, "redirect_uri": {in.RedirectURI}, "state": {in.State}}.Encode()
 		return redirection("/connexion?" + url.Values{"suite": {suite}}.Encode()), nil
