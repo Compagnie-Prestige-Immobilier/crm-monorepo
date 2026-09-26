@@ -1,5 +1,5 @@
 import type { ApiClient, components } from '@crm/api-client';
-import { unwrap } from '@crm/api-client/query';
+import { ApiError, unwrap } from '@crm/api-client/query';
 
 import { getApiClient } from '@/lib/api/browser';
 
@@ -15,6 +15,8 @@ export type SiteVenteInput = components['schemas']['SiteVenteModifyInputBody'];
 export type SiteVenteCreationInput = components['schemas']['SiteVenteInputBody'];
 export type CanalVenteInput = components['schemas']['CanalVenteModifyInputBody'];
 export type CanalVenteCreationInput = components['schemas']['CanalVenteInputBody'];
+export type EcheancesEnRetard = components['schemas']['EcheancesEnRetardOutputBody'];
+export type EcheanceEnRetard = components['schemas']['EcheanceEnRetardDTO'];
 export interface VentesData {
   classeur: ClasseurVentes | null;
   ventes: Vente[];
@@ -37,6 +39,22 @@ export async function fetchVentesConfiguration(
   client: ApiClient = getApiClient(),
 ): Promise<VentesConfiguration> {
   return unwrap(await client.GET('/api/v1/ventes/configuration'));
+}
+
+export async function fetchEcheancesEnRetard(
+  page: number,
+  taille: number,
+  client: ApiClient = getApiClient(),
+): Promise<EcheancesEnRetard> {
+  return unwrap(
+    await client.GET('/api/v1/ventes/echeances-en-retard', { params: { query: { page, taille } } }),
+  );
+}
+
+/** Le classeur se télécharge par le navigateur : la session voyage en cookie. */
+export function lienSommesDues(du: string, au: string, site: string): string {
+  const params = new URLSearchParams({ du, au, ...(site === '' ? {} : { site }) });
+  return `/api/v1/export/ventes-sommes-dues.xlsx?${params.toString()}`;
 }
 
 export async function createVente(
@@ -164,4 +182,18 @@ export function libelleCredit(vente: Vente): string {
   if (nombre === null) return 'Crédit';
   const rythme = vente.periodiciteMois > 1 ? `tous les ${vente.periodiciteMois} mois` : 'par mois';
   return `Crédit, ${nombre} échéance${nombre > 1 ? 's' : ''} ${rythme}`;
+}
+
+export function lotsRestants(site: SiteVente): string | null {
+  if (site.lotsRestants === null || site.totalLots === null) return null;
+  const restants = Math.max(site.lotsRestants, 0);
+  return `${restants} lot${restants > 1 ? 's' : ''} restant${restants > 1 ? 's' : ''} sur ${site.totalLots}`;
+}
+
+/** Le message du refus quand le site n'a plus assez de lots, sinon `null`. */
+export function stockEpuise(error: unknown): string | null {
+  if (!(error instanceof ApiError) || error.status !== 409) return null;
+  const corps = error.body;
+  if (typeof corps !== 'object' || corps === null || !('code' in corps)) return null;
+  return corps.code === 'VENTE_STOCK_EPUISE' ? error.message : null;
 }

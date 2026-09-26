@@ -500,6 +500,13 @@ const SECTIONS: readonly NavSection[] = [
         acces: 'ventes.lire',
       },
       {
+        href: '/ventes/retards',
+        label: 'Échéances en retard',
+        icon: BellIcon,
+        description: 'Clients à relancer',
+        acces: 'ventes.lire',
+      },
+      {
         href: '/ventes/sites',
         label: 'Par site',
         icon: LibraryIcon,
