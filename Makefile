@@ -11,8 +11,10 @@ setup: db gen ## base locale, dépendances, code généré, en une commande
 	pnpm --dir web install
 
 db: ## crée cpi_v2_dev depuis sql/schema.sql si la base n'existe pas, puis sème référentiels, comptes et 60 jours de données de développement
-	@case "$(DB)" in \
-	  postgres://localhost*|postgres://127.0.0.1*|postgresql://localhost*|postgresql://127.0.0.1*) ;; \
+	@hote=$$(printf '%s' "$(DB)" | sed -E 's#^postgres(ql)?://##; s#[/?].*##; s#.*@##; s#:[0-9]*$$##'); \
+	case "$(DB)" in *[?\&]host=*|*[?\&]hostaddr=*) hote= ;; postgres://*|postgresql://*) ;; *) hote= ;; esac; \
+	case "$$hote" in \
+	  localhost|127.0.0.1) ;; \
 	  *) echo "DB doit pointer vers localhost ou 127.0.0.1 : $(DB)" >&2; exit 1 ;; \
 	esac
 	@psql "$(DB)" -Atc 'select 1' >/dev/null 2>&1 || { \
