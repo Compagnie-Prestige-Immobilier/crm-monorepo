@@ -1,7 +1,4 @@
 -- name: RendezVousObtenus :many
--- Ce que le comptoir doit voir d'un rendez-vous, et rien de plus : qui vient,
--- quand, comment le joindre, quel type, qui l'a pris, et où en est sa venue.
--- La date du rendez-vous est celle du rappel promis par l'appel qui l'a fermé.
 SELECT
   p."id",
   p."prenom",
@@ -9,8 +6,7 @@ SELECT
   p."phoneE164",
   r."label" AS "type",
   r."code" AS "typeCode",
-  -- Rendue en texte ISO : sqlc tient la colonne d'une jointure externe pour
-  -- non nulle, et un scan de NULL dans une date échouerait à l'exécution.
+  -- sqlc tient la colonne d'une jointure externe pour non nulle : un NULL scanné en date échouerait.
   COALESCE(to_char(rdv."quand", 'YYYY-MM-DD"T"HH24:MI:SS"Z"'), '')::text AS "quand",
   p."lastCallAt",
   COALESCE(u."fullName", '') AS "prisPar",
@@ -23,12 +19,10 @@ SELECT
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
--- Le rappel en attente, sinon le dernier honoré, porte la date du rendez-vous :
--- un rappel supplanté ou annulé ne la donne jamais. Une fiche sans rappel garde
--- une date vide, et la jointure externe le dit au type rendu.
+-- Un rappel annulé garde la date du rendez-vous ; un rappel supplanté ne la donne jamais.
 LEFT JOIN LATERAL (
   SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-  WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+  WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
   ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
 ) rdv ON true
 LEFT JOIN LATERAL (

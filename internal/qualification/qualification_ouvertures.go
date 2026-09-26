@@ -202,7 +202,7 @@ func (s *service) qualificationReporterRappel(ctx context.Context, in *Qualifica
 	if !u.Peut(socle.PermissionFichesIgnorerPropriete) && row.AssignedToId != u.ID {
 		return nil, socle.Problem(http.StatusForbidden, "NOT_OWNER", "Ce rappel a été promis par un autre téléconseiller.")
 	}
-	if row.RendezVous && row.Status == db.ScheduledCallbackStatusPENDING {
+	if row.RendezVousNonReportable && row.Status == db.ScheduledCallbackStatusPENDING {
 		return nil, socle.Problem(http.StatusConflict, "RENDEZ_VOUS_NON_REPORTABLE",
 			"Un rendez-vous ne se décale pas de 15 minutes : changez sa date en requalifiant la fiche.")
 	}

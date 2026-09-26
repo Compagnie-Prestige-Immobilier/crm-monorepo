@@ -3,8 +3,11 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"net/http"
 	"slices"
+	"sync"
 	"testing"
 	"time"
 )
@@ -137,5 +140,111 @@ func TestRendezVousSiteSurCreneauOuvert(t *testing.T) {
 	b.attend(statut, http.StatusOK, "fiche sans rendez-vous", body)
 	if body["rendezVous"] != nil {
 		t.Fatalf("aucun rendez-vous attendu : %v", body)
+	}
+}
+
+// Le dimanche de 7 h à 8 h, une visite par heure ; les réglages d'avant reviennent à la fin du test.
+func rvSiteUneVisiteLeDimanche(t *testing.T) (site, point string) {
+	t.Helper()
+	admin := qualificationConnecte(t, "ADMIN")
+	var avant *string
+	_ = admin.pool.QueryRow(admin.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'rv_site.reglages'`).Scan(&avant)
+	t.Cleanup(func() {
+		_, _ = admin.pool.Exec(admin.ctx, `DELETE FROM "app_settings" WHERE "key" = 'rv_site.reglages'`)
+		if avant != nil {
+			_, _ = admin.pool.Exec(admin.ctx, `INSERT INTO "app_settings" ("key", "value", "updatedAt") VALUES ('rv_site.reglages', $1, now())`, *avant)
+		}
+	})
+	reglages := map[string]any{"jours": []int{7}, "heureDebut": 7, "heureFin": 8, "horizonJours": 60, "maxVisites": 1}
+	statut, body := qualificationEnvoi(admin, http.MethodPut, "/api/v1/rv-site/reglages", reglages)
+	admin.attend(statut, http.StatusOK, "réglages enregistrés", body)
+	if err := admin.pool.QueryRow(admin.ctx, `SELECT (SELECT "id" FROM "ventes_sites" WHERE "actif" LIMIT 1),
+		(SELECT "id" FROM "points_rencontre" WHERE "isActive" LIMIT 1)`).Scan(&site, &point); err != nil {
+		t.Fatal(err)
+	}
+	return site, point
+}
+
+func rvSiteCorps(fiche, site, point string, quand time.Time) map[string]any {
+	return qualificationCorpsTentative(fiche, map[string]any{
+		"reasonCode": "RV_SITE", "callbackAt": quand.Format(time.RFC3339), "siteId": site, "pointRencontreId": point,
+	})
+}
+
+func rvSiteFiche(b *banc) string {
+	b.t.Helper()
+	fiche := qualificationProspect(b)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	return fiche
+}
+
+// Un rappel supplanté libère sa place ; un rappel annulé la garde, comme la date à l'accueil.
+func TestRendezVousSitePlaceTenueParLeDernierRappel(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	b := qualificationConnecte(t, "COMMERCIAL")
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	huit := sept.Add(time.Hour)
+	premiere, seconde := rvSiteFiche(b), rvSiteFiche(b)
+
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(premiere, site, point, huit))
+	b.attend(statut, http.StatusOK, "RV site à 8 h", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(premiere, site, point, sept))
+	b.attend(statut, http.StatusOK, "RV site déplacé à 7 h", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/callbacks/"+rappelEnAttente(b, premiere)+"/cancel", nil)
+	b.attend(statut, http.StatusOK, "rappel du RV site annulé", body)
+
+	statut, body = qualificationEnvoi(b, http.MethodGet, "/api/v1/phase2/rv-site", nil)
+	b.attend(statut, http.StatusOK, "créneaux RV site", body)
+	reservations, _ := body["reservations"].([]any)
+	pris := map[string]float64{}
+	for _, r := range reservations {
+		ligne, _ := r.(map[string]any)
+		quand, _ := ligne["quand"].(string)
+		pris[quand], _ = ligne["nombre"].(float64)
+	}
+	if pris[sept.Format(time.RFC3339)] != 1 || pris[huit.Format(time.RFC3339)] != 0 {
+		t.Fatalf("réservations : %v, attendu une à 7 h et aucune à 8 h", pris)
+	}
+
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(seconde, site, point, sept))
+	b.attend(statut, http.StatusConflict, "7 h tenu par le rappel annulé", body)
+	statut, body = qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", rvSiteCorps(seconde, site, point, huit))
+	b.attend(statut, http.StatusOK, "8 h libéré par le rappel supplanté", body)
+}
+
+// Deux téléconseillers visent la dernière place au même instant : un seul l'obtient.
+func TestRendezVousSiteDernierePlaceDisputee(t *testing.T) {
+	site, point := rvSiteUneVisiteLeDimanche(t)
+	sept, _ := time.Parse(time.RFC3339, prochain(time.Sunday))
+	consoles := []*banc{qualificationConnecte(t, "COMMERCIAL"), qualificationConnecte(t, "COMMERCIAL")}
+	corps := make([][]byte, len(consoles))
+	for i, b := range consoles {
+		corps[i], _ = json.Marshal(rvSiteCorps(rvSiteFiche(b), site, point, sept))
+	}
+	statuts := make([]int, len(consoles))
+	var depart, fin sync.WaitGroup
+	depart.Add(1)
+	for i, b := range consoles {
+		fin.Add(1)
+		go func() {
+			defer fin.Done()
+			req, _ := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+"/api/v1/phase2/call-attempts", bytes.NewReader(corps[i]))
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Origin", b.ts.URL)
+			depart.Wait()
+			if resp, err := b.client.Do(req); err == nil {
+				statuts[i] = resp.StatusCode
+				_ = resp.Body.Close()
+			}
+		}()
+	}
+	depart.Done()
+	fin.Wait()
+	slices.Sort(statuts)
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusConflict {
+		t.Fatalf("statuts %v, attendu un 200 et un 409", statuts)
 	}
 }

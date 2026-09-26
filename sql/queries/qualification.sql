@@ -295,9 +295,10 @@ WHERE c."status" = 'PENDING'
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        c."status", p."phoneE164", p."prenom", p."nom", p."projet",
        u."fullName" AS "assignedToName",
-       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous"
+       (p."phase2Status" = 'APPOINTMENT' AND r."code" IS DISTINCT FROM 'RDV_TELEPHONIQUE')::bool AS "rendezVousNonReportable"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
+LEFT JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 JOIN "users" u ON u."id" = c."assignedToId"
 WHERE c."id" = $1;
 
@@ -525,12 +526,12 @@ SELECT "id", "label" FROM "points_rencontre"
 WHERE "isActive" ORDER BY "position", "label" LIMIT 100;
 
 -- name: RvSiteReservations :many
--- La date d'un rendez-vous se lit comme à l'accueil : le rappel en attente, sinon le dernier honoré.
+-- La date d'un rendez-vous se lit comme à l'accueil (RendezVousObtenus).
 SELECT rdv."quand"::timestamp AS "quand", count(*)::int AS "nombre"
 FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 LEFT JOIN LATERAL (
   SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-  WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+  WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
   ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
 ) rdv ON true
 WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
@@ -544,7 +545,7 @@ SELECT pg_advisory_xact_lock(hashtext('rv_site.creneaux'));
 SELECT (SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
         LEFT JOIN LATERAL (
           SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
-          WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+          WHERE sc."prospectId" = p."id" AND sc."status" <> 'SUPERSEDED'
           ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
         ) rdv ON true
         WHERE p."deletedAt" IS NULL AND p."phase2Status" = 'APPOINTMENT' AND r."code" = 'RV_SITE'
