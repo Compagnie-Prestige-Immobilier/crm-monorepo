@@ -28,6 +28,7 @@ type brevoVersionRecue struct {
 type brevoRecu struct {
 	Subject         string              `json:"subject"`
 	To              []map[string]string `json:"to"`
+	Cc              []map[string]string `json:"cc"`
 	HTMLContent     string              `json:"htmlContent"`
 	TextContent     string              `json:"textContent"`
 	MessageVersions []brevoVersionRecue `json:"messageVersions"`
@@ -699,8 +700,7 @@ func TestNotificationEmailReserveAuTeleconseiller(t *testing.T) {
 	}
 }
 
-// Une annonce à plusieurs téléconseillers partait dans un seul appel Brevo
-// avec un `to` de tous les destinataires : chacun lisait l'adresse des autres.
+// Une annonce à plusieurs téléconseillers : chacun ne lit que sa propre adresse.
 func TestAnnonceBrevoUneVersionParDestinataire(t *testing.T) {
 	faux := brevoDeTest(t)
 	b := nouveauBanc(t, "ADMIN")
@@ -738,5 +738,29 @@ func TestAnnonceBrevoUneVersionParDestinataire(t *testing.T) {
 	}
 	if !vues[emailA] || !vues[emailB] {
 		t.Fatalf("les deux destinataires doivent apparaître, chacun dans sa version : %v", vues)
+	}
+}
+
+// Un courriel opérationnel part en un seul exemplaire : tous ses destinataires dans `to`, la copie une fois.
+func TestCourrielOperationnelUnSeulToAvecCopie(t *testing.T) {
+	faux := brevoDeTest(t)
+	b := nouveauBanc(t, "ADMIN")
+	b.notificationAdminConnecte()
+	sujet := "Dossier encaissé " + uuid.NewString()
+	courrielID := uuid.NewString()
+	adminExec(b, `INSERT INTO "courriels" ("id","type","sujet","destinataires","copies","objetType","objetId","html","texte","statut","updatedAt")
+		VALUES ($1,'DOSSIER_ENCAISSE',$2,'{banque-a@test.cpi,banque-b@test.cpi}','{copie@test.cpi}','inscription',$1,'<p>x</p>','x','ECHEC',now())`,
+		courrielID, sujet)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "id" = $1`, courrielID) })
+
+	statut, body := b.notificationAppel(http.MethodPost, "/api/v1/courriels/"+courrielID+"/renvoyer", nil)
+	b.attend(statut, http.StatusOK, "renvoi", body)
+	appels := faux.pour(sujet)
+	if len(appels) != 1 {
+		t.Fatalf("un seul appel Brevo attendu, %d reçu(s)", len(appels))
+	}
+	appel := appels[0]
+	if len(appel.To) != 2 || len(appel.Cc) != 1 || len(appel.MessageVersions) != 0 {
+		t.Fatalf("to %v, cc %v, %d version(s) : un `to` à deux adresses et aucune version attendus", appel.To, appel.Cc, len(appel.MessageVersions))
 	}
 }

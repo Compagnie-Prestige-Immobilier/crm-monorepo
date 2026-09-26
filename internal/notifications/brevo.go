@@ -39,6 +39,8 @@ type MessageBrevo struct {
 	HTML          string
 	Texte         string
 	PieceJointe   *PieceJointeBrevo
+	// Annonces seulement : chaque destinataire ne lit que sa propre adresse.
+	UneVersionParDestinataire bool
 }
 
 type PieceJointeBrevo struct {
@@ -103,9 +105,6 @@ type corpsBrevo struct {
 	MessageVersions []versionBrevo      `json:"messageVersions,omitempty"`
 }
 
-// Une version par destinataire : sans elle, Brevo place tous les `to` d'un
-// même appel dans l'en-tête reçu par chacun, et chaque destinataire lit les
-// adresses des autres.
 type versionBrevo struct {
 	To []map[string]string `json:"to"`
 }
@@ -207,10 +206,8 @@ func (b *brevo) envoyerTranche(ctx context.Context, message *MessageBrevo, tranc
 		HTMLContent: message.HTML,
 		TextContent: message.Texte,
 	}
-	// Avec un seul destinataire, `to` suffit et Brevo rend `messageId`. Au-delà,
-	// `messageVersions` évite que chaque destinataire lise les adresses des autres,
-	// mais Brevo rend alors `messageIds` (voir la lecture de la réponse plus bas).
-	if len(adresses) > 1 {
+	// Une copie serait reçue une fois par version : les versions l'excluent.
+	if message.UneVersionParDestinataire && len(message.Copies) == 0 && len(adresses) > 1 {
 		versions := make([]versionBrevo, len(adresses))
 		for i, adresse := range adresses {
 			versions[i] = versionBrevo{To: []map[string]string{adresse}}
