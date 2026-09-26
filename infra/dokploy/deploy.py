@@ -891,7 +891,7 @@ def cmd_redeploy() -> None:
     # pas, ou une migration qui échoue, passaient pour un déploiement réussi.
     step(f"Attente de {GO_NAME}")
     _attendre_application(ids["GO_ID"])
-    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
+    _attendre_sante(revision)
 
 
 def exiger_sauvegarde_recente(postgres_id: str) -> None:
@@ -979,18 +979,24 @@ def _attendre_application(application_id: str, minutes: int = 20) -> None:
     sys.exit(1)
 
 
-def _attendre_sante(url: str, secondes: int = 120) -> None:
+def _attendre_sante(revision: str, secondes: int = 120) -> None:
+    """L'ancien conteneur répond 200 tant que le nouveau démarre : seule la révision servie prouve la mise en ligne."""
     # Cloudflare refuse les agents non navigateur (erreur 1010).
-    requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
+    entetes = {"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"}
+    vivant = urllib.request.Request(f"https://{API_DOMAIN}/health/live", headers=entetes)
+    pret = urllib.request.Request(f"https://{API_DOMAIN}/health/ready", headers=entetes)
+    servie = None
     for _ in range(secondes // 5):
         try:
-            with CLIENT_HTTP.open(requete, timeout=10) as reponse:
-                if reponse.status == 200:
+            with CLIENT_HTTP.open(vivant, timeout=10) as reponse:
+                servie = json.load(reponse).get("revision", "")
+            with CLIENT_HTTP.open(pret, timeout=10) as reponse:
+                if reponse.status == 200 and servie == revision:
                     return
-        except (urllib.error.URLError, TimeoutError):
+        except (urllib.error.URLError, TimeoutError, ValueError):
             pass
         time.sleep(5)
-    fail(f"{url} ne répond pas 200 après {secondes} s.")
+    fail(f"https://{API_DOMAIN} ne sert pas la révision {revision or '(vide)'} après {secondes} s ; servie : {servie}.")
     sys.exit(1)
 
 
