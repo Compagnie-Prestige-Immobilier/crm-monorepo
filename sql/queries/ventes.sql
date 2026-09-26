@@ -155,9 +155,10 @@ UPDATE "ventes_canaux" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
 
 -- name: EcheancesVentesACredit :many
-SELECT "client", "telephone", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement"
+SELECT "id", "client", "telephone", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement"
 FROM "ventes"
 WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuellement"
     AND "reliquat" > 0 AND "jourVersement" IS NOT NULL AND "premierVersement" IS NOT NULL
-ORDER BY "client"
-LIMIT 5000;
+    AND "id" > @apres::bigint
+ORDER BY "id"
+LIMIT @taille::bigint;
