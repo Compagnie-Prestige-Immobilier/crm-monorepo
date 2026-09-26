@@ -18,7 +18,3 @@ export const SANS_PROSPECT = {
   hasProspects: false,
   pageSize: 1,
 };
-
-export const hubKeys = {
-  prospectsEnAttente: ['chues', 'hub', 'prospects-en-attente'] as const,
-};
