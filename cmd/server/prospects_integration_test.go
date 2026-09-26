@@ -309,6 +309,9 @@ func TestProspectRequalificationParLEncadrement(t *testing.T) {
 		t.Fatal(err)
 	}
 
+	statut, body = appelJSON(superviseur, http.MethodPut, "/api/v1/prospects/"+id+"/methode", map[string]any{"methode": "PLATFORM"}, nil)
+	superviseur.attend(statut, http.StatusOK, "méthode du projet principal", body)
+
 	chemin := "/api/v1/prospects/" + id + "/requalifier"
 	corps := map[string]any{"projet": "GRAND_PUBLIC", "statut": "NOUVEAU"}
 	statut, body = appelJSON(b, http.MethodPost, chemin, corps, nil)
@@ -316,14 +319,27 @@ func TestProspectRequalificationParLEncadrement(t *testing.T) {
 	statut, body = appelJSON(superviseur, http.MethodPost, chemin, corps, nil)
 	superviseur.attend(statut, http.StatusOK, "requalification par le superviseur", body)
 
-	var etat, consent string
+	var etat, consent, phase2 string
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT "statut"::text, "consent"::text FROM "prospect_journeys" WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`,
-		id).Scan(&etat, &consent); err != nil {
+		`SELECT "statut"::text, "consent"::text, "phase2Status"::text FROM "prospect_journeys" WHERE "prospectId" = $1 AND "projet" = 'GRAND_PUBLIC'`,
+		id).Scan(&etat, &consent, &phase2); err != nil {
 		t.Fatal(err)
 	}
-	if etat != "NOUVEAU" || consent != "NON_DEMANDE" {
-		t.Fatalf("la fiche doit revenir à traiter : %s, %s", etat, consent)
+	if etat != "NOUVEAU" || consent != "NON_DEMANDE" || phase2 != "PENDING" {
+		t.Fatalf("le parcours doit revenir à traiter : %s, %s, %s", etat, consent, phase2)
+	}
+	var remise *time.Time
+	var methode *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "remiseATraiterAt", "phase2Status"::text, "enrollmentMethod"::text FROM "prospects" WHERE "id" = $1`,
+		id).Scan(&remise, &phase2, &methode); err != nil {
+		t.Fatal(err)
+	}
+	if remise == nil {
+		t.Fatal("la fiche doit revenir dans le reste à appeler")
+	}
+	if phase2 != "METHOD_OBTAINED" || methode == nil || *methode != "PLATFORM" {
+		t.Fatalf("le projet principal garde sa méthode : %s, %v", phase2, methode)
 	}
 }
 

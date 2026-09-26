@@ -739,14 +739,15 @@ UPDATE "prospect_journeys" SET
   "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
 WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
+-- Un autre projet que le principal ne touche que la remise en file.
 -- name: RequalifierProspect :execrows
 UPDATE "prospects" SET
-  "statut" = @statut::"ProspectStatut",
-  "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
-  "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
+  "statut" = CASE WHEN "projet" = @projet THEN @statut::"ProspectStatut" ELSE "statut" END,
+  "phase2Status" = CASE WHEN "projet" = @projet AND @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
+  "enrollmentMethod" = CASE WHEN "projet" = @projet AND @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
-WHERE "id" = @prospect_id AND "statut" NOT IN ('CONVERTI', 'VENDU');
+WHERE "id" = @prospect_id AND ("projet" <> @projet OR "statut" NOT IN ('CONVERTI', 'VENDU'));
 
 -- Sans méthode, une fiche ne peut plus rester « méthode obtenue » : elle redevient jointe.
 -- name: ModifierMethodeJourney :exec
