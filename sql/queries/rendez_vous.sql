@@ -43,8 +43,10 @@ WHERE p."deletedAt" IS NULL
   AND (sqlc.narg('du')::timestamp IS NULL OR rdv."quand" >= sqlc.narg('du')::timestamp)
   AND (sqlc.narg('au')::timestamp IS NULL OR rdv."quand" < sqlc.narg('au')::timestamp)
   AND (sqlc.narg('recherche')::text IS NULL
-       OR p."nom" ILIKE '%' || sqlc.narg('recherche')::text || '%'
-       OR p."prenom" ILIKE '%' || sqlc.narg('recherche')::text || '%'
+       OR public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom"))
+          LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('recherche')::text)) || '%'
+       OR public.immutable_unaccent(lower(p."prenom") || ' ' || lower(p."nom"))
+          LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('recherche')::text)) || '%'
        -- Une recherche sans chiffre laisserait un motif vide, qui prend tout.
        OR (regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') <> ''
            AND p."phoneE164" LIKE '%' || regexp_replace(sqlc.narg('recherche')::text, '\D', '', 'g') || '%'))

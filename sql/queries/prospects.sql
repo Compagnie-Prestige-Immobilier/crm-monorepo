@@ -179,6 +179,8 @@ WHERE p."deletedAt" IS NULL
     sqlc.narg('search')::text IS NULL
     OR public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom"))
        LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('search')::text)) || '%'
+    OR public.immutable_unaccent(lower(p."prenom") || ' ' || lower(p."nom"))
+       LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('search')::text)) || '%'
     OR (sqlc.narg('phone_search')::text IS NOT NULL AND p."phoneE164" LIKE '%' || sqlc.narg('phone_search')::text || '%')
   )
 ORDER BY
@@ -329,6 +331,8 @@ WHERE p."deletedAt" IS NULL
   AND (
     sqlc.narg('search')::text IS NULL
     OR public.immutable_unaccent(lower(p."nom") || ' ' || lower(p."prenom"))
+       LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('search')::text)) || '%'
+    OR public.immutable_unaccent(lower(p."prenom") || ' ' || lower(p."nom"))
        LIKE '%' || public.immutable_unaccent(lower(sqlc.narg('search')::text)) || '%'
     OR (sqlc.narg('phone_search')::text IS NOT NULL AND p."phoneE164" LIKE '%' || sqlc.narg('phone_search')::text || '%')
   );
