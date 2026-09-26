@@ -6,13 +6,54 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
-	"io"
 	"log/slog"
 	"path"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 )
+
+// L'archive CHUES se lit en entier pour servir une seule pièce : la garder
+// quelques minutes évite N téléchargements pour les N pièces d'un dossier.
+const (
+	archiveGardeeDuree = 3 * time.Minute
+	archivesGardeesMax = 4
+)
+
+type archiveGardee struct {
+	contenu []byte
+	expire  time.Time
+}
+
+var archivesRecentes = struct {
+	sync.Mutex
+	parDossier map[string]archiveGardee
+}{parDossier: map[string]archiveGardee{}}
+
+func archiveRecente(cle string) ([]byte, bool) {
+	archivesRecentes.Lock()
+	defer archivesRecentes.Unlock()
+	entree, ok := archivesRecentes.parDossier[cle]
+	if !ok || time.Now().After(entree.expire) {
+		delete(archivesRecentes.parDossier, cle)
+		return nil, false
+	}
+	return entree.contenu, true
+}
+
+func garderArchive(cle string, contenu []byte) {
+	archivesRecentes.Lock()
+	defer archivesRecentes.Unlock()
+	maintenant := time.Now()
+	for autre, entree := range archivesRecentes.parDossier {
+		if maintenant.After(entree.expire) || len(archivesRecentes.parDossier) >= archivesGardeesMax {
+			delete(archivesRecentes.parDossier, autre)
+		}
+	}
+	archivesRecentes.parDossier[cle] = archiveGardee{contenu: contenu, expire: maintenant.Add(archiveGardeeDuree)}
+}
 
 // Ce que Grand Public rend pour une pièce : une URL signée de courte durée,
 // jamais un chemin de stockage.
@@ -65,7 +106,7 @@ func pieceDuGrandPublic(ctx context.Context, source *sourceDesPieces, code strin
 		if doc.DocID != code || doc.FileURL == "" {
 			continue
 		}
-		corps, typeMime, errLecture := lirePlateformeBrut(ctx, doc.FileURL, "")
+		corps, typeMime, errLecture := ouvrirPlateforme(ctx, doc.FileURL, "")
 		if errLecture != nil {
 			return nil, piecesIndisponibles(errLecture.Error())
 		}
@@ -89,8 +130,16 @@ func archiveChues(ctx context.Context, base, jeton string, charge []byte) ([]byt
 	}
 	// Le flux d'intégration rend l'identifiant en chaîne, l'ancienne route en nombre.
 	dossier := strings.Trim(string(distant.Dossier.ID), `"`)
-	corps, _, err := lirePlateformeBrut(ctx, base+"/dossiers/"+dossier+"/archive", jeton)
-	return corps, err
+	cle := base + "/dossiers/" + dossier + "/archive"
+	if contenu, ok := archiveRecente(cle); ok {
+		return contenu, nil
+	}
+	corps, _, err := lirePlateformeBrut(ctx, cle, jeton)
+	if err != nil {
+		return nil, err
+	}
+	garderArchive(cle, corps)
+	return corps, nil
 }
 
 func piecesDeLArchive(archive []byte) ([]PieceDeposee, error) {
@@ -126,22 +175,16 @@ func pieceDeLArchive(ctx context.Context, source *sourceDesPieces, code string) 
 		if entree.Name != code {
 			continue
 		}
-		corps, errLecture := contenuDeLEntree(entree)
+		if entree.UncompressedSize64 > piecesTailleMax {
+			return nil, piecesIndisponibles(errPieceTropLourde.Error())
+		}
+		corps, errLecture := entree.Open()
 		if errLecture != nil {
 			return nil, piecesIndisponibles(errLecture.Error())
 		}
 		return reponseFichier(corps, path.Base(entree.Name), typeDeNom(entree.Name), false), nil
 	}
 	return nil, piecesIndisponibles("pièce inconnue")
-}
-
-func contenuDeLEntree(entree *zip.File) ([]byte, error) {
-	ouvert, err := entree.Open()
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = ouvert.Close() }()
-	return io.ReadAll(io.LimitReader(ouvert, piecesTailleMax))
 }
 
 func empaqueter(ctx context.Context, docs []pieceDistante) ([]byte, error) {

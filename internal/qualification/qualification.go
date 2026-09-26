@@ -4,10 +4,10 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/exports"
+	"cpi-go/internal/prospects"
 	"cpi-go/internal/representants"
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
-	"encoding/json"
 	"errors"
 	"net/http"
 	"regexp"
@@ -376,6 +376,9 @@ func (s *service) qualificationEcrireContactsRecommandes(ctx context.Context, q 
 		}
 		var resolu *string
 		existantID, err := q.ProspectIdParTelephoneExact(ctx, &e164)
+		if err == nil && existantID == b.ProspectID {
+			continue
+		}
 		if err == nil {
 			resolu = &existantID
 		} else if !errors.Is(err, pgx.ErrNoRows) {
@@ -837,6 +840,10 @@ func qualificationNormaliserTentative(b *QualificationCallAttemptBody, motif *qu
 // appel joint clôt la fiche sur la méthode obtenue, quel que soit le statut
 // choisi, qui reste le motif de la tentative. Un appel non joint la refuse.
 func qualificationAdhesionParFormulaire(b *QualificationCallAttemptBody, t *qualificationTentative) error {
+	if b.Method == nil && t.regle.exigeMethode {
+		return socle.Problem(http.StatusBadRequest, "PHASE2_METHOD_REQUIRED",
+			"L’issue « "+t.motif.label+" » exige la méthode d’enrôlement obtenue.")
+	}
 	if b.Method == nil || t.regle.exigeMethode {
 		return nil
 	}
@@ -958,6 +965,10 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 		return "", vide, socle.Problem(http.StatusUnprocessableEntity, "VALIDATION_FAILED",
 			"L’identifiant de la tentative est obligatoire.")
 	}
+	// Un poste en avance figerait le dernier appel de la fiche pour tous les appels suivants.
+	if maintenant := time.Now(); b.ClientCreatedAt.After(maintenant.Add(qualificationToleranceHorloge)) {
+		b.ClientCreatedAt = maintenant
+	}
 	motif, err := s.qualificationMotifDeLIssue(ctx, b.ReasonCode)
 	if err != nil {
 		return "", vide, err
@@ -966,15 +977,15 @@ func (s *service) qualificationConsignerTentative(ctx context.Context, u *socle.
 	if err != nil {
 		return "", vide, err
 	}
-	if err := s.rvSiteVerifier(ctx, b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); err != nil {
-		return "", vide, err
-	}
 	if err := s.qualificationProspectAttribue(ctx, u, b.ProspectID); err != nil {
 		return "", vide, err
 	}
 	var statut string
 	var etat QualificationProspectPhase2StateDTO
 	err = qualificationTx(ctx, s, func(q *db.Queries) error {
+		if e := s.rvSiteVerifier(ctx, q, b, strings.ToUpper(strings.TrimSpace(b.ReasonCode))); e != nil {
+			return e
+		}
 		var e error
 		statut, etat, e = s.qualificationAppliquerTentative(ctx, q, u, b, &tentative)
 		return e
@@ -1020,6 +1031,11 @@ func qualificationPreVol(ctx context.Context, q *db.Queries, b *QualificationCal
 	}
 	if duplicate, err = q.CallAttemptExiste(ctx, b.ID); err != nil || duplicate {
 		return prospect, parcours, duplicate, err
+	}
+	// Consigner sur une fiche vendue ou convertie ferait régresser son statut.
+	if prospect.Statut == db.ProspectStatutCONVERTI || prospect.Statut == db.ProspectStatutVENDU {
+		return prospect, parcours, false, socle.Problem(http.StatusUnprocessableEntity, "PROSPECT_CONVERTI",
+			"Une fiche convertie ou vendue ne se consigne plus.")
 	}
 	if b.ExpectedRev != nil && *b.ExpectedRev != prospect.Rev {
 		return prospect, parcours, false, socle.Problem(http.StatusConflict, "REV_CONFLICT",
@@ -1201,13 +1217,11 @@ func (s *service) qualificationCorrigerProspect(ctx context.Context, q *db.Queri
 	if err != nil {
 		return db.CorrigerProspectParTentativeRow{}, err
 	}
-	if len(b.ChampsLibres) > 0 {
-		brut, erreur := json.Marshal(b.ChampsLibres)
-		if erreur != nil {
-			return db.CorrigerProspectParTentativeRow{}, erreur
-		}
-		p.MajChampsLibres, p.ChampsLibres = true, brut
+	libres, err := prospects.ChampsLibresRetenus(ctx, s.Deps, courant.Projet, b.ChampsLibres)
+	if err != nil {
+		return db.CorrigerProspectParTentativeRow{}, err
 	}
+	p.MajChampsLibres, p.ChampsLibres = libres != nil, libres
 	p.MajFiche = qualificationFicheModifiee(&p)
 	p.MajDernierAppel = courant.LastCallAt == nil || !b.ClientCreatedAt.Before(*courant.LastCallAt)
 	if p.MajDernierAppel {

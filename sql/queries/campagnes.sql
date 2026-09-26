@@ -81,6 +81,9 @@ LIMIT 1000;
 -- name: EcrireFiltresLot :exec
 UPDATE "lots_export" SET "filters" = $2 WHERE "id" = $1;
 
+-- name: VerrouillerLot :one
+SELECT "filters" FROM "lots_export" WHERE "id" = $1 FOR UPDATE;
+
 -- name: SupprimerLot :execrows
 DELETE FROM "lots_export" WHERE "id" = $1;
 
@@ -347,7 +350,7 @@ INNER JOIN "departements" d ON d."id" = r."departementId"
 INNER JOIN "users" c ON c."id" = r."createdById"
 LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "iefs" ief ON ief."id" = r."iefId"
-WHERE i."lotId" = $1
+WHERE i."lotId" = $1 AND r."deletedAt" IS NULL
 ORDER BY i."position";
 
 -- name: LotLignesProspects :many
@@ -373,6 +376,7 @@ LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "representants" r ON r."id" = i."representantId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1 AND i."assigneeId" = $2 AND i."day" = $3
+  AND (i."representantId" IS NULL OR r."deletedAt" IS NULL)
 ORDER BY i."position";
 
 -- name: LotItemsPourPdfPositions :many
@@ -383,6 +387,7 @@ LEFT JOIN "users" u ON u."id" = i."assigneeId"
 LEFT JOIN "representants" r ON r."id" = i."representantId"
 LEFT JOIN "prospects" p ON p."id" = i."prospectId"
 WHERE i."lotId" = $1 AND i."assigneeId" = $2 AND i."position" = ANY($3::int[])
+  AND (i."representantId" IS NULL OR r."deletedAt" IS NULL)
 ORDER BY i."position";
 
 -- name: CompterRepresentantsCible :one
@@ -479,6 +484,7 @@ FROM "representant_suggestions" s
 INNER JOIN "representants" src ON src."id" = s."sourceRepresentantId"
 WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedRepresentantId" IS NULL
   AND src."deletedAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "representants" r WHERE r."phoneE164" = s."suggestedPhoneE164" AND r."deletedAt" IS NULL)
   AND (sqlc.narg('departement_id')::text IS NULL OR src."departementId" = sqlc.narg('departement_id'))
   AND (sqlc.narg('ief_id')::text IS NULL OR src."iefId" = sqlc.narg('ief_id'));
 
@@ -488,9 +494,11 @@ FROM "representant_suggestions" s
 INNER JOIN "representants" src ON src."id" = s."sourceRepresentantId"
 WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedRepresentantId" IS NULL
   AND src."deletedAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "representants" r WHERE r."phoneE164" = s."suggestedPhoneE164" AND r."deletedAt" IS NULL)
   AND (sqlc.narg('departement_id')::text IS NULL OR src."departementId" = sqlc.narg('departement_id'))
   AND (sqlc.narg('ief_id')::text IS NULL OR src."iefId" = sqlc.narg('ief_id'))
-ORDER BY s."createdAt" ASC;
+ORDER BY s."createdAt" ASC
+LIMIT sqlc.arg('places');
 
 -- name: TelephonesRepresentantsConnus :many
 SELECT r."phoneE164" FROM "representants" r

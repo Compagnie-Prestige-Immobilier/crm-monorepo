@@ -21,18 +21,26 @@ var colonnesProspectsImport = []colonneImport{
 
 func enteteProspectImport(rang int) string { return colonnesProspectsImport[rang].entete }
 
-var methodesEnrolementImport = map[string]string{
-	"rdv cpi": string(db.EnrollmentMethodAPPOINTMENT), "appointment": string(db.EnrollmentMethodAPPOINTMENT),
-	"plateforme en ligne": string(db.EnrollmentMethodPLATFORM), "platform": string(db.EnrollmentMethodPLATFORM),
-	"mail": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING), "voice or electronic messaging": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING),
-	"whatsapp": string(db.EnrollmentMethodWHATSAPP),
+var methodesEnrolementImport, libellesMethodesImport = indexMethodesImport()
+
+// Le modèle propose les libellés de l'export ; les anciens alias restent lus.
+func indexMethodesImport() (index map[string]string, libelles []string) {
+	index = map[string]string{
+		"rdv cpi": string(db.EnrollmentMethodAPPOINTMENT), "appointment": string(db.EnrollmentMethodAPPOINTMENT),
+		"platform": string(db.EnrollmentMethodPLATFORM), "voice or electronic messaging": string(db.EnrollmentMethodVOICEORELECTRONICMESSAGING),
+	}
+	for _, methode := range exports.ExportOrdreMethodes {
+		libelle := exports.ExportLibellesMethode[methode]
+		index[cleImport(libelle)] = methode
+		libelles = append(libelles, libelle)
+	}
+	return index, libelles
 }
 
 type ligneProspectImport struct {
 	numero                                 int
 	nom, prenom, telephone, representantID string
-	banqueID, syndicatID                   string
-	methode                                *db.EnrollmentMethod
+	banqueID, syndicatID, methode          *string
 }
 
 type etatProspectsImport struct {
@@ -120,30 +128,6 @@ func lireRepresentantProspectImport(brut string, etat *etatProspectsImport) stri
 	return etat.representants[tel]
 }
 
-func lireBanqueProspectImport(brut string, etat *etatProspectsImport) string {
-	if brut == "" {
-		return ""
-	}
-	return etat.banques[cleReferentielImport(brut)]
-}
-
-func lireSyndicatProspectImport(brut string, etat *etatProspectsImport) string {
-	if brut == "" {
-		return ""
-	}
-	return etat.syndicats[cleReferentielImport(brut)]
-}
-
-func lireMethodeProspectImport(brut string) *db.EnrollmentMethod {
-	if brut == "" {
-		return nil
-	}
-	if valeur, connu := methodesEnrolementImport[cleImport(brut)]; connu {
-		return pointeurImport(db.EnrollmentMethod(valeur))
-	}
-	return nil
-}
-
 func lireProspectImport(cellules map[string]string, numero int, brut any) (any, *erreurLigneImport) {
 	etat := brut.(*etatProspectsImport)
 	nom, prenom := cellules[enteteProspectImport(0)], cellules[enteteProspectImport(1)]
@@ -158,12 +142,25 @@ func lireProspectImport(cellules map[string]string, numero int, brut any) (any, 
 	if err != nil {
 		return nil, refusImport(numero, enteteProspectImport(2), "PROSPECT_IMPORT_PHONE_INVALID", fmt.Sprintf("Numéro de téléphone inexploitable : « %s ».", brutTelephone))
 	}
+	banqueID, refus := referentielFacultatifImport(cellules[enteteProspectImport(4)], etat.banques, cleReferentielImport, numero,
+		enteteProspectImport(4), "PROSPECT_IMPORT_BANQUE_INCONNUE", "Banque inconnue", etat.banqueLabels)
+	if refus != nil {
+		return nil, refus
+	}
+	syndicatID, refus := referentielFacultatifImport(cellules[enteteProspectImport(5)], etat.syndicats, cleReferentielImport, numero,
+		enteteProspectImport(5), "PROSPECT_IMPORT_SYNDICAT_INCONNU", "Syndicat inconnu", etat.syndicatLabels)
+	if refus != nil {
+		return nil, refus
+	}
+	methode, refus := referentielFacultatifImport(cellules[enteteProspectImport(6)], methodesEnrolementImport, cleImport, numero,
+		enteteProspectImport(6), "PROSPECT_IMPORT_METHODE_INCONNUE", "Méthode d’enrôlement inconnue", libellesMethodesImport)
+	if refus != nil {
+		return nil, refus
+	}
 	return ligneProspectImport{
 		numero: numero, nom: nom, prenom: prenom, telephone: telephone,
 		representantID: lireRepresentantProspectImport(cellules[enteteProspectImport(3)], etat),
-		banqueID:       lireBanqueProspectImport(cellules[enteteProspectImport(4)], etat),
-		syndicatID:     lireSyndicatProspectImport(cellules[enteteProspectImport(5)], etat),
-		methode:        lireMethodeProspectImport(cellules[enteteProspectImport(6)]),
+		banqueID:       banqueID, syndicatID: syndicatID, methode: methode,
 	}, nil
 }
 
@@ -236,11 +233,16 @@ func persisterProspectsImport(ctx context.Context, q *db.Queries, c contexteImpo
 	for i := range retenues {
 		ligne := &retenues[i]
 		identifiants[i] = identifiantImport()
+		var methode *db.EnrollmentMethod
+		if ligne.methode != nil {
+			valeur := db.EnrollmentMethod(*ligne.methode)
+			methode = &valeur
+		}
 		fiches[i] = db.InsertImportProspectParams{
 			ID: identifiants[i], Nom: ligne.nom, Prenom: ligne.prenom, PhoneE164: &ligne.telephone,
-			BanqueID: couperImport(ligne.banqueID, 36), SyndicatID: couperImport(ligne.syndicatID, 36), RepresentantID: couperImport(ligne.representantID, 36),
+			BanqueID: ligne.banqueID, SyndicatID: ligne.syndicatID, RepresentantID: couperImport(ligne.representantID, 36),
 			CreatedByID: c.demandeur, Phase2Status: phase2DepuisMethodeImport(ligne.methode),
-			EnrollmentMethod: ligne.methode, ClientCreatedAt: maintenant, ImportJobID: &c.jobID,
+			EnrollmentMethod: methode, ClientCreatedAt: maintenant, ImportJobID: &c.jobID,
 		}
 		// La contrainte `prospects_enrollment_method_matches_status` décide : les
 		// deux colonnes se déduisent l'une de l'autre.
@@ -255,7 +257,7 @@ func persisterProspectsImport(ctx context.Context, q *db.Queries, c contexteImpo
 	return int(ecrits), err
 }
 
-func phase2DepuisMethodeImport(methode *db.EnrollmentMethod) db.Phase2Status {
+func phase2DepuisMethodeImport(methode *string) db.Phase2Status {
 	if methode == nil {
 		return db.Phase2StatusPENDING
 	}

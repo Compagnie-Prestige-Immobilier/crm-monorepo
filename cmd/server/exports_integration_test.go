@@ -280,6 +280,11 @@ func TestExportRepresentantsColonnes(t *testing.T) {
 func TestExportVisitesRegistre(t *testing.T) {
 	b := nouveauBanc(t, "ACCUEIL")
 	j := exportSemer(b)
+	archivee, referenceArchivee := uuid.NewString(), j.reference+"-ARCH"
+	b.exec(`INSERT INTO "visites" ("id","reference","visitedAt","visitorName","entrepriseId","objetId","createdById","updatedAt","deletedAt")
+	        VALUES ($1,$2,'2026-01-06 15:00:00','VISITE ARCHIVEE',$3,$4,$5,now(),now())`,
+		archivee, referenceArchivee, j.entreprise, j.objet, b.userID)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "visites" WHERE "id" = $1`, archivee) })
 	statut, body := b.connexion(b.email, "motdepasse")
 	b.attend(statut, http.StatusOK, "connexion", body)
 
@@ -296,6 +301,15 @@ func TestExportVisitesRegistre(t *testing.T) {
 	ligne := exportChercherLigne(t, f, "Registre", j.reference)
 	if ligne[2] != "14:30" || ligne[3] != "MOUHAMED FALL" || ligne[5] != j.nomEnt {
 		t.Fatalf("ligne de visite : %v", ligne)
+	}
+	lignes, err := f.GetRows("Registre")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, ligne := range lignes {
+		if len(ligne) > 0 && ligne[0] == referenceArchivee {
+			t.Fatal("une visite archivée ne sort pas dans le registre")
+		}
 	}
 }
 

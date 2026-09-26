@@ -39,7 +39,7 @@ export default defineConfig({
   webServer: {
     command: '../cpi-go',
     url: `${BASE_URL}/health/ready`,
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
     timeout: 60_000,
     // Le limiteur compte alors par `X-Forwarded-For`, comme derrière Cloudflare
     // en production : chaque parcours dispose de son propre budget de 10/min.
@@ -51,6 +51,8 @@ export default defineConfig({
       PORT,
       LOG_FORMAT: 'text',
       API_TRUST_PROXY_HEADERS: 'true',
+      SEED_FIXTURE_PASSWORD: process.env.SEED_FIXTURE_PASSWORD ?? 'fixtures-e2e-2026',
+      PUBLIC_WEB_URL: BASE_URL,
       BETA_SUIVI_RENDEZ_VOUS: 'true',
       // GLPI configure mais injoignable : le support doit accepter et suivre
       // les signalements sans lui.

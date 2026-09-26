@@ -355,7 +355,10 @@ func (s *service) creerVisite(ctx context.Context, in *CreerVisiteInput) (*Visit
 	if _, err := jourValide(corps.Date); err != nil {
 		return nil, err
 	}
-	instant := s.instantVisite(corps.Date, corps.Time)
+	instant, err := s.instantVisite(corps.Date, corps.Time)
+	if err != nil {
+		return nil, err
+	}
 	id, err := uuid.NewV7()
 	if err != nil {
 		return nil, err
@@ -464,7 +467,9 @@ func (s *service) corrigerVisite(ctx context.Context, in *CorrigerVisiteInput) (
 	params.Comment = corps.Comment.ou(existante.Comment)
 	if corps.Time.fourni {
 		params.TimeKnown = corps.Time.valeur != nil
-		params.VisitedAt = s.instantVisite(s.jourDe(existante.VisitedAt), corps.Time.valeur)
+		if params.VisitedAt, err = s.instantVisite(s.jourDe(existante.VisitedAt), corps.Time.valeur); err != nil {
+			return nil, err
+		}
 	}
 	if corps.Phone.fourni {
 		params.Phone = texteRegistre(corps.Phone.valeur)
@@ -587,16 +592,17 @@ func (s *service) versVisite(r *db.VisiteParIdRow) Visite {
 }
 
 // Africa/Dakar ne change pas d'heure : l'offset tient sur toute la journée.
-func (s *service) instantVisite(jour string, heure *string) time.Time {
+func (s *service) instantVisite(jour string, heure *string) (time.Time, error) {
 	hhmm := "00:00"
 	if heure != nil {
 		hhmm = *heure
 	}
 	instant, err := time.ParseInLocation("2006-01-02 15:04", jour+" "+hhmm, s.Cfg.TimeZone)
 	if err != nil {
-		return time.Time{}
+		return time.Time{}, huma.Error422UnprocessableEntity("date ou heure invalide",
+			&huma.ErrorDetail{Location: "body.time", Message: "« " + jour + " " + hhmm + " » n’est pas un instant valide."})
 	}
-	return instant
+	return instant, nil
 }
 
 func (s *service) jourDe(instant time.Time) string {

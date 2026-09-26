@@ -506,7 +506,7 @@ function LigneFiche({
           {ETAT_LABELS[fiche.etat as LotExportFicheEtat] ?? fiche.etat}
         </Badge>
       </TableCell>
-      <TableCell>{fiche.statutLabel ?? '—'}</TableCell>
+      <TableCell>{fiche.statutLabel ?? '–'}</TableCell>
     </TableRow>
   );
 }

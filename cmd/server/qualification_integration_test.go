@@ -166,6 +166,27 @@ func TestQualificationProspectGrandPublicNonAttribueRefuse(t *testing.T) {
 	b.attend(statut, http.StatusOK, "prospect Grand Public attribué par une campagne", body)
 }
 
+func TestQualificationFicheVendueNeRegressePas(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	for _, statut := range []string{"VENDU", "CONVERTI"} {
+		prospect := qualificationProspect(b)
+		qualificationExec(b, `UPDATE "prospects" SET "statut" = $2 WHERE "id" = $1`, prospect, statut)
+
+		corps := qualificationCorpsTentative(prospect, map[string]any{"reasonCode": "A_SUPPRIMER"})
+		statutHTTP, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", corps)
+		b.attend(statutHTTP, http.StatusUnprocessableEntity, "consignation sur une fiche "+statut, body)
+		if body["code"] != "PROSPECT_CONVERTI" {
+			t.Fatalf("fiche %s, code : %v", statut, body["code"])
+		}
+		if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" WHERE "id" = $1 AND "statut" = $2`, prospect, statut); n != 1 {
+			t.Fatalf("le statut %s ne doit pas avoir bougé", statut)
+		}
+		if n := qualificationCompte(b, `SELECT count(*) FROM "call_attempts" WHERE "prospectId" = $1`, prospect); n != 0 {
+			t.Fatalf("aucune tentative ne doit être écrite sur une fiche %s", statut)
+		}
+	}
+}
+
 // La fiche distribuée à un autre échappe à son créateur ; l'encadrement l'ouvre
 // mais ne consigne pas dessus : deux personnes appelleraient la même.
 func TestQualificationFicheAttribueeAUnAutreEchappeAuCreateurEtALEncadrement(t *testing.T) {

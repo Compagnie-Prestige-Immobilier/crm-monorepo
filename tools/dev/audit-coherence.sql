@@ -45,7 +45,8 @@ SELECT * FROM (
            AND EXISTS (SELECT 1 FROM call_attempts a WHERE a."prospectId" = p."id")
   UNION ALL SELECT 'fiches : deux fiches vivantes au même numéro',
          coalesce(sum(n - 1), 0)::bigint FROM (
-           SELECT count(*) AS n FROM prospects WHERE "deletedAt" IS NULL GROUP BY "phoneE164" HAVING count(*) > 1) doublons
+           SELECT count(*) AS n FROM prospects WHERE "deletedAt" IS NULL AND "phoneE164" IS NOT NULL
+           GROUP BY "phoneE164" HAVING count(*) > 1) doublons
   UNION ALL SELECT 'fiches : convertie sans conversion signée',
          count(*) FROM prospect_journeys j WHERE j."statut" = 'CONVERTI'
            AND NOT EXISTS (SELECT 1 FROM prospect_conversions c WHERE c."journeyId" = j."id")
@@ -65,9 +66,10 @@ SELECT * FROM (
          WHERE l."cible"::text = 'PROSPECTS' AND i."prospectId" IS NULL
   UNION ALL SELECT 'campagnes : fiche supprimée encore distribuée',
          count(*) FROM lot_export_items i JOIN prospects p ON p."id" = i."prospectId" WHERE p."deletedAt" IS NOT NULL
-  UNION ALL SELECT 'campagnes : deux lignes pour la même position',
+  UNION ALL SELECT 'campagnes : même fiche deux fois dans un lot',
          coalesce(sum(n - 1), 0)::bigint FROM (
-           SELECT count(*) AS n FROM lot_export_items GROUP BY "lotId", "position" HAVING count(*) > 1) d
+           SELECT count(*) AS n FROM lot_export_items WHERE "prospectId" IS NOT NULL
+           GROUP BY "lotId", "prospectId" HAVING count(*) > 1) d
   UNION ALL SELECT 'campagnes : réaffectation vers un compte hors équipe',
          count(*) FROM lot_export_reaffectations r
          WHERE NOT EXISTS (SELECT 1 FROM users u WHERE u."id" = r."toAssigneeId")

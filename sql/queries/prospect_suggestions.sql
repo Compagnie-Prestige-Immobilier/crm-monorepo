@@ -15,7 +15,17 @@ FROM "prospect_suggestions" s
 INNER JOIN "prospects" src ON src."id" = s."sourceProspectId"
 WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedProspectId" IS NULL
   AND src."deletedAt" IS NULL
-ORDER BY s."createdAt" ASC;
+  AND NOT EXISTS (SELECT 1 FROM "prospects" p WHERE p."phoneE164" = s."suggestedPhoneE164" AND p."deletedAt" IS NULL)
+ORDER BY s."createdAt" ASC
+LIMIT sqlc.arg('places');
+
+-- name: CompterSuggestionsProspect :one
+SELECT COUNT(DISTINCT s."suggestedPhoneE164")::int
+FROM "prospect_suggestions" s
+INNER JOIN "prospects" src ON src."id" = s."sourceProspectId"
+WHERE s."deletedAt" IS NULL AND s."status" = 'A_APPELER' AND s."resolvedProspectId" IS NULL
+  AND src."deletedAt" IS NULL
+  AND NOT EXISTS (SELECT 1 FROM "prospects" p WHERE p."phoneE164" = s."suggestedPhoneE164" AND p."deletedAt" IS NULL);
 
 -- name: TelephonesProspectsConnus :many
 SELECT "phoneE164" FROM "prospects"
@@ -28,7 +38,9 @@ UPDATE "prospect_suggestions" SET "resolvedProspectId" = $2 WHERE "id" = $1;
 SELECT src."id", src."nom", src."prenom"
 FROM "prospect_suggestions" s
 JOIN "prospects" src ON src."id" = s."sourceProspectId"
-WHERE s."resolvedProspectId" = $1 AND s."deletedAt" IS NULL AND src."deletedAt" IS NULL
+WHERE s."resolvedProspectId" = $1 AND s."sourceProspectId" <> $1
+  AND s."deletedAt" IS NULL AND src."deletedAt" IS NULL
+ORDER BY s."createdAt" ASC, s."id" ASC
 LIMIT 1;
 
 -- name: ProspectsRecommandesPar :many

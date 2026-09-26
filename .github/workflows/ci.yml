@@ -1,10 +1,10 @@
 name: ci
 
-# `dev` seulement. `prod` n'a aucune CI : Dokploy la tire en git et construit le
-# Dockerfile lui-même. Ce qui arrive sur `prod` doit avoir été vert sur `dev`.
+# La PR dev→prod doit passer la même CI que dev : une fusion directe sans
+# vérification a déjà atteint `prod` (voir l'audit du 25 septembre 2026, B54).
 on:
   pull_request:
-    branches: [dev]
+    branches: [dev, prod]
     paths-ignore: ['docs/**', '**.md']
   push:
     branches: [dev]
@@ -37,12 +37,23 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
 
-      # Tout `*_test.go` sans le tag `integration` est un test unitaire, interdit ici.
+      # Tout `*_test.go` sans le tag `integration` et tout `*.test.ts(x)` est un test unitaire, interdit ici.
       - name: Aucun test unitaire
         run: |
           for f in $(git ls-files '*_test.go'); do
             head -1 "$f" | grep -q '^//go:build integration$' || { echo "::error::$f sans tag integration"; exit 1; }
           done
+          unitaires=$(git ls-files '*.test.ts' '*.test.tsx')
+          [ -z "$unitaires" ] || { echo "::error::tests unitaires TypeScript :"; echo "$unitaires"; exit 1; }
+      # goose refuse au démarrage une migration plus ancienne que la dernière appliquée : la production boucle.
+      - name: Migrations ajoutées après la plus récente de la base
+        env:
+          BASE: ${{ github.base_ref || github.event.before }}
+        run: |
+          git fetch -q --depth=1 origin "$BASE"
+          max=$(git ls-tree --name-only FETCH_HEAD sql/migrations/ | grep -o '[0-9]\{14\}' | sort | tail -1)
+          git diff --name-only --diff-filter=A FETCH_HEAD HEAD -- sql/migrations | grep -o '[0-9]\{14\}' \
+            | awk -v max="$max" '$1 <= max { print "::error::migration " $1 " <= " max; bad = 1 } END { exit bad }'
       - name: Plafonds et artefacts générés
         run: tools/dev/plafonds.sh
       - id: outils
@@ -83,7 +94,7 @@ jobs:
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6
         with:
           path: cpi-go
-          key: binaire-${{ hashFiles('go.mod', 'go.sum', 'sqlc.yaml', 'cmd/**', 'internal/**', 'sql/**', 'web/**', 'pnpm-lock.yaml') }}
+          key: binaire-${{ hashFiles('go.mod', 'go.sum', 'sqlc.yaml', 'cmd/**', 'internal/**', 'sql/**', 'web/**', 'pnpm-lock.yaml', 'pnpm-workspace.yaml', 'package.json', 'tsconfig.base.json', '.node-version', '.github/workflows/ci.yml') }}
       - if: steps.deja.outputs.cache-hit != 'true'
         uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
         with:
@@ -238,6 +249,30 @@ jobs:
           DATABASE_URL="$DATABASE_URL_DEMO" ./cpi-go -seed
       - run: pnpm test --shard=${{ matrix.part }}/4
         working-directory: e2e
+
+  # Le Dockerfile de production n'était jamais construit avant la fusion : une
+  # étape de sa chaîne pouvait casser sans que rien ne le voie ici.
+  docker:
+    name: image Docker, sans publication
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        with:
+          context: .
+          push: false
+          load: true
+          tags: cpi-go:ci
+      - name: Trivy sur l'image construite
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          scan-type: image
+          image-ref: cpi-go:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
 
   securite:
     name: sécurité, secrets, SAST, dépendances

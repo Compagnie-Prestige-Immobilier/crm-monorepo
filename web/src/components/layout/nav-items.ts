@@ -49,9 +49,9 @@ export const HUB_PATH = '/espaces';
 export const INBOX_PATH = '/notifications';
 
 /**
- * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le
- * téléconseiller et le chargé de clientèle en sont absents : les leurs visent
- * l'application mobile.
+ * Les rôles qui reçoivent des notifications LISIBLES DANS LE PANEL. Le panneau
+ * web est le seul client depuis l'abandon de l'application mobile : tous les
+ * rôles qui reçoivent des notifications côté serveur les lisent ici.
  */
 export const INBOX_ROLES: readonly Role[] = [
   'ADMIN',
@@ -59,6 +59,8 @@ export const INBOX_ROLES: readonly Role[] = [
   'SUPERVISEUR',
   'BANQUE_FINANCE',
   'ACCUEIL',
+  'COMMERCIAL',
+  'CHARGE_CLIENTELE',
 ];
 
 export const hasInbox = (role: Role): boolean => INBOX_ROLES.includes(role);
@@ -104,7 +106,7 @@ export const COQUES: readonly CoqueEntry[] = [
   },
   {
     id: 'teleconseil',
-    label: 'Commercial',
+    label: 'Téléconseil',
     path: '/teleconseil',
     description: 'Prospection, qualification, rappels et campagnes d’appels',
     acces: 'fiches.tenir',
@@ -438,7 +440,7 @@ const SECTIONS: readonly NavSection[] = [
         label: 'Exporter les dossiers',
         icon: FileSpreadsheetIcon,
         description: 'Classeur Dossiers · Historique · Synthèse',
-        acces: 'banque.dossiers',
+        acces: 'exports.banque',
         secondary: true,
       },
       {

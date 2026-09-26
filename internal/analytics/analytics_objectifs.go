@@ -49,18 +49,17 @@ func (s *service) lireObjectifs2026(ctx context.Context) (Campaigne2026Objectifs
 	tauxTemps := math.Round((float64(joursEcoules)/float64(joursTotaux)*100)*10) / 10
 
 	chuesTotal, err := s.Q.StockRepresentants(ctx)
-	realisedChues := 0
-	if err == nil {
-		realisedChues = int(chuesTotal.Total)
+	if err != nil {
+		return Campaigne2026Objectifs{}, err
 	}
+	realisedChues := int(chuesTotal.Total)
 
 	marketingQual, err := s.Q.QualiteMarketing(ctx)
-	realisedGP := 0
-	realisedLeads := 0
-	if err == nil {
-		realisedGP = int(marketingQual.Convertis)
-		realisedLeads = int(marketingQual.Total)
+	if err != nil {
+		return Campaigne2026Objectifs{}, err
 	}
+	realisedGP := int(marketingQual.Convertis)
+	realisedLeads := int(marketingQual.Total)
 
 	calculerObjectif := func(cible, realises int) ObjectifSuivi {
 		taux := 0.0

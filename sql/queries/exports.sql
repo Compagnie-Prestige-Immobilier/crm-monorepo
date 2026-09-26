@@ -244,7 +244,8 @@ INNER JOIN "visite_entreprises" e ON e."id" = v."entrepriseId"
 INNER JOIN "visite_objets" o ON o."id" = v."objetId"
 LEFT JOIN "visite_directions" d ON d."id" = v."directionId"
 LEFT JOIN "visite_destinataires" ds ON ds."id" = v."destinataireId"
-WHERE (sqlc.narg('apres')::text IS NULL OR v."reference" > sqlc.narg('apres')::text)
+WHERE v."deletedAt" IS NULL
+  AND (sqlc.narg('apres')::text IS NULL OR v."reference" > sqlc.narg('apres')::text)
   AND (sqlc.narg('du')::timestamp IS NULL OR v."visitedAt" >= sqlc.narg('du')::timestamp)
   AND (sqlc.narg('au')::timestamp IS NULL OR v."visitedAt" <= sqlc.narg('au')::timestamp)
   AND (sqlc.narg('entreprise')::text IS NULL OR v."entrepriseId" = sqlc.narg('entreprise')::text)

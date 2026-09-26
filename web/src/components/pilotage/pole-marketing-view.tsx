@@ -165,7 +165,7 @@ export function PoleMarketingView() {
               />
             </p>
             <p className="mt-1 font-display text-2xl font-bold">
-              {data.score === null ? '—' : `${formatNumber(data.score)} / 100`}
+              {data.score === null ? '–' : `${formatNumber(data.score)} / 100`}
             </p>
           </CardContent>
         </Card>

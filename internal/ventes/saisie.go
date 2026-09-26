@@ -89,15 +89,17 @@ func (s *service) creer(ctx context.Context, in *creerVenteInput) (*VenteOutput,
 	if err != nil {
 		return nil, err
 	}
-	numero, err := s.Q.ProchainNumeroVente(ctx)
-	if err != nil {
-		return nil, err
-	}
-	preparee.Vente.Numero = numero
 	var id int64
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if err := q.VerrouNumerotationVentes(ctx); err != nil {
+			return err
+		}
+		preparee.Vente.Numero, err = q.ProchainNumeroVente(ctx)
+		if err != nil {
+			return err
+		}
 		id, err = q.InsererVenteSaisie(ctx, preparee.Vente)
 		if err != nil {
 			return err
@@ -139,6 +141,9 @@ func (s *service) corriger(ctx context.Context, in *modifierVenteInput) (*VenteO
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if err := verrouillerVente(ctx, q, id); err != nil {
+			return err
+		}
 		versements, err := q.TotalVersementsVente(ctx, id)
 		if err != nil {
 			return err
@@ -182,13 +187,6 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 	if err != nil {
 		return nil, err
 	}
-	vente, err := s.Q.VenteParID(ctx, id)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
-	}
-	if err != nil {
-		return nil, err
-	}
 	date, err := time.Parse(time.DateOnly, in.Body.Date)
 	if err != nil || date.After(time.Now()) || in.Body.Montant <= 0 {
 		return nil, socle.Problem(http.StatusBadRequest, "VENTE_VERSEMENT_INVALIDE", "Le versement doit avoir une date passée ou du jour et un montant positif.")
@@ -196,6 +194,9 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if err := verrouillerVente(ctx, q, id); err != nil {
+			return err
+		}
 		rang, err := q.ProchainRangVersement(ctx, id)
 		if err != nil {
 			return err
@@ -205,24 +206,25 @@ func (s *service) ajouterVersement(ctx context.Context, in *ajouterVersementInpu
 		}); err != nil {
 			return err
 		}
-		totalVersements, err := q.TotalVersementsVente(ctx, id)
+		reliquat, err := q.RecalculerReliquatVente(ctx, id)
 		if err != nil {
 			return err
 		}
-		if err := q.ModifierReliquatVente(ctx, db.ModifierReliquatVenteParams{
-			ID: id, Reliquat: vente.PrixTotal - vente.Acompte - totalVersements,
-		}); err != nil {
-			return err
-		}
-		return database.Auditer(ctx, q, acteur, "vente.versement_ajouter", "vente", in.ID,
-			map[string]any{"montant": in.Body.Montant}, map[string]any{
-				"reliquat": vente.PrixTotal - vente.Acompte - totalVersements,
-			})
+		return database.Auditer(ctx, q, acteur, "vente.versement_ajouter", "vente", strconv.FormatInt(id, 10),
+			map[string]any{"montant": in.Body.Montant}, map[string]any{"reliquat": reliquat})
 	}); err != nil {
 		return nil, err
 	}
 	s.Live.Emettre("ventes")
 	return s.sortie(ctx, id)
+}
+
+func verrouillerVente(ctx context.Context, q *db.Queries, id int64) error {
+	_, err := q.VerrouillerVente(ctx, id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
+	}
+	return err
 }
 
 func (s *service) archiver(ctx context.Context, in *venteIDInput) (*struct{}, error) {
@@ -259,8 +261,12 @@ func (s *service) restaurer(ctx context.Context, in *venteIDInput) (*VenteOutput
 	acteur := socle.UtilisateurCourant(ctx).ID
 	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
-		if err := q.RestaurerVente(ctx, id); err != nil {
+		restaurees, err := q.RestaurerVente(ctx, id)
+		if err != nil {
 			return err
+		}
+		if restaurees == 0 {
+			return socle.Problem(http.StatusNotFound, "VENTE_NOT_FOUND", "Vente introuvable.")
 		}
 		apres, err := q.VenteParID(ctx, id)
 		if err != nil {
@@ -303,7 +309,11 @@ func (s *service) preparer(ctx context.Context, in *venteInput, avant *db.Vente)
 	if err != nil {
 		return ventePreparee{}, err
 	}
-	proprietaire, apporteur, cpi := partsVente(in, &contexte.site, prix*int64(in.NombreLots))
+	proprietaire, apporteur, cpi := repartitionVente(in, avant, &contexte.site, prix)
+	if !partsCouvertesParLePrix(prix*int64(in.NombreLots), proprietaire, apporteur, cpi) {
+		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_PARTS_INVALIDES",
+			"Les parts du propriétaire, de l’apporteur et de CPI doivent être positives et ne pas dépasser le prix total.")
+	}
 	if in.Acompte < 0 {
 		return ventePreparee{}, socle.Problem(http.StatusBadRequest, "VENTE_ACOMPTE_INVALIDE", "L’acompte ne peut pas être négatif.")
 	}
@@ -462,6 +472,18 @@ func prixVente(in *venteInput, site *db.VentesSite) (int64, error) {
 	return prix, nil
 }
 
+// Une correction qui ne touche ni site, ni lots, ni prix garde ses parts :
+// la règle du site a pu changer depuis la saisie.
+func repartitionVente(in *venteInput, avant *db.Vente, site *db.VentesSite, prix int64) (proprietaire, apporteur, cpi int64) {
+	total := prix * int64(in.NombreLots)
+	if avant != nil && avant.Site == strings.ToUpper(strings.TrimSpace(in.Site)) &&
+		avant.NombreLots == in.NombreLots && avant.PrixUnitaire == prix &&
+		in.PartProprietaire == nil && in.PartApporteur == nil && in.PartCpi == nil {
+		return avant.PartProprietaire, avant.PartApporteur, avant.PartCpi
+	}
+	return partsVente(in, site, total)
+}
+
 func partsVente(in *venteInput, site *db.VentesSite, total int64) (proprietaire, apporteur, cpi int64) {
 	proprietaire = site.PartProprietaireParLot * int64(in.NombreLots)
 	if in.PartProprietaire != nil {
@@ -476,6 +498,14 @@ func partsVente(in *venteInput, site *db.VentesSite, total int64) (proprietaire,
 		cpi = *in.PartCpi
 	}
 	return proprietaire, apporteur, cpi
+}
+
+// Soustraire plutôt qu'additionner : une part saisie énorme ferait déborder la somme.
+func partsCouvertesParLePrix(total, proprietaire, apporteur, cpi int64) bool {
+	if proprietaire < 0 || apporteur < 0 || cpi < 0 {
+		return false
+	}
+	return proprietaire <= total && apporteur <= total-proprietaire && cpi <= total-proprietaire-apporteur
 }
 
 func partApporteur(site *db.VentesSite, partProprietaire int64, lots int32) int64 {

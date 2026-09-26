@@ -11,7 +11,8 @@ SELECT * FROM "courriels" WHERE "id" = $1;
 SELECT "id", "type", "sujet", "destinataires", "copies", "objetType", "objetId", "nomPieceJointe",
        "statut", "erreur", "envoyeLe", "remisLe", "ouvertLe", "createdAt"
 FROM "courriels" WHERE "objetType" = $1 AND "objetId" = $2
-ORDER BY "createdAt" DESC;
+ORDER BY "createdAt" DESC
+LIMIT 500;
 
 -- name: CourrielsJournal :many
 SELECT "id", "type", "sujet", "destinataires", "copies", "objetType", "objetId", "nomPieceJointe",
@@ -34,6 +35,11 @@ WHERE "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
 ORDER BY "createdAt"
 LIMIT @prendre::bigint;
 
+-- name: CourrielReserverRejeu :one
+SELECT "id" FROM "courriels"
+WHERE "id" = @id AND "statut" = 'ECHEC' AND "tentatives" < @tentatives_max::int
+FOR UPDATE SKIP LOCKED;
+
 -- name: CourrielRejeuEnregistre :exec
 UPDATE "courriels" SET "statut" = $2, "messageId" = $3, "erreur" = $4, "envoyeLe" = $5,
   "tentatives" = "tentatives" + 1
@@ -49,11 +55,14 @@ UPDATE "courriels" SET "statut" = $2, "messageId" = $3, "erreur" = $4, "envoyeLe
 WHERE "id" = $1;
 
 -- name: CourrielEvenementBrevo :execrows
+-- Un rebond ou une plainte signalés par Brevo sont définitifs : geler les
+-- tentatives pour ne pas rejouer un envoi vers une adresse qui a rejeté.
 UPDATE "courriels" SET
   "statut" = CASE WHEN "statut" = 'OUVERT' AND @statut::text = 'REMIS' THEN "statut" ELSE @statut::text END,
   "remisLe" = COALESCE("remisLe", CASE WHEN @statut::text IN ('REMIS', 'OUVERT') THEN @quand::timestamp END),
   "ouvertLe" = COALESCE("ouvertLe", CASE WHEN @statut::text = 'OUVERT' THEN @quand::timestamp END),
-  "erreur" = CASE WHEN @statut::text = 'ECHEC' THEN @erreur::text ELSE "erreur" END
+  "erreur" = CASE WHEN @statut::text = 'ECHEC' THEN @erreur::text ELSE "erreur" END,
+  "tentatives" = CASE WHEN @statut::text = 'ECHEC' THEN GREATEST("tentatives", 3) ELSE "tentatives" END
 WHERE "messageId" = @message_id::text;
 
 -- name: CourrielsStatutsParObjets :many

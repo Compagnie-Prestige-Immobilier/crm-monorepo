@@ -137,19 +137,12 @@ func (s *service) campagneTitulaireVise(ctx context.Context, in *CampagneAffecte
 	if row.PausedAt != nil {
 		return "", socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EN_PAUSE", "Cette campagne est en pause.")
 	}
-	if lotSurRepresentants(string(row.Cible)) != surRepresentants {
+	if lotSurRepresentants(string(row.Cible), row.Projet) != surRepresentants {
 		return "", socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_CIBLE", "Cette campagne ne vise pas ce type de fiche.")
 	}
 	membre, err := s.campagneMembreLeMoinsCharge(ctx, row)
 	if err != nil {
 		return "", err
-	}
-	items, err := s.Q.LotsActifsDeLaFiche(ctx, fiche)
-	if err != nil {
-		return "", err
-	}
-	if slices.ContainsFunc(items, func(item db.LotsActifsDeLaFicheRow) bool { return item.LotId == row.ID }) {
-		return membre, nil
 	}
 	return membre, s.campagneAjouterFiche(ctx, row, fiche, membre)
 }
@@ -183,6 +176,16 @@ func (s *service) campagneAjouterFiche(ctx context.Context, row *db.LotParIdRow,
 	auteur := socle.UtilisateurCourant(ctx).ID
 	return pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
 		q := s.Q.WithTx(tx)
+		if _, err := lotFiltresVerrouilles(ctx, q, row.ID); err != nil {
+			return err
+		}
+		items, err := q.LotsActifsDeLaFiche(ctx, fiche)
+		if err != nil {
+			return err
+		}
+		if slices.ContainsFunc(items, func(item db.LotsActifsDeLaFicheRow) bool { return item.LotId == row.ID }) {
+			return nil
+		}
 		position, err := q.AjouterFicheAuLot(ctx, db.AjouterFicheAuLotParams{
 			LotID: row.ID, RepresentantID: fiche.RepresentantID, ProspectID: fiche.ProspectID, AssigneeID: &membre,
 		})
@@ -217,11 +220,7 @@ func (s *service) campagneSuivreLaFiche(ctx context.Context, fiche db.LotsActifs
 		if len(mouvements) == 0 {
 			continue
 		}
-		equipe := lotLireFiltres(row.Filters).Distribution.TeleconseillerIds
-		if !slices.Contains(equipe, vers) {
-			equipe = append(equipe, vers)
-		}
-		if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.reaffectation",
+		if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.reaffectation",
 			map[string]any{lotCleVers: vers, "fiche": "affectation"}); err != nil {
 			return suivies, err
 		}

@@ -1,27 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useSyncExternalStore } from 'react';
+
+const REQUETE = '(prefers-reduced-motion: reduce)';
+
+function abonner(prevenir: () => void): () => void {
+  const query = window.matchMedia(REQUETE);
+  query.addEventListener('change', prevenir);
+  return () => {
+    query.removeEventListener('change', prevenir);
+  };
+}
 
 export function usePrefersReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(
-    () =>
-      typeof window !== 'undefined' &&
-      window.matchMedia('(prefers-reduced-motion: reduce)').matches,
-  );
-
-  useEffect(() => {
-    const query = window.matchMedia('(prefers-reduced-motion: reduce)');
-    // oxlint-disable-next-line react/set-state-in-effect -- synchronisation avec matchMedia
-    setReduced(query.matches);
-
-    const onChange = (event: MediaQueryListEvent): void => {
-      setReduced(event.matches);
-    };
-    query.addEventListener('change', onChange);
-    return () => {
-      query.removeEventListener('change', onChange);
-    };
-  }, []);
-
-  return reduced;
+  return useSyncExternalStore(abonner, () => window.matchMedia(REQUETE).matches);
 }

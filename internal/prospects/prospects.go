@@ -53,6 +53,7 @@ const (
 	prospectChampDureeSysteme       = "dureeSystemeMois"
 	prospectChampMethode            = "method"
 	prospectChampRendezVous         = "rendezVousAt"
+	prospectChampProjet             = "projet"
 )
 
 // Un PATCH doit séparer « champ absent » de « champ vidé » : sans ce type, une
@@ -141,7 +142,7 @@ func prospectTronquer(texte string, maximum int) string {
 	if len(texte) <= maximum {
 		return texte
 	}
-	return texte[:maximum]
+	return strings.ToValidUTF8(texte[:maximum], "")
 }
 
 type ProspectJourney struct {
@@ -471,7 +472,7 @@ type ProspectListInput struct {
 	ResteAAppeler          bool   `query:"resteAAppeler"`
 	SortBy                 string `query:"sortBy" enum:"createdAt,clientCreatedAt,nom,prenom,statut,lastCallAt"`
 	SortOrder              string `query:"sortOrder" enum:"asc,desc"`
-	Page                   int32  `query:"page" minimum:"1" default:"1"`
+	Page                   int32  `query:"page" minimum:"1" maximum:"10000" default:"1"`
 	PageSize               int32  `query:"pageSize" minimum:"1" maximum:"200" default:"25"`
 }
 
@@ -775,7 +776,7 @@ func (s *service) prospectCommercialUtilisable(ctx context.Context, id *string) 
 	}
 	_, err := s.Q.UtilisateurVivant(ctx, *id)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Commercial de destination introuvable.")
+		return socle.Problem(http.StatusNotFound, "USER_NOT_FOUND", "Téléconseiller de destination introuvable.")
 	}
 	return err
 }
@@ -862,6 +863,9 @@ func prospectIdentifiantDemande(demande string) (string, error) {
 func (s *service) prospectCreer(ctx context.Context, in *ProspectCreerInput) (*ProspectOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
 	corps := &in.Body
+	if err := prospectStatutModifiable(&u, db.ProspectStatutNOUVEAU, corps.Statut); err != nil {
+		return nil, err
+	}
 	phoneE164, id, err := s.prospectAvantCreation(ctx, &u, corps)
 	if err != nil {
 		return nil, err
@@ -907,6 +911,10 @@ func (s *service) prospectAvantCreation(ctx context.Context, u *socle.Utilisateu
 		return "", "", err
 	}
 	return phoneE164, id, s.prospectRepresentantUtilisable(ctx, corps.RepresentantID)
+}
+
+func ChampsLibresRetenus(ctx context.Context, d *socle.Deps, projet db.Projet, envoyes map[string]string) ([]byte, error) {
+	return (&service{Deps: d}).prospectLibresRetenus(ctx, projet, envoyes)
 }
 
 // Les reponses aux champs ajoutes, filtrees sur les champs declares pour le
@@ -1022,14 +1030,19 @@ func (s *service) prospectRattacher(ctx context.Context, u *socle.Utilisateur, p
 	prospectPoserEnum[db.PaymentMode](maj, prospectChampPaiement, corps.PaymentMode)
 	prospectPoserEnum[db.TypeBien](maj, prospectChampTypeBien, corps.TypeBien)
 	prospectPoser(maj, "canalProvenanceId", corps.CanalProvenanceID.valeur)
-	err = s.prospectTx(ctx, func(q *db.Queries) error {
+	err = pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		q := s.Q.WithTx(tx)
 		if err := q.InsertJourney(ctx, db.InsertJourneyParams{
 			ID: journeyID.String(), ProspectId: existant.ID, Projet: projet,
 			Statut: prospectStatutOuNouveau(corps.Statut), Consent: consent, ConsentAt: consentAt,
 		}); err != nil {
 			return err
 		}
-		return maj.appliquer(ctx, s.Pool, existant.ID)
+		if err := maj.appliquer(ctx, tx, existant.ID); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, q, u.ID, "prospect.rattacher", prospectEntite, existant.ID, nil,
+			map[string]any{prospectChampProjet: projet, "journeyId": journeyID.String()})
 	})
 	if err != nil {
 		return aucune, err
@@ -1173,7 +1186,7 @@ func (s *service) prospectMajColonnes(maj *prospectMaj, corps *ProspectBody, exi
 	prospectPoser(maj, "representantId", corps.RepresentantID)
 	prospectPoser(maj, socle.ProspectChampProfession, prospectRogner(corps.Profession))
 	prospectPoser(maj, prospectChampDureeSysteme, corps.DureeSystemeMois)
-	prospectPoserEnum[db.Projet](maj, "projet", corps.Projet)
+	prospectPoserEnum[db.Projet](maj, prospectChampProjet, corps.Projet)
 	prospectPoserEnum[db.ProspectType](maj, prospectChampType, corps.Type)
 	prospectPoserEnum[db.PaymentMode](maj, prospectChampPaiement, corps.PaymentMode)
 	prospectPoserEnum[db.TypeBien](maj, prospectChampTypeBien, corps.TypeBien)
@@ -1303,7 +1316,7 @@ func (s *service) prospectSupprimer(ctx context.Context, in *ProspectIDInput) (*
 		socle.ProspectChampPhone: prospectDeref(existant.PhoneE164),
 	}
 	err = s.prospectTx(ctx, func(q *db.Queries) error {
-		if err := q.SoftDeleteProspect(ctx, in.ID); err != nil {
+		if _, err := q.SoftDeleteProspect(ctx, in.ID); err != nil {
 			return err
 		}
 		if err := q.AnnulerRappelsEnAttente(ctx, in.ID); err != nil {
@@ -1317,30 +1330,6 @@ func (s *service) prospectSupprimer(ctx context.Context, in *ProspectIDInput) (*
 	out := &ProspectOkOutput{}
 	out.Body.Ok = true
 	return out, nil
-}
-
-// `WHERE revueAt IS NULL` et non un simple UPDATE : deux revues simultanées
-// écriraient deux auteurs, et c'est le PREMIER qui a relu la demande.
-func (s *service) prospectRevue(ctx context.Context, in *ProspectIDInput) (*ProspectOutput, error) {
-	u := socle.UtilisateurCourant(ctx)
-	existant, err := s.Q.ProspectVivant(ctx, in.ID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return nil, socle.Problem(http.StatusNotFound, prospectCodeIntrouvable, prospectIntrouvable)
-	}
-	if err != nil {
-		return nil, err
-	}
-	if existant.Statut != db.ProspectStatutCONVERTI && existant.Statut != db.ProspectStatutVENDU {
-		return nil, socle.Problem(http.StatusBadRequest, "PROSPECT_REVUE_REQUIRES_CONVERSION", "Seule une demande convertie se revoit.")
-	}
-	if err := s.Q.MarquerProspectRevue(ctx, db.MarquerProspectRevueParams{ID: in.ID, RevueById: &u.ID}); err != nil {
-		return nil, err
-	}
-	item, err := s.prospectLire(ctx, &u, in.ID)
-	if err != nil {
-		return nil, err
-	}
-	return &ProspectOutput{Body: *item}, nil
 }
 
 type ProspectFusionInput struct {
@@ -1415,7 +1404,7 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 		return out, nil
 	}
 	if corps.RepresentantID == nil && corps.CommercialID == nil {
-		return nil, socle.Problem(http.StatusBadRequest, "REASSIGN_NO_TARGET", "Indiquez au moins un représentant ou un commercial de destination.")
+		return nil, socle.Problem(http.StatusBadRequest, "REASSIGN_NO_TARGET", "Indiquez au moins un représentant ou un téléconseiller de destination.")
 	}
 	portee := u.Peut(socle.PermissionProspectsReaffecterTout)
 	if err := prospectReaffecterOwnerAutorise(corps.CommercialID, portee); err != nil {
@@ -1434,13 +1423,14 @@ func (s *service) prospectReaffecter(ctx context.Context, in *ProspectReaffectat
 		return nil, err
 	}
 	if err := s.prospectTx(ctx, func(q *db.Queries) error {
-		if err := q.ReaffecterProspects(ctx, db.ReaffecterProspectsParams{
+		err := q.ReaffecterProspects(ctx, db.ReaffecterProspectsParams{
 			RepresentantID: corps.RepresentantID, CommercialID: corps.CommercialID, Ids: ids,
-		}); err != nil {
-			return err
+		})
+		apres := map[string]any{"prospectIds": ids, "representantId": corps.RepresentantID, "commercialId": corps.CommercialID}
+		for i := 0; err == nil && i < len(ids); i++ {
+			err = database.Auditer(ctx, q, u.ID, "prospect.reassign", prospectEntite, ids[i], nil, apres)
 		}
-		return database.Auditer(ctx, q, u.ID, "prospect.reassign", prospectEntite, ids[0], nil,
-			map[string]any{"prospectIds": ids, "representantId": corps.RepresentantID, "commercialId": corps.CommercialID})
+		return err
 	}); err != nil {
 		return nil, err
 	}

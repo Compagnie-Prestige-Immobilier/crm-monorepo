@@ -211,24 +211,28 @@ JOIN "users" u ON u."id" = a."performedById"
 JOIN "statuts_qualification" sq ON sq."id" = a."statutQualificationId"
 LEFT JOIN "representant_suggestions" s ON s."sourceAttemptId" = a."id"
 WHERE a."representantId" = $1
-ORDER BY a."clientCreatedAt" DESC, a."id" DESC;
+ORDER BY a."clientCreatedAt" DESC, a."id" DESC
+LIMIT 500;
 
 -- name: DureesDeTraitement :many
 SELECT "closingAttemptId", "firstInputAt", "closedAt"
 FROM "ouvertures_fiche"
-WHERE "representantId" = $1 AND "closingAttemptId" IS NOT NULL AND "firstInputAt" IS NOT NULL;
+WHERE "representantId" = $1 AND "closingAttemptId" IS NOT NULL AND "firstInputAt" IS NOT NULL
+LIMIT 5000;
 
 -- name: ListFicheChanges :many
 SELECT a."id", a."userId", a."action", a."before", a."after", a."at", u."fullName" AS changed_by_name
 FROM "audit_logs" a
 LEFT JOIN "users" u ON u."id" = a."userId"
 WHERE a."entity" = 'representant' AND a."entityId" = $1 AND a."action" LIKE 'representant.fiche.%'
-ORDER BY a."at" DESC, a."id" DESC;
+ORDER BY a."at" DESC, a."id" DESC
+LIMIT 500;
 
 -- name: NomsDesReferences :many
 SELECT "id", "name" FROM "departements" WHERE "id" = ANY(sqlc.arg('ids')::text[])
 UNION ALL
-SELECT "id", "name" FROM "iefs" WHERE "id" = ANY(sqlc.arg('ids')::text[]);
+SELECT "id", "name" FROM "iefs" WHERE "id" = ANY(sqlc.arg('ids')::text[])
+LIMIT 1000;
 
 -- name: ListRepresentantComments :many
 SELECT c.*, u."fullName" AS author_name

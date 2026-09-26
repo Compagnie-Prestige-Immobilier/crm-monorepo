@@ -9,22 +9,17 @@ version précédente.
 
 USAGE
     export DOKPLOY_KEY='votre-clé'
-    python3 infra/dokploy/deploy.py provision   # Postgres + les 2 applications
-    python3 infra/dokploy/deploy.py configure   # dépôt, build, variables, domaines
+    python3 infra/dokploy/deploy.py provision   # Postgres + l'application cpi-go
+    python3 infra/dokploy/deploy.py configure   # dépôt, build, variables fusionnées, domaines
     python3 infra/dokploy/deploy.py deploy      # démarrage
-    python3 infra/dokploy/deploy.py redeploy    # applications seules, voie automatisée
-    python3 infra/dokploy/deploy.py redeploy cpi-go   # le binaire Go v2 seul
-    BRANCH=v2 python3 infra/dokploy/deploy.py configure-go --sans-taches  # v2 sur son hôte d'essai, v1 intacte
+    python3 infra/dokploy/deploy.py redeploy    # cpi-go seul, refusé sans sauvegarde de moins de 26 h
     python3 infra/dokploy/deploy.py backup      # sauvegarde nocturne hors du VPS
     python3 infra/dokploy/deploy.py status      # état courant
     python3 infra/dokploy/deploy.py all         # les trois premières d'affilée
-    python3 infra/dokploy/deploy.py bascule --oui  # jour J, les domaines passent en v2
-    python3 infra/dokploy/deploy.py retour --oui   # retour arrière, jusqu'à J+7
 
 `backup` reste HORS de `all` : il réclame les coordonnées d'un stockage S3 que
-l'opérateur seul détient, et un `all` qui échoue faute de bucket ferait échouer
-un déploiement par ailleurs correct. Il n'est pas facultatif pour autant, et
-`status` affiche en rouge tant qu'il n'a pas été lancé.
+l'opérateur seul détient. `redeploy` refuse de partir sans lui : le binaire
+applique ses migrations au démarrage.
 
 Chaque étape est IDEMPOTENTE : elle cherche l'existant avant de créer.
 
@@ -34,8 +29,8 @@ script qui plante.
 
 POURQUOI PAS docker-compose.prod.yml
     Il lance Caddy sur les ports 80 et 443, qui appartiennent déjà à Traefik sur
-    un hôte Dokploy. La forme native, un service Postgres, deux applications
-    construites depuis leurs Dockerfile, rend à Traefik le domaine et le TLS.
+    un hôte Dokploy. La forme native, un service Postgres et une application
+    construite depuis le Dockerfile, rend à Traefik le domaine et le TLS.
 """
 
 from __future__ import annotations
@@ -44,11 +39,13 @@ import json
 import os
 import secrets
 import string
+import subprocess
 import sys
 import time
 import urllib.error
 import urllib.parse
 import urllib.request
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -87,19 +84,10 @@ API_DOMAIN = setting("API_DOMAIN", "go.cpi-chues.com")
 WEB_DOMAIN = setting("WEB_DOMAIN", "go-admin.cpi-chues.com")
 
 PG_NAME = "cpi-go-postgres"
-REDIS_NAME = "cpi-go-redis"
-API_NAME = "cpi-go-api"
-WEB_NAME = "cpi-go-web"
-API_PORT = 3001
-WEB_PORT = 3000
 SSH_KEY_NAME = "cpi-go-deploy"
-APK_RELEASE_MOUNT = "/repo/storage/releases"
-# Nom RÉEL du volume en production : il porte les APK publiés, on ne le renomme pas.
-APK_RELEASE_VOLUME = "cpi-go-releases"
-# Exports intégraux de la base, demandés depuis Paramètres. Même motif que les
-# APK, et il n'est pas facultatif : l'état du travail vit en base et nomme un
-# fichier. Sans volume, un redéploiement emporte le fichier et laisse l'écran
-# proposer le téléchargement d'un export qui n'existe plus.
+# Exports intégraux de la base, demandés depuis Paramètres. Sans volume, un
+# redéploiement emporte le fichier et laisse l'écran proposer le téléchargement
+# d'un export qui n'existe plus.
 #
 # Le contenu, lui, ne dure PAS : il est détruit dès son téléchargement, et de
 # toute façon à son échéance. Ce volume est fait pour survivre à une image, pas
@@ -107,13 +95,12 @@ APK_RELEASE_VOLUME = "cpi-go-releases"
 DB_DUMP_MOUNT = "/repo/storage/db-dumps"
 DB_DUMP_VOLUME = "cpi-go-db-dumps"
 
-# Binaire Go v2, docs/v2-refonte/plan.md §3 et §7. UNE application : le binaire
-# sert l'API et le panneau embarqué sur le même port, il n'y a plus de service
-# web séparé. Ses deux domaines de production restent sur la v1 jusqu'au jour de
-# bascule ; en attendant il se met en scène sur GO_STAGING_DOMAIN.
+# UNE application : le binaire sert l'API et le panneau embarqué sur le même
+# port, sur les deux domaines de production.
 GO_NAME = "cpi-go"
 GO_PORT = 4000
-GO_STAGING_DOMAIN = setting("GO_STAGING_DOMAIN", "go-v2.cpi-chues.com")
+# Une sauvegarde par nuit, plus deux heures de marge : une nuit manquée bloque `redeploy`.
+SAUVEGARDE_AGE_MAX = timedelta(hours=26)
 # Notes vocales de la consignation. Sans volume, un redéploiement pendant une
 # qualification emporte la note que l'historique continue d'annoncer.
 # Fichiers d'import en cours de traitement, même raison : l'état du travail vit
@@ -248,6 +235,20 @@ def _explain(payload: dict) -> str:
     return message or json.dumps(err)[:300]
 
 
+# Le client par défaut d'urllib ouvre aussi file://, ftp:// et data: ; celui-ci ne parle que HTTP(S).
+CLIENT_HTTP = urllib.request.OpenerDirector()
+for gestionnaire in (
+    urllib.request.ProxyHandler(),
+    urllib.request.UnknownHandler(),
+    urllib.request.HTTPHandler(),
+    urllib.request.HTTPSHandler(),
+    urllib.request.HTTPDefaultErrorHandler(),
+    urllib.request.HTTPRedirectHandler(),
+    urllib.request.HTTPErrorProcessor(),
+):
+    CLIENT_HTTP.add_handler(gestionnaire)
+
+
 def call(procedure: str, payload: dict | None = None, *, method: str = "POST"):
     """Appelle une procédure tRPC. Lève DokployError si le serveur refuse."""
     url = f"{DOKPLOY_URL}/api/trpc/{procedure}"
@@ -277,9 +278,7 @@ def call(procedure: str, payload: dict | None = None, *, method: str = "POST"):
         },
     )
     try:
-        # DOKPLOY_URL is an operator-controlled deployment endpoint, not user
-        # input; urllib is used here to keep the provisioning tool dependency-free.
-        with urllib.request.urlopen(request, timeout=180) as response:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+        with CLIENT_HTTP.open(request, timeout=180) as response:
             body = json.loads(response.read().decode())
     except urllib.error.HTTPError as exc:
         try:
@@ -342,19 +341,10 @@ def load_secrets() -> dict[str, str]:
     existing = _read_kv(SECRETS_FILE)
     if existing.get("PG_PASSWORD"):
         info(f"secrets relus depuis {SECRETS_FILE.name}")
-        # Redis est arrivé après les premiers déploiements : un fichier plus
-        # ancien n'a pas ce secret, on le complète sans toucher aux autres.
-        if not existing.get("REDIS_PASSWORD"):
-            existing["REDIS_PASSWORD"] = _token(32)
-            _write_kv(SECRETS_FILE, existing, f"Complété le {time.strftime('%Y-%m-%dT%H:%M:%SZ')}")
-            ok("REDIS_PASSWORD engendré et ajouté")
         return existing
 
     values = {
         "PG_PASSWORD": _token(32),
-        "REDIS_PASSWORD": _token(32),
-        "JWT_ACCESS": _token(48),
-        "JWT_REFRESH": _token(48),
         "ADMIN_PASSWORD": _token(18),
     }
     _write_kv(SECRETS_FILE, values, f"Engendré le {time.strftime('%Y-%m-%dT%H:%M:%SZ')}")
@@ -449,18 +439,11 @@ def find_existing() -> dict[str, str]:
 
     for environment in project.get("environments", []) or []:
         for app in environment.get("applications", []) or []:
-            if app.get("name") == API_NAME:
-                found["API_ID"] = app.get("applicationId", "")
-            elif app.get("name") == WEB_NAME:
-                found["WEB_ID"] = app.get("applicationId", "")
-            elif app.get("name") == GO_NAME:
+            if app.get("name") == GO_NAME:
                 found["GO_ID"] = app.get("applicationId", "")
         for db in environment.get("postgres", []) or []:
             if db.get("name") == PG_NAME:
                 found["POSTGRES_ID"] = db.get("postgresId", "")
-        for cache in environment.get("redis", []) or []:
-            if cache.get("name") == REDIS_NAME:
-                found["REDIS_ID"] = cache.get("redisId", "")
     return found
 
 
@@ -494,44 +477,21 @@ def cmd_provision() -> None:
         ids["POSTGRES_ID"] = (result or {}).get("postgresId", "")
         ok(f"créée, {ids['POSTGRES_ID']}")
 
-    step("Cache Redis")
-    if ids.get("REDIS_ID"):
-        ok(f"existe déjà, {ids['REDIS_ID']}")
+    step(f"Application {GO_NAME}")
+    if ids.get("GO_ID"):
+        ok(f"existe déjà, {ids['GO_ID']}")
     else:
-        result = call(
-            "redis.create",
-            {
-                "environmentId": ENVIRONMENT_ID,
-                "name": REDIS_NAME,
-                "appName": REDIS_NAME,
-                "databasePassword": secrets_["REDIS_PASSWORD"],
-                "dockerImage": "redis:8-alpine",
-                "description": "Cache des agrégats CPI GO, sans persistance",
-            },
-        )
-        ids["REDIS_ID"] = (result or {}).get("redisId", "")
-        ok(f"créé, {ids['REDIS_ID']}")
-
-    for key, name, description in (
-        ("API_ID", API_NAME, "API NestJS, source du contrat OpenAPI"),
-        ("WEB_ID", WEB_NAME, "Panel admin Next.js"),
-        ("GO_ID", GO_NAME, "Binaire Go v2, API et panneau embarqué"),
-    ):
-        step(f"Application {name}")
-        if ids.get(key):
-            ok(f"existe déjà, {ids[key]}")
-            continue
         result = call(
             "application.create",
             {
                 "environmentId": ENVIRONMENT_ID,
-                "name": name,
-                "appName": name,
-                "description": description,
+                "name": GO_NAME,
+                "appName": GO_NAME,
+                "description": "Binaire Go, API et panneau embarqué",
             },
         )
-        ids[key] = (result or {}).get("applicationId", "")
-        ok(f"créée, {ids[key]}")
+        ids["GO_ID"] = (result or {}).get("applicationId", "")
+        ok(f"créée, {ids['GO_ID']}")
 
     save_ids(ids)
     print(f"\n{DIM}Identifiants écrits dans {IDS_FILE.name}{RESET}")
@@ -617,90 +577,65 @@ def _leads_env() -> list[str]:
     return [f"IMPORT_LEADS_URL={lien}"] if lien else []
 
 
-def _go_env(s: dict[str, str], names: dict[str, str]) -> str:
-    """Environnement du binaire v2, audits/go-securite.md §5.
+def _go_env(existant: str, s: dict[str, str], postgres: str) -> str:
+    """Environnement du binaire, FUSIONNÉ dans celui déjà posé sur Dokploy.
 
-    Ni `JWT_*`, ni `REDIS_URL`, ni `APK_*`, ni `SYNC_*`, ni `DEMO_*`, ni
-    `API_CORS_ORIGINS`, ni `API_DOCS_ENABLED`, ni `NEXT_PUBLIC_*` : le binaire
-    ne lit aucune de ces variables. Elles restent posées sur la v1 jusqu'à J+7,
-    c'est ce qui rend `retour` possible.
-
-    `PASSWORD_MIN_LENGTH` et `PASSWORD_MAX_LENGTH` sont absentes à dessein : les
-    défauts de `lireConfig` valent déjà 8 et 24.
+    Une variable que le script ne connaît pas (`GLPI_*`, `KAIRO_*`,
+    `BREVO_WEBHOOK_SECRET`, `SUPPORT_AI_*`, `DATABASE_URL_<NOM>`…) reste en
+    place. Un défaut du script ne remplace jamais une valeur posée ; seules les
+    intégrations exportées par l'opérateur pour cette session l'écrasent.
     """
-    return "\n".join(
-        [
-            f"PORT={GO_PORT}",
-            # PAS de `?schema=public` ici, contrairement à la v1 : ce paramètre
-            # est propre à Prisma. pgx transmet au serveur tout paramètre qu'il
-            # ne connaît pas, et Postgres refuse alors la connexion sur
-            # « unrecognized configuration parameter "schema" ».
-            f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{names['postgres']}:5432/crm",
-            "LOG_LEVEL=info",
-            "LOG_FORMAT=json",
-            "SESSION_TTL_DAYS=30",
-            "AUTH_LOGIN_RATE_LIMIT=10",
-            "API_GLOBAL_RATE_LIMIT=3000",
-            # Traefik est en amont et réécrit X-Forwarded-For, même raison qu'en
-            # v1 : sans cela toutes les requêtes semblent venir de Traefik et la
-            # limitation de débit devient globale.
-            "API_TRUST_PROXY_HEADERS=true",
-            "BUSINESS_TIME_ZONE=Africa/Dakar",
-            "PHONE_DEFAULT_REGION=SN",
-            f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
-            f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
-            "DB_DUMP_ENABLED=true",
-            f"IMPORTS_DIR={IMPORTS_MOUNT}",
-            "SEED_ADMIN_EMAIL=admin@cpi.sn",
-            "SEED_ADMIN_USERNAME=admin",
-            f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
-            "SEED_ADMIN_FULL_NAME=Administrateur CPI",
-            *_brevo_env(),
-            *_turnstile_env(),
-            *_plateformes_env(),
-            *_leads_env(),
-        ]
-    )
+    lignes = existant.splitlines()
+    position = {
+        ligne.split("=", 1)[0].strip(): i
+        for i, ligne in enumerate(lignes)
+        if "=" in ligne and not ligne.lstrip().startswith("#")
+    }
+
+    def poser(ligne: str, ecraser: bool) -> None:
+        cle = ligne.split("=", 1)[0]
+        if cle not in position:
+            position[cle] = len(lignes)
+            lignes.append(ligne)
+        elif ecraser:
+            lignes[position[cle]] = ligne
+
+    for ligne in _go_env_defauts(s, postgres):
+        poser(ligne, ecraser=False)
+    for ligne in (*_brevo_env(), *_turnstile_env(), *_plateformes_env(), *_leads_env()):
+        poser(ligne, ecraser=True)
+    return "\n".join(lignes)
 
 
-def _api_env(s: dict[str, str], names: dict[str, str]) -> str:
-    return "\n".join(
-        [
-            "NODE_ENV=production",
-            "PORT=3001",
-            "LOG_LEVEL=info",
-            f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{names['postgres']}:5432/crm?schema=public",
-            f"REDIS_URL=redis://:{s['REDIS_PASSWORD']}@{names['redis']}:6379/0",
-            f"JWT_ACCESS_SECRET={s['JWT_ACCESS']}",
-            f"JWT_REFRESH_SECRET={s['JWT_REFRESH']}",
-            "JWT_ACCESS_TTL=15m",
-            "JWT_REFRESH_TTL_DAYS=30",
-            "AUTH_LOGIN_RATE_LIMIT=10",
-            f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
-            f"API_CORS_ORIGINS=https://{WEB_DOMAIN}",
-            # Traefik est en amont et réécrit X-Forwarded-For : l'en-tête est
-            # fiable ici, et il le faut, sinon toutes les requêtes semblent
-            # venir de Traefik et la limitation de débit devient globale.
-            "API_TRUST_PROXY_HEADERS=true",
-            # Swagger fermé : le contrat est publié par la CI, pas par le serveur.
-            "API_DOCS_ENABLED=false",
-            f"APK_RELEASE_DIR={APK_RELEASE_MOUNT}",
-            # Flotte NAT : une IP publique partagée par tout le parc.
-            "APK_DOWNLOAD_RATE_LIMIT=50000",
-            f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
-            "DB_DUMP_ENABLED=true",
-            "BUSINESS_TIME_ZONE=Africa/Dakar",
-            "PHONE_DEFAULT_REGION=SN",
-            "SYNC_MAX_BATCH_SIZE=200",
-            "IDEMPOTENCY_TTL_DAYS=7",
-            "SEED_ADMIN_EMAIL=admin@cpi.sn",
-            "SEED_ADMIN_USERNAME=admin",
-            f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
-            "SEED_ADMIN_FULL_NAME=Administrateur CPI",
-            *_brevo_env(),
-            *_turnstile_env(),
-        ]
-    )
+def _go_env_defauts(s: dict[str, str], postgres: str) -> list[str]:
+    return [
+        f"PORT={GO_PORT}",
+        # PAS de `?schema=public` : pgx transmet au serveur tout paramètre
+        # qu'il ne connaît pas, et Postgres refuse alors la connexion sur
+        # « unrecognized configuration parameter "schema" ».
+        f"DATABASE_URL=postgresql://crm:{s['PG_PASSWORD']}@{postgres}:5432/crm",
+        "LOG_LEVEL=info",
+        "LOG_FORMAT=json",
+        "SESSION_TTL_DAYS=30",
+        "AUTH_LOGIN_RATE_LIMIT=10",
+        "API_GLOBAL_RATE_LIMIT=3000",
+        # Traefik est en amont et réécrit X-Forwarded-For : sans cela toutes les
+        # requêtes semblent venir de Traefik et la limitation de débit devient globale.
+        "API_TRUST_PROXY_HEADERS=true",
+        "BUSINESS_TIME_ZONE=Africa/Dakar",
+        "PHONE_DEFAULT_REGION=SN",
+        f"PUBLIC_WEB_URL=https://{WEB_DOMAIN}",
+        f"DB_DUMP_DIR={DB_DUMP_MOUNT}",
+        "DB_DUMP_ENABLED=true",
+        f"IMPORTS_DIR={IMPORTS_MOUNT}",
+        "SEED_ADMIN_EMAIL=admin@cpi.sn",
+        "SEED_ADMIN_USERNAME=admin",
+        f"SEED_ADMIN_PASSWORD={s['ADMIN_PASSWORD']}",
+        "SEED_ADMIN_FULL_NAME=Administrateur CPI",
+        # Exigé hors développement pour semer une base de démonstration ; la
+        # valeur déjà posée sur Dokploy est conservée (`ecraser=False`).
+        f"SEED_FIXTURE_PASSWORD={_token(18)}",
+    ]
 
 
 def ensure_volume_mount(
@@ -741,11 +676,6 @@ def ensure_volume_mount(
     ok(f"volume {label} « {volume_name} » monté sur {mount_path}")
 
 
-def ensure_apk_mount(application_id: str) -> None:
-    """Ensure releases are stored outside the replaceable application image."""
-    ensure_volume_mount(application_id, APK_RELEASE_VOLUME, APK_RELEASE_MOUNT, "APK")
-
-
 def ensure_db_dump_mount(application_id: str) -> None:
     """Ensure database exports are stored outside the replaceable image."""
     ensure_volume_mount(application_id, DB_DUMP_VOLUME, DB_DUMP_MOUNT, "exports base")
@@ -756,7 +686,7 @@ def _attach_domain(application_id: str, host: str, port: int) -> None:
 
     Dokploy refuse un hôte déjà pris, et ce refus est traité comme « déjà
     configuré ». C'est juste tant que l'hôte est sur l'application VISÉE ; s'il
-    est sur une autre, il faut le détacher d'abord, ce que fait `bascule`.
+    est sur une autre, il faut le détacher d'abord dans Dokploy.
     """
     try:
         call(
@@ -779,84 +709,27 @@ def _attach_domain(application_id: str, host: str, port: int) -> None:
             raise
 
 
-def _detach_domain(application_id: str, host: str) -> None:
-    """Retire un hôte d'une application, TOUTES ses entrées.
-
-    Un hôte peut être inscrit deux fois sur la même application. N'en retirer
-    qu'une laisse un routeur Traefik vers un conteneur arrêté, donc un 502 sur
-    l'hôte qu'on croyait libéré (bascule du 12 septembre 2026).
-    """
-    rows = call("domain.byApplicationId", {"applicationId": application_id}, method="GET") or []
-    retires = 0
-    for row in rows:
-        if row.get("host") == host:
-            call("domain.delete", {"domainId": row.get("domainId", "")})
-            retires += 1
-    if retires:
-        ok(f"{host} détaché, {retires} entrée(s)")
-        return
-    info(f"{host} n'était pas rattaché à cette application")
-
-
-def _web_env(names: dict[str, str]) -> str:
-    return "\n".join(
-        [
-            "NODE_ENV=production",
-            "PORT=3000",
-            # De serveur à serveur, dans le réseau Docker : ni TLS ni passage
-            # par l'internet public.
-            f"API_URL=http://{names['api']}:3001",
-            f"API_INTERNAL_URL=http://{names['api']}:3001",
-            f"NEXT_PUBLIC_API_URL=https://{API_DOMAIN}",
-        ]
-    )
-
-
-def service_app_names(ids: dict[str, str]) -> dict[str, str]:
-    """Noms de service RÉELS, tels que Docker les résout.
+def postgres_service_name(ids: dict[str, str]) -> str:
+    """Nom de service RÉEL de la base, tel que Docker le résout.
 
     Dokploy suffixe chaque `appName` d'un identifiant court, `cpi-go-postgres`
     devient `cpi-go-postgres-cmsq36`. C'est ce nom suffixé, et lui seul, qui
-    résout dans le réseau Docker. Écrire le nom court dans DATABASE_URL fait
-    échouer la résolution DNS : `migrate deploy` ne trouve pas la base, le point
-    d'entrée refuse de démarrer, et le conteneur redémarre en boucle avec un
-    build pourtant vert.
-
-    Le repli sur le nom court est donc DÉLIBÉRÉMENT absent. Il existait, sous
-    la forme d'un `except DokployError` qui posait un avertissement et rendait
-    les noms courts : `cmd_configure` écrivait alors la `DATABASE_URL` que le
-    paragraphe ci-dessus décrit comme cassée, puis affichait « ✓ API, N
-    variables ». Le script signalait une réussite en ayant configuré à coup sûr
-    une panne. Une résolution impossible doit interrompre.
+    résout dans le réseau Docker. Une résolution impossible interrompt : le nom
+    court écrirait une DATABASE_URL cassée et le conteneur redémarrerait en boucle.
     """
-    names = {"postgres": PG_NAME, "redis": REDIS_NAME, "api": API_NAME, "web": WEB_NAME}
-    if ids.get("POSTGRES_ID"):
-        db = call("postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET") or {}
-        appname = db.get("appName")
-        if not appname:
-            raise DokployError(
-                "nom de service Docker de Postgres illisible : DATABASE_URL serait fausse."
-            )
-        names["postgres"] = appname
-    if ids.get("REDIS_ID"):
-        cache = call("redis.one", {"redisId": ids["REDIS_ID"]}, method="GET") or {}
-        appname = cache.get("appName")
-        if not appname:
-            raise DokployError("nom de service Docker de Redis illisible : REDIS_URL serait fausse.")
-        names["redis"] = appname
-    for key, slot in (("API_ID", "api"), ("WEB_ID", "web")):
-        if ids.get(key):
-            app = call("application.one", {"applicationId": ids[key]}, method="GET") or {}
-            names[slot] = app.get("appName") or names[slot]
-    return names
+    db = call("postgres.one", {"postgresId": ids["POSTGRES_ID"]}, method="GET") or {}
+    appname = db.get("appName")
+    if not appname:
+        raise DokployError("nom de service Docker de Postgres illisible : DATABASE_URL serait fausse.")
+    return appname
 
 
 def cmd_configure() -> None:
     secrets_ = load_secrets()
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
-    if not ids.get("API_ID") or not ids.get("WEB_ID") or not ids.get("GO_ID"):
-        fail("applications introuvables, lancez d'abord `provision`.")
+    if not ids.get("POSTGRES_ID") or not ids.get("GO_ID"):
+        fail("Postgres ou cpi-go introuvable, lancez d'abord `provision`.")
         sys.exit(1)
     save_ids(ids)
 
@@ -866,58 +739,20 @@ def cmd_configure() -> None:
     ok(f"clé {ids['SSH_KEY_ID']}")
 
     step(f"Source Git, {GIT_URL} @ {BRANCH}")
-    for key in ("API_ID", "WEB_ID", "GO_ID"):
-        call(
-            "application.saveGitProvider",
-            {
-                "applicationId": ids[key],
-                "customGitUrl": GIT_URL,
-                "customGitBranch": BRANCH,
-                "customGitBuildPath": "/",
-                "customGitSSHKeyId": ids["SSH_KEY_ID"],
-                "watchPaths": [],
-            },
-        )
-    ok("les trois applications pointent sur le dépôt")
+    call(
+        "application.saveGitProvider",
+        {
+            "applicationId": ids["GO_ID"],
+            "customGitUrl": GIT_URL,
+            "customGitBranch": BRANCH,
+            "customGitBuildPath": "/",
+            "customGitSSHKeyId": ids["SSH_KEY_ID"],
+            "watchPaths": [],
+        },
+    )
+    ok(f"{GO_NAME} pointe sur le dépôt")
 
-    # Le Dockerfile vit dans infra/docker/ mais son CONTEXTE est la racine du
-    # dépôt : le build a besoin du pnpm-workspace, du lockfile et des paquets
-    # partagés. D'où dockerContextPath = '/'.
     step("Type de build")
-    call(
-        "application.saveBuildType",
-        {
-            "applicationId": ids["API_ID"],
-            "buildType": "dockerfile",
-            "dockerfile": "infra/docker/Dockerfile.api",
-            "dockerContextPath": "/",
-            "dockerBuildStage": "runner",
-            "herokuVersion": "",
-            "railpackVersion": "",
-        },
-    )
-    ok("API, infra/docker/Dockerfile.api (étape runner)")
-
-    step("Stockage persistant des releases Android")
-    ensure_apk_mount(ids["API_ID"])
-
-    step("Stockage persistant des exports de la base")
-    ensure_db_dump_mount(ids["API_ID"])
-
-    call(
-        "application.saveBuildType",
-        {
-            "applicationId": ids["WEB_ID"],
-            "buildType": "dockerfile",
-            "dockerfile": "infra/docker/Dockerfile.web",
-            "dockerContextPath": "/",
-            "dockerBuildStage": "",
-            "herokuVersion": "",
-            "railpackVersion": "",
-        },
-    )
-    ok("Web, infra/docker/Dockerfile.web")
-
     # Pas de dockerBuildStage : `runner` est la dernière étape du Dockerfile.
     # Le HEALTHCHECK est dans l'image, Dokploy n'expose pas de champ pour cela
     # hors mode swarm.
@@ -936,67 +771,34 @@ def cmd_configure() -> None:
     ok("Go, Dockerfile à la racine")
 
     step("Stockage persistant du binaire Go")
-    # `cpi-go-db-dumps` est le volume DÉJÀ en production sous l'API v1 : il est
-    # monté sur les deux applications, et à la bascule seule la v2 l'écrit.
     ensure_db_dump_mount(ids["GO_ID"])
     ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
 
     step("Variables d'environnement")
-    names = service_app_names(ids)
-    info(f"service base : {names['postgres']}")
-    api_env = _api_env(secrets_, names)
-    call(
-        "application.saveEnvironment",
-        {
-            "applicationId": ids["API_ID"],
-            "env": api_env,
-            "buildArgs": "",
-            "buildSecrets": "",
-            "createEnvFile": True,
-        },
-    )
-    ok(f"API, {len(api_env.splitlines())} variables")
-
-    web_env = _web_env(names)
-    call(
-        "application.saveEnvironment",
-        {
-            "applicationId": ids["WEB_ID"],
-            "env": web_env,
-            "buildArgs": "",
-            "buildSecrets": "",
-            "createEnvFile": True,
-        },
-    )
-    ok(f"Web, {len(web_env.splitlines())} variables")
-
-    go_env = _go_env(secrets_, names)
+    postgres = postgres_service_name(ids)
+    info(f"service base : {postgres}")
+    app = call("application.one", {"applicationId": ids["GO_ID"]}, method="GET") or {}
+    existant = app.get("env") or ""
+    go_env = _go_env(existant, secrets_, postgres)
     call(
         "application.saveEnvironment",
         {
             "applicationId": ids["GO_ID"],
             "env": go_env,
-            "buildArgs": "",
-            "buildSecrets": "",
+            "buildArgs": app.get("buildArgs") or "",
+            "buildSecrets": app.get("buildSecrets") or "",
             "createEnvFile": True,
         },
     )
-    ok(f"Go, {len(go_env.splitlines())} variables")
+    ok(f"{len(existant.splitlines())} lignes conservées, {len(go_env.splitlines())} au total")
 
     # `https: true` SANS certificateType 'letsencrypt' : le certificat est celui
     # d'origine Cloudflare, posé sur le serveur. Demander Let's Encrypt ici
     # échouerait, Cloudflare proxifie, donc le challenge HTTP n'atteint jamais
     # Traefik.
-    #
-    # `cpi-go` ne reçoit QUE son hôte d'essai : les deux domaines de production
-    # appartiennent à la v1 tant que `bascule` n'a pas été lancée.
     step("Domaines")
-    for app_key, host, port in (
-        ("API_ID", API_DOMAIN, API_PORT),
-        ("WEB_ID", WEB_DOMAIN, WEB_PORT),
-        ("GO_ID", GO_STAGING_DOMAIN, GO_PORT),
-    ):
-        _attach_domain(ids[app_key], host, port)
+    for host in (API_DOMAIN, WEB_DOMAIN):
+        _attach_domain(ids["GO_ID"], host, GO_PORT)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1016,136 +818,129 @@ def cmd_deploy() -> None:
     call("postgres.deploy", {"postgresId": ids["POSTGRES_ID"]})
     ok("demandé")
 
-    step("Démarrage de Redis")
-    if ids.get("REDIS_ID"):
-        call("redis.deploy", {"redisId": ids["REDIS_ID"]})
-        ok("demandé")
-    else:
-        warn("absent : l'API démarre sans cache. Lancez `provision` pour le créer.")
     # Le déploiement est asynchrone : on laisse la base se lever avant
     # d'enchaîner, sinon la première migration tombe sur un port fermé.
-    info("attente de 45 s avant de déployer l'API…")
+    info(f"attente de 45 s avant de déployer {GO_NAME}…")
     time.sleep(45)
 
-    # Le compteur d'absents existe pour une raison précise : la boucle
-    # imprimait un « ✗ … introuvable » rouge, passait au suivant, puis
-    # `_epilogue` annonçait « Déploiements lancés » et le script sortait en 0.
-    # Un enveloppeur ou un pipeline qui regarde `$?`, la seule chose qu'une
-    # automatisation regarde, voyait une réussite alors que la moitié de la
-    # pile n'avait pas été déployée.
-    manquants = []
-    for key, label, dockerfile in (
-        ("API_ID", "API", "Dockerfile.api"),
-        ("WEB_ID", "panel web", "Dockerfile.web"),
-    ):
-        step(f"Déploiement, {label}")
-        if not ids.get(key):
-            fail(f"{label} introuvable")
-            manquants.append(label)
-            continue
-        call("application.deploy", {"applicationId": ids[key]})
-        ok(f"demandé, construction depuis infra/docker/{dockerfile}")
-
-    if manquants:
-        fail(f"non déployé : {', '.join(manquants)}. Lancez d'abord `provision`.")
+    step(f"Déploiement, {GO_NAME}")
+    if not ids.get("GO_ID"):
+        fail(f"{GO_NAME} introuvable. Lancez d'abord `provision`.")
         sys.exit(1)
+    call("application.deploy", {"applicationId": ids["GO_ID"]})
+    ok("demandé, construction depuis le Dockerfile à la racine")
 
     print(_epilogue(secrets_))
 
 
+def _revision_prod() -> str:
+    """Dokploy construit la tête de `prod` : c'est elle que `/health/live` doit annoncer."""
+    sortie = subprocess.run(
+        ["git", "ls-remote", "origin", "refs/heads/prod"],
+        check=True, capture_output=True, text=True,
+    ).stdout
+    return sortie.split()[0] if sortie.strip() else ""
+
+
 def cmd_redeploy() -> None:
-    """Redéploie les DEUX APPLICATIONS, et rien d'autre. Voie automatisée.
+    """Redéploie `cpi-go` seul. Voie des fusions vers `prod`.
 
-    ═══════════════════════════════════════════════════════════════════════════
-    POURQUOI CETTE COMMANDE EXISTE, PLUTÔT QUE D'APPELER `deploy`
-    ═══════════════════════════════════════════════════════════════════════════
+    `deploy` est écrit pour une PREMIÈRE mise en route : il engendre des secrets
+    quand `.secrets.generated` manque, redémarre Postgres et dort 45 s. Celle-ci
+    relit les identifiants auprès de Dokploy, exige une sauvegarde récente, puis
+    attend que le binaire réponde : il applique ses migrations au démarrage.
 
-    `deploy` est écrit pour une PREMIÈRE mise en route conduite par un humain.
-    Trois de ses gestes sont inacceptables sur une fusion vers `prod` :
-
-      1. Il appelle `load_secrets()`, qui ENGENDRE des secrets quand le fichier
-         `.secrets.generated` est absent. Un exécutant d'intégration continue
-         part d'une copie neuve à chaque fois : le fichier n'y est JAMAIS là.
-         Chaque déploiement fabriquerait donc un mot de passe Postgres et deux
-         secrets JWT tout neufs, que `_epilogue` imprime ensuite dans le journal
-         public de l'exécution. Ces valeurs ne sont pas celles de la production
-         — elles ne sont poussées nulle part —, mais un journal qui affiche des
-         chaînes présentées comme les secrets de production est une fuite de
-         plus à instruire, pour rien.
-
-      2. Il redéploie POSTGRES. Sur une première mise en route c'est le geste
-         attendu ; sur chaque fusion, cela redémarre la base de production alors
-         qu'aucune de ses données ni de sa configuration n'a bougé, et coupe le
-         service le temps du redémarrage.
-
-      3. Il dort 45 secondes pour laisser la base se lever. Sans redéploiement
-         de Postgres, cette attente n'a plus d'objet.
-
-    Ce que fait celle-ci : elle relit les identifiants auprès de Dokploy, refuse
-    net si l'une des applications manque, et demande le déploiement des deux.
-    Les migrations, elles, restent jouées par `api-entrypoint.sh` au démarrage
-    de l'API, exactement comme aujourd'hui.
-
-    `redeploy cpi-go` vise le binaire v2 SEUL. C'est la voie de mise en scène
-    sur l'hôte d'essai avant le jour J, et celle que le job CI devra prendre
-    après la bascule.
+    `redeploy cpi-go` reste accepté, c'est la même cible.
     """
     ids = load_ids()
     ids.update({k: v for k, v in find_existing().items() if v})
 
-    cible = sys.argv[2] if len(sys.argv) > 2 else ""
-    if cible == GO_NAME:
-        couples = (("GO_ID", GO_NAME),)
-    elif cible:
+    cible = sys.argv[2] if len(sys.argv) > 2 else GO_NAME
+    if cible != GO_NAME:
         fail(f"cible inconnue : {cible!r}. Seule « {GO_NAME} » est acceptée.")
         sys.exit(1)
-    else:
-        # L'API et le panneau v1 ont été supprimés à la bascule du 12 septembre
-        # 2026 : sans cible, il n'y a plus que le binaire Go à déployer.
-        couples = (("GO_ID", GO_NAME),)
-
-    # Même raisonnement que dans `find_existing` : un identifiant manquant se
-    # lit comme « rien à déployer », et un déploiement qui ne déploie rien doit
-    # s'arrêter en rouge, jamais s'annoncer réussi.
-    manquants = [label for key, label in couples if not ids.get(key)]
-    if manquants:
-        fail(f"introuvable sur Dokploy : {', '.join(manquants)}. Lancez d'abord `provision`.")
+    if not ids.get("GO_ID") or not ids.get("POSTGRES_ID"):
+        fail("cpi-go ou Postgres introuvable sur Dokploy. Lancez d'abord `provision`.")
         sys.exit(1)
 
-    for key, label in couples:
-        image = setting("DOKPLOY_IMAGE", "")
-        if image:
-            step(f"Image Dokploy, {image}")
-            call(
-                "application.saveDockerProvider",
-                {
-                    "applicationId": ids[key],
-                    "dockerImage": image,
-                    "username": "",
-                    "password": "",
-                    "registryUrl": "ghcr.io",
-                },
-            )
-            ok("source Docker configurée")
-        step(f"Déploiement, {label}")
-        call("application.deploy", {"applicationId": ids[key]})
-        ok("demandé")
+    step("Sauvegarde de la base")
+    exiger_sauvegarde_recente(ids["POSTGRES_ID"])
+
+    image = setting("DOKPLOY_IMAGE", "")
+    if image:
+        step(f"Image Dokploy, {image}")
+        call(
+            "application.saveDockerProvider",
+            {
+                "applicationId": ids["GO_ID"],
+                "dockerImage": image,
+                "username": "",
+                "password": "",
+                "registryUrl": "ghcr.io",
+            },
+        )
+        ok("source Docker configurée")
+
+    step("Révision gravée dans le binaire")
+    revision = _revision_prod()
+    app = call("application.one", {"applicationId": ids["GO_ID"]}, method="GET") or {}
+    call(
+        "application.saveEnvironment",
+        {
+            "applicationId": ids["GO_ID"],
+            "env": app.get("env") or "",
+            "buildArgs": f"REVISION={revision}",
+            "buildSecrets": app.get("buildSecrets") or "",
+            "createEnvFile": True,
+        },
+    )
+    ok(revision or "inconnue")
+
+    step(f"Déploiement, {GO_NAME}")
+    call("application.deploy", {"applicationId": ids["GO_ID"]})
+    ok("demandé")
 
     # Sortir ici déclarait la CI verte dès l'appel : un binaire qui ne démarre
     # pas, ou une migration qui échoue, passaient pour un déploiement réussi.
-    for key, label in couples:
-        step(f"Attente de {label}")
-        _attendre_application(ids[key])
+    step(f"Attente de {GO_NAME}")
+    _attendre_application(ids["GO_ID"])
     _attendre_sante(f"https://{API_DOMAIN}/health/ready")
+
+
+def exiger_sauvegarde_recente(postgres_id: str) -> None:
+    """Refuse de déployer si la dernière sauvegarde réussie a plus de 26 h.
+
+    Le binaire applique ses migrations au démarrage, et certaines suppriment des
+    données : sans sauvegarde récente hors du VPS, rien ne permet de revenir.
+    """
+    reussites = [
+        run.get("createdAt") or ""
+        for backup in postgres_backups(postgres_id)
+        if backup.get("enabled")
+        for run in backup.get("deployments", []) or []
+        if run.get("status") == "done"
+    ]
+    if not reussites:
+        fail("aucune sauvegarde réussie de la base : déploiement refusé.")
+        info("activez-la avec : python3 infra/dokploy/deploy.py backup")
+        sys.exit(1)
+    derniere = datetime.fromisoformat(max(reussites).replace("Z", "+00:00"))
+    derniere = derniere.replace(tzinfo=derniere.tzinfo or timezone.utc)
+    age = datetime.now(timezone.utc) - derniere
+    if age > SAUVEGARDE_AGE_MAX:
+        fail(f"dernière sauvegarde réussie il y a {age}, plus de 26 h : déploiement refusé.")
+        info("lancez une sauvegarde depuis Dokploy → la base → Backups, puis relancez.")
+        sys.exit(1)
+    ok(f"dernière sauvegarde réussie : {derniere:%Y-%m-%d %H:%M} UTC")
 
 
 def _epilogue(s: dict[str, str]) -> str:
     return f"""
 {'─' * 76}
-Déploiements lancés. Suivez les journaux dans l'interface Dokploy : la première
-construction prend plusieurs minutes (installation pnpm, puis build Next).
+Déploiement lancé. Suivez les journaux dans l'interface Dokploy : la première
+construction prend plusieurs minutes (panneau puis binaire).
 
-VÉRIFICATION, une fois les trois services verts
+VÉRIFICATION, une fois les deux services verts
 
   curl -s -o /dev/null -w '%{{http_code}}\\n' https://{API_DOMAIN}/api/v1/referentiels/banques
 
@@ -1154,15 +949,12 @@ VÉRIFICATION, une fois les trois services verts
   corriger d'urgence. Un 502 ou 526 signale que le certificat d'origine n'est
   pas en place.
 
-AMORÇAGE, une seule fois, depuis un terminal du conteneur API
+AMORÇAGE, une seule fois, depuis un terminal du conteneur {GO_NAME}
 
-  pnpm --filter @crm/database db:seed     # référentiels + compte administrateur
-  pnpm --filter @crm/database db:seed:demo # espace démo, via la factory
+  /cpi-go -seed     # référentiels, workflow bancaire et compte administrateur
 
   Sans le seed, aucune saisie n'est possible : banques, syndicats et
   départements sont des clés étrangères obligatoires.
-
-  L'espace démo peut ensuite être réinitialisé depuis le panel web.
 
 IDENTIFIANTS
   {API_DOMAIN}        API
@@ -1178,79 +970,6 @@ IDENTIFIANTS
 """
 
 
-# ─────────────────────────────────────────────────────────────────────────────
-# Bascule v1 → v2, et son retour, docs/v2-refonte/plan.md §7
-# ─────────────────────────────────────────────────────────────────────────────
-
-
-def _confirmer(action: str) -> None:
-    """Ces deux commandes coupent le service : elles exigent un geste explicite."""
-    if "--oui" in sys.argv[2:]:
-        return
-    fail(f"« {action} » coupe le service en production.")
-    info(f"relancez avec : python3 infra/dokploy/deploy.py {action} --oui")
-    sys.exit(1)
-
-
-def _ids_bascule() -> dict[str, str]:
-    ids = load_ids()
-    ids.update({k: v for k, v in find_existing().items() if v})
-    manquants = [
-        nom
-        for cle, nom in (("GO_ID", GO_NAME), ("API_ID", API_NAME), ("WEB_ID", WEB_NAME))
-        if not ids.get(cle)
-    ]
-    if manquants:
-        fail(f"introuvable sur Dokploy : {', '.join(manquants)}. Lancez d'abord `provision`.")
-        sys.exit(1)
-    save_ids(ids)
-    return ids
-
-
-def cmd_bascule() -> None:
-    """Jour J : les deux domaines passent de la v1 au binaire Go.
-
-    L'ordre n'est pas interchangeable. Arrêter la v1 AVANT de toucher aux
-    domaines évite qu'une écriture en cours parte vers un service à moitié
-    coupé. Détacher AVANT de rattacher évite deux routeurs Traefik sur le même
-    hôte, cas où la destination servie est celle que Traefik a chargée en
-    dernier, donc indéterminée.
-
-    Le binaire Go est construit et vérifié sur l'hôte d'essai AVANT d'arrêter la
-    v1 : une image qui ne se construit pas laisse alors la production intacte au
-    lieu de couper les deux domaines (simulation du 9 septembre 2026 : un COPY
-    manquant dans le Dockerfile a fait échouer la première construction).
-
-    Les applications v1 restent DÉFINIES, seulement arrêtées : `retour` les
-    remet en service sans rien reconstruire.
-    """
-    _confirmer("bascule")
-    ids = _ids_bascule()
-
-    step(f"Construction et démarrage de {GO_NAME} sur {GO_STAGING_DOMAIN}")
-    call("application.deploy", {"applicationId": ids["GO_ID"]})
-    _attendre_application(ids["GO_ID"])
-    _attendre_sante(f"https://{GO_STAGING_DOMAIN}/health/ready")
-    ok("binaire en ligne, goose a appliqué la migration des triggers updatedAt")
-
-    step("Arrêt de la v1")
-    for cle, nom in (("API_ID", API_NAME), ("WEB_ID", WEB_NAME)):
-        call("application.stop", {"applicationId": ids[cle]})
-        ok(f"{nom} arrêtée")
-    warn("vérifiez maintenant qu'aucun sync_batches IN_PROGRESS ni import_jobs ne tourne")
-
-    step("Domaines détachés de la v1")
-    _detach_domain(ids["API_ID"], API_DOMAIN)
-    _detach_domain(ids["WEB_ID"], WEB_DOMAIN)
-
-    step(f"Domaines rattachés à {GO_NAME}")
-    _attach_domain(ids["GO_ID"], API_DOMAIN, GO_PORT)
-    _attach_domain(ids["GO_ID"], WEB_DOMAIN, GO_PORT)
-    _attendre_sante(f"https://{API_DOMAIN}/health/ready")
-    ok("les deux domaines répondent depuis le binaire Go")
-    info(f"l'hôte d'essai {GO_STAGING_DOMAIN} reste rattaché, il ne gêne pas")
-
-
 def _attendre_application(application_id: str, minutes: int = 20) -> None:
     """Dokploy construit de façon asynchrone : on attend `done`, on refuse `error`.
 
@@ -1262,14 +981,14 @@ def _attendre_application(application_id: str, minutes: int = 20) -> None:
         app = call("application.one", {"applicationId": application_id}, method="GET") or {}
         statut = app.get("applicationStatus")
         if statut == "error":
-            fail("la construction a échoué sur Dokploy ; la v1 n'a pas été touchée.")
+            fail("la construction a échoué sur Dokploy.")
             sys.exit(1)
         if statut != "done":
             commencee = True
         elif commencee:
             return
         time.sleep(10)
-    fail(f"construction toujours en cours après {minutes} minutes ; la v1 n'a pas été touchée.")
+    fail(f"construction toujours en cours après {minutes} minutes.")
     sys.exit(1)
 
 
@@ -1278,7 +997,7 @@ def _attendre_sante(url: str, secondes: int = 120) -> None:
     requete = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0 (X11; Linux) deploy.py"})
     for _ in range(secondes // 5):
         try:
-            with urllib.request.urlopen(requete, timeout=10) as reponse:  # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
+            with CLIENT_HTTP.open(requete, timeout=10) as reponse:
                 if reponse.status == 200:
                     return
         except (urllib.error.URLError, TimeoutError):
@@ -1286,34 +1005,6 @@ def _attendre_sante(url: str, secondes: int = 120) -> None:
         time.sleep(5)
     fail(f"{url} ne répond pas 200 après {secondes} s.")
     sys.exit(1)
-
-
-def cmd_retour() -> None:
-    """Retour arrière, valable jusqu'à J+7 SEULEMENT.
-
-    Après la migration de nettoyage de J+7 la v1 ne démarre plus : les tables
-    `sync_*` et `android_releases` qu'elle exige n'existent plus. Cette commande
-    ne peut pas le savoir, c'est la date qui tranche.
-    """
-    _confirmer("retour")
-    ids = _ids_bascule()
-
-    step(f"Domaines détachés de {GO_NAME}")
-    _detach_domain(ids["GO_ID"], API_DOMAIN)
-    _detach_domain(ids["GO_ID"], WEB_DOMAIN)
-
-    step(f"Arrêt de {GO_NAME}")
-    call("application.stop", {"applicationId": ids["GO_ID"]})
-    ok("arrêté")
-
-    step("Domaines rendus à la v1")
-    _attach_domain(ids["API_ID"], API_DOMAIN, API_PORT)
-    _attach_domain(ids["WEB_ID"], WEB_DOMAIN, WEB_PORT)
-
-    step("Redémarrage de la v1")
-    for cle, nom in (("API_ID", API_NAME), ("WEB_ID", WEB_NAME)):
-        call("application.start", {"applicationId": ids[cle]})
-        ok(f"{nom} redémarrée")
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -1589,7 +1280,7 @@ CE QUI VOUS PRÉVIENT
   Contrôle mensuel, deux minutes : `deploy.py status` doit annoncer la
   sauvegarde active, et le bucket doit contenir un fichier daté de cette nuit.
 
-RESTAURER, la procédure est dans infra/README.md, section Sauvegardes.
+RESTAURER, la procédure est dans infra/dokploy/README.md, section Restaurer.
 {'─' * 76}
 """
 
@@ -1606,9 +1297,8 @@ def cmd_status() -> None:
     for environment in project.get("environments", []) or []:
         apps = environment.get("applications", []) or []
         dbs = environment.get("postgres", []) or []
-        caches = environment.get("redis", []) or []
         print(f"\n  environnement {environment.get('name', '?')}")
-        if not apps and not dbs and not caches:
+        if not apps and not dbs:
             info("  (vide)")
         # Le défaut '?' n'est pas de la coquetterie : `.get('name')` sans
         # défaut rend None, et `format(None, '24s')` lève une TypeError que
@@ -1620,11 +1310,6 @@ def cmd_status() -> None:
             print(
                 f"    postgres  {db.get('name') or '?':24s} "
                 f"{db.get('applicationStatus', '?')}"
-            )
-        for cache in caches:
-            print(
-                f"    redis     {cache.get('name') or '?':24s} "
-                f"{cache.get('applicationStatus', '?')}"
             )
         for app in apps:
             domains = ", ".join(d.get("host", "") for d in app.get("domains", []) or [])
@@ -1684,122 +1369,15 @@ def _print_backup_status(project: dict) -> None:
         info("corrigez avec : python3 infra/dokploy/deploy.py backup")
 
 
-def cmd_configure_go() -> None:
-    """Prépare et déploie le binaire Go SEUL, sur son hôte d'essai, à côté de la v1.
-
-    Rien n'est engendré ni réécrit sur la v1 : l'URL de la base et le mot de
-    passe d'amorçage sont relus depuis l'environnement de l'API en production,
-    la même base sert aux deux. `--sans-taches` coupe les sept tâches planifiées
-    du binaire : tant que la v1 tourne, deux planificateurs se disputeraient les
-    notifications dues et les jobs d'import.
-    """
-    sans_taches = "--sans-taches" in sys.argv[2:]
-    ids = load_ids()
-    ids.update({k: v for k, v in find_existing().items() if v})
-    if not ids.get("API_ID"):
-        fail("API v1 introuvable sur Dokploy : son DATABASE_URL est la référence.")
-        sys.exit(1)
-    if not ids.get("GO_ID"):
-        step(f"Application {GO_NAME}")
-        result = call(
-            "application.create",
-            {
-                "environmentId": ENVIRONMENT_ID,
-                "name": GO_NAME,
-                "appName": GO_NAME,
-                "description": "Binaire Go v2, API et panneau embarqué",
-            },
-        )
-        ids["GO_ID"] = (result or {}).get("applicationId", "")
-        ok(f"créée, {ids['GO_ID']}")
-    ids["SSH_KEY_ID"] = ensure_ssh_key(ids)
-    save_ids(ids)
-
-    api = call("application.one", {"applicationId": ids["API_ID"]}, method="GET") or {}
-    api_env = dict(
-        ligne.split("=", 1)
-        for ligne in (api.get("env") or "").splitlines()
-        if "=" in ligne and not ligne.startswith("#")
-    )
-    base = urllib.parse.urlsplit(api_env.get("DATABASE_URL", ""))
-    if not base.password or not base.hostname:
-        fail("DATABASE_URL de l'API illisible : impossible de partager la base.")
-        sys.exit(1)
-    secrets_ = {
-        "PG_PASSWORD": base.password,
-        "ADMIN_PASSWORD": api_env.get("SEED_ADMIN_PASSWORD", ""),
-    }
-    names = service_app_names(ids)
-    names["postgres"] = base.hostname
-
-    step(f"Source Git, {GIT_URL} @ {BRANCH}")
-    call(
-        "application.saveGitProvider",
-        {
-            "applicationId": ids["GO_ID"],
-            "customGitUrl": GIT_URL,
-            "customGitBranch": BRANCH,
-            "customGitBuildPath": "/",
-            "customGitSSHKeyId": ids["SSH_KEY_ID"],
-            "watchPaths": [],
-        },
-    )
-    call(
-        "application.saveBuildType",
-        {
-            "applicationId": ids["GO_ID"],
-            "buildType": "dockerfile",
-            "dockerfile": "Dockerfile",
-            "dockerContextPath": "/",
-            "dockerBuildStage": "",
-            "herokuVersion": "",
-            "railpackVersion": "",
-        },
-    )
-    ok("Dockerfile à la racine")
-
-    step("Volumes")
-    ensure_db_dump_mount(ids["GO_ID"])
-    ensure_volume_mount(ids["GO_ID"], IMPORTS_VOLUME, IMPORTS_MOUNT, "imports")
-
-    step("Variables d'environnement")
-    go_env = _go_env(secrets_, names)
-    if sans_taches:
-        go_env += "\nTACHES_PLANIFIEES=false"
-    call(
-        "application.saveEnvironment",
-        {
-            "applicationId": ids["GO_ID"],
-            "env": go_env,
-            "buildArgs": "",
-            "buildSecrets": "",
-            "createEnvFile": True,
-        },
-    )
-    ok(f"{len(go_env.splitlines())} variables, tâches planifiées {'coupées' if sans_taches else 'actives'}")
-
-    step("Domaine d'essai")
-    _attach_domain(ids["GO_ID"], GO_STAGING_DOMAIN, GO_PORT)
-
-    step(f"Construction et démarrage de {GO_NAME}")
-    call("application.deploy", {"applicationId": ids["GO_ID"]})
-    _attendre_application(ids["GO_ID"])
-    ok("construit et démarré, goose a appliqué ses migrations sur la base partagée")
-    info(f"DNS : {GO_STAGING_DOMAIN} doit pointer, proxifié, vers le VPS pour être joignable")
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 
 COMMANDS = {
     "provision": cmd_provision,
     "configure": cmd_configure,
-    "configure-go": cmd_configure_go,
     "deploy": cmd_deploy,
     "redeploy": cmd_redeploy,
     "backup": cmd_backup,
     "status": cmd_status,
-    "bascule": cmd_bascule,
-    "retour": cmd_retour,
 }
 
 

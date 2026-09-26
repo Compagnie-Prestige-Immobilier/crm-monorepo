@@ -14,7 +14,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components/ui/table';
 import { SortableTableHead } from '@/components/ui/sortable-table-head';
 import { RechercheTableau, useTriLocal } from '@/components/ui/tri-local';
-import { callbackKeys, formatCallbackAt } from '@/lib/data/console';
+import { formatCallbackAt } from '@/lib/data/console';
 import {
   SUIVI_PAGE_SIZE,
   fetchRepresentantsSuivi,
@@ -23,8 +23,16 @@ import {
 import { fetchUsers } from '@/lib/data/users';
 import { formatDateTime, formatNumber, formatPhone } from '@/lib/format';
 import { shouldShowError, shouldShowSkeleton } from '@/lib/live';
+import { queryKeys } from '@/lib/query-keys';
 import type { Paginated, RepresentantRow } from '@/lib/types';
-import { EMPTY_USER_FILTERS } from '@/lib/user-filters';
+import { EMPTY_USER_FILTERS, type UserFilters } from '@/lib/user-filters';
+
+const TELECONSEILLERS_ACTIFS: UserFilters = {
+  ...EMPTY_USER_FILTERS,
+  role: 'COMMERCIAL',
+  isActive: true,
+  pageSize: 200,
+};
 
 const ONGLETS: readonly { value: RepresentantSuivi; label: string }[] = [
   { value: 'A_RAPPELER', label: 'À rappeler' },
@@ -78,9 +86,8 @@ export function RepresentantsSuiviView({
   });
 
   const teleconseillers = useQuery({
-    queryKey: callbackKeys.teleconseillers,
-    queryFn: () =>
-      fetchUsers({ ...EMPTY_USER_FILTERS, role: 'COMMERCIAL', isActive: true, pageSize: 200 }),
+    queryKey: queryKeys.commerciaux(TELECONSEILLERS_ACTIFS),
+    queryFn: () => fetchUsers(TELECONSEILLERS_ACTIFS),
     enabled: canFilter,
     staleTime: 300_000,
   });

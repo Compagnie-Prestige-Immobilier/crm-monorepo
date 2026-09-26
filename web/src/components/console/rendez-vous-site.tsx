@@ -28,10 +28,21 @@ interface RvSiteSaisie {
 
 const VIDE: RvSiteSaisie = { siteId: '', pointRencontreId: '', pointRencontreCommentaire: '' };
 
-type Choix = Awaited<ReturnType<typeof fetchRvSite>>;
+type Choix = {
+  reglages: {
+    jours: number[];
+    heureDebut: number;
+    heureFin: number;
+    maxVisites?: number;
+    horizonJours: number;
+  };
+  reservations: Array<{ quand: string; nombre: number }>;
+  sites: Array<{ id: string; nom: string; prix: number }>;
+  points: Array<{ id: string; label: string }>;
+};
 
-async function fetchRvSite() {
-  return unwrap(await getApiClient().GET('/api/v1/phase2/rv-site'));
+async function fetchRvSite(): Promise<Choix> {
+  return unwrap(await getApiClient().GET('/api/v1/phase2/rv-site')) as unknown as Choix;
 }
 
 function corpsRvSite(saisie: RvSiteSaisie) {

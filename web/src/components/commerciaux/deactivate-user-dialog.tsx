@@ -1,7 +1,7 @@
 'use client';
 
 import { InfoIcon } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { Field } from '@/components/forms/field';
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/select';
 import { formatNumber } from '@/lib/format';
 import type { UserRow } from '@/lib/types';
+import { useRecalage } from '@/lib/use-recalage';
 
 function TransfertInfo({
   reprisRequise,
@@ -58,11 +59,10 @@ export function DeactivateUserDialog({
   const [repreneur, setRepreneur] = useState<string | null>(null);
   const [erreur, setErreur] = useState<string | undefined>(undefined);
 
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie remise à zéro par compte
+  useRecalage([user?.id], () => {
     setRepreneur(null);
     setErreur(undefined);
-  }, [user?.id]);
+  });
 
   // Le portefeuille GÈLE sans repreneur : `createdById` reste sur le compte
   // parti, et plus aucun téléconseiller actif ne peut lire ni corriger ces fiches.

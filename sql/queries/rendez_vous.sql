@@ -23,12 +23,14 @@ SELECT
 FROM "prospects" p
 JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
 LEFT JOIN "users" u ON u."id" = p."lastCallById"
--- Le dernier rappel promis porte la date du rendez-vous ; une fiche sans rappel
--- garde une date vide, et la jointure externe le dit au type rendu.
-LEFT JOIN (
-  SELECT "prospectId", MAX("scheduledAt") AS "quand"
-  FROM "scheduled_callbacks" GROUP BY "prospectId"
-) rdv ON rdv."prospectId" = p."id"
+-- Le rappel en attente, sinon le dernier honoré, porte la date du rendez-vous :
+-- un rappel supplanté ou annulé ne la donne jamais. Une fiche sans rappel garde
+-- une date vide, et la jointure externe le dit au type rendu.
+LEFT JOIN LATERAL (
+  SELECT sc."scheduledAt" AS "quand" FROM "scheduled_callbacks" sc
+  WHERE sc."prospectId" = p."id" AND sc."status" IN ('PENDING', 'DONE')
+  ORDER BY (sc."status" = 'PENDING') DESC, sc."createdAt" DESC LIMIT 1
+) rdv ON true
 LEFT JOIN LATERAL (
   SELECT a."siteId", a."pointRencontreId", a."pointRencontreCommentaire" FROM "call_attempts" a
   WHERE a."prospectId" = p."id" ORDER BY a."clientCreatedAt" DESC, a."id" DESC LIMIT 1

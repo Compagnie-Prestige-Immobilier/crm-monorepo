@@ -15,6 +15,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 )
 
+const nodeEnvDevelopment = "development"
+
 // Même forme que le seed Prisma de la v1 : 20 upsert de référentiels dans
 // une transaction, contrôle bloquant sur le nombre de départements, admin et
 // fixtures créés seulement s'ils sont absents.
@@ -41,10 +43,16 @@ func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 		seedSemerCallOutcomeReasons,
 		seedSemerStatutsQualification,
 		seedSemerVisiteReferentiels,
-		seedSemerAdmin,
 	}
 	for _, etape := range etapes {
 		if err := etape(ctx, q); err != nil {
+			return err
+		}
+	}
+	// L'admin de production n'a rien à faire sur une base de démonstration :
+	// son hachage part dans le dump partagé, semé avec les mêmes identifiants.
+	if cfg.Base == socle.BasePublique {
+		if err := seedSemerAdmin(ctx, q); err != nil {
 			return err
 		}
 	}
@@ -53,7 +61,7 @@ func semer(ctx context.Context, pool *pgxpool.Pool, cfg *socle.Config) error {
 	// production, et les sept comptes y sont restés ouverts avec un mot de passe
 	// écrit dans ce dépôt. Ici il faut une raison POSITIVE de les semer, une base
 	// de démonstration ou un poste de développement déclaré.
-	demonstration := cfg.Base != socle.BasePublique || socle.Env("NODE_ENV", "") == "development"
+	demonstration := cfg.Base != socle.BasePublique || socle.Env("NODE_ENV", "") == nodeEnvDevelopment
 	if err := seedSemerFixtures(ctx, q, tx, demonstration); err != nil {
 		return err
 	}
@@ -276,7 +284,7 @@ func seedDefautDev(nom string, autoriseDefaut bool, defaut string) string {
 }
 
 func seedSemerAdmin(ctx context.Context, q *db.Queries) error {
-	autoriseDefaut := socle.Env("NODE_ENV", "") == "development"
+	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
 	email := seedDefautDev("SEED_ADMIN_EMAIL", autoriseDefaut, "admin@cpi.sn")
 	username := seedDefautDev("SEED_ADMIN_USERNAME", autoriseDefaut, "admin")
 	password := seedDefautDev("SEED_ADMIN_PASSWORD", autoriseDefaut, "ChangeMoiEnProd2026")
@@ -324,7 +332,11 @@ func seedSemerFixtures(ctx context.Context, q *db.Queries, tx pgx.Tx, demonstrat
 		slog.Info("seed fixtures", "statut", "aucune sur la base principale", "désactivés", desactives)
 		return nil
 	}
-	password := socle.Env("SEED_FIXTURE_PASSWORD", "ChangeMoi123456")
+	autoriseDefaut := socle.Env("NODE_ENV", "") == nodeEnvDevelopment
+	password := seedDefautDev("SEED_FIXTURE_PASSWORD", autoriseDefaut, "ChangeMoi123456")
+	if password == "" {
+		return errors.New("SEED_FIXTURE_PASSWORD est requis hors développement")
+	}
 	if len(password) < 12 {
 		return errors.New("SEED_FIXTURE_PASSWORD doit faire au moins 12 caractères")
 	}

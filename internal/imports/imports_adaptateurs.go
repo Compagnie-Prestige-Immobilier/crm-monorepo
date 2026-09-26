@@ -1196,7 +1196,11 @@ func (t *triGrandPublicImport) retenirNouvelle(ligne *ligneGrandPublicImport, ra
 		precedente := t.nouvelles[rang]
 		t.ignorer(refusImport(precedente.numero, enteteGrandPublicImport(2), codeRemplaceeImport,
 			fmt.Sprintf("Ce numéro revient à la ligne %d, qui fait foi.", ligne.numero)))
-		t.nouvelles[rang] = *ligne
+		// Comme d'une tranche à l'autre, où la fiche déjà créée garde son projet :
+		// sans cela le résultat dépendrait de IMPORTS_CHUNK_SIZE.
+		remplacante := *ligne
+		remplacante.projet, remplacante.creeLe = precedente.projet, precedente.creeLe
+		t.nouvelles[rang] = remplacante
 		return
 	}
 	if telephone != "" {

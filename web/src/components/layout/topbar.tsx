@@ -3,9 +3,15 @@
 import { LayoutGridIcon, MenuIcon } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState } from 'react';
+import { lazy, Suspense, useState } from 'react';
 
-import { DevRoleSwitcher } from '@/components/auth/dev-role-switcher';
+// Absent du bundle de production : seul `make build` pose VITE_BASCULE_ROLES.
+const DevRoleSwitcher =
+  import.meta.env.VITE_BASCULE_ROLES === '1'
+    ? lazy(() =>
+        import('@/components/auth/dev-role-switcher').then((m) => ({ default: m.DevRoleSwitcher })),
+      )
+    : null;
 import { coqueOf, hasInbox, HUB_PATH, inboxPathFor, navTitle } from '@/components/layout/nav-items';
 import { SidebarNav } from '@/components/layout/sidebar-nav';
 import { SignalerProbleme } from '@/components/layout/signaler-probleme';
@@ -18,7 +24,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { peut, type SessionUser } from '@/lib/types';
 import { cn } from '@/lib/utils';
 
-export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: boolean }) {
+export function Topbar({ user }: { user: SessionUser }) {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const accueil = coqueOf(pathname) === 'accueil';
@@ -81,7 +87,11 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
         {title}
       </h1>
 
-      <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
+      {DevRoleSwitcher ? (
+        <Suspense fallback={null}>
+          <DevRoleSwitcher currentRole={user.role} className="hidden md:block" />
+        </Suspense>
+      ) : null}
 
       {/* Sous 768 px, la barre n'a plus la place pour ces actions secondaires :
           « Tous les espaces » reste joignable par le pied de la navigation
@@ -116,7 +126,7 @@ export function Topbar({ user, demoEnabled }: { user: SessionUser; demoEnabled: 
       ) : null}
       {hasInbox(user.role) ? <NotificationBell href={inboxPathFor(user.role)} /> : null}
       <ThemeToggle />
-      <UserMenu user={user} demoEnabled={demoEnabled} />
+      <UserMenu user={user} />
     </header>
   );
 }

@@ -569,15 +569,12 @@ func (r refsVisite) motifAbsence(brut, kind string) (code, message string) {
 func lireDateRegistre(brut string) string {
 	coupe := strings.TrimSpace(brut)
 	if dateISO.MatchString(coupe) {
-		return coupe[:10]
+		return dateExistante(coupe[:10])
 	}
 	if m := dateFR.FindStringSubmatch(coupe); m != nil {
 		jour, _ := strconv.Atoi(m[1])
 		mois, _ := strconv.Atoi(m[2])
-		if mois >= 1 && mois <= 12 && jour >= 1 && jour <= 31 {
-			return m[3] + "-" + pad2(mois) + "-" + pad2(jour)
-		}
-		return ""
+		return dateExistante(m[3] + "-" + pad2(mois) + "-" + pad2(jour))
 	}
 	// Le classeur porte des dates numériques : le rang Excel, styles ignorés.
 	if rang, err := strconv.Atoi(coupe); err == nil && rang >= 61 && rang <= 2958465 {
@@ -586,13 +583,21 @@ func lireDateRegistre(brut string) string {
 	return ""
 }
 
+// « 31/04 » a la forme d'une date sans en être une.
+func dateExistante(iso string) string {
+	if _, err := time.Parse(time.DateOnly, iso); err != nil {
+		return ""
+	}
+	return iso
+}
+
 // Une heure retapée devient une fraction de journée sous la plume d'Excel :
 // `0,604166…` pour 14:30. Essayée EN PREMIER.
 func lireHeureRegistre(brut string) string {
 	coupe := strings.TrimSpace(brut)
 	if strings.ContainsAny(coupe, ".,") {
 		if fraction, err := strconv.ParseFloat(strings.ReplaceAll(coupe, ",", "."), 64); err == nil && fraction >= 0 && fraction < 1 {
-			minutes := int(fraction*1440 + 0.5)
+			minutes := min(int(fraction*1440+0.5), 1439)
 			return pad2(minutes/60) + ":" + pad2(minutes%60)
 		}
 	}
@@ -626,7 +631,8 @@ func (e classeurError) Error() string { return e.raison }
 // Les colonnes sont retrouvées par leur en-tête, ONGLET PAR ONGLET : le
 // classeur de l'accueil gagne des colonnes en cours d'année.
 func lireLignesClasseur(contenu []byte) ([]map[string]string, error) {
-	classeur, err := excelize.OpenReader(bytes.NewReader(contenu))
+	// Sans ce motif, excelize rend une date au format court natif en « mm-dd-yy ».
+	classeur, err := excelize.OpenReader(bytes.NewReader(contenu), excelize.Options{ShortDatePattern: "dd/mm/yyyy"})
 	if err != nil {
 		return nil, classeurError{"Ce classeur ne peut pas être lu."}
 	}
@@ -1116,8 +1122,12 @@ func (s *service) reecrireLigne(ctx context.Context, q *db.Queries, auteur strin
 			change.Label+" a été corrigée à l’accueil depuis votre revue. Sa ligne n’a pas été écrite. Réexportez pour la revoir."), nil
 	}
 
-	err := q.MettreAJourVisite(ctx, db.MettreAJourVisiteParams{
-		ID: visite.ID, VisitedAt: s.instantVisite(ligne.date, texteRegistre(&ligne.heure)), TimeKnown: ligne.heure != "",
+	instant, err := s.instantVisite(ligne.date, texteRegistre(&ligne.heure))
+	if err != nil {
+		return nil, err
+	}
+	err = q.MettreAJourVisite(ctx, db.MettreAJourVisiteParams{
+		ID: visite.ID, VisitedAt: instant, TimeKnown: ligne.heure != "",
 		VisitorName: ligne.nom, Phone: texteRegistre(&ligne.telephone), PhoneE164: ligne.phoneE164,
 		EntrepriseId: ligne.entreprise.id, ObjetId: ligne.objet.id,
 		DirectionId: identifiantOuNil(ligne.direction), DestinataireId: identifiantOuNil(ligne.destinataire),
@@ -1162,9 +1172,13 @@ func (s *service) creerLignes(ctx context.Context, q *db.Queries, auteur string,
 		if err != nil {
 			return crees, err
 		}
+		instant, err := s.instantVisite(ligne.date, texteRegistre(&ligne.heure))
+		if err != nil {
+			return crees, err
+		}
 		err = q.InsererVisite(ctx, db.InsererVisiteParams{
 			ID: id.String(), Reference: "V-" + strconv.Itoa(annee) + "-" + formaterRang(suivants[annee]),
-			VisitedAt: s.instantVisite(ligne.date, texteRegistre(&ligne.heure)), TimeKnown: ligne.heure != "",
+			VisitedAt: instant, TimeKnown: ligne.heure != "",
 			VisitorName: ligne.nom, Phone: texteRegistre(&ligne.telephone), PhoneE164: ligne.phoneE164,
 			EntrepriseId: ligne.entreprise.id, ObjetId: ligne.objet.id,
 			DirectionId: identifiantOuNil(ligne.direction), DestinataireId: identifiantOuNil(ligne.destinataire),

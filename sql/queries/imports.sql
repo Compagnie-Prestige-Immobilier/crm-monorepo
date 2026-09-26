@@ -60,7 +60,7 @@ WHERE "id" = @id AND "claimToken" = @token::text;
 UPDATE "import_jobs"
 SET "status" = 'running', "processedRows" = @processed_rows, "createdRows" = @created_rows,
     "updatedRows" = @updated_rows, "skippedRows" = @skipped_rows, "errorRows" = @error_rows,
-    "claimedAt" = @now::timestamp, "updatedAt" = now()
+    "report" = @report, "claimedAt" = @now::timestamp, "updatedAt" = now()
 WHERE "id" = @id AND "claimToken" = @token::text;
 
 -- name: FinishImportJob :execrows

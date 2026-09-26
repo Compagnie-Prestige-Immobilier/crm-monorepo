@@ -1,4 +1,3 @@
-import { format, parseISO } from 'date-fns';
 import { parsePhoneNumberFromString } from 'libphonenumber-js/min';
 
 const DAKAR_UTC_OFFSET = '+00:00';
@@ -19,7 +18,6 @@ export function formatDakarDateTime(local: string): string | null {
   const pad = (value: number): string => String(value).padStart(2, '0');
   return `${pad(at.getUTCDate())}/${pad(at.getUTCMonth() + 1)}/${String(at.getUTCFullYear())} à ${pad(at.getUTCHours())}:${pad(at.getUTCMinutes())} (heure de Dakar)`;
 }
-import { fr } from 'date-fns/locale';
 
 import { RETIRED_SUFFIX } from '@/lib/types';
 
@@ -45,16 +43,35 @@ export function formatRateOrNone(value: number | null): string {
   return value === null ? 'Sans objet' : formatRate(value);
 }
 
+const DAKAR = 'Africa/Dakar';
+const dateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+const shortDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  day: '2-digit',
+  month: 'short',
+});
+const clockFormatter = new Intl.DateTimeFormat('fr-FR', {
+  timeZone: DAKAR,
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 export function formatDate(iso: string): string {
-  return format(parseISO(iso), 'dd MMM yyyy', { locale: fr });
+  return dateFormatter.format(new Date(iso));
 }
 
 export function formatDateTime(iso: string): string {
-  return format(parseISO(iso), "dd MMM yyyy 'à' HH:mm", { locale: fr });
+  const at = new Date(iso);
+  return `${dateFormatter.format(at)} à ${clockFormatter.format(at)}`;
 }
 
 export function formatShortDate(iso: string): string {
-  return format(parseISO(iso), 'dd MMM', { locale: fr });
+  return shortDateFormatter.format(new Date(iso));
 }
 
 const DEVICE_CALL_LABELS: Record<string, string> = {
@@ -84,7 +101,7 @@ export function formatDetectedCall(call: {
   const duree = call.deviceCallDurationSeconds ?? null;
   const parts = [DEVICE_CALL_LABELS[call.deviceCallType ?? ''] ?? 'Inconnu'];
   if (duree !== null) parts.push(formatCallDuration(duree));
-  parts.push(format(parseISO(call.deviceCallAt), 'HH:mm', { locale: fr }));
+  parts.push(clockFormatter.format(new Date(call.deviceCallAt)));
   return parts.join(' · ');
 }
 

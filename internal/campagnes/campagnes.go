@@ -269,7 +269,11 @@ func lotRepartir(fiches int, membres []lotMembreCapacite, jours int) []lotAffect
 	return sorties
 }
 
-func lotSurRepresentants(cible string) bool {
+// Un lot CONTACTS_RECOMMANDES Grand Public est un parrainage : ses fiches sont des prospects.
+func lotSurRepresentants(cible string, projet *db.Projet) bool {
+	if cible == lotCibleRecommandes {
+		return projet == nil || *projet != db.ProjetGRANDPUBLIC
+	}
 	return cible != lotCibleProspects
 }
 
@@ -394,18 +398,38 @@ func RetirerDesEquipes(ctx context.Context, d *socle.Deps, teleconseillerID stri
 		return err
 	}
 	for _, lot := range lots {
+		if err := s.lotRetraitPossible(ctx, lot.ID, teleconseillerID); err != nil {
+			return lotEquipeVideNommee(err, lot.Name)
+		}
+	}
+	for _, lot := range lots {
 		in := &CampagneRetraitInput{ID: lot.ID}
 		in.Body.TeleconseillerID = teleconseillerID
 		if _, err := s.campagneRetrait(ctx, in); err != nil {
-			var probleme *socle.ProblemError
-			if errors.As(err, &probleme) && probleme.Code == "LOT_EXPORT_EQUIPE_VIDE" {
-				return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE", fmt.Sprintf(
-					"La campagne « %s » n’aurait plus aucun téléconseiller : renforcez son équipe ou supprimez-la avant de changer ce rôle.", lot.Name))
-			}
-			return err
+			return lotEquipeVideNommee(err, lot.Name)
 		}
 	}
 	return nil
+}
+
+func (s *service) lotRetraitPossible(ctx context.Context, lotID, teleconseillerID string) error {
+	row, err := s.lot(ctx, lotID)
+	if err != nil {
+		return err
+	}
+	restants := slices.DeleteFunc(slices.Clone(lotLireFiltres(row.Filters).Distribution.TeleconseillerIds),
+		func(membre string) bool { return membre == teleconseillerID })
+	_, err = s.lotEquipeRestante(ctx, restants)
+	return err
+}
+
+func lotEquipeVideNommee(err error, nomCampagne string) error {
+	var probleme *socle.ProblemError
+	if errors.As(err, &probleme) && probleme.Code == "LOT_EXPORT_EQUIPE_VIDE" {
+		return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE", fmt.Sprintf(
+			"La campagne « %s » n’aurait plus aucun téléconseiller : renforcez son équipe ou supprimez-la avant de changer ce rôle.", nomCampagne))
+	}
+	return err
 }
 
 func lotObjectifsDe(saisis []CampagneObjectif) map[string]int {
@@ -462,12 +486,16 @@ func lotFiltresDuCorps(body *CampagneCreationBody) *lotFiltres {
 func (s *service) lotCompterCible(ctx context.Context, body *CampagneCreationBody) (int, error) {
 	f := lotFiltresDuCorps(body)
 	if body.Cible == lotCibleRecommandes {
+		if !lotSurRepresentants(body.Cible, projetDuLot(body)) {
+			n, err := s.Q.CompterSuggestionsProspect(ctx)
+			return int(n), err
+		}
 		n, err := s.Q.CompterSuggestions(ctx, db.CompterSuggestionsParams{
 			DepartementID: lotPointeurTexte(f.DepartementID), IefID: lotPointeurTexte(f.IefID),
 		})
 		return int(n), err
 	}
-	if lotSurRepresentants(body.Cible) {
+	if lotSurRepresentants(body.Cible, projetDuLot(body)) {
 		n, err := s.Q.CompterRepresentantsCible(ctx, lotRepresentantsCible(body.Cible, f))
 		return int(n), err
 	}
@@ -554,7 +582,7 @@ type CampagneOutput struct {
 
 func (s *service) campagneCreer(ctx context.Context, in *CampagneCreationInput) (*CampagneOutput, error) {
 	u := socle.UtilisateurCourant(ctx)
-	if lotSurRepresentants(in.Body.Cible) == (in.Body.Representants == nil) {
+	if lotSurRepresentants(in.Body.Cible, projetDuLot(&in.Body)) == (in.Body.Representants == nil) {
 		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_FILTRES_REQUIS",
 			"Les critères de la cible sont requis.")
 	}
@@ -591,7 +619,8 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 		return "", err
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
-	if _, err := tx.Exec(ctx, "SET LOCAL statement_timeout = '120s'"); err != nil {
+	// Le verrou : l'exclusion des fiches déjà distribuées ne voit pas un tirage concurrent non validé.
+	if _, err := tx.Exec(ctx, "SET LOCAL statement_timeout = '120s'; SELECT pg_advisory_xact_lock(hashtext('lots_export.tirage'))"); err != nil {
 		return "", err
 	}
 	q := s.Q.WithTx(tx)
@@ -634,7 +663,7 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 			LotId: lotID.String(), Position: lotInt32(index + 1),
 			AssigneeId: lotPointeurTexte(a.assigneeID), Day: lotInt32(a.jour),
 		}
-		if lotSurRepresentants(in.Body.Cible) {
+		if lotSurRepresentants(in.Body.Cible, projetDuLot(&in.Body)) {
 			item.RepresentantId = lotPointeurTexte(fiches[index])
 		} else {
 			item.ProspectId = lotPointeurTexte(fiches[index])
@@ -656,15 +685,17 @@ func (s *service) lotEcrireCampagne(ctx context.Context, createurID string, in *
 }
 
 // Un représentant est CHUES par construction ; un lot de prospects sans projet
-// tire CHUES et Grand Public ensemble.
+// tire CHUES et Grand Public ensemble. Un CONTACTS_RECOMMANDES sans filtre
+// « prospects » est une recommandation de représentant, donc CHUES aussi.
 func projetDuLot(body *CampagneCreationBody) *db.Projet {
-	projet := db.Projet("CHUES")
-	if !lotSurRepresentants(body.Cible) && body.Prospects != nil {
-		if body.Prospects.Projet == "" {
-			return nil
-		}
-		projet = db.Projet(body.Prospects.Projet)
+	if body.Prospects == nil {
+		projet := db.Projet("CHUES")
+		return &projet
 	}
+	if body.Prospects.Projet == "" {
+		return nil
+	}
+	projet := db.Projet(body.Prospects.Projet)
 	return &projet
 }
 
@@ -688,14 +719,12 @@ func (s *service) lotTirerFiches(ctx context.Context, q *db.Queries, createurID 
 ) ([]string, error) {
 	f := lotFiltresDuCorps(body)
 	if body.Cible == lotCibleRecommandes {
-		// Le corps porte un filtre « prospects » : c'est un parrainage Grand
-		// Public, pas une recommandation de représentant.
-		if body.Prospects != nil {
+		if !lotSurRepresentants(body.Cible, projetDuLot(body)) {
 			return s.lotOuvrirContactsRecommandesProspects(ctx, q, createurID, places)
 		}
 		return s.lotOuvrirContactsRecommandes(ctx, q, createurID, f, places)
 	}
-	if lotSurRepresentants(body.Cible) {
+	if lotSurRepresentants(body.Cible, projetDuLot(body)) {
 		p := lotRepresentantsCible(body.Cible, f)
 		return q.TirerRepresentantsCible(ctx, db.TirerRepresentantsCibleParams{
 			DepartementID: p.DepartementID, IefID: p.IefID,
@@ -719,6 +748,7 @@ func (*service) lotOuvrirContactsRecommandes(ctx context.Context, q *db.Queries,
 ) ([]string, error) {
 	suggestions, err := q.TirerSuggestions(ctx, db.TirerSuggestionsParams{
 		DepartementID: lotPointeurTexte(f.DepartementID), IefID: lotPointeurTexte(f.IefID),
+		Places: lotInt32(places),
 	})
 	if err != nil {
 		return nil, err
@@ -774,8 +804,8 @@ func lotValeurTexte(valeur *string) string {
 	return *valeur
 }
 
-func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, depuis time.Time) (calls, fiches int, err error) {
-	if lotSurRepresentants(string(cible)) {
+func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCible, projet *db.Projet, depuis time.Time) (calls, fiches int, err error) {
+	if lotSurRepresentants(string(cible), projet) {
 		row, err := s.Q.LotStatsRepresentants(ctx, db.LotStatsRepresentantsParams{LotId: id, ClientCreatedAt: depuis})
 		return int(row.Calls), int(row.Fiches), err
 	}
@@ -784,7 +814,7 @@ func (s *service) lotStats(ctx context.Context, id string, cible db.LotExportCib
 }
 
 func (s *service) lotResume(ctx context.Context, row *db.LotParIdRow) (CampagneResume, error) {
-	calls, fiches, err := s.lotStats(ctx, row.ID, row.Cible, row.CreatedAt)
+	calls, fiches, err := s.lotStats(ctx, row.ID, row.Cible, row.Projet, row.CreatedAt)
 	if err != nil {
 		return CampagneResume{}, err
 	}
@@ -1061,7 +1091,7 @@ func lotFichesEnMain(row *db.LotReaffectationsRow, tenues map[int32]string, recu
 
 func (s *service) lotAppelsParAgent(ctx context.Context, row *db.LotParIdRow) (map[string]int, error) {
 	appels := map[string]int{}
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		lignes, err := s.Q.LotAppelsParAgentRepresentants(ctx, db.LotAppelsParAgentRepresentantsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
@@ -1080,7 +1110,7 @@ func (s *service) lotAppelsParAgent(ctx context.Context, row *db.LotParIdRow) (m
 }
 
 func (s *service) lotTentativesRecentes(ctx context.Context, row *db.LotParIdRow) ([]CampagneTentative, error) {
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		lignes, err := s.Q.LotAttemptsRepresentants(ctx, db.LotAttemptsRepresentantsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
@@ -1167,7 +1197,7 @@ func (s *service) lotPerformance(ctx context.Context, row *db.LotParIdRow, store
 }
 
 func (s *service) lotLignesPerformance(ctx context.Context, row *db.LotParIdRow) ([]db.LotPerformanceRepresentantsRow, error) {
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		return s.Q.LotPerformanceRepresentants(ctx, db.LotPerformanceRepresentantsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
@@ -1189,7 +1219,7 @@ func (s *service) lotLignesPerformance(ctx context.Context, row *db.LotParIdRow)
 func (s *service) lotPositionsTraitees(ctx context.Context, row *db.LotParIdRow) (map[int32]bool, error) {
 	var positions []int32
 	var err error
-	if lotSurRepresentants(string(row.Cible)) {
+	if lotSurRepresentants(string(row.Cible), row.Projet) {
 		positions, err = s.Q.LotPositionsAppeleesRepresentants(ctx, db.LotPositionsAppeleesRepresentantsParams{
 			LotId: row.ID, ClientCreatedAt: row.CreatedAt,
 		})
@@ -1229,11 +1259,7 @@ func (s *service) campagneReaffecter(ctx context.Context, in *CampagneReaffecter
 	if len(mouvements) == 0 {
 		return nil, lotReaffectationVide()
 	}
-	equipe := lotLireFiltres(row.Filters).Distribution.TeleconseillerIds
-	if !slices.Contains(equipe, vers) {
-		equipe = append(equipe, vers)
-	}
-	if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.reaffectation",
+	if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.reaffectation",
 		map[string]any{lotCleVers: vers}); err != nil {
 		return nil, err
 	}
@@ -1282,7 +1308,9 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 		return nil, err
 	}
 	membres := lotCapacites(equipe, max(1, filtres.Distribution.FichesParJour), filtres.Distribution.Objectifs)
-	reprises := lotRepartir(len(arendre), membres, max(1, filtres.Distribution.Jours))
+	parJour := max(1, lotPlacesDe(membres, 1))
+	jours := max(1, filtres.Distribution.Jours, (len(arendre)+parJour-1)/parJour)
+	reprises := lotRepartir(len(arendre), membres, jours)
 	parRepreneur := map[string][]int32{}
 	for index, position := range arendre {
 		if index >= len(reprises) {
@@ -1295,7 +1323,7 @@ func (s *service) campagneRetrait(ctx context.Context, in *CampagneRetraitInput)
 	for _, vers := range slices.Sorted(maps.Keys(parRepreneur)) {
 		lotMouvements = append(lotMouvements, lotMouvement{de: retire, vers: vers, positions: parRepreneur[vers]})
 	}
-	if err := s.lotAppliquerMouvements(ctx, row, lotMouvements, restants, "lot_export.retrait",
+	if err := s.lotAppliquerMouvements(ctx, row, lotMouvements, "", retire, "lot_export.retrait",
 		map[string]any{"teleconseillerId": retire}); err != nil {
 		return nil, err
 	}
@@ -1311,7 +1339,7 @@ type lotMouvement struct {
 // Le déplacement des positions, sa trace et la nouvelle équipe dans une seule
 // transaction : une trace écrite hors du geste survivrait à un geste annulé.
 func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRow, lotMouvements []lotMouvement,
-	equipe []string, action string, details map[string]any,
+	entrant, sortant, action string, details map[string]any,
 ) error {
 	tx, err := s.Pool.Begin(ctx)
 	if err != nil {
@@ -1319,6 +1347,9 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 	q := s.Q.WithTx(tx)
+	if err := s.lotRecomposerEquipe(ctx, q, row.ID, entrant, sortant); err != nil {
+		return err
+	}
 	auteur := socle.UtilisateurCourant(ctx).ID
 	fiches := 0
 	for _, m := range lotMouvements {
@@ -1338,16 +1369,6 @@ func (s *service) lotAppliquerMouvements(ctx context.Context, row *db.LotParIdRo
 			return err
 		}
 		fiches += len(m.positions)
-	}
-	filtres := lotLireFiltres(row.Filters)
-	filtres.Distribution.TeleconseillerIds = equipe
-	for id := range filtres.Distribution.Objectifs {
-		if !slices.Contains(equipe, id) {
-			delete(filtres.Distribution.Objectifs, id)
-		}
-	}
-	if err := s.lotEcrireFiltres(ctx, q, row.ID, filtres); err != nil {
-		return err
 	}
 	details["fiches"] = fiches
 	if err := database.Auditer(ctx, q, auteur, action, "lot_export", row.ID, nil, details); err != nil {

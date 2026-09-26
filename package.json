@@ -14,7 +14,7 @@
     "format:check": "prettier . --check",
     "plafonds": "tools/dev/plafonds.sh",
     "lint:go": "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v2.13.2 run ./...",
-    "complexite:go": "go run github.com/uudashr/gocognit/cmd/gocognit@latest -top 10 ./cmd ./internal && go run github.com/fzipp/gocyclo/cmd/gocyclo@latest -top 10 cmd internal",
+    "complexite:go": "go run github.com/uudashr/gocognit/cmd/gocognit@v1.2.1 -top 10 ./cmd ./internal && go run github.com/fzipp/gocyclo/cmd/gocyclo@v0.6.0 -top 10 cmd internal",
     "verify:local": "pnpm format:check && pnpm lint && pnpm dead-code && pnpm typecheck && pnpm plafonds && pnpm lint:go",
     "prepare": "test ! -d .git || lefthook install"
   },

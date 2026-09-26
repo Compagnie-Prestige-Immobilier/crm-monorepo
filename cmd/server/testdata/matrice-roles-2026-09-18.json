@@ -1,4 +1,20 @@
 {
+  "GET /api/v1/phase2/rv-site": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/prospects/{id}/rendez-vous": [
+    "ADMIN",
+    "CHARGE_CLIENTELE",
+    "COMMERCIAL",
+    "DIRECTION",
+    "SUPERVISEUR"
+  ],
+  "GET /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
+  "PUT /api/v1/rv-site/reglages": ["ADMIN", "DIRECTION", "SUPERVISEUR"],
   "GET /api/v1/prospects/{id}/parrainage": [
     "ADMIN",
     "CHARGE_CLIENTELE",

@@ -207,7 +207,7 @@ function VentesLoaded({
           if (!open) setVenteAArchiver(null);
         }}
         title="Archiver cette vente ?"
-        description="Elle ne sera plus visible dans les ventes actives, mais pourra être restaurée."
+        description="Elle ne sera plus visible dans les ventes actives."
         confirmLabel="Archiver"
         pending={archivage.isPending}
         onConfirm={() => {

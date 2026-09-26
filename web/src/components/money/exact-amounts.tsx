@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useMemo, useState } from 'react';
 import type { ReactNode } from 'react';
 
 import { formatXof, formatXofCompact } from '@/lib/money';
@@ -22,12 +22,7 @@ function readStored(): boolean {
 }
 
 export function ExactAmountsProvider({ children }: { children: ReactNode }) {
-  const [exact, setExact] = useState(false);
-
-  useEffect(() => {
-    // oxlint-disable-next-line react/set-state-in-effect -- préférence relue après hydratation
-    setExact(readStored());
-  }, []);
+  const [exact, setExact] = useState(readStored);
 
   const toggle = useCallback(() => {
     setExact((current) => {

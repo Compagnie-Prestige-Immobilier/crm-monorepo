@@ -634,12 +634,7 @@ func (g *exportClasseurGlobal) prospects(ctx context.Context) error {
 	libres := g.s.exportChampsLibres(ctx, []string{exportCleChues, exportCleGrandPublic})
 	entetes := make([]string, 0, len(ExportEntetesProspects)+len(libres)+16)
 	entetes = append(entetes, exportEnteteIdentifiant, "Identifiant représentant")
-	for _, entete := range ExportEntetesProspects {
-		if entete == exportEnteteCommercial {
-			entete = ExportEnteteTeleconseiller
-		}
-		entetes = append(entetes, entete)
-	}
+	entetes = append(entetes, ExportEntetesProspects...)
 	entetes = append(entetes, exportEntetesChampsLibres(libres)...)
 	entetes = append(entetes, exportEnteteIdentifiantAgent, "Projet d’origine", "Établissement",
 		"E-mail", "Revenu mensuel", "Paiement", "Statut WhatsApp", "Origine", "Détail origine",

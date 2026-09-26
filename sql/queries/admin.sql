@@ -44,6 +44,7 @@ WHERE "id" = $1 AND "deletedAt" IS NULL;
 SELECT "email", "username" FROM "users"
 WHERE (sqlc.narg('email')::text IS NOT NULL AND "email" = sqlc.narg('email')::text)
    OR (sqlc.narg('username')::text IS NOT NULL AND "username" = sqlc.narg('username')::text)
+ORDER BY "createdAt", "id"
 LIMIT 1;
 
 -- Verrou du dernier ADMIN : toutes les lignes ADMIN actives sont verrouillées,
@@ -214,10 +215,15 @@ WHERE "projet" = sqlc.arg('projet')::"Projet" AND "disparueLe" IS NULL
   AND NOT ("identifiantDistant" = ANY(sqlc.arg('vus')::text[]));
 
 -- name: PurgerInscriptions :execrows
-DELETE FROM "inscriptions_plateforme" WHERE "projet" = $1;
+-- Une inscription liée à un dossier bancaire garde son identifiant : le vider
+-- couperait `bank_cases.inscriptionId` (ON DELETE SET NULL) et ferait
+-- réapparaître le dossier comme « à ouvrir » sous une inscription neuve.
+DELETE FROM "inscriptions_plateforme" i WHERE i."projet" = $1
+  AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id");
 
 -- name: SupprimerInscription :execrows
-DELETE FROM "inscriptions_plateforme" WHERE "id" = $1 AND "projet" = $2;
+DELETE FROM "inscriptions_plateforme" i WHERE i."id" = $1 AND i."projet" = $2
+  AND NOT EXISTS (SELECT 1 FROM "bank_cases" c WHERE c."inscriptionId" = i."id");
 
 -- name: CandidatsParTelephone :many
 SELECT p."id", p."projet", p."phoneE164", p."whatsappE164", p."clientCreatedAt"

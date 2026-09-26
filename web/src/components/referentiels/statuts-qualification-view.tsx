@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { PencilIcon, PlusIcon, PowerIcon, PowerOffIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { useForm } from 'react-hook-form';
+import { useForm, useWatch } from 'react-hook-form';
 import { toast } from 'sonner';
 
 import { Field } from '@/components/forms/field';
@@ -374,7 +374,7 @@ function FormulaireStatut({
   // reconfigure pas. Le serveur refuse de toute façon.
   const regleFigee = statut?.isSystem === true;
 
-  const { register, handleSubmit, reset, watch, setValue, formState } = useForm<Draft>({
+  const { register, handleSubmit, reset, control, setValue, formState } = useForm<Draft>({
     defaultValues: EMPTY,
   });
 
@@ -395,12 +395,10 @@ function FormulaireStatut({
     );
   }, [open, statut, reset]);
 
-  // oxlint-disable-next-line react/incompatible-library -- faux positif react-hook-form
-  const effect = watch('effect');
-  const priorite = watch('priorite');
-  const relation = watch('relation');
-  const reessai = watch('reessai');
-  const parent = watch('parent');
+  const [effect, priorite, relation, reessai, parent] = useWatch({
+    control,
+    name: ['effect', 'priorite', 'relation', 'reessai', 'parent'],
+  });
   const { parentChoisi, effetRetenu, descriptionEffet, parents } = deriverParent(
     racines,
     parent,

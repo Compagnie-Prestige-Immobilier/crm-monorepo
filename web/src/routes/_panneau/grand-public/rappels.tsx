@@ -5,10 +5,10 @@ import { RappelsView } from '@/components/rappels/rappels-view';
 import { RepresentantsSuiviView } from '@/components/rappels/representants-suivi-view';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { guardRoles } from '@/lib/guard';
+import { guardPermission } from '@/lib/guard';
 
 export const Route = createFileRoute('/_panneau/grand-public/rappels')({
-  beforeLoad: guardRoles(['ADMIN', 'COMMERCIAL', 'CHARGE_CLIENTELE', 'SUPERVISEUR', 'DIRECTION']),
+  beforeLoad: guardPermission('fiches.tenir'),
   component: RappelsPage,
   pendingComponent: Loading,
 });

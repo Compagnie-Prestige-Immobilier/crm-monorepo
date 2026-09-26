@@ -10,8 +10,10 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
+	"strings"
 	"testing"
 	"time"
+	"unicode/utf8"
 
 	"github.com/google/uuid"
 )
@@ -406,12 +408,13 @@ func TestProspectReaffectationEstAuditee(t *testing.T) {
 	destinataire := autreCompte(b, "COMMERCIAL")
 	nettoyerProspects(b, b.userID, destinataire.userID)
 	id := creerProspect(b, "Cissé", numeroSenegalais(17))["id"].(string)
+	second := creerProspect(b, "Sow", numeroSenegalais(23))["id"].(string)
 
 	statut, body := appelJSON(b, http.MethodPost, "/api/v1/prospects/reassign",
-		map[string]any{"prospectIds": []string{id}, "commercialId": destinataire.userID}, nil)
+		map[string]any{"prospectIds": []string{id, second}, "commercialId": destinataire.userID}, nil)
 	b.attend(statut, http.StatusOK, "réaffectation", body)
-	if body["updated"] != float64(1) {
-		t.Fatalf("une fiche doit être réaffectée : %v", body["updated"])
+	if body["updated"] != float64(2) {
+		t.Fatalf("deux fiches doivent être réaffectées : %v", body["updated"])
 	}
 	var proprietaire string
 	if err := b.pool.QueryRow(b.ctx, `SELECT "createdById" FROM "prospects" WHERE "id" = $1`, id).Scan(&proprietaire); err != nil {
@@ -422,11 +425,11 @@ func TestProspectReaffectationEstAuditee(t *testing.T) {
 	}
 	var traces int
 	if err := b.pool.QueryRow(b.ctx,
-		`SELECT count(*) FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces); err != nil {
+		`SELECT count(DISTINCT "entityId") FROM "audit_logs" WHERE "action" = 'prospect.reassign' AND "userId" = $1`, b.userID).Scan(&traces); err != nil {
 		t.Fatal(err)
 	}
-	if traces != 1 {
-		t.Fatalf("la réaffectation doit laisser une trace : %d", traces)
+	if traces != 2 {
+		t.Fatalf("chaque fiche réaffectée doit laisser sa trace : %d", traces)
 	}
 }
 
@@ -645,4 +648,226 @@ func TestProspectBasculeDeSegmentRefuseeSansSegment(t *testing.T) {
 	statut, body := appelJSON(autre, http.MethodPatch, chemin,
 		map[string]any{"banqueId": uuid.NewString(), "reason": "Hors encadrement"}, nil)
 	autre.attend(statut, http.StatusForbidden, "bascule par un téléconseiller", body)
+}
+
+func appelEtRappelEnAttente(b *banc, prospect, motif string, quand time.Time) string {
+	b.t.Helper()
+	tentative, rappel := uuid.NewString(), uuid.NewString()
+	qualificationExec(b, `INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		SELECT $1,$2,$3,"id",$4 FROM "call_outcome_reasons" WHERE "code" = $5`, tentative, prospect, b.userID, quand, motif)
+	qualificationExec(b, `UPDATE "prospects" SET "lastCallAt" = $2, "lastCallById" = $3,
+		"lastReasonId" = (SELECT "id" FROM "call_outcome_reasons" WHERE "code" = $4) WHERE "id" = $1`, prospect, quand, b.userID, motif)
+	qualificationExec(b, `INSERT INTO "scheduled_callbacks" ("id","prospectId","assignedToId","scheduledAt","sourceAttemptId","updatedAt")
+		VALUES ($1,$2,$3,$4,$5,now())`, rappel, prospect, b.userID, quand.Add(24*time.Hour), tentative)
+	return rappel
+}
+
+func fusionnerEnArrierePlan(b *banc, corps []byte, statuts chan<- int) {
+	req, err := http.NewRequestWithContext(b.ctx, http.MethodPost, b.ts.URL+"/api/v1/prospects/merge", bytes.NewReader(corps))
+	if err != nil {
+		statuts <- 0
+		return
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Origin", b.ts.URL)
+	resp, err := b.client.Do(req)
+	if err != nil {
+		statuts <- 0
+		return
+	}
+	_ = resp.Body.Close()
+	statuts <- resp.StatusCode
+}
+
+func attendreFusionsBloquees(b *banc, nombre int) {
+	b.t.Helper()
+	for range 100 {
+		var bloquees int
+		if err := b.pool.QueryRow(b.ctx,
+			`SELECT count(*) FROM pg_stat_activity WHERE "wait_event_type" = 'Lock' AND "query" LIKE '%SET "deletedAt" = now()%'`).Scan(&bloquees); err != nil {
+			b.t.Fatal(err)
+		}
+		if bloquees >= nombre {
+			return
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+	b.t.Fatalf("%d fusions attendues en attente du verrou", nombre)
+}
+
+// Le test tient la source verrouillée pour que deux fusions identiques se suivent :
+// la seconde trouve la source déjà absorbée.
+func TestFusionDeuxRappelsEnAttente(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	cible := creerProspect(b, "Kane cible", numeroDeCourse(3))["id"].(string)
+	source := creerProspect(b, "Kane source", numeroDeCourse(4))["id"].(string)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = ANY($1)`, []string{cible, source})
+	})
+	rappelCible := appelEtRappelEnAttente(b, cible, "PAS_DE_REPONSE", time.Now().UTC().Add(-2*time.Hour))
+	rappelSource := appelEtRappelEnAttente(b, source, "MESSAGERIE", time.Now().UTC().Add(-time.Hour))
+
+	verrou, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = verrou.Rollback(b.ctx) }()
+	if _, err := verrou.Exec(b.ctx, `SELECT 1 FROM "prospects" WHERE "id" = $1 FOR UPDATE`, source); err != nil {
+		t.Fatal(err)
+	}
+	corps, err := json.Marshal(map[string]any{"targetId": cible, "sourceId": source})
+	if err != nil {
+		t.Fatal(err)
+	}
+	statuts := make(chan int, 2)
+	for i := range 2 {
+		go fusionnerEnArrierePlan(b, corps, statuts)
+		attendreFusionsBloquees(b, i+1)
+	}
+	if err := verrou.Rollback(b.ctx); err != nil {
+		t.Fatal(err)
+	}
+	premier, second := <-statuts, <-statuts
+	if premier+second != http.StatusOK+http.StatusConflict || premier*second != http.StatusOK*http.StatusConflict {
+		t.Fatalf("une fusion aboutit, la seconde trouve la source absorbée : %d, %d", premier, second)
+	}
+
+	if n := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'PENDING'`,
+		cible); n != 1 || qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "id" = $1 AND "status" = 'PENDING'`, rappelCible) != 1 {
+		t.Fatalf("le rappel en attente de la cible doit rester seul : %d", n)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "scheduled_callbacks" WHERE "prospectId" = $1 AND "status" = 'SUPERSEDED' AND "id" = $2`,
+		cible, rappelSource); n != 1 {
+		t.Fatalf("le rappel de la source doit suivre la fusion, supplanté : %d", n)
+	}
+	if n := qualificationCompte(b, `SELECT count(*) FROM "prospects" p JOIN "call_outcome_reasons" r ON r."id" = p."lastReasonId"
+		WHERE p."id" = $1 AND r."code" = 'MESSAGERIE' AND p."lastCallById" = $2`, cible, b.userID); n != 1 {
+		t.Fatal("la cible doit porter le dernier appel, celui de la source")
+	}
+}
+
+// Audit B21 : sans le contrôle de `prospectStatutModifiable` à la création,
+// une fiche pouvait naître directement CONVERTI, sans offre ni conversion signée.
+func TestProspectCreationRefuseConverti(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	nettoyerProspects(b, b.userID)
+	telephone := numeroSenegalais(24)
+
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/prospects",
+		map[string]any{"nom": "Diagne", "phone": telephone, "statut": "CONVERTI"}, nil)
+	b.attend(statut, http.StatusForbidden, "création directe en CONVERTI", body)
+	if body["code"] != "PROSPECT_STATUT_TRANSITION_REFUSED" {
+		t.Fatalf("code : %v", body["code"])
+	}
+	var fiches int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*) FROM "prospects" WHERE "phoneE164" = $1`, telephone).Scan(&fiches); err != nil {
+		t.Fatal(err)
+	}
+	if fiches != 0 {
+		t.Fatalf("aucune fiche ne doit être créée : %d", fiches)
+	}
+}
+
+// Audit B22 : sans la garde de `ConvertirJourney`, une conversion Grand Public
+// rejouée sur une fiche déjà vendue redevenait CONVERTI et écrasait l'auteur et
+// le montant de la conversion signée.
+func TestConversionGrandPublicNeRegressePasUneVente(t *testing.T) {
+	b := nouveauBanc(t, "COMMERCIAL")
+	connecte(b)
+	admin := autreCompte(b, "ADMIN")
+	nettoyerProspects(b, b.userID, admin.userID)
+	id := creerProspect(b, "Thiam", numeroSenegalais(25))["id"].(string)
+
+	offre := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "offers" ("id","code","label","updatedAt") VALUES ($1,$2,$3,now())`,
+		offre, "TEST-"+offre[:8], "Offre test "+offre[:8]); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx,
+			`DELETE FROM "prospect_conversions" WHERE "journeyId" IN (SELECT "id" FROM "prospect_journeys" WHERE "prospectId" = $1)`, id)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "offers" WHERE "id" = $1`, offre)
+	})
+
+	consentement := "/api/v1/prospects/" + id + "/parcours/grand-public/consentement"
+	statut, body := appelJSON(b, http.MethodPatch, consentement, map[string]any{"consent": "INTERESSE"}, nil)
+	b.attend(statut, http.StatusOK, "accord consigné", body)
+
+	chemin := "/api/v1/prospects/" + id + "/parcours/grand-public/conversion"
+	statut, body = appelJSON(b, http.MethodPost, chemin,
+		map[string]any{"offerId": offre, "paymentMode": "COMPTANT", "amountXof": 150000}, nil)
+	b.attend(statut, http.StatusOK, "première conversion", body)
+
+	statut, body = appelJSON(b, http.MethodPost, "/api/v1/prospects/"+id+"/vendre", nil, nil)
+	b.attend(statut, http.StatusOK, "vente", body)
+	if body["statut"] != "VENDU" {
+		t.Fatalf("la fiche doit être vendue : %v", body["statut"])
+	}
+
+	statut, body = appelJSON(admin, http.MethodPost, chemin,
+		map[string]any{"offerId": offre, "paymentMode": "COMPTANT", "amountXof": 999999}, nil)
+	admin.attend(statut, http.StatusUnprocessableEntity, "conversion rejouée sur une fiche vendue", body)
+	if body["code"] != "PROSPECT_CONVERTI" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	var statutEnBase, auteur string
+	var montant int32
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT p."statut"::text, c."confirmedById", c."amountXof" FROM "prospects" p
+		 JOIN "prospect_journeys" j ON j."prospectId" = p."id" AND j."projet" = 'GRAND_PUBLIC'
+		 JOIN "prospect_conversions" c ON c."journeyId" = j."id" WHERE p."id" = $1`,
+		id).Scan(&statutEnBase, &auteur, &montant); err != nil {
+		t.Fatal(err)
+	}
+	if statutEnBase != "VENDU" {
+		t.Fatalf("la fiche ne doit pas régresser : %s", statutEnBase)
+	}
+	if auteur != b.userID || montant != 150000 {
+		t.Fatalf("l’auteur et le montant de la conversion signée ne doivent pas être écrasés : %s, %d", auteur, montant)
+	}
+}
+
+// Audit B23 : la troncature par octets coupait un caractère accentué en deux,
+// et Postgres refusait la chaîne invalide (22021) sans notifier la supervision.
+// Le numéro et les noms sont choisis pour que l'octet 500 tombe au milieu d'un
+// `é`, comme relevé par l'audit.
+func TestFormulairePublicMessageAccentuePrevientLaSupervision(t *testing.T) {
+	t.Setenv("API_TRUST_PROXY_HEADERS", "true")
+	t.Setenv("TURNSTILE_ALLOW_DEGRADED", "true")
+	b := nouveauBanc(t, "COMMERCIAL")
+	nettoyerProspects(b, b.userID)
+	reglagesPublicsSansObligation(b)
+	visiteur := map[string]string{"X-Forwarded-For": "10.0.0.4"}
+	telephone := numeroSenegalais(88)
+
+	message := strings.Repeat("é", 490)
+	demande := map[string]any{"nom": "Sarr", "prenom": "Fatou", "phone": telephone, "message": message}
+	statut, body := appelJSON(b, http.MethodPost, "/api/v1/formulaire-public/"+jetonFormulaire(b), demande, visiteur)
+	b.attend(statut, http.StatusCreated, "message accentué long", body)
+
+	var id string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "id" FROM "prospects" WHERE "phoneE164" = $1 AND "deletedAt" IS NULL`, telephone).Scan(&id); err != nil {
+		t.Fatal(err)
+	}
+	route := "/chues/prospects/" + id
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "notifications" WHERE "route" = $1`, route) })
+
+	var notifs int
+	var corpsNotif string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT count(*), coalesce(max("body"), '') FROM "notifications" WHERE "route" = $1`, route).Scan(&notifs, &corpsNotif); err != nil {
+		t.Fatal(err)
+	}
+	if notifs != 1 {
+		t.Fatalf("la supervision doit recevoir une notification : %d", notifs)
+	}
+	if !utf8.ValidString(corpsNotif) {
+		t.Fatal("le corps tronqué doit rester un UTF-8 valide")
+	}
 }

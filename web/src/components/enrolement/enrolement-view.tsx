@@ -793,7 +793,7 @@ function TableauInscriptions({
                 </button>
               </TableCell>
               <TableCell className="text-muted-foreground">
-                {ligne.email ?? ligne.phoneE164 ?? '—'}
+                {ligne.email ?? ligne.phoneE164 ?? '–'}
               </TableCell>
               <TableCell>
                 <Badge variant={tonStatut(ligne.statutDistant)}>
@@ -807,14 +807,14 @@ function TableauInscriptions({
               </TableCell>
               <TableCell>
                 {ligne.motifNegatif === null ? (
-                  '—'
+                  '–'
                 ) : (
                   <Badge variant="destructive">{ligne.motifNegatif}</Badge>
                 )}
               </TableCell>
-              <TableCell className="tabular-nums">{ligne.etapeDistante ?? '—'}</TableCell>
+              <TableCell className="tabular-nums">{ligne.etapeDistante ?? '–'}</TableCell>
               <TableCell>
-                {ligne.inscriteLe === null ? '—' : formatDate(ligne.inscriteLe)}
+                {ligne.inscriteLe === null ? '–' : formatDate(ligne.inscriteLe)}
               </TableCell>
               <TableCell>{ligne.prospectId === null ? 'Non rapproché' : 'Rapproché'}</TableCell>
               <TableCell>

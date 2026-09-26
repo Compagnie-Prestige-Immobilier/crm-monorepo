@@ -42,8 +42,7 @@ func (s *service) campagneAjouterTeleconseiller(ctx context.Context, in *Campagn
 	if len(in.Body.Positions) > 0 && len(mouvements) == 0 {
 		return nil, lotReaffectationVide()
 	}
-	equipe = append(slices.Clone(equipe), vers)
-	if err := s.lotAppliquerMouvements(ctx, row, mouvements, equipe, "lot_export.ajout_teleconseiller",
+	if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.ajout_teleconseiller",
 		map[string]any{"teleconseiller": vers}); err != nil {
 		return nil, err
 	}

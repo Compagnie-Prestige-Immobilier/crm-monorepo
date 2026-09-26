@@ -13,7 +13,9 @@ import (
 	"net/http"
 	"slices"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/xuri/excelize/v2"
@@ -434,6 +436,153 @@ func TestCampagneRetraitRendLesFichesNonTraitees(t *testing.T) {
 	}
 }
 
+// A tient 10 fiches, B n'en prend qu'une par jour : au retrait de A, B reprend
+// les dix quitte à dépasser les jours prévus.
+func TestCampagneRetraitRendToutesLesFiches(t *testing.T) {
+	b := nouveauBancCampagne(t, 12)
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+		"name": "Campagne déséquilibrée", "cible": "REPRESENTANTS",
+		"representants": map[string]any{"departementId": b.departement},
+		"distribution": map[string]any{
+			"teleconseillerIds": []string{b.agentA, b.agentB}, "fichesParJour": 5, "jours": 2,
+			"objectifs": []map[string]any{{"teleconseillerId": b.agentB, "fichesParJour": 1}},
+		},
+	})
+	b.attend(statut, http.StatusCreated, "création de la campagne", body)
+	b.lotID, _ = body["id"].(string)
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, b.lotID) })
+	if a, bb := len(b.positionsDe(b.agentA)), len(b.positionsDe(b.agentB)); a != 10 || bb != 2 {
+		t.Fatalf("10 fiches pour A, 2 pour B attendues : %d et %d", a, bb)
+	}
+	statut, body = b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
+		map[string]any{"teleconseillerId": b.agentA})
+	b.attend(statut, http.StatusOK, "retrait", body)
+	if restantes, reprises := b.positionsDe(b.agentA), b.positionsDe(b.agentB); len(restantes) != 0 || len(reprises) != 12 {
+		t.Fatalf("toutes les fiches de A passent à B : A %v, B %v", restantes, reprises)
+	}
+}
+
+// Le test tient le verrou pendant que les appels partent : ils s'y empilent tous,
+// puis s'exécutent à sa libération, ce qui rend la course reproductible.
+func sousVerrou(b *banc, verrou string, arguments []any, appels ...func() int) []int {
+	b.t.Helper()
+	tx, err := b.pool.Begin(b.ctx)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	defer func() { _ = tx.Rollback(b.ctx) }()
+	if _, err := tx.Exec(b.ctx, verrou, arguments...); err != nil {
+		b.t.Fatal(err)
+	}
+	statuts := make([]int, len(appels))
+	var attente sync.WaitGroup
+	for i, appel := range appels {
+		attente.Go(func() { statuts[i] = appel() })
+	}
+	empiles := 0
+	for essai := 0; essai < 200 && empiles < len(appels); essai++ {
+		time.Sleep(25 * time.Millisecond)
+		if err := b.pool.QueryRow(b.ctx, `SELECT count(*)::int FROM pg_stat_activity
+			WHERE wait_event_type = 'Lock' AND datname = current_database()`).Scan(&empiles); err != nil {
+			b.t.Fatal(err)
+		}
+	}
+	if err := tx.Commit(b.ctx); err != nil {
+		b.t.Fatal(err)
+	}
+	attente.Wait()
+	if empiles < len(appels) {
+		b.t.Fatalf("%d appel(s) sur %d ont attendu le verrou (statuts %v)", empiles, len(appels), statuts)
+	}
+	return statuts
+}
+
+func TestCampagnesSimultaneesSansFicheCommune(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	feuille := "Feuille " + uuid.NewString()
+	for range 4 {
+		b.prospect(feuille, "CHUES", nil, "NOUVEAU")
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "createdById" = $1`, b.userID) })
+	creer := func() int {
+		statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", map[string]any{
+			"name": "Campagne simultanée", "cible": "PROSPECTS", "prospects": map[string]any{"importFeuille": feuille},
+			"distribution": map[string]any{"teleconseillerIds": []string{b.agentA}, "fichesParJour": 10, "jours": 1},
+		})
+		return statut
+	}
+	statuts := sousVerrou(b.banc, `SELECT pg_advisory_xact_lock(hashtext('lots_export.tirage'))`, nil, creer, creer)
+	slices.Sort(statuts)
+	if !slices.Equal(statuts, []int{http.StatusCreated, http.StatusUnprocessableEntity}) {
+		t.Fatalf("la seconde campagne ne trouve plus de fiche libre : %v", statuts)
+	}
+	lignes := b.compte(`SELECT count(*)::int FROM "lot_export_items" i JOIN "lots_export" l ON l."id" = i."lotId" WHERE l."createdById" = $1`, b.userID)
+	fiches := b.compte(`SELECT count(DISTINCT i."prospectId")::int FROM "lot_export_items" i JOIN "lots_export" l ON l."id" = i."lotId" WHERE l."createdById" = $1`, b.userID)
+	if lignes != 4 || fiches != 4 {
+		t.Fatalf("chaque fiche dans une seule campagne : %d lignes pour %d fiches", lignes, fiches)
+	}
+}
+
+func TestLotRefuseDoublonFiche(t *testing.T) {
+	b := nouveauBancCampagne(t, 3)
+	b.creer()
+	fiche := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt")
+		 VALUES ($1,'Fiche ajoutée',$2,$3,$4,now())`,
+		fiche, fmt.Sprintf("+2217%08d", rand.IntN(90_000_000)+10_000_000), b.departement, b.userID); err != nil {
+		t.Fatal(err)
+	}
+	affecter := func() int {
+		statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/representants/"+fiche+"/affecter", map[string]any{"campagneId": b.lotID})
+		return statut
+	}
+	statuts := sousVerrou(b.banc, `SELECT 1 FROM "lots_export" WHERE "id" = $1 FOR UPDATE`, []any{b.lotID}, affecter, affecter)
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusOK {
+		t.Fatalf("les deux affectations aboutissent : %v", statuts)
+	}
+	if n := b.compte(`SELECT count(*)::int FROM "lot_export_items" WHERE "lotId" = $1 AND "representantId" = $2`, b.lotID, fiche); n != 1 {
+		t.Fatalf("la fiche entre une seule fois dans la campagne : %d lignes", n)
+	}
+	if n := b.compte(`SELECT "itemCount" FROM "lots_export" WHERE "id" = $1`, b.lotID); n != 4 {
+		t.Fatalf("itemCount : %d", n)
+	}
+}
+
+// Une réaffectation vers un renfort et le retrait de B partent ensemble : l'équipe
+// finale garde le renfort et perd B.
+func TestReaffectationsConcurrentesGardentLEquipe(t *testing.T) {
+	b := nouveauBancCampagne(t, 10)
+	renfort := b.agent("Agent Coumba Fall")
+	b.creer()
+	aDonner := b.positionsDe(b.agentA)[:1]
+	statuts := sousVerrou(b.banc, `SELECT 1 FROM "lots_export" WHERE "id" = $1 FOR UPDATE`, []any{b.lotID},
+		func() int {
+			statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/reaffectation",
+				map[string]any{"positions": aDonner, "versTeleconseillerId": renfort})
+			return statut
+		},
+		func() int {
+			statut, _ := b.appelCampagne(http.MethodPost, "/api/v1/lots-export/"+b.lotID+"/retrait",
+				map[string]any{"teleconseillerId": b.agentB})
+			return statut
+		})
+	if statuts[0] != http.StatusOK || statuts[1] != http.StatusOK {
+		t.Fatalf("réaffectation et retrait aboutissent : %v", statuts)
+	}
+	var equipe []string
+	if err := b.pool.QueryRow(b.ctx, `SELECT ARRAY(SELECT jsonb_array_elements_text("filters"->'distribution'->'teleconseillerIds'))
+		FROM "lots_export" WHERE "id" = $1`, b.lotID).Scan(&equipe); err != nil {
+		t.Fatal(err)
+	}
+	attendue := []string{b.agentA, renfort}
+	slices.Sort(equipe)
+	slices.Sort(attendue)
+	if !slices.Equal(equipe, attendue) {
+		t.Fatalf("équipe finale %v, attendue %v", equipe, attendue)
+	}
+}
+
 // Deux membres passés chargés de clientèle : le premier se retire même si le
 // second siège encore, seuls ceux restés téléconseillers reprennent ses fiches.
 func TestCampagneRetraitDunMembreDontLeRoleAChange(t *testing.T) {
@@ -733,6 +882,68 @@ func TestCampagneOngletReparitiEntrePlusieursReleves(t *testing.T) {
 	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
 	if !b.dansLeLot(lotID, fiche) {
 		t.Fatalf("la fiche de l'onglet entre dans la campagne : %v", body)
+	}
+}
+
+// B06 : un parrainage Grand Public (prospect_suggestions) doit ouvrir une
+// campagne CONTACTS_RECOMMANDES sur des fiches prospects, pas représentants.
+// Avant correction, lotSurRepresentants traitait toute cible autre que
+// PROSPECTS comme des représentants : refus LOT_EXPORT_FILTRES_REQUIS, puis
+// écriture de l'identifiant de prospect dans representantId.
+func TestCampagneParrainageGrandPublic(t *testing.T) {
+	b := nouveauBancCampagne(t, 0)
+	source := b.prospect("Feuille "+uuid.NewString(), "GRAND_PUBLIC", nil, "NOUVEAU")
+	tentative := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "call_attempts" ("id","prospectId","performedById","reasonId","clientCreatedAt")
+		 SELECT $1,$2,$3,"id",now() FROM "call_outcome_reasons" WHERE "code" = 'PAS_DE_REPONSE'`,
+		tentative, source, b.userID); err != nil {
+		t.Fatal(err)
+	}
+	numero := fmt.Sprintf("+2217%08d", rand.IntN(90_000_000)+10_000_000)
+	suggestion := uuid.NewString()
+	if _, err := b.pool.Exec(b.ctx,
+		`INSERT INTO "prospect_suggestions" ("id","sourceProspectId","suggestedName","suggestedPhoneE164","suggestedById","sourceAttemptId","clientCreatedAt")
+		 VALUES ($1,$2,'Filleul Test',$3,$4,$5,now())`,
+		suggestion, source, numero, b.userID, tentative); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospect_suggestions" WHERE "id" = $1`, suggestion)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "id" = $1`, tentative)
+	})
+
+	corps := map[string]any{
+		"name": "Campagne parrainage", "cible": "CONTACTS_RECOMMANDES",
+		"prospects": map[string]any{"projet": "GRAND_PUBLIC"},
+		"distribution": map[string]any{
+			"teleconseillerIds": []string{b.agentA}, "fichesParJour": 3, "jours": 1,
+		},
+	}
+	b.apercuEligible(corps, 1, "aperçu du parrainage Grand Public")
+
+	statut, body := b.appelCampagne(http.MethodPost, "/api/v1/lots-export", corps)
+	b.attend(statut, http.StatusCreated, "création de la campagne de parrainage", body)
+	lotID, _ := body["id"].(string)
+	if lotID == "" {
+		t.Fatalf("campagne sans identifiant : %v", body)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "lots_export" WHERE "id" = $1`, lotID) })
+
+	var filleulID string
+	var representantID *string
+	if err := b.pool.QueryRow(b.ctx,
+		`SELECT "prospectId", "representantId" FROM "lot_export_items" WHERE "lotId" = $1`, lotID).
+		Scan(&filleulID, &representantID); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _, _ = b.pool.Exec(b.ctx, `DELETE FROM "prospects" WHERE "id" = $1`, filleulID) })
+	if filleulID == "" || representantID != nil {
+		t.Fatalf("le filleul doit être écrit comme prospect, pas comme représentant : prospectId=%q representantId=%v",
+			filleulID, representantID)
+	}
+	if n := b.compte(`SELECT count(*)::int FROM "prospects" WHERE "id" = $1 AND "projet" = 'GRAND_PUBLIC'`, filleulID); n != 1 {
+		t.Fatalf("le filleul doit être une fiche Grand Public : %d", n)
 	}
 }
 

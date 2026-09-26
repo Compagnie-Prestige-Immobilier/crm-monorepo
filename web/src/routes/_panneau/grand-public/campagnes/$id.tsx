@@ -9,7 +9,7 @@ export const Route = createFileRoute('/_panneau/grand-public/campagnes/$id')({
   // La v1 renvoyait un rôle refusé vers l'accueil du projet, sans écran de refus.
   beforeLoad: ({ context }) => {
     if (!peut(context.user, 'campagnes.superviser')) {
-      throw redirect({ href: '/chues' });
+      throw redirect({ href: '/grand-public' });
     }
   },
   component: LotExportDetailPage,

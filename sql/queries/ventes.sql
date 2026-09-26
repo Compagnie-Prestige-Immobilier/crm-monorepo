@@ -4,6 +4,13 @@ DELETE FROM "ventes_classeurs";
 -- name: SupprimerVentesImportees :exec
 DELETE FROM "ventes" WHERE "origine" = 'IMPORT';
 
+-- Les versements de l'onglet « Échéances » sont aussi dans ventes_versements : seul le journal distingue une saisie.
+-- name: VentesImporteesNonRemplacables :one
+SELECT count(*)::int AS "nombre" FROM "ventes" v WHERE v."origine" = 'IMPORT'
+    AND (v."archiveeLe" IS NOT NULL OR EXISTS (
+        SELECT 1 FROM "audit_logs" a
+        WHERE a."entity" = 'vente' AND a."entityId" = v."id"::text AND a."action" = 'vente.versement_ajouter'));
+
 -- name: InsererClasseurVentes :exec
 INSERT INTO "ventes_classeurs" ("id", "nomFichier", "contenu", "depuis", "importeParId")
 VALUES ($1, $2, $3, $4, $5);
@@ -14,6 +21,10 @@ INSERT INTO "ventes" ("classeurId", "origine", "numero", "canal", "dateSouscript
     "reliquat", "partProprietaire", "partApporteur", "partCpi")
 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
 RETURNING "id";
+
+-- Deux saisies simultanées liraient sinon le même MAX("numero").
+-- name: VerrouNumerotationVentes :exec
+SELECT pg_advisory_xact_lock(hashtext('ventes.numero'));
 
 -- name: ProchainNumeroVente :one
 SELECT COALESCE(MAX("numero"), 0)::integer + 1 AS "numero" FROM "ventes";
@@ -45,7 +56,7 @@ WHERE "id" = $1 AND "archiveeLe" IS NULL;
 UPDATE "ventes" SET "archiveeLe" = CURRENT_TIMESTAMP, "archiveeParId" = $2
 WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
--- name: RestaurerVente :exec
+-- name: RestaurerVente :execrows
 UPDATE "ventes" SET "archiveeLe" = NULL, "archiveeParId" = NULL
 WHERE "id" = $1;
 
@@ -64,10 +75,15 @@ FROM "ventes_versements" WHERE "venteId" = $1;
 SELECT COALESCE(SUM("montant"), 0)::bigint AS "total"
 FROM "ventes_versements" WHERE "venteId" = $1;
 
--- name: ModifierReliquatVente :exec
-UPDATE "ventes"
-SET "reliquat" = $2
-WHERE "id" = $1 AND "archiveeLe" IS NULL;
+-- name: VerrouillerVente :one
+SELECT "id" FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL FOR UPDATE;
+
+-- name: RecalculerReliquatVente :one
+UPDATE "ventes" v
+SET "reliquat" = v."prixTotal" - v."acompte"
+    - (SELECT COALESCE(SUM(vv."montant"), 0) FROM "ventes_versements" vv WHERE vv."venteId" = v."id")
+WHERE v."id" = $1 AND v."archiveeLe" IS NULL
+RETURNING v."reliquat";
 
 -- name: ClasseurVentes :one
 SELECT c."id", c."nomFichier", c."depuis", c."importeLe", u."fullName" AS "importePar"
@@ -78,7 +94,7 @@ INNER JOIN "users" u ON u."id" = c."importeParId";
 SELECT "nomFichier", "contenu" FROM "ventes_classeurs";
 
 -- name: ListerVentes :many
-SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL ORDER BY "dateSouscription", "numero";
+SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL ORDER BY "dateSouscription", "numero" LIMIT 5000;
 
 -- name: VenteParID :one
 SELECT * FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL;
@@ -110,6 +126,9 @@ SET "nom" = $2, "ordre" = $3, "totalLots" = $4, "superficieDefaut" = $5,
 WHERE "id" = $1
 RETURNING *;
 
+-- name: RenommerSiteDesVentes :exec
+UPDATE "ventes" SET "site" = @nouveau::text WHERE "site" = @ancien::text;
+
 -- name: ActiverSiteVente :one
 UPDATE "ventes_sites" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1
@@ -128,6 +147,9 @@ INSERT INTO "ventes_canaux" ("libelle", "ordre") VALUES ($1, $2) RETURNING *;
 UPDATE "ventes_canaux" SET "libelle" = $2, "ordre" = $3, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
 
+-- name: RenommerCanalDesVentes :exec
+UPDATE "ventes" SET "canal" = @nouveau::text WHERE "canal" = @ancien::text;
+
 -- name: ActiverCanalVente :one
 UPDATE "ventes_canaux" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
@@ -137,4 +159,5 @@ SELECT "client", "telephone", "nombreEcheances", "periodiciteMois", "jourVerseme
 FROM "ventes"
 WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuellement"
     AND "reliquat" > 0 AND "jourVersement" IS NOT NULL AND "premierVersement" IS NOT NULL
-ORDER BY "client";
+ORDER BY "client"
+LIMIT 5000;

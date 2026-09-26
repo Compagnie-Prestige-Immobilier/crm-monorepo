@@ -385,8 +385,8 @@ INSERT INTO "prospects" (
   $35, $36
 );
 
--- name: SoftDeleteProspect :exec
-UPDATE "prospects" SET "deletedAt" = now(), "rev" = "rev" + 1 WHERE "id" = $1;
+-- name: SoftDeleteProspect :execrows
+UPDATE "prospects" SET "deletedAt" = now(), "rev" = "rev" + 1 WHERE "id" = $1 AND "deletedAt" IS NULL;
 
 -- name: AnnulerRappelsEnAttente :exec
 UPDATE "scheduled_callbacks" SET "status" = 'CANCELLED'
@@ -396,7 +396,7 @@ WHERE "prospectId" = $1 AND "status" = 'PENDING';
 UPDATE "prospects" SET "revueAt" = now(), "revueById" = $2 WHERE "id" = $1 AND "revueAt" IS NULL;
 
 -- name: MarquerProspectConverti :exec
-UPDATE "prospects" SET "statut" = 'CONVERTI', "rev" = "rev" + 1 WHERE "id" = $1;
+UPDATE "prospects" SET "statut" = 'CONVERTI', "rev" = "rev" + 1 WHERE "id" = $1 AND "statut" <> 'VENDU';
 
 -- Une vente validée vaut conversion : toute fiche vivante devient vendue. Le
 -- `statut <> 'VENDU'` protège la transition, un double dépôt ne fait rien.
@@ -465,10 +465,10 @@ VALUES (sqlc.arg('id'), sqlc.arg('prospect_id'), 'GRAND_PUBLIC', sqlc.arg('conse
 ON CONFLICT ("prospectId", "projet") DO UPDATE
 SET "consent" = EXCLUDED."consent", "consentAt" = EXCLUDED."consentAt", "consentById" = EXCLUDED."consentById";
 
--- name: ConvertirJourney :exec
+-- name: ConvertirJourney :execrows
 UPDATE "prospect_journeys"
 SET "statut" = 'CONVERTI', "convertedAt" = $2, "convertedById" = $3
-WHERE "id" = $1;
+WHERE "id" = $1 AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
 -- name: UpsertConversion :exec
 INSERT INTO "prospect_conversions" ("id", "journeyId", "offerId", "paymentMode", "amountXof", "durationMonths", "confirmedById", "confirmedAt")
@@ -508,13 +508,18 @@ UPDATE "bank_cases" SET "prospectId" = $2 WHERE "prospectId" = $1;
 -- name: DeplacerTentatives :exec
 UPDATE "call_attempts" SET "prospectId" = $2 WHERE "prospectId" = $1;
 
+-- Un seul rappel en attente par fiche : celui de la cible reste, celui de la source est supplanté.
 -- name: DeplacerRappels :exec
-UPDATE "scheduled_callbacks" SET "prospectId" = $2 WHERE "prospectId" = $1;
+UPDATE "scheduled_callbacks" c SET "prospectId" = $2,
+  "status" = CASE WHEN c."status" = 'PENDING' AND EXISTS (
+    SELECT 1 FROM "scheduled_callbacks" t WHERE t."prospectId" = $2 AND t."status" = 'PENDING'
+  ) THEN 'SUPERSEDED' ELSE c."status" END
+WHERE c."prospectId" = $1;
 
 -- name: DeplacerDemandesClient :exec
 UPDATE "client_creation_requests" SET "createdProspectId" = $2 WHERE "createdProspectId" = $1;
 
--- name: FusionnerProspect :exec
+-- name: FusionnerProspect :execrows
 UPDATE "prospects" t SET
   "nom" = CASE WHEN sqlc.arg('prefer_source')::boolean THEN s."nom" ELSE t."nom" END,
   "prenom" = CASE WHEN sqlc.arg('prefer_source')::boolean THEN s."prenom" ELSE t."prenom" END,
@@ -523,9 +528,12 @@ UPDATE "prospects" t SET
   "syndicatId" = CASE WHEN sqlc.arg('prefer_source')::boolean THEN s."syndicatId" ELSE t."syndicatId" END,
   "statut" = CASE WHEN sqlc.arg('prefer_source')::boolean THEN s."statut" ELSE t."statut" END,
   "clientCreatedAt" = LEAST(s."clientCreatedAt", t."clientCreatedAt"),
+  "lastCallAt" = CASE WHEN s."lastCallAt" > COALESCE(t."lastCallAt", '-infinity') THEN s."lastCallAt" ELSE t."lastCallAt" END,
+  "lastCallById" = CASE WHEN s."lastCallAt" > COALESCE(t."lastCallAt", '-infinity') THEN s."lastCallById" ELSE t."lastCallById" END,
+  "lastReasonId" = CASE WHEN s."lastCallAt" > COALESCE(t."lastCallAt", '-infinity') THEN s."lastReasonId" ELSE t."lastReasonId" END,
   "rev" = t."rev" + 1
 FROM "prospects" s
-WHERE s."id" = sqlc.arg('source_id') AND t."id" = sqlc.arg('target_id');
+WHERE s."id" = sqlc.arg('source_id') AND t."id" = sqlc.arg('target_id') AND t."deletedAt" IS NULL;
 
 -- name: ProspectsAReaffecter :many
 SELECT "id" FROM "prospects"
@@ -592,7 +600,8 @@ JOIN "users" u ON u."id" = a."performedById"
 JOIN "call_outcome_reasons" cr ON cr."id" = a."reasonId"
 LEFT JOIN "ouvertures_fiche" ou ON ou."closingAttemptId" = a."id" AND ou."firstInputAt" IS NOT NULL
 WHERE a."prospectId" = $1
-ORDER BY a."clientCreatedAt" DESC, a."id" DESC;
+ORDER BY a."clientCreatedAt" DESC, a."id" DESC
+LIMIT 500;
 
 -- name: AppSettingParCle :one
 SELECT "key", "value", "updatedAt" FROM "app_settings" WHERE "key" = $1;
@@ -670,14 +679,14 @@ RETURNING "formulaireJeton";
 SELECT "id", "createdById", "statut", "phoneE164", "nom", "prenom", "whatsappStatus", "whatsappE164",
        "paymentMode", "dureeSystemeMois", "representantId", "clientCreatedAt", "banqueId", "syndicatId",
        "email", "profession", "professionId", "employeur", "etablissement", "incomeBandId", "type",
-       "champsLibres"
+       "champsLibres", "origin"
 FROM "prospects" WHERE "email" = $1 AND "deletedAt" IS NULL ORDER BY "id" LIMIT 1;
 
 -- name: ProspectParTelephone :one
 SELECT "id", "createdById", "statut", "phoneE164", "nom", "prenom", "whatsappStatus", "whatsappE164",
        "paymentMode", "dureeSystemeMois", "representantId", "clientCreatedAt", "banqueId", "syndicatId",
        "email", "profession", "professionId", "employeur", "etablissement", "incomeBandId", "type",
-       "champsLibres"
+       "champsLibres", "origin"
 FROM "prospects" WHERE "phoneE164" = $1 AND "deletedAt" IS NULL LIMIT 1;
 
 -- name: ProspectPourSegment :one
@@ -704,7 +713,8 @@ SELECT c.*, u."fullName" AS changed_by_name
 FROM "segment_changes" c
 JOIN "users" u ON u."id" = c."changedById"
 WHERE c."prospectId" = $1
-ORDER BY c."changedAt" DESC, c."id" DESC;
+ORDER BY c."changedAt" DESC, c."id" DESC
+LIMIT 500;
 
 -- name: BanqueSigleSegment :one
 SELECT "shortName" FROM "banques" WHERE "id" = $1;
@@ -729,14 +739,14 @@ UPDATE "prospect_journeys" SET
   "closedAt" = NULL, "closedReason" = NULL, "closedById" = NULL, "updatedAt" = now()
 WHERE "prospectId" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
--- name: RequalifierProspect :exec
+-- name: RequalifierProspect :execrows
 UPDATE "prospects" SET
   "statut" = @statut::"ProspectStatut",
   "phase2Status" = CASE WHEN @statut = 'NOUVEAU' THEN 'PENDING' ELSE "phase2Status" END,
   "enrollmentMethod" = CASE WHEN @statut = 'NOUVEAU' THEN NULL ELSE "enrollmentMethod" END,
   "remiseATraiterAt" = CASE WHEN @statut = 'NOUVEAU' THEN now() ELSE "remiseATraiterAt" END,
   "rev" = "rev" + 1, "updatedAt" = now()
-WHERE "id" = @prospect_id AND "projet" = @projet AND "statut" NOT IN ('CONVERTI', 'VENDU');
+WHERE "id" = @prospect_id AND "statut" NOT IN ('CONVERTI', 'VENDU');
 
 -- Sans méthode, une fiche ne peut plus rester « méthode obtenue » : elle redevient jointe.
 -- name: ModifierMethodeJourney :exec

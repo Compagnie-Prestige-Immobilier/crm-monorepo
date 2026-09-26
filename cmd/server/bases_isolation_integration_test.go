@@ -7,7 +7,9 @@ import (
 	"cpi-go/internal/shared/socle"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/google/uuid"
@@ -254,6 +256,52 @@ func TestBaseDemoSupprimeeLaisseLaBasePubliqueIntacte(t *testing.T) {
 	}
 	statut, body = appelJSON(b, http.MethodGet, "/api/v1/auth/me", nil, nil)
 	b.attend(statut, http.StatusOK, "la session publique survit à la suppression", body)
+}
+
+// Kairo, GLPI et les plateformes d'enrôlement lisent l'environnement du
+// processus sans regarder la base servie : un ADMIN semé sur une base de
+// démonstration ne doit jamais leur parler.
+func TestBaseDemoNAtteintAucunServiceExterne(t *testing.T) {
+	var appels int32
+	faux := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&appels, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	t.Cleanup(faux.Close)
+
+	t.Setenv("KAIRO_URL", faux.URL)
+	t.Setenv("KAIRO_ADMIN_TOKEN", "jeton-essai")
+	t.Setenv("GLPI_URL", faux.URL)
+	t.Setenv("GLPI_APP_TOKEN", "jeton-essai")
+	t.Setenv("GLPI_USER_TOKEN", "jeton-essai")
+	t.Setenv("PLATEFORME_CHUES_URL", faux.URL)
+	t.Setenv("PLATEFORME_CHUES_TOKEN", "jeton-essai")
+
+	b := nouveauBanc(t, "ADMIN")
+	connecte(b)
+	d := creerBaseDemo(b, "externes")
+	connexionDansBase(b, d)
+
+	appelsInterdits := []struct {
+		methode, chemin string
+		corps           any
+	}{
+		{http.MethodPost, "/api/v1/admin/kairo/pause", nil},
+		{http.MethodPost, "/api/v1/support/tickets", map[string]any{"sujet": "essai", "message": "essai"}},
+		{http.MethodPost, "/api/v1/enrolement/CHUES/tirage", nil},
+	}
+	for _, appel := range appelsInterdits {
+		statut, body := appelJSON(b, appel.methode, appel.chemin, appel.corps, nil)
+		if statut != http.StatusForbidden {
+			t.Fatalf("%s %s depuis une base de démonstration : 403 attendu, %d reçu %v", appel.methode, appel.chemin, statut, body)
+		}
+		if code, _ := body["code"].(string); code != "BASE_DEMO" {
+			t.Fatalf("%s %s : code BASE_DEMO attendu, reçu %v", appel.methode, appel.chemin, body)
+		}
+	}
+	if n := atomic.LoadInt32(&appels); n != 0 {
+		t.Fatalf("le faux service a reçu %d appel(s) depuis une base de démonstration", n)
+	}
 }
 
 func basePublique(t *testing.T, b *banc) string {

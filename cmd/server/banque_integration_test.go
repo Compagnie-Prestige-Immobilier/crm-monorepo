@@ -14,6 +14,7 @@ import (
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 )
@@ -338,6 +339,7 @@ func TestBanqueDemandeApprouveeCreeLeProspect(t *testing.T) {
 	s := nouveauBancBanque(t, "ADMIN")
 	s.connecte()
 	region, departement, representant, syndicat := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	phone := fmt.Sprintf("+22177%07d", time.Now().UnixNano()%10_000_000)
 	banqueExec(s.banc, `INSERT INTO "regions" ("id","code","name","updatedAt") VALUES ($1,$2,$2,now())`, region, region[:8])
 	banqueExec(s.banc, `INSERT INTO "departements" ("id","code","name","regionId","updatedAt") VALUES ($1,$2,$2,$3,now())`, departement, departement[:8], region)
 	banqueExec(s.banc, `INSERT INTO "representants" ("id","fullName","phoneE164","departementId","createdById","clientCreatedAt","updatedAt")
@@ -355,11 +357,11 @@ func TestBanqueDemandeApprouveeCreeLeProspect(t *testing.T) {
 	})
 
 	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/client-requests", map[string]any{
-		"nom": "Ndiaye", "prenom": "Awa", "phone": "77 123 45 67", "banqueId": s.banqueID,
+		"nom": "Ndiaye", "prenom": "Awa", "phone": phone, "banqueId": s.banqueID,
 	})
 	s.attend(statut, http.StatusCreated, "dépôt de la demande", body)
 	demande := body["id"].(string)
-	if body["phoneE164"] != "+221771234567" {
+	if body["phoneE164"] != phone {
 		t.Fatalf("le téléphone doit être normalisé avant tout contrôle : %v", body["phoneE164"])
 	}
 
@@ -716,5 +718,95 @@ func TestBanqueEncaissementSignaleLeTeleconseiller(t *testing.T) {
 	if n := banqueCompter(s, `SELECT count(*)::int FROM "notification_deliveries" d INNER JOIN "notifications" n ON n."id" = d."notificationId"
 		WHERE d."userId" = $1 AND n."title" LIKE 'Dossier bancaire encaissé%'`, s.userID); n != 1 {
 		t.Fatalf("le téléconseiller doit être notifié de l'encaissement, %d livraisons", n)
+	}
+
+	sansFiche := s.inscriptionDistante("GRAND_PUBLIC", "etape-2", `{"demande":{"soumise":true},"pieces":[{"statut":"accepte"}]}`)
+	banqueExec(s.banc, `UPDATE "inscriptions_plateforme" SET "phoneE164" = $2 WHERE "id" = $1`, sansFiche, "+2217"+sansFiche[:8])
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases",
+		map[string]any{"inscriptionId": sansFiche, "processingBankId": s.banqueID})
+	s.attend(statut, http.StatusCreated, "dossier Grand Public sans fiche au CRM", body)
+	idSansFiche, revSansFiche := texteDe(body["id"]), body["rev"].(float64)
+	statut, body = banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/"+idSansFiche+"?projet=GRAND_PUBLIC", nil)
+	s.attend(statut, http.StatusOK, "dossier sans fiche lu depuis Grand Public", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+idSansFiche+"/transitions",
+		map[string]any{"targetStageId": s.etude, "expectedRev": revSansFiche})
+	s.attend(statut, http.StatusCreated, "prise en traitement sans fiche", body)
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+idSansFiche+"/transitions",
+		map[string]any{"targetStageId": s.encaisse, "expectedRev": revSansFiche + 1, "amountXof": "250000"})
+	s.attend(statut, http.StatusCreated, "encaissement sans fiche", body)
+	if n := banqueCompter(s, `SELECT count(*)::int FROM "courriels" WHERE "type" = 'DOSSIER_ENCAISSE' AND "objetId" = $1
+		AND "sujet" LIKE '[CPI GRAND PUBLIC]%'`, idSansFiche); n != 1 {
+		t.Fatalf("un dossier sans fiche au CRM doit tracer son courriel Grand Public, %d trouvés", n)
+	}
+}
+
+// B09 : la liste « à ouvrir » et l'ouverture partagent désormais le même
+// prédicat (pièces acceptées, sans exiger de date de décision) ; une
+// inscription Grand Public proposée doit donc s'ouvrir sans détour.
+func TestBanqueInscriptionProposeeEstOuvrable(t *testing.T) {
+	s := nouveauBancBanque(t, "BANQUE_FINANCE")
+	s.connecte()
+	inscription := s.inscriptionDistante("GRAND_PUBLIC", "etape-2",
+		`{"demande":{"soumise":true},"pieces":[{"statut":"accepte"},{"statut":"accepte"}]}`)
+	banqueExec(s.banc, `UPDATE "inscriptions_plateforme" SET "phoneE164" = $2 WHERE "id" = $1`, inscription, "+2217"+inscription[:8])
+
+	statut, body := banqueJSON(s.banc, http.MethodGet, "/api/v1/bank-cases/a-ouvrir?projet=GRAND_PUBLIC", nil)
+	s.attend(statut, http.StatusOK, "inscriptions à ouvrir", body)
+	if !banqueContientID(body["items"], inscription) {
+		t.Fatalf("une inscription Grand Public aux pièces acceptées doit être proposée : %v", body["items"])
+	}
+
+	statut, body = banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases",
+		map[string]any{"inscriptionId": inscription, "processingBankId": s.banqueID})
+	s.attend(statut, http.StatusCreated, "ouverture d’une inscription proposée à l’ouverture", body)
+}
+
+// B10 : vider le miroir des inscriptions ne doit pas couper le lien d'un
+// dossier bancaire, et la suppression unitaire d'une inscription liée refuse
+// au lieu de laisser `bank_cases.inscriptionId` retomber à NULL.
+func TestEnrolementPurgeGardeLeDossier(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	id, _ := s.ouvrirDossier()
+
+	statut, body := banqueJSON(s.banc, http.MethodDelete, "/api/v1/enrolement/CHUES/inscriptions", nil)
+	s.attend(statut, http.StatusOK, "purge du miroir CHUES", body)
+
+	var inscriptionEncore string
+	if err := s.pool.QueryRow(s.ctx, `SELECT "inscriptionId" FROM "bank_cases" WHERE "id" = $1`, id).Scan(&inscriptionEncore); err != nil {
+		t.Fatal(err)
+	}
+	if inscriptionEncore != s.inscriptionID {
+		t.Fatalf("la purge a détaché le dossier de son inscription : %q reçu, %q attendu", inscriptionEncore, s.inscriptionID)
+	}
+
+	statut, body = banqueJSON(s.banc, http.MethodDelete, "/api/v1/enrolement/CHUES/inscriptions/"+s.inscriptionID, nil)
+	s.attend(statut, http.StatusConflict, "suppression unitaire d’une inscription liée à un dossier", body)
+	if body["code"] != "INSCRIPTION_LIEE_A_UN_DOSSIER" {
+		t.Fatalf("code : %v", body["code"])
+	}
+}
+
+// B91 : le schéma accepte un motif de trois espaces (minLength satisfait),
+// mais une fois nettoyé il ne reste rien à consigner : la correction doit le
+// refuser, pas l'écrire tel quel dans l'audit.
+func TestBanqueMotifVideRefuse(t *testing.T) {
+	s := nouveauBancBanque(t, "ADMIN")
+	s.connecte()
+	id, rev := s.ouvrirDossier()
+
+	statut, body := banqueJSON(s.banc, http.MethodPost, "/api/v1/bank-cases/"+id+"/corrections",
+		map[string]any{"targetStageId": s.etude, "expectedRev": rev, "reason": "   "})
+	s.attend(statut, http.StatusUnprocessableEntity, "correction au motif rempli d’espaces", body)
+	if body["code"] != "BANK_REASON_REQUIRED" {
+		t.Fatalf("code : %v", body["code"])
+	}
+
+	var transitions int
+	if err := s.pool.QueryRow(s.ctx, `SELECT count(*)::int FROM "bank_case_transitions" WHERE "caseId" = $1`, id).Scan(&transitions); err != nil {
+		t.Fatal(err)
+	}
+	if transitions != 1 {
+		t.Fatalf("un motif refusé ne doit rien écrire au-delà de la transition d’ouverture : %d transitions", transitions)
 	}
 }

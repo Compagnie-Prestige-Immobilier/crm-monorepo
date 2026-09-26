@@ -20,7 +20,6 @@ export const callbackKeys = {
   root: ['callbacks'] as const,
   list: (scope: CallbackScope, assignedToId: string | null) =>
     ['callbacks', scope, assignedToId] as const,
-  teleconseillers: ['callbacks', 'teleconseillers'] as const,
 };
 
 export type Callback = components['schemas']['QualificationRappelDTO'];

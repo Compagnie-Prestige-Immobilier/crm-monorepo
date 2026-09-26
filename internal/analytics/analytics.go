@@ -503,8 +503,8 @@ type ligneDeFinance struct {
 // un WHERE sur bc la rendrait interne et supprimerait le sommet de l'entonnoir.
 const sqlEtapesEntonnoir = `
 	SELECT
-	  COUNT(*)::int                                                     AS prospects,
-	  COUNT(*) FILTER (WHERE p."phase2Status" = 'METHOD_OBTAINED')::int AS methodes,
+	  COUNT(DISTINCT p."id")::int                                       AS prospects,
+	  COUNT(DISTINCT p."id") FILTER (WHERE p."phase2Status" = 'METHOD_OBTAINED')::int AS methodes,
 	  COUNT(DISTINCT bc."prospectId")::int                              AS dossiers,
 	  COUNT(DISTINCT bc."prospectId") FILTER (WHERE st."type" = 'CASHED')::int AS encaisses` +
 	deProspectsEtReferentiels + `

@@ -319,9 +319,16 @@ func (s *service) reordonnerListeVisite(ctx context.Context, in *Reordonnancemen
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.Pool.Exec(ctx, `UPDATE "`+table+`" AS t SET "sortOrder" = rang."ordre" * 10
-		FROM (SELECT "id", "ordre"::int FROM unnest($1::text[]) WITH ORDINALITY AS u("id","ordre")) AS rang
-		WHERE t."id" = rang."id"`, in.Body.Ids); err != nil {
+	auteur := socle.UtilisateurCourant(ctx).ID
+	if err := pgx.BeginFunc(ctx, s.Pool, func(tx pgx.Tx) error {
+		if _, err := tx.Exec(ctx, `UPDATE "`+table+`" AS t SET "sortOrder" = rang."ordre" * 10
+			FROM (SELECT "id", "ordre"::int FROM unnest($1::text[]) WITH ORDINALITY AS u("id","ordre")) AS rang
+			WHERE t."id" = rang."id"`, in.Body.Ids); err != nil {
+			return err
+		}
+		return database.Auditer(ctx, s.Q.WithTx(tx), auteur, "referentiel.reorder", familleListeVisite+in.Kind, in.Kind,
+			nil, map[string]any{"ids": in.Body.Ids})
+	}); err != nil {
 		return nil, err
 	}
 	return s.listeVisiteOrdonnee(ctx, table, false)

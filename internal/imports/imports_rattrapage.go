@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/database"
+	"cpi-go/internal/shared/socle"
 	"log/slog"
 	"net/http"
 	"os"
@@ -68,7 +69,7 @@ func (s *service) rattraperFeuilles(ctx context.Context, _ *struct{}) (*Rattrapa
 }
 
 func classeurDepuisSharePoint(ctx context.Context) string {
-	lien := strings.TrimSpace(os.Getenv("IMPORT_LEADS_URL"))
+	lien := strings.TrimSpace(socle.Env("IMPORT_LEADS_URL", ""))
 	if lien == "" {
 		return ""
 	}

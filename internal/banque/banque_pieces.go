@@ -1,6 +1,7 @@
 package banque
 
 import (
+	"bytes"
 	"context"
 	"cpi-go/internal/shared/socle"
 	"errors"
@@ -8,9 +9,12 @@ import (
 	"io"
 	"log/slog"
 	"mime"
+	"net"
 	"net/http"
+	neturl "net/url"
 	"path"
 	"strings"
+	"syscall"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -24,7 +28,27 @@ const (
 	piecesMessageIndispo = "Les pièces de ce dossier ne sont pas disponibles sur la plateforme."
 )
 
-var clientPieces = &http.Client{Timeout: piecesDelaiLecture}
+var clientPieces = &http.Client{Timeout: piecesDelaiLecture, Transport: transportPieces()}
+
+// L'URL d'une pièce vient de la plateforme : elle ne doit pas atteindre le réseau interne.
+func transportPieces() *http.Transport {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	transport.DialContext = (&net.Dialer{Timeout: piecesDelaiLecture, Control: adressePublique}).DialContext
+	return transport
+}
+
+func adressePublique(_, adresse string, _ syscall.RawConn) error {
+	hote, _, err := net.SplitHostPort(adresse)
+	if err != nil {
+		return err
+	}
+	ip := net.ParseIP(hote)
+	if ip == nil || !ip.IsGlobalUnicast() || ip.IsPrivate() {
+		return fmt.Errorf("pièce plateforme : adresse %s refusée", hote)
+	}
+	return nil
+}
 
 type PieceDeposee struct {
 	Code   string `json:"code"`
@@ -50,7 +74,8 @@ type PiecesOutput struct {
 }
 
 func piecesIndisponibles(raison string) error {
-	return huma.Error404NotFound(piecesMessageIndispo, errors.New(raison))
+	slog.Warn("pièces de plateforme indisponibles", "raison", raison)
+	return huma.Error404NotFound(piecesMessageIndispo)
 }
 
 // Où lire les pièces d'une inscription. L'inscription, et non le dossier
@@ -137,15 +162,23 @@ func (s *service) archiveDesPieces(ctx context.Context, in *piecesInput) (*huma.
 	return reponseFichier(corps, nom, piecesTypeMimeZip, true), nil
 }
 
-func toutesLesPieces(ctx context.Context, source *sourceDesPieces) ([]byte, error) {
+func toutesLesPieces(ctx context.Context, source *sourceDesPieces) (io.ReadCloser, error) {
 	if !source.grandPublic() {
-		return archiveChues(ctx, source.base, source.jeton, source.charge)
+		paquet, err := archiveChues(ctx, source.base, source.jeton, source.charge)
+		if err != nil {
+			return nil, err
+		}
+		return io.NopCloser(bytes.NewReader(paquet)), nil
 	}
 	docs, err := docsGrandPublic(ctx, source.base, source.jeton, source.distant)
 	if err != nil {
 		return nil, err
 	}
-	return empaqueter(ctx, docs)
+	paquet, err := empaqueter(ctx, docs)
+	if err != nil {
+		return nil, err
+	}
+	return io.NopCloser(bytes.NewReader(paquet)), nil
 }
 
 func monterPieces(api huma.API, s *service) {
@@ -163,24 +196,32 @@ func monterPieces(api huma.API, s *service) {
 	}, s.archiveDesPieces)
 }
 
-func reponseFichier(corps []byte, nom, typeMime string, telecharger bool) *huma.StreamResponse {
+func reponseFichier(corps io.ReadCloser, nom, typeMime string, telecharger bool) *huma.StreamResponse {
 	disposition := "inline"
 	if telecharger || typeMime == piecesTypeMimeDefaut {
 		disposition = "attachment"
 	}
 	return &huma.StreamResponse{Body: func(ctx huma.Context) {
+		defer func() { _ = corps.Close() }()
 		ctx.SetHeader("Content-Type", typeMime)
 		ctx.SetHeader("Content-Disposition", disposition+`; filename="`+strings.ReplaceAll(nom, `"`, "")+`"`)
 		ctx.SetHeader("Cache-Control", "no-store")
-		if _, err := ctx.BodyWriter().Write(corps); err != nil {
+		ecrits, err := io.Copy(ctx.BodyWriter(), io.LimitReader(corps, piecesTailleMax))
+		if err != nil {
 			slog.Error("écriture d’une pièce", "fichier", nom, "err", err)
+		} else if ecrits == piecesTailleMax {
+			slog.Error("pièce tronquée à la taille maximale", "fichier", nom)
 		}
 	}}
 }
 
 // Une URL signée n'accepte pas l'en-tête d'autorisation : un jeton vide la laisse passer.
-func lirePlateformeBrut(ctx context.Context, url, jeton string) (corps []byte, typeMime string, err error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, http.NoBody)
+func ouvrirPlateforme(ctx context.Context, brute, jeton string) (corps io.ReadCloser, typeMime string, err error) {
+	url, err := neturl.Parse(brute)
+	if err != nil || url.Scheme != "https" {
+		return nil, "", errors.New("pièce plateforme : URL refusée")
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url.String(), http.NoBody)
 	if err != nil {
 		return nil, "", err
 	}
@@ -191,12 +232,30 @@ func lirePlateformeBrut(ctx context.Context, url, jeton string) (corps []byte, t
 	if err != nil {
 		return nil, "", err
 	}
-	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusOK {
-		return nil, "", fmt.Errorf("plateforme %d sur %s", resp.StatusCode, url)
+		_ = resp.Body.Close()
+		return nil, "", fmt.Errorf("plateforme %d sur %s", resp.StatusCode, url.Host+url.Path)
 	}
-	lu, err := io.ReadAll(io.LimitReader(resp.Body, piecesTailleMax))
-	return lu, resp.Header.Get("Content-Type"), err
+	if resp.ContentLength > piecesTailleMax {
+		_ = resp.Body.Close()
+		return nil, "", errPieceTropLourde
+	}
+	return resp.Body, resp.Header.Get("Content-Type"), nil
+}
+
+var errPieceTropLourde = fmt.Errorf("pièce plateforme : plus de %d Mo", piecesTailleMax>>20)
+
+func lirePlateformeBrut(ctx context.Context, url, jeton string) (lu []byte, typeMime string, err error) {
+	corps, typeMime, err := ouvrirPlateforme(ctx, url, jeton)
+	if err != nil {
+		return nil, "", err
+	}
+	defer func() { _ = corps.Close() }()
+	lu, err = io.ReadAll(io.LimitReader(corps, piecesTailleMax+1))
+	if err == nil && len(lu) > piecesTailleMax {
+		return nil, "", errPieceTropLourde
+	}
+	return lu, typeMime, err
 }
 
 // La plateforme est une source distante : réémettre son `Content-Type` tel quel

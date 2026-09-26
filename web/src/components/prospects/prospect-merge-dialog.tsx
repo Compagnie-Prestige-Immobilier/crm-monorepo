@@ -25,6 +25,7 @@ import { toastApiError } from '@/lib/mutation-feedback';
 import { queryKeys } from '@/lib/query-keys';
 import { PROSPECT_STATUT_LABELS, type Paginated, type ProspectRow } from '@/lib/types';
 import { useDebouncedSearch } from '@/lib/use-debounced-search';
+import { useRecalage } from '@/lib/use-recalage';
 import { cn } from '@/lib/utils';
 
 function pairForMerge<T extends ProspectRow | null>(
@@ -62,13 +63,14 @@ export function ProspectMergeDialog({
     reset: resetSearch,
   } = useDebouncedSearch(search, setSearch);
 
-  useEffect(() => {
+  useRecalage([prospect], () => {
     if (prospect === null) return;
-    resetSearch('');
-    // oxlint-disable-next-line react/set-state-in-effect -- saisie recalée sur le prospect
     setSearch('');
     setDuplicate(null);
     setKeepOriginal(true);
+  });
+  useEffect(() => {
+    if (prospect !== null) resetSearch('');
   }, [prospect, resetSearch]);
 
   const candidateFilters = { ...EMPTY_FILTERS, search, pageSize: 10 };

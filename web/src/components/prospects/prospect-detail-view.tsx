@@ -121,7 +121,9 @@ export function ProspectDetailView({ prospectId, role }: { prospectId: string; r
         }
         actions={
           <>
-            {peutTenirUneFiche(user) ? (
+            {peutTenirUneFiche(user) &&
+            prospect.statut !== 'CONVERTI' &&
+            prospect.statut !== 'VENDU' ? (
               <Link
                 href={`/teleconseil/console?fiche=${encodeURIComponent(prospect.id)}`}
                 className={buttonVariants({ variant: 'default' })}

@@ -14,6 +14,7 @@ type registre struct {
 	mu       sync.RWMutex
 	gardes   map[string]http.Handler
 	pools    map[string]*pgxpool.Pool
+	flux     map[string]*socle.Live
 	annuaire *socle.Annuaire
 }
 
@@ -21,14 +22,16 @@ func nouveauRegistre(annuaire *socle.Annuaire) *registre {
 	return &registre{
 		gardes:   map[string]http.Handler{},
 		pools:    map[string]*pgxpool.Pool{},
+		flux:     map[string]*socle.Live{},
 		annuaire: annuaire,
 	}
 }
 
 func (r *registre) monter(nom string, i *instance, pool *pgxpool.Pool) {
 	r.mu.Lock()
-	r.gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q, i.deps.Attributions)
+	r.gardes[nom] = socle.GarderAcces(i.mux, i.deps.Q, i.deps.Attributions, nom)
 	r.pools[nom] = pool
+	r.flux[nom] = i.deps.Live
 	r.mu.Unlock()
 	r.annuaire.Ajouter(nom)
 }
@@ -40,9 +43,24 @@ func (r *registre) demonter(nom string) *pgxpool.Pool {
 	delete(r.gardes, nom)
 	pool := r.pools[nom]
 	delete(r.pools, nom)
+	live := r.flux[nom]
+	delete(r.flux, nom)
 	r.mu.Unlock()
 	r.annuaire.Retirer(nom)
+	if live != nil {
+		live.Fermer()
+	}
 	return pool
+}
+
+// `Shutdown` attend chaque flux ouvert : celui d'une base de démonstration
+// aussi, sinon l'arrêt atteint son délai et sort en erreur.
+func (r *registre) fermerFlux() {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	for _, live := range r.flux {
+		live.Fermer()
+	}
 }
 
 func (r *registre) garde(nom string) (http.Handler, bool) {
