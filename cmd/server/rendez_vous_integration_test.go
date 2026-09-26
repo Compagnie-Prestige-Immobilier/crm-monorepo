@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"net/url"
 	"slices"
 	"sync"
 	"testing"
@@ -249,5 +250,36 @@ func TestRendezVousSiteDernierePlaceDisputee(t *testing.T) {
 	slices.Sort(statuts)
 	if statuts[0] != http.StatusOK || statuts[1] != http.StatusConflict {
 		t.Fatalf("statuts %v, attendu un 200 et un 409", statuts)
+	}
+}
+
+// « Khady Kane » et « Kane Khady » trouvent la même fiche, dans les prospects comme dans les rendez-vous.
+func TestRechercheNomPrenomDansLesDeuxOrdres(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	direction := qualificationConnecte(t, "DIRECTION")
+	fiche := qualificationProspect(b)
+	qualificationExec(b, `UPDATE "prospects" SET "nom" = 'Kane', "prenom" = 'Khady' WHERE "id" = $1`, fiche)
+	t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "scheduled_callbacks" WHERE "prospectId" = $1`, fiche)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, fiche)
+	})
+	quand := time.Now().Add(24 * time.Hour).UTC().Format(time.RFC3339)
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts",
+		qualificationCorpsTentative(fiche, map[string]any{"reasonCode": "RV_CPI", "callbackAt": quand}))
+	b.attend(statut, http.StatusOK, "rendez-vous consigné", body)
+
+	for _, liste := range []string{"/api/v1/prospects?pageSize=100&search=", "/api/v1/rendez-vous?pageSize=200&search="} {
+		for _, terme := range []string{"Khady Kane", "kane khady"} {
+			statut, body := qualificationEnvoi(direction, http.MethodGet, liste+url.QueryEscape(terme), nil)
+			direction.attend(statut, http.StatusOK, liste+terme, body)
+			items, _ := body["items"].([]any)
+			trouvee := slices.ContainsFunc(items, func(item any) bool {
+				ligne, _ := item.(map[string]any)
+				return ligne["id"] == fiche || ligne["prospectId"] == fiche
+			})
+			if !trouvee {
+				t.Fatalf("%s%q doit trouver la fiche : %d résultat(s)", liste, terme, len(items))
+			}
+		}
 	}
 }

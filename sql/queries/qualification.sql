@@ -253,7 +253,8 @@ WHERE "id" = @id;
 -- name: ListerRappels :many
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        p."phoneE164", p."prenom", p."nom", p."projet",
-       cr."label" AS "reasonLabel",
+       cr."label" AS "reasonLabel", cr."code" AS "reasonCode",
+       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous",
        u."fullName" AS "assignedToName"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
@@ -292,7 +293,8 @@ WHERE c."status" = 'PENDING'
 -- name: RappelParId :one
 SELECT c."id", c."prospectId", c."scheduledAt", c."comment", c."assignedToId",
        c."status", p."phoneE164", p."prenom", p."nom", p."projet",
-       u."fullName" AS "assignedToName",
+       u."fullName" AS "assignedToName", r."label" AS "reasonLabel", r."code" AS "reasonCode",
+       (p."phase2Status" = 'APPOINTMENT')::bool AS "rendezVous",
        (p."phase2Status" = 'APPOINTMENT' AND r."code" IS DISTINCT FROM 'RDV_TELEPHONIQUE')::bool AS "rendezVousNonReportable"
 FROM "scheduled_callbacks" c
 JOIN "prospects" p ON p."id" = c."prospectId"
@@ -303,6 +305,12 @@ WHERE c."id" = $1;
 -- name: AnnulerRappel :exec
 UPDATE "scheduled_callbacks" SET "status" = 'CANCELLED'
 WHERE "id" = $1 AND "status" = 'PENDING';
+
+-- Une fiche supprimée ne retrouve pas de rappel ; l'index d'unicité refuse un second rappel en attente.
+-- name: RetablirRappel :execrows
+UPDATE "scheduled_callbacks" c SET "status" = 'PENDING'
+WHERE c."id" = $1 AND c."status" = 'CANCELLED'
+  AND EXISTS (SELECT 1 FROM "prospects" p WHERE p."id" = c."prospectId" AND p."deletedAt" IS NULL);
 
 -- name: ReporterRappel :exec
 UPDATE "scheduled_callbacks" SET "scheduledAt" = @scheduled_at
@@ -332,9 +340,10 @@ INSERT INTO "ouvertures_fiche"
   ("id", "openedById", "representantId", "prospectId", "openedAt", "draft")
 VALUES (@id, @opened_by_id, @representant_id, @prospect_id, @opened_at, @draft);
 
+-- Une ouverture restée ouverte compte : une fiche quittée par le menu n'est pas fermée.
 -- name: BrouillonPrecedent :one
 SELECT "draft" FROM "ouvertures_fiche"
-WHERE "openedById" = @opened_by_id AND "closedAt" IS NOT NULL
+WHERE "openedById" = @opened_by_id AND "draft" IS NOT NULL
   AND "representantId" IS NOT DISTINCT FROM CAST(sqlc.narg('representant_id') AS text)
   AND "prospectId" IS NOT DISTINCT FROM CAST(sqlc.narg('prospect_id') AS text)
 ORDER BY "openedAt" DESC, "id" DESC LIMIT 1;
@@ -490,7 +499,10 @@ SELECT p."id", p."nom", p."prenom", p."phoneE164", p."email", p."projet"::text A
        p."enrollmentMethod"::text AS "methode", p."enrollmentCapturedAt",
        (SELECT a."rendezVousAt" FROM "call_attempts" a
          WHERE a."prospectId" = p."id" AND a."rendezVousAt" IS NOT NULL
-         ORDER BY a."createdAt" DESC LIMIT 1) AS "rendezVousAt"
+         ORDER BY a."createdAt" DESC LIMIT 1) AS "rendezVousAt",
+       COALESCE((SELECT c."texte" FROM "courriels" c
+         WHERE c."objetType" = 'prospect' AND c."objetId" = p."id" AND c."type" = 'PROSPECT_ENROLEMENT'
+         ORDER BY c."createdAt" DESC LIMIT 1), '')::text AS "dernierCourriel"
 FROM "prospects" p
 LEFT JOIN "banques" b ON b."id" = p."banqueId"
 LEFT JOIN "users" su ON su."id" = COALESCE(p."lastCallById", p."createdById")

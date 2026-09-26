@@ -9,6 +9,7 @@ import (
 	"cpi-go/internal/shared/database"
 	"cpi-go/internal/shared/socle"
 	"encoding/json"
+	"fmt"
 	"math/rand/v2"
 	"net/http"
 	"net/http/cookiejar"
@@ -826,4 +827,130 @@ func TestCourrielRenvoiPendantLeRejeuNeDoublePas(t *testing.T) {
 	if n := len(faux.pour(sujet)); n != 0 {
 		t.Fatalf("aucun envoi tant que le rejeu tient la ligne, %d reçu(s)", n)
 	}
+}
+
+func (b *banc) reglerCourrielEnrolement(destinataires ...string) {
+	b.t.Helper()
+	var avant *string
+	_ = b.pool.QueryRow(b.ctx, `SELECT "value" FROM "app_settings" WHERE "key" = 'courriels.destinataires'`).Scan(&avant)
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "app_settings" WHERE "key" = 'courriels.destinataires'`)
+		if avant != nil {
+			_, _ = b.pool.Exec(b.ctx, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('courriels.destinataires',$1,now())`, *avant)
+		}
+	})
+	valeur, err := json.Marshal(map[string]any{"enrolement": map[string]any{"destinataires": destinataires}})
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	adminExec(b, `INSERT INTO "app_settings" ("key","value","updatedAt") VALUES ('courriels.destinataires',$1,now())
+		ON CONFLICT ("key") DO UPDATE SET "value" = EXCLUDED."value"`, string(valeur))
+}
+
+func (b *banc) consignerMethode(prospect, methode string) {
+	b.t.Helper()
+	revenu := uuid.NewString()
+	adminExec(b, `INSERT INTO "income_bands" ("id","code","label","updatedAt") VALUES ($1,$2,$2,now())`, revenu, "REVENU_"+revenu[:8])
+	b.t.Cleanup(func() {
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "call_attempts" WHERE "prospectId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "courriels" WHERE "objetId" = $1`, prospect)
+		_, _ = b.pool.Exec(b.ctx, `DELETE FROM "income_bands" WHERE "id" = $1`, revenu)
+	})
+	statut, body := qualificationEnvoi(b, http.MethodPost, "/api/v1/phase2/call-attempts", qualificationCorpsTentative(prospect, map[string]any{
+		"reasonCode": "INTERESSE", "method": methode, "incomeBandId": revenu, "dureeEtablissementMois": 12,
+	}))
+	b.attend(statut, http.StatusOK, "méthode "+methode+" consignée", body)
+}
+
+type courrielEnrolementLu struct {
+	id, statut string
+	avecPDF    bool
+	texte      string
+}
+
+func (b *banc) courrielsEnrolement(prospect string) []courrielEnrolementLu {
+	b.t.Helper()
+	lignes, err := b.pool.Query(b.ctx, `SELECT "id", "statut", "nomPieceJointe" IS NOT NULL OR "pieceJointe" IS NOT NULL, "texte"
+		FROM "courriels" WHERE "type" = 'PROSPECT_ENROLEMENT' AND "objetType" = 'prospect' AND "objetId" = $1
+		ORDER BY "createdAt"`, prospect)
+	if err != nil {
+		b.t.Fatal(err)
+	}
+	defer lignes.Close()
+	var lus []courrielEnrolementLu
+	for lignes.Next() {
+		var lu courrielEnrolementLu
+		if err := lignes.Scan(&lu.id, &lu.statut, &lu.avecPDF, &lu.texte); err != nil {
+			b.t.Fatal(err)
+		}
+		lus = append(lus, lu)
+	}
+	return lus
+}
+
+// Sans destinataire, le courriel d'enrôlement est coupé : aucune ligne, donc ni échec ni incident.
+func TestCourrielEnrolementCoupeSansDestinataire(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	b.reglerCourrielEnrolement()
+	fiche := qualificationProspect(b)
+	b.consignerMethode(fiche, "WHATSAPP")
+	if lus := b.courrielsEnrolement(fiche); len(lus) != 0 {
+		t.Fatalf("aucune ligne attendue sans destinataire : %+v", lus)
+	}
+}
+
+// Un courriel par fiche, sans PDF ; un second seulement quand la méthode change.
+func TestCourrielEnrolementUnParFicheSaufMethodeChangee(t *testing.T) {
+	b := qualificationConnecte(t, "COMMERCIAL")
+	b.reglerCourrielEnrolement("enrolement@test.cpi")
+	fiche := qualificationProspect(b)
+	b.consignerMethode(fiche, "WHATSAPP")
+	b.consignerMethode(fiche, "WHATSAPP")
+	lus := b.courrielsEnrolement(fiche)
+	if len(lus) != 1 {
+		t.Fatalf("la même méthode reconsignée ne renvoie rien : %d courriel(s)", len(lus))
+	}
+	if lus[0].avecPDF || strings.Contains(lus[0].texte, "PDF") {
+		t.Fatalf("le courriel d'enrôlement part sans pièce jointe : %q", lus[0].texte)
+	}
+	b.consignerMethode(fiche, "MAIL")
+	b.consignerMethode(fiche, "MAIL")
+	if n := len(b.courrielsEnrolement(fiche)); n != 2 {
+		t.Fatalf("une nouvelle méthode renvoie un courriel, une seule fois : %d courriel(s)", n)
+	}
+}
+
+// Etc/GMT inverse le signe : Etc/GMT-3 est UTC+3.
+func zoneOuIlEstTroisHeures() string {
+	decalage := (3 - time.Now().UTC().Hour() + 24) % 24
+	if decalage > 14 {
+		decalage -= 24
+	}
+	if decalage == 0 {
+		return "Etc/GMT"
+	}
+	return fmt.Sprintf("Etc/GMT%+d", -decalage)
+}
+
+// La nuit, le courriel attend la première heure ouvrable sans passer pour un échec.
+func TestCourrielReporteLaNuitResteEnAttente(t *testing.T) {
+	t.Setenv("BUSINESS_TIME_ZONE", zoneOuIlEstTroisHeures())
+	b := qualificationConnecte(t, "COMMERCIAL")
+	b.reglerCourrielEnrolement("enrolement@test.cpi")
+	fiche := qualificationProspect(b)
+	b.consignerMethode(fiche, "WHATSAPP")
+	lus := b.courrielsEnrolement(fiche)
+	if len(lus) != 1 || lus[0].statut != "EN_ATTENTE" {
+		t.Fatalf("un courriel reporté est en attente, pas en échec : %+v", lus)
+	}
+	aRejouer, err := db.New(b.pool).CourrielsARejouer(b.ctx, db.CourrielsARejouerParams{TentativesMax: 3, Prendre: 1000})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for i := range aRejouer {
+		if aRejouer[i].ID == lus[0].id {
+			return
+		}
+	}
+	t.Fatal("le rejeu de la première heure ouvrable reprend le courriel en attente")
 }

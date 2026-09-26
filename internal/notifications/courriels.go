@@ -32,6 +32,8 @@ const (
 	CourrielOuvert = "OUVERT"
 	CourrielEchec  = "ECHEC"
 
+	CourrielEnAttente = "EN_ATTENTE"
+
 	cleReglagesCourriels = "courriels.destinataires"
 	sujetCourriels       = "courriels"
 	courrielsPageMax     = 100
@@ -146,7 +148,7 @@ type CourrielDTO struct {
 	ObjetType      string     `json:"objetType"`
 	ObjetID        string     `json:"objetId"`
 	NomPieceJointe *string    `json:"nomPieceJointe"`
-	Statut         string     `json:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC"`
+	Statut         string     `json:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC,EN_ATTENTE"`
 	Erreur         *string    `json:"erreur"`
 	EnvoyeLe       *time.Time `json:"envoyeLe"`
 	RemisLe        *time.Time `json:"remisLe"`
@@ -195,12 +197,15 @@ func courrielHorsHeures(zone *time.Location) *string {
 	return &detail
 }
 
-// Nil si un courriel peut partir maintenant, sinon la raison de le retenir.
-func CourrielSuspendu(cfg *socle.Config) *string {
+// Raison nil si un courriel peut partir maintenant ; sinon le statut à écrire et la raison.
+func CourrielSuspendu(cfg *socle.Config) (statut string, raison *string) {
 	if raison := courrielRetenu(cfg.Base); raison != nil {
-		return raison
+		return CourrielEchec, raison
 	}
-	return courrielHorsHeures(cfg.TimeZone)
+	if raison := courrielHorsHeures(cfg.TimeZone); raison != nil {
+		return CourrielEnAttente, raison
+	}
+	return "", nil
 }
 
 // L'envoi est tracé même sans destinataire ni transport : le journal doit
@@ -220,7 +225,7 @@ func EnvoyerCourriel(ctx context.Context, d *socle.Deps, c *Courriel) error {
 		}
 		nomPDF = &c.NomPieceJointe
 	}
-	statut, erreur := CourrielEchec, CourrielSuspendu(d.Cfg)
+	statut, erreur := CourrielSuspendu(d.Cfg)
 	var messageID *string
 	var envoyeLe *time.Time
 	if erreur == nil {
@@ -391,7 +396,7 @@ func (s *service) courrielsParObjet(ctx context.Context, in *CourrielsObjetInput
 
 type CourrielsJournalInput struct {
 	Type     string `query:"type" enum:"DOSSIER_COMPLET,DOSSIER_ENCAISSE,DOSSIER_REJETE,PROSPECT_ENROLEMENT,IMPORT_LEADS"`
-	Statut   string `query:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC"`
+	Statut   string `query:"statut" enum:"ENVOYE,REMIS,OUVERT,ECHEC,EN_ATTENTE"`
 	Page     int    `query:"page" minimum:"1" default:"1"`
 	PageSize int    `query:"pageSize" minimum:"1" maximum:"100" default:"25"`
 }
