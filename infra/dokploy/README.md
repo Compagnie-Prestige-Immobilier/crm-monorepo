@@ -144,6 +144,7 @@ Choisir l'une des deux protections, avant la mise en production :
     https://go.cpi-chues.com/api/v1/referentiels/banques
   curl -m 10 -s -o /dev/null -w '%{http_code}\n' https://go.cpi-chues.com/api/v1/referentiels/banques
   ```
+
 - **Authenticated Origin Pulls** : Cloudflare → **SSL/TLS → Origin Server**,
   activer _Authenticated Origin Pulls_ et faire vérifier par Traefik le
   certificat client `cloudflare.crt` que Cloudflare présente à chaque requête.
