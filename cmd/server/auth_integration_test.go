@@ -39,7 +39,7 @@ type banc struct {
 // les tests tournent sans NODE_ENV et n'exportent que TEST_DATABASE_URL.
 func TestMain(m *testing.M) {
 	if os.Getenv("SEED_FIXTURE_PASSWORD") == "" {
-		_ = os.Setenv("SEED_FIXTURE_PASSWORD", "fixtures-de-test-2026")
+		_ = os.Setenv("SEED_FIXTURE_PASSWORD", uuid.NewString())
 	}
 	os.Exit(m.Run())
 }

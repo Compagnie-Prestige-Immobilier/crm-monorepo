@@ -7,6 +7,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'assistant_lecture') THEN
     CREATE ROLE assistant_lecture NOLOGIN;
   END IF;
+EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 -- +goose StatementEnd
 
@@ -33,6 +34,17 @@ GRANT SELECT ("id", "email", "username", "fullName", "phoneE164", "role", "isAct
 -- Sous `SET ROLE`, set_config('role', ...) rendrait le superutilisateur et
 -- lèverait le délai de la requête : le superutilisateur, lui, n'est pas concerné.
 REVOKE EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) FROM PUBLIC;
+-- pg_dump appelle set_config dès la connexion.
+GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO CURRENT_USER;
+-- Un rôle applicatif sans ADMIN sur assistant_lecture l'a reçu du superutilisateur (infra/dokploy/README.md).
+-- +goose StatementBegin
+DO $$
+BEGIN
+  IF NOT pg_has_role(CURRENT_USER, 'assistant_lecture', 'MEMBER') THEN
+    GRANT assistant_lecture TO CURRENT_USER;
+  END IF;
+END $$;
+-- +goose StatementEnd
 
 -- +goose Down
 GRANT EXECUTE ON FUNCTION pg_catalog.set_config(text, text, boolean) TO PUBLIC;
