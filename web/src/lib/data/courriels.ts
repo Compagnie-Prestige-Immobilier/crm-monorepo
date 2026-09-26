@@ -32,6 +32,7 @@ export const COURRIEL_STATUT_LABELS: Record<Courriel['statut'], string> = {
   REMIS: 'Remis',
   OUVERT: 'Ouvert',
   ECHEC: 'Échec',
+  EN_ATTENTE: 'En attente',
 };
 
 export async function fetchCourriels(

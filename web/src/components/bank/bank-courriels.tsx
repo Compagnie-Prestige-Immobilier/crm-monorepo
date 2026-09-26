@@ -23,12 +23,13 @@ import type { Courriel } from '@/lib/types';
 
 const VARIANTE_STATUT: Record<
   Courriel['statut'],
-  'secondary' | 'success' | 'info' | 'destructive'
+  'secondary' | 'success' | 'info' | 'destructive' | 'outline'
 > = {
   ENVOYE: 'secondary',
   REMIS: 'success',
   OUVERT: 'info',
   ECHEC: 'destructive',
+  EN_ATTENTE: 'outline',
 };
 
 export function StatutCourriel({ courriel }: { courriel: Courriel }) {
