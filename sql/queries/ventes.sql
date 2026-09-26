@@ -1,15 +1,25 @@
 -- name: SupprimerClasseursVentes :exec
 DELETE FROM "ventes_classeurs";
 
--- name: SupprimerVentesImportees :exec
-DELETE FROM "ventes" WHERE "origine" = 'IMPORT';
+-- name: SupprimerVersementsVentesImportees :many
+DELETE FROM "ventes_versements" vv USING "ventes" v
+WHERE vv."venteId" = v."id" AND v."origine" = 'IMPORT'
+RETURNING vv."venteId", vv."rang", vv."date", vv."montant";
 
--- Les versements de l'onglet « Échéances » sont aussi dans ventes_versements : seul le journal distingue une saisie.
--- name: VentesImporteesNonRemplacables :one
-SELECT count(*)::int AS "nombre" FROM "ventes" v WHERE v."origine" = 'IMPORT'
-    AND (v."archiveeLe" IS NOT NULL OR EXISTS (
-        SELECT 1 FROM "audit_logs" a
-        WHERE a."entity" = 'vente' AND a."entityId" = v."id"::text AND a."action" = 'vente.versement_ajouter'));
+-- name: SupprimerVentesImportees :many
+DELETE FROM "ventes" WHERE "origine" = 'IMPORT' RETURNING *;
+
+-- Rien ne marque un versement saisi au panneau : seule sa trace au journal désigne la vente qui en a reçu.
+-- name: VentesAuxVersementsAbsentsDuClasseur :many
+SELECT DISTINCT v."numero" FROM "ventes" v
+INNER JOIN "ventes_versements" vv ON vv."venteId" = v."id"
+WHERE v."origine" = 'IMPORT'
+    AND EXISTS (SELECT 1 FROM "audit_logs" a
+        WHERE a."entity" = 'vente' AND a."entityId" = v."id"::text AND a."action" = 'vente.versement_ajouter')
+    AND NOT EXISTS (SELECT 1 FROM generate_subscripts(@numeros::int[], 1) AS i
+        WHERE (@numeros::int[])[i] = v."numero" AND (@dates::date[])[i] = vv."date" AND (@montants::bigint[])[i] = vv."montant")
+ORDER BY v."numero"
+LIMIT 20;
 
 -- name: InsererClasseurVentes :exec
 INSERT INTO "ventes_classeurs" ("id", "nomFichier", "contenu", "depuis", "importeParId")
@@ -56,7 +66,7 @@ WHERE "id" = $1 AND "archiveeLe" IS NULL;
 UPDATE "ventes" SET "archiveeLe" = CURRENT_TIMESTAMP, "archiveeParId" = $2
 WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
--- name: RestaurerVente :execrows
+-- name: RestaurerVente :exec
 UPDATE "ventes" SET "archiveeLe" = NULL, "archiveeParId" = NULL
 WHERE "id" = $1;
 
@@ -75,8 +85,8 @@ FROM "ventes_versements" WHERE "venteId" = $1;
 SELECT COALESCE(SUM("montant"), 0)::bigint AS "total"
 FROM "ventes_versements" WHERE "venteId" = $1;
 
--- name: VerrouillerVente :one
-SELECT "id" FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL FOR UPDATE;
+-- name: VenteVerrouillee :one
+SELECT * FROM "ventes" WHERE "id" = $1 FOR UPDATE;
 
 -- name: RecalculerReliquatVente :one
 UPDATE "ventes" v
@@ -94,13 +104,15 @@ INNER JOIN "users" u ON u."id" = c."importeParId";
 SELECT "nomFichier", "contenu" FROM "ventes_classeurs";
 
 -- name: ListerVentes :many
-SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL ORDER BY "dateSouscription", "numero" LIMIT 5000;
+SELECT * FROM "ventes" WHERE "archiveeLe" IS NULL
+ORDER BY "dateSouscription" DESC NULLS LAST, "numero" DESC, "id" DESC
+LIMIT @limite;
 
 -- name: VenteParID :one
 SELECT * FROM "ventes" WHERE "id" = $1 AND "archiveeLe" IS NULL;
 
 -- name: ListerVersementsVentes :many
-SELECT * FROM "ventes_versements" ORDER BY "venteId", "rang";
+SELECT * FROM "ventes_versements" WHERE "venteId" = ANY(@ventes::bigint[]) ORDER BY "venteId", "rang";
 
 -- name: ListerSitesVentes :many
 SELECT * FROM "ventes_sites" ORDER BY "ordre", "nom";

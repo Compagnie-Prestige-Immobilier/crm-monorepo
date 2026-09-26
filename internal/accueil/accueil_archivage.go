@@ -12,9 +12,8 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// Une visite saisie par erreur restait au registre pour toujours. L'archivage
-// est immédiat et réversible en base ; la destruction est définitive, donc
-// réservée à la direction et refusée tant que l'archive n'a pas vieilli.
+// L'archivage est immédiat et réversible ; la destruction, définitive, est réservée à la direction
+// et refusée tant que l'archive n'a pas vieilli.
 const (
 	delaiDestructionVisite = 30
 	cheminVisite           = "/api/v1/visites/{id}"

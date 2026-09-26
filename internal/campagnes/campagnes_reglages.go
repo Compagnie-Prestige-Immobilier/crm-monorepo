@@ -120,22 +120,22 @@ func lotFiltresVerrouilles(ctx context.Context, q *db.Queries, id string) (*lotF
 	return lotLireFiltres(brut), nil
 }
 
-func (s *service) lotRecomposerEquipe(ctx context.Context, q *db.Queries, id, entrant, sortant string) error {
+func (s *service) lotRecomposerEquipe(ctx context.Context, q *db.Queries, id, entrant, sortant string) (*lotFiltres, error) {
 	filtres, err := lotFiltresVerrouilles(ctx, q, id)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	equipe := slices.DeleteFunc(filtres.Distribution.TeleconseillerIds, func(membre string) bool { return membre == sortant })
 	if entrant != "" && !slices.Contains(equipe, entrant) {
 		equipe = append(equipe, entrant)
 	}
 	if len(equipe) == 0 {
-		return socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
+		return nil, socle.Problem(http.StatusUnprocessableEntity, "LOT_EXPORT_EQUIPE_VIDE",
 			"Une campagne garde au moins un téléconseiller.")
 	}
 	filtres.Distribution.TeleconseillerIds = equipe
 	maps.DeleteFunc(filtres.Distribution.Objectifs, func(membre string, _ int) bool { return !slices.Contains(equipe, membre) })
-	return s.lotEcrireFiltres(ctx, q, id, filtres)
+	return filtres, s.lotEcrireFiltres(ctx, q, id, filtres)
 }
 
 func (*service) lotEcrireFiltres(ctx context.Context, q *db.Queries, id string, filtres *lotFiltres) error {

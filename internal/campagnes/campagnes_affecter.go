@@ -148,7 +148,7 @@ func (s *service) campagneTitulaireVise(ctx context.Context, in *CampagneAffecte
 }
 
 func (s *service) campagneMembreLeMoinsCharge(ctx context.Context, row *db.LotParIdRow) (string, error) {
-	equipe, err := s.lotEquipeRestante(ctx, lotLireFiltres(row.Filters).Distribution.TeleconseillerIds)
+	equipe, err := lotEquipeRestante(ctx, s.Q, lotLireFiltres(row.Filters).Distribution.TeleconseillerIds)
 	if err != nil {
 		return "", err
 	}
@@ -213,15 +213,15 @@ func (s *service) campagneSuivreLaFiche(ctx context.Context, fiche db.LotsActifs
 		if err != nil {
 			return suivies, err
 		}
-		mouvements, err := s.lotMouvementsVers(ctx, row, []int{int(item.Position)}, vers, true)
-		if err != nil {
-			return suivies, err
-		}
-		if len(mouvements) == 0 {
+		err = s.lotAppliquerMouvements(ctx, row, vers, "", "lot_export.reaffectation", map[string]any{lotCleVers: vers, "fiche": "affectation"},
+			func(q *db.Queries, _ *lotFiltres) ([]lotMouvement, error) {
+				return lotMouvementsExiges(lotMouvementsVers(ctx, q, row, []int{int(item.Position)}, vers, true))
+			})
+		var probleme *socle.ProblemError
+		if errors.As(err, &probleme) && probleme.Code == codeReaffectationVide {
 			continue
 		}
-		if err := s.lotAppliquerMouvements(ctx, row, mouvements, vers, "", "lot_export.reaffectation",
-			map[string]any{lotCleVers: vers, "fiche": "affectation"}); err != nil {
+		if err != nil {
 			return suivies, err
 		}
 		suivies++

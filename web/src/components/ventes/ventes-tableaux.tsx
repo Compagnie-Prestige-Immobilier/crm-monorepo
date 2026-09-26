@@ -130,6 +130,9 @@ function CelluleReste({ vente }: { vente: Vente }) {
   );
 }
 
+/** Une vente importée ne se modifie que dans le classeur, redéposé ensuite. */
+export const venteDuClasseur = (vente: Vente): boolean => vente.origine === 'IMPORT';
+
 function ActionsVente({
   vente,
   onDetail,
@@ -142,6 +145,7 @@ function ActionsVente({
   onArchive?: ((vente: Vente) => void) | undefined;
 }) {
   if (onDetail === undefined && onEdit === undefined && onArchive === undefined) return null;
+  const modifiable = !venteDuClasseur(vente);
   return (
     <div className="flex justify-end gap-1">
       {onDetail === undefined ? null : (
@@ -154,7 +158,7 @@ function ActionsVente({
           <EyeIcon aria-hidden="true" />
         </Button>
       )}
-      {onEdit === undefined ? null : (
+      {onEdit === undefined || !modifiable ? null : (
         <Button
           variant="ghost"
           size="icon"
@@ -164,7 +168,7 @@ function ActionsVente({
           <PencilIcon aria-hidden="true" />
         </Button>
       )}
-      {onArchive === undefined ? null : (
+      {onArchive === undefined || !modifiable ? null : (
         <Button
           variant="ghost"
           size="icon"
@@ -245,6 +249,7 @@ export function TableVentes({
                   {modeLabel(vente)}
                 </Badge>
                 <Badge variant={paiementVariant(vente)}>{paiementLabel(vente)}</Badge>
+                {venteDuClasseur(vente) ? <Badge variant="outline">Classeur</Badge> : null}
               </span>
             </TableCell>
             <TableCell className={MONTANT}>{formatFcfa(vente.partProprietaire)}</TableCell>
