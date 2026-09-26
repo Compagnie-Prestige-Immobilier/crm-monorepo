@@ -172,6 +172,17 @@ test.describe('parcours 9, le tableau de pilotage', () => {
     await constructeur.getByRole('button', { name: 'Un autre indicateur' }).click();
     await expect(constructeur.getByLabel('Votre demande')).toBeFocused();
 
+    await constructeur.getByLabel('Votre demande').fill('ventes par site');
+    await constructeur.getByLabel('Votre demande').press('Enter');
+    await constructeur.getByRole('button', { name: 'Oui, c’est ça' }).click();
+    const formes = constructeur.getByRole('group', { name: 'Formes possibles' });
+    await expect(formes.getByRole('button').first()).toBeVisible();
+    await expect(constructeur.getByText('Rien sur la période')).toHaveCount(0);
+    await formes.getByRole('button').first().click();
+    await expect(constructeur.getByText('C’est celui-ci ?')).toBeVisible();
+    await expect(constructeur.getByText('Rien sur la période')).toHaveCount(0);
+    await page.keyboard.press('Escape');
+
     await page.reload();
     const retirer = page.getByRole('button', { name: `Retirer ${titre}` });
     await expect(retirer).toBeVisible();

@@ -11,8 +11,8 @@ import {
   entree,
   Forme,
   type ArgsApercu,
-  type ChargementDonnees,
 } from '@/components/accueil/tableau-de-bord/etapes-constructeur';
+import type { ChargementDonnees } from '@/components/accueil/tableau-de-bord/apercu-donnees';
 import {
   Ajoute,
   ICI,
