@@ -250,6 +250,7 @@ func TestSeedFactoryTableauxDeBord(t *testing.T) {
 			}
 		}
 		seedVerifierInscriptionsAOuvrir(b, passage)
+		seedVerifierVentes(b, passage)
 	}
 }
 
@@ -264,6 +265,20 @@ func seedVerifierInscriptionsAOuvrir(b *banc, passage int) {
 		if !ok || len(items) == 0 {
 			b.t.Fatalf("passage %d, %s : aucune inscription à ouvrir", passage, projet)
 		}
+	}
+}
+
+// Sans ventes, le pilotage de démonstration n'affiche que des zéros.
+func seedVerifierVentes(b *banc, passage int) {
+	b.t.Helper()
+	var ventes, credit, enRetard int
+	if err := b.pool.QueryRow(b.ctx, `SELECT count(*), count(*) FILTER (WHERE "modePaiement"='CREDIT'),
+		count(*) FILTER (WHERE "modePaiement"='CREDIT' AND "reliquat" = "prixTotal"-"acompte")
+		FROM "ventes" WHERE "classeurId"='0199f100-0000-7021-8000-000000000001'`).Scan(&ventes, &credit, &enRetard); err != nil {
+		b.t.Fatal(err)
+	}
+	if ventes != 120 || credit == 0 || enRetard == 0 {
+		b.t.Fatalf("passage %d : %d ventes, %d à crédit, %d sans versement", passage, ventes, credit, enRetard)
 	}
 }
 
