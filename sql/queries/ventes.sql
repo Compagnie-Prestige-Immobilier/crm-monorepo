@@ -167,8 +167,10 @@ UPDATE "ventes_canaux" SET "actif" = $2, "modifieLe" = CURRENT_TIMESTAMP
 WHERE "id" = $1 RETURNING *;
 
 -- name: EcheancesVentesACredit :many
-SELECT "id", "client", "telephone", "nombreEcheances", "periodiciteMois", "jourVersement", "premierVersement"
-FROM "ventes"
+SELECT v."id", v."numero", v."client", v."telephone", v."site", v."prixTotal", v."acompte",
+    v."nombreEcheances", v."periodiciteMois", v."jourVersement", v."premierVersement",
+    (SELECT COALESCE(SUM(vv."montant"), 0) FROM "ventes_versements" vv WHERE vv."venteId" = v."id")::bigint AS "verse"
+FROM "ventes" v
 WHERE "modePaiement" = 'CREDIT' AND "archiveeLe" IS NULL AND NOT "soldeeManuellement"
     AND "reliquat" > 0 AND "jourVersement" IS NOT NULL AND "premierVersement" IS NOT NULL
     AND "id" > @apres::bigint

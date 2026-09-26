@@ -4,6 +4,7 @@ import (
 	"context"
 	"cpi-go/db"
 	"cpi-go/internal/shared/socle"
+	"cpi-go/internal/ventes"
 	"errors"
 	"log/slog"
 	"slices"
@@ -104,28 +105,13 @@ func (s *service) clientsEcheantLe(ctx context.Context, jour time.Time) ([]strin
 	}
 }
 
-// La première échéance tombe à la date choisie, les suivantes au jour de
-// versement, tous les `periodiciteMois` mois.
 func echeanceLe(vente *db.EcheancesVentesACreditRow, jour time.Time) bool {
-	premier := vente.PremierVersement.Time
 	nombre := int32(1)
 	if vente.NombreEcheances != nil {
 		nombre = *vente.NombreEcheances
 	}
-	for rang := range nombre {
-		echeance := premier
-		if rang > 0 {
-			mois := int(premier.Month()) + int(rang)*int(vente.PeriodiciteMois)
-			echeance = time.Date(premier.Year(), time.Month(mois), int(*vente.JourVersement), 0, 0, 0, 0, time.UTC)
-		}
-		if echeance.Equal(jour) {
-			return true
-		}
-		if echeance.After(jour) {
-			return false
-		}
-	}
-	return false
+	dates := ventes.DatesEcheances(vente.PremierVersement.Time, vente.PeriodiciteMois, *vente.JourVersement, nombre)
+	return slices.ContainsFunc(dates, jour.Equal)
 }
 
 // Rappels promis et encore dus d'ici la fin de la journée, RETARDS COMPRIS :
