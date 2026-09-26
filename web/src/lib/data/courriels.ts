@@ -22,16 +22,28 @@ export const COURRIEL_TYPE_LABELS: Record<string, string> = {
   DOSSIER_COMPLET: 'Dossier complet sur la plateforme',
   DOSSIER_ENCAISSE: 'Dossier bancaire encaissé',
   DOSSIER_REJETE: 'Dossier bancaire rejeté',
-  PROSPECT_ENROLEMENT: 'Enrôlement',
+  PROSPECT_ENROLEMENT: 'Rendez-vous d’enrôlement',
   IMPORT_LEADS: 'Relevé des leads',
   FORMULAIRE_PUBLIC: 'Formulaire public',
+  INCIDENT: 'Alerte d’incidents',
+  NOTIFICATION: 'Notification',
 };
+
+/** Les types que le filtre du journal accepte côté serveur. */
+export const TYPES_COURRIEL_FILTRABLES: TypeCourriel[] = [
+  'PROSPECT_ENROLEMENT',
+  'DOSSIER_ENCAISSE',
+  'DOSSIER_REJETE',
+  'DOSSIER_COMPLET',
+  'IMPORT_LEADS',
+];
 
 export const COURRIEL_STATUT_LABELS: Record<Courriel['statut'], string> = {
   ENVOYE: 'Envoyé',
   REMIS: 'Remis',
   OUVERT: 'Ouvert',
   ECHEC: 'Échec',
+  EN_ATTENTE: 'En attente',
 };
 
 export async function fetchCourriels(
